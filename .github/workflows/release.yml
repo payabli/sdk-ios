@@ -107,10 +107,14 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ inputs.version }}
-          name: PayabliTTP SDK v${{ inputs.version }}
-          body: ${{ steps.notes.outputs.NOTES }}
-          draft: false
-          prerelease: ${{ contains(inputs.version, '-') }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PRERELEASE=""
+          if echo "${{ inputs.version }}" | grep -q '-'; then
+            PRERELEASE="--prerelease"
+          fi
+          gh release create "${{ inputs.version }}" \
+            --title "PayabliTTP SDK v${{ inputs.version }}" \
+            --notes "${{ steps.notes.outputs.NOTES }}" \
+            $PRERELEASE
