@@ -1,0 +1,14 @@
+{
+  "pins" : [
+    {
+      "identity" : "ttppackage",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/Fiserv/TTPPackage.git",
+      "state" : {
+        "revision" : "047dd9119cea21723c75ff089127657ad867fdde",
+        "version" : "1.0.7"
+      }
+    }
+  ],
+  "version" : 2
+}
