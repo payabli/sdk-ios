@@ -1,0 +1,112 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release (e.g. 0.2.0)"
+        required: true
+        type: string
+      release_notes:
+        description: "Release notes (markdown)"
+        required: false
+        default: ""
+
+jobs:
+  release:
+    name: Test, Tag & Release
+    runs-on: macos-15
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate version format
+        run: |
+          if ! echo "${{ inputs.version }}" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "❌ Invalid version format '${{ inputs.version }}'. Use MAJOR.MINOR.PATCH (e.g. 0.2.0)"
+            exit 1
+          fi
+
+      - name: Check tag does not already exist
+        run: |
+          if git tag | grep -qx "${{ inputs.version }}"; then
+            echo "❌ Tag ${{ inputs.version }} already exists"
+            exit 1
+          fi
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_16.2.app
+
+      - name: Show versions
+        run: |
+          swift --version
+          xcodebuild -version
+
+      - name: Resolve dependencies
+        run: |
+          xcodebuild -resolvePackageDependencies \
+            -scheme PayabliTTP \
+            -clonedSourcePackagesDirPath .build/checkouts
+
+      - name: Build
+        run: |
+          xcodebuild build \
+            -scheme PayabliTTP \
+            -destination 'generic/platform=iOS' \
+            -clonedSourcePackagesDirPath .build/checkouts \
+            CODE_SIGNING_ALLOWED=NO \
+            | xcpretty && exit ${PIPESTATUS[0]}
+
+      - name: Test
+        run: |
+          xcodebuild test \
+            -scheme PayabliTTP \
+            -destination 'platform=iOS Simulator,OS=latest,name=iPhone 16' \
+            -clonedSourcePackagesDirPath .build/checkouts \
+            CODE_SIGNING_ALLOWED=NO \
+            | xcpretty && exit ${PIPESTATUS[0]}
+
+      - name: Create and push tag
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "${{ inputs.version }}" \
+            -m "PayabliTTP SDK v${{ inputs.version }}"
+          git push origin "${{ inputs.version }}"
+
+      - name: Build release notes
+        id: notes
+        run: |
+          CUSTOM="${{ inputs.release_notes }}"
+          PREV_TAG=$(git tag --sort=-version:refname | grep -v "${{ inputs.version }}" | head -n 1)
+
+          if [ -n "$PREV_TAG" ]; then
+            COMMITS=$(git log "${PREV_TAG}".."${{ inputs.version }}" --pretty=format:"- %s" | head -20)
+          else
+            COMMITS=$(git log --pretty=format:"- %s" | head -20)
+          fi
+
+          {
+            echo "NOTES<<EOF"
+            if [ -n "$CUSTOM" ]; then
+              echo "$CUSTOM"
+              echo ""
+            fi
+            echo "## Changes since ${PREV_TAG:-initial release}"
+            echo "$COMMITS"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.version }}
+          name: PayabliTTP SDK v${{ inputs.version }}
+          body: ${{ steps.notes.outputs.NOTES }}
+          draft: false
+          prerelease: ${{ contains(inputs.version, '-') }}
