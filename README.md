@@ -20,7 +20,7 @@ let result = try await ttp.charge(amount: 25.00, type: .sale)
 | Device | iPhone with NFC (iPhone XS or later) |
 | Entitlement | `com.apple.developer.proximity-reader.payment.acceptance` |
 
-> **Device registration required.** The `deviceId` must be pre-registered in the [Payabli dashboard](https://dashboard.payabli.com) before initializing the SDK.
+> **Device registration required.** The `deviceId` must be pre-registered in the [Payabli dashboard](https://app.payabli.com) before initializing the SDK.
 
 ---
 
