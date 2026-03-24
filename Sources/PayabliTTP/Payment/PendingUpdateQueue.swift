@@ -3,17 +3,27 @@ import Foundation
 /// Persists failed PATCH /update calls so they can be retried on next session.
 /// This is the critical safety net: if the NFC tap succeeded but the backend
 /// update failed (network issue, timeout), the transaction data is not lost.
+/// Also queues failed error-update calls (when NFC itself fails and the PATCH
+/// notifying the backend also fails) so the backend always learns the outcome.
 ///
 /// Storage: UserDefaults (lightweight, sufficient for a small queue).
-/// Each entry holds the paymentTransId + raw Fiserv response dict.
+/// Each entry holds the paymentTransId + raw Fiserv response dict (success)
+/// or an error description (failure).
 public struct PendingUpdate: Sendable {
     public let paymentTransId: String
     public let fiservResponse: Data
     public let createdAt: Date
+    /// `true` when the original NFC charge failed and we are queuing the error
+    /// notification to the backend; `false` for a successful charge whose
+    /// PATCH /update did not reach the backend.
+    public let isErrorUpdate: Bool
+    /// Human-readable reason stored for error updates (nil for success updates).
+    public let errorDescription: String?
 
     /// Deserialize the Fiserv response back to dictionary for retry.
     var responseDict: [String: Any]? {
-        try? JSONSerialization.jsonObject(with: fiservResponse) as? [String: Any]
+        guard !isErrorUpdate else { return nil }
+        return try? JSONSerialization.jsonObject(with: fiservResponse) as? [String: Any]
     }
 }
 
@@ -29,6 +39,7 @@ final class PendingUpdateQueue {
         self.defaults = defaults
     }
 
+    /// Enqueue a failed success-update (NFC succeeded, PATCH /update failed).
     func enqueue(paymentTransId: String, responseDict: [String: Any]) {
         var entries = loadEntries()
 
@@ -37,7 +48,25 @@ final class PendingUpdateQueue {
         let entry = StoredEntry(
             paymentTransId: paymentTransId,
             fiservResponse: data,
-            createdAt: Date()
+            createdAt: Date(),
+            isErrorUpdate: false,
+            errorDescription: nil
+        )
+        entries.append(entry)
+        evict(&entries)
+        saveEntries(entries)
+    }
+
+    /// Enqueue a failed error-update (NFC failed AND the PATCH notifying the backend also failed).
+    func enqueueError(paymentTransId: String, errorDescription: String) {
+        var entries = loadEntries()
+
+        let entry = StoredEntry(
+            paymentTransId: paymentTransId,
+            fiservResponse: Data(),
+            createdAt: Date(),
+            isErrorUpdate: true,
+            errorDescription: errorDescription
         )
         entries.append(entry)
         evict(&entries)
@@ -53,7 +82,9 @@ final class PendingUpdateQueue {
             PendingUpdate(
                 paymentTransId: $0.paymentTransId,
                 fiservResponse: $0.fiservResponse,
-                createdAt: $0.createdAt
+                createdAt: $0.createdAt,
+                isErrorUpdate: $0.isErrorUpdate,
+                errorDescription: $0.errorDescription
             )
         }
     }
@@ -74,6 +105,8 @@ final class PendingUpdateQueue {
         let paymentTransId: String
         let fiservResponse: Data
         let createdAt: Date
+        let isErrorUpdate: Bool
+        let errorDescription: String?
     }
 
     private func loadEntries() -> [StoredEntry] {

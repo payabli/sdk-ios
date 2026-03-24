@@ -13,6 +13,10 @@ final class FiservCardReader: CardReading {
     // MARK: - CardReading
 
     func configure(with config: ConfigResponse) throws {
+        // Reset before reconfiguring so stale `true` from a previous session
+        // doesn't persist while the new reader is being set up.
+        isSessionActive = false
+
         let env = Self.mapEnvironment(config.fiserv.environment)
 
         let fiservConfig = FiservTTPConfig(
@@ -30,6 +34,9 @@ final class FiservCardReader: CardReading {
 
         let newReader = FiservTTPCardReader(configuration: fiservConfig)
 
+        // Publisher is the ground truth for session expiry (fires false when session ends).
+        // Manual isSessionActive = true in initializeSession() is kept as a reliable
+        // fallback for cases where the publisher may not fire synchronously after setup.
         sessionReadyCancellable = newReader.sessionReadySubject
             .receive(on: DispatchQueue.main)
             .sink { [weak self] ready in
@@ -93,6 +100,7 @@ final class FiservCardReader: CardReading {
         case "PROD", "PRODUCTION":
             return .Production
         default:
+            Log.cardReader.error("Unknown Fiserv environment '\(value)' — defaulting to QA. Check backend config.")
             return .QA
         }
     }

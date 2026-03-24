@@ -49,31 +49,37 @@ final class SessionManager {
     /// Phase B: Fetch Fiserv config from backend
     /// Phase C: Initialize card reader for NFC
     func initialize() async throws {
-        // Phase A: Attestation
-        try transition(to: .attestingDevice)
-        events.emit(.attestationStarted)
+        do {
+            // Phase A: Attestation
+            try transition(to: .attestingDevice)
+            events.emit(.attestationStarted)
 
-        try await performAttestationIfNeeded()
+            try await performAttestationIfNeeded()
 
-        events.emit(.attestationCompleted)
+            events.emit(.attestationCompleted)
 
-        // Phase B: Fetch config
-        try transition(to: .fetchingConfig)
+            // Phase B: Fetch config
+            try transition(to: .fetchingConfig)
 
-        let config = try await fetchConfig()
-        currentConfig = config
-        transactionService.configure(requestToken: config.requestToken)
+            let config = try await fetchConfig()
+            currentConfig = config
+            transactionService.configure(requestToken: config.requestToken)
 
-        events.emit(.configFetched)
+            events.emit(.configFetched)
 
-        // Phase C: Card reader
-        try transition(to: .initializingReader)
-        events.emit(.readerInitializing)
+            // Phase C: Card reader
+            try transition(to: .initializingReader)
+            events.emit(.readerInitializing)
 
-        try await setupCardReader(with: config)
+            try await setupCardReader(with: config)
 
-        try transition(to: .ready)
-        events.emit(.sessionReady)
+            try transition(to: .ready)
+            events.emit(.sessionReady)
+        } catch {
+            // Ensure internal state is .error so recovery via reinitializeIfNeeded() works.
+            state = .error(error.localizedDescription)
+            throw error
+        }
     }
 
     // MARK: - Reinitialize (session recovery)
@@ -88,31 +94,42 @@ final class SessionManager {
             try await initialize()
             return
         case .error:
-            state = .idle
+            // Reset to idle via the state machine before re-running full init.
+            try transition(to: .idle)
             try await initialize()
             return
-        case .ready, .sessionExpired:
+        case .ready:
+            guard !cardReader.isSessionActive else { return }
+            try transition(to: .sessionExpired)
+            events.emit(.sessionExpired)
+        case .sessionExpired:
+            // Already marked expired — proceed directly to reinit.
             break
         default:
-            return
+            // Initialization is in progress on another call; the caller should
+            // await the current initialize() or retry after it completes.
+            throw PayabliTTPError.invalidState(
+                "SDK initialization is in progress. Await initialize() before calling reinitializeIfNeeded()."
+            )
         }
 
-        guard !cardReader.isSessionActive else { return }
+        // At this point state is .sessionExpired.
+        do {
+            try transition(to: .reinitializing)
+            events.emit(.reinitializationStarted)
 
-        try transition(to: .sessionExpired)
-        events.emit(.sessionExpired)
+            let config = try await fetchConfig()
+            currentConfig = config
+            transactionService.configure(requestToken: config.requestToken)
 
-        try transition(to: .reinitializing)
-        events.emit(.reinitializationStarted)
+            try await setupCardReader(with: config)
 
-        let config = try await fetchConfig()
-        currentConfig = config
-        transactionService.configure(requestToken: config.requestToken)
-
-        try await setupCardReader(with: config)
-
-        try transition(to: .ready)
-        events.emit(.reinitializationCompleted)
+            try transition(to: .ready)
+            events.emit(.reinitializationCompleted)
+        } catch {
+            state = .error(error.localizedDescription)
+            throw error
+        }
     }
 
     var isReady: Bool {
