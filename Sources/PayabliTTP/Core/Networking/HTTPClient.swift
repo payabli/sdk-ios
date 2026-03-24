@@ -56,6 +56,23 @@ final class HTTPClient: Networking {
         }
     }
 
+    /// Execute request and unwrap the standard Payabli envelope `{ responseData: T }`.
+    /// Throws `backendError` if `isSuccess` is false.
+    func executePayabli<T: Decodable>(_ request: URLRequest) async throws -> T {
+        let (data, _) = try await performRequest(request)
+        do {
+            let envelope = try decoder.decode(PayabliResponse<T>.self, from: data)
+            guard envelope.isSuccess else {
+                throw PayabliTTPError.backendError(statusCode: 0, message: envelope.responseText)
+            }
+            return envelope.responseData
+        } catch let error as PayabliTTPError {
+            throw error
+        } catch {
+            throw PayabliTTPError.decodingError(error.localizedDescription)
+        }
+    }
+
     /// Execute request where we only care about success/failure.
     func executeVoid(_ request: URLRequest) async throws {
         _ = try await performRequest(request)
@@ -102,4 +119,15 @@ final class HTTPClient: Networking {
         }
         return String(data: data, encoding: .utf8) ?? "Unknown error"
     }
+}
+
+// MARK: - Payabli standard response envelope
+
+/// Standard Payabli API response wrapper.
+/// All endpoints return this shape; `responseData` contains the endpoint-specific payload.
+struct PayabliResponse<T: Decodable>: Decodable {
+    let responseCode: Int
+    let isSuccess: Bool
+    let responseText: String
+    let responseData: T
 }

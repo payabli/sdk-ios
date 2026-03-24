@@ -23,6 +23,7 @@ final class MockNetworking: Networking {
             apiKey: "test-api-key",
             entry: "test-entry",
             deviceId: "test-device-id",
+            appId: "TEAM123.com.test.app",
             environment: .qa,
             logLevel: .none
         )
@@ -45,6 +46,10 @@ final class MockNetworking: Networking {
             throw PayabliTTPError.decodingError("No mock response queued for type \(T.self)")
         }
         return value
+    }
+
+    func executePayabli<T: Decodable>(_ request: URLRequest) async throws -> T {
+        try await execute(request)
     }
 
     func executeVoid(_ request: URLRequest) async throws {

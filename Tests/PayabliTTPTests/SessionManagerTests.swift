@@ -25,6 +25,7 @@ final class SessionManagerTests: XCTestCase {
             transactionService: transactionService,
             cardReader: cardReader,
             deviceId: "test-device-id",
+            appId: "TEAM123.com.test.app",
             events: events
         )
     }
@@ -72,6 +73,7 @@ final class SessionManagerTests: XCTestCase {
             transactionService: transactionService,
             cardReader: cardReader,
             deviceId: "test-device-id",
+            appId: "TEAM123.com.test.app",
             events: events
         )
 
@@ -99,6 +101,7 @@ final class SessionManagerTests: XCTestCase {
             transactionService: transactionService,
             cardReader: cardReader,
             deviceId: "test-device-id",
+            appId: "TEAM123.com.test.app",
             events: events
         )
 
@@ -136,6 +139,7 @@ final class SessionManagerTests: XCTestCase {
             transactionService: transactionService,
             cardReader: cardReader,
             deviceId: "test-device-id",
+            appId: "TEAM123.com.test.app",
             events: events
         )
 
@@ -163,6 +167,7 @@ final class SessionManagerTests: XCTestCase {
             transactionService: transactionService,
             cardReader: cardReader,
             deviceId: "test-device-id",
+            appId: "TEAM123.com.test.app",
             events: events
         )
 
@@ -188,6 +193,7 @@ final class SessionManagerTests: XCTestCase {
             transactionService: transactionService,
             cardReader: cardReader,
             deviceId: "test-device-id",
+            appId: "TEAM123.com.test.app",
             events: events
         )
 

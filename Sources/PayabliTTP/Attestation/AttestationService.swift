@@ -2,7 +2,7 @@ import Foundation
 
 /// Handles all device attestation API calls:
 /// challenge, attest, and config (fetch Fiserv credentials).
-/// Uses apiKey for authentication on all 3 endpoints.
+/// Uses `requestToken` header (value: apiKey) for authentication on all 3 endpoints.
 final class AttestationService {
 
     private let http: Networking
@@ -15,21 +15,36 @@ final class AttestationService {
     func fetchChallenge() async throws -> ChallengeResponse {
         let request = try http.buildRequest(
             endpoint: .challenge,
-            authHeader: ("apiKey", http.configuration.apiKey)
+            authHeader: ("requestToken", http.configuration.apiKey)
         )
-        return try await http.execute(request)
+        return try await http.executePayabli(request)
     }
 
-    /// Register the attested key (keyId + attestation object) with the backend.
-    /// Also sends deviceId so the backend can link the attestation to the registered device.
-    func registerAttestation(keyId: String, attestation: Data, deviceId: String) async throws {
-        let body = AttestRequest(keyId: keyId, attestation: attestation.base64EncodedString(), deviceId: deviceId)
+    /// Register the attested key with the backend.
+    /// Sends challengeId so the backend can verify the nonce it issued,
+    /// keyId + attestation for cryptographic verification, deviceId (poi_id) to link
+    /// the attestation record to the registered device, and appId for rpIdHash verification.
+    @discardableResult
+    func registerAttestation(
+        challengeId: String,
+        keyId: String,
+        attestation: Data,
+        deviceId: String,
+        appId: String
+    ) async throws -> AttestResponse {
+        let body = AttestRequest(
+            challengeId: challengeId,
+            keyId: keyId,
+            attestation: attestation.base64EncodedString(),
+            deviceId: deviceId,
+            appId: appId
+        )
         var request = try http.buildRequest(
             endpoint: .attest,
-            authHeader: ("apiKey", http.configuration.apiKey)
+            authHeader: ("requestToken", http.configuration.apiKey)
         )
         request.httpBody = try http.encode(body)
-        try await http.executeVoid(request)
+        return try await http.executePayabli(request)
     }
 
     /// Fetch Fiserv credentials + requestToken. Requires a valid assertion
@@ -37,7 +52,7 @@ final class AttestationService {
     func fetchConfig(assertion: Data, keyId: String, deviceId: String) async throws -> ConfigResponse {
         var request = try http.buildRequest(
             endpoint: .config(entry: http.configuration.entry),
-            authHeader: ("apiKey", http.configuration.apiKey)
+            authHeader: ("requestToken", http.configuration.apiKey)
         )
         request.setValue(assertion.base64EncodedString(), forHTTPHeaderField: "X-App-Assertion")
         request.setValue(keyId, forHTTPHeaderField: "X-App-KeyId")
