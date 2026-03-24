@@ -8,6 +8,7 @@ final class PayabliTTPConfigurationTests: XCTestCase {
             apiKey: "pk_test",
             entry: "myapp",
             deviceId: "dev-123",
+            appId: "TEAM123.com.test.app",
             environment: .qa,
             logLevel: .debug
         )
@@ -15,6 +16,7 @@ final class PayabliTTPConfigurationTests: XCTestCase {
         XCTAssertEqual(config.apiKey, "pk_test")
         XCTAssertEqual(config.entry, "myapp")
         XCTAssertEqual(config.deviceId, "dev-123")
+        XCTAssertEqual(config.appId, "TEAM123.com.test.app")
         XCTAssertEqual(config.environment, .qa)
         XCTAssertEqual(config.logLevel, .debug)
     }
@@ -23,7 +25,8 @@ final class PayabliTTPConfigurationTests: XCTestCase {
         let config = PayabliTTPConfiguration(
             apiKey: "pk_test",
             entry: "myapp",
-            deviceId: "dev-456"
+            deviceId: "dev-456",
+            appId: "TEAM123.com.test.app"
         )
 
         XCTAssertEqual(config.environment, .production)
@@ -86,7 +89,8 @@ final class SecureStorageTests: XCTestCase {
         let config = PayabliTTPConfiguration(
             apiKey: "pk_test",
             entry: "myapp",
-            deviceId: "dev-merchant-registered"
+            deviceId: "dev-merchant-registered",
+            appId: "TEAM123.com.test.app"
         )
         XCTAssertEqual(config.deviceId, "dev-merchant-registered")
     }

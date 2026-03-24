@@ -5,7 +5,7 @@ import Combine
 ///
 /// Usage:
 /// ```swift
-/// let ttp = PayabliTTP(apiKey: "pk_...", entry: "myapp", deviceId: "dev_abc123")
+/// let ttp = PayabliTTP(apiKey: "pk_...", entry: "myapp", deviceId: "dev_abc123", appId: "TEAM.com.partner.app")
 /// try await ttp.initialize()
 /// let result = try await ttp.charge(amount: 9.99, type: .sale)
 /// ```
@@ -58,6 +58,7 @@ public final class PayabliTTP: ObservableObject {
         apiKey: String,
         entry: String,
         deviceId: String,
+        appId: String,
         environment: PayabliTTPEnvironment = .production,
         logLevel: LogLevel = .none
     ) {
@@ -65,6 +66,7 @@ public final class PayabliTTP: ObservableObject {
             apiKey: apiKey,
             entry: entry,
             deviceId: deviceId,
+            appId: appId,
             environment: environment,
             logLevel: logLevel
         )
@@ -90,6 +92,7 @@ public final class PayabliTTP: ObservableObject {
             transactionService: transactionService,
             cardReader: cardReader,
             deviceId: config.deviceId,
+            appId: config.appId,
             events: eventStream
         )
 
@@ -139,6 +142,7 @@ public final class PayabliTTP: ObservableObject {
             transactionService: transactionService,
             cardReader: cardReader,
             deviceId: configuration.deviceId,
+            appId: configuration.appId,
             events: eventStream
         )
 

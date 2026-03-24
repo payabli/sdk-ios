@@ -21,7 +21,8 @@ final class PayabliTTPFacadeTests: XCTestCase {
             configuration: PayabliTTPConfiguration(
                 apiKey: "test-key",
                 entry: "test-entry",
-                deviceId: "test-device-id"
+                deviceId: "test-device-id",
+                appId: "TEAM123.com.test.app"
             ),
             storage: storage,
             http: http,
@@ -85,7 +86,8 @@ final class PayabliTTPFacadeTests: XCTestCase {
             configuration: PayabliTTPConfiguration(
                 apiKey: "test-key",
                 entry: "test-entry",
-                deviceId: "test-device-id"
+                deviceId: "test-device-id",
+                appId: "TEAM123.com.test.app"
             ),
             storage: storage,
             http: http,

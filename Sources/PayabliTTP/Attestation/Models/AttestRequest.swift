@@ -6,6 +6,8 @@ struct AttestRequest: Encodable {
     let keyId: String
     let attestation: String
     let deviceId: String
+    /// iOS App ID ("TEAM_ID.BUNDLE_ID"). Temporary until backend reads it
+    let appId: String
 }
 
 /// Decoded `responseData` from POST /api/v2/device/taptopay/attest

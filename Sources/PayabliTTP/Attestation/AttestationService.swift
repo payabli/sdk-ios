@@ -22,15 +22,22 @@ final class AttestationService {
 
     /// Register the attested key with the backend.
     /// Sends challengeId so the backend can verify the nonce it issued,
-    /// keyId + attestation for cryptographic verification, and deviceId (poi_id) to link
-    /// the attestation record to the registered device.
+    /// keyId + attestation for cryptographic verification, deviceId (poi_id) to link
+    /// the attestation record to the registered device, and appId for rpIdHash verification.
     @discardableResult
-    func registerAttestation(challengeId: String, keyId: String, attestation: Data, deviceId: String) async throws -> AttestResponse {
+    func registerAttestation(
+        challengeId: String,
+        keyId: String,
+        attestation: Data,
+        deviceId: String,
+        appId: String
+    ) async throws -> AttestResponse {
         let body = AttestRequest(
             challengeId: challengeId,
             keyId: keyId,
             attestation: attestation.base64EncodedString(),
-            deviceId: deviceId
+            deviceId: deviceId,
+            appId: appId
         )
         var request = try http.buildRequest(
             endpoint: .attest,

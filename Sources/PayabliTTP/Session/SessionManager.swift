@@ -24,6 +24,7 @@ final class SessionManager {
     private let transactionService: TransactionService
     private let cardReader: CardReading
     private let deviceId: String
+    private let appId: String
     private let events: EventStream
 
     init(
@@ -32,6 +33,7 @@ final class SessionManager {
         transactionService: TransactionService,
         cardReader: CardReading,
         deviceId: String,
+        appId: String,
         events: EventStream
     ) {
         self.attester = attester
@@ -39,6 +41,7 @@ final class SessionManager {
         self.transactionService = transactionService
         self.cardReader = cardReader
         self.deviceId = deviceId
+        self.appId = appId
         self.events = events
     }
 
@@ -154,7 +157,8 @@ final class SessionManager {
             challengeId: challengeResponse.challengeId,
             keyId: keyId,
             attestation: attestation,
-            deviceId: deviceId
+            deviceId: deviceId,
+            appId: appId
         )
         try attester.persistKeyId(keyId)
     }

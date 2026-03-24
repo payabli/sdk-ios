@@ -23,6 +23,7 @@ final class MockNetworking: Networking {
             apiKey: "test-api-key",
             entry: "test-entry",
             deviceId: "test-device-id",
+            appId: "TEAM123.com.test.app",
             environment: .qa,
             logLevel: .none
         )
