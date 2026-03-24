@@ -60,7 +60,15 @@ final class DeviceAttestManager: DeviceAttesting {
             throw PayabliTTPError.attestationFailed("No registered keyId. Device must be attested first.")
         }
         let clientDataHash = Data(SHA256.hash(data: requestData))
-        return try await DCAppAttestService.shared.generateAssertion(keyId, clientDataHash: clientDataHash)
+        do {
+            return try await DCAppAttestService.shared.generateAssertion(keyId, clientDataHash: clientDataHash)
+        } catch let error as DCError where error.code == .invalidKey {
+            // The Secure Enclave key is no longer valid (device migrated, restored from backup,
+            // or Apple revoked it). Discard the persisted keyId so the next initialize()
+            // triggers full Phase A re-attestation.
+            discardKey()
+            throw PayabliTTPError.attestationFailed("Attestation key invalidated by Apple. Re-attestation required.")
+        }
     }
 
     // MARK: - Helpers

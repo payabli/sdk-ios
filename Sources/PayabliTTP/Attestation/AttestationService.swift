@@ -20,16 +20,24 @@ final class AttestationService {
         return try await http.executePayabli(request)
     }
 
-    /// Register the attested key (keyId + attestation object) with the backend.
-    /// Also sends deviceId so the backend can link the attestation to the registered device.
-    func registerAttestation(keyId: String, attestation: Data, deviceId: String) async throws {
-        let body = AttestRequest(keyId: keyId, attestation: attestation.base64EncodedString(), deviceId: deviceId)
+    /// Register the attested key with the backend.
+    /// Sends challengeId so the backend can verify the nonce it issued,
+    /// keyId + attestation for cryptographic verification, and deviceId (poi_id) to link
+    /// the attestation record to the registered device.
+    @discardableResult
+    func registerAttestation(challengeId: String, keyId: String, attestation: Data, deviceId: String) async throws -> AttestResponse {
+        let body = AttestRequest(
+            challengeId: challengeId,
+            keyId: keyId,
+            attestation: attestation.base64EncodedString(),
+            deviceId: deviceId
+        )
         var request = try http.buildRequest(
             endpoint: .attest,
             authHeader: ("requestToken", http.configuration.apiKey)
         )
         request.httpBody = try http.encode(body)
-        try await http.executeVoid(request)
+        return try await http.executePayabli(request)
     }
 
     /// Fetch Fiserv credentials + requestToken. Requires a valid assertion

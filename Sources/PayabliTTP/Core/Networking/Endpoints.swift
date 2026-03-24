@@ -26,7 +26,7 @@ enum Endpoint {
         case .challenge:
             return "/api/v2/device/taptopay/challenge"
         case .attest:
-            return "/api/v2/TapToPay/attest"
+            return "/api/v2/device/taptopay/attest"
         case .config:
             return "/api/v2/TapToPay/config"
         case .initiate:

@@ -150,7 +150,12 @@ final class SessionManager {
         let keyId = try await attester.generateKey()
         let attestation = try await attester.attestKey(keyId, challenge: challengeData)
 
-        try await attestationService.registerAttestation(keyId: keyId, attestation: attestation, deviceId: deviceId)
+        try await attestationService.registerAttestation(
+            challengeId: challengeResponse.challengeId,
+            keyId: keyId,
+            attestation: attestation,
+            deviceId: deviceId
+        )
         try attester.persistKeyId(keyId)
     }
 
