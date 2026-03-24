@@ -47,6 +47,10 @@ final class MockNetworking: Networking {
         return value
     }
 
+    func executePayabli<T: Decodable>(_ request: URLRequest) async throws -> T {
+        try await execute(request)
+    }
+
     func executeVoid(_ request: URLRequest) async throws {
         executeVoidCalled += 1
         if !executeVoidResponses.isEmpty {

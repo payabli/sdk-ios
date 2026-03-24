@@ -24,7 +24,7 @@ enum Endpoint {
     var path: String {
         switch self {
         case .challenge:
-            return "/api/v2/TapToPay/challenge"
+            return "/api/v2/device/taptopay/challenge"
         case .attest:
             return "/api/v2/TapToPay/attest"
         case .config:
