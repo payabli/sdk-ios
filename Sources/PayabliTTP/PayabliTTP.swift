@@ -142,6 +142,7 @@ public final class PayabliTTP: ObservableObject {
             transactionService: transactionService,
             cardReader: cardReader,
             deviceId: configuration.deviceId,
+            appId: configuration.appId,
             events: eventStream
         )
 
