@@ -69,11 +69,8 @@ final class PaymentOrchestrator {
                 merchantTransactionId: paymentTransId
             )
         } catch {
-            // NFC failed -- report error to backend
-            try? await sendUpdateError(
-                paymentTransId: paymentTransId,
-                error: error
-            )
+            // NFC failed -- notify backend with retry; queue if all attempts fail.
+            await sendUpdateError(paymentTransId: paymentTransId, error: error)
             events.emit(.transactionFailed(error: error.localizedDescription))
             throw PayabliTTPError.fiservError(error.localizedDescription)
         }
@@ -86,7 +83,7 @@ final class PaymentOrchestrator {
             fiservResponse: cardReaderResponse
         )
 
-        events.emit(.transactionCompleted(paymentTransId: paymentTransId))
+        events.emit(.transactionCompleted(paymentTransId: paymentTransId, syncStatus: syncStatus))
 
         return TransactionResult(
             transactionId: paymentTransId,
@@ -98,13 +95,22 @@ final class PaymentOrchestrator {
     func retryPendingUpdates() async {
         let pending = pendingQueue.all()
         for update in pending {
-            guard let dict = update.responseDict else {
-                Log.payment.error("Corrupt pending update for \(update.paymentTransId), removing")
-                pendingQueue.remove(paymentTransId: update.paymentTransId)
-                continue
-            }
             do {
-                let body = UpdateRequest(fiservResponse: dict, error: nil)
+                let body: UpdateRequest
+                if update.isErrorUpdate {
+                    let reason = update.errorDescription ?? "NFC tap failed"
+                    body = UpdateRequest(
+                        fiservResponse: nil,
+                        error: .init(title: "NFC Tap Failed", description: reason, failureReason: reason)
+                    )
+                } else {
+                    guard let dict = update.responseDict else {
+                        Log.payment.error("Corrupt pending update for \(update.paymentTransId), removing")
+                        pendingQueue.remove(paymentTransId: update.paymentTransId)
+                        continue
+                    }
+                    body = UpdateRequest(fiservResponse: dict, error: nil)
+                }
                 try await transactionService.updateTransaction(
                     paymentTransId: update.paymentTransId,
                     body: body
@@ -170,22 +176,30 @@ final class PaymentOrchestrator {
         }
     }
 
-    /// Best-effort: notify backend that the NFC tap failed.
-    private func sendUpdateError(
-        paymentTransId: String,
-        error: Error
-    ) async throws {
+    /// Notify backend that the NFC tap failed, with retry.
+    /// If all retry attempts fail, the error-update is queued for the next session.
+    private func sendUpdateError(paymentTransId: String, error: Error) async {
+        let description = error.localizedDescription
         let body = UpdateRequest(
             fiservResponse: nil,
             error: .init(
                 title: "NFC Tap Failed",
-                description: error.localizedDescription,
+                description: description,
                 failureReason: String(describing: error)
             )
         )
-        try await transactionService.updateTransaction(
-            paymentTransId: paymentTransId,
-            body: body
-        )
+        let retry = RetryPolicy(maxAttempts: 3, baseDelay: 1.0, maxDelay: 8.0)
+        do {
+            try await retry.execute {
+                try await transactionService.updateTransaction(
+                    paymentTransId: paymentTransId,
+                    body: body
+                )
+            }
+        } catch {
+            Log.payment.error("Error update failed after retries for \(paymentTransId), queuing")
+            pendingQueue.enqueueError(paymentTransId: paymentTransId, errorDescription: description)
+            events.emit(.pendingUpdateQueued(paymentTransId: paymentTransId))
+        }
     }
 }

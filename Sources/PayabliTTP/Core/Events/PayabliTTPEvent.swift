@@ -15,7 +15,11 @@ public enum PayabliTTPEvent: Sendable {
     case transactionInitiated(paymentTransId: String)
     case waitingForCardTap
     case cardTapCompleted
-    case transactionCompleted(paymentTransId: String)
+    /// The NFC charge completed. `syncStatus` indicates whether the Payabli backend
+    /// was successfully updated (`.synced`) or the update is queued for the next session
+    /// (`.pendingSyncWithBackend`). Partners should check `syncStatus` rather than
+    /// treating every `transactionCompleted` event as a confirmed backend sync.
+    case transactionCompleted(paymentTransId: String, syncStatus: SyncStatus)
     case transactionFailed(error: String)
 
     // MARK: - Session management

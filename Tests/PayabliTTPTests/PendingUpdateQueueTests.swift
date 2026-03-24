@@ -68,4 +68,42 @@ final class PendingUpdateQueueTests: XCTestCase {
         XCTAssertNotNil(retrieved?.responseDict)
         XCTAssertEqual(retrieved?.responseDict?["transactionState"] as? String, "CAPTURED")
     }
+
+    func testSuccessUpdateIsNotErrorUpdate() {
+        queue.enqueue(paymentTransId: "txn-success", responseDict: ["status": "CAPTURED"])
+        let item = queue.all().first!
+        XCTAssertFalse(item.isErrorUpdate)
+        XCTAssertNil(item.errorDescription)
+    }
+
+    func testEnqueueError() {
+        queue.enqueueError(paymentTransId: "txn-err", errorDescription: "NFC tap failed")
+
+        XCTAssertFalse(queue.isEmpty)
+        let item = queue.all().first!
+        XCTAssertEqual(item.paymentTransId, "txn-err")
+        XCTAssertTrue(item.isErrorUpdate)
+        XCTAssertEqual(item.errorDescription, "NFC tap failed")
+        XCTAssertNil(item.responseDict, "Error updates have no Fiserv response dict")
+    }
+
+    func testErrorUpdatePersistsAcrossInstances() {
+        queue.enqueueError(paymentTransId: "txn-err-persist", errorDescription: "NFC failed")
+
+        let newQueue = PendingUpdateQueue(defaults: defaults)
+        let item = newQueue.all().first
+        XCTAssertEqual(item?.paymentTransId, "txn-err-persist")
+        XCTAssertTrue(item?.isErrorUpdate ?? false)
+        XCTAssertEqual(item?.errorDescription, "NFC failed")
+    }
+
+    func testMixedQueueContainsBothTypes() {
+        queue.enqueue(paymentTransId: "txn-success", responseDict: ["status": "CAPTURED"])
+        queue.enqueueError(paymentTransId: "txn-error", errorDescription: "NFC failed")
+
+        let items = queue.all()
+        XCTAssertEqual(items.count, 2)
+        XCTAssertFalse(items[0].isErrorUpdate)
+        XCTAssertTrue(items[1].isErrorUpdate)
+    }
 }

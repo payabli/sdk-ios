@@ -98,20 +98,43 @@ final class PaymentOrchestratorTests: XCTestCase {
 
     func testUpdateFailureQueuesPendingUpdate() async throws {
         http.responses = [TestFixtures.makeTransactionResponse(paymentTransId: "txn-pending")]
-        // Make the update call fail (second HTTP call)
-        // The initiate succeeds (first execute), the update fails (second executeVoid)
-        // We need to make executeVoid fail for the update
-        let failingHttp = MockNetworking()
-        let transactionService = TransactionService(http: failingHttp)
-        transactionService.configure(requestToken: "mock-token")
+        // Initiate succeeds (execute), update fails on all 3 retry attempts (executeVoid).
+        // RetryPolicy only retries on networkError/5xx, so we use a non-retryable error to
+        // skip the actual sleeps and trigger the queue path immediately.
+        let updateError = PayabliTTPError.backendError(statusCode: 503, message: "Service unavailable")
+        http.executeVoidResponses = [updateError, updateError, updateError]
 
-        // Re-create orchestrator with a service where update fails
-        // Since we can't easily make only the 2nd call fail with current mock,
-        // let's test the queue directly
-        pendingQueue.enqueue(paymentTransId: "txn-queued", responseDict: ["status": "CAPTURED"])
+        let result = try await sut.chargeSale(
+            amount: 5.00, order: nil, customer: nil, invoice: nil, serviceFee: nil
+        )
 
-        XCTAssertFalse(pendingQueue.isEmpty)
-        XCTAssertEqual(pendingQueue.all().first?.paymentTransId, "txn-queued")
+        XCTAssertEqual(result.transactionId, "txn-pending")
+        XCTAssertEqual(result.syncStatus, .pendingSyncWithBackend)
+        XCTAssertFalse(pendingQueue.isEmpty, "Failed update should be queued")
+        XCTAssertEqual(pendingQueue.all().first?.paymentTransId, "txn-pending")
+        XCTAssertFalse(pendingQueue.all().first?.isErrorUpdate ?? true, "Should be a success update")
+    }
+
+    func testNFCFailureQueuesErrorUpdateWhenPATCHFails() async throws {
+        http.responses = [TestFixtures.makeTransactionResponse(paymentTransId: "txn-nfc-fail")]
+        cardReader.shouldFailCharge = true
+        // Make the error-update PATCH also fail on all retry attempts.
+        let updateError = PayabliTTPError.backendError(statusCode: 503, message: "Service unavailable")
+        http.executeVoidResponses = [updateError, updateError, updateError]
+
+        do {
+            _ = try await sut.chargeSale(
+                amount: 5.00, order: nil, customer: nil, invoice: nil, serviceFee: nil
+            )
+            XCTFail("Should have thrown fiservError")
+        } catch PayabliTTPError.fiservError {
+            // expected
+        }
+
+        XCTAssertFalse(pendingQueue.isEmpty, "Failed error-update should be queued")
+        let queued = pendingQueue.all().first
+        XCTAssertEqual(queued?.paymentTransId, "txn-nfc-fail")
+        XCTAssertTrue(queued?.isErrorUpdate ?? false, "Should be an error update")
     }
 
     // MARK: - Retry pending updates

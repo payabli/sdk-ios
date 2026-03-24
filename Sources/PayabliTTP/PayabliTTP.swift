@@ -115,6 +115,54 @@ public final class PayabliTTP: ObservableObject {
         self.paymentOrchestrator = paymentOrchestrator
     }
 
+    /// Internal initializer for testing — injects all dependencies as protocols.
+    /// This allows unit tests to drive the facade with mocks without touching Keychain,
+    /// URLSession, DCAppAttestService, or FiservTTPCardReader.
+    init(
+        configuration: PayabliTTPConfiguration,
+        storage: SecureStorage,
+        http: Networking,
+        attester: DeviceAttesting,
+        cardReader: CardReading,
+        eventStream: EventStream = EventStream(),
+        pendingQueue: PendingUpdateQueue = PendingUpdateQueue()
+    ) {
+        self.configuration = configuration
+        Log.level = configuration.logLevel
+
+        let attestationService = AttestationService(http: http)
+        let transactionService = TransactionService(http: http)
+
+        let sessionManager = SessionManager(
+            attester: attester,
+            attestationService: attestationService,
+            transactionService: transactionService,
+            cardReader: cardReader,
+            deviceId: configuration.deviceId,
+            events: eventStream
+        )
+
+        let paymentOrchestrator = PaymentOrchestrator(
+            transactionService: transactionService,
+            cardReader: cardReader,
+            deviceId: configuration.deviceId,
+            pendingQueue: pendingQueue,
+            events: eventStream,
+            entry: configuration.entry
+        )
+
+        self.storage = storage
+        self.http = http
+        self.attester = attester
+        self.cardReader = cardReader
+        self.eventStream = eventStream
+        self.pendingQueue = pendingQueue
+        self.attestationService = attestationService
+        self.transactionService = transactionService
+        self.sessionManager = sessionManager
+        self.paymentOrchestrator = paymentOrchestrator
+    }
+
     // MARK: - Public API
 
     /// Initialize the SDK: attest device, fetch config, set up NFC reader.

@@ -7,7 +7,14 @@ final class MockNetworking: Networking {
 
     /// Queue of responses to return. Each call to execute() pops the first element.
     var responses: [Any] = []
+
+    /// Per-call queue for executeVoid. Each entry is either nil (success) or an Error to throw.
+    /// When the queue is exhausted, falls back to `shouldFail`.
+    var executeVoidResponses: [Error?] = []
+
+    /// Fallback error applied when per-call queues are empty. Affects both execute() and executeVoid().
     var shouldFail: Error?
+
     var executeCalled = 0
     var executeVoidCalled = 0
 
@@ -42,6 +49,10 @@ final class MockNetworking: Networking {
 
     func executeVoid(_ request: URLRequest) async throws {
         executeVoidCalled += 1
+        if !executeVoidResponses.isEmpty {
+            if let error = executeVoidResponses.removeFirst() { throw error }
+            return
+        }
         if let error = shouldFail { throw error }
     }
 

@@ -47,6 +47,9 @@ jobs:
           xcodebuild -version
           swift --version
 
+      - name: Install xcpretty
+        run: gem install xcpretty --no-document
+
       - name: Resolve dependencies
         run: |
           xcodebuild -resolvePackageDependencies \
