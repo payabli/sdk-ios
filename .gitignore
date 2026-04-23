@@ -1,0 +1,47 @@
+# Swift Package Manager
+.build/
+.swiftpm/
+Package.resolved
+
+# Xcode
+DerivedData/
+*.xcodeproj/xcuserdata/
+*.xcworkspace/xcuserdata/
+*.xcuserstate
+xcuserdata/
+
+# CocoaPods
+Pods/
+*.xcworkspace
+
+# Build artifacts
+build/
+*.xcframework/
+
+# .NET / MAUI build artifacts
+**/bin/
+**/obj/
+
+# Secrets
+Example/PayabliDemo/Secrets.swift
+Example/PayabliDemo/Config.xcconfig
+.env
+.env.local
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# IDEs
+.vscode/
+.idea/
+
+# Fastlane
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/test_output
+
+# Bundler
+.bundle/
+vendor/

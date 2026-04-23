@@ -1,0 +1,22 @@
+name: payabli_flutter_demo
+description: Minimal Flutter demo calling the native PayabliSDK via MethodChannel.
+version: 1.0.0
+publish_to: 'none'
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+  flutter: '>=3.16.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  # Points at the Dart wrapper shipped with this repo.
+  payabli_sdk:
+    path: ../../Bridges/Flutter
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+flutter:
+  uses-material-design: true

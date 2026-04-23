@@ -1,0 +1,32 @@
+PayabliSDK for iOS
+Copyright (c) 2026 Payabli, Inc.
+
+This product includes software developed by Payabli, Inc.
+
+-----------------------------------------------------------------------
+Third-party notices
+-----------------------------------------------------------------------
+
+The following third-party components may be used when their corresponding
+optional modules are included by the host application. Each component is
+governed by its own license.
+
+  * Fiserv FiservTTP SDK — required only when `PayabliSDKPayIn` is configured
+    with the Fiserv Tap to Pay provider. Subject to the Fiserv SDK License
+    Agreement (see BR-10 in RFC-0001 §6).
+
+  * Apple ProximityReader (Tap to Pay on iPhone) — provided by Apple under the
+    Apple Developer Program License Agreement and the ProximityReader
+    entitlement request (BR-2).
+
+  * Apple PassKit — provided by Apple under the Apple Developer Program
+    License Agreement.
+
+  * sentry-cocoa (Sentry SDK) — MIT License, optional, included only when the
+    host app pulls in the `PayabliSDKTelemetry` module with Sentry enabled.
+
+  * posthog-ios (PostHog SDK) — MIT License, optional, included only when the
+    host app pulls in the `PayabliSDKTelemetry` module with PostHog enabled.
+
+Copies of each license are distributed with the respective component and are
+available upon written request to legal@payabli.com.

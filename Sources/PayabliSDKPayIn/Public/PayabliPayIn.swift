@@ -1,0 +1,480 @@
+import Foundation
+import SwiftUI
+import PayabliSDKCore
+
+#if canImport(UIKit)
+import UIKit
+#endif
+
+/// Public callback for tokenization flows.
+/// See PRD FR-6.5.
+public typealias PayabliTokenizationCompletion = @Sendable @MainActor (String?, Error?) -> Void
+
+/// Public callback for payment-processing flows.
+/// See PRD FR-6.9.
+public typealias PayabliPaymentCompletion = @Sendable @MainActor (PayabliTransactionResult?, Error?) -> Void
+
+/// The PayIn component facade.
+///
+/// Singleton entry point for tokenization, card-not-present payments (getpaid),
+/// and card-present Tap to Pay. See PRD §5.3 FR-6.
+///
+/// ```swift
+/// let config = PayabliConfig(
+///     clientId: "...",
+///     clientSecret: "...",
+///     entryPoint: "myEntry",
+///     environment: .sandbox
+/// )
+/// PayabliPayIn.shared.configure(config: config, theme: .default)
+/// let vc = PayabliPayIn.shared.createTokenizationViewController(type: .card, customerId: 4440) {
+///     token, err in
+///     // handle result
+/// }
+/// present(vc, animated: true)
+/// ```
+@MainActor
+public final class PayabliPayIn: NSObject, PayabliComponent {
+
+    // MARK: - PayabliComponent
+
+    public nonisolated static var componentId: String { "payin" }
+    public nonisolated static var sessionTier: PayabliSessionTier { .tier1Transactional }
+    public nonisolated static var requiredPermissions: [String] {
+        ["tokenize_card", "tokenize_ach", "process_payment"]
+    }
+
+    // MARK: - Singleton
+
+    public static let shared = PayabliPayIn()
+
+    override private init() {
+        super.init()
+    }
+
+    // MARK: - State
+
+    private var config: PayabliConfig?
+    private var theme: PayabliTheme = .default
+    private var auth: PayabliAuth?
+    private var service: PayabliService?
+    private var tokenStorage: TokenStorageClient?
+    private var getpaid: GetpaidClient?
+    #if canImport(PassKit) && os(iOS)
+    private var applePayManager: ApplePayManager?
+    #endif
+
+    // MARK: - Public API
+
+    /// Configure the component. Must be called before any operation.
+    ///
+    /// Performs session-tier validation (PRD §28.7): if the session doesn't
+    /// meet this component's required tier, the failure is logged but the
+    /// configure call still completes — callers surface the issue on first
+    /// operation. Tier enforcement strengthens in v2.0 (§16.7).
+    public func configure(config: PayabliConfig, theme: PayabliTheme) {
+        do {
+            try SessionTierValidator.validate(component: Self.self, against: config)
+        } catch {
+            PayabliLogger(category: .core).error("Session tier validation failed")
+        }
+        self.config = config
+        self.theme = theme
+
+        let service = PayabliService(environment: config.environment)
+        let auth = PayabliAuth(config: config)
+
+        self.service = service
+        self.auth = auth
+        self.tokenStorage = TokenStorageClient(service: service, auth: auth)
+        self.getpaid = GetpaidClient(service: service, auth: auth)
+        #if canImport(PassKit) && os(iOS)
+        self.applePayManager = RealApplePayManager()
+        #endif
+    }
+
+    #if canImport(PassKit) && os(iOS)
+    /// Override the Apple Pay manager (testing hook).
+    public func overrideApplePayManager(_ manager: ApplePayManager) {
+        self.applePayManager = manager
+    }
+    #endif
+
+    #if os(iOS)
+    /// Creates a `UIViewController` hosting the tokenization form for the given
+    /// payment type. Present modally from the host app.
+    ///
+    /// See PRD FR-6.2, FR-3.1.
+    public func createTokenizationViewController(
+        type: PayabliPaymentType,
+        customerId: Int,
+        completion: @escaping PayabliTokenizationCompletion
+    ) -> UIViewController {
+        let cardVM = CardFormViewModel()
+        let achVM = ACHFormViewModel()
+
+        let hosting = UIHostingController(
+            rootView: PaymentFormView(
+                type: type,
+                theme: theme,
+                submitTitle: "Save Payment Method",
+                cardViewModel: cardVM,
+                achViewModel: achVM,
+                onSubmitCard: { [weak self] in
+                    Task {
+                        await self?.submitCardTokenization(
+                            cardVM,
+                            customerId: customerId,
+                            completion: completion
+                        )
+                    }
+                },
+                onSubmitACH: { [weak self] in
+                    Task {
+                        await self?.submitACHTokenization(
+                            achVM,
+                            customerId: customerId,
+                            completion: completion
+                        )
+                    }
+                },
+                onCancel: {
+                    // Host dismisses the VC; SDK reports cancellation.
+                    completion(nil, PayabliGenericError(
+                        code: .userCancelled,
+                        reason: "User cancelled"
+                    ))
+                }
+            )
+        )
+        hosting.modalPresentationStyle = .formSheet
+        hosting.isModalInPresentation = false
+        return hosting
+    }
+
+    /// Creates a `UIViewController` hosting the payment form that, on submit,
+    /// executes an authorize-and-capture via `POST /api/v2/MoneyIn/getpaid`.
+    ///
+    /// See PRD FR-6.7, FR-12A.
+    public func createPaymentViewController(
+        type: PayabliPaymentType,
+        paymentRequest: PayabliPaymentRequest,
+        customerId: Int,
+        completion: @escaping PayabliPaymentCompletion
+    ) -> UIViewController {
+        let cardVM = CardFormViewModel()
+        let achVM = ACHFormViewModel()
+
+        let hosting = UIHostingController(
+            rootView: PaymentFormView(
+                type: type,
+                theme: theme,
+                submitTitle: formatPayButtonTitle(request: paymentRequest),
+                cardViewModel: cardVM,
+                achViewModel: achVM,
+                onSubmitCard: { [weak self] in
+                    Task {
+                        await self?.submitCardPayment(
+                            cardVM,
+                            request: paymentRequest,
+                            customerId: customerId,
+                            completion: completion
+                        )
+                    }
+                },
+                onSubmitACH: { [weak self] in
+                    Task {
+                        await self?.submitACHPayment(
+                            achVM,
+                            request: paymentRequest,
+                            customerId: customerId,
+                            completion: completion
+                        )
+                    }
+                },
+                onCancel: {
+                    completion(nil, PayabliGenericError(
+                        code: .userCancelled,
+                        reason: "User cancelled"
+                    ))
+                }
+            )
+        )
+        hosting.modalPresentationStyle = .formSheet
+        hosting.isModalInPresentation = false
+        return hosting
+    }
+    #endif
+
+    #if canImport(PassKit) && os(iOS)
+    /// Present Apple Pay in "Set Up" mode — tokenizes the selected card for
+    /// future use via `POST /api/TokenStorage/add` with `method:"applepay"`.
+    ///
+    /// See PRD FR-10.9, §9.3.
+    public func setupApplePay(
+        applePayConfig: PayabliApplePayConfig,
+        amount: Decimal,
+        customerId: Int,
+        completion: @escaping PayabliTokenizationCompletion
+    ) async {
+        guard let config, let tokenStorage, let applePayManager else {
+            completion(nil, PayabliGenericError(
+                code: .invalidConfiguration,
+                reason: "PayabliPayIn not configured"
+            ))
+            return
+        }
+
+        let request = PayabliPaymentRequest(totalAmount: amount)
+        do {
+            let token = try await applePayManager.presentPaymentSheet(
+                request: request,
+                config: applePayConfig
+            )
+            let tokenizationRequest = ApplePayTokenizationRequest(
+                customerData: CustomerDataBlock(customerId: customerId),
+                entryPoint: config.entryPoint,
+                paymentMethod: ApplePayTokenizationPayload(
+                    applePayToken: token.paymentData.base64EncodedString(),
+                    applePayNetwork: token.network,
+                    applePayDisplayName: token.displayName
+                )
+            )
+            let payabliToken = try await tokenStorage.tokenizeApplePay(tokenizationRequest)
+            completion(payabliToken, nil)
+        } catch {
+            completion(nil, error)
+        }
+    }
+
+    /// Present Apple Pay in "Pay" mode — executes an authorize-and-capture via
+    /// `POST /api/v2/MoneyIn/getpaid`.
+    ///
+    /// See PRD FR-10.9, §9.3.
+    public func chargeApplePay(
+        applePayConfig: PayabliApplePayConfig,
+        paymentRequest: PayabliPaymentRequest,
+        customerId: Int,
+        completion: @escaping PayabliPaymentCompletion
+    ) async {
+        guard let config, let getpaid, let applePayManager else {
+            completion(nil, PayabliGenericError(
+                code: .invalidConfiguration,
+                reason: "PayabliPayIn not configured"
+            ))
+            return
+        }
+
+        do {
+            let token = try await applePayManager.presentPaymentSheet(
+                request: paymentRequest,
+                config: applePayConfig
+            )
+            let result = try await getpaid.chargeApplePay(
+                token: token,
+                request: paymentRequest,
+                customerId: customerId,
+                entryPoint: config.entryPoint
+            )
+            completion(result, nil)
+        } catch {
+            completion(nil, error)
+        }
+    }
+    #endif
+
+    /// Charges a previously tokenized payment method headlessly (no UI).
+    ///
+    /// Requires `paymentRequest.storedMethodId` to be set. See PRD FR-6.10, §9.3C.
+    public func chargeStoredMethod(
+        methodType: PayabliPaymentType,
+        paymentRequest: PayabliPaymentRequest,
+        customerId: Int,
+        completion: @escaping PayabliPaymentCompletion
+    ) async {
+        guard let config, let getpaid else {
+            completion(nil, PayabliGenericError(
+                code: .invalidConfiguration,
+                reason: "PayabliPayIn not configured"
+            ))
+            return
+        }
+
+        do {
+            let result = try await getpaid.chargeStoredMethod(
+                methodType: methodType,
+                request: paymentRequest,
+                customerId: customerId,
+                entryPoint: config.entryPoint
+            )
+            completion(result, nil)
+        } catch {
+            completion(nil, error)
+        }
+    }
+
+    // MARK: - Internal (also exposed for tests)
+
+    func submitCardTokenization(
+        _ viewModel: CardFormViewModel,
+        customerId: Int,
+        completion: @escaping PayabliTokenizationCompletion
+    ) async {
+        guard viewModel.isValid else {
+            viewModel.endSubmission(error: "Please correct the errors and try again.")
+            return
+        }
+        guard let config, let tokenStorage else {
+            completion(nil, PayabliGenericError(
+                code: .invalidConfiguration,
+                reason: "PayabliPayIn not configured"
+            ))
+            return
+        }
+
+        viewModel.beginSubmission()
+        let request = CardTokenizationRequest(
+            customerData: CustomerDataBlock(customerId: customerId),
+            entryPoint: config.entryPoint,
+            paymentMethod: viewModel.makePayload()
+        )
+
+        do {
+            let token = try await tokenStorage.tokenizeCard(request)
+            viewModel.endSubmission()
+            completion(token, nil)
+        } catch {
+            viewModel.endSubmission(error: errorDisplayMessage(error))
+            completion(nil, error)
+        }
+    }
+
+    func submitACHTokenization(
+        _ viewModel: ACHFormViewModel,
+        customerId: Int,
+        completion: @escaping PayabliTokenizationCompletion
+    ) async {
+        guard viewModel.isValid else {
+            viewModel.endSubmission(error: "Please correct the errors and try again.")
+            return
+        }
+        guard let config, let tokenStorage else {
+            completion(nil, PayabliGenericError(
+                code: .invalidConfiguration,
+                reason: "PayabliPayIn not configured"
+            ))
+            return
+        }
+
+        viewModel.beginSubmission()
+        let request = ACHTokenizationRequest(
+            customerData: CustomerDataBlock(customerId: customerId),
+            entryPoint: config.entryPoint,
+            paymentMethod: viewModel.makePayload()
+        )
+
+        do {
+            let token = try await tokenStorage.tokenizeACH(request)
+            viewModel.endSubmission()
+            completion(token, nil)
+        } catch {
+            viewModel.endSubmission(error: errorDisplayMessage(error))
+            completion(nil, error)
+        }
+    }
+
+    private func errorDisplayMessage(_ error: Error) -> String {
+        if let payment = error as? PayabliPaymentError {
+            return payment.asPayabliError.reason
+        }
+        if let payabli = error as? PayabliError {
+            return payabli.reason
+        }
+        return "Tokenization failed. Please try again."
+    }
+
+    // MARK: - Payment submit handlers
+
+    func submitCardPayment(
+        _ viewModel: CardFormViewModel,
+        request: PayabliPaymentRequest,
+        customerId: Int,
+        completion: @escaping PayabliPaymentCompletion
+    ) async {
+        guard viewModel.isValid else {
+            viewModel.endSubmission(error: "Please correct the errors and try again.")
+            return
+        }
+        guard let config, let getpaid else {
+            completion(nil, PayabliGenericError(
+                code: .invalidConfiguration,
+                reason: "PayabliPayIn not configured"
+            ))
+            return
+        }
+
+        viewModel.beginSubmission()
+        do {
+            let result = try await getpaid.chargeCard(
+                payload: viewModel.makePayload(),
+                request: request,
+                customerId: customerId,
+                entryPoint: config.entryPoint
+            )
+            viewModel.endSubmission()
+            completion(result, nil)
+        } catch {
+            viewModel.endSubmission(error: errorDisplayMessage(error))
+            completion(nil, error)
+        }
+    }
+
+    func submitACHPayment(
+        _ viewModel: ACHFormViewModel,
+        request: PayabliPaymentRequest,
+        customerId: Int,
+        completion: @escaping PayabliPaymentCompletion
+    ) async {
+        guard viewModel.isValid else {
+            viewModel.endSubmission(error: "Please correct the errors and try again.")
+            return
+        }
+        guard let config, let getpaid else {
+            completion(nil, PayabliGenericError(
+                code: .invalidConfiguration,
+                reason: "PayabliPayIn not configured"
+            ))
+            return
+        }
+
+        viewModel.beginSubmission()
+        do {
+            let result = try await getpaid.chargeACH(
+                payload: viewModel.makePayload(),
+                request: request,
+                customerId: customerId,
+                entryPoint: config.entryPoint
+            )
+            viewModel.endSubmission()
+            completion(result, nil)
+        } catch {
+            viewModel.endSubmission(error: errorDisplayMessage(error))
+            completion(nil, error)
+        }
+    }
+
+    // MARK: - Button title
+
+    func formatPayButtonTitle(request: PayabliPaymentRequest) -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .currency
+        formatter.currencyCode = request.currency
+        formatter.maximumFractionDigits = 2
+        formatter.minimumFractionDigits = 2
+
+        if let formatted = formatter.string(from: request.totalAmount as NSDecimalNumber) {
+            return "Pay \(formatted)"
+        }
+        return "Pay"
+    }
+}
