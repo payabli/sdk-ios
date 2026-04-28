@@ -11,20 +11,6 @@ public struct AttestationResult: Sendable {
     }
 }
 
-/// Plaintext activation code issued by the backend for a pending device
-/// (response of `POST /api/v2/device/taptopay/activate/challenge`).
-public struct ActivationCodeInfo: Sendable {
-    public let code: String
-    public let expiresAt: Date?
-    public let alreadyIssued: Bool
-
-    public init(code: String, expiresAt: Date?, alreadyIssued: Bool) {
-        self.code = code
-        self.expiresAt = expiresAt
-        self.alreadyIssued = alreadyIssued
-    }
-}
-
 /// A per-request integrity assertion (PRD §18.2).
 public struct AssertionHeaders: Sendable {
     public let assertion: String
@@ -67,19 +53,14 @@ public protocol DeviceAttestationService: AnyObject, Sendable {
     /// `status == "pending"` (PRD FR-11F.1).
     func attest(entry: String, appId: String) async throws -> AttestationResult
 
-    /// Generates an assertion for a protected request (PRD §18.2).
-    func generateAssertion(for data: Data) async throws -> AssertionHeaders
+    /// Produces fresh `AssertionHeaders` (signed over a current timestamp) for
+    /// the next protected request. PRD §18.2.
+    func generateAssertion() async throws -> AssertionHeaders
 
-    /// Issues (or returns the current) activation code for a pending device
-    /// by calling `POST /api/v2/device/taptopay/activate/challenge`. The
-    /// backend persists the code in `PayabliCloudDevices.ActivationCode` so
-    /// that a subsequent `activateDevice(...)` call can validate it.
-    ///
-    /// In production the OTP is typically issued by an admin dashboard out of
-    /// band. For test/POC flows the SDK caller can request it directly.
-    func requestActivationCode(entry: String) async throws -> ActivationCodeInfo
-
-    /// Activates a pending device with an admin-supplied code (PRD §9.7).
+    /// Activates a pending device with an activation code issued out-of-band
+    /// by the partner (e.g. from their admin dashboard). The SDK does not
+    /// request the code itself — the partner is responsible for delivering it
+    /// to the device user. PRD §9.7.
     func activateDevice(activationCode: String, entry: String) async throws
 
     /// Clears cached attestation state (triggers a full re-attestation on next

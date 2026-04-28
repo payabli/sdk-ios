@@ -2,7 +2,7 @@ import Foundation
 
 /// Provider-agnostic abstraction over the contactless NFC card reader.
 ///
-/// Implementations (Fiserv, Stripe, Apple ProximityReader direct, etc.) are
+/// Implementations (Fiserv, Apple ProximityReader direct, etc.) are
 /// registered with `TapToPayProviderFactory`. The TTP facade depends only on
 /// this protocol (PRD FR-11A.1..7).
 ///

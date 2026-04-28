@@ -63,9 +63,6 @@ public enum TelemetryEventName {
     public static let ttpNfcFailed             = "ttp.nfc.failed"
     public static let ttpReinitializeStarted   = "ttp.reinitialize.started"
     public static let ttpReinitializeSucceeded = "ttp.reinitialize.succeeded"
-    public static let ttpPendingEnqueued       = "ttp.pendingUpdate.enqueued"
-    public static let ttpPendingSynced         = "ttp.pendingUpdate.synced"
-    public static let ttpPendingEvicted        = "ttp.pendingUpdate.evicted"
     public static let ttpStateChanged          = "ttp.session.stateChanged"
 
     // System

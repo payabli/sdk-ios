@@ -18,35 +18,11 @@ import Foundation
     case sale = 0
 }
 
-/// Sync status on a `TransactionResult` indicating whether the backend update
-/// succeeded or was enqueued for later sync.
-@objc public enum SyncStatus: Int, Sendable {
-    case synced = 0
-    case pendingSyncWithBackend = 1
-}
-
 /// Result of a successful `charge()` call.
 public struct TransactionResult: Sendable {
     public let paymentTransId: String
-    public let syncStatus: SyncStatus
 
-    public init(paymentTransId: String, syncStatus: SyncStatus) {
+    public init(paymentTransId: String) {
         self.paymentTransId = paymentTransId
-        self.syncStatus = syncStatus
-    }
-}
-
-/// Pending update awaiting backend sync (PRD §21.2).
-public struct PendingUpdate: Codable, Sendable {
-    public let paymentTransId: String
-    public let updateBody: Data       // opaque JSON body (forward-compatible)
-    public let createdAt: Date
-    public let attemptCount: Int
-
-    public init(paymentTransId: String, updateBody: Data, createdAt: Date = Date(), attemptCount: Int = 0) {
-        self.paymentTransId = paymentTransId
-        self.updateBody = updateBody
-        self.createdAt = createdAt
-        self.attemptCount = attemptCount
     }
 }

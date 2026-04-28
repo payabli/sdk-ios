@@ -3,33 +3,27 @@ import PayabliSDKCore
 #if canImport(FiservTTP)
 import FiservTTP
 import ProximityReader
-import Combine
 #endif
 
 /// Fiserv adapter for `TapToPayProvider` (PRD FR-11B).
 ///
-/// Wraps the Fiserv `FiservTTP` SDK (≥ 1.0.7) to accept contactless NFC
-/// payments on iPhone via Apple's ProximityReader. `charges(amount:)` is
-/// atomic — NFC tap and charge happen in a single SDK call — so this adapter
-/// returns the full processor response as `CardReadResult.providerResponseJSON`
-/// so the facade can forward it verbatim under the backend's `fiservResponse`
-/// key.
+/// `FiservTTP.charges(amount:)` is atomic (NFC read + charge in one call), so
+/// `startReading` returns the full processor response as
+/// `providerResponseJSON` for the facade to forward verbatim.
 ///
-/// Runtime-only credentials: every Fiserv field (`secretKey`, `apiKey`,
-/// `environment`, `currencyCode`, `merchantId`, `appleTtpMerchantId`,
-/// `merchantName`, `merchantCategoryCode`, `terminalId`, `terminalProfileId`)
-/// is delivered via the Payabli `/config` endpoint (FR-11B.3) and lives only
-/// in RAM (NFR-5D). This class never persists them.
+/// Credentials come from `/config` (FR-11B.3), live in RAM only (NFR-5D),
+/// and are dropped from `self` as soon as `buildReader` hands them to the
+/// Fiserv SDK. Retries require a fresh `/config` fetch.
+///
+/// Error mapping: see `FiservCardReader+Errors.swift`.
 public final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
 
     public static var providerId: String { "fiserv" }
 
-    /// Full set of Fiserv credentials required by `FiservTTPConfig`.
-    /// Matches the `credentials` block returned by `/api/v2/device/taptopay/config/{entry}`.
+    /// `/config` `credentials` block — maps 1:1 to `FiservTTPConfig`.
     public struct Credentials: Sendable {
         public let secretKey: String
         public let apiKey: String
-        /// `"production"` → `.Production`, anything else → `.Sandbox`.
         public let environment: String
         public let currencyCode: String
         public let merchantId: String
@@ -70,78 +64,45 @@ public final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
 
     #if canImport(FiservTTP)
     private var reader: FiservTTPCardReader?
-    private var sessionReadyCancellable: AnyCancellable?
-    private var _isSessionActive: Bool = false
-    private var isSessionActive: Bool {
-        get { lock.lock(); defer { lock.unlock() }; return _isSessionActive }
-        set { lock.lock(); defer { lock.unlock() }; _isSessionActive = newValue }
-    }
     #endif
 
     public init() {}
 
-    /// Inject credentials directly (typed). Useful for tests and hosts that
-    /// build the `Credentials` struct themselves; the facade path goes through
-    /// `configure(credentials:)`.
+    /// Injects `Credentials` directly. Facade path uses `configure(credentials:)`.
     public func setCredentials(_ credentials: Credentials) {
         lock.lock()
         self.credentials = credentials
         lock.unlock()
     }
 
-    /// Convenience for the 10 raw fields that come from the `/config` envelope.
-    public func setCredentials(
-        secretKey: String,
-        apiKey: String,
-        environment: String,
-        currencyCode: String,
-        merchantId: String,
-        appleTtpMerchantId: String,
-        merchantName: String,
-        merchantCategoryCode: String,
-        terminalId: String,
-        terminalProfileId: String
-    ) {
-        setCredentials(
-            Credentials(
-                secretKey: secretKey,
-                apiKey: apiKey,
-                environment: environment,
-                currencyCode: currencyCode,
-                merchantId: merchantId,
-                appleTtpMerchantId: appleTtpMerchantId,
-                merchantName: merchantName,
-                merchantCategoryCode: merchantCategoryCode,
-                terminalId: terminalId,
-                terminalProfileId: terminalProfileId
-            )
-        )
-    }
-
     // MARK: - TapToPayProvider
 
-    /// Keys expected in the `/config` `providerCredentials` block for Fiserv.
-    /// Exposed `internal` so tests can assert against the contract.
+    /// Keys that must be present and non-empty in the `/config` dict.
     static let requiredCredentialKeys: [String] = [
         "secretKey", "apiKey", "merchantId", "terminalId"
     ]
 
-    /// Optional keys — if missing, the adapter falls back to safe defaults
-    /// (e.g. environment → `"sandbox"`) but logs a descriptive message.
+    /// Keys that fall back to safe defaults; `configure` logs a warning for
+    /// each one missing.
     static let optionalCredentialKeys: [String] = [
         "environment", "currencyCode", "appleTtpMerchantId",
         "merchantName", "merchantCategoryCode", "terminalProfileId"
     ]
 
-    /// Consumes the opaque `providerCredentials` dict from `/config` and
-    /// produces a typed `Credentials` struct. Fails loudly when a required
-    /// field is missing so `initialize()` surfaces a descriptive error before
-    /// any NFC UI is attempted.
+    /// Validates the `/config` `providerCredentials` dict and stores it as
+    /// `Credentials`. Throws on any missing required key.
     public func configure(credentials raw: [String: String]) throws {
         let missing = Self.requiredCredentialKeys.filter { raw[$0]?.isEmpty != false }
         guard missing.isEmpty else {
             throw PayabliTTPError.readerSetupFailed(
                 reason: "Fiserv credentials missing required field(s): \(missing.joined(separator: ", "))"
+            )
+        }
+
+        let missingOptional = Self.optionalCredentialKeys.filter { raw[$0]?.isEmpty != false }
+        if !missingOptional.isEmpty {
+            logger.warning(
+                "[fiserv.configure] optional credentials missing, using defaults: \(missingOptional.joined(separator: ", "))"
             )
         }
 
@@ -161,8 +122,8 @@ public final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
         )
     }
 
-    /// Validates platform + Apple ProximityReader support. Intentionally does
-    /// NOT require credentials: eligibility runs before `/config` is fetched.
+    /// Platform + `PaymentCardReader` hardware check. Runs before `/config`
+    /// is fetched, so must not require credentials.
     public func checkEligibility() async -> Result<Void, PayabliTTPError> {
         #if canImport(FiservTTP)
         if #available(iOS 16.7, *) {
@@ -184,6 +145,12 @@ public final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
         let creds = try requireCredentials()
         let newReader = try buildReader(credentials: creds)
 
+        // Drop our copy; credentials now live inside `newReader` (NFR-5D).
+        lock.lock()
+        credentials = nil
+        lock.unlock()
+
+        logger.info("[fiserv.prepare] → requesting session")
         do {
             try await newReader.requestSessionToken()
 
@@ -193,9 +160,10 @@ public final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
             }
 
             try await newReader.initializeSession()
-            isSessionActive = true
+            logger.info("[fiserv.prepare] ← reader ready (linked=\(linked))")
         } catch {
-            throw Self.mapError(error, fallbackKind: .readerSetupFailed)
+            clearAllState()
+            throw Self.mapError(error) { .readerSetupFailed(reason: $0) }
         }
         #else
         throw PayabliTTPError.readerSetupFailed(reason: "Tap to Pay is iOS-only")
@@ -229,11 +197,8 @@ public final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
             "description=\(request.order.orderDescription ?? "<nil>") " +
             "invoiceNumber=\(request.order.invoiceNumber ?? "<nil>")}"
         )
-        // NOTE: Fiserv's `charges(amount:)` atomic API does not accept a
-        // billing address / cardholder name. The customer data is still
-        // persisted at /initiate (step 1) and echoed in logs so that any
-        // "John Doe"-style sandbox cardholder name in the CommerceHub
-        // response can be traced back to the processor, not the SDK.
+        // Fiserv's atomic API has no slot for customer data; it ships only
+        // at /initiate and in the logs above.
 
         let started = Date()
         let response: Models.CommerceHubResponse
@@ -244,7 +209,7 @@ public final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
                 transactionDetailsRequest: details
             )
         } catch {
-            throw Self.mapError(error, fallbackKind: .nfcFailed)
+            throw Self.mapError(error) { .nfcFailed(reason: $0) }
         }
 
         let elapsedMs = Int(Date().timeIntervalSince(started) * 1000)
@@ -267,29 +232,27 @@ public final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
     }
 
     public func cancelReading() async {
-        tearDownReader(clearingCredentials: false)
+        logger.info("[fiserv.cancel] clearing reader state")
+        clearAllState()
     }
 
     public func cleanUp() async {
-        tearDownReader(clearingCredentials: true)
+        logger.info("[fiserv.cleanup] clearing reader state")
+        clearAllState()
     }
 
     // MARK: - Private
 
-    /// Releases the Fiserv reader and, optionally, the cached credentials.
-    /// Kept synchronous so the lock can be used safely from `async` callers.
-    private func tearDownReader(clearingCredentials: Bool) {
+    /// Releases the reader and clears `self.credentials`. After this the
+    /// adapter requires a full `configure()` + `prepareReader()` cycle.
+    /// Synchronous so the lock is safe from `async` callers.
+    private func clearAllState() {
         lock.lock()
         #if canImport(FiservTTP)
-        sessionReadyCancellable?.cancel()
-        sessionReadyCancellable = nil
         reader?.finalize()
         reader = nil
-        _isSessionActive = false
         #endif
-        if clearingCredentials {
-            credentials = nil
-        }
+        credentials = nil
         lock.unlock()
     }
 
@@ -302,16 +265,12 @@ public final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
         return creds
     }
 
-    /// Builds a fresh `FiservTTPCardReader`, tearing down any previous instance
-    /// first — Apple's `PaymentCardReader` allows only one active instance per
-    /// process.
+    /// Builds a fresh `FiservTTPCardReader`. Tears down the previous instance
+    /// first — Apple's `PaymentCardReader` allows only one per process.
     private func buildReader(credentials creds: Credentials) throws -> FiservTTPCardReader {
         lock.lock()
-        sessionReadyCancellable?.cancel()
-        sessionReadyCancellable = nil
         reader?.finalize()
         reader = nil
-        _isSessionActive = false
         lock.unlock()
 
         let config = FiservTTPConfig(
@@ -329,15 +288,8 @@ public final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
 
         let newReader = FiservTTPCardReader(configuration: config)
 
-        let cancellable = newReader.sessionReadySubject
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] ready in
-                self?.isSessionActive = ready
-            }
-
         lock.lock()
         reader = newReader
-        sessionReadyCancellable = cancellable
         lock.unlock()
 
         return newReader
@@ -353,10 +305,8 @@ public final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
         }
     }
 
-    /// Best-effort `card.brand` extraction from the Fiserv response for
-    /// surfacing on `CardReadResult.cardNetwork`.
-    /// Returns the JSON data re-encoded with `.prettyPrinted` for log
-    /// readability, or `nil` if `json` isn't valid JSON.
+    /// Re-encodes `json` with `.prettyPrinted` + `.sortedKeys` for log output.
+    /// Returns `nil` if `json` isn't valid JSON.
     private static func prettyPrintJSON(_ json: Data) -> String? {
         guard
             let obj = try? JSONSerialization.jsonObject(with: json),
@@ -368,11 +318,12 @@ public final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
         return String(data: pretty, encoding: .utf8)
     }
 
+    /// Pulls `card.brand` out of the CommerceHub response for
+    /// `CardReadResult.cardNetwork`. Tolerates minor schema drift.
     private static func extractCardNetwork(from json: Data) -> String? {
         guard
             let obj = try? JSONSerialization.jsonObject(with: json) as? [String: Any]
         else { return nil }
-        // CommerceHub shape — tolerate minor schema drift.
         if let pm = (obj["source"] as? [String: Any]) ?? (obj["paymentSources"] as? [String: Any]) {
             if let brand = pm["brand"] as? String { return brand }
             if let card = pm["card"] as? [String: Any], let brand = card["brand"] as? String {
@@ -381,58 +332,10 @@ public final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
         }
         return nil
     }
-
-    /// Map Fiserv / ProximityReader errors to `PayabliTTPError`. Cancellations
-    /// become `.nfcFailed(reason: "cancelled: ...")`, so callers can detect them
-    /// by substring if they need user-cancel UX.
-    private static func mapError(
-        _ error: Error,
-        fallbackKind: PayabliTTPErrorKind
-    ) -> PayabliTTPError {
-        if let pte = error as? PayabliTTPError { return pte }
-
-        if (error as NSError).code == NSUserCancelledError {
-            return .nfcFailed(reason: "cancelled: user dismissed Tap to Pay sheet")
-        }
-
-        if #available(iOS 16.4, *), error is PaymentCardReaderError {
-            let desc = error.localizedDescription
-            if desc.lowercased().contains("version") {
-                return .readerSetupFailed(reason: "OS version not supported: \(desc)")
-            }
-        }
-
-        let detail = extractFiservDetail(error)
-        let desc = detail.isEmpty ? error.localizedDescription : detail
-        switch fallbackKind {
-        case .readerSetupFailed: return .readerSetupFailed(reason: desc)
-        case .nfcFailed: return .nfcFailed(reason: desc)
-        }
-    }
-
-    /// `FiservTTPCardReaderError` is a struct whose stored `localizedDescription`
-    /// property shadows — but does NOT override — `Error.localizedDescription`,
-    /// so `error.localizedDescription` produces a generic NSError message. Pull
-    /// the real title + description via reflection (matches the old SDK).
-    private static func extractFiservDetail(_ error: Error) -> String {
-        let mirror = Mirror(reflecting: error)
-        let title = mirror.children.first(where: { $0.label == "title" })?.value as? String
-        let desc = mirror.children.first(where: { $0.label == "localizedDescription" })?.value as? String
-        if let title, let desc { return "\(title): \(desc)" }
-        if let desc { return desc }
-        return ""
-    }
     #endif
 }
 
-/// Private discriminator used to route `mapError` to the correct fallback
-/// `PayabliTTPError` case (setup vs. NFC failure).
-private enum PayabliTTPErrorKind {
-    case readerSetupFailed
-    case nfcFailed
-}
-
-// MARK: - Decimal rounding (matches old SDK behavior)
+// MARK: - Decimal rounding
 
 private extension Decimal {
     func rounded(_ scale: Int, _ roundingMode: NSDecimalNumber.RoundingMode) -> Decimal {

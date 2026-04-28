@@ -2,7 +2,8 @@ import Foundation
 
 // MARK: - Backend wire types (PRD §8.2)
 //
-// Split from `AppAttestService.swift` for readability. Same module — internal access.
+// Endpoint-specific DTOs for the attestation family. Generic envelope
+// scaffolding lives in `PayabliSDKCore.PayabliEnvelope`.
 
 // MARK: /challenge
 
@@ -17,7 +18,7 @@ struct ChallengeResponse: Decodable {
 
 struct RegisterRequest: Encodable {
     let entry: String
-    let keyId: String
+    let keyId: AppAttestKeyId
     let hardwareId: String
     let deviceName: String
     let model: String
@@ -34,8 +35,8 @@ struct RegisterResponse: Decodable {
 
 struct AttestRequest: Encodable {
     let challengeId: String
-    let keyId: String
-    let attestation: String
+    let keyId: AppAttestKeyId
+    let attestation: AttestationObject
     let deviceId: String
     let appId: String
     let entry: String
@@ -49,40 +50,3 @@ struct ActivateRequest: Encodable {
     let deviceId: String
     let activationCode: String
 }
-
-struct ActivationChallengeRequest: Encodable {
-    let entry: String
-    let deviceId: String
-}
-
-struct ActivationChallengePayload: Decodable {
-    let code: String
-    let expiresAt: Date?
-    let alreadyIssued: Bool?
-}
-
-struct ActivationChallengeEnvelope: Decodable {
-    let responseData: ActivationChallengePayload?
-}
-
-// MARK: Generic envelope helpers (HTTP 200 + isSuccess: false)
-
-struct DeclinePayload: Decodable {
-    let resultCode: Int?
-    let resultText: String?
-}
-
-struct RawEnvelope: Decodable {
-    let isSuccess: Bool?
-    let responseText: String?
-}
-
-struct SuccessEnvelope<Payload: Decodable>: Decodable {
-    let responseData: Payload?
-}
-
-struct DeclineEnvelope: Decodable {
-    let responseData: DeclinePayload?
-}
-
-struct EmptyPayload: Decodable {}

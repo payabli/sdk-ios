@@ -12,7 +12,7 @@ import Foundation
 ///      / lastName / customerNumber` (PRD §8.2 "Initiate request").
 ///   2. Provider `startReading(_:)` — forwarded via `CardReadRequest.customer`
 ///      so adapters that can pass a cardholder name to their processor SDK
-///      (e.g. Stripe `BillingDetails`) receive it. Fiserv's atomic
+///      (e.g. `BillingDetails`) receive it. Fiserv's atomic
 ///      `charges(amount:)` call does not accept a billing address, so the
 ///      Fiserv adapter only logs it — but the data is still available to any
 ///      future provider that needs it.

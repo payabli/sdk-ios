@@ -41,11 +41,8 @@ final class PayabliTTPTests: XCTestCase {
     private func makeTTP(
         provider: MockTapToPayProvider = MockTapToPayProvider(),
         attestation: MockDeviceAttestationService = MockDeviceAttestationService(),
-        defaults: UserDefaults = UserDefaults(suiteName: "com.payabli.tests.ttp")!,
         retry: RetryPolicy = RetryPolicy(maxAttempts: 1, baseDelay: 0, maxDelay: 0, multiplier: 1, maxJitter: 0)
     ) -> (PayabliTTP, MockTapToPayProvider, MockDeviceAttestationService) {
-        defaults.removePersistentDomain(forName: "com.payabli.tests.ttp")
-        let queue = PendingUpdateQueue(defaults: defaults)
         let config = PayabliConfig(
             accessToken: "seed_token",
             entryPoint: "e",
@@ -56,7 +53,6 @@ final class PayabliTTPTests: XCTestCase {
             appId: "appid",
             provider: provider,
             attestation: attestation,
-            queue: queue,
             retryPolicy: retry,
             session: StubURLProtocol.makeSession()
         )

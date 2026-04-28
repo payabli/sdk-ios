@@ -1,8 +1,6 @@
 import Foundation
 
-/// Lifecycle events emitted by `PayabliTTP.events()`.
-///
-/// The 17 event types catalog from PRD §20.1.
+/// Lifecycle events emitted by `PayabliTTP.events()` (PRD §20.1).
 public enum PayabliTTPEvent: Sendable {
     case attestationStarted
     case attestationCompleted
@@ -15,12 +13,13 @@ public enum PayabliTTPEvent: Sendable {
     case nfcFailed(error: String)
     case updateCompleted(paymentTransId: String)
     case updateFailed(paymentTransId: String, error: String)
-    case pendingUpdateEnqueued(paymentTransId: String)
-    case pendingUpdateSynced(paymentTransId: String)
     case sessionExpired
     case reinitializeStarted
     case reinitializeCompleted
     case devicePendingActivation
+    case activationStarted
+    case activationCompleted
+    case activationFailed(error: String)
 }
 
 /// TTP-specific errors (PRD §20.2).
@@ -29,10 +28,6 @@ public enum PayabliTTPError: Error, Sendable {
     case invalidState(current: PayabliTTPSessionState, attempted: String)
     case notReady(current: PayabliTTPSessionState)
     case devicePendingActivation
-    /// Server reported that the device has no active attestation (e.g. the
-    /// `DeviceAttestations` row was never created, or was revoked). The SDK
-    /// has already cleared its local attestation cache; callers should re-run
-    /// `initialize()` to perform a fresh attestation.
     case attestationRevoked(reason: String)
     case attestationFailed(reason: String)
     case configFailed(reason: String)

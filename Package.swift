@@ -60,7 +60,11 @@ let package = Package(
                     condition: .when(platforms: [.iOS])
                 )
             ],
-            path: "Sources/PayabliSDKPayIn"
+            path: "Sources/PayabliSDKPayIn",
+            exclude: [
+                "TapToPay/README.md",
+                "TapToPay/Adapters/README.md"
+            ]
         ),
         .target(
             name: "PayabliSDKTelemetry",

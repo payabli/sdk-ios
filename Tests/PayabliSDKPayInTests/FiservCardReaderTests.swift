@@ -104,16 +104,18 @@ final class FiservCardReaderTests: XCTestCase {
     func testCleanUpClearsCredentials() async {
         let reader = FiservCardReader()
         reader.setCredentials(
-            secretKey: "s",
-            apiKey: "a",
-            environment: "sandbox",
-            currencyCode: "USD",
-            merchantId: "m",
-            appleTtpMerchantId: "atm",
-            merchantName: "Test",
-            merchantCategoryCode: "1000",
-            terminalId: "t",
-            terminalProfileId: "tp"
+            FiservCardReader.Credentials(
+                secretKey: "s",
+                apiKey: "a",
+                environment: "sandbox",
+                currencyCode: "USD",
+                merchantId: "m",
+                appleTtpMerchantId: "atm",
+                merchantName: "Test",
+                merchantCategoryCode: "1000",
+                terminalId: "t",
+                terminalProfileId: "tp"
+            )
         )
         await reader.cleanUp()
         // After cleanUp, prepareReader should fail because credentials are gone.

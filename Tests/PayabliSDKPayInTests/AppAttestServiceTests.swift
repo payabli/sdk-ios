@@ -25,8 +25,6 @@ final class AppAttestServiceTests: XCTestCase {
             auth: auth,
             attestor: attestor,
             storage: storage,
-            entry: "myEntry",
-            appId: "TEAM.bundle.id",
             hardwareIdProvider: { "fixed-hw-id" },
             deviceNameProvider: { "iPhone" },
             modelProvider: { "iPhone15,2" },
@@ -146,7 +144,7 @@ final class AppAttestServiceTests: XCTestCase {
         try storage.set("cached_deviceId", forKey: PayabliKeychainKey.deviceId)
 
         let (sut, attestor, _) = makeAttest(storage: storage)
-        let headers = try await sut.generateAssertion(for: Data("payload".utf8))
+        let headers = try await sut.generateAssertion()
         XCTAssertEqual(headers.keyId, "cached_keyId")
         XCTAssertEqual(headers.deviceId, "cached_deviceId")
         XCTAssertFalse(headers.assertion.isEmpty)
@@ -157,7 +155,7 @@ final class AppAttestServiceTests: XCTestCase {
     func testGenerateAssertionFailsWithoutState() async throws {
         let (sut, _, _) = makeAttest()
         do {
-            _ = try await sut.generateAssertion(for: Data())
+            _ = try await sut.generateAssertion()
             XCTFail("expected throw")
         } catch PayabliTTPError.attestationFailed {
             // ok

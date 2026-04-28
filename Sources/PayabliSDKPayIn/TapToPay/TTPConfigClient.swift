@@ -35,22 +35,6 @@ public final class TTPConfigClient: Sendable {
     /// `.tokenExpired` — callers should clear attestation cache and re-attest
     /// (PRD §18.4).
     ///
-    /// Wire shape (see pay-in-api `TapToPayConfigResponse`):
-    /// ```json
-    /// {
-    ///   "isSuccess": true,
-    ///   "responseText": "Success",
-    ///   "responseData": {
-    ///     "credentials": {
-    ///       "secretKey": "...", "apiKey": "...", "merchantId": "...",
-    ///       "environment": "...", "currencyCode": "...",
-    ///       "appleTtpMerchantId": "...", "merchantName": "...",
-    ///       "merchantCategoryCode": "...", "terminalId": "...",
-    ///       "terminalProfileId": "..."
-    ///     }
-    ///   }
-    /// }
-    /// ```
     /// The SDK flattens `credentials` into `TTPConfig.providerCredentials`
     /// for the TapToPayProvider to consume.
     public func fetchConfig(entry: String) async throws -> TTPConfig {
@@ -87,33 +71,9 @@ public final class TTPConfigClient: Sendable {
             throw PayabliTTPError.configFailed(reason: "HTTP \(response.statusCode)")
         }
 
-        // Backend returns business-level failures as HTTP 200 +
-        // `isSuccess: false` (e.g. "Device not attested or attestation
-        // revoked."); treat those as errors with the server-side message.
-        struct RawEnvelope: Decodable {
-            let isSuccess: Bool?
-            let responseText: String?
-        }
-        struct DeclineData: Decodable {
-            let resultCode: Int?
-            let resultText: String?
-        }
-        struct DeclineEnvelope: Decodable {
-            let responseData: DeclineData?
-        }
-        struct SuccessEnvelope: Decodable {
-            struct Data: Decodable { let credentials: [String: String]? }
-            let responseData: Data?
-        }
-
-        let decoder = JSONDecoder()
-        let raw = try? decoder.decode(RawEnvelope.self, from: response.body)
-        if raw?.isSuccess == false {
-            let decline = try? decoder.decode(DeclineEnvelope.self, from: response.body)
-            let reason = decline?.responseData?.resultText
-                ?? raw?.responseText
-                ?? "server declined"
-            let code = decline?.responseData?.resultCode ?? 0
+        // Shared envelope helpers live in `PayabliSDKCore/Networking/ResponseEnvelope.swift`.
+        if let (rawCode, reason) = PayabliEnvelope.declineOutcome(from: response.body) {
+            let code = rawCode ?? 0
             logger.error("[config] declined (isSuccess=false code=\(code)): \(reason)")
             // 401 semantics from the server body: attestation was revoked or
             // device not attested → caller should clear cache and re-attest.
@@ -126,7 +86,11 @@ public final class TTPConfigClient: Sendable {
             throw PayabliTTPError.configFailed(reason: reason)
         }
 
-        guard let envelope = try? decoder.decode(SuccessEnvelope.self, from: response.body),
+        let decoder = JSONDecoder()
+        guard let envelope = try? decoder.decode(
+                PayabliEnvelope.Success<ConfigCredentialsPayload>.self,
+                from: response.body
+              ),
               let credentials = envelope.responseData?.credentials else {
             logger.error("[config] payload decode failed")
             throw PayabliTTPError.configFailed(reason: "Invalid config envelope")
@@ -139,6 +103,6 @@ public final class TTPConfigClient: Sendable {
     }
 
     private func assertionHeaders() async throws -> AssertionHeaders {
-        try await attestation.generateAssertion(for: Data())
+        try await attestation.generateAssertion()
     }
 }

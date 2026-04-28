@@ -27,7 +27,7 @@ Host applications that accept payments on iOS face two distinct problems (PRD §
 1. **Card-not-present:** PCI-DSS compliance burden from handling raw card data and orchestrating tokenization/capture flows against Payabli's API.
 2. **Card-present:** Apple's Tap to Pay on iPhone requires coordinating `DCAppAttestService`, ProximityReader, a payment processor SDK (Fiserv), and a multi-step transaction API with crash/network resilience.
 
-Without a first-party SDK, every partner reimplements SwiftUI forms, client-side validation, auth token lifecycle, Apple Pay, App Attest, retry logic, and offline queuing. This is error-prone, expensive, and produces inconsistent user experience across integrations.
+Without a first-party SDK, every partner reimplements SwiftUI forms, client-side validation, auth token lifecycle, Apple Pay, App Attest, and retry logic. This is error-prone, expensive, and produces inconsistent user experience across integrations.
 
 A sanctioned SDK reduces integration time to < 30 minutes (PRD §23.4), eliminates raw-card data from host apps (PCI scope reduction, NFR-1..5), and gives Payabli a controlled surface for observability (§24) and future platform evolution (Tier 1/Tier 2 session JWTs — §16).
 
@@ -40,8 +40,8 @@ A sanctioned SDK reduces integration time to < 30 minutes (PRD §23.4), eliminat
 - Client-credentials OAuth2 auth flow (§5.3 FR-6A)
 - SwiftUI drop-in forms with on-blur validation and `PayabliTheme` customization
 - Device attestation via `DCAppAttestService` with challenge/register/attest flow (§18)
-- Pending-update queue with retry policy and TTL eviction (§21)
-- 9-state TTP session state machine (§17) and 17-event lifecycle stream (§20)
+- Retry policy for transient backend failures (§21.1)
+- 9-state TTP session state machine (§17) and lifecycle event stream (§20)
 - Optional `PayabliSDKTelemetry` module (PostHog + Sentry)
 - Cross-platform bridge architecture for Flutter, MAUI, React Native (native module + bindings for Flutter and MAUI; RN architecture only, per FR-9.1)
 - Distribution: SPM, CocoaPods, signed XCFramework with `PrivacyInfo.xcprivacy`
@@ -67,7 +67,7 @@ Key invariants:
 - **Core has zero third-party dependencies.** Foundation, SwiftUI, and `os` only. Sentry, PostHog, Fiserv SDK are confined to optional adapter/telemetry modules.
 - **All components share one auth session.** One `PayabliConfig` → one access token → usable by any component.
 - **TTP is provider-agnostic.** `TapToPayProvider` protocol + `TapToPayProviderFactory`; Fiserv is the v1.0 default, but Stripe/Apple-direct can be added without touching the ViewModel or public API (FR-11A.6, FR-11A.7).
-- **Secrets live only in RAM.** `clientSecret`, access tokens, Fiserv credentials, card data — never persisted (NFR-5A..D). Keychain holds only non-secret identity (`keyId`, `deviceId`); UserDefaults holds only the non-sensitive pending-update queue.
+- **Secrets live only in RAM.** `clientSecret`, access tokens, Fiserv credentials, card data — never persisted (NFR-5A..D). Keychain holds only non-secret identity (`keyId`, `deviceId`); nothing else persists to disk.
 
 ## 5. Detailed design — phased implementation
 
@@ -145,14 +145,13 @@ Phases are ordered by dependency. Each phase produces a shippable artifact that 
 - `CardReadResult` value type
 - `SessionManager` — 9-state machine (§17) on `@MainActor`, `@Published sessionState`, transition enforcement, `reinitializeIfNeeded()`, `forceSessionExpiry()`
 - `DeviceAttestationService` — `DCAppAttestService` integration, challenge → register → attest flow (§18), SHA256 `clientDataHash`
-- `PendingUpdateQueue` — `UserDefaults`-backed, 50 entries, 7-day TTL, forward-compatible JSON decoding (drop corrupt entries, not whole queue)
 - Keychain storage for `keyId` / `deviceId` (`kSecClassGenericPassword`)
 - `RetryPolicy` — 3 attempts, 1s→8s exponential backoff with 0–0.5s jitter (§21.1)
-- `EventMulticaster` — `AsyncStream<PayabliTTPEvent>` per caller, multicast fan-out (17 event types, §20.1)
-- `PayabliTTP` facade (`@MainActor`, `ObservableObject`): `initialize()`, `activateDevice(activationCode:)`, `charge(amount:type:)`, `syncTransactions()`, `events()`, `isReady`, `sessionState`, `pendingUpdates`
+- `EventMulticaster` — `AsyncStream<PayabliTTPEvent>` per caller, multicast fan-out (§20.1)
+- `PayabliTTP` facade (`@MainActor`, `ObservableObject`): `initialize()`, `activateDevice(activationCode:)`, `charge(amount:type:)`, `events()`, `isReady`, `sessionState`
 - Typed errors (§20.2)
 - Mock `TapToPayProvider` for unit tests
-- Tests: state machine transitions, queue eviction/TTL/corrupt handling, retry backoff & jitter bounds, 401 recovery, token chaining, attestation with mocked `DCAppAttestService`
+- Tests: state machine transitions, retry backoff & jitter bounds, 401 recovery, token chaining, attestation with mocked `DCAppAttestService`
 
 ### Phase 6 — Fiserv TTP adapter (FR-11B)
 
@@ -184,7 +183,7 @@ Phases are ordered by dependency. Each phase produces a shippable artifact that 
 
 **Deliverable:** SwiftUI demo app exercising every public API; doubles as manual-QA harness (§12.3).
 
-- SwiftUI screens: tokenization (card / ACH / Apple Pay), payment (card / ACH / stored), Tap to Pay (init / charge / queue / activation)
+- SwiftUI screens: tokenization (card / ACH / Apple Pay), payment (card / ACH / stored), Tap to Pay (init / charge / activation)
 - Sandbox credentials via xcconfig / gitignored `Secrets.swift`
 - Demonstrates `PayabliConfig`, `PayabliTheme` customization, event stream observation, typed error handling
 - Manual QA checklist (§12.3) maps to demo screens
@@ -243,8 +242,8 @@ Parallelizable once core is stable:
 
 Aligned with PRD §12.
 
-- **Unit tests** (Phases 1–7): validators, ViewModel state, model encoding, state-machine transitions, retry policy bounds, queue TTL/corruption handling, mocked `DCAppAttestService` and `PKPaymentAuthorizationController`
-- **Integration tests** (Phases 2, 3, 5): end-to-end flows against `api-sandbox.payabli.com` — tokenization, `getpaid` (approved/declined/validation/server), TTP challenge→register→attest→config→initiate→update, 401 recovery, queue flush
+- **Unit tests** (Phases 1–7): validators, ViewModel state, model encoding, state-machine transitions, retry policy bounds, mocked `DCAppAttestService` and `PKPaymentAuthorizationController`
+- **Integration tests** (Phases 2, 3, 5): end-to-end flows against `api-sandbox.payabli.com` — tokenization, `getpaid` (approved/declined/validation/server), TTP challenge→register→attest→config→initiate→update, 401 recovery
 - **Instrumented tests** (Phase 6): physical iPhone XS+ on iOS 16.7+ against Fiserv sandbox
 - **Manual QA** (Phase 8): §12.3 checklist against demo app — form UX, wheel picker, sheet dismissal, Apple Pay on real device, TTP lifecycle, unsupported-device error paths, cross-platform demos
 - **TTP test matrix** (§12.4): the 10 scenarios in the PRD are executable against the mock provider (Phase 5) and the Fiserv provider (Phase 6)

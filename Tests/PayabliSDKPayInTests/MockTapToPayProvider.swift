@@ -55,13 +55,9 @@ final class MockDeviceAttestationService: DeviceAttestationService, @unchecked S
         AttestationResult(keyId: "mock_key", deviceId: "mock_device")
     )
     var activationResult: Result<Void, Error> = .success(())
-    var activationCodeResult: Result<ActivationCodeInfo, Error> = .success(
-        ActivationCodeInfo(code: "111111", expiresAt: nil, alreadyIssued: false)
-    )
     var attestCalls = 0
     var assertionCalls = 0
     var activateCalls = 0
-    var requestActivationCodeCalls = 0
 
     func attest(entry: String, appId: String) async throws -> AttestationResult {
         attestCalls += 1
@@ -74,7 +70,7 @@ final class MockDeviceAttestationService: DeviceAttestationService, @unchecked S
         }
     }
 
-    func generateAssertion(for data: Data) async throws -> AssertionHeaders {
+    func generateAssertion() async throws -> AssertionHeaders {
         assertionCalls += 1
         return AssertionHeaders(
             assertion: "mock_assertion",
@@ -82,14 +78,6 @@ final class MockDeviceAttestationService: DeviceAttestationService, @unchecked S
             deviceId: "mock_device",
             timestamp: "2026-04-21T00:00:00Z"
         )
-    }
-
-    func requestActivationCode(entry: String) async throws -> ActivationCodeInfo {
-        requestActivationCodeCalls += 1
-        switch activationCodeResult {
-        case .success(let info): return info
-        case .failure(let err): throw err
-        }
     }
 
     func activateDevice(activationCode: String, entry: String) async throws {
