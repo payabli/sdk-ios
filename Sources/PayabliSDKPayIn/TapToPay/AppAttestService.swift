@@ -6,58 +6,7 @@ import PayabliSDKCore
 import UIKit
 #endif
 
-// MARK: - Backend wire types (PRD §8.2)
-
-private struct ChallengeRequest: Encodable { let entry: String }
-private struct ChallengeResponse: Decodable {
-    let challengeId: String
-    let challenge: String
-}
-
-private struct RegisterRequest: Encodable {
-    let entry: String
-    let keyId: String
-    let hardwareId: String
-    let deviceName: String
-    let model: String
-    let osVersion: String
-    let platform: String
-}
-private struct RegisterResponse: Decodable {
-    let deviceId: String
-    let status: String?
-}
-
-private struct AttestRequest: Encodable {
-    let challengeId: String
-    let keyId: String
-    let attestation: String
-    let deviceId: String
-    let appId: String
-    let entry: String
-    let platform: String
-}
-
-private struct ActivateRequest: Encodable {
-    let entry: String
-    let deviceId: String
-    let activationCode: String
-}
-
-private struct ActivationChallengeRequest: Encodable {
-    let entry: String
-    let deviceId: String
-}
-
-private struct ActivationChallengePayload: Decodable {
-    let code: String
-    let expiresAt: Date?
-    let alreadyIssued: Bool?
-}
-
-private struct ActivationChallengeEnvelope: Decodable {
-    let responseData: ActivationChallengePayload?
-}
+// Wire-format DTOs: `AppAttestWireFormat.swift`.
 
 // MARK: - AppAttestService
 
@@ -346,36 +295,6 @@ public final class AppAttestService: DeviceAttestationService, @unchecked Sendab
 
     // MARK: - Internals
 
-    /// Generic decline/error payload shape returned when `isSuccess == false`.
-    /// The backend does not use HTTP error codes for business-level failures —
-    /// it returns HTTP 200 with this shape instead, so every caller must
-    /// inspect `isSuccess` in addition to the HTTP status.
-    private struct DeclinePayload: Decodable {
-        let resultCode: Int?
-        let resultText: String?
-    }
-
-    /// Decodes the top-level envelope without committing to a shape for
-    /// `responseData` (different shapes apply to success vs decline). Used as
-    /// a pre-pass to detect `isSuccess: false` and surface the server-side
-    /// reason without failing on "can't decode responseData".
-    private struct RawEnvelope: Decodable {
-        let isSuccess: Bool?
-        let responseText: String?
-    }
-
-    /// Envelope used when `isSuccess == true`. `responseData` decodes into the
-    /// caller-provided payload type.
-    private struct SuccessEnvelope<Payload: Decodable>: Decodable {
-        let responseData: Payload?
-    }
-
-    /// Shape of `responseData` on decline responses (used to extract a useful
-    /// server-side message when `isSuccess: false`).
-    private struct DeclineEnvelope: Decodable {
-        let responseData: DeclinePayload?
-    }
-
     private func postChallenge(entry: String) async throws -> ChallengeResponse {
         let data: ChallengeResponse? = try await postAttestationRequest(
             path: "/api/v2/device/taptopay/challenge",
@@ -400,7 +319,6 @@ public final class AppAttestService: DeviceAttestationService, @unchecked Sendab
         return data
     }
 
-    private struct EmptyPayload: Decodable {}
     private func postAttest(_ body: AttestRequest) async throws {
         let _: EmptyPayload? = try await postAttestationRequest(
             path: "/api/v2/device/taptopay/attest",

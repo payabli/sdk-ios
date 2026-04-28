@@ -13,6 +13,9 @@ import Foundation
 /// `providerResponseJSON`. Future providers that follow a "collect encrypted
 /// payload, charge server-side" flow can ignore the merchant IDs and populate
 /// `encryptedPayload` instead.
+///
+/// `CardReadRequest` and `CardReadResult` are defined in
+/// `Models/TapToPayCardRead.swift` (PRD §7.2).
 public protocol TapToPayProvider: AnyObject, Sendable {
     /// Identifier sent in the API payload `provider` field so the backend
     /// routes decryption correctly (PRD FR-11J.3).
@@ -54,84 +57,4 @@ public protocol TapToPayProvider: AnyObject, Sendable {
 
     /// Cleans up reader resources.
     func cleanUp() async
-}
-
-/// Parameters the facade hands to the provider for an NFC charge. Atomic
-/// providers (Fiserv) forward the merchant IDs to their processor SDK so the
-/// charge can be correlated with the Payabli `paymentTransId`.
-///
-/// `customer` and `order` carry the same structured data that was forwarded to
-/// `/initiate`, so adapters that can attach a cardholder name or an order id
-/// to their processor SDK receive a ready-to-use snapshot. Adapters that have
-/// no use for these fields (e.g. Fiserv `charges(amount:)` which does not
-/// accept a billing address) may ignore them — the facade still logs them for
-/// diagnostics.
-public struct CardReadRequest: Sendable {
-    public let amount: Decimal
-    /// Payabli-generated `paymentTransId` from `/initiate`. Sent to the
-    /// processor SDK as its primary merchant-side correlation identifier.
-    public let merchantTransactionId: String
-    public let merchantOrderId: String?
-    public let merchantInvoiceNumber: String?
-    /// Structured customer data as provided to `PayabliTTP.charge(..., customer:)`.
-    /// Never `nil` — an empty `PayabliTTPCustomerData` is passed when the host
-    /// app did not supply customer information, so adapters can always rely on
-    /// a concrete value type.
-    public let customer: PayabliTTPCustomerData
-    /// Structured order data as provided to `PayabliTTP.charge(..., order:)`.
-    public let order: PayabliTTPOrderData
-
-    public init(
-        amount: Decimal,
-        merchantTransactionId: String,
-        merchantOrderId: String? = nil,
-        merchantInvoiceNumber: String? = nil,
-        customer: PayabliTTPCustomerData = PayabliTTPCustomerData(),
-        order: PayabliTTPOrderData = PayabliTTPOrderData()
-    ) {
-        self.amount = amount
-        self.merchantTransactionId = merchantTransactionId
-        self.merchantOrderId = merchantOrderId
-        self.merchantInvoiceNumber = merchantInvoiceNumber
-        self.customer = customer
-        self.order = order
-    }
-}
-
-/// Provider-agnostic encrypted card-read result (PRD FR-11A.3).
-public struct CardReadResult: Sendable {
-    /// Provider identifier — see `TapToPayProvider.providerId`.
-    public let provider: String
-
-    /// Encrypted payload the backend forwards to the processor. Used by
-    /// providers that follow a "collect then charge" flow. For atomic providers
-    /// (Fiserv) this is empty and the full response lives in
-    /// `providerResponseJSON`.
-    public let encryptedPayload: Data
-
-    /// Detected card network, when the provider can surface it.
-    public let cardNetwork: String?
-
-    /// Additional provider-specific string metadata (forwarded as-is to the API).
-    public let providerMetadata: [String: String]
-
-    /// Full provider charge response, encoded as JSON. Forwarded verbatim to
-    /// `PATCH /api/v2/MoneyIn/update/{id}` under the `fiservResponse` key.
-    /// `nil` when the provider does not return a processor response at the SDK
-    /// layer (payload-only providers).
-    public let providerResponseJSON: Data?
-
-    public init(
-        provider: String,
-        encryptedPayload: Data,
-        cardNetwork: String? = nil,
-        providerMetadata: [String: String] = [:],
-        providerResponseJSON: Data? = nil
-    ) {
-        self.provider = provider
-        self.encryptedPayload = encryptedPayload
-        self.cardNetwork = cardNetwork
-        self.providerMetadata = providerMetadata
-        self.providerResponseJSON = providerResponseJSON
-    }
 }
