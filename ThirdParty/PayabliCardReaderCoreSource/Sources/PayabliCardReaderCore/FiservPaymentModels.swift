@@ -1,3 +1,4 @@
+#if os(iOS)
 //  FiservPaymentModels
 //
 //  Copyright (c) 2022 - 2025 Fiserv, Inc.
@@ -779,3 +780,5 @@ extension Models.ApprovedAmountResponse {
         self.currency = try container.decode(String.self, forKey: .currency)
     }
 }
+
+#endif // os(iOS)

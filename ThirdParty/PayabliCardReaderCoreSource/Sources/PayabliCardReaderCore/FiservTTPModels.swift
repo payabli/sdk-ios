@@ -1,3 +1,4 @@
+#if os(iOS)
 //  FiservTTP
 //
 //  Copyright (c) 2022 - 2025 Fiserv, Inc.
@@ -662,3 +663,5 @@ public struct FiservTTPChargeResponseDebitPinlessIndicator: Codable {
     public let debitNetworkId: String?
     public let pinnedPOS: String?
 }
+
+#endif // os(iOS)

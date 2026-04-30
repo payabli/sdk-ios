@@ -1,6 +1,6 @@
 import Foundation
 import PayabliSDKCore
-#if canImport(PayabliCardReaderCore)
+#if canImport(PayabliCardReaderCore) && canImport(ProximityReader)
 import PayabliCardReaderCore
 import ProximityReader
 #endif
@@ -63,7 +63,7 @@ public final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
     private var credentials: Credentials?
     private let logger = PayabliLogger(category: .taptopay)
 
-    #if canImport(PayabliCardReaderCore)
+    #if canImport(PayabliCardReaderCore) && canImport(ProximityReader)
     private var reader: FiservTTPCardReader?
     #endif
 
@@ -126,7 +126,7 @@ public final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
     /// Platform + `PaymentCardReader` hardware check. Runs before `/config`
     /// is fetched, so must not require credentials.
     public func checkEligibility() async -> Result<Void, PayabliTTPError> {
-        #if canImport(PayabliCardReaderCore)
+        #if canImport(PayabliCardReaderCore) && canImport(ProximityReader)
         if #available(iOS 16.7, *) {
             guard PaymentCardReader.isSupported else {
                 return .failure(.readerSetupFailed(
@@ -142,7 +142,7 @@ public final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
     }
 
     public func prepareReader() async throws {
-        #if canImport(PayabliCardReaderCore)
+        #if canImport(PayabliCardReaderCore) && canImport(ProximityReader)
         let creds = try requireCredentials()
         let newReader = try buildReader(credentials: creds)
 
@@ -172,7 +172,7 @@ public final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
     }
 
     public func startReading(_ request: CardReadRequest) async throws -> CardReadResult {
-        #if canImport(PayabliCardReaderCore)
+        #if canImport(PayabliCardReaderCore) && canImport(ProximityReader)
         lock.lock()
         let activeReader = reader
         lock.unlock()
@@ -249,7 +249,7 @@ public final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
     /// Synchronous so the lock is safe from `async` callers.
     private func clearAllState() {
         lock.lock()
-        #if canImport(PayabliCardReaderCore)
+        #if canImport(PayabliCardReaderCore) && canImport(ProximityReader)
         reader?.finalize()
         reader = nil
         #endif
@@ -257,7 +257,7 @@ public final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
         lock.unlock()
     }
 
-    #if canImport(PayabliCardReaderCore)
+    #if canImport(PayabliCardReaderCore) && canImport(ProximityReader)
     private func requireCredentials() throws -> Credentials {
         lock.lock(); defer { lock.unlock() }
         guard let creds = credentials else {

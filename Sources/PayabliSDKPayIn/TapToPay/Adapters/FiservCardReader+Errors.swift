@@ -1,6 +1,6 @@
 import Foundation
 import PayabliSDKCore
-#if canImport(PayabliCardReaderCore)
+#if canImport(PayabliCardReaderCore) && canImport(ProximityReader)
 import PayabliCardReaderCore
 import ProximityReader
 #endif
@@ -13,7 +13,7 @@ extension FiservCardReader {
     /// can distinguish it from a hard failure by substring.
     static let cancellationReasonPrefix = "cancelled:"
 
-    #if canImport(PayabliCardReaderCore)
+    #if canImport(PayabliCardReaderCore) && canImport(ProximityReader)
 
     /// Translates a card-reader / ProximityReader error into `PayabliTTPError`.
     /// `fallback` picks the case (setup vs. NFC) for non-cancel errors.
