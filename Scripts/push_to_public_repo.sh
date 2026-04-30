@@ -78,32 +78,57 @@ if [[ -f "$REPO_ROOT/THIRD_PARTY_LICENSES.txt" ]]; then
     cp "$REPO_ROOT/THIRD_PARTY_LICENSES.txt" "NOTICE"
 fi
 
+# Classify the release channel from the version suffix. Controls whether
+# `main` on the public repo advances (Production only) or the commit stays
+# orphan and only the tag is pushed (QA / Sandbox).
+case "$VERSION" in
+    *-qa)    env_label="qa"         ; is_production=false ;;
+    *-beta)  env_label="sandbox"    ; is_production=false ;;
+    *)       env_label="production" ; is_production=true  ;;
+esac
+
+# Always create a local commit so the tag has a stable object to point at,
+# even for non-production channels (tags pointing at orphan commits work
+# fine — git preserves any commit referenced by a tag regardless of branch
+# reachability).
 if git diff --quiet && git diff --cached --quiet; then
-    echo "[push] no diff against ${PUBLIC_REPO}@${PUBLIC_BRANCH} — skipping commit"
+    # Rare: a workflow_dispatch re-run that somehow produced byte-identical
+    # manifests. Still need a commit so the tag can point somewhere new.
+    echo "[push] no diff against ${PUBLIC_REPO}@${PUBLIC_BRANCH} — creating empty release commit"
+    git commit --allow-empty -m "release: ${VERSION} (${env_label})"
 else
     git add -A
-    # Pick a sensible env label for the commit subject.
-    case "$VERSION" in
-        *-qa)    env_label="qa" ;;
-        *-beta)  env_label="sandbox" ;;
-        *)       env_label="production" ;;
-    esac
     git commit -m "release: ${VERSION} (${env_label})"
-    echo "[push] pushing commit to ${PUBLIC_BRANCH}"
-    git push origin "$PUBLIC_BRANCH"
 fi
 
 # Tags are immutable: fail loudly if we accidentally re-publish the same
 # version (monotonic versioning should prevent this, but double-checking
 # protects against accidental re-runs of workflow_dispatch).
-if git rev-parse "refs/tags/${VERSION}" >/dev/null 2>&1; then
-    echo "error: tag ${VERSION} already exists in ${PUBLIC_REPO}" >&2
+if git ls-remote --tags origin "refs/tags/${VERSION}" | grep -q "refs/tags/${VERSION}"; then
+    echo "error: tag ${VERSION} already exists on ${PUBLIC_REPO}" >&2
     exit 1
 fi
 
 echo "[push] tagging ${VERSION}"
 git tag -a "$VERSION" -m "PayabliSDK ${VERSION}"
+
+# Push the tag first. `git push` of a tag also uploads any commits it
+# references, so the commit with the rendered manifests becomes permanent
+# in the remote's object store — reachable by `git checkout <tag>` and by
+# SPM resolvers, whether or not it's on any branch.
+echo "[push] pushing tag ${VERSION}"
 git push origin "refs/tags/${VERSION}"
+
+# Production releases additionally advance `main` so a naked `git clone` of
+# the public repo shows the latest GA manifest. QA / Sandbox releases do
+# NOT push the branch: `main` stays on the previous production commit, and
+# the QA/beta tag lives as an orphan object reachable only by tag name.
+if [[ "$is_production" == true ]]; then
+    echo "[push] production release — pushing commit to ${PUBLIC_BRANCH}"
+    git push origin "$PUBLIC_BRANCH"
+else
+    echo "[push] ${env_label} release — leaving ${PUBLIC_BRANCH} untouched (tag-only publish)"
+fi
 
 # GitHub Release — pre-releases are marked for qa/beta suffixes.
 prerelease_flag=""

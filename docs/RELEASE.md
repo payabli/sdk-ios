@@ -25,6 +25,23 @@ All three tiers publish tags to the **same** public repo
 `payabli/payabli-sdk-ios`. Consumers pick a tier by the tag pattern they
 resolve (`from: "1.0.0"` = GA only, `exact: "1.0.247-beta"` = sandbox, etc.).
 
+### Public repo branching model
+
+The public distribution repo is tag-driven, not branch-driven:
+
+- **Branches:** only `main`. Consumers should never resolve by branch.
+- **Tags:** one per release across all three tiers
+  (`1.0.247-qa`, `1.0.248-beta`, `1.0.249`, …). Every tag is immutable
+  and carries its own rendered `Package.swift` with the correct S3 bucket.
+
+The `main` branch **only advances on Production releases**. QA and Sandbox
+releases create a tag that points at an orphan commit (a commit not on any
+branch). Git preserves any object referenced by a tag, so SPM resolvers
+resolve these tags correctly — they just aren't reachable from the branch
+graph. Net effect: a naked `git clone https://github.com/payabli/payabli-sdk-ios`
+always shows the latest GA manifest, not whatever intermediate QA/beta
+artifact happened to ship last.
+
 ## Promotion flow
 
 ```

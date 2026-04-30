@@ -53,7 +53,10 @@ the doc wins.
 
 ## Public repo (`payabli/payabli-sdk-ios`) — distribution mirror
 
-Only has `main`:
+Only has `main`. `main` only advances on **Production** releases; QA and
+Sandbox releases publish tags pointing at orphan commits (see
+`Scripts/push_to_public_repo.sh` and `docs/RELEASE.md §Public repo
+branching model`).
 
 - **Require a pull request before merging:** no. The only writer is the
   release bot using `PUBLIC_REPO_PAT`. The PAT owner is in the
