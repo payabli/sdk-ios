@@ -2,17 +2,18 @@ import Foundation
 
 /// Provider-agnostic abstraction over the contactless NFC card reader.
 ///
-/// Implementations (Fiserv, Apple ProximityReader direct, etc.) are
-/// registered with `TapToPayProviderFactory`. The TTP facade depends only on
-/// this protocol (PRD FR-11A.1..7).
+/// Implementations (the vendored `PayabliCardReaderCore` adapter, future
+/// Apple ProximityReader direct, etc.) are registered with
+/// `TapToPayProviderFactory`. The TTP facade depends only on this protocol
+/// (PRD FR-11A.1..7).
 ///
-/// v1.0 only ships the Fiserv adapter. Because FiservTTP's `charges(amount:)`
-/// is atomic (NFC read + charge in a single SDK call), `startReading` receives
-/// a `CardReadRequest` (amount + merchant correlation IDs) and returns a
-/// `CardReadResult` that carries the full processor response JSON under
-/// `providerResponseJSON`. Future providers that follow a "collect encrypted
-/// payload, charge server-side" flow can ignore the merchant IDs and populate
-/// `encryptedPayload` instead.
+/// v1.0 only ships the `PayabliCardReaderCore` adapter. Because that
+/// adapter's `charges(amount:)` is atomic (NFC read + charge in a single SDK
+/// call), `startReading` receives a `CardReadRequest` (amount + merchant
+/// correlation IDs) and returns a `CardReadResult` that carries the full
+/// processor response JSON under `providerResponseJSON`. Future providers
+/// that follow a "collect encrypted payload, charge server-side" flow can
+/// ignore the merchant IDs and populate `encryptedPayload` instead.
 ///
 /// `CardReadRequest` and `CardReadResult` are defined in
 /// `Models/TapToPayCardRead.swift` (PRD §7.2).

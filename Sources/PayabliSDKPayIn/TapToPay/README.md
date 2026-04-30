@@ -58,7 +58,7 @@ rejected, keeping the machine honest.
 The split mirrors the facade pattern: one class declaration, one file per
 concern. The convenience init on `PayabliTTP` is only available where
 `DeviceCheck` can be imported. Package floor is already iOS 16.7 (from
-FiservTTP / ProximityReader) and macOS 12 — both well above
+`PayabliCardReaderCore` / `ProximityReader`) and macOS 12 — both well above
 `DCAppAttestService`'s own minimums — so no inline `@available` gates are
 required. Platforms without `DeviceCheck` must use the designated init
 with a custom `DeviceAttestationService`.

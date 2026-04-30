@@ -1,19 +1,20 @@
 import Foundation
 import PayabliSDKCore
-#if canImport(FiservTTP)
-import FiservTTP
+#if canImport(PayabliCardReaderCore)
+import PayabliCardReaderCore
 import ProximityReader
 #endif
 
-/// Fiserv adapter for `TapToPayProvider` (PRD FR-11B).
+/// Card-reader adapter for `TapToPayProvider` (PRD FR-11B), backed by the
+/// vendored `PayabliCardReaderCore` module.
 ///
-/// `FiservTTP.charges(amount:)` is atomic (NFC read + charge in one call), so
+/// `charges(amount:)` is atomic (NFC read + charge in one call), so
 /// `startReading` returns the full processor response as
 /// `providerResponseJSON` for the facade to forward verbatim.
 ///
 /// Credentials come from `/config` (FR-11B.3), live in RAM only (NFR-5D),
 /// and are dropped from `self` as soon as `buildReader` hands them to the
-/// Fiserv SDK. Retries require a fresh `/config` fetch.
+/// card-reader SDK. Retries require a fresh `/config` fetch.
 ///
 /// Error mapping: see `FiservCardReader+Errors.swift`.
 public final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
@@ -62,7 +63,7 @@ public final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
     private var credentials: Credentials?
     private let logger = PayabliLogger(category: .taptopay)
 
-    #if canImport(FiservTTP)
+    #if canImport(PayabliCardReaderCore)
     private var reader: FiservTTPCardReader?
     #endif
 
@@ -95,7 +96,7 @@ public final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
         let missing = Self.requiredCredentialKeys.filter { raw[$0]?.isEmpty != false }
         guard missing.isEmpty else {
             throw PayabliTTPError.readerSetupFailed(
-                reason: "Fiserv credentials missing required field(s): \(missing.joined(separator: ", "))"
+                reason: "Provider credentials missing required field(s): \(missing.joined(separator: ", "))"
             )
         }
 
@@ -125,7 +126,7 @@ public final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
     /// Platform + `PaymentCardReader` hardware check. Runs before `/config`
     /// is fetched, so must not require credentials.
     public func checkEligibility() async -> Result<Void, PayabliTTPError> {
-        #if canImport(FiservTTP)
+        #if canImport(PayabliCardReaderCore)
         if #available(iOS 16.7, *) {
             guard PaymentCardReader.isSupported else {
                 return .failure(.readerSetupFailed(
@@ -141,7 +142,7 @@ public final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
     }
 
     public func prepareReader() async throws {
-        #if canImport(FiservTTP)
+        #if canImport(PayabliCardReaderCore)
         let creds = try requireCredentials()
         let newReader = try buildReader(credentials: creds)
 
@@ -171,7 +172,7 @@ public final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
     }
 
     public func startReading(_ request: CardReadRequest) async throws -> CardReadResult {
-        #if canImport(FiservTTP)
+        #if canImport(PayabliCardReaderCore)
         lock.lock()
         let activeReader = reader
         lock.unlock()
@@ -197,8 +198,8 @@ public final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
             "description=\(request.order.orderDescription ?? "<nil>") " +
             "invoiceNumber=\(request.order.invoiceNumber ?? "<nil>")}"
         )
-        // Fiserv's atomic API has no slot for customer data; it ships only
-        // at /initiate and in the logs above.
+        // The atomic card-reader API has no slot for customer data; it
+        // ships only at /initiate and in the logs above.
 
         let started = Date()
         let response: Models.CommerceHubResponse
@@ -248,7 +249,7 @@ public final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
     /// Synchronous so the lock is safe from `async` callers.
     private func clearAllState() {
         lock.lock()
-        #if canImport(FiservTTP)
+        #if canImport(PayabliCardReaderCore)
         reader?.finalize()
         reader = nil
         #endif
@@ -256,17 +257,18 @@ public final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
         lock.unlock()
     }
 
-    #if canImport(FiservTTP)
+    #if canImport(PayabliCardReaderCore)
     private func requireCredentials() throws -> Credentials {
         lock.lock(); defer { lock.unlock() }
         guard let creds = credentials else {
-            throw PayabliTTPError.readerSetupFailed(reason: "Missing Fiserv credentials")
+            throw PayabliTTPError.readerSetupFailed(reason: "Missing provider credentials")
         }
         return creds
     }
 
-    /// Builds a fresh `FiservTTPCardReader`. Tears down the previous instance
-    /// first — Apple's `PaymentCardReader` allows only one per process.
+    /// Builds a fresh `FiservTTPCardReader` (vendored from PayabliCardReaderCore).
+    /// Tears down the previous instance first — Apple's `PaymentCardReader`
+    /// allows only one per process.
     private func buildReader(credentials creds: Credentials) throws -> FiservTTPCardReader {
         lock.lock()
         reader?.finalize()
@@ -300,7 +302,7 @@ public final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
             return try JSONEncoder().encode(value)
         } catch {
             throw PayabliTTPError.nfcFailed(
-                reason: "Failed to encode Fiserv response: \(error.localizedDescription)"
+                reason: "Failed to encode provider response: \(error.localizedDescription)"
             )
         }
     }

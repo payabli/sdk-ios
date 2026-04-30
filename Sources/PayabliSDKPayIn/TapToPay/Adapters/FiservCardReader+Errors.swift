@@ -1,11 +1,11 @@
 import Foundation
 import PayabliSDKCore
-#if canImport(FiservTTP)
-import FiservTTP
+#if canImport(PayabliCardReaderCore)
+import PayabliCardReaderCore
 import ProximityReader
 #endif
 
-// MARK: - Fiserv error mapping
+// MARK: - Card reader error mapping
 
 extension FiservCardReader {
 
@@ -13,9 +13,9 @@ extension FiservCardReader {
     /// can distinguish it from a hard failure by substring.
     static let cancellationReasonPrefix = "cancelled:"
 
-    #if canImport(FiservTTP)
+    #if canImport(PayabliCardReaderCore)
 
-    /// Translates a Fiserv / ProximityReader error into `PayabliTTPError`.
+    /// Translates a card-reader / ProximityReader error into `PayabliTTPError`.
     /// `fallback` picks the case (setup vs. NFC) for non-cancel errors.
     static func mapError(
         _ error: Error,
@@ -36,7 +36,7 @@ extension FiservCardReader {
             }
         }
 
-        let detail = extractFiservDetail(error)
+        let detail = extractReaderDetail(error)
         return fallback(detail.isEmpty ? error.localizedDescription : detail)
     }
 
@@ -44,7 +44,7 @@ extension FiservCardReader {
     /// that shadows (doesn't override) `Error.localizedDescription`, so the
     /// usual accessor returns a generic NSError message. Read the real
     /// `title` + `localizedDescription` via reflection.
-    static func extractFiservDetail(_ error: Error) -> String {
+    static func extractReaderDetail(_ error: Error) -> String {
         let mirror = Mirror(reflecting: error)
         let title = mirror.children.first(where: { $0.label == "title" })?.value as? String
         let desc = mirror.children.first(where: { $0.label == "localizedDescription" })?.value as? String

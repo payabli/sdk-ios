@@ -65,8 +65,8 @@ public final class PayabliTTP: ObservableObject {
     /// `tokenProvider` callback for refreshes (see `PayabliConfig`).
     ///
     /// Only available where Apple's `DeviceCheck` framework is importable.
-    /// The package minimums (iOS 16.7 from FiservTTP / ProximityReader, and
-    /// macOS 12 from `Package.swift`) are both well above `DCAppAttestService`'s
+    /// The package minimums (iOS 16.7 from PayabliCardReaderCore / ProximityReader,
+    /// and macOS 12 from `Package.swift`) are both well above `DCAppAttestService`'s
     /// own floor (iOS 14 / macOS 11.3), so no extra `@available` gate is needed.
     /// Platforms without `DeviceCheck` must use the designated init with a
     /// custom `DeviceAttestationService`.

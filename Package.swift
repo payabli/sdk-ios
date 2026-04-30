@@ -5,8 +5,9 @@ let package = Package(
     name: "PayabliSDK",
     defaultLocalization: "en",
     platforms: [
-        // 16.7 is the minimum required by FiservTTP / Apple's ProximityReader.
-        // Non-TTP modules still compile for macOS for local `swift test`.
+        // 16.7 is the minimum required by PayabliCardReaderCore (Apple's
+        // ProximityReader). Non-TTP modules still compile for macOS so local
+        // `swift test` runs without requiring a simulator.
         .iOS("16.7"),
         .macOS(.v12)
     ],
@@ -34,14 +35,13 @@ let package = Package(
             targets: ["PayabliSDKTelemetry"]
         )
     ],
-    // PayabliSDKCore and PayabliSDKTelemetry stay dep-free (NFR-8). PayabliSDKPayIn
-    // pulls FiservTTP only on iOS via a platform-conditional product dependency so
-    // macOS test compilation still works (the adapter file is gated with
-    // `#if canImport(FiservTTP)`). Telemetry integrations with Sentry / PostHog
-    // remain "bring your own instance".
-    dependencies: [
-        .package(url: "https://github.com/Fiserv/TTPPackage.git", from: "1.0.7")
-    ],
+    // Zero external SPM dependencies. PayabliCardReaderCore (MIT-licensed Tap
+    // to Phone engine) is vendored at `ThirdParty/PayabliCardReaderCoreSource/`
+    // and compiled as a local target so the public Package.swift, Package.resolved,
+    // `otool -L`, and `.swiftinterface` of the shipped binary contain no
+    // third-party package references. Telemetry integrations with Sentry /
+    // PostHog remain "bring your own instance".
+    dependencies: [],
     targets: [
         .target(
             name: "PayabliSDKCore",
@@ -51,12 +51,15 @@ let package = Package(
             ]
         ),
         .target(
+            name: "PayabliCardReaderCore",
+            path: "ThirdParty/PayabliCardReaderCoreSource/Sources/PayabliCardReaderCore"
+        ),
+        .target(
             name: "PayabliSDKPayIn",
             dependencies: [
                 "PayabliSDKCore",
-                .product(
-                    name: "FiservTTP",
-                    package: "TTPPackage",
+                .target(
+                    name: "PayabliCardReaderCore",
                     condition: .when(platforms: [.iOS])
                 )
             ],
