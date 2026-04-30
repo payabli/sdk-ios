@@ -106,8 +106,8 @@ for scheme in "${SCHEMES[@]}"; do
     archive_scheme "$scheme" "$DEVICE_DESTINATION" "device" > /dev/null
     archive_scheme "$scheme" "$SIM_DESTINATION"   "sim"    > /dev/null
 
-    device_framework="$ARCHIVE_DIR/${scheme}-device.xcarchive/Products/Library/Frameworks/${scheme}.framework"
-    sim_framework="$ARCHIVE_DIR/${scheme}-sim.xcarchive/Products/Library/Frameworks/${scheme}.framework"
+    device_framework="$ARCHIVE_DIR/${scheme}-device.xcarchive/Products/usr/local/lib/${scheme}.framework"
+    sim_framework="$ARCHIVE_DIR/${scheme}-sim.xcarchive/Products/usr/local/lib/${scheme}.framework"
 
     if [[ ! -d "$device_framework" ]]; then
         echo "error: missing device slice for ${scheme} at ${device_framework}" >&2
