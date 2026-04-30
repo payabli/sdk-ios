@@ -44,18 +44,14 @@ the doc wins.
 - **Allow deletions:** disabled.
 - **Allowed source branches:** `sandbox` only.
 
-### Tag protection
+### Tags on the private repo
 
-- All release tags are created by the release workflow using
-  `GITHUB_TOKEN`. Humans do **not** push tags manually.
-- **Target tags pattern:** a single `*.*.*` fnmatch rule is sufficient —
-  GitHub's `*` is greedy and matches any content except `/`, so
-  `*.*.*` covers GA (`1.0.247`), QA (`1.0.247-qa`), and Sandbox
-  (`1.0.247-beta`) simultaneously. Adding separate `*.*.*-qa` and
-  `*.*.*-beta` entries is redundant.
-- **Rules on the tag target:** `Restrict updates`, `Restrict deletions`,
-  and `Require signed commits` off (our tags are annotated, not signed).
-  Allow creates from the release bot only; block everyone else.
+The release pipeline does **not** create tags on the private repo — tags
+only exist on the public distribution repo (see the Public repo section
+below for the rules that protect them). The private repo only carries
+the historical `0.1.0`–`0.4.0` legacy tags preserved on `main-backup`
+after the one-time migration, which are immutable archival refs and
+should have `Restrict deletions` enabled to prevent accidental cleanup.
 
 ## Public repo (`payabli/payabli-sdk-ios`) — distribution mirror
 
@@ -63,6 +59,8 @@ Only has `main`. `main` only advances on **Production** releases; QA and
 Sandbox releases publish tags pointing at orphan commits (see
 `Scripts/push_to_public_repo.sh` and `docs/RELEASE.md §Public repo
 branching model`).
+
+### `main` branch ruleset
 
 - **Require a pull request before merging:** no. The only writer is the
   release bot using `PUBLIC_REPO_PAT`. The PAT owner is in the
@@ -74,8 +72,23 @@ branching model`).
   consume the tag.
 - **Allow force pushes:** disabled.
 - **Allow deletions:** disabled.
-- **Tag protection:** only the release bot identity can create/delete
-  release tags. All tags are immutable once created.
+
+### Tag ruleset (release tags live here)
+
+All release tags are created by the release workflow running in the
+**private** repo — it clones the public repo, tags, and pushes. The
+public repo must protect those tags against mutation or deletion by any
+human identity.
+
+- **Target tags pattern:** a single `*.*.*` fnmatch rule is sufficient —
+  GitHub's `*` is greedy and matches any content except `/`, so
+  `*.*.*` covers GA (`1.0.247`), QA (`1.0.247-qa`), and Sandbox
+  (`1.0.247-beta`) simultaneously. Adding separate `*.*.*-qa` and
+  `*.*.*-beta` entries is redundant.
+- **Rules on the tag target:** `Restrict creations` allowed **only** to
+  the release-bot identity; `Restrict updates` enabled; `Restrict
+  deletions` enabled. `Require signed commits` off (our tags are
+  annotated, not signed). Allow the bot to create; block everyone else.
 
 ## Migration checklist
 
