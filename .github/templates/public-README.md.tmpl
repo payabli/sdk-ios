@@ -1,0 +1,90 @@
+# Payabli iOS SDK
+
+Official iOS SDK for accepting payments via Payabli. Distributes as three
+pre-built XCFrameworks: `PayabliSDKCore` (shared infrastructure),
+`PayabliSDKPayIn` (tokenization, Apple Pay, Tap to Pay), and
+`PayabliCardReaderCore` (MIT-licensed Tap to Phone card reader engine).
+
+Source for the Payabli-owned modules lives in a private repo; this repo
+is a distribution mirror that ships Swift Package Manager and CocoaPods
+manifests pointing to signed binary artifacts on Payabli's CDN.
+
+Latest version: **${VERSION}**
+
+## Installation
+
+### Swift Package Manager (recommended)
+
+Add the package in Xcode (File → Add Packages…) or edit your `Package.swift`:
+
+```swift
+// Production (GA) — recommended for shipping apps.
+.package(
+    url: "https://github.com/payabli/payabli-sdk-ios",
+    from: "1.0.0"
+)
+
+// Sandbox (beta) — partners opted in to early-access releases.
+.package(
+    url: "https://github.com/payabli/payabli-sdk-ios",
+    exact: "<latest-beta>"
+)
+
+// QA — internal Payabli engineers reproducing bugs against backend QA.
+.package(
+    url: "https://github.com/payabli/payabli-sdk-ios",
+    exact: "<latest-qa>"
+)
+```
+
+Then link the products your app needs:
+
+- `PayabliSDK` — umbrella (Core + PayIn + CardReaderCore); the typical choice.
+- `PayabliSDKCore` — shared infrastructure only (no payment flows).
+- `PayabliSDKPayIn` — tokenization, Apple Pay, Tap to Pay, forms.
+
+### CocoaPods
+
+Only production releases are published to Trunk.
+
+```ruby
+pod 'PayabliSDK', '~> 1.0'
+```
+
+Subspecs are available if you only need part of the SDK:
+
+```ruby
+pod 'PayabliSDK/Core'
+pod 'PayabliSDK/PayIn'
+pod 'PayabliSDK/PayabliCardReaderCore'
+```
+
+## Requirements
+
+- iOS 16.7 or newer (required by Apple's `ProximityReader` for Tap to Pay)
+- Xcode 15 or newer
+- Swift 5.9 or newer
+
+## Release channels
+
+| Channel    | Tag pattern            | Audience                                         |
+|------------|------------------------|--------------------------------------------------|
+| Production | `1.0.247`              | Shipping integrations (default)                  |
+| Sandbox    | `1.0.247-beta`         | Partners opted in to early-access validation     |
+| QA         | `1.0.247-qa`           | Internal Payabli engineering and bug reproduction |
+
+Only production releases go to CocoaPods Trunk. Beta and QA are
+SPM-only and marked as pre-releases on GitHub.
+
+## Licenses
+
+- The Payabli-owned modules (`PayabliSDKCore`, `PayabliSDKPayIn`) are
+  licensed under the terms in [LICENSE](LICENSE).
+- `PayabliCardReaderCore` is a Payabli-branded distribution of the
+  MIT-licensed [`Fiserv/TTPPackage`](https://github.com/Fiserv/TTPPackage)
+  upstream. Full attribution is in [NOTICE](NOTICE).
+
+## Support
+
+- Bug reports and feature requests: sdk-support@payabli.com
+- Integration docs: https://docs.payabli.com/ios

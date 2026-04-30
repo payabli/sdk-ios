@@ -81,13 +81,15 @@ public final class TTPTransactionClient: Sendable {
     }
 
     /// Encodes a typed update payload for `PATCH /MoneyIn/update/{id}`.
-    /// Atomic providers forward their full response under `fiservResponse`;
-    /// payload-only providers are wrapped into the same shape.
+    /// Atomic providers forward their full response under the
+    /// `providerResponse` Swift field (mapped to the legacy `fiservResponse`
+    /// JSON key on the wire); payload-only providers are wrapped into the
+    /// same shape.
     static func updateBody(for payload: TTPUpdatePayload) -> Data {
         let encoder = JSONEncoder()
         switch payload {
         case .success(let result):
-            let body = UpdateSuccessBody(fiservResponse: providerResponse(from: result))
+            let body = UpdateSuccessBody(providerResponse: providerResponse(from: result))
             return (try? encoder.encode(body)) ?? Data()
 
         case .nfcFailure(let description):
@@ -102,7 +104,7 @@ public final class TTPTransactionClient: Sendable {
 
     /// Prefer the provider's own response JSON when it's available (atomic
     /// flow). Fall back to the payload-only shape otherwise, so the backend
-    /// always sees the same `fiservResponse` key.
+    /// always sees the same wire envelope regardless of provider.
     private static func providerResponse(from result: CardReadResult) -> ProviderResponsePayload {
         if let json = result.providerResponseJSON {
             return .opaqueJSON(json)

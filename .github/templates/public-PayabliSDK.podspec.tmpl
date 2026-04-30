@@ -1,0 +1,42 @@
+#
+# Payabli iOS SDK — public CocoaPods podspec.
+# Generated from `.github/templates/public-PayabliSDK.podspec.tmpl` at release
+# time. Do not edit by hand. Only `main`-branch releases are pushed to Trunk;
+# `-qa` and `-beta` versions publish SPM-only.
+#
+Pod::Spec.new do |s|
+  s.name             = 'PayabliSDK'
+  s.version          = '${VERSION}'
+  s.summary          = 'Payabli iOS SDK for tokenization, Apple Pay, and Tap to Pay.'
+  s.description      = <<-DESC
+    PayabliSDK is the official iOS SDK for accepting payments via Payabli.
+    Ships three modules: PayabliSDKCore (shared infrastructure),
+    PayabliSDKPayIn (tokenization, Apple Pay, Tap to Pay), and
+    PayabliCardReaderCore (MIT-licensed Tap to Phone card reader).
+    All modules are distributed as pre-built XCFrameworks.
+  DESC
+
+  s.homepage         = 'https://github.com/payabli/payabli-sdk-ios'
+  s.license          = { :type => 'MIT', :file => 'LICENSE' }
+  s.author           = { 'Payabli' => 'sdk-support@payabli.com' }
+  s.source           = { :http => 'https://${S3_PUBLIC_HOST}/payabli-ios-sdk-${VERSION}.zip' }
+
+  s.ios.deployment_target = '16.7'
+  s.swift_version    = '5.9'
+
+  s.default_subspecs = 'Core', 'PayIn', 'PayabliCardReaderCore'
+
+  s.subspec 'Core' do |ss|
+    ss.vendored_frameworks = 'PayabliSDKCore.xcframework'
+  end
+
+  s.subspec 'PayIn' do |ss|
+    ss.dependency 'PayabliSDK/Core'
+    ss.dependency 'PayabliSDK/PayabliCardReaderCore'
+    ss.vendored_frameworks = 'PayabliSDKPayIn.xcframework'
+  end
+
+  s.subspec 'PayabliCardReaderCore' do |ss|
+    ss.vendored_frameworks = 'PayabliCardReaderCore.xcframework'
+  end
+end

@@ -1,0 +1,143 @@
+name: Deploy iOS SDK
+
+on:
+  push:
+    branches: [develop, sandbox, main]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version override (e.g. 1.0.248-hotfix). Use only if auto-versioning fails."
+        required: false
+        default: ""
+      skip_publish:
+        description: "Build and test only — skip S3 upload, public-repo push, and CocoaPods."
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: >-
+      ${{ (github.ref == 'refs/heads/develop' && 'QA')
+       || (github.ref == 'refs/heads/sandbox' && 'Sandbox')
+       || 'Production' }}
+    runs-on: macos-15
+    environment: >-
+      ${{ (github.ref == 'refs/heads/develop' && 'QA')
+       || (github.ref == 'refs/heads/sandbox' && 'Sandbox')
+       || 'Production' }}
+    env:
+      AWS_SECRET_NAME: >-
+        ${{ (github.ref == 'refs/heads/main' && 'prod/payabli-sdk-ios')
+         || (github.ref == 'refs/heads/sandbox' && 'sandbox/payabli-sdk-ios')
+         || 'qa/payabli-sdk-ios' }}
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      BUCKET_NAME: ${{ vars.BUCKET_NAME }}
+      S3_PUBLIC_HOST: ${{ vars.S3_PUBLIC_HOST }}
+      PUBLIC_REPO: ${{ vars.PUBLIC_REPO }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Compute version
+        run: |
+          if [[ -n "${{ inputs.version }}" ]]; then
+            echo "VERSION=${{ inputs.version }}" >> "$GITHUB_ENV"
+            echo "[version] using workflow_dispatch override: ${{ inputs.version }}"
+          else
+            Scripts/compute_version.sh >> "$GITHUB_ENV"
+          fi
+
+      - name: Validate version format
+        run: |
+          if ! echo "$VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+(-[a-z0-9]+)?$'; then
+            echo "error: invalid VERSION format '$VERSION'" >&2
+            exit 1
+          fi
+          echo "[version] VERSION=$VERSION"
+
+      - name: Select latest Xcode
+        run: |
+          XCODE=$(ls /Applications | grep -E '^Xcode(_[0-9]+)?\.app$' | sort -V | tail -1)
+          sudo xcode-select -s "/Applications/$XCODE/Contents/Developer"
+          echo "[xcode] using /Applications/$XCODE"
+          xcodebuild -version
+          swift --version
+
+      - name: Install xcpretty
+        run: gem install xcpretty --no-document
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Load secrets from AWS Secrets Manager
+        run: |
+          SECRET_JSON=$(aws secretsmanager get-secret-value \
+              --secret-id "$AWS_SECRET_NAME" \
+              --query SecretString --output text)
+          # Mask every value before exporting.
+          echo "$SECRET_JSON" | jq -r '.[]' | while IFS= read -r value; do
+              echo "::add-mask::$value"
+          done
+          echo "$SECRET_JSON" | jq -r 'to_entries[] | "\(.key)=\(.value)"' >> "$GITHUB_ENV"
+
+      - name: Resolve dependencies
+        run: xcodebuild -resolvePackageDependencies -scheme PayabliSDK
+
+      - name: Test
+        run: |
+          SIMULATOR_ID=$(xcrun simctl list devices available -j | python3 -c "
+          import json, sys
+          d = json.load(sys.stdin)['devices']
+          iphones = [v for k, vals in d.items() if 'iOS' in k for v in vals if 'iPhone' in v['name'] and v['isAvailable']]
+          if not iphones:
+              raise SystemExit('no iPhone simulator available')
+          print(sorted(iphones, key=lambda x: x['name'])[-1]['udid'])
+          ")
+          echo "[test] using simulator $SIMULATOR_ID"
+          xcodebuild test \
+              -scheme PayabliSDK \
+              -destination "platform=iOS Simulator,id=$SIMULATOR_ID" \
+              CODE_SIGNING_ALLOWED=NO \
+              | xcpretty
+          exit ${PIPESTATUS[0]}
+
+      - name: Build XCFrameworks
+        if: ${{ !inputs.skip_publish }}
+        run: Scripts/build_release_frameworks.sh
+
+      - name: Upload XCFramework zips to S3
+        if: ${{ !inputs.skip_publish }}
+        run: Scripts/upload_release.sh
+
+      - name: Render public manifests
+        if: ${{ !inputs.skip_publish }}
+        run: Scripts/render_public_manifests.sh
+
+      - name: Push to public repo + tag + release
+        if: ${{ !inputs.skip_publish }}
+        env:
+          GH_ACTOR: "Payabli Release Bot"
+          GH_EMAIL: "releases@payabli.com"
+        run: Scripts/push_to_public_repo.sh
+
+      - name: CocoaPods trunk push (main only)
+        if: ${{ !inputs.skip_publish && github.ref == 'refs/heads/main' }}
+        run: |
+          pod trunk push build/public/PayabliSDK.podspec \
+              --allow-warnings \
+              --skip-tests \
+              --skip-import-validation

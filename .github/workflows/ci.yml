@@ -2,19 +2,22 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [develop, sandbox, main]
   pull_request:
-    branches: [main]
+    branches: [develop, sandbox, main]
 
 jobs:
   build:
     name: Build & Test
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
 
-      - name: Select Xcode 15
-        run: sudo xcode-select -s /Applications/Xcode_15.2.app
+      - name: Select latest Xcode
+        run: |
+          XCODE=$(ls /Applications | grep -E '^Xcode(_[0-9]+)?\.app$' | sort -V | tail -1)
+          sudo xcode-select -s "/Applications/$XCODE/Contents/Developer"
+          echo "[xcode] using /Applications/$XCODE"
 
       - name: Show Swift version
         run: swift --version
@@ -30,7 +33,7 @@ jobs:
 
   lint:
     name: Lint
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
 
@@ -40,14 +43,38 @@ jobs:
       - name: Run SwiftLint
         run: swiftlint --strict
 
-  podspec:
-    name: Podspec lint
-    runs-on: macos-14
+  validate-pods:
+    name: Podspec lint (rendered)
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
 
-      - name: Select Xcode 15
-        run: sudo xcode-select -s /Applications/Xcode_15.2.app
+      - name: Select latest Xcode
+        run: |
+          XCODE=$(ls /Applications | grep -E '^Xcode(_[0-9]+)?\.app$' | sort -V | tail -1)
+          sudo xcode-select -s "/Applications/$XCODE/Contents/Developer"
 
-      - name: Lint podspec
-        run: pod lib lint PayabliSDK.podspec --allow-warnings
+      # The canonical podspec lives in the release template and only becomes
+      # a real file after `render_public_manifests.sh` substitutes VERSION,
+      # S3_PUBLIC_HOST, and the per-product sha256s. We feed it dummy values
+      # here so the Ruby DSL parses — `pod lib lint` itself exercises the
+      # spec structure, subspecs, and dependencies without needing the real
+      # S3 URLs to be reachable (`--skip-import-validation` handles that).
+      - name: Render podspec with dummy values
+        env:
+          VERSION: "0.0.0-dryrun"
+          S3_PUBLIC_HOST: "example.invalid"
+          CORE_SHA256: "0000000000000000000000000000000000000000000000000000000000000000"
+          PAYIN_SHA256: "0000000000000000000000000000000000000000000000000000000000000000"
+          CARD_READER_CORE_SHA256: "0000000000000000000000000000000000000000000000000000000000000000"
+        run: Scripts/render_public_manifests.sh
+
+      - name: Lint rendered podspec
+        # --quick keeps this under 2 minutes by skipping deep linting; the
+        # full lint happens inside the release workflow's `pod trunk push`.
+        # --skip-import-validation avoids needing the real S3 host.
+        run: |
+          pod lib lint build/public/PayabliSDK.podspec \
+              --quick \
+              --allow-warnings \
+              --skip-import-validation

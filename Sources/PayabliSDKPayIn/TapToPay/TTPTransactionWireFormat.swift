@@ -14,7 +14,7 @@ struct InitiateCustomerData: Encodable {
 }
 
 struct InitiatePaymentMethod: Encodable {
-    let method: String           // "cloud" (POI-device-backed TTP flow)
+    let method: String           // "device" (POI-device-backed TTP flow)
     let device: String           // Payabli deviceId (from /attest or /activate)
 }
 
@@ -41,9 +41,19 @@ enum TTPUpdatePayload {
     case nfcFailure(description: String)
 }
 
-/// Success update body — forwards the provider response under `fiservResponse`.
+/// Success update body — forwards the processor response to the backend.
+///
+/// The Swift field is named `providerResponse` for provider-agnostic clarity,
+/// but the wire JSON key is still `fiservResponse` because the backend
+/// contract has not been renamed yet. The `CodingKeys` mapping below
+/// preserves the wire format verbatim — do not change it without a
+/// coordinated backend rollout.
 struct UpdateSuccessBody: Encodable {
-    let fiservResponse: ProviderResponsePayload
+    let providerResponse: ProviderResponsePayload
+
+    enum CodingKeys: String, CodingKey {
+        case providerResponse = "fiservResponse"
+    }
 }
 
 /// Error update body — NFC failure notification.
@@ -56,10 +66,12 @@ struct UpdateErrorBody: Encodable {
     let error: ErrorDetail
 }
 
-// MARK: - Provider response (under `fiservResponse`)
+// MARK: - Provider response (serialized under the `fiservResponse` wire key)
 
-/// What the SDK forwards under the `fiservResponse` key on a successful
-/// `/update`. Two flavors the backend accepts interchangeably:
+/// What the SDK forwards under the `providerResponse` Swift field — which
+/// still serializes to the `fiservResponse` JSON key on the wire (see
+/// `UpdateSuccessBody.CodingKeys`). Two flavors the backend accepts
+/// interchangeably:
 ///
 /// - `.opaqueJSON`: the adapter hit the processor itself (atomic flow, e.g.
 ///   Fiserv) and owns the raw response JSON. Forwarded verbatim.

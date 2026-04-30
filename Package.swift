@@ -52,7 +52,10 @@ let package = Package(
         ),
         .target(
             name: "PayabliCardReaderCore",
-            path: "ThirdParty/PayabliCardReaderCoreSource/Sources/PayabliCardReaderCore"
+            path: "ThirdParty/PayabliCardReaderCoreSource/Sources/PayabliCardReaderCore",
+            resources: [
+                .copy("Resources/PrivacyInfo.xcprivacy")
+            ]
         ),
         .target(
             name: "PayabliSDKPayIn",
@@ -70,7 +73,8 @@ let package = Package(
                 "Resources/README.md"
             ],
             resources: [
-                .process("Resources/PayabliBrandAssets.xcassets")
+                .process("Resources/PayabliBrandAssets.xcassets"),
+                .copy("Resources/PrivacyInfo.xcprivacy")
             ]
         ),
         .target(
