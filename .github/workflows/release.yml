@@ -80,7 +80,12 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Resolve dependencies
-        run: xcodebuild -resolvePackageDependencies -scheme PayabliSDK
+        # SPM's auto-generated umbrella scheme (`PayabliSDK-Package`) is the
+        # one that aggregates every test target across the package — the
+        # per-product schemes (PayabliSDK, PayabliSDKCore, PayabliSDKPayIn,
+        # PayabliSDKTelemetry) don't carry a test action. Use the umbrella
+        # here for both resolve and test.
+        run: xcodebuild -resolvePackageDependencies -scheme PayabliSDK-Package
 
       - name: Test
         run: |
@@ -94,7 +99,7 @@ jobs:
           ")
           echo "[test] using simulator $SIMULATOR_ID"
           xcodebuild test \
-              -scheme PayabliSDK \
+              -scheme PayabliSDK-Package \
               -destination "platform=iOS Simulator,id=$SIMULATOR_ID" \
               CODE_SIGNING_ALLOWED=NO \
               | xcpretty
