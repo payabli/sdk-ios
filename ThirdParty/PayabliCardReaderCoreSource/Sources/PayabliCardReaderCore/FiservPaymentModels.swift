@@ -1,4 +1,3 @@
-#if os(iOS)
 //  FiservPaymentModels
 //
 //  Copyright (c) 2022 - 2025 Fiserv, Inc.
@@ -781,4 +780,3 @@ extension Models.ApprovedAmountResponse {
     }
 }
 
-#endif // os(iOS)

@@ -61,11 +61,17 @@ jobs:
           fi
           echo "[version] VERSION=$VERSION"
 
-      - name: Select latest Xcode
+      - name: Select Xcode
+        # Pin to Xcode 16.4 — the current `macos-15` runner-image default,
+        # which ships the complete iOS 18.5 SDK + iOS 18.5 Simulator
+        # runtime. Picking "whatever sorts highest alphabetically" bit us
+        # once before when the runner image had a stripped-down Xcode_16.0
+        # beta whose iOS SDK wasn't fully provisioned, so we pin an
+        # explicit, stable version here. Bump this when GitHub retires
+        # Xcode 16.4 from the image.
         run: |
-          XCODE=$(ls /Applications | grep -E '^Xcode(_[0-9]+)?\.app$' | sort -V | tail -1)
-          sudo xcode-select -s "/Applications/$XCODE/Contents/Developer"
-          echo "[xcode] using /Applications/$XCODE"
+          sudo xcode-select -s /Applications/Xcode_16.4.app/Contents/Developer
+          echo "[xcode] using Xcode 16.4"
           xcodebuild -version
           swift --version
 
@@ -80,21 +86,30 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Resolve dependencies
-        run: swift package resolve
+        run: xcodebuild -resolvePackageDependencies -scheme PayabliSDK-Package
 
       - name: Test
-        # Runs `swift test` on macOS host — same gate CI applies on every
-        # PR (see `ci.yml`). We intentionally don't drive xcodebuild into
-        # an iOS Simulator here: the SPM-auto-generated `PayabliSDK-Package`
-        # scheme lists its supported platforms as the union of the sim
-        # runtimes installed on the runner image, and GitHub-hosted
-        # macos-15 images ship a fluctuating subset, so simulator-based
-        # test runs are flaky between Xcode releases. iOS-only code paths
-        # are fenced with `#if os(iOS)` / `#if canImport(...)` guards and
-        # are exercised by the `Build XCFrameworks` step below, which
-        # compiles each target against both `iphoneos` and
-        # `iphonesimulator` SDKs.
-        run: swift test -v
+        # The package is iOS-only. We test with `xcodebuild test` against
+        # an iOS 18.5 Simulator iPhone — pick the first available iPhone
+        # simulator on the pinned Xcode 16.4's bundled iOS 18.5 runtime.
+        # PayabliSDK-Package is SPM's auto-generated umbrella scheme that
+        # aggregates every testTarget in the package.
+        run: |
+          SIMULATOR_ID=$(xcrun simctl list devices available -j | python3 -c "
+          import json, sys
+          d = json.load(sys.stdin)['devices']
+          iphones = [v for k, vals in d.items() if 'iOS' in k for v in vals if 'iPhone' in v['name'] and v['isAvailable']]
+          if not iphones:
+              raise SystemExit('no iPhone simulator available on this runner')
+          print(sorted(iphones, key=lambda x: x['name'])[-1]['udid'])
+          ")
+          echo "[test] using simulator $SIMULATOR_ID"
+          set -o pipefail
+          xcodebuild test \
+              -scheme PayabliSDK-Package \
+              -destination "platform=iOS Simulator,id=$SIMULATOR_ID" \
+              CODE_SIGNING_ALLOWED=NO \
+              | xcpretty
 
       - name: Build XCFrameworks
         if: ${{ !inputs.skip_publish }}

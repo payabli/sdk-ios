@@ -108,19 +108,7 @@ for f in "${SWIFT_SOURCES[@]}"; do
         echo "error: upstream file missing: $src" >&2
         exit 1
     fi
-    # Wrap each upstream file with `#if os(iOS)` / `#endif` because the
-    # vendored module is exposed as a library product in the private
-    # Package.swift (so `xcodebuild -scheme PayabliCardReaderCore` can
-    # archive it) — and library products aren't platform-filterable at
-    # the SPM product level, so `swift build` / `swift test` running on
-    # the macOS host would otherwise try to compile `import ProximityReader`
-    # and fail. The guard makes the module compile as effectively empty
-    # on macOS. iOS consumers see the original upstream source.
-    {
-        printf '#if os(iOS)\n'
-        cat "$src"
-        printf '\n#endif // os(iOS)\n'
-    } > "$VENDOR_DIR/$f"
+    cp "$src" "$VENDOR_DIR/$f"
     chmod u+w "$VENDOR_DIR/$f"
 done
 

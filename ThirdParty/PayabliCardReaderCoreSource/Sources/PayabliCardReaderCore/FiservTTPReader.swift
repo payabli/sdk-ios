@@ -1,4 +1,3 @@
-#if os(iOS)
 //  FiservTTP
 //
 //  Copyright (c) 2022 - 2025 Fiserv, Inc.
@@ -266,4 +265,3 @@ internal class FiservTTPReader {
     }
 }
 
-#endif // os(iOS)

@@ -5,11 +5,12 @@ let package = Package(
     name: "PayabliSDK",
     defaultLocalization: "en",
     platforms: [
-        // 16.7 is the minimum required by PayabliCardReaderCore (Apple's
-        // ProximityReader). Non-TTP modules still compile for macOS so local
-        // `swift test` runs without requiring a simulator.
-        .iOS("16.7"),
-        .macOS(.v12)
+        // iOS-only. 16.7 is the minimum required by PayabliCardReaderCore
+        // (Apple's ProximityReader). The SDK is not intended to run on any
+        // other Apple platform, so development, CI, and release all target
+        // iPhone iOS (device + simulator) via `xcodebuild`. No macOS
+        // compatibility shims are maintained.
+        .iOS("16.7")
     ],
     products: [
         // Dynamic per PRD NFR-11 — distributed as a dynamic XCFramework with

@@ -13,23 +13,40 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Select latest Xcode
+      - name: Select Xcode
         run: |
-          XCODE=$(ls /Applications | grep -E '^Xcode(_[0-9]+)?\.app$' | sort -V | tail -1)
-          sudo xcode-select -s "/Applications/$XCODE/Contents/Developer"
-          echo "[xcode] using /Applications/$XCODE"
+          sudo xcode-select -s /Applications/Xcode_16.4.app/Contents/Developer
+          echo "[xcode] using Xcode 16.4"
+          xcodebuild -version
+          swift --version
 
-      - name: Show Swift version
-        run: swift --version
+      - name: Install xcpretty
+        run: gem install xcpretty --no-document
 
       - name: Resolve dependencies
-        run: swift package resolve
-
-      - name: Build
-        run: swift build -v
+        run: xcodebuild -resolvePackageDependencies -scheme PayabliSDK-Package
 
       - name: Run tests
-        run: swift test -v
+        # Package is iOS-only; tests run on the iOS 18.5 Simulator bundled
+        # with Xcode 16.4. The umbrella `PayabliSDK-Package` scheme is the
+        # one SPM auto-generates with a `test` action — the per-product
+        # schemes don't have one.
+        run: |
+          SIMULATOR_ID=$(xcrun simctl list devices available -j | python3 -c "
+          import json, sys
+          d = json.load(sys.stdin)['devices']
+          iphones = [v for k, vals in d.items() if 'iOS' in k for v in vals if 'iPhone' in v['name'] and v['isAvailable']]
+          if not iphones:
+              raise SystemExit('no iPhone simulator available on this runner')
+          print(sorted(iphones, key=lambda x: x['name'])[-1]['udid'])
+          ")
+          echo "[test] using simulator $SIMULATOR_ID"
+          set -o pipefail
+          xcodebuild test \
+              -scheme PayabliSDK-Package \
+              -destination "platform=iOS Simulator,id=$SIMULATOR_ID" \
+              CODE_SIGNING_ALLOWED=NO \
+              | xcpretty
 
   lint:
     name: Lint
@@ -49,10 +66,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Select latest Xcode
-        run: |
-          XCODE=$(ls /Applications | grep -E '^Xcode(_[0-9]+)?\.app$' | sort -V | tail -1)
-          sudo xcode-select -s "/Applications/$XCODE/Contents/Developer"
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_16.4.app/Contents/Developer
 
       # The canonical podspec lives in the release template and only becomes
       # a real file after `render_public_manifests.sh` substitutes VERSION,
