@@ -3,6 +3,6 @@ import XCTest
 
 final class PayabliSDKCoreTests: XCTestCase {
     func testVersionIsPopulated() {
-        XCTAssertFalse(PayabliSDKCore.version.isEmpty)
+        XCTAssertFalse(PayabliCore.version.isEmpty)
     }
 }

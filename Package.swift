@@ -29,6 +29,18 @@ let package = Package(
             type: .dynamic,
             targets: ["PayabliSDKPayIn"]
         ),
+        // `PayabliCardReaderCore` is exposed as a library product in the
+        // private Package.swift so `xcodebuild -scheme PayabliCardReaderCore`
+        // (driven by Scripts/build_release_frameworks.sh) can archive it
+        // independently and produce its own XCFramework. Consumers of the
+        // *public* Package.swift never see this as a stand-alone product —
+        // the public template lists CardReaderCore only as a binaryTarget
+        // pulled transitively by PayabliSDKPayIn.
+        .library(
+            name: "PayabliCardReaderCore",
+            type: .dynamic,
+            targets: ["PayabliCardReaderCore"]
+        ),
         .library(
             name: "PayabliSDKTelemetry",
             type: .dynamic,
