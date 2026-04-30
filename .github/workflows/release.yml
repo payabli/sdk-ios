@@ -34,10 +34,6 @@ jobs:
        || (github.ref == 'refs/heads/sandbox' && 'Sandbox')
        || 'Production' }}
     env:
-      AWS_SECRET_NAME: >-
-        ${{ (github.ref == 'refs/heads/main' && 'prod/payabli-sdk-ios')
-         || (github.ref == 'refs/heads/sandbox' && 'sandbox/payabli-sdk-ios')
-         || 'qa/payabli-sdk-ios' }}
       AWS_REGION: ${{ vars.AWS_REGION }}
       BUCKET_NAME: ${{ vars.BUCKET_NAME }}
       S3_PUBLIC_HOST: ${{ vars.S3_PUBLIC_HOST }}
@@ -83,17 +79,6 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Load secrets from AWS Secrets Manager
-        run: |
-          SECRET_JSON=$(aws secretsmanager get-secret-value \
-              --secret-id "$AWS_SECRET_NAME" \
-              --query SecretString --output text)
-          # Mask every value before exporting.
-          echo "$SECRET_JSON" | jq -r '.[]' | while IFS= read -r value; do
-              echo "::add-mask::$value"
-          done
-          echo "$SECRET_JSON" | jq -r 'to_entries[] | "\(.key)=\(.value)"' >> "$GITHUB_ENV"
-
       - name: Resolve dependencies
         run: xcodebuild -resolvePackageDependencies -scheme PayabliSDK
 
@@ -132,12 +117,28 @@ jobs:
         env:
           GH_ACTOR: "Payabli Release Bot"
           GH_EMAIL: "releases@payabli.com"
+          # Reuses the org-level GHB_PAT_TOKEN (same secret used by other
+          # Payabli release workflows; see .github/BRANCH_PROTECTION.md).
+          # The PAT's owner must be in the Bypass list of both rulesets on
+          # payabli/payabli-sdk-ios (main branch + tag ruleset).
+          PUBLIC_REPO_PAT: ${{ secrets.GHB_PAT_TOKEN }}
         run: Scripts/push_to_public_repo.sh
 
-      - name: CocoaPods trunk push (main only)
-        if: ${{ !inputs.skip_publish && github.ref == 'refs/heads/main' }}
-        run: |
-          pod trunk push build/public/PayabliSDK.podspec \
-              --allow-warnings \
-              --skip-tests \
-              --skip-import-validation
+      # CocoaPods publication is deferred until DevOps provisions the
+      # COCOAPODS_TRUNK_TOKEN secret and the combined-zip packaging gap is
+      # resolved (see docs/RELEASE.md §CocoaPods (deferred)). To re-enable:
+      #   1. Create repo secret COCOAPODS_TRUNK_TOKEN.
+      #   2. Fix Scripts/build_release_frameworks.sh to emit a combined zip
+      #      (or adjust public-PayabliSDK.podspec.tmpl to 3 vendored_frameworks).
+      #   3. Restore the CocoaPods section in .github/templates/public-README.md.tmpl.
+      #   4. Uncomment the step below.
+      #
+      # - name: CocoaPods trunk push (main only)
+      #   if: ${{ !inputs.skip_publish && github.ref == 'refs/heads/main' }}
+      #   env:
+      #     COCOAPODS_TRUNK_TOKEN: ${{ secrets.COCOAPODS_TRUNK_TOKEN }}
+      #   run: |
+      #     pod trunk push build/public/PayabliSDK.podspec \
+      #         --allow-warnings \
+      #         --skip-tests \
+      #         --skip-import-validation

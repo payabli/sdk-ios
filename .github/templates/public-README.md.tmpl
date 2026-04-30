@@ -6,8 +6,8 @@ pre-built XCFrameworks: `PayabliSDKCore` (shared infrastructure),
 `PayabliCardReaderCore` (MIT-licensed Tap to Phone card reader engine).
 
 Source for the Payabli-owned modules lives in a private repo; this repo
-is a distribution mirror that ships Swift Package Manager and CocoaPods
-manifests pointing to signed binary artifacts on Payabli's CDN.
+is a distribution mirror that ships a Swift Package Manager manifest
+pointing to signed binary artifacts on Payabli's CDN.
 
 Latest version: **${VERSION}**
 
@@ -45,19 +45,8 @@ Then link the products your app needs:
 
 ### CocoaPods
 
-Only production releases are published to Trunk.
-
-```ruby
-pod 'PayabliSDK', '~> 1.0'
-```
-
-Subspecs are available if you only need part of the SDK:
-
-```ruby
-pod 'PayabliSDK/Core'
-pod 'PayabliSDK/PayIn'
-pod 'PayabliSDK/PayabliCardReaderCore'
-```
+CocoaPods support is planned for a future release. For now, integrate via
+Swift Package Manager.
 
 ## Requirements
 
@@ -73,8 +62,8 @@ pod 'PayabliSDK/PayabliCardReaderCore'
 | Sandbox    | `1.0.247-beta`         | Partners opted in to early-access validation     |
 | QA         | `1.0.247-qa`           | Internal Payabli engineering and bug reproduction |
 
-Only production releases go to CocoaPods Trunk. Beta and QA are
-SPM-only and marked as pre-releases on GitHub.
+All three channels are distributed via Swift Package Manager; beta and QA
+are marked as pre-releases on GitHub.
 
 ## Licenses
 

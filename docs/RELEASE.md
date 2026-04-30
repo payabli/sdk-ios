@@ -54,7 +54,6 @@ feature/* -----(PR)-----> develop ------> auto-deploy to QA       (tag 1.0.N-qa)
                            (PR)
                              v
                            main ---------> auto-deploy to Prod    (tag 1.0.N)
-                                                                   + CocoaPods Trunk
 ```
 
 The same commit will carry different tag suffixes as it moves between
@@ -80,8 +79,8 @@ about, and SemVer resolvers still treat `1.0.248` as "newer than
    Watch `Deploy iOS SDK → Sandbox`. The resulting tag is `1.0.(N+1)-beta`
    (new merge commit bumps the count).
 7. Notify beta partners. When the beta bake is complete, open **promotion
-   PR** `sandbox → main`. Merge. `Deploy iOS SDK → Production` runs, the
-   tag `1.0.(N+2)` lands on the public repo **and** `pod trunk push` fires.
+   PR** `sandbox → main`. Merge. `Deploy iOS SDK → Production` runs and
+   the tag `1.0.(N+2)` lands on the public repo.
 8. Announce GA.
 
 ## Major / minor bump
@@ -163,6 +162,10 @@ the re-build is reproducible (SOURCE_DATE_EPOCH pinned to HEAD).
 
 ### 4. CocoaPods rollback (GA only)
 
+**N/A for v1.** CocoaPods publication is deferred (see *CocoaPods
+(deferred)* below). This section is retained for when Trunk publishing
+is re-enabled:
+
 `pod trunk delete PayabliSDK <VERSION>` works within a 30-day window.
 After that, the only recourse is to publish a superseding version.
 
@@ -183,15 +186,34 @@ After that, the only recourse is to publish a superseding version.
 - macos-15 GitHub-hosted runners ship a handful of iPhone simulators
   pre-installed; if none are available, re-run the job.
 
-### `aws secretsmanager get-secret-value` fails with `AccessDeniedException`
+### `push_to_public_repo.sh` fails with `Permission to payabli/payabli-sdk-ios denied`
+
+- The `PUBLIC_REPO_PAT` env var is injected from the org-level
+  `GHB_PAT_TOKEN` secret. Verify the token value hasn't expired and
+  that the owning GitHub user (whoever created the PAT) is in the
+  **Bypass list** of both rulesets on `payabli/payabli-sdk-ios` (the
+  `main` branch rule and the `*.*.*` tag rule). The bot cannot push
+  if the ruleset blocks its identity.
+- Quick check:
+  ```bash
+  curl -sI -H "Authorization: Bearer $TOKEN" \
+    https://api.github.com/repos/payabli/payabli-sdk-ios
+  # expect HTTP/2 200
+  ```
+
+### `aws s3 cp` fails with `AccessDenied` on the upload step
 
 - Confirm the runner's AWS credentials (`AWS_ACCESS_KEY_ID` /
-  `AWS_SECRET_ACCESS_KEY`) have read access to the exact
-  `${env}/payabli-sdk-ios` secret name.
+  `AWS_SECRET_ACCESS_KEY`) have `s3:PutObject` on the
+  environment-specific bucket (`payabli-public-objects-{qa,sandbox,prod}`).
 - Confirm the GitHub Environment for the branch is correctly mapped
-  (`QA`, `Sandbox`, or `Production`) — these env vars are per-environment.
+  (`QA`, `Sandbox`, or `Production`) — `BUCKET_NAME` is per-environment.
 
 ### `pod trunk push` fails on the main release
+
+**Currently disabled for v1.** See *CocoaPods (deferred)* below.
+
+When re-enabled:
 
 - Trunk is eventually-consistent; propagation can take up to ~2h.
   `pod search PayabliSDK` against the CDN happens only after Trunk
@@ -238,3 +260,54 @@ swift package init --type executable
 
 For the full partner-integration smoke test, see
 `Example/INTERNAL_APPS_INTEGRATION.md`.
+
+## CocoaPods (deferred)
+
+CocoaPods publication is **disabled for v1**. The pipeline ships via
+Swift Package Manager only. All the infrastructure to turn it on later
+remains in place in the private repo:
+
+- `.github/templates/public-PayabliSDK.podspec.tmpl` — rendered template.
+- `Scripts/render_public_manifests.sh` — renders `PayabliSDK.podspec`
+  into `build/public/` every release (catches template regressions).
+- `.github/workflows/ci.yml` → `validate-pods` — lints the rendered
+  podspec on every PR.
+- `Scripts/push_to_public_repo.sh` — copies the rendered podspec into
+  the public repo alongside `Package.swift` (dormant file; nothing
+  consumes it because the public README no longer advertises CocoaPods).
+- `.github/workflows/release.yml` — the `CocoaPods trunk push (main only)`
+  step is commented out with a TODO block listing the exact steps to
+  re-enable.
+
+### Known gap to fix before flipping on
+
+The current `public-PayabliSDK.podspec.tmpl` assumes a **single combined
+XCFramework zip** (`payabli-ios-sdk-${VERSION}.zip`) but
+`Scripts/build_release_frameworks.sh` produces three separate zips
+(`-core-`, `-payin-`, `-card-reader-core-`). Before enabling the
+Trunk push, pick one of:
+
+1. Extend `build_release_frameworks.sh` to emit a 4th combined zip and
+   update `upload_release.sh` to push it too; keep the podspec referencing
+   the combined zip.
+2. Rewrite `public-PayabliSDK.podspec.tmpl` so each subspec has its own
+   `vendored_frameworks` entry pointing at its existing per-product zip
+   (same URLs SPM already resolves; no repackaging needed).
+
+Option 2 is cleaner — both package managers consume the same S3 objects.
+
+### Re-enable checklist
+
+When DevOps is ready:
+
+1. Have the release maintainer run `pod trunk register releases@payabli.com`
+   on their laptop to generate a Trunk session token.
+2. Create a repo secret `COCOAPODS_TRUNK_TOKEN` with that token value
+   on `payabli/sdk-ios`.
+3. Apply one of the two fixes above for the combined-zip gap.
+4. Restore the CocoaPods installation section in
+   `.github/templates/public-README.md.tmpl`.
+5. Uncomment the `CocoaPods trunk push (main only)` step in
+   `.github/workflows/release.yml`.
+6. Smoke-test with `skip_publish=false` on a hotfix branch before the
+   next real `main` release.

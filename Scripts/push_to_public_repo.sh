@@ -9,7 +9,7 @@
 #   VERSION              e.g. 1.0.247 or 1.0.247-beta
 #   PUBLIC_REPO          GitHub slug, e.g. payabli/payabli-sdk-ios
 #   PUBLIC_REPO_PAT      GitHub token with write access to the public repo
-#                        (sourced from AWS Secrets Manager in CI)
+#                        (sourced from the GHB_PAT_TOKEN GitHub secret in CI)
 #
 # Optional:
 #   GH_ACTOR             commit author name (defaults to "Payabli Release Bot")
