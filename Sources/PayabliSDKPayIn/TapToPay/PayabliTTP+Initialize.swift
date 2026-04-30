@@ -99,7 +99,7 @@ extension PayabliTTP {
         multicaster.emit(.attestationStarted)
 
         do {
-            let result = try await attestation.attest(entry: entry, appId: appId)
+            let result = try await attestation.attest(entry: entryPoint, appId: appId)
             multicaster.emit(.attestationCompleted)
             _ = sessionManager.transition(to: .fetchingConfig)
             syncPublished()
@@ -122,7 +122,7 @@ extension PayabliTTP {
     ///   - anything else → `.error`, rewrap non-typed errors as `.configFailed`
     private func runFetchConfigPhase() async throws -> TTPConfig {
         do {
-            return try await configClient.fetchConfig(entry: entry)
+            return try await configClient.fetchConfig(entry: entryPoint)
         } catch PayabliTTPError.devicePendingActivation {
             markPendingActivation()
             throw PayabliTTPError.devicePendingActivation

@@ -1,9 +1,12 @@
 import Foundation
 import Combine
+import PayabliSDKCore
 
 /// Form-level state for the card tokenization / payment form.
 ///
-/// Implements on-blur validation and touched-field tracking (PRD FR-4.1, FR-4.2).
+/// Implements on-blur validation and touched-field tracking (PRD FR-4.1, FR-4.2),
+/// live PAN auto-formatting ("4242 4242 4242 4242" — Amex "XXXX XXXXXX XXXXX"),
+/// and CVV length capping based on the detected brand.
 @MainActor
 public final class CardFormViewModel: ObservableObject {
     public enum Field: Hashable, CaseIterable {
@@ -17,14 +20,80 @@ public final class CardFormViewModel: ObservableObject {
     // MARK: - Inputs
 
     @Published public var holderName: String = ""
-    @Published public var cardNumber: String = ""
+
+    /// Card number. Auto-formats with brand-appropriate spaces as the user types.
+    @Published public var cardNumber: String = "" {
+        didSet {
+            let digits = cardNumber.filter(\.isNumber)
+            let brand = PaymentValidators.cardBrand(for: digits)
+            let capped = String(digits.prefix(PaymentValidators.maxDigits(for: brand)))
+            let formatted = PaymentValidators.formatCardNumber(capped, brand: brand)
+            if formatted != cardNumber {
+                cardNumber = formatted
+            }
+        }
+    }
+
     /// Expiration month (1-12).
     @Published public var expirationMonth: Int = 1
     /// Expiration year (full, e.g. 2027).
     @Published public var expirationYear: Int = Calendar.current
         .component(.year, from: Date())
-    @Published public var cvv: String = ""
+
+    /// Inline "MM / YY" expiration text. Auto-formats as the user types
+    /// (digits-only, slash inserted after the 2nd digit) and keeps
+    /// `expirationMonth` / `expirationYear` in sync.
+    @Published public var expirationText: String = "" {
+        didSet {
+            let digits = String(expirationText.filter(\.isNumber).prefix(4))
+            let formatted: String
+            switch digits.count {
+            case 0, 1, 2:
+                formatted = String(digits)
+            default:
+                let mm = digits.prefix(2)
+                let yy = digits.dropFirst(2)
+                formatted = "\(mm) / \(yy)"
+            }
+            if formatted != expirationText {
+                expirationText = formatted
+            }
+            if digits.count >= 2, let m = Int(digits.prefix(2)) {
+                expirationMonth = m
+            }
+            if digits.count == 4, let y = Int(digits.suffix(2)) {
+                expirationYear = 2000 + y
+            }
+        }
+    }
+
+    /// CVV. Capped to brand-appropriate length (Amex = 4, others = 3).
+    @Published public var cvv: String = "" {
+        didSet {
+            let digits = cvv.filter(\.isNumber)
+            let maxLength = PaymentValidators.cvvLength(for: cardBrand)
+            let capped = String(digits.prefix(maxLength))
+            if capped != cvv {
+                cvv = capped
+            }
+        }
+    }
+
     @Published public var zip: String = ""
+
+    // MARK: - Configuration
+    //
+    // `strings` and `allowedBrands` are populated by the `CardFormView` on
+    // first appear. They drive (1) localized error copy and (2) brand
+    // restriction. Defaults match the unconfigured/test path.
+
+    /// Localized copy used for field labels and validation errors.
+    @Published public var strings: CardFormStrings = .default
+
+    /// Set of card brands the form will accept. Defaults to `.all`.
+    /// PANs whose detected brand is outside this set fail validation with
+    /// `strings.disallowedBrandError`.
+    @Published public var allowedBrands: PayabliCardBrand = .all
 
     // MARK: - State
 
@@ -51,24 +120,30 @@ public final class CardFormViewModel: ObservableObject {
         switch field {
         case .holderName:
             return PaymentValidators.isValidHolderName(holderName)
-                ? nil : "Card holder name is required"
+                ? nil : strings.holderNameError
 
         case .cardNumber:
+            // Brand restriction takes precedence over Luhn — surfacing
+            // "brand not accepted" is more actionable than "invalid number"
+            // for a PAN that is otherwise well-formed but unsupported.
+            if !allowedBrands.allows(cardBrand) {
+                return strings.disallowedBrandError
+            }
             return PaymentValidators.isValidCardNumber(cardNumber)
-                ? nil : "Invalid card number"
+                ? nil : strings.cardNumberError
 
         case .expiration:
             return PaymentValidators.isValidExpiration(
                 month: expirationMonth,
                 year: expirationYear
-            ) ? nil : "Invalid expiration date"
+            ) ? nil : strings.expirationError
 
         case .cvv:
             return PaymentValidators.isValidCVV(cvv, brand: cardBrand)
-                ? nil : "Invalid CVV"
+                ? nil : strings.cvcError
 
         case .zip:
-            return PaymentValidators.isValidZIP(zip) ? nil : "Invalid ZIP code"
+            return PaymentValidators.isValidZIP(zip) ? nil : strings.zipError
         }
     }
 
@@ -90,9 +165,24 @@ public final class CardFormViewModel: ObservableObject {
         lastError = nil
     }
 
-    public func endSubmission(error: String? = nil) {
+    /// Ends the submission. Pass `nil` for success, an `Error` for failure —
+    /// the VM translates it to a user-facing string for `lastError`.
+    public func endSubmission(error: Error? = nil) {
         isSubmitting = false
-        lastError = error
+        lastError = error.map(Self.userFacingMessage(from:))
+    }
+
+    private static func userFacingMessage(from error: Error) -> String {
+        if let payment = error as? PayabliPaymentError {
+            return payment.asPayabliError.reason
+        }
+        if let payabli = error as? PayabliError {
+            return payabli.reason
+        }
+        if let localized = (error as? LocalizedError)?.errorDescription {
+            return localized
+        }
+        return "Request failed. Please try again."
     }
 
     /// Produces the formatted "MMYY" expiration string required by the API.

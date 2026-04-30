@@ -63,7 +63,11 @@ let package = Package(
             path: "Sources/PayabliSDKPayIn",
             exclude: [
                 "TapToPay/README.md",
-                "TapToPay/Adapters/README.md"
+                "TapToPay/Adapters/README.md",
+                "Resources/README.md"
+            ],
+            resources: [
+                .process("Resources/PayabliBrandAssets.xcassets")
             ]
         ),
         .target(

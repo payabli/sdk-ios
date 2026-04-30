@@ -135,7 +135,8 @@ public final class GetpaidClient: Sendable {
                 categories: request.categories,
                 invoiceData: request.invoiceData
             ),
-            paymentMethod: method
+            paymentMethod: method,
+            source: "mobile"
         )
 
         return try await withAuthRetry { token in

@@ -109,7 +109,7 @@ extension PayabliTTP {
             )
         }
         return try await transactionClient.initiate(
-            entryPoint: entry,
+            entryPoint: entryPoint,
             amount: context.amount,
             serviceFee: context.serviceFee,
             deviceId: deviceId,

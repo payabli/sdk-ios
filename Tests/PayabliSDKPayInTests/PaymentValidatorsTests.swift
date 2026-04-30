@@ -95,4 +95,58 @@ final class PaymentValidatorsTests: XCTestCase {
         XCTAssertFalse(PaymentValidators.isValidHolderName(""))
         XCTAssertFalse(PaymentValidators.isValidHolderName("   "))
     }
+
+    // MARK: - Card number formatting
+
+    func testFormatCardNumberVisa() {
+        XCTAssertEqual(
+            PaymentValidators.formatCardNumber("4242424242424242", brand: .visa),
+            "4242 4242 4242 4242"
+        )
+    }
+
+    func testFormatCardNumberAmexUsesFourSixFive() {
+        XCTAssertEqual(
+            PaymentValidators.formatCardNumber("378282246310005", brand: .amex),
+            "3782 822463 10005"
+        )
+    }
+
+    func testFormatCardNumberIdempotent() {
+        let once = PaymentValidators.formatCardNumber("4242424242424242", brand: .visa)
+        let twice = PaymentValidators.formatCardNumber(once, brand: .visa)
+        XCTAssertEqual(once, twice)
+    }
+
+    func testFormatCardNumberStripsNonDigits() {
+        XCTAssertEqual(
+            PaymentValidators.formatCardNumber("4242-abc-4242 4242", brand: .visa),
+            "4242 4242 4242"
+        )
+    }
+
+    func testFormatCardNumberPartialInput() {
+        XCTAssertEqual(PaymentValidators.formatCardNumber("4242", brand: .visa), "4242")
+        XCTAssertEqual(PaymentValidators.formatCardNumber("42421", brand: .visa), "4242 1")
+        XCTAssertEqual(PaymentValidators.formatCardNumber("", brand: .visa), "")
+    }
+
+    func testMaxDigits() {
+        XCTAssertEqual(PaymentValidators.maxDigits(for: .amex), 15)
+        XCTAssertEqual(PaymentValidators.maxDigits(for: .mastercard), 16)
+        XCTAssertEqual(PaymentValidators.maxDigits(for: .visa), 16)
+        XCTAssertEqual(PaymentValidators.maxDigits(for: .discover), 16)
+        XCTAssertEqual(PaymentValidators.maxDigits(for: .unknown), 16)
+    }
+
+    func testAutoAdvanceDigits() {
+        XCTAssertEqual(PaymentValidators.autoAdvanceDigits(for: .visa), 16)
+        XCTAssertEqual(PaymentValidators.autoAdvanceDigits(for: .amex), 15)
+        XCTAssertNil(PaymentValidators.autoAdvanceDigits(for: .unknown))
+    }
+
+    func testCvvLength() {
+        XCTAssertEqual(PaymentValidators.cvvLength(for: .amex), 4)
+        XCTAssertEqual(PaymentValidators.cvvLength(for: .visa), 3)
+    }
 }

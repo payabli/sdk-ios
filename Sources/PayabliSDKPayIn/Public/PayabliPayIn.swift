@@ -53,15 +53,18 @@ public final class PayabliPayIn: NSObject, PayabliComponent {
     }
 
     // MARK: - State
+    //
+    // `internal` (not `private`) so the companion `+Async` / `+Forms`
+    // extensions in this module can read them without detours.
 
-    private var config: PayabliConfig?
-    private var theme: PayabliTheme = .default
-    private var auth: PayabliAuth?
-    private var service: PayabliService?
-    private var tokenStorage: TokenStorageClient?
-    private var getpaid: GetpaidClient?
+    var config: PayabliConfig?
+    var theme: PayabliTheme = .default
+    var auth: PayabliAuth?
+    var service: PayabliService?
+    var tokenStorage: TokenStorageClient?
+    var getpaid: GetpaidClient?
     #if canImport(PassKit) && os(iOS)
-    private var applePayManager: ApplePayManager?
+    var applePayManager: ApplePayManager?
     #endif
 
     // MARK: - Public API
@@ -104,49 +107,28 @@ public final class PayabliPayIn: NSObject, PayabliComponent {
     /// Creates a `UIViewController` hosting the tokenization form for the given
     /// payment type. Present modally from the host app.
     ///
+    /// `cardStrings`, `achStrings`, and `allowedBrands` are forwarded to the
+    /// underlying `CardFormView` / `ACHFormView` for label and brand
+    /// customization. Defaults match the unconfigured English path.
+    ///
     /// See PRD FR-6.2, FR-3.1.
     public func createTokenizationViewController(
         type: PayabliPaymentType,
         customerId: Int,
+        cardStrings: CardFormStrings = .default,
+        achStrings: ACHFormStrings = .default,
+        allowedBrands: PayabliCardBrand = .all,
         completion: @escaping PayabliTokenizationCompletion
     ) -> UIViewController {
-        let cardVM = CardFormViewModel()
-        let achVM = ACHFormViewModel()
-
-        let hosting = UIHostingController(
-            rootView: PaymentFormView(
-                type: type,
-                theme: theme,
-                submitTitle: "Save Payment Method",
-                cardViewModel: cardVM,
-                achViewModel: achVM,
-                onSubmitCard: { [weak self] in
-                    Task {
-                        await self?.submitCardTokenization(
-                            cardVM,
-                            customerId: customerId,
-                            completion: completion
-                        )
-                    }
-                },
-                onSubmitACH: { [weak self] in
-                    Task {
-                        await self?.submitACHTokenization(
-                            achVM,
-                            customerId: customerId,
-                            completion: completion
-                        )
-                    }
-                },
-                onCancel: {
-                    // Host dismisses the VC; SDK reports cancellation.
-                    completion(nil, PayabliGenericError(
-                        code: .userCancelled,
-                        reason: "User cancelled"
-                    ))
-                }
-            )
+        let rootView = tokenizationRootView(
+            type: type,
+            customerId: customerId,
+            cardStrings: cardStrings,
+            achStrings: achStrings,
+            allowedBrands: allowedBrands,
+            completion: completion
         )
+        let hosting = UIHostingController(rootView: rootView)
         hosting.modalPresentationStyle = .formSheet
         hosting.isModalInPresentation = false
         return hosting
@@ -156,53 +138,183 @@ public final class PayabliPayIn: NSObject, PayabliComponent {
     /// executes an authorize-and-capture via `POST /api/v2/MoneyIn/getpaid`.
     ///
     /// See PRD FR-6.7, FR-12A.
+    public func processPaymentViewController(
+        type: PayabliPaymentType,
+        paymentRequest: PayabliPaymentRequest,
+        customerId: Int,
+        cardStrings: CardFormStrings = .default,
+        achStrings: ACHFormStrings = .default,
+        allowedBrands: PayabliCardBrand = .all,
+        completion: @escaping PayabliPaymentCompletion
+    ) -> UIViewController {
+        let rootView = paymentRootView(
+            type: type,
+            paymentRequest: paymentRequest,
+            customerId: customerId,
+            cardStrings: cardStrings,
+            achStrings: achStrings,
+            allowedBrands: allowedBrands,
+            completion: completion
+        )
+        let hosting = UIHostingController(rootView: rootView)
+        hosting.modalPresentationStyle = .formSheet
+        hosting.isModalInPresentation = false
+        return hosting
+    }
+
+    // MARK: - UIKit rootView builders
+    //
+    // Both card and ACH paths wrap the corresponding turn-key SwiftUI view
+    // (`CardFormView` / `ACHFormView`) — each owns its own VM and calls the
+    // right endpoint internally. `applePay` and `tapToPay` surface a message
+    // pointing callers at their dedicated APIs (`setupApplePay` /
+    // `chargeApplePay` / `PayabliTTP`).
+
+    @ViewBuilder
+    private func tokenizationRootView(
+        type: PayabliPaymentType,
+        customerId: Int,
+        cardStrings: CardFormStrings,
+        achStrings: ACHFormStrings,
+        allowedBrands: PayabliCardBrand,
+        completion: @escaping PayabliTokenizationCompletion
+    ) -> some View {
+        switch type {
+        case .card:
+            sheetChrome(title: cardStrings.sheetTitle, cancel: {
+                completion(nil, PayabliGenericError(code: .userCancelled, reason: "User cancelled"))
+            }) {
+                CardFormView(
+                    customerId: customerId,
+                    theme: theme,
+                    strings: cardStrings,
+                    allowedBrands: allowedBrands,
+                    onCompletion: completion
+                )
+            }
+        case .ach:
+            sheetChrome(title: achStrings.sheetTitle, cancel: {
+                completion(nil, PayabliGenericError(code: .userCancelled, reason: "User cancelled"))
+            }) {
+                ACHFormView(
+                    customerId: customerId,
+                    theme: theme,
+                    strings: achStrings,
+                    onCompletion: completion
+                )
+            }
+        case .applePay:
+            placeholderSheet(title: "Apple Pay",
+                             message: "Apple Pay uses setupApplePay / chargeApplePay instead.",
+                             onCancel: {
+                                 completion(nil, PayabliGenericError(code: .userCancelled, reason: "User cancelled"))
+                             })
+        case .tapToPay:
+            placeholderSheet(title: "Tap to Pay",
+                             message: "Tap to Pay uses PayabliTTP instead.",
+                             onCancel: {
+                                 completion(nil, PayabliGenericError(code: .userCancelled, reason: "User cancelled"))
+                             })
+        }
+    }
+
+    @ViewBuilder
+    private func paymentRootView(
+        type: PayabliPaymentType,
+        paymentRequest: PayabliPaymentRequest,
+        customerId: Int,
+        cardStrings: CardFormStrings,
+        achStrings: ACHFormStrings,
+        allowedBrands: PayabliCardBrand,
+        completion: @escaping PayabliPaymentCompletion
+    ) -> some View {
+        switch type {
+        case .card:
+            sheetChrome(title: cardStrings.sheetTitle, cancel: {
+                completion(nil, PayabliGenericError(code: .userCancelled, reason: "User cancelled"))
+            }) {
+                CardFormView(
+                    paymentRequest: paymentRequest,
+                    customerId: customerId,
+                    theme: theme,
+                    strings: cardStrings,
+                    allowedBrands: allowedBrands,
+                    onCompletion: completion
+                )
+            }
+        case .ach:
+            sheetChrome(title: achStrings.sheetTitle, cancel: {
+                completion(nil, PayabliGenericError(code: .userCancelled, reason: "User cancelled"))
+            }) {
+                ACHFormView(
+                    paymentRequest: paymentRequest,
+                    customerId: customerId,
+                    theme: theme,
+                    strings: achStrings,
+                    onCompletion: completion
+                )
+            }
+        case .applePay:
+            placeholderSheet(title: "Apple Pay",
+                             message: "Apple Pay uses setupApplePay / chargeApplePay instead.",
+                             onCancel: {
+                                 completion(nil, PayabliGenericError(code: .userCancelled, reason: "User cancelled"))
+                             })
+        case .tapToPay:
+            placeholderSheet(title: "Tap to Pay",
+                             message: "Tap to Pay uses PayabliTTP instead.",
+                             onCancel: {
+                                 completion(nil, PayabliGenericError(code: .userCancelled, reason: "User cancelled"))
+                             })
+        }
+    }
+
+    @ViewBuilder
+    private func sheetChrome<Body: View>(
+        title: String,
+        cancel: @escaping () -> Void,
+        @ViewBuilder body: () -> Body
+    ) -> some View {
+        VStack(spacing: 0) {
+            PayabliSheetHeader(title: title, tint: theme.primaryColor, onCancel: cancel)
+            Divider()
+            body()
+        }
+    }
+
+    @ViewBuilder
+    private func placeholderSheet(
+        title: String,
+        message: String,
+        onCancel: @escaping () -> Void
+    ) -> some View {
+        sheetChrome(title: title, cancel: onCancel) {
+            VStack {
+                Spacer()
+                Text(message).foregroundColor(.secondary).padding()
+                Spacer()
+            }
+        }
+    }
+
     public func createPaymentViewController(
         type: PayabliPaymentType,
         paymentRequest: PayabliPaymentRequest,
         customerId: Int,
+        cardStrings: CardFormStrings = .default,
+        achStrings: ACHFormStrings = .default,
+        allowedBrands: PayabliCardBrand = .all,
         completion: @escaping PayabliPaymentCompletion
     ) -> UIViewController {
-        let cardVM = CardFormViewModel()
-        let achVM = ACHFormViewModel()
-
-        let hosting = UIHostingController(
-            rootView: PaymentFormView(
-                type: type,
-                theme: theme,
-                submitTitle: formatPayButtonTitle(request: paymentRequest),
-                cardViewModel: cardVM,
-                achViewModel: achVM,
-                onSubmitCard: { [weak self] in
-                    Task {
-                        await self?.submitCardPayment(
-                            cardVM,
-                            request: paymentRequest,
-                            customerId: customerId,
-                            completion: completion
-                        )
-                    }
-                },
-                onSubmitACH: { [weak self] in
-                    Task {
-                        await self?.submitACHPayment(
-                            achVM,
-                            request: paymentRequest,
-                            customerId: customerId,
-                            completion: completion
-                        )
-                    }
-                },
-                onCancel: {
-                    completion(nil, PayabliGenericError(
-                        code: .userCancelled,
-                        reason: "User cancelled"
-                    ))
-                }
-            )
+        processPaymentViewController(
+            type: type,
+            paymentRequest: paymentRequest,
+            customerId: customerId,
+            cardStrings: cardStrings,
+            achStrings: achStrings,
+            allowedBrands: allowedBrands,
+            completion: completion
         )
-        hosting.modalPresentationStyle = .formSheet
-        hosting.isModalInPresentation = false
-        return hosting
     }
     #endif
 
@@ -321,14 +433,13 @@ public final class PayabliPayIn: NSObject, PayabliComponent {
         completion: @escaping PayabliTokenizationCompletion
     ) async {
         guard viewModel.isValid else {
-            viewModel.endSubmission(error: "Please correct the errors and try again.")
+            viewModel.endSubmission(error: Self.preflightError)
             return
         }
         guard let config, let tokenStorage else {
-            completion(nil, PayabliGenericError(
-                code: .invalidConfiguration,
-                reason: "PayabliPayIn not configured"
-            ))
+            let error = Self.notConfiguredError
+            viewModel.endSubmission(error: error)
+            completion(nil, error)
             return
         }
 
@@ -344,7 +455,7 @@ public final class PayabliPayIn: NSObject, PayabliComponent {
             viewModel.endSubmission()
             completion(token, nil)
         } catch {
-            viewModel.endSubmission(error: errorDisplayMessage(error))
+            viewModel.endSubmission(error: error)
             completion(nil, error)
         }
     }
@@ -355,14 +466,13 @@ public final class PayabliPayIn: NSObject, PayabliComponent {
         completion: @escaping PayabliTokenizationCompletion
     ) async {
         guard viewModel.isValid else {
-            viewModel.endSubmission(error: "Please correct the errors and try again.")
+            viewModel.endSubmission(error: Self.preflightError)
             return
         }
         guard let config, let tokenStorage else {
-            completion(nil, PayabliGenericError(
-                code: .invalidConfiguration,
-                reason: "PayabliPayIn not configured"
-            ))
+            let error = Self.notConfiguredError
+            viewModel.endSubmission(error: error)
+            completion(nil, error)
             return
         }
 
@@ -378,20 +488,20 @@ public final class PayabliPayIn: NSObject, PayabliComponent {
             viewModel.endSubmission()
             completion(token, nil)
         } catch {
-            viewModel.endSubmission(error: errorDisplayMessage(error))
+            viewModel.endSubmission(error: error)
             completion(nil, error)
         }
     }
 
-    private func errorDisplayMessage(_ error: Error) -> String {
-        if let payment = error as? PayabliPaymentError {
-            return payment.asPayabliError.reason
-        }
-        if let payabli = error as? PayabliError {
-            return payabli.reason
-        }
-        return "Tokenization failed. Please try again."
-    }
+    private static let preflightError = PayabliGenericError(
+        code: .invalidConfiguration,
+        reason: "Please correct the errors and try again."
+    )
+
+    private static let notConfiguredError = PayabliGenericError(
+        code: .invalidConfiguration,
+        reason: "PayabliPayIn not configured"
+    )
 
     // MARK: - Payment submit handlers
 
@@ -402,14 +512,13 @@ public final class PayabliPayIn: NSObject, PayabliComponent {
         completion: @escaping PayabliPaymentCompletion
     ) async {
         guard viewModel.isValid else {
-            viewModel.endSubmission(error: "Please correct the errors and try again.")
+            viewModel.endSubmission(error: Self.preflightError)
             return
         }
         guard let config, let getpaid else {
-            completion(nil, PayabliGenericError(
-                code: .invalidConfiguration,
-                reason: "PayabliPayIn not configured"
-            ))
+            let error = Self.notConfiguredError
+            viewModel.endSubmission(error: error)
+            completion(nil, error)
             return
         }
 
@@ -424,7 +533,7 @@ public final class PayabliPayIn: NSObject, PayabliComponent {
             viewModel.endSubmission()
             completion(result, nil)
         } catch {
-            viewModel.endSubmission(error: errorDisplayMessage(error))
+            viewModel.endSubmission(error: error)
             completion(nil, error)
         }
     }
@@ -436,14 +545,13 @@ public final class PayabliPayIn: NSObject, PayabliComponent {
         completion: @escaping PayabliPaymentCompletion
     ) async {
         guard viewModel.isValid else {
-            viewModel.endSubmission(error: "Please correct the errors and try again.")
+            viewModel.endSubmission(error: Self.preflightError)
             return
         }
         guard let config, let getpaid else {
-            completion(nil, PayabliGenericError(
-                code: .invalidConfiguration,
-                reason: "PayabliPayIn not configured"
-            ))
+            let error = Self.notConfiguredError
+            viewModel.endSubmission(error: error)
+            completion(nil, error)
             return
         }
 
@@ -458,7 +566,7 @@ public final class PayabliPayIn: NSObject, PayabliComponent {
             viewModel.endSubmission()
             completion(result, nil)
         } catch {
-            viewModel.endSubmission(error: errorDisplayMessage(error))
+            viewModel.endSubmission(error: error)
             completion(nil, error)
         }
     }

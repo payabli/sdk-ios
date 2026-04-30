@@ -23,7 +23,7 @@ extension PayabliTTP {
         }
         multicaster.emit(.activationStarted)
         do {
-            try await attestation.activateDevice(activationCode: activationCode, entry: entry)
+            try await attestation.activateDevice(activationCode: activationCode, entry: entryPoint)
             _ = sessionManager.transition(to: .idle)
             syncPublished()
             multicaster.emit(.activationCompleted)

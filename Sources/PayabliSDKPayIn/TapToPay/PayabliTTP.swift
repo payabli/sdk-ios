@@ -9,7 +9,7 @@ import PayabliSDKCore
 ///
 /// ```swift
 /// let ttp = PayabliTTP(
-///     accessToken: "...", entry: "myEntry",
+///     accessToken: "...", entryPoint: "myEntry",
 ///     appId: "TEAM.bundle.id", environment: .sandbox
 /// )
 /// try await ttp.initialize()
@@ -26,7 +26,7 @@ public final class PayabliTTP: ObservableObject {
 
     // MARK: - Dependencies
 
-    let entry: String
+    let entryPoint: String
     let appId: String
     let environment: PayabliEnvironment
 
@@ -74,14 +74,14 @@ public final class PayabliTTP: ObservableObject {
     public convenience init(
         accessToken: String,
         tokenProvider: PayabliTokenRefresh? = nil,
-        entry: String,
+        entryPoint: String,
         appId: String,
         environment: PayabliEnvironment
     ) {
         let config = PayabliConfig(
             accessToken: accessToken,
             tokenProvider: tokenProvider,
-            entryPoint: entry,
+            entryPoint: entryPoint,
             environment: environment
         )
         let service = PayabliService(environment: environment)
@@ -113,7 +113,7 @@ public final class PayabliTTP: ObservableObject {
         retryPolicy: RetryPolicy = .default,
         session: URLSession? = nil
     ) {
-        self.entry = config.entryPoint
+        self.entryPoint = config.entryPoint
         self.appId = appId
         self.environment = config.environment
         self.provider = provider

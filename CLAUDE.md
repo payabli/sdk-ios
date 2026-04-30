@@ -22,20 +22,39 @@ CI runs on macOS 14 / Xcode 15.2 via `.github/workflows/ci.yml`.
 Three Swift package targets, all dynamic frameworks (PRD NFR-11):
 
 **PayabliSDKCore** — Zero external dependencies (NFR-8). Shared infrastructure used by all other modules:
+
 - `PayabliAuth` (actor): token storage with in-flight refresh deduplication; never logs tokens
 - `PayabliService`: pure HTTP transport — no auth state, returns raw or decoded responses
 - `PayabliRequest` / response envelopes: two envelope shapes exist — legacy `PayabliEnvelope` (attestation/device endpoints) and `PayabliV2Envelope<T>` (MoneyIn v2 endpoints)
 - `PayabliComponent` protocol: static requirements (componentId, sessionTier, requiredPermissions) used for lifecycle uniformity across all components
 - `PayabliLogger`: wraps `os.Logger` with explicit `.public`/`.private` privacy levels — PANs, tokens, CVVs, account numbers are never logged
 
-**PayabliSDKPayIn** — Depends on Core + FiservTTP (iOS-only, platform-conditional):
-- `PayabliPayIn` (singleton facade, aliased as `PayabliClient`)
-- SwiftUI forms: `PaymentFormView` backed by `CardFormViewModel` / `ACHFormViewModel` (@MainActor, @ObservableObject); on-blur validation only shows errors for touched fields
-- `GetpaidClient`: card/ACH/Apple Pay via `POST /api/v2/MoneyIn/getpaid`
-- `TokenStorageClient`: payment method tokenization
-- **Tap to Pay**: `PayabliTTP` (main facade split across 3 companion files per §7.2 — `+Initialize`, `+Activation`, `+Charge`), `FiservCardReader` adapter, `AppAttestService` (App Attest + Keychain), 9-state `SessionManager`. No offline retry: if the final `PATCH /update` fails, `charge()` throws `PayabliTTPError.updateFailed` and partners reconcile manually.
+**PayabliSDKPayIn** — Depends on Core + FiservTTP (iOS-only, platform-conditional). Hosts every PayIn flow (tokenization, getpaid, Apple Pay, Tap to Pay). Folder rules are below — **when adding a file, pick the folder from the table; don't invent new folders without updating the PRD §7.2 section**.
 
 **PayabliSDKTelemetry** — Depends on Core only. Optional observability with Sentry and PostHog transports (bring-your-own-instance). Opt-out via `PayabliConfig.telemetryEnabled`.
+
+## Folder Layout (PayabliSDKPayIn)
+
+Strict, per PRD §7.2. Each folder owns a single concern; cross-folder imports are fine but file placement is not.
+
+
+| Folder        | What goes here                                                                                                                                                                                                                                                                                                                                                                                             | What does NOT                                           |
+| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| `Public/`     | Entry-point facades the host app imports: `PayabliPayIn` singleton + its `+Async` extension, `PayabliClient` typealias, public enums (`PayabliPaymentType`), public option sets (`PayabliCardBrand`), and form-customization strings structs (`CardFormStrings`, `ACHFormStrings`). First surface a consumer types after `import PayabliSDKPayIn`.                                                         | SwiftUI Views, wire DTOs, HTTP clients, platform glue.  |
+| `Models/`     | (1) Public data types on the SDK surface (`PayabliPaymentRequest`, `PayabliTransactionResult`). (2) Endpoint-scoped groups: each HTTP client lives **next to** its wire-format DTOs — e.g. `GetpaidClient.swift` + `GetpaidWireFormat.swift`, `TokenStorageClient.swift` + `TokenizationRequest.swift`. (3) Pure cross-flow helpers (`PaymentValidators`).                                                 | SwiftUI, Apple Pay / NFC platform glue, facades.        |
+| `Payments/`   | Native platform payment stacks — code that bridges to PassKit / StoreKit / ProximityReader and is driven by the OS framework's control flow. Today: `ApplePayManager`, `PayabliApplePayConfig`.                                                                                                                                                                                                            | HTTP clients (those go in `Models/`), SwiftUI.          |
+| `ViewModels/` | SwiftUI `@MainActor ObservableObject` state holders (`CardFormViewModel`, `ACHFormViewModel`). Transient UI state + validation + payload assembly. Testable without presenting a view.                                                                                                                                                                                                                     | HTTP calls, platform APIs, `View` types.                |
+| `Views/`      | All SwiftUI Views. Turn-key forms own their VM via `@StateObject` + expose two inits (tokenize vs charge): `CardFormView` (+ `.payabliCardSheet(...)`) and `ACHFormView` (+ `.payabliAchSheet(...)`); sheet modifiers live in the same file as the form. Low-level atoms: `CardBrandBadge`. Shared chrome: `PayabliSheetHeader`. UIKit `UIViewController` factories on `PayabliPayIn` wrap these turn-key views directly — there is no per-type composite view. One principal `View` per file. | Business logic, HTTP, platform glue.                    |
+| `TapToPay/`   | Intentionally flat per PRD §7.2. Facade (`PayabliTTP.swift`) split across companion files (`+Initialize`, `+Charge`, `+Activation`); attestation (`AppAttestService`*); wire formats (`*WireFormat.swift`); provider adapters under `TapToPay/Adapters/`. See `TapToPay/README.md` for the full map.                                                                                                       | Anything non-TTP. Don't spill TTP types into `Models/`. |
+
+
+Rules of thumb when unsure:
+
+- "Does the consumer call it by name?" → `Public/`
+- "Is it a value type, a DTO, or the HTTP client that owns an endpoint?" → `Models/`
+- "Does it wrap an Apple framework that drives the control flow?" → `Payments/` (or `TapToPay/Adapters/` for NFC)
+- "Is it `@Published` state for a form?" → `ViewModels/`
+- "Is it a `View` or a `ViewModifier`?" → `Views/`
 
 ## Key Design Patterns
 
@@ -43,7 +62,7 @@ Three Swift package targets, all dynamic frameworks (PRD NFR-11):
 
 **Auth flow**: On 401, `PayabliAuth.invalidateAndRefresh()` calls the host app's `PayabliConfig.tokenProvider()` callback. Concurrent 401s are deduplicated via a stored `Task` (`inFlightRefresh`).
 
-**Companion files**: Large facades are split across `+Extension.swift` files (e.g., `PayabliTTP+Initialize.swift`, `PayabliTTP+Charge.swift`). This is intentional per PRD §7.2 — don't consolidate them.
+**Companion files**: Large facades are split across `+Extension.swift` files (e.g., `PayabliTTP+Initialize.swift`, `PayabliTTP+Charge.swift`, `PayabliPayIn+Async.swift`). This is intentional per PRD §7.2 — don't consolidate them. Companion files live in the same folder as their principal type.
 
 **Platform gating**: `FiservTTP` is iOS-only via `.when(platforms: [.iOS])` in Package.swift, so macOS builds compile without TTP. Guard TTP-specific code with `#if canImport(FiservTTP)` or `#if os(iOS)`.
 
@@ -66,3 +85,4 @@ Three Swift package targets, all dynamic frameworks (PRD NFR-11):
 
 - `RFC-0001-payabli-sdk-ios.md` — implementation roadmap and architecture decisions; consult before changing module boundaries or error model
 - `Example/PayabliDemo/` — requires `Config.xcconfig` (copy from `.sample` and fill sandbox credentials)
+

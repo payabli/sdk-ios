@@ -88,4 +88,5 @@ struct GetpaidRequest<Method: Encodable>: Encodable {
     let customerData: CustomerDataBlock
     let paymentDetails: GetpaidPaymentDetails
     let paymentMethod: Method
+    let source: String
 }

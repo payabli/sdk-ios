@@ -14,10 +14,11 @@ SwiftUI demo app exercising every public `PayabliPayIn` API. Maps to the manual 
 
 ## What it covers
 
-- **Tokenization** — card + ACH via `createTokenizationViewController(...)` (FR-1, FR-2).
-- **Payment (getpaid)** — card + ACH via `createPaymentViewController(...)` (FR-12A).
+- **Tokenization** — SwiftUI: `CardFormView(customerId:...)` / `ACHFormView(customerId:...)` or their `.payabliCardSheet` / `.payabliAchSheet` view modifiers. UIKit: `createTokenizationViewController(...)` or `tokenize(...)` (async) (FR-1, FR-2, FR-6.2).
+- **Payment (getpaid)** — SwiftUI: `CardFormView(paymentRequest:...)` / `ACHFormView(paymentRequest:...)` or their `.payabliCardSheet` / `.payabliAchSheet` modifiers. UIKit: `processPaymentViewController(...)` or `processPayment(...)` (async) (FR-12A).
 - **Stored-method headless** — via `chargeStoredMethod(...)` (FR-12B, §9.3C).
 - **Theming** — custom `primaryColorHex` + `cornerRadius` applied across forms.
+- **Customization** — `strings:` (`CardFormStrings` / `ACHFormStrings`) for label/error/placeholder copy, and `allowedBrands:` (`PayabliCardBrand`) on card forms to restrict accepted networks.
 
 ## Not included in this scaffold
 

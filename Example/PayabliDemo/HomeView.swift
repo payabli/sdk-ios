@@ -118,7 +118,7 @@ private struct PaymentSheet: UIViewControllerRepresentable {
     let completion: (String) -> Void
 
     func makeUIViewController(context: Context) -> UIViewController {
-        PayabliPayIn.shared.createPaymentViewController(
+        PayabliPayIn.shared.processPaymentViewController(
             type: type,
             paymentRequest: request
         ) { result, error in

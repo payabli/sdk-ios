@@ -55,4 +55,48 @@ final class ACHFormViewModelTests: XCTestCase {
         XCTAssertEqual(payload.achAccountType, .savings)
         XCTAssertEqual(payload.achHolderType, .business)
     }
+
+    // MARK: - Input caps
+
+    func testRoutingCappedAtNineDigits() {
+        let vm = ACHFormViewModel()
+        vm.routingNumber = "02100002199"
+        XCTAssertEqual(vm.routingNumber, "021000021")
+    }
+
+    func testRoutingStripsNonDigits() {
+        let vm = ACHFormViewModel()
+        vm.routingNumber = "021-000-021"
+        XCTAssertEqual(vm.routingNumber, "021000021")
+    }
+
+    func testAccountCappedAtSeventeenDigits() {
+        let vm = ACHFormViewModel()
+        vm.accountNumber = "123456789012345678"
+        XCTAssertEqual(vm.accountNumber.count, 17)
+    }
+
+    func testAccountStripsNonDigits() {
+        let vm = ACHFormViewModel()
+        vm.accountNumber = "1234-5678"
+        XCTAssertEqual(vm.accountNumber, "12345678")
+    }
+
+    // MARK: - Customization (strings)
+
+    func testCustomStringsDriveValidationErrors() {
+        let vm = ACHFormViewModel()
+        vm.strings = ACHFormStrings(
+            holderNameError: "Titular requerido",
+            routingNumberError: "Ruta invalida",
+            accountNumberError: "Cuenta invalida"
+        )
+        for field in ACHFormViewModel.Field.allCases {
+            vm.markTouched(field)
+        }
+
+        XCTAssertEqual(vm.errorMessage(for: .holderName), "Titular requerido")
+        XCTAssertEqual(vm.errorMessage(for: .routingNumber), "Ruta invalida")
+        XCTAssertEqual(vm.errorMessage(for: .accountNumber), "Cuenta invalida")
+    }
 }
