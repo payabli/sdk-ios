@@ -46,10 +46,16 @@ the doc wins.
 
 ### Tag protection
 
-- All release tags (`*.*.*`, `*.*.*-qa`, `*.*.*-beta`) are created by the
-  release workflow using `GITHUB_TOKEN`. Humans do **not** push tags
-  manually. Optional hardening: a tag protection rule blocking any non-bot
-  identity from creating/deleting those tag patterns.
+- All release tags are created by the release workflow using
+  `GITHUB_TOKEN`. Humans do **not** push tags manually.
+- **Target tags pattern:** a single `*.*.*` fnmatch rule is sufficient —
+  GitHub's `*` is greedy and matches any content except `/`, so
+  `*.*.*` covers GA (`1.0.247`), QA (`1.0.247-qa`), and Sandbox
+  (`1.0.247-beta`) simultaneously. Adding separate `*.*.*-qa` and
+  `*.*.*-beta` entries is redundant.
+- **Rules on the tag target:** `Restrict updates`, `Restrict deletions`,
+  and `Require signed commits` off (our tags are annotated, not signed).
+  Allow creates from the release bot only; block everyone else.
 
 ## Public repo (`payabli/payabli-sdk-ios`) — distribution mirror
 
