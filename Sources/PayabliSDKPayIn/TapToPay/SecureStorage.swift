@@ -33,4 +33,3 @@ public final class InMemorySecureStorage: SecureStorage, @unchecked Sendable {
         store.removeValue(forKey: key)
     }
 }
-

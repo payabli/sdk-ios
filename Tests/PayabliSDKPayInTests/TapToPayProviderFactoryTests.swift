@@ -5,11 +5,11 @@ final class TapToPayProviderFactoryTests: XCTestCase {
 
     override func setUp() {
         super.setUp()
-        TapToPayProviderFactory.shared._reset()
+        TapToPayProviderFactory.shared.resetForTesting()
     }
 
     override func tearDown() {
-        TapToPayProviderFactory.shared._reset()
+        TapToPayProviderFactory.shared.resetForTesting()
         super.tearDown()
     }
 

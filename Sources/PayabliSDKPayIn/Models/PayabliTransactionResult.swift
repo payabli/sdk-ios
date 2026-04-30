@@ -74,8 +74,14 @@ public struct PayabliTransactionResult: Sendable {
         self.explanation = envelope.explanation
         self.action = envelope.action
 
-        // Envelope.data is non-nil on approved paths (we only construct on approval).
-        let txData = envelope.data!
+        // Envelope.data is non-nil on approved paths; we only construct this
+        // result on the approval branch in the client layer, so a nil here
+        // signals a programmer error upstream rather than a user-facing case.
+        guard let txData = envelope.data else {
+            preconditionFailure(
+                "PayabliTransactionResult cannot be constructed from an envelope without `data`"
+            )
+        }
         self.data = txData
         self.paymentTransId = txData.paymentTransId
         self.authCode = txData.responseData?.authcode

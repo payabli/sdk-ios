@@ -1,11 +1,33 @@
+# SwiftLint configuration — Payabli iOS SDK
+#
+# The repo has two layers of config:
+#   - this file: project-wide defaults for Sources/ and Tests/.
+#   - Tests/.swiftlint.yml: nested config that inherits from this file and
+#     relaxes rules that conflict with idiomatic XCTest patterns (force
+#     unwraps on fixtures, large fixture tuples, etc.).
+#
+# CI runs `swiftlint --strict`, so every warning is treated as an error.
+# Keep warning thresholds calibrated to the real shape of the codebase so
+# strict mode stays useful instead of getting disabled.
+
 disabled_rules:
   - trailing_whitespace
   - todo
+  # `multiple_closures_with_trailing_closure` flags idiomatic SwiftUI patterns
+  # like `Button { ... } label: { ... }` and our `.alert(isPresented:) { ... }
+  # with a custom title builder`. Noise-to-signal is too high for this codebase.
+  - multiple_closures_with_trailing_closure
+  # `opening_brace` clashes with how swiftformat lays out long multi-line
+  # function signatures that end the parameter list on its own line; the
+  # formatter wins this fight, so silence the linter on it.
+  - opening_brace
 
 opt_in_rules:
   - empty_count
   - force_unwrapping
   - implicitly_unwrapped_optional
+
+analyzer_rules:
   - unused_import
   - unused_declaration
 
@@ -17,6 +39,10 @@ excluded:
   - .build
   - .swiftpm
   - Example/PayabliDemo/build
+  # Vendored Fiserv/TTPPackage source is carried byte-identical to upstream
+  # (see Scripts/refresh_vendored_ttp.sh). Linting it would either force us to
+  # fork the style or re-apply diffs on every refresh — neither is worth it.
+  - ThirdParty
 
 line_length:
   warning: 140
@@ -24,7 +50,16 @@ line_length:
   ignores_urls: true
   ignores_function_declarations: true
 
+# Facade classes (PayabliPayIn) and turn-key SwiftUI forms (CardFormView,
+# ACHFormView) run long by design per PRD §7.2. Raise the warning bar above
+# their current footprint so reviewers still get yelled at on further growth.
 file_length:
+  warning: 800
+  error: 1500
+
+# SwiftUI view bodies and large public facades blow past the default 300/500.
+# Keep error threshold firm so nobody merges a 600-line view silently.
+type_body_length:
   warning: 500
   error: 800
 
@@ -32,19 +67,34 @@ function_body_length:
   warning: 60
   error: 100
 
-type_body_length:
-  warning: 300
-  error: 500
+# SwiftUI row builders and the PayIn facade's `chargeCard(...)` / `tokenize(...)`
+# methods legitimately take 6–7 parameters. Raise the warning ceiling to 8.
+function_parameter_count:
+  warning: 8
+  error: 10
 
 cyclomatic_complexity:
   warning: 12
   error: 20
 
+# Keep the excluded list in sync with the single-letter names that show up in
+# Codable `encode(to:)` / `init(from:)` bodies and SwiftUI state closures —
+# renaming them for lint appeasement actively hurts readability.
 identifier_name:
   min_length: 2
   excluded:
     - id
     - ok
     - to
+    - a   # `async let a = fetch(...)`
+    - b   # `async let b = fetch(...)`
+    - c   # `var c = encoder.container(...)`
+    - v   # `let v = try c.decode(...)`
+    - m   # month (CardForm)
+    - y   # year (CardForm)
+    - f   # Foundation `@ViewBuilder f`
+    - s   # test fixture strings / single-char recorder params
+    - t   # timestamp / task helpers
+    - x
 
 reporter: "xcode"

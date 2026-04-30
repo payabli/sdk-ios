@@ -43,8 +43,8 @@ public enum ACHAccountType: String, Sendable, Codable {
 
 /// Holder type for ACH tokenization.
 public enum ACHHolderType: String, Sendable, Codable {
-    case personal = "personal"
-    case business = "business"
+    case personal
+    case business
 }
 
 /// ACH tokenization payload (PRD §8 "ACH Payload").

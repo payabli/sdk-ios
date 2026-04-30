@@ -189,7 +189,13 @@ public final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
             createToken: false
         )
 
-        logger.info("[fiserv.charges] → amount=\(amount) currency=\(credentials?.currencyCode ?? "?") merchantTxId=\(request.merchantTransactionId) merchantOrderId=\(request.merchantOrderId ?? "<nil>") invoice=\(request.merchantInvoiceNumber ?? "<nil>")")
+        logger.info(
+            "[fiserv.charges] → amount=\(amount) " +
+            "currency=\(credentials?.currencyCode ?? "?") " +
+            "merchantTxId=\(request.merchantTransactionId) " +
+            "merchantOrderId=\(request.merchantOrderId ?? "<nil>") " +
+            "invoice=\(request.merchantInvoiceNumber ?? "<nil>")"
+        )
         logger.info(
             "[fiserv.charges] customer={firstName=\(request.customer.firstName ?? "<nil>") " +
             "lastName=\(request.customer.lastName ?? "<nil>") " +

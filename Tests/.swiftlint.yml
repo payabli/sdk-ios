@@ -1,0 +1,46 @@
+# SwiftLint configuration for `Tests/` — inherits from `../.swiftlint.yml`
+# and relaxes rules that are noisy on idiomatic XCTest code.
+#
+# SwiftLint resolves `parent_config` relative to this file, so Sources/
+# keeps the full strict ruleset while Tests/ opts out of a handful of
+# patterns that are normal in fixtures / assertions.
+
+parent_config: ../.swiftlint.yml
+
+disabled_rules:
+  # Inherit all disables from the parent. Repeat them because nested
+  # configs replace the parent's `disabled_rules` list rather than
+  # extending it.
+  - trailing_whitespace
+  - todo
+  - multiple_closures_with_trailing_closure
+  - opening_brace
+
+  # Test-only relaxations:
+
+  # `URL(string: "https://...")!` and `try Data(..., encoding: .utf8)!` on
+  # known-good literals are standard in XCTestCase setup — asserting them
+  # via `try XCTUnwrap(...)` adds noise without catching bugs.
+  - force_unwrapping
+
+  # `try JSONDecoder().decode(T.self, from: fixtureJSON)` inside a test is
+  # the desired behaviour — if the fixture is malformed the test should
+  # fail loudly with the throw, not be wrapped in a `do/catch`.
+  - force_try
+
+  # Several HTTP-style fixtures return `(Data, URLResponse, Error?)` triples
+  # from `StubURLProtocol` handlers. Refactoring them into named structs
+  # would obscure the intent of the stub builders.
+  - large_tuple
+
+  # `StubURLProtocol` overrides `URLProtocol.canInit(with:)` and friends,
+  # which are declared as `class func` on the Foundation superclass. The
+  # `static_over_final_class` rule flags the overrides even though they're
+  # required to match the protocol signature.
+  - static_over_final_class
+
+# Test fixtures (request bodies, large JSON blobs) routinely exceed the
+# 140-column soft limit without losing readability. Give them more room.
+line_length:
+  warning: 180
+  error: 240

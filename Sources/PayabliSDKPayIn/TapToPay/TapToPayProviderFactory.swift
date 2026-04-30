@@ -31,8 +31,9 @@ public final class TapToPayProviderFactory: @unchecked Sendable {
         return builders[providerId] != nil
     }
 
-    /// For tests.
-    func _reset() {
+    /// Internal hook for unit tests to reset the factory between cases.
+    /// Not exposed publicly — callers outside the module cannot see it.
+    func resetForTesting() {
         lock.lock(); defer { lock.unlock() }
         builders.removeAll()
     }

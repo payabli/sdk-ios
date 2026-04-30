@@ -9,7 +9,7 @@ import XCTest
 final class TTPTransactionWireFormatTests: XCTestCase {
 
     func test_updateSuccessBody_serializesOpaqueJSONUnderFiservResponseKey() throws {
-        let innerJSON = try XCTUnwrap(#"{"transactionId":"abc","status":"approved"}"#.data(using: .utf8))
+        let innerJSON = Data(#"{"transactionId":"abc","status":"approved"}"#.utf8)
         let payload = ProviderResponsePayload.opaqueJSON(innerJSON)
         let body = UpdateSuccessBody(providerResponse: payload)
 
