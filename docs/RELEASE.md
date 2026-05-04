@@ -19,7 +19,7 @@ no manual tag/bump step for routine releases.
 | `sandbox` | `Sandbox`          | `payabli-public-objects-sandbox`  | `-beta`        | Partners opted in to early-access    |
 | `main`    | `Production`       | `payabli-public-objects-prod`     | *(none)*       | Partners GA                          |
 
-URL pattern: `https://{BUCKET}.s3.amazonaws.com/payabli-ios-sdk-{core|payin|card-reader-core}-{VERSION}.zip`.
+URL pattern: `https://{BUCKET}.s3.amazonaws.com/payabli-ios-sdk-{core|payin|taptopay|card-reader-core}-{VERSION}.zip`.
 
 All three tiers publish tags to the **same** public repo
 `payabli/payabli-sdk-ios`. Consumers pick a tier by the tag pattern they
@@ -245,7 +245,7 @@ cat Package.swift
 
 # 3. Verify the advertised binaries exist and have the advertised sha256.
 BUCKET="payabli-public-objects-qa.s3.amazonaws.com"
-for slug in core payin card-reader-core; do
+for slug in core payin taptopay card-reader-core; do
     url="https://${BUCKET}/payabli-ios-sdk-${slug}-1.0.247-qa.zip"
     curl -sI "$url" | head -n 1     # expect: HTTP/2 200
     remote_sha=$(curl -s "$url" | shasum -a 256 | awk '{print $1}')
@@ -283,9 +283,9 @@ remains in place in the private repo:
 
 The current `public-PayabliSDK.podspec.tmpl` assumes a **single combined
 XCFramework zip** (`payabli-ios-sdk-${VERSION}.zip`) but
-`Scripts/build_release_frameworks.sh` produces three separate zips
-(`-core-`, `-payin-`, `-card-reader-core-`). Before enabling the
-Trunk push, pick one of:
+`Scripts/build_release_frameworks.sh` produces four separate zips
+(`-core-`, `-payin-`, `-taptopay-`, `-card-reader-core-`). Before enabling
+the Trunk push, pick one of:
 
 1. Extend `build_release_frameworks.sh` to emit a 4th combined zip and
    update `upload_release.sh` to push it too; keep the podspec referencing

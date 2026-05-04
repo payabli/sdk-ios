@@ -5,6 +5,13 @@
 // Do not edit by hand; edits to the rendered file will be overwritten on the
 // next release.
 //
+// Ships four binaryTargets:
+//   - PayabliSDKCore         (shared infrastructure, zero deps)
+//   - PayabliSDKPayIn        (forms, tokenization, getpaid, Apple Pay)
+//   - PayabliSDKTapToPay     (Tap to Pay on iPhone)
+//   - PayabliCardReaderCore  (vendored MIT card-reader engine; pulled in
+//                             transitively by PayabliSDKTapToPay)
+//
 // Version: ${VERSION}
 // Bucket:  https://${S3_PUBLIC_HOST}/
 //
@@ -17,7 +24,7 @@ let package = Package(
     products: [
         .library(
             name: "PayabliSDK",
-            targets: ["PayabliSDKCore", "PayabliSDKPayIn", "PayabliCardReaderCore"]
+            targets: ["PayabliSDKCore", "PayabliSDKPayIn", "PayabliSDKTapToPay", "PayabliCardReaderCore"]
         ),
         .library(
             name: "PayabliSDKCore",
@@ -26,6 +33,10 @@ let package = Package(
         .library(
             name: "PayabliSDKPayIn",
             targets: ["PayabliSDKPayIn"]
+        ),
+        .library(
+            name: "PayabliSDKTapToPay",
+            targets: ["PayabliSDKTapToPay"]
         )
     ],
     targets: [
@@ -38,6 +49,11 @@ let package = Package(
             name: "PayabliSDKPayIn",
             url: "https://${S3_PUBLIC_HOST}/payabli-ios-sdk-payin-${VERSION}.zip",
             checksum: "${PAYIN_SHA256}"
+        ),
+        .binaryTarget(
+            name: "PayabliSDKTapToPay",
+            url: "https://${S3_PUBLIC_HOST}/payabli-ios-sdk-taptopay-${VERSION}.zip",
+            checksum: "${TAPTOPAY_SHA256}"
         ),
         .binaryTarget(
             name: "PayabliCardReaderCore",

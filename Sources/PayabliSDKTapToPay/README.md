@@ -1,10 +1,17 @@
-# Tap to Pay
+# PayabliSDKTapToPay
 
 Everything the SDK needs to run a Tap-to-Pay-on-iPhone charge lives in this
-folder: the public facade, the 9-state session lifecycle, device attestation,
-the backend clients, and the processor-agnostic adapter contract.
+module: the public facade, the 9-state session lifecycle, device
+attestation, the backend clients, and the processor-agnostic adapter
+contract.
 
-The folder is flat by design — PRD §7.2 fixes the layout and forbids
+> Layout note: this module was promoted from
+> `Sources/PayabliSDKPayIn/TapToPay/` to its own SPM target so consumers can
+> link Tap to Pay independently of `PayabliSDKPayIn`. PayIn no longer
+> depends on `PayabliCardReaderCore`; the TTP transitive dependency lives
+> only here.
+
+The module is flat by design — PRD §7.2 fixes the layout and forbids
 sub-folders for the TapToPay module (except `Adapters/`, which is the one
 sub-folder the PRD does allow). To keep it scalable we rely on three
 conventions instead of folders: naming prefixes, companion files, and one

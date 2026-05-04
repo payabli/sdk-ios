@@ -1,5 +1,5 @@
 import XCTest
-@testable import PayabliSDKPayIn
+@testable import PayabliSDKTapToPay
 
 final class TapToPayProviderFactoryTests: XCTestCase {
 

@@ -24,7 +24,11 @@ are push-triggered on `develop` / `sandbox` / `main` via `.github/workflows/rele
 
 ## Module Architecture
 
-Four Swift package targets, all dynamic frameworks (PRD NFR-11):
+Five Swift package targets, all dynamic frameworks (PRD NFR-11). The public
+SDK ships **Core + PayIn + TapToPay + CardReaderCore** as four independent
+XCFramework binaries — `PayabliSDKPayIn` and `PayabliSDKTapToPay` are
+peers, neither depends on the other, and host apps can link only the ones
+they need.
 
 **PayabliSDKCore** — Zero external dependencies (NFR-8). Shared infrastructure used by all other modules:
 
@@ -34,7 +38,9 @@ Four Swift package targets, all dynamic frameworks (PRD NFR-11):
 - `PayabliComponent` protocol: static requirements (componentId, sessionTier, requiredPermissions) used for lifecycle uniformity across all components
 - `PayabliLogger`: wraps `os.Logger` with explicit `.public`/`.private` privacy levels — PANs, tokens, CVVs, account numbers are never logged
 
-**PayabliSDKPayIn** — Depends on Core + `PayabliCardReaderCore` (iOS-only, platform-conditional). Hosts every PayIn flow (tokenization, getpaid, Apple Pay, Tap to Pay). Folder rules are below — **when adding a file, pick the folder from the table; don't invent new folders without updating the PRD §7.2 section**.
+**PayabliSDKTapToPay** — Depends on Core + `PayabliCardReaderCore` (iOS-only, platform-conditional). Hosts the entire Tap to Pay on iPhone surface: `PayabliTTP` facade (split across `+Initialize`, `+Charge`, `+Activation` companions), App Attest device attestation, session manager, retry policy, secure storage, and the `TapToPayProvider`/`Adapters/FiservCardReader` provider stack. Flat folder layout (no `TapToPay/` subfolder — the module *is* the TapToPay surface). See `Sources/PayabliSDKTapToPay/README.md` for the full file map.
+
+**PayabliSDKPayIn** — Depends on Core only. Hosts every non-TTP PayIn flow (tokenization, getpaid, Apple Pay, card / ACH forms). Folder rules are below — **when adding a file, pick the folder from the table; don't invent new folders without updating the PRD §7.2 section**.
 
 **PayabliCardReaderCore** — Vendored MIT-licensed source of `Fiserv/TTPPackage` compiled under the module name `PayabliCardReaderCore`. Source lives under `ThirdParty/PayabliCardReaderCoreSource/Sources/PayabliCardReaderCore/` and is **byte-identical** to upstream; every file preserves the original Fiserv copyright header. The module rename is achieved at the SPM target level only — do not edit class names in the vendored source. Re-sync with `./Scripts/refresh_vendored_ttp.sh <tag>`; see `ThirdParty/PayabliCardReaderCoreSource/README.md` for the vendoring contract.
 
@@ -52,14 +58,14 @@ Strict, per PRD §7.2. Each folder owns a single concern; cross-folder imports a
 | `Payments/`   | Native platform payment stacks — code that bridges to PassKit / StoreKit / ProximityReader and is driven by the OS framework's control flow. Today: `ApplePayManager`, `PayabliApplePayConfig`.                                                                                                                                                                                                            | HTTP clients (those go in `Models/`), SwiftUI.          |
 | `ViewModels/` | SwiftUI `@MainActor ObservableObject` state holders (`CardFormViewModel`, `ACHFormViewModel`). Transient UI state + validation + payload assembly. Testable without presenting a view.                                                                                                                                                                                                                     | HTTP calls, platform APIs, `View` types.                |
 | `Views/`      | All SwiftUI Views. Turn-key forms own their VM via `@StateObject` + expose two inits (tokenize vs charge): `CardFormView` (+ `.payabliCardSheet(...)`) and `ACHFormView` (+ `.payabliAchSheet(...)`); sheet modifiers live in the same file as the form. Low-level atoms: `CardBrandBadge`. Shared chrome: `PayabliSheetHeader`. UIKit `UIViewController` factories on `PayabliPayIn` wrap these turn-key views directly — there is no per-type composite view. One principal `View` per file. | Business logic, HTTP, platform glue.                    |
-| `TapToPay/`   | Intentionally flat per PRD §7.2. Facade (`PayabliTTP.swift`) split across companion files (`+Initialize`, `+Charge`, `+Activation`); attestation (`AppAttestService`*); wire formats (`*WireFormat.swift`); provider adapters under `TapToPay/Adapters/`. See `TapToPay/README.md` for the full map.                                                                                                       | Anything non-TTP. Don't spill TTP types into `Models/`. |
 
 
 Rules of thumb when unsure:
 
 - "Does the consumer call it by name?" → `Public/`
 - "Is it a value type, a DTO, or the HTTP client that owns an endpoint?" → `Models/`
-- "Does it wrap an Apple framework that drives the control flow?" → `Payments/` (or `TapToPay/Adapters/` for NFC)
+- "Does it wrap an Apple framework that drives the control flow?" → `Payments/` (or `Adapters/` inside `PayabliSDKTapToPay` for NFC)
+- "Is it Tap to Pay code (attestation, session, charge, provider)?" → not in PayIn at all — it lives in the `PayabliSDKTapToPay` module
 - "Is it `@Published` state for a form?" → `ViewModels/`
 - "Is it a `View` or a `ViewModifier`?" → `Views/`
 
@@ -88,7 +94,7 @@ Rules of thumb when unsure:
 
 | Folder          | Purpose                                                                                                                                                                                                                             |
 | --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Sources/`      | First-party Payabli code across `PayabliSDKCore`, `PayabliSDKPayIn`, `PayabliSDKTelemetry`. Module-scoped folder rules per `PayabliSDKPayIn` above.                                                                                  |
+| `Sources/`      | First-party Payabli code across `PayabliSDKCore`, `PayabliSDKPayIn`, `PayabliSDKTapToPay`, `PayabliSDKTelemetry`. Module-scoped folder rules per `PayabliSDKPayIn` above; `PayabliSDKTapToPay` keeps a flat layout (see `Sources/PayabliSDKTapToPay/README.md`).            |
 | `ThirdParty/`   | Vendored MIT / Apache source from upstream projects, kept byte-identical. Today: `PayabliCardReaderCoreSource/` (re-sync via `Scripts/refresh_vendored_ttp.sh`). Each subfolder **must** carry a `README.md` documenting the vendoring contract. |
 | `Scripts/`      | Build, release, and maintenance shell scripts. `build_release_frameworks.sh` (distribution XCFrameworks), `compute_version.sh` (auto-version), `render_public_manifests.sh`, `upload_release.sh`, `push_to_public_repo.sh`, `refresh_vendored_ttp.sh`. |
 | `.github/`      | CI workflows (`ci.yml`, `release.yml`) and rendering templates (`templates/public-*.tmpl`) for the public distribution repo. Workflows in this repo push artifacts + rendered manifests to the public mirror.                        |
@@ -101,7 +107,7 @@ Rules of thumb when unsure:
 
 ## Bridging (non-SPM)
 
-`Bridges/` contains Flutter (MethodChannel), .NET MAUI, and React Native wrappers. These are not compiled as part of the Swift package — they're consumed by their respective host toolchains and should not be modified as part of Core/PayIn work.
+`Bridges/` contains Flutter (MethodChannel), .NET MAUI, and React Native wrappers. These are not compiled as part of the Swift package — they're consumed by their respective host toolchains and should not be modified as part of Core / PayIn / TapToPay work.
 
 ## Reference
 

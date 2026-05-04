@@ -1,5 +1,5 @@
 import XCTest
-@testable import PayabliSDKPayIn
+@testable import PayabliSDKTapToPay
 
 /// Contract tests for the backend `PATCH /MoneyIn/update/{id}` wire format.
 /// The backend still expects the top-level key `fiservResponse`; the SDK's

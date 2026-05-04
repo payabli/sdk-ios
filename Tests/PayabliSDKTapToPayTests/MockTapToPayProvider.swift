@@ -1,5 +1,5 @@
 import Foundation
-@testable import PayabliSDKPayIn
+@testable import PayabliSDKTapToPay
 
 final class MockTapToPayProvider: TapToPayProvider, @unchecked Sendable {
     static var providerId: String { "mock" }

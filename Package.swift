@@ -15,10 +15,18 @@ let package = Package(
     products: [
         // Dynamic per PRD NFR-11 — distributed as a dynamic XCFramework with
         // BUILD_LIBRARY_FOR_DISTRIBUTION=YES at binary-framework time.
+        //
+        // The umbrella `PayabliSDK` library aggregates every shippable target
+        // so a host app can `import PayabliSDK*` modules à la carte after a
+        // single `.product(name: "PayabliSDK", package: "PayabliSDK")` link.
+        // The public Package.swift template under `.github/templates/` is the
+        // source of truth for what consumers actually receive — it mirrors
+        // the four shippable products below as `binaryTarget`s pointing at
+        // signed XCFramework zips on Payabli's CDN.
         .library(
             name: "PayabliSDK",
             type: .dynamic,
-            targets: ["PayabliSDKCore", "PayabliSDKPayIn"]
+            targets: ["PayabliSDKCore", "PayabliSDKPayIn", "PayabliSDKTapToPay"]
         ),
         .library(
             name: "PayabliSDKCore",
@@ -30,13 +38,18 @@ let package = Package(
             type: .dynamic,
             targets: ["PayabliSDKPayIn"]
         ),
+        .library(
+            name: "PayabliSDKTapToPay",
+            type: .dynamic,
+            targets: ["PayabliSDKTapToPay"]
+        ),
         // `PayabliCardReaderCore` is exposed as a library product in the
         // private Package.swift so `xcodebuild -scheme PayabliCardReaderCore`
         // (driven by Scripts/build_release_frameworks.sh) can archive it
         // independently and produce its own XCFramework. Consumers of the
         // *public* Package.swift never see this as a stand-alone product —
         // the public template lists CardReaderCore only as a binaryTarget
-        // pulled transitively by PayabliSDKPayIn.
+        // pulled transitively by PayabliSDKTapToPay.
         .library(
             name: "PayabliCardReaderCore",
             type: .dynamic,
@@ -73,21 +86,30 @@ let package = Package(
         .target(
             name: "PayabliSDKPayIn",
             dependencies: [
+                "PayabliSDKCore"
+            ],
+            path: "Sources/PayabliSDKPayIn",
+            exclude: [
+                "Resources/README.md"
+            ],
+            resources: [
+                .process("Resources/PayabliBrandAssets.xcassets"),
+                .copy("Resources/PrivacyInfo.xcprivacy")
+            ]
+        ),
+        .target(
+            name: "PayabliSDKTapToPay",
+            dependencies: [
                 "PayabliSDKCore",
                 .target(
                     name: "PayabliCardReaderCore",
                     condition: .when(platforms: [.iOS])
                 )
             ],
-            path: "Sources/PayabliSDKPayIn",
+            path: "Sources/PayabliSDKTapToPay",
             exclude: [
-                "TapToPay/README.md",
-                "TapToPay/Adapters/README.md",
-                "Resources/README.md"
-            ],
-            resources: [
-                .process("Resources/PayabliBrandAssets.xcassets"),
-                .copy("Resources/PrivacyInfo.xcprivacy")
+                "README.md",
+                "Adapters/README.md"
             ]
         ),
         .target(
@@ -104,6 +126,11 @@ let package = Package(
             name: "PayabliSDKPayInTests",
             dependencies: ["PayabliSDKPayIn"],
             path: "Tests/PayabliSDKPayInTests"
+        ),
+        .testTarget(
+            name: "PayabliSDKTapToPayTests",
+            dependencies: ["PayabliSDKTapToPay"],
+            path: "Tests/PayabliSDKTapToPayTests"
         ),
         .testTarget(
             name: "PayabliSDKTelemetryTests",
