@@ -168,7 +168,8 @@ public final class PayabliPayIn: NSObject, PayabliComponent {
     // (`CardFormView` / `ACHFormView`) — each owns its own VM and calls the
     // right endpoint internally. `applePay` and `tapToPay` surface a message
     // pointing callers at their dedicated APIs (`setupApplePay` /
-    // `chargeApplePay` / `PayabliTTP`).
+    // `chargeApplePay` for Apple Pay, the `PayabliSDKTapToPay` module for
+    // Tap to Pay on iPhone).
 
     @ViewBuilder
     private func tokenizationRootView(
@@ -211,7 +212,7 @@ public final class PayabliPayIn: NSObject, PayabliComponent {
                              })
         case .tapToPay:
             placeholderSheet(title: "Tap to Pay",
-                             message: "Tap to Pay uses PayabliTTP instead.",
+                             message: "Tap to Pay lives in PayabliSDKTapToPay — import PayabliSDKTapToPay and use PayabliTTP.",
                              onCancel: {
                                  completion(nil, PayabliGenericError(code: .userCancelled, reason: "User cancelled"))
                              })
@@ -262,7 +263,7 @@ public final class PayabliPayIn: NSObject, PayabliComponent {
                              })
         case .tapToPay:
             placeholderSheet(title: "Tap to Pay",
-                             message: "Tap to Pay uses PayabliTTP instead.",
+                             message: "Tap to Pay lives in PayabliSDKTapToPay — import PayabliSDKTapToPay and use PayabliTTP.",
                              onCancel: {
                                  completion(nil, PayabliGenericError(code: .userCancelled, reason: "User cancelled"))
                              })

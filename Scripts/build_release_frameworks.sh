@@ -2,10 +2,11 @@
 #
 # build_release_frameworks.sh
 # ---------------------------
-# Builds the three Payabli iOS SDK distribution XCFrameworks
-# (PayabliSDKCore, PayabliSDKPayIn, PayabliCardReaderCore) for device + iOS
-# Simulator slices, with distribution-mode settings and a pinned
-# SOURCE_DATE_EPOCH for reproducible zips.
+# Builds the four Payabli iOS SDK distribution XCFrameworks
+# (PayabliSDKCore, PayabliSDKPayIn, PayabliSDKTapToPay,
+# PayabliCardReaderCore) for device + iOS Simulator slices, with
+# distribution-mode settings and a pinned SOURCE_DATE_EPOCH for
+# reproducible zips.
 #
 # Environment:
 #   VERSION             required. Used as filename suffix.
@@ -23,6 +24,7 @@
 #   build/release/
 #     payabli-ios-sdk-core-${VERSION}.zip
 #     payabli-ios-sdk-payin-${VERSION}.zip
+#     payabli-ios-sdk-taptopay-${VERSION}.zip
 #     payabli-ios-sdk-card-reader-core-${VERSION}.zip
 #     checksums.txt           (one sha256 per zip, space-separated lines)
 #     THIRD_PARTY_LICENSES.txt  (bundled copy for the upload/publish step)
@@ -62,10 +64,11 @@ XCF_DIR="$BUILD_DIR/xcframeworks"
 rm -rf "$BUILD_DIR"
 mkdir -p "$ARCHIVE_DIR" "$XCF_DIR"
 
-# The three schemes we ship publicly. Each matches a Package.swift product.
+# The four schemes we ship publicly. Each matches a Package.swift product.
 SCHEMES=(
     "PayabliSDKCore"
     "PayabliSDKPayIn"
+    "PayabliSDKTapToPay"
     "PayabliCardReaderCore"
 )
 
@@ -74,6 +77,7 @@ slug_for() {
     case "$1" in
         PayabliSDKCore)          echo "core" ;;
         PayabliSDKPayIn)         echo "payin" ;;
+        PayabliSDKTapToPay)      echo "taptopay" ;;
         PayabliCardReaderCore)   echo "card-reader-core" ;;
         *) echo "error: unknown scheme '$1'" >&2; exit 1 ;;
     esac

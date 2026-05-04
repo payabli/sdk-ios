@@ -4,16 +4,20 @@
 # time. Do not edit by hand. Only `main`-branch releases are pushed to Trunk;
 # `-qa` and `-beta` versions publish SPM-only.
 #
+# Ships four subspecs: Core, PayIn, TapToPay, PayabliCardReaderCore. PayIn
+# only depends on Core; TapToPay pulls in CardReaderCore transitively.
+#
 Pod::Spec.new do |s|
   s.name             = 'PayabliSDK'
   s.version          = '${VERSION}'
-  s.summary          = 'Payabli iOS SDK for tokenization, Apple Pay, and Tap to Pay.'
+  s.summary          = 'Payabli iOS SDK for tokenization, Apple Pay, and Tap to Pay on iPhone.'
   s.description      = <<-DESC
     PayabliSDK is the official iOS SDK for accepting payments via Payabli.
-    Ships three modules: PayabliSDKCore (shared infrastructure),
-    PayabliSDKPayIn (tokenization, Apple Pay, Tap to Pay), and
-    PayabliCardReaderCore (MIT-licensed Tap to Phone card reader).
-    All modules are distributed as pre-built XCFrameworks.
+    Ships four modules: PayabliSDKCore (shared infrastructure),
+    PayabliSDKPayIn (forms, tokenization, getpaid, Apple Pay),
+    PayabliSDKTapToPay (Tap to Pay on iPhone), and PayabliCardReaderCore
+    (MIT-licensed Tap to Phone card reader engine). All modules are
+    distributed as pre-built XCFrameworks.
   DESC
 
   s.homepage         = 'https://github.com/payabli/payabli-sdk-ios'
@@ -24,7 +28,7 @@ Pod::Spec.new do |s|
   s.ios.deployment_target = '16.7'
   s.swift_version    = '5.9'
 
-  s.default_subspecs = 'Core', 'PayIn', 'PayabliCardReaderCore'
+  s.default_subspecs = 'Core', 'PayIn', 'TapToPay', 'PayabliCardReaderCore'
 
   s.subspec 'Core' do |ss|
     ss.vendored_frameworks = 'PayabliSDKCore.xcframework'
@@ -32,8 +36,13 @@ Pod::Spec.new do |s|
 
   s.subspec 'PayIn' do |ss|
     ss.dependency 'PayabliSDK/Core'
-    ss.dependency 'PayabliSDK/PayabliCardReaderCore'
     ss.vendored_frameworks = 'PayabliSDKPayIn.xcframework'
+  end
+
+  s.subspec 'TapToPay' do |ss|
+    ss.dependency 'PayabliSDK/Core'
+    ss.dependency 'PayabliSDK/PayabliCardReaderCore'
+    ss.vendored_frameworks = 'PayabliSDKTapToPay.xcframework'
   end
 
   s.subspec 'PayabliCardReaderCore' do |ss|
