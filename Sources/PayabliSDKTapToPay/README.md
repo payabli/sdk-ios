@@ -34,9 +34,49 @@ The public entry point that host apps consume. Split across companion files
 | `PayabliTTP+Initialize.swift` | `initialize()` (cold/warm path) and `reinitializeIfNeeded()` (fresh `/config` after 401) |
 | `PayabliTTP+Activation.swift` | `activateDevice()` for pending-device flows. Emits `activationStarted` / `activationCompleted` / `activationFailed`. The partner provisions the activation code out-of-band (PRD §9.7) |
 | `PayabliTTP+Charge.swift` | 3-step sale pipeline: `/initiate` → `startReading` → `/update` (PRD §19.1) |
-| `PayabliTTPEvent.swift` | `PayabliTTPEvent` (lifecycle cases) + `PayabliTTPError` (PRD §20) |
+| `PayabliTTPEvent.swift` | `PayabliTTPEvent` (lifecycle cases) + `PayabliTTPError` (PRD §20) + `PayabliTTPEventCode` (`@objc`) + per-case `payload` schema + `CustomNSError` bridging |
 | `PayabliTTPTypes.swift` | `PayabliTTPSessionState`, `PayabliTTPPaymentType`, `TransactionResult` |
 | `PayabliTTPTransactionData.swift` | `PayabliTTPCustomerData`, `PayabliTTPOrderData`, internal `TTPTransactionContext` |
+| `PayabliTTPTransactionData+ObjC.swift` | `@objc` companion classes (`PayabliTTPCustomerDataObjC`, `PayabliTTPOrderDataObjC`, `PayabliTTPTransactionResultObjC`) used by ObjC / MAUI / Flutter / RN consumers |
+
+---
+
+## 1.5. ObjC interop (bilingual contract)
+
+`PayabliSDKTapToPay` is bilingual Swift/ObjC, following the
+[URLSession](https://developer.apple.com/documentation/foundation/urlsession)
+and [Stripe Terminal](https://stripe.com/docs/terminal) patterns. Every
+Swift `async throws` method has a callback-based `@objc` companion in the
+same file; structs have `*ObjC` companion classes; events expose a
+`PayabliTTPEventCode` int + `[String: Any]` payload alongside the
+associated-value enum; errors bridge cleanly to `NSError` with domain
+`"com.payabli.ttp"` and stable per-case codes.
+
+This unblocks the MAUI/Xamarin binding (sharpie consumes the generated
+ObjC header), the Flutter `MethodChannel` plugin, and the React Native
+`Native Module` — none of which can express Swift `async`, `AsyncStream`,
+or value-typed `enum`s with associated values.
+
+| Swift API (unchanged) | ObjC / MAUI / RN companion |
+|---|---|
+| `try await ttp.initialize()` | `[ttp initializeWithCompletion:^(NSError *err){...}]` |
+| `try await ttp.charge(amount:type:serviceFee:customer:order:)` | `[ttp chargeWithAmount:type:serviceFee:customer:order:completion:]` returning `PayabliTTPTransactionResultObjC*` + `NSError*` |
+| `try await ttp.activateDevice(activationCode:)` | `[ttp activateDeviceWithActivationCode:completion:]` |
+| `for await event in ttp.events()` | `[ttp addEventListenerWithHandler:^(PayabliTTPEventCode code, NSDictionary *payload){...}]` returning a `PayabliTTPEventToken` (call `[token cancel]` to stop) |
+| `PayabliTTPCustomerData(...)` (struct) | `[[PayabliTTPCustomerDataObjC alloc] initWithFirstName:lastName:customerNumber:email:phone:]` |
+| `enum PayabliTTPEvent` w/ associated values | `PayabliTTPEventCode` (`@objc Int`) + `payload` dict — see `PayabliTTPEvent.payload` for per-case schema |
+| `enum PayabliTTPError` w/ associated values | `NSError` (domain `"com.payabli.ttp"`, stable per-case `code`) — see `errorCode` table |
+
+All `@objc` callbacks are dispatched on the main thread because the entire
+`PayabliTTP` surface is `@MainActor`.
+
+**Maintenance contract.** Any change to the public Swift API — new
+method, new event case, new error case, new struct field — **must** be
+reflected in the ObjC companion at the same time. The companion is part
+of the public API and downstream bridges depend on it. CI tests in
+`PayabliTTPObjCInteropTests`, `PayabliTTPEventCodeMappingTests`, and
+`PayabliTTPErrorNSErrorTests` lock the integer codes and payload schemas
+so silent breakage is caught at build time.
 
 `@Published` setters are `public internal(set)` so the companion extensions
 in this folder can mutate state without weakening the public read-only
