@@ -26,17 +26,12 @@ let package = Package(
         .library(
             name: "PayabliSDK",
             type: .dynamic,
-            targets: ["PayabliSDKCore", "PayabliSDKPayIn", "PayabliSDKTapToPay"]
+            targets: ["PayabliSDKCore", "PayabliSDKTapToPay"]
         ),
         .library(
             name: "PayabliSDKCore",
             type: .dynamic,
             targets: ["PayabliSDKCore"]
-        ),
-        .library(
-            name: "PayabliSDKPayIn",
-            type: .dynamic,
-            targets: ["PayabliSDKPayIn"]
         ),
         .library(
             name: "PayabliSDKTapToPay",
@@ -84,20 +79,6 @@ let package = Package(
             ]
         ),
         .target(
-            name: "PayabliSDKPayIn",
-            dependencies: [
-                "PayabliSDKCore"
-            ],
-            path: "Sources/PayabliSDKPayIn",
-            exclude: [
-                "Resources/README.md"
-            ],
-            resources: [
-                .process("Resources/PayabliBrandAssets.xcassets"),
-                .copy("Resources/PrivacyInfo.xcprivacy")
-            ]
-        ),
-        .target(
             name: "PayabliSDKTapToPay",
             dependencies: [
                 "PayabliSDKCore",
@@ -123,11 +104,6 @@ let package = Package(
             path: "Tests/PayabliSDKCoreTests"
         ),
         .testTarget(
-            name: "PayabliSDKPayInTests",
-            dependencies: ["PayabliSDKPayIn"],
-            path: "Tests/PayabliSDKPayInTests"
-        ),
-        .testTarget(
             name: "PayabliSDKTapToPayTests",
             dependencies: ["PayabliSDKTapToPay"],
             path: "Tests/PayabliSDKTapToPayTests"
@@ -136,11 +112,6 @@ let package = Package(
             name: "PayabliSDKTelemetryTests",
             dependencies: ["PayabliSDKTelemetry"],
             path: "Tests/PayabliSDKTelemetryTests"
-        ),
-        .testTarget(
-            name: "PayabliSDKIntegrationTests",
-            dependencies: ["PayabliSDKCore", "PayabliSDKPayIn"],
-            path: "Tests/PayabliSDKIntegrationTests"
         )
     ]
 )
