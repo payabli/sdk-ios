@@ -22,7 +22,7 @@ jobs:
       - name: Select latest Xcode
         run: |
           XCODE=$(ls /Applications | grep -E '^Xcode_[0-9]' | sort -V | tail -1)
-          sudo xcode-select -s "/Applications/$XCODE"
+          sudo xcode-select -s "/Applications/$XCODE/Contents/Developer"
           echo "Using $XCODE"
           xcodebuild -version
           swift --version
@@ -48,6 +48,9 @@ jobs:
             for v in vals
             if 'iPhone' in v['name'] and v['isAvailable']
           ]
+          if not iphones:
+            print('error: no available iPhone simulator found', file=sys.stderr)
+            sys.exit(1)
           print(sorted(iphones, key=lambda x: x['name'])[-1]['udid'])
           ")
           echo "Using simulator: $SIMULATOR_ID"

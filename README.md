@@ -122,7 +122,7 @@ your own server that does the trade:
 ```text
    📱  iOS app           🖥️  Your backend           🔐  Payabli
    ───────────           ──────────────             ─────────
-   "I need a token"  ──▶  "Swap this for a       ──▶  POST /v2/Token/serverside
+   "I need a token"  ──▶  "Swap this for a       ──▶  POST /api/v2/token/serverside
                           short-lived token"
                                                   ◀──  access_token
                      ◀── access_token  ◀──
@@ -153,7 +153,7 @@ app.post("/payabli/token", async (req, res) => {
     return res.status(400).json({ error: "clientId and clientSecret are required" });
   }
 
-  const upstream = await fetch(`${PAYABLI_URL}/v2/Token/serverside`, {
+  const upstream = await fetch(`${PAYABLI_URL}/v2/token/serverside`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ clientId, clientSecret }),
