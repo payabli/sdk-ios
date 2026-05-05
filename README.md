@@ -75,7 +75,7 @@ https://github.com/payabli/payabli-sdk-ios.git
 Or add it to your `Package.swift`:
 
 ```swift
-.package(url: "https://github.com/payabli/payabli-sdk-ios.git", from: "1.0.0")
+.package(url: "https://github.com/payabli/payabli-sdk-ios.git", branch: "main")
 ```
 
 Then link the product you need:
@@ -276,11 +276,29 @@ A few one-time setup steps with Apple and Payabli:
    set to `production` (or `development` for dev builds). Match this with
    the `environment` you pass to the SDK (see
    [Configuration values](#configuration-values)).
-3. **Authorize the app in the Payabli dashboard.** Sign in at
-   `https://app.payabli.com/<entryPoint>/signin`, open
-   **Settings → Devices**, click **Authorized Apps**, and add the same
-   `appId` (`<TEAM_ID>.<BUNDLE_ID>`) you'll pass to the SDK. Until the app
-   is authorized here, attestation will be rejected on `initialize()`.
+3. **Authorize the app on the paypoint allowlist.** Register the same
+   `appId` (`<TEAM_ID>.<BUNDLE_ID>`) you'll pass to the SDK on the entry
+   point's allowlist. Until it's registered, attestation is rejected on
+   `initialize()`. Two ways to do it:
+
+   - **Dashboard.** Sign in at `https://app.payabli.com/<entryPoint>/signin`
+     (sandbox: `https://app-sandbox.payabli.com/<entryPoint>/signin`),
+     open **Settings → Devices → Authorized Apps**, and add the `appId`.
+   - **API.** `POST /api/v2/paypoint/<entryPoint>/apps` against the same
+     host you configured for the SDK
+     (`https://api.payabli.com` / `https://api-sandbox.payabli.com`):
+
+     ```json
+     {
+       "deviceOs": "ios",
+       "appId": "<TEAM_ID>.<BUNDLE_ID>",
+       "friendlyName": "My iOS App"
+     }
+     ```
+
+     `deviceOs` is `"ios"`; `friendlyName` is optional.
+     The call is idempotent on `(entryPoint, deviceOs, appId)`, so it's
+     safe to re-run from a provisioning script.
 4. **Eligible device.** iPhone XS or newer, iOS 16.7+, supported region,
    unlocked. The SDK will check this for you on `initialize()`.
 5. **Entry point.** Have Payabli provision a Tap to Pay-enabled entry point
