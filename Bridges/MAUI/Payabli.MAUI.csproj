@@ -1,0 +1,58 @@
+<!--
+  Payabli.MAUI — .NET binding library for the PayabliSDKTapToPay iOS XCFramework.
+
+  This project produces a managed assembly that re-exports the @objc surface
+  of `PayabliSDKTapToPay.xcframework` to .NET MAUI / Xamarin.iOS host apps.
+  The actual binding declarations live in `PayabliBinding.cs` (sharpie-style
+  ApiDefinitions). The XCFrameworks come from the SDK release artifacts:
+
+    - PayabliSDKCore.xcframework        (provides PayabliEnvironment)
+    - PayabliSDKTapToPay.xcframework    (the bilingual @objc surface)
+    - PayabliCardReaderCore.xcframework (transitive Fiserv reader)
+
+  Place the XCFrameworks alongside this csproj (or override the
+  `XcframeworksRoot` property) before `dotnet build`.
+
+  Usage (MAUI host app):
+    <ItemGroup>
+      <ProjectReference Include="path/to/Payabli.MAUI.csproj" />
+    </ItemGroup>
+-->
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net8.0-ios</TargetFramework>
+        <SupportedOSPlatformVersion>16.7</SupportedOSPlatformVersion>
+        <IsBindingProject>true</IsBindingProject>
+        <NoBindingEmbedding>true</NoBindingEmbedding>
+        <RootNamespace>Payabli.TapToPay</RootNamespace>
+        <AssemblyName>Payabli.MAUI</AssemblyName>
+        <Nullable>enable</Nullable>
+        <LangVersion>latest</LangVersion>
+        <XcframeworksRoot Condition=" '$(XcframeworksRoot)' == '' ">$(MSBuildThisFileDirectory)Frameworks</XcframeworksRoot>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <!-- ApiDefinition.cs / StructsAndEnums.cs equivalent. -->
+        <ObjcBindingApiDefinition Include="PayabliBinding.cs" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <NativeReference Include="$(XcframeworksRoot)/PayabliSDKCore.xcframework">
+            <Kind>Framework</Kind>
+            <Frameworks>Foundation UIKit DeviceCheck</Frameworks>
+            <SmartLink>True</SmartLink>
+        </NativeReference>
+        <NativeReference Include="$(XcframeworksRoot)/PayabliSDKTapToPay.xcframework">
+            <Kind>Framework</Kind>
+            <Frameworks>Foundation UIKit ProximityReader DeviceCheck</Frameworks>
+            <SmartLink>True</SmartLink>
+        </NativeReference>
+        <NativeReference Include="$(XcframeworksRoot)/PayabliCardReaderCore.xcframework">
+            <Kind>Framework</Kind>
+            <Frameworks>Foundation</Frameworks>
+            <SmartLink>True</SmartLink>
+        </NativeReference>
+    </ItemGroup>
+
+</Project>
