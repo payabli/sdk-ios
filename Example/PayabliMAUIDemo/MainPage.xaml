@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="PayabliMauiDemo.MainPage"
+             Title="Payabli TTP Demo">
+    <ScrollView>
+        <VerticalStackLayout Padding="16" Spacing="16">
+
+            <!-- Session state badge -->
+            <Frame Padding="8,4" CornerRadius="12" HorizontalOptions="End" BackgroundColor="LightGray">
+                <Label x:Name="StateBadge" Text="—" FontAttributes="Bold" FontSize="11" />
+            </Frame>
+
+            <!-- Lifecycle -->
+            <Label Text="Lifecycle" FontAttributes="Bold" FontSize="12" TextColor="Gray" />
+            <Frame Padding="12">
+                <VerticalStackLayout Spacing="8">
+                    <Button x:Name="InitializeButton" Text="Initialize" Clicked="OnInitializeClicked" />
+                    <Button x:Name="ActivateButton" Text="Activate device…" Clicked="OnActivateClicked" />
+                </VerticalStackLayout>
+            </Frame>
+
+            <!-- Sale -->
+            <Label Text="Sale" FontAttributes="Bold" FontSize="12" TextColor="Gray" />
+            <Frame Padding="12">
+                <VerticalStackLayout Spacing="8">
+                    <Entry x:Name="AmountEntry" Placeholder="Amount" Text="9.99" Keyboard="Numeric" />
+                    <Button x:Name="ChargeButton" Text="Charge" Clicked="OnChargeClicked" />
+                </VerticalStackLayout>
+            </Frame>
+
+            <!-- Last result -->
+            <Label Text="Last result" FontAttributes="Bold" FontSize="12" TextColor="Gray" />
+            <Frame Padding="12">
+                <Label x:Name="ResultLabel" Text="—" FontSize="14" />
+            </Frame>
+
+            <!-- Event log -->
+            <Label Text="Event log" FontAttributes="Bold" FontSize="12" TextColor="Gray" />
+            <Frame Padding="12" HeightRequest="240">
+                <ScrollView>
+                    <Label x:Name="EventLog" Text="No events yet" FontSize="12" TextColor="Gray" />
+                </ScrollView>
+            </Frame>
+
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

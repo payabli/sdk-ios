@@ -15,10 +15,10 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- Binding project that wraps the XCFramework.
-         Generate with `dotnet new iosbinding` + sharpie; see Bridges/MAUI. -->
-    <ProjectReference Include="..\..\Bridges\MAUI\PayabliBinding.csproj"
-                      Condition="Exists('..\..\Bridges\MAUI\PayabliBinding.csproj')" />
+    <!-- TTP-only binding library that wraps the PayabliSDKTapToPay /
+         PayabliSDKCore / PayabliCardReaderCore XCFrameworks.
+         See Bridges/MAUI/README.md for the binding contract. -->
+    <ProjectReference Include="..\..\Bridges\MAUI\Payabli.MAUI.csproj" />
   </ItemGroup>
 
 </Project>
