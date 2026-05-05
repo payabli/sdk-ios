@@ -21,8 +21,18 @@ import PayabliSDKCore
 ///   - `PayabliTTP+Initialize.swift` — startup & session refresh
 ///   - `PayabliTTP+Activation.swift` — pending-device activation (PRD §9.7)
 ///   - `PayabliTTP+Charge.swift`     — 3-step sale pipeline (PRD §19.1)
+///
+/// ## ObjC interop
+///
+/// `PayabliTTP` inherits `NSObject` so it can be consumed from Objective-C,
+/// MAUI/Xamarin (via sharpie-generated bindings), Flutter, and React Native.
+/// Each Swift `async throws` method has a callback-based `@objc` companion
+/// in the same file — see the `+Initialize`, `+Charge`, and `+Activation`
+/// extensions. Existing Swift consumers continue to use the unchanged
+/// `async throws` API, `AsyncStream<PayabliTTPEvent>` events, and value-type
+/// `struct`s. See `README.md` for the bilingual contract.
 @MainActor
-public final class PayabliTTP: ObservableObject {
+public final class PayabliTTP: NSObject, ObservableObject {
 
     // MARK: - Dependencies
 
@@ -126,7 +136,78 @@ public final class PayabliTTP: ObservableObject {
         self.auth = auth
         self.transactionClient = TTPTransactionClient(service: service, auth: auth)
         self.configClient = TTPConfigClient(service: service, auth: auth, attestation: attestation)
+        super.init()
     }
+
+    /// `@objc`-friendly convenience init for ObjC / MAUI / sharpie consumers
+    /// that can't represent the Swift `PayabliTokenRefresh` (`@Sendable () async
+    /// throws -> String`) closure.
+    ///
+    /// Token refresh is exposed here as a completion-style block:
+    /// `tokenRefreshHandler` receives a `(token, error) -> Void` callback that
+    /// the host invokes exactly once with either a fresh access token or an
+    /// `NSError` — the SDK bridges that to the underlying async closure
+    /// internally. Pass `nil` to disable silent refresh; the SDK will surface
+    /// `tokenExpired` instead.
+    ///
+    /// All other parameters mirror the Swift convenience init exactly. Swift
+    /// callers that need an `async throws` token provider should keep using
+    /// the Swift-only convenience init above.
+    #if canImport(DeviceCheck)
+    @objc public convenience init(
+        accessToken: String,
+        tokenRefreshHandler: ((@escaping (String?, NSError?) -> Void) -> Void)?,
+        entryPoint: String,
+        appId: String,
+        environment: PayabliEnvironment
+    ) {
+        let bridged: PayabliTokenRefresh? = tokenRefreshHandler.map { handler in
+            // ObjC blocks are heap-allocated and copy-on-capture, so the
+            // bridged closure can safely be `@Sendable` even though Swift
+            // does not infer `@Sendable` for the input handler type.
+            let sendable = UncheckedSendableBox(handler)
+            return { @Sendable in
+                try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<String, Error>) in
+                    // Guard against the ObjC host invoking the completion
+                    // block more than once — that would resume the same
+                    // continuation twice and crash. We honor only the first
+                    // invocation (success or failure) and silently drop any
+                    // subsequent calls. A `Locked<Bool>` keeps this thread-
+                    // safe in case the host dispatches the callback from a
+                    // background queue.
+                    let resumed = Locked(false)
+                    sendable.value { token, error in
+                        let firstCall = resumed.withLock { hasResumed in
+                            guard !hasResumed else { return false }
+                            hasResumed = true
+                            return true
+                        }
+                        guard firstCall else { return }
+                        if let error {
+                            continuation.resume(throwing: error)
+                        } else if let token {
+                            continuation.resume(returning: token)
+                        } else {
+                            continuation.resume(throwing: NSError(
+                                domain: "com.payabli.ttp",
+                                code: -1,
+                                userInfo: [NSLocalizedDescriptionKey:
+                                    "tokenRefreshHandler returned nil token and nil error"]
+                            ))
+                        }
+                    }
+                }
+            }
+        }
+        self.init(
+            accessToken: accessToken,
+            tokenProvider: bridged,
+            entryPoint: entryPoint,
+            appId: appId,
+            environment: environment
+        )
+    }
+    #endif
 
     // MARK: - Events
 
@@ -143,5 +224,84 @@ public final class PayabliTTP: ObservableObject {
     func syncPublished() {
         sessionState = sessionManager.sessionState
         isReady = sessionManager.isReady
+    }
+
+    // MARK: - ObjC event listener
+
+    /// Subscribes a callback to the `events()` stream — the ObjC / MAUI
+    /// counterpart to iterating `for await event in ttp.events()` in Swift.
+    ///
+    /// The handler is invoked on the main thread (the entire `PayabliTTP`
+    /// surface is `@MainActor`). Each event is delivered as a
+    /// `(PayabliTTPEventCode, NSDictionary)` pair: `code` identifies the
+    /// case, and the dictionary carries the case's associated values
+    /// (`paymentTransId`, `error`) — empty for cases without payload. See
+    /// `PayabliTTPEvent.payload` for the per-case schema.
+    ///
+    /// The returned `PayabliTTPEventToken` owns the underlying `Task`. Call
+    /// `cancel()` to stop receiving events; otherwise the listener lives
+    /// for the lifetime of the `PayabliTTP` instance.
+    @objc public func addEventListener(
+        handler: @escaping (PayabliTTPEventCode, NSDictionary) -> Void
+    ) -> PayabliTTPEventToken {
+        let stream = self.events()
+        let task = Task { @MainActor in
+            for await event in stream {
+                handler(event.code, event.payload as NSDictionary)
+            }
+        }
+        return PayabliTTPEventToken(task: task)
+    }
+}
+
+// MARK: - ObjC event token
+
+/// Opaque handle returned by `PayabliTTP.addEventListener(handler:)`. Holds
+/// the underlying `Task` that drains the `AsyncStream<PayabliTTPEvent>` and
+/// dispatches to the ObjC callback. Call `cancel()` to tear it down.
+@objc(PayabliTTPEventToken)
+public final class PayabliTTPEventToken: NSObject {
+    let task: Task<Void, Never>
+
+    init(task: Task<Void, Never>) {
+        self.task = task
+        super.init()
+    }
+
+    /// Cancels the underlying task. Idempotent.
+    @objc public func cancel() {
+        task.cancel()
+    }
+}
+
+// MARK: - Internal helpers
+
+/// Box that lets us thread an ObjC block through a Swift `@Sendable` closure.
+/// ObjC blocks are heap-allocated and copy-on-capture, but Swift can't infer
+/// `@Sendable` for the input function type, so we opt out of the check
+/// explicitly at the boundary. Used by the `@objc` convenience init only.
+struct UncheckedSendableBox<Value>: @unchecked Sendable {
+    let value: Value
+    init(_ value: Value) { self.value = value }
+}
+
+/// Tiny `NSLock`-backed reference cell used as a one-shot guard when bridging
+/// ObjC completion blocks into a `CheckedContinuation`. We can't trust the
+/// host to invoke the block exactly once — and `CheckedContinuation` will
+/// crash on the second `resume` — so the bridge serializes "did I already
+/// resume?" through this cell. Reference type so closures can mutate the
+/// shared state without `var` capture warnings under strict concurrency.
+final class Locked<Value>: @unchecked Sendable {
+    private let lock = NSLock()
+    private var value: Value
+
+    init(_ value: Value) { self.value = value }
+
+    /// Mutates and returns whatever the caller derives from the protected
+    /// state, atomically. Use the inout argument to read+write.
+    func withLock<R>(_ body: (inout Value) -> R) -> R {
+        lock.lock()
+        defer { lock.unlock() }
+        return body(&value)
     }
 }

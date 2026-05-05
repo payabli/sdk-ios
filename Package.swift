@@ -10,6 +10,14 @@ let package = Package(
         // other Apple platform, so development, CI, and release all target
         // iPhone iOS (device + simulator) via `xcodebuild`. No macOS
         // compatibility shims are maintained.
+        //
+        // Non-Xcode IDEs (Cursor, VS Code with sourcekit-lsp) need to be
+        // told that "host = iOS Simulator" — otherwise sourcekit-lsp falls
+        // back to the macOS host triple and surfaces availability noise
+        // (`ObservableObject` 10.15+, `URLSession.data(for:)` 12+, etc.)
+        // even though build/CI/release are unaffected. See the repo-level
+        // `.sourcekit-lsp/config.json` which configures that triple
+        // automatically when you open the package in Cursor / VS Code.
         .iOS("16.7")
     ],
     products: [
@@ -26,17 +34,12 @@ let package = Package(
         .library(
             name: "PayabliSDK",
             type: .dynamic,
-            targets: ["PayabliSDKCore", "PayabliSDKPayIn", "PayabliSDKTapToPay"]
+            targets: ["PayabliSDKCore", "PayabliSDKTapToPay"]
         ),
         .library(
             name: "PayabliSDKCore",
             type: .dynamic,
             targets: ["PayabliSDKCore"]
-        ),
-        .library(
-            name: "PayabliSDKPayIn",
-            type: .dynamic,
-            targets: ["PayabliSDKPayIn"]
         ),
         .library(
             name: "PayabliSDKTapToPay",
@@ -84,20 +87,6 @@ let package = Package(
             ]
         ),
         .target(
-            name: "PayabliSDKPayIn",
-            dependencies: [
-                "PayabliSDKCore"
-            ],
-            path: "Sources/PayabliSDKPayIn",
-            exclude: [
-                "Resources/README.md"
-            ],
-            resources: [
-                .process("Resources/PayabliBrandAssets.xcassets"),
-                .copy("Resources/PrivacyInfo.xcprivacy")
-            ]
-        ),
-        .target(
             name: "PayabliSDKTapToPay",
             dependencies: [
                 "PayabliSDKCore",
@@ -123,11 +112,6 @@ let package = Package(
             path: "Tests/PayabliSDKCoreTests"
         ),
         .testTarget(
-            name: "PayabliSDKPayInTests",
-            dependencies: ["PayabliSDKPayIn"],
-            path: "Tests/PayabliSDKPayInTests"
-        ),
-        .testTarget(
             name: "PayabliSDKTapToPayTests",
             dependencies: ["PayabliSDKTapToPay"],
             path: "Tests/PayabliSDKTapToPayTests"
@@ -136,11 +120,6 @@ let package = Package(
             name: "PayabliSDKTelemetryTests",
             dependencies: ["PayabliSDKTelemetry"],
             path: "Tests/PayabliSDKTelemetryTests"
-        ),
-        .testTarget(
-            name: "PayabliSDKIntegrationTests",
-            dependencies: ["PayabliSDKCore", "PayabliSDKPayIn"],
-            path: "Tests/PayabliSDKIntegrationTests"
         )
     ]
 )

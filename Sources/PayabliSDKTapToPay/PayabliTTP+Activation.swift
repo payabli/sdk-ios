@@ -51,4 +51,25 @@ extension PayabliTTP {
             throw mapped
         }
     }
+
+    /// `@objc` companion to `activateDevice(activationCode:)` for ObjC /
+    /// MAUI / Flutter / RN consumers. `completion(nil)` on success,
+    /// `completion(NSError)` on failure (domain `"com.payabli.ttp"` for
+    /// typed `PayabliTTPError`s).
+    ///
+    /// The completion handler is always invoked on the main thread because
+    /// the entire `PayabliTTP` surface is `@MainActor`.
+    @objc public func activateDevice(
+        activationCode: String,
+        completion: @escaping (NSError?) -> Void
+    ) {
+        Task { @MainActor in
+            do {
+                try await self.activateDevice(activationCode: activationCode)
+                completion(nil)
+            } catch {
+                completion(error.toPayabliNSError())
+            }
+        }
+    }
 }

@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [develop, sandbox, main]
+    branches: [develop, sandbox, main, release/ttp-only]
   pull_request:
-    branches: [develop, sandbox, main]
+    branches: [develop, sandbox, main, release/ttp-only]
 
 jobs:
   build:
@@ -80,7 +80,6 @@ jobs:
           VERSION: "0.0.0-dryrun"
           S3_PUBLIC_HOST: "example.invalid"
           CORE_SHA256: "0000000000000000000000000000000000000000000000000000000000000000"
-          PAYIN_SHA256: "0000000000000000000000000000000000000000000000000000000000000000"
           TAPTOPAY_SHA256: "0000000000000000000000000000000000000000000000000000000000000000"
           CARD_READER_CORE_SHA256: "0000000000000000000000000000000000000000000000000000000000000000"
         run: Scripts/render_public_manifests.sh

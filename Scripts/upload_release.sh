@@ -45,7 +45,7 @@ fi
 
 expected_zips=(
     "payabli-ios-sdk-core-${VERSION}.zip"
-    "payabli-ios-sdk-payin-${VERSION}.zip"
+    "payabli-ios-sdk-taptopay-${VERSION}.zip"
     "payabli-ios-sdk-card-reader-core-${VERSION}.zip"
 )
 

@@ -1,5 +1,5 @@
 name: payabli_flutter_demo
-description: Minimal Flutter demo calling the native PayabliSDK via MethodChannel.
+description: Minimal Flutter demo wrapping the native Tap to Pay surface of the PayabliSDK via MethodChannel + EventChannel.
 version: 1.0.0
 publish_to: 'none'
 

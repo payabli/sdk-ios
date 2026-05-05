@@ -4,20 +4,22 @@
 # time. Do not edit by hand. Only `main`-branch releases are pushed to Trunk;
 # `-qa` and `-beta` versions publish SPM-only.
 #
-# Ships four subspecs: Core, PayIn, TapToPay, PayabliCardReaderCore. PayIn
-# only depends on Core; TapToPay pulls in CardReaderCore transitively.
+# Ships three subspecs (TTP-only branch — PayIn is intentionally absent
+# and lives unchanged on `develop`):
+#   Core, TapToPay, PayabliCardReaderCore.
+# TapToPay pulls in CardReaderCore transitively.
 #
 Pod::Spec.new do |s|
   s.name             = 'PayabliSDK'
   s.version          = '${VERSION}'
-  s.summary          = 'Payabli iOS SDK for tokenization, Apple Pay, and Tap to Pay on iPhone.'
+  s.summary          = 'Payabli iOS SDK for Tap to Pay on iPhone.'
   s.description      = <<-DESC
     PayabliSDK is the official iOS SDK for accepting payments via Payabli.
-    Ships four modules: PayabliSDKCore (shared infrastructure),
-    PayabliSDKPayIn (forms, tokenization, getpaid, Apple Pay),
-    PayabliSDKTapToPay (Tap to Pay on iPhone), and PayabliCardReaderCore
-    (MIT-licensed Tap to Phone card reader engine). All modules are
-    distributed as pre-built XCFrameworks.
+    This TTP-only build ships three modules: PayabliSDKCore (shared
+    infrastructure), PayabliSDKTapToPay (Tap to Pay on iPhone, bilingual
+    Swift/ObjC), and PayabliCardReaderCore (MIT-licensed Tap to Phone
+    card reader engine). All modules are distributed as pre-built
+    XCFrameworks.
   DESC
 
   s.homepage         = 'https://github.com/payabli/payabli-sdk-ios'
@@ -28,15 +30,10 @@ Pod::Spec.new do |s|
   s.ios.deployment_target = '16.7'
   s.swift_version    = '5.9'
 
-  s.default_subspecs = 'Core', 'PayIn', 'TapToPay', 'PayabliCardReaderCore'
+  s.default_subspecs = 'Core', 'TapToPay', 'PayabliCardReaderCore'
 
   s.subspec 'Core' do |ss|
     ss.vendored_frameworks = 'PayabliSDKCore.xcframework'
-  end
-
-  s.subspec 'PayIn' do |ss|
-    ss.dependency 'PayabliSDK/Core'
-    ss.vendored_frameworks = 'PayabliSDKPayIn.xcframework'
   end
 
   s.subspec 'TapToPay' do |ss|
