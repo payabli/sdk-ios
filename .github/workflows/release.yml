@@ -1,155 +1,126 @@
-name: Deploy iOS SDK
+name: Release
 
 on:
-  push:
-    branches: [develop, sandbox, main]
   workflow_dispatch:
     inputs:
       version:
-        description: "Version override (e.g. 1.0.248-hotfix). Use only if auto-versioning fails."
+        description: "Version to release (e.g. 0.2.0)"
+        required: true
+        type: string
+      release_notes:
+        description: "Release notes (markdown)"
         required: false
         default: ""
-      skip_publish:
-        description: "Build and test only — skip S3 upload, public-repo push, and CocoaPods."
-        required: false
-        type: boolean
-        default: false
-
-permissions:
-  contents: write
-
-concurrency:
-  group: deploy-${{ github.ref }}
-  cancel-in-progress: false
 
 jobs:
-  deploy:
-    name: >-
-      ${{ (github.ref == 'refs/heads/develop' && 'QA')
-       || (github.ref == 'refs/heads/sandbox' && 'Sandbox')
-       || 'Production' }}
+  release:
+    name: Test, Tag & Release
     runs-on: macos-15
-    environment: >-
-      ${{ (github.ref == 'refs/heads/develop' && 'QA')
-       || (github.ref == 'refs/heads/sandbox' && 'Sandbox')
-       || 'Production' }}
-    env:
-      AWS_REGION: ${{ vars.AWS_REGION }}
-      BUCKET_NAME: ${{ vars.BUCKET_NAME }}
-      S3_PUBLIC_HOST: ${{ vars.S3_PUBLIC_HOST }}
-      PUBLIC_REPO: ${{ vars.PUBLIC_REPO }}
+    permissions:
+      contents: write
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Compute version
-        run: |
-          if [[ -n "${{ inputs.version }}" ]]; then
-            echo "VERSION=${{ inputs.version }}" >> "$GITHUB_ENV"
-            echo "[version] using workflow_dispatch override: ${{ inputs.version }}"
-          else
-            Scripts/compute_version.sh >> "$GITHUB_ENV"
-          fi
-
       - name: Validate version format
         run: |
-          if ! echo "$VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+(-[a-z0-9]+)?$'; then
-            echo "error: invalid VERSION format '$VERSION'" >&2
+          if ! echo "${{ inputs.version }}" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?$'; then
+            echo "❌ Invalid version format '${{ inputs.version }}'. Use MAJOR.MINOR.PATCH or MAJOR.MINOR.PATCH-prerelease (e.g. 0.2.0 or 0.2.0-beta.1)"
             exit 1
           fi
-          echo "[version] VERSION=$VERSION"
 
-      - name: Select Xcode
-        # Pin to Xcode 16.4 — the current `macos-15` runner-image default,
-        # which ships the complete iOS 18.5 SDK + iOS 18.5 Simulator
-        # runtime. Picking "whatever sorts highest alphabetically" bit us
-        # once before when the runner image had a stripped-down Xcode_16.0
-        # beta whose iOS SDK wasn't fully provisioned, so we pin an
-        # explicit, stable version here. Bump this when GitHub retires
-        # Xcode 16.4 from the image.
+      - name: Check tag does not already exist
         run: |
-          sudo xcode-select -s /Applications/Xcode_16.4.app/Contents/Developer
-          echo "[xcode] using Xcode 16.4"
+          if git tag | grep -qx "${{ inputs.version }}"; then
+            echo "❌ Tag ${{ inputs.version }} already exists"
+            exit 1
+          fi
+
+      - name: Select latest Xcode
+        run: |
+          XCODE=$(ls /Applications | grep -E '^Xcode_[0-9]' | sort -V | tail -1)
+          sudo xcode-select -s "/Applications/$XCODE/Contents/Developer"
+          echo "Using $XCODE"
           xcodebuild -version
           swift --version
 
       - name: Install xcpretty
         run: gem install xcpretty --no-document
 
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
-
       - name: Resolve dependencies
-        run: xcodebuild -resolvePackageDependencies -scheme PayabliSDK-Package
+        run: |
+          xcodebuild -resolvePackageDependencies \
+            -scheme PayabliSDK-Package \
+            -clonedSourcePackagesDirPath .build/checkouts
 
       - name: Test
-        # The package is iOS-only. We test with `xcodebuild test` against
-        # an iOS 18.5 Simulator iPhone — pick the first available iPhone
-        # simulator on the pinned Xcode 16.4's bundled iOS 18.5 runtime.
-        # PayabliSDK-Package is SPM's auto-generated umbrella scheme that
-        # aggregates every testTarget in the package.
         run: |
-          SIMULATOR_ID=$(xcrun simctl list devices available -j | python3 -c "
+          SIMULATOR_ID=$(xcrun simctl list devices available -j \
+            | python3 -c "
           import json, sys
           d = json.load(sys.stdin)['devices']
-          iphones = [v for k, vals in d.items() if 'iOS' in k for v in vals if 'iPhone' in v['name'] and v['isAvailable']]
+          iphones = [
+            v for k, vals in d.items()
+            if 'iOS' in k
+            for v in vals
+            if 'iPhone' in v['name'] and v['isAvailable']
+          ]
           if not iphones:
-              raise SystemExit('no iPhone simulator available on this runner')
+            print('error: no available iPhone simulator found', file=sys.stderr)
+            sys.exit(1)
           print(sorted(iphones, key=lambda x: x['name'])[-1]['udid'])
           ")
-          echo "[test] using simulator $SIMULATOR_ID"
-          set -o pipefail
+          echo "Using simulator: $SIMULATOR_ID"
           xcodebuild test \
-              -scheme PayabliSDK-Package \
-              -destination "platform=iOS Simulator,id=$SIMULATOR_ID" \
-              CODE_SIGNING_ALLOWED=NO \
-              | xcpretty
+            -scheme PayabliSDK-Package \
+            -destination "platform=iOS Simulator,id=$SIMULATOR_ID" \
+            -clonedSourcePackagesDirPath .build/checkouts \
+            CODE_SIGNING_ALLOWED=NO \
+            | xcpretty && exit ${PIPESTATUS[0]}
 
-      - name: Build XCFrameworks
-        if: ${{ !inputs.skip_publish }}
-        run: Scripts/build_release_frameworks.sh
+      - name: Create and push tag
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "${{ inputs.version }}" \
+            -m "PayabliTTP SDK v${{ inputs.version }}"
+          git push origin "${{ inputs.version }}"
 
-      - name: Upload XCFramework zips to S3
-        if: ${{ !inputs.skip_publish }}
-        run: Scripts/upload_release.sh
+      - name: Build release notes
+        id: notes
+        run: |
+          CUSTOM="${{ inputs.release_notes }}"
+          PREV_TAG=$(git tag --sort=-version:refname | grep -v "${{ inputs.version }}" | head -n 1)
 
-      - name: Render public manifests
-        if: ${{ !inputs.skip_publish }}
-        run: Scripts/render_public_manifests.sh
+          if [ -n "$PREV_TAG" ]; then
+            COMMITS=$(git log "${PREV_TAG}".."${{ inputs.version }}" --pretty=format:"- %s" | head -20)
+          else
+            COMMITS=$(git log --pretty=format:"- %s" | head -20)
+          fi
 
-      - name: Push to public repo + tag + release
-        if: ${{ !inputs.skip_publish }}
+          {
+            echo "NOTES<<EOF"
+            if [ -n "$CUSTOM" ]; then
+              echo "$CUSTOM"
+              echo ""
+            fi
+            echo "## Changes since ${PREV_TAG:-initial release}"
+            echo "$COMMITS"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
         env:
-          GH_ACTOR: "Payabli Release Bot"
-          GH_EMAIL: "releases@payabli.com"
-          # Reuses the org-level GHB_PAT_TOKEN (same secret used by other
-          # Payabli release workflows; see .github/BRANCH_PROTECTION.md).
-          # The PAT's owner must be in the Bypass list of both rulesets on
-          # payabli/payabli-sdk-ios (main branch + tag ruleset).
-          PUBLIC_REPO_PAT: ${{ secrets.GHB_PAT_TOKEN }}
-        run: Scripts/push_to_public_repo.sh
-
-      # CocoaPods publication is deferred until DevOps provisions the
-      # COCOAPODS_TRUNK_TOKEN secret and the combined-zip packaging gap is
-      # resolved (see docs/RELEASE.md §CocoaPods (deferred)). To re-enable:
-      #   1. Create repo secret COCOAPODS_TRUNK_TOKEN.
-      #   2. Fix Scripts/build_release_frameworks.sh to emit a combined zip
-      #      (or adjust public-PayabliSDK.podspec.tmpl to 3 vendored_frameworks).
-      #   3. Restore the CocoaPods section in .github/templates/public-README.md.tmpl.
-      #   4. Uncomment the step below.
-      #
-      # - name: CocoaPods trunk push (main only)
-      #   if: ${{ !inputs.skip_publish && github.ref == 'refs/heads/main' }}
-      #   env:
-      #     COCOAPODS_TRUNK_TOKEN: ${{ secrets.COCOAPODS_TRUNK_TOKEN }}
-      #   run: |
-      #     pod trunk push build/public/PayabliSDK.podspec \
-      #         --allow-warnings \
-      #         --skip-tests \
-      #         --skip-import-validation
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PRERELEASE=""
+          if echo "${{ inputs.version }}" | grep -q '-'; then
+            PRERELEASE="--prerelease"
+          fi
+          gh release create "${{ inputs.version }}" \
+            --title "PayabliTTP SDK v${{ inputs.version }}" \
+            --notes "${{ steps.notes.outputs.NOTES }}" \
+            $PRERELEASE
