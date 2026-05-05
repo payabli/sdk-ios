@@ -177,7 +177,7 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 _section('Lifecycle', [
                   FilledButton(
-                    onPressed: _isWorking || _state == PayabliTTPSessionState.Ready ? null : _runInitialize,
+                    onPressed: _isWorking || _state == PayabliTTPSessionState.ready ? null : _runInitialize,
                     child: const Text('Initialize'),
                   ),
                   OutlinedButton(
@@ -198,7 +198,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   const SizedBox(height: 8),
                   FilledButton(
-                    onPressed: _isWorking || _state != PayabliTTPSessionState.Ready ? null : _runCharge,
+                    onPressed: _isWorking || _state != PayabliTTPSessionState.ready ? null : _runCharge,
                     child: const Text('Charge'),
                   ),
                 ]),
@@ -247,9 +247,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _stateBadge(PayabliTTPSessionState s) {
     final color = switch (s) {
-      PayabliTTPSessionState.Ready => Colors.green,
-      PayabliTTPSessionState.Error || PayabliTTPSessionState.SessionExpired => Colors.red,
-      PayabliTTPSessionState.PendingActivation => Colors.orange,
+      PayabliTTPSessionState.ready => Colors.green,
+      PayabliTTPSessionState.error || PayabliTTPSessionState.sessionExpired => Colors.red,
+      PayabliTTPSessionState.pendingActivation => Colors.orange,
       _ => Colors.grey,
     };
     return Container(

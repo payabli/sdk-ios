@@ -168,7 +168,21 @@ public final class PayabliTTP: NSObject, ObservableObject {
             let sendable = UncheckedSendableBox(handler)
             return { @Sendable in
                 try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<String, Error>) in
+                    // Guard against the ObjC host invoking the completion
+                    // block more than once — that would resume the same
+                    // continuation twice and crash. We honor only the first
+                    // invocation (success or failure) and silently drop any
+                    // subsequent calls. A `Locked<Bool>` keeps this thread-
+                    // safe in case the host dispatches the callback from a
+                    // background queue.
+                    let resumed = Locked(false)
                     sendable.value { token, error in
+                        let firstCall = resumed.withLock { hasResumed in
+                            guard !hasResumed else { return false }
+                            hasResumed = true
+                            return true
+                        }
+                        guard firstCall else { return }
                         if let error {
                             continuation.resume(throwing: error)
                         } else if let token {
@@ -269,4 +283,25 @@ public final class PayabliTTPEventToken: NSObject {
 struct UncheckedSendableBox<Value>: @unchecked Sendable {
     let value: Value
     init(_ value: Value) { self.value = value }
+}
+
+/// Tiny `NSLock`-backed reference cell used as a one-shot guard when bridging
+/// ObjC completion blocks into a `CheckedContinuation`. We can't trust the
+/// host to invoke the block exactly once — and `CheckedContinuation` will
+/// crash on the second `resume` — so the bridge serializes "did I already
+/// resume?" through this cell. Reference type so closures can mutate the
+/// shared state without `var` capture warnings under strict concurrency.
+final class Locked<Value>: @unchecked Sendable {
+    private let lock = NSLock()
+    private var value: Value
+
+    init(_ value: Value) { self.value = value }
+
+    /// Mutates and returns whatever the caller derives from the protected
+    /// state, atomically. Use the inout argument to read+write.
+    func withLock<R>(_ body: (inout Value) -> R) -> R {
+        lock.lock()
+        defer { lock.unlock() }
+        return body(&value)
+    }
 }

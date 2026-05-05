@@ -149,8 +149,7 @@ for scheme in "${SCHEMES[@]}"; do
     checksum="$(swift package compute-checksum "$BUILD_DIR/$zip_name")"
     printf '%s  %s\n' "$checksum" "$zip_name" >> "$checksums_file"
     # Also expose individual vars for the render step:
-    #   CORE_SHA256, PAYIN_SHA256, CARDREADER_SHA256
-    # Exposes CORE_SHA256, TAPTOPAY_SHA256, CARD_READER_CORE_SHA256
+    #   CORE_SHA256, TAPTOPAY_SHA256, CARD_READER_CORE_SHA256
     # (matches render_public_manifests.sh's required vars).
     upper="$(echo "${slug//-/_}" | tr '[:lower:]' '[:upper:]')"
     if [[ -n "${GITHUB_ENV:-}" ]]; then

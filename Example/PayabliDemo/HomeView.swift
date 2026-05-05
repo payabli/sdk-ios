@@ -190,31 +190,30 @@ struct HomeView: View {
 
     private func subscribeToEvents() {
         guard eventToken == nil else { return }
-        let stream = ttp.events()
-        Task { @MainActor in
-            for await event in stream {
-                let detail: String
-                switch event.payload.count {
-                case 0: detail = ""
-                default:
-                    detail = event.payload
-                        .map { "\($0.key): \($0.value)" }
-                        .sorted()
-                        .joined(separator: ", ")
-                }
+        // Single source of truth: the addEventListener token owns both the
+        // subscription *and* its tear-down (cancelled in onDisappear). Using
+        // events() with a separate detached Task here would leak that Task
+        // across view appearances since SwiftUI gives us no handle to cancel
+        // it from onDisappear.
+        eventToken = ttp.addEventListener { code, payload in
+            let detail: String
+            if payload.isEmpty {
+                detail = ""
+            } else {
+                detail = payload
+                    .map { "\($0.key): \($0.value)" }
+                    .sorted()
+                    .joined(separator: ", ")
+            }
+            DispatchQueue.main.async {
                 eventLog.insert(
-                    EventLogEntry(label: String(describing: event.code), detail: detail),
+                    EventLogEntry(label: String(describing: code), detail: detail),
                     at: 0
                 )
                 if eventLog.count > 100 {
                     eventLog.removeLast(eventLog.count - 100)
                 }
             }
-        }
-        // Hold a token so re-subscribes don't pile up listeners.
-        eventToken = ttp.addEventListener { _, _ in
-            // No-op — the AsyncStream loop above handles UI updates.
-            // The token is only here as a tear-down handle on disappear.
         }
     }
 

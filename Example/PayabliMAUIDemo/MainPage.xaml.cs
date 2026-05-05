@@ -115,7 +115,10 @@ public partial class MainPage : ContentPage
         SetWorking(true);
         _ttp.Charge(
             amount: NSDecimalNumber.FromString(amount.ToString(System.Globalization.CultureInfo.InvariantCulture)),
-            type: (System.IntPtr)PayabliTTPPaymentType.Sale,
+            // PayabliTTPPaymentType is `enum : long`, and the binding signature
+            // expects `nint`. C# disallows enum -> nint without going through
+            // the underlying integral type first, so cast through `long`.
+            type: (nint)(long)PayabliTTPPaymentType.Sale,
             serviceFee: NSDecimalNumber.Zero,
             customer: null,
             order: null,
