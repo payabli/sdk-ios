@@ -19,33 +19,60 @@ public final class TTPTransactionClient: Sendable {
     /// `POST /api/v2/MoneyIn/initiate` — returns the authoritative
     /// `paymentTransId` from the backend. Mirrors the reference flow used by
     /// the Fiserv direct POC (`SaleView.swift`): `paymentMethod.method` is
-    /// always `"cloud"` (the POI-device flavor that the backend looks for in
-    /// `MoneyInAuth.cs` — `method == "cloud"`), and empty fields are sent as
-    /// strings rather than `null`.
-    ///
-    /// Customer and order data flow in as structured values so the call site
-    /// (`PayabliTTP.charge`) can thread the same snapshot through every stage
-    /// of the charge pipeline (initiate → card reader → update).
+    /// always `"device"` (the POI-device flavor), and the three legacy fields
+    /// (`firstName`, `lastName`, `customerNumber`) are sent as empty strings
+    /// rather than `null` for backward compatibility. All other customer
+    /// fields are omitted from the JSON when nil.
     public func initiate(
         entryPoint: String,
-        amount: Decimal,
-        serviceFee: Decimal = 0,
         deviceId: String,
+        paymentDetails: PayabliTTPPaymentDetails,
         customer: PayabliTTPCustomerData = PayabliTTPCustomerData(),
-        order: PayabliTTPOrderData = PayabliTTPOrderData()
+        invoice: PayabliTTPInvoiceData = PayabliTTPInvoiceData(),
+        orderDescription: String? = nil
     ) async throws -> String {
         let token = await auth.currentAccessToken()
+
+        let wireCustomer = InitiateCustomerData(
+            firstName: customer.firstName ?? "",
+            lastName: customer.lastName ?? "",
+            customerNumber: customer.customerNumber ?? "",
+            email: customer.email,
+            phone: customer.phone,
+            customerId: customer.customerId,
+            company: customer.company,
+            billingAddress1: customer.billingAddress1,
+            billingAddress2: customer.billingAddress2,
+            billingCity: customer.billingCity,
+            billingState: customer.billingState,
+            billingZip: customer.billingZip,
+            billingCountry: customer.billingCountry,
+            billingPhone: customer.billingPhone,
+            billingEmail: customer.billingEmail,
+            shippingAddress1: customer.shippingAddress1,
+            shippingAddress2: customer.shippingAddress2,
+            shippingCity: customer.shippingCity,
+            shippingState: customer.shippingState,
+            shippingZip: customer.shippingZip,
+            shippingCountry: customer.shippingCountry
+        )
+
+        let wireInvoice: InitiateInvoiceData? = invoice.invoiceNumber.map {
+            InitiateInvoiceData(invoiceNumber: $0)
+        }
+
         let body = InitiateRequest(
             entryPoint: entryPoint,
-            orderId: order.orderId ?? "",
-            orderDescription: order.orderDescription ?? "",
-            paymentDetails: InitiatePaymentDetails(totalAmount: amount, serviceFee: serviceFee),
+            orderDescription: orderDescription ?? "",
+            paymentDetails: InitiatePaymentDetails(
+                totalAmount: paymentDetails.amount,
+                serviceFee: paymentDetails.serviceFee,
+                currency: paymentDetails.currency,
+                paymentDescription: paymentDetails.paymentDescription
+            ),
             paymentMethod: InitiatePaymentMethod(method: "device", device: deviceId),
-            customerData: InitiateCustomerData(
-                firstName: customer.firstName ?? "",
-                lastName: customer.lastName ?? "",
-                customerNumber: customer.customerNumber ?? ""
-            )
+            customerData: wireCustomer,
+            invoiceData: wireInvoice
         )
 
         let request = try PayabliRequest.json(
