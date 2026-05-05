@@ -163,7 +163,10 @@ struct HomeView: View {
         Task {
             defer { isWorking = false }
             do {
-                let result = try await ttp.charge(amount: amount, type: .sale)
+                let result = try await ttp.charge(
+                    type: .sale,
+                    paymentDetails: PayabliTTPPaymentDetails(amount: amount)
+                )
                 lastResult = "✓ Charged · txn \(result.paymentTransId)"
             } catch {
                 lastResult = "✗ Charge failed: \(error.localizedDescription)"
