@@ -42,7 +42,8 @@ progress updates.
 | Pending-device activation     | OTP flow for first-time devices, fully wired.            |
 | Optional telemetry            | Plug in your own Sentry / PostHog if you want it.        |
 
-**Requirements:** iOS 16.7+, iPhone XS or newer, Xcode 15+, Swift 5.9+.
+**Requirements:** iOS 16.7+, iPhone XS or newer, Xcode 15+, Swift 5.9+
+(Swift Package Manager 5.9+, bundled with Xcode 15).
 
 ---
 
@@ -85,6 +86,56 @@ Then link the product you need:
 
 That's it — `PayabliSDKTapToPay` brings in the core and reader engine for
 you.
+
+---
+
+## Configuration values
+
+When you create `PayabliTTP`, you pass four values. Here's where each comes
+from:
+
+### `entryPoint`
+
+The Payabli identifier for your merchant entry. Issued by Payabli when your
+account is provisioned for Tap to Pay (e.g. `"acmePay"`). It's the same
+slug you use to sign in to the dashboard at
+`https://app.payabli.com/<entryPoint>/signin`.
+
+### `appId`
+
+Your iOS app's identity from Apple's perspective:
+`<TEAM_ID>.<BUNDLE_ID>`.
+
+- **`TEAM_ID`** — the 10-character team identifier from your
+  [Apple Developer account](https://developer.apple.com/account)
+  (Membership → Team ID).
+- **`BUNDLE_ID`** — your app's bundle identifier from Xcode
+  (Target → General → Bundle Identifier), e.g. `com.acme.checkout`.
+
+Full example: `"TEAM123456.com.acme.checkout"`.
+
+App Attest uses `appId` to prove that the binary on the device is the one
+you registered — a mismatch surfaces as `attestationFailed` on
+`initialize()`. The same `appId` must be authorized in the Payabli
+dashboard (see [Before your first tap](#before-your-first-tap)).
+
+### `environment`
+
+Picks which Payabli API the SDK talks to:
+
+| Value         | Base URL                          |
+| ------------- | --------------------------------- |
+| `.sandbox`    | `https://api-sandbox.payabli.com` |
+| `.production` | `https://api.payabli.com`         |
+
+Use `.sandbox` while developing and testing; switch to `.production` for
+live merchant traffic. Match this with your App Attest entitlement —
+`development` for sandbox builds, `production` for release builds.
+
+### `accessToken` / `tokenProvider`
+
+Short-lived bearer token from your backend, plus an `async` closure the SDK
+calls to refresh it. Covered in [How auth works](#how-auth-works) below.
 
 ---
 
@@ -189,10 +240,6 @@ func fetchPayabliAccessToken() async throws -> String {
     var request = URLRequest(url: URL(string: "https://your-backend.example.com/payabli/token")!)
     request.httpMethod = "POST"
     request.addValue("application/json", forHTTPHeaderField: "Content-Type")
-    request.httpBody = try JSONSerialization.data(withJSONObject: [
-        "clientId": "<your-payabli-client-id>",
-        "clientSecret": "<your-payabli-client-secret>",
-    ])
 
     let (data, _) = try await URLSession.shared.data(for: request)
     return try JSONDecoder().decode(Response.self, from: data).access_token
@@ -226,9 +273,14 @@ A few one-time setup steps with Apple and Payabli:
    [Setting Up the Entitlement](https://developer.apple.com/documentation/proximityreader/setting-up-the-entitlement-for-tap-to-pay-on-iphone)
    guide walks you through it.
 2. **App Attest entitlement.** Add `com.apple.developer.devicecheck.appattest-environment`
-   set to `production` (or `development` for dev builds).
-3. **Bundle ID enrollment.** Get your bundle ID enrolled in both Apple's
-   Tap to Pay program and Payabli's partner onboarding.
+   set to `production` (or `development` for dev builds). Match this with
+   the `environment` you pass to the SDK (see
+   [Configuration values](#configuration-values)).
+3. **Authorize the app in the Payabli dashboard.** Sign in at
+   `https://app.payabli.com/<entryPoint>/signin`, open
+   **Settings → Devices**, click **Authorized Apps**, and add the same
+   `appId` (`<TEAM_ID>.<BUNDLE_ID>`) you'll pass to the SDK. Until the app
+   is authorized here, attestation will be rejected on `initialize()`.
 4. **Eligible device.** iPhone XS or newer, iOS 16.7+, supported region,
    unlocked. The SDK will check this for you on `initialize()`.
 5. **Entry point.** Have Payabli provision a Tap to Pay-enabled entry point
@@ -370,6 +422,65 @@ let result = try await ttp.charge(
     ),
     invoice: PayabliTTPInvoiceData(invoiceNumber: "INV-9001"),
     orderDescription: "Two coffees + croissant"
+)
+```
+
+### What `charge(...)` accepts
+
+```swift
+public func charge(
+    amount: Decimal,
+    type: PayabliTTPPaymentType,
+    serviceFee: Decimal = 0,
+    customer: PayabliTTPCustomerData = .init(),
+    order: PayabliTTPOrderData = .init()
+) async throws -> TransactionResult
+```
+
+| Parameter    | Type                       | Required | Notes                                                                                       |
+| ------------ | -------------------------- | -------- | ------------------------------------------------------------------------------------------- |
+| `amount`     | `Decimal`                  | yes      | Total amount to charge in the merchant's currency (e.g. `9.99`).                            |
+| `type`       | `PayabliTTPPaymentType`    | yes      | v1.0 supports `.sale` only.                                                                 |
+| `serviceFee` | `Decimal`                  | no       | Optional convenience fee added on top of `amount`. Defaults to `0`.                         |
+| `customer`   | `PayabliTTPCustomerData`   | no       | Cardholder/customer snapshot. Persisted at `/initiate`. Defaults to an empty (anonymous) customer. |
+| `order`      | `PayabliTTPOrderData`      | no       | Order/invoice metadata. Persisted at `/initiate`.                                           |
+
+`PayabliTTPCustomerData` (every field optional, blank values are
+ignored):
+
+| Field             | Type      | Purpose                                                                |
+| ----------------- | --------- | ---------------------------------------------------------------------- |
+| `firstName`       | `String?` | Cardholder first name.                                                 |
+| `lastName`        | `String?` | Cardholder last name.                                                  |
+| `customerNumber`  | `String?` | Your internal customer reference, surfaced on the Payabli transaction. |
+| `email`           | `String?` | Customer email for receipts / reconciliation.                          |
+| `phone`           | `String?` | Customer phone, free-form.                                             |
+
+`PayabliTTPOrderData` (every field optional):
+
+| Field              | Type      | Purpose                                                                                            |
+| ------------------ | --------- | -------------------------------------------------------------------------------------------------- |
+| `orderId`          | `String?` | Your order identifier; also used as the fallback invoice number when `invoiceNumber` is `nil`.     |
+| `orderDescription` | `String?` | Human-readable description of the order.                                                           |
+| `invoiceNumber`    | `String?` | Invoice reference passed to the processor. Falls back to `orderId` if `nil`.                       |
+
+```swift
+let result = try await ttp.charge(
+    amount: 24.50,
+    type: .sale,
+    serviceFee: 1.00,
+    customer: PayabliTTPCustomerData(
+        firstName: "Jane",
+        lastName: "Doe",
+        customerNumber: "cust-1234",
+        email: "jane@example.com",
+        phone: "+1 555 0100"
+    ),
+    order: PayabliTTPOrderData(
+        orderId: "order-9001",
+        orderDescription: "Two coffees + croissant",
+        invoiceNumber: "INV-9001"
+    )
 )
 ```
 
