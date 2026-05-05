@@ -46,8 +46,8 @@ extension PayabliTTP {
             orderDescription: orderDescription
         )
 
-        // Public-safe summary — PII fields (billing/shipping/email/phone) are
-        // logged separately under `.private` privacy in a follow-up.
+        // Public-safe summary — only business-public fields land in shared
+        // OS logs at `.public` privacy.
         logger.info(
             "[charge] → amount=\(paymentDetails.amount) serviceFee=\(paymentDetails.serviceFee) " +
             "currency=\(paymentDetails.currency) " +
@@ -59,6 +59,29 @@ extension PayabliTTP {
             "invoice={invoiceNumber=\(invoice.invoiceNumber ?? "<nil>")} " +
             "orderDescription=\(orderDescription ?? "<nil>")"
         )
+
+        // PII detail line — billing / shipping / email / phone are tagged
+        // `.private` so they're redacted in shared OS logs and only visible
+        // in the developer's local stream attached to the device.
+        if !customer.isEmpty {
+            let pii = "email=\(customer.email ?? "<nil>") " +
+                "phone=\(customer.phone ?? "<nil>") " +
+                "billing.address1=\(customer.billingAddress1 ?? "<nil>") " +
+                "billing.address2=\(customer.billingAddress2 ?? "<nil>") " +
+                "billing.city=\(customer.billingCity ?? "<nil>") " +
+                "billing.state=\(customer.billingState ?? "<nil>") " +
+                "billing.zip=\(customer.billingZip ?? "<nil>") " +
+                "billing.country=\(customer.billingCountry ?? "<nil>") " +
+                "billing.email=\(customer.billingEmail ?? "<nil>") " +
+                "billing.phone=\(customer.billingPhone ?? "<nil>") " +
+                "shipping.address1=\(customer.shippingAddress1 ?? "<nil>") " +
+                "shipping.address2=\(customer.shippingAddress2 ?? "<nil>") " +
+                "shipping.city=\(customer.shippingCity ?? "<nil>") " +
+                "shipping.state=\(customer.shippingState ?? "<nil>") " +
+                "shipping.zip=\(customer.shippingZip ?? "<nil>") " +
+                "shipping.country=\(customer.shippingCountry ?? "<nil>")"
+            logger.info("[charge] customerPII", private: pii)
+        }
 
         // Step 1 — backend mints the paymentTransId.
         let paymentTransId = try await runInitiate(context: context)
