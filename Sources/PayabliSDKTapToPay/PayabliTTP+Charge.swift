@@ -97,53 +97,6 @@ extension PayabliTTP {
         }
     }
 
-    /// `@objc` companion to `charge(amount:type:serviceFee:customer:order:)`.
-    ///
-    /// ObjC / MAUI / Flutter / RN consumers express:
-    ///   - `amount` and `serviceFee` as `NSDecimalNumber` (bridges to Swift
-    ///     `Decimal` losslessly).
-    ///   - `type` as the raw value of `PayabliTTPPaymentType` (`Int`); falls
-    ///     back to `.sale` if the value is unknown — v1.0 only supports
-    ///     `.sale = 0` so this is the practical identity.
-    ///   - `customer` and `order` as the `*ObjC` companion classes; pass `nil`
-    ///     for "no customer / no order provided" (equivalent to passing the
-    ///     default-initialized Swift struct).
-    ///
-    /// On success the completion is invoked with a non-nil
-    /// `PayabliTTPTransactionResultObjC` and `nil` error. On failure the
-    /// completion receives a nil result and an `NSError` (domain
-    /// `"com.payabli.ttp"` for typed `PayabliTTPError`s). The completion is
-    /// always invoked on the main thread.
-    @objc public func charge(
-        amount: NSDecimalNumber,
-        type: Int,
-        serviceFee: NSDecimalNumber,
-        customer: PayabliTTPCustomerDataObjC?,
-        order: PayabliTTPOrderDataObjC?,
-        completion: @escaping (PayabliTTPTransactionResultObjC?, NSError?) -> Void
-    ) {
-        let paymentType = PayabliTTPPaymentType(rawValue: type) ?? .sale
-        let swiftCustomer = customer?.toSwift() ?? PayabliTTPCustomerData()
-        let swiftOrder = order?.toSwift() ?? PayabliTTPOrderData()
-        let amountDecimal = amount.decimalValue
-        let serviceFeeDecimal = serviceFee.decimalValue
-
-        Task { @MainActor in
-            do {
-                let result = try await self.charge(
-                    amount: amountDecimal,
-                    type: paymentType,
-                    serviceFee: serviceFeeDecimal,
-                    customer: swiftCustomer,
-                    order: swiftOrder
-                )
-                completion(PayabliTTPTransactionResultObjC(result), nil)
-            } catch {
-                completion(nil, error.toPayabliNSError())
-            }
-        }
-    }
-
     // MARK: - Charge helpers
 
     /// `POST /MoneyIn/initiate`. Fails loudly if `deviceId` is missing —

@@ -2,14 +2,11 @@
 #
 # build_release_frameworks.sh
 # ---------------------------
-# Builds the three Payabli iOS SDK distribution XCFrameworks
-# (PayabliSDKCore, PayabliSDKTapToPay, PayabliCardReaderCore) for
-# device + iOS Simulator slices, with distribution-mode settings and a
-# pinned SOURCE_DATE_EPOCH for reproducible zips.
-#
-# Note: this is the TTP-only branch — PayabliSDKPayIn is intentionally
-# absent from the SCHEMES array. The PayIn module (and its release
-# pipeline) still lives unchanged on `develop`.
+# Builds the four Payabli iOS SDK distribution XCFrameworks
+# (PayabliSDKCore, PayabliSDKPayIn, PayabliSDKTapToPay,
+# PayabliCardReaderCore) for device + iOS Simulator slices, with
+# distribution-mode settings and a pinned SOURCE_DATE_EPOCH for
+# reproducible zips.
 #
 # Environment:
 #   VERSION             required. Used as filename suffix.
@@ -26,6 +23,7 @@
 # Outputs:
 #   build/release/
 #     payabli-ios-sdk-core-${VERSION}.zip
+#     payabli-ios-sdk-payin-${VERSION}.zip
 #     payabli-ios-sdk-taptopay-${VERSION}.zip
 #     payabli-ios-sdk-card-reader-core-${VERSION}.zip
 #     checksums.txt           (one sha256 per zip, space-separated lines)
@@ -66,9 +64,10 @@ XCF_DIR="$BUILD_DIR/xcframeworks"
 rm -rf "$BUILD_DIR"
 mkdir -p "$ARCHIVE_DIR" "$XCF_DIR"
 
-# The three schemes we ship publicly. Each matches a Package.swift product.
+# The four schemes we ship publicly. Each matches a Package.swift product.
 SCHEMES=(
     "PayabliSDKCore"
+    "PayabliSDKPayIn"
     "PayabliSDKTapToPay"
     "PayabliCardReaderCore"
 )
@@ -77,6 +76,7 @@ SCHEMES=(
 slug_for() {
     case "$1" in
         PayabliSDKCore)          echo "core" ;;
+        PayabliSDKPayIn)         echo "payin" ;;
         PayabliSDKTapToPay)      echo "taptopay" ;;
         PayabliCardReaderCore)   echo "card-reader-core" ;;
         *) echo "error: unknown scheme '$1'" >&2; exit 1 ;;
@@ -149,8 +149,7 @@ for scheme in "${SCHEMES[@]}"; do
     checksum="$(swift package compute-checksum "$BUILD_DIR/$zip_name")"
     printf '%s  %s\n' "$checksum" "$zip_name" >> "$checksums_file"
     # Also expose individual vars for the render step:
-    #   CORE_SHA256, TAPTOPAY_SHA256, CARD_READER_CORE_SHA256
-    # (matches render_public_manifests.sh's required vars).
+    #   CORE_SHA256, PAYIN_SHA256, CARDREADER_SHA256
     upper="$(echo "${slug//-/_}" | tr '[:lower:]' '[:upper:]')"
     if [[ -n "${GITHUB_ENV:-}" ]]; then
         printf '%s_SHA256=%s\n' "$upper" "$checksum" >> "$GITHUB_ENV"

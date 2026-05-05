@@ -1,20 +1,16 @@
 # Payabli iOS SDK
 
-Official iOS SDK for accepting payments via Payabli. This release is the
-**Tap to Pay on iPhone** distribution and ships three pre-built
-XCFrameworks:
+Official iOS SDK for accepting payments via Payabli. Distributes as four
+pre-built XCFrameworks:
 
 - `PayabliSDKCore` — shared infrastructure (auth, transport, logging).
-- `PayabliSDKTapToPay` — Tap to Pay on iPhone (attestation, session,
-  charge, activation). Bilingual Swift / Objective-C surface so the
-  module is consumable from MAUI/Xamarin, Flutter, and React Native
-  hosts as well as native Swift apps.
+- `PayabliSDKPayIn` — card / ACH forms, tokenization, getpaid, Apple Pay.
+- `PayabliSDKTapToPay` — Tap to Pay on iPhone (attestation, session, charge).
 - `PayabliCardReaderCore` — MIT-licensed Tap to Phone card reader engine,
   pulled in transitively by `PayabliSDKTapToPay`.
 
-> **Looking for `PayabliSDKPayIn`?** The card/ACH/Apple Pay surface
-> lives unchanged on the SDK's `develop` branch and will be re-introduced
-> in a future release. This package is intentionally TTP-only.
+`PayabliSDKPayIn` and `PayabliSDKTapToPay` are independent of each other —
+link only what your app uses.
 
 Source for the Payabli-owned modules lives in a private repo; this repo
 is a distribution mirror that ships a Swift Package Manager manifest
@@ -50,8 +46,9 @@ Add the package in Xcode (File → Add Packages…) or edit your `Package.swift`
 
 Then link the products your app needs:
 
-- `PayabliSDK` — umbrella (Core + TapToPay + CardReaderCore); the typical choice for TTP integrations.
+- `PayabliSDK` — umbrella (Core + PayIn + TapToPay + CardReaderCore); the typical choice.
 - `PayabliSDKCore` — shared infrastructure only (no payment flows).
+- `PayabliSDKPayIn` — card / ACH forms, tokenization, getpaid, Apple Pay (transitively pulls Core).
 - `PayabliSDKTapToPay` — Tap to Pay on iPhone (transitively pulls Core + CardReaderCore).
 
 ### CocoaPods
@@ -78,8 +75,8 @@ are marked as pre-releases on GitHub.
 
 ## Licenses
 
-- The Payabli-owned modules (`PayabliSDKCore`, `PayabliSDKTapToPay`)
-  are licensed under the terms in [LICENSE](LICENSE).
+- The Payabli-owned modules (`PayabliSDKCore`, `PayabliSDKPayIn`,
+  `PayabliSDKTapToPay`) are licensed under the terms in [LICENSE](LICENSE).
 - `PayabliCardReaderCore` is distributed under the MIT license.
   Full attribution is in [NOTICE](NOTICE).
 

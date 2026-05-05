@@ -1,26 +1,41 @@
 import SwiftUI
 import PayabliSDKCore
-import PayabliSDKTapToPay
+import PayabliSDKPayIn
 
-/// Entry point of the TTP-only demo app.
-///
-/// The app owns a single `PayabliTTP` instance, instantiated at launch with
-/// the partner-supplied access token and exposed to the view tree as an
-/// `@StateObject` via `HomeView`.
 @main
 struct PayabliDemoApp: App {
-    @StateObject private var ttp = PayabliTTP(
-        accessToken: Secrets.placeholderAccessToken,
-        tokenProvider: { try await Secrets.fetchAccessToken() },
-        entryPoint: Secrets.entryPoint,
-        appId: Secrets.appId,
-        environment: .sandbox
-    )
+    init() {
+        Task { @MainActor in
+            await configurePayabli()
+        }
+    }
 
     var body: some Scene {
         WindowGroup {
             HomeView()
-                .environmentObject(ttp)
+        }
+    }
+
+    /// Fetch an access token from the partner backend, then configure PayIn.
+    /// See Secrets.swift.sample for why the token comes from a server endpoint.
+    @MainActor
+    private func configurePayabli() async {
+        do {
+            let initialToken = try await Secrets.fetchAccessToken()
+            PayabliPayIn.shared.configure(
+                config: PayabliConfig(
+                    accessToken: initialToken,
+                    tokenProvider: { try await Secrets.fetchAccessToken() },
+                    entryPoint: Secrets.entryPoint,
+                    environment: .sandbox
+                ),
+                theme: PayabliTheme(
+                    primaryColorHex: "#10B981",
+                    cornerRadius: 10
+                )
+            )
+        } catch {
+            print("⚠️ Failed to configure PayabliSDK: \(error)")
         }
     }
 }

@@ -1,6 +1,0 @@
-{
-  "$schema": "https://raw.githubusercontent.com/swiftlang/sourcekit-lsp/main/config.schema.json",
-  "swiftPM": {
-    "triple": "arm64-apple-ios16.7-simulator"
-  }
-}

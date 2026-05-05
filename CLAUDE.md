@@ -24,18 +24,11 @@ are push-triggered on `develop` / `sandbox` / `main` via `.github/workflows/rele
 
 ## Module Architecture
 
-> **Branch note (`release/ttp-only`):** `PayabliSDKPayIn` and the
-> integration-tests target are temporarily removed on this branch so it
-> can ship a TTP-only distribution. PayIn lives unchanged on `develop`
-> as the live reference for a future re-introduction PR. The folder
-> rules below for `PayabliSDKPayIn` still apply when re-introducing
-> PayIn — they're kept here for that purpose.
-
-Four Swift package targets on this branch (Core + TapToPay + CardReaderCore
-+ Telemetry), all dynamic frameworks (PRD NFR-11). The public SDK ships
-**Core + TapToPay + CardReaderCore** as three independent XCFramework
-binaries on this branch; on `develop` it ships four (the same plus
-PayIn).
+Five Swift package targets, all dynamic frameworks (PRD NFR-11). The public
+SDK ships **Core + PayIn + TapToPay + CardReaderCore** as four independent
+XCFramework binaries — `PayabliSDKPayIn` and `PayabliSDKTapToPay` are
+peers, neither depends on the other, and host apps can link only the ones
+they need.
 
 **PayabliSDKCore** — Zero external dependencies (NFR-8). Shared infrastructure used by all other modules:
 

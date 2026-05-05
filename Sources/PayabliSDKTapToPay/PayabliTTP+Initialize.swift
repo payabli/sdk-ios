@@ -38,24 +38,6 @@ extension PayabliTTP {
         multicaster.emit(.readerReady)
     }
 
-    /// `@objc` companion to `initialize()` for ObjC / MAUI / Flutter / RN
-    /// consumers. Bridges the `async throws` Swift method to a callback-based
-    /// signature: `completion(nil)` on success, `completion(NSError)` on
-    /// failure (domain `"com.payabli.ttp"` for typed `PayabliTTPError`s).
-    ///
-    /// The completion handler is always invoked on the main thread because
-    /// the entire `PayabliTTP` surface is `@MainActor`.
-    @objc public func initialize(completion: @escaping (NSError?) -> Void) {
-        Task { @MainActor in
-            do {
-                try await self.initialize()
-                completion(nil)
-            } catch {
-                completion(error.toPayabliNSError())
-            }
-        }
-    }
-
     /// Session refresh for host/bridge re-entry.
     ///
     /// No-op when already `.ready`. For non-terminal transient states
@@ -90,22 +72,6 @@ extension PayabliTTP {
         _ = sessionManager.transition(to: .ready)
         syncPublished()
         multicaster.emit(.reinitializeCompleted)
-    }
-
-    /// `@objc` companion to `reinitializeIfNeeded()`. Same callback contract
-    /// as the `initialize` companion above — always invoked on the main
-    /// thread.
-    @objc public func reinitializeIfNeeded(
-        completion: @escaping (NSError?) -> Void
-    ) {
-        Task { @MainActor in
-            do {
-                try await self.reinitializeIfNeeded()
-                completion(nil)
-            } catch {
-                completion(error.toPayabliNSError())
-            }
-        }
     }
 
     // MARK: - Phase 0 — eligibility

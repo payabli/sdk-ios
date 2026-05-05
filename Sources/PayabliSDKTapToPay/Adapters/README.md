@@ -153,9 +153,9 @@ convenience initializer; a second adapter would follow the same pattern
 6. Any failure inside `prepareReader()` calls `clearAllState()` before throwing.
 7. `cancelReading()` and `cleanUp()` both call `clearAllState()`.
 8. `XxxCardReader+Errors.swift` with `mapError(_:fallback:)` and `cancellationReasonPrefix`.
-9. Unit tests: `XxxCardReaderTests.swift` under `Tests/PayabliSDKTapToPayTests/` covering eligibility, `configure` validation, and the `cleanUp → prepareReader` failure path.
+9. Unit tests: `XxxCardReaderTests.swift` under `Tests/PayabliSDKPayInTests/` covering eligibility, `configure` validation, and the `cleanUp → prepareReader` failure path.
 10. Register with `TapToPayProviderFactory`.
-11. Verify `swift build` + `swift test --filter PayabliSDKTapToPayTests` are green.
+11. Verify `swift build` + `swift test --filter PayabliSDKPayInTests` are green.
 
 ---
 
