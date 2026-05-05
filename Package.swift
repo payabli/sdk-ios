@@ -10,6 +10,14 @@ let package = Package(
         // other Apple platform, so development, CI, and release all target
         // iPhone iOS (device + simulator) via `xcodebuild`. No macOS
         // compatibility shims are maintained.
+        //
+        // Non-Xcode IDEs (Cursor, VS Code with sourcekit-lsp) need to be
+        // told that "host = iOS Simulator" — otherwise sourcekit-lsp falls
+        // back to the macOS host triple and surfaces availability noise
+        // (`ObservableObject` 10.15+, `URLSession.data(for:)` 12+, etc.)
+        // even though build/CI/release are unaffected. See the repo-level
+        // `.sourcekit-lsp/config.json` which configures that triple
+        // automatically when you open the package in Cursor / VS Code.
         .iOS("16.7")
     ],
     products: [
