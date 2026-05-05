@@ -200,9 +200,7 @@ public final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
             "[fiserv.charges] customer={firstName=\(request.customer.firstName ?? "<nil>") " +
             "lastName=\(request.customer.lastName ?? "<nil>") " +
             "customerNumber=\(request.customer.customerNumber ?? "<nil>")} " +
-            "order={orderId=\(request.order.orderId ?? "<nil>") " +
-            "description=\(request.order.orderDescription ?? "<nil>") " +
-            "invoiceNumber=\(request.order.invoiceNumber ?? "<nil>")}"
+            "invoice={invoiceNumber=\(request.invoice.invoiceNumber ?? "<nil>")}"
         )
         // The atomic card-reader API has no slot for customer data; it
         // ships only at /initiate and in the logs above.
