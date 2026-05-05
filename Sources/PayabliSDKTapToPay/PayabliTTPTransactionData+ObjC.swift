@@ -103,3 +103,38 @@ public final class PayabliTTPTransactionResultObjC: NSObject {
         super.init()
     }
 }
+
+/// ObjC companion for `PayabliTTPPaymentDetails`.
+///
+/// `amount` and `serviceFee` use `NSDecimalNumber` for lossless bridging to
+/// Swift `Decimal`. `currency` is non-null on the ObjC side because the Swift
+/// struct always materializes a non-nil currency (default `"USD"`).
+@objc(PayabliTTPPaymentDetailsObjC)
+public final class PayabliTTPPaymentDetailsObjC: NSObject {
+    @objc public let amount: NSDecimalNumber
+    @objc public let serviceFee: NSDecimalNumber
+    @objc public let currency: String
+    @objc public let paymentDescription: String?
+
+    @objc public init(
+        amount: NSDecimalNumber,
+        serviceFee: NSDecimalNumber,
+        currency: String,
+        paymentDescription: String?
+    ) {
+        self.amount = amount
+        self.serviceFee = serviceFee
+        self.currency = currency
+        self.paymentDescription = paymentDescription
+        super.init()
+    }
+
+    func toSwift() -> PayabliTTPPaymentDetails {
+        PayabliTTPPaymentDetails(
+            amount: amount.decimalValue,
+            serviceFee: serviceFee.decimalValue,
+            currency: currency,
+            paymentDescription: paymentDescription
+        )
+    }
+}

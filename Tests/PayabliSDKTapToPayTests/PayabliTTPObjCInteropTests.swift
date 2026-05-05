@@ -115,4 +115,52 @@ final class PayabliTTPObjCInteropTests: XCTestCase {
 
         XCTAssertTrue(token.task.isCancelled)
     }
+
+    // MARK: - PayabliTTPPaymentDetails
+
+    func testPaymentDetailsSwiftDefaults() {
+        let details = PayabliTTPPaymentDetails(amount: 25.00)
+        XCTAssertEqual(details.amount, 25.00)
+        XCTAssertEqual(details.serviceFee, 0)
+        XCTAssertEqual(details.currency, "USD")
+        XCTAssertNil(details.paymentDescription)
+    }
+
+    func testPaymentDetailsSwiftSanitizesCurrencyAndDescription() {
+        let details = PayabliTTPPaymentDetails(
+            amount: 10,
+            serviceFee: 1,
+            currency: "  usd  ",
+            paymentDescription: "  Coffee  "
+        )
+        XCTAssertEqual(details.currency, "USD")
+        XCTAssertEqual(details.paymentDescription, "Coffee")
+    }
+
+    func testPaymentDetailsSwiftDropsBlankPaymentDescription() {
+        let details = PayabliTTPPaymentDetails(
+            amount: 10,
+            paymentDescription: "   "
+        )
+        XCTAssertNil(details.paymentDescription)
+    }
+
+    func testPaymentDetailsObjCRoundTripPreservesAllFields() {
+        let objc = PayabliTTPPaymentDetailsObjC(
+            amount: NSDecimalNumber(string: "25.00"),
+            serviceFee: NSDecimalNumber(string: "1.50"),
+            currency: "USD",
+            paymentDescription: "Coffee"
+        )
+        XCTAssertEqual(objc.amount, NSDecimalNumber(string: "25.00"))
+        XCTAssertEqual(objc.serviceFee, NSDecimalNumber(string: "1.50"))
+        XCTAssertEqual(objc.currency, "USD")
+        XCTAssertEqual(objc.paymentDescription, "Coffee")
+
+        let swift = objc.toSwift()
+        XCTAssertEqual(swift.amount, Decimal(string: "25.00"))
+        XCTAssertEqual(swift.serviceFee, Decimal(string: "1.50"))
+        XCTAssertEqual(swift.currency, "USD")
+        XCTAssertEqual(swift.paymentDescription, "Coffee")
+    }
 }

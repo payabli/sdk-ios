@@ -104,6 +104,50 @@ public struct PayabliTTPOrderData: Sendable, Equatable {
     }
 }
 
+// MARK: - Payment details
+
+/// Payment-amount inputs for a Tap to Pay charge. Mirrors the wire-level
+/// `paymentDetails` object the backend `/initiate` endpoint expects.
+///
+/// Threaded through every stage of the charge pipeline:
+///   1. `POST /api/v2/MoneyIn/initiate` — serialised as
+///      `paymentDetails.{totalAmount, serviceFee, currency, paymentDescription}`.
+///   2. Provider `startReading(_:)` — `amount` flows in via
+///      `CardReadRequest.amount`. The remaining fields are not consumed by
+///      atomic providers (Fiserv) but are available to future providers.
+///   3. `PATCH /api/v2/MoneyIn/update/{id}` — backend persists `paymentDetails`
+///      from the initiate step; update bodies only carry the provider response.
+public struct PayabliTTPPaymentDetails: Sendable, Equatable {
+    public let amount: Decimal
+    public let serviceFee: Decimal
+    public let currency: String
+    public let paymentDescription: String?
+
+    public init(
+        amount: Decimal,
+        serviceFee: Decimal = 0,
+        currency: String = "USD",
+        paymentDescription: String? = nil
+    ) {
+        self.amount = amount
+        self.serviceFee = serviceFee
+        self.currency = PayabliTTPPaymentDetails.normalizeCurrency(currency)
+        self.paymentDescription = PayabliTTPPaymentDetails.sanitize(paymentDescription)
+    }
+
+    private static func normalizeCurrency(_ value: String) -> String {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalized = trimmed.isEmpty ? "USD" : trimmed.uppercased()
+        return normalized
+    }
+
+    private static func sanitize(_ value: String?) -> String? {
+        guard let value else { return nil }
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
+}
+
 // MARK: - Internal transaction context
 
 /// Bundles the immutable per-charge inputs (amount, serviceFee, customer,
