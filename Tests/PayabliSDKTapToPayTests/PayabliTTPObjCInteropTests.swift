@@ -18,7 +18,16 @@ final class PayabliTTPObjCInteropTests: XCTestCase {
             lastName: "Lovelace",
             customerNumber: "C-42",
             email: "ada@example.com",
-            phone: "+1-415-555-0100"
+            phone: "+1-415-555-0100",
+            customerId: nil,
+            company: nil,
+            billingAddress1: nil, billingAddress2: nil,
+            billingCity: nil, billingState: nil,
+            billingZip: nil, billingCountry: nil,
+            billingPhone: nil, billingEmail: nil,
+            shippingAddress1: nil, shippingAddress2: nil,
+            shippingCity: nil, shippingState: nil,
+            shippingZip: nil, shippingCountry: nil
         )
 
         XCTAssertEqual(objc.firstName, "Ada")
@@ -38,7 +47,16 @@ final class PayabliTTPObjCInteropTests: XCTestCase {
     func testCustomerDataObjCAcceptsAllNilFields() {
         let objc = PayabliTTPCustomerDataObjC(
             firstName: nil, lastName: nil, customerNumber: nil,
-            email: nil, phone: nil
+            email: nil, phone: nil,
+            customerId: nil,
+            company: nil,
+            billingAddress1: nil, billingAddress2: nil,
+            billingCity: nil, billingState: nil,
+            billingZip: nil, billingCountry: nil,
+            billingPhone: nil, billingEmail: nil,
+            shippingAddress1: nil, shippingAddress2: nil,
+            shippingCity: nil, shippingState: nil,
+            shippingZip: nil, shippingCountry: nil
         )
 
         XCTAssertNil(objc.firstName)
@@ -55,7 +73,16 @@ final class PayabliTTPObjCInteropTests: XCTestCase {
         // bridge through `toSwift()` should give the trimmed output.
         let objc = PayabliTTPCustomerDataObjC(
             firstName: "  Ada  ", lastName: "", customerNumber: "  ",
-            email: nil, phone: nil
+            email: nil, phone: nil,
+            customerId: nil,
+            company: nil,
+            billingAddress1: nil, billingAddress2: nil,
+            billingCity: nil, billingState: nil,
+            billingZip: nil, billingCountry: nil,
+            billingPhone: nil, billingEmail: nil,
+            shippingAddress1: nil, shippingAddress2: nil,
+            shippingCity: nil, shippingState: nil,
+            shippingZip: nil, shippingCountry: nil
         )
 
         let swift = objc.toSwift()
@@ -193,5 +220,116 @@ final class PayabliTTPObjCInteropTests: XCTestCase {
         let objc = PayabliTTPInvoiceDataObjC(invoiceNumber: nil)
         XCTAssertNil(objc.invoiceNumber)
         XCTAssertTrue(objc.toSwift().isEmpty)
+    }
+
+    // MARK: - PayabliTTPCustomerData expanded fields
+
+    func testCustomerDataSwiftAcceptsCustomerIdAndCompany() {
+        let customer = PayabliTTPCustomerData(
+            firstName: "Ana",
+            customerId: 12345,
+            company: "Acme Inc"
+        )
+        XCTAssertEqual(customer.customerId, 12345)
+        XCTAssertEqual(customer.company, "Acme Inc")
+    }
+
+    func testCustomerDataSwiftAcceptsBillingBlock() {
+        let customer = PayabliTTPCustomerData(
+            billingAddress1: "1 Market St",
+            billingAddress2: "Apt 5",
+            billingCity: "San Francisco",
+            billingState: "CA",
+            billingZip: "94105",
+            billingCountry: "US",
+            billingPhone: "+1-415-555-0100",
+            billingEmail: "ana@example.com"
+        )
+        XCTAssertEqual(customer.billingAddress1, "1 Market St")
+        XCTAssertEqual(customer.billingAddress2, "Apt 5")
+        XCTAssertEqual(customer.billingCity, "San Francisco")
+        XCTAssertEqual(customer.billingState, "CA")
+        XCTAssertEqual(customer.billingZip, "94105")
+        XCTAssertEqual(customer.billingCountry, "US")
+        XCTAssertEqual(customer.billingPhone, "+1-415-555-0100")
+        XCTAssertEqual(customer.billingEmail, "ana@example.com")
+    }
+
+    func testCustomerDataSwiftAcceptsShippingBlock() {
+        let customer = PayabliTTPCustomerData(
+            shippingAddress1: "2 Pine St",
+            shippingAddress2: "Suite 9",
+            shippingCity: "Oakland",
+            shippingState: "CA",
+            shippingZip: "94607",
+            shippingCountry: "US"
+        )
+        XCTAssertEqual(customer.shippingAddress1, "2 Pine St")
+        XCTAssertEqual(customer.shippingAddress2, "Suite 9")
+        XCTAssertEqual(customer.shippingCity, "Oakland")
+        XCTAssertEqual(customer.shippingState, "CA")
+        XCTAssertEqual(customer.shippingZip, "94607")
+        XCTAssertEqual(customer.shippingCountry, "US")
+    }
+
+    func testCustomerDataSwiftSanitizesNewStringFields() {
+        let customer = PayabliTTPCustomerData(
+            company: "  Acme  ",
+            billingAddress1: "   ",
+            billingCity: ""
+        )
+        XCTAssertEqual(customer.company, "Acme")
+        XCTAssertNil(customer.billingAddress1)
+        XCTAssertNil(customer.billingCity)
+    }
+
+    func testCustomerDataObjCRoundTripsCustomerIdAsNSNumber() {
+        let objc = PayabliTTPCustomerDataObjC(
+            firstName: nil, lastName: nil, customerNumber: nil,
+            email: nil, phone: nil,
+            customerId: NSNumber(value: 99),
+            company: "Acme",
+            billingAddress1: "1 Market",
+            billingAddress2: nil,
+            billingCity: "SF",
+            billingState: "CA",
+            billingZip: "94105",
+            billingCountry: "US",
+            billingPhone: nil,
+            billingEmail: nil,
+            shippingAddress1: nil,
+            shippingAddress2: nil,
+            shippingCity: nil,
+            shippingState: nil,
+            shippingZip: nil,
+            shippingCountry: nil
+        )
+        XCTAssertEqual(objc.customerId, NSNumber(value: 99))
+        XCTAssertEqual(objc.company, "Acme")
+        XCTAssertEqual(objc.billingCity, "SF")
+
+        let swift = objc.toSwift()
+        XCTAssertEqual(swift.customerId, 99)
+        XCTAssertEqual(swift.company, "Acme")
+        XCTAssertEqual(swift.billingCity, "SF")
+        XCTAssertNil(swift.billingPhone)
+    }
+
+    func testCustomerDataObjCNilCustomerIdMapsToSwiftNil() {
+        let objc = PayabliTTPCustomerDataObjC(
+            firstName: nil, lastName: nil, customerNumber: nil,
+            email: nil, phone: nil,
+            customerId: nil,
+            company: nil,
+            billingAddress1: nil, billingAddress2: nil,
+            billingCity: nil, billingState: nil,
+            billingZip: nil, billingCountry: nil,
+            billingPhone: nil, billingEmail: nil,
+            shippingAddress1: nil, shippingAddress2: nil,
+            shippingCity: nil, shippingState: nil,
+            shippingZip: nil, shippingCountry: nil
+        )
+        XCTAssertNil(objc.customerId)
+        XCTAssertNil(objc.toSwift().customerId)
     }
 }

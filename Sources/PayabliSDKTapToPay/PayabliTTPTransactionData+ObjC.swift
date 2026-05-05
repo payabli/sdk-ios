@@ -28,19 +28,70 @@ public final class PayabliTTPCustomerDataObjC: NSObject {
     @objc public let email: String?
     @objc public let phone: String?
 
+    @objc public let customerId: NSNumber?
+    @objc public let company: String?
+
+    @objc public let billingAddress1: String?
+    @objc public let billingAddress2: String?
+    @objc public let billingCity: String?
+    @objc public let billingState: String?
+    @objc public let billingZip: String?
+    @objc public let billingCountry: String?
+    @objc public let billingPhone: String?
+    @objc public let billingEmail: String?
+
+    @objc public let shippingAddress1: String?
+    @objc public let shippingAddress2: String?
+    @objc public let shippingCity: String?
+    @objc public let shippingState: String?
+    @objc public let shippingZip: String?
+    @objc public let shippingCountry: String?
+
     /// Designated init. Argument labels match `PayabliTTPCustomerData.init`.
     @objc public init(
         firstName: String?,
         lastName: String?,
         customerNumber: String?,
         email: String?,
-        phone: String?
+        phone: String?,
+        customerId: NSNumber?,
+        company: String?,
+        billingAddress1: String?,
+        billingAddress2: String?,
+        billingCity: String?,
+        billingState: String?,
+        billingZip: String?,
+        billingCountry: String?,
+        billingPhone: String?,
+        billingEmail: String?,
+        shippingAddress1: String?,
+        shippingAddress2: String?,
+        shippingCity: String?,
+        shippingState: String?,
+        shippingZip: String?,
+        shippingCountry: String?
     ) {
         self.firstName = firstName
         self.lastName = lastName
         self.customerNumber = customerNumber
         self.email = email
         self.phone = phone
+        self.customerId = customerId
+        self.company = company
+        self.billingAddress1 = billingAddress1
+        self.billingAddress2 = billingAddress2
+        self.billingCity = billingCity
+        self.billingState = billingState
+        self.billingZip = billingZip
+        self.billingCountry = billingCountry
+        self.billingPhone = billingPhone
+        self.billingEmail = billingEmail
+        self.shippingAddress1 = shippingAddress1
+        self.shippingAddress2 = shippingAddress2
+        self.shippingCity = shippingCity
+        self.shippingState = shippingState
+        self.shippingZip = shippingZip
+        self.shippingCountry = shippingCountry
         super.init()
     }
 
@@ -51,7 +102,23 @@ public final class PayabliTTPCustomerDataObjC: NSObject {
             lastName: lastName,
             customerNumber: customerNumber,
             email: email,
-            phone: phone
+            phone: phone,
+            customerId: customerId?.intValue,
+            company: company,
+            billingAddress1: billingAddress1,
+            billingAddress2: billingAddress2,
+            billingCity: billingCity,
+            billingState: billingState,
+            billingZip: billingZip,
+            billingCountry: billingCountry,
+            billingPhone: billingPhone,
+            billingEmail: billingEmail,
+            shippingAddress1: shippingAddress1,
+            shippingAddress2: shippingAddress2,
+            shippingCity: shippingCity,
+            shippingState: shippingState,
+            shippingZip: shippingZip,
+            shippingCountry: shippingCountry
         )
     }
 }
