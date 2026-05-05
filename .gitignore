@@ -45,3 +45,6 @@ fastlane/test_output
 # Bundler
 .bundle/
 vendor/
+
+
+docs/
