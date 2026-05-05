@@ -125,7 +125,7 @@ public final class PayabliTTPCustomerDataObjC: NSObject {
 
 /// ObjC companion for `TransactionResult`.
 ///
-/// Returned to ObjC callers via the `charge(amount:type:serviceFee:customer:order:completion:)`
+/// Returned to ObjC callers via the `charge(type:paymentDetails:customer:invoice:orderDescription:completion:)`
 /// completion block when the underlying Swift `charge(...)` returns
 /// successfully.
 @objc(PayabliTTPTransactionResultObjC)

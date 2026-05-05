@@ -2,7 +2,8 @@ import XCTest
 @testable import PayabliSDKTapToPay
 
 /// Round-trip tests for the ObjC companion classes that wrap
-/// `PayabliTTPCustomerData`, `PayabliTTPOrderData`, and `TransactionResult`.
+/// `PayabliTTPCustomerData`, `PayabliTTPPaymentDetails`,
+/// `PayabliTTPInvoiceData`, and `TransactionResult`.
 ///
 /// These tests guard the contract documented in
 /// `PayabliTTPTransactionData+ObjC.swift`: that the `*ObjC` companion classes

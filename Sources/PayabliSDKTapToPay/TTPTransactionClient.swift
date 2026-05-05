@@ -33,46 +33,13 @@ public final class TTPTransactionClient: Sendable {
     ) async throws -> String {
         let token = await auth.currentAccessToken()
 
-        let wireCustomer = InitiateCustomerData(
-            firstName: customer.firstName ?? "",
-            lastName: customer.lastName ?? "",
-            customerNumber: customer.customerNumber ?? "",
-            email: customer.email,
-            phone: customer.phone,
-            customerId: customer.customerId,
-            company: customer.company,
-            billingAddress1: customer.billingAddress1,
-            billingAddress2: customer.billingAddress2,
-            billingCity: customer.billingCity,
-            billingState: customer.billingState,
-            billingZip: customer.billingZip,
-            billingCountry: customer.billingCountry,
-            billingPhone: customer.billingPhone,
-            billingEmail: customer.billingEmail,
-            shippingAddress1: customer.shippingAddress1,
-            shippingAddress2: customer.shippingAddress2,
-            shippingCity: customer.shippingCity,
-            shippingState: customer.shippingState,
-            shippingZip: customer.shippingZip,
-            shippingCountry: customer.shippingCountry
-        )
-
-        let wireInvoice: InitiateInvoiceData? = invoice.invoiceNumber.map {
-            InitiateInvoiceData(invoiceNumber: $0)
-        }
-
         let body = InitiateRequest(
             entryPoint: entryPoint,
             orderDescription: orderDescription ?? "",
-            paymentDetails: InitiatePaymentDetails(
-                totalAmount: paymentDetails.amount,
-                serviceFee: paymentDetails.serviceFee,
-                currency: paymentDetails.currency,
-                paymentDescription: paymentDetails.paymentDescription
-            ),
+            paymentDetails: Self.makeWirePaymentDetails(from: paymentDetails),
             paymentMethod: InitiatePaymentMethod(method: "device", device: deviceId),
-            customerData: wireCustomer,
-            invoiceData: wireInvoice
+            customerData: Self.makeWireCustomer(from: customer),
+            invoiceData: invoice.invoiceNumber.map { InitiateInvoiceData(invoiceNumber: $0) }
         )
 
         let request = try PayabliRequest.json(
@@ -105,6 +72,45 @@ public final class TTPTransactionClient: Sendable {
             throw PayabliTTPError.initiateFailed(reason: envelope.reason ?? envelope.code)
         }
         return data.paymentTransId
+    }
+
+    private static func makeWirePaymentDetails(
+        from details: PayabliTTPPaymentDetails
+    ) -> InitiatePaymentDetails {
+        InitiatePaymentDetails(
+            totalAmount: details.amount,
+            serviceFee: details.serviceFee,
+            currency: details.currency,
+            paymentDescription: details.paymentDescription
+        )
+    }
+
+    private static func makeWireCustomer(
+        from customer: PayabliTTPCustomerData
+    ) -> InitiateCustomerData {
+        InitiateCustomerData(
+            firstName: customer.firstName ?? "",
+            lastName: customer.lastName ?? "",
+            customerNumber: customer.customerNumber ?? "",
+            email: customer.email,
+            phone: customer.phone,
+            customerId: customer.customerId,
+            company: customer.company,
+            billingAddress1: customer.billingAddress1,
+            billingAddress2: customer.billingAddress2,
+            billingCity: customer.billingCity,
+            billingState: customer.billingState,
+            billingZip: customer.billingZip,
+            billingCountry: customer.billingCountry,
+            billingPhone: customer.billingPhone,
+            billingEmail: customer.billingEmail,
+            shippingAddress1: customer.shippingAddress1,
+            shippingAddress2: customer.shippingAddress2,
+            shippingCity: customer.shippingCity,
+            shippingState: customer.shippingState,
+            shippingZip: customer.shippingZip,
+            shippingCountry: customer.shippingCountry
+        )
     }
 
     /// Encodes a typed update payload for `PATCH /MoneyIn/update/{id}`.
