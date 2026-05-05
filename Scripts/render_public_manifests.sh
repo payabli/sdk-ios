@@ -10,9 +10,11 @@
 #   VERSION                  e.g. 1.0.247-qa
 #   S3_PUBLIC_HOST           e.g. payabli-public-objects-qa.s3.amazonaws.com
 #   CORE_SHA256              sha256 of payabli-ios-sdk-core-${VERSION}.zip
-#   PAYIN_SHA256             sha256 of payabli-ios-sdk-payin-${VERSION}.zip
 #   TAPTOPAY_SHA256          sha256 of payabli-ios-sdk-taptopay-${VERSION}.zip
 #   CARD_READER_CORE_SHA256  sha256 of payabli-ios-sdk-card-reader-core-${VERSION}.zip
+#
+# Note: this is the TTP-only branch — PAYIN_SHA256 has been intentionally
+# removed from both the required vars list and the substitution set.
 #
 # Inputs (repo-relative):
 #   .github/templates/public-Package.swift.tmpl
@@ -33,7 +35,7 @@ REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$REPO_ROOT"
 
 missing=()
-for var in VERSION S3_PUBLIC_HOST CORE_SHA256 PAYIN_SHA256 TAPTOPAY_SHA256 CARD_READER_CORE_SHA256; do
+for var in VERSION S3_PUBLIC_HOST CORE_SHA256 TAPTOPAY_SHA256 CARD_READER_CORE_SHA256; do
     if [[ -z "${!var:-}" ]]; then
         missing+=("$var")
     fi
@@ -50,7 +52,7 @@ mkdir -p "$OUTPUT_DIR"
 
 # envsubst substitutes only the variables we pass, so unrelated `$`-strings
 # inside the templates are left intact.
-VARS='${VERSION} ${S3_PUBLIC_HOST} ${CORE_SHA256} ${PAYIN_SHA256} ${TAPTOPAY_SHA256} ${CARD_READER_CORE_SHA256}'
+VARS='${VERSION} ${S3_PUBLIC_HOST} ${CORE_SHA256} ${TAPTOPAY_SHA256} ${CARD_READER_CORE_SHA256}'
 
 render() {
     local template="$1" output="$2"

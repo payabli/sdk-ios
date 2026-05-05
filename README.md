@@ -2,6 +2,31 @@
 
 Native iOS SDK to accept payments with Payabli — drop-in SwiftUI forms, Apple Pay, and Tap to Pay on iPhone.
 
+> ## ⚠️ This branch is TTP-only
+>
+> You're reading the README on the **`release/ttp-only`** branch. This
+> branch ships only `PayabliSDKCore` + `PayabliSDKTapToPay` +
+> `PayabliCardReaderCore` and intentionally **omits `PayabliSDKPayIn`**
+> (card / ACH forms, tokenization, getpaid, Apple Pay).
+>
+> Quick links for TTP integration:
+>
+> - **Module README:** [`Sources/PayabliSDKTapToPay/README.md`](./Sources/PayabliSDKTapToPay/README.md) — the bilingual Swift/ObjC contract, file map, and event/error catalog.
+> - **SwiftUI demo:** [`Example/PayabliDemo/`](./Example/PayabliDemo/) — initialize, charge, activate, live event log.
+> - **Cross-platform bridges:** [`Bridges/Flutter/`](./Bridges/Flutter/), [`Bridges/ReactNative/`](./Bridges/ReactNative/), [`Bridges/MAUI/`](./Bridges/MAUI/) — all rewritten for TTP in this branch.
+>
+> Quick install (Swift Package Manager — link only what you need):
+>
+> ```swift
+> .package(url: "https://github.com/payabli/sdk-ios.git", branch: "release/ttp-only"),
+> // then add the product to your target:
+> .product(name: "PayabliSDKTapToPay", package: "sdk-ios"),
+> ```
+>
+> Need PayIn? It's unchanged on the [`develop`](https://github.com/payabli/sdk-ios/tree/develop) branch.
+
+The rest of this README documents the **full** SDK API as it exists on `develop`. PayIn snippets below will not compile against this branch — refer to the TTP module README linked above instead.
+
 Set up once, then drop a form in anywhere:
 
 ```swift
