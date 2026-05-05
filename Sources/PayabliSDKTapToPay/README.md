@@ -36,8 +36,8 @@ The public entry point that host apps consume. Split across companion files
 | `PayabliTTP+Charge.swift` | 3-step sale pipeline: `/initiate` → `startReading` → `/update` (PRD §19.1) |
 | `PayabliTTPEvent.swift` | `PayabliTTPEvent` (lifecycle cases) + `PayabliTTPError` (PRD §20) + `PayabliTTPEventCode` (`@objc`) + per-case `payload` schema + `CustomNSError` bridging |
 | `PayabliTTPTypes.swift` | `PayabliTTPSessionState`, `PayabliTTPPaymentType`, `TransactionResult` |
-| `PayabliTTPTransactionData.swift` | `PayabliTTPCustomerData`, `PayabliTTPOrderData`, internal `TTPTransactionContext` |
-| `PayabliTTPTransactionData+ObjC.swift` | `@objc` companion classes (`PayabliTTPCustomerDataObjC`, `PayabliTTPOrderDataObjC`, `PayabliTTPTransactionResultObjC`) used by ObjC / MAUI / Flutter / RN consumers |
+| `PayabliTTPTransactionData.swift` | `PayabliTTPCustomerData`, `PayabliTTPPaymentDetails`, `PayabliTTPInvoiceData`, internal `TTPTransactionContext` |
+| `PayabliTTPTransactionData+ObjC.swift` | `@objc` companion classes (`PayabliTTPCustomerDataObjC`, `PayabliTTPPaymentDetailsObjC`, `PayabliTTPInvoiceDataObjC`, `PayabliTTPTransactionResultObjC`) used by ObjC / MAUI / Flutter / RN consumers |
 
 ---
 
@@ -60,10 +60,12 @@ or value-typed `enum`s with associated values.
 | Swift API (unchanged) | ObjC / MAUI / RN companion |
 |---|---|
 | `try await ttp.initialize()` | `[ttp initializeWithCompletion:^(NSError *err){...}]` |
-| `try await ttp.charge(amount:type:serviceFee:customer:order:)` | `[ttp chargeWithAmount:type:serviceFee:customer:order:completion:]` returning `PayabliTTPTransactionResultObjC*` + `NSError*` |
+| `try await ttp.charge(type:paymentDetails:customer:invoice:orderDescription:)` | `[ttp chargeWithType:paymentDetails:customer:invoice:orderDescription:completion:]` returning `PayabliTTPTransactionResultObjC*` + `NSError*` |
 | `try await ttp.activateDevice(activationCode:)` | `[ttp activateDeviceWithActivationCode:completion:]` |
 | `for await event in ttp.events()` | `[ttp addEventListenerWithHandler:^(PayabliTTPEventCode code, NSDictionary *payload){...}]` returning a `PayabliTTPEventToken` (call `[token cancel]` to stop) |
-| `PayabliTTPCustomerData(...)` (struct) | `[[PayabliTTPCustomerDataObjC alloc] initWithFirstName:lastName:customerNumber:email:phone:]` |
+| `PayabliTTPCustomerData(...)` (struct) | `[[PayabliTTPCustomerDataObjC alloc] initWithFirstName:lastName:customerNumber:email:phone:customerId:company:billingAddress1:billingAddress2:billingCity:billingState:billingZip:billingCountry:billingPhone:billingEmail:shippingAddress1:shippingAddress2:shippingCity:shippingState:shippingZip:shippingCountry:]` |
+| `PayabliTTPPaymentDetails(...)` (struct) | `[[PayabliTTPPaymentDetailsObjC alloc] initWithAmount:serviceFee:currency:paymentDescription:]` |
+| `PayabliTTPInvoiceData(...)` (struct) | `[[PayabliTTPInvoiceDataObjC alloc] initWithInvoiceNumber:]` |
 | `enum PayabliTTPEvent` w/ associated values | `PayabliTTPEventCode` (`@objc Int`) + `payload` dict — see `PayabliTTPEvent.payload` for per-case schema |
 | `enum PayabliTTPError` w/ associated values | `NSError` (domain `"com.payabli.ttp"`, stable per-case `code`) — see `errorCode` table |
 
@@ -225,7 +227,7 @@ to do" from a log of past announcements.
 
 ## 4. Charge pipeline (PRD §19.1)
 
-`PayabliTTP.charge(amount:type:)` in `PayabliTTP+Charge.swift` runs three
+`PayabliTTP.charge(type:paymentDetails:customer:invoice:orderDescription:)` in `PayabliTTP+Charge.swift` runs three
 serial steps. The result of each step feeds the next:
 
 ```
