@@ -6,7 +6,7 @@ This file lists the open-source components redistributed inside the Payabli
 iOS SDK binary artifacts and their respective licenses. Include this file
 when redistributing the compiled Payabli SDK.
 
-Questions or requests for additional attribution: sdk-support@payabli.com
+Questions or requests for additional attribution: support@payabli.com
 
 --------------------------------------------------------------------------------
 Component:   PayabliCardReaderCore

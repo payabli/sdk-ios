@@ -29,4 +29,4 @@ governed by its own license.
     host app pulls in the `PayabliSDKTelemetry` module with PostHog enabled.
 
 Copies of each license are distributed with the respective component and are
-available upon written request to legal@payabli.com.
+available upon written request to security@payabli.com.

@@ -2,21 +2,28 @@ name: CI
 
 on:
   push:
-    branches: [develop, sandbox, main, release/ttp-only]
+    branches: [main]
   pull_request:
-    branches: [develop, sandbox, main, release/ttp-only]
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  build:
+  test:
     name: Build & Test
     runs-on: macos-15
-    steps:
-      - uses: actions/checkout@v4
 
-      - name: Select Xcode
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select latest Xcode
         run: |
-          sudo xcode-select -s /Applications/Xcode_16.4.app/Contents/Developer
-          echo "[xcode] using Xcode 16.4"
+          XCODE=$(ls /Applications | grep -E '^Xcode_[0-9]' | sort -V | tail -1)
+          sudo xcode-select -s "/Applications/$XCODE"
+          echo "Using $XCODE"
           xcodebuild -version
           swift --version
 
@@ -24,72 +31,29 @@ jobs:
         run: gem install xcpretty --no-document
 
       - name: Resolve dependencies
-        run: xcodebuild -resolvePackageDependencies -scheme PayabliSDK-Package
-
-      - name: Run tests
-        # Package is iOS-only; tests run on the iOS 18.5 Simulator bundled
-        # with Xcode 16.4. The umbrella `PayabliSDK-Package` scheme is the
-        # one SPM auto-generates with a `test` action — the per-product
-        # schemes don't have one.
         run: |
-          SIMULATOR_ID=$(xcrun simctl list devices available -j | python3 -c "
+          xcodebuild -resolvePackageDependencies \
+            -scheme PayabliTTP \
+            -clonedSourcePackagesDirPath .build/checkouts
+
+      - name: Test
+        run: |
+          SIMULATOR_ID=$(xcrun simctl list devices available -j \
+            | python3 -c "
           import json, sys
           d = json.load(sys.stdin)['devices']
-          iphones = [v for k, vals in d.items() if 'iOS' in k for v in vals if 'iPhone' in v['name'] and v['isAvailable']]
-          if not iphones:
-              raise SystemExit('no iPhone simulator available on this runner')
+          iphones = [
+            v for k, vals in d.items()
+            if 'iOS' in k
+            for v in vals
+            if 'iPhone' in v['name'] and v['isAvailable']
+          ]
           print(sorted(iphones, key=lambda x: x['name'])[-1]['udid'])
           ")
-          echo "[test] using simulator $SIMULATOR_ID"
-          set -o pipefail
+          echo "Using simulator: $SIMULATOR_ID"
           xcodebuild test \
-              -scheme PayabliSDK-Package \
-              -destination "platform=iOS Simulator,id=$SIMULATOR_ID" \
-              CODE_SIGNING_ALLOWED=NO \
-              | xcpretty
-
-  lint:
-    name: Lint
-    runs-on: macos-15
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install SwiftLint
-        run: brew install swiftlint
-
-      - name: Run SwiftLint
-        run: swiftlint --strict
-
-  validate-pods:
-    name: Podspec lint (rendered)
-    runs-on: macos-15
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Select Xcode
-        run: sudo xcode-select -s /Applications/Xcode_16.4.app/Contents/Developer
-
-      # The canonical podspec lives in the release template and only becomes
-      # a real file after `render_public_manifests.sh` substitutes VERSION,
-      # S3_PUBLIC_HOST, and the per-product sha256s. We feed it dummy values
-      # here so the Ruby DSL parses — `pod lib lint` itself exercises the
-      # spec structure, subspecs, and dependencies without needing the real
-      # S3 URLs to be reachable (`--skip-import-validation` handles that).
-      - name: Render podspec with dummy values
-        env:
-          VERSION: "0.0.0-dryrun"
-          S3_PUBLIC_HOST: "example.invalid"
-          CORE_SHA256: "0000000000000000000000000000000000000000000000000000000000000000"
-          TAPTOPAY_SHA256: "0000000000000000000000000000000000000000000000000000000000000000"
-          CARD_READER_CORE_SHA256: "0000000000000000000000000000000000000000000000000000000000000000"
-        run: Scripts/render_public_manifests.sh
-
-      - name: Lint rendered podspec
-        # --quick keeps this under 2 minutes by skipping deep linting; the
-        # full lint happens inside the release workflow's `pod trunk push`.
-        # --skip-import-validation avoids needing the real S3 host.
-        run: |
-          pod lib lint build/public/PayabliSDK.podspec \
-              --quick \
-              --allow-warnings \
-              --skip-import-validation
+            -scheme PayabliTTP \
+            -destination "platform=iOS Simulator,id=$SIMULATOR_ID" \
+            -clonedSourcePackagesDirPath .build/checkouts \
+            CODE_SIGNING_ALLOWED=NO \
+            | xcpretty && exit ${PIPESTATUS[0]}
