@@ -123,38 +123,6 @@ public final class PayabliTTPCustomerDataObjC: NSObject {
     }
 }
 
-/// ObjC companion for `PayabliTTPOrderData`.
-///
-/// Same shape as `PayabliTTPCustomerDataObjC`: ordered, optional fields with
-/// labels that mirror the Swift struct.
-@objc(PayabliTTPOrderDataObjC)
-public final class PayabliTTPOrderDataObjC: NSObject {
-    @objc public let orderId: String?
-    @objc public let orderDescription: String?
-    @objc public let invoiceNumber: String?
-
-    /// Designated init. Argument labels match `PayabliTTPOrderData.init`.
-    @objc public init(
-        orderId: String?,
-        orderDescription: String?,
-        invoiceNumber: String?
-    ) {
-        self.orderId = orderId
-        self.orderDescription = orderDescription
-        self.invoiceNumber = invoiceNumber
-        super.init()
-    }
-
-    /// Bridge to the Swift value type used internally by the charge pipeline.
-    func toSwift() -> PayabliTTPOrderData {
-        PayabliTTPOrderData(
-            orderId: orderId,
-            orderDescription: orderDescription,
-            invoiceNumber: invoiceNumber
-        )
-    }
-}
-
 /// ObjC companion for `TransactionResult`.
 ///
 /// Returned to ObjC callers via the `charge(amount:type:serviceFee:customer:order:completion:)`

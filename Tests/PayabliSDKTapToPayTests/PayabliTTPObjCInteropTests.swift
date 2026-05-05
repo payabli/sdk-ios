@@ -91,36 +91,6 @@ final class PayabliTTPObjCInteropTests: XCTestCase {
         XCTAssertNil(swift.customerNumber)
     }
 
-    // MARK: - PayabliTTPOrderDataObjC
-
-    func testOrderDataObjCRoundTripPreservesAllFields() {
-        let objc = PayabliTTPOrderDataObjC(
-            orderId: "O-1",
-            orderDescription: "Coffee + croissant",
-            invoiceNumber: "INV-1001"
-        )
-
-        XCTAssertEqual(objc.orderId, "O-1")
-        XCTAssertEqual(objc.orderDescription, "Coffee + croissant")
-        XCTAssertEqual(objc.invoiceNumber, "INV-1001")
-
-        let swift = objc.toSwift()
-        XCTAssertEqual(swift.orderId, "O-1")
-        XCTAssertEqual(swift.orderDescription, "Coffee + croissant")
-        XCTAssertEqual(swift.invoiceNumber, "INV-1001")
-    }
-
-    func testOrderDataObjCAcceptsAllNilFields() {
-        let objc = PayabliTTPOrderDataObjC(
-            orderId: nil, orderDescription: nil, invoiceNumber: nil
-        )
-
-        XCTAssertNil(objc.orderId)
-        XCTAssertNil(objc.orderDescription)
-        XCTAssertNil(objc.invoiceNumber)
-        XCTAssertTrue(objc.toSwift().isEmpty)
-    }
-
     // MARK: - PayabliTTPTransactionResultObjC
 
     func testTransactionResultObjCWrapsSwiftValue() {

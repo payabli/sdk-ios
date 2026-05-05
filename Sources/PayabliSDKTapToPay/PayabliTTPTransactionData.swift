@@ -124,45 +124,6 @@ public struct PayabliTTPCustomerData: Sendable, Equatable {
     }
 }
 
-// MARK: - Order data
-
-/// Order / invoice information associated with a Tap to Pay charge.
-///
-/// Flows through the same pipeline as `PayabliTTPCustomerData`:
-///
-///   1. `/initiate` uses `orderId` and `orderDescription` as-is (empty string
-///      when nil, matching the reference flow in `SaleView.processSale`).
-///   2. `CardReadRequest.order` forwards the struct to the provider adapter,
-///      which maps `orderId` → `merchantOrderId` and `invoiceNumber` (falling
-///      back to `orderId`) → `merchantInvoiceNumber` on its processor SDK.
-///   3. Backend `/update` looks up the transaction by `paymentTransId` — the
-///      order metadata persisted at `/initiate` is reused transparently.
-public struct PayabliTTPOrderData: Sendable, Equatable {
-    public let orderId: String?
-    public let orderDescription: String?
-    public let invoiceNumber: String?
-
-    public init(
-        orderId: String? = nil,
-        orderDescription: String? = nil,
-        invoiceNumber: String? = nil
-    ) {
-        self.orderId = PayabliTTPOrderData.sanitize(orderId)
-        self.orderDescription = PayabliTTPOrderData.sanitize(orderDescription)
-        self.invoiceNumber = PayabliTTPOrderData.sanitize(invoiceNumber)
-    }
-
-    public var isEmpty: Bool {
-        orderId == nil && orderDescription == nil && invoiceNumber == nil
-    }
-
-    private static func sanitize(_ value: String?) -> String? {
-        guard let value else { return nil }
-        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? nil : trimmed
-    }
-}
-
 // MARK: - Payment details
 
 /// Payment-amount inputs for a Tap to Pay charge. Mirrors the wire-level
