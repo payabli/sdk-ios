@@ -10,7 +10,7 @@ TTP-only branch of the SDK. Maps to the Tap to Pay manual QA checklist.
 - **Re-initialize** — silent recovery from `.sessionExpired` /
   `.idle` / `.error` via `ttp.reinitializeIfNeeded()`.
 - **Charge** — full sale pipeline (`/initiate` → NFC tap → `/update`)
-  via `try await ttp.charge(amount:type:)`.
+  via `try await ttp.charge(type:paymentDetails:)`.
 - **Activate device** — pending-device activation with an out-of-band
   code via `ttp.activateDevice(activationCode:)`.
 - **Live event log** — every `PayabliTTPEvent` from the multicaster

@@ -144,21 +144,35 @@ public final class PayabliSDKModule: RCTEventEmitter {
             reject("NOT_CONFIGURED", "Call configure() before charge()", nil)
             return
         }
-        guard let amountValue = (params["amount"] as? NSNumber) else {
-            reject("INVALID_ARGS", "Missing amount", nil)
+        guard let pdDict = params["paymentDetails"] as? [String: Any],
+              let amountValue = (pdDict["amount"] as? NSNumber) else {
+            reject("INVALID_ARGS", "Missing paymentDetails.amount", nil)
             return
         }
         let typeRaw = (params["type"] as? Int) ?? 0
-        let serviceFeeValue = (params["serviceFee"] as? NSNumber) ?? 0
+        let serviceFeeValue = (pdDict["serviceFee"] as? NSNumber) ?? 0
+        // Pass through nil so the SDK omits `currency` from `/initiate` and the
+        // backend authorizes in the merchant's configured processor currency.
+        let currency = pdDict["currency"] as? String
+        let paymentDescription = pdDict["paymentDescription"] as? String
+
+        let paymentDetails = PayabliTTPPaymentDetailsObjC(
+            amount: NSDecimalNumber(decimal: amountValue.decimalValue),
+            serviceFee: NSDecimalNumber(decimal: serviceFeeValue.decimalValue),
+            currency: currency,
+            paymentDescription: paymentDescription
+        )
+
         let customer = (params["customer"] as? [String: Any]).map(Self.customerObjC(from:))
-        let order = (params["order"] as? [String: Any]).map(Self.orderObjC(from:))
+        let invoice = (params["invoice"] as? [String: Any]).map(Self.invoiceObjC(from:))
+        let orderDescription = params["orderDescription"] as? String
 
         ttp.charge(
-            amount: NSDecimalNumber(decimal: amountValue.decimalValue),
             type: typeRaw,
-            serviceFee: NSDecimalNumber(decimal: serviceFeeValue.decimalValue),
+            paymentDetails: paymentDetails,
             customer: customer,
-            order: order
+            invoice: invoice,
+            orderDescription: orderDescription
         ) { result, error in
             if let result {
                 resolve(["paymentTransId": result.paymentTransId])
@@ -236,19 +250,34 @@ public final class PayabliSDKModule: RCTEventEmitter {
     // MARK: - Argument helpers
 
     private static func customerObjC(from dict: [String: Any]) -> PayabliTTPCustomerDataObjC {
-        PayabliTTPCustomerDataObjC(
+        let customerId = (dict["customerId"] as? Int).map { NSNumber(value: $0) }
+        return PayabliTTPCustomerDataObjC(
             firstName: dict["firstName"] as? String,
             lastName: dict["lastName"] as? String,
             customerNumber: dict["customerNumber"] as? String,
             email: dict["email"] as? String,
-            phone: dict["phone"] as? String
+            phone: dict["phone"] as? String,
+            customerId: customerId,
+            company: dict["company"] as? String,
+            billingAddress1: dict["billingAddress1"] as? String,
+            billingAddress2: dict["billingAddress2"] as? String,
+            billingCity: dict["billingCity"] as? String,
+            billingState: dict["billingState"] as? String,
+            billingZip: dict["billingZip"] as? String,
+            billingCountry: dict["billingCountry"] as? String,
+            billingPhone: dict["billingPhone"] as? String,
+            billingEmail: dict["billingEmail"] as? String,
+            shippingAddress1: dict["shippingAddress1"] as? String,
+            shippingAddress2: dict["shippingAddress2"] as? String,
+            shippingCity: dict["shippingCity"] as? String,
+            shippingState: dict["shippingState"] as? String,
+            shippingZip: dict["shippingZip"] as? String,
+            shippingCountry: dict["shippingCountry"] as? String
         )
     }
 
-    private static func orderObjC(from dict: [String: Any]) -> PayabliTTPOrderDataObjC {
-        PayabliTTPOrderDataObjC(
-            orderId: dict["orderId"] as? String,
-            orderDescription: dict["orderDescription"] as? String,
+    private static func invoiceObjC(from dict: [String: Any]) -> PayabliTTPInvoiceDataObjC {
+        PayabliTTPInvoiceDataObjC(
             invoiceNumber: dict["invoiceNumber"] as? String
         )
     }

@@ -17,8 +17,8 @@ public struct CardReadRequest: Sendable {
     /// app did not supply customer information, so adapters can always rely on
     /// a concrete value type.
     public let customer: PayabliTTPCustomerData
-    /// Structured order data as provided to `PayabliTTP.charge(..., order:)`.
-    public let order: PayabliTTPOrderData
+    /// Structured invoice data as provided to `PayabliTTP.charge(..., invoice:)`.
+    public let invoice: PayabliTTPInvoiceData
 
     public init(
         amount: Decimal,
@@ -26,14 +26,14 @@ public struct CardReadRequest: Sendable {
         merchantOrderId: String? = nil,
         merchantInvoiceNumber: String? = nil,
         customer: PayabliTTPCustomerData = PayabliTTPCustomerData(),
-        order: PayabliTTPOrderData = PayabliTTPOrderData()
+        invoice: PayabliTTPInvoiceData = PayabliTTPInvoiceData()
     ) {
         self.amount = amount
         self.merchantTransactionId = merchantTransactionId
         self.merchantOrderId = merchantOrderId
         self.merchantInvoiceNumber = merchantInvoiceNumber
         self.customer = customer
-        self.order = order
+        self.invoice = invoice
     }
 }
 

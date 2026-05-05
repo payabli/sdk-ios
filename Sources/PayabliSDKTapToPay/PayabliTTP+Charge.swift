@@ -15,18 +15,19 @@ extension PayabliTTP {
 
     /// Charge a transaction. v1.0 supports `.sale` only (FR-11D.1).
     ///
-    /// Threads the `customer` / `order` snapshot through the 3-step flow:
+    /// Threads the `paymentDetails` / `customer` / `invoice` / `orderDescription`
+    /// snapshot through the 3-step flow:
     ///   1. `POST /MoneyIn/initiate` — backend mints the `paymentTransId`.
     ///   2. `provider.startReading(_:)` — NFC tap. `paymentTransId` wires as
     ///      both `merchantTransactionId` and `merchantOrderId`.
     ///   3. `PATCH /MoneyIn/update/{paymentTransId}` — only the provider
-    ///      response travels; customer/order were persisted at step 1.
+    ///      response travels; everything else was persisted at step 1.
     public func charge(
-        amount: Decimal,
         type: PayabliTTPPaymentType,
-        serviceFee: Decimal = 0,
+        paymentDetails: PayabliTTPPaymentDetails,
         customer: PayabliTTPCustomerData = PayabliTTPCustomerData(),
-        order: PayabliTTPOrderData = PayabliTTPOrderData()
+        invoice: PayabliTTPInvoiceData = PayabliTTPInvoiceData(),
+        orderDescription: String? = nil
     ) async throws -> TransactionResult {
         guard type == .sale else {
             throw PayabliTTPError.invalidState(current: sessionState, attempted: "charge(non-sale)")
@@ -38,21 +39,28 @@ extension PayabliTTP {
             throw PayabliTTPError.notReady(current: sessionState)
         }
 
+        // Match the trim/blank-to-nil semantics that `PayabliTTPCustomerData`
+        // and `PayabliTTPInvoiceData` apply to their string fields, so a
+        // whitespace-only description doesn't reach the wire as a padded
+        // value.
+        let trimmedOrderDescription = orderDescription?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let cleanedOrderDescription = (trimmedOrderDescription?.isEmpty ?? true)
+            ? nil
+            : trimmedOrderDescription
+
         let context = TTPTransactionContext(
-            amount: amount,
-            serviceFee: serviceFee,
+            paymentDetails: paymentDetails,
             customer: customer,
-            order: order
+            invoice: invoice,
+            orderDescription: cleanedOrderDescription
         )
 
-        logger.info(
-            "[charge] → amount=\(context.amount) serviceFee=\(context.serviceFee) " +
-            "customer={firstName=\(customer.firstName ?? "<nil>") " +
-            "lastName=\(customer.lastName ?? "<nil>") " +
-            "customerNumber=\(customer.customerNumber ?? "<nil>")} " +
-            "order={orderId=\(order.orderId ?? "<nil>") " +
-            "description=\(order.orderDescription ?? "<nil>") " +
-            "invoice=\(order.invoiceNumber ?? "<nil>")}"
+        logChargeStart(
+            paymentDetails: paymentDetails,
+            customer: customer,
+            invoice: invoice,
+            orderDescription: cleanedOrderDescription
         )
 
         // Step 1 — backend mints the paymentTransId.
@@ -61,14 +69,13 @@ extension PayabliTTP {
 
         // Step 2 — NFC tap.
         multicaster.emit(.nfcStarted)
-        let invoiceNumber = context.order.invoiceNumber ?? context.order.orderId
         let readRequest = CardReadRequest(
-            amount: context.amount,
+            amount: context.paymentDetails.amount,
             merchantTransactionId: paymentTransId,
             merchantOrderId: paymentTransId,
-            merchantInvoiceNumber: invoiceNumber,
+            merchantInvoiceNumber: context.invoice.invoiceNumber,
             customer: context.customer,
-            order: context.order
+            invoice: context.invoice
         )
         let readResult: CardReadResult
         do {
@@ -97,17 +104,17 @@ extension PayabliTTP {
         }
     }
 
-    /// `@objc` companion to `charge(amount:type:serviceFee:customer:order:)`.
+    /// `@objc` companion to `charge(type:paymentDetails:customer:invoice:orderDescription:)`.
     ///
     /// ObjC / MAUI / Flutter / RN consumers express:
-    ///   - `amount` and `serviceFee` as `NSDecimalNumber` (bridges to Swift
-    ///     `Decimal` losslessly).
     ///   - `type` as the raw value of `PayabliTTPPaymentType` (`Int`); falls
     ///     back to `.sale` if the value is unknown — v1.0 only supports
     ///     `.sale = 0` so this is the practical identity.
-    ///   - `customer` and `order` as the `*ObjC` companion classes; pass `nil`
-    ///     for "no customer / no order provided" (equivalent to passing the
-    ///     default-initialized Swift struct).
+    ///   - `paymentDetails` as the `*ObjC` companion class (non-null).
+    ///   - `customer` and `invoice` as their `*ObjC` companion classes; pass
+    ///     `nil` for "no customer / no invoice provided" (equivalent to
+    ///     passing the default-initialized Swift struct).
+    ///   - `orderDescription` as an optional `String`.
     ///
     /// On success the completion is invoked with a non-nil
     /// `PayabliTTPTransactionResultObjC` and `nil` error. On failure the
@@ -115,27 +122,26 @@ extension PayabliTTP {
     /// `"com.payabli.ttp"` for typed `PayabliTTPError`s). The completion is
     /// always invoked on the main thread.
     @objc public func charge(
-        amount: NSDecimalNumber,
         type: Int,
-        serviceFee: NSDecimalNumber,
+        paymentDetails: PayabliTTPPaymentDetailsObjC,
         customer: PayabliTTPCustomerDataObjC?,
-        order: PayabliTTPOrderDataObjC?,
+        invoice: PayabliTTPInvoiceDataObjC?,
+        orderDescription: String?,
         completion: @escaping (PayabliTTPTransactionResultObjC?, NSError?) -> Void
     ) {
         let paymentType = PayabliTTPPaymentType(rawValue: type) ?? .sale
+        let swiftDetails = paymentDetails.toSwift()
         let swiftCustomer = customer?.toSwift() ?? PayabliTTPCustomerData()
-        let swiftOrder = order?.toSwift() ?? PayabliTTPOrderData()
-        let amountDecimal = amount.decimalValue
-        let serviceFeeDecimal = serviceFee.decimalValue
+        let swiftInvoice = invoice?.toSwift() ?? PayabliTTPInvoiceData()
 
         Task { @MainActor in
             do {
                 let result = try await self.charge(
-                    amount: amountDecimal,
                     type: paymentType,
-                    serviceFee: serviceFeeDecimal,
+                    paymentDetails: swiftDetails,
                     customer: swiftCustomer,
-                    order: swiftOrder
+                    invoice: swiftInvoice,
+                    orderDescription: orderDescription
                 )
                 completion(PayabliTTPTransactionResultObjC(result), nil)
             } catch {
@@ -157,11 +163,11 @@ extension PayabliTTP {
         }
         return try await transactionClient.initiate(
             entryPoint: entryPoint,
-            amount: context.amount,
-            serviceFee: context.serviceFee,
             deviceId: deviceId,
+            paymentDetails: context.paymentDetails,
             customer: context.customer,
-            order: context.order
+            invoice: context.invoice,
+            orderDescription: context.orderDescription
         )
     }
 
@@ -226,5 +232,47 @@ extension PayabliTTP {
             multicaster.emit(.updateFailed(paymentTransId: paymentTransId, error: reason))
             return .failed(reason: reason)
         }
+    }
+
+    /// Two-line log: a `.public` summary that lands in shared OS logs, plus
+    /// a `.private` detail line carrying PII (billing/shipping/email/phone)
+    /// that's redacted in shared logs but visible in the developer's local
+    /// stream.
+    private func logChargeStart(
+        paymentDetails: PayabliTTPPaymentDetails,
+        customer: PayabliTTPCustomerData,
+        invoice: PayabliTTPInvoiceData,
+        orderDescription: String?
+    ) {
+        logger.info(
+            "[charge] → amount=\(paymentDetails.amount) serviceFee=\(paymentDetails.serviceFee) " +
+            "currency=\(paymentDetails.currency ?? "<nil>") " +
+            "customer={firstName=\(customer.firstName ?? "<nil>") " +
+            "lastName=\(customer.lastName ?? "<nil>") " +
+            "customerNumber=\(customer.customerNumber ?? "<nil>") " +
+            "customerId=\(customer.customerId.map(String.init) ?? "<nil>") " +
+            "company=\(customer.company ?? "<nil>")} " +
+            "invoice={invoiceNumber=\(invoice.invoiceNumber ?? "<nil>")} " +
+            "orderDescription=\(orderDescription ?? "<nil>")"
+        )
+
+        guard !customer.isEmpty else { return }
+        let pii = "email=\(customer.email ?? "<nil>") " +
+            "phone=\(customer.phone ?? "<nil>") " +
+            "billing.address1=\(customer.billingAddress1 ?? "<nil>") " +
+            "billing.address2=\(customer.billingAddress2 ?? "<nil>") " +
+            "billing.city=\(customer.billingCity ?? "<nil>") " +
+            "billing.state=\(customer.billingState ?? "<nil>") " +
+            "billing.zip=\(customer.billingZip ?? "<nil>") " +
+            "billing.country=\(customer.billingCountry ?? "<nil>") " +
+            "billing.email=\(customer.billingEmail ?? "<nil>") " +
+            "billing.phone=\(customer.billingPhone ?? "<nil>") " +
+            "shipping.address1=\(customer.shippingAddress1 ?? "<nil>") " +
+            "shipping.address2=\(customer.shippingAddress2 ?? "<nil>") " +
+            "shipping.city=\(customer.shippingCity ?? "<nil>") " +
+            "shipping.state=\(customer.shippingState ?? "<nil>") " +
+            "shipping.zip=\(customer.shippingZip ?? "<nil>") " +
+            "shipping.country=\(customer.shippingCountry ?? "<nil>")"
+        logger.info("[charge] customerPII", private: pii)
     }
 }

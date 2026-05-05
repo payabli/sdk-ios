@@ -8,7 +8,7 @@ Minimal Flutter app wrapping the native Tap to Pay on iPhone surface of
 
 - **Initialize** — runs the cold/warm App Attest + `/config` + reader
   prepare pipeline.
-- **Charge** — full sale via `PayabliTTP.charge(amount:)` with NFC tap.
+- **Charge** — full sale via `PayabliTTP.charge(paymentDetails:)` with NFC tap.
 - **Activate device** — pending-device activation with an out-of-band
   code.
 - **Live event log** — every `PayabliTTPEvent` from the EventChannel

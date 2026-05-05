@@ -81,11 +81,32 @@ export interface PayabliTTPCustomerData {
     customerNumber?: string;
     email?: string;
     phone?: string;
+    customerId?: number;
+    company?: string;
+    billingAddress1?: string;
+    billingAddress2?: string;
+    billingCity?: string;
+    billingState?: string;
+    billingZip?: string;
+    billingCountry?: string;
+    billingPhone?: string;
+    billingEmail?: string;
+    shippingAddress1?: string;
+    shippingAddress2?: string;
+    shippingCity?: string;
+    shippingState?: string;
+    shippingZip?: string;
+    shippingCountry?: string;
 }
 
-export interface PayabliTTPOrderData {
-    orderId?: string;
-    orderDescription?: string;
+export interface PayabliTTPPaymentDetails {
+    amount: number;
+    serviceFee?: number;
+    currency?: string;
+    paymentDescription?: string;
+}
+
+export interface PayabliTTPInvoiceData {
     invoiceNumber?: string;
 }
 
@@ -108,11 +129,11 @@ export interface PayabliTTPConfig {
 }
 
 export interface PayabliTTPChargeRequest {
-    amount: number;
+    paymentDetails: PayabliTTPPaymentDetails;
     type?: PayabliTTPPaymentType;
-    serviceFee?: number;
     customer?: PayabliTTPCustomerData;
-    order?: PayabliTTPOrderData;
+    invoice?: PayabliTTPInvoiceData;
+    orderDescription?: string;
 }
 
 // MARK: - Native module typing
@@ -128,11 +149,16 @@ interface NativePayabliSDKModule {
     initialize(): Promise<void>;
 
     charge(params: {
-        amount: number;
         type: number;
-        serviceFee: number;
+        paymentDetails: {
+            amount: number;
+            serviceFee: number;
+            currency?: string;
+            paymentDescription?: string;
+        };
         customer?: PayabliTTPCustomerData;
-        order?: PayabliTTPOrderData;
+        invoice?: PayabliTTPInvoiceData;
+        orderDescription?: string;
     }): Promise<PayabliTTPTransactionResult>;
 
     activateDevice(activationCode: string): Promise<void>;
@@ -186,11 +212,19 @@ export function initialize(): Promise<void> {
 /** Runs a full sale charge: backend `/initiate` → NFC tap → backend `/update`. */
 export function charge(req: PayabliTTPChargeRequest): Promise<PayabliTTPTransactionResult> {
     return PayabliSDKModule.charge({
-        amount: req.amount,
         type: req.type ?? PayabliTTPPaymentType.Sale,
-        serviceFee: req.serviceFee ?? 0,
+        paymentDetails: {
+            amount: req.paymentDetails.amount,
+            serviceFee: req.paymentDetails.serviceFee ?? 0,
+            // Pass `currency` through verbatim — when undefined the SDK omits
+            // it from `/initiate` and the backend authorizes in the
+            // merchant's configured processor currency.
+            currency: req.paymentDetails.currency,
+            paymentDescription: req.paymentDetails.paymentDescription,
+        },
         customer: req.customer,
-        order: req.order,
+        invoice: req.invoice,
+        orderDescription: req.orderDescription,
     });
 }
 

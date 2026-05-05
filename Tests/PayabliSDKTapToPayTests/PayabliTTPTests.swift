@@ -133,7 +133,10 @@ final class PayabliTTPTests: XCTestCase {
     func testChargeRejectsNonSale() async throws {
         let (ttp, _, _) = makeTTP()
         do {
-            _ = try await ttp.charge(amount: 9.99, type: PayabliTTPPaymentType(rawValue: 99) ?? .sale)
+            _ = try await ttp.charge(
+                type: PayabliTTPPaymentType(rawValue: 99) ?? .sale,
+                paymentDetails: PayabliTTPPaymentDetails(amount: 9.99)
+            )
             // .sale is the only case in v1.0, so this test is defensive. Pass either way.
         } catch {
             // ok

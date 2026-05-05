@@ -5,12 +5,85 @@ import Foundation
 struct InitiatePaymentDetails: Encodable {
     let totalAmount: Decimal
     let serviceFee: Decimal
+    let currency: String?
+    let paymentDescription: String?
+
+    enum CodingKeys: String, CodingKey {
+        case totalAmount, serviceFee, currency, paymentDescription
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(totalAmount, forKey: .totalAmount)
+        try c.encode(serviceFee, forKey: .serviceFee)
+        try c.encodeIfPresent(currency, forKey: .currency)
+        try c.encodeIfPresent(paymentDescription, forKey: .paymentDescription)
+    }
 }
 
 struct InitiateCustomerData: Encodable {
+    // Existing — empty string when source is nil (preserves current behavior).
     let firstName: String
     let lastName: String
     let customerNumber: String
+
+    // Existing fields, newly serialized — omitted when nil.
+    let email: String?
+    let phone: String?
+
+    // New — omitted when nil.
+    let customerId: Int?
+    let company: String?
+
+    let billingAddress1: String?
+    let billingAddress2: String?
+    let billingCity: String?
+    let billingState: String?
+    let billingZip: String?
+    let billingCountry: String?
+    let billingPhone: String?
+    let billingEmail: String?
+
+    let shippingAddress1: String?
+    let shippingAddress2: String?
+    let shippingCity: String?
+    let shippingState: String?
+    let shippingZip: String?
+    let shippingCountry: String?
+
+    enum CodingKeys: String, CodingKey {
+        case firstName, lastName, customerNumber, email, phone
+        case customerId, company
+        case billingAddress1, billingAddress2, billingCity, billingState
+        case billingZip, billingCountry, billingPhone, billingEmail
+        case shippingAddress1, shippingAddress2, shippingCity, shippingState
+        case shippingZip, shippingCountry
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(firstName, forKey: .firstName)
+        try c.encode(lastName, forKey: .lastName)
+        try c.encode(customerNumber, forKey: .customerNumber)
+        try c.encodeIfPresent(email, forKey: .email)
+        try c.encodeIfPresent(phone, forKey: .phone)
+        try c.encodeIfPresent(customerId, forKey: .customerId)
+        try c.encodeIfPresent(company, forKey: .company)
+        try c.encodeIfPresent(billingAddress1, forKey: .billingAddress1)
+        try c.encodeIfPresent(billingAddress2, forKey: .billingAddress2)
+        try c.encodeIfPresent(billingCity, forKey: .billingCity)
+        try c.encodeIfPresent(billingState, forKey: .billingState)
+        try c.encodeIfPresent(billingZip, forKey: .billingZip)
+        try c.encodeIfPresent(billingCountry, forKey: .billingCountry)
+        try c.encodeIfPresent(billingPhone, forKey: .billingPhone)
+        try c.encodeIfPresent(billingEmail, forKey: .billingEmail)
+        try c.encodeIfPresent(shippingAddress1, forKey: .shippingAddress1)
+        try c.encodeIfPresent(shippingAddress2, forKey: .shippingAddress2)
+        try c.encodeIfPresent(shippingCity, forKey: .shippingCity)
+        try c.encodeIfPresent(shippingState, forKey: .shippingState)
+        try c.encodeIfPresent(shippingZip, forKey: .shippingZip)
+        try c.encodeIfPresent(shippingCountry, forKey: .shippingCountry)
+    }
 }
 
 struct InitiatePaymentMethod: Encodable {
@@ -18,13 +91,32 @@ struct InitiatePaymentMethod: Encodable {
     let device: String           // Payabli deviceId (from /attest or /activate)
 }
 
+struct InitiateInvoiceData: Encodable {
+    let invoiceNumber: String
+}
+
 struct InitiateRequest: Encodable {
     let entryPoint: String
-    let orderId: String
     let orderDescription: String
     let paymentDetails: InitiatePaymentDetails
     let paymentMethod: InitiatePaymentMethod
     let customerData: InitiateCustomerData
+    let invoiceData: InitiateInvoiceData?
+
+    enum CodingKeys: String, CodingKey {
+        case entryPoint, orderDescription, paymentDetails, paymentMethod
+        case customerData, invoiceData
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(entryPoint, forKey: .entryPoint)
+        try c.encode(orderDescription, forKey: .orderDescription)
+        try c.encode(paymentDetails, forKey: .paymentDetails)
+        try c.encode(paymentMethod, forKey: .paymentMethod)
+        try c.encode(customerData, forKey: .customerData)
+        try c.encodeIfPresent(invoiceData, forKey: .invoiceData)
+    }
 }
 
 struct InitiateData: Decodable, Sendable {

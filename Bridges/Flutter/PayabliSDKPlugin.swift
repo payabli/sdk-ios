@@ -153,29 +153,44 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
             ))
             return
         }
-        guard let args = arguments as? [String: Any],
-              let amount = args["amount"] as? Double else {
+        guard let args = arguments as? [String: Any] else {
+            result(FlutterError(code: "INVALID_ARGS", message: "Missing arguments", details: nil))
+            return
+        }
+        guard let pdDict = args["paymentDetails"] as? [String: Any],
+              let amount = pdDict["amount"] as? Double else {
             result(FlutterError(
                 code: "INVALID_ARGS",
-                message: "Missing amount",
+                message: "Missing paymentDetails.amount",
                 details: nil
             ))
             return
         }
 
         let typeRaw = (args["type"] as? Int) ?? 0
-        let serviceFee = (args["serviceFee"] as? Double) ?? 0
-        let amountNumber = NSDecimalNumber(value: amount)
-        let serviceFeeNumber = NSDecimalNumber(value: serviceFee)
+        let serviceFee = (pdDict["serviceFee"] as? Double) ?? 0
+        // Pass through nil so the SDK omits `currency` from `/initiate` and the
+        // backend authorizes in the merchant's configured processor currency.
+        let currency = pdDict["currency"] as? String
+        let paymentDescription = pdDict["paymentDescription"] as? String
+
+        let paymentDetails = PayabliTTPPaymentDetailsObjC(
+            amount: NSDecimalNumber(value: amount),
+            serviceFee: NSDecimalNumber(value: serviceFee),
+            currency: currency,
+            paymentDescription: paymentDescription
+        )
+
         let customer = (args["customer"] as? [String: Any]).map(Self.customerObjC(from:))
-        let order = (args["order"] as? [String: Any]).map(Self.orderObjC(from:))
+        let invoice = (args["invoice"] as? [String: Any]).map(Self.invoiceObjC(from:))
+        let orderDescription = args["orderDescription"] as? String
 
         ttp.charge(
-            amount: amountNumber,
             type: typeRaw,
-            serviceFee: serviceFeeNumber,
+            paymentDetails: paymentDetails,
             customer: customer,
-            order: order
+            invoice: invoice,
+            orderDescription: orderDescription
         ) { txnResult, error in
             if let txnResult {
                 result(["paymentTransId": txnResult.paymentTransId])
@@ -248,19 +263,34 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
     // MARK: - Argument helpers
 
     private static func customerObjC(from dict: [String: Any]) -> PayabliTTPCustomerDataObjC {
-        PayabliTTPCustomerDataObjC(
+        let customerId = (dict["customerId"] as? Int).map { NSNumber(value: $0) }
+        return PayabliTTPCustomerDataObjC(
             firstName: dict["firstName"] as? String,
             lastName: dict["lastName"] as? String,
             customerNumber: dict["customerNumber"] as? String,
             email: dict["email"] as? String,
-            phone: dict["phone"] as? String
+            phone: dict["phone"] as? String,
+            customerId: customerId,
+            company: dict["company"] as? String,
+            billingAddress1: dict["billingAddress1"] as? String,
+            billingAddress2: dict["billingAddress2"] as? String,
+            billingCity: dict["billingCity"] as? String,
+            billingState: dict["billingState"] as? String,
+            billingZip: dict["billingZip"] as? String,
+            billingCountry: dict["billingCountry"] as? String,
+            billingPhone: dict["billingPhone"] as? String,
+            billingEmail: dict["billingEmail"] as? String,
+            shippingAddress1: dict["shippingAddress1"] as? String,
+            shippingAddress2: dict["shippingAddress2"] as? String,
+            shippingCity: dict["shippingCity"] as? String,
+            shippingState: dict["shippingState"] as? String,
+            shippingZip: dict["shippingZip"] as? String,
+            shippingCountry: dict["shippingCountry"] as? String
         )
     }
 
-    private static func orderObjC(from dict: [String: Any]) -> PayabliTTPOrderDataObjC {
-        PayabliTTPOrderDataObjC(
-            orderId: dict["orderId"] as? String,
-            orderDescription: dict["orderDescription"] as? String,
+    private static func invoiceObjC(from dict: [String: Any]) -> PayabliTTPInvoiceDataObjC {
+        PayabliTTPInvoiceDataObjC(
             invoiceNumber: dict["invoiceNumber"] as? String
         )
     }

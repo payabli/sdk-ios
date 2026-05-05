@@ -13,7 +13,10 @@ import PayabliSDKCore
 ///     appId: "TEAM.bundle.id", environment: .sandbox
 /// )
 /// try await ttp.initialize()
-/// let result = try await ttp.charge(amount: 9.99, type: .sale)
+/// let result = try await ttp.charge(
+///     type: .sale,
+///     paymentDetails: PayabliTTPPaymentDetails(amount: 9.99)
+/// )
 /// ```
 ///
 /// The façade is split across companion files (same folder, PRD §7.2) to keep

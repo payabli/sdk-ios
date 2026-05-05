@@ -15,7 +15,10 @@ let ttp = PayabliTTP(
 )
 
 try await ttp.initialize()
-let result = try await ttp.charge(amount: 9.99, type: .sale)
+let result = try await ttp.charge(
+    type: .sale,
+    paymentDetails: PayabliTTPPaymentDetails(amount: 9.99)
+)
 print("Got it! Transaction ID:", result.paymentTransId)
 ```
 
@@ -328,19 +331,99 @@ try await viewModel.ttp.initialize()
 
 // 2. Take the payment.
 let result = try await viewModel.ttp.charge(
-    amount: 9.99,
     type: .sale,
+    paymentDetails: PayabliTTPPaymentDetails(amount: 9.99),
     customer: PayabliTTPCustomerData(firstName: "Jane", lastName: "Doe"),
-    order: PayabliTTPOrderData(orderId: "order-9001")
+    invoice: PayabliTTPInvoiceData(invoiceNumber: "INV-9001")
 )
 
 print("Payment captured! ID:", result.paymentTransId)
 ```
 
-`charge(amount:type:serviceFee:customer:order:)` runs three steps:
-`POST /MoneyIn/initiate` → NFC tap → `PATCH /MoneyIn/update/{id}`. If the
-final update fails after retries, the transaction is still authorized on
-the processor side — you'll need to reconcile manually (this is rare).
+`charge(type:paymentDetails:customer:invoice:orderDescription:)` runs
+three steps: `POST /MoneyIn/initiate` → NFC tap →
+`PATCH /MoneyIn/update/{id}`. If the final update fails after retries,
+the transaction is still authorized on the processor side — you'll need
+to reconcile manually (this is rare).
+
+### What `charge(...)` accepts
+
+```swift
+public func charge(
+    type: PayabliTTPPaymentType,
+    paymentDetails: PayabliTTPPaymentDetails,
+    customer: PayabliTTPCustomerData = .init(),
+    invoice: PayabliTTPInvoiceData = .init(),
+    orderDescription: String? = nil
+) async throws -> TransactionResult
+```
+
+| Parameter         | Type                          | Required | Notes                                                                                                            |
+| ----------------- | ----------------------------- | -------- | ---------------------------------------------------------------------------------------------------------------- |
+| `type`            | `PayabliTTPPaymentType`       | yes      | v1.0 supports `.sale` only.                                                                                       |
+| `paymentDetails`  | `PayabliTTPPaymentDetails`    | yes      | Bundles `amount` (required), `serviceFee` (default 0), optional `currency` (omitted when `nil` — the backend then authorizes in the merchant's configured processor currency), and optional `paymentDescription`. |
+| `customer`        | `PayabliTTPCustomerData`      | no       | Cardholder snapshot (name, customerId, billing/shipping addresses…). Persisted at `/initiate`. Defaults to anonymous.   |
+| `invoice`         | `PayabliTTPInvoiceData`       | no       | Invoice metadata (`invoiceNumber`). Persisted at `/initiate`.                                                     |
+| `orderDescription`| `String?`                     | no       | Free-form description forwarded to the backend at the top-level `orderDescription` key.                          |
+
+`PayabliTTPCustomerData` (every field optional, blank values are
+ignored):
+
+| Field                 | Type      | Purpose                                                                |
+| --------------------- | --------- | ---------------------------------------------------------------------- |
+| `firstName`           | `String?` | Customer given name.                                                   |
+| `lastName`            | `String?` | Customer family name.                                                  |
+| `customerNumber`      | `String?` | Host-app customer number (free-form).                                  |
+| `email`               | `String?` | Customer email for receipts / reconciliation.                          |
+| `phone`               | `String?` | Customer phone, free-form.                                             |
+| `customerId`          | `Int?`    | Payabli internal customer ID, when the customer is already registered. |
+| `company`             | `String?` | Business name when the cardholder represents an organization.          |
+| `billingAddress1`     | `String?` | Billing address — street line 1.                                       |
+| `billingAddress2`     | `String?` | Billing address — street line 2.                                       |
+| `billingCity`         | `String?` | Billing city.                                                          |
+| `billingState`        | `String?` | Billing state / region.                                                |
+| `billingZip`          | `String?` | Billing postal code.                                                   |
+| `billingCountry`      | `String?` | Billing country (ISO-3166 alpha-2 recommended).                        |
+| `billingPhone`        | `String?` | Billing phone (distinct from `phone`).                                 |
+| `billingEmail`        | `String?` | Billing email (distinct from `email`).                                 |
+| `shippingAddress1`    | `String?` | Shipping address — street line 1.                                      |
+| `shippingAddress2`    | `String?` | Shipping address — street line 2.                                      |
+| `shippingCity`        | `String?` | Shipping city.                                                         |
+| `shippingState`       | `String?` | Shipping state / region.                                               |
+| `shippingZip`         | `String?` | Shipping postal code.                                                  |
+| `shippingCountry`     | `String?` | Shipping country.                                                      |
+
+`PayabliTTPInvoiceData` (every field optional):
+
+| Field           | Type      | Purpose                                                                |
+| --------------- | --------- | ---------------------------------------------------------------------- |
+| `invoiceNumber` | `String?` | Invoice reference forwarded to the backend and the processor.          |
+
+```swift
+let result = try await ttp.charge(
+    type: .sale,
+    paymentDetails: PayabliTTPPaymentDetails(
+        amount: 24.50,
+        serviceFee: 1.00,
+        currency: "USD",
+        paymentDescription: "Two coffees + croissant"
+    ),
+    customer: PayabliTTPCustomerData(
+        firstName: "Jane",
+        lastName: "Doe",
+        customerNumber: "cust-1234",
+        email: "jane@example.com",
+        phone: "+1 555 0100",
+        billingAddress1: "1 Market St",
+        billingCity: "San Francisco",
+        billingState: "CA",
+        billingZip: "94105",
+        billingCountry: "US"
+    ),
+    invoice: PayabliTTPInvoiceData(invoiceNumber: "INV-9001"),
+    orderDescription: "Two coffees + croissant"
+)
+```
 
 ### What `charge(...)` accepts
 
@@ -463,12 +546,18 @@ PayabliTTP *ttp = [[PayabliTTP alloc]
 
 [ttp initializeWithCompletion:^(NSError *err) {
     if (err) { /* handle */ return; }
-    [ttp chargeWithAmount:[NSDecimalNumber decimalNumberWithString:@"9.99"]
-                     type:PayabliTTPPaymentTypeSale
-               serviceFee:NSDecimalNumber.zero
-                 customer:nil
-                    order:nil
-               completion:^(PayabliTTPTransactionResultObjC *result, NSError *e) {
+    PayabliTTPPaymentDetailsObjC *details =
+        [[PayabliTTPPaymentDetailsObjC alloc]
+            initWithAmount:[NSDecimalNumber decimalNumberWithString:@"9.99"]
+                serviceFee:NSDecimalNumber.zero
+                  currency:@"USD"
+        paymentDescription:nil];
+    [ttp chargeWithType:PayabliTTPPaymentTypeSale
+        paymentDetails:details
+              customer:nil
+               invoice:nil
+      orderDescription:nil
+            completion:^(PayabliTTPTransactionResultObjC *result, NSError *e) {
         NSLog(@"Got it! ID: %@", result.paymentTransId);
     }];
 }];
@@ -488,7 +577,10 @@ match exactly the cases you care about:
 ```swift
 do {
     try await ttp.initialize()
-    let result = try await ttp.charge(amount: 9.99, type: .sale)
+    let result = try await ttp.charge(
+        type: .sale,
+        paymentDetails: PayabliTTPPaymentDetails(amount: 9.99)
+    )
 } catch PayabliTTPError.devicePendingActivation {
     // First-time device — prompt for activation code.
 } catch let PayabliTTPError.invalidState(current, attempted) {

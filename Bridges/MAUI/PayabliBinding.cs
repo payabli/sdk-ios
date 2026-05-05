@@ -104,13 +104,29 @@ namespace Payabli.TapToPay
     [DisableDefaultCtor]
     public interface PayabliTTPCustomerDataObjC
     {
-        [Export("initWithFirstName:lastName:customerNumber:email:phone:")]
+        [Export("initWithFirstName:lastName:customerNumber:email:phone:customerId:company:billingAddress1:billingAddress2:billingCity:billingState:billingZip:billingCountry:billingPhone:billingEmail:shippingAddress1:shippingAddress2:shippingCity:shippingState:shippingZip:shippingCountry:")]
         IntPtr Constructor(
             [NullAllowed] string firstName,
             [NullAllowed] string lastName,
             [NullAllowed] string customerNumber,
             [NullAllowed] string email,
-            [NullAllowed] string phone
+            [NullAllowed] string phone,
+            [NullAllowed] NSNumber customerId,
+            [NullAllowed] string company,
+            [NullAllowed] string billingAddress1,
+            [NullAllowed] string billingAddress2,
+            [NullAllowed] string billingCity,
+            [NullAllowed] string billingState,
+            [NullAllowed] string billingZip,
+            [NullAllowed] string billingCountry,
+            [NullAllowed] string billingPhone,
+            [NullAllowed] string billingEmail,
+            [NullAllowed] string shippingAddress1,
+            [NullAllowed] string shippingAddress2,
+            [NullAllowed] string shippingCity,
+            [NullAllowed] string shippingState,
+            [NullAllowed] string shippingZip,
+            [NullAllowed] string shippingCountry
         );
 
         [NullAllowed, Export("firstName")] string FirstName { get; }
@@ -118,23 +134,53 @@ namespace Payabli.TapToPay
         [NullAllowed, Export("customerNumber")] string CustomerNumber { get; }
         [NullAllowed, Export("email")] string Email { get; }
         [NullAllowed, Export("phone")] string Phone { get; }
+        [NullAllowed, Export("customerId")] NSNumber CustomerId { get; }
+        [NullAllowed, Export("company")] string Company { get; }
+        [NullAllowed, Export("billingAddress1")] string BillingAddress1 { get; }
+        [NullAllowed, Export("billingAddress2")] string BillingAddress2 { get; }
+        [NullAllowed, Export("billingCity")] string BillingCity { get; }
+        [NullAllowed, Export("billingState")] string BillingState { get; }
+        [NullAllowed, Export("billingZip")] string BillingZip { get; }
+        [NullAllowed, Export("billingCountry")] string BillingCountry { get; }
+        [NullAllowed, Export("billingPhone")] string BillingPhone { get; }
+        [NullAllowed, Export("billingEmail")] string BillingEmail { get; }
+        [NullAllowed, Export("shippingAddress1")] string ShippingAddress1 { get; }
+        [NullAllowed, Export("shippingAddress2")] string ShippingAddress2 { get; }
+        [NullAllowed, Export("shippingCity")] string ShippingCity { get; }
+        [NullAllowed, Export("shippingState")] string ShippingState { get; }
+        [NullAllowed, Export("shippingZip")] string ShippingZip { get; }
+        [NullAllowed, Export("shippingCountry")] string ShippingCountry { get; }
     }
 
-    // MARK: - PayabliTTPOrderDataObjC
+    // MARK: - PayabliTTPPaymentDetailsObjC
 
     [BaseType(typeof(NSObject))]
     [DisableDefaultCtor]
-    public interface PayabliTTPOrderDataObjC
+    public interface PayabliTTPPaymentDetailsObjC
     {
-        [Export("initWithOrderId:orderDescription:invoiceNumber:")]
+        [Export("initWithAmount:serviceFee:currency:paymentDescription:")]
         IntPtr Constructor(
-            [NullAllowed] string orderId,
-            [NullAllowed] string orderDescription,
-            [NullAllowed] string invoiceNumber
+            NSDecimalNumber amount,
+            NSDecimalNumber serviceFee,
+            string currency,
+            [NullAllowed] string paymentDescription
         );
 
-        [NullAllowed, Export("orderId")] string OrderId { get; }
-        [NullAllowed, Export("orderDescription")] string OrderDescription { get; }
+        [Export("amount")] NSDecimalNumber Amount { get; }
+        [Export("serviceFee")] NSDecimalNumber ServiceFee { get; }
+        [Export("currency")] string Currency { get; }
+        [NullAllowed, Export("paymentDescription")] string PaymentDescription { get; }
+    }
+
+    // MARK: - PayabliTTPInvoiceDataObjC
+
+    [BaseType(typeof(NSObject))]
+    [DisableDefaultCtor]
+    public interface PayabliTTPInvoiceDataObjC
+    {
+        [Export("initWithInvoiceNumber:")]
+        IntPtr Constructor([NullAllowed] string invoiceNumber);
+
         [NullAllowed, Export("invoiceNumber")] string InvoiceNumber { get; }
     }
 
@@ -183,13 +229,13 @@ namespace Payabli.TapToPay
         [Export("reinitializeIfNeededWithCompletion:")]
         void ReinitializeIfNeeded(PayabliTTPCompletion completion);
 
-        [Export("chargeWithAmount:type:serviceFee:customer:order:completion:")]
+        [Export("chargeWithType:paymentDetails:customer:invoice:orderDescription:completion:")]
         void Charge(
-            NSDecimalNumber amount,
             nint type,
-            NSDecimalNumber serviceFee,
+            PayabliTTPPaymentDetailsObjC paymentDetails,
             [NullAllowed] PayabliTTPCustomerDataObjC customer,
-            [NullAllowed] PayabliTTPOrderDataObjC order,
+            [NullAllowed] PayabliTTPInvoiceDataObjC invoice,
+            [NullAllowed] string orderDescription,
             PayabliTTPChargeCompletion completion
         );
 

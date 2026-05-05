@@ -24,6 +24,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          token: ${{ secrets.GHB_PAT_TOKEN }}
 
       - name: Validate version format
         run: |
@@ -114,7 +115,7 @@ jobs:
 
       - name: Create GitHub Release
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GHB_PAT_TOKEN }}
         run: |
           PRERELEASE=""
           if echo "${{ inputs.version }}" | grep -q '-'; then

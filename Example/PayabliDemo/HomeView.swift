@@ -4,7 +4,7 @@ import PayabliSDKTapToPay
 
 /// Demo app landing screen exercising the full `PayabliTTP` API:
 ///   - `initialize()` — cold/warm attestation + reader prepare.
-///   - `charge(amount:)` — full sale pipeline with NFC tap.
+///   - `charge(type:paymentDetails:)` — full sale pipeline with NFC tap.
 ///   - `activateDevice(activationCode:)` — pending-device activation.
 ///   - `events()` — live event log surfaced via `addEventListener`.
 ///   - `sessionState` — surfaced in the navigation bar as a colored badge.
@@ -163,7 +163,10 @@ struct HomeView: View {
         Task {
             defer { isWorking = false }
             do {
-                let result = try await ttp.charge(amount: amount, type: .sale)
+                let result = try await ttp.charge(
+                    type: .sale,
+                    paymentDetails: PayabliTTPPaymentDetails(amount: amount)
+                )
                 lastResult = "✓ Charged · txn \(result.paymentTransId)"
             } catch {
                 lastResult = "✗ Charge failed: \(error.localizedDescription)"

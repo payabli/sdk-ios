@@ -97,7 +97,9 @@ class _HomeScreenState extends State<HomeScreen> {
     }
     setState(() => _isWorking = true);
     try {
-      final paymentTransId = await PayabliTTP.charge(amount: amount);
+      final paymentTransId = await PayabliTTP.charge(
+        paymentDetails: PayabliTTPPaymentDetails(amount: amount),
+      );
       setState(() => _lastResult = '✓ Charged · txn $paymentTransId');
     } on PayabliTTPException catch (e) {
       setState(() => _lastResult = '✗ ${e.code}: ${e.message}');

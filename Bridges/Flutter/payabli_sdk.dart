@@ -76,21 +76,21 @@ class PayabliTTP {
   /// Runs a sale charge end-to-end: backend `/initiate` → NFC tap →
   /// backend `/update`. Returns the [paymentTransId] on success.
   static Future<String> charge({
-    required double amount,
+    required PayabliTTPPaymentDetails paymentDetails,
     PayabliTTPPaymentType type = PayabliTTPPaymentType.sale,
-    double serviceFee = 0,
     PayabliTTPCustomerData? customer,
-    PayabliTTPOrderData? order,
+    PayabliTTPInvoiceData? invoice,
+    String? orderDescription,
   }) async {
     try {
       final result = await _methodChannel.invokeMapMethod<String, dynamic>(
         'charge',
         {
-          'amount': amount,
           'type': type.index,
-          'serviceFee': serviceFee,
+          'paymentDetails': paymentDetails._toMap(),
           if (customer != null) 'customer': customer._toMap(),
-          if (order != null) 'order': order._toMap(),
+          if (invoice != null) 'invoice': invoice._toMap(),
+          if (orderDescription != null) 'orderDescription': orderDescription,
         },
       );
       final paymentTransId = result?['paymentTransId'] as String?;
@@ -232,6 +232,22 @@ class PayabliTTPCustomerData {
     this.customerNumber,
     this.email,
     this.phone,
+    this.customerId,
+    this.company,
+    this.billingAddress1,
+    this.billingAddress2,
+    this.billingCity,
+    this.billingState,
+    this.billingZip,
+    this.billingCountry,
+    this.billingPhone,
+    this.billingEmail,
+    this.shippingAddress1,
+    this.shippingAddress2,
+    this.shippingCity,
+    this.shippingState,
+    this.shippingZip,
+    this.shippingCountry,
   });
 
   final String? firstName;
@@ -239,32 +255,78 @@ class PayabliTTPCustomerData {
   final String? customerNumber;
   final String? email;
   final String? phone;
+  final int? customerId;
+  final String? company;
+  final String? billingAddress1;
+  final String? billingAddress2;
+  final String? billingCity;
+  final String? billingState;
+  final String? billingZip;
+  final String? billingCountry;
+  final String? billingPhone;
+  final String? billingEmail;
+  final String? shippingAddress1;
+  final String? shippingAddress2;
+  final String? shippingCity;
+  final String? shippingState;
+  final String? shippingZip;
+  final String? shippingCountry;
 
-  Map<String, String?> _toMap() => {
+  Map<String, dynamic> _toMap() => {
         if (firstName != null) 'firstName': firstName,
         if (lastName != null) 'lastName': lastName,
         if (customerNumber != null) 'customerNumber': customerNumber,
         if (email != null) 'email': email,
         if (phone != null) 'phone': phone,
+        if (customerId != null) 'customerId': customerId,
+        if (company != null) 'company': company,
+        if (billingAddress1 != null) 'billingAddress1': billingAddress1,
+        if (billingAddress2 != null) 'billingAddress2': billingAddress2,
+        if (billingCity != null) 'billingCity': billingCity,
+        if (billingState != null) 'billingState': billingState,
+        if (billingZip != null) 'billingZip': billingZip,
+        if (billingCountry != null) 'billingCountry': billingCountry,
+        if (billingPhone != null) 'billingPhone': billingPhone,
+        if (billingEmail != null) 'billingEmail': billingEmail,
+        if (shippingAddress1 != null) 'shippingAddress1': shippingAddress1,
+        if (shippingAddress2 != null) 'shippingAddress2': shippingAddress2,
+        if (shippingCity != null) 'shippingCity': shippingCity,
+        if (shippingState != null) 'shippingState': shippingState,
+        if (shippingZip != null) 'shippingZip': shippingZip,
+        if (shippingCountry != null) 'shippingCountry': shippingCountry,
       };
 }
 
-/// Order information forwarded to the charge pipeline. Mirrors
-/// `PayabliTTPOrderData` / `PayabliTTPOrderDataObjC` field-for-field.
-class PayabliTTPOrderData {
-  const PayabliTTPOrderData({
-    this.orderId,
-    this.orderDescription,
-    this.invoiceNumber,
+/// Payment-amount inputs for a charge. Mirrors `PayabliTTPPaymentDetails`.
+class PayabliTTPPaymentDetails {
+  const PayabliTTPPaymentDetails({
+    required this.amount,
+    this.serviceFee = 0,
+    this.currency = 'USD',
+    this.paymentDescription,
   });
 
-  final String? orderId;
-  final String? orderDescription;
+  final double amount;
+  final double serviceFee;
+  final String currency;
+  final String? paymentDescription;
+
+  Map<String, dynamic> _toMap() => {
+        'amount': amount,
+        'serviceFee': serviceFee,
+        'currency': currency,
+        if (paymentDescription != null) 'paymentDescription': paymentDescription,
+      };
+}
+
+/// Invoice information forwarded to the charge pipeline. Mirrors
+/// `PayabliTTPInvoiceData`.
+class PayabliTTPInvoiceData {
+  const PayabliTTPInvoiceData({this.invoiceNumber});
+
   final String? invoiceNumber;
 
-  Map<String, String?> _toMap() => {
-        if (orderId != null) 'orderId': orderId,
-        if (orderDescription != null) 'orderDescription': orderDescription,
+  Map<String, dynamic> _toMap() => {
         if (invoiceNumber != null) 'invoiceNumber': invoiceNumber,
       };
 }
