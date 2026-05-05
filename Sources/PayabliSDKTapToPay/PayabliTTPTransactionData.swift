@@ -233,13 +233,12 @@ public struct PayabliTTPInvoiceData: Sendable, Equatable {
 
 // MARK: - Internal transaction context
 
-/// Bundles the immutable per-charge inputs (amount, serviceFee, customer,
-/// order) so they can be threaded through the 3-step pipeline without
-/// exploding argument lists. Lives at the SDK boundary — never exposed to
-/// host apps, never persisted.
+/// Bundles the immutable per-charge inputs so they can be threaded through
+/// the 3-step pipeline without exploding argument lists. Lives at the SDK
+/// boundary — never exposed to host apps, never persisted.
 struct TTPTransactionContext: Sendable {
-    let amount: Decimal
-    let serviceFee: Decimal
+    let paymentDetails: PayabliTTPPaymentDetails
     let customer: PayabliTTPCustomerData
-    let order: PayabliTTPOrderData
+    let invoice: PayabliTTPInvoiceData
+    let orderDescription: String?
 }

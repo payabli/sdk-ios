@@ -15,18 +15,19 @@ extension PayabliTTP {
 
     /// Charge a transaction. v1.0 supports `.sale` only (FR-11D.1).
     ///
-    /// Threads the `customer` / `order` snapshot through the 3-step flow:
+    /// Threads the `paymentDetails` / `customer` / `invoice` / `orderDescription`
+    /// snapshot through the 3-step flow:
     ///   1. `POST /MoneyIn/initiate` — backend mints the `paymentTransId`.
     ///   2. `provider.startReading(_:)` — NFC tap. `paymentTransId` wires as
     ///      both `merchantTransactionId` and `merchantOrderId`.
     ///   3. `PATCH /MoneyIn/update/{paymentTransId}` — only the provider
-    ///      response travels; customer/order were persisted at step 1.
+    ///      response travels; everything else was persisted at step 1.
     public func charge(
-        amount: Decimal,
         type: PayabliTTPPaymentType,
-        serviceFee: Decimal = 0,
+        paymentDetails: PayabliTTPPaymentDetails,
         customer: PayabliTTPCustomerData = PayabliTTPCustomerData(),
-        order: PayabliTTPOrderData = PayabliTTPOrderData()
+        invoice: PayabliTTPInvoiceData = PayabliTTPInvoiceData(),
+        orderDescription: String? = nil
     ) async throws -> TransactionResult {
         guard type == .sale else {
             throw PayabliTTPError.invalidState(current: sessionState, attempted: "charge(non-sale)")
@@ -39,20 +40,24 @@ extension PayabliTTP {
         }
 
         let context = TTPTransactionContext(
-            amount: amount,
-            serviceFee: serviceFee,
+            paymentDetails: paymentDetails,
             customer: customer,
-            order: order
+            invoice: invoice,
+            orderDescription: orderDescription
         )
 
+        // Public-safe summary — PII fields (billing/shipping/email/phone) are
+        // logged separately under `.private` privacy in a follow-up.
         logger.info(
-            "[charge] → amount=\(context.amount) serviceFee=\(context.serviceFee) " +
+            "[charge] → amount=\(paymentDetails.amount) serviceFee=\(paymentDetails.serviceFee) " +
+            "currency=\(paymentDetails.currency) " +
             "customer={firstName=\(customer.firstName ?? "<nil>") " +
             "lastName=\(customer.lastName ?? "<nil>") " +
-            "customerNumber=\(customer.customerNumber ?? "<nil>")} " +
-            "order={orderId=\(order.orderId ?? "<nil>") " +
-            "description=\(order.orderDescription ?? "<nil>") " +
-            "invoice=\(order.invoiceNumber ?? "<nil>")}"
+            "customerNumber=\(customer.customerNumber ?? "<nil>") " +
+            "customerId=\(customer.customerId.map(String.init) ?? "<nil>") " +
+            "company=\(customer.company ?? "<nil>")} " +
+            "invoice={invoiceNumber=\(invoice.invoiceNumber ?? "<nil>")} " +
+            "orderDescription=\(orderDescription ?? "<nil>")"
         )
 
         // Step 1 — backend mints the paymentTransId.
@@ -61,14 +66,13 @@ extension PayabliTTP {
 
         // Step 2 — NFC tap.
         multicaster.emit(.nfcStarted)
-        let invoiceNumber = context.order.invoiceNumber ?? context.order.orderId
         let readRequest = CardReadRequest(
-            amount: context.amount,
+            amount: context.paymentDetails.amount,
             merchantTransactionId: paymentTransId,
             merchantOrderId: paymentTransId,
-            merchantInvoiceNumber: invoiceNumber,
+            merchantInvoiceNumber: context.invoice.invoiceNumber,
             customer: context.customer,
-            order: context.order
+            invoice: context.invoice
         )
         let readResult: CardReadResult
         do {
@@ -157,11 +161,11 @@ extension PayabliTTP {
         }
         return try await transactionClient.initiate(
             entryPoint: entryPoint,
-            amount: context.amount,
-            serviceFee: context.serviceFee,
             deviceId: deviceId,
+            paymentDetails: context.paymentDetails,
             customer: context.customer,
-            order: context.order
+            invoice: context.invoice,
+            orderDescription: context.orderDescription
         )
     }
 
