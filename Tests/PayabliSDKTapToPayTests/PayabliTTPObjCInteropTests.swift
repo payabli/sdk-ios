@@ -163,4 +163,35 @@ final class PayabliTTPObjCInteropTests: XCTestCase {
         XCTAssertEqual(swift.currency, "USD")
         XCTAssertEqual(swift.paymentDescription, "Coffee")
     }
+
+    // MARK: - PayabliTTPInvoiceData
+
+    func testInvoiceDataSwiftDefaults() {
+        let invoice = PayabliTTPInvoiceData()
+        XCTAssertNil(invoice.invoiceNumber)
+        XCTAssertTrue(invoice.isEmpty)
+    }
+
+    func testInvoiceDataSwiftSanitizesInvoiceNumber() {
+        let invoice = PayabliTTPInvoiceData(invoiceNumber: "  INV-1  ")
+        XCTAssertEqual(invoice.invoiceNumber, "INV-1")
+        XCTAssertFalse(invoice.isEmpty)
+    }
+
+    func testInvoiceDataSwiftDropsBlankInvoiceNumber() {
+        let invoice = PayabliTTPInvoiceData(invoiceNumber: "   ")
+        XCTAssertNil(invoice.invoiceNumber)
+    }
+
+    func testInvoiceDataObjCRoundTrip() {
+        let objc = PayabliTTPInvoiceDataObjC(invoiceNumber: "INV-1001")
+        XCTAssertEqual(objc.invoiceNumber, "INV-1001")
+        XCTAssertEqual(objc.toSwift().invoiceNumber, "INV-1001")
+    }
+
+    func testInvoiceDataObjCAcceptsNil() {
+        let objc = PayabliTTPInvoiceDataObjC(invoiceNumber: nil)
+        XCTAssertNil(objc.invoiceNumber)
+        XCTAssertTrue(objc.toSwift().isEmpty)
+    }
 }

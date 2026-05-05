@@ -138,3 +138,18 @@ public final class PayabliTTPPaymentDetailsObjC: NSObject {
         )
     }
 }
+
+/// ObjC companion for `PayabliTTPInvoiceData`.
+@objc(PayabliTTPInvoiceDataObjC)
+public final class PayabliTTPInvoiceDataObjC: NSObject {
+    @objc public let invoiceNumber: String?
+
+    @objc public init(invoiceNumber: String?) {
+        self.invoiceNumber = invoiceNumber
+        super.init()
+    }
+
+    func toSwift() -> PayabliTTPInvoiceData {
+        PayabliTTPInvoiceData(invoiceNumber: invoiceNumber)
+    }
+}

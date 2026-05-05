@@ -148,6 +148,30 @@ public struct PayabliTTPPaymentDetails: Sendable, Equatable {
     }
 }
 
+// MARK: - Invoice data
+
+/// Invoice information associated with a Tap to Pay charge. Mirrors the
+/// wire-level `invoiceData` object the backend `/initiate` endpoint expects.
+///
+/// The struct deliberately exposes only `invoiceNumber` — additional invoice
+/// metadata (line items, totals, due dates) is not part of the
+/// `GetPaidRequestPayload` contract.
+public struct PayabliTTPInvoiceData: Sendable, Equatable {
+    public let invoiceNumber: String?
+
+    public init(invoiceNumber: String? = nil) {
+        self.invoiceNumber = PayabliTTPInvoiceData.sanitize(invoiceNumber)
+    }
+
+    public var isEmpty: Bool { invoiceNumber == nil }
+
+    private static func sanitize(_ value: String?) -> String? {
+        guard let value else { return nil }
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
+}
+
 // MARK: - Internal transaction context
 
 /// Bundles the immutable per-charge inputs (amount, serviceFee, customer,
