@@ -151,7 +151,9 @@ public final class PayabliSDKModule: RCTEventEmitter {
         }
         let typeRaw = (params["type"] as? Int) ?? 0
         let serviceFeeValue = (pdDict["serviceFee"] as? NSNumber) ?? 0
-        let currency = (pdDict["currency"] as? String) ?? "USD"
+        // Pass through nil so the SDK omits `currency` from `/initiate` and the
+        // backend authorizes in the merchant's configured processor currency.
+        let currency = pdDict["currency"] as? String
         let paymentDescription = pdDict["paymentDescription"] as? String
 
         let paymentDetails = PayabliTTPPaymentDetailsObjC(

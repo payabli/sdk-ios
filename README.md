@@ -361,7 +361,7 @@ public func charge(
 | Parameter         | Type                          | Required | Notes                                                                                                            |
 | ----------------- | ----------------------------- | -------- | ---------------------------------------------------------------------------------------------------------------- |
 | `type`            | `PayabliTTPPaymentType`       | yes      | v1.0 supports `.sale` only.                                                                                       |
-| `paymentDetails`  | `PayabliTTPPaymentDetails`    | yes      | Bundles `amount` (required), `serviceFee` (default 0), `currency` (default `"USD"`), and optional `paymentDescription`. |
+| `paymentDetails`  | `PayabliTTPPaymentDetails`    | yes      | Bundles `amount` (required), `serviceFee` (default 0), optional `currency` (omitted when `nil` — the backend then authorizes in the merchant's configured processor currency), and optional `paymentDescription`. |
 | `customer`        | `PayabliTTPCustomerData`      | no       | Cardholder snapshot (name, customerId, billing/shipping addresses…). Persisted at `/initiate`. Defaults to anonymous.   |
 | `invoice`         | `PayabliTTPInvoiceData`       | no       | Invoice metadata (`invoiceNumber`). Persisted at `/initiate`.                                                     |
 | `orderDescription`| `String?`                     | no       | Free-form description forwarded to the backend at the top-level `orderDescription` key.                          |

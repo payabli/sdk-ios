@@ -39,18 +39,28 @@ extension PayabliTTP {
             throw PayabliTTPError.notReady(current: sessionState)
         }
 
+        // Match the trim/blank-to-nil semantics that `PayabliTTPCustomerData`
+        // and `PayabliTTPInvoiceData` apply to their string fields, so a
+        // whitespace-only description doesn't reach the wire as a padded
+        // value.
+        let trimmedOrderDescription = orderDescription?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let cleanedOrderDescription = (trimmedOrderDescription?.isEmpty ?? true)
+            ? nil
+            : trimmedOrderDescription
+
         let context = TTPTransactionContext(
             paymentDetails: paymentDetails,
             customer: customer,
             invoice: invoice,
-            orderDescription: orderDescription
+            orderDescription: cleanedOrderDescription
         )
 
         logChargeStart(
             paymentDetails: paymentDetails,
             customer: customer,
             invoice: invoice,
-            orderDescription: orderDescription
+            orderDescription: cleanedOrderDescription
         )
 
         // Step 1 — backend mints the paymentTransId.
@@ -236,7 +246,7 @@ extension PayabliTTP {
     ) {
         logger.info(
             "[charge] → amount=\(paymentDetails.amount) serviceFee=\(paymentDetails.serviceFee) " +
-            "currency=\(paymentDetails.currency) " +
+            "currency=\(paymentDetails.currency ?? "<nil>") " +
             "customer={firstName=\(customer.firstName ?? "<nil>") " +
             "lastName=\(customer.lastName ?? "<nil>") " +
             "customerNumber=\(customer.customerNumber ?? "<nil>") " +

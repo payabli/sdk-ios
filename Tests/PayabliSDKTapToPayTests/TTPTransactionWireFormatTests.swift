@@ -75,6 +75,23 @@ final class TTPTransactionWireFormatTests: XCTestCase {
         XCTAssertEqual(parsed["currency"] as? String, "USD")
     }
 
+    /// When the host doesn't pass a `currency`, the field must be omitted from
+    /// the wire payload. The backend then authorizes in the merchant's
+    /// configured processor currency (the same one the reader uses from
+    /// `/config`), so the backend record and processor transaction can't
+    /// disagree on currency for non-USD merchants.
+    func test_initiatePaymentDetails_omitsCurrencyWhenNil() throws {
+        let pd = InitiatePaymentDetails(
+            totalAmount: 10,
+            serviceFee: 0,
+            currency: nil,
+            paymentDescription: nil
+        )
+        let wire = try JSONEncoder().encode(pd)
+        let parsed = try XCTUnwrap(JSONSerialization.jsonObject(with: wire) as? [String: Any])
+        XCTAssertNil(parsed["currency"], "currency should be omitted when nil")
+    }
+
     // MARK: - Initiate request — customerData
 
     func test_initiateCustomerData_omitsOptionalFieldsWhenNil() throws {

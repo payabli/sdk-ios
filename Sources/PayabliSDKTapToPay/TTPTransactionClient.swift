@@ -56,7 +56,9 @@ public final class TTPTransactionClient: Sendable {
         let bodyDump = request.body.flatMap { String(data: $0, encoding: .utf8) } ?? "<nil>"
         logger.info("[initiate] → POST \(request.path)")
         logger.info("[initiate] headers: \(headersDump)")
-        logger.info("[initiate] body: \(bodyDump)")
+        // Body carries PII (billing/shipping/email/phone) — keep redacted in
+        // shared OS logs.
+        logger.info("[initiate] body", private: bodyDump)
 
         let envelope: PayabliV2Envelope<InitiateData>
         do {

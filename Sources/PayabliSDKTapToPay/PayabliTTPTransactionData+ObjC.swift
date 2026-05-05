@@ -103,7 +103,7 @@ public final class PayabliTTPCustomerDataObjC: NSObject {
             customerNumber: customerNumber,
             email: email,
             phone: phone,
-            customerId: customerId?.intValue,
+            customerId: customerId.map { Int(truncating: $0) },
             company: company,
             billingAddress1: billingAddress1,
             billingAddress2: billingAddress2,
@@ -148,13 +148,13 @@ public final class PayabliTTPTransactionResultObjC: NSObject {
 public final class PayabliTTPPaymentDetailsObjC: NSObject {
     @objc public let amount: NSDecimalNumber
     @objc public let serviceFee: NSDecimalNumber
-    @objc public let currency: String
+    @objc public let currency: String?
     @objc public let paymentDescription: String?
 
     @objc public init(
         amount: NSDecimalNumber,
         serviceFee: NSDecimalNumber,
-        currency: String,
+        currency: String?,
         paymentDescription: String?
     ) {
         self.amount = amount

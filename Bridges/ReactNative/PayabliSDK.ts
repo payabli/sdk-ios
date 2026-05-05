@@ -153,7 +153,7 @@ interface NativePayabliSDKModule {
         paymentDetails: {
             amount: number;
             serviceFee: number;
-            currency: string;
+            currency?: string;
             paymentDescription?: string;
         };
         customer?: PayabliTTPCustomerData;
@@ -216,7 +216,10 @@ export function charge(req: PayabliTTPChargeRequest): Promise<PayabliTTPTransact
         paymentDetails: {
             amount: req.paymentDetails.amount,
             serviceFee: req.paymentDetails.serviceFee ?? 0,
-            currency: req.paymentDetails.currency ?? 'USD',
+            // Pass `currency` through verbatim — when undefined the SDK omits
+            // it from `/initiate` and the backend authorizes in the
+            // merchant's configured processor currency.
+            currency: req.paymentDetails.currency,
             paymentDescription: req.paymentDetails.paymentDescription,
         },
         customer: req.customer,

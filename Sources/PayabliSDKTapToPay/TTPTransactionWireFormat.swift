@@ -5,7 +5,7 @@ import Foundation
 struct InitiatePaymentDetails: Encodable {
     let totalAmount: Decimal
     let serviceFee: Decimal
-    let currency: String
+    let currency: String?
     let paymentDescription: String?
 
     enum CodingKeys: String, CodingKey {
@@ -16,7 +16,7 @@ struct InitiatePaymentDetails: Encodable {
         var c = encoder.container(keyedBy: CodingKeys.self)
         try c.encode(totalAmount, forKey: .totalAmount)
         try c.encode(serviceFee, forKey: .serviceFee)
-        try c.encode(currency, forKey: .currency)
+        try c.encodeIfPresent(currency, forKey: .currency)
         try c.encodeIfPresent(paymentDescription, forKey: .paymentDescription)
     }
 }

@@ -120,7 +120,9 @@ final class PayabliTTPObjCInteropTests: XCTestCase {
         let details = PayabliTTPPaymentDetails(amount: 25.00)
         XCTAssertEqual(details.amount, 25.00)
         XCTAssertEqual(details.serviceFee, 0)
-        XCTAssertEqual(details.currency, "USD")
+        // currency defaults to nil so the wire JSON omits the field and the
+        // backend authorizes in the merchant's configured processor currency.
+        XCTAssertNil(details.currency)
         XCTAssertNil(details.paymentDescription)
     }
 
@@ -133,6 +135,14 @@ final class PayabliTTPObjCInteropTests: XCTestCase {
         )
         XCTAssertEqual(details.currency, "USD")
         XCTAssertEqual(details.paymentDescription, "Coffee")
+    }
+
+    func testPaymentDetailsSwiftDropsBlankCurrency() {
+        let details = PayabliTTPPaymentDetails(
+            amount: 10,
+            currency: "   "
+        )
+        XCTAssertNil(details.currency)
     }
 
     func testPaymentDetailsSwiftDropsBlankPaymentDescription() {
@@ -302,5 +312,27 @@ final class PayabliTTPObjCInteropTests: XCTestCase {
         )
         XCTAssertNil(objc.customerId)
         XCTAssertNil(objc.toSwift().customerId)
+    }
+
+    /// Regression: bridging from `NSNumber` to Swift `Int` must preserve
+    /// 64-bit values. Using `NSNumber.intValue` (Int32) would silently
+    /// truncate any customer record id above `Int32.max`, attaching the
+    /// charge to the wrong customer.
+    func testCustomerDataObjCCustomerIdPreserves64BitValue() {
+        let big = Int64(Int32.max) + 1   // 2_147_483_648 — overflows Int32
+        let objc = PayabliTTPCustomerDataObjC(
+            firstName: nil, lastName: nil, customerNumber: nil,
+            email: nil, phone: nil,
+            customerId: NSNumber(value: big),
+            company: nil,
+            billingAddress1: nil, billingAddress2: nil,
+            billingCity: nil, billingState: nil,
+            billingZip: nil, billingCountry: nil,
+            billingPhone: nil, billingEmail: nil,
+            shippingAddress1: nil, shippingAddress2: nil,
+            shippingCity: nil, shippingState: nil,
+            shippingZip: nil, shippingCountry: nil
+        )
+        XCTAssertEqual(objc.toSwift().customerId, Int(big))
     }
 }
