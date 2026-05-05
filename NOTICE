@@ -13,7 +13,7 @@ governed by its own license.
 
   * Fiserv FiservTTP SDK — required only when `PayabliSDKPayIn` is configured
     with the Fiserv Tap to Pay provider. Subject to the Fiserv SDK License
-    Agreement (see BR-10 in RFC-0001 §6).
+    Agreement.
 
   * Apple ProximityReader (Tap to Pay on iPhone) — provided by Apple under the
     Apple Developer Program License Agreement and the ProximityReader

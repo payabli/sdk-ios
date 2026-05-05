@@ -33,7 +33,7 @@ jobs:
       - name: Resolve dependencies
         run: |
           xcodebuild -resolvePackageDependencies \
-            -scheme PayabliTTP \
+            -scheme PayabliSDK-Package \
             -clonedSourcePackagesDirPath .build/checkouts
 
       - name: Test
@@ -52,7 +52,7 @@ jobs:
           ")
           echo "Using simulator: $SIMULATOR_ID"
           xcodebuild test \
-            -scheme PayabliTTP \
+            -scheme PayabliSDK-Package \
             -destination "platform=iOS Simulator,id=$SIMULATOR_ID" \
             -clonedSourcePackagesDirPath .build/checkouts \
             CODE_SIGNING_ALLOWED=NO \

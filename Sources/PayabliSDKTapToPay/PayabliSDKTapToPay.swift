@@ -12,7 +12,7 @@ import PayabliSDKCore
 /// > `BUILD_LIBRARY_FOR_DISTRIBUTION=YES`; and not `PayabliTTP`, which is
 /// > already the public facade class in this module). See the companion
 /// > namespaces in `PayabliSDKCore` and `PayabliSDKPayIn` for the same
-/// > rationale. RFC-0001 §5, PRD §5.
+/// > rationale.
 public enum PayabliTapToPayModule {
     public static let version: String = "1.0.0"
 }

@@ -13,7 +13,7 @@ import Foundation
 /// > `BUILD_LIBRARY_FOR_DISTRIBUTION=YES`: the generated
 /// > `.swiftinterface` writes fully-qualified type references as
 /// > `PayabliSDKCore.PayabliConfig`, which re-parses as "nested type of
-/// > the enum" and fails to resolve. See RFC-0001 §4 and PRD §28.2.
+/// > the enum" and fails to resolve when library evolution is enabled.
 public enum PayabliCore {
     public static let version = "1.0.0"
 }

@@ -10,17 +10,24 @@ swift test -v                         # Run all test targets
 swift test --filter <TestClass>       # Run a single test class
 swift test --filter <TestClass/testMethod>  # Run a single test
 ./Scripts/build_release_frameworks.sh # Build 3 distribution XCFrameworks → build/release/
-./Scripts/refresh_vendored_ttp.sh <tag>  # Re-sync ThirdParty/PayabliCardReaderCoreSource/ from Fiserv upstream
 swiftlint                             # Lint (config: .swiftlint.yml)
 swiftformat .                         # Format (config: .swiftformat)
 ```
 
 No canonical `PayabliSDK.podspec` lives in this repo — the public CocoaPods
-spec is **rendered at release time** from `.github/templates/public-PayabliSDK.podspec.tmpl`
-into the separate public distribution repo (`payabli/payabli-sdk-ios`).
+spec is produced from `.github/templates/public-PayabliSDK.podspec.tmpl` via
+`Scripts/render_public_manifests.sh` (writes `build/public/`), alongside
+matching `Package.swift` and `README.md` templates, when publishing binaries.
 
-CI runs on macOS 15 / latest Xcode via `.github/workflows/ci.yml`. Releases
-are push-triggered on `develop` / `sandbox` / `main` via `.github/workflows/release.yml`.
+CI runs on macOS 15 / latest Xcode via `.github/workflows/ci.yml` on **push
+and pull_request to `main`**. It resolves SPM deps and runs **`xcodebuild test`
+against the root SPM scheme `PayabliSDK-Package`**, not plain `swift test`.
+
+Releases are **manual**: `.github/workflows/release.yml` is triggered with
+`workflow_dispatch`. Provide a **semver** `MAJOR.MINOR.PATCH`, optional release
+notes; the workflow runs the same tests as CI, creates an **annotated git tag**
+for that version, pushes it to `origin`, and opens a **GitHub Release** with
+`gh release create`.
 
 ## Module Architecture
 
@@ -47,15 +54,15 @@ PayIn).
 
 **PayabliSDKTapToPay** — Depends on Core + `PayabliCardReaderCore` (iOS-only, platform-conditional). Hosts the entire Tap to Pay on iPhone surface: `PayabliTTP` facade (split across `+Initialize`, `+Charge`, `+Activation` companions), App Attest device attestation, session manager, retry policy, secure storage, and the `TapToPayProvider`/`Adapters/FiservCardReader` provider stack. Flat folder layout (no `TapToPay/` subfolder — the module *is* the TapToPay surface). See `Sources/PayabliSDKTapToPay/README.md` for the full file map.
 
-**PayabliSDKPayIn** — Depends on Core only. Hosts every non-TTP PayIn flow (tokenization, getpaid, Apple Pay, card / ACH forms). Folder rules are below — **when adding a file, pick the folder from the table; don't invent new folders without updating the PRD §7.2 section**.
+**PayabliSDKPayIn** — Depends on Core only. Hosts every non-TTP PayIn flow (tokenization, getpaid, Apple Pay, card / ACH forms). Folder rules are below — **when adding a file, pick the folder from the table; don't invent new folders without updating PRD section 7.2**.
 
-**PayabliCardReaderCore** — Vendored MIT-licensed source of `Fiserv/TTPPackage` compiled under the module name `PayabliCardReaderCore`. Source lives under `ThirdParty/PayabliCardReaderCoreSource/Sources/PayabliCardReaderCore/` and is **byte-identical** to upstream; every file preserves the original Fiserv copyright header. The module rename is achieved at the SPM target level only — do not edit class names in the vendored source. Re-sync with `./Scripts/refresh_vendored_ttp.sh <tag>`; see `ThirdParty/PayabliCardReaderCoreSource/README.md` for the vendoring contract.
+**PayabliCardReaderCore** — Vendored MIT-licensed source of `Fiserv/TTPPackage` compiled under the module name `PayabliCardReaderCore`. Source lives under `ThirdParty/PayabliCardReaderCoreSource/Sources/PayabliCardReaderCore/` and is **byte-identical** to upstream; every file preserves the original Fiserv copyright header. The module rename is achieved at the SPM target level only — do not edit class names in the vendored source. To refresh from upstream, replace the vendored Swift files from [`Fiserv/TTPPackage`](https://github.com/Fiserv/TTPPackage) at the desired tag, update the pin table in `ThirdParty/PayabliCardReaderCoreSource/README.md`, and run `swift build` / `swift test` before committing.
 
 **PayabliSDKTelemetry** — Depends on Core only. Optional observability with Sentry and PostHog transports (bring-your-own-instance). Opt-out via `PayabliConfig.telemetryEnabled`.
 
 ## Folder Layout (PayabliSDKPayIn)
 
-Strict, per PRD §7.2. Each folder owns a single concern; cross-folder imports are fine but file placement is not.
+Strict, per PRD section 7.2. Each folder owns a single concern; cross-folder imports are fine but file placement is not.
 
 
 | Folder        | What goes here                                                                                                                                                                                                                                                                                                                                                                                             | What does NOT                                           |
@@ -82,7 +89,7 @@ Rules of thumb when unsure:
 
 **Auth flow**: On 401, `PayabliAuth.invalidateAndRefresh()` calls the host app's `PayabliConfig.tokenProvider()` callback. Concurrent 401s are deduplicated via a stored `Task` (`inFlightRefresh`).
 
-**Companion files**: Large facades are split across `+Extension.swift` files (e.g., `PayabliTTP+Initialize.swift`, `PayabliTTP+Charge.swift`, `PayabliPayIn+Async.swift`). This is intentional per PRD §7.2 — don't consolidate them. Companion files live in the same folder as their principal type.
+**Companion files**: Large facades are split across `+Extension.swift` files (e.g., `PayabliTTP+Initialize.swift`, `PayabliTTP+Charge.swift`, `PayabliPayIn+Async.swift`). This is intentional per PRD section 7.2 — don't consolidate them. Companion files live in the same folder as their principal type.
 
 **Platform gating**: `PayabliCardReaderCore` is iOS-only via `.when(platforms: [.iOS])` in Package.swift, so macOS builds compile without TTP. Guard TTP-specific code with `#if canImport(PayabliCardReaderCore)` or `#if os(iOS)`.
 
@@ -102,15 +109,15 @@ Rules of thumb when unsure:
 | Folder          | Purpose                                                                                                                                                                                                                             |
 | --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `Sources/`      | First-party Payabli code across `PayabliSDKCore`, `PayabliSDKPayIn`, `PayabliSDKTapToPay`, `PayabliSDKTelemetry`. Module-scoped folder rules per `PayabliSDKPayIn` above; `PayabliSDKTapToPay` keeps a flat layout (see `Sources/PayabliSDKTapToPay/README.md`).            |
-| `ThirdParty/`   | Vendored MIT / Apache source from upstream projects, kept byte-identical. Today: `PayabliCardReaderCoreSource/` (re-sync via `Scripts/refresh_vendored_ttp.sh`). Each subfolder **must** carry a `README.md` documenting the vendoring contract. |
-| `Scripts/`      | Build, release, and maintenance shell scripts. `build_release_frameworks.sh` (distribution XCFrameworks), `compute_version.sh` (auto-version), `render_public_manifests.sh`, `upload_release.sh`, `push_to_public_repo.sh`, `refresh_vendored_ttp.sh`. |
-| `.github/`      | CI workflows (`ci.yml`, `release.yml`) and rendering templates (`templates/public-*.tmpl`) for the public distribution repo. Workflows in this repo push artifacts + rendered manifests to the public mirror.                        |
+| `ThirdParty/`   | Vendored MIT / Apache source from upstream projects, kept byte-identical. Today: `PayabliCardReaderCoreSource/` (upstream [`Fiserv/TTPPackage`](https://github.com/Fiserv/TTPPackage); contract in `ThirdParty/PayabliCardReaderCoreSource/README.md`). Each subfolder **must** carry a `README.md` documenting the vendoring contract. |
+| `Scripts/`      | `build_release_frameworks.sh` (XCFramework zips → `build/release/`), `render_public_manifests.sh` (templates → `build/public/`), `upload_release.sh` (upload `build/release/` zips to S3 when credentials are configured). |
+| `.github/`      | CI (`ci.yml`), release (`release.yml`), and `templates/public-*.tmpl` inputs for `render_public_manifests.sh`.                                                                                         |
 | `Tests/`        | `XCTest` targets per module plus `PayabliSDKIntegrationTests` (requires `PAYABLI_SANDBOX_*` env vars).                                                                                                                               |
-| `Example/`      | `PayabliDemo` sample app + integration docs for internal Payabli apps.                                                                                                                                                              |
+| `Example/`      | `PayabliDemo` sample app (Xcode project uses the `PayabliTTP` scheme); CI builds/tests the repo-root **`PayabliSDK-Package`** scheme instead.                                                                                                                      |
 | `Bridges/`      | Flutter / .NET MAUI / React Native bridge code, consumed by their respective host toolchains. Not built by `swift build`.                                                                                                          |
-| `docs/`         | Release runbook and operational documentation (`RELEASE.md`).                                                                                                                                                                        |
 | `THIRD_PARTY_LICENSES.txt` | MIT attribution for every vendored dependency. Required to ship alongside the distribution zip.                                                                                                                                     |
-| `VERSION`       | `major.minor` baseline (e.g. `1.0`). CI auto-derives patch number from `git rev-list --count HEAD`. Edit only for intentional major/minor bumps.                                                                                  |
+
+**Versioning:** There is no checked-in `VERSION` file. Release versions are **explicit semver strings** passed into the Release workflow; CI does not auto-bump patch from commit count.
 
 ## Bridging (non-SPM)
 
@@ -118,8 +125,6 @@ Rules of thumb when unsure:
 
 ## Reference
 
-- `RFC-0001-payabli-sdk-ios.md` — implementation roadmap and architecture decisions; consult before changing module boundaries or error model
+- `README.md` — consumer-facing overview and repo layout for this branch
 - `ThirdParty/PayabliCardReaderCoreSource/README.md` — vendoring contract for the Fiserv TTP MIT source
-- `docs/RELEASE.md` — release runbook (promotion flow develop → sandbox → main, rollback, troubleshooting)
 - `Example/PayabliDemo/` — requires `Config.xcconfig` (copy from `.sample` and fill sandbox credentials)
-
