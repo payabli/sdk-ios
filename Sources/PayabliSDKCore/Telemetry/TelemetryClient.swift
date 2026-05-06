@@ -7,24 +7,6 @@ public protocol TelemetryTransport: Sendable {
     func send(_ batch: [TelemetryEvent]) async
 }
 
-/// In-memory transport that records batches. Useful for tests + as a default
-/// when the host app has `telemetryEnabled = false`.
-public actor InMemoryTelemetryTransport: TelemetryTransport {
-    public private(set) var batches: [[TelemetryEvent]] = []
-
-    public init() {}
-
-    public func send(_ batch: [TelemetryEvent]) async {
-        batches.append(batch)
-    }
-
-    public func drainBatches() -> [[TelemetryEvent]] {
-        let snapshot = batches
-        batches.removeAll()
-        return snapshot
-    }
-}
-
 /// Batched, best-effort, opt-out telemetry client (PRD §24).
 ///
 /// - **Opt-out:** disabled when `PayabliConfig.telemetryEnabled == false` (NFR-18).
