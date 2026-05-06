@@ -95,6 +95,28 @@ final class PayabliAuthTests: XCTestCase {
             XCTFail("wrong error: \(error)")
         }
     }
+
+    func testTokenChangesEmitsAfterRefresh() async throws {
+        let config = PayabliConfig(
+            accessToken: "old",
+            tokenProvider: { "new" },
+            entryPoint: "demo",
+            environment: .sandbox
+        )
+        let auth = PayabliAuth(config: config)
+
+        let stream = await auth.tokenChanges()
+        let collector = Task<String?, Never> {
+            for await token in stream {
+                return token
+            }
+            return nil
+        }
+
+        _ = try await auth.invalidateAndRefresh()
+        let received = await collector.value
+        XCTAssertEqual(received, "new")
+    }
 }
 
 /// Simple actor counter for tracking concurrent calls in tests.
