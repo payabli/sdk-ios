@@ -134,6 +134,11 @@ let package = Package(
             name: "PayabliSDKTelemetryTests",
             dependencies: ["PayabliSDKTelemetry", "PayabliSDKTestUtils"],
             path: "Tests/PayabliSDKTelemetryTests"
+        ),
+        .testTarget(
+            name: "PayabliSDKTestUtilsTests",
+            dependencies: ["PayabliSDKTestUtils"],
+            path: "Tests/PayabliSDKTestUtilsTests"
         )
     ]
 )
