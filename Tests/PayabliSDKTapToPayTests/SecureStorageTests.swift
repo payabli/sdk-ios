@@ -1,5 +1,5 @@
 import XCTest
-import PayabliSDKTapToPay
+@testable import PayabliSDKTapToPay
 import PayabliSDKTestUtils
 
 final class SecureStorageTests: XCTestCase {
