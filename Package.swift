@@ -115,8 +115,7 @@ let package = Package(
             name: "PayabliSDKTestUtils",
             dependencies: [
                 "PayabliSDKCore",
-                "PayabliSDKTapToPay",
-                "PayabliSDKTelemetry"
+                "PayabliSDKTapToPay"
             ],
             path: "Sources/PayabliSDKTestUtils"
         ),
