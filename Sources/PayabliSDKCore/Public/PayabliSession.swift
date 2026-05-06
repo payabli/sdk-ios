@@ -34,4 +34,11 @@ public final class PayabliSession: @unchecked Sendable {
             session: urlSession
         )
     }
+
+    /// Transport that every endpoint client should consume. Wraps the
+    /// session's `PayabliService` with bearer-auth injection and 401
+    /// refresh-and-retry.
+    public var transport: any PayabliTransport {
+        AuthenticatedTransport(base: service, auth: auth)
+    }
 }
