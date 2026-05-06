@@ -1,5 +1,5 @@
 import Foundation
-@testable import PayabliSDKTapToPay
+import PayabliSDKTapToPay
 
 final class MockAppAttestor: AppAttestor, @unchecked Sendable {
     var isSupported: Bool = true
