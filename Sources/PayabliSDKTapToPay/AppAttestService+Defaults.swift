@@ -10,7 +10,7 @@ import UIKit
 
 extension AppAttestService {
 
-    public static var defaultHardwareId: @Sendable () -> String {
+    internal static var defaultHardwareId: @Sendable () -> String {
         {
             #if canImport(UIKit)
             return UIDevice.current.identifierForVendor?.uuidString ?? UUID().uuidString
@@ -20,7 +20,7 @@ extension AppAttestService {
         }
     }
 
-    public static var defaultDeviceName: @Sendable () -> String {
+    internal static var defaultDeviceName: @Sendable () -> String {
         {
             #if canImport(UIKit)
             return UIDevice.current.name
@@ -30,7 +30,7 @@ extension AppAttestService {
         }
     }
 
-    public static var defaultModel: @Sendable () -> String {
+    internal static var defaultModel: @Sendable () -> String {
         {
             var sysinfo = utsname()
             uname(&sysinfo)
@@ -41,7 +41,7 @@ extension AppAttestService {
         }
     }
 
-    public static var defaultOSVersion: @Sendable () -> String {
+    internal static var defaultOSVersion: @Sendable () -> String {
         {
             #if canImport(UIKit)
             return UIDevice.current.systemVersion
