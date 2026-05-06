@@ -7,11 +7,11 @@ import Foundation
 ///
 /// Endpoint clients that need bearer auth depend on this transport rather
 /// than open-coding the header / retry dance themselves.
-public struct AuthenticatedTransport: PayabliTransport {
+internal struct AuthenticatedTransport: PayabliTransport {
     private let base: any PayabliTransport
     private let auth: PayabliAuth
 
-    public init(base: any PayabliTransport, auth: PayabliAuth) {
+    internal init(base: any PayabliTransport, auth: PayabliAuth) {
         self.base = base
         self.auth = auth
     }
