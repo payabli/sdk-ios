@@ -171,9 +171,10 @@ extension PayabliTTP {
         )
     }
 
-    /// Runs `PATCH /update/{paymentTransId}` with retry. 401 → one token
-    /// refresh + retry (FR-11D.5). Returns a typed outcome so callers don't
-    /// have to guess at `Bool` semantics.
+    /// Runs `PATCH /update/{paymentTransId}` with retry. Bearer auth and
+    /// 401 refresh-and-retry are delegated to `session.transport`
+    /// (FR-11D.5). Returns a typed outcome so callers don't have to guess
+    /// at `Bool` semantics.
     private func tryUpdate(
         paymentTransId: String,
         payload: TTPUpdatePayload
@@ -182,15 +183,13 @@ extension PayabliTTP {
         let logger = self.logger
         let bodyDump = String(data: body, encoding: .utf8) ?? "<non-utf8 \(body.count) bytes>"
         let path = "/api/v2/MoneyIn/update/\(paymentTransId)"
+        let transport = self.session.transport
 
-        @Sendable func performOnce(token: String, attempt: String) async throws -> PayabliResponse {
+        @Sendable func performOnce(attempt: String) async throws -> PayabliResponse {
             let request = PayabliRequest(
                 method: .patch,
                 path: path,
-                headers: [
-                    "Authorization": "Bearer \(token)",
-                    "Content-Type": "application/json"
-                ],
+                headers: ["Content-Type": "application/json"],
                 body: body
             )
             let headersDump = request.headers
@@ -200,25 +199,17 @@ extension PayabliTTP {
             logger.info("[update/\(attempt)] → PATCH \(path)")
             logger.info("[update/\(attempt)] headers: \(headersDump)")
             logger.info("[update/\(attempt)] body: \(bodyDump)")
-            let response = try await service.perform(request)
+            let response = try await transport.perform(request)
             let responseBody = String(data: response.body, encoding: .utf8) ?? "<non-utf8 \(response.body.count) bytes>"
             logger.info("[update/\(attempt)] ← [\(response.statusCode)] body: \(responseBody)")
             return response
         }
 
         do {
-            try await Retry.run(policy: retryPolicy) { [retryPolicy, auth] _ in
-                let token = await auth.currentAccessToken()
-                var response = try await performOnce(token: token, attempt: "first")
+            try await Retry.run(policy: retryPolicy) { [retryPolicy] attempt in
+                let response = try await performOnce(attempt: String(attempt))
 
-                if response.statusCode == 401 {
-                    let refreshed = try await auth.invalidateAndRefresh()
-                    response = try await performOnce(token: refreshed, attempt: "refreshed")
-                }
-
-                if (200..<300).contains(response.statusCode) {
-                    return
-                }
+                if (200..<300).contains(response.statusCode) { return }
                 if retryPolicy.isRetryable(statusCode: response.statusCode) {
                     throw RetryableError(PayabliTTPError.updateFailed(
                         reason: "HTTP \(response.statusCode)"
