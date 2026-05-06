@@ -42,6 +42,30 @@ final class AuthenticatedTransportTests: XCTestCase {
         XCTAssertEqual(captured[1].headers["Authorization"], "Bearer new")
     }
 
+    func testPerformV2MapsNon2xxToTypedError() async {
+        let mock = MockTransport(scripted: [
+            .response(statusCode: 500, body: Data("{}".utf8))
+        ])
+        let auth = PayabliAuth(config: PayabliConfig(
+            accessToken: "tok",
+            entryPoint: "demo",
+            environment: .sandbox
+        ))
+        let decorator = AuthenticatedTransport(base: mock, auth: auth)
+        let request = PayabliRequest(method: .get, path: "/x")
+
+        do {
+            let _: PayabliV2Envelope<DummyPayload> = try await decorator.performV2(request, decoding: DummyPayload.self)
+            XCTFail("expected throw")
+        } catch is PayabliPaymentError {
+            // HTTP 500 with decodable body → .server; mapPayabliHTTPError ran correctly
+        } catch is PayabliGenericError {
+            // Fallback: .unknown if body didn't decode to PayabliServerError; mapping still ran
+        } catch {
+            XCTFail("wrong error: \(type(of: error)) - \(error)")
+        }
+    }
+
     func testThrowsTokenExpiredAfterDouble401() async {
         let mock = MockTransport(scripted: [
             .response(statusCode: 401, body: Data()),
@@ -65,6 +89,8 @@ final class AuthenticatedTransportTests: XCTestCase {
         }
     }
 }
+
+private struct DummyPayload: Decodable, Sendable {}
 
 actor MockTransport: PayabliTransport {
     enum Scripted: Sendable {

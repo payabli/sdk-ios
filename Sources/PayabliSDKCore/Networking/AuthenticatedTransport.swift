@@ -38,6 +38,7 @@ public struct AuthenticatedTransport: PayabliTransport {
         decoding: T.Type
     ) async throws -> PayabliV2Envelope<T> {
         let response = try await perform(request)
+        try mapPayabliHTTPError(response: response)
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         do {
