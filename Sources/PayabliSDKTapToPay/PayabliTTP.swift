@@ -277,34 +277,3 @@ public final class PayabliTTPEventToken: NSObject {
     }
 }
 
-// MARK: - Internal helpers
-
-/// Box that lets us thread an ObjC block through a Swift `@Sendable` closure.
-/// ObjC blocks are heap-allocated and copy-on-capture, but Swift can't infer
-/// `@Sendable` for the input function type, so we opt out of the check
-/// explicitly at the boundary. Used by the `@objc` convenience init only.
-struct UncheckedSendableBox<Value>: @unchecked Sendable {
-    let value: Value
-    init(_ value: Value) { self.value = value }
-}
-
-/// Tiny `NSLock`-backed reference cell used as a one-shot guard when bridging
-/// ObjC completion blocks into a `CheckedContinuation`. We can't trust the
-/// host to invoke the block exactly once — and `CheckedContinuation` will
-/// crash on the second `resume` — so the bridge serializes "did I already
-/// resume?" through this cell. Reference type so closures can mutate the
-/// shared state without `var` capture warnings under strict concurrency.
-final class Locked<Value>: @unchecked Sendable {
-    private let lock = NSLock()
-    private var value: Value
-
-    init(_ value: Value) { self.value = value }
-
-    /// Mutates and returns whatever the caller derives from the protected
-    /// state, atomically. Use the inout argument to read+write.
-    func withLock<R>(_ body: (inout Value) -> R) -> R {
-        lock.lock()
-        defer { lock.unlock() }
-        return body(&value)
-    }
-}
