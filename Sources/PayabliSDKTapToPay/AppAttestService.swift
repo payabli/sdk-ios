@@ -30,8 +30,7 @@ import PayabliSDKCore
 ///   - `AppAttestWireFormat.swift`         — request/response DTOs
 public final class AppAttestService: DeviceAttestationService, @unchecked Sendable {
 
-    let service: PayabliService
-    let auth: PayabliAuth
+    let transport: any PayabliTransport
     let attestor: AppAttestor
     let storage: SecureStorage
     let logger = PayabliLogger(category: .taptopay)
@@ -43,14 +42,12 @@ public final class AppAttestService: DeviceAttestationService, @unchecked Sendab
     let osVersionProvider: @Sendable () -> String
 
     public convenience init(
-        service: PayabliService,
-        auth: PayabliAuth,
+        transport: any PayabliTransport,
         attestor: AppAttestor,
         storage: SecureStorage
     ) {
         self.init(
-            service: service,
-            auth: auth,
+            transport: transport,
             attestor: attestor,
             storage: storage,
             hardwareIdProvider: AppAttestService.defaultHardwareId,
@@ -61,8 +58,7 @@ public final class AppAttestService: DeviceAttestationService, @unchecked Sendab
     }
 
     internal init(
-        service: PayabliService,
-        auth: PayabliAuth,
+        transport: any PayabliTransport,
         attestor: AppAttestor,
         storage: SecureStorage,
         hardwareIdProvider: @Sendable @escaping () -> String,
@@ -70,8 +66,7 @@ public final class AppAttestService: DeviceAttestationService, @unchecked Sendab
         modelProvider: @Sendable @escaping () -> String,
         osVersionProvider: @Sendable @escaping () -> String
     ) {
-        self.service = service
-        self.auth = auth
+        self.transport = transport
         self.attestor = attestor
         self.storage = storage
         self.hardwareIdProvider = hardwareIdProvider

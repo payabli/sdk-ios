@@ -94,6 +94,11 @@ extension AppAttestService {
     /// Bearer + (optional) assertion headers, logging, HTTP error mapping, and
     /// the "HTTP 200 with `isSuccess: false`" decline check. Returns the raw
     /// response so the two public variants above can decide how to decode.
+    ///
+    /// Bearer injection and 401 refresh-and-retry are handled by the
+    /// `transport` decorator (`AuthenticatedTransport`); this method only
+    /// appends the App Attest assertion headers that are specific to the
+    /// attestation/activation endpoint family.
     private func performAuthenticatedPOST<Body: Encodable>(
         path: String,
         body: Body,
@@ -101,8 +106,7 @@ extension AppAttestService {
         assertion: AssertionHeaders?,
         makeDeclineError: (_ code: Int?, _ reason: String) -> PayabliTTPError
     ) async throws -> PayabliResponse {
-        let token = await auth.currentAccessToken()
-        var headers = ["Authorization": "Bearer \(token)"]
+        var headers: [String: String] = [:]
         if let assertion {
             headers.merge(assertion.asDictionary) { _, new in new }
         }
@@ -124,7 +128,7 @@ extension AppAttestService {
 
         let response: PayabliResponse
         do {
-            response = try await service.perform(request)
+            response = try await transport.perform(request)
         } catch {
             logger.error("[\(label)] transport error: \(error.localizedDescription)")
             throw error
@@ -134,7 +138,7 @@ extension AppAttestService {
         logger.info("[\(label)] ← [\(response.statusCode)] body: \(responseBody)")
 
         do {
-            try service.mapHTTPError(response: response)
+            try mapPayabliHTTPError(response: response)
         } catch {
             logger.error("[\(label)] HTTP error: \(error.localizedDescription)")
             throw error
