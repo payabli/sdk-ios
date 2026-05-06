@@ -42,15 +42,33 @@ public final class AppAttestService: DeviceAttestationService, @unchecked Sendab
     let modelProvider: @Sendable () -> String
     let osVersionProvider: @Sendable () -> String
 
-    public init(
+    public convenience init(
+        service: PayabliService,
+        auth: PayabliAuth,
+        attestor: AppAttestor,
+        storage: SecureStorage
+    ) {
+        self.init(
+            service: service,
+            auth: auth,
+            attestor: attestor,
+            storage: storage,
+            hardwareIdProvider: AppAttestService.defaultHardwareId,
+            deviceNameProvider: AppAttestService.defaultDeviceName,
+            modelProvider: AppAttestService.defaultModel,
+            osVersionProvider: AppAttestService.defaultOSVersion
+        )
+    }
+
+    internal init(
         service: PayabliService,
         auth: PayabliAuth,
         attestor: AppAttestor,
         storage: SecureStorage,
-        hardwareIdProvider: @Sendable @escaping () -> String = AppAttestService.defaultHardwareId,
-        deviceNameProvider: @Sendable @escaping () -> String = AppAttestService.defaultDeviceName,
-        modelProvider: @Sendable @escaping () -> String = AppAttestService.defaultModel,
-        osVersionProvider: @Sendable @escaping () -> String = AppAttestService.defaultOSVersion
+        hardwareIdProvider: @Sendable @escaping () -> String,
+        deviceNameProvider: @Sendable @escaping () -> String,
+        modelProvider: @Sendable @escaping () -> String,
+        osVersionProvider: @Sendable @escaping () -> String
     ) {
         self.service = service
         self.auth = auth
