@@ -35,6 +35,7 @@ public struct RetryPolicy: Sendable {
         multiplier: Double,
         maxJitter: TimeInterval
     ) {
+        precondition(maxAttempts >= 1, "RetryPolicy requires at least 1 attempt")
         self.maxAttempts = maxAttempts
         self.baseDelay = baseDelay
         self.maxDelay = maxDelay

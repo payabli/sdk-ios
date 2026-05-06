@@ -12,6 +12,12 @@ final class RetryPolicyTests: XCTestCase {
         XCTAssertEqual(policy.maxJitter, 0.5)
     }
 
+    func testMinimumValidMaxAttempts() {
+        // maxAttempts == 1 is the minimum valid value; construction must not trap.
+        let policy = RetryPolicy(maxAttempts: 1, baseDelay: 0, maxDelay: 0, multiplier: 1, maxJitter: 0)
+        XCTAssertEqual(policy.maxAttempts, 1)
+    }
+
     func testDelayForAttempt() {
         let policy = RetryPolicy(maxAttempts: 4, baseDelay: 1, maxDelay: 8, multiplier: 2, maxJitter: 0)
         XCTAssertEqual(policy.delay(forAttempt: 1), 0)
