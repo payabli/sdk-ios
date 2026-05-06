@@ -91,9 +91,9 @@ The application's provisioning profile requires two entitlements:
    Set to `production` for release builds, or `development` for development
    builds. The value must match the `environment` passed to `PayabliTTP`.
 
-### Payabli entry point
+### Payabli entrypoint
 
-You need a Tap to Pay-enabled entry point provisioned by Payabli.
+You need a Tap to Pay-enabled entrypoint provisioned by Payabli.
 The entrypoint slug (example: `acmePay`) is supplied to the SDK
 as the `entryPoint` constructor parameter and is also the path
 component of the merchant dashboard URL
@@ -104,7 +104,7 @@ component of the merchant dashboard URL
 To do attestation successfully, you must authorize the application's `appId` (`<TEAM_ID>.<BUNDLE_ID>`)
 on the entrypoint allowlist. Two methods are supported:
 
-- **Dashboard.** Sign in to the entry point at
+- **Dashboard.** Sign in to the entrypoint at
   `https://app.payabli.com/<entryPoint>/signin` (sandbox:
   `https://app-sandbox.payabli.com/<entryPoint>/signin`), navigate to
   **Settings → Devices → Authorized Apps**, and add the `appId`.
@@ -205,7 +205,7 @@ let ttp = PayabliTTP(
 | ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `accessToken`    | A valid short-lived bearer token issued by the host backend.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | `tokenProvider`  | An `async throws -> String` closure. The SDK invokes it to obtain a fresh token after a `401 Unauthorized` response. Concurrent refresh attempts are deduplicated.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| `entryPoint`     | The entrypoint slug provisioned by Payabli (see [Payabli entry point](#payabli-entry-point)).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `entryPoint`     | The entrypoint slug provisioned by Payabli (see [Payabli entrypoint](#payabli-entry-point)).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | `appId`          | The application's identity in the form `<TEAM_ID>.<BUNDLE_ID>`. The `TEAM_ID` is the 10-character team identifier from the [Apple Developer account](https://developer.apple.com/account); the `BUNDLE_ID` is the application's bundle identifier (e.g., `TEAM123456.com.acme.checkout`). The same `appId` must be authorized on the paypoint allowlist (see [Authorized application on the paypoint allowlist](#authorized-application-on-the-paypoint-allowlist)). App Attest uses `appId` to verify that the binary on the device matches the registered application; a mismatch surfaces as `PayabliTTPError.attestationFailed`. |
 | `environment`    | Selects the target Payabli API (see the values table below). The value must match the `appattest-environment` entitlement: `development` for `.sandbox`, `production` for `.production`.                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 
