@@ -28,7 +28,7 @@ public final class PayabliService: PayabliTransport, Sendable {
         self.logger = PayabliLogger(category: .network)
     }
 
-    private static func makeDefaultSession() -> URLSession {
+    internal static func makeDefaultSession() -> URLSession {
         let config = URLSessionConfiguration.ephemeral
         config.timeoutIntervalForRequest = defaultRequestTimeout
         config.timeoutIntervalForResource = defaultRequestTimeout * 3
