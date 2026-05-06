@@ -71,6 +71,54 @@ public final class PayabliTTP: NSObject, ObservableObject {
 
     // MARK: - Init
 
+    /// Designated init. Shares a single `PayabliAuth` + `PayabliService`
+    /// across every component facade constructed with the same `PayabliSession`.
+    public init(
+        session: PayabliSession,
+        appId: String,
+        provider: TapToPayProvider,
+        attestation: DeviceAttestationService,
+        retryPolicy: RetryPolicy = .default
+    ) {
+        self.entryPoint = session.config.entryPoint
+        self.appId = appId
+        self.environment = session.config.environment
+        self.provider = provider
+        self.attestation = attestation
+        self.retryPolicy = retryPolicy
+
+        self.service = session.service
+        self.auth = session.auth
+        self.transactionClient = TTPTransactionClient(service: session.service, auth: session.auth)
+        self.configClient = TTPConfigClient(
+            service: session.service,
+            auth: session.auth,
+            attestation: attestation
+        )
+        super.init()
+    }
+
+    /// Convenience init that wraps a `PayabliConfig` in a fresh
+    /// `PayabliSession`. Use the `session:` init when you need to share auth
+    /// across multiple component facades on the same config.
+    public convenience init(
+        config: PayabliConfig,
+        appId: String,
+        provider: TapToPayProvider,
+        attestation: DeviceAttestationService,
+        retryPolicy: RetryPolicy = .default,
+        session: URLSession? = nil
+    ) {
+        let payabliSession = PayabliSession(config: config, urlSession: session)
+        self.init(
+            session: payabliSession,
+            appId: appId,
+            provider: provider,
+            attestation: attestation,
+            retryPolicy: retryPolicy
+        )
+    }
+
     /// PRD §19.1 convenience init. Wires the default `FiservCardReader`
     /// provider and a real `AppAttestService` with Keychain-backed storage.
     ///
@@ -97,50 +145,22 @@ public final class PayabliTTP: NSObject, ObservableObject {
             entryPoint: entryPoint,
             environment: environment
         )
-        let service = PayabliService(environment: environment)
-        let auth = PayabliAuth(config: config)
+        let payabliSession = PayabliSession(config: config)
         let storage: SecureStorage = KeychainStorage()
         let attestation = AppAttestService(
-            service: service,
-            auth: auth,
+            service: payabliSession.service,
+            auth: payabliSession.auth,
             attestor: RealAppAttestor(),
             storage: storage
         )
         self.init(
-            config: config,
+            session: payabliSession,
             appId: appId,
             provider: FiservCardReader(),
             attestation: attestation
         )
     }
     #endif
-
-    /// Full-dependency init. Prefer the `accessToken` convenience init for
-    /// production; this one is mainly for tests and power users that need to
-    /// inject a custom provider or attestation service.
-    public init(
-        config: PayabliConfig,
-        appId: String,
-        provider: TapToPayProvider,
-        attestation: DeviceAttestationService,
-        retryPolicy: RetryPolicy = .default,
-        session: URLSession? = nil
-    ) {
-        self.entryPoint = config.entryPoint
-        self.appId = appId
-        self.environment = config.environment
-        self.provider = provider
-        self.attestation = attestation
-        self.retryPolicy = retryPolicy
-
-        let service = PayabliService(environment: config.environment, session: session)
-        let auth = PayabliAuth(config: config)
-        self.service = service
-        self.auth = auth
-        self.transactionClient = TTPTransactionClient(service: service, auth: auth)
-        self.configClient = TTPConfigClient(service: service, auth: auth, attestation: attestation)
-        super.init()
-    }
 
     /// `@objc`-friendly convenience init for ObjC / MAUI / sharpie consumers
     /// that can't represent the Swift `PayabliTokenRefresh` (`@Sendable () async
