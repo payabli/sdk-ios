@@ -1,5 +1,5 @@
 import XCTest
-@testable import PayabliSDKTapToPay
+import PayabliSDKTapToPay
 
 /// Guards the public mapping between `PayabliTTPEvent` (Swift enum with
 /// associated values) and `PayabliTTPEventCode` (`@objc Int` enum) plus the
