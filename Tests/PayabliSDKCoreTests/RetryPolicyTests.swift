@@ -1,5 +1,5 @@
 import XCTest
-@testable import PayabliSDKTapToPay
+@testable import PayabliSDKCore
 
 final class RetryPolicyTests: XCTestCase {
 

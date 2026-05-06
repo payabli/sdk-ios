@@ -88,6 +88,9 @@ public enum Retry {
                 throw error
             }
         }
-        throw lastUnderlying ?? PayabliTTPError.updateFailed(reason: "Exhausted retries")
+        throw lastUnderlying ?? PayabliGenericError(
+            code: .networkError,
+            reason: "Exhausted retries"
+        )
     }
 }
