@@ -15,55 +15,50 @@ public struct TTPConfig: Sendable {
 /// Client for the attestation-protected config endpoint (PRD §8.2).
 ///
 /// Requires `X-App-Assertion`, `X-App-KeyId`, `X-Device-Id`, `X-Assertion-Timestamp`.
+/// Bearer-auth injection and HTTP 401 refresh-and-retry are delegated to the
+/// `PayabliTransport` passed at init — callers should supply `session.transport`.
+/// Attestation headers are component-specific and are added inline.
 public final class TTPConfigClient: Sendable {
-    private let service: PayabliService
-    private let auth: PayabliAuth
+    private let transport: any PayabliTransport
     private let attestation: DeviceAttestationService
     private let logger = PayabliLogger(category: .taptopay)
 
     public init(
-        service: PayabliService,
-        auth: PayabliAuth,
+        transport: any PayabliTransport,
         attestation: DeviceAttestationService
     ) {
-        self.service = service
-        self.auth = auth
+        self.transport = transport
         self.attestation = attestation
     }
 
-    /// Fetches the TTP config for the given `entry`. On 401, throws
-    /// `.tokenExpired` — callers should clear attestation cache and re-attest
-    /// (PRD §18.4).
+    /// Fetches the TTP config for the given `entry`. On 401 (after transport
+    /// refresh-and-retry exhaustion), the underlying `PayabliGenericError(.tokenExpired)`
+    /// propagates — callers should clear attestation cache and re-attest (PRD §18.4).
     ///
     /// The SDK flattens `credentials` into `TTPConfig.providerCredentials`
     /// for the TapToPayProvider to consume.
     public func fetchConfig(entry: String) async throws -> TTPConfig {
         let headers = try await assertionHeaders()
-        let token = await auth.currentAccessToken()
 
-        let merged = headers.asDictionary.merging(["Authorization": "Bearer \(token)"]) { current, _ in current }
-
+        // Attestation headers are component-specific; bearer is added by the transport.
         let request = PayabliRequest(
             method: .get,
             path: "/api/v2/device/taptopay/config/\(entry)",
-            headers: merged
+            headers: headers.asDictionary
         )
 
-        let headersDump = merged
+        let headersDump = headers.asDictionary
             .map { "\($0.key): \($0.value)" }
             .sorted()
             .joined(separator: " | ")
         logger.info("[config] → GET \(request.path)")
         logger.info("[config] headers: \(headersDump)")
 
-        let response = try await service.perform(request)
+        let response = try await transport.perform(request)
 
         let responseBody = String(data: response.body, encoding: .utf8) ?? "<non-utf8 \(response.body.count) bytes>"
         logger.info("[config] ← [\(response.statusCode)] body: \(responseBody)")
 
-        if response.statusCode == 401 {
-            throw PayabliGenericError(code: .tokenExpired, reason: "Config endpoint returned 401")
-        }
         if response.statusCode == 403 {
             throw PayabliTTPError.devicePendingActivation
         }

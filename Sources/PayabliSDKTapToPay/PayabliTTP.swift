@@ -91,8 +91,7 @@ public final class PayabliTTP: NSObject, ObservableObject {
         self.auth = session.auth
         self.transactionClient = TTPTransactionClient(transport: session.transport)
         self.configClient = TTPConfigClient(
-            service: session.service,
-            auth: session.auth,
+            transport: session.transport,
             attestation: attestation
         )
         super.init()
