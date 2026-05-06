@@ -460,35 +460,35 @@ This assessment was implemented in full on branch `worktree-assessment+swift-lib
 
 | Finding | Status | Resolved by |
 | ------- | ------ | ----------- |
-| F1 — PayabliAuth shared via Core (Proposal A) | ✅ resolved | `8fb0962`, `89772b5` |
-| F2 — PayabliConfig as value type | ✅ resolved | `4e90e23` |
-| F3 — RetryPolicy → Core | ✅ resolved | `6f9cdd1` |
-| F4 — EventMulticaster generic + Core | ✅ resolved | `3469ca7` |
-| F5 — PayabliTransport protocol (Proposal B) | ✅ resolved | `227389e`, `fb3cbad`, `75f4ee7`, `dd8cec7`, `2bf1063`, `49b4b94` |
-| F6 — 401 retry centralized in transport | ✅ resolved | `b0ea0aa` |
-| F7 — TapToPayProviderFactory deleted (Proposal D) | ✅ resolved | `b1fc159` |
+| F1 — PayabliAuth shared via Core (Proposal A) | ✅ resolved | `8f4798e`, `cff0a24` |
+| F2 — PayabliConfig as value type | ✅ resolved | `67f01f5` |
+| F3 — RetryPolicy → Core | ✅ resolved | `c4aee9e` |
+| F4 — EventMulticaster generic + Core | ✅ resolved | `3435f11` |
+| F5 — PayabliTransport protocol (Proposal B) | ✅ resolved | `1b6c910`, `f5d1e5a`, `4989d1b`, `d68c06b`, `d4b5255`, `bacdff5` |
+| F6 — 401 retry centralized in transport | ✅ resolved | `3ef2eef` |
+| F7 — TapToPayProviderFactory deleted (Proposal D) | ✅ resolved | `516b2e2` |
 | F8 — PayabliTTP ivar access modifier | ⏸ deferred | per assessment ("acceptable today") |
-| F9 — SessionManager → internal | ✅ resolved | `4d96d86` |
-| F10 — AppAttestService init split | ✅ resolved | `22dadc3`, `d848b46` |
-| F11 — FiservCardReader.Credentials → internal | ✅ resolved | `0436bee` |
-| F12 — HTTP error mapping unified | ✅ resolved | `2509807` |
-| F13 — `PayabliAuth.tokenChanges()` AsyncStream | ✅ resolved | `291f606` |
-| F14 — Umbrella inclusion rule documented | ✅ resolved | `11b65f2` |
-| F15 — SessionTierValidator → internal | ✅ resolved | `46622a5` |
-| F16 — `@testable import` hygiene | ✅ resolved | 12 commits (`442baa1`…`2166d21`) |
+| F9 — SessionManager → internal | ✅ resolved | `1ee1bfc` |
+| F10 — AppAttestService init split | ✅ resolved | `0f0b08a`, `31cdf3d` |
+| F11 — FiservCardReader.Credentials → internal | ✅ resolved | `03eea61` |
+| F12 — HTTP error mapping unified | ✅ resolved | `78d9200` |
+| F13 — `PayabliAuth.tokenChanges()` AsyncStream | ✅ resolved | `417ea42` |
+| F14 — Umbrella inclusion rule documented | ✅ resolved | `04e6263` |
+| F15 — SessionTierValidator → internal | ✅ resolved | `185b3cf` |
+| F16 — `@testable import` hygiene | ✅ resolved | 12 commits (`d109254`…`62aa253`) |
 | F17 — `@MainActor` scope | ⏸ deferred | per assessment ("refactor, not a bug") |
 | F18 — Drop redundant ProximityReader import | ⏸ skipped | `PaymentCardReader.isSupported` is load-bearing — plan authorized escape hatch |
-| F19 — Housekeeping (rolled up) | ✅ resolved | `3a8a941`, `2376f72`, `ec364f3`, `b854145`, `a0cf1bc`, `cb23cef`, `dfca525` |
+| F19 — Housekeeping (rolled up) | ✅ resolved | `8a321bb`, `0ff9ddf`, `0a37c83`, `a21ee2d`, `4bc2e3c`, `4a2a7ba`, `194ffb7` |
 
 ### Proposals
 
 | Proposal | Status | Resolved by |
 | -------- | ------ | ----------- |
-| A — `PayabliSession` in Core | ✅ delivered | `8fb0962`, `89772b5` |
-| B — `PayabliTransport` + `AuthenticatedTransport` decorator | ✅ delivered | `227389e`, `fb3cbad`, `75f4ee7`, `dd8cec7`, `2bf1063`, `b0ea0aa`, `2509807`, `49b4b94` |
-| C — Move primitives to Core | ✅ delivered | `6f9cdd1`, `3469ca7`, `f6c794e` |
-| D — Delete `TapToPayProviderFactory` | ✅ delivered | `b1fc159` |
-| E — `PayabliSDKTestUtils` library product | ✅ delivered | `d008b30`, `ecedc2e`, `9171ec9`, `bc211ef`, `c698ac0`, `fe26616`, `0032569`, `221dfe9` |
+| A — `PayabliSession` in Core | ✅ delivered | `8f4798e`, `cff0a24` |
+| B — `PayabliTransport` + `AuthenticatedTransport` decorator | ✅ delivered | `1b6c910`, `f5d1e5a`, `4989d1b`, `d68c06b`, `d4b5255`, `3ef2eef`, `78d9200`, `bacdff5` |
+| C — Move primitives to Core | ✅ delivered | `c4aee9e`, `3435f11`, `dd58b2c` |
+| D — Delete `TapToPayProviderFactory` | ✅ delivered | `516b2e2` |
+| E — `PayabliSDKTestUtils` library product | ✅ delivered | `31d79d7`, `846c08b`, `befde84`, `988f607`, `b56dad7`, `ea79d9c`, `c997590`, `ca0b889` |
 
 ### Follow-ups (caught during code review, out of scope of this assessment)
 
