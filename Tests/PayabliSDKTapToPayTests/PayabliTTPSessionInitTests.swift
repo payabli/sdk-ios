@@ -4,7 +4,7 @@ import XCTest
 
 @MainActor
 final class PayabliTTPSessionInitTests: XCTestCase {
-    func testTwoFacadesShareTheSameAuth() async {
+    func testTwoFacadesShareTheSameSession() async {
         let config = PayabliConfig(
             accessToken: "shared-token",
             entryPoint: "demo",
@@ -25,7 +25,7 @@ final class PayabliTTPSessionInitTests: XCTestCase {
             attestation: MockDeviceAttestationService()
         )
 
-        // Both facades hold the same actor reference.
-        XCTAssertEqual(ObjectIdentifier(ttp1.auth), ObjectIdentifier(ttp2.auth))
+        // Both facades hold the same session reference.
+        XCTAssertTrue(ttp1.session === ttp2.session)
     }
 }
