@@ -493,7 +493,7 @@ This assessment was implemented in full on branch `worktree-assessment+swift-lib
 ### Follow-ups (caught during code review, out of scope of this assessment)
 
 - ✅ **`AppAttestService+Requests.swift` transport-seam bypass closed.** `AppAttestService` now stores `transport: any PayabliTransport` instead of `(service, auth)`; `performAuthenticatedPOST` calls `transport.perform` and `mapPayabliHTTPError`, so device-attestation requests flow through `AuthenticatedTransport` (bearer injection, 401 refresh-and-retry) exactly like every other endpoint client. Closed by this PR.
-- **`AuthenticatedTransport` is `public`.** It's reachable only via `PayabliSession.transport` (typed as `any PayabliTransport`), but the concrete type is itself public. If host apps should not be able to construct one directly, demote to `internal` and gate construction behind `PayabliSession`. Either choice is defensible; flag for a team decision.
+- ✅ **`AuthenticatedTransport` visibility tightened.** Demoted from `public struct` to `internal struct`. Reachable from the public surface only via `PayabliSession.transport` returning `any PayabliTransport`; the concrete type is no longer in autocomplete or documented public API. Closed by this PR.
 - **`PayabliSession.auth` and `.service` are `public`.** Required for the existing `accessToken:`-based convenience init on `PayabliTTP`. Once Swift `package` access is more widely adopted in this codebase, both could be demoted to `package` for stricter hygiene.
 
 ---
