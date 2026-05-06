@@ -1,21 +1,32 @@
 import Foundation
 
-/// URLProtocol stub mirroring the one in PayabliSDKCoreTests, used by Tap to
-/// Pay tests that exercise the attestation / TTP transaction clients
-/// end-to-end against stubbed HTTP.
-final class StubURLProtocol: URLProtocol {
-    typealias Handler = (URLRequest) throws -> (HTTPURLResponse, Data)
+/// A URLProtocol that returns programmed responses instead of hitting the network.
+///
+/// Usage:
+/// ```swift
+/// let session = StubURLProtocol.makeSession()
+/// StubURLProtocol.handler = { request in
+///     (HTTPURLResponse(...), Data(...))
+/// }
+/// defer { StubURLProtocol.handler = nil }
+/// ```
+///
+/// POST bodies streamed via `httpBodyStream` are drained into `httpBody`
+/// automatically, so test handlers can inspect the request payload.
+public final class StubURLProtocol: URLProtocol {
+    public typealias Handler = (URLRequest) throws -> (HTTPURLResponse, Data)
 
-    nonisolated(unsafe) static var handler: Handler?
+    public nonisolated(unsafe) static var handler: Handler?
 
-    override class func canInit(with request: URLRequest) -> Bool { true }
-    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override public class func canInit(with request: URLRequest) -> Bool { true }
+    override public class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
 
-    override func startLoading() {
+    override public func startLoading() {
         guard let handler = Self.handler else {
             client?.urlProtocol(self, didFailWithError: URLError(.badServerResponse))
             return
         }
+
         // URLSession streams POST bodies via httpBodyStream. Drain it into
         // httpBody so test handlers can inspect the payload.
         var inspectable = request
@@ -33,9 +44,11 @@ final class StubURLProtocol: URLProtocol {
         }
     }
 
-    override func stopLoading() {}
+    override public func stopLoading() {}
 
-    static func makeSession() -> URLSession {
+    /// Returns a `URLSession` pre-configured to intercept all requests with
+    /// this protocol. Register a `handler` before making requests.
+    public static func makeSession() -> URLSession {
         let config = URLSessionConfiguration.ephemeral
         config.protocolClasses = [StubURLProtocol.self]
         return URLSession(configuration: config)

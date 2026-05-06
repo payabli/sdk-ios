@@ -1,6 +1,7 @@
 import XCTest
 import PayabliSDKCore
 @testable import PayabliSDKTapToPay
+import PayabliSDKTestUtils
 
 final class AppAttestServiceTests: XCTestCase {
     override func tearDown() {
