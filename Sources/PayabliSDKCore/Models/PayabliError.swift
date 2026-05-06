@@ -13,8 +13,8 @@ public enum PayabliErrorCode: String, Sendable {
     case invalidConfiguration = "INVALID_CONFIGURATION"
     case networkError = "NETWORK_ERROR"
     case decodingError = "DECODING_ERROR"
-    case validation = "VALIDATION_ERROR"
     case userCancelled = "USER_CANCELLED"
+    case validation = "VALIDATION_ERROR"
     case unknown = "UNKNOWN"
 }
 
