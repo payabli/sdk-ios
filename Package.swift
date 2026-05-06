@@ -62,6 +62,11 @@ let package = Package(
             name: "PayabliSDKTelemetry",
             type: .dynamic,
             targets: ["PayabliSDKTelemetry"]
+        ),
+        .library(
+            name: "PayabliSDKTestUtils",
+            type: .dynamic,
+            targets: ["PayabliSDKTestUtils"]
         )
     ],
     // Zero external SPM dependencies. PayabliCardReaderCore (MIT-licensed Tap
@@ -105,6 +110,15 @@ let package = Package(
             name: "PayabliSDKTelemetry",
             dependencies: ["PayabliSDKCore"],
             path: "Sources/PayabliSDKTelemetry"
+        ),
+        .target(
+            name: "PayabliSDKTestUtils",
+            dependencies: [
+                "PayabliSDKCore",
+                "PayabliSDKTapToPay",
+                "PayabliSDKTelemetry"
+            ],
+            path: "Sources/PayabliSDKTestUtils"
         ),
         .testTarget(
             name: "PayabliSDKCoreTests",
