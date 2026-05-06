@@ -60,6 +60,17 @@ PayIn).
 
 **PayabliSDKTelemetry** — Depends on Core only. Optional observability with Sentry and PostHog transports (bring-your-own-instance). Opt-out via `PayabliConfig.telemetryEnabled`.
 
+### Umbrella inclusion rule
+
+The `PayabliSDK` umbrella library aggregates targets that lie on the
+critical path of every SDK consumer's primary integration. Today that
+is `PayabliSDKCore` + `PayabliSDKTapToPay`. When PayIn re-lands from
+`develop`, it joins the umbrella; when an opt-in module like
+`PayabliSDKTelemetry` is introduced, it stays out and consumers link
+it explicitly. New modules must declare which side of this line they
+fall on in their own README. `PayabliSDKTestUtils` is a test-time
+dependency only and never belongs in the umbrella.
+
 ## Folder Layout (PayabliSDKPayIn)
 
 Strict, per PRD section 7.2. Each folder owns a single concern; cross-folder imports are fine but file placement is not.
