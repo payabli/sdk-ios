@@ -42,12 +42,12 @@ print("Transaction captured. ID:", result.paymentTransId)
 | Pending-device activation     | Out-of-band OTP flow for first-time devices.                             |
 | Optional telemetry            | Pluggable Sentry and PostHog transports; bring your own instance.        |
 
-### System requirements 
+### System requirements
 
 You need the following to build and run the SDK:
 - iPhone XS or newer
 - iOS 16.7 or later
-- Xcode 15 or later 
+- Xcode 15 or later
 - Swift 5.9 or later (Swift Package Manager 5.9+, bundled with Xcode 15)
 
 ### Modules
@@ -533,7 +533,7 @@ It covers initialization, charge, activation, and a live event log.
 Follow these steps to set up the sample app:
 
 ```bash
-git clone https://github.com/payabli/sdk-ios
+git clone https://github.com/payabli/sdk-ios.git
 cd sdk-ios/Example/PayabliDemo
 cp Secrets.swift.sample Secrets.swift    # populate with sandbox credentials
 ```
