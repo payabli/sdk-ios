@@ -1,6 +1,7 @@
 import XCTest
 @testable import PayabliSDKTapToPay
 @testable import PayabliSDKCore
+import PayabliSDKTestUtils
 
 @MainActor
 final class PayabliTTPSessionInitTests: XCTestCase {
