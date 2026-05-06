@@ -22,19 +22,19 @@ public final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
     public static var providerId: String { "fiserv" }
 
     /// `/config` `credentials` block — maps 1:1 to `FiservTTPConfig`.
-    public struct Credentials: Sendable {
-        public let secretKey: String
-        public let apiKey: String
-        public let environment: String
-        public let currencyCode: String
-        public let merchantId: String
-        public let appleTtpMerchantId: String
-        public let merchantName: String
-        public let merchantCategoryCode: String
-        public let terminalId: String
-        public let terminalProfileId: String
+    internal struct Credentials: Sendable {
+        let secretKey: String
+        let apiKey: String
+        let environment: String
+        let currencyCode: String
+        let merchantId: String
+        let appleTtpMerchantId: String
+        let merchantName: String
+        let merchantCategoryCode: String
+        let terminalId: String
+        let terminalProfileId: String
 
-        public init(
+        init(
             secretKey: String,
             apiKey: String,
             environment: String,
@@ -70,7 +70,7 @@ public final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
     public init() {}
 
     /// Injects `Credentials` directly. Facade path uses `configure(credentials:)`.
-    public func setCredentials(_ credentials: Credentials) {
+    internal func setCredentials(_ credentials: Credentials) {
         lock.lock()
         self.credentials = credentials
         lock.unlock()
