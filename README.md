@@ -1,7 +1,13 @@
 # Payabli iOS SDK
 
-Accept in-person card payments on iPhone with **Tap to Pay** — no card
-reader required, just an iPhone running iOS 16.7 or newer.
+## Summary
+
+The Payabli iOS SDK enables iPhone applications to accept in-person
+card payments using Apple's Tap to Pay on iPhone. No external card
+reader is required: any iPhone XS or newer running iOS 16.7 or later is
+supported. The SDK handles device attestation, session management, NFC
+card reading, retry logic, and reconciliation with the Payabli backend;
+the host application provides the checkout user interface.
 
 ```swift
 import PayabliSDKTapToPay
@@ -10,7 +16,7 @@ let ttp = PayabliTTP(
     accessToken: token,
     tokenProvider: { try await yourBackend.fetchPayabliAccessToken() },
     entryPoint: "your-entry-point",
-    appId: "TEAM123456.com.yourcompany.app",   // TEAMID.bundle-id
+    appId: "TEAM123456.com.yourcompany.app",
     environment: .sandbox
 )
 
@@ -19,137 +25,171 @@ let result = try await ttp.charge(
     type: .sale,
     paymentDetails: PayabliTTPPaymentDetails(amount: 9.99)
 )
-print("Got it! Transaction ID:", result.paymentTransId)
+print("Transaction captured. ID:", result.paymentTransId)
 ```
 
-That's the whole happy path. The SDK takes care of device attestation,
-session management, NFC reading, retries, and reconciling with Payabli's
-backend — you write the checkout UI.
+`PayabliTTP` conforms to `ObservableObject`. The `sessionState` and
+`isReady` properties may be bound directly in SwiftUI, and the
+`events()` AsyncSequence emits fine-grained progress updates.
 
-`PayabliTTP` is an `ObservableObject`, so you can bind `sessionState` and
-`isReady` directly in SwiftUI, or subscribe to `events()` for fine-grained
-progress updates.
+### Capabilities
 
----
+| Capability                    | Notes                                                                    |
+| ----------------------------- | ------------------------------------------------------------------------ |
+| Tap to Pay on iPhone          | Card-present NFC; no external reader required.                           |
+| Swift and Objective-C APIs    | First-class `@objc` surface for MAUI, Flutter, and React Native hosts.   |
+| Built-in App Attest           | Cold and warm device attestation, cached automatically.                  |
+| Pending-device activation     | Out-of-band OTP flow for first-time devices.                             |
+| Optional telemetry            | Pluggable Sentry and PostHog transports; bring your own instance.        |
 
-## What you get
+**System requirements:** iOS 16.7 or later, iPhone XS or newer,
+Xcode 15 or later, Swift 5.9 or later (Swift Package Manager 5.9+,
+bundled with Xcode 15).
 
-| Capability                    | Notes                                                    |
-| ----------------------------- | -------------------------------------------------------- |
-| Tap to Pay on iPhone          | Card-present NFC, no external reader needed.             |
-| Swift **and** Objective-C API | First-class `@objc` surface for MAUI, Flutter, RN hosts. |
-| Built-in App Attest           | Cold/warm device attestation, cached for you.            |
-| Pending-device activation     | OTP flow for first-time devices, fully wired.            |
-| Optional telemetry            | Plug in your own Sentry / PostHog if you want it.        |
+### Modules
 
-**Requirements:** iOS 16.7+, iPhone XS or newer, Xcode 15+, Swift 5.9+
-(Swift Package Manager 5.9+, bundled with Xcode 15).
+The SDK ships as several focused frameworks. Most applications only
+need `PayabliSDKTapToPay`.
 
----
-
-## Pick the right module
-
-The SDK ships as a few focused frameworks. Most apps only need
-`PayabliSDKTapToPay`:
-
-| Module                  | When to pick it                                                  |
-| ----------------------- | ---------------------------------------------------------------- |
-| `PayabliSDK`            | Umbrella — links Core + TapToPay together. Fine if you're unsure. |
-| `PayabliSDKCore`        | Just the building blocks (config, auth, transport).              |
-| `PayabliSDKTapToPay`    | Tap to Pay on iPhone. **This is the one you probably want.**     |
-| `PayabliCardReaderCore` | The Tap to Phone engine — pulled in for you, no need to add it.  |
-| `PayabliSDKTelemetry`   | Optional Sentry / PostHog plumbing. Bring your own instance.     |
+| Module                  | When to select it                                                            |
+| ----------------------- | ---------------------------------------------------------------------------- |
+| `PayabliSDK`            | Umbrella product linking Core and TapToPay together.                         |
+| `PayabliSDKCore`        | Core building blocks (config, auth, transport).                              |
+| `PayabliSDKTapToPay`    | Tap to Pay on iPhone. The product most applications require.                 |
+| `PayabliCardReaderCore` | Tap to Phone engine. Pulled in transitively; no explicit link required.      |
+| `PayabliSDKTelemetry`   | Optional Sentry and PostHog plumbing; bring your own instance.               |
 
 ---
 
-## Install
+## Pre-requisites
+
+Before integrating the SDK, the following must be in place.
+
+### Device and operating system
+
+- iPhone XS or newer.
+- iOS 16.7 or later.
+- A region where Tap to Pay on iPhone is supported by Apple.
+- The device unlocked at the time of the transaction.
+
+The SDK validates device eligibility during `initialize()`.
+
+### Apple entitlements
+
+Two entitlements are required on the application's provisioning
+profile:
+
+1. **`com.apple.developer.proximity-reader.payment.acceptance`.** This
+   entitlement is allowlisted by Apple and must be requested
+   explicitly. See Apple's
+   [Setting Up the Entitlement](https://developer.apple.com/documentation/proximityreader/setting-up-the-entitlement-for-tap-to-pay-on-iphone)
+   guide.
+2. **`com.apple.developer.devicecheck.appattest-environment`.** Set to
+   `production` for release builds, or `development` for development
+   builds. The value must match the `environment` passed to
+   `PayabliTTP`.
+
+### Payabli entry point
+
+A Tap to Pay-enabled entry point provisioned by Payabli is required.
+The entry-point slug — for example, `acmePay` — is supplied to the SDK
+as the `entryPoint` constructor parameter and is also the path
+component of the merchant dashboard URL
+(`https://app.payabli.com/<entryPoint>/signin`).
+
+### Authorized application on the paypoint allowlist
+
+The application's `appId` (`<TEAM_ID>.<BUNDLE_ID>`) must be authorized
+on the entry-point allowlist before attestation will succeed. Two
+methods are supported:
+
+- **Dashboard.** Sign in to the entry point at
+  `https://app.payabli.com/<entryPoint>/signin` (sandbox:
+  `https://app-sandbox.payabli.com/<entryPoint>/signin`), navigate to
+  **Settings → Devices → Authorized Apps**, and add the `appId`.
+- **API.** Issue `POST /api/v2/paypoint/<entryPoint>/apps` against the
+  same host configured for the SDK (`https://api.payabli.com` for
+  production, `https://api-sandbox.payabli.com` for sandbox):
+
+  ```json
+  {
+    "deviceOs": "ios",
+    "appId": "<TEAM_ID>.<BUNDLE_ID>",
+    "friendlyName": "My iOS App"
+  }
+  ```
+
+  `deviceOs` must be `"ios"`. `friendlyName` is optional. The endpoint
+  is idempotent on `(entryPoint, deviceOs, appId)` and is safe to
+  invoke from a provisioning script.
+
+If the application's `appId` is not registered, `initialize()` rejects
+attestation with `PayabliTTPError.attestationFailed`.
+
+### Backend token endpoint
+
+The SDK consumes short-lived `access_token`s. The `clientSecret` issued
+to the merchant must never reside on the device; it is held by the host
+application's backend, which exchanges it for an `access_token` via
+Payabli's `POST /api/v2/token/serverside` endpoint and returns the
+token to the iOS application.
+
+```text
+  iOS App            Host Backend            Payabli API
+     │                    │                       │
+     │  request token     │                       │
+     ├───────────────────▶│                       │
+     │                    │  POST /v2/token/serverside
+     │                    │  { clientId, clientSecret }
+     │                    ├──────────────────────▶│
+     │                    │                       │
+     │                    │           access_token│
+     │                    │◀──────────────────────┤
+     │      access_token  │                       │
+     │◀───────────────────┤                       │
+     ▼                    ▼                       ▼
+```
+
+A backend endpoint that performs this exchange is therefore required.
+The implementation is covered in
+[Implementing the token provider](#implementing-the-token-provider).
+
+---
+
+## Installation
 
 ### Swift Package Manager
 
-In Xcode, choose **File → Add Packages…** and paste:
+In Xcode, choose **File → Add Packages…** and enter the repository
+URL:
 
 ```
 https://github.com/payabli/payabli-sdk-ios.git
 ```
 
-Or add it to your `Package.swift`:
+Alternatively, declare the dependency in `Package.swift`:
 
 ```swift
 .package(url: "https://github.com/payabli/payabli-sdk-ios.git", branch: "main")
 ```
 
-Then link the product you need:
+Link the required product. Most applications only need
+`PayabliSDKTapToPay`:
 
 ```swift
 .product(name: "PayabliSDKTapToPay", package: "payabli-sdk-ios")
 ```
 
-That's it — `PayabliSDKTapToPay` brings in the core and reader engine for
-you.
+`PayabliSDKTapToPay` transitively links `PayabliSDKCore` and
+`PayabliCardReaderCore`; no additional product references are required.
 
 ---
 
-## Configuration values
+## Usage
 
-When you create `PayabliTTP`, you pass four values. Here's where each comes
-from:
+### Configuring `PayabliTTP`
 
-### `entryPoint`
-
-The Payabli identifier for your merchant entry. Issued by Payabli when your
-account is provisioned for Tap to Pay (e.g. `"acmePay"`). It's the same
-slug you use to sign in to the dashboard at
-`https://app.payabli.com/<entryPoint>/signin`.
-
-### `appId`
-
-Your iOS app's identity from Apple's perspective:
-`<TEAM_ID>.<BUNDLE_ID>`.
-
-- **`TEAM_ID`** — the 10-character team identifier from your
-  [Apple Developer account](https://developer.apple.com/account)
-  (Membership → Team ID).
-- **`BUNDLE_ID`** — your app's bundle identifier from Xcode
-  (Target → General → Bundle Identifier), e.g. `com.acme.checkout`.
-
-Full example: `"TEAM123456.com.acme.checkout"`.
-
-App Attest uses `appId` to prove that the binary on the device is the one
-you registered — a mismatch surfaces as `attestationFailed` on
-`initialize()`. The same `appId` must be authorized in the Payabli
-dashboard (see [Before your first tap](#before-your-first-tap)).
-
-### `environment`
-
-Picks which Payabli API the SDK talks to:
-
-| Value         | Base URL                          |
-| ------------- | --------------------------------- |
-| `.sandbox`    | `https://api-sandbox.payabli.com` |
-| `.production` | `https://api.payabli.com`         |
-
-Use `.sandbox` while developing and testing; switch to `.production` for
-live merchant traffic. Match this with your App Attest entitlement —
-`development` for sandbox builds, `production` for release builds.
-
-### `accessToken` / `tokenProvider`
-
-Short-lived bearer token from your backend, plus an `async` closure the SDK
-calls to refresh it. Covered in [How auth works](#how-auth-works) below.
-
----
-
-## How auth works
-
-Your `clientSecret` never touches the device. Your backend exchanges it for
-a short-lived `access_token`, and your app uses that:
-
-```text
-Mobile app  ──▶  Your backend  ──▶  Payabli (POST /api/v2/token/serverside)
-            ◀──  access_token  ◀──
-```
-
-Pass the token (and a refresh callback) when you create `PayabliTTP`:
+`PayabliTTP` is constructed with four parameters:
 
 ```swift
 let ttp = PayabliTTP(
@@ -161,34 +201,32 @@ let ttp = PayabliTTP(
 )
 ```
 
-When the SDK sees a `401 Unauthorized`, it calls `tokenProvider`, gets a
-fresh token, and quietly retries the request. Concurrent 401s are
-deduplicated, so you don't have to worry about thundering-herd refreshes.
+| Parameter        | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `accessToken`    | A valid short-lived bearer token issued by the host backend.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `tokenProvider`  | An `async throws -> String` closure. The SDK invokes it to obtain a fresh token after a `401 Unauthorized` response. Concurrent refresh attempts are deduplicated.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `entryPoint`     | The entry-point slug provisioned by Payabli (see [Payabli entry point](#payabli-entry-point)).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `appId`          | The application's identity in the form `<TEAM_ID>.<BUNDLE_ID>`. The `TEAM_ID` is the 10-character team identifier from the [Apple Developer account](https://developer.apple.com/account); the `BUNDLE_ID` is the application's bundle identifier (e.g., `TEAM123456.com.acme.checkout`). The same `appId` must be authorized on the paypoint allowlist (see [Authorized application on the paypoint allowlist](#authorized-application-on-the-paypoint-allowlist)). App Attest uses `appId` to verify that the binary on the device matches the registered application; a mismatch surfaces as `PayabliTTPError.attestationFailed`. |
+| `environment`    | Selects the target Payabli API (see the values table below). The value must match the `appattest-environment` entitlement: `development` for `.sandbox`, `production` for `.production`.                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 
----
+Environment values:
 
-## Wiring up your backend (5-minute version)
+| Value         | Base URL                          |
+| ------------- | --------------------------------- |
+| `.sandbox`    | `https://api-sandbox.payabli.com` |
+| `.production` | `https://api.payabli.com`         |
 
-Your `clientSecret` is like the master key to your Payabli account — it
-should never live in the app. Instead, you stand up one tiny endpoint on
-your own server that does the trade:
+### Implementing the token provider
 
-```text
-   📱  iOS app           🖥️  Your backend           🔐  Payabli
-   ───────────           ──────────────             ─────────
-   "I need a token"  ──▶  "Swap this for a       ──▶  POST /api/v2/token/serverside
-                          short-lived token"
-                                                  ◀──  access_token
-                     ◀── access_token  ◀──
-```
+The `tokenProvider` closure returns a fresh `access_token` from the
+host backend. Two pieces are required: a backend endpoint that
+performs the exchange with Payabli, and an iOS closure that calls it.
 
-That's the whole flow. The app talks to *your* backend; *your* backend
-talks to Payabli. The secret never leaves your servers.
+#### Backend endpoint
 
-### A working example in ~30 lines of Node.js
-
-Drop this into a Node project (`npm i express cors dotenv`) and you've got
-a working token endpoint:
+Any HTTP server capable of forwarding the `clientId` / `clientSecret`
+exchange is sufficient. The minimal Node.js implementation below
+illustrates the contract:
 
 ```js
 // server.js
@@ -217,21 +255,18 @@ app.post("/payabli/token", async (req, res) => {
 });
 
 app.listen(process.env.PORT || 3000, () =>
-  console.log("Token server ready 🚀"));
+  console.log("Token server ready"));
 ```
 
-That's it. Hit `POST /payabli/token` with your credentials and you'll get
-an access token back, ready to hand to the iOS SDK.
+For production deployments, store `clientId` and `clientSecret` in
+environment variables, and protect the endpoint with the same
+authentication scheme used elsewhere in the host application (session
+cookie, partner JWT, mTLS, or equivalent).
 
-> 💡 **Going to production?** Move `clientId` and `clientSecret` into
-> environment variables on your server, and protect the endpoint with
-> whatever auth your app already uses (session cookie, partner JWT, mTLS,
-> etc.) — the example above keeps it simple on purpose.
+#### iOS closure
 
-### Calling it from iOS
-
-The `tokenProvider` you pass to `PayabliTTP` is just an `async` closure
-that returns a `String`. Plug your backend in like this:
+A typical implementation of the closure passed to `PayabliTTP` issues
+a `POST` against the backend endpoint above and returns the token:
 
 ```swift
 func fetchPayabliAccessToken() async throws -> String {
@@ -246,125 +281,38 @@ func fetchPayabliAccessToken() async throws -> String {
 }
 ```
 
-And you're done — pass it straight into the SDK:
+When the SDK receives a `401 Unauthorized`, it invokes `tokenProvider`,
+retries the request with the new token, and deduplicates concurrent
+refreshes. The host application is not required to track expirations,
+schedule refreshes, or implement debouncing.
+
+### Initialization and charging
+
+`initialize()` performs device attestation and brings the session to
+the `.ready` state. It is intended to be called once per session;
+subsequent launches reuse cached attestation and complete substantially
+faster than the first launch.
 
 ```swift
-let ttp = PayabliTTP(
-    accessToken: try await fetchPayabliAccessToken(),
-    tokenProvider: { try await fetchPayabliAccessToken() },
-    entryPoint: "your-entry-point",
-    appId: "TEAM123456.com.yourcompany.app",
-    environment: .sandbox
-)
-```
+try await ttp.initialize()
 
-The SDK will call `tokenProvider` again on its own whenever the token
-expires. You don't have to track expirations, schedule refreshes, or
-debounce anything — it just works.
-
----
-
-## Before your first tap
-
-A few one-time setup steps with Apple and Payabli:
-
-1. **Apple entitlement.** Request `com.apple.developer.proximity-reader.payment.acceptance`
-   from Apple — it's allowlisted, not granted automatically. Apple's
-   [Setting Up the Entitlement](https://developer.apple.com/documentation/proximityreader/setting-up-the-entitlement-for-tap-to-pay-on-iphone)
-   guide walks you through it.
-2. **App Attest entitlement.** Add `com.apple.developer.devicecheck.appattest-environment`
-   set to `production` (or `development` for dev builds). Match this with
-   the `environment` you pass to the SDK (see
-   [Configuration values](#configuration-values)).
-3. **Authorize the app on the paypoint allowlist.** Register the same
-   `appId` (`<TEAM_ID>.<BUNDLE_ID>`) you'll pass to the SDK on the entry
-   point's allowlist. Until it's registered, attestation is rejected on
-   `initialize()`. Two ways to do it:
-
-   - **Dashboard.** Sign in at `https://app.payabli.com/<entryPoint>/signin`
-     (sandbox: `https://app-sandbox.payabli.com/<entryPoint>/signin`),
-     open **Settings → Devices → Authorized Apps**, and add the `appId`.
-   - **API.** `POST /api/v2/paypoint/<entryPoint>/apps` against the same
-     host you configured for the SDK
-     (`https://api.payabli.com` / `https://api-sandbox.payabli.com`):
-
-     ```json
-     {
-       "deviceOs": "ios",
-       "appId": "<TEAM_ID>.<BUNDLE_ID>",
-       "friendlyName": "My iOS App"
-     }
-     ```
-
-     `deviceOs` is `"ios"`; `friendlyName` is optional.
-     The call is idempotent on `(entryPoint, deviceOs, appId)`, so it's
-     safe to re-run from a provisioning script.
-4. **Eligible device.** iPhone XS or newer, iOS 16.7+, supported region,
-   unlocked. The SDK will check this for you on `initialize()`.
-5. **Entry point.** Have Payabli provision a Tap to Pay-enabled entry point
-   for you.
-
----
-
-## The session lifecycle
-
-Here's what happens behind the scenes:
-
-```
-.idle ─▶ .attestingDevice ─▶ .fetchingConfig ─▶ .initializingReader ─▶ .ready
-                              │
-                              └─▶ .pendingActivation ─▶ (partner OTP) ─▶ .idle
-
-.ready ─▶ .sessionExpired ─▶ .reinitializing ─▶ .fetchingConfig ─▶ .initializingReader ─▶ .ready
-```
-
-The first launch does **cold attestation** (Apple's App Attest plus
-Payabli's `/register` and `/attest` endpoints). Subsequent launches reuse
-the cached attestation and just refresh `/config`, so they're much faster.
-
----
-
-## A complete example
-
-```swift
-import PayabliSDKTapToPay
-
-@MainActor
-final class CheckoutViewModel: ObservableObject {
-    let ttp: PayabliTTP
-
-    init(accessToken: String, refresh: @escaping () async throws -> String) {
-        self.ttp = PayabliTTP(
-            accessToken: accessToken,
-            tokenProvider: refresh,
-            entryPoint: "your-entry-point",
-            appId: "TEAM123456.com.yourcompany.app",
-            environment: .sandbox
-        )
-    }
-}
-
-// 1. Once per session — this can take a few seconds on a cold start.
-try await viewModel.ttp.initialize()
-
-// 2. Take the payment.
-let result = try await viewModel.ttp.charge(
+let result = try await ttp.charge(
     type: .sale,
     paymentDetails: PayabliTTPPaymentDetails(amount: 9.99),
     customer: PayabliTTPCustomerData(firstName: "Jane", lastName: "Doe"),
     invoice: PayabliTTPInvoiceData(invoiceNumber: "INV-9001")
 )
 
-print("Payment captured! ID:", result.paymentTransId)
+print("Transaction captured. ID:", result.paymentTransId)
 ```
 
-`charge(type:paymentDetails:customer:invoice:orderDescription:)` runs
-three steps: `POST /MoneyIn/initiate` → NFC tap →
-`PATCH /MoneyIn/update/{id}`. If the final update fails after retries,
-the transaction is still authorized on the processor side — you'll need
-to reconcile manually (this is rare).
+`charge(type:paymentDetails:customer:invoice:orderDescription:)`
+performs three operations: `POST /MoneyIn/initiate`, the NFC card
+read, and `PATCH /MoneyIn/update/{id}`. If the final update fails
+after retries, the transaction is still authorized on the processor
+side and must be reconciled out of band. This case is rare.
 
-### What `charge(...)` accepts
+### `charge(...)` reference
 
 ```swift
 public func charge(
@@ -376,38 +324,38 @@ public func charge(
 ) async throws -> TransactionResult
 ```
 
-| Parameter         | Type                          | Required | Notes                                                                                                            |
-| ----------------- | ----------------------------- | -------- | ---------------------------------------------------------------------------------------------------------------- |
-| `type`            | `PayabliTTPPaymentType`       | yes      | v1.0 supports `.sale` only.                                                                                       |
-| `paymentDetails`  | `PayabliTTPPaymentDetails`    | yes      | Bundles `amount` (required), `serviceFee` (default 0), optional `currency` (omitted when `nil` — the backend then authorizes in the merchant's configured processor currency), and optional `paymentDescription`. |
-| `customer`        | `PayabliTTPCustomerData`      | no       | Cardholder snapshot (name, customerId, billing/shipping addresses…). Persisted at `/initiate`. Defaults to anonymous.   |
-| `invoice`         | `PayabliTTPInvoiceData`       | no       | Invoice metadata (`invoiceNumber`). Persisted at `/initiate`.                                                     |
-| `orderDescription`| `String?`                     | no       | Free-form description forwarded to the backend at the top-level `orderDescription` key.                          |
+| Parameter         | Type                          | Required | Notes                                                                                                                                                                                                                  |
+| ----------------- | ----------------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `type`            | `PayabliTTPPaymentType`       | yes      | v1.0 supports `.sale` only.                                                                                                                                                                                            |
+| `paymentDetails`  | `PayabliTTPPaymentDetails`    | yes      | Bundles `amount` (required), `serviceFee` (default `0`), optional `currency` (omitted when `nil`; the backend then authorizes in the merchant's configured processor currency), and optional `paymentDescription`.    |
+| `customer`        | `PayabliTTPCustomerData`      | no       | Cardholder snapshot (name, customer ID, billing and shipping addresses). Persisted at `/initiate`. Defaults to anonymous.                                                                                              |
+| `invoice`         | `PayabliTTPInvoiceData`       | no       | Invoice metadata (`invoiceNumber`). Persisted at `/initiate`.                                                                                                                                                          |
+| `orderDescription`| `String?`                     | no       | Free-form description forwarded to the backend at the top-level `orderDescription` key.                                                                                                                                |
 
-`PayabliTTPCustomerData` (every field optional, blank values are
+`PayabliTTPCustomerData` (every field optional; blank values are
 ignored):
 
 | Field                 | Type      | Purpose                                                                |
 | --------------------- | --------- | ---------------------------------------------------------------------- |
 | `firstName`           | `String?` | Customer given name.                                                   |
 | `lastName`            | `String?` | Customer family name.                                                  |
-| `customerNumber`      | `String?` | Host-app customer number (free-form).                                  |
-| `email`               | `String?` | Customer email for receipts / reconciliation.                          |
+| `customerNumber`      | `String?` | Host-application customer number (free-form).                          |
+| `email`               | `String?` | Customer email for receipts and reconciliation.                        |
 | `phone`               | `String?` | Customer phone, free-form.                                             |
 | `customerId`          | `Int?`    | Payabli internal customer ID, when the customer is already registered. |
 | `company`             | `String?` | Business name when the cardholder represents an organization.          |
 | `billingAddress1`     | `String?` | Billing address — street line 1.                                       |
 | `billingAddress2`     | `String?` | Billing address — street line 2.                                       |
 | `billingCity`         | `String?` | Billing city.                                                          |
-| `billingState`        | `String?` | Billing state / region.                                                |
+| `billingState`        | `String?` | Billing state or region.                                               |
 | `billingZip`          | `String?` | Billing postal code.                                                   |
-| `billingCountry`      | `String?` | Billing country (ISO-3166 alpha-2 recommended).                        |
+| `billingCountry`      | `String?` | Billing country (ISO 3166 alpha-2 recommended).                        |
 | `billingPhone`        | `String?` | Billing phone (distinct from `phone`).                                 |
 | `billingEmail`        | `String?` | Billing email (distinct from `email`).                                 |
 | `shippingAddress1`    | `String?` | Shipping address — street line 1.                                      |
 | `shippingAddress2`    | `String?` | Shipping address — street line 2.                                      |
 | `shippingCity`        | `String?` | Shipping city.                                                         |
-| `shippingState`       | `String?` | Shipping state / region.                                               |
+| `shippingState`       | `String?` | Shipping state or region.                                              |
 | `shippingZip`         | `String?` | Shipping postal code.                                                  |
 | `shippingCountry`     | `String?` | Shipping country.                                                      |
 
@@ -417,6 +365,8 @@ ignored):
 | --------------- | --------- | ---------------------------------------------------------------------- |
 | `invoiceNumber` | `String?` | Invoice reference forwarded to the backend and the processor.          |
 
+A comprehensive example:
+
 ```swift
 let result = try await ttp.charge(
     type: .sale,
@@ -424,7 +374,7 @@ let result = try await ttp.charge(
         amount: 24.50,
         serviceFee: 1.00,
         currency: "USD",
-        paymentDescription: "Two coffees + croissant"
+        paymentDescription: "Two coffees and a croissant"
     ),
     customer: PayabliTTPCustomerData(
         firstName: "Jane",
@@ -439,61 +389,110 @@ let result = try await ttp.charge(
         billingCountry: "US"
     ),
     invoice: PayabliTTPInvoiceData(invoiceNumber: "INV-9001"),
-    orderDescription: "Two coffees + croissant"
+    orderDescription: "Two coffees and a croissant"
 )
 ```
 
----
+### Session lifecycle
 
-## Listening for events
+```text
+COLD START
+──────────────────────────────────────────────────────────────────────
+  .idle ─▶ .attestingDevice ─▶ .fetchingConfig ─▶ .initializingReader ─▶ .ready
 
-If you want a play-by-play of what the session is doing — to drive a
-spinner, log analytics, or update UI — subscribe to `events()`:
+PENDING-ACTIVATION BRANCH (first-time device)
+──────────────────────────────────────────────────────────────────────
+  .attestingDevice ─▶ .pendingActivation ─▶ (partner OTP) ─▶ .idle
+
+WARM RESTART (session expired while .ready)
+──────────────────────────────────────────────────────────────────────
+  .ready ─▶ .sessionExpired ─▶ .reinitializing ─▶ .fetchingConfig ─▶ .initializingReader ─▶ .ready
+```
+
+The first launch performs cold attestation: Apple's App Attest
+combined with Payabli's `/register` and `/attest` endpoints.
+Subsequent launches reuse the cached attestation and refresh `/config`
+only.
+
+### Listening for events
+
+The `events()` AsyncSequence emits a play-by-play of session activity,
+suitable for driving spinners, analytics, or progress UI:
 
 ```swift
 for await event in viewModel.ttp.events() {
     switch event {
-    case .readerReady:              print("Ready to tap!")
-    case .nfcStarted:               print("Hold card near iPhone…")
+    case .readerReady:              print("Ready to tap")
+    case .nfcStarted:               print("Hold card near iPhone")
     case .updateCompleted(let id):  print("Charge complete: \(id)")
-    case .devicePendingActivation:  print("Ask admin for activation code")
+    case .devicePendingActivation:  print("Activation code required")
     default: break
     }
 }
 ```
 
-Multiple subscribers all receive every event — go nuts.
+Multiple subscribers each receive every event.
 
----
+### Pending device activation
 
-## Pending device activation
-
-The very first time a device runs your app, it may need an activation code
-before it can take payments. `initialize()` will throw
-`.devicePendingActivation` to let you know:
+The first time a device runs the application, it may require an
+activation code before payments can be accepted. `initialize()` throws
+`PayabliTTPError.devicePendingActivation` to signal this condition:
 
 ```swift
 do {
     try await ttp.initialize()
 } catch PayabliTTPError.devicePendingActivation {
-    let code = await promptForActivationCode()        // your UI
+    let code = await promptForActivationCode()        // host UI
     try await ttp.activateDevice(activationCode: code)
-    try await ttp.initialize()                        // try again
+    try await ttp.initialize()                         // retry
 }
 ```
 
-The activation code is issued by your partner backend (typically your admin
-dashboard), not by the SDK. You deliver it to the user through whatever
-channel makes sense for your business. The SDK just consumes it.
+The activation code is issued by the partner backend (typically via an
+administrator dashboard); the SDK does not generate it. Delivery of
+the code to the user is the host application's responsibility.
+
+### Handling errors
+
+`PayabliTTPError` covers the entire session and charge lifecycle:
+
+```swift
+do {
+    try await ttp.initialize()
+    let result = try await ttp.charge(
+        type: .sale,
+        paymentDetails: PayabliTTPPaymentDetails(amount: 9.99)
+    )
+} catch PayabliTTPError.devicePendingActivation {
+    // First-time device — prompt for activation code.
+} catch let PayabliTTPError.invalidState(current, attempted) {
+    // Session is not in the required state for this call.
+} catch let PayabliTTPError.attestationFailed(reason) {
+    // App Attest or Payabli refused to attest the device.
+} catch let PayabliTTPError.nfcFailed(reason) {
+    // Card removed prematurely, reader timeout, or similar; usually retryable.
+} catch let PayabliTTPError.updateFailed(reason) {
+    // /update PATCH failed after retries. Reconcile out of band.
+} catch PayabliTTPError.tokenExpired {
+    // tokenProvider returned no token; re-authentication required.
+}
+```
+
+When the SDK is consumed from Objective-C or a bridged framework,
+these errors surface as `NSError` instances with domain
+`"com.payabli.ttp"` and a stable per-case integer code.
 
 ---
 
-## Objective-C, MAUI, Flutter, React Native
+## Reference
 
-The SDK is bilingual. Every Swift `async throws` method has a
-callback-based `@objc` companion, structs have `*ObjC` companion classes,
-events expose stable integer codes, and errors bridge to `NSError` with
-domain `"com.payabli.ttp"`.
+### Objective-C and cross-platform bridges
+
+The SDK exposes a parallel Objective-C surface. Every Swift
+`async throws` method has a callback-based `@objc` companion, structs
+have `*ObjC` companion classes, events expose stable integer codes,
+and errors bridge to `NSError` with domain `"com.payabli.ttp"`.
 
 ```objc
 PayabliTTP *ttp = [[PayabliTTP alloc]
@@ -517,74 +516,41 @@ PayabliTTP *ttp = [[PayabliTTP alloc]
                invoice:nil
       orderDescription:nil
             completion:^(PayabliTTPTransactionResultObjC *result, NSError *e) {
-        NSLog(@"Got it! ID: %@", result.paymentTransId);
+        NSLog(@"Transaction captured. ID: %@", result.paymentTransId);
     }];
 }];
 ```
 
-Cross-platform host code lives under `Bridges/Flutter/`, `Bridges/MAUI/`,
-and `Bridges/ReactNative/`. See [Bridges/README.md](./Bridges/README.md) for
-the current status of each.
+Cross-platform host code is provided under `Bridges/Flutter/`,
+`Bridges/MAUI/`, and `Bridges/ReactNative/`. See
+[Bridges/README.md](./Bridges/README.md) for the current status of
+each binding.
 
----
+### Sample application
 
-## Handling errors
-
-`PayabliTTPError` covers the whole session and charge lifecycle, so you can
-match exactly the cases you care about:
-
-```swift
-do {
-    try await ttp.initialize()
-    let result = try await ttp.charge(
-        type: .sale,
-        paymentDetails: PayabliTTPPaymentDetails(amount: 9.99)
-    )
-} catch PayabliTTPError.devicePendingActivation {
-    // First-time device — prompt for activation code.
-} catch let PayabliTTPError.invalidState(current, attempted) {
-    // Session isn't in the right state for this call.
-} catch let PayabliTTPError.attestationFailed(reason) {
-    // App Attest or Payabli refused to attest this device.
-} catch let PayabliTTPError.nfcFailed(reason) {
-    // Card removed too soon, reader timeout, etc. — usually retryable.
-} catch let PayabliTTPError.updateFailed(reason) {
-    // /update PATCH failed after retries. Reconcile manually.
-} catch PayabliTTPError.tokenExpired {
-    // tokenProvider returned nothing — re-auth required.
-}
-```
-
-If you're using the SDK from Objective-C or a bridged framework, you'll see
-these as `NSError` instances with domain `"com.payabli.ttp"` and a stable
-per-case integer code.
-
----
-
-## Try it out
-
-A complete SwiftUI sample app — initialize, charge, activate, live event
-log — is in [`Example/PayabliDemo`](./Example/PayabliDemo/):
+A complete SwiftUI sample application — covering initialization,
+charge, activation, and a live event log — is located at
+[`Example/PayabliDemo`](./Example/PayabliDemo/):
 
 ```bash
 cd Example/PayabliDemo
-cp Secrets.swift.sample Secrets.swift    # fill in your sandbox credentials
+cp Secrets.swift.sample Secrets.swift    # populate with sandbox credentials
 ```
 
-Tap to Pay only works on a real iPhone XS (or newer) running iOS 16.7+.
-Simulators won't pass the eligibility check.
+Tap to Pay on iPhone requires a physical iPhone XS or newer running
+iOS 16.7 or later. The simulator does not pass the eligibility check.
 
 ---
 
 ## Support
 
 - Bug reports and feature requests: **support@payabli.com**
-- Integration docs: **<https://docs.payabli.com/ios>**
+- Integration documentation: **<https://docs.payabli.com/ios>**
 
 ---
 
 ## License
 
 Commercial — see [LICENSE](./LICENSE). The bundled
-`PayabliCardReaderCore` engine is MIT-licensed; full attribution lives in
-`THIRD_PARTY_LICENSES.txt`.
+`PayabliCardReaderCore` engine is MIT-licensed; full attribution is
+documented in `THIRD_PARTY_LICENSES.txt`.
