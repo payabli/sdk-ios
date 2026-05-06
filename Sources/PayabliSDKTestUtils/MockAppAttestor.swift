@@ -4,29 +4,67 @@ import PayabliSDKTapToPay
 /// Mock `AppAttestor` for unit tests that exercise attestation flows without
 /// hitting `DCAppAttestService`.
 public final class MockAppAttestor: AppAttestor, @unchecked Sendable {
-    public var isSupported: Bool = true
-    public var generatedKeyId: AppAttestKeyId = AppAttestKeyId("mock_keyId")
-    public var attestationPayload: AttestationObject = AttestationObject(Data("attest".utf8))
-    public var assertionPayload: AppAttestAssertion = AppAttestAssertion(Data("assert".utf8))
+    private let lock = NSLock()
 
-    public private(set) var generateKeyCalls = 0
-    public private(set) var attestKeyCalls = 0
-    public private(set) var generateAssertionCalls = 0
+    private var _isSupported = true
+    public var isSupported: Bool {
+        get { lock.withLock { _isSupported } }
+        set { lock.withLock { _isSupported = newValue } }
+    }
+
+    private var _generatedKeyId = AppAttestKeyId("mock_keyId")
+    public var generatedKeyId: AppAttestKeyId {
+        get { lock.withLock { _generatedKeyId } }
+        set { lock.withLock { _generatedKeyId = newValue } }
+    }
+
+    private var _attestationPayload = AttestationObject(Data("attest".utf8))
+    public var attestationPayload: AttestationObject {
+        get { lock.withLock { _attestationPayload } }
+        set { lock.withLock { _attestationPayload = newValue } }
+    }
+
+    private var _assertionPayload = AppAttestAssertion(Data("assert".utf8))
+    public var assertionPayload: AppAttestAssertion {
+        get { lock.withLock { _assertionPayload } }
+        set { lock.withLock { _assertionPayload = newValue } }
+    }
+
+    private var _generateKeyCalls = 0
+    public var generateKeyCalls: Int {
+        lock.withLock { _generateKeyCalls }
+    }
+
+    private var _attestKeyCalls = 0
+    public var attestKeyCalls: Int {
+        lock.withLock { _attestKeyCalls }
+    }
+
+    private var _generateAssertionCalls = 0
+    public var generateAssertionCalls: Int {
+        lock.withLock { _generateAssertionCalls }
+    }
 
     public init() {}
 
     public func generateKey() async throws -> AppAttestKeyId {
-        generateKeyCalls += 1
-        return generatedKeyId
+        return lock.withLock {
+            _generateKeyCalls += 1
+            return _generatedKeyId
+        }
     }
 
     public func attestKey(_ keyId: AppAttestKeyId, clientDataHash: ClientDataHash) async throws -> AttestationObject {
-        attestKeyCalls += 1
-        return attestationPayload
+        return lock.withLock {
+            _attestKeyCalls += 1
+            return _attestationPayload
+        }
     }
 
     public func generateAssertion(_ keyId: AppAttestKeyId, clientDataHash: ClientDataHash) async throws -> AppAttestAssertion {
-        generateAssertionCalls += 1
-        return assertionPayload
+        return lock.withLock {
+            _generateAssertionCalls += 1
+            return _assertionPayload
+        }
     }
 }
