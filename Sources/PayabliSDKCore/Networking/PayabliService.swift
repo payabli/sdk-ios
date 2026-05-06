@@ -14,7 +14,7 @@ import Foundation
 /// - 410 → throws `PayabliGenericError(code: .sessionBurned)`
 /// - 500 → throws `PayabliPaymentError.server`
 /// - Other non-2xx → throws `PayabliGenericError(code: .unknown)`
-public final class PayabliService: Sendable {
+public final class PayabliService: PayabliTransport, Sendable {
     private let baseURL: URL
     private let session: URLSession
     private let logger: PayabliLogger
