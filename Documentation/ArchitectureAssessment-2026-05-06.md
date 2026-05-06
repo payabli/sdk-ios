@@ -452,6 +452,52 @@ Topics that might be relevant to a future audit but were intentionally out of sc
 
 ---
 
+## Resolution status
+
+This assessment was implemented in full on branch `worktree-assessment+swift-library-architecture` across 49 commits, each verified with `xcodebuild test` against the iOS Simulator scheme. Final state: all 88 tests pass.
+
+### Findings
+
+| Finding | Status | Resolved by |
+| ------- | ------ | ----------- |
+| F1 — PayabliAuth shared via Core (Proposal A) | ✅ resolved | `8fb0962`, `89772b5` |
+| F2 — PayabliConfig as value type | ✅ resolved | `4e90e23` |
+| F3 — RetryPolicy → Core | ✅ resolved | `6f9cdd1` |
+| F4 — EventMulticaster generic + Core | ✅ resolved | `3469ca7` |
+| F5 — PayabliTransport protocol (Proposal B) | ✅ resolved | `227389e`, `fb3cbad`, `75f4ee7`, `dd8cec7`, `2bf1063`, `49b4b94` |
+| F6 — 401 retry centralized in transport | ✅ resolved | `b0ea0aa` |
+| F7 — TapToPayProviderFactory deleted (Proposal D) | ✅ resolved | `b1fc159` |
+| F8 — PayabliTTP ivar access modifier | ⏸ deferred | per assessment ("acceptable today") |
+| F9 — SessionManager → internal | ✅ resolved | `4d96d86` |
+| F10 — AppAttestService init split | ✅ resolved | `22dadc3`, `d848b46` |
+| F11 — FiservCardReader.Credentials → internal | ✅ resolved | `0436bee` |
+| F12 — HTTP error mapping unified | ✅ resolved | `2509807` |
+| F13 — `PayabliAuth.tokenChanges()` AsyncStream | ✅ resolved | `291f606` |
+| F14 — Umbrella inclusion rule documented | ✅ resolved | `11b65f2` |
+| F15 — SessionTierValidator → internal | ✅ resolved | `46622a5` |
+| F16 — `@testable import` hygiene | ✅ resolved | 12 commits (`442baa1`…`2166d21`) |
+| F17 — `@MainActor` scope | ⏸ deferred | per assessment ("refactor, not a bug") |
+| F18 — Drop redundant ProximityReader import | ⏸ skipped | `PaymentCardReader.isSupported` is load-bearing — plan authorized escape hatch |
+| F19 — Housekeeping (rolled up) | ✅ resolved | `3a8a941`, `2376f72`, `ec364f3`, `b854145`, `a0cf1bc`, `cb23cef`, `dfca525` |
+
+### Proposals
+
+| Proposal | Status | Resolved by |
+| -------- | ------ | ----------- |
+| A — `PayabliSession` in Core | ✅ delivered | `8fb0962`, `89772b5` |
+| B — `PayabliTransport` + `AuthenticatedTransport` decorator | ✅ delivered | `227389e`, `fb3cbad`, `75f4ee7`, `dd8cec7`, `2bf1063`, `b0ea0aa`, `2509807`, `49b4b94` |
+| C — Move primitives to Core | ✅ delivered | `6f9cdd1`, `3469ca7`, `f6c794e` |
+| D — Delete `TapToPayProviderFactory` | ✅ delivered | `b1fc159` |
+| E — `PayabliSDKTestUtils` library product | ✅ delivered | `d008b30`, `ecedc2e`, `9171ec9`, `bc211ef`, `c698ac0`, `fe26616`, `0032569`, `221dfe9` |
+
+### Follow-ups (caught during code review, out of scope of this assessment)
+
+- **`AppAttestService+Requests.swift` still bypasses the transport seam.** It manually injects the bearer header and calls `service.perform` directly rather than going through `AuthenticatedTransport`. Migration would push device-attestation requests through the same 401-refresh-and-retry path as every other client. Belongs in a follow-up assessment focused on the attestation layer.
+- **`AuthenticatedTransport` is `public`.** It's reachable only via `PayabliSession.transport` (typed as `any PayabliTransport`), but the concrete type is itself public. If host apps should not be able to construct one directly, demote to `internal` and gate construction behind `PayabliSession`. Either choice is defensible; flag for a team decision.
+- **`PayabliSession.auth` and `.service` are `public`.** Required for the existing `accessToken:`-based convenience init on `PayabliTTP`. Once Swift `package` access is more widely adopted in this codebase, both could be demoted to `package` for stricter hygiene.
+
+---
+
 ## Appendix — Sources
 
 **Apple authoritative guidance:**
