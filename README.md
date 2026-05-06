@@ -62,6 +62,7 @@ need `PayabliSDKTapToPay`.
 | `PayabliSDKTapToPay`    | Tap to Pay on iPhone. The product most applications require.                 |
 | `PayabliCardReaderCore` | Tap to Phone engine. Pulled in transitively; no explicit link required.      |
 | `PayabliSDKTelemetry`   | Optional Sentry and PostHog plumbing; bring your own instance.               |
+| `PayabliSDKTestUtils`   | Test fixtures (`StubURLProtocol`, `InMemorySecureStorage`, mocks). Link in test targets only. |
 
 ---
 
@@ -183,6 +184,23 @@ Link the required product. Most applications only need
 `PayabliSDKTapToPay` transitively links `PayabliSDKCore` and
 `PayabliCardReaderCore`; no additional product references are required.
 
+For host-app integration tests, also link `PayabliSDKTestUtils`:
+
+```swift
+.testTarget(
+    name: "MyAppTests",
+    dependencies: [
+        "MyApp",
+        .product(name: "PayabliSDKTestUtils", package: "payabli-sdk-ios")
+    ]
+)
+```
+
+It ships `StubURLProtocol`, `InMemorySecureStorage`, `MockTapToPayProvider`,
+`MockAppAttestor`, `MockDeviceAttestationService`, and
+`InMemoryTelemetryTransport` so test bundles don't need to re-implement
+these. Don't link it from production targets.
+
 ---
 
 ## Usage
@@ -205,7 +223,7 @@ let ttp = PayabliTTP(
 | ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `accessToken`    | A valid short-lived bearer token issued by the host backend.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | `tokenProvider`  | An `async throws -> String` closure. The SDK invokes it to obtain a fresh token after a `401 Unauthorized` response. Concurrent refresh attempts are deduplicated.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| `entryPoint`     | The entrypoint slug provisioned by Payabli (see [Payabli entrypoint](#payabli-entry-point)).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `entryPoint`     | The entrypoint slug provisioned by Payabli (see [Payabli entrypoint](#payabli-entrypoint)).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | `appId`          | The application's identity in the form `<TEAM_ID>.<BUNDLE_ID>`. The `TEAM_ID` is the 10-character team identifier from the [Apple Developer account](https://developer.apple.com/account); the `BUNDLE_ID` is the application's bundle identifier (e.g., `TEAM123456.com.acme.checkout`). The same `appId` must be authorized on the paypoint allowlist (see [Authorized application on the paypoint allowlist](#authorized-application-on-the-paypoint-allowlist)). App Attest uses `appId` to verify that the binary on the device matches the registered application; a mismatch surfaces as `PayabliTTPError.attestationFailed`. |
 | `environment`    | Selects the target Payabli API (see the values table below). The value must match the `appattest-environment` entitlement: `development` for `.sandbox`, `production` for `.production`.                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 
