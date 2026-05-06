@@ -13,6 +13,7 @@ public enum PayabliErrorCode: String, Sendable {
     case invalidConfiguration = "INVALID_CONFIGURATION"
     case networkError = "NETWORK_ERROR"
     case decodingError = "DECODING_ERROR"
+    case validation = "VALIDATION_ERROR"
     case userCancelled = "USER_CANCELLED"
     case unknown = "UNKNOWN"
 }
@@ -73,7 +74,7 @@ public struct PayabliValidationError: PayabliError, Decodable {
     public let errors: [String: [PayabliFieldError]]?
     public let token: String?
 
-    public var code: PayabliErrorCode { .decodingError }
+    public var code: PayabliErrorCode { .validation }
     public var reason: String { title ?? "Validation failed" }
 
     enum CodingKeys: String, CodingKey {
