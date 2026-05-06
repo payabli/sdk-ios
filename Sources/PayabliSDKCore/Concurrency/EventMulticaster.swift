@@ -1,14 +1,14 @@
 import Foundation
 
-/// Multicast emitter for `PayabliTTPEvent` — every concurrent caller of
-/// `events()` receives all subsequent events (PRD FR-11G.2).
-public final class EventMulticaster: @unchecked Sendable {
+/// Multicast emitter for any `Sendable` event type. Every concurrent caller
+/// of `stream()` receives all subsequent events.
+public final class EventMulticaster<Event: Sendable>: @unchecked Sendable {
 
     private final class Subscription: @unchecked Sendable {
         let id = UUID()
-        let continuation: AsyncStream<PayabliTTPEvent>.Continuation
+        let continuation: AsyncStream<Event>.Continuation
 
-        init(continuation: AsyncStream<PayabliTTPEvent>.Continuation) {
+        init(continuation: AsyncStream<Event>.Continuation) {
             self.continuation = continuation
         }
     }
@@ -18,42 +18,31 @@ public final class EventMulticaster: @unchecked Sendable {
 
     public init() {}
 
-    /// Returns an independent stream. Multiple callers receive the same events.
-    public func stream() -> AsyncStream<PayabliTTPEvent> {
+    public func stream() -> AsyncStream<Event> {
         AsyncStream { continuation in
             let sub = Subscription(continuation: continuation)
-
             lock.lock()
             subscribers.append(sub)
             lock.unlock()
-
             continuation.onTermination = { [weak self] _ in
                 self?.remove(sub.id)
             }
         }
     }
 
-    /// Broadcast an event to all active subscribers.
-    public func emit(_ event: PayabliTTPEvent) {
+    public func emit(_ event: Event) {
         lock.lock()
         let snapshot = subscribers
         lock.unlock()
-
-        for sub in snapshot {
-            sub.continuation.yield(event)
-        }
+        for sub in snapshot { sub.continuation.yield(event) }
     }
 
-    /// Terminate all active streams. Typically called on SDK teardown.
     public func finishAll() {
         lock.lock()
         let snapshot = subscribers
         subscribers.removeAll()
         lock.unlock()
-
-        for sub in snapshot {
-            sub.continuation.finish()
-        }
+        for sub in snapshot { sub.continuation.finish() }
     }
 
     private func remove(_ id: UUID) {

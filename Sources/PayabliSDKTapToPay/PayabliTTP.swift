@@ -45,7 +45,7 @@ public final class PayabliTTP: NSObject, ObservableObject {
 
     let provider: TapToPayProvider
     let attestation: DeviceAttestationService
-    let multicaster = EventMulticaster()
+    let multicaster = TTPEventMulticaster()
     let retryPolicy: RetryPolicy
     let logger = PayabliLogger(category: .taptopay)
 
