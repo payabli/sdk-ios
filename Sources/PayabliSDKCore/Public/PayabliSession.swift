@@ -22,8 +22,18 @@ import Foundation
 /// `PayabliSession` internally — single-component apps do not have to
 /// touch this type.
 public final class PayabliSession: @unchecked Sendable {
+    /// The configuration this session was constructed with.
     public let config: PayabliConfig
+
+    /// The shared authentication actor for this session. Holds the
+    /// current access token and deduplicates concurrent refreshes.
+    /// Subscribe to `auth.tokenChanges()` to observe rotations.
     public let auth: PayabliAuth
+
+    /// The shared HTTP transport for this session. Prefer
+    /// `session.transport` (which wraps this in `AuthenticatedTransport`)
+    /// over reaching this directly — endpoint clients should always go
+    /// through the authenticated decorator.
     public let service: PayabliService
 
     public init(config: PayabliConfig, urlSession: URLSession? = nil) {
