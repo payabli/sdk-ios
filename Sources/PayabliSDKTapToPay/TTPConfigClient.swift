@@ -59,11 +59,9 @@ public final class TTPConfigClient: Sendable {
         let responseBody = String(data: response.body, encoding: .utf8) ?? "<non-utf8 \(response.body.count) bytes>"
         logger.info("[config] ← [\(response.statusCode)] body: \(responseBody)")
 
-        if response.statusCode == 403 {
-            throw PayabliTTPError.devicePendingActivation
-        }
-        guard (200..<300).contains(response.statusCode) else {
-            throw PayabliTTPError.configFailed(reason: "HTTP \(response.statusCode)")
+        try mapPayabliHTTPError(response: response) { code in
+            if code == 403 { return PayabliTTPError.devicePendingActivation }
+            return nil
         }
 
         // Shared envelope helpers live in `PayabliSDKCore/Networking/ResponseEnvelope.swift`.
