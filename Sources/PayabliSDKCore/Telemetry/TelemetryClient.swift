@@ -26,7 +26,7 @@ public actor TelemetryClient {
             flushInterval: TimeInterval = 30,
             batchSize: Int = 20,
             enabled: Bool = true,
-            sdkVersion: String = "1.0.0",
+            sdkVersion: String = PayabliCore.version,
             entry: String,
             environment: String
         ) {

@@ -83,6 +83,6 @@ final class TelemetryClientTests: XCTestCase {
         let batches = await transport.batches
         let event = batches.first?.first
         XCTAssertEqual(event?.schemaVersion, 1)
-        XCTAssertEqual(event?.sdkVersion, "1.0.0")
+        XCTAssertFalse(event?.sdkVersion.isEmpty ?? true)
     }
 }
