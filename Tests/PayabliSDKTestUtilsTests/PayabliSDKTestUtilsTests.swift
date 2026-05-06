@@ -16,8 +16,9 @@ final class PayabliSDKTestUtilsTests: XCTestCase {
         XCTAssertNil(storage.string(forKey: "key"))
     }
 
-    func testMockTapToPayProviderInitializes() {
-        _ = MockTapToPayProvider()
-        XCTAssertTrue(true)
+    func testMockTapToPayProviderHasMockProviderId() {
+        XCTAssertEqual(MockTapToPayProvider.providerId, "mock")
+        let mock = MockTapToPayProvider()
+        XCTAssertNotNil(mock)
     }
 }
