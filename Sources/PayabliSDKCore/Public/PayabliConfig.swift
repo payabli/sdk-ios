@@ -31,7 +31,7 @@ import Foundation
 /// - The token is held in memory for the duration of the session only.
 /// - The `clientSecret` is not part of this config — by design, it lives on
 ///   the partner's server.
-public final class PayabliConfig: @unchecked Sendable {
+public struct PayabliConfig: Sendable {
     /// Pre-minted access token obtained by the host app from its own backend,
     /// which performed the client-credentials exchange server-side against
     /// `POST /api/v2/token/serverside`.
