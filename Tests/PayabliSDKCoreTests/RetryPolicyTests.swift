@@ -80,8 +80,12 @@ final class RetryPolicyTests: XCTestCase {
                 throw RetryableError(NSError(domain: "test", code: 500))
             }
             XCTFail("should have thrown")
-        } catch {
+        } catch let nsError as NSError {
             XCTAssertEqual(attempts, 2)
+            XCTAssertEqual(nsError.domain, "test")
+            XCTAssertEqual(nsError.code, 500)
+        } catch {
+            XCTFail("expected NSError but got \(type(of: error))")
         }
     }
 

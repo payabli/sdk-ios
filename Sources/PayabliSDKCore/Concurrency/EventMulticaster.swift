@@ -18,6 +18,11 @@ public final class EventMulticaster<Event: Sendable>: @unchecked Sendable {
 
     public init() {}
 
+    /// Returns an independent `AsyncStream` for an event subscriber. Every
+    /// concurrent caller of `stream()` receives all subsequent events emitted
+    /// by `emit(_:)`. Subscriptions are cleaned up automatically when the
+    /// returned stream's iterator is released or the consuming task is
+    /// cancelled.
     public func stream() -> AsyncStream<Event> {
         AsyncStream { continuation in
             let sub = Subscription(continuation: continuation)
@@ -30,6 +35,8 @@ public final class EventMulticaster<Event: Sendable>: @unchecked Sendable {
         }
     }
 
+    /// Broadcasts an event to every currently-active subscriber. Subscribers
+    /// added after this call do not receive the event.
     public func emit(_ event: Event) {
         lock.lock()
         let snapshot = subscribers
@@ -37,6 +44,9 @@ public final class EventMulticaster<Event: Sendable>: @unchecked Sendable {
         for sub in snapshot { sub.continuation.yield(event) }
     }
 
+    /// Terminates every active stream. Typical use is during SDK teardown so
+    /// consumer `for await` loops exit cleanly. Idempotent; new subscribers
+    /// added after `finishAll()` start a fresh stream.
     public func finishAll() {
         lock.lock()
         let snapshot = subscribers
