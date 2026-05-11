@@ -1,5 +1,6 @@
 import XCTest
-@testable import PayabliSDKCore
+import PayabliSDKCore
+import PayabliSDKTestUtils
 
 private struct FakeData: Decodable, Sendable {
     let paymentTransId: String

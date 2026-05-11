@@ -1,5 +1,5 @@
 import XCTest
-@testable import PayabliSDKCore
+import PayabliSDKCore
 
 final class PayabliAuthTests: XCTestCase {
 
@@ -94,6 +94,28 @@ final class PayabliAuthTests: XCTestCase {
         } catch {
             XCTFail("wrong error: \(error)")
         }
+    }
+
+    func testTokenChangesEmitsAfterRefresh() async throws {
+        let config = PayabliConfig(
+            accessToken: "old",
+            tokenProvider: { "new" },
+            entryPoint: "demo",
+            environment: .sandbox
+        )
+        let auth = PayabliAuth(config: config)
+
+        let stream = await auth.tokenChanges()
+        let collector = Task<String?, Never> {
+            for await token in stream {
+                return token
+            }
+            return nil
+        }
+
+        _ = try await auth.invalidateAndRefresh()
+        let received = await collector.value
+        XCTAssertEqual(received, "new")
     }
 }
 

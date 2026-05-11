@@ -1,6 +1,12 @@
 import Foundation
 
-/// Retry policy for `PATCH /update/{paymentTransId}` (PRD §21.1).
+/// Retry policy for transport-level operations.
+///
+/// Generic over the operation; consumers (TapToPay, future modules) supply
+/// the policy and an `async throws` operation. The defaults match the
+/// MoneyIn `update` PRD requirements (PRD §21.1) — max 3 attempts, 1s
+/// base / 8s max / 2× exponential backoff, 0–0.5s jitter — but any
+/// caller that needs different settings can construct a custom policy.
 ///
 /// - Max 3 attempts
 /// - Base delay 1.0s, max 8.0s, 2× exponential
@@ -29,6 +35,7 @@ public struct RetryPolicy: Sendable {
         multiplier: Double,
         maxJitter: TimeInterval
     ) {
+        precondition(maxAttempts >= 1, "RetryPolicy requires at least 1 attempt")
         self.maxAttempts = maxAttempts
         self.baseDelay = baseDelay
         self.maxDelay = maxDelay
@@ -88,6 +95,9 @@ public enum Retry {
                 throw error
             }
         }
-        throw lastUnderlying ?? PayabliTTPError.updateFailed(reason: "Exhausted retries")
+        throw lastUnderlying ?? PayabliGenericError(
+            code: .networkError,
+            reason: "Exhausted retries"
+        )
     }
 }

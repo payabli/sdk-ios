@@ -14,5 +14,11 @@ import PayabliSDKCore
 /// `posthog-ios` (NFR-26). They live here, behind an optional SPM product
 /// and CocoaPods subspec.
 public enum PayabliSDKTelemetry {
-    public static let version = "1.0.0"
+    public static var version: String {
+        Bundle(for: VersionMarker.self)
+            .infoDictionary?["CFBundleShortVersionString"] as? String
+            ?? "0.0.0"
+    }
+
+    private final class VersionMarker {}
 }

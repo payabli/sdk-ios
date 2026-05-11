@@ -45,13 +45,12 @@ public final class PayabliTTP: NSObject, ObservableObject {
 
     let provider: TapToPayProvider
     let attestation: DeviceAttestationService
-    let multicaster = EventMulticaster()
+    let multicaster = TTPEventMulticaster()
     let retryPolicy: RetryPolicy
     let logger = PayabliLogger(category: .taptopay)
 
     // Networking
-    let service: PayabliService
-    let auth: PayabliAuth
+    let session: PayabliSession
     let transactionClient: TTPTransactionClient
     let configClient: TTPConfigClient
 
@@ -70,6 +69,52 @@ public final class PayabliTTP: NSObject, ObservableObject {
     @Published public internal(set) var isReady: Bool = false
 
     // MARK: - Init
+
+    /// Designated init. Shares a single `PayabliAuth` + `PayabliService`
+    /// across every component facade constructed with the same `PayabliSession`.
+    public init(
+        session: PayabliSession,
+        appId: String,
+        provider: TapToPayProvider,
+        attestation: DeviceAttestationService,
+        retryPolicy: RetryPolicy = .default
+    ) {
+        self.entryPoint = session.config.entryPoint
+        self.appId = appId
+        self.environment = session.config.environment
+        self.provider = provider
+        self.attestation = attestation
+        self.retryPolicy = retryPolicy
+
+        self.session = session
+        self.transactionClient = TTPTransactionClient(transport: session.transport)
+        self.configClient = TTPConfigClient(
+            transport: session.transport,
+            attestation: attestation
+        )
+        super.init()
+    }
+
+    /// Convenience init that wraps a `PayabliConfig` in a fresh
+    /// `PayabliSession`. Use the `session:` init when you need to share auth
+    /// across multiple component facades on the same config.
+    public convenience init(
+        config: PayabliConfig,
+        appId: String,
+        provider: TapToPayProvider,
+        attestation: DeviceAttestationService,
+        retryPolicy: RetryPolicy = .default,
+        session: URLSession? = nil
+    ) {
+        let payabliSession = PayabliSession(config: config, urlSession: session)
+        self.init(
+            session: payabliSession,
+            appId: appId,
+            provider: provider,
+            attestation: attestation,
+            retryPolicy: retryPolicy
+        )
+    }
 
     /// PRD §19.1 convenience init. Wires the default `FiservCardReader`
     /// provider and a real `AppAttestService` with Keychain-backed storage.
@@ -97,50 +142,21 @@ public final class PayabliTTP: NSObject, ObservableObject {
             entryPoint: entryPoint,
             environment: environment
         )
-        let service = PayabliService(environment: environment)
-        let auth = PayabliAuth(config: config)
+        let payabliSession = PayabliSession(config: config)
         let storage: SecureStorage = KeychainStorage()
         let attestation = AppAttestService(
-            service: service,
-            auth: auth,
+            transport: payabliSession.transport,
             attestor: RealAppAttestor(),
             storage: storage
         )
         self.init(
-            config: config,
+            session: payabliSession,
             appId: appId,
             provider: FiservCardReader(),
             attestation: attestation
         )
     }
     #endif
-
-    /// Full-dependency init. Prefer the `accessToken` convenience init for
-    /// production; this one is mainly for tests and power users that need to
-    /// inject a custom provider or attestation service.
-    public init(
-        config: PayabliConfig,
-        appId: String,
-        provider: TapToPayProvider,
-        attestation: DeviceAttestationService,
-        retryPolicy: RetryPolicy = .default,
-        session: URLSession? = nil
-    ) {
-        self.entryPoint = config.entryPoint
-        self.appId = appId
-        self.environment = config.environment
-        self.provider = provider
-        self.attestation = attestation
-        self.retryPolicy = retryPolicy
-
-        let service = PayabliService(environment: config.environment, session: session)
-        let auth = PayabliAuth(config: config)
-        self.service = service
-        self.auth = auth
-        self.transactionClient = TTPTransactionClient(service: service, auth: auth)
-        self.configClient = TTPConfigClient(service: service, auth: auth, attestation: attestation)
-        super.init()
-    }
 
     /// `@objc`-friendly convenience init for ObjC / MAUI / sharpie consumers
     /// that can't represent the Swift `PayabliTokenRefresh` (`@Sendable () async
@@ -277,34 +293,3 @@ public final class PayabliTTPEventToken: NSObject {
     }
 }
 
-// MARK: - Internal helpers
-
-/// Box that lets us thread an ObjC block through a Swift `@Sendable` closure.
-/// ObjC blocks are heap-allocated and copy-on-capture, but Swift can't infer
-/// `@Sendable` for the input function type, so we opt out of the check
-/// explicitly at the boundary. Used by the `@objc` convenience init only.
-struct UncheckedSendableBox<Value>: @unchecked Sendable {
-    let value: Value
-    init(_ value: Value) { self.value = value }
-}
-
-/// Tiny `NSLock`-backed reference cell used as a one-shot guard when bridging
-/// ObjC completion blocks into a `CheckedContinuation`. We can't trust the
-/// host to invoke the block exactly once — and `CheckedContinuation` will
-/// crash on the second `resume` — so the bridge serializes "did I already
-/// resume?" through this cell. Reference type so closures can mutate the
-/// shared state without `var` capture warnings under strict concurrency.
-final class Locked<Value>: @unchecked Sendable {
-    private let lock = NSLock()
-    private var value: Value
-
-    init(_ value: Value) { self.value = value }
-
-    /// Mutates and returns whatever the caller derives from the protected
-    /// state, atomically. Use the inout argument to read+write.
-    func withLock<R>(_ body: (inout Value) -> R) -> R {
-        lock.lock()
-        defer { lock.unlock() }
-        return body(&value)
-    }
-}

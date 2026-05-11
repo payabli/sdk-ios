@@ -15,5 +15,11 @@ import Foundation
 /// > `PayabliSDKCore.PayabliConfig`, which re-parses as "nested type of
 /// > the enum" and fails to resolve when library evolution is enabled.
 public enum PayabliCore {
-    public static let version = "1.0.0"
+    public static var version: String {
+        Bundle(for: VersionMarker.self)
+            .infoDictionary?["CFBundleShortVersionString"] as? String
+            ?? "0.0.0"
+    }
+
+    private final class VersionMarker {}
 }

@@ -3,17 +3,16 @@ import PayabliSDKCore
 
 /// HTTP client for `/api/v2/MoneyIn/initiate` and `/api/v2/MoneyIn/update/{id}`.
 ///
-/// Every request uses the same access token held by `PayabliAuth`; the v2
-/// envelope's chained `token` field is intentionally ignored.
+/// Bearer-auth injection and 401 refresh-and-retry are handled by the
+/// `PayabliTransport` passed at init — callers should supply
+/// `session.transport` (an `AuthenticatedTransport`).
 ///
 public final class TTPTransactionClient: Sendable {
-    private let service: PayabliService
-    private let auth: PayabliAuth
+    private let transport: any PayabliTransport
     private let logger = PayabliLogger(category: .taptopay)
 
-    public init(service: PayabliService, auth: PayabliAuth) {
-        self.service = service
-        self.auth = auth
+    public init(transport: any PayabliTransport) {
+        self.transport = transport
     }
 
     /// `POST /api/v2/MoneyIn/initiate` — returns the authoritative
@@ -31,8 +30,6 @@ public final class TTPTransactionClient: Sendable {
         invoice: PayabliTTPInvoiceData = PayabliTTPInvoiceData(),
         orderDescription: String? = nil
     ) async throws -> String {
-        let token = await auth.currentAccessToken()
-
         let body = InitiateRequest(
             entryPoint: entryPoint,
             orderDescription: orderDescription ?? "",
@@ -42,10 +39,11 @@ public final class TTPTransactionClient: Sendable {
             invoiceData: invoice.invoiceNumber.map { InitiateInvoiceData(invoiceNumber: $0) }
         )
 
+        // Bearer header is injected by the transport (AuthenticatedTransport).
         let request = try PayabliRequest.json(
             method: .post,
             path: "/api/v2/MoneyIn/initiate",
-            headers: ["Authorization": "Bearer \(token)"],
+            headers: [:],
             jsonBody: body
         )
 
@@ -62,7 +60,7 @@ public final class TTPTransactionClient: Sendable {
 
         let envelope: PayabliV2Envelope<InitiateData>
         do {
-            envelope = try await service.performV2(request, decoding: InitiateData.self)
+            envelope = try await transport.performV2(request, decoding: InitiateData.self)
         } catch {
             logger.error("[initiate] transport/decode error: \(String(describing: error))")
             throw error

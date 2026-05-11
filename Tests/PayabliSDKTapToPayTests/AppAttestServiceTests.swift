@@ -1,6 +1,7 @@
 import XCTest
-import PayabliSDKCore
+@testable import PayabliSDKCore
 @testable import PayabliSDKTapToPay
+import PayabliSDKTestUtils
 
 final class AppAttestServiceTests: XCTestCase {
     override func tearDown() {
@@ -11,18 +12,18 @@ final class AppAttestServiceTests: XCTestCase {
     private func makeAttest(
         storage: SecureStorage = InMemorySecureStorage()
     ) -> (AppAttestService, MockAppAttestor, PayabliAuth) {
-        let session = StubURLProtocol.makeSession()
-        let service = PayabliService(environment: .sandbox, session: session)
+        let urlSession = StubURLProtocol.makeSession()
+        let service = PayabliService(environment: .sandbox, session: urlSession)
         let config = PayabliConfig(
             accessToken: "seed",
             entryPoint: "myEntry",
             environment: .sandbox
         )
         let auth = PayabliAuth(config: config)
+        let transport = AuthenticatedTransport(base: service, auth: auth)
         let attestor = MockAppAttestor()
         let sut = AppAttestService(
-            service: service,
-            auth: auth,
+            transport: transport,
             attestor: attestor,
             storage: storage,
             hardwareIdProvider: { "fixed-hw-id" },

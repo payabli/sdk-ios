@@ -14,5 +14,11 @@ import PayabliSDKCore
 /// > namespaces in `PayabliSDKCore` and `PayabliSDKPayIn` for the same
 /// > rationale.
 public enum PayabliTapToPayModule {
-    public static let version: String = "1.0.0"
+    public static var version: String {
+        Bundle(for: VersionMarker.self)
+            .infoDictionary?["CFBundleShortVersionString"] as? String
+            ?? "0.0.0"
+    }
+
+    private final class VersionMarker {}
 }

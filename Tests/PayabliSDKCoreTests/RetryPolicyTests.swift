@@ -1,5 +1,5 @@
 import XCTest
-@testable import PayabliSDKTapToPay
+import PayabliSDKCore
 
 final class RetryPolicyTests: XCTestCase {
 
@@ -10,6 +10,12 @@ final class RetryPolicyTests: XCTestCase {
         XCTAssertEqual(policy.maxDelay, 8.0)
         XCTAssertEqual(policy.multiplier, 2.0)
         XCTAssertEqual(policy.maxJitter, 0.5)
+    }
+
+    func testMinimumValidMaxAttempts() {
+        // maxAttempts == 1 is the minimum valid value; construction must not trap.
+        let policy = RetryPolicy(maxAttempts: 1, baseDelay: 0, maxDelay: 0, multiplier: 1, maxJitter: 0)
+        XCTAssertEqual(policy.maxAttempts, 1)
     }
 
     func testDelayForAttempt() {
@@ -80,8 +86,12 @@ final class RetryPolicyTests: XCTestCase {
                 throw RetryableError(NSError(domain: "test", code: 500))
             }
             XCTFail("should have thrown")
-        } catch {
+        } catch let nsError as NSError {
             XCTAssertEqual(attempts, 2)
+            XCTAssertEqual(nsError.domain, "test")
+            XCTAssertEqual(nsError.code, 500)
+        } catch {
+            XCTFail("expected NSError but got \(type(of: error))")
         }
     }
 

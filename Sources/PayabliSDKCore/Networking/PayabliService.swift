@@ -14,7 +14,7 @@ import Foundation
 /// - 410 → throws `PayabliGenericError(code: .sessionBurned)`
 /// - 500 → throws `PayabliPaymentError.server`
 /// - Other non-2xx → throws `PayabliGenericError(code: .unknown)`
-public final class PayabliService: Sendable {
+public final class PayabliService: PayabliTransport, Sendable {
     private let baseURL: URL
     private let session: URLSession
     private let logger: PayabliLogger
@@ -28,7 +28,7 @@ public final class PayabliService: Sendable {
         self.logger = PayabliLogger(category: .network)
     }
 
-    private static func makeDefaultSession() -> URLSession {
+    internal static func makeDefaultSession() -> URLSession {
         let config = URLSessionConfiguration.ephemeral
         config.timeoutIntervalForRequest = defaultRequestTimeout
         config.timeoutIntervalForResource = defaultRequestTimeout * 3
@@ -125,43 +125,72 @@ public final class PayabliService: Sendable {
     /// Callers that decode responses manually (e.g. attestation endpoints
     /// that return a non-v2 envelope) should invoke this before decoding.
     public func mapHTTPError(response: PayabliResponse) throws {
-        guard !(200..<300).contains(response.statusCode) else { return }
+        try mapPayabliHTTPError(response: response)
+    }
+}
 
-        let decoder = JSONDecoder()
+// MARK: - Shared HTTP error mapping
 
-        switch response.statusCode {
-        case 400:
-            if let validation = try? decoder.decode(PayabliValidationError.self, from: response.body) {
-                throw PayabliPaymentError.validation(validation)
-            }
-            throw PayabliGenericError(code: .unknown, reason: "Bad request (400)")
+/// Maps a non-2xx `PayabliResponse` to a typed error. No-op for 2xx.
+///
+/// The `override` closure receives the raw HTTP status code and may return a
+/// component-specific error (e.g. `PayabliTTPError.devicePendingActivation`
+/// for a 403 on the config endpoint). Return `nil` to fall through to the
+/// standard mapping.
+///
+/// Standard mappings (PRD §8):
+/// - 400 → `PayabliPaymentError.validation` (or `.generic(.unknown)`)
+/// - 401 → `PayabliGenericError(.tokenExpired)`
+/// - 402 → `PayabliPaymentError.decline` (or `.generic(.unknown)`)
+/// - 403 → `PayabliGenericError(.permissionDenied)`
+/// - 410 → `PayabliGenericError(.sessionBurned)`
+/// - 500+ → `PayabliPaymentError.server` (or `.generic(.unknown)`)
+/// - other non-2xx → `PayabliGenericError(.unknown)`
+public func mapPayabliHTTPError(
+    response: PayabliResponse,
+    override: ((Int) -> (any Error)?)? = nil
+) throws {
+    guard !(200..<300).contains(response.statusCode) else { return }
 
-        case 401:
-            throw PayabliGenericError(code: .tokenExpired, reason: "Unauthorized (401)")
+    // Component-specific override takes priority.
+    if let customError = override?(response.statusCode) {
+        throw customError
+    }
 
-        case 402:
-            if let decline = try? decoder.decode(PayabliDeclineError.self, from: response.body) {
-                throw PayabliPaymentError.decline(decline)
-            }
-            throw PayabliGenericError(code: .unknown, reason: "Payment declined (402)")
+    let decoder = JSONDecoder()
 
-        case 403:
-            throw PayabliGenericError(code: .permissionDenied, reason: "Forbidden (403)")
-
-        case 410:
-            throw PayabliGenericError(code: .sessionBurned, reason: "Session burned (410)")
-
-        case 500...:
-            if let server = try? decoder.decode(PayabliServerError.self, from: response.body) {
-                throw PayabliPaymentError.server(server)
-            }
-            throw PayabliGenericError(code: .unknown, reason: "Server error (\(response.statusCode))")
-
-        default:
-            throw PayabliGenericError(
-                code: .unknown,
-                reason: "HTTP \(response.statusCode)"
-            )
+    switch response.statusCode {
+    case 400:
+        if let validation = try? decoder.decode(PayabliValidationError.self, from: response.body) {
+            throw PayabliPaymentError.validation(validation)
         }
+        throw PayabliGenericError(code: .unknown, reason: "Bad request (400)")
+
+    case 401:
+        throw PayabliGenericError(code: .tokenExpired, reason: "Unauthorized (401)")
+
+    case 402:
+        if let decline = try? decoder.decode(PayabliDeclineError.self, from: response.body) {
+            throw PayabliPaymentError.decline(decline)
+        }
+        throw PayabliGenericError(code: .unknown, reason: "Payment declined (402)")
+
+    case 403:
+        throw PayabliGenericError(code: .permissionDenied, reason: "Forbidden (403)")
+
+    case 410:
+        throw PayabliGenericError(code: .sessionBurned, reason: "Session burned (410)")
+
+    case 500...:
+        if let server = try? decoder.decode(PayabliServerError.self, from: response.body) {
+            throw PayabliPaymentError.server(server)
+        }
+        throw PayabliGenericError(code: .unknown, reason: "Server error (\(response.statusCode))")
+
+    default:
+        throw PayabliGenericError(
+            code: .unknown,
+            reason: "HTTP \(response.statusCode)"
+        )
     }
 }

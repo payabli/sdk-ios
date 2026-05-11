@@ -7,12 +7,12 @@ import Combine
 /// `@Published sessionState`. All transitions occur on `@MainActor` for safe
 /// SwiftUI observation (§17.4).
 @MainActor
-public final class SessionManager: ObservableObject {
-    @Published public private(set) var sessionState: PayabliTTPSessionState = .idle
-    @Published public private(set) var isReady: Bool = false
-    public private(set) var lastError: Error?
+internal final class SessionManager: ObservableObject {
+    @Published private(set) var sessionState: PayabliTTPSessionState = .idle
+    @Published private(set) var isReady: Bool = false
+    private(set) var lastError: Error?
 
-    public init() {}
+    init() {}
 
     /// Attempt to transition to a new state. Rejects invalid transitions.
     @discardableResult

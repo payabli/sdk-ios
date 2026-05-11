@@ -12,9 +12,9 @@ import Foundation
 ///
 /// Components pass in their static requirements; a mismatch throws
 /// `PayabliGenericError(.permissionDenied)`.
-public enum SessionTierValidator {
+internal enum SessionTierValidator {
 
-    public static func validate(
+    static func validate(
         component: any PayabliComponent.Type,
         against config: PayabliConfig
     ) throws {
@@ -31,7 +31,7 @@ public enum SessionTierValidator {
 
     /// Best-effort tier detection. Defaults to Tier 1 when nothing indicates
     /// a higher tier (v2.0 JWT adoption will flesh this out — §16.7).
-    public static func detectedTier(from config: PayabliConfig) -> PayabliSessionTier {
+    static func detectedTier(from config: PayabliConfig) -> PayabliSessionTier {
         // If the config has no sessionToken we're on the client-credentials
         // (access-token) path — treat as Tier 1 per §16.1.
         // If sessionToken is set, attempt to decode JWT claims for the tier.

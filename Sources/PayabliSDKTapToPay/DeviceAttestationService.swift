@@ -18,6 +18,13 @@ public struct AssertionHeaders: Sendable {
     public let deviceId: String
     public let timestamp: String
 
+    public init(assertion: String, keyId: String, deviceId: String, timestamp: String) {
+        self.assertion = assertion
+        self.keyId = keyId
+        self.deviceId = deviceId
+        self.timestamp = timestamp
+    }
+
     public var asDictionary: [String: String] {
         [
             "X-App-Assertion": assertion,

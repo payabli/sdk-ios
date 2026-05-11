@@ -9,6 +9,10 @@ public actor PayabliAuth {
     /// other callers await the same Task result.
     private var inFlightRefresh: Task<String, Error>?
 
+    // Multicasts every successful token rotation. Producers append on every
+    // refresh; consumers iterate as long as they want.
+    private var tokenChangeContinuations: [UUID: AsyncStream<String>.Continuation] = [:]
+
     public init(config: PayabliConfig) {
         self.config = config
         self.currentToken = config.accessToken
@@ -51,6 +55,10 @@ public actor PayabliAuth {
             currentToken = fresh
             inFlightRefresh = nil
             logger.info("Access token refreshed")
+            // Notify observers of the rotation.
+            for (_, continuation) in tokenChangeContinuations {
+                continuation.yield(fresh)
+            }
             return fresh
         } catch {
             inFlightRefresh = nil
@@ -68,5 +76,22 @@ public actor PayabliAuth {
     public func reset() {
         currentToken = config.accessToken
         inFlightRefresh = nil
+    }
+
+    /// AsyncStream that emits whenever `invalidateAndRefresh()` succeeds.
+    /// Each call returns an independent stream — multiple subscribers each
+    /// receive every subsequent token.
+    public func tokenChanges() -> AsyncStream<String> {
+        let id = UUID()
+        return AsyncStream { continuation in
+            tokenChangeContinuations[id] = continuation
+            continuation.onTermination = { [weak self] _ in
+                Task { await self?.removeTokenChangeContinuation(id: id) }
+            }
+        }
+    }
+
+    private func removeTokenChangeContinuation(id: UUID) {
+        tokenChangeContinuations.removeValue(forKey: id)
     }
 }
