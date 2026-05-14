@@ -12,7 +12,7 @@ and redistribution under a different name, provided the original copyright
 notice travels with every substantial copy of the software.
 
 We vendor the source so that the binary XCFrameworks we ship publicly
-(under `payabli/payabli-sdk-ios`) expose a **Payabli-branded module**
+(under `payabli/sdk-ios`) expose a **Payabli-branded module**
 (`PayabliCardReaderCore`) instead of the upstream `FiservTTP` name. This
 keeps the Swift Package Manager manifest, `Package.resolved`, `otool -L`
 output, `CFBundleIdentifier`, and public `.swiftinterface` of the published

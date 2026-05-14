@@ -165,20 +165,20 @@ In Xcode, choose **File → Add Packages…** and enter the repository
 URL:
 
 ```
-https://github.com/payabli/payabli-sdk-ios.git
+https://github.com/payabli/sdk-ios.git
 ```
 
 Alternatively, declare the dependency in `Package.swift`:
 
 ```swift
-.package(url: "https://github.com/payabli/payabli-sdk-ios.git", branch: "main")
+.package(url: "https://github.com/payabli/sdk-ios.git", branch: "main")
 ```
 
 Link the required product. Most applications only need
 `PayabliSDKTapToPay`:
 
 ```swift
-.product(name: "PayabliSDKTapToPay", package: "payabli-sdk-ios")
+.product(name: "PayabliSDKTapToPay", package: "sdk-ios")
 ```
 
 `PayabliSDKTapToPay` transitively links `PayabliSDKCore` and
@@ -191,7 +191,7 @@ For host-app integration tests, also link `PayabliSDKTestUtils`:
     name: "MyAppTests",
     dependencies: [
         "MyApp",
-        .product(name: "PayabliSDKTestUtils", package: "payabli-sdk-ios")
+        .product(name: "PayabliSDKTestUtils", package: "sdk-ios")
     ]
 )
 ```
