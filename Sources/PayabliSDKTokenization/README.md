@@ -94,7 +94,7 @@ PayabliTokenizationView(
     component: tokenization,
     configuration: PayabliTokenizationFormConfiguration(
         allowedMethods: [.card, .ach],
-        cardFieldOrder: [.cardNumber, .cardExpiration, .cardCvv, .cardZip, .cardholderName],
+        cardFieldOrder: [.cardholderName, .cardNumber, .cardExpiration, .cardCvv, .cardZip],
         achFieldOrder: [.achHolder, .achRouting, .achAccount, .achAccountType],
         hiddenValues: PayabliTokenizationHiddenValues(
             achHolderType: .personal,

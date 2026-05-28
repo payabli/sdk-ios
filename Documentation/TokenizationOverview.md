@@ -204,11 +204,11 @@ PayabliTokenizationView(
         allowedMethods: [.card, .ach],
         defaultMethod: .card,
         cardFieldOrder: [
+            .cardholderName,
             .cardNumber,
             .cardExpiration,
             .cardCvv,
-            .cardZip,
-            .cardholderName
+            .cardZip
         ],
         achFieldOrder: [
             .achHolder,
