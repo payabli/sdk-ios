@@ -194,8 +194,9 @@ for analytics, support tooling, or custom success/error handling.
 
 `PayabliPaymentMethodView` is the turn-key SwiftUI component. Required payment
 fields are enforced by the SDK. Optional visible fields are controlled by the
-field-order arrays. Optional hidden values are supplied through
-`PayabliPaymentMethodHiddenValues` or `PayabliPaymentMethodOptions`.
+field-order arrays and can be made required with `requiredFields`. Optional
+hidden values are supplied through `PayabliPaymentMethodHiddenValues` or
+`PayabliPaymentMethodOptions`.
 
 ```swift
 PayabliPaymentMethodView(
@@ -343,6 +344,7 @@ should be moved into the sheet header.
 | `inputSizing` | Default and per-field width, height, and horizontal padding. |
 | `cardBrandIconPlacement` | Card-number brand icon placement: `.leading`, `.trailing`, or `.hidden`. |
 | `errorMessagePlacement` | Payment Method error placement: `.top` or `.aboveSubmitButton`. |
+| `requiredFields` | Additional optional fields that must be completed before submit. Core API-required fields cannot be made optional. |
 
 Supported visible fields:
 
@@ -355,7 +357,6 @@ Supported visible fields:
 
 Supported hidden values:
 
-- `cardCvv`
 - `achHolderType`
 - `achSecCode` (defaults to `.web`)
 - `achDevice`
@@ -368,6 +369,10 @@ merged with `options.customerData` and `hiddenValues.customerData`.
 
 The view preserves the configured field order. When adjacent, expiration/CVV
 and first-name/last-name fields are rendered as paired inputs to save space.
+Card number, expiration, CVV, cardholder name, and card ZIP are always required
+for card submissions. ACH holder, routing, account, and account type are always
+required for ACH submissions. Use `requiredFields` to require optional visible
+fields such as `.billingEmail`, `.methodDescription`, or `.achDevice`.
 
 ## Configurable Endpoint Fields
 

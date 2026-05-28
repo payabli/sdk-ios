@@ -176,9 +176,10 @@ required payment-method values: query flags, idempotency key, customer data,
 vendor data, fallback auth, method description, source, and subdomain.
 `PayabliPaymentMethodFormConfiguration` controls whether the form is card-only,
 ACH-only, or dual-method, which optional fields are visible, hidden field
-values, submit button text, label layout, formatting, and per-field input
-sizing. The default submit button text is "Add Payment Method". Card ZIP is
-always required and cannot be supplied as a hidden value.
+values, submit button text, label layout, formatting, per-field input sizing,
+and additional required optional fields. The default submit button text is
+"Add Payment Method". Card CVV and ZIP are always required and cannot be
+supplied as hidden values.
 ACH SEC Code is sent from `hiddenValues.achSecCode` and defaults to `.web`.
 Payment Method API failures are decoded from `isSuccess: false` responses before
 generic HTTP mapping; the form renders the user-facing message at the configured

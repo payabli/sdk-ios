@@ -223,6 +223,33 @@ final class TokenStorageClientTests: XCTestCase {
         }
     }
 
+    func testMissingCardCvvDoesNotReachTransport() async throws {
+        let transport = MockTransport(responseBody: "{}")
+        let client = TokenStorageClient(
+            transport: transport,
+            accessTokenProvider: { "access-token" }
+        )
+
+        do {
+            _ = try await client.addMethod(
+                entryPoint: "entry",
+                paymentMethod: .card(PayabliCardPaymentMethodData(
+                    cardNumber: "4111111111111111",
+                    expiration: "02/25",
+                    cardholderName: "John Doe",
+                    billingZip: "12345"
+                ))
+            )
+            XCTFail("Expected validation error")
+        } catch let PayabliPaymentMethodError.invalidInput(message) {
+            XCTAssertEqual(message, "CVV is required.")
+            let requests = await transport.requests
+            XCTAssertTrue(requests.isEmpty)
+        } catch {
+            XCTFail("Wrong error: \(error)")
+        }
+    }
+
     func testDetectsCardBrandFromCardNumberPrefix() {
         XCTAssertEqual(PayabliPaymentMethodCardBrand.detect(cardNumber: "4111 1111 1111 1111"), .visa)
         XCTAssertEqual(PayabliPaymentMethodCardBrand.detect(cardNumber: "5555 5555 5555 4444"), .mastercard)
@@ -448,6 +475,7 @@ final class TokenStorageClientTests: XCTestCase {
                     cardNumber: "4111111111111111",
                     expiration: "02/28",
                     cardholderName: "Jane Doe",
+                    cvv: "123",
                     billingZip: "33139"
                 ))
             )
@@ -462,7 +490,7 @@ final class TokenStorageClientTests: XCTestCase {
     }
 
     @MainActor
-    func testFormConfigurationSubmitsRequiredCardZipAndHiddenOptionalFields() async throws {
+    func testFormConfigurationSubmitsRequiredCardFieldsAndHiddenOptionalFields() async throws {
         let transport = MockTransport(responseBody: """
         {
           "responseText": "Success",
@@ -488,7 +516,6 @@ final class TokenStorageClientTests: XCTestCase {
                 allowedMethods: [.card],
                 cardFieldOrder: [.cardNumber, .cardExpiration, .cardholderName],
                 hiddenValues: PayabliPaymentMethodHiddenValues(
-                    cardCvv: "123",
                     methodDescription: "Hidden primary card",
                     customerData: PayabliPaymentMethodCustomerData(
                         billingEmail: "hidden@example.com",
@@ -501,7 +528,10 @@ final class TokenStorageClientTests: XCTestCase {
         viewModel.cardExpiration = "02/25"
         viewModel.cardholderName = "Jane Doe"
         XCTAssertFalse(viewModel.canSubmit)
+        viewModel.cardCvv = "321"
+        XCTAssertFalse(viewModel.canSubmit)
         viewModel.cardZip = "33139"
+        XCTAssertTrue(viewModel.activeFields.contains(.cardCvv))
         XCTAssertTrue(viewModel.activeFields.contains(.cardZip))
         XCTAssertTrue(viewModel.canSubmit)
 
@@ -519,8 +549,62 @@ final class TokenStorageClientTests: XCTestCase {
         XCTAssertEqual(customer["billingEmail"] as? String, "hidden@example.com")
 
         let paymentMethod = try XCTUnwrap(body["paymentMethod"] as? [String: Any])
-        XCTAssertEqual(paymentMethod["cardcvv"] as? String, "123")
+        XCTAssertEqual(paymentMethod["cardcvv"] as? String, "321")
         XCTAssertEqual(paymentMethod["cardzip"] as? String, "33139")
+    }
+
+    @MainActor
+    func testFormConfigurationCanRequireOptionalFields() async throws {
+        let transport = MockTransport(responseBody: """
+        {
+          "responseText": "Success",
+          "isSuccess": true,
+          "responseData": {
+            "referenceId": "stored-required",
+            "resultCode": 1,
+            "resultText": "Approved",
+            "methodReferenceId": "stored-required"
+          }
+        }
+        """)
+        let component = PayabliPaymentMethod(
+            accessToken: "access-token-required",
+            entryPoint: "entry-required",
+            environment: .sandbox,
+            transport: transport
+        )
+        let viewModel = PayabliPaymentMethodViewModel(
+            component: component,
+            configuration: PayabliPaymentMethodFormConfiguration(
+                allowedMethods: [.card],
+                cardFieldOrder: [.cardholderName, .cardNumber, .cardExpiration, .cardCvv, .cardZip],
+                requiredFields: [.billingEmail, .methodDescription]
+            )
+        )
+
+        XCTAssertTrue(viewModel.activeFields.contains(.billingEmail))
+        XCTAssertTrue(viewModel.activeFields.contains(.methodDescription))
+
+        viewModel.cardholderName = "Jane Doe"
+        viewModel.cardNumber = "4111111111111111"
+        viewModel.cardExpiration = "02/28"
+        viewModel.cardCvv = "123"
+        viewModel.cardZip = "33139"
+        XCTAssertFalse(viewModel.canSubmit)
+
+        viewModel.billingEmail = "jane@example.com"
+        XCTAssertFalse(viewModel.canSubmit)
+
+        viewModel.methodDescription = "Primary card"
+        XCTAssertTrue(viewModel.canSubmit)
+
+        _ = try await viewModel.submit()
+
+        let request = try await firstRequest(from: transport)
+        let body = try parseBody(request)
+        XCTAssertEqual(body["methodDescription"] as? String, "Primary card")
+        let customer = try XCTUnwrap(body["customerData"] as? [String: Any])
+        XCTAssertEqual(customer["billingEmail"] as? String, "jane@example.com")
     }
 
     @MainActor
@@ -637,6 +721,7 @@ final class TokenStorageClientTests: XCTestCase {
 
         viewModel.cardholderName = "Jane Doe"
         viewModel.cardExpiration = "02/28"
+        viewModel.cardCvv = "123"
         viewModel.cardZip = "33139"
         XCTAssertFalse(viewModel.canSubmit)
 

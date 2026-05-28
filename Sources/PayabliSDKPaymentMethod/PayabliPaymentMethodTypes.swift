@@ -620,7 +620,11 @@ extension PayabliCardPaymentMethodData {
         guard !billingZip.trimmed.isEmpty else {
             throw PayabliPaymentMethodError.invalidInput("Card ZIP code is required.")
         }
-        if let cvv = cvv?.digitsOnly, !cvv.isEmpty, !(3 ... 4).contains(cvv.count) {
+        let cvvDigits = cvv?.digitsOnly ?? ""
+        guard !cvvDigits.isEmpty else {
+            throw PayabliPaymentMethodError.invalidInput("CVV is required.")
+        }
+        guard (3 ... 4).contains(cvvDigits.count) else {
             throw PayabliPaymentMethodError.invalidInput("CVV must be 3 or 4 digits.")
         }
     }

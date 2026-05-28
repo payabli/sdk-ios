@@ -60,7 +60,6 @@ public struct PayabliPaymentMethodFormatting: Sendable {
 }
 
 public struct PayabliPaymentMethodHiddenValues: Sendable {
-    public var cardCvv: String?
     public var achHolderType: PayabliACHHolderType?
     public var achSecCode: PayabliACHSecCode?
     public var achDevice: String?
@@ -68,14 +67,12 @@ public struct PayabliPaymentMethodHiddenValues: Sendable {
     public var customerData: PayabliPaymentMethodCustomerData?
 
     public init(
-        cardCvv: String? = nil,
         achHolderType: PayabliACHHolderType? = nil,
         achSecCode: PayabliACHSecCode? = .web,
         achDevice: String? = nil,
         methodDescription: String? = nil,
         customerData: PayabliPaymentMethodCustomerData? = nil
     ) {
-        self.cardCvv = cardCvv
         self.achHolderType = achHolderType
         self.achSecCode = achSecCode
         self.achDevice = achDevice
@@ -174,6 +171,7 @@ public struct PayabliPaymentMethodFormConfiguration: Sendable {
     public var inputSizing: PayabliPaymentMethodInputSizing
     public var cardBrandIconPlacement: PayabliPaymentMethodCardBrandIconPlacement
     public var errorMessagePlacement: PayabliPaymentMethodErrorMessagePlacement
+    public var requiredFields: Set<PayabliPaymentMethodField>
 
     public init(
         allowedMethods: [PayabliPaymentMethodType] = [.card, .ach],
@@ -187,18 +185,20 @@ public struct PayabliPaymentMethodFormConfiguration: Sendable {
         formatting: PayabliPaymentMethodFormatting = PayabliPaymentMethodFormatting(),
         inputSizing: PayabliPaymentMethodInputSizing = PayabliPaymentMethodInputSizing(),
         cardBrandIconPlacement: PayabliPaymentMethodCardBrandIconPlacement = .trailing,
-        errorMessagePlacement: PayabliPaymentMethodErrorMessagePlacement = .aboveSubmitButton
+        errorMessagePlacement: PayabliPaymentMethodErrorMessagePlacement = .aboveSubmitButton,
+        requiredFields: Set<PayabliPaymentMethodField> = []
     ) {
         let methods = allowedMethods.isEmpty ? [defaultMethod] : allowedMethods
+        let visibleRequiredFields = Self.visibleRequiredFields(from: requiredFields)
         self.allowedMethods = methods
         self.defaultMethod = methods.contains(defaultMethod) ? defaultMethod : methods[0]
         self.cardFieldOrder = Self.includingRequiredFields(
             cardFieldOrder,
-            required: Self.requiredCardFields
+            required: Self.requiredCardFields + Self.cardRequiredFields(from: visibleRequiredFields)
         )
         self.achFieldOrder = Self.includingRequiredFields(
             Self.visibleACHFields(from: achFieldOrder),
-            required: Self.requiredACHFields
+            required: Self.requiredACHFields + Self.achRequiredFields(from: visibleRequiredFields)
         )
         self.hiddenValues = hiddenValues
         self.options = options
@@ -208,6 +208,7 @@ public struct PayabliPaymentMethodFormConfiguration: Sendable {
         self.inputSizing = inputSizing
         self.cardBrandIconPlacement = cardBrandIconPlacement
         self.errorMessagePlacement = errorMessagePlacement
+        self.requiredFields = visibleRequiredFields
     }
 
     public static let defaultCardFieldOrder: [PayabliPaymentMethodField] = [
@@ -230,6 +231,7 @@ public struct PayabliPaymentMethodFormConfiguration: Sendable {
         .cardNumber,
         .cardExpiration,
         .cardholderName,
+        .cardCvv,
         .cardZip
     ]
 
@@ -244,12 +246,45 @@ public struct PayabliPaymentMethodFormConfiguration: Sendable {
         _ fields: [PayabliPaymentMethodField],
         required: [PayabliPaymentMethodField]
     ) -> [PayabliPaymentMethodField] {
-        fields + required.filter { !fields.contains($0) }
+        var output = fields
+        for field in required where !output.contains(field) {
+            output.append(field)
+        }
+        return output
     }
 
     private static func visibleACHFields(from fields: [PayabliPaymentMethodField]) -> [PayabliPaymentMethodField] {
         fields.filter { $0 != .achSecCode }
     }
+
+    private static func visibleRequiredFields(
+        from fields: Set<PayabliPaymentMethodField>
+    ) -> Set<PayabliPaymentMethodField> {
+        fields.subtracting([.achSecCode])
+    }
+
+    private static func cardRequiredFields(
+        from fields: Set<PayabliPaymentMethodField>
+    ) -> [PayabliPaymentMethodField] {
+        let supported = Set(defaultCardFieldOrder + customerFields)
+        return PayabliPaymentMethodField.allCases.filter { fields.contains($0) && supported.contains($0) }
+    }
+
+    private static func achRequiredFields(
+        from fields: Set<PayabliPaymentMethodField>
+    ) -> [PayabliPaymentMethodField] {
+        let supported = Set(defaultACHFieldOrder + [.achDevice] + customerFields)
+        return PayabliPaymentMethodField.allCases.filter { fields.contains($0) && supported.contains($0) }
+    }
+
+    private static let customerFields: [PayabliPaymentMethodField] = [
+        .methodDescription,
+        .firstName,
+        .lastName,
+        .customerNumber,
+        .billingEmail,
+        .billingZip
+    ]
 }
 
 public struct PayabliPaymentMethodView: View {

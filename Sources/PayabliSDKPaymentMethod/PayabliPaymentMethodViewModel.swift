@@ -88,11 +88,14 @@ public final class PayabliPaymentMethodViewModel: ObservableObject {
                 && cardNumber.digitsOnly.count >= 12
                 && cardNumberValidationMessage == nil
                 && cardExpiration.digitsOnly.count >= 4
+                && (3 ... 4).contains(cardCvv.digitsOnly.count)
                 && !cardZip.trimmed.isEmpty
+                && requiredFieldsAreSatisfied
         case .ach:
             return !achHolder.trimmed.isEmpty
                 && achRouting.digitsOnly.count == 9
                 && achAccount.digitsOnly.count >= 4
+                && requiredFieldsAreSatisfied
         }
     }
 
@@ -103,6 +106,7 @@ public final class PayabliPaymentMethodViewModel: ObservableObject {
         let submittedPaymentMethod = paymentMethod()
 
         do {
+            try validateRequiredFields()
             let result = try await component.addPaymentMethod(
                 submittedPaymentMethod,
                 options: mergedOptions()
@@ -166,7 +170,7 @@ public final class PayabliPaymentMethodViewModel: ObservableObject {
                 cardNumber: cardNumber,
                 expiration: cardExpiration,
                 cardholderName: cardholderName,
-                cvv: fieldIsVisible(.cardCvv) ? cardCvv : configuration.hiddenValues.cardCvv,
+                cvv: cardCvv,
                 billingZip: cardZip
             ))
         case .ach:
@@ -211,6 +215,57 @@ public final class PayabliPaymentMethodViewModel: ObservableObject {
 
     private func fieldIsVisible(_ field: PayabliPaymentMethodField) -> Bool {
         activeFields.contains(field)
+    }
+
+    private var requiredFieldsAreSatisfied: Bool {
+        configuration.requiredFields
+            .filter { activeFields.contains($0) }
+            .allSatisfy(fieldHasRequiredValue)
+    }
+
+    private func validateRequiredFields() throws {
+        for field in configuration.requiredFields where activeFields.contains(field) {
+            guard fieldHasRequiredValue(field) else {
+                throw PayabliPaymentMethodError.invalidInput("\(configuration.labels.label(for: field)) is required.")
+            }
+        }
+    }
+
+    private func fieldHasRequiredValue(_ field: PayabliPaymentMethodField) -> Bool {
+        switch field {
+        case .cardholderName:
+            return !cardholderName.trimmed.isEmpty
+        case .cardNumber:
+            return cardNumber.digitsOnly.count >= 12 && cardNumberValidationMessage == nil
+        case .cardExpiration:
+            return cardExpiration.digitsOnly.count >= 4
+        case .cardCvv:
+            return (3 ... 4).contains(cardCvv.digitsOnly.count)
+        case .cardZip:
+            return !cardZip.trimmed.isEmpty
+        case .achHolder:
+            return !achHolder.trimmed.isEmpty
+        case .achRouting:
+            return achRouting.digitsOnly.count == 9
+        case .achAccount:
+            return achAccount.digitsOnly.count >= 4
+        case .achAccountType, .achHolderType, .achSecCode:
+            return true
+        case .achDevice:
+            return !achDevice.trimmed.isEmpty
+        case .methodDescription:
+            return !methodDescription.trimmed.isEmpty
+        case .firstName:
+            return !firstName.trimmed.isEmpty
+        case .lastName:
+            return !lastName.trimmed.isEmpty
+        case .customerNumber:
+            return !customerNumber.trimmed.isEmpty
+        case .billingEmail:
+            return !billingEmail.trimmed.isEmpty
+        case .billingZip:
+            return !billingZip.trimmed.isEmpty
+        }
     }
 
     private func clearSensitiveFields() {

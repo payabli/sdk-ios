@@ -16,8 +16,8 @@ For the full feature reference, supported fields, and style samples, see
    - Use `PayabliPaymentMethodView` for an inline SwiftUI component.
    - Use `.payabliPaymentMethodSheet(...)` for the SDK-provided bottom sheet.
    - Use the Flutter or MAUI bridge when integrating from those frameworks.
-5. Configure visible optional fields, hidden values, labels, formatting,
-   ordering, input sizing, and style.
+5. Configure visible optional fields, additional required fields, hidden
+   values, labels, formatting, ordering, input sizing, and style.
 6. Store only `storedMethodId` and safe metadata after success.
 7. Handle `PayabliError` failures and show an app-specific retry path.
 
@@ -221,6 +221,14 @@ PayabliPaymentMethodFormConfiguration(
 )
 ```
 
+Require optional fields:
+
+```swift
+PayabliPaymentMethodFormConfiguration(
+    requiredFields: [.billingEmail, .methodDescription]
+)
+```
+
 Placeholder labels:
 
 ```swift
@@ -251,8 +259,8 @@ PayabliPaymentMethodFormConfiguration(
 
 Use `.trailing` for the right side, or `.hidden` to suppress the icon.
 
-Card ZIP is always required by the component. If `.cardZip` is omitted from
-`cardFieldOrder`, the SDK appends it to the rendered card fields.
+Card CVV and ZIP are always required by the component. If either field is
+omitted from `cardFieldOrder`, the SDK appends it to the rendered card fields.
 
 ## Native SwiftUI Sheet
 
