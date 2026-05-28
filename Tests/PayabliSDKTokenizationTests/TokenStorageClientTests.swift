@@ -257,6 +257,10 @@ final class TokenStorageClientTests: XCTestCase {
         XCTAssertEqual(configuration.errorMessagePlacement, .top)
     }
 
+    func testTokenizationLabelsDefaultSubmitButtonText() {
+        XCTAssertEqual(PayabliTokenizationLabels().submitButton, "Add Payment Method")
+    }
+
     func testSheetConfigurationDefaultsToSdkOwnedPresentation() {
         let configuration = PayabliTokenizationSheetConfiguration()
 

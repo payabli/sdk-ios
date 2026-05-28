@@ -275,7 +275,8 @@ card-only, ACH-only, or dual-method forms.
 Use `labelLayout: .external` for labels above inputs, or
 `labelLayout: .placeholder` to put labels inside text inputs as placeholders.
 Use `PayabliTokenizationLabels(submitButton:)` to override the submit button
-text from the form configuration.
+text from the form configuration. The default submit button text is
+"Add Payment Method".
 
 ## SwiftUI Sheet
 

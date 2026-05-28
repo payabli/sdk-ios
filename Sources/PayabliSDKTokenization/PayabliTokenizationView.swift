@@ -93,7 +93,7 @@ public struct PayabliTokenizationLabels: Sendable {
     public init(
         title: String = "Save Payment Method",
         subtitle: String? = nil,
-        submitButton: String = "Save",
+        submitButton: String = "Add Payment Method",
         fieldLabels: [PayabliTokenizationField: String] = Self.defaultFieldLabels
     ) {
         self.title = title

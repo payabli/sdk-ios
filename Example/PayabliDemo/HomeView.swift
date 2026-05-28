@@ -143,8 +143,7 @@ struct HomeView: View {
             ),
             labels: PayabliTokenizationLabels(
                 title: "Save Payment Method",
-                subtitle: "Create a card or ACH token from sandbox data.",
-                submitButton: "Tokenize"
+                subtitle: "Create a card or ACH token from sandbox data."
             ),
             labelLayout: .external,
             formatting: PayabliTokenizationFormatting(

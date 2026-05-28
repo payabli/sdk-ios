@@ -112,8 +112,7 @@ struct TokenizationQAView: View {
             ),
             labels: PayabliTokenizationLabels(
                 title: "Save Payment Method",
-                subtitle: "Create a card or ACH token.",
-                submitButton: "Tokenize"
+                subtitle: "Create a card or ACH token."
             ),
             labelLayout: .external,
             formatting: PayabliTokenizationFormatting(
