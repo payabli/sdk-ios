@@ -511,6 +511,13 @@ public struct PayabliPaymentMethodView: View {
         )
     }
 
+    private var focusedFieldBinding: Binding<PayabliPaymentMethodField?> {
+        Binding(
+            get: { focusedField },
+            set: { focusedField = $0 }
+        )
+    }
+
     private var cardCvvBinding: Binding<String> {
         Binding(
             get: { viewModel.cardCvv },
@@ -561,7 +568,8 @@ public struct PayabliPaymentMethodView: View {
                 field,
                 text: cardholderNameBinding,
                 textContentType: .name,
-                autocapitalization: .words
+                autocapitalization: .words,
+                sanitize: viewModel.limitCardholderName
             )
         case .cardNumber:
             cardNumberField()
@@ -571,13 +579,15 @@ public struct PayabliPaymentMethodView: View {
             secureField(
                 field,
                 text: cardCvvBinding,
-                keyboardType: .numberPad
+                keyboardType: .numberPad,
+                sanitize: viewModel.limitCardCvv
             )
         case .cardZip:
             textField(
                 field,
                 text: cardZipBinding,
-                keyboardType: .numbersAndPunctuation
+                keyboardType: .numbersAndPunctuation,
+                sanitize: viewModel.limitPostalCode
             )
         default:
             EmptyView()
@@ -592,26 +602,30 @@ public struct PayabliPaymentMethodView: View {
                 field,
                 text: achHolderBinding,
                 textContentType: .name,
-                autocapitalization: .words
+                autocapitalization: .words,
+                sanitize: viewModel.limitACHHolderName
             )
         case .achRouting:
             textField(
                 field,
                 text: achRoutingBinding,
-                keyboardType: .numberPad
+                keyboardType: .numberPad,
+                sanitize: viewModel.limitACHRouting
             )
         case .achAccount:
             if configuration.formatting.masksACHAccountEntry {
                 secureField(
                     field,
                     text: achAccountBinding,
-                    keyboardType: .numberPad
+                    keyboardType: .numberPad,
+                    sanitize: viewModel.limitACHAccount
                 )
             } else {
                 textField(
                     field,
                     text: achAccountBinding,
-                    keyboardType: .numberPad
+                    keyboardType: .numberPad,
+                    sanitize: viewModel.limitACHAccount
                 )
             }
         case .achAccountType:
@@ -654,7 +668,8 @@ public struct PayabliPaymentMethodView: View {
             textField(
                 field,
                 text: billingZipBinding,
-                keyboardType: .numbersAndPunctuation
+                keyboardType: .numbersAndPunctuation,
+                sanitize: viewModel.limitPostalCode
             )
         default:
             EmptyView()
@@ -666,28 +681,32 @@ public struct PayabliPaymentMethodView: View {
         text: Binding<String>,
         keyboardType: UIKeyboardType = .default,
         textContentType: UITextContentType? = nil,
-        autocapitalization: TextInputAutocapitalization = .never
+        autocapitalization: UITextAutocapitalizationType = .none,
+        sanitize: @escaping (String) -> String = { $0 }
     ) -> some View {
         let label = configuration.labels.label(for: field)
         let inputSize = configuration.inputSizing.size(for: field)
 
         return fieldRow(field) {
-            TextField(configuration.labelLayout == .placeholder ? label : "", text: text)
-                .keyboardType(keyboardType)
-                .textContentType(textContentType)
-                .textInputAutocapitalization(autocapitalization)
-                .autocorrectionDisabled()
-                .focused($focusedField, equals: field)
-                .font(resolvedStyle.input.font)
-                .foregroundStyle(resolvedStyle.input.textColor)
-                .padding(.horizontal, inputSize.horizontalPadding)
-                .frame(width: inputSize.width, height: inputSize.height)
-                .frame(maxWidth: inputSize.width == nil ? .infinity : nil)
-                .background(fieldBackground(field))
-                .overlay(fieldBorder(field))
-                .clipShape(inputShape)
-                .accessibilityLabel(label)
-                .privacySensitive()
+            PayabliPaymentMethodUIKitTextField(
+                text: text,
+                placeholder: configuration.labelLayout == .placeholder ? label : "",
+                field: field,
+                focusedField: focusedFieldBinding,
+                keyboardType: keyboardType,
+                textContentType: textContentType,
+                autocapitalization: autocapitalization,
+                isSecure: false,
+                sanitize: sanitize
+            )
+            .padding(.horizontal, inputSize.horizontalPadding)
+            .frame(width: inputSize.width, height: inputSize.height)
+            .frame(maxWidth: inputSize.width == nil ? .infinity : nil)
+            .background(fieldBackground(field))
+            .overlay(fieldBorder(field))
+            .clipShape(inputShape)
+            .accessibilityLabel(label)
+            .privacySensitive()
         }
     }
 
@@ -710,15 +729,20 @@ public struct PayabliPaymentMethodView: View {
                     cardBrandIcon
                 }
 
-                TextField(configuration.labelLayout == .placeholder ? label : "", text: text)
-                    .keyboardType(.numberPad)
-                    .textContentType(.creditCardNumber)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
-                    .focused($focusedField, equals: field)
-                    .font(resolvedStyle.input.font)
-                    .foregroundStyle(cardNumberTextColor)
-                    .accessibilityLabel(label)
+                PayabliPaymentMethodUIKitTextField(
+                    text: text,
+                    placeholder: configuration.labelLayout == .placeholder ? label : "",
+                    field: field,
+                    focusedField: focusedFieldBinding,
+                    keyboardType: .numberPad,
+                    textContentType: .creditCardNumber,
+                    autocapitalization: .none,
+                    isSecure: false,
+                    textColor: cardNumberUIKitTextColor,
+                    sanitize: viewModel.formatCardNumber
+                )
+                .frame(maxWidth: .infinity, minHeight: inputSize.height, alignment: .leading)
+                .accessibilityLabel(label)
 
                 if configuration.cardBrandIconPlacement == .trailing {
                     cardBrandIcon
@@ -847,27 +871,31 @@ public struct PayabliPaymentMethodView: View {
     private func secureField(
         _ field: PayabliPaymentMethodField,
         text: Binding<String>,
-        keyboardType: UIKeyboardType = .default
+        keyboardType: UIKeyboardType = .default,
+        sanitize: @escaping (String) -> String = { $0 }
     ) -> some View {
         let label = configuration.labels.label(for: field)
         let inputSize = configuration.inputSizing.size(for: field)
 
         return fieldRow(field) {
-            SecureField(configuration.labelLayout == .placeholder ? label : "", text: text)
-                .keyboardType(keyboardType)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-                .focused($focusedField, equals: field)
-                .font(resolvedStyle.input.font)
-                .foregroundStyle(resolvedStyle.input.textColor)
-                .padding(.horizontal, inputSize.horizontalPadding)
-                .frame(width: inputSize.width, height: inputSize.height)
-                .frame(maxWidth: inputSize.width == nil ? .infinity : nil)
-                .background(fieldBackground(field))
-                .overlay(fieldBorder(field))
-                .clipShape(inputShape)
-                .accessibilityLabel(label)
-                .privacySensitive()
+            PayabliPaymentMethodUIKitTextField(
+                text: text,
+                placeholder: configuration.labelLayout == .placeholder ? label : "",
+                field: field,
+                focusedField: focusedFieldBinding,
+                keyboardType: keyboardType,
+                autocapitalization: .none,
+                isSecure: true,
+                sanitize: sanitize
+            )
+            .padding(.horizontal, inputSize.horizontalPadding)
+            .frame(width: inputSize.width, height: inputSize.height)
+            .frame(maxWidth: inputSize.width == nil ? .infinity : nil)
+            .background(fieldBackground(field))
+            .overlay(fieldBorder(field))
+            .clipShape(inputShape)
+            .accessibilityLabel(label)
+            .privacySensitive()
         }
     }
 
@@ -972,10 +1000,8 @@ public struct PayabliPaymentMethodView: View {
         resolvedStyle.error.color.opacity(0.08)
     }
 
-    private var cardNumberTextColor: Color {
-        viewModel.cardNumberValidationMessage == nil
-            ? resolvedStyle.input.textColor
-            : resolvedStyle.error.color
+    private var cardNumberUIKitTextColor: UIColor {
+        viewModel.cardNumberValidationMessage == nil ? .label : .systemRed
     }
 
     private func fieldBackground(_ field: PayabliPaymentMethodField?) -> some View {
