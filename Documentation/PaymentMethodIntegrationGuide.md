@@ -375,6 +375,60 @@ URL with query parameters, redacted headers, redacted JSON body, HTTP status,
 elapsed duration, and any transport failure text. Sensitive values are replaced
 before the handler is called.
 
+## Local QA Mock Responses
+
+The sample app includes local success and failure mocks for UI/UX validation.
+Use these only in local development or QA builds; production apps should let
+`PayabliPaymentMethod` create its default network transport.
+
+Enable one mock in `Example/PayabliDemo/Secrets.swift`:
+
+```swift
+static let paymentMethodMockSuccessEnabled = true
+static let paymentMethodMockFailureEnabled = false
+```
+
+or:
+
+```swift
+static let paymentMethodMockSuccessEnabled = false
+static let paymentMethodMockFailureEnabled = true
+```
+
+If both flags are enabled, the failure mock wins. Mock mode returns a placeholder
+bearer token from the sample app and does not call
+`fetchPaymentMethodAccessToken()`.
+
+The success mock returns:
+
+```json
+{
+  "isSuccess": true,
+  "responseText": "Success",
+  "responseData": {
+    "referenceId": "qa-mock-stored-method",
+    "resultCode": 1,
+    "resultText": "Approved",
+    "methodReferenceId": "qa-mock-method-reference",
+    "customerId": 123456789
+  }
+}
+```
+
+The failure mock returns:
+
+```json
+{
+  "isSuccess": false,
+  "responseText": "Error",
+  "responseCode": 6000,
+  "responseData": {
+    "explanation": "Invalid Card",
+    "todoAction": "Please check your card details and try again."
+  }
+}
+```
+
 ## Error Handling
 
 ```swift

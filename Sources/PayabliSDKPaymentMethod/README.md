@@ -214,3 +214,9 @@ response, and transport-failure phases. Headers and JSON bodies are redacted
 before they reach the handler: bearer tokens, PAN, CVV, ACH account/routing
 values, cardholder/customer PII, and stored-method identifiers are replaced
 with `[REDACTED]`.
+
+The QA sample app also includes local success and failure mock responses for
+UI/UX testing. Configure `paymentMethodMockSuccessEnabled` or
+`paymentMethodMockFailureEnabled` in `Example/PayabliDemo/Secrets.swift`;
+the exact response bodies are documented in the sample app README and the
+payment method integration guide.

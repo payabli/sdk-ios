@@ -1,4 +1,5 @@
 import os
+import PayabliSDKCore
 import PayabliSDKPaymentMethod
 import SwiftUI
 
@@ -22,12 +23,12 @@ struct PaymentMethodQAApp: App {
         entryPoint: Secrets.entryPoint,
         environment: PaymentMethodQAConfiguration.environment,
         accessTokenProvider: {
-            if Secrets.paymentMethodMockFailureEnabled {
+            if Secrets.paymentMethodMockSuccessEnabled || Secrets.paymentMethodMockFailureEnabled {
                 return "mock-token"
             }
             return try await Secrets.fetchPaymentMethodAccessToken()
         },
-        transport: Secrets.paymentMethodMockFailureEnabled ? PaymentMethodQAMockFailureTransport() : nil,
+        transport: Self.paymentMethodMockTransport,
         diagnostics: Self.paymentMethodDiagnostics
     )
 
@@ -36,6 +37,16 @@ struct PaymentMethodQAApp: App {
             PaymentMethodQAView()
                 .environmentObject(paymentMethod)
         }
+    }
+
+    private static var paymentMethodMockTransport: (any PayabliTransport)? {
+        if Secrets.paymentMethodMockFailureEnabled {
+            return PaymentMethodQAMockTransport(result: .failure)
+        }
+        if Secrets.paymentMethodMockSuccessEnabled {
+            return PaymentMethodQAMockTransport(result: .success)
+        }
+        return nil
     }
 
     private static var paymentMethodDiagnostics: PayabliPaymentMethodDiagnostics {

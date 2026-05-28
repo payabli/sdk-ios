@@ -62,6 +62,59 @@ The payment method tab can be visually exercised in the Simulator. Submitting
 the form requires `Secrets.fetchPaymentMethodAccessToken()` to call your backend
 for a short-lived Payabli access token.
 
+### Payment Method QA mock responses
+
+For local UI/UX validation, the QA sample can bypass sandbox and return a
+mocked payment method response directly from the app. Copy
+`Secrets.swift.sample` to `Secrets.swift`, then enable exactly one of these
+flags:
+
+```swift
+static let paymentMethodMockSuccessEnabled = true
+static let paymentMethodMockFailureEnabled = false
+```
+
+or:
+
+```swift
+static let paymentMethodMockSuccessEnabled = false
+static let paymentMethodMockFailureEnabled = true
+```
+
+If both are enabled, the failure mock wins so error rendering is explicit.
+Mock mode uses a placeholder bearer token and does not call
+`fetchPaymentMethodAccessToken()`.
+
+The success mock returns:
+
+```json
+{
+  "isSuccess": true,
+  "responseText": "Success",
+  "responseData": {
+    "referenceId": "qa-mock-stored-method",
+    "resultCode": 1,
+    "resultText": "Approved",
+    "methodReferenceId": "qa-mock-method-reference",
+    "customerId": 123456789
+  }
+}
+```
+
+The failure mock returns:
+
+```json
+{
+  "isSuccess": false,
+  "responseText": "Error",
+  "responseCode": 6000,
+  "responseData": {
+    "explanation": "Invalid Card",
+    "todoAction": "Please check your card details and try again."
+  }
+}
+```
+
 ## Architecture notes
 
 `PayabliDemoApp` owns one `PayabliTTP` instance and one
@@ -76,6 +129,7 @@ The payment method tab renders `PayabliPaymentMethodView` with:
 - `allowedMethods: [.card, .ach]`
 - required card ZIP input
 - hidden optional values for ACH holder type and method description
+- local success and failure mock responses for UI/UX QA
 - `labelLayout: .external`
 - configurable submit button text
 - per-field input sizing

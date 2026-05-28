@@ -14,7 +14,7 @@
 		AF77F479977FE319B28EB3D7 /* PaymentMethodQAApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6EA1E9A0909DDC1A7B827C8D /* PaymentMethodQAApp.swift */; };
 		C9B9D43650B2230A8582B93C /* Secrets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C921D1F3EE7130C23911757 /* Secrets.swift */; };
 		D4DCE94B54535A867D1DDB65 /* PaymentMethodQAView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB9C96115FF840C6491AED9C /* PaymentMethodQAView.swift */; };
-		E2A908F7E4994CFB93E06501 /* PaymentMethodQAMockFailureTransport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8821051F86FA45809F6D8B57 /* PaymentMethodQAMockFailureTransport.swift */; };
+		E2A908F7E4994CFB93E06501 /* PaymentMethodQAMockTransport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8821051F86FA45809F6D8B57 /* PaymentMethodQAMockTransport.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -22,7 +22,7 @@
 		1DADA588F49DF0C4A6611302 /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		4C921D1F3EE7130C23911757 /* Secrets.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Secrets.swift; sourceTree = "<group>"; };
 		6EA1E9A0909DDC1A7B827C8D /* PaymentMethodQAApp.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PaymentMethodQAApp.swift; sourceTree = "<group>"; };
-		8821051F86FA45809F6D8B57 /* PaymentMethodQAMockFailureTransport.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PaymentMethodQAMockFailureTransport.swift; sourceTree = "<group>"; };
+		8821051F86FA45809F6D8B57 /* PaymentMethodQAMockTransport.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PaymentMethodQAMockTransport.swift; sourceTree = "<group>"; };
 		BB9C96115FF840C6491AED9C /* PaymentMethodQAView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PaymentMethodQAView.swift; sourceTree = "<group>"; };
 		F201F43C477597B328446F93 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
 		F427A5EA0CEF029F22AF2170 /* PayabliDemo.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PayabliDemo.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -82,7 +82,7 @@
 				F866419FEDEC4373794B0014 /* PaymentMethodQAConfiguration.swift */,
 				BB9C96115FF840C6491AED9C /* PaymentMethodQAView.swift */,
 				0F5E8CC6E7A24D19A71B0A1C /* PaymentMethodAddedView.swift */,
-				8821051F86FA45809F6D8B57 /* PaymentMethodQAMockFailureTransport.swift */,
+				8821051F86FA45809F6D8B57 /* PaymentMethodQAMockTransport.swift */,
 				4C921D1F3EE7130C23911757 /* Secrets.swift */,
 				1DADA588F49DF0C4A6611302 /* Info.plist */,
 			);
@@ -164,7 +164,7 @@
 				6C370DCD5559AB1DE7E823B1 /* PaymentMethodQAConfiguration.swift in Sources */,
 				D4DCE94B54535A867D1DDB65 /* PaymentMethodQAView.swift in Sources */,
 				0F5E8CC7E7A24D19A71B0A1C /* PaymentMethodAddedView.swift in Sources */,
-				E2A908F7E4994CFB93E06501 /* PaymentMethodQAMockFailureTransport.swift in Sources */,
+				E2A908F7E4994CFB93E06501 /* PaymentMethodQAMockTransport.swift in Sources */,
 				C9B9D43650B2230A8582B93C /* Secrets.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
