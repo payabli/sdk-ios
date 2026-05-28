@@ -1,3 +1,4 @@
+import Dispatch
 import os
 import PayabliSDKPaymentMethod
 import SwiftUI
@@ -6,10 +7,11 @@ struct PaymentMethodQAView: View {
     @EnvironmentObject private var paymentMethod: PayabliPaymentMethod
     @StateObject private var diagnosticsStore = PaymentMethodQADiagnosticsStore.shared
     @State private var resultText = ""
+    @State private var isPaymentMethodAddedViewPresented = false
     @State private var isPaymentMethodSheetPresented = false
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     Button {
@@ -66,6 +68,9 @@ struct PaymentMethodQAView: View {
                 .padding(16)
             }
             .navigationTitle("Payment Method QA")
+            .navigationDestination(isPresented: $isPaymentMethodAddedViewPresented) {
+                PaymentMethodAddedView()
+            }
         }
         .payabliPaymentMethodSheet(
             isPresented: $isPaymentMethodSheetPresented,
@@ -153,6 +158,15 @@ struct PaymentMethodQAView: View {
             subsystem: "com.payabli.demo.paymentmethodqa",
             category: "PaymentMethodDiagnostics"
         ).info("Payment method added: \(method.responseText, privacy: .public)")
+
+        if isPaymentMethodSheetPresented {
+            isPaymentMethodSheetPresented = false
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                isPaymentMethodAddedViewPresented = true
+            }
+        } else {
+            isPaymentMethodAddedViewPresented = true
+        }
     }
 
     private func handleError(_ error: Error) {
