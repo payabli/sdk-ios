@@ -179,7 +179,10 @@ ACH-only, or dual-method, which optional fields are visible, hidden field
 values, submit button text, label layout, formatting, per-field input sizing,
 and additional required optional fields. The default submit button text is
 "Add Payment Method". Card CVV and ZIP are always required and cannot be
-supplied as hidden values.
+supplied as hidden values. The form caps cardholder and ACH holder names at 60
+characters, PAN at 19 digits, CVV at 4 digits, ZIP/postal code at 12
+characters, ACH routing at 9 digits, and ACH account at 17 digits; direct API
+calls are validated against the same limits before a request is sent.
 ACH SEC Code is sent from `hiddenValues.achSecCode` and defaults to `.web`.
 Payment Method API failures are decoded from `isSuccess: false` responses before
 generic HTTP mapping; the form renders the user-facing message at the configured

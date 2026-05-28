@@ -55,7 +55,7 @@ public final class PayabliPaymentMethodViewModel: ObservableObject {
     public var cardNumberValidationMessage: String? {
         let digits = cardNumber.digitsOnly
         guard configuration.options.validation.requiresLuhnCheck,
-              digits.count >= 12,
+              digits.count >= PayabliPaymentMethodInputLimits.minimumCardNumberDigits,
               !PayabliCardPaymentMethodData.passesLuhn(digits)
         else {
             return nil
@@ -84,17 +84,17 @@ public final class PayabliPaymentMethodViewModel: ObservableObject {
     public var canSubmit: Bool {
         switch selectedMethod {
         case .card:
-            return !cardholderName.trimmed.isEmpty
-                && cardNumber.digitsOnly.count >= 12
+            return fieldHasRequiredValue(.cardholderName)
+                && fieldHasRequiredValue(.cardNumber)
                 && cardNumberValidationMessage == nil
                 && cardExpiration.digitsOnly.count >= 4
-                && (3 ... 4).contains(cardCvv.digitsOnly.count)
-                && !cardZip.trimmed.isEmpty
+                && fieldHasRequiredValue(.cardCvv)
+                && fieldHasRequiredValue(.cardZip)
                 && requiredFieldsAreSatisfied
         case .ach:
-            return !achHolder.trimmed.isEmpty
-                && achRouting.digitsOnly.count == 9
-                && achAccount.digitsOnly.count >= 4
+            return fieldHasRequiredValue(.achHolder)
+                && fieldHasRequiredValue(.achRouting)
+                && fieldHasRequiredValue(.achAccount)
                 && requiredFieldsAreSatisfied
         }
     }
@@ -121,7 +121,7 @@ public final class PayabliPaymentMethodViewModel: ObservableObject {
     }
 
     public func formatCardNumber(_ value: String) -> String {
-        let digits = String(value.digitsOnly.prefix(19))
+        let digits = String(value.digitsOnly.prefix(PayabliPaymentMethodInputLimits.maximumCardNumberDigits))
         guard configuration.formatting.insertsCardNumberSpaces else { return digits }
 
         var groups: [String] = []
@@ -132,6 +132,30 @@ public final class PayabliPaymentMethodViewModel: ObservableObject {
             current = next
         }
         return groups.joined(separator: " ")
+    }
+
+    func limitCardholderName(_ value: String) -> String {
+        String(value.prefix(PayabliPaymentMethodInputLimits.maximumCardholderNameCharacters))
+    }
+
+    func limitCardCvv(_ value: String) -> String {
+        String(value.digitsOnly.prefix(PayabliPaymentMethodInputLimits.maximumCardCvvDigits))
+    }
+
+    func limitPostalCode(_ value: String) -> String {
+        String(value.prefix(PayabliPaymentMethodInputLimits.maximumPostalCodeCharacters))
+    }
+
+    func limitACHHolderName(_ value: String) -> String {
+        String(value.prefix(PayabliPaymentMethodInputLimits.maximumACHHolderNameCharacters))
+    }
+
+    func limitACHRouting(_ value: String) -> String {
+        String(value.digitsOnly.prefix(PayabliPaymentMethodInputLimits.achRoutingDigits))
+    }
+
+    func limitACHAccount(_ value: String) -> String {
+        String(value.digitsOnly.prefix(PayabliPaymentMethodInputLimits.maximumACHAccountDigits))
     }
 
     public func formatExpiration(_ value: String) -> String {
@@ -234,21 +258,31 @@ public final class PayabliPaymentMethodViewModel: ObservableObject {
     private func fieldHasRequiredValue(_ field: PayabliPaymentMethodField) -> Bool {
         switch field {
         case .cardholderName:
-            return !cardholderName.trimmed.isEmpty
+            let value = cardholderName.trimmed
+            return !value.isEmpty
+                && value.count <= PayabliPaymentMethodInputLimits.maximumCardholderNameCharacters
         case .cardNumber:
-            return cardNumber.digitsOnly.count >= 12 && cardNumberValidationMessage == nil
+            return (PayabliPaymentMethodInputLimits.minimumCardNumberDigits ... PayabliPaymentMethodInputLimits.maximumCardNumberDigits)
+                .contains(cardNumber.digitsOnly.count)
+                && cardNumberValidationMessage == nil
         case .cardExpiration:
             return cardExpiration.digitsOnly.count >= 4
         case .cardCvv:
-            return (3 ... 4).contains(cardCvv.digitsOnly.count)
+            return (PayabliPaymentMethodInputLimits.minimumCardCvvDigits ... PayabliPaymentMethodInputLimits.maximumCardCvvDigits)
+                .contains(cardCvv.digitsOnly.count)
         case .cardZip:
-            return !cardZip.trimmed.isEmpty
+            let value = cardZip.trimmed
+            return !value.isEmpty
+                && value.count <= PayabliPaymentMethodInputLimits.maximumPostalCodeCharacters
         case .achHolder:
-            return !achHolder.trimmed.isEmpty
+            let value = achHolder.trimmed
+            return !value.isEmpty
+                && value.count <= PayabliPaymentMethodInputLimits.maximumACHHolderNameCharacters
         case .achRouting:
-            return achRouting.digitsOnly.count == 9
+            return achRouting.digitsOnly.count == PayabliPaymentMethodInputLimits.achRoutingDigits
         case .achAccount:
-            return achAccount.digitsOnly.count >= 4
+            return (PayabliPaymentMethodInputLimits.minimumACHAccountDigits ... PayabliPaymentMethodInputLimits.maximumACHAccountDigits)
+                .contains(achAccount.digitsOnly.count)
         case .achAccountType, .achHolderType, .achSecCode:
             return true
         case .achDevice:

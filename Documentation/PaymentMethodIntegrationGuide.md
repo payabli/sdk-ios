@@ -262,6 +262,18 @@ Use `.trailing` for the right side, or `.hidden` to suppress the icon.
 Card CVV and ZIP are always required by the component. If either field is
 omitted from `cardFieldOrder`, the SDK appends it to the rendered card fields.
 
+Input length limits are enforced in the UI and again before a request is sent:
+
+| Field | Limit |
+|---|---|
+| Name on card | 60 characters |
+| Card number | 12 to 19 digits; entry is capped at 19 digits |
+| CVV | 3 to 4 digits; entry is capped at 4 digits |
+| ZIP/postal code | 12 characters, covering US ZIP+4, Canada, and common international postal formats |
+| ACH routing number | Exactly 9 digits for US banks |
+| ACH account number | 4 to 17 digits for US ACH |
+| ACH account holder | 60 characters |
+
 ## Native SwiftUI Sheet
 
 Use this path when the host app wants a bottom-sheet "add payment method"

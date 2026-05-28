@@ -607,24 +607,36 @@ extension PayabliPaymentMethodInput {
 extension PayabliCardPaymentMethodData {
     func validate(_ validation: PayabliPaymentMethodValidation) throws {
         let digits = cardNumber.digitsOnly
-        guard (12 ... 19).contains(digits.count) else {
+        guard (PayabliPaymentMethodInputLimits.minimumCardNumberDigits ... PayabliPaymentMethodInputLimits.maximumCardNumberDigits)
+            .contains(digits.count)
+        else {
             throw PayabliPaymentMethodError.invalidInput("Card number must be 12 to 19 digits.")
         }
         if validation.requiresLuhnCheck, !Self.passesLuhn(digits) {
             throw PayabliPaymentMethodError.invalidInput("Card number failed validation.")
         }
         _ = try normalizedExpiration()
-        guard !cardholderName.trimmed.isEmpty else {
+        let trimmedCardholderName = cardholderName.trimmed
+        guard !trimmedCardholderName.isEmpty else {
             throw PayabliPaymentMethodError.invalidInput("Cardholder name is required.")
         }
-        guard !billingZip.trimmed.isEmpty else {
+        guard trimmedCardholderName.count <= PayabliPaymentMethodInputLimits.maximumCardholderNameCharacters else {
+            throw PayabliPaymentMethodError.invalidInput("Cardholder name must be 60 characters or fewer.")
+        }
+        let trimmedBillingZip = billingZip.trimmed
+        guard !trimmedBillingZip.isEmpty else {
             throw PayabliPaymentMethodError.invalidInput("Card ZIP code is required.")
+        }
+        guard trimmedBillingZip.count <= PayabliPaymentMethodInputLimits.maximumPostalCodeCharacters else {
+            throw PayabliPaymentMethodError.invalidInput("Card ZIP code must be 12 characters or fewer.")
         }
         let cvvDigits = cvv?.digitsOnly ?? ""
         guard !cvvDigits.isEmpty else {
             throw PayabliPaymentMethodError.invalidInput("CVV is required.")
         }
-        guard (3 ... 4).contains(cvvDigits.count) else {
+        guard (PayabliPaymentMethodInputLimits.minimumCardCvvDigits ... PayabliPaymentMethodInputLimits.maximumCardCvvDigits)
+            .contains(cvvDigits.count)
+        else {
             throw PayabliPaymentMethodError.invalidInput("CVV must be 3 or 4 digits.")
         }
     }
@@ -659,20 +671,26 @@ extension PayabliCardPaymentMethodData {
 extension PayabliACHPaymentMethodData {
     func validate(_ validation: PayabliPaymentMethodValidation) throws {
         let account = accountNumber.digitsOnly
-        guard (4 ... 17).contains(account.count) else {
+        guard (PayabliPaymentMethodInputLimits.minimumACHAccountDigits ... PayabliPaymentMethodInputLimits.maximumACHAccountDigits)
+            .contains(account.count)
+        else {
             throw PayabliPaymentMethodError.invalidInput("ACH account number must be 4 to 17 digits.")
         }
         let routing = routingNumber.digitsOnly
-        guard routing.count == 9 else {
+        guard routing.count == PayabliPaymentMethodInputLimits.achRoutingDigits else {
             throw PayabliPaymentMethodError.invalidInput("ACH routing number must be 9 digits.")
         }
         if validation.validatesACHRoutingChecksum, !Self.passesABAChecksum(routing) {
             throw PayabliPaymentMethodError.invalidInput("ACH routing number failed validation.")
         }
-        guard !holderName.trimmed.isEmpty else {
+        let trimmedHolderName = holderName.trimmed
+        guard !trimmedHolderName.isEmpty else {
             throw PayabliPaymentMethodError.invalidInput("ACH account holder is required.")
         }
-        let allowed = holderName.range(
+        guard trimmedHolderName.count <= PayabliPaymentMethodInputLimits.maximumACHHolderNameCharacters else {
+            throw PayabliPaymentMethodError.invalidInput("ACH account holder must be 60 characters or fewer.")
+        }
+        let allowed = trimmedHolderName.range(
             of: #"^[A-Za-z0-9 .'\-]+$"#,
             options: .regularExpression
         ) != nil

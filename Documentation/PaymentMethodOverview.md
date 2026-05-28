@@ -374,6 +374,18 @@ for card submissions. ACH holder, routing, account, and account type are always
 required for ACH submissions. Use `requiredFields` to require optional visible
 fields such as `.billingEmail`, `.methodDescription`, or `.achDevice`.
 
+Built-in input limits:
+
+| Field | Limit |
+|---|---|
+| Cardholder name | 60 characters |
+| Card number | 12 to 19 digits; UI caps entry at 19 digits |
+| CVV | 3 to 4 digits; UI caps entry at 4 digits |
+| Card ZIP / billing postal code | 12 characters, covering US ZIP+4, Canadian postal codes, and common international postal formats |
+| ACH routing number | Exactly 9 digits for US banks |
+| ACH account number | 4 to 17 digits for US ACH |
+| ACH account holder | 60 characters |
+
 ## Configurable Endpoint Fields
 
 `PayabliPaymentMethodOptions` supports the optional API fields outside the

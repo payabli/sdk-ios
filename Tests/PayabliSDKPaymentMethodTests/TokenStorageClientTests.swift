@@ -250,6 +250,125 @@ final class TokenStorageClientTests: XCTestCase {
         }
     }
 
+    func testCardLengthLimitsDoNotReachTransport() async throws {
+        let scenarios: [(PayabliCardPaymentMethodData, String)] = [
+            (PayabliCardPaymentMethodData(
+                cardNumber: String(repeating: "4", count: 20),
+                expiration: "02/25",
+                cardholderName: "John Doe",
+                cvv: "123",
+                billingZip: "12345"
+            ), "Card number must be 12 to 19 digits."),
+            (PayabliCardPaymentMethodData(
+                cardNumber: "4111111111111111",
+                expiration: "02/25",
+                cardholderName: String(repeating: "A", count: 61),
+                cvv: "123",
+                billingZip: "12345"
+            ), "Cardholder name must be 60 characters or fewer."),
+            (PayabliCardPaymentMethodData(
+                cardNumber: "4111111111111111",
+                expiration: "02/25",
+                cardholderName: "John Doe",
+                cvv: "12345",
+                billingZip: "12345"
+            ), "CVV must be 3 or 4 digits."),
+            (PayabliCardPaymentMethodData(
+                cardNumber: "4111111111111111",
+                expiration: "02/25",
+                cardholderName: "John Doe",
+                cvv: "123",
+                billingZip: String(repeating: "A", count: 13)
+            ), "Card ZIP code must be 12 characters or fewer.")
+        ]
+
+        for (paymentMethod, expectedMessage) in scenarios {
+            let transport = MockTransport(responseBody: "{}")
+            let client = TokenStorageClient(
+                transport: transport,
+                accessTokenProvider: { "access-token" }
+            )
+
+            do {
+                _ = try await client.addMethod(
+                    entryPoint: "entry",
+                    paymentMethod: .card(paymentMethod)
+                )
+                XCTFail("Expected validation error")
+            } catch let PayabliPaymentMethodError.invalidInput(message) {
+                XCTAssertEqual(message, expectedMessage)
+                let requests = await transport.requests
+                XCTAssertTrue(requests.isEmpty)
+            } catch {
+                XCTFail("Wrong error: \(error)")
+            }
+        }
+    }
+
+    func testACHLengthLimitsDoNotReachTransport() async throws {
+        let scenarios: [(PayabliACHPaymentMethodData, String)] = [
+            (PayabliACHPaymentMethodData(
+                accountNumber: String(repeating: "1", count: 18),
+                accountType: .checking,
+                holderName: "John Doe",
+                routingNumber: "123456780"
+            ), "ACH account number must be 4 to 17 digits."),
+            (PayabliACHPaymentMethodData(
+                accountNumber: "1111111111111",
+                accountType: .checking,
+                holderName: "John Doe",
+                routingNumber: "1234567800"
+            ), "ACH routing number must be 9 digits."),
+            (PayabliACHPaymentMethodData(
+                accountNumber: "1111111111111",
+                accountType: .checking,
+                holderName: String(repeating: "A", count: 61),
+                routingNumber: "123456780"
+            ), "ACH account holder must be 60 characters or fewer.")
+        ]
+
+        for (paymentMethod, expectedMessage) in scenarios {
+            let transport = MockTransport(responseBody: "{}")
+            let client = TokenStorageClient(
+                transport: transport,
+                accessTokenProvider: { "access-token" }
+            )
+
+            do {
+                _ = try await client.addMethod(
+                    entryPoint: "entry",
+                    paymentMethod: .ach(paymentMethod)
+                )
+                XCTFail("Expected validation error")
+            } catch let PayabliPaymentMethodError.invalidInput(message) {
+                XCTAssertEqual(message, expectedMessage)
+                let requests = await transport.requests
+                XCTAssertTrue(requests.isEmpty)
+            } catch {
+                XCTFail("Wrong error: \(error)")
+            }
+        }
+    }
+
+    @MainActor
+    func testViewModelInputLimitHelpers() {
+        let component = PayabliPaymentMethod(
+            accessToken: "access-token",
+            entryPoint: "entry",
+            environment: .sandbox,
+            transport: MockTransport(responseBody: "{}")
+        )
+        let viewModel = PayabliPaymentMethodViewModel(component: component)
+
+        XCTAssertEqual(viewModel.limitCardholderName(String(repeating: "A", count: 61)).count, 60)
+        XCTAssertEqual(viewModel.formatCardNumber(String(repeating: "4", count: 25)).digitsOnly.count, 19)
+        XCTAssertEqual(viewModel.limitCardCvv("12345"), "1234")
+        XCTAssertEqual(viewModel.limitPostalCode("A1A 1A1-EXTRA").count, 12)
+        XCTAssertEqual(viewModel.limitACHHolderName(String(repeating: "A", count: 61)).count, 60)
+        XCTAssertEqual(viewModel.limitACHRouting("1234567890"), "123456789")
+        XCTAssertEqual(viewModel.limitACHAccount(String(repeating: "1", count: 20)).count, 17)
+    }
+
     func testDetectsCardBrandFromCardNumberPrefix() {
         XCTAssertEqual(PayabliPaymentMethodCardBrand.detect(cardNumber: "4111 1111 1111 1111"), .visa)
         XCTAssertEqual(PayabliPaymentMethodCardBrand.detect(cardNumber: "5555 5555 5555 4444"), .mastercard)
