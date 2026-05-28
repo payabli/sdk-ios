@@ -1,4 +1,5 @@
 import { createServer } from "node:http";
+import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -7,18 +8,33 @@ const serverDir = dirname(fileURLToPath(import.meta.url));
 loadEnv(join(serverDir, ".env"));
 
 const port = Number.parseInt(process.env.PORT || "8787", 10);
+const bindHost = stringValue(process.env.PAYABLI_LOCAL_TOKEN_SERVER_HOST) || "127.0.0.1";
 const defaultApiBaseUrl = process.env.PAYABLI_API_BASE_URL || "https://api-sandbox.payabli.com/api";
 const defaultTokenPath = process.env.PAYABLI_TOKEN_PATH || "/v2/token/serverside";
 const responseTokenField = (process.env.PAYABLI_RESPONSE_TOKEN_FIELD || "").trim();
 const cacheTtlSeconds = Number.parseInt(process.env.PAYABLI_TOKEN_CACHE_TTL_SECONDS || "300", 10);
+const maxRequestBodyBytes = Number.parseInt(process.env.PAYABLI_MAX_REQUEST_BODY_BYTES || "32768", 10);
+const allowedApiHosts = parseCsvSet(
+  process.env.PAYABLI_ALLOWED_API_HOSTS ||
+    "api-sandbox.payabli.com,api-qa.payabli.com,api.payabli.com"
+);
+const configuredCorsOrigins = parseCsvSet(process.env.PAYABLI_ALLOWED_CORS_ORIGINS || "");
 const tokenCache = new Map();
+
+class LocalTokenServerError extends Error {
+  constructor(statusCode, message) {
+    super(message);
+    this.statusCode = statusCode;
+  }
+}
 
 const server = createServer((req, res) => {
   handleRequest(req, res).catch((error) => {
-    console.error(error);
-    sendJson(res, 500, {
+    console.error(redactSensitiveText(error instanceof Error ? error.stack || error.message : String(error)));
+    const statusCode = error instanceof LocalTokenServerError ? error.statusCode : 500;
+    sendJson(res, statusCode, {
       error: "Local token server failed",
-      detail: error instanceof Error ? error.message : String(error)
+      detail: publicErrorMessage(error)
     });
   });
 });
@@ -26,11 +42,16 @@ const server = createServer((req, res) => {
 async function handleRequest(req, res) {
   const url = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
 
-  setCorsHeaders(res);
+  const corsAllowed = setCorsHeaders(req, res);
 
   if (req.method === "OPTIONS") {
-    res.writeHead(204);
+    res.writeHead(corsAllowed ? 204 : 403);
     res.end();
+    return;
+  }
+
+  if (!corsAllowed) {
+    sendJson(res, 403, { error: "Origin not allowed" });
     return;
   }
 
@@ -60,9 +81,9 @@ async function handleRequest(req, res) {
   sendJson(res, 404, { error: "Not found" });
 }
 
-server.listen(port, "0.0.0.0", () => {
-  console.log(`Payabli local token server listening on http://127.0.0.1:${port}`);
-  console.log(`Access token endpoint: http://127.0.0.1:${port}/payabli/access-token`);
+server.listen(port, bindHost, () => {
+  console.log(`Payabli local token server listening on http://${bindHost}:${port}`);
+  console.log(`Access token endpoint: http://${bindHost}:${port}/payabli/access-token`);
 });
 
 async function resolveAccessToken(options = {}) {
@@ -79,7 +100,7 @@ async function exchangeCredentials(options = {}, { forceRefresh = false } = {}) 
   const clientId = stringValue(options.clientId) || stringValue(process.env.PAYABLI_CLIENT_ID);
   const clientSecret = stringValue(options.clientSecret) || stringValue(process.env.PAYABLI_CLIENT_SECRET);
   const apiBaseUrl = normalizeBaseUrl(stringValue(options.apiBaseUrl) || defaultApiBaseUrl);
-  const tokenPath = stringValue(options.tokenPath) || defaultTokenPath;
+  const tokenPath = normalizeTokenPath(stringValue(options.tokenPath) || defaultTokenPath);
   const tokenField = stringValue(options.responseTokenField) || responseTokenField;
 
   if (!clientId || !clientSecret) {
@@ -88,7 +109,13 @@ async function exchangeCredentials(options = {}, { forceRefresh = false } = {}) 
     );
   }
 
-  const cacheKey = JSON.stringify({ clientId, clientSecret, apiBaseUrl, tokenPath, tokenField });
+  const cacheKey = JSON.stringify({
+    clientIdHash: sha256(clientId),
+    clientSecretHash: sha256(clientSecret),
+    apiBaseUrl,
+    tokenPath,
+    tokenField
+  });
   const cached = tokenCache.get(cacheKey);
   if (!forceRefresh && cached && cached.expiresAt > Date.now()) {
     return { token: cached.token, upstreamStatus: 200 };
@@ -136,14 +163,27 @@ async function exchangeCredentials(options = {}, { forceRefresh = false } = {}) 
 }
 
 function sendJson(res, status, body) {
-  res.writeHead(status, { "Content-Type": "application/json; charset=utf-8" });
+  res.writeHead(status, {
+    "Cache-Control": "no-store",
+    "Content-Type": "application/json; charset=utf-8",
+    "X-Content-Type-Options": "nosniff"
+  });
   res.end(JSON.stringify(body));
 }
 
-function setCorsHeaders(res) {
-  res.setHeader("Access-Control-Allow-Origin", "*");
+function setCorsHeaders(req, res) {
+  const origin = req.headers.origin;
+  res.setHeader("Vary", "Origin");
   res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type,Authorization");
+  if (!origin) {
+    return true;
+  }
+  if (!isAllowedCorsOrigin(origin)) {
+    return false;
+  }
+  res.setHeader("Access-Control-Allow-Origin", origin);
+  return true;
 }
 
 function loadEnv(path) {
@@ -216,24 +256,47 @@ function ensureTrailingSlash(url) {
 
 function normalizeBaseUrl(url) {
   const trimmed = url.trim();
-  if (/^https?:\/\//i.test(trimmed)) {
-    return trimmed;
+  const normalized = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+  const parsed = new URL(normalized);
+
+  if (parsed.protocol !== "https:" && process.env.PAYABLI_ALLOW_INSECURE_UPSTREAM !== "true") {
+    throw new LocalTokenServerError(400, "PAYABLI_API_BASE_URL must use https.");
   }
 
-  return `https://${trimmed}`;
+  if (!allowedApiHosts.has(parsed.hostname.toLowerCase())) {
+    throw new LocalTokenServerError(
+      400,
+      `PAYABLI_API_BASE_URL host is not allowed. Allowed hosts: ${Array.from(allowedApiHosts).join(", ")}`
+    );
+  }
+
+  return parsed.toString();
+}
+
+function normalizeTokenPath(path) {
+  const trimmed = path.trim();
+  if (/^[a-z][a-z0-9+.-]*:/i.test(trimmed)) {
+    throw new LocalTokenServerError(400, "PAYABLI_TOKEN_PATH must be a path, not an absolute URL.");
+  }
+  return trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
 }
 
 function safeJson(value) {
   try {
-    return JSON.stringify(value);
+    return redactSensitiveText(JSON.stringify(value));
   } catch {
-    return String(value);
+    return redactSensitiveText(String(value));
   }
 }
 
 async function readJsonBody(req) {
   const chunks = [];
+  let totalBytes = 0;
   for await (const chunk of req) {
+    totalBytes += chunk.length;
+    if (totalBytes > maxRequestBodyBytes) {
+      throw new LocalTokenServerError(413, `Request body is too large. Maximum is ${maxRequestBodyBytes} bytes.`);
+    }
     chunks.push(chunk);
   }
 
@@ -245,6 +308,53 @@ async function readJsonBody(req) {
   try {
     return JSON.parse(raw);
   } catch {
-    throw new Error("Request body must be valid JSON.");
+    throw new LocalTokenServerError(400, "Request body must be valid JSON.");
   }
+}
+
+function parseCsvSet(value) {
+  return new Set(
+    value
+      .split(",")
+      .map((item) => item.trim().toLowerCase())
+      .filter(Boolean)
+  );
+}
+
+function isAllowedCorsOrigin(origin) {
+  if (configuredCorsOrigins.has(origin.toLowerCase())) {
+    return true;
+  }
+
+  if (configuredCorsOrigins.size > 0) {
+    return false;
+  }
+
+  try {
+    const parsed = new URL(origin);
+    return ["127.0.0.1", "localhost", "::1", "[::1]"].includes(parsed.hostname.toLowerCase());
+  } catch {
+    return false;
+  }
+}
+
+function sha256(value) {
+  return createHash("sha256").update(value).digest("hex");
+}
+
+function publicErrorMessage(error) {
+  return redactSensitiveText(error instanceof Error ? error.message : String(error));
+}
+
+function redactSensitiveText(value) {
+  return value
+    .replace(/(bearer\s+)[a-z0-9._~+/-]+=*/gi, "$1[REDACTED]")
+    .replace(
+      /("(?:access_token|accessToken|token|clientSecret|client_secret|secret)"\s*:\s*)"[^"]*"/gi,
+      '$1"[REDACTED]"'
+    )
+    .replace(
+      /((?:access_token|accessToken|token|clientSecret|client_secret|secret)=)[^\s&]+/gi,
+      "$1[REDACTED]"
+    );
 }

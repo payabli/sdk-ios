@@ -17,8 +17,10 @@ For step-by-step app integration, see
 - Use `PayabliPaymentMethod(entryPoint:environment:accessTokenProvider:)` so
   the app can request a short-lived or scoped access token from your backend
   immediately before submission.
-- The SwiftUI form marks its content `privacySensitive()` and clears PAN, CVV,
-  ACH routing number, and ACH account number after every submit attempt.
+- The SwiftUI form marks its content `privacySensitive()`. It clears PAN,
+  expiration, CVV, ACH routing number, and ACH account number after successful
+  submission, and clears CVV after failed card submission so users can correct
+  non-CVV fields without re-entering the whole form.
 - The module does not log PAN, CVV, ACH account numbers, routing numbers,
   access tokens, or stored method identifiers.
 - Card PAN is Luhn-checked by default. ACH routing numbers are ABA-checksum

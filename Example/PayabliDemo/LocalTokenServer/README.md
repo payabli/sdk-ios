@@ -30,6 +30,10 @@ Start the server:
 node server.mjs
 ```
 
+By default the server binds only to `127.0.0.1`. Keep that default when testing
+in Simulator so local credentials and returned access tokens are not exposed on
+your LAN.
+
 The iOS Simulator can call:
 
 ```text
@@ -69,6 +73,15 @@ PAYABLI_API_BASE_URL=https://api-qa.payabli.com/api
 
 The server also accepts `api-sandbox.payabli.com/api` or
 `api-qa.payabli.com/api` and will add `https://` automatically.
+Token exchange is restricted to Payabli hosts by default:
+
+```bash
+PAYABLI_ALLOWED_API_HOSTS=api-sandbox.payabli.com,api-qa.payabli.com,api.payabli.com
+```
+
+Only add hosts for trusted local test infrastructure. Do not point credential
+exchange at arbitrary URLs, because that would send the configured
+`clientSecret` to that host.
 
 Then call the same sample URL:
 
@@ -87,7 +100,8 @@ curl -X POST http://127.0.0.1:8787/payabli/exchange-token \
   }'
 ```
 
-Every upstream detail is overridable from either `.env` or the POST body:
+Upstream request details are configurable from either `.env` or the POST body,
+subject to the allowed-host guard:
 
 ```json
 {
@@ -110,6 +124,17 @@ Mac's LAN IP instead:
 ```text
 http://<mac-lan-ip>:8787/payabli/access-token
 ```
+
+To expose the local server to a physical device, explicitly bind to all
+interfaces while you are testing:
+
+```bash
+PAYABLI_LOCAL_TOKEN_SERVER_HOST=0.0.0.0 node server.mjs
+```
+
+Use this only on a trusted network, stop the process when finished, and prefer
+short-lived sandbox credentials. Browser CORS responses are restricted to
+localhost origins by default; native iOS requests do not need CORS.
 
 Because this is plain HTTP for local development, the app target may need an
 ATS local-network exception such as `NSAllowsLocalNetworking` in `Info.plist`,

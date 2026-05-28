@@ -17,8 +17,9 @@ Detailed documentation:
 
 - The component never logs PAN, CVV, ACH account, routing number, or access
   tokens.
-- Raw payment values are held in SwiftUI state only while the form is active
-  and are cleared after a submit attempt.
+- Raw payment values are held in SwiftUI state only while the form is active.
+  PAN, expiration, CVV, ACH routing, and ACH account values are cleared after
+  successful submission; CVV is also cleared after failed card submission.
 - The endpoint uses `Authorization: Bearer <access token>`. Do not embed a
   long-lived private API token in a production app. Prefer an
   `accessTokenProvider` that asks your backend for an appropriately scoped token

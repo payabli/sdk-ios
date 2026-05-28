@@ -832,6 +832,9 @@ Sample app files:
 
 The sample app reads QA/development toggles from `Secrets.swift`, which is
 gitignored. Keep private Payabli credentials out of committed source.
+The local token server defaults to loopback-only binding, restricts browser
+CORS to localhost origins, restricts credential exchange to Payabli API hosts,
+caps JSON request bodies, and keeps `.env` files ignored.
 
 ### Where to look next
 
