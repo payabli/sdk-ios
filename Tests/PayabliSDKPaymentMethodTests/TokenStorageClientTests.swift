@@ -476,6 +476,25 @@ final class TokenStorageClientTests: XCTestCase {
         XCTAssertEqual(configuration.detents, [.large])
     }
 
+    @MainActor
+    func testPaymentMethodLegacyConfigureWithThemeRoutesToCurrentConfigure() {
+        let component = PayabliPaymentMethod(
+            accessToken: "access-token",
+            entryPoint: "old-entry",
+            environment: .sandbox
+        )
+        let config = PayabliConfig(
+            accessToken: "access-token",
+            entryPoint: "new-entry",
+            environment: .qa
+        )
+
+        component.configure(config: config, theme: .default)
+
+        XCTAssertEqual(component.entryPoint, "new-entry")
+        XCTAssertEqual(component.environment, .qa)
+    }
+
     func testDiagnosticsLogRedactedRequestAndResponse() async throws {
         let sink = DiagnosticSink()
         let transport = MockTransport(responseBody: """

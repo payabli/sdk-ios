@@ -3,15 +3,6 @@ import XCTest
 
 @MainActor
 final class PayabliComponentCompatibilityTests: XCTestCase {
-    func testLegacyConfigureWithThemeRoutesToNewConfigure() {
-        let component = NewConfigureComponent()
-        let config = testConfig(entryPoint: "new-entry")
-
-        component.configure(config: config, theme: .default)
-
-        XCTAssertEqual(component.configuredEntryPoint, "new-entry")
-    }
-
     func testNewConfigureRoutesToLegacyConfigureImplementation() {
         let component = LegacyConfigureComponent()
         let config = testConfig(entryPoint: "legacy-entry")
@@ -28,19 +19,6 @@ final class PayabliComponentCompatibilityTests: XCTestCase {
             entryPoint: entryPoint,
             environment: .sandbox
         )
-    }
-}
-
-@MainActor
-private final class NewConfigureComponent: PayabliComponent {
-    nonisolated static let componentId = "new"
-    nonisolated static let sessionTier = PayabliSessionTier.tier1Transactional
-    nonisolated static let requiredPermissions: [String] = []
-
-    private(set) var configuredEntryPoint: String?
-
-    func configure(config: PayabliConfig) {
-        configuredEntryPoint = config.entryPoint
     }
 }
 

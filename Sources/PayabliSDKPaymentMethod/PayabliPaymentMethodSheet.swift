@@ -94,6 +94,7 @@ private struct PayabliPaymentMethodSheetContent: View {
     @Binding var isPresented: Bool
     @State private var selectedDetent: PresentationDetent
     @State private var measuredContentHeight: CGFloat = 0
+    @State private var availableSheetHeight: CGFloat = 0
 
     let component: PayabliPaymentMethod
     let configuration: PayabliPaymentMethodFormConfiguration
@@ -156,10 +157,10 @@ private struct PayabliPaymentMethodSheetContent: View {
                 )
             }
             .onAppear {
-                updateSelectedDetent()
+                updateAvailableSheetHeight(from: proxy)
             }
             .onChange(of: proxy.size.height) { _ in
-                updateSelectedDetent()
+                updateAvailableSheetHeight(from: proxy)
             }
             .onPreferenceChange(PayabliPaymentMethodSheetContentHeightKey.self) { contentHeight in
                 updateMeasuredContentHeight(contentHeight)
@@ -283,7 +284,7 @@ private struct PayabliPaymentMethodSheetContent: View {
     }
 
     private var maximumContentDetentHeight: CGFloat {
-        max(320, UIScreen.main.bounds.height - 96)
+        max(0, availableSheetHeight - 24)
     }
 
     private var contentHeightUpdateTolerance: CGFloat {
@@ -301,6 +302,18 @@ private struct PayabliPaymentMethodSheetContent: View {
         }
 
         measuredContentHeight = roundedHeight
+        updateSelectedDetent()
+    }
+
+    private func updateAvailableSheetHeight(from proxy: GeometryProxy) {
+        let verticalSafeArea = proxy.safeAreaInsets.top + proxy.safeAreaInsets.bottom
+        let availableHeight = max(0, proxy.size.height - verticalSafeArea)
+        guard abs(availableHeight - availableSheetHeight) >= 1 else {
+            updateSelectedDetent()
+            return
+        }
+
+        availableSheetHeight = availableHeight
         updateSelectedDetent()
     }
 

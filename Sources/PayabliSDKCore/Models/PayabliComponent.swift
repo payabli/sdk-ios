@@ -34,6 +34,6 @@ public extension PayabliComponent {
     }
 
     func configure(config: PayabliConfig, theme: PayabliTheme) {
-        configure(config: config)
+        fatalError("PayabliComponent conformers must implement configure(config:) or configure(config:theme:).")
     }
 }

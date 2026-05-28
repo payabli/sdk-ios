@@ -94,6 +94,10 @@ public final class PayabliPaymentMethod: NSObject, ObservableObject, PayabliComp
         )
     }
 
+    public func configure(config: PayabliConfig, theme _: PayabliTheme) {
+        configure(config: config)
+    }
+
     public func addPaymentMethod(
         _ paymentMethod: PayabliPaymentMethodInput,
         options: PayabliPaymentMethodOptions = PayabliPaymentMethodOptions()
