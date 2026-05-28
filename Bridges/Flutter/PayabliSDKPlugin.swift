@@ -1,7 +1,8 @@
 import Flutter
-import UIKit
 import PayabliSDKCore
+import PayabliSDKPaymentMethod
 import PayabliSDKTapToPay
+import UIKit
 
 /// Flutter plugin bridging Dart calls into the native `PayabliSDKTapToPay`
 /// surface. Exposes the bilingual `@objc` companions added in
@@ -28,6 +29,7 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
 
     private var ttp: PayabliTTP?
     private var eventToken: PayabliTTPEventToken?
+    private var paymentMethod: PayabliPaymentMethod?
 
     init(methodChannel: FlutterMethodChannel, eventChannel: FlutterEventChannel) {
         self.methodChannel = methodChannel
@@ -63,6 +65,12 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
             handleActivateDevice(call.arguments, result: result)
         case "getSessionState":
             handleGetSessionState(result: result)
+        case "configurePaymentMethod":
+            handleConfigurePaymentMethod(call.arguments, result: result)
+        case "addCard":
+            handleAddCard(call.arguments, result: result)
+        case "addACH":
+            handleAddACH(call.arguments, result: result)
         default:
             result(FlutterMethodNotImplemented)
         }
@@ -76,7 +84,8 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
               let entryPoint = args["entryPoint"] as? String,
               let appId = args["appId"] as? String,
               let envRaw = args["environment"] as? Int,
-              let environment = PayabliEnvironment(rawValue: envRaw) else {
+              let environment = PayabliEnvironment(rawValue: envRaw)
+        else {
             result(FlutterError(
                 code: "INVALID_ARGS",
                 message: "Missing accessToken/entryPoint/appId/environment",
@@ -158,7 +167,8 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
             return
         }
         guard let pdDict = args["paymentDetails"] as? [String: Any],
-              let amount = pdDict["amount"] as? Double else {
+              let amount = pdDict["amount"] as? Double
+        else {
             result(FlutterError(
                 code: "INVALID_ARGS",
                 message: "Missing paymentDetails.amount",
@@ -218,7 +228,8 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
             return
         }
         guard let args = arguments as? [String: Any],
-              let activationCode = args["activationCode"] as? String else {
+              let activationCode = args["activationCode"] as? String
+        else {
             result(FlutterError(
                 code: "INVALID_ARGS",
                 message: "Missing activationCode",
@@ -242,6 +253,143 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
             let raw = self.ttp?.sessionState.rawValue ?? PayabliTTPSessionState.idle.rawValue
             result(raw)
         }
+    }
+
+    // MARK: - Payment Method
+
+    private func handleConfigurePaymentMethod(_ arguments: Any?, result: @escaping FlutterResult) {
+        guard let args = arguments as? [String: Any],
+              let entryPoint = args["entryPoint"] as? String,
+              let envRaw = args["environment"] as? Int,
+              let environment = PayabliEnvironment(rawValue: envRaw)
+        else {
+            result(FlutterError(
+                code: "INVALID_ARGS",
+                message: "Missing entryPoint/environment",
+                details: nil
+            ))
+            return
+        }
+
+        let methodChannel = self.methodChannel
+        let accessTokenProvider: PayabliPaymentMethodAccessTokenProvider = { @Sendable [methodChannel] in
+            try await withCheckedThrowingContinuation { continuation in
+                Task { @MainActor in
+                    methodChannel.invokeMethod("accessToken", arguments: nil) { value in
+                        if let token = value as? String {
+                            continuation.resume(returning: token)
+                        } else {
+                            continuation.resume(throwing: PayabliGenericError(
+                                code: .missingToken,
+                                reason: "Dart side did not return a payment method access token"
+                            ))
+                        }
+                    }
+                }
+            }
+        }
+
+        Task { @MainActor in
+            self.paymentMethod = PayabliPaymentMethod(
+                entryPoint: entryPoint,
+                environment: environment,
+                accessTokenProvider: accessTokenProvider
+            )
+            result(nil)
+        }
+    }
+
+    private func handleAddCard(_ arguments: Any?, result: @escaping FlutterResult) {
+        guard let paymentMethod else {
+            result(FlutterError(code: "NOT_CONFIGURED", message: "Call configurePaymentMethod() first", details: nil))
+            return
+        }
+        guard let args = arguments as? [String: Any],
+              let cardNumber = args["cardNumber"] as? String,
+              let expiration = args["expiration"] as? String,
+              let cardholderName = args["cardholderName"] as? String,
+              let cvv = args["cvv"] as? String,
+              let billingZip = args["billingZip"] as? String
+        else {
+            result(FlutterError(
+                code: "INVALID_ARGS",
+                message: "Missing required card fields: cardNumber, expiration, cardholderName, cvv, billingZip",
+                details: nil
+            ))
+            return
+        }
+
+        let card = PayabliCardPaymentMethodData(
+            cardNumber: cardNumber,
+            expiration: expiration,
+            cardholderName: cardholderName,
+            cvv: cvv,
+            billingZip: billingZip
+        )
+        handleAddPaymentMethod(
+            .card(card),
+            options: paymentMethodOptions(from: args),
+            component: paymentMethod,
+            result: result
+        )
+    }
+
+    private func handleAddACH(_ arguments: Any?, result: @escaping FlutterResult) {
+        guard let paymentMethod else {
+            result(FlutterError(code: "NOT_CONFIGURED", message: "Call configurePaymentMethod() first", details: nil))
+            return
+        }
+        guard let args = arguments as? [String: Any],
+              let accountNumber = args["accountNumber"] as? String,
+              let accountType = args["accountType"] as? String,
+              let resolvedAccountType = PayabliACHAccountType(rawValue: accountType),
+              let holderName = args["holderName"] as? String,
+              let routingNumber = args["routingNumber"] as? String
+        else {
+            result(FlutterError(code: "INVALID_ARGS", message: "Missing required ACH fields", details: nil))
+            return
+        }
+
+        let ach = PayabliACHPaymentMethodData(
+            accountNumber: accountNumber,
+            accountType: resolvedAccountType,
+            holderName: holderName,
+            routingNumber: routingNumber,
+            secCode: (args["secCode"] as? String).flatMap(PayabliACHSecCode.init(rawValue:)),
+            holderType: (args["holderType"] as? String).flatMap(PayabliACHHolderType.init(rawValue:))
+        )
+        handleAddPaymentMethod(
+            .ach(ach),
+            options: paymentMethodOptions(from: args),
+            component: paymentMethod,
+            result: result
+        )
+    }
+
+    private func handleAddPaymentMethod(
+        _ paymentMethod: PayabliPaymentMethodInput,
+        options: PayabliPaymentMethodOptions,
+        component: PayabliPaymentMethod,
+        result: @escaping FlutterResult
+    ) {
+        Task { @MainActor in
+            do {
+                let method = try await component.addPaymentMethod(paymentMethod, options: options)
+                result(Self.storedPaymentMethodMap(method))
+            } catch {
+                result((error as NSError).toFlutterError(defaultCode: "PAYMENT_METHOD_FAILED"))
+            }
+        }
+    }
+
+    private func paymentMethodOptions(from args: [String: Any]) -> PayabliPaymentMethodOptions {
+        PayabliPaymentMethodOptions(
+            achValidation: args["achValidation"] as? Bool,
+            createAnonymous: args["createAnonymous"] as? Bool,
+            forceCustomerCreation: args["forceCustomerCreation"] as? Bool,
+            temporary: args["temporary"] as? Bool,
+            source: args["source"] as? String
+        )
     }
 
     // MARK: - Event subscription
@@ -293,6 +441,38 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
         PayabliTTPInvoiceDataObjC(
             invoiceNumber: dict["invoiceNumber"] as? String
         )
+    }
+
+    private static func storedPaymentMethodMap(_ method: PayabliStoredPaymentMethod) -> [String: Any] {
+        var map: [String: Any] = [
+            "responseText": method.responseText,
+            "apiResponse": dictionary(from: method.apiResponse)
+        ]
+        if let storedMethodId = method.storedMethodId {
+            map["storedMethodId"] = storedMethodId
+        }
+        if let methodReferenceId = method.methodReferenceId {
+            map["methodReferenceId"] = methodReferenceId
+        }
+        if let resultCode = method.resultCode {
+            map["resultCode"] = resultCode
+        }
+        if let resultText = method.resultText {
+            map["resultText"] = resultText
+        }
+        if let customerId = method.customerId {
+            map["customerId"] = customerId
+        }
+        return map
+    }
+
+    private static func dictionary(from response: PayabliPaymentMethodAPIResponse) -> [String: Any] {
+        guard let data = try? JSONEncoder().encode(response),
+              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+        else {
+            return [:]
+        }
+        return object
     }
 }
 

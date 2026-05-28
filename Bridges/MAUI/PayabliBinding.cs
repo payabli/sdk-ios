@@ -1,8 +1,9 @@
-// PayabliBinding — .NET MAUI / Xamarin.iOS binding for PayabliSDKTapToPay.
+// PayabliBinding — .NET MAUI / .NET iOS binding for PayabliSDKTapToPay
+// and PayabliSDKPaymentMethod.
 //
 // The C# surface produced by `sharpie bind` against the
-// `PayabliSDKTapToPay.xcframework` (and `PayabliSDKCore.xcframework` for
-// `PayabliEnvironment`). Host MAUI apps consume this via a binding
+// `PayabliSDKTapToPay.xcframework`, `PayabliSDKPaymentMethod.xcframework`,
+// and `PayabliSDKCore.xcframework` for `PayabliEnvironment`. Host MAUI apps consume this via a binding
 // library project (see `Payabli.MAUI.csproj` next to this file) and
 // drive the Tap to Pay on iPhone flow from C#.
 //
@@ -86,6 +87,13 @@ namespace Payabli.TapToPay
 
     public delegate void TokenRefreshRequest(TokenRefreshCompletion completion);
 
+    public delegate void AccessTokenCompletion(
+        [NullAllowed] string token,
+        [NullAllowed] NSError error
+    );
+
+    public delegate void AccessTokenRequest(AccessTokenCompletion completion);
+
     public delegate void PayabliTTPCompletion([NullAllowed] NSError error);
 
     public delegate void PayabliTTPChargeCompletion(
@@ -96,6 +104,11 @@ namespace Payabli.TapToPay
     public delegate void PayabliTTPEventHandler(
         PayabliTTPEventCode code,
         NSDictionary payload
+    );
+
+    public delegate void PayabliPaymentMethodCompletion(
+        [NullAllowed] PayabliStoredPaymentMethodObjC result,
+        [NullAllowed] NSError error
     );
 
     // MARK: - PayabliTTPCustomerDataObjC
@@ -253,5 +266,62 @@ namespace Payabli.TapToPay
 
         [Export("addEventListenerWithHandler:")]
         PayabliTTPEventToken AddEventListener(PayabliTTPEventHandler handler);
+    }
+
+    // MARK: - Payment Method
+
+    [BaseType(typeof(NSObject))]
+    [DisableDefaultCtor]
+    public interface PayabliStoredPaymentMethodObjC
+    {
+        [NullAllowed, Export("storedMethodId")] string StoredMethodId { get; }
+        [NullAllowed, Export("methodReferenceId")] string MethodReferenceId { get; }
+        [NullAllowed, Export("resultCode")] NSNumber ResultCode { get; }
+        [NullAllowed, Export("resultText")] string ResultText { get; }
+        [NullAllowed, Export("customerId")] NSNumber CustomerId { get; }
+        [Export("responseText")] string ResponseText { get; }
+        [Export("apiResponse")] NSDictionary ApiResponse { get; }
+    }
+
+    [BaseType(typeof(NSObject))]
+    [DisableDefaultCtor]
+    public interface PayabliPaymentMethodObjC
+    {
+        [Export("initWithAccessTokenHandler:entryPoint:environment:")]
+        IntPtr Constructor(
+            AccessTokenRequest accessTokenHandler,
+            string entryPoint,
+            PayabliEnvironment environment
+        );
+
+        [Export("addCardWithCardNumber:expiration:cardholderName:cvv:billingZip:createAnonymous:forceCustomerCreation:temporary:source:completion:")]
+        void AddCard(
+            string cardNumber,
+            string expiration,
+            string cardholderName,
+            string cvv,
+            string billingZip,
+            bool createAnonymous,
+            bool forceCustomerCreation,
+            bool temporary,
+            [NullAllowed] string source,
+            PayabliPaymentMethodCompletion completion
+        );
+
+        [Export("addACHWithAccountNumber:accountType:holderName:routingNumber:secCode:holderType:achValidation:createAnonymous:forceCustomerCreation:temporary:source:completion:")]
+        void AddACH(
+            string accountNumber,
+            string accountType,
+            string holderName,
+            string routingNumber,
+            [NullAllowed] string secCode,
+            [NullAllowed] string holderType,
+            bool achValidation,
+            bool createAnonymous,
+            bool forceCustomerCreation,
+            bool temporary,
+            [NullAllowed] string source,
+            PayabliPaymentMethodCompletion completion
+        );
     }
 }

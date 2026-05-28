@@ -1,25 +1,43 @@
-import SwiftUI
 import PayabliSDKCore
+import PayabliSDKPaymentMethod
 import PayabliSDKTapToPay
+import SwiftUI
 
-/// Demo app landing screen exercising the full `PayabliTTP` API:
+/// Demo app landing screen exercising Tap to Pay and payment method:
 ///   - `initialize()` — cold/warm attestation + reader prepare.
 ///   - `charge(type:paymentDetails:)` — full sale pipeline with NFC tap.
 ///   - `activateDevice(activationCode:)` — pending-device activation.
 ///   - `events()` — live event log surfaced via `addEventListener`.
 ///   - `sessionState` — surfaced in the navigation bar as a colored badge.
+///   - `PayabliPaymentMethodView` — configurable card PAN / ACH payment method.
 struct HomeView: View {
     @EnvironmentObject private var ttp: PayabliTTP
+    @EnvironmentObject private var paymentMethod: PayabliPaymentMethod
 
     @State private var amountText: String = "9.99"
     @State private var activationCode: String = ""
     @State private var lastResult: String = ""
+    @State private var paymentMethodResult: String = ""
     @State private var eventLog: [EventLogEntry] = []
     @State private var eventToken: PayabliTTPEventToken?
     @State private var presentingActivation = false
     @State private var isWorking = false
 
     var body: some View {
+        TabView {
+            tapToPayTab
+                .tabItem {
+                    Label("Tap to Pay", systemImage: "wave.3.right")
+                }
+
+            paymentMethodTab
+                .tabItem {
+                    Label("Payment Method", systemImage: "creditcard")
+                }
+        }
+    }
+
+    private var tapToPayTab: some View {
         NavigationView {
             List {
                 stateSection
@@ -32,6 +50,40 @@ struct HomeView: View {
             .sheet(isPresented: $presentingActivation) { activationSheet }
             .onAppear(perform: subscribeToEvents)
             .onDisappear { eventToken?.cancel() }
+        }
+    }
+
+    private var paymentMethodTab: some View {
+        NavigationView {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    PayabliPaymentMethodView(
+                        component: paymentMethod,
+                        configuration: paymentMethodConfiguration,
+                        onPaymentMethodAdded: { method in
+                            paymentMethodResult = [
+                                "Stored method: \(method.storedMethodId ?? "—")",
+                                "Response: \(method.responseText)",
+                                "Result: \(method.resultText ?? "—")"
+                            ].joined(separator: "\n")
+                        },
+                        onError: { error in
+                            paymentMethodResult = "Payment method failed: \(error.localizedDescription)"
+                        }
+                    )
+                    .payabliPaymentMethodStyle(paymentMethodStyle)
+
+                    Text(paymentMethodResult.isEmpty ? "No payment method result yet" : paymentMethodResult)
+                        .font(.footnote)
+                        .foregroundColor(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(12)
+                        .background(Color(.secondarySystemBackground))
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                }
+                .padding(16)
+            }
+            .navigationTitle("Payment Method")
         }
     }
 
@@ -58,6 +110,68 @@ struct HomeView: View {
             Button("Charge") { runCharge() }
                 .disabled(isWorking || !ttp.isReady)
         }
+    }
+
+    private var paymentMethodConfiguration: PayabliPaymentMethodFormConfiguration {
+        PayabliPaymentMethodFormConfiguration(
+            allowedMethods: [.card, .ach],
+            defaultMethod: .card,
+            cardFieldOrder: [
+                .cardholderName,
+                .cardNumber,
+                .cardExpiration,
+                .cardCvv,
+                .cardZip
+            ],
+            achFieldOrder: [
+                .achHolder,
+                .achRouting,
+                .achAccount,
+                .achAccountType
+            ],
+            hiddenValues: PayabliPaymentMethodHiddenValues(
+                achHolderType: .personal,
+                achSecCode: .web,
+                methodDescription: "Demo stored method"
+            ),
+            options: PayabliPaymentMethodOptions(
+                achValidation: true,
+                createAnonymous: false,
+                forceCustomerCreation: true,
+                temporary: false,
+                source: "ios-demo"
+            ),
+            labels: PayabliPaymentMethodLabels(
+                title: "Save Payment Method",
+                subtitle: "Create a card or ACH token from sandbox data."
+            ),
+            labelLayout: .external,
+            formatting: PayabliPaymentMethodFormatting(
+                insertsCardNumberSpaces: true,
+                masksACHAccountEntry: true
+            ),
+            inputSizing: PayabliPaymentMethodInputSizing(
+                defaultSize: PayabliPaymentMethodInputSize(height: 52),
+                fieldSizes: [
+                    .cardExpiration: PayabliPaymentMethodInputSize(height: 48),
+                    .cardCvv: PayabliPaymentMethodInputSize(height: 48)
+                ]
+            ),
+            cardBrandIconPlacement: .trailing
+        )
+    }
+
+    private var paymentMethodStyle: PayabliPaymentMethodStyle {
+        PayabliPaymentMethodStyle(
+            accentColor: .green,
+            input: PayabliPaymentMethodInputStyle(
+                backgroundColor: Color(.systemBackground),
+                borderColor: Color(.separator).opacity(0.6),
+                cornerRadius: 8
+            ),
+            submitButton: PayabliPaymentMethodSubmitButtonStyle(cornerRadius: 8),
+            layout: PayabliPaymentMethodLayoutStyle(contentSpacing: 18, fieldGroupSpacing: 12)
+        )
     }
 
     private var resultSection: some View {
@@ -199,11 +313,10 @@ struct HomeView: View {
         // across view appearances since SwiftUI gives us no handle to cancel
         // it from onDisappear.
         eventToken = ttp.addEventListener { code, payload in
-            let detail: String
-            if payload.isEmpty {
-                detail = ""
+            let detail: String = if payload.count == 0 {
+                ""
             } else {
-                detail = payload
+                payload
                     .map { "\($0.key): \($0.value)" }
                     .sorted()
                     .joined(separator: ", ")

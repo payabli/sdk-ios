@@ -2,8 +2,9 @@
 #
 # build_release_frameworks.sh
 # ---------------------------
-# Builds the three Payabli iOS SDK distribution XCFrameworks
-# (PayabliSDKCore, PayabliSDKTapToPay, PayabliCardReaderCore) for
+# Builds the Payabli iOS SDK distribution XCFrameworks
+# (PayabliSDKCore, PayabliSDKTapToPay, PayabliSDKPaymentMethod,
+# PayabliCardReaderCore) for
 # device + iOS Simulator slices, with distribution-mode settings and a
 # pinned SOURCE_DATE_EPOCH for reproducible zips.
 #
@@ -27,6 +28,7 @@
 #   build/release/
 #     payabli-ios-sdk-core-${VERSION}.zip
 #     payabli-ios-sdk-taptopay-${VERSION}.zip
+#     payabli-ios-sdk-payment-method-${VERSION}.zip
 #     payabli-ios-sdk-card-reader-core-${VERSION}.zip
 #     checksums.txt           (one sha256 per zip, space-separated lines)
 #     THIRD_PARTY_LICENSES.txt  (bundled copy for the upload/publish step)
@@ -66,10 +68,11 @@ XCF_DIR="$BUILD_DIR/xcframeworks"
 rm -rf "$BUILD_DIR"
 mkdir -p "$ARCHIVE_DIR" "$XCF_DIR"
 
-# The three schemes we ship publicly. Each matches a Package.swift product.
+# Publicly shipped schemes. Each matches a Package.swift product.
 SCHEMES=(
     "PayabliSDKCore"
     "PayabliSDKTapToPay"
+    "PayabliSDKPaymentMethod"
     "PayabliCardReaderCore"
 )
 
@@ -78,6 +81,7 @@ slug_for() {
     case "$1" in
         PayabliSDKCore)          echo "core" ;;
         PayabliSDKTapToPay)      echo "taptopay" ;;
+        PayabliSDKPaymentMethod)  echo "payment-method" ;;
         PayabliCardReaderCore)   echo "card-reader-core" ;;
         *) echo "error: unknown scheme '$1'" >&2; exit 1 ;;
     esac
@@ -87,16 +91,32 @@ archive_scheme() {
     local scheme="$1" destination="$2" suffix="$3"
     local archive_path="$ARCHIVE_DIR/${scheme}-${suffix}.xcarchive"
     echo "[release] archiving ${scheme} (${suffix})"
-    xcodebuild archive \
-        -scheme "$scheme" \
-        -destination "$destination" \
-        -archivePath "$archive_path" \
-        -configuration "$BUILD_CONFIG" \
-        SKIP_INSTALL=NO \
-        BUILD_LIBRARY_FOR_DISTRIBUTION=YES \
-        CODE_SIGNING_REQUIRED=NO \
-        CODE_SIGNING_ALLOWED=NO \
-        | xcpretty && exit_code=${PIPESTATUS[0]} || exit_code=${PIPESTATUS[0]}
+    set +e
+    if command -v xcpretty >/dev/null 2>&1; then
+        xcodebuild archive \
+            -scheme "$scheme" \
+            -destination "$destination" \
+            -archivePath "$archive_path" \
+            -configuration "$BUILD_CONFIG" \
+            SKIP_INSTALL=NO \
+            BUILD_LIBRARY_FOR_DISTRIBUTION=YES \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            | xcpretty
+        exit_code=${PIPESTATUS[0]}
+    else
+        xcodebuild archive \
+            -scheme "$scheme" \
+            -destination "$destination" \
+            -archivePath "$archive_path" \
+            -configuration "$BUILD_CONFIG" \
+            SKIP_INSTALL=NO \
+            BUILD_LIBRARY_FOR_DISTRIBUTION=YES \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO
+        exit_code=$?
+    fi
+    set -e
     if [[ "$exit_code" -ne 0 ]]; then
         echo "error: xcodebuild archive failed (exit ${exit_code}) for ${scheme} (${suffix})" >&2
         exit "$exit_code"
@@ -149,7 +169,7 @@ for scheme in "${SCHEMES[@]}"; do
     checksum="$(swift package compute-checksum "$BUILD_DIR/$zip_name")"
     printf '%s  %s\n' "$checksum" "$zip_name" >> "$checksums_file"
     # Also expose individual vars for the render step:
-    #   CORE_SHA256, TAPTOPAY_SHA256, CARD_READER_CORE_SHA256
+    #   CORE_SHA256, TAPTOPAY_SHA256, PAYMENT_METHOD_SHA256, CARD_READER_CORE_SHA256
     # (matches render_public_manifests.sh's required vars).
     upper="$(echo "${slug//-/_}" | tr '[:lower:]' '[:upper:]')"
     if [[ -n "${GITHUB_ENV:-}" ]]; then

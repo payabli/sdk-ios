@@ -34,6 +34,7 @@ import PayabliSDKCore
 /// extensions. Existing Swift consumers continue to use the unchanged
 /// `async throws` API, `AsyncStream<PayabliTTPEvent>` events, and value-type
 /// `struct`s. See `README.md` for the bilingual contract.
+@objc(PayabliTTP)
 @MainActor
 public final class PayabliTTP: NSObject, ObservableObject {
 
@@ -292,4 +293,3 @@ public final class PayabliTTPEventToken: NSObject {
         task.cancel()
     }
 }
-

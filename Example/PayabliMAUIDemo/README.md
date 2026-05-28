@@ -1,8 +1,7 @@
-# PayabliMauiDemo (TTP-only)
+# PayabliMauiDemo
 
-Minimal .NET MAUI demo wrapping the native Tap to Pay on iPhone surface
-of `PayabliSDKTapToPay` via the Xamarin.iOS binding library in
-`Bridges/MAUI/`.
+Minimal .NET MAUI demo wrapping Tap to Pay and payment method through the
+.NET iOS binding library in `Bridges/MAUI/`.
 
 ## What it covers
 
@@ -15,10 +14,14 @@ of `PayabliSDKTapToPay` via the Xamarin.iOS binding library in
   rendered into a scrollable label.
 - **Session badge** — current `PayabliTTPSessionState` shown in the
   page header.
+- **Card and ACH payment method** — sample forms calling
+  `PayabliPaymentMethodObjC.AddCard(...)` and
+  `PayabliPaymentMethodObjC.AddACH(...)`, then rendering the
+  stored-method response.
 
 ## Setup
 
-1. Build the three release XCFrameworks (run from the repo root):
+1. Build the release XCFrameworks (run from the repo root):
    ```bash
    ./Scripts/build_release_frameworks.sh
    ```
@@ -27,17 +30,26 @@ of `PayabliSDKTapToPay` via the Xamarin.iOS binding library in
    mkdir -p Bridges/MAUI/Frameworks
    cp -R build/release/PayabliSDKCore.xcframework        Bridges/MAUI/Frameworks/
    cp -R build/release/PayabliSDKTapToPay.xcframework    Bridges/MAUI/Frameworks/
+   cp -R build/release/PayabliSDKPaymentMethod.xcframework Bridges/MAUI/Frameworks/
    cp -R build/release/PayabliCardReaderCore.xcframework Bridges/MAUI/Frameworks/
    ```
-3. Restore and build the demo:
+3. Restore and build the demo with the .NET 10 iOS workload:
    ```bash
    cd Example/PayabliMAUIDemo
    dotnet restore
-   dotnet build -f net8.0-ios17.0
+   dotnet workload restore
+   dotnet build -f net10.0-ios
    ```
-4. Wire `FetchAccessTokenFromPartnerBackend()` in `MainPage.xaml.cs` to
-   your backend's `/payabli/token` endpoint and update the `Secrets`
-   constants (`EntryPoint`, `AppId`).
+   If your .NET SDK is installed system-wide, `dotnet workload restore` may
+   require elevated privileges. If restore cannot infer workloads from the
+   project graph, install them directly:
+   ```bash
+   sudo dotnet workload install maui-ios mobile-librarybuilder
+   ```
+4. Wire `FetchAccessTokenFromPartnerBackend()` and
+   `FetchPaymentMethodAccessTokenFromPartnerBackend()` in `MainPage.xaml.cs` to
+   your backend's Tap to Pay token and payment method access-token endpoints,
+   then update the `Secrets` constants (`EntryPoint`, `AppId`).
 5. Run on a physical iPhone XS or newer.
 
 ## Required iOS entitlements (host app)
@@ -59,6 +71,10 @@ You also need to:
 Tap to Pay only works on **physical iPhone XS or newer running iOS
 16.7+**. Trying to run on the Simulator will fail at the eligibility
 gate during `Initialize`.
+
+The payment method section can be visually exercised in the Simulator.
+Submitting the form requires a valid Bearer access token from your backend for
+`/api/TokenStorage/add`.
 
 ## Not included in the scaffold
 

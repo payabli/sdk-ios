@@ -1,7 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFrameworks>net8.0-ios17.0</TargetFrameworks>
+    <TargetFramework>net10.0-ios</TargetFramework>
+    <SupportedOSPlatformVersion>16.7</SupportedOSPlatformVersion>
     <OutputType>Exe</OutputType>
     <RootNamespace>PayabliMauiDemo</RootNamespace>
     <UseMaui>true</UseMaui>
@@ -15,10 +16,15 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- TTP-only binding library that wraps the PayabliSDKTapToPay /
-         PayabliSDKCore / PayabliCardReaderCore XCFrameworks.
-         See Bridges/MAUI/README.md for the binding contract. -->
-    <ProjectReference Include="..\..\Bridges\MAUI\Payabli.MAUI.csproj" />
+    <PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Binding library that wraps the PayabliSDKTapToPay /
+         PayabliSDKPaymentMethod / PayabliSDKCore / PayabliCardReaderCore XCFrameworks.
+         See Bridges/README.md for the binding contract. -->
+    <ProjectReference Include="..\..\Bridges\MAUI\Payabli.MAUI.csproj"
+                      Condition="'$(TargetPlatformIdentifier)' == 'ios' Or $([System.String]::Copy('$(TargetFramework)').Contains('-ios'))" />
   </ItemGroup>
 
 </Project>

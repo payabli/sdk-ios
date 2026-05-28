@@ -2,7 +2,7 @@ import Foundation
 
 /// Shared configuration for all PayabliSDK components.
 ///
-/// Passed to each component's `configure(config:theme:)` entry point. One
+/// Passed to each component's `configure(config:)` entry point. One
 /// `PayabliConfig` can be reused across components — they share the underlying
 /// auth session (PRD §28.8).
 ///

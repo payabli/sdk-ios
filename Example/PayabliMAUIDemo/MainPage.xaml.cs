@@ -13,8 +13,10 @@ namespace PayabliMauiDemo;
 public partial class MainPage : ContentPage
 {
     private PayabliTTP? _ttp;
+    private PayabliPaymentMethodObjC? _paymentMethod;
     private PayabliTTPEventToken? _eventToken;
     private bool _isWorking;
+    private bool _isSavingPaymentMethod;
 
     public MainPage()
     {
@@ -62,6 +64,25 @@ public partial class MainPage : ContentPage
                 appId: Secrets.AppId,
                 environment: PayabliEnvironment.Sandbox
             );
+            _paymentMethod = new PayabliPaymentMethodObjC(
+                accessTokenHandler: (completion) =>
+                {
+                    Task.Run(async () =>
+                    {
+                        try
+                        {
+                            var token = await FetchPaymentMethodAccessTokenFromPartnerBackend();
+                            completion(token, null);
+                        }
+                        catch (System.Exception ex)
+                        {
+                            completion(null, DemoNSError(ex.Message));
+                        }
+                    });
+                },
+                entryPoint: Secrets.EntryPoint,
+                environment: PayabliEnvironment.Sandbox
+            );
 
             _eventToken = _ttp.AddEventListener((code, payload) =>
             {
@@ -85,6 +106,14 @@ public partial class MainPage : ContentPage
         // Replace with a real call to your backend that exchanges your
         // server-side clientId + clientSecret for an access_token.
         return await Task.FromResult(Secrets.PlaceholderAccessToken);
+    }
+
+    private async Task<string> FetchPaymentMethodAccessTokenFromPartnerBackend()
+    {
+        // Replace with a real call to your backend that exchanges your
+        // server-side clientId + clientSecret for an access_token scoped for
+        // token storage.
+        return await Task.FromResult(Secrets.PlaceholderPaymentMethodAccessToken);
     }
 
     // MARK: - Lifecycle handlers
@@ -113,15 +142,21 @@ public partial class MainPage : ContentPage
         }
 
         SetWorking(true);
+        var paymentDetails = new PayabliTTPPaymentDetailsObjC(
+            new NSDecimalNumber(amount.ToString(System.Globalization.CultureInfo.InvariantCulture)),
+            NSDecimalNumber.Zero,
+            "USD",
+            "MAUI demo sale"
+        );
         _ttp.Charge(
-            amount: NSDecimalNumber.FromString(amount.ToString(System.Globalization.CultureInfo.InvariantCulture)),
             // PayabliTTPPaymentType is `enum : long`, and the binding signature
             // expects `nint`. C# disallows enum -> nint without going through
             // the underlying integral type first, so cast through `long`.
             type: (nint)(long)PayabliTTPPaymentType.Sale,
-            serviceFee: NSDecimalNumber.Zero,
+            paymentDetails: paymentDetails,
             customer: null,
-            order: null,
+            invoice: null,
+            orderDescription: null,
             completion: (result, error) =>
             {
                 SetWorking(false);
@@ -148,6 +183,56 @@ public partial class MainPage : ContentPage
                 : $"✗ {error.LocalizedDescription}";
             UpdateSessionBadge();
         });
+    }
+
+    private void OnAddCardClicked(object? sender, EventArgs e)
+    {
+        if (_paymentMethod is null || _isSavingPaymentMethod) return;
+        SetSavingPaymentMethod(true);
+        _paymentMethod.AddCard(
+            cardNumber: CardNumberEntry.Text ?? "",
+            expiration: CardExpirationEntry.Text ?? "",
+            cardholderName: CardHolderEntry.Text ?? "",
+            cvv: CardCvvEntry.Text ?? "",
+            billingZip: CardZipEntry.Text ?? "",
+            createAnonymous: false,
+            forceCustomerCreation: true,
+            temporary: false,
+            source: "maui-demo",
+            completion: (method, error) =>
+            {
+                SetSavingPaymentMethod(false);
+                ResultLabel.Text = method is not null
+                    ? $"✓ Added · stored method {method.StoredMethodId ?? "—"} · {method.ResponseText}"
+                    : $"✗ {error?.LocalizedDescription ?? "unknown payment method error"}";
+            }
+        );
+    }
+
+    private void OnAddAchClicked(object? sender, EventArgs e)
+    {
+        if (_paymentMethod is null || _isSavingPaymentMethod) return;
+        SetSavingPaymentMethod(true);
+        _paymentMethod.AddACH(
+            accountNumber: AchAccountEntry.Text ?? "",
+            accountType: "Checking",
+            holderName: AchHolderEntry.Text ?? "",
+            routingNumber: AchRoutingEntry.Text ?? "",
+            secCode: "WEB",
+            holderType: "personal",
+            achValidation: true,
+            createAnonymous: false,
+            forceCustomerCreation: true,
+            temporary: false,
+            source: "maui-demo",
+            completion: (method, error) =>
+            {
+                SetSavingPaymentMethod(false);
+                ResultLabel.Text = method is not null
+                    ? $"✓ Added · stored method {method.StoredMethodId ?? "—"} · {method.ResponseText}"
+                    : $"✗ {error?.LocalizedDescription ?? "unknown payment method error"}";
+            }
+        );
     }
 
     // MARK: - UI helpers
@@ -178,6 +263,25 @@ public partial class MainPage : ContentPage
         ActivateButton.IsEnabled = !working;
     }
 
+    private void SetSavingPaymentMethod(bool savingPaymentMethod)
+    {
+        _isSavingPaymentMethod = savingPaymentMethod;
+        AddCardButton.IsEnabled = !savingPaymentMethod;
+        AddAchButton.IsEnabled = !savingPaymentMethod;
+    }
+
+    private static NSError DemoNSError(string message)
+    {
+        return new NSError(
+            new NSString("com.payabli.demo"),
+            -1,
+            NSDictionary.FromObjectsAndKeys(
+                new object[] { new NSString(message) },
+                new object[] { NSError.LocalizedDescriptionKey }
+            )
+        );
+    }
+
     protected override void OnDisappearing()
     {
         _eventToken?.Cancel();
@@ -194,4 +298,5 @@ internal static class Secrets
     public const string EntryPoint = "<YOUR_ENTRY_POINT>";
     public const string AppId = "<TEAM_ID>.<BUNDLE_ID>";
     public const string PlaceholderAccessToken = "placeholder-token";
+    public const string PlaceholderPaymentMethodAccessToken = "placeholder-payment-method-access-token";
 }
