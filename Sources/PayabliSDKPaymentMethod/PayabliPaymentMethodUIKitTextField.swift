@@ -79,12 +79,6 @@ struct PayabliPaymentMethodUIKitTextField: UIViewRepresentable {
         textField.isSecureTextEntry = isSecure
         textField.font = UIFont.preferredFont(forTextStyle: .body)
         textField.textColor = textColor
-
-        if focusedField == field, !textField.isFirstResponder {
-            textField.becomeFirstResponder()
-        } else if focusedField != field, textField.isFirstResponder {
-            textField.resignFirstResponder()
-        }
     }
 
     final class Coordinator: NSObject, UITextFieldDelegate {
