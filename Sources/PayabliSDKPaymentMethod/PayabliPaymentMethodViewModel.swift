@@ -4,16 +4,72 @@ import SwiftUI
 @MainActor
 public final class PayabliPaymentMethodViewModel: ObservableObject {
     @Published public var selectedMethod: PayabliPaymentMethodType
-    @Published public var cardholderName = ""
-    @Published public var cardNumber = ""
+    @Published public var cardholderName = "" {
+        didSet {
+            let limited = limitCardholderName(cardholderName)
+            if cardholderName != limited {
+                cardholderName = limited
+            }
+        }
+    }
+
+    @Published public var cardNumber = "" {
+        didSet {
+            let formatted = formatCardNumber(cardNumber)
+            if cardNumber != formatted {
+                cardNumber = formatted
+            }
+        }
+    }
+
     @Published public var cardExpiration = ""
     @Published public var cardExpirationMonth: Int?
     @Published public var cardExpirationYear: Int?
-    @Published public var cardCvv = ""
-    @Published public var cardZip = ""
-    @Published public var achHolder = ""
-    @Published public var achRouting = ""
-    @Published public var achAccount = ""
+    @Published public var cardCvv = "" {
+        didSet {
+            let limited = limitCardCvv(cardCvv)
+            if cardCvv != limited {
+                cardCvv = limited
+            }
+        }
+    }
+
+    @Published public var cardZip = "" {
+        didSet {
+            let limited = limitPostalCode(cardZip)
+            if cardZip != limited {
+                cardZip = limited
+            }
+        }
+    }
+
+    @Published public var achHolder = "" {
+        didSet {
+            let limited = limitACHHolderName(achHolder)
+            if achHolder != limited {
+                achHolder = limited
+            }
+        }
+    }
+
+    @Published public var achRouting = "" {
+        didSet {
+            let limited = limitACHRouting(achRouting)
+            if achRouting != limited {
+                achRouting = limited
+            }
+        }
+    }
+
+    @Published public var achAccount = "" {
+        didSet {
+            let limited = limitACHAccount(achAccount)
+            if achAccount != limited {
+                achAccount = limited
+            }
+        }
+    }
+
     @Published public var achAccountType: PayabliACHAccountType = .checking
     @Published public var achHolderType: PayabliACHHolderType = .personal
     @Published public var achSecCode: PayabliACHSecCode = .web
@@ -23,7 +79,15 @@ public final class PayabliPaymentMethodViewModel: ObservableObject {
     @Published public var lastName = ""
     @Published public var customerNumber = ""
     @Published public var billingEmail = ""
-    @Published public var billingZip = ""
+    @Published public var billingZip = "" {
+        didSet {
+            let limited = limitPostalCode(billingZip)
+            if billingZip != limited {
+                billingZip = limited
+            }
+        }
+    }
+
     @Published public private(set) var isSubmitting = false
     @Published public private(set) var errorMessage: String?
 

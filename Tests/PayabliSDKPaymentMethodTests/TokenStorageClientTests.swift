@@ -367,6 +367,27 @@ final class TokenStorageClientTests: XCTestCase {
         XCTAssertEqual(viewModel.limitACHHolderName(String(repeating: "A", count: 61)).count, 60)
         XCTAssertEqual(viewModel.limitACHRouting("1234567890"), "123456789")
         XCTAssertEqual(viewModel.limitACHAccount(String(repeating: "1", count: 20)).count, 17)
+
+        viewModel.cardholderName = String(repeating: "A", count: 61)
+        XCTAssertEqual(viewModel.cardholderName.count, 60)
+
+        viewModel.cardNumber = String(repeating: "4", count: 25)
+        XCTAssertEqual(viewModel.cardNumber.digitsOnly.count, 19)
+
+        viewModel.cardCvv = "12345"
+        XCTAssertEqual(viewModel.cardCvv, "1234")
+
+        viewModel.cardZip = "A1A 1A1-EXTRA"
+        XCTAssertEqual(viewModel.cardZip.count, 12)
+
+        viewModel.achHolder = String(repeating: "A", count: 61)
+        XCTAssertEqual(viewModel.achHolder.count, 60)
+
+        viewModel.achRouting = "1234567890"
+        XCTAssertEqual(viewModel.achRouting, "123456789")
+
+        viewModel.achAccount = String(repeating: "1", count: 20)
+        XCTAssertEqual(viewModel.achAccount.count, 17)
     }
 
     func testDetectsCardBrandFromCardNumberPrefix() {
@@ -810,7 +831,7 @@ final class TokenStorageClientTests: XCTestCase {
         } catch let PayabliPaymentMethodError.saveFailed(failure) {
             XCTAssertEqual(failure.responseCode, 6000)
             XCTAssertEqual(viewModel.errorMessage, "Invalid Card\nPlease check your card details and try again.")
-            XCTAssertEqual(viewModel.cardNumber, "4111111111111111")
+            XCTAssertEqual(viewModel.cardNumber.digitsOnly, "4111111111111111")
             XCTAssertEqual(viewModel.cardExpiration, "02/28")
             XCTAssertEqual(viewModel.cardholderName, "Jane Doe")
             XCTAssertEqual(viewModel.cardZip, "33139")

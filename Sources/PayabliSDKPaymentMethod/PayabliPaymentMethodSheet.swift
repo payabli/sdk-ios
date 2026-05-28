@@ -283,7 +283,7 @@ private struct PayabliPaymentMethodSheetContent: View {
     }
 
     private var contentHeightUpdateTolerance: CGFloat {
-        12
+        56
     }
 
     private func updateMeasuredContentHeight(_ contentHeight: CGFloat) {
@@ -303,7 +303,7 @@ private struct PayabliPaymentMethodSheetContent: View {
     private func updateSelectedDetent() {
         if let contentSizedDetent {
             guard selectedDetent != contentSizedDetent else { return }
-            selectedDetent = contentSizedDetent
+            setSelectedDetent(contentSizedDetent)
             return
         }
 
@@ -315,7 +315,15 @@ private struct PayabliPaymentMethodSheetContent: View {
             return
         }
 
-        selectedDetent = .large
+        setSelectedDetent(.large)
+    }
+
+    private func setSelectedDetent(_ detent: PresentationDetent) {
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            selectedDetent = detent
+        }
     }
 }
 
