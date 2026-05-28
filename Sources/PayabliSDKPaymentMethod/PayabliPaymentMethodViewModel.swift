@@ -4,71 +4,17 @@ import SwiftUI
 @MainActor
 public final class PayabliPaymentMethodViewModel: ObservableObject {
     @Published public var selectedMethod: PayabliPaymentMethodType
-    @Published public var cardholderName = "" {
-        didSet {
-            let limited = limitCardholderName(cardholderName)
-            if cardholderName != limited {
-                cardholderName = limited
-            }
-        }
-    }
-
-    @Published public var cardNumber = "" {
-        didSet {
-            let formatted = formatCardNumber(cardNumber)
-            if cardNumber != formatted {
-                cardNumber = formatted
-            }
-        }
-    }
+    @Published private var cardholderNameStorage = ""
+    @Published private var cardNumberStorage = ""
 
     @Published public var cardExpiration = ""
     @Published public var cardExpirationMonth: Int?
     @Published public var cardExpirationYear: Int?
-    @Published public var cardCvv = "" {
-        didSet {
-            let limited = limitCardCvv(cardCvv)
-            if cardCvv != limited {
-                cardCvv = limited
-            }
-        }
-    }
-
-    @Published public var cardZip = "" {
-        didSet {
-            let limited = limitPostalCode(cardZip)
-            if cardZip != limited {
-                cardZip = limited
-            }
-        }
-    }
-
-    @Published public var achHolder = "" {
-        didSet {
-            let limited = limitACHHolderName(achHolder)
-            if achHolder != limited {
-                achHolder = limited
-            }
-        }
-    }
-
-    @Published public var achRouting = "" {
-        didSet {
-            let limited = limitACHRouting(achRouting)
-            if achRouting != limited {
-                achRouting = limited
-            }
-        }
-    }
-
-    @Published public var achAccount = "" {
-        didSet {
-            let limited = limitACHAccount(achAccount)
-            if achAccount != limited {
-                achAccount = limited
-            }
-        }
-    }
+    @Published private var cardCvvStorage = ""
+    @Published private var cardZipStorage = ""
+    @Published private var achHolderStorage = ""
+    @Published private var achRoutingStorage = ""
+    @Published private var achAccountStorage = ""
 
     @Published public var achAccountType: PayabliACHAccountType = .checking
     @Published public var achHolderType: PayabliACHHolderType = .personal
@@ -79,14 +25,7 @@ public final class PayabliPaymentMethodViewModel: ObservableObject {
     @Published public var lastName = ""
     @Published public var customerNumber = ""
     @Published public var billingEmail = ""
-    @Published public var billingZip = "" {
-        didSet {
-            let limited = limitPostalCode(billingZip)
-            if billingZip != limited {
-                billingZip = limited
-            }
-        }
-    }
+    @Published private var billingZipStorage = ""
 
     @Published public private(set) var isSubmitting = false
     @Published public private(set) var errorMessage: String?
@@ -101,6 +40,78 @@ public final class PayabliPaymentMethodViewModel: ObservableObject {
         self.component = component
         self.configuration = configuration
         self.selectedMethod = configuration.defaultMethod
+    }
+
+    public var cardholderName: String {
+        get { cardholderNameStorage }
+        set {
+            let limited = limitCardholderName(newValue)
+            guard cardholderNameStorage != limited else { return }
+            cardholderNameStorage = limited
+        }
+    }
+
+    public var cardNumber: String {
+        get { cardNumberStorage }
+        set {
+            let formatted = formatCardNumber(newValue)
+            guard cardNumberStorage != formatted else { return }
+            cardNumberStorage = formatted
+        }
+    }
+
+    public var cardCvv: String {
+        get { cardCvvStorage }
+        set {
+            let limited = limitCardCvv(newValue)
+            guard cardCvvStorage != limited else { return }
+            cardCvvStorage = limited
+        }
+    }
+
+    public var cardZip: String {
+        get { cardZipStorage }
+        set {
+            let limited = limitPostalCode(newValue)
+            guard cardZipStorage != limited else { return }
+            cardZipStorage = limited
+        }
+    }
+
+    public var achHolder: String {
+        get { achHolderStorage }
+        set {
+            let limited = limitACHHolderName(newValue)
+            guard achHolderStorage != limited else { return }
+            achHolderStorage = limited
+        }
+    }
+
+    public var achRouting: String {
+        get { achRoutingStorage }
+        set {
+            let limited = limitACHRouting(newValue)
+            guard achRoutingStorage != limited else { return }
+            achRoutingStorage = limited
+        }
+    }
+
+    public var achAccount: String {
+        get { achAccountStorage }
+        set {
+            let limited = limitACHAccount(newValue)
+            guard achAccountStorage != limited else { return }
+            achAccountStorage = limited
+        }
+    }
+
+    public var billingZip: String {
+        get { billingZipStorage }
+        set {
+            let limited = limitPostalCode(newValue)
+            guard billingZipStorage != limited else { return }
+            billingZipStorage = limited
+        }
     }
 
     public var activeFields: [PayabliPaymentMethodField] {

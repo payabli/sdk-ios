@@ -504,13 +504,62 @@ public struct PayabliPaymentMethodView: View {
         }
     }
 
+    private var cardholderNameBinding: Binding<String> {
+        Binding(
+            get: { viewModel.cardholderName },
+            set: { viewModel.cardholderName = $0 }
+        )
+    }
+
+    private var cardCvvBinding: Binding<String> {
+        Binding(
+            get: { viewModel.cardCvv },
+            set: { viewModel.cardCvv = $0 }
+        )
+    }
+
+    private var cardZipBinding: Binding<String> {
+        Binding(
+            get: { viewModel.cardZip },
+            set: { viewModel.cardZip = $0 }
+        )
+    }
+
+    private var achHolderBinding: Binding<String> {
+        Binding(
+            get: { viewModel.achHolder },
+            set: { viewModel.achHolder = $0 }
+        )
+    }
+
+    private var achRoutingBinding: Binding<String> {
+        Binding(
+            get: { viewModel.achRouting },
+            set: { viewModel.achRouting = $0 }
+        )
+    }
+
+    private var achAccountBinding: Binding<String> {
+        Binding(
+            get: { viewModel.achAccount },
+            set: { viewModel.achAccount = $0 }
+        )
+    }
+
+    private var billingZipBinding: Binding<String> {
+        Binding(
+            get: { viewModel.billingZip },
+            set: { viewModel.billingZip = $0 }
+        )
+    }
+
     @ViewBuilder
     private func cardFieldView(_ field: PayabliPaymentMethodField) -> some View {
         switch field {
         case .cardholderName:
             textField(
                 field,
-                text: $viewModel.cardholderName,
+                text: cardholderNameBinding,
                 textContentType: .name,
                 autocapitalization: .words
             )
@@ -521,13 +570,13 @@ public struct PayabliPaymentMethodView: View {
         case .cardCvv:
             secureField(
                 field,
-                text: $viewModel.cardCvv,
+                text: cardCvvBinding,
                 keyboardType: .numberPad
             )
         case .cardZip:
             textField(
                 field,
-                text: $viewModel.cardZip,
+                text: cardZipBinding,
                 keyboardType: .numbersAndPunctuation
             )
         default:
@@ -541,27 +590,27 @@ public struct PayabliPaymentMethodView: View {
         case .achHolder:
             textField(
                 field,
-                text: $viewModel.achHolder,
+                text: achHolderBinding,
                 textContentType: .name,
                 autocapitalization: .words
             )
         case .achRouting:
             textField(
                 field,
-                text: $viewModel.achRouting,
+                text: achRoutingBinding,
                 keyboardType: .numberPad
             )
         case .achAccount:
             if configuration.formatting.masksACHAccountEntry {
                 secureField(
                     field,
-                    text: $viewModel.achAccount,
+                    text: achAccountBinding,
                     keyboardType: .numberPad
                 )
             } else {
                 textField(
                     field,
-                    text: $viewModel.achAccount,
+                    text: achAccountBinding,
                     keyboardType: .numberPad
                 )
             }
@@ -604,7 +653,7 @@ public struct PayabliPaymentMethodView: View {
         case .billingZip:
             textField(
                 field,
-                text: $viewModel.billingZip,
+                text: billingZipBinding,
                 keyboardType: .numbersAndPunctuation
             )
         default:
@@ -651,7 +700,11 @@ public struct PayabliPaymentMethodView: View {
             set: { viewModel.cardNumber = $0 }
         )
 
-        return fieldRow(field, errorMessage: viewModel.cardNumberValidationMessage) {
+        return fieldRow(
+            field,
+            errorMessage: viewModel.cardNumberValidationMessage,
+            reservedErrorMessage: "Invalid Card Number"
+        ) {
             HStack(spacing: 10) {
                 if configuration.cardBrandIconPlacement == .leading {
                     cardBrandIcon
@@ -864,6 +917,7 @@ public struct PayabliPaymentMethodView: View {
     private func fieldRow(
         _ field: PayabliPaymentMethodField,
         errorMessage: String? = nil,
+        reservedErrorMessage: String? = nil,
         @ViewBuilder content: () -> some View
     ) -> some View {
         let inputSize = configuration.inputSizing.size(for: field)
@@ -880,14 +934,22 @@ public struct PayabliPaymentMethodView: View {
             content()
 
             if let errorMessage {
-                Text(errorMessage)
-                    .font(resolvedStyle.error.font)
-                    .foregroundStyle(resolvedStyle.error.color)
-                    .fixedSize(horizontal: false, vertical: true)
+                fieldErrorText(errorMessage)
+            } else if let reservedErrorMessage {
+                fieldErrorText(reservedErrorMessage)
+                    .hidden()
+                    .accessibilityHidden(true)
             }
         }
         .frame(width: inputSize.width)
         .frame(maxWidth: inputSize.width == nil ? .infinity : nil, alignment: .leading)
+    }
+
+    private func fieldErrorText(_ text: String) -> some View {
+        Text(text)
+            .font(resolvedStyle.error.font)
+            .foregroundStyle(resolvedStyle.error.color)
+            .fixedSize(horizontal: false, vertical: true)
     }
 
     private var inputShape: RoundedRectangle {
