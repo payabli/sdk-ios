@@ -22,6 +22,11 @@ build/
 **/bin/
 **/obj/
 
+# Flutter local tool state
+**/.dart_tool/
+**/.flutter-plugins
+**/.flutter-plugins-dependencies
+
 # Secrets
 Example/PayabliDemo/Secrets.swift
 Example/PayabliDemo/Config.xcconfig

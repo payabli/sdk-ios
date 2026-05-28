@@ -1,25 +1,43 @@
-import SwiftUI
 import PayabliSDKCore
 import PayabliSDKTapToPay
+import PayabliSDKTokenization
+import SwiftUI
 
-/// Demo app landing screen exercising the full `PayabliTTP` API:
+/// Demo app landing screen exercising Tap to Pay and tokenization:
 ///   - `initialize()` — cold/warm attestation + reader prepare.
 ///   - `charge(type:paymentDetails:)` — full sale pipeline with NFC tap.
 ///   - `activateDevice(activationCode:)` — pending-device activation.
 ///   - `events()` — live event log surfaced via `addEventListener`.
 ///   - `sessionState` — surfaced in the navigation bar as a colored badge.
+///   - `PayabliTokenizationView` — configurable card PAN / ACH tokenization.
 struct HomeView: View {
     @EnvironmentObject private var ttp: PayabliTTP
+    @EnvironmentObject private var tokenization: PayabliTokenization
 
     @State private var amountText: String = "9.99"
     @State private var activationCode: String = ""
     @State private var lastResult: String = ""
+    @State private var tokenizationResult: String = ""
     @State private var eventLog: [EventLogEntry] = []
     @State private var eventToken: PayabliTTPEventToken?
     @State private var presentingActivation = false
     @State private var isWorking = false
 
     var body: some View {
+        TabView {
+            tapToPayTab
+                .tabItem {
+                    Label("Tap to Pay", systemImage: "wave.3.right")
+                }
+
+            tokenizationTab
+                .tabItem {
+                    Label("Tokenize", systemImage: "creditcard")
+                }
+        }
+    }
+
+    private var tapToPayTab: some View {
         NavigationView {
             List {
                 stateSection
@@ -32,6 +50,40 @@ struct HomeView: View {
             .sheet(isPresented: $presentingActivation) { activationSheet }
             .onAppear(perform: subscribeToEvents)
             .onDisappear { eventToken?.cancel() }
+        }
+    }
+
+    private var tokenizationTab: some View {
+        NavigationView {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    PayabliTokenizationView(
+                        component: tokenization,
+                        configuration: tokenizationConfiguration,
+                        onTokenized: { method in
+                            tokenizationResult = [
+                                "Stored method: \(method.storedMethodId ?? "—")",
+                                "Response: \(method.responseText)",
+                                "Result: \(method.resultText ?? "—")"
+                            ].joined(separator: "\n")
+                        },
+                        onError: { error in
+                            tokenizationResult = "Tokenization failed: \(error.localizedDescription)"
+                        }
+                    )
+                    .payabliTokenizationStyle(tokenizationStyle)
+
+                    Text(tokenizationResult.isEmpty ? "No tokenization result yet" : tokenizationResult)
+                        .font(.footnote)
+                        .foregroundColor(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(12)
+                        .background(Color(.secondarySystemBackground))
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                }
+                .padding(16)
+            }
+            .navigationTitle("Tokenization")
         }
     }
 
@@ -58,6 +110,69 @@ struct HomeView: View {
             Button("Charge") { runCharge() }
                 .disabled(isWorking || !ttp.isReady)
         }
+    }
+
+    private var tokenizationConfiguration: PayabliTokenizationFormConfiguration {
+        PayabliTokenizationFormConfiguration(
+            allowedMethods: [.card, .ach],
+            defaultMethod: .card,
+            cardFieldOrder: [
+                .cardNumber,
+                .cardExpiration,
+                .cardCvv,
+                .cardZip,
+                .cardholderName
+            ],
+            achFieldOrder: [
+                .achHolder,
+                .achRouting,
+                .achAccount,
+                .achAccountType
+            ],
+            hiddenValues: PayabliTokenizationHiddenValues(
+                achHolderType: .personal,
+                achSecCode: .web,
+                methodDescription: "Demo stored method"
+            ),
+            options: PayabliTokenizationOptions(
+                achValidation: true,
+                createAnonymous: false,
+                forceCustomerCreation: true,
+                temporary: false,
+                source: "ios-demo"
+            ),
+            labels: PayabliTokenizationLabels(
+                title: "Save Payment Method",
+                subtitle: "Create a card or ACH token from sandbox data.",
+                submitButton: "Tokenize"
+            ),
+            labelLayout: .external,
+            formatting: PayabliTokenizationFormatting(
+                insertsCardNumberSpaces: true,
+                masksACHAccountEntry: true
+            ),
+            inputSizing: PayabliTokenizationInputSizing(
+                defaultSize: PayabliTokenizationInputSize(height: 52),
+                fieldSizes: [
+                    .cardExpiration: PayabliTokenizationInputSize(height: 48),
+                    .cardCvv: PayabliTokenizationInputSize(height: 48)
+                ]
+            ),
+            cardBrandIconPlacement: .trailing
+        )
+    }
+
+    private var tokenizationStyle: PayabliTokenizationStyle {
+        PayabliTokenizationStyle(
+            accentColor: .green,
+            input: PayabliTokenizationInputStyle(
+                backgroundColor: Color(.systemBackground),
+                borderColor: Color(.separator).opacity(0.6),
+                cornerRadius: 8
+            ),
+            submitButton: PayabliTokenizationSubmitButtonStyle(cornerRadius: 8),
+            layout: PayabliTokenizationLayoutStyle(contentSpacing: 18, fieldGroupSpacing: 12)
+        )
     }
 
     private var resultSection: some View {
@@ -199,11 +314,10 @@ struct HomeView: View {
         // across view appearances since SwiftUI gives us no handle to cancel
         // it from onDisappear.
         eventToken = ttp.addEventListener { code, payload in
-            let detail: String
-            if payload.isEmpty {
-                detail = ""
+            let detail: String = if payload.count == 0 {
+                ""
             } else {
-                detail = payload
+                payload
                     .map { "\($0.key): \($0.value)" }
                     .sorted()
                     .joined(separator: ", ")

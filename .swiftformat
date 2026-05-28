@@ -11,4 +11,4 @@
 --semicolons never
 --header ignore
 --disable redundantSelf,redundantReturn
---exclude .build,.swiftpm,Example/PayabliDemo/build
+--exclude .build,.swiftpm,Example/PayabliDemo/build,ThirdParty

@@ -5,7 +5,7 @@ import Foundation
 /// Enables uniform lifecycle management across PayIn, Payout, Reporting, and
 /// Onboarding components. See PRD §28.3.
 ///
-/// `configure(config:theme:)` is `@MainActor` because components own SwiftUI /
+/// `configure(config:)` is `@MainActor` because components own SwiftUI /
 /// `ObservableObject` state. The static requirements are `nonisolated` since
 /// they are compile-time constants.
 @MainActor
@@ -20,5 +20,5 @@ public protocol PayabliComponent: AnyObject {
     nonisolated static var requiredPermissions: [String] { get }
 
     /// Initialize the component with shared configuration.
-    func configure(config: PayabliConfig, theme: PayabliTheme)
+    func configure(config: PayabliConfig)
 }

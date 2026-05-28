@@ -1803,7 +1803,6 @@ Goal: downgrade `@testable import` to plain `import` everywhere it is not load-b
 
 - [ ] Repeat Task 7.1 for `Tests/PayabliSDKCoreTests/`. Files almost certainly OK to downgrade:
   - `Tests/PayabliSDKCoreTests/PayabliEnvironmentTests.swift`
-  - `Tests/PayabliSDKCoreTests/PayabliThemeTests.swift`
   - `Tests/PayabliSDKCoreTests/PayabliSDKCoreTests.swift` (sanity tests)
 
   Likely needs `@testable`:

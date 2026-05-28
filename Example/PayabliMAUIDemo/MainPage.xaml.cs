@@ -13,8 +13,10 @@ namespace PayabliMauiDemo;
 public partial class MainPage : ContentPage
 {
     private PayabliTTP? _ttp;
+    private PayabliTokenizationObjC? _tokenization;
     private PayabliTTPEventToken? _eventToken;
     private bool _isWorking;
+    private bool _isTokenizing;
 
     public MainPage()
     {
@@ -62,6 +64,25 @@ public partial class MainPage : ContentPage
                 appId: Secrets.AppId,
                 environment: PayabliEnvironment.Sandbox
             );
+            _tokenization = new PayabliTokenizationObjC(
+                accessTokenHandler: (completion) =>
+                {
+                    Task.Run(async () =>
+                    {
+                        try
+                        {
+                            var token = await FetchTokenizationAccessTokenFromPartnerBackend();
+                            completion(token, null);
+                        }
+                        catch (System.Exception ex)
+                        {
+                            completion(null, DemoNSError(ex.Message));
+                        }
+                    });
+                },
+                entryPoint: Secrets.EntryPoint,
+                environment: PayabliEnvironment.Sandbox
+            );
 
             _eventToken = _ttp.AddEventListener((code, payload) =>
             {
@@ -85,6 +106,14 @@ public partial class MainPage : ContentPage
         // Replace with a real call to your backend that exchanges your
         // server-side clientId + clientSecret for an access_token.
         return await Task.FromResult(Secrets.PlaceholderAccessToken);
+    }
+
+    private async Task<string> FetchTokenizationAccessTokenFromPartnerBackend()
+    {
+        // Replace with a real call to your backend that exchanges your
+        // server-side clientId + clientSecret for an access_token scoped for
+        // token storage.
+        return await Task.FromResult(Secrets.PlaceholderTokenizationAccessToken);
     }
 
     // MARK: - Lifecycle handlers
@@ -113,15 +142,21 @@ public partial class MainPage : ContentPage
         }
 
         SetWorking(true);
+        var paymentDetails = new PayabliTTPPaymentDetailsObjC(
+            new NSDecimalNumber(amount.ToString(System.Globalization.CultureInfo.InvariantCulture)),
+            NSDecimalNumber.Zero,
+            "USD",
+            "MAUI demo sale"
+        );
         _ttp.Charge(
-            amount: NSDecimalNumber.FromString(amount.ToString(System.Globalization.CultureInfo.InvariantCulture)),
             // PayabliTTPPaymentType is `enum : long`, and the binding signature
             // expects `nint`. C# disallows enum -> nint without going through
             // the underlying integral type first, so cast through `long`.
             type: (nint)(long)PayabliTTPPaymentType.Sale,
-            serviceFee: NSDecimalNumber.Zero,
+            paymentDetails: paymentDetails,
             customer: null,
-            order: null,
+            invoice: null,
+            orderDescription: null,
             completion: (result, error) =>
             {
                 SetWorking(false);
@@ -148,6 +183,56 @@ public partial class MainPage : ContentPage
                 : $"✗ {error.LocalizedDescription}";
             UpdateSessionBadge();
         });
+    }
+
+    private void OnTokenizeCardClicked(object? sender, EventArgs e)
+    {
+        if (_tokenization is null || _isTokenizing) return;
+        SetTokenizing(true);
+        _tokenization.TokenizeCard(
+            cardNumber: CardNumberEntry.Text ?? "",
+            expiration: CardExpirationEntry.Text ?? "",
+            cardholderName: CardHolderEntry.Text ?? "",
+            cvv: CardCvvEntry.Text,
+            billingZip: CardZipEntry.Text,
+            createAnonymous: false,
+            forceCustomerCreation: true,
+            temporary: false,
+            source: "maui-demo",
+            completion: (method, error) =>
+            {
+                SetTokenizing(false);
+                ResultLabel.Text = method is not null
+                    ? $"✓ Tokenized · stored method {method.StoredMethodId ?? "—"} · {method.ResponseText}"
+                    : $"✗ {error?.LocalizedDescription ?? "unknown tokenization error"}";
+            }
+        );
+    }
+
+    private void OnTokenizeAchClicked(object? sender, EventArgs e)
+    {
+        if (_tokenization is null || _isTokenizing) return;
+        SetTokenizing(true);
+        _tokenization.TokenizeACH(
+            accountNumber: AchAccountEntry.Text ?? "",
+            accountType: "Checking",
+            holderName: AchHolderEntry.Text ?? "",
+            routingNumber: AchRoutingEntry.Text ?? "",
+            secCode: "WEB",
+            holderType: "personal",
+            achValidation: true,
+            createAnonymous: false,
+            forceCustomerCreation: true,
+            temporary: false,
+            source: "maui-demo",
+            completion: (method, error) =>
+            {
+                SetTokenizing(false);
+                ResultLabel.Text = method is not null
+                    ? $"✓ Tokenized · stored method {method.StoredMethodId ?? "—"} · {method.ResponseText}"
+                    : $"✗ {error?.LocalizedDescription ?? "unknown tokenization error"}";
+            }
+        );
     }
 
     // MARK: - UI helpers
@@ -178,6 +263,25 @@ public partial class MainPage : ContentPage
         ActivateButton.IsEnabled = !working;
     }
 
+    private void SetTokenizing(bool tokenizing)
+    {
+        _isTokenizing = tokenizing;
+        TokenizeCardButton.IsEnabled = !tokenizing;
+        TokenizeAchButton.IsEnabled = !tokenizing;
+    }
+
+    private static NSError DemoNSError(string message)
+    {
+        return new NSError(
+            new NSString("com.payabli.demo"),
+            -1,
+            NSDictionary.FromObjectsAndKeys(
+                new object[] { new NSString(message) },
+                new object[] { NSError.LocalizedDescriptionKey }
+            )
+        );
+    }
+
     protected override void OnDisappearing()
     {
         _eventToken?.Cancel();
@@ -194,4 +298,5 @@ internal static class Secrets
     public const string EntryPoint = "<YOUR_ENTRY_POINT>";
     public const string AppId = "<TEAM_ID>.<BUNDLE_ID>";
     public const string PlaceholderAccessToken = "placeholder-token";
+    public const string PlaceholderTokenizationAccessToken = "placeholder-tokenization-access-token";
 }

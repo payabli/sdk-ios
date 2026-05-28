@@ -11,10 +11,10 @@ class PayabliFlutterDemoApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => MaterialApp(
-        title: 'Payabli TTP Demo',
-        theme: ThemeData(useMaterial3: true, colorSchemeSeed: Colors.green),
-        home: const HomeScreen(),
-      );
+    title: 'Payabli TTP Demo',
+    theme: ThemeData(useMaterial3: true, colorSchemeSeed: Colors.green),
+    home: const HomeScreen(),
+  );
 }
 
 class HomeScreen extends StatefulWidget {
@@ -25,15 +25,43 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  final TextEditingController _amountController = TextEditingController(text: '9.99');
+  final TextEditingController _amountController = TextEditingController(
+    text: '9.99',
+  );
   final TextEditingController _activationController = TextEditingController();
+  final TextEditingController _cardNumberController = TextEditingController(
+    text: '4111 1111 1111 1111',
+  );
+  final TextEditingController _cardExpController = TextEditingController(
+    text: '02/25',
+  );
+  final TextEditingController _cardHolderController = TextEditingController(
+    text: 'Jane Doe',
+  );
+  final TextEditingController _cardCvvController = TextEditingController(
+    text: '123',
+  );
+  final TextEditingController _cardZipController = TextEditingController(
+    text: '33139',
+  );
+  final TextEditingController _achAccountController = TextEditingController(
+    text: '1111111111111',
+  );
+  final TextEditingController _achRoutingController = TextEditingController(
+    text: '123456780',
+  );
+  final TextEditingController _achHolderController = TextEditingController(
+    text: 'Jane Doe',
+  );
 
   PayabliTTPSessionState _state = PayabliTTPSessionState.idle;
   String _lastResult = '';
+  String _tokenizationResult = '';
   final List<PayabliTTPEvent> _eventLog = [];
   StreamSubscription<PayabliTTPEvent>? _eventSub;
   bool _configured = false;
   bool _isWorking = false;
+  bool _isTokenizing = false;
 
   @override
   void initState() {
@@ -46,6 +74,14 @@ class _HomeScreenState extends State<HomeScreen> {
     _eventSub?.cancel();
     _amountController.dispose();
     _activationController.dispose();
+    _cardNumberController.dispose();
+    _cardExpController.dispose();
+    _cardHolderController.dispose();
+    _cardCvvController.dispose();
+    _cardZipController.dispose();
+    _achAccountController.dispose();
+    _achRoutingController.dispose();
+    _achHolderController.dispose();
     super.dispose();
   }
 
@@ -62,10 +98,62 @@ class _HomeScreenState extends State<HomeScreen> {
         appId: Secrets.appId,
         environment: PayabliEnvironment.sandbox,
       );
+      await PayabliTokenization.configure(
+        accessTokenProvider: Secrets.fetchTokenizationAccessToken,
+        entryPoint: Secrets.entryPoint,
+        environment: PayabliEnvironment.sandbox,
+      );
       _eventSub = PayabliTTP.events().listen(_onEvent);
       setState(() => _configured = true);
     } catch (e) {
       setState(() => _lastResult = 'Configure failed: $e');
+    }
+  }
+
+  Future<void> _runTokenizeCard() async {
+    setState(() => _isTokenizing = true);
+    try {
+      final method = await PayabliTokenization.tokenizeCard(
+        cardNumber: _cardNumberController.text,
+        expiration: _cardExpController.text,
+        cardholderName: _cardHolderController.text,
+        cvv: _cardCvvController.text,
+        billingZip: _cardZipController.text,
+      );
+      setState(() {
+        _tokenizationResult =
+            "Stored method: ${method.storedMethodId ?? '—'}\n"
+            'Response: ${method.responseText}\n'
+            "Result: ${method.resultText ?? '—'}";
+      });
+    } on PayabliTTPException catch (e) {
+      setState(() => _tokenizationResult = '✗ ${e.code}: ${e.message}');
+    } finally {
+      setState(() => _isTokenizing = false);
+    }
+  }
+
+  Future<void> _runTokenizeACH() async {
+    setState(() => _isTokenizing = true);
+    try {
+      final method = await PayabliTokenization.tokenizeACH(
+        accountNumber: _achAccountController.text,
+        accountType: 'Checking',
+        holderName: _achHolderController.text,
+        routingNumber: _achRoutingController.text,
+        secCode: 'WEB',
+        holderType: 'personal',
+      );
+      setState(() {
+        _tokenizationResult =
+            "Stored method: ${method.storedMethodId ?? '—'}\n"
+            'Response: ${method.responseText}\n'
+            "Result: ${method.resultText ?? '—'}";
+      });
+    } on PayabliTTPException catch (e) {
+      setState(() => _tokenizationResult = '✗ ${e.code}: ${e.message}');
+    } finally {
+      setState(() => _isTokenizing = false);
     }
   }
 
@@ -132,14 +220,19 @@ class _HomeScreenState extends State<HomeScreen> {
       isScrollControlled: true,
       builder: (ctx) => Padding(
         padding: EdgeInsets.only(
-          left: 16, right: 16, top: 24,
+          left: 16,
+          right: 16,
+          top: 24,
           bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text('Activate device', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const Text(
+              'Activate device',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
             const SizedBox(height: 12),
             TextField(
               controller: _activationController,
@@ -151,7 +244,10 @@ class _HomeScreenState extends State<HomeScreen> {
               autofocus: true,
             ),
             const SizedBox(height: 12),
-            FilledButton(onPressed: _runActivate, child: const Text('Activate')),
+            FilledButton(
+              onPressed: _runActivate,
+              child: const Text('Activate'),
+            ),
           ],
         ),
       ),
@@ -162,107 +258,240 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Payabli TTP Demo'),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 12),
-            child: Center(child: _stateBadge(_state)),
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Payabli Demo'),
+          bottom: const TabBar(
+            tabs: [
+              Tab(text: 'Tap to Pay'),
+              Tab(text: 'Tokenize'),
+            ],
           ),
-        ],
-      ),
-      body: !_configured
-          ? const Center(child: CircularProgressIndicator())
-          : ListView(
-              padding: const EdgeInsets.all(16),
-              children: [
-                _section('Lifecycle', [
-                  FilledButton(
-                    onPressed: _isWorking || _state == PayabliTTPSessionState.ready ? null : _runInitialize,
-                    child: const Text('Initialize'),
-                  ),
-                  OutlinedButton(
-                    onPressed: _isWorking ? null : _showActivationSheet,
-                    child: const Text('Activate device…'),
-                  ),
-                ]),
-                const SizedBox(height: 16),
-                _section('Sale', [
-                  TextField(
-                    controller: _amountController,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    decoration: const InputDecoration(
-                      labelText: 'Amount',
-                      prefixText: r'$ ',
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  FilledButton(
-                    onPressed: _isWorking || _state != PayabliTTPSessionState.ready ? null : _runCharge,
-                    child: const Text('Charge'),
-                  ),
-                ]),
-                const SizedBox(height: 16),
-                _section('Last result', [
-                  Text(_lastResult.isEmpty ? '—' : _lastResult),
-                ]),
-                const SizedBox(height: 16),
-                _section('Event log', [
-                  if (_eventLog.isEmpty)
-                    const Text('No events yet', style: TextStyle(color: Colors.grey))
-                  else
-                    ..._eventLog.map((e) => Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 4),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(e.code.name, style: const TextStyle(fontWeight: FontWeight.w600)),
-                              if (e.payload.isNotEmpty)
-                                Text(e.payload.toString(), style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                            ],
-                          ),
-                        )),
-                ]),
-              ],
+          actions: [
+            Padding(
+              padding: const EdgeInsets.only(right: 12),
+              child: Center(child: _stateBadge(_state)),
             ),
+          ],
+        ),
+        body: !_configured
+            ? const Center(child: CircularProgressIndicator())
+            : TabBarView(
+                children: [_tapToPayContent(), _tokenizationContent()],
+              ),
+      ),
     );
   }
 
-  Widget _section(String title, List<Widget> children) => Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(title, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
-          const SizedBox(height: 8),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(12),
+  Widget _tapToPayContent() => ListView(
+    padding: const EdgeInsets.all(16),
+    children: [
+      _section('Lifecycle', [
+        FilledButton(
+          onPressed: _isWorking || _state == PayabliTTPSessionState.ready
+              ? null
+              : _runInitialize,
+          child: const Text('Initialize'),
+        ),
+        OutlinedButton(
+          onPressed: _isWorking ? null : _showActivationSheet,
+          child: const Text('Activate device…'),
+        ),
+      ]),
+      const SizedBox(height: 16),
+      _section('Sale', [
+        TextField(
+          controller: _amountController,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          decoration: const InputDecoration(
+            labelText: 'Amount',
+            prefixText: r'$ ',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        const SizedBox(height: 8),
+        FilledButton(
+          onPressed: _isWorking || _state != PayabliTTPSessionState.ready
+              ? null
+              : _runCharge,
+          child: const Text('Charge'),
+        ),
+      ]),
+      const SizedBox(height: 16),
+      _section('Last result', [Text(_lastResult.isEmpty ? '—' : _lastResult)]),
+      const SizedBox(height: 16),
+      _section('Event log', [
+        if (_eventLog.isEmpty)
+          const Text('No events yet', style: TextStyle(color: Colors.grey))
+        else
+          ..._eventLog.map(
+            (e) => Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: children,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    e.code.name,
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  if (e.payload.isNotEmpty)
+                    Text(
+                      e.payload.toString(),
+                      style: const TextStyle(fontSize: 12, color: Colors.grey),
+                    ),
+                ],
               ),
             ),
           ),
-        ],
-      );
+      ]),
+    ],
+  );
+
+  Widget _tokenizationContent() => ListView(
+    padding: const EdgeInsets.all(16),
+    children: [
+      _section('Card tokenization', [
+        TextField(
+          controller: _cardNumberController,
+          keyboardType: TextInputType.number,
+          decoration: const InputDecoration(
+            labelText: 'Card number',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        const SizedBox(height: 8),
+        TextField(
+          controller: _cardExpController,
+          keyboardType: TextInputType.number,
+          decoration: const InputDecoration(
+            labelText: 'Expiration',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        const SizedBox(height: 8),
+        TextField(
+          controller: _cardHolderController,
+          decoration: const InputDecoration(
+            labelText: 'Name on card',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        const SizedBox(height: 8),
+        TextField(
+          controller: _cardCvvController,
+          keyboardType: TextInputType.number,
+          decoration: const InputDecoration(
+            labelText: 'CVV',
+            border: OutlineInputBorder(),
+          ),
+          obscureText: true,
+        ),
+        const SizedBox(height: 8),
+        TextField(
+          controller: _cardZipController,
+          keyboardType: TextInputType.number,
+          decoration: const InputDecoration(
+            labelText: 'ZIP code',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        const SizedBox(height: 8),
+        FilledButton(
+          onPressed: _isTokenizing ? null : _runTokenizeCard,
+          child: Text(_isTokenizing ? 'Tokenizing…' : 'Tokenize card'),
+        ),
+      ]),
+      const SizedBox(height: 16),
+      _section('ACH tokenization', [
+        TextField(
+          controller: _achAccountController,
+          keyboardType: TextInputType.number,
+          decoration: const InputDecoration(
+            labelText: 'Account number',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        const SizedBox(height: 8),
+        TextField(
+          controller: _achRoutingController,
+          keyboardType: TextInputType.number,
+          decoration: const InputDecoration(
+            labelText: 'Routing number',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        const SizedBox(height: 8),
+        TextField(
+          controller: _achHolderController,
+          decoration: const InputDecoration(
+            labelText: 'Account holder',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        const SizedBox(height: 8),
+        FilledButton(
+          onPressed: _isTokenizing ? null : _runTokenizeACH,
+          child: Text(_isTokenizing ? 'Tokenizing…' : 'Tokenize ACH'),
+        ),
+      ]),
+      const SizedBox(height: 16),
+      _section('Tokenization result', [
+        Text(
+          _tokenizationResult.isEmpty
+              ? 'No tokenization result yet'
+              : _tokenizationResult,
+        ),
+      ]),
+    ],
+  );
+
+  Widget _section(String title, List<Widget> children) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(
+        title,
+        style: const TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.bold,
+          color: Colors.grey,
+        ),
+      ),
+      const SizedBox(height: 8),
+      Card(
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: children,
+          ),
+        ),
+      ),
+    ],
+  );
 
   Widget _stateBadge(PayabliTTPSessionState s) {
     final color = switch (s) {
       PayabliTTPSessionState.ready => Colors.green,
-      PayabliTTPSessionState.error || PayabliTTPSessionState.sessionExpired => Colors.red,
+      PayabliTTPSessionState.error ||
+      PayabliTTPSessionState.sessionExpired => Colors.red,
       PayabliTTPSessionState.pendingActivation => Colors.orange,
       _ => Colors.grey,
     };
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.2),
+        color: color.withValues(alpha: 0.2),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Text(
         s.name,
-        style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 11),
+        style: TextStyle(
+          color: color,
+          fontWeight: FontWeight.bold,
+          fontSize: 11,
+        ),
       ),
     );
   }
@@ -274,12 +503,16 @@ class Secrets {
   static const String entryPoint = '<YOUR_ENTRY_POINT>';
   static const String appId = '<TEAM_ID>.<BUNDLE_ID>';
 
-  static const String _tokenEndpoint = 'https://your-backend.example.com/payabli/token';
+  static const String _tokenEndpoint =
+      'https://your-backend.example.com/payabli/token';
 
   /// Replace with a real call to your backend. The mocked implementation
   /// below returns a placeholder so the app boots without network access
   /// — initialize() will fail with a clear error if the token is invalid.
   static Future<String> fetchAccessToken() async => 'placeholder-token';
+
+  static Future<String> fetchTokenizationAccessToken() async =>
+      'placeholder-tokenization-access-token';
 
   static String get tokenEndpoint => _tokenEndpoint;
 }
