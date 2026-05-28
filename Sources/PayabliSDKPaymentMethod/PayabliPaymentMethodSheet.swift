@@ -139,6 +139,10 @@ private struct PayabliPaymentMethodSheetContent: View {
                         },
                         onError: onError
                     )
+                    .transaction { transaction in
+                        transaction.animation = nil
+                        transaction.disablesAnimations = true
+                    }
                 }
                 .padding(sheetConfiguration.contentInsets)
                 .frame(maxWidth: .infinity, alignment: .leading)

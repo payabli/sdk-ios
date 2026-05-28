@@ -343,6 +343,9 @@ public struct PayabliPaymentMethodView: View {
 
             submitButton
         }
+        .transaction { transaction in
+            transaction.animation = nil
+        }
         .frame(
             maxWidth: .infinity,
             alignment: .leading
@@ -507,10 +510,7 @@ public struct PayabliPaymentMethodView: View {
         case .cardholderName:
             textField(
                 field,
-                text: Binding(
-                    get: { viewModel.cardholderName },
-                    set: { viewModel.cardholderName = viewModel.limitCardholderName($0) }
-                ),
+                text: $viewModel.cardholderName,
                 textContentType: .name,
                 autocapitalization: .words
             )
@@ -521,19 +521,13 @@ public struct PayabliPaymentMethodView: View {
         case .cardCvv:
             secureField(
                 field,
-                text: Binding(
-                    get: { viewModel.cardCvv },
-                    set: { viewModel.cardCvv = viewModel.limitCardCvv($0) }
-                ),
+                text: $viewModel.cardCvv,
                 keyboardType: .numberPad
             )
         case .cardZip:
             textField(
                 field,
-                text: Binding(
-                    get: { viewModel.cardZip },
-                    set: { viewModel.cardZip = viewModel.limitPostalCode($0) }
-                ),
+                text: $viewModel.cardZip,
                 keyboardType: .numbersAndPunctuation
             )
         default:
@@ -547,39 +541,27 @@ public struct PayabliPaymentMethodView: View {
         case .achHolder:
             textField(
                 field,
-                text: Binding(
-                    get: { viewModel.achHolder },
-                    set: { viewModel.achHolder = viewModel.limitACHHolderName($0) }
-                ),
+                text: $viewModel.achHolder,
                 textContentType: .name,
                 autocapitalization: .words
             )
         case .achRouting:
             textField(
                 field,
-                text: Binding(
-                    get: { viewModel.achRouting },
-                    set: { viewModel.achRouting = viewModel.limitACHRouting($0) }
-                ),
+                text: $viewModel.achRouting,
                 keyboardType: .numberPad
             )
         case .achAccount:
             if configuration.formatting.masksACHAccountEntry {
                 secureField(
                     field,
-                    text: Binding(
-                        get: { viewModel.achAccount },
-                        set: { viewModel.achAccount = viewModel.limitACHAccount($0) }
-                    ),
+                    text: $viewModel.achAccount,
                     keyboardType: .numberPad
                 )
             } else {
                 textField(
                     field,
-                    text: Binding(
-                        get: { viewModel.achAccount },
-                        set: { viewModel.achAccount = viewModel.limitACHAccount($0) }
-                    ),
+                    text: $viewModel.achAccount,
                     keyboardType: .numberPad
                 )
             }
@@ -622,10 +604,7 @@ public struct PayabliPaymentMethodView: View {
         case .billingZip:
             textField(
                 field,
-                text: Binding(
-                    get: { viewModel.billingZip },
-                    set: { viewModel.billingZip = viewModel.limitPostalCode($0) }
-                ),
+                text: $viewModel.billingZip,
                 keyboardType: .numbersAndPunctuation
             )
         default:
@@ -669,7 +648,7 @@ public struct PayabliPaymentMethodView: View {
         let inputSize = configuration.inputSizing.size(for: field)
         let text = Binding(
             get: { viewModel.cardNumber },
-            set: { viewModel.cardNumber = viewModel.formatCardNumber($0) }
+            set: { viewModel.cardNumber = $0 }
         )
 
         return fieldRow(field, errorMessage: viewModel.cardNumberValidationMessage) {
