@@ -94,7 +94,7 @@ private struct PayabliPaymentMethodSheetContent: View {
     @Binding var isPresented: Bool
     @State private var selectedDetent: PresentationDetent
     @State private var measuredContentHeight: CGFloat = 0
-    @State private var availableSheetHeight: CGFloat = 0
+    @State private var largestAvailableSheetHeight: CGFloat = 0
 
     let component: PayabliPaymentMethod
     let configuration: PayabliPaymentMethodFormConfiguration
@@ -157,10 +157,10 @@ private struct PayabliPaymentMethodSheetContent: View {
                 )
             }
             .onAppear {
-                updateAvailableSheetHeight(from: proxy)
+                recordAvailableSheetHeight(from: proxy)
             }
             .onChange(of: proxy.size.height) { _ in
-                updateAvailableSheetHeight(from: proxy)
+                recordAvailableSheetHeight(from: proxy)
             }
             .onPreferenceChange(PayabliPaymentMethodSheetContentHeightKey.self) { contentHeight in
                 updateMeasuredContentHeight(contentHeight)
@@ -284,7 +284,7 @@ private struct PayabliPaymentMethodSheetContent: View {
     }
 
     private var maximumContentDetentHeight: CGFloat {
-        max(0, availableSheetHeight - 24)
+        max(0, largestAvailableSheetHeight - 24)
     }
 
     private var contentHeightUpdateTolerance: CGFloat {
@@ -305,15 +305,23 @@ private struct PayabliPaymentMethodSheetContent: View {
         updateSelectedDetent()
     }
 
-    private func updateAvailableSheetHeight(from proxy: GeometryProxy) {
+    private func recordAvailableSheetHeight(from proxy: GeometryProxy) {
         let verticalSafeArea = proxy.safeAreaInsets.top + proxy.safeAreaInsets.bottom
         let availableHeight = max(0, proxy.size.height - verticalSafeArea)
-        guard abs(availableHeight - availableSheetHeight) >= 1 else {
+        guard availableHeight > 0 else { return }
+
+        let shouldRecordHeight = selectedDetent == .large || availableHeight > largestAvailableSheetHeight
+        guard shouldRecordHeight else {
             updateSelectedDetent()
             return
         }
 
-        availableSheetHeight = availableHeight
+        guard abs(availableHeight - largestAvailableSheetHeight) >= 1 else {
+            updateSelectedDetent()
+            return
+        }
+
+        largestAvailableSheetHeight = availableHeight
         updateSelectedDetent()
     }
 
