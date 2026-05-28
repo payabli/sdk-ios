@@ -158,8 +158,7 @@ private struct PayabliTokenizationSheetContent: View {
                 updateSelectedDetent()
             }
             .onPreferenceChange(PayabliTokenizationSheetContentHeightKey.self) { contentHeight in
-                measuredContentHeight = contentHeight
-                updateSelectedDetent()
+                updateMeasuredContentHeight(contentHeight)
             }
         }
         .background(Color(uiColor: .systemBackground))
@@ -283,8 +282,27 @@ private struct PayabliTokenizationSheetContent: View {
         max(320, UIScreen.main.bounds.height - 96)
     }
 
+    private var contentHeightUpdateTolerance: CGFloat {
+        12
+    }
+
+    private func updateMeasuredContentHeight(_ contentHeight: CGFloat) {
+        let roundedHeight = ceil(contentHeight)
+        guard roundedHeight > 0 else { return }
+
+        if measuredContentHeight > 0,
+           abs(roundedHeight - measuredContentHeight) < contentHeightUpdateTolerance
+        {
+            return
+        }
+
+        measuredContentHeight = roundedHeight
+        updateSelectedDetent()
+    }
+
     private func updateSelectedDetent() {
         if let contentSizedDetent {
+            guard selectedDetent != contentSizedDetent else { return }
             selectedDetent = contentSizedDetent
             return
         }

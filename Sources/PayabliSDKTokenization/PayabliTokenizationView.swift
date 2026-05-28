@@ -313,7 +313,6 @@ public struct PayabliTokenizationView: View {
             alignment: .leading
         )
         .privacySensitive()
-        .animation(.easeInOut(duration: 0.18), value: viewModel.selectedMethod)
         .sheet(isPresented: $isExpirationPickerPresented) {
             expirationWheelSheet
         }
