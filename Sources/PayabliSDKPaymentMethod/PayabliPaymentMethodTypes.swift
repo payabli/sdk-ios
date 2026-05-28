@@ -235,14 +235,14 @@ public struct PayabliCardPaymentMethodData: Sendable {
     public var cardNumber: String
     public var expiration: String
     public var cardholderName: String
-    public var cvv: String?
+    public var cvv: String
     public var billingZip: String
 
     public init(
         cardNumber: String,
         expiration: String,
         cardholderName: String,
-        cvv: String? = nil,
+        cvv: String,
         billingZip: String
     ) {
         self.cardNumber = cardNumber
@@ -577,7 +577,7 @@ extension PayabliPaymentMethodInput: Encodable {
             try c.encode(data.normalizedExpiration(), forKey: .cardexp)
             try c.encode(data.cardholderName.trimmed, forKey: .cardHolder)
             try c.encode(data.cardNumber.digitsOnly, forKey: .cardnumber)
-            try c.encodeIfPresent(data.cvv.map(\.digitsOnly)?.nilIfEmpty, forKey: .cardcvv)
+            try c.encode(data.cvv.digitsOnly, forKey: .cardcvv)
             try c.encode(data.billingZip.trimmed, forKey: .cardzip)
 
         case let .ach(data):
@@ -630,7 +630,7 @@ extension PayabliCardPaymentMethodData {
         guard trimmedBillingZip.count <= PayabliPaymentMethodInputLimits.maximumPostalCodeCharacters else {
             throw PayabliPaymentMethodError.invalidInput("Card ZIP code must be 12 characters or fewer.")
         }
-        let cvvDigits = cvv?.digitsOnly ?? ""
+        let cvvDigits = cvv.digitsOnly
         guard !cvvDigits.isEmpty else {
             throw PayabliPaymentMethodError.invalidInput("CVV is required.")
         }
@@ -643,14 +643,14 @@ extension PayabliCardPaymentMethodData {
 
     func normalizedExpiration() throws -> String {
         let digits = expiration.digitsOnly
-        guard digits.count == 4 || digits.count == 6 else {
+        guard digits.count == 4 else {
             throw PayabliPaymentMethodError.invalidInput("Expiration must be in MMYY or MM/YY format.")
         }
         let monthPrefix = String(digits.prefix(2))
         guard let month = Int(monthPrefix), (1 ... 12).contains(month) else {
             throw PayabliPaymentMethodError.invalidInput("Expiration month must be between 01 and 12.")
         }
-        let year = digits.count == 4 ? String(digits.suffix(2)) : String(digits.suffix(2))
+        let year = String(digits.suffix(2))
         return "\(monthPrefix)/\(year)"
     }
 

@@ -193,7 +193,7 @@ public partial class MainPage : ContentPage
             cardNumber: CardNumberEntry.Text ?? "",
             expiration: CardExpirationEntry.Text ?? "",
             cardholderName: CardHolderEntry.Text ?? "",
-            cvv: CardCvvEntry.Text,
+            cvv: CardCvvEntry.Text ?? "",
             billingZip: CardZipEntry.Text,
             createAnonymous: false,
             forceCustomerCreation: true,

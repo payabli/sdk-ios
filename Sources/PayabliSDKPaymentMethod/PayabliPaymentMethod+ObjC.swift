@@ -81,7 +81,7 @@ public final class PayabliPaymentMethodObjC: NSObject {
         cardNumber: String,
         expiration: String,
         cardholderName: String,
-        cvv: String?,
+        cvv: String,
         billingZip: String,
         createAnonymous: Bool,
         forceCustomerCreation: Bool,

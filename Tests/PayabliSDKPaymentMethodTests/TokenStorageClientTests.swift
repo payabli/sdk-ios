@@ -184,6 +184,7 @@ final class TokenStorageClientTests: XCTestCase {
                     cardNumber: "4111111111111112",
                     expiration: "02/25",
                     cardholderName: "John Doe",
+                    cvv: "123",
                     billingZip: "12345"
                 ))
             )
@@ -210,6 +211,7 @@ final class TokenStorageClientTests: XCTestCase {
                     cardNumber: "4111111111111111",
                     expiration: "02/25",
                     cardholderName: "John Doe",
+                    cvv: "123",
                     billingZip: ""
                 ))
             )
@@ -237,6 +239,7 @@ final class TokenStorageClientTests: XCTestCase {
                     cardNumber: "4111111111111111",
                     expiration: "02/25",
                     cardholderName: "John Doe",
+                    cvv: "",
                     billingZip: "12345"
                 ))
             )
@@ -302,6 +305,34 @@ final class TokenStorageClientTests: XCTestCase {
             } catch {
                 XCTFail("Wrong error: \(error)")
             }
+        }
+    }
+
+    func testSixDigitExpirationDoesNotReachTransport() async throws {
+        let transport = MockTransport(responseBody: "{}")
+        let client = TokenStorageClient(
+            transport: transport,
+            accessTokenProvider: { "access-token" }
+        )
+
+        do {
+            _ = try await client.addMethod(
+                entryPoint: "entry",
+                paymentMethod: .card(PayabliCardPaymentMethodData(
+                    cardNumber: "4111111111111111",
+                    expiration: "022028",
+                    cardholderName: "John Doe",
+                    cvv: "123",
+                    billingZip: "12345"
+                ))
+            )
+            XCTFail("Expected validation error")
+        } catch let PayabliPaymentMethodError.invalidInput(message) {
+            XCTAssertEqual(message, "Expiration must be in MMYY or MM/YY format.")
+            let requests = await transport.requests
+            XCTAssertTrue(requests.isEmpty)
+        } catch {
+            XCTFail("Wrong error: \(error)")
         }
     }
 
@@ -836,6 +867,46 @@ final class TokenStorageClientTests: XCTestCase {
             XCTAssertEqual(viewModel.cardholderName, "Jane Doe")
             XCTAssertEqual(viewModel.cardZip, "33139")
             XCTAssertEqual(viewModel.cardCvv, "")
+        } catch {
+            XCTFail("Wrong error: \(error)")
+        }
+    }
+
+    @MainActor
+    func testACHViewModelFailureKeepsEditableFields() async throws {
+        let transport = MockTransport(statusCode: 500, responseBody: """
+        {
+          "isSuccess": false,
+          "responseText": "Server Error"
+        }
+        """)
+        let viewModel = PayabliPaymentMethodViewModel(
+            component: PayabliPaymentMethod(
+                accessToken: "access-token",
+                entryPoint: "entry",
+                environment: .sandbox,
+                transport: transport
+            ),
+            configuration: PayabliPaymentMethodFormConfiguration(
+                allowedMethods: [.ach],
+                defaultMethod: .ach
+            )
+        )
+        viewModel.achHolder = "Jane Business"
+        viewModel.achRouting = "123456780"
+        viewModel.achAccount = "1111111111111"
+        viewModel.achAccountType = .checking
+
+        do {
+            _ = try await viewModel.submit()
+            XCTFail("Expected payment method failure")
+        } catch let PayabliPaymentMethodError.saveFailed(failure) {
+            XCTAssertEqual(failure.responseText, "Server Error")
+            XCTAssertEqual(viewModel.errorMessage, "Unable to save payment method right now. Please try again.")
+            XCTAssertEqual(viewModel.achHolder, "Jane Business")
+            XCTAssertEqual(viewModel.achRouting, "123456780")
+            XCTAssertEqual(viewModel.achAccount, "1111111111111")
+            XCTAssertEqual(viewModel.achAccountType, .checking)
         } catch {
             XCTFail("Wrong error: \(error)")
         }

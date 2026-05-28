@@ -120,9 +120,6 @@ The card component requires:
 - `expiration` in `MMYY` or `MM/YY` input form
 - `cardholderName`
 - `billingZip` / `.cardZip`
-
-Optional card component fields:
-
 - `cvv`
 
 The ACH component requires:

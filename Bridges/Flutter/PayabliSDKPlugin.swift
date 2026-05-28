@@ -308,11 +308,12 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
               let cardNumber = args["cardNumber"] as? String,
               let expiration = args["expiration"] as? String,
               let cardholderName = args["cardholderName"] as? String,
+              let cvv = args["cvv"] as? String,
               let billingZip = args["billingZip"] as? String
         else {
             result(FlutterError(
                 code: "INVALID_ARGS",
-                message: "Missing required card fields: cardNumber, expiration, cardholderName, billingZip",
+                message: "Missing required card fields: cardNumber, expiration, cardholderName, cvv, billingZip",
                 details: nil
             ))
             return
@@ -322,7 +323,7 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
             cardNumber: cardNumber,
             expiration: expiration,
             cardholderName: cardholderName,
-            cvv: args["cvv"] as? String,
+            cvv: cvv,
             billingZip: billingZip
         )
         handleAddPaymentMethod(
@@ -376,7 +377,7 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
                 let method = try await component.addPaymentMethod(paymentMethod, options: options)
                 result(Self.storedPaymentMethodMap(method))
             } catch {
-                result(error.toFlutterError(defaultCode: "PAYMENT_METHOD_FAILED"))
+                result((error as NSError).toFlutterError(defaultCode: "PAYMENT_METHOD_FAILED"))
             }
         }
     }

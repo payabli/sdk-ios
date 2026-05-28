@@ -253,7 +253,7 @@ PayabliCardPaymentMethodData(
     cardNumber: String,
     expiration: String,
     cardholderName: String,
-    cvv: String? = nil,
+    cvv: String,
     billingZip: String
 )
 ```
