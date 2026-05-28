@@ -21,7 +21,7 @@
 
   <ItemGroup>
     <!-- Binding library that wraps the PayabliSDKTapToPay /
-         PayabliSDKTokenization / PayabliSDKCore / PayabliCardReaderCore XCFrameworks.
+         PayabliSDKPaymentMethod / PayabliSDKCore / PayabliCardReaderCore XCFrameworks.
          See Bridges/README.md for the binding contract. -->
     <ProjectReference Include="..\..\Bridges\MAUI\Payabli.MAUI.csproj"
                       Condition="'$(TargetPlatformIdentifier)' == 'ios' Or $([System.String]::Copy('$(TargetFramework)').Contains('-ios'))" />

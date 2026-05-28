@@ -1,23 +1,23 @@
 import PayabliSDKCore
+import PayabliSDKPaymentMethod
 import PayabliSDKTapToPay
-import PayabliSDKTokenization
 import SwiftUI
 
-/// Demo app landing screen exercising Tap to Pay and tokenization:
+/// Demo app landing screen exercising Tap to Pay and payment method:
 ///   - `initialize()` — cold/warm attestation + reader prepare.
 ///   - `charge(type:paymentDetails:)` — full sale pipeline with NFC tap.
 ///   - `activateDevice(activationCode:)` — pending-device activation.
 ///   - `events()` — live event log surfaced via `addEventListener`.
 ///   - `sessionState` — surfaced in the navigation bar as a colored badge.
-///   - `PayabliTokenizationView` — configurable card PAN / ACH tokenization.
+///   - `PayabliPaymentMethodView` — configurable card PAN / ACH payment method.
 struct HomeView: View {
     @EnvironmentObject private var ttp: PayabliTTP
-    @EnvironmentObject private var tokenization: PayabliTokenization
+    @EnvironmentObject private var paymentMethod: PayabliPaymentMethod
 
     @State private var amountText: String = "9.99"
     @State private var activationCode: String = ""
     @State private var lastResult: String = ""
-    @State private var tokenizationResult: String = ""
+    @State private var paymentMethodResult: String = ""
     @State private var eventLog: [EventLogEntry] = []
     @State private var eventToken: PayabliTTPEventToken?
     @State private var presentingActivation = false
@@ -30,9 +30,9 @@ struct HomeView: View {
                     Label("Tap to Pay", systemImage: "wave.3.right")
                 }
 
-            tokenizationTab
+            paymentMethodTab
                 .tabItem {
-                    Label("Tokenize", systemImage: "creditcard")
+                    Label("Payment Method", systemImage: "creditcard")
                 }
         }
     }
@@ -53,27 +53,27 @@ struct HomeView: View {
         }
     }
 
-    private var tokenizationTab: some View {
+    private var paymentMethodTab: some View {
         NavigationView {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
-                    PayabliTokenizationView(
-                        component: tokenization,
-                        configuration: tokenizationConfiguration,
-                        onTokenized: { method in
-                            tokenizationResult = [
+                    PayabliPaymentMethodView(
+                        component: paymentMethod,
+                        configuration: paymentMethodConfiguration,
+                        onPaymentMethodAdded: { method in
+                            paymentMethodResult = [
                                 "Stored method: \(method.storedMethodId ?? "—")",
                                 "Response: \(method.responseText)",
                                 "Result: \(method.resultText ?? "—")"
                             ].joined(separator: "\n")
                         },
                         onError: { error in
-                            tokenizationResult = "Tokenization failed: \(error.localizedDescription)"
+                            paymentMethodResult = "Payment method failed: \(error.localizedDescription)"
                         }
                     )
-                    .payabliTokenizationStyle(tokenizationStyle)
+                    .payabliPaymentMethodStyle(paymentMethodStyle)
 
-                    Text(tokenizationResult.isEmpty ? "No tokenization result yet" : tokenizationResult)
+                    Text(paymentMethodResult.isEmpty ? "No payment method result yet" : paymentMethodResult)
                         .font(.footnote)
                         .foregroundColor(.secondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -83,7 +83,7 @@ struct HomeView: View {
                 }
                 .padding(16)
             }
-            .navigationTitle("Tokenization")
+            .navigationTitle("Payment Method")
         }
     }
 
@@ -112,8 +112,8 @@ struct HomeView: View {
         }
     }
 
-    private var tokenizationConfiguration: PayabliTokenizationFormConfiguration {
-        PayabliTokenizationFormConfiguration(
+    private var paymentMethodConfiguration: PayabliPaymentMethodFormConfiguration {
+        PayabliPaymentMethodFormConfiguration(
             allowedMethods: [.card, .ach],
             defaultMethod: .card,
             cardFieldOrder: [
@@ -129,48 +129,48 @@ struct HomeView: View {
                 .achAccount,
                 .achAccountType
             ],
-            hiddenValues: PayabliTokenizationHiddenValues(
+            hiddenValues: PayabliPaymentMethodHiddenValues(
                 achHolderType: .personal,
                 achSecCode: .web,
                 methodDescription: "Demo stored method"
             ),
-            options: PayabliTokenizationOptions(
+            options: PayabliPaymentMethodOptions(
                 achValidation: true,
                 createAnonymous: false,
                 forceCustomerCreation: true,
                 temporary: false,
                 source: "ios-demo"
             ),
-            labels: PayabliTokenizationLabels(
+            labels: PayabliPaymentMethodLabels(
                 title: "Save Payment Method",
                 subtitle: "Create a card or ACH token from sandbox data."
             ),
             labelLayout: .external,
-            formatting: PayabliTokenizationFormatting(
+            formatting: PayabliPaymentMethodFormatting(
                 insertsCardNumberSpaces: true,
                 masksACHAccountEntry: true
             ),
-            inputSizing: PayabliTokenizationInputSizing(
-                defaultSize: PayabliTokenizationInputSize(height: 52),
+            inputSizing: PayabliPaymentMethodInputSizing(
+                defaultSize: PayabliPaymentMethodInputSize(height: 52),
                 fieldSizes: [
-                    .cardExpiration: PayabliTokenizationInputSize(height: 48),
-                    .cardCvv: PayabliTokenizationInputSize(height: 48)
+                    .cardExpiration: PayabliPaymentMethodInputSize(height: 48),
+                    .cardCvv: PayabliPaymentMethodInputSize(height: 48)
                 ]
             ),
             cardBrandIconPlacement: .trailing
         )
     }
 
-    private var tokenizationStyle: PayabliTokenizationStyle {
-        PayabliTokenizationStyle(
+    private var paymentMethodStyle: PayabliPaymentMethodStyle {
+        PayabliPaymentMethodStyle(
             accentColor: .green,
-            input: PayabliTokenizationInputStyle(
+            input: PayabliPaymentMethodInputStyle(
                 backgroundColor: Color(.systemBackground),
                 borderColor: Color(.separator).opacity(0.6),
                 cornerRadius: 8
             ),
-            submitButton: PayabliTokenizationSubmitButtonStyle(cornerRadius: 8),
-            layout: PayabliTokenizationLayoutStyle(contentSpacing: 18, fieldGroupSpacing: 12)
+            submitButton: PayabliPaymentMethodSubmitButtonStyle(cornerRadius: 8),
+            layout: PayabliPaymentMethodLayoutStyle(contentSpacing: 18, fieldGroupSpacing: 12)
         )
     }
 

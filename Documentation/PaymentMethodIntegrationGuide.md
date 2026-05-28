@@ -1,20 +1,20 @@
-# Payabli Tokenization Integration Guide
+# Payabli Payment Method Integration Guide
 
 This guide is the shortest path from "I linked the SDK" to "my app can save a
 card or ACH account as a Payabli stored payment method."
 
 For the full feature reference, supported fields, and style samples, see
-[`TokenizationOverview.md`](TokenizationOverview.md).
+[`PaymentMethodOverview.md`](PaymentMethodOverview.md).
 
 ## Integration Checklist
 
-1. Add the `PayabliSDKTokenization` product to the host app target.
+1. Add the `PayabliSDKPaymentMethod` product to the host app target.
 2. Build a backend endpoint that returns a Payabli access token for
-   tokenization.
-3. Create a `PayabliTokenization` component in the app.
+   payment method.
+3. Create a `PayabliPaymentMethod` component in the app.
 4. Choose one UI path:
-   - Use `PayabliTokenizationView` for an inline SwiftUI component.
-   - Use `.payabliTokenizationSheet(...)` for the SDK-provided bottom sheet.
+   - Use `PayabliPaymentMethodView` for an inline SwiftUI component.
+   - Use `.payabliPaymentMethodSheet(...)` for the SDK-provided bottom sheet.
    - Use the Flutter or MAUI bridge when integrating from those frameworks.
 5. Configure visible optional fields, hidden values, labels, formatting,
    ordering, input sizing, and style.
@@ -70,11 +70,11 @@ both response fields.
 The iOS side then wires that endpoint into the component:
 
 ```swift
-let tokenization = PayabliTokenization(
+let paymentMethod = PayabliPaymentMethod(
     entryPoint: "<PAYABLI_ENTRY_POINT>",
     environment: .sandbox,
     accessTokenProvider: {
-        try await backend.fetchTokenStorageAccessToken()
+        try await backend.fetchPaymentMethodAccessToken()
     }
 )
 ```
@@ -86,8 +86,8 @@ tokens.
 
 Before implementation, decide:
 
-- Presentation: embed `PayabliTokenizationView` inline or present the same form
-  through `.payabliTokenizationSheet(...)`.
+- Presentation: embed `PayabliPaymentMethodView` inline or present the same form
+  through `.payabliPaymentMethodSheet(...)`.
 - Method coverage: card-only, ACH-only, or a segmented card/ACH form.
 - Customer behavior: for customer-owned reusable methods, pass
   `createAnonymous: false`, `forceCustomerCreation: true`, and
@@ -105,22 +105,22 @@ inside SwiftUI.
 ```swift
 import SwiftUI
 import PayabliSDKCore
-import PayabliSDKTokenization
+import PayabliSDKPaymentMethod
 
 struct SavePaymentMethodScreen: View {
-    @StateObject private var tokenization = PayabliTokenization(
+    @StateObject private var paymentMethod = PayabliPaymentMethod(
         entryPoint: "<PAYABLI_ENTRY_POINT>",
         environment: .sandbox,
         accessTokenProvider: {
-            try await Backend.shared.fetchTokenStorageAccessToken()
+            try await Backend.shared.fetchPaymentMethodAccessToken()
         }
     )
 
     var body: some View {
-        PayabliTokenizationView(
-            component: tokenization,
+        PayabliPaymentMethodView(
+            component: paymentMethod,
             configuration: configuration,
-            onTokenized: { method in
+            onPaymentMethodAdded: { method in
                 guard let storedMethodId = method.storedMethodId else {
                     return
                 }
@@ -131,12 +131,12 @@ struct SavePaymentMethodScreen: View {
                 present(error)
             }
         )
-        .payabliTokenizationStyle(style)
+        .payabliPaymentMethodStyle(style)
         .padding()
     }
 
-    private var configuration: PayabliTokenizationFormConfiguration {
-        PayabliTokenizationFormConfiguration(
+    private var configuration: PayabliPaymentMethodFormConfiguration {
+        PayabliPaymentMethodFormConfiguration(
             allowedMethods: [.card, .ach],
             defaultMethod: .card,
             cardFieldOrder: [
@@ -152,15 +152,15 @@ struct SavePaymentMethodScreen: View {
                 .achAccount,
                 .achAccountType
             ],
-            hiddenValues: PayabliTokenizationHiddenValues(
+            hiddenValues: PayabliPaymentMethodHiddenValues(
                 achHolderType: .personal,
                 achSecCode: .web,
                 methodDescription: "Primary payment method",
-                customerData: PayabliTokenizationCustomerData(
+                customerData: PayabliPaymentMethodCustomerData(
                     customerNumber: "customer-123"
                 )
             ),
-            options: PayabliTokenizationOptions(
+            options: PayabliPaymentMethodOptions(
                 achValidation: true,
                 createAnonymous: false,
                 forceCustomerCreation: true,
@@ -168,16 +168,16 @@ struct SavePaymentMethodScreen: View {
                 source: "ios-app"
             ),
             labelLayout: .external,
-            formatting: PayabliTokenizationFormatting(
+            formatting: PayabliPaymentMethodFormatting(
                 insertsCardNumberSpaces: true,
                 expirationSeparator: "/",
                 masksACHAccountEntry: true
             ),
-            inputSizing: PayabliTokenizationInputSizing(
-                defaultSize: PayabliTokenizationInputSize(height: 52),
+            inputSizing: PayabliPaymentMethodInputSizing(
+                defaultSize: PayabliPaymentMethodInputSize(height: 52),
                 fieldSizes: [
-                    .cardExpiration: PayabliTokenizationInputSize(width: 132, height: 48),
-                    .cardCvv: PayabliTokenizationInputSize(width: 104, height: 48)
+                    .cardExpiration: PayabliPaymentMethodInputSize(width: 132, height: 48),
+                    .cardCvv: PayabliPaymentMethodInputSize(width: 104, height: 48)
                 ]
             ),
             cardBrandIconPlacement: .trailing,
@@ -185,11 +185,11 @@ struct SavePaymentMethodScreen: View {
         )
     }
 
-    private var style: PayabliTokenizationStyle {
-        PayabliTokenizationStyle(
+    private var style: PayabliPaymentMethodStyle {
+        PayabliPaymentMethodStyle(
             accentColor: .blue,
-            input: PayabliTokenizationInputStyle(cornerRadius: 8),
-            submitButton: PayabliTokenizationSubmitButtonStyle(cornerRadius: 8)
+            input: PayabliPaymentMethodInputStyle(cornerRadius: 8),
+            submitButton: PayabliPaymentMethodSubmitButtonStyle(cornerRadius: 8)
         )
     }
 }
@@ -200,7 +200,7 @@ struct SavePaymentMethodScreen: View {
 Card only:
 
 ```swift
-PayabliTokenizationFormConfiguration(
+PayabliPaymentMethodFormConfiguration(
     allowedMethods: [.card],
     cardFieldOrder: [.cardholderName, .cardNumber, .cardExpiration, .cardCvv, .cardZip]
 )
@@ -209,24 +209,24 @@ PayabliTokenizationFormConfiguration(
 ACH only:
 
 ```swift
-PayabliTokenizationFormConfiguration(
+PayabliPaymentMethodFormConfiguration(
     allowedMethods: [.ach],
     defaultMethod: .ach,
     achFieldOrder: [.achHolder, .achRouting, .achAccount, .achAccountType],
-    hiddenValues: PayabliTokenizationHiddenValues(
+    hiddenValues: PayabliPaymentMethodHiddenValues(
         achSecCode: .web,
         achHolderType: .personal
     ),
-    options: PayabliTokenizationOptions(achValidation: true)
+    options: PayabliPaymentMethodOptions(achValidation: true)
 )
 ```
 
 Placeholder labels:
 
 ```swift
-PayabliTokenizationFormConfiguration(
+PayabliPaymentMethodFormConfiguration(
     labelLayout: .placeholder,
-    labels: PayabliTokenizationLabels(
+    labels: PayabliPaymentMethodLabels(
         title: "Add Payment Method",
         submitButton: "Save"
     )
@@ -236,15 +236,15 @@ PayabliTokenizationFormConfiguration(
 Submit button text:
 
 ```swift
-PayabliTokenizationFormConfiguration(
-    labels: PayabliTokenizationLabels(submitButton: "Save Payment Method")
+PayabliPaymentMethodFormConfiguration(
+    labels: PayabliPaymentMethodLabels(submitButton: "Save Payment Method")
 )
 ```
 
 Card brand icon on the left:
 
 ```swift
-PayabliTokenizationFormConfiguration(
+PayabliPaymentMethodFormConfiguration(
     cardBrandIconPlacement: .leading
 )
 ```
@@ -262,43 +262,43 @@ and error rendering.
 
 ```swift
 struct CheckoutScreen: View {
-    @State private var isTokenizationPresented = false
-    @StateObject private var tokenization = PayabliTokenization(
+    @State private var isPaymentMethodPresented = false
+    @StateObject private var paymentMethod = PayabliPaymentMethod(
         entryPoint: "<PAYABLI_ENTRY_POINT>",
         environment: .sandbox,
         accessTokenProvider: {
-            try await Backend.shared.fetchTokenStorageAccessToken()
+            try await Backend.shared.fetchPaymentMethodAccessToken()
         }
     )
 
     var body: some View {
         Button("Add payment method") {
-            isTokenizationPresented = true
+            isPaymentMethodPresented = true
         }
-        .payabliTokenizationSheet(
-            isPresented: $isTokenizationPresented,
-            component: tokenization,
-            configuration: PayabliTokenizationFormConfiguration(
+        .payabliPaymentMethodSheet(
+            isPresented: $isPaymentMethodPresented,
+            component: paymentMethod,
+            configuration: PayabliPaymentMethodFormConfiguration(
                 allowedMethods: [.card],
-                labels: PayabliTokenizationLabels(
+                labels: PayabliPaymentMethodLabels(
                     title: "Add Card",
                     submitButton: "Save Card"
                 ),
                 cardBrandIconPlacement: .trailing
             ),
-            sheetConfiguration: PayabliTokenizationSheetConfiguration(
+            sheetConfiguration: PayabliPaymentMethodSheetConfiguration(
                 dismissButton: .back,
-                dismissesOnTokenized: true,
+                dismissesOnSuccess: true,
                 detents: [.medium, .large],
                 sizesToContentWhenPossible: true,
                 expandsToLargeWhenContentDoesNotFit: true
             ),
-            style: PayabliTokenizationStyle(
+            style: PayabliPaymentMethodStyle(
                 accentColor: .blue,
-                input: PayabliTokenizationInputStyle(cornerRadius: 8),
-                submitButton: PayabliTokenizationSubmitButtonStyle(cornerRadius: 8)
+                input: PayabliPaymentMethodInputStyle(cornerRadius: 8),
+                submitButton: PayabliPaymentMethodSubmitButtonStyle(cornerRadius: 8)
             ),
-            onTokenized: { method in
+            onPaymentMethodAdded: { method in
                 saveStoredMethodId(method.storedMethodId)
             },
             onError: { error in
@@ -309,8 +309,8 @@ struct CheckoutScreen: View {
 }
 ```
 
-The sheet modifier reuses `PayabliTokenizationView` internally. By default it
-moves `PayabliTokenizationLabels.title` and `subtitle` into the sheet header so
+The sheet modifier reuses `PayabliPaymentMethodView` internally. By default it
+moves `PayabliPaymentMethodLabels.title` and `subtitle` into the sheet header so
 the form does not render a duplicate title. Set
 `movesFormHeaderToSheetHeader: false` when the host app wants the form header
 inside the scrollable content. By default, the sheet sizes itself to the
@@ -320,10 +320,10 @@ grouped together. When the form is taller than the available sheet height and
 
 ## Response Handling
 
-Always treat the returned `PayabliTokenizedMethod` as the source of truth.
+Always treat the returned `PayabliStoredPaymentMethod` as the source of truth.
 
 ```swift
-func handleTokenized(_ method: PayabliTokenizedMethod) {
+func handlePaymentMethodAdded(_ method: PayabliStoredPaymentMethod) {
     guard let storedMethodId = method.storedMethodId else {
         return
     }
@@ -343,15 +343,15 @@ access tokens.
 
 ## Development Diagnostics
 
-For local or QA validation, enable redacted diagnostics on the tokenization
+For local or QA validation, enable redacted diagnostics on the payment method
 component:
 
 ```swift
-let tokenization = PayabliTokenization(
+let paymentMethod = PayabliPaymentMethod(
     entryPoint: Secrets.entryPoint,
     environment: .sandbox,
     accessTokenProvider: {
-        try await Backend.shared.fetchTokenStorageAccessToken()
+        try await Backend.shared.fetchPaymentMethodAccessToken()
     },
     diagnostics: .enabled { entry in
         print("[\(entry.phase.rawValue)] \(entry.method) \(entry.url)")
@@ -362,7 +362,7 @@ let tokenization = PayabliTokenization(
 ```
 
 Developers access logs through that handler. Each
-`PayabliTokenizationDiagnosticEntry` contains the request/response phase, full
+`PayabliPaymentMethodDiagnosticEntry` contains the request/response phase, full
 URL with query parameters, redacted headers, redacted JSON body, HTTP status,
 elapsed duration, and any transport failure text. Sensitive values are replaced
 before the handler is called.
@@ -371,9 +371,10 @@ before the handler is called.
 
 ```swift
 do {
-    let method = try await tokenization.tokenize(paymentMethod: paymentMethod)
-    handleTokenized(method)
-} catch let error as PayabliTokenizationError {
+    let input = PayabliPaymentMethodInput.card(cardData)
+    let method = try await paymentMethod.addPaymentMethod(input)
+    handlePaymentMethodAdded(method)
+} catch let error as PayabliPaymentMethodError {
     show(error.reason)
 } catch let error as any PayabliError {
     show(error.reason)
@@ -386,13 +387,13 @@ Expected integration errors include:
 
 - Invalid card, expiration, CVV, ACH account, routing number, or ACH holder
 - Empty or missing access token
-- Payabli decline or failed tokenization response
+- Payabli decline or failed payment method response
 - HTTP authentication/authorization/server errors from the shared Core error
   mapping
 
 ## Flutter Integration
 
-The Flutter bridge exposes tokenization over the existing
+The Flutter bridge exposes payment method over the existing
 `com.payabli.sdk/taptopay` method channel.
 
 Example app:
@@ -403,17 +404,17 @@ Example app:
 Configure:
 
 ```dart
-await PayabliTokenization.configure(
-  accessTokenProvider: Secrets.fetchTokenizationAccessToken,
+await PayabliPaymentMethod.configure(
+  accessTokenProvider: Secrets.fetchPaymentMethodAccessToken,
   entryPoint: Secrets.entryPoint,
   environment: PayabliEnvironment.sandbox,
 );
 ```
 
-Tokenize card:
+Add a card:
 
 ```dart
-final method = await PayabliTokenization.tokenizeCard(
+final method = await PayabliPaymentMethod.addCard(
   cardNumber: cardNumber,
   expiration: expiration,
   cardholderName: cardholderName,
@@ -425,10 +426,10 @@ final method = await PayabliTokenization.tokenizeCard(
 );
 ```
 
-Tokenize ACH:
+Add ACH:
 
 ```dart
-final method = await PayabliTokenization.tokenizeACH(
+final method = await PayabliPaymentMethod.addACH(
   accountNumber: accountNumber,
   accountType: 'Checking',
   holderName: holderName,
@@ -446,7 +447,7 @@ The Dart result exposes `storedMethodId`, `methodReferenceId`, `resultCode`,
 
 ## .NET MAUI Integration
 
-The MAUI binding exposes the Objective-C-compatible tokenization wrapper.
+The MAUI binding exposes the Objective-C-compatible payment method wrapper.
 
 Example app:
 
@@ -460,7 +461,7 @@ Build and copy the release frameworks before building the MAUI host:
 mkdir -p Bridges/MAUI/Frameworks
 cp -R build/release/PayabliSDKCore.xcframework Bridges/MAUI/Frameworks/
 cp -R build/release/PayabliSDKTapToPay.xcframework Bridges/MAUI/Frameworks/
-cp -R build/release/PayabliSDKTokenization.xcframework Bridges/MAUI/Frameworks/
+cp -R build/release/PayabliSDKPaymentMethod.xcframework Bridges/MAUI/Frameworks/
 cp -R build/release/PayabliCardReaderCore.xcframework Bridges/MAUI/Frameworks/
 ```
 
@@ -483,7 +484,7 @@ sudo dotnet workload install maui-ios mobile-librarybuilder
 Configure:
 
 ```csharp
-_tokenization = new PayabliTokenizationObjC(
+_paymentMethod = new PayabliPaymentMethodObjC(
     accessTokenHandler: completion =>
     {
         Task.Run(async () =>
@@ -504,10 +505,10 @@ _tokenization = new PayabliTokenizationObjC(
 );
 ```
 
-Tokenize card:
+Add a card:
 
 ```csharp
-_tokenization.TokenizeCard(
+_paymentMethod.AddCard(
     cardNumber: cardNumber,
     expiration: expiration,
     cardholderName: cardholderName,
@@ -527,10 +528,10 @@ _tokenization.TokenizeCard(
 );
 ```
 
-Tokenize ACH:
+Add ACH:
 
 ```csharp
-_tokenization.TokenizeACH(
+_paymentMethod.AddACH(
     accountNumber: accountNumber,
     accountType: "Checking",
     holderName: holderName,
@@ -558,7 +559,7 @@ The MAUI result exposes `StoredMethodId`, `MethodReferenceId`, `ResultCode`,
 ## Visual QA
 
 Use the native SwiftUI sample in `Example/PayabliDemo` for component styling QA
-on Simulator. Tap to Pay still requires a physical iPhone, but tokenization can
+on Simulator. Tap to Pay still requires a physical iPhone, but payment method can
 be visually checked in Simulator.
 
 ```bash
@@ -566,5 +567,5 @@ xcodebuild build -scheme PayabliSDK-Package \
   -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.5'
 ```
 
-The Flutter and MAUI demos include their own tokenization screens for bridge
+The Flutter and MAUI demos include their own payment method screens for bridge
 visual QA.

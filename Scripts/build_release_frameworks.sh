@@ -3,7 +3,7 @@
 # build_release_frameworks.sh
 # ---------------------------
 # Builds the Payabli iOS SDK distribution XCFrameworks
-# (PayabliSDKCore, PayabliSDKTapToPay, PayabliSDKTokenization,
+# (PayabliSDKCore, PayabliSDKTapToPay, PayabliSDKPaymentMethod,
 # PayabliCardReaderCore) for
 # device + iOS Simulator slices, with distribution-mode settings and a
 # pinned SOURCE_DATE_EPOCH for reproducible zips.
@@ -28,7 +28,7 @@
 #   build/release/
 #     payabli-ios-sdk-core-${VERSION}.zip
 #     payabli-ios-sdk-taptopay-${VERSION}.zip
-#     payabli-ios-sdk-tokenization-${VERSION}.zip
+#     payabli-ios-sdk-payment-method-${VERSION}.zip
 #     payabli-ios-sdk-card-reader-core-${VERSION}.zip
 #     checksums.txt           (one sha256 per zip, space-separated lines)
 #     THIRD_PARTY_LICENSES.txt  (bundled copy for the upload/publish step)
@@ -72,7 +72,7 @@ mkdir -p "$ARCHIVE_DIR" "$XCF_DIR"
 SCHEMES=(
     "PayabliSDKCore"
     "PayabliSDKTapToPay"
-    "PayabliSDKTokenization"
+    "PayabliSDKPaymentMethod"
     "PayabliCardReaderCore"
 )
 
@@ -81,7 +81,7 @@ slug_for() {
     case "$1" in
         PayabliSDKCore)          echo "core" ;;
         PayabliSDKTapToPay)      echo "taptopay" ;;
-        PayabliSDKTokenization)  echo "tokenization" ;;
+        PayabliSDKPaymentMethod)  echo "payment-method" ;;
         PayabliCardReaderCore)   echo "card-reader-core" ;;
         *) echo "error: unknown scheme '$1'" >&2; exit 1 ;;
     esac
@@ -169,7 +169,7 @@ for scheme in "${SCHEMES[@]}"; do
     checksum="$(swift package compute-checksum "$BUILD_DIR/$zip_name")"
     printf '%s  %s\n' "$checksum" "$zip_name" >> "$checksums_file"
     # Also expose individual vars for the render step:
-    #   CORE_SHA256, TAPTOPAY_SHA256, TOKENIZATION_SHA256, CARD_READER_CORE_SHA256
+    #   CORE_SHA256, TAPTOPAY_SHA256, PAYMENT_METHOD_SHA256, CARD_READER_CORE_SHA256
     # (matches render_public_manifests.sh's required vars).
     upper="$(echo "${slug//-/_}" | tr '[:lower:]' '[:upper:]')"
     if [[ -n "${GITHUB_ENV:-}" ]]; then

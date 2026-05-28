@@ -1,7 +1,7 @@
 import Flutter
 import PayabliSDKCore
+import PayabliSDKPaymentMethod
 import PayabliSDKTapToPay
-import PayabliSDKTokenization
 import UIKit
 
 /// Flutter plugin bridging Dart calls into the native `PayabliSDKTapToPay`
@@ -29,7 +29,7 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
 
     private var ttp: PayabliTTP?
     private var eventToken: PayabliTTPEventToken?
-    private var tokenization: PayabliTokenization?
+    private var paymentMethod: PayabliPaymentMethod?
 
     init(methodChannel: FlutterMethodChannel, eventChannel: FlutterEventChannel) {
         self.methodChannel = methodChannel
@@ -65,12 +65,12 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
             handleActivateDevice(call.arguments, result: result)
         case "getSessionState":
             handleGetSessionState(result: result)
-        case "configureTokenization":
-            handleConfigureTokenization(call.arguments, result: result)
-        case "tokenizeCard":
-            handleTokenizeCard(call.arguments, result: result)
-        case "tokenizeACH":
-            handleTokenizeACH(call.arguments, result: result)
+        case "configurePaymentMethod":
+            handleConfigurePaymentMethod(call.arguments, result: result)
+        case "addCard":
+            handleAddCard(call.arguments, result: result)
+        case "addACH":
+            handleAddACH(call.arguments, result: result)
         default:
             result(FlutterMethodNotImplemented)
         }
@@ -255,9 +255,9 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
         }
     }
 
-    // MARK: - Tokenization
+    // MARK: - Payment Method
 
-    private func handleConfigureTokenization(_ arguments: Any?, result: @escaping FlutterResult) {
+    private func handleConfigurePaymentMethod(_ arguments: Any?, result: @escaping FlutterResult) {
         guard let args = arguments as? [String: Any],
               let entryPoint = args["entryPoint"] as? String,
               let envRaw = args["environment"] as? Int,
@@ -272,7 +272,7 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
         }
 
         let methodChannel = self.methodChannel
-        let accessTokenProvider: PayabliTokenizationAccessTokenProvider = { @Sendable [methodChannel] in
+        let accessTokenProvider: PayabliPaymentMethodAccessTokenProvider = { @Sendable [methodChannel] in
             try await withCheckedThrowingContinuation { continuation in
                 Task { @MainActor in
                     methodChannel.invokeMethod("accessToken", arguments: nil) { value in
@@ -281,7 +281,7 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
                         } else {
                             continuation.resume(throwing: PayabliGenericError(
                                 code: .missingToken,
-                                reason: "Dart side did not return a tokenization access token"
+                                reason: "Dart side did not return a payment method access token"
                             ))
                         }
                     }
@@ -290,7 +290,7 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
         }
 
         Task { @MainActor in
-            self.tokenization = PayabliTokenization(
+            self.paymentMethod = PayabliPaymentMethod(
                 entryPoint: entryPoint,
                 environment: environment,
                 accessTokenProvider: accessTokenProvider
@@ -299,9 +299,9 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
         }
     }
 
-    private func handleTokenizeCard(_ arguments: Any?, result: @escaping FlutterResult) {
-        guard let tokenization else {
-            result(FlutterError(code: "NOT_CONFIGURED", message: "Call configureTokenization() first", details: nil))
+    private func handleAddCard(_ arguments: Any?, result: @escaping FlutterResult) {
+        guard let paymentMethod else {
+            result(FlutterError(code: "NOT_CONFIGURED", message: "Call configurePaymentMethod() first", details: nil))
             return
         }
         guard let args = arguments as? [String: Any],
@@ -318,24 +318,24 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
             return
         }
 
-        let card = PayabliCardTokenizationData(
+        let card = PayabliCardPaymentMethodData(
             cardNumber: cardNumber,
             expiration: expiration,
             cardholderName: cardholderName,
             cvv: args["cvv"] as? String,
             billingZip: billingZip
         )
-        handleTokenize(
+        handleAddPaymentMethod(
             .card(card),
-            options: tokenizationOptions(from: args),
-            component: tokenization,
+            options: paymentMethodOptions(from: args),
+            component: paymentMethod,
             result: result
         )
     }
 
-    private func handleTokenizeACH(_ arguments: Any?, result: @escaping FlutterResult) {
-        guard let tokenization else {
-            result(FlutterError(code: "NOT_CONFIGURED", message: "Call configureTokenization() first", details: nil))
+    private func handleAddACH(_ arguments: Any?, result: @escaping FlutterResult) {
+        guard let paymentMethod else {
+            result(FlutterError(code: "NOT_CONFIGURED", message: "Call configurePaymentMethod() first", details: nil))
             return
         }
         guard let args = arguments as? [String: Any],
@@ -349,7 +349,7 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
             return
         }
 
-        let ach = PayabliACHTokenizationData(
+        let ach = PayabliACHPaymentMethodData(
             accountNumber: accountNumber,
             accountType: resolvedAccountType,
             holderName: holderName,
@@ -357,32 +357,32 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
             secCode: (args["secCode"] as? String).flatMap(PayabliACHSecCode.init(rawValue:)),
             holderType: (args["holderType"] as? String).flatMap(PayabliACHHolderType.init(rawValue:))
         )
-        handleTokenize(
+        handleAddPaymentMethod(
             .ach(ach),
-            options: tokenizationOptions(from: args),
-            component: tokenization,
+            options: paymentMethodOptions(from: args),
+            component: paymentMethod,
             result: result
         )
     }
 
-    private func handleTokenize(
-        _ paymentMethod: PayabliTokenizationPaymentMethod,
-        options: PayabliTokenizationOptions,
-        component: PayabliTokenization,
+    private func handleAddPaymentMethod(
+        _ paymentMethod: PayabliPaymentMethodInput,
+        options: PayabliPaymentMethodOptions,
+        component: PayabliPaymentMethod,
         result: @escaping FlutterResult
     ) {
         Task { @MainActor in
             do {
-                let method = try await component.tokenize(paymentMethod: paymentMethod, options: options)
-                result(Self.tokenizedMethodMap(method))
+                let method = try await component.addPaymentMethod(paymentMethod, options: options)
+                result(Self.storedPaymentMethodMap(method))
             } catch {
-                result(error.toFlutterError(defaultCode: "TOKENIZATION_FAILED"))
+                result(error.toFlutterError(defaultCode: "PAYMENT_METHOD_FAILED"))
             }
         }
     }
 
-    private func tokenizationOptions(from args: [String: Any]) -> PayabliTokenizationOptions {
-        PayabliTokenizationOptions(
+    private func paymentMethodOptions(from args: [String: Any]) -> PayabliPaymentMethodOptions {
+        PayabliPaymentMethodOptions(
             achValidation: args["achValidation"] as? Bool,
             createAnonymous: args["createAnonymous"] as? Bool,
             forceCustomerCreation: args["forceCustomerCreation"] as? Bool,
@@ -442,7 +442,7 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
         )
     }
 
-    private static func tokenizedMethodMap(_ method: PayabliTokenizedMethod) -> [String: Any] {
+    private static func storedPaymentMethodMap(_ method: PayabliStoredPaymentMethod) -> [String: Any] {
         var map: [String: Any] = [
             "responseText": method.responseText,
             "apiResponse": dictionary(from: method.apiResponse)
@@ -465,7 +465,7 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
         return map
     }
 
-    private static func dictionary(from response: PayabliTokenizationAPIResponse) -> [String: Any] {
+    private static func dictionary(from response: PayabliPaymentMethodAPIResponse) -> [String: Any] {
         guard let data = try? JSONEncoder().encode(response),
               let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
         else {

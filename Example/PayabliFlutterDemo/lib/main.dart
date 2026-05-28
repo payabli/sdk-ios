@@ -11,10 +11,10 @@ class PayabliFlutterDemoApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => MaterialApp(
-    title: 'Payabli TTP Demo',
-    theme: ThemeData(useMaterial3: true, colorSchemeSeed: Colors.green),
-    home: const HomeScreen(),
-  );
+        title: 'Payabli TTP Demo',
+        theme: ThemeData(useMaterial3: true, colorSchemeSeed: Colors.green),
+        home: const HomeScreen(),
+      );
 }
 
 class HomeScreen extends StatefulWidget {
@@ -56,12 +56,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
   PayabliTTPSessionState _state = PayabliTTPSessionState.idle;
   String _lastResult = '';
-  String _tokenizationResult = '';
+  String _paymentMethodResult = '';
   final List<PayabliTTPEvent> _eventLog = [];
   StreamSubscription<PayabliTTPEvent>? _eventSub;
   bool _configured = false;
   bool _isWorking = false;
-  bool _isTokenizing = false;
+  bool _isSavingPaymentMethod = false;
 
   @override
   void initState() {
@@ -98,8 +98,8 @@ class _HomeScreenState extends State<HomeScreen> {
         appId: Secrets.appId,
         environment: PayabliEnvironment.sandbox,
       );
-      await PayabliTokenization.configure(
-        accessTokenProvider: Secrets.fetchTokenizationAccessToken,
+      await PayabliPaymentMethod.configure(
+        accessTokenProvider: Secrets.fetchPaymentMethodAccessToken,
         entryPoint: Secrets.entryPoint,
         environment: PayabliEnvironment.sandbox,
       );
@@ -110,10 +110,10 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Future<void> _runTokenizeCard() async {
-    setState(() => _isTokenizing = true);
+  Future<void> _runAddCard() async {
+    setState(() => _isSavingPaymentMethod = true);
     try {
-      final method = await PayabliTokenization.tokenizeCard(
+      final method = await PayabliPaymentMethod.addCard(
         cardNumber: _cardNumberController.text,
         expiration: _cardExpController.text,
         cardholderName: _cardHolderController.text,
@@ -121,22 +121,22 @@ class _HomeScreenState extends State<HomeScreen> {
         billingZip: _cardZipController.text,
       );
       setState(() {
-        _tokenizationResult =
+        _paymentMethodResult =
             "Stored method: ${method.storedMethodId ?? '—'}\n"
             'Response: ${method.responseText}\n'
             "Result: ${method.resultText ?? '—'}";
       });
     } on PayabliTTPException catch (e) {
-      setState(() => _tokenizationResult = '✗ ${e.code}: ${e.message}');
+      setState(() => _paymentMethodResult = '✗ ${e.code}: ${e.message}');
     } finally {
-      setState(() => _isTokenizing = false);
+      setState(() => _isSavingPaymentMethod = false);
     }
   }
 
-  Future<void> _runTokenizeACH() async {
-    setState(() => _isTokenizing = true);
+  Future<void> _runAddACH() async {
+    setState(() => _isSavingPaymentMethod = true);
     try {
-      final method = await PayabliTokenization.tokenizeACH(
+      final method = await PayabliPaymentMethod.addACH(
         accountNumber: _achAccountController.text,
         accountType: 'Checking',
         holderName: _achHolderController.text,
@@ -145,15 +145,15 @@ class _HomeScreenState extends State<HomeScreen> {
         holderType: 'personal',
       );
       setState(() {
-        _tokenizationResult =
+        _paymentMethodResult =
             "Stored method: ${method.storedMethodId ?? '—'}\n"
             'Response: ${method.responseText}\n'
             "Result: ${method.resultText ?? '—'}";
       });
     } on PayabliTTPException catch (e) {
-      setState(() => _tokenizationResult = '✗ ${e.code}: ${e.message}');
+      setState(() => _paymentMethodResult = '✗ ${e.code}: ${e.message}');
     } finally {
-      setState(() => _isTokenizing = false);
+      setState(() => _isSavingPaymentMethod = false);
     }
   }
 
@@ -266,7 +266,7 @@ class _HomeScreenState extends State<HomeScreen> {
           bottom: const TabBar(
             tabs: [
               Tab(text: 'Tap to Pay'),
-              Tab(text: 'Tokenize'),
+              Tab(text: 'Payment Method'),
             ],
           ),
           actions: [
@@ -279,203 +279,207 @@ class _HomeScreenState extends State<HomeScreen> {
         body: !_configured
             ? const Center(child: CircularProgressIndicator())
             : TabBarView(
-                children: [_tapToPayContent(), _tokenizationContent()],
+                children: [_tapToPayContent(), _paymentMethodContent()],
               ),
       ),
     );
   }
 
   Widget _tapToPayContent() => ListView(
-    padding: const EdgeInsets.all(16),
-    children: [
-      _section('Lifecycle', [
-        FilledButton(
-          onPressed: _isWorking || _state == PayabliTTPSessionState.ready
-              ? null
-              : _runInitialize,
-          child: const Text('Initialize'),
-        ),
-        OutlinedButton(
-          onPressed: _isWorking ? null : _showActivationSheet,
-          child: const Text('Activate device…'),
-        ),
-      ]),
-      const SizedBox(height: 16),
-      _section('Sale', [
-        TextField(
-          controller: _amountController,
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          decoration: const InputDecoration(
-            labelText: 'Amount',
-            prefixText: r'$ ',
-            border: OutlineInputBorder(),
-          ),
-        ),
-        const SizedBox(height: 8),
-        FilledButton(
-          onPressed: _isWorking || _state != PayabliTTPSessionState.ready
-              ? null
-              : _runCharge,
-          child: const Text('Charge'),
-        ),
-      ]),
-      const SizedBox(height: 16),
-      _section('Last result', [Text(_lastResult.isEmpty ? '—' : _lastResult)]),
-      const SizedBox(height: 16),
-      _section('Event log', [
-        if (_eventLog.isEmpty)
-          const Text('No events yet', style: TextStyle(color: Colors.grey))
-        else
-          ..._eventLog.map(
-            (e) => Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    e.code.name,
-                    style: const TextStyle(fontWeight: FontWeight.w600),
+        padding: const EdgeInsets.all(16),
+        children: [
+          _section('Lifecycle', [
+            FilledButton(
+              onPressed: _isWorking || _state == PayabliTTPSessionState.ready
+                  ? null
+                  : _runInitialize,
+              child: const Text('Initialize'),
+            ),
+            OutlinedButton(
+              onPressed: _isWorking ? null : _showActivationSheet,
+              child: const Text('Activate device…'),
+            ),
+          ]),
+          const SizedBox(height: 16),
+          _section('Sale', [
+            TextField(
+              controller: _amountController,
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
+              decoration: const InputDecoration(
+                labelText: 'Amount',
+                prefixText: r'$ ',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 8),
+            FilledButton(
+              onPressed: _isWorking || _state != PayabliTTPSessionState.ready
+                  ? null
+                  : _runCharge,
+              child: const Text('Charge'),
+            ),
+          ]),
+          const SizedBox(height: 16),
+          _section(
+              'Last result', [Text(_lastResult.isEmpty ? '—' : _lastResult)]),
+          const SizedBox(height: 16),
+          _section('Event log', [
+            if (_eventLog.isEmpty)
+              const Text('No events yet', style: TextStyle(color: Colors.grey))
+            else
+              ..._eventLog.map(
+                (e) => Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        e.code.name,
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      if (e.payload.isNotEmpty)
+                        Text(
+                          e.payload.toString(),
+                          style:
+                              const TextStyle(fontSize: 12, color: Colors.grey),
+                        ),
+                    ],
                   ),
-                  if (e.payload.isNotEmpty)
-                    Text(
-                      e.payload.toString(),
-                      style: const TextStyle(fontSize: 12, color: Colors.grey),
-                    ),
-                ],
+                ),
+              ),
+          ]),
+        ],
+      );
+
+  Widget _paymentMethodContent() => ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          _section('Card payment method', [
+            TextField(
+              controller: _cardNumberController,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: 'Card number',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _cardExpController,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: 'Expiration',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _cardHolderController,
+              decoration: const InputDecoration(
+                labelText: 'Name on card',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _cardCvvController,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: 'CVV',
+                border: OutlineInputBorder(),
+              ),
+              obscureText: true,
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _cardZipController,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: 'ZIP code',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 8),
+            FilledButton(
+              onPressed: _isSavingPaymentMethod ? null : _runAddCard,
+              child: Text(_isSavingPaymentMethod ? 'Saving…' : 'Add card'),
+            ),
+          ]),
+          const SizedBox(height: 16),
+          _section('ACH payment method', [
+            TextField(
+              controller: _achAccountController,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: 'Account number',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _achRoutingController,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: 'Routing number',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _achHolderController,
+              decoration: const InputDecoration(
+                labelText: 'Account holder',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 8),
+            FilledButton(
+              onPressed: _isSavingPaymentMethod ? null : _runAddACH,
+              child: Text(_isSavingPaymentMethod ? 'Saving…' : 'Add ACH'),
+            ),
+          ]),
+          const SizedBox(height: 16),
+          _section('Payment Method result', [
+            Text(
+              _paymentMethodResult.isEmpty
+                  ? 'No payment method result yet'
+                  : _paymentMethodResult,
+            ),
+          ]),
+        ],
+      );
+
+  Widget _section(String title, List<Widget> children) => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: Colors.grey,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: children,
               ),
             ),
           ),
-      ]),
-    ],
-  );
-
-  Widget _tokenizationContent() => ListView(
-    padding: const EdgeInsets.all(16),
-    children: [
-      _section('Card tokenization', [
-        TextField(
-          controller: _cardNumberController,
-          keyboardType: TextInputType.number,
-          decoration: const InputDecoration(
-            labelText: 'Card number',
-            border: OutlineInputBorder(),
-          ),
-        ),
-        const SizedBox(height: 8),
-        TextField(
-          controller: _cardExpController,
-          keyboardType: TextInputType.number,
-          decoration: const InputDecoration(
-            labelText: 'Expiration',
-            border: OutlineInputBorder(),
-          ),
-        ),
-        const SizedBox(height: 8),
-        TextField(
-          controller: _cardHolderController,
-          decoration: const InputDecoration(
-            labelText: 'Name on card',
-            border: OutlineInputBorder(),
-          ),
-        ),
-        const SizedBox(height: 8),
-        TextField(
-          controller: _cardCvvController,
-          keyboardType: TextInputType.number,
-          decoration: const InputDecoration(
-            labelText: 'CVV',
-            border: OutlineInputBorder(),
-          ),
-          obscureText: true,
-        ),
-        const SizedBox(height: 8),
-        TextField(
-          controller: _cardZipController,
-          keyboardType: TextInputType.number,
-          decoration: const InputDecoration(
-            labelText: 'ZIP code',
-            border: OutlineInputBorder(),
-          ),
-        ),
-        const SizedBox(height: 8),
-        FilledButton(
-          onPressed: _isTokenizing ? null : _runTokenizeCard,
-          child: Text(_isTokenizing ? 'Tokenizing…' : 'Tokenize card'),
-        ),
-      ]),
-      const SizedBox(height: 16),
-      _section('ACH tokenization', [
-        TextField(
-          controller: _achAccountController,
-          keyboardType: TextInputType.number,
-          decoration: const InputDecoration(
-            labelText: 'Account number',
-            border: OutlineInputBorder(),
-          ),
-        ),
-        const SizedBox(height: 8),
-        TextField(
-          controller: _achRoutingController,
-          keyboardType: TextInputType.number,
-          decoration: const InputDecoration(
-            labelText: 'Routing number',
-            border: OutlineInputBorder(),
-          ),
-        ),
-        const SizedBox(height: 8),
-        TextField(
-          controller: _achHolderController,
-          decoration: const InputDecoration(
-            labelText: 'Account holder',
-            border: OutlineInputBorder(),
-          ),
-        ),
-        const SizedBox(height: 8),
-        FilledButton(
-          onPressed: _isTokenizing ? null : _runTokenizeACH,
-          child: Text(_isTokenizing ? 'Tokenizing…' : 'Tokenize ACH'),
-        ),
-      ]),
-      const SizedBox(height: 16),
-      _section('Tokenization result', [
-        Text(
-          _tokenizationResult.isEmpty
-              ? 'No tokenization result yet'
-              : _tokenizationResult,
-        ),
-      ]),
-    ],
-  );
-
-  Widget _section(String title, List<Widget> children) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Text(
-        title,
-        style: const TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.bold,
-          color: Colors.grey,
-        ),
-      ),
-      const SizedBox(height: 8),
-      Card(
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: children,
-          ),
-        ),
-      ),
-    ],
-  );
+        ],
+      );
 
   Widget _stateBadge(PayabliTTPSessionState s) {
     final color = switch (s) {
       PayabliTTPSessionState.ready => Colors.green,
       PayabliTTPSessionState.error ||
-      PayabliTTPSessionState.sessionExpired => Colors.red,
+      PayabliTTPSessionState.sessionExpired =>
+        Colors.red,
       PayabliTTPSessionState.pendingActivation => Colors.orange,
       _ => Colors.grey,
     };
@@ -511,8 +515,8 @@ class Secrets {
   /// — initialize() will fail with a clear error if the token is invalid.
   static Future<String> fetchAccessToken() async => 'placeholder-token';
 
-  static Future<String> fetchTokenizationAccessToken() async =>
-      'placeholder-tokenization-access-token';
+  static Future<String> fetchPaymentMethodAccessToken() async =>
+      'placeholder-payment-method-access-token';
 
   static String get tokenEndpoint => _tokenEndpoint;
 }

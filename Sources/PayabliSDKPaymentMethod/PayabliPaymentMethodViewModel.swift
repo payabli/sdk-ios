@@ -2,8 +2,8 @@ import PayabliSDKCore
 import SwiftUI
 
 @MainActor
-public final class PayabliTokenizationViewModel: ObservableObject {
-    @Published public var selectedMethod: PayabliTokenizationMethod
+public final class PayabliPaymentMethodViewModel: ObservableObject {
+    @Published public var selectedMethod: PayabliPaymentMethodType
     @Published public var cardholderName = ""
     @Published public var cardNumber = ""
     @Published public var cardExpiration = ""
@@ -27,19 +27,19 @@ public final class PayabliTokenizationViewModel: ObservableObject {
     @Published public private(set) var isSubmitting = false
     @Published public private(set) var errorMessage: String?
 
-    private let component: PayabliTokenization
-    private let configuration: PayabliTokenizationFormConfiguration
+    private let component: PayabliPaymentMethod
+    private let configuration: PayabliPaymentMethodFormConfiguration
 
     public init(
-        component: PayabliTokenization,
-        configuration: PayabliTokenizationFormConfiguration = PayabliTokenizationFormConfiguration()
+        component: PayabliPaymentMethod,
+        configuration: PayabliPaymentMethodFormConfiguration = PayabliPaymentMethodFormConfiguration()
     ) {
         self.component = component
         self.configuration = configuration
         self.selectedMethod = configuration.defaultMethod
     }
 
-    public var activeFields: [PayabliTokenizationField] {
+    public var activeFields: [PayabliPaymentMethodField] {
         switch selectedMethod {
         case .card:
             return configuration.cardFieldOrder
@@ -48,15 +48,15 @@ public final class PayabliTokenizationViewModel: ObservableObject {
         }
     }
 
-    public var detectedCardBrand: PayabliTokenizationCardBrand {
-        PayabliTokenizationCardBrand.detect(cardNumber: cardNumber)
+    public var detectedCardBrand: PayabliPaymentMethodCardBrand {
+        PayabliPaymentMethodCardBrand.detect(cardNumber: cardNumber)
     }
 
     public var cardNumberValidationMessage: String? {
         let digits = cardNumber.digitsOnly
         guard configuration.options.validation.requiresLuhnCheck,
               digits.count >= 12,
-              !PayabliCardTokenizationData.passesLuhn(digits)
+              !PayabliCardPaymentMethodData.passesLuhn(digits)
         else {
             return nil
         }
@@ -96,15 +96,15 @@ public final class PayabliTokenizationViewModel: ObservableObject {
         }
     }
 
-    public func submit() async throws -> PayabliTokenizedMethod {
+    public func submit() async throws -> PayabliStoredPaymentMethod {
         errorMessage = nil
         isSubmitting = true
         defer { isSubmitting = false }
         let submittedPaymentMethod = paymentMethod()
 
         do {
-            let result = try await component.tokenize(
-                paymentMethod: submittedPaymentMethod,
+            let result = try await component.addPaymentMethod(
+                submittedPaymentMethod,
                 options: mergedOptions()
             )
             clearSensitiveFields()
@@ -159,10 +159,10 @@ public final class PayabliTokenizationViewModel: ObservableObject {
         synchronizeExpirationText()
     }
 
-    private func paymentMethod() -> PayabliTokenizationPaymentMethod {
+    private func paymentMethod() -> PayabliPaymentMethodInput {
         switch selectedMethod {
         case .card:
-            return .card(PayabliCardTokenizationData(
+            return .card(PayabliCardPaymentMethodData(
                 cardNumber: cardNumber,
                 expiration: cardExpiration,
                 cardholderName: cardholderName,
@@ -170,7 +170,7 @@ public final class PayabliTokenizationViewModel: ObservableObject {
                 billingZip: cardZip
             ))
         case .ach:
-            return .ach(PayabliACHTokenizationData(
+            return .ach(PayabliACHPaymentMethodData(
                 accountNumber: achAccount,
                 accountType: achAccountType,
                 holderName: achHolder,
@@ -182,7 +182,7 @@ public final class PayabliTokenizationViewModel: ObservableObject {
         }
     }
 
-    private func mergedOptions() -> PayabliTokenizationOptions {
+    private func mergedOptions() -> PayabliPaymentMethodOptions {
         var options = configuration.options
         if let hiddenDescription = configuration.hiddenValues.methodDescription?.trimmed.nilIfEmpty {
             options.methodDescription = hiddenDescription
@@ -196,8 +196,8 @@ public final class PayabliTokenizationViewModel: ObservableObject {
         return options
     }
 
-    private func mergedCustomerData() -> PayabliTokenizationCustomerData? {
-        var customer = configuration.options.customerData ?? PayabliTokenizationCustomerData()
+    private func mergedCustomerData() -> PayabliPaymentMethodCustomerData? {
+        var customer = configuration.options.customerData ?? PayabliPaymentMethodCustomerData()
         if let hiddenCustomer = configuration.hiddenValues.customerData {
             customer.merge(hiddenCustomer)
         }
@@ -209,7 +209,7 @@ public final class PayabliTokenizationViewModel: ObservableObject {
         return customer.hasAnyValue ? customer : nil
     }
 
-    private func fieldIsVisible(_ field: PayabliTokenizationField) -> Bool {
+    private func fieldIsVisible(_ field: PayabliPaymentMethodField) -> Bool {
         activeFields.contains(field)
     }
 
@@ -223,7 +223,7 @@ public final class PayabliTokenizationViewModel: ObservableObject {
         achAccount = ""
     }
 
-    private func clearFieldsAfterFailure(for paymentMethod: PayabliTokenizationPaymentMethod) {
+    private func clearFieldsAfterFailure(for paymentMethod: PayabliPaymentMethodInput) {
         switch paymentMethod {
         case .card:
             cardCvv = ""
@@ -285,8 +285,8 @@ public final class PayabliTokenizationViewModel: ObservableObject {
     }
 }
 
-private extension PayabliTokenizationCustomerData {
-    mutating func merge(_ override: PayabliTokenizationCustomerData) {
+private extension PayabliPaymentMethodCustomerData {
+    mutating func merge(_ override: PayabliPaymentMethodCustomerData) {
         apply(\.additionalData, override.additionalData)
         apply(\.billingAddress1, override.billingAddress1)
         apply(\.billingAddress2, override.billingAddress2)

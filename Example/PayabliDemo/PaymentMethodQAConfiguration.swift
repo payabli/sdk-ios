@@ -1,5 +1,5 @@
 import PayabliSDKCore
 
-enum TokenizationQAConfiguration {
+enum PaymentMethodQAConfiguration {
     static let environment: PayabliEnvironment = .qa
 }

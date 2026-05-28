@@ -1,19 +1,19 @@
 import os
-import PayabliSDKTokenization
+import PayabliSDKPaymentMethod
 import SwiftUI
 
-struct TokenizationQAView: View {
-    @EnvironmentObject private var tokenization: PayabliTokenization
-    @StateObject private var diagnosticsStore = TokenizationQADiagnosticsStore.shared
+struct PaymentMethodQAView: View {
+    @EnvironmentObject private var paymentMethod: PayabliPaymentMethod
+    @StateObject private var diagnosticsStore = PaymentMethodQADiagnosticsStore.shared
     @State private var resultText = ""
-    @State private var isTokenizationSheetPresented = false
+    @State private var isPaymentMethodSheetPresented = false
 
     var body: some View {
         NavigationView {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     Button {
-                        isTokenizationSheetPresented = true
+                        isPaymentMethodSheetPresented = true
                     } label: {
                         Label("Open sheet experience", systemImage: "rectangle.bottomthird.inset.filled")
                             .frame(maxWidth: .infinity)
@@ -23,15 +23,15 @@ struct TokenizationQAView: View {
                     Text("Inline experience")
                         .font(.headline)
 
-                    PayabliTokenizationView(
-                        component: tokenization,
+                    PayabliPaymentMethodView(
+                        component: paymentMethod,
                         configuration: configuration,
-                        onTokenized: handleTokenized,
+                        onPaymentMethodAdded: handlePaymentMethodAdded,
                         onError: handleError
                     )
-                    .payabliTokenizationStyle(style)
+                    .payabliPaymentMethodStyle(style)
 
-                    Text(resultText.isEmpty ? "No tokenization result yet" : resultText)
+                    Text(resultText.isEmpty ? "No payment method result yet" : resultText)
                         .font(.footnote)
                         .foregroundColor(.secondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -39,7 +39,7 @@ struct TokenizationQAView: View {
                         .background(Color(.secondarySystemBackground))
                         .clipShape(RoundedRectangle(cornerRadius: 8))
 
-                    if Secrets.tokenizationDiagnosticsEnabled {
+                    if Secrets.paymentMethodDiagnosticsEnabled {
                         VStack(alignment: .leading, spacing: 8) {
                             Text("Diagnostics")
                                 .font(.headline)
@@ -65,24 +65,24 @@ struct TokenizationQAView: View {
                 }
                 .padding(16)
             }
-            .navigationTitle("Tokenization QA")
+            .navigationTitle("Payment Method QA")
         }
-        .payabliTokenizationSheet(
-            isPresented: $isTokenizationSheetPresented,
-            component: tokenization,
+        .payabliPaymentMethodSheet(
+            isPresented: $isPaymentMethodSheetPresented,
+            component: paymentMethod,
             configuration: configuration,
-            sheetConfiguration: PayabliTokenizationSheetConfiguration(
+            sheetConfiguration: PayabliPaymentMethodSheetConfiguration(
                 title: "Add Payment Method",
                 dismissButton: .back
             ),
             style: style,
-            onTokenized: handleTokenized,
+            onPaymentMethodAdded: handlePaymentMethodAdded,
             onError: handleError
         )
     }
 
-    private var configuration: PayabliTokenizationFormConfiguration {
-        PayabliTokenizationFormConfiguration(
+    private var configuration: PayabliPaymentMethodFormConfiguration {
+        PayabliPaymentMethodFormConfiguration(
             allowedMethods: [.card, .ach],
             defaultMethod: .card,
             cardFieldOrder: [
@@ -98,68 +98,68 @@ struct TokenizationQAView: View {
                 .achAccount,
                 .achAccountType
             ],
-            hiddenValues: PayabliTokenizationHiddenValues(
+            hiddenValues: PayabliPaymentMethodHiddenValues(
                 achHolderType: .personal,
                 achSecCode: .web,
-                methodDescription: "Tokenization QA"
+                methodDescription: "Payment Method QA"
             ),
-            options: PayabliTokenizationOptions(
+            options: PayabliPaymentMethodOptions(
                 achValidation: true,
                 createAnonymous: false,
                 forceCustomerCreation: true,
                 temporary: false,
-                source: "ios-tokenization-qa"
+                source: "ios-payment-method-qa"
             ),
-            labels: PayabliTokenizationLabels(
+            labels: PayabliPaymentMethodLabels(
                 title: "Save Payment Method",
                 subtitle: "Create a card or ACH token."
             ),
             labelLayout: .external,
-            formatting: PayabliTokenizationFormatting(
+            formatting: PayabliPaymentMethodFormatting(
                 insertsCardNumberSpaces: true,
                 masksACHAccountEntry: true
             ),
-            inputSizing: PayabliTokenizationInputSizing(
-                defaultSize: PayabliTokenizationInputSize(height: 52),
+            inputSizing: PayabliPaymentMethodInputSizing(
+                defaultSize: PayabliPaymentMethodInputSize(height: 52),
                 fieldSizes: [
-                    .cardExpiration: PayabliTokenizationInputSize(height: 48),
-                    .cardCvv: PayabliTokenizationInputSize(height: 48)
+                    .cardExpiration: PayabliPaymentMethodInputSize(height: 48),
+                    .cardCvv: PayabliPaymentMethodInputSize(height: 48)
                 ]
             ),
             cardBrandIconPlacement: .trailing
         )
     }
 
-    private var style: PayabliTokenizationStyle {
-        PayabliTokenizationStyle(
+    private var style: PayabliPaymentMethodStyle {
+        PayabliPaymentMethodStyle(
             accentColor: .green,
-            input: PayabliTokenizationInputStyle(
+            input: PayabliPaymentMethodInputStyle(
                 backgroundColor: Color(.systemBackground),
                 borderColor: Color(.separator).opacity(0.6),
                 cornerRadius: 8
             ),
-            submitButton: PayabliTokenizationSubmitButtonStyle(cornerRadius: 8),
-            layout: PayabliTokenizationLayoutStyle(contentSpacing: 18, fieldGroupSpacing: 12)
+            submitButton: PayabliPaymentMethodSubmitButtonStyle(cornerRadius: 8),
+            layout: PayabliPaymentMethodLayoutStyle(contentSpacing: 18, fieldGroupSpacing: 12)
         )
     }
 
-    private func handleTokenized(_ method: PayabliTokenizedMethod) {
+    private func handlePaymentMethodAdded(_ method: PayabliStoredPaymentMethod) {
         resultText = [
             "Stored method: \(method.storedMethodId ?? "-")",
             "Response: \(method.responseText)",
             "Result: \(method.resultText ?? "-")"
         ].joined(separator: "\n")
         Logger(
-            subsystem: "com.payabli.demo.tokenizationqa",
-            category: "TokenizationDiagnostics"
-        ).info("Tokenization succeeded: \(method.responseText, privacy: .public)")
+            subsystem: "com.payabli.demo.paymentmethodqa",
+            category: "PaymentMethodDiagnostics"
+        ).info("Payment method added: \(method.responseText, privacy: .public)")
     }
 
     private func handleError(_ error: Error) {
-        resultText = "Tokenization failed: \(error.localizedDescription)"
+        resultText = "Payment method failed: \(error.localizedDescription)"
         Logger(
-            subsystem: "com.payabli.demo.tokenizationqa",
-            category: "TokenizationDiagnostics"
-        ).error("Tokenization failed: \(error.localizedDescription, privacy: .public)")
+            subsystem: "com.payabli.demo.paymentmethodqa",
+            category: "PaymentMethodDiagnostics"
+        ).error("Payment method failed: \(error.localizedDescription, privacy: .public)")
     }
 }

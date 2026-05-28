@@ -1,12 +1,12 @@
 import PayabliSDKCore
+import PayabliSDKPaymentMethod
 import PayabliSDKTapToPay
-import PayabliSDKTokenization
 import SwiftUI
 
 /// Entry point of the Payabli demo app.
 ///
 /// The app owns a single `PayabliTTP` instance, instantiated at launch with
-/// the partner-supplied access token, plus a `PayabliTokenization` instance
+/// the partner-supplied access token, plus a `PayabliPaymentMethod` instance
 /// for card/ACH stored-method examples.
 @main
 struct PayabliDemoApp: App {
@@ -17,17 +17,17 @@ struct PayabliDemoApp: App {
         appId: Secrets.appId,
         environment: .sandbox
     )
-    @StateObject private var tokenization = PayabliTokenization(
+    @StateObject private var paymentMethod = PayabliPaymentMethod(
         entryPoint: Secrets.entryPoint,
         environment: .sandbox,
-        accessTokenProvider: { try await Secrets.fetchTokenizationAccessToken() }
+        accessTokenProvider: { try await Secrets.fetchPaymentMethodAccessToken() }
     )
 
     var body: some Scene {
         WindowGroup {
             HomeView()
                 .environmentObject(ttp)
-                .environmentObject(tokenization)
+                .environmentObject(paymentMethod)
         }
     }
 }

@@ -47,9 +47,9 @@ let package = Package(
             targets: ["PayabliSDKTapToPay"]
         ),
         .library(
-            name: "PayabliSDKTokenization",
+            name: "PayabliSDKPaymentMethod",
             type: .dynamic,
-            targets: ["PayabliSDKTokenization"]
+            targets: ["PayabliSDKPaymentMethod"]
         ),
         // `PayabliCardReaderCore` is exposed as a library product in the
         // private Package.swift so `xcodebuild -scheme PayabliCardReaderCore`
@@ -117,9 +117,9 @@ let package = Package(
             path: "Sources/PayabliSDKTelemetry"
         ),
         .target(
-            name: "PayabliSDKTokenization",
+            name: "PayabliSDKPaymentMethod",
             dependencies: ["PayabliSDKCore"],
-            path: "Sources/PayabliSDKTokenization",
+            path: "Sources/PayabliSDKPaymentMethod",
             exclude: [
                 "README.md"
             ],
@@ -151,9 +151,9 @@ let package = Package(
             path: "Tests/PayabliSDKTelemetryTests"
         ),
         .testTarget(
-            name: "PayabliSDKTokenizationTests",
-            dependencies: ["PayabliSDKCore", "PayabliSDKTokenization"],
-            path: "Tests/PayabliSDKTokenizationTests"
+            name: "PayabliSDKPaymentMethodTests",
+            dependencies: ["PayabliSDKCore", "PayabliSDKPaymentMethod"],
+            path: "Tests/PayabliSDKPaymentMethodTests"
         ),
         .testTarget(
             name: "PayabliSDKTestUtilsTests",

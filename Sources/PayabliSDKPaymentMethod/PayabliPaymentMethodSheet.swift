@@ -1,7 +1,7 @@
 import SwiftUI
 import UIKit
 
-public enum PayabliTokenizationSheetDismissButton: Sendable, Equatable {
+public enum PayabliPaymentMethodSheetDismissButton: Sendable, Equatable {
     case close
     case back
     case hidden
@@ -29,11 +29,11 @@ public enum PayabliTokenizationSheetDismissButton: Sendable, Equatable {
     }
 }
 
-public struct PayabliTokenizationSheetConfiguration {
+public struct PayabliPaymentMethodSheetConfiguration {
     public var title: String?
     public var subtitle: String?
-    public var dismissButton: PayabliTokenizationSheetDismissButton
-    public var dismissesOnTokenized: Bool
+    public var dismissButton: PayabliPaymentMethodSheetDismissButton
+    public var dismissesOnSuccess: Bool
     public var detents: Set<PresentationDetent>
     public var dragIndicatorVisibility: Visibility
     public var contentInsets: EdgeInsets
@@ -44,8 +44,8 @@ public struct PayabliTokenizationSheetConfiguration {
     public init(
         title: String? = nil,
         subtitle: String? = nil,
-        dismissButton: PayabliTokenizationSheetDismissButton = .close,
-        dismissesOnTokenized: Bool = true,
+        dismissButton: PayabliPaymentMethodSheetDismissButton = .close,
+        dismissesOnSuccess: Bool = true,
         detents: Set<PresentationDetent> = [.medium, .large],
         dragIndicatorVisibility: Visibility = .visible,
         contentInsets: EdgeInsets = EdgeInsets(top: 20, leading: 20, bottom: 24, trailing: 20),
@@ -56,7 +56,7 @@ public struct PayabliTokenizationSheetConfiguration {
         self.title = title
         self.subtitle = subtitle
         self.dismissButton = dismissButton
-        self.dismissesOnTokenized = dismissesOnTokenized
+        self.dismissesOnSuccess = dismissesOnSuccess
         self.detents = detents.isEmpty ? [.large] : detents
         self.dragIndicatorVisibility = dragIndicatorVisibility
         self.contentInsets = contentInsets
@@ -67,48 +67,48 @@ public struct PayabliTokenizationSheetConfiguration {
 }
 
 public extension View {
-    func payabliTokenizationSheet(
+    func payabliPaymentMethodSheet(
         isPresented: Binding<Bool>,
-        component: PayabliTokenization,
-        configuration: PayabliTokenizationFormConfiguration = PayabliTokenizationFormConfiguration(),
-        sheetConfiguration: PayabliTokenizationSheetConfiguration = PayabliTokenizationSheetConfiguration(),
-        style: PayabliTokenizationStyle? = nil,
-        onTokenized: @escaping (PayabliTokenizedMethod) -> Void,
+        component: PayabliPaymentMethod,
+        configuration: PayabliPaymentMethodFormConfiguration = PayabliPaymentMethodFormConfiguration(),
+        sheetConfiguration: PayabliPaymentMethodSheetConfiguration = PayabliPaymentMethodSheetConfiguration(),
+        style: PayabliPaymentMethodStyle? = nil,
+        onPaymentMethodAdded: @escaping (PayabliStoredPaymentMethod) -> Void,
         onError: @escaping (Error) -> Void = { _ in }
     ) -> some View {
         sheet(isPresented: isPresented) {
-            PayabliTokenizationSheetContent(
+            PayabliPaymentMethodSheetContent(
                 isPresented: isPresented,
                 component: component,
                 configuration: configuration,
                 sheetConfiguration: sheetConfiguration,
                 style: style,
-                onTokenized: onTokenized,
+                onPaymentMethodAdded: onPaymentMethodAdded,
                 onError: onError
             )
         }
     }
 }
 
-private struct PayabliTokenizationSheetContent: View {
+private struct PayabliPaymentMethodSheetContent: View {
     @Binding var isPresented: Bool
     @State private var selectedDetent: PresentationDetent
     @State private var measuredContentHeight: CGFloat = 0
 
-    let component: PayabliTokenization
-    let configuration: PayabliTokenizationFormConfiguration
-    let sheetConfiguration: PayabliTokenizationSheetConfiguration
-    let style: PayabliTokenizationStyle?
-    let onTokenized: (PayabliTokenizedMethod) -> Void
+    let component: PayabliPaymentMethod
+    let configuration: PayabliPaymentMethodFormConfiguration
+    let sheetConfiguration: PayabliPaymentMethodSheetConfiguration
+    let style: PayabliPaymentMethodStyle?
+    let onPaymentMethodAdded: (PayabliStoredPaymentMethod) -> Void
     let onError: (Error) -> Void
 
     init(
         isPresented: Binding<Bool>,
-        component: PayabliTokenization,
-        configuration: PayabliTokenizationFormConfiguration,
-        sheetConfiguration: PayabliTokenizationSheetConfiguration,
-        style: PayabliTokenizationStyle?,
-        onTokenized: @escaping (PayabliTokenizedMethod) -> Void,
+        component: PayabliPaymentMethod,
+        configuration: PayabliPaymentMethodFormConfiguration,
+        sheetConfiguration: PayabliPaymentMethodSheetConfiguration,
+        style: PayabliPaymentMethodStyle?,
+        onPaymentMethodAdded: @escaping (PayabliStoredPaymentMethod) -> Void,
         onError: @escaping (Error) -> Void
     ) {
         _isPresented = isPresented
@@ -117,7 +117,7 @@ private struct PayabliTokenizationSheetContent: View {
         self.configuration = configuration
         self.sheetConfiguration = sheetConfiguration
         self.style = style
-        self.onTokenized = onTokenized
+        self.onPaymentMethodAdded = onPaymentMethodAdded
         self.onError = onError
     }
 
@@ -127,13 +127,13 @@ private struct PayabliTokenizationSheetContent: View {
                 VStack(alignment: .leading, spacing: 20) {
                     sheetHeader
 
-                    PayabliTokenizationView(
+                    PayabliPaymentMethodView(
                         component: component,
                         configuration: formConfiguration,
                         style: style,
-                        onTokenized: { method in
-                            onTokenized(method)
-                            if sheetConfiguration.dismissesOnTokenized {
+                        onPaymentMethodAdded: { method in
+                            onPaymentMethodAdded(method)
+                            if sheetConfiguration.dismissesOnSuccess {
                                 isPresented = false
                             }
                         },
@@ -145,7 +145,7 @@ private struct PayabliTokenizationSheetContent: View {
                 .background(
                     GeometryReader { contentProxy in
                         Color.clear.preference(
-                            key: PayabliTokenizationSheetContentHeightKey.self,
+                            key: PayabliPaymentMethodSheetContentHeightKey.self,
                             value: contentProxy.size.height
                         )
                     }
@@ -157,7 +157,7 @@ private struct PayabliTokenizationSheetContent: View {
             .onChange(of: proxy.size.height) { _ in
                 updateSelectedDetent()
             }
-            .onPreferenceChange(PayabliTokenizationSheetContentHeightKey.self) { contentHeight in
+            .onPreferenceChange(PayabliPaymentMethodSheetContentHeightKey.self) { contentHeight in
                 updateMeasuredContentHeight(contentHeight)
             }
         }
@@ -234,7 +234,7 @@ private struct PayabliTokenizationSheetContent: View {
         return configuration.labels.subtitle?.trimmed.nilIfEmpty
     }
 
-    private var formConfiguration: PayabliTokenizationFormConfiguration {
+    private var formConfiguration: PayabliPaymentMethodFormConfiguration {
         guard sheetConfiguration.movesFormHeaderToSheetHeader else { return configuration }
 
         var adjusted = configuration
@@ -246,7 +246,7 @@ private struct PayabliTokenizationSheetContent: View {
     }
 
     private static func initialDetent(
-        for sheetConfiguration: PayabliTokenizationSheetConfiguration
+        for sheetConfiguration: PayabliPaymentMethodSheetConfiguration
     ) -> PresentationDetent {
         if sheetConfiguration.detents.contains(.medium) {
             return .medium
@@ -319,7 +319,7 @@ private struct PayabliTokenizationSheetContent: View {
     }
 }
 
-private struct PayabliTokenizationSheetContentHeightKey: PreferenceKey {
+private struct PayabliPaymentMethodSheetContentHeightKey: PreferenceKey {
     static let defaultValue: CGFloat = 0
 
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {

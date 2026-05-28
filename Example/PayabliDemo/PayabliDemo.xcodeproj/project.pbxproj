@@ -8,23 +8,23 @@
 
 /* Begin PBXBuildFile section */
 		60EDCF1CBB535529F6138573 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F201F43C477597B328446F93 /* Foundation.framework */; };
-		6C370DCD5559AB1DE7E823B1 /* TokenizationQAConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = F866419FEDEC4373794B0014 /* TokenizationQAConfiguration.swift */; };
-		A03B0E6E4088BA6D78561D44 /* PayabliSDKTokenization in Frameworks */ = {isa = PBXBuildFile; productRef = FEDABC50AF32A316A88C675E /* PayabliSDKTokenization */; };
-		AF77F479977FE319B28EB3D7 /* TokenizationQAApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6EA1E9A0909DDC1A7B827C8D /* TokenizationQAApp.swift */; };
+		6C370DCD5559AB1DE7E823B1 /* PaymentMethodQAConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = F866419FEDEC4373794B0014 /* PaymentMethodQAConfiguration.swift */; };
+		A03B0E6E4088BA6D78561D44 /* PayabliSDKPaymentMethod in Frameworks */ = {isa = PBXBuildFile; productRef = FEDABC50AF32A316A88C675E /* PayabliSDKPaymentMethod */; };
+		AF77F479977FE319B28EB3D7 /* PaymentMethodQAApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6EA1E9A0909DDC1A7B827C8D /* PaymentMethodQAApp.swift */; };
 		C9B9D43650B2230A8582B93C /* Secrets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C921D1F3EE7130C23911757 /* Secrets.swift */; };
-		D4DCE94B54535A867D1DDB65 /* TokenizationQAView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB9C96115FF840C6491AED9C /* TokenizationQAView.swift */; };
-		E2A908F7E4994CFB93E06501 /* TokenizationQAMockFailureTransport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8821051F86FA45809F6D8B57 /* TokenizationQAMockFailureTransport.swift */; };
+		D4DCE94B54535A867D1DDB65 /* PaymentMethodQAView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB9C96115FF840C6491AED9C /* PaymentMethodQAView.swift */; };
+		E2A908F7E4994CFB93E06501 /* PaymentMethodQAMockFailureTransport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8821051F86FA45809F6D8B57 /* PaymentMethodQAMockFailureTransport.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		1DADA588F49DF0C4A6611302 /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		4C921D1F3EE7130C23911757 /* Secrets.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Secrets.swift; sourceTree = "<group>"; };
-		6EA1E9A0909DDC1A7B827C8D /* TokenizationQAApp.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TokenizationQAApp.swift; sourceTree = "<group>"; };
-		8821051F86FA45809F6D8B57 /* TokenizationQAMockFailureTransport.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TokenizationQAMockFailureTransport.swift; sourceTree = "<group>"; };
-		BB9C96115FF840C6491AED9C /* TokenizationQAView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TokenizationQAView.swift; sourceTree = "<group>"; };
+		6EA1E9A0909DDC1A7B827C8D /* PaymentMethodQAApp.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PaymentMethodQAApp.swift; sourceTree = "<group>"; };
+		8821051F86FA45809F6D8B57 /* PaymentMethodQAMockFailureTransport.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PaymentMethodQAMockFailureTransport.swift; sourceTree = "<group>"; };
+		BB9C96115FF840C6491AED9C /* PaymentMethodQAView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PaymentMethodQAView.swift; sourceTree = "<group>"; };
 		F201F43C477597B328446F93 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
 		F427A5EA0CEF029F22AF2170 /* PayabliDemo.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PayabliDemo.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		F866419FEDEC4373794B0014 /* TokenizationQAConfiguration.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TokenizationQAConfiguration.swift; sourceTree = "<group>"; };
+		F866419FEDEC4373794B0014 /* PaymentMethodQAConfiguration.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PaymentMethodQAConfiguration.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -33,7 +33,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				60EDCF1CBB535529F6138573 /* Foundation.framework in Frameworks */,
-				A03B0E6E4088BA6D78561D44 /* PayabliSDKTokenization in Frameworks */,
+				A03B0E6E4088BA6D78561D44 /* PayabliSDKPaymentMethod in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -76,10 +76,10 @@
 		B5DAA0EB93D1309AB418DD32 /* PayabliDemo */ = {
 			isa = PBXGroup;
 			children = (
-				6EA1E9A0909DDC1A7B827C8D /* TokenizationQAApp.swift */,
-				F866419FEDEC4373794B0014 /* TokenizationQAConfiguration.swift */,
-				BB9C96115FF840C6491AED9C /* TokenizationQAView.swift */,
-				8821051F86FA45809F6D8B57 /* TokenizationQAMockFailureTransport.swift */,
+				6EA1E9A0909DDC1A7B827C8D /* PaymentMethodQAApp.swift */,
+				F866419FEDEC4373794B0014 /* PaymentMethodQAConfiguration.swift */,
+				BB9C96115FF840C6491AED9C /* PaymentMethodQAView.swift */,
+				8821051F86FA45809F6D8B57 /* PaymentMethodQAMockFailureTransport.swift */,
 				4C921D1F3EE7130C23911757 /* Secrets.swift */,
 				1DADA588F49DF0C4A6611302 /* Info.plist */,
 			);
@@ -104,7 +104,7 @@
 			);
 			name = PayabliDemo;
 			packageProductDependencies = (
-				FEDABC50AF32A316A88C675E /* PayabliSDKTokenization */,
+				FEDABC50AF32A316A88C675E /* PayabliSDKPaymentMethod */,
 			);
 			productName = PayabliDemo;
 			productReference = F427A5EA0CEF029F22AF2170 /* PayabliDemo.app */;
@@ -157,10 +157,10 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				AF77F479977FE319B28EB3D7 /* TokenizationQAApp.swift in Sources */,
-				6C370DCD5559AB1DE7E823B1 /* TokenizationQAConfiguration.swift in Sources */,
-				D4DCE94B54535A867D1DDB65 /* TokenizationQAView.swift in Sources */,
-				E2A908F7E4994CFB93E06501 /* TokenizationQAMockFailureTransport.swift in Sources */,
+				AF77F479977FE319B28EB3D7 /* PaymentMethodQAApp.swift in Sources */,
+				6C370DCD5559AB1DE7E823B1 /* PaymentMethodQAConfiguration.swift in Sources */,
+				D4DCE94B54535A867D1DDB65 /* PaymentMethodQAView.swift in Sources */,
+				E2A908F7E4994CFB93E06501 /* PaymentMethodQAMockFailureTransport.swift in Sources */,
 				C9B9D43650B2230A8582B93C /* Secrets.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -239,7 +239,7 @@
 				IPHONEOS_DEPLOYMENT_TARGET = 16.7;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.payabli.demo.tokenizationqa;
+				PRODUCT_BUNDLE_IDENTIFIER = com.payabli.demo.paymentmethodqa;
 				PRODUCT_NAME = PayabliDemo;
 				SDKROOT = iphoneos;
 				SWIFT_VERSION = 5.0;
@@ -325,7 +325,7 @@
 				IPHONEOS_DEPLOYMENT_TARGET = 16.7;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.payabli.demo.tokenizationqa;
+				PRODUCT_BUNDLE_IDENTIFIER = com.payabli.demo.paymentmethodqa;
 				PRODUCT_NAME = PayabliDemo;
 				SDKROOT = iphoneos;
 				SWIFT_VERSION = 5.0;
@@ -365,10 +365,10 @@
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		FEDABC50AF32A316A88C675E /* PayabliSDKTokenization */ = {
+		FEDABC50AF32A316A88C675E /* PayabliSDKPaymentMethod */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 9D53E7C2DDF2C3C9B8D4F07B /* XCLocalSwiftPackageReference ".." */;
-			productName = PayabliSDKTokenization;
+			productName = PayabliSDKPaymentMethod;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

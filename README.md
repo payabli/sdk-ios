@@ -4,11 +4,11 @@
 
 The Payabli iOS SDK enables iPhone applications to accept in-person
 card payments using Apple's Tap to Pay on iPhone and, through the opt-in
-tokenization module, save card PAN or ACH account data as Payabli stored
+payment method module, save card PAN or ACH account data as Payabli stored
 payment methods. No external card reader is required for Tap to Pay:
 any iPhone XS or newer running iOS 16.7 or later is supported. The SDK
 handles device attestation, session management, NFC card reading, retry
-logic, tokenization request assembly, and reconciliation with the Payabli
+logic, payment method request assembly, and reconciliation with the Payabli
 backend; the host application provides the checkout user interface.
 
 ```swift
@@ -39,7 +39,7 @@ print("Transaction captured. ID:", result.paymentTransId)
 | Capability                    | Notes                                                                    |
 | ----------------------------- | ------------------------------------------------------------------------ |
 | Tap to Pay on iPhone          | Card-present NFC; no external reader required.                           |
-| Card and ACH tokenization     | Opt-in SwiftUI component and direct API for stored payment methods.       |
+| Card and ACH payment method   | Opt-in SwiftUI component and direct API for stored payment methods.       |
 | Swift and Objective-C APIs    | First-class `@objc` surface for MAUI, Flutter, and React Native hosts.   |
 | Built-in App Attest           | Cold and warm device attestation, cached automatically.                  |
 | Pending-device activation     | Out-of-band OTP flow for first-time devices.                             |
@@ -63,7 +63,7 @@ need `PayabliSDKTapToPay`.
 | `PayabliSDK`            | Umbrella product linking Core and TapToPay together.                         |
 | `PayabliSDKCore`        | Core building blocks (config, auth, transport).                              |
 | `PayabliSDKTapToPay`    | Tap to Pay on iPhone. The product most applications require.                 |
-| `PayabliSDKTokenization` | Opt-in card PAN and ACH tokenization component.                             |
+| `PayabliSDKPaymentMethod` | Opt-in card PAN and ACH payment method component.                         |
 | `PayabliCardReaderCore` | Tap to Phone engine. Pulled in transitively; no explicit link required.      |
 | `PayabliSDKTelemetry`   | Optional Sentry and PostHog plumbing; bring your own instance.               |
 | `PayabliSDKTestUtils`   | Test fixtures (`StubURLProtocol`, `InMemorySecureStorage`, mocks). Link in test targets only. |
@@ -188,15 +188,15 @@ Link the required product. Most applications only need
 `PayabliSDKTapToPay` transitively links `PayabliSDKCore` and
 `PayabliCardReaderCore`; no additional product references are required.
 
-For card PAN or ACH tokenization, link the opt-in tokenization component:
+For card PAN or ACH payment method, link the opt-in payment method component:
 
 ```swift
-.product(name: "PayabliSDKTokenization", package: "sdk-ios")
+.product(name: "PayabliSDKPaymentMethod", package: "sdk-ios")
 ```
 
-See [`Documentation/TokenizationOverview.md`](Documentation/TokenizationOverview.md)
-for the complete tokenization feature reference and
-[`Documentation/TokenizationIntegrationGuide.md`](Documentation/TokenizationIntegrationGuide.md)
+See [`Documentation/PaymentMethodOverview.md`](Documentation/PaymentMethodOverview.md)
+for the complete payment method feature reference and
+[`Documentation/PaymentMethodIntegrationGuide.md`](Documentation/PaymentMethodIntegrationGuide.md)
 for native SwiftUI, Flutter, and MAUI integration paths.
 
 For host-app integration tests, also link `PayabliSDKTestUtils`:

@@ -13,10 +13,10 @@ namespace PayabliMauiDemo;
 public partial class MainPage : ContentPage
 {
     private PayabliTTP? _ttp;
-    private PayabliTokenizationObjC? _tokenization;
+    private PayabliPaymentMethodObjC? _paymentMethod;
     private PayabliTTPEventToken? _eventToken;
     private bool _isWorking;
-    private bool _isTokenizing;
+    private bool _isSavingPaymentMethod;
 
     public MainPage()
     {
@@ -64,14 +64,14 @@ public partial class MainPage : ContentPage
                 appId: Secrets.AppId,
                 environment: PayabliEnvironment.Sandbox
             );
-            _tokenization = new PayabliTokenizationObjC(
+            _paymentMethod = new PayabliPaymentMethodObjC(
                 accessTokenHandler: (completion) =>
                 {
                     Task.Run(async () =>
                     {
                         try
                         {
-                            var token = await FetchTokenizationAccessTokenFromPartnerBackend();
+                            var token = await FetchPaymentMethodAccessTokenFromPartnerBackend();
                             completion(token, null);
                         }
                         catch (System.Exception ex)
@@ -108,12 +108,12 @@ public partial class MainPage : ContentPage
         return await Task.FromResult(Secrets.PlaceholderAccessToken);
     }
 
-    private async Task<string> FetchTokenizationAccessTokenFromPartnerBackend()
+    private async Task<string> FetchPaymentMethodAccessTokenFromPartnerBackend()
     {
         // Replace with a real call to your backend that exchanges your
         // server-side clientId + clientSecret for an access_token scoped for
         // token storage.
-        return await Task.FromResult(Secrets.PlaceholderTokenizationAccessToken);
+        return await Task.FromResult(Secrets.PlaceholderPaymentMethodAccessToken);
     }
 
     // MARK: - Lifecycle handlers
@@ -185,11 +185,11 @@ public partial class MainPage : ContentPage
         });
     }
 
-    private void OnTokenizeCardClicked(object? sender, EventArgs e)
+    private void OnAddCardClicked(object? sender, EventArgs e)
     {
-        if (_tokenization is null || _isTokenizing) return;
-        SetTokenizing(true);
-        _tokenization.TokenizeCard(
+        if (_paymentMethod is null || _isSavingPaymentMethod) return;
+        SetSavingPaymentMethod(true);
+        _paymentMethod.AddCard(
             cardNumber: CardNumberEntry.Text ?? "",
             expiration: CardExpirationEntry.Text ?? "",
             cardholderName: CardHolderEntry.Text ?? "",
@@ -201,19 +201,19 @@ public partial class MainPage : ContentPage
             source: "maui-demo",
             completion: (method, error) =>
             {
-                SetTokenizing(false);
+                SetSavingPaymentMethod(false);
                 ResultLabel.Text = method is not null
-                    ? $"✓ Tokenized · stored method {method.StoredMethodId ?? "—"} · {method.ResponseText}"
-                    : $"✗ {error?.LocalizedDescription ?? "unknown tokenization error"}";
+                    ? $"✓ Added · stored method {method.StoredMethodId ?? "—"} · {method.ResponseText}"
+                    : $"✗ {error?.LocalizedDescription ?? "unknown payment method error"}";
             }
         );
     }
 
-    private void OnTokenizeAchClicked(object? sender, EventArgs e)
+    private void OnAddAchClicked(object? sender, EventArgs e)
     {
-        if (_tokenization is null || _isTokenizing) return;
-        SetTokenizing(true);
-        _tokenization.TokenizeACH(
+        if (_paymentMethod is null || _isSavingPaymentMethod) return;
+        SetSavingPaymentMethod(true);
+        _paymentMethod.AddACH(
             accountNumber: AchAccountEntry.Text ?? "",
             accountType: "Checking",
             holderName: AchHolderEntry.Text ?? "",
@@ -227,10 +227,10 @@ public partial class MainPage : ContentPage
             source: "maui-demo",
             completion: (method, error) =>
             {
-                SetTokenizing(false);
+                SetSavingPaymentMethod(false);
                 ResultLabel.Text = method is not null
-                    ? $"✓ Tokenized · stored method {method.StoredMethodId ?? "—"} · {method.ResponseText}"
-                    : $"✗ {error?.LocalizedDescription ?? "unknown tokenization error"}";
+                    ? $"✓ Added · stored method {method.StoredMethodId ?? "—"} · {method.ResponseText}"
+                    : $"✗ {error?.LocalizedDescription ?? "unknown payment method error"}";
             }
         );
     }
@@ -263,11 +263,11 @@ public partial class MainPage : ContentPage
         ActivateButton.IsEnabled = !working;
     }
 
-    private void SetTokenizing(bool tokenizing)
+    private void SetSavingPaymentMethod(bool savingPaymentMethod)
     {
-        _isTokenizing = tokenizing;
-        TokenizeCardButton.IsEnabled = !tokenizing;
-        TokenizeAchButton.IsEnabled = !tokenizing;
+        _isSavingPaymentMethod = savingPaymentMethod;
+        AddCardButton.IsEnabled = !savingPaymentMethod;
+        AddAchButton.IsEnabled = !savingPaymentMethod;
     }
 
     private static NSError DemoNSError(string message)
@@ -298,5 +298,5 @@ internal static class Secrets
     public const string EntryPoint = "<YOUR_ENTRY_POINT>";
     public const string AppId = "<TEAM_ID>.<BUNDLE_ID>";
     public const string PlaceholderAccessToken = "placeholder-token";
-    public const string PlaceholderTokenizationAccessToken = "placeholder-tokenization-access-token";
+    public const string PlaceholderPaymentMethodAccessToken = "placeholder-payment-method-access-token";
 }

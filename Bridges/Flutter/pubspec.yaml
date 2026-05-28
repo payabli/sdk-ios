@@ -1,5 +1,5 @@
 name: payabli_sdk
-description: Flutter MethodChannel wrapper for Payabli iOS Tap to Pay and tokenization.
+description: Flutter MethodChannel wrapper for Payabli iOS Tap to Pay and payment method.
 version: 1.0.0
 publish_to: 'none'
 

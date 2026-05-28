@@ -1,30 +1,30 @@
 import Foundation
 import PayabliSDKCore
 
-public typealias PayabliTokenizationDiagnosticHandler = @Sendable (PayabliTokenizationDiagnosticEntry) -> Void
+public typealias PayabliPaymentMethodDiagnosticHandler = @Sendable (PayabliPaymentMethodDiagnosticEntry) -> Void
 
-public struct PayabliTokenizationDiagnostics: Sendable {
+public struct PayabliPaymentMethodDiagnostics: Sendable {
     public let isEnabled: Bool
-    public let handler: PayabliTokenizationDiagnosticHandler?
+    public let handler: PayabliPaymentMethodDiagnosticHandler?
 
     public init(
         isEnabled: Bool = false,
-        handler: PayabliTokenizationDiagnosticHandler? = nil
+        handler: PayabliPaymentMethodDiagnosticHandler? = nil
     ) {
         self.isEnabled = isEnabled
         self.handler = handler
     }
 
-    public static let disabled = PayabliTokenizationDiagnostics()
+    public static let disabled = PayabliPaymentMethodDiagnostics()
 
     public static func enabled(
-        handler: @escaping PayabliTokenizationDiagnosticHandler
-    ) -> PayabliTokenizationDiagnostics {
-        PayabliTokenizationDiagnostics(isEnabled: true, handler: handler)
+        handler: @escaping PayabliPaymentMethodDiagnosticHandler
+    ) -> PayabliPaymentMethodDiagnostics {
+        PayabliPaymentMethodDiagnostics(isEnabled: true, handler: handler)
     }
 }
 
-public struct PayabliTokenizationDiagnosticEntry: Identifiable, Sendable {
+public struct PayabliPaymentMethodDiagnosticEntry: Identifiable, Sendable {
     public enum Phase: String, Sendable {
         case request
         case response
@@ -67,10 +67,10 @@ public struct PayabliTokenizationDiagnosticEntry: Identifiable, Sendable {
     }
 }
 
-extension PayabliTokenizationDiagnostics {
+extension PayabliPaymentMethodDiagnostics {
     func logRequest(_ request: PayabliRequest, baseURL: URL?) {
         guard isEnabled, let handler else { return }
-        handler(PayabliTokenizationDiagnosticEntry(
+        handler(PayabliPaymentMethodDiagnosticEntry(
             phase: .request,
             method: request.method.rawValue,
             url: Self.urlString(for: request, baseURL: baseURL),
@@ -86,7 +86,7 @@ extension PayabliTokenizationDiagnostics {
         durationMilliseconds: Double
     ) {
         guard isEnabled, let handler else { return }
-        handler(PayabliTokenizationDiagnosticEntry(
+        handler(PayabliPaymentMethodDiagnosticEntry(
             phase: .response,
             method: request.method.rawValue,
             url: Self.urlString(for: request, baseURL: baseURL),
@@ -104,7 +104,7 @@ extension PayabliTokenizationDiagnostics {
         durationMilliseconds: Double
     ) {
         guard isEnabled, let handler else { return }
-        handler(PayabliTokenizationDiagnosticEntry(
+        handler(PayabliPaymentMethodDiagnosticEntry(
             phase: .failure,
             method: request.method.rawValue,
             url: Self.urlString(for: request, baseURL: baseURL),
@@ -181,7 +181,7 @@ extension PayabliTokenizationDiagnostics {
             .lowercased()
             .filter { $0.isLetter || $0.isNumber }
 
-        let exactKeys: Set<String> = [
+        let exactKeys: Set = [
             "authorization",
             "requesttoken",
             "accesstoken",

@@ -1,10 +1,10 @@
-import PayabliSDKTokenization
-import SwiftUI
 import os
+import PayabliSDKPaymentMethod
+import SwiftUI
 
 @MainActor
-final class TokenizationQADiagnosticsStore: ObservableObject {
-    static let shared = TokenizationQADiagnosticsStore()
+final class PaymentMethodQADiagnosticsStore: ObservableObject {
+    static let shared = PaymentMethodQADiagnosticsStore()
 
     @Published private(set) var messages: [String] = []
 
@@ -17,33 +17,33 @@ final class TokenizationQADiagnosticsStore: ObservableObject {
 }
 
 @main
-struct TokenizationQAApp: App {
-    @StateObject private var tokenization = PayabliTokenization(
+struct PaymentMethodQAApp: App {
+    @StateObject private var paymentMethod = PayabliPaymentMethod(
         entryPoint: Secrets.entryPoint,
-        environment: TokenizationQAConfiguration.environment,
+        environment: PaymentMethodQAConfiguration.environment,
         accessTokenProvider: {
-            if Secrets.tokenizationMockFailureEnabled {
+            if Secrets.paymentMethodMockFailureEnabled {
                 return "mock-token"
             }
-            return try await Secrets.fetchTokenizationAccessToken()
+            return try await Secrets.fetchPaymentMethodAccessToken()
         },
-        transport: Secrets.tokenizationMockFailureEnabled ? TokenizationQAMockFailureTransport() : nil,
-        diagnostics: Self.tokenizationDiagnostics
+        transport: Secrets.paymentMethodMockFailureEnabled ? PaymentMethodQAMockFailureTransport() : nil,
+        diagnostics: Self.paymentMethodDiagnostics
     )
 
     var body: some Scene {
         WindowGroup {
-            TokenizationQAView()
-                .environmentObject(tokenization)
+            PaymentMethodQAView()
+                .environmentObject(paymentMethod)
         }
     }
 
-    private static var tokenizationDiagnostics: PayabliTokenizationDiagnostics {
-        guard Secrets.tokenizationDiagnosticsEnabled else { return .disabled }
+    private static var paymentMethodDiagnostics: PayabliPaymentMethodDiagnostics {
+        guard Secrets.paymentMethodDiagnosticsEnabled else { return .disabled }
 
         return .enabled { entry in
             var lines = [
-                "[PayabliTokenizationDiagnostics] \(entry.phase.rawValue.uppercased()) \(entry.method) \(entry.url)"
+                "[PayabliPaymentMethodDiagnostics] \(entry.phase.rawValue.uppercased()) \(entry.method) \(entry.url)"
             ]
             if let statusCode = entry.statusCode {
                 lines.append("statusCode=\(statusCode)")
@@ -61,11 +61,11 @@ struct TokenizationQAApp: App {
             let message = lines.joined(separator: "\n")
             print(message)
             Logger(
-                subsystem: "com.payabli.demo.tokenizationqa",
-                category: "TokenizationDiagnostics"
+                subsystem: "com.payabli.demo.paymentmethodqa",
+                category: "PaymentMethodDiagnostics"
             ).info("\(message, privacy: .public)")
             Task { @MainActor in
-                TokenizationQADiagnosticsStore.shared.append(message)
+                PaymentMethodQADiagnosticsStore.shared.append(message)
             }
         }
     }

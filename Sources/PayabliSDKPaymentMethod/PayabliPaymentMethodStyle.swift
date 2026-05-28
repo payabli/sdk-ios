@@ -1,7 +1,7 @@
 import SwiftUI
 import UIKit
 
-public struct PayabliTokenizationTextStyle {
+public struct PayabliPaymentMethodTextStyle {
     public var font: Font
     public var color: Color
 
@@ -14,7 +14,7 @@ public struct PayabliTokenizationTextStyle {
     }
 }
 
-public struct PayabliTokenizationInputStyle {
+public struct PayabliPaymentMethodInputStyle {
     public var font: Font
     public var textColor: Color
     public var backgroundColor: Color
@@ -51,7 +51,7 @@ public struct PayabliTokenizationInputStyle {
     }
 }
 
-public struct PayabliTokenizationSubmitButtonStyle {
+public struct PayabliPaymentMethodSubmitButtonStyle {
     public var font: Font
     public var backgroundColor: Color?
     public var foregroundColor: Color
@@ -82,7 +82,7 @@ public struct PayabliTokenizationSubmitButtonStyle {
     }
 }
 
-public struct PayabliTokenizationLayoutStyle {
+public struct PayabliPaymentMethodLayoutStyle {
     public var contentSpacing: CGFloat
     public var headerSpacing: CGFloat
     public var fieldGroupSpacing: CGFloat
@@ -104,37 +104,37 @@ public struct PayabliTokenizationLayoutStyle {
     }
 }
 
-public struct PayabliTokenizationStyle {
+public struct PayabliPaymentMethodStyle {
     public var accentColor: Color
-    public var title: PayabliTokenizationTextStyle
-    public var subtitle: PayabliTokenizationTextStyle
-    public var label: PayabliTokenizationTextStyle
-    public var input: PayabliTokenizationInputStyle
-    public var submitButton: PayabliTokenizationSubmitButtonStyle
-    public var error: PayabliTokenizationTextStyle
-    public var layout: PayabliTokenizationLayoutStyle
+    public var title: PayabliPaymentMethodTextStyle
+    public var subtitle: PayabliPaymentMethodTextStyle
+    public var label: PayabliPaymentMethodTextStyle
+    public var input: PayabliPaymentMethodInputStyle
+    public var submitButton: PayabliPaymentMethodSubmitButtonStyle
+    public var error: PayabliPaymentMethodTextStyle
+    public var layout: PayabliPaymentMethodLayoutStyle
 
     public init(
         accentColor: Color = .accentColor,
-        title: PayabliTokenizationTextStyle = PayabliTokenizationTextStyle(
+        title: PayabliPaymentMethodTextStyle = PayabliPaymentMethodTextStyle(
             font: .title3.weight(.semibold),
             color: .primary
         ),
-        subtitle: PayabliTokenizationTextStyle = PayabliTokenizationTextStyle(
+        subtitle: PayabliPaymentMethodTextStyle = PayabliPaymentMethodTextStyle(
             font: .subheadline,
             color: .secondary
         ),
-        label: PayabliTokenizationTextStyle = PayabliTokenizationTextStyle(
+        label: PayabliPaymentMethodTextStyle = PayabliPaymentMethodTextStyle(
             font: .footnote.weight(.medium),
             color: Color(uiColor: .secondaryLabel)
         ),
-        input: PayabliTokenizationInputStyle = PayabliTokenizationInputStyle(),
-        submitButton: PayabliTokenizationSubmitButtonStyle = PayabliTokenizationSubmitButtonStyle(),
-        error: PayabliTokenizationTextStyle = PayabliTokenizationTextStyle(
+        input: PayabliPaymentMethodInputStyle = PayabliPaymentMethodInputStyle(),
+        submitButton: PayabliPaymentMethodSubmitButtonStyle = PayabliPaymentMethodSubmitButtonStyle(),
+        error: PayabliPaymentMethodTextStyle = PayabliPaymentMethodTextStyle(
             font: .footnote,
             color: .red
         ),
-        layout: PayabliTokenizationLayoutStyle = PayabliTokenizationLayoutStyle()
+        layout: PayabliPaymentMethodLayoutStyle = PayabliPaymentMethodLayoutStyle()
     ) {
         self.accentColor = accentColor
         self.title = title
@@ -146,22 +146,22 @@ public struct PayabliTokenizationStyle {
         self.layout = layout
     }
 
-    public static let `default` = PayabliTokenizationStyle()
+    public static let `default` = PayabliPaymentMethodStyle()
 }
 
-private struct PayabliTokenizationStyleKey: EnvironmentKey {
-    static let defaultValue = PayabliTokenizationStyle.default
+private struct PayabliPaymentMethodStyleKey: EnvironmentKey {
+    static let defaultValue = PayabliPaymentMethodStyle.default
 }
 
 public extension EnvironmentValues {
-    var payabliTokenizationStyle: PayabliTokenizationStyle {
-        get { self[PayabliTokenizationStyleKey.self] }
-        set { self[PayabliTokenizationStyleKey.self] = newValue }
+    var payabliPaymentMethodStyle: PayabliPaymentMethodStyle {
+        get { self[PayabliPaymentMethodStyleKey.self] }
+        set { self[PayabliPaymentMethodStyleKey.self] = newValue }
     }
 }
 
 public extension View {
-    func payabliTokenizationStyle(_ style: PayabliTokenizationStyle) -> some View {
-        environment(\.payabliTokenizationStyle, style)
+    func payabliPaymentMethodStyle(_ style: PayabliPaymentMethodStyle) -> some View {
+        environment(\.payabliPaymentMethodStyle, style)
     }
 }

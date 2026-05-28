@@ -2,7 +2,7 @@ import PayabliSDKCore
 import SwiftUI
 import UIKit
 
-public enum PayabliTokenizationField: String, CaseIterable, Identifiable, Sendable {
+public enum PayabliPaymentMethodField: String, CaseIterable, Identifiable, Sendable {
     case cardholderName
     case cardNumber
     case cardExpiration
@@ -27,23 +27,23 @@ public enum PayabliTokenizationField: String, CaseIterable, Identifiable, Sendab
     }
 }
 
-public enum PayabliTokenizationLabelLayout: Sendable {
+public enum PayabliPaymentMethodLabelLayout: Sendable {
     case external
     case placeholder
 }
 
-public enum PayabliTokenizationCardBrandIconPlacement: Sendable, Equatable {
+public enum PayabliPaymentMethodCardBrandIconPlacement: Sendable, Equatable {
     case leading
     case trailing
     case hidden
 }
 
-public enum PayabliTokenizationErrorMessagePlacement: Sendable, Equatable {
+public enum PayabliPaymentMethodErrorMessagePlacement: Sendable, Equatable {
     case top
     case aboveSubmitButton
 }
 
-public struct PayabliTokenizationFormatting: Sendable {
+public struct PayabliPaymentMethodFormatting: Sendable {
     public var insertsCardNumberSpaces: Bool
     public var expirationSeparator: String
     public var masksACHAccountEntry: Bool
@@ -59,13 +59,13 @@ public struct PayabliTokenizationFormatting: Sendable {
     }
 }
 
-public struct PayabliTokenizationHiddenValues: Sendable {
+public struct PayabliPaymentMethodHiddenValues: Sendable {
     public var cardCvv: String?
     public var achHolderType: PayabliACHHolderType?
     public var achSecCode: PayabliACHSecCode?
     public var achDevice: String?
     public var methodDescription: String?
-    public var customerData: PayabliTokenizationCustomerData?
+    public var customerData: PayabliPaymentMethodCustomerData?
 
     public init(
         cardCvv: String? = nil,
@@ -73,7 +73,7 @@ public struct PayabliTokenizationHiddenValues: Sendable {
         achSecCode: PayabliACHSecCode? = .web,
         achDevice: String? = nil,
         methodDescription: String? = nil,
-        customerData: PayabliTokenizationCustomerData? = nil
+        customerData: PayabliPaymentMethodCustomerData? = nil
     ) {
         self.cardCvv = cardCvv
         self.achHolderType = achHolderType
@@ -84,17 +84,17 @@ public struct PayabliTokenizationHiddenValues: Sendable {
     }
 }
 
-public struct PayabliTokenizationLabels: Sendable {
+public struct PayabliPaymentMethodLabels: Sendable {
     public var title: String
     public var subtitle: String?
     public var submitButton: String
-    public var fieldLabels: [PayabliTokenizationField: String]
+    public var fieldLabels: [PayabliPaymentMethodField: String]
 
     public init(
         title: String = "Save Payment Method",
         subtitle: String? = nil,
         submitButton: String = "Add Payment Method",
-        fieldLabels: [PayabliTokenizationField: String] = Self.defaultFieldLabels
+        fieldLabels: [PayabliPaymentMethodField: String] = Self.defaultFieldLabels
     ) {
         self.title = title
         self.subtitle = subtitle
@@ -102,11 +102,11 @@ public struct PayabliTokenizationLabels: Sendable {
         self.fieldLabels = fieldLabels
     }
 
-    public func label(for field: PayabliTokenizationField) -> String {
+    public func label(for field: PayabliPaymentMethodField) -> String {
         fieldLabels[field] ?? Self.defaultFieldLabels[field] ?? field.rawValue
     }
 
-    public static let defaultFieldLabels: [PayabliTokenizationField: String] = [
+    public static let defaultFieldLabels: [PayabliPaymentMethodField: String] = [
         .cardholderName: "Name on card",
         .cardNumber: "Card number",
         .cardExpiration: "Expiration",
@@ -128,7 +128,7 @@ public struct PayabliTokenizationLabels: Sendable {
     ]
 }
 
-public struct PayabliTokenizationInputSize: Sendable, Equatable {
+public struct PayabliPaymentMethodInputSize: Sendable, Equatable {
     public var width: CGFloat?
     public var height: CGFloat
     public var horizontalPadding: CGFloat
@@ -144,50 +144,50 @@ public struct PayabliTokenizationInputSize: Sendable, Equatable {
     }
 }
 
-public struct PayabliTokenizationInputSizing: Sendable, Equatable {
-    public var defaultSize: PayabliTokenizationInputSize
-    public var fieldSizes: [PayabliTokenizationField: PayabliTokenizationInputSize]
+public struct PayabliPaymentMethodInputSizing: Sendable, Equatable {
+    public var defaultSize: PayabliPaymentMethodInputSize
+    public var fieldSizes: [PayabliPaymentMethodField: PayabliPaymentMethodInputSize]
 
     public init(
-        defaultSize: PayabliTokenizationInputSize = PayabliTokenizationInputSize(),
-        fieldSizes: [PayabliTokenizationField: PayabliTokenizationInputSize] = [:]
+        defaultSize: PayabliPaymentMethodInputSize = PayabliPaymentMethodInputSize(),
+        fieldSizes: [PayabliPaymentMethodField: PayabliPaymentMethodInputSize] = [:]
     ) {
         self.defaultSize = defaultSize
         self.fieldSizes = fieldSizes
     }
 
-    public func size(for field: PayabliTokenizationField) -> PayabliTokenizationInputSize {
+    public func size(for field: PayabliPaymentMethodField) -> PayabliPaymentMethodInputSize {
         fieldSizes[field] ?? defaultSize
     }
 }
 
-public struct PayabliTokenizationFormConfiguration: Sendable {
-    public var allowedMethods: [PayabliTokenizationMethod]
-    public var defaultMethod: PayabliTokenizationMethod
-    public var cardFieldOrder: [PayabliTokenizationField]
-    public var achFieldOrder: [PayabliTokenizationField]
-    public var hiddenValues: PayabliTokenizationHiddenValues
-    public var options: PayabliTokenizationOptions
-    public var labels: PayabliTokenizationLabels
-    public var labelLayout: PayabliTokenizationLabelLayout
-    public var formatting: PayabliTokenizationFormatting
-    public var inputSizing: PayabliTokenizationInputSizing
-    public var cardBrandIconPlacement: PayabliTokenizationCardBrandIconPlacement
-    public var errorMessagePlacement: PayabliTokenizationErrorMessagePlacement
+public struct PayabliPaymentMethodFormConfiguration: Sendable {
+    public var allowedMethods: [PayabliPaymentMethodType]
+    public var defaultMethod: PayabliPaymentMethodType
+    public var cardFieldOrder: [PayabliPaymentMethodField]
+    public var achFieldOrder: [PayabliPaymentMethodField]
+    public var hiddenValues: PayabliPaymentMethodHiddenValues
+    public var options: PayabliPaymentMethodOptions
+    public var labels: PayabliPaymentMethodLabels
+    public var labelLayout: PayabliPaymentMethodLabelLayout
+    public var formatting: PayabliPaymentMethodFormatting
+    public var inputSizing: PayabliPaymentMethodInputSizing
+    public var cardBrandIconPlacement: PayabliPaymentMethodCardBrandIconPlacement
+    public var errorMessagePlacement: PayabliPaymentMethodErrorMessagePlacement
 
     public init(
-        allowedMethods: [PayabliTokenizationMethod] = [.card, .ach],
-        defaultMethod: PayabliTokenizationMethod = .card,
-        cardFieldOrder: [PayabliTokenizationField] = Self.defaultCardFieldOrder,
-        achFieldOrder: [PayabliTokenizationField] = Self.defaultACHFieldOrder,
-        hiddenValues: PayabliTokenizationHiddenValues = PayabliTokenizationHiddenValues(),
-        options: PayabliTokenizationOptions = PayabliTokenizationOptions(),
-        labels: PayabliTokenizationLabels = PayabliTokenizationLabels(),
-        labelLayout: PayabliTokenizationLabelLayout = .external,
-        formatting: PayabliTokenizationFormatting = PayabliTokenizationFormatting(),
-        inputSizing: PayabliTokenizationInputSizing = PayabliTokenizationInputSizing(),
-        cardBrandIconPlacement: PayabliTokenizationCardBrandIconPlacement = .trailing,
-        errorMessagePlacement: PayabliTokenizationErrorMessagePlacement = .aboveSubmitButton
+        allowedMethods: [PayabliPaymentMethodType] = [.card, .ach],
+        defaultMethod: PayabliPaymentMethodType = .card,
+        cardFieldOrder: [PayabliPaymentMethodField] = Self.defaultCardFieldOrder,
+        achFieldOrder: [PayabliPaymentMethodField] = Self.defaultACHFieldOrder,
+        hiddenValues: PayabliPaymentMethodHiddenValues = PayabliPaymentMethodHiddenValues(),
+        options: PayabliPaymentMethodOptions = PayabliPaymentMethodOptions(),
+        labels: PayabliPaymentMethodLabels = PayabliPaymentMethodLabels(),
+        labelLayout: PayabliPaymentMethodLabelLayout = .external,
+        formatting: PayabliPaymentMethodFormatting = PayabliPaymentMethodFormatting(),
+        inputSizing: PayabliPaymentMethodInputSizing = PayabliPaymentMethodInputSizing(),
+        cardBrandIconPlacement: PayabliPaymentMethodCardBrandIconPlacement = .trailing,
+        errorMessagePlacement: PayabliPaymentMethodErrorMessagePlacement = .aboveSubmitButton
     ) {
         let methods = allowedMethods.isEmpty ? [defaultMethod] : allowedMethods
         self.allowedMethods = methods
@@ -210,7 +210,7 @@ public struct PayabliTokenizationFormConfiguration: Sendable {
         self.errorMessagePlacement = errorMessagePlacement
     }
 
-    public static let defaultCardFieldOrder: [PayabliTokenizationField] = [
+    public static let defaultCardFieldOrder: [PayabliPaymentMethodField] = [
         .cardholderName,
         .cardNumber,
         .cardExpiration,
@@ -218,7 +218,7 @@ public struct PayabliTokenizationFormConfiguration: Sendable {
         .cardZip
     ]
 
-    public static let defaultACHFieldOrder: [PayabliTokenizationField] = [
+    public static let defaultACHFieldOrder: [PayabliPaymentMethodField] = [
         .achHolder,
         .achRouting,
         .achAccount,
@@ -226,14 +226,14 @@ public struct PayabliTokenizationFormConfiguration: Sendable {
         .achHolderType
     ]
 
-    private static let requiredCardFields: [PayabliTokenizationField] = [
+    private static let requiredCardFields: [PayabliPaymentMethodField] = [
         .cardNumber,
         .cardExpiration,
         .cardholderName,
         .cardZip
     ]
 
-    private static let requiredACHFields: [PayabliTokenizationField] = [
+    private static let requiredACHFields: [PayabliPaymentMethodField] = [
         .achHolder,
         .achRouting,
         .achAccount,
@@ -241,46 +241,46 @@ public struct PayabliTokenizationFormConfiguration: Sendable {
     ]
 
     private static func includingRequiredFields(
-        _ fields: [PayabliTokenizationField],
-        required: [PayabliTokenizationField]
-    ) -> [PayabliTokenizationField] {
+        _ fields: [PayabliPaymentMethodField],
+        required: [PayabliPaymentMethodField]
+    ) -> [PayabliPaymentMethodField] {
         fields + required.filter { !fields.contains($0) }
     }
 
-    private static func visibleACHFields(from fields: [PayabliTokenizationField]) -> [PayabliTokenizationField] {
+    private static func visibleACHFields(from fields: [PayabliPaymentMethodField]) -> [PayabliPaymentMethodField] {
         fields.filter { $0 != .achSecCode }
     }
 }
 
-public struct PayabliTokenizationView: View {
-    @StateObject private var viewModel: PayabliTokenizationViewModel
+public struct PayabliPaymentMethodView: View {
+    @StateObject private var viewModel: PayabliPaymentMethodViewModel
     @State private var isExpirationPickerPresented = false
-    @FocusState private var focusedField: PayabliTokenizationField?
-    @Environment(\.payabliTokenizationStyle) private var environmentStyle
-    private let configuration: PayabliTokenizationFormConfiguration
-    private let explicitStyle: PayabliTokenizationStyle?
-    private let onTokenized: (PayabliTokenizedMethod) -> Void
+    @FocusState private var focusedField: PayabliPaymentMethodField?
+    @Environment(\.payabliPaymentMethodStyle) private var environmentStyle
+    private let configuration: PayabliPaymentMethodFormConfiguration
+    private let explicitStyle: PayabliPaymentMethodStyle?
+    private let onPaymentMethodAdded: (PayabliStoredPaymentMethod) -> Void
     private let onError: (Error) -> Void
 
     @MainActor
     public init(
-        component: PayabliTokenization,
-        configuration: PayabliTokenizationFormConfiguration = PayabliTokenizationFormConfiguration(),
-        style: PayabliTokenizationStyle? = nil,
-        onTokenized: @escaping (PayabliTokenizedMethod) -> Void,
+        component: PayabliPaymentMethod,
+        configuration: PayabliPaymentMethodFormConfiguration = PayabliPaymentMethodFormConfiguration(),
+        style: PayabliPaymentMethodStyle? = nil,
+        onPaymentMethodAdded: @escaping (PayabliStoredPaymentMethod) -> Void,
         onError: @escaping (Error) -> Void = { _ in }
     ) {
         self.configuration = configuration
         self.explicitStyle = style
-        self.onTokenized = onTokenized
+        self.onPaymentMethodAdded = onPaymentMethodAdded
         self.onError = onError
-        _viewModel = StateObject(wrappedValue: PayabliTokenizationViewModel(
+        _viewModel = StateObject(wrappedValue: PayabliPaymentMethodViewModel(
             component: component,
             configuration: configuration
         ))
     }
 
-    private var resolvedStyle: PayabliTokenizationStyle {
+    private var resolvedStyle: PayabliPaymentMethodStyle {
         explicitStyle ?? environmentStyle
     }
 
@@ -362,8 +362,8 @@ public struct PayabliTokenizationView: View {
         .accessibilityLabel("Payment method")
     }
 
-    private var fieldGroups: [[PayabliTokenizationField]] {
-        var groups: [[PayabliTokenizationField]] = []
+    private var fieldGroups: [[PayabliPaymentMethodField]] {
+        var groups: [[PayabliPaymentMethodField]] = []
         var index = viewModel.activeFields.startIndex
 
         while index < viewModel.activeFields.endIndex {
@@ -390,7 +390,7 @@ public struct PayabliTokenizationView: View {
             Task {
                 do {
                     let result = try await viewModel.submit()
-                    onTokenized(result)
+                    onPaymentMethodAdded(result)
                 } catch {
                     onError(error)
                 }
@@ -427,7 +427,7 @@ public struct PayabliTokenizationView: View {
     }
 
     @ViewBuilder
-    private func fieldGroup(_ fields: [PayabliTokenizationField]) -> some View {
+    private func fieldGroup(_ fields: [PayabliPaymentMethodField]) -> some View {
         if fields.count == 2 {
             HStack(alignment: .top, spacing: resolvedStyle.layout.pairedFieldSpacing) {
                 ForEach(fields) { field in
@@ -440,8 +440,8 @@ public struct PayabliTokenizationView: View {
     }
 
     private func shouldPair(
-        _ first: PayabliTokenizationField,
-        _ second: PayabliTokenizationField
+        _ first: PayabliPaymentMethodField,
+        _ second: PayabliPaymentMethodField
     ) -> Bool {
         switch (first, second) {
         case (.cardExpiration, .cardCvv),
@@ -455,7 +455,7 @@ public struct PayabliTokenizationView: View {
     }
 
     @ViewBuilder
-    private func fieldView(_ field: PayabliTokenizationField) -> some View {
+    private func fieldView(_ field: PayabliPaymentMethodField) -> some View {
         switch field {
         case .cardholderName, .cardNumber, .cardExpiration, .cardCvv, .cardZip:
             cardFieldView(field)
@@ -467,7 +467,7 @@ public struct PayabliTokenizationView: View {
     }
 
     @ViewBuilder
-    private func cardFieldView(_ field: PayabliTokenizationField) -> some View {
+    private func cardFieldView(_ field: PayabliPaymentMethodField) -> some View {
         switch field {
         case .cardholderName:
             textField(
@@ -497,7 +497,7 @@ public struct PayabliTokenizationView: View {
     }
 
     @ViewBuilder
-    private func achFieldView(_ field: PayabliTokenizationField) -> some View {
+    private func achFieldView(_ field: PayabliPaymentMethodField) -> some View {
         switch field {
         case .achHolder:
             textField(
@@ -549,7 +549,7 @@ public struct PayabliTokenizationView: View {
     }
 
     @ViewBuilder
-    private func customerFieldView(_ field: PayabliTokenizationField) -> some View {
+    private func customerFieldView(_ field: PayabliPaymentMethodField) -> some View {
         switch field {
         case .methodDescription:
             textField(field, text: $viewModel.methodDescription, autocapitalization: .sentences)
@@ -579,7 +579,7 @@ public struct PayabliTokenizationView: View {
     }
 
     private func textField(
-        _ field: PayabliTokenizationField,
+        _ field: PayabliPaymentMethodField,
         text: Binding<String>,
         keyboardType: UIKeyboardType = .default,
         textContentType: UITextContentType? = nil,
@@ -609,7 +609,7 @@ public struct PayabliTokenizationView: View {
     }
 
     private func cardNumberField() -> some View {
-        let field = PayabliTokenizationField.cardNumber
+        let field = PayabliPaymentMethodField.cardNumber
         let label = configuration.labels.label(for: field)
         let inputSize = configuration.inputSizing.size(for: field)
         let text = Binding(
@@ -648,7 +648,7 @@ public struct PayabliTokenizationView: View {
     }
 
     private func expirationPickerField() -> some View {
-        let field = PayabliTokenizationField.cardExpiration
+        let field = PayabliPaymentMethodField.cardExpiration
         let label = configuration.labels.label(for: field)
         let inputSize = configuration.inputSizing.size(for: field)
 
@@ -758,7 +758,7 @@ public struct PayabliTokenizationView: View {
     }
 
     private func secureField(
-        _ field: PayabliTokenizationField,
+        _ field: PayabliPaymentMethodField,
         text: Binding<String>,
         keyboardType: UIKeyboardType = .default
     ) -> some View {
@@ -785,7 +785,7 @@ public struct PayabliTokenizationView: View {
     }
 
     private func pickerField<Value>(
-        _ field: PayabliTokenizationField,
+        _ field: PayabliPaymentMethodField,
         selection: Binding<Value>,
         values: [Value]
     ) -> some View where Value: RawRepresentable & Identifiable & Hashable, Value.RawValue == String {
@@ -828,7 +828,7 @@ public struct PayabliTokenizationView: View {
     }
 
     private func fieldRow(
-        _ field: PayabliTokenizationField,
+        _ field: PayabliPaymentMethodField,
         errorMessage: String? = nil,
         @ViewBuilder content: () -> some View
     ) -> some View {
@@ -882,7 +882,7 @@ public struct PayabliTokenizationView: View {
             : resolvedStyle.error.color
     }
 
-    private func fieldBackground(_ field: PayabliTokenizationField?) -> some View {
+    private func fieldBackground(_ field: PayabliPaymentMethodField?) -> some View {
         inputShape.fill(
             fieldHasError(field)
                 ? invalidCardNumberBackgroundColor
@@ -892,7 +892,7 @@ public struct PayabliTokenizationView: View {
         )
     }
 
-    private func fieldBorder(_ field: PayabliTokenizationField?) -> some View {
+    private func fieldBorder(_ field: PayabliPaymentMethodField?) -> some View {
         inputShape.stroke(
             fieldHasError(field)
                 ? resolvedStyle.error.color
@@ -907,7 +907,7 @@ public struct PayabliTokenizationView: View {
         )
     }
 
-    private func fieldHasError(_ field: PayabliTokenizationField?) -> Bool {
+    private func fieldHasError(_ field: PayabliPaymentMethodField?) -> Bool {
         field == .cardNumber && viewModel.cardNumberValidationMessage != nil
     }
 

@@ -6,18 +6,18 @@ import PayabliSDKCore
 /// This endpoint authenticates with a server-side bearer token fetched from
 /// the host application's backend. This client intentionally uses a raw
 /// `PayabliTransport` instead of `PayabliSession.transport` because
-/// tokenization owns the one-off access-token fetch before submit.
+/// the payment method component owns the one-off access-token fetch before submit.
 public final class TokenStorageClient: Sendable {
     private let transport: any PayabliTransport
-    private let accessTokenProvider: PayabliTokenizationAccessTokenProvider
+    private let accessTokenProvider: PayabliPaymentMethodAccessTokenProvider
     private let baseURL: URL?
-    private let diagnostics: PayabliTokenizationDiagnostics
+    private let diagnostics: PayabliPaymentMethodDiagnostics
 
     public init(
         transport: any PayabliTransport,
-        accessTokenProvider: @escaping PayabliTokenizationAccessTokenProvider,
+        accessTokenProvider: @escaping PayabliPaymentMethodAccessTokenProvider,
         baseURL: URL? = nil,
-        diagnostics: PayabliTokenizationDiagnostics = .disabled
+        diagnostics: PayabliPaymentMethodDiagnostics = .disabled
     ) {
         self.transport = transport
         self.accessTokenProvider = accessTokenProvider
@@ -27,19 +27,19 @@ public final class TokenStorageClient: Sendable {
 
     public func addMethod(
         entryPoint: String,
-        paymentMethod: PayabliTokenizationPaymentMethod,
-        options: PayabliTokenizationOptions = PayabliTokenizationOptions()
-    ) async throws -> PayabliTokenizedMethod {
+        paymentMethod: PayabliPaymentMethodInput,
+        options: PayabliPaymentMethodOptions = PayabliPaymentMethodOptions()
+    ) async throws -> PayabliStoredPaymentMethod {
         let entry = entryPoint.trimmed
         guard !entry.isEmpty else {
-            throw PayabliTokenizationError.invalidInput("Entrypoint is required.")
+            throw PayabliPaymentMethodError.invalidInput("Entrypoint is required.")
         }
         try paymentMethod.validate(options.validation)
 
         let accessToken = try await accessTokenProvider()
         let trimmedAccessToken = accessToken.trimmed
         guard !trimmedAccessToken.isEmpty else {
-            throw PayabliTokenizationError.missingAccessToken
+            throw PayabliPaymentMethodError.missingAccessToken
         }
 
         let request = try addMethodRequest(
@@ -68,17 +68,17 @@ public final class TokenStorageClient: Sendable {
             baseURL: baseURL,
             durationMilliseconds: Date().timeIntervalSince(start) * 1000
         )
-        if let failure = decodeTokenizationFailure(from: response) {
-            throw PayabliTokenizationError.tokenizationFailed(failure)
+        if let failure = decodePaymentMethodFailure(from: response) {
+            throw PayabliPaymentMethodError.saveFailed(failure)
         }
         try mapPayabliHTTPError(response: response)
-        return try decodeTokenizedMethod(from: response)
+        return try decodeStoredPaymentMethod(from: response)
     }
 
     private func addMethodRequest(
         entryPoint: String,
-        paymentMethod: PayabliTokenizationPaymentMethod,
-        options: PayabliTokenizationOptions,
+        paymentMethod: PayabliPaymentMethodInput,
+        options: PayabliPaymentMethodOptions,
         accessToken: String
     ) throws -> PayabliRequest {
         var headers = ["Authorization": "Bearer \(accessToken)"]
@@ -105,15 +105,15 @@ public final class TokenStorageClient: Sendable {
         )
     }
 
-    private func decodeTokenizedMethod(from response: PayabliResponse) throws -> PayabliTokenizedMethod {
+    private func decodeStoredPaymentMethod(from response: PayabliResponse) throws -> PayabliStoredPaymentMethod {
         let decoder = JSONDecoder()
         do {
-            let decoded = try decoder.decode(PayabliTokenizationAPIResponse.self, from: response.body)
+            let decoded = try decoder.decode(PayabliPaymentMethodAPIResponse.self, from: response.body)
             let approved = decoded.isSuccess == true || decoded.responseData?.resultCode == 1
             guard approved else {
-                throw PayabliTokenizationError.tokenizationFailed(decoded.failure(httpStatusCode: response.statusCode))
+                throw PayabliPaymentMethodError.saveFailed(decoded.failure(httpStatusCode: response.statusCode))
             }
-            return PayabliTokenizedMethod(
+            return PayabliStoredPaymentMethod(
                 storedMethodId: decoded.responseData?.referenceId,
                 methodReferenceId: decoded.responseData?.methodReferenceId,
                 resultCode: decoded.responseData?.resultCode,
@@ -122,37 +122,37 @@ public final class TokenStorageClient: Sendable {
                 responseText: decoded.responseText,
                 apiResponse: decoded
             )
-        } catch let error as PayabliTokenizationError {
+        } catch let error as PayabliPaymentMethodError {
             throw error
         } catch {
             throw PayabliGenericError(
                 code: .decodingError,
-                reason: "Failed to decode tokenization response",
+                reason: "Failed to decode payment method response",
                 underlying: error
             )
         }
     }
 
-    private func decodeTokenizationFailure(from response: PayabliResponse) -> PayabliTokenizationFailure? {
-        let decoded = try? JSONDecoder().decode(PayabliTokenizationAPIResponse.self, from: response.body)
+    private func decodePaymentMethodFailure(from response: PayabliResponse) -> PayabliPaymentMethodFailure? {
+        let decoded = try? JSONDecoder().decode(PayabliPaymentMethodAPIResponse.self, from: response.body)
         guard let decoded, decoded.isSuccess == false else { return nil }
         return decoded.failure(httpStatusCode: response.statusCode)
     }
 }
 
 private struct TokenStorageAddMethodBody: Encodable {
-    let customerData: PayabliTokenizationCustomerData?
+    let customerData: PayabliPaymentMethodCustomerData?
     let entryPoint: String
     let fallbackAuth: Bool?
     let fallbackAuthAmount: Int?
     let methodDescription: String?
-    let paymentMethod: PayabliTokenizationPaymentMethod
-    let vendorData: PayabliTokenizationVendorData?
+    let paymentMethod: PayabliPaymentMethodInput
+    let vendorData: PayabliPaymentMethodVendorData?
     let source: String?
     let subdomain: String?
 }
 
-private extension PayabliTokenizationOptions {
+private extension PayabliPaymentMethodOptions {
     var queryItems: [URLQueryItem] {
         var items: [URLQueryItem] = []
         appendBool(achValidation, name: "achValidation", to: &items)

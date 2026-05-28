@@ -1,7 +1,7 @@
 import Foundation
 import PayabliSDKCore
 
-struct TokenizationQAMockFailureTransport: PayabliTransport {
+struct PaymentMethodQAMockFailureTransport: PayabliTransport {
     func perform(_ request: PayabliRequest) async throws -> PayabliResponse {
         PayabliResponse(
             statusCode: 400,
@@ -14,7 +14,7 @@ struct TokenizationQAMockFailureTransport: PayabliTransport {
         _ request: PayabliRequest,
         decoding: T.Type
     ) async throws -> PayabliV2Envelope<T> {
-        throw PayabliGenericError(code: .unknown, reason: "performV2 is not used by tokenization QA")
+        throw PayabliGenericError(code: .unknown, reason: "performV2 is not used by payment method QA")
     }
 
     private static let failureBody = """

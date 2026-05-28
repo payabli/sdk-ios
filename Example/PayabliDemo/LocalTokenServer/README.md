@@ -1,6 +1,6 @@
 # PayabliDemo Local Token Server
 
-Tiny development server for tokenization-only QA. It gives the iOS sample a
+Tiny development server for payment method-only QA. It gives the iOS sample a
 backend-shaped endpoint without putting Payabli credentials in the app.
 
 The server supports two local QA modes:
@@ -36,7 +36,7 @@ The iOS Simulator can call:
 http://127.0.0.1:8787/payabli/access-token
 ```
 
-Use that URL for `Secrets.partnerTokenizationAccessTokenEndpoint` in the sample app.
+Use that URL for `Secrets.partnerPaymentMethodAccessTokenEndpoint` in the sample app.
 
 ## Credential Exchange Mode
 
@@ -124,4 +124,4 @@ or you can expose the server through an HTTPS tunnel.
 { "accessToken": "..." }
 ```
 
-The sample's `Secrets.fetchTokenizationAccessToken()` already expects this response shape.
+The sample's `Secrets.fetchPaymentMethodAccessToken()` already expects this response shape.

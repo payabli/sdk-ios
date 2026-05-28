@@ -1,7 +1,7 @@
 import Foundation
 import PayabliSDKCore
 
-public enum PayabliTokenizationMethod: String, CaseIterable, Identifiable, Sendable {
+public enum PayabliPaymentMethodType: String, CaseIterable, Identifiable, Sendable {
     case card
     case ach
 
@@ -17,7 +17,7 @@ public enum PayabliTokenizationMethod: String, CaseIterable, Identifiable, Senda
     }
 }
 
-public enum PayabliTokenizationCardBrand: String, CaseIterable, Identifiable, Sendable, Equatable {
+public enum PayabliPaymentMethodCardBrand: String, CaseIterable, Identifiable, Sendable, Equatable {
     case unknown
     case visa
     case mastercard
@@ -59,7 +59,7 @@ public enum PayabliTokenizationCardBrand: String, CaseIterable, Identifiable, Se
         }
     }
 
-    public static func detect(cardNumber: String) -> PayabliTokenizationCardBrand {
+    public static func detect(cardNumber: String) -> PayabliPaymentMethodCardBrand {
         let digits = cardNumber.digitsOnly
         guard !digits.isEmpty else { return .unknown }
 
@@ -67,7 +67,8 @@ public enum PayabliTokenizationCardBrand: String, CaseIterable, Identifiable, Se
             return .visa
         }
         if prefixValue(digits, length: 2).map({ (51 ... 55).contains($0) }) == true ||
-            prefixValue(digits, length: 4).map({ (2221 ... 2720).contains($0) }) == true {
+            prefixValue(digits, length: 4).map({ (2221 ... 2720).contains($0) }) == true
+        {
             return .mastercard
         }
         if ["34", "37"].contains(where: digits.hasPrefix) {
@@ -76,11 +77,13 @@ public enum PayabliTokenizationCardBrand: String, CaseIterable, Identifiable, Se
         if digits.hasPrefix("6011") ||
             digits.hasPrefix("65") ||
             prefixValue(digits, length: 3).map({ (644 ... 649).contains($0) }) == true ||
-            prefixValue(digits, length: 6).map({ (622_126 ... 622_925).contains($0) }) == true {
+            prefixValue(digits, length: 6).map({ (622_126 ... 622_925).contains($0) }) == true
+        {
             return .discover
         }
         if prefixValue(digits, length: 3).map({ (300 ... 305).contains($0) }) == true ||
-            ["36", "38", "39"].contains(where: digits.hasPrefix) {
+            ["36", "38", "39"].contains(where: digits.hasPrefix)
+        {
             return .dinersClub
         }
         if prefixValue(digits, length: 4).map({ (3528 ... 3589).contains($0) }) == true {
@@ -128,7 +131,7 @@ public enum PayabliACHSecCode: String, CaseIterable, Identifiable, Codable, Send
     }
 }
 
-public struct PayabliTokenizationValidation: Sendable {
+public struct PayabliPaymentMethodValidation: Sendable {
     public var requiresLuhnCheck: Bool
     public var validatesACHRoutingChecksum: Bool
 
@@ -140,13 +143,13 @@ public struct PayabliTokenizationValidation: Sendable {
         self.validatesACHRoutingChecksum = validatesACHRoutingChecksum
     }
 
-    public static let `default` = PayabliTokenizationValidation()
+    public static let `default` = PayabliPaymentMethodValidation()
 }
 
-public enum PayabliTokenizationError: PayabliError {
+public enum PayabliPaymentMethodError: PayabliError {
     case invalidInput(String)
     case missingAccessToken
-    case tokenizationFailed(PayabliTokenizationFailure)
+    case saveFailed(PayabliPaymentMethodFailure)
 
     public var code: PayabliErrorCode {
         switch self {
@@ -154,7 +157,7 @@ public enum PayabliTokenizationError: PayabliError {
             return .validation
         case .missingAccessToken:
             return .missingToken
-        case .tokenizationFailed:
+        case .saveFailed:
             return .unknown
         }
     }
@@ -165,7 +168,7 @@ public enum PayabliTokenizationError: PayabliError {
             return message
         case .missingAccessToken:
             return "Missing access token"
-        case let .tokenizationFailed(failure):
+        case let .saveFailed(failure):
             return failure.reason
         }
     }
@@ -174,13 +177,13 @@ public enum PayabliTokenizationError: PayabliError {
         switch self {
         case .invalidInput, .missingAccessToken:
             return nil
-        case let .tokenizationFailed(failure):
+        case let .saveFailed(failure):
             return failure.detail
         }
     }
 }
 
-public struct PayabliTokenizationFailure: Codable, Sendable, Equatable {
+public struct PayabliPaymentMethodFailure: Codable, Sendable, Equatable {
     public let isSuccess: Bool?
     public let responseText: String
     public let responseCode: Int?
@@ -218,9 +221,9 @@ public struct PayabliTokenizationFailure: Codable, Sendable, Equatable {
             return resultText
         }
         if let httpStatusCode, httpStatusCode >= 500 {
-            return "Unable to tokenize right now. Please try again."
+            return "Unable to save payment method right now. Please try again."
         }
-        return responseText.trimmed.nilIfEmpty ?? "Tokenization failed."
+        return responseText.trimmed.nilIfEmpty ?? "Unable to save payment method."
     }
 
     public var detail: String? {
@@ -228,7 +231,7 @@ public struct PayabliTokenizationFailure: Codable, Sendable, Equatable {
     }
 }
 
-public struct PayabliCardTokenizationData: Sendable {
+public struct PayabliCardPaymentMethodData: Sendable {
     public var cardNumber: String
     public var expiration: String
     public var cardholderName: String
@@ -250,7 +253,7 @@ public struct PayabliCardTokenizationData: Sendable {
     }
 }
 
-public struct PayabliACHTokenizationData: Sendable {
+public struct PayabliACHPaymentMethodData: Sendable {
     public var accountNumber: String
     public var accountType: PayabliACHAccountType
     public var holderName: String
@@ -278,11 +281,11 @@ public struct PayabliACHTokenizationData: Sendable {
     }
 }
 
-public enum PayabliTokenizationPaymentMethod: Sendable {
-    case card(PayabliCardTokenizationData)
-    case ach(PayabliACHTokenizationData)
+public enum PayabliPaymentMethodInput: Sendable {
+    case card(PayabliCardPaymentMethodData)
+    case ach(PayabliACHPaymentMethodData)
 
-    public var method: PayabliTokenizationMethod {
+    public var method: PayabliPaymentMethodType {
         switch self {
         case .card: return .card
         case .ach: return .ach
@@ -290,7 +293,7 @@ public enum PayabliTokenizationPaymentMethod: Sendable {
     }
 }
 
-public struct PayabliTokenizationCustomerData: Codable, Sendable {
+public struct PayabliPaymentMethodCustomerData: Codable, Sendable {
     public var additionalData: [String: String]?
     public var billingAddress1: String?
     public var billingAddress2: String?
@@ -360,7 +363,7 @@ public struct PayabliTokenizationCustomerData: Codable, Sendable {
     }
 }
 
-public struct PayabliTokenizationVendorData: Codable, Sendable {
+public struct PayabliPaymentMethodVendorData: Codable, Sendable {
     public var vendorId: Int64?
     public var vendorNumber: String?
 
@@ -370,20 +373,20 @@ public struct PayabliTokenizationVendorData: Codable, Sendable {
     }
 }
 
-public struct PayabliTokenizationOptions: Sendable {
+public struct PayabliPaymentMethodOptions: Sendable {
     public var achValidation: Bool?
     public var createAnonymous: Bool?
     public var forceCustomerCreation: Bool?
     public var temporary: Bool?
     public var idempotencyKey: String?
-    public var customerData: PayabliTokenizationCustomerData?
-    public var vendorData: PayabliTokenizationVendorData?
+    public var customerData: PayabliPaymentMethodCustomerData?
+    public var vendorData: PayabliPaymentMethodVendorData?
     public var fallbackAuth: Bool?
     public var fallbackAuthAmount: Int?
     public var methodDescription: String?
     public var source: String?
     public var subdomain: String?
-    public var validation: PayabliTokenizationValidation
+    public var validation: PayabliPaymentMethodValidation
 
     public init(
         achValidation: Bool? = nil,
@@ -391,14 +394,14 @@ public struct PayabliTokenizationOptions: Sendable {
         forceCustomerCreation: Bool? = nil,
         temporary: Bool? = nil,
         idempotencyKey: String? = nil,
-        customerData: PayabliTokenizationCustomerData? = nil,
-        vendorData: PayabliTokenizationVendorData? = nil,
+        customerData: PayabliPaymentMethodCustomerData? = nil,
+        vendorData: PayabliPaymentMethodVendorData? = nil,
         fallbackAuth: Bool? = nil,
         fallbackAuthAmount: Int? = nil,
         methodDescription: String? = nil,
         source: String? = nil,
         subdomain: String? = nil,
-        validation: PayabliTokenizationValidation = .default
+        validation: PayabliPaymentMethodValidation = .default
     ) {
         self.achValidation = achValidation
         self.createAnonymous = createAnonymous
@@ -416,7 +419,7 @@ public struct PayabliTokenizationOptions: Sendable {
     }
 }
 
-public struct PayabliTokenizationAPIResponseData: Codable, Sendable, Equatable {
+public struct PayabliPaymentMethodAPIResponseData: Codable, Sendable, Equatable {
     public let referenceId: String?
     public let resultCode: Int?
     public let resultText: String?
@@ -465,17 +468,17 @@ public struct PayabliTokenizationAPIResponseData: Codable, Sendable, Equatable {
     }
 }
 
-public struct PayabliTokenizationAPIResponse: Codable, Sendable, Equatable {
+public struct PayabliPaymentMethodAPIResponse: Codable, Sendable, Equatable {
     public let isSuccess: Bool?
     public let responseText: String
     public let responseCode: Int?
-    public let responseData: PayabliTokenizationAPIResponseData?
+    public let responseData: PayabliPaymentMethodAPIResponseData?
 
     public init(
         isSuccess: Bool? = nil,
         responseText: String,
         responseCode: Int? = nil,
-        responseData: PayabliTokenizationAPIResponseData? = nil
+        responseData: PayabliPaymentMethodAPIResponseData? = nil
     ) {
         self.isSuccess = isSuccess
         self.responseText = responseText
@@ -495,11 +498,11 @@ public struct PayabliTokenizationAPIResponse: Codable, Sendable, Equatable {
         isSuccess = try c.decodeIfPresent(Bool.self, forKey: .isSuccess)
         responseText = try c.decode(String.self, forKey: .responseText)
         responseCode = c.decodeLossyIntIfPresent(forKey: .responseCode)
-        responseData = try? c.decodeIfPresent(PayabliTokenizationAPIResponseData.self, forKey: .responseData)
+        responseData = try? c.decodeIfPresent(PayabliPaymentMethodAPIResponseData.self, forKey: .responseData)
     }
 
-    public func failure(httpStatusCode: Int? = nil) -> PayabliTokenizationFailure {
-        PayabliTokenizationFailure(
+    public func failure(httpStatusCode: Int? = nil) -> PayabliPaymentMethodFailure {
+        PayabliPaymentMethodFailure(
             isSuccess: isSuccess,
             responseText: responseText,
             responseCode: responseCode,
@@ -512,14 +515,14 @@ public struct PayabliTokenizationAPIResponse: Codable, Sendable, Equatable {
     }
 }
 
-public struct PayabliTokenizedMethod: Sendable, Equatable {
+public struct PayabliStoredPaymentMethod: Sendable, Equatable {
     public let storedMethodId: String?
     public let methodReferenceId: String?
     public let resultCode: Int?
     public let resultText: String?
     public let customerId: Int64?
     public let responseText: String
-    public let apiResponse: PayabliTokenizationAPIResponse
+    public let apiResponse: PayabliPaymentMethodAPIResponse
 
     public init(
         storedMethodId: String?,
@@ -528,7 +531,7 @@ public struct PayabliTokenizedMethod: Sendable, Equatable {
         resultText: String?,
         customerId: Int64?,
         responseText: String,
-        apiResponse: PayabliTokenizationAPIResponse? = nil
+        apiResponse: PayabliPaymentMethodAPIResponse? = nil
     ) {
         self.storedMethodId = storedMethodId
         self.methodReferenceId = methodReferenceId
@@ -536,9 +539,9 @@ public struct PayabliTokenizedMethod: Sendable, Equatable {
         self.resultText = resultText
         self.customerId = customerId
         self.responseText = responseText
-        self.apiResponse = apiResponse ?? PayabliTokenizationAPIResponse(
+        self.apiResponse = apiResponse ?? PayabliPaymentMethodAPIResponse(
             responseText: responseText,
-            responseData: PayabliTokenizationAPIResponseData(
+            responseData: PayabliPaymentMethodAPIResponseData(
                 referenceId: storedMethodId,
                 resultCode: resultCode,
                 resultText: resultText,
@@ -549,7 +552,7 @@ public struct PayabliTokenizedMethod: Sendable, Equatable {
     }
 }
 
-extension PayabliTokenizationPaymentMethod: Encodable {
+extension PayabliPaymentMethodInput: Encodable {
     enum CodingKeys: String, CodingKey {
         case method
         case cardcvv
@@ -570,7 +573,7 @@ extension PayabliTokenizationPaymentMethod: Encodable {
         var c = encoder.container(keyedBy: CodingKeys.self)
         switch self {
         case let .card(data):
-            try c.encode(PayabliTokenizationMethod.card.rawValue, forKey: .method)
+            try c.encode(PayabliPaymentMethodType.card.rawValue, forKey: .method)
             try c.encode(data.normalizedExpiration(), forKey: .cardexp)
             try c.encode(data.cardholderName.trimmed, forKey: .cardHolder)
             try c.encode(data.cardNumber.digitsOnly, forKey: .cardnumber)
@@ -578,7 +581,7 @@ extension PayabliTokenizationPaymentMethod: Encodable {
             try c.encode(data.billingZip.trimmed, forKey: .cardzip)
 
         case let .ach(data):
-            try c.encode(PayabliTokenizationMethod.ach.rawValue, forKey: .method)
+            try c.encode(PayabliPaymentMethodType.ach.rawValue, forKey: .method)
             try c.encode(data.accountNumber.digitsOnly, forKey: .achAccount)
             try c.encode(data.accountType.rawValue, forKey: .achAccountType)
             try c.encode(data.holderName.trimmed, forKey: .achHolder)
@@ -590,8 +593,8 @@ extension PayabliTokenizationPaymentMethod: Encodable {
     }
 }
 
-extension PayabliTokenizationPaymentMethod {
-    func validate(_ validation: PayabliTokenizationValidation) throws {
+extension PayabliPaymentMethodInput {
+    func validate(_ validation: PayabliPaymentMethodValidation) throws {
         switch self {
         case let .card(data):
             try data.validate(validation)
@@ -601,35 +604,35 @@ extension PayabliTokenizationPaymentMethod {
     }
 }
 
-extension PayabliCardTokenizationData {
-    func validate(_ validation: PayabliTokenizationValidation) throws {
+extension PayabliCardPaymentMethodData {
+    func validate(_ validation: PayabliPaymentMethodValidation) throws {
         let digits = cardNumber.digitsOnly
         guard (12 ... 19).contains(digits.count) else {
-            throw PayabliTokenizationError.invalidInput("Card number must be 12 to 19 digits.")
+            throw PayabliPaymentMethodError.invalidInput("Card number must be 12 to 19 digits.")
         }
         if validation.requiresLuhnCheck, !Self.passesLuhn(digits) {
-            throw PayabliTokenizationError.invalidInput("Card number failed validation.")
+            throw PayabliPaymentMethodError.invalidInput("Card number failed validation.")
         }
         _ = try normalizedExpiration()
         guard !cardholderName.trimmed.isEmpty else {
-            throw PayabliTokenizationError.invalidInput("Cardholder name is required.")
+            throw PayabliPaymentMethodError.invalidInput("Cardholder name is required.")
         }
         guard !billingZip.trimmed.isEmpty else {
-            throw PayabliTokenizationError.invalidInput("Card ZIP code is required.")
+            throw PayabliPaymentMethodError.invalidInput("Card ZIP code is required.")
         }
         if let cvv = cvv?.digitsOnly, !cvv.isEmpty, !(3 ... 4).contains(cvv.count) {
-            throw PayabliTokenizationError.invalidInput("CVV must be 3 or 4 digits.")
+            throw PayabliPaymentMethodError.invalidInput("CVV must be 3 or 4 digits.")
         }
     }
 
     func normalizedExpiration() throws -> String {
         let digits = expiration.digitsOnly
         guard digits.count == 4 || digits.count == 6 else {
-            throw PayabliTokenizationError.invalidInput("Expiration must be in MMYY or MM/YY format.")
+            throw PayabliPaymentMethodError.invalidInput("Expiration must be in MMYY or MM/YY format.")
         }
         let monthPrefix = String(digits.prefix(2))
         guard let month = Int(monthPrefix), (1 ... 12).contains(month) else {
-            throw PayabliTokenizationError.invalidInput("Expiration month must be between 01 and 12.")
+            throw PayabliPaymentMethodError.invalidInput("Expiration month must be between 01 and 12.")
         }
         let year = digits.count == 4 ? String(digits.suffix(2)) : String(digits.suffix(2))
         return "\(monthPrefix)/\(year)"
@@ -649,28 +652,28 @@ extension PayabliCardTokenizationData {
     }
 }
 
-extension PayabliACHTokenizationData {
-    func validate(_ validation: PayabliTokenizationValidation) throws {
+extension PayabliACHPaymentMethodData {
+    func validate(_ validation: PayabliPaymentMethodValidation) throws {
         let account = accountNumber.digitsOnly
         guard (4 ... 17).contains(account.count) else {
-            throw PayabliTokenizationError.invalidInput("ACH account number must be 4 to 17 digits.")
+            throw PayabliPaymentMethodError.invalidInput("ACH account number must be 4 to 17 digits.")
         }
         let routing = routingNumber.digitsOnly
         guard routing.count == 9 else {
-            throw PayabliTokenizationError.invalidInput("ACH routing number must be 9 digits.")
+            throw PayabliPaymentMethodError.invalidInput("ACH routing number must be 9 digits.")
         }
         if validation.validatesACHRoutingChecksum, !Self.passesABAChecksum(routing) {
-            throw PayabliTokenizationError.invalidInput("ACH routing number failed validation.")
+            throw PayabliPaymentMethodError.invalidInput("ACH routing number failed validation.")
         }
         guard !holderName.trimmed.isEmpty else {
-            throw PayabliTokenizationError.invalidInput("ACH account holder is required.")
+            throw PayabliPaymentMethodError.invalidInput("ACH account holder is required.")
         }
         let allowed = holderName.range(
             of: #"^[A-Za-z0-9 .'\-]+$"#,
             options: .regularExpression
         ) != nil
         guard allowed else {
-            throw PayabliTokenizationError.invalidInput("ACH holder contains unsupported characters.")
+            throw PayabliPaymentMethodError.invalidInput("ACH holder contains unsupported characters.")
         }
     }
 

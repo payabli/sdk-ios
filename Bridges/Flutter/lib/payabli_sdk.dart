@@ -155,12 +155,12 @@ class PayabliTTP {
       return await provider();
     }
     if (call.method == 'accessToken') {
-      final provider = PayabliTokenization._accessToken;
+      final provider = PayabliPaymentMethod._accessToken;
       if (provider == null) {
         throw PlatformException(
           code: 'NO_ACCESS_TOKEN_PROVIDER',
           message:
-              'PayabliTokenization.configure() was not called with an accessTokenProvider',
+              'PayabliPaymentMethod.configure() was not called with an accessTokenProvider',
         );
       }
       return await provider();
@@ -183,12 +183,12 @@ class PayabliTTP {
 /// Mirrors `PayabliEnvironment` raw values.
 enum PayabliEnvironment { local, qa, sandbox, production }
 
-/// Dart API for the Payabli card/ACH tokenization surface.
+/// Dart API for the Payabli card/ACH payment method surface.
 ///
 /// The access token must come from your backend. Do not embed a private
 /// Payabli API key in Flutter code.
-class PayabliTokenization {
-  PayabliTokenization._();
+class PayabliPaymentMethod {
+  PayabliPaymentMethod._();
 
   static Future<String> Function()? _accessToken;
 
@@ -202,13 +202,13 @@ class PayabliTokenization {
       PayabliTTP._handleNativeCallback,
     );
 
-    await _payabliMethodChannel.invokeMethod<void>('configureTokenization', {
+    await _payabliMethodChannel.invokeMethod<void>('configurePaymentMethod', {
       'entryPoint': entryPoint,
       'environment': environment.index,
     });
   }
 
-  static Future<PayabliTokenizedMethod> tokenizeCard({
+  static Future<PayabliStoredPaymentMethod> addCard({
     required String cardNumber,
     required String expiration,
     required String cardholderName,
@@ -221,7 +221,7 @@ class PayabliTokenization {
   }) async {
     try {
       final result = await _payabliMethodChannel
-          .invokeMapMethod<String, dynamic>('tokenizeCard', {
+          .invokeMapMethod<String, dynamic>('addCard', {
             'cardNumber': cardNumber,
             'expiration': expiration,
             'cardholderName': cardholderName,
@@ -232,13 +232,13 @@ class PayabliTokenization {
             'temporary': temporary,
             'source': source,
           });
-      return PayabliTokenizedMethod._fromMap(result ?? const {});
+      return PayabliStoredPaymentMethod._fromMap(result ?? const {});
     } on PlatformException catch (e) {
       throw PayabliTTPException._fromPlatform(e);
     }
   }
 
-  static Future<PayabliTokenizedMethod> tokenizeACH({
+  static Future<PayabliStoredPaymentMethod> addACH({
     required String accountNumber,
     required String accountType,
     required String holderName,
@@ -253,7 +253,7 @@ class PayabliTokenization {
   }) async {
     try {
       final result = await _payabliMethodChannel
-          .invokeMapMethod<String, dynamic>('tokenizeACH', {
+          .invokeMapMethod<String, dynamic>('addACH', {
             'accountNumber': accountNumber,
             'accountType': accountType,
             'holderName': holderName,
@@ -266,15 +266,15 @@ class PayabliTokenization {
             'temporary': temporary,
             'source': source,
           });
-      return PayabliTokenizedMethod._fromMap(result ?? const {});
+      return PayabliStoredPaymentMethod._fromMap(result ?? const {});
     } on PlatformException catch (e) {
       throw PayabliTTPException._fromPlatform(e);
     }
   }
 }
 
-class PayabliTokenizedMethod {
-  const PayabliTokenizedMethod({
+class PayabliStoredPaymentMethod {
+  const PayabliStoredPaymentMethod({
     required this.responseText,
     required this.apiResponse,
     this.storedMethodId,
@@ -292,8 +292,8 @@ class PayabliTokenizedMethod {
   final String responseText;
   final Map<String, dynamic> apiResponse;
 
-  factory PayabliTokenizedMethod._fromMap(Map<String, dynamic> map) =>
-      PayabliTokenizedMethod(
+  factory PayabliStoredPaymentMethod._fromMap(Map<String, dynamic> map) =>
+      PayabliStoredPaymentMethod(
         storedMethodId: map['storedMethodId'] as String?,
         methodReferenceId: map['methodReferenceId'] as String?,
         resultCode: map['resultCode'] as int?,

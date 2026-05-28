@@ -1,20 +1,20 @@
-# PayabliSDKTokenization Overview
+# PayabliSDKPaymentMethod Overview
 
-`PayabliSDKTokenization` is an opt-in Swift package product for saving card
+`PayabliSDKPaymentMethod` is an opt-in Swift package product for saving card
 PAN or ACH account data as a Payabli stored payment method. It calls
 `POST /api/TokenStorage/add` and returns the Payabli `referenceId` as
 `storedMethodId`.
 
 The module is intentionally separate from the `PayabliSDK` umbrella. Host apps
-link it only when they need card-not-present or ACH tokenization.
+link it only when they need card-not-present or ACH payment method.
 
 For step-by-step app integration, see
-[`Documentation/TokenizationIntegrationGuide.md`](TokenizationIntegrationGuide.md).
+[`Documentation/PaymentMethodIntegrationGuide.md`](PaymentMethodIntegrationGuide.md).
 
 ## Security Model
 
 - Do not embed a long-lived private API token in an iOS app.
-- Use `PayabliTokenization(entryPoint:environment:accessTokenProvider:)` so
+- Use `PayabliPaymentMethod(entryPoint:environment:accessTokenProvider:)` so
   the app can request a short-lived or scoped access token from your backend
   immediately before submission.
 - The SwiftUI form marks its content `privacySensitive()` and clears PAN, CVV,
@@ -24,23 +24,23 @@ For step-by-step app integration, see
 - Card PAN is Luhn-checked by default. ACH routing numbers are ABA-checksum
   validated by default. Disable these only when the integration has a documented
   reason.
-- Integrators receive Payabli tokenization results, not raw payment values.
+- Integrators receive Payabli stored payment method results, not raw payment values.
   Store only the returned stored-method identifier and any non-sensitive
   metadata your app needs.
 
 ## Package Integration
 
-Add the tokenization product to the host app target:
+Add the payment method product to the host app target:
 
 ```swift
-.product(name: "PayabliSDKTokenization", package: "sdk-ios")
+.product(name: "PayabliSDKPaymentMethod", package: "sdk-ios")
 ```
 
 Then import the module:
 
 ```swift
 import PayabliSDKCore
-import PayabliSDKTokenization
+import PayabliSDKPaymentMethod
 ```
 
 `PayabliSDKCore` supplies shared SDK types such as `PayabliConfig`,
@@ -52,7 +52,7 @@ Create one component instance for the screen or flow. Prefer the provider-based
 initializer in production:
 
 ```swift
-let tokenization = PayabliTokenization(
+let paymentMethod = PayabliPaymentMethod(
     entryPoint: "f743aed24a",
     environment: .sandbox,
     accessTokenProvider: {
@@ -64,11 +64,11 @@ let tokenization = PayabliTokenization(
 The direct `accessToken:` initializer exists for tests, demos, or public
 ephemeral access tokens only.
 
-To inspect redacted tokenization HTTP traffic during local or QA development,
+To inspect redacted payment method HTTP traffic during local or QA development,
 pass diagnostics at component initialization:
 
 ```swift
-let tokenization = PayabliTokenization(
+let paymentMethod = PayabliPaymentMethod(
     entryPoint: "f743aed24a",
     environment: .sandbox,
     accessTokenProvider: {
@@ -82,7 +82,7 @@ let tokenization = PayabliTokenization(
 )
 ```
 
-`PayabliTokenizationDiagnosticEntry` includes `phase`, `method`, `url`,
+`PayabliPaymentMethodDiagnosticEntry` includes `phase`, `method`, `url`,
 `statusCode`, redacted `headers`, redacted `body`, elapsed duration for
 responses/failures, and transport error text for failures.
 
@@ -90,7 +90,7 @@ responses/failures, and transport error text for failures.
 
 ### Component
 
-`PayabliTokenization` is the public component facade.
+`PayabliPaymentMethod` is the public component facade.
 
 | API | Purpose |
 |---|---|
@@ -98,15 +98,15 @@ responses/failures, and transport error text for failures.
 | `init(config:accessTokenProvider:transport:diagnostics:)` | Uses `PayabliConfig.entryPoint` and `PayabliConfig.environment`. |
 | `init(accessToken:entryPoint:environment:transport:diagnostics:)` | Convenience for tests, demos, or ephemeral public access tokens only. |
 | `configure(config:)` | Repoints the component at a new entrypoint/environment. |
-| `tokenize(paymentMethod:options:)` | Low-level submission API used by the component and bridge layers. |
-| `tokenizeCard(_:options:)` | Low-level card helper for SDK-owned bridge layers. |
-| `tokenizeACH(_:options:)` | Low-level ACH helper for SDK-owned bridge layers. |
+| `addPaymentMethod(_:options:)` | Low-level submission API used by the component and bridge layers. |
+| `addCard(_:options:)` | Low-level card helper for SDK-owned bridge layers. |
+| `addACH(_:options:)` | Low-level ACH helper for SDK-owned bridge layers. |
 | `isSubmitting` | Published submission state. |
-| `lastTokenizedMethod` | Published last successful tokenization result. |
+| `lastStoredPaymentMethod` | Published last successful payment method result. |
 
 `transport:` is injectable for tests and advanced hosts. Production apps should
 normally let the component create its default `PayabliService`.
-Mobile app integrators should prefer `PayabliTokenizationView` so raw PAN,
+Mobile app integrators should prefer `PayabliPaymentMethodView` so raw PAN,
 CVV, and ACH account values stay inside the SDK-owned component instead of
 host-app form code.
 
@@ -138,7 +138,7 @@ Optional ACH request values:
 
 ### Options
 
-`PayabliTokenizationOptions` maps the optional API fields outside the required
+`PayabliPaymentMethodOptions` maps the optional API fields outside the required
 payment-method values.
 
 | Option | API location | Notes |
@@ -150,7 +150,7 @@ payment-method values.
 | `idempotencyKey` | Header | Recommended for retry-safe submissions. |
 | `customerData` | Body | Payor/customer owner data. |
 | `vendorData` | Body | Vendor owner data for ACH Pay Out use cases. |
-| `fallbackAuth` | Body | Allows Payabli fallback card authorization when tokenization fails. |
+| `fallbackAuth` | Body | Allows Payabli fallback card authorization when payment method fails. |
 | `fallbackAuthAmount` | Body | Amount for fallback auth, in cents. |
 | `methodDescription` | Body | Stored method display description. |
 | `source` | Body | Integration source tag. |
@@ -165,7 +165,7 @@ should always create a customer-owned reusable stored method, use
 
 ### Diagnostics Redaction
 
-`PayabliTokenizationDiagnostics` emits redacted request, response, and
+`PayabliPaymentMethodDiagnostics` emits redacted request, response, and
 transport-failure entries through your handler. It never exposes bearer tokens,
 PAN, CVV, ACH account/routing values, cardholder/customer PII, or stored-method
 identifiers. Use the entry `url` to verify environment and query flags, and the
@@ -174,7 +174,7 @@ redacted `body` to verify non-sensitive fields such as `entryPoint`, `source`,
 
 ### Response
 
-`PayabliTokenizedMethod` returns both convenience fields and the full decoded
+`PayabliStoredPaymentMethod` returns both convenience fields and the full decoded
 API response.
 
 | Property | Description |
@@ -185,22 +185,22 @@ API response.
 | `resultText` | Payabli result text. |
 | `customerId` | Payabli customer ID when returned. |
 | `responseText` | Top-level Payabli response text. |
-| `apiResponse` | Full decoded `PayabliTokenizationAPIResponse`. |
+| `apiResponse` | Full decoded `PayabliPaymentMethodAPIResponse`. |
 
 Use `apiResponse` when the host application needs the complete Payabli response
 for analytics, support tooling, or custom success/error handling.
 
 ## SwiftUI Form
 
-`PayabliTokenizationView` is the turn-key SwiftUI component. Required payment
+`PayabliPaymentMethodView` is the turn-key SwiftUI component. Required payment
 fields are enforced by the SDK. Optional visible fields are controlled by the
 field-order arrays. Optional hidden values are supplied through
-`PayabliTokenizationHiddenValues` or `PayabliTokenizationOptions`.
+`PayabliPaymentMethodHiddenValues` or `PayabliPaymentMethodOptions`.
 
 ```swift
-PayabliTokenizationView(
-    component: tokenization,
-    configuration: PayabliTokenizationFormConfiguration(
+PayabliPaymentMethodView(
+    component: paymentMethod,
+    configuration: PayabliPaymentMethodFormConfiguration(
         allowedMethods: [.card, .ach],
         defaultMethod: .card,
         cardFieldOrder: [
@@ -216,42 +216,42 @@ PayabliTokenizationView(
             .achAccount,
             .achAccountType
         ],
-        hiddenValues: PayabliTokenizationHiddenValues(
+        hiddenValues: PayabliPaymentMethodHiddenValues(
             achHolderType: .personal,
             achSecCode: .web,
             methodDescription: "Primary payment method",
-            customerData: PayabliTokenizationCustomerData(
+            customerData: PayabliPaymentMethodCustomerData(
                 customerNumber: "cust-123"
             )
         ),
-        options: PayabliTokenizationOptions(
+        options: PayabliPaymentMethodOptions(
             achValidation: true,
             createAnonymous: false,
             forceCustomerCreation: true,
             temporary: false,
             source: "ios-sdk"
         ),
-        labels: PayabliTokenizationLabels(
+        labels: PayabliPaymentMethodLabels(
             title: "Payment Method",
             subtitle: "Save a payment method for future transactions.",
             submitButton: "Save Method"
         ),
         labelLayout: .external,
-        formatting: PayabliTokenizationFormatting(
+        formatting: PayabliPaymentMethodFormatting(
             insertsCardNumberSpaces: true,
             masksACHAccountEntry: true
         ),
-        inputSizing: PayabliTokenizationInputSizing(
-            defaultSize: PayabliTokenizationInputSize(height: 52),
+        inputSizing: PayabliPaymentMethodInputSizing(
+            defaultSize: PayabliPaymentMethodInputSize(height: 52),
             fieldSizes: [
-                .cardExpiration: PayabliTokenizationInputSize(height: 48),
-                .cardCvv: PayabliTokenizationInputSize(height: 48)
+                .cardExpiration: PayabliPaymentMethodInputSize(height: 48),
+                .cardCvv: PayabliPaymentMethodInputSize(height: 48)
             ]
         ),
         cardBrandIconPlacement: .trailing,
         errorMessagePlacement: .aboveSubmitButton
     ),
-    onTokenized: { method in
+    onPaymentMethodAdded: { method in
         let storedMethodId = method.storedMethodId
         let fullResponse = method.apiResponse
         let resultText = fullResponse.responseData?.resultText
@@ -260,11 +260,11 @@ PayabliTokenizationView(
         // Present an integration-specific error state.
     }
 )
-.payabliTokenizationStyle(
-    PayabliTokenizationStyle(
+.payabliPaymentMethodStyle(
+    PayabliPaymentMethodStyle(
         accentColor: .blue,
-        input: PayabliTokenizationInputStyle(cornerRadius: 8),
-        submitButton: PayabliTokenizationSubmitButtonStyle(cornerRadius: 8)
+        input: PayabliPaymentMethodInputStyle(cornerRadius: 8),
+        submitButton: PayabliPaymentMethodSubmitButtonStyle(cornerRadius: 8)
     )
 )
 ```
@@ -274,42 +274,42 @@ card-only, ACH-only, or dual-method forms.
 
 Use `labelLayout: .external` for labels above inputs, or
 `labelLayout: .placeholder` to put labels inside text inputs as placeholders.
-Use `PayabliTokenizationLabels(submitButton:)` to override the submit button
+Use `PayabliPaymentMethodLabels(submitButton:)` to override the submit button
 text from the form configuration. The default submit button text is
 "Add Payment Method".
 
 ## SwiftUI Sheet
 
-Use `.payabliTokenizationSheet(...)` when the host app wants the SDK-provided
-bottom-sheet presentation around the same tokenization form:
+Use `.payabliPaymentMethodSheet(...)` when the host app wants the SDK-provided
+bottom-sheet presentation around the same payment method form:
 
 ```swift
 Button("Add payment method") {
-    isTokenizationPresented = true
+    isPaymentMethodPresented = true
 }
-.payabliTokenizationSheet(
-    isPresented: $isTokenizationPresented,
-    component: tokenization,
-    configuration: PayabliTokenizationFormConfiguration(
+.payabliPaymentMethodSheet(
+    isPresented: $isPaymentMethodPresented,
+    component: paymentMethod,
+    configuration: PayabliPaymentMethodFormConfiguration(
         allowedMethods: [.card],
-        labels: PayabliTokenizationLabels(
+        labels: PayabliPaymentMethodLabels(
             title: "Add Card",
             submitButton: "Save Card"
         )
     ),
-    sheetConfiguration: PayabliTokenizationSheetConfiguration(
+    sheetConfiguration: PayabliPaymentMethodSheetConfiguration(
         dismissButton: .back,
-        dismissesOnTokenized: true,
+        dismissesOnSuccess: true,
         detents: [.medium, .large],
         sizesToContentWhenPossible: true,
         expandsToLargeWhenContentDoesNotFit: true
     ),
-    style: PayabliTokenizationStyle(
+    style: PayabliPaymentMethodStyle(
         accentColor: .blue,
-        input: PayabliTokenizationInputStyle(cornerRadius: 8),
-        submitButton: PayabliTokenizationSubmitButtonStyle(cornerRadius: 8)
+        input: PayabliPaymentMethodInputStyle(cornerRadius: 8),
+        submitButton: PayabliPaymentMethodSubmitButtonStyle(cornerRadius: 8)
     ),
-    onTokenized: { method in
+    onPaymentMethodAdded: { method in
         saveStoredMethodId(method.storedMethodId)
     },
     onError: { error in
@@ -318,16 +318,16 @@ Button("Add payment method") {
 )
 ```
 
-`PayabliTokenizationSheetConfiguration` controls sheet title override, optional
+`PayabliPaymentMethodSheetConfiguration` controls sheet title override, optional
 back or close dismiss button, whether the sheet dismisses after successful
-tokenization, presentation detents, content-height sizing when the form fits on
+payment method, presentation detents, content-height sizing when the form fits on
 screen, automatic expansion to `.large` when the form is too tall, drag
 indicator visibility, content insets, and whether the form title/subtitle
 should be moved into the sheet header.
 
 ## Form Configuration Reference
 
-`PayabliTokenizationFormConfiguration` controls behavior and displayed fields.
+`PayabliPaymentMethodFormConfiguration` controls behavior and displayed fields.
 
 | Property | Purpose |
 |---|---|
@@ -342,7 +342,7 @@ should be moved into the sheet header.
 | `formatting` | Card spacing, expiration separator, and ACH account masking. |
 | `inputSizing` | Default and per-field width, height, and horizontal padding. |
 | `cardBrandIconPlacement` | Card-number brand icon placement: `.leading`, `.trailing`, or `.hidden`. |
-| `errorMessagePlacement` | Tokenization error placement: `.top` or `.aboveSubmitButton`. |
+| `errorMessagePlacement` | Payment Method error placement: `.top` or `.aboveSubmitButton`. |
 
 Supported visible fields:
 
@@ -371,7 +371,7 @@ and first-name/last-name fields are rendered as paired inputs to save space.
 
 ## Configurable Endpoint Fields
 
-`PayabliTokenizationOptions` supports the optional API fields outside the
+`PayabliPaymentMethodOptions` supports the optional API fields outside the
 required payment method values:
 
 - Query flags: `achValidation`, `createAnonymous`, `forceCustomerCreation`,
@@ -379,9 +379,9 @@ required payment method values:
 - Header: `idempotencyKey`
 - Body: `customerData`, `vendorData`, `fallbackAuth`, `fallbackAuthAmount`,
   `methodDescription`, `source`, `subdomain`
-- Validation policy: `PayabliTokenizationValidation`
+- Validation policy: `PayabliPaymentMethodValidation`
 
-Use `PayabliTokenizationFormConfiguration` for display concerns:
+Use `PayabliPaymentMethodFormConfiguration` for display concerns:
 
 - `allowedMethods` and `defaultMethod`
 - `cardFieldOrder` and `achFieldOrder`
@@ -393,7 +393,7 @@ Use `PayabliTokenizationFormConfiguration` for display concerns:
 - `errorMessagePlacement`
 - `cardBrandIconPlacement`
 
-Use `PayabliTokenizationStyle` for visual concerns:
+Use `PayabliPaymentMethodStyle` for visual concerns:
 
 - `accentColor`
 - Header, label, input, error, and submit button fonts and colors
@@ -401,8 +401,8 @@ Use `PayabliTokenizationStyle` for visual concerns:
 - Submit button enabled/disabled colors, height, padding, and corner radius
 - Layout spacing for headers, fields, paired fields, and labels
 
-Apply it with `.payabliTokenizationStyle(...)` to follow SwiftUI's standard
-component styling pattern, or pass `style:` directly to `PayabliTokenizationView`
+Apply it with `.payabliPaymentMethodStyle(...)` to follow SwiftUI's standard
+component styling pattern, or pass `style:` directly to `PayabliPaymentMethodView`
 when a single instance needs an override.
 
 ## Style Samples
@@ -413,14 +413,14 @@ Use this when the host app wants a native iOS form that follows the app accent
 color and standard dynamic type.
 
 ```swift
-let platformDefaultStyle = PayabliTokenizationStyle(
+let platformDefaultStyle = PayabliPaymentMethodStyle(
     accentColor: Color.accentColor,
-    input: PayabliTokenizationInputStyle(
+    input: PayabliPaymentMethodInputStyle(
         backgroundColor: Color(uiColor: .secondarySystemBackground),
         borderColor: Color(uiColor: .separator).opacity(0.45),
         cornerRadius: 8
     ),
-    submitButton: PayabliTokenizationSubmitButtonStyle(cornerRadius: 8)
+    submitButton: PayabliPaymentMethodSubmitButtonStyle(cornerRadius: 8)
 )
 ```
 
@@ -430,33 +430,33 @@ Use this when the form lives inside a checkout sheet or a dense account-settings
 screen.
 
 ```swift
-let compactCheckoutStyle = PayabliTokenizationStyle(
+let compactCheckoutStyle = PayabliPaymentMethodStyle(
     accentColor: .green,
-    title: PayabliTokenizationTextStyle(
+    title: PayabliPaymentMethodTextStyle(
         font: .headline,
         color: .primary
     ),
-    subtitle: PayabliTokenizationTextStyle(
+    subtitle: PayabliPaymentMethodTextStyle(
         font: .caption,
         color: .secondary
     ),
-    label: PayabliTokenizationTextStyle(
+    label: PayabliPaymentMethodTextStyle(
         font: .caption.weight(.semibold),
         color: .secondary
     ),
-    input: PayabliTokenizationInputStyle(
+    input: PayabliPaymentMethodInputStyle(
         font: .callout,
         backgroundColor: Color(uiColor: .systemBackground),
         borderColor: Color(uiColor: .separator),
         focusedBorderColor: .green,
         cornerRadius: 6
     ),
-    submitButton: PayabliTokenizationSubmitButtonStyle(
+    submitButton: PayabliPaymentMethodSubmitButtonStyle(
         font: .callout.weight(.semibold),
         cornerRadius: 6,
         height: 46
     ),
-    layout: PayabliTokenizationLayoutStyle(
+    layout: PayabliPaymentMethodLayoutStyle(
         contentSpacing: 14,
         fieldGroupSpacing: 10,
         pairedFieldSpacing: 8,
@@ -464,11 +464,11 @@ let compactCheckoutStyle = PayabliTokenizationStyle(
     )
 )
 
-let compactCheckoutSizing = PayabliTokenizationInputSizing(
-    defaultSize: PayabliTokenizationInputSize(height: 46, horizontalPadding: 12),
+let compactCheckoutSizing = PayabliPaymentMethodInputSizing(
+    defaultSize: PayabliPaymentMethodInputSize(height: 46, horizontalPadding: 12),
     fieldSizes: [
-        .cardExpiration: PayabliTokenizationInputSize(width: 132, height: 46),
-        .cardCvv: PayabliTokenizationInputSize(width: 104, height: 46)
+        .cardExpiration: PayabliPaymentMethodInputSize(width: 132, height: 46),
+        .cardCvv: PayabliPaymentMethodInputSize(width: 104, height: 46)
     ]
 )
 ```
@@ -479,17 +479,17 @@ Use this when the host app needs stronger visual affordances and prominent
 focused input states.
 
 ```swift
-let highContrastStyle = PayabliTokenizationStyle(
+let highContrastStyle = PayabliPaymentMethodStyle(
     accentColor: .indigo,
-    title: PayabliTokenizationTextStyle(
+    title: PayabliPaymentMethodTextStyle(
         font: .title3.weight(.bold),
         color: .primary
     ),
-    label: PayabliTokenizationTextStyle(
+    label: PayabliPaymentMethodTextStyle(
         font: .footnote.weight(.bold),
         color: .primary
     ),
-    input: PayabliTokenizationInputStyle(
+    input: PayabliPaymentMethodInputStyle(
         font: .body.weight(.medium),
         textColor: .primary,
         backgroundColor: Color(uiColor: .systemBackground),
@@ -501,14 +501,14 @@ let highContrastStyle = PayabliTokenizationStyle(
         cornerRadius: 10,
         pickerIconColor: .indigo
     ),
-    submitButton: PayabliTokenizationSubmitButtonStyle(
+    submitButton: PayabliPaymentMethodSubmitButtonStyle(
         backgroundColor: .indigo,
         foregroundColor: .white,
         disabledBackgroundColor: Color(uiColor: .systemGray4),
         cornerRadius: 10,
         height: 54
     ),
-    error: PayabliTokenizationTextStyle(
+    error: PayabliPaymentMethodTextStyle(
         font: .footnote.weight(.semibold),
         color: .red
     )
@@ -517,12 +517,12 @@ let highContrastStyle = PayabliTokenizationStyle(
 
 ## Error Handling
 
-The component throws `PayabliTokenizationError` for tokenization-specific
+The component throws `PayabliPaymentMethodError` for payment method-specific
 failures:
 
 - `.invalidInput` for SDK-side validation failures
 - `.missingAccessToken` when the provider returns an empty token
-- `.tokenizationFailed` when Payabli returns a decoded unsuccessful response
+- `.saveFailed` when Payabli returns a decoded unsuccessful response
 
 HTTP errors are mapped through Core's `mapPayabliHTTPError(response:)`, so host
 apps should also handle the shared `PayabliError` family used by the rest of the

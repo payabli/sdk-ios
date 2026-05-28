@@ -1,10 +1,10 @@
 @testable import PayabliSDKCore
-@testable import PayabliSDKTokenization
+@testable import PayabliSDKPaymentMethod
 import SwiftUI
 import XCTest
 
 final class TokenStorageClientTests: XCTestCase {
-    func testAddMethodSerializesCardTokenizationRequest() async throws {
+    func testAddMethodSerializesCardPaymentMethodRequest() async throws {
         let transport = MockTransport(responseBody: """
         {
           "responseText": "Success",
@@ -25,19 +25,19 @@ final class TokenStorageClientTests: XCTestCase {
 
         let result = try await client.addMethod(
             entryPoint: "f743aed24a",
-            paymentMethod: .card(PayabliCardTokenizationData(
+            paymentMethod: .card(PayabliCardPaymentMethodData(
                 cardNumber: "4111 1111 1111 1111",
                 expiration: "02/25",
                 cardholderName: "John Doe",
                 cvv: "123",
                 billingZip: "12345"
             )),
-            options: PayabliTokenizationOptions(
+            options: PayabliPaymentMethodOptions(
                 createAnonymous: true,
                 forceCustomerCreation: false,
                 temporary: true,
                 idempotencyKey: "idem-1",
-                customerData: PayabliTokenizationCustomerData(customerId: 4440),
+                customerData: PayabliPaymentMethodCustomerData(customerId: 4440),
                 fallbackAuth: true,
                 fallbackAuthAmount: 100,
                 methodDescription: "Primary Visa card",
@@ -46,8 +46,8 @@ final class TokenStorageClientTests: XCTestCase {
             )
         )
 
-        assertCardTokenizationResult(result)
-        try await assertCardTokenizationRequest(firstRequest(from: transport))
+        assertCardPaymentMethodResult(result)
+        try await assertCardPaymentMethodRequest(firstRequest(from: transport))
     }
 
     func testAddMethodSerializesAuthorizationHeaderOnly() async throws {
@@ -69,7 +69,7 @@ final class TokenStorageClientTests: XCTestCase {
 
         _ = try await client.addMethod(
             entryPoint: "f743aed24a",
-            paymentMethod: .card(PayabliCardTokenizationData(
+            paymentMethod: .card(PayabliCardPaymentMethodData(
                 cardNumber: "4111111111111111",
                 expiration: "02/25",
                 cardholderName: "John Doe",
@@ -83,7 +83,7 @@ final class TokenStorageClientTests: XCTestCase {
         XCTAssertEqual(Set(request.headers.keys), ["Authorization", "Content-Type"])
     }
 
-    func testAddMethodSerializesACHTokenizationRequest() async throws {
+    func testAddMethodSerializesACHPaymentMethodRequest() async throws {
         let transport = MockTransport(responseBody: """
         {
           "responseText": "Success",
@@ -104,7 +104,7 @@ final class TokenStorageClientTests: XCTestCase {
 
         _ = try await client.addMethod(
             entryPoint: "f743aed24a",
-            paymentMethod: .ach(PayabliACHTokenizationData(
+            paymentMethod: .ach(PayabliACHPaymentMethodData(
                 accountNumber: "1111111111111",
                 accountType: .checking,
                 holderName: "John Doe",
@@ -112,9 +112,9 @@ final class TokenStorageClientTests: XCTestCase {
                 secCode: .web,
                 holderType: .personal
             )),
-            options: PayabliTokenizationOptions(
+            options: PayabliPaymentMethodOptions(
                 achValidation: true,
-                vendorData: PayabliTokenizationVendorData(vendorId: 7890)
+                vendorData: PayabliPaymentMethodVendorData(vendorId: 7890)
             )
         )
 
@@ -137,7 +137,7 @@ final class TokenStorageClientTests: XCTestCase {
         XCTAssertEqual(paymentMethod["achRouting"] as? String, "123456780")
     }
 
-    func testACHTokenizationDefaultsSecCodeToWeb() async throws {
+    func testACHPaymentMethodDefaultsSecCodeToWeb() async throws {
         let transport = MockTransport(responseBody: """
         {
           "responseText": "Success",
@@ -156,7 +156,7 @@ final class TokenStorageClientTests: XCTestCase {
 
         _ = try await client.addMethod(
             entryPoint: "f743aed24a",
-            paymentMethod: .ach(PayabliACHTokenizationData(
+            paymentMethod: .ach(PayabliACHPaymentMethodData(
                 accountNumber: "1111111111111",
                 accountType: .checking,
                 holderName: "John Doe",
@@ -180,7 +180,7 @@ final class TokenStorageClientTests: XCTestCase {
         do {
             _ = try await client.addMethod(
                 entryPoint: "entry",
-                paymentMethod: .card(PayabliCardTokenizationData(
+                paymentMethod: .card(PayabliCardPaymentMethodData(
                     cardNumber: "4111111111111112",
                     expiration: "02/25",
                     cardholderName: "John Doe",
@@ -188,7 +188,7 @@ final class TokenStorageClientTests: XCTestCase {
                 ))
             )
             XCTFail("Expected validation error")
-        } catch PayabliTokenizationError.invalidInput {
+        } catch PayabliPaymentMethodError.invalidInput {
             let requests = await transport.requests
             XCTAssertTrue(requests.isEmpty)
         } catch {
@@ -206,7 +206,7 @@ final class TokenStorageClientTests: XCTestCase {
         do {
             _ = try await client.addMethod(
                 entryPoint: "entry",
-                paymentMethod: .card(PayabliCardTokenizationData(
+                paymentMethod: .card(PayabliCardPaymentMethodData(
                     cardNumber: "4111111111111111",
                     expiration: "02/25",
                     cardholderName: "John Doe",
@@ -214,7 +214,7 @@ final class TokenStorageClientTests: XCTestCase {
                 ))
             )
             XCTFail("Expected validation error")
-        } catch let PayabliTokenizationError.invalidInput(message) {
+        } catch let PayabliPaymentMethodError.invalidInput(message) {
             XCTAssertEqual(message, "Card ZIP code is required.")
             let requests = await transport.requests
             XCTAssertTrue(requests.isEmpty)
@@ -224,48 +224,48 @@ final class TokenStorageClientTests: XCTestCase {
     }
 
     func testDetectsCardBrandFromCardNumberPrefix() {
-        XCTAssertEqual(PayabliTokenizationCardBrand.detect(cardNumber: "4111 1111 1111 1111"), .visa)
-        XCTAssertEqual(PayabliTokenizationCardBrand.detect(cardNumber: "5555 5555 5555 4444"), .mastercard)
-        XCTAssertEqual(PayabliTokenizationCardBrand.detect(cardNumber: "378282246310005"), .americanExpress)
-        XCTAssertEqual(PayabliTokenizationCardBrand.detect(cardNumber: "6011111111111117"), .discover)
-        XCTAssertEqual(PayabliTokenizationCardBrand.detect(cardNumber: "30569309025904"), .dinersClub)
-        XCTAssertEqual(PayabliTokenizationCardBrand.detect(cardNumber: "3530111333300000"), .jcb)
-        XCTAssertEqual(PayabliTokenizationCardBrand.detect(cardNumber: "6200000000000005"), .unionPay)
-        XCTAssertEqual(PayabliTokenizationCardBrand.detect(cardNumber: ""), .unknown)
+        XCTAssertEqual(PayabliPaymentMethodCardBrand.detect(cardNumber: "4111 1111 1111 1111"), .visa)
+        XCTAssertEqual(PayabliPaymentMethodCardBrand.detect(cardNumber: "5555 5555 5555 4444"), .mastercard)
+        XCTAssertEqual(PayabliPaymentMethodCardBrand.detect(cardNumber: "378282246310005"), .americanExpress)
+        XCTAssertEqual(PayabliPaymentMethodCardBrand.detect(cardNumber: "6011111111111117"), .discover)
+        XCTAssertEqual(PayabliPaymentMethodCardBrand.detect(cardNumber: "30569309025904"), .dinersClub)
+        XCTAssertEqual(PayabliPaymentMethodCardBrand.detect(cardNumber: "3530111333300000"), .jcb)
+        XCTAssertEqual(PayabliPaymentMethodCardBrand.detect(cardNumber: "6200000000000005"), .unionPay)
+        XCTAssertEqual(PayabliPaymentMethodCardBrand.detect(cardNumber: ""), .unknown)
     }
 
     func testCardBrandAssetNamesUsePayabliCatalogNames() {
-        XCTAssertEqual(PayabliTokenizationCardBrand.visa.brandAssetName, "brand-visa")
-        XCTAssertEqual(PayabliTokenizationCardBrand.mastercard.brandAssetName, "brand-mastercard")
-        XCTAssertEqual(PayabliTokenizationCardBrand.americanExpress.brandAssetName, "brand-amex")
-        XCTAssertEqual(PayabliTokenizationCardBrand.discover.brandAssetName, "brand-discover")
-        XCTAssertNil(PayabliTokenizationCardBrand.unknown.brandAssetName)
-        XCTAssertNil(PayabliTokenizationCardBrand.jcb.brandAssetName)
+        XCTAssertEqual(PayabliPaymentMethodCardBrand.visa.brandAssetName, "brand-visa")
+        XCTAssertEqual(PayabliPaymentMethodCardBrand.mastercard.brandAssetName, "brand-mastercard")
+        XCTAssertEqual(PayabliPaymentMethodCardBrand.americanExpress.brandAssetName, "brand-amex")
+        XCTAssertEqual(PayabliPaymentMethodCardBrand.discover.brandAssetName, "brand-discover")
+        XCTAssertNil(PayabliPaymentMethodCardBrand.unknown.brandAssetName)
+        XCTAssertNil(PayabliPaymentMethodCardBrand.jcb.brandAssetName)
     }
 
     func testCardBrandIconPlacementIsConfigurable() {
-        let configuration = PayabliTokenizationFormConfiguration(cardBrandIconPlacement: .leading)
+        let configuration = PayabliPaymentMethodFormConfiguration(cardBrandIconPlacement: .leading)
 
         XCTAssertEqual(configuration.cardBrandIconPlacement, .leading)
     }
 
     func testErrorMessagePlacementIsConfigurable() {
-        XCTAssertEqual(PayabliTokenizationFormConfiguration().errorMessagePlacement, .aboveSubmitButton)
+        XCTAssertEqual(PayabliPaymentMethodFormConfiguration().errorMessagePlacement, .aboveSubmitButton)
 
-        let configuration = PayabliTokenizationFormConfiguration(errorMessagePlacement: .top)
+        let configuration = PayabliPaymentMethodFormConfiguration(errorMessagePlacement: .top)
 
         XCTAssertEqual(configuration.errorMessagePlacement, .top)
     }
 
-    func testTokenizationLabelsDefaultSubmitButtonText() {
-        XCTAssertEqual(PayabliTokenizationLabels().submitButton, "Add Payment Method")
+    func testPaymentMethodLabelsDefaultSubmitButtonText() {
+        XCTAssertEqual(PayabliPaymentMethodLabels().submitButton, "Add Payment Method")
     }
 
     func testSheetConfigurationDefaultsToSdkOwnedPresentation() {
-        let configuration = PayabliTokenizationSheetConfiguration()
+        let configuration = PayabliPaymentMethodSheetConfiguration()
 
         XCTAssertEqual(configuration.dismissButton, .close)
-        XCTAssertTrue(configuration.dismissesOnTokenized)
+        XCTAssertTrue(configuration.dismissesOnSuccess)
         XCTAssertTrue(configuration.movesFormHeaderToSheetHeader)
         XCTAssertTrue(configuration.sizesToContentWhenPossible)
         XCTAssertTrue(configuration.expandsToLargeWhenContentDoesNotFit)
@@ -273,7 +273,7 @@ final class TokenStorageClientTests: XCTestCase {
     }
 
     func testSheetConfigurationUsesLargeDetentWhenGivenEmptySet() {
-        let configuration = PayabliTokenizationSheetConfiguration(detents: Set<PresentationDetent>())
+        let configuration = PayabliPaymentMethodSheetConfiguration(detents: Set<PresentationDetent>())
 
         XCTAssertEqual(configuration.detents, [.large])
     }
@@ -302,18 +302,18 @@ final class TokenStorageClientTests: XCTestCase {
 
         _ = try await client.addMethod(
             entryPoint: "f743aed24a",
-            paymentMethod: .card(PayabliCardTokenizationData(
+            paymentMethod: .card(PayabliCardPaymentMethodData(
                 cardNumber: "4111111111111111",
                 expiration: "02/25",
                 cardholderName: "Jane Doe",
                 cvv: "123",
                 billingZip: "33139"
             )),
-            options: PayabliTokenizationOptions(
+            options: PayabliPaymentMethodOptions(
                 createAnonymous: false,
                 forceCustomerCreation: true,
                 temporary: false,
-                customerData: PayabliTokenizationCustomerData(
+                customerData: PayabliPaymentMethodCustomerData(
                     billingEmail: "jane@example.com",
                     customerNumber: "cust-secret"
                 ),
@@ -350,7 +350,7 @@ final class TokenStorageClientTests: XCTestCase {
         XCTAssertFalse(responseBody.contains("4440"))
     }
 
-    func testDeclinedTokenizationThrowsDomainError() async throws {
+    func testDeclinedPaymentMethodThrowsDomainError() async throws {
         let transport = MockTransport(responseBody: """
         {
           "responseText": "Declined",
@@ -369,15 +369,15 @@ final class TokenStorageClientTests: XCTestCase {
         do {
             _ = try await client.addMethod(
                 entryPoint: "entry",
-                paymentMethod: .ach(PayabliACHTokenizationData(
+                paymentMethod: .ach(PayabliACHPaymentMethodData(
                     accountNumber: "1111111111111",
                     accountType: .checking,
                     holderName: "John Doe",
                     routingNumber: "123456780"
                 ))
             )
-            XCTFail("Expected tokenization failure")
-        } catch let PayabliTokenizationError.tokenizationFailed(failure) {
+            XCTFail("Expected payment method failure")
+        } catch let PayabliPaymentMethodError.saveFailed(failure) {
             XCTAssertEqual(failure.responseText, "Declined")
             XCTAssertEqual(failure.resultCode, 2)
             XCTAssertEqual(failure.resultText, "Account validation failed")
@@ -387,7 +387,7 @@ final class TokenStorageClientTests: XCTestCase {
         }
     }
 
-    func testBadRequestTokenizationEnvelopeThrowsTokenizationFailure() async throws {
+    func testBadRequestPaymentMethodEnvelopeThrowsPaymentMethodFailure() async throws {
         let transport = MockTransport(statusCode: 400, responseBody: """
         {
           "isSuccess": false,
@@ -407,7 +407,7 @@ final class TokenStorageClientTests: XCTestCase {
         do {
             _ = try await client.addMethod(
                 entryPoint: "entry",
-                paymentMethod: .card(PayabliCardTokenizationData(
+                paymentMethod: .card(PayabliCardPaymentMethodData(
                     cardNumber: "4111111111111111",
                     expiration: "02/28",
                     cardholderName: "Jane Doe",
@@ -415,8 +415,8 @@ final class TokenStorageClientTests: XCTestCase {
                     billingZip: "33139"
                 ))
             )
-            XCTFail("Expected tokenization failure")
-        } catch let PayabliTokenizationError.tokenizationFailed(failure) {
+            XCTFail("Expected payment method failure")
+        } catch let PayabliPaymentMethodError.saveFailed(failure) {
             XCTAssertEqual(failure.httpStatusCode, 400)
             XCTAssertEqual(failure.responseText, "Error")
             XCTAssertEqual(failure.responseCode, 6000)
@@ -429,7 +429,7 @@ final class TokenStorageClientTests: XCTestCase {
         }
     }
 
-    func testServerErrorTokenizationEnvelopeUsesSafeMessage() async throws {
+    func testServerErrorPaymentMethodEnvelopeUsesSafeMessage() async throws {
         let transport = MockTransport(statusCode: 500, responseBody: """
         {
           "isSuccess": false,
@@ -444,18 +444,18 @@ final class TokenStorageClientTests: XCTestCase {
         do {
             _ = try await client.addMethod(
                 entryPoint: "entry",
-                paymentMethod: .card(PayabliCardTokenizationData(
+                paymentMethod: .card(PayabliCardPaymentMethodData(
                     cardNumber: "4111111111111111",
                     expiration: "02/28",
                     cardholderName: "Jane Doe",
                     billingZip: "33139"
                 ))
             )
-            XCTFail("Expected tokenization failure")
-        } catch let PayabliTokenizationError.tokenizationFailed(failure) {
+            XCTFail("Expected payment method failure")
+        } catch let PayabliPaymentMethodError.saveFailed(failure) {
             XCTAssertEqual(failure.httpStatusCode, 500)
             XCTAssertEqual(failure.responseText, "Error")
-            XCTAssertEqual(failure.reason, "Unable to tokenize right now. Please try again.")
+            XCTAssertEqual(failure.reason, "Unable to save payment method right now. Please try again.")
         } catch {
             XCTFail("Wrong error: \(error)")
         }
@@ -476,21 +476,21 @@ final class TokenStorageClientTests: XCTestCase {
           }
         }
         """)
-        let component = PayabliTokenization(
+        let component = PayabliPaymentMethod(
             accessToken: "access-token-hidden",
             entryPoint: "entry-hidden",
             environment: .sandbox,
             transport: transport
         )
-        let viewModel = PayabliTokenizationViewModel(
+        let viewModel = PayabliPaymentMethodViewModel(
             component: component,
-            configuration: PayabliTokenizationFormConfiguration(
+            configuration: PayabliPaymentMethodFormConfiguration(
                 allowedMethods: [.card],
                 cardFieldOrder: [.cardNumber, .cardExpiration, .cardholderName],
-                hiddenValues: PayabliTokenizationHiddenValues(
+                hiddenValues: PayabliPaymentMethodHiddenValues(
                     cardCvv: "123",
                     methodDescription: "Hidden primary card",
-                    customerData: PayabliTokenizationCustomerData(
+                    customerData: PayabliPaymentMethodCustomerData(
                         billingEmail: "hidden@example.com",
                         customerNumber: "cust-hidden"
                     )
@@ -537,26 +537,26 @@ final class TokenStorageClientTests: XCTestCase {
           }
         }
         """)
-        let component = PayabliTokenization(
+        let component = PayabliPaymentMethod(
             accessToken: "access-token-ach-hidden",
             entryPoint: "entry-ach-hidden",
             environment: .sandbox,
             transport: transport
         )
-        let viewModel = PayabliTokenizationViewModel(
+        let viewModel = PayabliPaymentMethodViewModel(
             component: component,
-            configuration: PayabliTokenizationFormConfiguration(
+            configuration: PayabliPaymentMethodFormConfiguration(
                 allowedMethods: [.ach],
                 defaultMethod: .ach,
                 achFieldOrder: [.achHolder, .achRouting, .achAccount, .achAccountType, .achSecCode],
-                hiddenValues: PayabliTokenizationHiddenValues(
+                hiddenValues: PayabliPaymentMethodHiddenValues(
                     achHolderType: .business,
                     achSecCode: .ccd
                 )
             )
         )
 
-        XCTAssertFalse(viewModel.activeFields.contains(PayabliTokenizationField.achSecCode))
+        XCTAssertFalse(viewModel.activeFields.contains(PayabliPaymentMethodField.achSecCode))
 
         viewModel.achHolder = "Jane Business"
         viewModel.achRouting = "123456780"
@@ -574,7 +574,7 @@ final class TokenStorageClientTests: XCTestCase {
     }
 
     @MainActor
-    func testViewModelShowsTokenizationFailureActionAndKeepsEditableFields() async throws {
+    func testViewModelShowsPaymentMethodFailureActionAndKeepsEditableFields() async throws {
         let transport = MockTransport(statusCode: 400, responseBody: """
         {
           "isSuccess": false,
@@ -586,14 +586,14 @@ final class TokenStorageClientTests: XCTestCase {
           }
         }
         """)
-        let viewModel = PayabliTokenizationViewModel(
-            component: PayabliTokenization(
+        let viewModel = PayabliPaymentMethodViewModel(
+            component: PayabliPaymentMethod(
                 accessToken: "access-token",
                 entryPoint: "entry",
                 environment: .sandbox,
                 transport: transport
             ),
-            configuration: PayabliTokenizationFormConfiguration(allowedMethods: [.card])
+            configuration: PayabliPaymentMethodFormConfiguration(allowedMethods: [.card])
         )
         viewModel.cardNumber = "4111111111111111"
         viewModel.cardExpiration = "02/28"
@@ -603,8 +603,8 @@ final class TokenStorageClientTests: XCTestCase {
 
         do {
             _ = try await viewModel.submit()
-            XCTFail("Expected tokenization failure")
-        } catch let PayabliTokenizationError.tokenizationFailed(failure) {
+            XCTFail("Expected payment method failure")
+        } catch let PayabliPaymentMethodError.saveFailed(failure) {
             XCTAssertEqual(failure.responseCode, 6000)
             XCTAssertEqual(viewModel.errorMessage, "Invalid Card\nPlease check your card details and try again.")
             XCTAssertEqual(viewModel.cardNumber, "4111111111111111")
@@ -619,14 +619,14 @@ final class TokenStorageClientTests: XCTestCase {
 
     @MainActor
     func testViewModelReportsInvalidCardNumberAsUserTypes() {
-        let viewModel = PayabliTokenizationViewModel(
-            component: PayabliTokenization(
+        let viewModel = PayabliPaymentMethodViewModel(
+            component: PayabliPaymentMethod(
                 accessToken: "access-token",
                 entryPoint: "entry",
                 environment: .sandbox,
                 transport: MockTransport(responseBody: "{}")
             ),
-            configuration: PayabliTokenizationFormConfiguration(allowedMethods: [.card])
+            configuration: PayabliPaymentMethodFormConfiguration(allowedMethods: [.card])
         )
 
         viewModel.cardNumber = "4111 1111"
@@ -647,14 +647,14 @@ final class TokenStorageClientTests: XCTestCase {
 
     @MainActor
     func testViewModelBuildsExpirationFromMonthYearSelection() {
-        let viewModel = PayabliTokenizationViewModel(
-            component: PayabliTokenization(
+        let viewModel = PayabliPaymentMethodViewModel(
+            component: PayabliPaymentMethod(
                 accessToken: "access-token",
                 entryPoint: "entry",
                 environment: .sandbox,
                 transport: MockTransport(responseBody: "{}")
             ),
-            configuration: PayabliTokenizationFormConfiguration(allowedMethods: [.card])
+            configuration: PayabliPaymentMethodFormConfiguration(allowedMethods: [.card])
         )
 
         XCTAssertEqual(viewModel.expirationDisplayText, "MM/YY")
@@ -679,7 +679,7 @@ private func firstRequest(from transport: MockTransport) async throws -> Payabli
     return try XCTUnwrap(requests.first)
 }
 
-private func assertCardTokenizationResult(_ result: PayabliTokenizedMethod) {
+private func assertCardPaymentMethodResult(_ result: PayabliStoredPaymentMethod) {
     XCTAssertEqual(result.storedMethodId, "stored-123")
     XCTAssertEqual(result.apiResponse.isSuccess, true)
     XCTAssertEqual(result.apiResponse.responseText, "Success")
@@ -687,7 +687,7 @@ private func assertCardTokenizationResult(_ result: PayabliTokenizedMethod) {
     XCTAssertEqual(result.apiResponse.responseData?.customerId, 4440)
 }
 
-private func assertCardTokenizationRequest(_ request: PayabliRequest) throws {
+private func assertCardPaymentMethodRequest(_ request: PayabliRequest) throws {
     XCTAssertEqual(request.method, .post)
     XCTAssertEqual(request.path, "/api/TokenStorage/add")
     XCTAssertEqual(request.headers["Authorization"], "Bearer access-token-1")
@@ -748,15 +748,15 @@ private actor MockTransport: PayabliTransport {
 
 private final class DiagnosticSink: @unchecked Sendable {
     private let lock = NSLock()
-    private var captured: [PayabliTokenizationDiagnosticEntry] = []
+    private var captured: [PayabliPaymentMethodDiagnosticEntry] = []
 
-    func append(_ entry: PayabliTokenizationDiagnosticEntry) {
+    func append(_ entry: PayabliPaymentMethodDiagnosticEntry) {
         lock.lock()
         defer { lock.unlock() }
         captured.append(entry)
     }
 
-    func entries() -> [PayabliTokenizationDiagnosticEntry] {
+    func entries() -> [PayabliPaymentMethodDiagnosticEntry] {
         lock.lock()
         defer { lock.unlock() }
         return captured
