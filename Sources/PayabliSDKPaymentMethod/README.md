@@ -43,11 +43,13 @@ Detailed documentation:
 | API options | `PayabliPaymentMethodOptions` |
 | Redacted request/response diagnostics | `PayabliPaymentMethodDiagnostics.enabled { ... }` |
 | Full response return | `PayabliStoredPaymentMethod.apiResponse` |
-| External or placeholder labels | `PayabliPaymentMethodLabelLayout` |
+| Field labels and placeholders | `showsFieldLabels`, `hiddenFieldLabels`, `fieldPlaceholders`, `PayabliPaymentMethodLabelLayout` |
+| Field sections and spacing | `cardSections`, `achSections` with `PayabliPaymentMethodFieldSection` |
+| Accessibility support | Hidden visual labels keep accessibility labels; placeholders are not read as values; minimum input/button size is 44 pt |
 | Error message placement | `errorMessagePlacement: .top` or `.aboveSubmitButton` |
 | Submit button text | `PayabliPaymentMethodLabels(submitButton:)` |
 | Per-input sizing | `PayabliPaymentMethodInputSizing` |
-| Styling | `.payabliPaymentMethodStyle(...)` or `style:` |
+| Styling and spacing | `.payabliPaymentMethodStyle(...)` or `style:` |
 
 ## Maintainer notes
 
@@ -67,6 +69,8 @@ File ownership:
   payload assembly, and field clearing after submission.
 - `PayabliPaymentMethodView.swift` and `PayabliPaymentMethodSheet.swift` own
   SwiftUI rendering only.
+- `PayabliPaymentMethodAccessibility.swift` owns shared accessibility labels,
+  values, hints, announcements, and touch-target constants.
 - `PayabliPaymentMethod+ObjC.swift` is the bridge surface used by MAUI and any
   Objective-C-compatible host. Keep its selector shape in sync with
   `Bridges/MAUI/PayabliBinding.cs` whenever parameters change.
@@ -77,6 +81,9 @@ Maintenance checklist:
 
 - Run the focused test target after code or docs examples move:
   `xcodebuild test -scheme PayabliSDK-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.4.1' -only-testing:PayabliSDKPaymentMethodTests`.
+- Run a focused coverage report after substantive component changes:
+  `xcodebuild test -scheme PayabliSDK-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.4.1' -only-testing:PayabliSDKPaymentMethodTests -enableCodeCoverage YES -resultBundlePath build/TestResults/PaymentMethodCoverage.xcresult`,
+  then `xcrun xccov view --report build/TestResults/PaymentMethodCoverage.xcresult`.
 - Build the QA sample when view, sheet, diagnostics, secrets, or local token
   server behavior changes.
 - Keep SwiftUI, Flutter, and MAUI examples aligned on the Bearer token flow.
@@ -97,6 +104,22 @@ PayabliPaymentMethodView(
         allowedMethods: [.card, .ach],
         cardFieldOrder: [.cardholderName, .cardNumber, .cardExpiration, .cardCvv, .cardZip],
         achFieldOrder: [.achHolder, .achRouting, .achAccount, .achAccountType],
+        cardSections: [
+            PayabliPaymentMethodFieldSection(
+                title: "Card Information",
+                fields: [.cardholderName, .cardNumber, .cardExpiration, .cardCvv, .cardZip],
+                inputVerticalSpacing: 4,
+                inputHorizontalSpacing: 8,
+                fieldVerticalSpacings: [
+                    .cardNumber: 2,
+                    .cardCvv: 2
+                ]
+            ),
+            PayabliPaymentMethodFieldSection(
+                title: "Customer Information",
+                fields: [.firstName, .lastName, .billingEmail]
+            )
+        ],
         hiddenValues: PayabliPaymentMethodHiddenValues(
             achHolderType: .personal,
             achSecCode: .web,
@@ -111,9 +134,16 @@ PayabliPaymentMethodView(
         labels: PayabliPaymentMethodLabels(
             title: "Payment Method",
             subtitle: "Save a payment method for future transactions.",
-            submitButton: "Save Method"
+            submitButton: "Save Method",
+            fieldPlaceholders: [
+                .cardNumber: "1234 1234 1234 1234",
+                .cardExpiration: "MM/YY",
+                .billingEmail: "customer@example.com"
+            ]
         ),
         labelLayout: .external,
+        showsFieldLabels: true,
+        hiddenFieldLabels: [.cardCvv],
         formatting: PayabliPaymentMethodFormatting(insertsCardNumberSpaces: true),
         inputSizing: PayabliPaymentMethodInputSizing(
             defaultSize: PayabliPaymentMethodInputSize(height: 52),
@@ -134,7 +164,12 @@ PayabliPaymentMethodView(
     PayabliPaymentMethodStyle(
         accentColor: .blue,
         input: PayabliPaymentMethodInputStyle(cornerRadius: 8),
-        submitButton: PayabliPaymentMethodSubmitButtonStyle(cornerRadius: 8)
+        submitButton: PayabliPaymentMethodSubmitButtonStyle(cornerRadius: 8),
+        layout: PayabliPaymentMethodLayoutStyle(
+            fieldGroupSpacing: 14,
+            pairedFieldSpacing: 12,
+            sectionSpacing: 20
+        )
     )
 )
 ```
@@ -177,11 +212,18 @@ required payment-method values: query flags, idempotency key, customer data,
 vendor data, fallback auth, method description, source, and subdomain.
 `PayabliPaymentMethodFormConfiguration` controls whether the form is card-only,
 ACH-only, or dual-method, which optional fields are visible, hidden field
-values, submit button text, label layout, formatting, per-field input sizing,
-and additional required optional fields. The default submit button text is
-"Add Payment Method". Card CVV and ZIP are always required and cannot be
+values, submit button text, label visibility, placeholders, field sections,
+formatting, per-field input sizing, and additional required optional fields.
+Use `cardSections` and `achSections` to group fields under headings such as
+"Card Information" and "Customer Information"; required API fields are appended
+if a custom section omits them. Use `PayabliPaymentMethodLayoutStyle` for
+default vertical spacing between input rows and horizontal spacing between
+paired inputs. Each `PayabliPaymentMethodFieldSection` can override those
+defaults with `inputVerticalSpacing`, `inputHorizontalSpacing`, and
+`fieldVerticalSpacings` for spacing after specific field rows.
+The default submit button text is "Add Payment Method". Card CVV and postal code are always required and cannot be
 supplied as hidden values. The form caps cardholder and ACH holder names at 60
-characters, PAN at 19 digits, CVV at 4 digits, ZIP/postal code at 12
+characters, PAN at 19 digits, CVV at 4 digits, postal code at 12
 characters, ACH routing at 9 digits, and ACH account at 17 digits; direct API
 calls are validated against the same limits before a request is sent.
 ACH SEC Code is sent from `hiddenValues.achSecCode` and defaults to `.web`.
@@ -189,7 +231,14 @@ Payment Method API failures are decoded from `isSuccess: false` responses before
 generic HTTP mapping; the form renders the user-facing message at the configured
 `errorMessagePlacement`.
 `PayabliPaymentMethodStyle` controls visual styling using the same SwiftUI
-modifier shape as `buttonStyle` and `textFieldStyle`.
+modifier shape as `buttonStyle` and `textFieldStyle`. Input styles can set
+SwiftUI-rendered fonts, UIKit text-field fonts with `uiFont`, entered text
+color, placeholder color, backgrounds, borders, and focus states.
+Host apps can use system font families returned by `UIFont.familyNames`, or
+register custom `.ttf` / `.otf` fonts by adding them to the app target, listing
+them under `UIAppFonts`, and passing the registered face name to both
+`Font.custom(_:size:)` and `UIFont(name:size:)`. Set both `font` and `uiFont`
+when custom fonts should apply to all payment method inputs.
 
 For complete style samples, including platform default, compact checkout, and
 high-contrast configurations, see the overview documentation.

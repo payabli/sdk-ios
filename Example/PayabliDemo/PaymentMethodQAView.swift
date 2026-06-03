@@ -103,6 +103,57 @@ struct PaymentMethodQAView: View {
                 .achAccount,
                 .achAccountType
             ],
+            cardSections: [
+                PayabliPaymentMethodFieldSection(
+                    title: "Card Information",
+                    fields: [
+                        .cardholderName,
+                        .cardNumber,
+                        .cardExpiration,
+                        .cardCvv,
+                        .cardZip
+                    ],
+                    inputVerticalSpacing: 4,
+                    inputHorizontalSpacing: 8,
+                    fieldVerticalSpacings: [
+                        .cardNumber: 2,
+                        .cardCvv: 2
+                    ]
+                ),
+                PayabliPaymentMethodFieldSection(
+                    title: "Customer Information",
+                    fields: [
+                        .firstName,
+                        .lastName,
+                        .billingEmail
+                    ]
+                )
+            ],
+            achSections: [
+                PayabliPaymentMethodFieldSection(
+                    title: "Bank Information",
+                    fields: [
+                        .achHolder,
+                        .achRouting,
+                        .achAccount,
+                        .achAccountType
+                    ],
+                    inputVerticalSpacing: 4,
+                    inputHorizontalSpacing: 8,
+                    fieldVerticalSpacings: [
+                        .achRouting: 2,
+                        .achAccount: 2
+                    ]
+                ),
+                PayabliPaymentMethodFieldSection(
+                    title: "Customer Information",
+                    fields: [
+                        .firstName,
+                        .lastName,
+                        .billingEmail
+                    ]
+                )
+            ],
             hiddenValues: PayabliPaymentMethodHiddenValues(
                 achHolderType: .personal,
                 achSecCode: .web,
@@ -117,9 +168,12 @@ struct PaymentMethodQAView: View {
             ),
             labels: PayabliPaymentMethodLabels(
                 title: "Save Payment Method",
-                subtitle: "Create a card or ACH token."
+                subtitle: "Create a card or ACH token.",
+                fieldPlaceholders: labelMatchingPlaceholders(for: fieldsWithHiddenLabels)
             ),
             labelLayout: .external,
+            showsFieldLabels: true,
+            hiddenFieldLabels: Set(fieldsWithHiddenLabels),
             formatting: PayabliPaymentMethodFormatting(
                 insertsCardNumberSpaces: true,
                 masksACHAccountEntry: true
@@ -144,8 +198,42 @@ struct PaymentMethodQAView: View {
                 cornerRadius: 8
             ),
             submitButton: PayabliPaymentMethodSubmitButtonStyle(cornerRadius: 8),
-            layout: PayabliPaymentMethodLayoutStyle(contentSpacing: 18, fieldGroupSpacing: 12)
+            layout: PayabliPaymentMethodLayoutStyle(
+                contentSpacing: 18,
+                fieldGroupSpacing: 14,
+                pairedFieldSpacing: 12,
+                sectionSpacing: 20,
+                sectionTitleSpacing: 10
+            )
         )
+    }
+
+    private var fieldsWithHiddenLabels: [PayabliPaymentMethodField] {
+        [
+            .cardholderName,
+            .cardNumber,
+            .cardExpiration,
+            .cardCvv,
+            .cardZip,
+            .achHolder,
+            .achRouting,
+            .achAccount,
+            .achAccountType,
+            .firstName,
+            .lastName,
+            .billingEmail
+        ]
+    }
+
+    private func labelMatchingPlaceholders(
+        for fields: [PayabliPaymentMethodField]
+    ) -> [PayabliPaymentMethodField: String] {
+        Dictionary(uniqueKeysWithValues: fields.map { field in
+            (
+                field,
+                PayabliPaymentMethodLabels.defaultFieldLabels[field] ?? field.rawValue
+            )
+        })
     }
 
     private func handlePaymentMethodAdded(_ method: PayabliStoredPaymentMethod) {

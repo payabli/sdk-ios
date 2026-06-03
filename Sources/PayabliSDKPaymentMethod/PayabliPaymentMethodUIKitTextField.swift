@@ -10,7 +10,11 @@ struct PayabliPaymentMethodUIKitTextField: UIViewRepresentable {
     var textContentType: UITextContentType?
     var autocapitalization: UITextAutocapitalizationType
     var isSecure: Bool
+    var font: UIFont
     var textColor: UIColor
+    var placeholderColor: UIColor
+    var accessibilityLabel: String
+    var accessibilityHint: String?
     var sanitize: (String) -> String
 
     init(
@@ -22,7 +26,11 @@ struct PayabliPaymentMethodUIKitTextField: UIViewRepresentable {
         textContentType: UITextContentType? = nil,
         autocapitalization: UITextAutocapitalizationType = .none,
         isSecure: Bool = false,
+        font: UIFont = UIFont.preferredFont(forTextStyle: .body),
         textColor: UIColor = .label,
+        placeholderColor: UIColor = .placeholderText,
+        accessibilityLabel: String,
+        accessibilityHint: String? = nil,
         sanitize: @escaping (String) -> String = { $0 }
     ) {
         _text = text
@@ -33,7 +41,11 @@ struct PayabliPaymentMethodUIKitTextField: UIViewRepresentable {
         self.textContentType = textContentType
         self.autocapitalization = autocapitalization
         self.isSecure = isSecure
+        self.font = font
         self.textColor = textColor
+        self.placeholderColor = placeholderColor
+        self.accessibilityLabel = accessibilityLabel
+        self.accessibilityHint = accessibilityHint
         self.sanitize = sanitize
     }
 
@@ -70,15 +82,34 @@ struct PayabliPaymentMethodUIKitTextField: UIViewRepresentable {
             textField.text = sanitizedText
         }
 
-        textField.placeholder = placeholder
+        textField.attributedPlaceholder = attributedPlaceholder
         textField.keyboardType = keyboardType
         textField.textContentType = textContentType
         textField.autocapitalizationType = autocapitalization
         textField.autocorrectionType = .no
         textField.spellCheckingType = .no
         textField.isSecureTextEntry = isSecure
-        textField.font = UIFont.preferredFont(forTextStyle: .body)
+        textField.font = font
         textField.textColor = textColor
+        textField.accessibilityLabel = accessibilityLabel
+        textField.accessibilityValue = PayabliPaymentMethodAccessibility.textFieldValue(
+            text: sanitizedText,
+            isSecure: isSecure
+        )
+        textField.accessibilityHint = accessibilityHint
+        textField.accessibilityIdentifier = PayabliPaymentMethodAccessibility.fieldIdentifier(field)
+    }
+
+    private var attributedPlaceholder: NSAttributedString? {
+        guard !placeholder.isEmpty else { return nil }
+
+        return NSAttributedString(
+            string: placeholder,
+            attributes: [
+                .foregroundColor: placeholderColor,
+                .font: font
+            ]
+        )
     }
 
     final class Coordinator: NSObject, UITextFieldDelegate {

@@ -86,21 +86,28 @@ public struct PayabliPaymentMethodLabels: Sendable {
     public var subtitle: String?
     public var submitButton: String
     public var fieldLabels: [PayabliPaymentMethodField: String]
+    public var fieldPlaceholders: [PayabliPaymentMethodField: String]
 
     public init(
         title: String = "Save Payment Method",
         subtitle: String? = nil,
         submitButton: String = "Add Payment Method",
-        fieldLabels: [PayabliPaymentMethodField: String] = Self.defaultFieldLabels
+        fieldLabels: [PayabliPaymentMethodField: String] = Self.defaultFieldLabels,
+        fieldPlaceholders: [PayabliPaymentMethodField: String] = [:]
     ) {
         self.title = title
         self.subtitle = subtitle
         self.submitButton = submitButton
         self.fieldLabels = fieldLabels
+        self.fieldPlaceholders = fieldPlaceholders
     }
 
     public func label(for field: PayabliPaymentMethodField) -> String {
         fieldLabels[field] ?? Self.defaultFieldLabels[field] ?? field.rawValue
+    }
+
+    public func placeholder(for field: PayabliPaymentMethodField) -> String? {
+        fieldPlaceholders[field]?.trimmed.nilIfEmpty
     }
 
     public static let defaultFieldLabels: [PayabliPaymentMethodField: String] = [
@@ -108,7 +115,7 @@ public struct PayabliPaymentMethodLabels: Sendable {
         .cardNumber: "Card number",
         .cardExpiration: "Expiration",
         .cardCvv: "CVV",
-        .cardZip: "ZIP code",
+        .cardZip: "Postal Code",
         .achHolder: "Account holder",
         .achRouting: "Routing number",
         .achAccount: "Account number",
@@ -121,8 +128,47 @@ public struct PayabliPaymentMethodLabels: Sendable {
         .lastName: "Last name",
         .customerNumber: "Customer number",
         .billingEmail: "Billing email",
-        .billingZip: "Billing ZIP"
+        .billingZip: "Billing Postal Code"
     ]
+}
+
+public struct PayabliPaymentMethodFieldSection: Identifiable, Sendable, Equatable {
+    public var id: String
+    public var title: String?
+    public var fields: [PayabliPaymentMethodField]
+    public var inputVerticalSpacing: CGFloat?
+    public var inputHorizontalSpacing: CGFloat?
+    public var fieldVerticalSpacings: [PayabliPaymentMethodField: CGFloat]
+
+    public init(
+        id: String? = nil,
+        title: String? = nil,
+        fields: [PayabliPaymentMethodField],
+        inputVerticalSpacing: CGFloat? = nil,
+        inputHorizontalSpacing: CGFloat? = nil,
+        fieldVerticalSpacings: [PayabliPaymentMethodField: CGFloat] = [:]
+    ) {
+        let resolvedTitle = title?.trimmed.nilIfEmpty
+        self.id = id?.trimmed.nilIfEmpty
+            ?? resolvedTitle
+            ?? fields.map(\.rawValue).joined(separator: "-")
+        self.title = resolvedTitle
+        self.fields = fields
+        self.inputVerticalSpacing = inputVerticalSpacing.map { max(0, $0) }
+        self.inputHorizontalSpacing = inputHorizontalSpacing.map { max(0, $0) }
+        self.fieldVerticalSpacings = fieldVerticalSpacings.mapValues { max(0, $0) }
+    }
+
+    func replacingFields(_ fields: [PayabliPaymentMethodField]) -> PayabliPaymentMethodFieldSection {
+        PayabliPaymentMethodFieldSection(
+            id: id,
+            title: title,
+            fields: fields,
+            inputVerticalSpacing: inputVerticalSpacing,
+            inputHorizontalSpacing: inputHorizontalSpacing,
+            fieldVerticalSpacings: fieldVerticalSpacings
+        )
+    }
 }
 
 public struct PayabliPaymentMethodInputSize: Sendable, Equatable {
@@ -136,7 +182,7 @@ public struct PayabliPaymentMethodInputSize: Sendable, Equatable {
         horizontalPadding: CGFloat = 14
     ) {
         self.width = width
-        self.height = max(36, height)
+        self.height = max(PayabliPaymentMethodAccessibility.minimumTouchTarget, height)
         self.horizontalPadding = max(0, horizontalPadding)
     }
 }
@@ -167,21 +213,29 @@ public struct PayabliPaymentMethodFormConfiguration: Sendable {
     public var options: PayabliPaymentMethodOptions
     public var labels: PayabliPaymentMethodLabels
     public var labelLayout: PayabliPaymentMethodLabelLayout
+    public var showsFieldLabels: Bool
+    public var hiddenFieldLabels: Set<PayabliPaymentMethodField>
     public var formatting: PayabliPaymentMethodFormatting
     public var inputSizing: PayabliPaymentMethodInputSizing
     public var cardBrandIconPlacement: PayabliPaymentMethodCardBrandIconPlacement
     public var errorMessagePlacement: PayabliPaymentMethodErrorMessagePlacement
     public var requiredFields: Set<PayabliPaymentMethodField>
+    public var cardSections: [PayabliPaymentMethodFieldSection]
+    public var achSections: [PayabliPaymentMethodFieldSection]
 
     public init(
         allowedMethods: [PayabliPaymentMethodType] = [.card, .ach],
         defaultMethod: PayabliPaymentMethodType = .card,
         cardFieldOrder: [PayabliPaymentMethodField] = Self.defaultCardFieldOrder,
         achFieldOrder: [PayabliPaymentMethodField] = Self.defaultACHFieldOrder,
+        cardSections: [PayabliPaymentMethodFieldSection]? = nil,
+        achSections: [PayabliPaymentMethodFieldSection]? = nil,
         hiddenValues: PayabliPaymentMethodHiddenValues = PayabliPaymentMethodHiddenValues(),
         options: PayabliPaymentMethodOptions = PayabliPaymentMethodOptions(),
         labels: PayabliPaymentMethodLabels = PayabliPaymentMethodLabels(),
         labelLayout: PayabliPaymentMethodLabelLayout = .external,
+        showsFieldLabels: Bool? = nil,
+        hiddenFieldLabels: Set<PayabliPaymentMethodField> = [],
         formatting: PayabliPaymentMethodFormatting = PayabliPaymentMethodFormatting(),
         inputSizing: PayabliPaymentMethodInputSizing = PayabliPaymentMethodInputSizing(),
         cardBrandIconPlacement: PayabliPaymentMethodCardBrandIconPlacement = .trailing,
@@ -190,20 +244,37 @@ public struct PayabliPaymentMethodFormConfiguration: Sendable {
     ) {
         let methods = allowedMethods.isEmpty ? [defaultMethod] : allowedMethods
         let visibleRequiredFields = Self.visibleRequiredFields(from: requiredFields)
+        let requiredCardFields = Self.requiredCardFields + Self.cardRequiredFields(from: visibleRequiredFields)
+        let requiredACHFields = Self.requiredACHFields + Self.achRequiredFields(from: visibleRequiredFields)
+        let normalizedCardSections = Self.normalizedSections(
+            cardSections,
+            defaultFields: Self.includingRequiredFields(
+                cardFieldOrder,
+                required: requiredCardFields
+            ),
+            required: requiredCardFields
+        )
+        let normalizedACHSections = Self.normalizedSections(
+            achSections,
+            defaultFields: Self.includingRequiredFields(
+                Self.visibleACHFields(from: achFieldOrder),
+                required: requiredACHFields
+            ),
+            required: requiredACHFields,
+            hiddenFields: [.achSecCode]
+        )
         self.allowedMethods = methods
         self.defaultMethod = methods.contains(defaultMethod) ? defaultMethod : methods[0]
-        self.cardFieldOrder = Self.includingRequiredFields(
-            cardFieldOrder,
-            required: Self.requiredCardFields + Self.cardRequiredFields(from: visibleRequiredFields)
-        )
-        self.achFieldOrder = Self.includingRequiredFields(
-            Self.visibleACHFields(from: achFieldOrder),
-            required: Self.requiredACHFields + Self.achRequiredFields(from: visibleRequiredFields)
-        )
+        self.cardFieldOrder = normalizedCardSections.flatMap(\.fields)
+        self.achFieldOrder = normalizedACHSections.flatMap(\.fields)
+        self.cardSections = normalizedCardSections
+        self.achSections = normalizedACHSections
         self.hiddenValues = hiddenValues
         self.options = options
         self.labels = labels
         self.labelLayout = labelLayout
+        self.showsFieldLabels = showsFieldLabels ?? (labelLayout == .external)
+        self.hiddenFieldLabels = hiddenFieldLabels
         self.formatting = formatting
         self.inputSizing = inputSizing
         self.cardBrandIconPlacement = cardBrandIconPlacement
@@ -253,6 +324,59 @@ public struct PayabliPaymentMethodFormConfiguration: Sendable {
         return output
     }
 
+    private static func normalizedSections(
+        _ sections: [PayabliPaymentMethodFieldSection]?,
+        defaultFields: [PayabliPaymentMethodField],
+        required: [PayabliPaymentMethodField],
+        hiddenFields: Set<PayabliPaymentMethodField> = []
+    ) -> [PayabliPaymentMethodFieldSection] {
+        let sourceSections = sections?.isEmpty == false
+            ? sections ?? []
+            : [PayabliPaymentMethodFieldSection(fields: defaultFields)]
+        var seenFields = Set<PayabliPaymentMethodField>()
+        var output = sourceSections.compactMap { section -> PayabliPaymentMethodFieldSection? in
+            let visibleFields = section.fields.filter { field in
+                !hiddenFields.contains(field) && seenFields.insert(field).inserted
+            }
+            guard !visibleFields.isEmpty else { return nil }
+            return section.replacingFields(visibleFields)
+        }
+
+        for field in required where !hiddenFields.contains(field) && !seenFields.contains(field) {
+            append(field, to: &output)
+            seenFields.insert(field)
+        }
+
+        return output
+    }
+
+    private static func append(
+        _ field: PayabliPaymentMethodField,
+        to sections: inout [PayabliPaymentMethodFieldSection]
+    ) {
+        guard !sections.isEmpty else {
+            sections = [PayabliPaymentMethodFieldSection(fields: [field])]
+            return
+        }
+
+        let targetIndex: Int
+        if customerFields.contains(field) {
+            targetIndex = sections.lastIndex { section in
+                section.fields.contains { customerFields.contains($0) }
+            } ?? sections.index(before: sections.endIndex)
+        } else if defaultACHFieldOrder.contains(field) {
+            targetIndex = sections.firstIndex { section in
+                section.fields.contains { defaultACHFieldOrder.contains($0) }
+            } ?? sections.startIndex
+        } else {
+            targetIndex = sections.firstIndex { section in
+                section.fields.contains { defaultCardFieldOrder.contains($0) }
+            } ?? sections.startIndex
+        }
+
+        sections[targetIndex].fields.append(field)
+    }
+
     private static func visibleACHFields(from fields: [PayabliPaymentMethodField]) -> [PayabliPaymentMethodField] {
         fields.filter { $0 != .achSecCode }
     }
@@ -291,7 +415,9 @@ public struct PayabliPaymentMethodView: View {
     @StateObject private var viewModel: PayabliPaymentMethodViewModel
     @State private var isExpirationPickerPresented = false
     @FocusState private var focusedField: PayabliPaymentMethodField?
+    @AccessibilityFocusState private var isErrorAccessibilityFocused: Bool
     @Environment(\.payabliPaymentMethodStyle) private var environmentStyle
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     private let configuration: PayabliPaymentMethodFormConfiguration
     private let explicitStyle: PayabliPaymentMethodStyle?
     private let onPaymentMethodAdded: (PayabliStoredPaymentMethod) -> Void
@@ -331,9 +457,9 @@ public struct PayabliPaymentMethodView: View {
                 methodSelector
             }
 
-            VStack(alignment: .leading, spacing: resolvedStyle.layout.fieldGroupSpacing) {
-                ForEach(fieldGroups, id: \.self) { group in
-                    fieldGroup(group)
+            VStack(alignment: .leading, spacing: resolvedStyle.layout.sectionSpacing) {
+                ForEach(Array(activeSections.enumerated()), id: \.offset) { _, section in
+                    fieldSection(section)
                 }
             }
 
@@ -354,15 +480,22 @@ public struct PayabliPaymentMethodView: View {
         .sheet(isPresented: $isExpirationPickerPresented) {
             expirationWheelSheet
         }
+        .onChange(of: viewModel.errorMessage) { message in
+            announceErrorMessage(message)
+        }
+        .onChange(of: viewModel.cardNumberValidationMessage) { message in
+            announceFieldError(
+                field: .cardNumber,
+                message: message
+            )
+        }
     }
 
     @ViewBuilder
     private var errorMessageView: some View {
         if let errorMessage = viewModel.errorMessage {
-            Text(errorMessage)
-                .font(resolvedStyle.error.font)
-                .foregroundStyle(resolvedStyle.error.color)
-                .fixedSize(horizontal: false, vertical: true)
+            errorText(errorMessage)
+                .accessibilityFocused($isErrorAccessibilityFocused)
         }
     }
 
@@ -377,6 +510,8 @@ public struct PayabliPaymentMethodView: View {
                     Text(title)
                         .font(resolvedStyle.title.font)
                         .foregroundStyle(resolvedStyle.title.color)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityAddTraits(.isHeader)
                 }
 
                 if let subtitle {
@@ -398,20 +533,33 @@ public struct PayabliPaymentMethodView: View {
         .pickerStyle(.segmented)
         .tint(resolvedStyle.accentColor)
         .accessibilityLabel("Payment method")
+        .accessibilityValue(viewModel.selectedMethod.displayName)
+        .accessibilityHint("Selects the payment method type.")
     }
 
-    private var fieldGroups: [[PayabliPaymentMethodField]] {
-        var groups: [[PayabliPaymentMethodField]] = []
-        var index = viewModel.activeFields.startIndex
+    private var activeSections: [PayabliPaymentMethodFieldSection] {
+        switch viewModel.selectedMethod {
+        case .card:
+            return configuration.cardSections
+        case .ach:
+            return configuration.achSections
+        }
+    }
 
-        while index < viewModel.activeFields.endIndex {
-            let field = viewModel.activeFields[index]
-            let nextIndex = viewModel.activeFields.index(after: index)
-            if nextIndex < viewModel.activeFields.endIndex {
-                let next = viewModel.activeFields[nextIndex]
+    private func fieldGroups(
+        for fields: [PayabliPaymentMethodField]
+    ) -> [[PayabliPaymentMethodField]] {
+        var groups: [[PayabliPaymentMethodField]] = []
+        var index = fields.startIndex
+
+        while index < fields.endIndex {
+            let field = fields[index]
+            let nextIndex = fields.index(after: index)
+            if nextIndex < fields.endIndex {
+                let next = fields[nextIndex]
                 if shouldPair(field, next) {
                     groups.append([field, next])
-                    index = viewModel.activeFields.index(after: nextIndex)
+                    index = fields.index(after: nextIndex)
                     continue
                 }
             }
@@ -439,6 +587,7 @@ public struct PayabliPaymentMethodView: View {
                     ProgressView()
                         .controlSize(.small)
                         .tint(resolvedStyle.submitButton.foregroundColor)
+                        .accessibilityHidden(true)
                 }
 
                 Text(viewModel.isSubmitting ? "Saving" : configuration.labels.submitButton)
@@ -461,13 +610,53 @@ public struct PayabliPaymentMethodView: View {
         }
         .buttonStyle(.plain)
         .disabled(!viewModel.canSubmit || viewModel.isSubmitting)
-        .accessibilityHint(viewModel.canSubmit ? "" : "Complete the required fields before saving.")
+        .accessibilityLabel(viewModel.isSubmitting ? "Saving payment method" : configuration.labels.submitButton)
+        .accessibilityValue(PayabliPaymentMethodAccessibility.submitValue(
+            canSubmit: viewModel.canSubmit,
+            isSubmitting: viewModel.isSubmitting
+        ))
+        .accessibilityHint(PayabliPaymentMethodAccessibility.submitHint(
+            canSubmit: viewModel.canSubmit,
+            isSubmitting: viewModel.isSubmitting
+        ))
+    }
+
+    private func fieldSection(_ section: PayabliPaymentMethodFieldSection) -> some View {
+        let groups = fieldGroups(for: section.fields)
+
+        return VStack(alignment: .leading, spacing: section.title == nil ? 0 : resolvedStyle.layout.sectionTitleSpacing) {
+            if let title = section.title {
+                Text(title)
+                    .font(resolvedStyle.sectionTitle.font)
+                    .foregroundStyle(resolvedStyle.sectionTitle.color)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityAddTraits(.isHeader)
+            }
+
+            VStack(alignment: .leading, spacing: 0) {
+                ForEach(Array(groups.enumerated()), id: \.offset) { index, group in
+                    fieldGroup(
+                        group,
+                        horizontalSpacing: inputHorizontalSpacing(in: section)
+                    )
+
+                    if index < groups.count - 1 {
+                        Color.clear
+                            .frame(height: verticalSpacing(after: group, in: section))
+                            .accessibilityHidden(true)
+                    }
+                }
+            }
+        }
     }
 
     @ViewBuilder
-    private func fieldGroup(_ fields: [PayabliPaymentMethodField]) -> some View {
+    private func fieldGroup(
+        _ fields: [PayabliPaymentMethodField],
+        horizontalSpacing: CGFloat
+    ) -> some View {
         if fields.count == 2 {
-            HStack(alignment: .top, spacing: resolvedStyle.layout.pairedFieldSpacing) {
+            HStack(alignment: .top, spacing: horizontalSpacing) {
                 ForEach(fields) { field in
                     fieldView(field)
                 }
@@ -477,10 +666,35 @@ public struct PayabliPaymentMethodView: View {
         }
     }
 
+    private func inputVerticalSpacing(in section: PayabliPaymentMethodFieldSection) -> CGFloat {
+        section.inputVerticalSpacing ?? resolvedStyle.layout.inputVerticalSpacing
+    }
+
+    private func inputHorizontalSpacing(in section: PayabliPaymentMethodFieldSection) -> CGFloat {
+        section.inputHorizontalSpacing ?? resolvedStyle.layout.inputHorizontalSpacing
+    }
+
+    private func verticalSpacing(
+        after fields: [PayabliPaymentMethodField],
+        in section: PayabliPaymentMethodFieldSection
+    ) -> CGFloat {
+        for field in fields.reversed() {
+            if let spacing = section.fieldVerticalSpacings[field] {
+                return spacing
+            }
+        }
+
+        return inputVerticalSpacing(in: section)
+    }
+
     private func shouldPair(
         _ first: PayabliPaymentMethodField,
         _ second: PayabliPaymentMethodField
     ) -> Bool {
+        guard !dynamicTypeSize.isAccessibilitySize else {
+            return false
+        }
+
         switch (first, second) {
         case (.cardExpiration, .cardCvv),
              (.cardCvv, .cardExpiration),
@@ -690,22 +904,26 @@ public struct PayabliPaymentMethodView: View {
         return fieldRow(field) {
             PayabliPaymentMethodUIKitTextField(
                 text: text,
-                placeholder: configuration.labelLayout == .placeholder ? label : "",
+                placeholder: placeholder(for: field),
                 field: field,
                 focusedField: focusedFieldBinding,
                 keyboardType: keyboardType,
                 textContentType: textContentType,
                 autocapitalization: autocapitalization,
                 isSecure: false,
+                font: inputUIKitFont,
+                textColor: inputUIKitTextColor,
+                placeholderColor: inputUIKitPlaceholderColor,
+                accessibilityLabel: label,
                 sanitize: sanitize
             )
             .padding(.horizontal, inputSize.horizontalPadding)
-            .frame(width: inputSize.width, height: inputSize.height)
+            .frame(width: inputSize.width)
+            .frame(minHeight: inputSize.height)
             .frame(maxWidth: inputSize.width == nil ? .infinity : nil)
             .background(fieldBackground(field))
             .overlay(fieldBorder(field))
             .clipShape(inputShape)
-            .accessibilityLabel(label)
             .privacySensitive()
         }
     }
@@ -722,7 +940,7 @@ public struct PayabliPaymentMethodView: View {
         return fieldRow(
             field,
             errorMessage: viewModel.cardNumberValidationMessage,
-            reservedErrorMessage: "Invalid Card Number"
+            reservedErrorMessage: showsExternalLabel(for: field) ? "Invalid Card Number" : nil
         ) {
             HStack(spacing: 10) {
                 if configuration.cardBrandIconPlacement == .leading {
@@ -731,25 +949,32 @@ public struct PayabliPaymentMethodView: View {
 
                 PayabliPaymentMethodUIKitTextField(
                     text: text,
-                    placeholder: configuration.labelLayout == .placeholder ? label : "",
+                    placeholder: placeholder(for: field),
                     field: field,
                     focusedField: focusedFieldBinding,
                     keyboardType: .numberPad,
                     textContentType: .creditCardNumber,
                     autocapitalization: .none,
                     isSecure: false,
+                    font: inputUIKitFont,
                     textColor: cardNumberUIKitTextColor,
+                    placeholderColor: inputUIKitPlaceholderColor,
+                    accessibilityLabel: label,
+                    accessibilityHint: PayabliPaymentMethodAccessibility.cardNumberHint(
+                        brand: viewModel.detectedCardBrand,
+                        validationMessage: viewModel.cardNumberValidationMessage
+                    ),
                     sanitize: viewModel.formatCardNumber
                 )
                 .frame(maxWidth: .infinity, minHeight: inputSize.height, alignment: .leading)
-                .accessibilityLabel(label)
 
                 if configuration.cardBrandIconPlacement == .trailing {
                     cardBrandIcon
                 }
             }
             .padding(.horizontal, inputSize.horizontalPadding)
-            .frame(width: inputSize.width, height: inputSize.height)
+            .frame(width: inputSize.width)
+            .frame(minHeight: inputSize.height)
             .frame(maxWidth: inputSize.width == nil ? .infinity : nil)
             .background(fieldBackground(field))
             .overlay(fieldBorder(field))
@@ -761,6 +986,7 @@ public struct PayabliPaymentMethodView: View {
     private func expirationPickerField() -> some View {
         let field = PayabliPaymentMethodField.cardExpiration
         let label = configuration.labels.label(for: field)
+        let placeholder = placeholder(for: field, defaultText: "MM/YY")
         let inputSize = configuration.inputSizing.size(for: field)
 
         return fieldRow(field) {
@@ -770,12 +996,12 @@ public struct PayabliPaymentMethodView: View {
                 isExpirationPickerPresented = true
             } label: {
                 HStack(spacing: 10) {
-                    Text(viewModel.expirationDisplayText)
+                    Text(viewModel.hasSelectedExpiration ? viewModel.expirationDisplayText : placeholder)
                         .font(resolvedStyle.input.font)
                         .foregroundStyle(
                             viewModel.hasSelectedExpiration
                                 ? resolvedStyle.input.textColor
-                                : Color(uiColor: .placeholderText)
+                                : resolvedStyle.input.placeholderColor
                         )
                     Spacer(minLength: 8)
                     Image(systemName: "calendar")
@@ -783,7 +1009,8 @@ public struct PayabliPaymentMethodView: View {
                         .foregroundStyle(resolvedStyle.input.pickerIconColor)
                 }
                 .padding(.horizontal, inputSize.horizontalPadding)
-                .frame(width: inputSize.width, height: inputSize.height)
+                .frame(width: inputSize.width)
+                .frame(minHeight: inputSize.height)
                 .frame(maxWidth: inputSize.width == nil ? .infinity : nil)
                 .background(fieldBackground(nil))
                 .overlay(fieldBorder(nil))
@@ -791,7 +1018,12 @@ public struct PayabliPaymentMethodView: View {
             }
             .buttonStyle(.plain)
             .accessibilityLabel(label)
-            .accessibilityValue(viewModel.expirationDisplayText)
+            .accessibilityValue(PayabliPaymentMethodAccessibility.expirationValue(
+                displayText: viewModel.expirationDisplayText,
+                hasSelectedExpiration: viewModel.hasSelectedExpiration
+            ))
+            .accessibilityHint(PayabliPaymentMethodAccessibility.expirationHint(format: placeholder))
+            .accessibilityIdentifier(PayabliPaymentMethodAccessibility.fieldIdentifier(field))
         }
     }
 
@@ -865,7 +1097,7 @@ public struct PayabliPaymentMethodView: View {
             }
         }
         .frame(width: 42, height: 26)
-        .accessibilityLabel(brand.displayName)
+        .accessibilityHidden(true)
     }
 
     private func secureField(
@@ -880,21 +1112,25 @@ public struct PayabliPaymentMethodView: View {
         return fieldRow(field) {
             PayabliPaymentMethodUIKitTextField(
                 text: text,
-                placeholder: configuration.labelLayout == .placeholder ? label : "",
+                placeholder: placeholder(for: field),
                 field: field,
                 focusedField: focusedFieldBinding,
                 keyboardType: keyboardType,
                 autocapitalization: .none,
                 isSecure: true,
+                font: inputUIKitFont,
+                textColor: inputUIKitTextColor,
+                placeholderColor: inputUIKitPlaceholderColor,
+                accessibilityLabel: label,
                 sanitize: sanitize
             )
             .padding(.horizontal, inputSize.horizontalPadding)
-            .frame(width: inputSize.width, height: inputSize.height)
+            .frame(width: inputSize.width)
+            .frame(minHeight: inputSize.height)
             .frame(maxWidth: inputSize.width == nil ? .infinity : nil)
             .background(fieldBackground(field))
             .overlay(fieldBorder(field))
             .clipShape(inputShape)
-            .accessibilityLabel(label)
             .privacySensitive()
         }
     }
@@ -931,7 +1167,8 @@ public struct PayabliPaymentMethodView: View {
                         .foregroundStyle(resolvedStyle.input.pickerIconColor)
                 }
                 .padding(.horizontal, inputSize.horizontalPadding)
-                .frame(width: inputSize.width, height: inputSize.height)
+                .frame(width: inputSize.width)
+                .frame(minHeight: inputSize.height)
                 .frame(maxWidth: inputSize.width == nil ? .infinity : nil)
                 .background(fieldBackground(nil))
                 .overlay(fieldBorder(nil))
@@ -939,6 +1176,9 @@ public struct PayabliPaymentMethodView: View {
             }
             .buttonStyle(.plain)
             .accessibilityLabel(label)
+            .accessibilityValue(selection.wrappedValue.rawValue)
+            .accessibilityHint(PayabliPaymentMethodAccessibility.pickerHint(label: label))
+            .accessibilityIdentifier(PayabliPaymentMethodAccessibility.fieldIdentifier(field))
         }
     }
 
@@ -951,20 +1191,19 @@ public struct PayabliPaymentMethodView: View {
         let inputSize = configuration.inputSizing.size(for: field)
 
         return VStack(alignment: .leading, spacing: resolvedStyle.layout.labelSpacing) {
-            if configuration.labelLayout == .external {
+            if showsExternalLabel(for: field) {
                 Text(configuration.labels.label(for: field))
                     .font(resolvedStyle.label.font)
                     .foregroundStyle(resolvedStyle.label.color)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.85)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
             content()
 
             if let errorMessage {
-                fieldErrorText(errorMessage)
+                fieldErrorText(errorMessage, for: field)
             } else if let reservedErrorMessage {
-                fieldErrorText(reservedErrorMessage)
+                fieldErrorText(reservedErrorMessage, for: field)
                     .hidden()
                     .accessibilityHidden(true)
             }
@@ -972,12 +1211,74 @@ public struct PayabliPaymentMethodView: View {
         .frame(width: inputSize.width)
         .frame(maxWidth: inputSize.width == nil ? .infinity : nil, alignment: .leading)
     }
+}
 
-    private func fieldErrorText(_ text: String) -> some View {
-        Text(text)
+private extension PayabliPaymentMethodView {
+    private func showsExternalLabel(for field: PayabliPaymentMethodField) -> Bool {
+        configuration.showsFieldLabels && !configuration.hiddenFieldLabels.contains(field)
+    }
+
+    private func placeholder(
+        for field: PayabliPaymentMethodField,
+        defaultText: String = ""
+    ) -> String {
+        if let placeholder = configuration.labels.placeholder(for: field) {
+            return placeholder
+        }
+        if configuration.labelLayout == .placeholder {
+            return configuration.labels.label(for: field)
+        }
+        return defaultText
+    }
+
+    private func errorText(_ text: String) -> some View {
+        return Text(text)
             .font(resolvedStyle.error.font)
             .foregroundStyle(resolvedStyle.error.color)
             .fixedSize(horizontal: false, vertical: true)
+            .accessibilityLabel(PayabliPaymentMethodAccessibility.errorLabel(text))
+    }
+
+    private func fieldErrorText(
+        _ text: String,
+        for field: PayabliPaymentMethodField
+    ) -> some View {
+        let label = configuration.labels.label(for: field)
+
+        return Text(text)
+            .font(resolvedStyle.error.font)
+            .foregroundStyle(resolvedStyle.error.color)
+            .fixedSize(horizontal: false, vertical: true)
+            .accessibilityLabel(PayabliPaymentMethodAccessibility.fieldErrorLabel(
+                fieldLabel: label,
+                message: text
+            ))
+    }
+
+    private func announceErrorMessage(_ message: String?) {
+        guard let announcement = PayabliPaymentMethodAccessibility.errorAnnouncement(for: message) else {
+            return
+        }
+
+        DispatchQueue.main.async {
+            isErrorAccessibilityFocused = true
+            UIAccessibility.post(notification: .announcement, argument: announcement)
+        }
+    }
+
+    private func announceFieldError(
+        field: PayabliPaymentMethodField,
+        message: String?
+    ) {
+        let fieldLabel = configuration.labels.label(for: field)
+        guard let announcement = PayabliPaymentMethodAccessibility.fieldErrorAnnouncement(
+            fieldLabel: fieldLabel,
+            message: message
+        ) else {
+            return
+        }
+
+        UIAccessibility.post(notification: .announcement, argument: announcement)
     }
 
     private var inputShape: RoundedRectangle {
@@ -1000,8 +1301,22 @@ public struct PayabliPaymentMethodView: View {
         resolvedStyle.error.color.opacity(0.08)
     }
 
+    private var inputUIKitFont: UIFont {
+        resolvedStyle.input.resolvedUIFont
+    }
+
+    private var inputUIKitTextColor: UIColor {
+        UIColor(resolvedStyle.input.textColor)
+    }
+
+    private var inputUIKitPlaceholderColor: UIColor {
+        UIColor(resolvedStyle.input.placeholderColor)
+    }
+
     private var cardNumberUIKitTextColor: UIColor {
-        viewModel.cardNumberValidationMessage == nil ? .label : .systemRed
+        viewModel.cardNumberValidationMessage == nil
+            ? inputUIKitTextColor
+            : UIColor(resolvedStyle.error.color)
     }
 
     private func fieldBackground(_ field: PayabliPaymentMethodField?) -> some View {

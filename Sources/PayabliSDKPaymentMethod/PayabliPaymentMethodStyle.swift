@@ -16,7 +16,9 @@ public struct PayabliPaymentMethodTextStyle {
 
 public struct PayabliPaymentMethodInputStyle {
     public var font: Font
+    public var uiFont: UIFont?
     public var textColor: Color
+    public var placeholderColor: Color
     public var backgroundColor: Color
     public var focusedBackgroundColor: Color?
     public var borderColor: Color
@@ -28,7 +30,9 @@ public struct PayabliPaymentMethodInputStyle {
 
     public init(
         font: Font = .body,
+        uiFont: UIFont? = nil,
         textColor: Color = .primary,
+        placeholderColor: Color = Color(uiColor: .placeholderText),
         backgroundColor: Color = Color(uiColor: .secondarySystemBackground),
         focusedBackgroundColor: Color? = nil,
         borderColor: Color = Color(uiColor: .separator).opacity(0.45),
@@ -39,7 +43,9 @@ public struct PayabliPaymentMethodInputStyle {
         pickerIconColor: Color = .secondary
     ) {
         self.font = font
+        self.uiFont = uiFont
         self.textColor = textColor
+        self.placeholderColor = placeholderColor
         self.backgroundColor = backgroundColor
         self.focusedBackgroundColor = focusedBackgroundColor
         self.borderColor = borderColor
@@ -48,6 +54,13 @@ public struct PayabliPaymentMethodInputStyle {
         self.focusedBorderWidth = max(0, focusedBorderWidth)
         self.cornerRadius = max(0, cornerRadius)
         self.pickerIconColor = pickerIconColor
+    }
+
+    var resolvedUIFont: UIFont {
+        if let uiFont {
+            return UIFontMetrics(forTextStyle: .body).scaledFont(for: uiFont)
+        }
+        return UIFont.preferredFont(forTextStyle: .body)
     }
 }
 
@@ -77,7 +90,7 @@ public struct PayabliPaymentMethodSubmitButtonStyle {
         self.disabledBackgroundColor = disabledBackgroundColor
         self.disabledForegroundColor = disabledForegroundColor
         self.cornerRadius = max(0, cornerRadius)
-        self.height = max(36, height)
+        self.height = max(PayabliPaymentMethodAccessibility.minimumTouchTarget, height)
         self.horizontalPadding = max(0, horizontalPadding)
     }
 }
@@ -88,19 +101,35 @@ public struct PayabliPaymentMethodLayoutStyle {
     public var fieldGroupSpacing: CGFloat
     public var pairedFieldSpacing: CGFloat
     public var labelSpacing: CGFloat
+    public var sectionSpacing: CGFloat
+    public var sectionTitleSpacing: CGFloat
+
+    public var inputVerticalSpacing: CGFloat {
+        get { fieldGroupSpacing }
+        set { fieldGroupSpacing = max(0, newValue) }
+    }
+
+    public var inputHorizontalSpacing: CGFloat {
+        get { pairedFieldSpacing }
+        set { pairedFieldSpacing = max(0, newValue) }
+    }
 
     public init(
         contentSpacing: CGFloat = 20,
         headerSpacing: CGFloat = 4,
         fieldGroupSpacing: CGFloat = 12,
         pairedFieldSpacing: CGFloat = 12,
-        labelSpacing: CGFloat = 7
+        labelSpacing: CGFloat = 7,
+        sectionSpacing: CGFloat = 18,
+        sectionTitleSpacing: CGFloat = 10
     ) {
         self.contentSpacing = max(0, contentSpacing)
         self.headerSpacing = max(0, headerSpacing)
         self.fieldGroupSpacing = max(0, fieldGroupSpacing)
         self.pairedFieldSpacing = max(0, pairedFieldSpacing)
         self.labelSpacing = max(0, labelSpacing)
+        self.sectionSpacing = max(0, sectionSpacing)
+        self.sectionTitleSpacing = max(0, sectionTitleSpacing)
     }
 }
 
@@ -108,6 +137,7 @@ public struct PayabliPaymentMethodStyle {
     public var accentColor: Color
     public var title: PayabliPaymentMethodTextStyle
     public var subtitle: PayabliPaymentMethodTextStyle
+    public var sectionTitle: PayabliPaymentMethodTextStyle
     public var label: PayabliPaymentMethodTextStyle
     public var input: PayabliPaymentMethodInputStyle
     public var submitButton: PayabliPaymentMethodSubmitButtonStyle
@@ -124,6 +154,10 @@ public struct PayabliPaymentMethodStyle {
             font: .subheadline,
             color: .secondary
         ),
+        sectionTitle: PayabliPaymentMethodTextStyle = PayabliPaymentMethodTextStyle(
+            font: .subheadline.weight(.semibold),
+            color: .primary
+        ),
         label: PayabliPaymentMethodTextStyle = PayabliPaymentMethodTextStyle(
             font: .footnote.weight(.medium),
             color: Color(uiColor: .secondaryLabel)
@@ -139,6 +173,7 @@ public struct PayabliPaymentMethodStyle {
         self.accentColor = accentColor
         self.title = title
         self.subtitle = subtitle
+        self.sectionTitle = sectionTitle
         self.label = label
         self.input = input
         self.submitButton = submitButton

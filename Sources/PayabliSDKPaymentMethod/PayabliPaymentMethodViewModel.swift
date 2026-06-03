@@ -317,17 +317,19 @@ public final class PayabliPaymentMethodViewModel: ObservableObject {
     }
 
     private var requiredFieldsAreSatisfied: Bool {
-        configuration.requiredFields
-            .filter { activeFields.contains($0) }
-            .allSatisfy(fieldHasRequiredValue)
+        activeRequiredFields.allSatisfy(fieldHasRequiredValue)
     }
 
     private func validateRequiredFields() throws {
-        for field in configuration.requiredFields where activeFields.contains(field) {
+        for field in activeRequiredFields {
             guard fieldHasRequiredValue(field) else {
                 throw PayabliPaymentMethodError.invalidInput("\(configuration.labels.label(for: field)) is required.")
             }
         }
+    }
+
+    private var activeRequiredFields: [PayabliPaymentMethodField] {
+        activeFields.filter { configuration.requiredFields.contains($0) }
     }
 
     private func fieldHasRequiredValue(_ field: PayabliPaymentMethodField) -> Bool {

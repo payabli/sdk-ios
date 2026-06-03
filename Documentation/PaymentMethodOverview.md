@@ -216,6 +216,32 @@ PayabliPaymentMethodView(
             .achAccount,
             .achAccountType
         ],
+        cardSections: [
+            PayabliPaymentMethodFieldSection(
+                title: "Card Information",
+                fields: [.cardholderName, .cardNumber, .cardExpiration, .cardCvv, .cardZip],
+                inputVerticalSpacing: 4,
+                inputHorizontalSpacing: 8,
+                fieldVerticalSpacings: [
+                    .cardNumber: 2,
+                    .cardCvv: 2
+                ]
+            ),
+            PayabliPaymentMethodFieldSection(
+                title: "Customer Information",
+                fields: [.firstName, .lastName, .billingEmail]
+            )
+        ],
+        achSections: [
+            PayabliPaymentMethodFieldSection(
+                title: "Bank Information",
+                fields: [.achHolder, .achRouting, .achAccount, .achAccountType]
+            ),
+            PayabliPaymentMethodFieldSection(
+                title: "Customer Information",
+                fields: [.firstName, .lastName, .billingEmail]
+            )
+        ],
         hiddenValues: PayabliPaymentMethodHiddenValues(
             achHolderType: .personal,
             achSecCode: .web,
@@ -234,9 +260,15 @@ PayabliPaymentMethodView(
         labels: PayabliPaymentMethodLabels(
             title: "Payment Method",
             subtitle: "Save a payment method for future transactions.",
-            submitButton: "Save Method"
+            submitButton: "Save Method",
+            fieldPlaceholders: [
+                .cardNumber: "1234 1234 1234 1234",
+                .cardExpiration: "MM/YY",
+                .billingEmail: "customer@example.com"
+            ]
         ),
         labelLayout: .external,
+        showsFieldLabels: true,
         formatting: PayabliPaymentMethodFormatting(
             insertsCardNumberSpaces: true,
             masksACHAccountEntry: true
@@ -272,11 +304,42 @@ PayabliPaymentMethodView(
 Set `allowedMethods` to ` [.card]`, `[.ach]`, or `[.card, .ach]` to render
 card-only, ACH-only, or dual-method forms.
 
-Use `labelLayout: .external` for labels above inputs, or
-`labelLayout: .placeholder` to put labels inside text inputs as placeholders.
+Use `showsFieldLabels` to show or hide outward labels globally, and
+`hiddenFieldLabels` to hide labels for selected inputs. Use
+`PayabliPaymentMethodLabels(fieldPlaceholders:)` to configure internal
+placeholder text independently of the outward label. Existing
+`labelLayout: .placeholder` behavior is still supported and hides outward labels
+while using field labels as fallback placeholders.
+Use `PayabliPaymentMethodLayoutStyle` for default input spacing across the form.
+Each `PayabliPaymentMethodFieldSection` can override those defaults with
+`inputVerticalSpacing`, `inputHorizontalSpacing`, and `fieldVerticalSpacings`.
+`fieldVerticalSpacings` maps a field to the vertical gap after that field's row;
+for paired rows, the last field in the row is checked first.
 Use `PayabliPaymentMethodLabels(submitButton:)` to override the submit button
 text from the form configuration. The default submit button text is
 "Add Payment Method".
+
+## Accessibility
+
+`PayabliPaymentMethodView` is designed for standard iOS accessibility checks:
+
+- Inputs, submit buttons, and sheet dismiss buttons preserve a minimum
+  44-point touch target.
+- Hiding outward field labels with `showsFieldLabels: false` or
+  `hiddenFieldLabels` does not remove the accessibility label. VoiceOver still
+  uses `PayabliPaymentMethodLabels.label(for:)`.
+- Placeholder text is not exposed as the accessibility value. Empty text fields
+  read as `Empty`; secure fields with text read as `Entered`.
+- Expiration, account type, holder type, submit, and dismiss controls expose
+  labels, values, and hints.
+- Error text uses accessible labels and form/field errors post VoiceOver
+  announcements.
+- Form and section titles are marked as headers.
+- Card-brand images are decorative and hidden from accessibility.
+- Paired fields automatically stack at accessibility Dynamic Type sizes.
+
+Focused coverage for these behaviors lives in
+`PaymentMethodAccessibilityTests`.
 
 ## SwiftUI Sheet
 
@@ -335,10 +398,14 @@ should be moved into the sheet header.
 | `defaultMethod` | Initial selected method when both are allowed. |
 | `cardFieldOrder` | Visible card fields and order. Required card fields are appended if omitted. |
 | `achFieldOrder` | Visible ACH fields and order. Required ACH fields are appended if omitted. |
+| `cardSections` | Optional card-view field groups with headings and section/field spacing overrides. Overrides flat card rendering when provided. |
+| `achSections` | Optional ACH-view field groups with headings and section/field spacing overrides. Overrides flat ACH rendering when provided. |
 | `hiddenValues` | Supplies optional values without rendering inputs. |
 | `options` | API options applied to component submissions. |
-| `labels` | Title, subtitle, submit label, and per-field label overrides. |
-| `labelLayout` | `.external` labels above inputs or `.placeholder` labels inside inputs. |
+| `labels` | Title, subtitle, submit label, per-field label overrides, and per-field placeholder overrides. |
+| `labelLayout` | Backward-compatible `.external` or `.placeholder` behavior. |
+| `showsFieldLabels` | Shows or hides outward labels for all inputs. Defaults from `labelLayout`. |
+| `hiddenFieldLabels` | Hides outward labels for selected inputs while leaving placeholders configurable. |
 | `formatting` | Card spacing, expiration separator, and ACH account masking. |
 | `inputSizing` | Default and per-field width, height, and horizontal padding. |
 | `cardBrandIconPlacement` | Card-number brand icon placement: `.leading`, `.trailing`, or `.hidden`. |
@@ -368,7 +435,7 @@ merged with `options.customerData` and `hiddenValues.customerData`.
 
 The view preserves the configured field order. When adjacent, expiration/CVV
 and first-name/last-name fields are rendered as paired inputs to save space.
-Card number, expiration, CVV, cardholder name, and card ZIP are always required
+Card number, expiration, CVV, cardholder name, and card postal code are always required
 for card submissions. ACH holder, routing, account, and account type are always
 required for ACH submissions. Use `requiredFields` to require optional visible
 fields such as `.billingEmail`, `.methodDescription`, or `.achDevice`.
@@ -380,7 +447,7 @@ Built-in input limits:
 | Cardholder name | 60 characters |
 | Card number | 12 to 19 digits; UI caps entry at 19 digits |
 | CVV | 3 to 4 digits; UI caps entry at 4 digits |
-| Card ZIP / billing postal code | 12 characters, covering US ZIP+4, Canadian postal codes, and common international postal formats |
+| Card/billing postal code | 12 characters, covering US ZIP+4, Canadian postal codes, and common international postal formats |
 | ACH routing number | Exactly 9 digits for US banks |
 | ACH account number | 4 to 17 digits for US ACH |
 | ACH account holder | 60 characters |
@@ -401,9 +468,12 @@ Use `PayabliPaymentMethodFormConfiguration` for display concerns:
 
 - `allowedMethods` and `defaultMethod`
 - `cardFieldOrder` and `achFieldOrder`
+- `cardSections` and `achSections`
+- Section-level and field-row spacing overrides
 - `hiddenValues`
 - `labels`
 - `labelLayout`
+- `showsFieldLabels` and `hiddenFieldLabels`
 - `formatting`
 - `inputSizing`
 - `errorMessagePlacement`
@@ -413,13 +483,53 @@ Use `PayabliPaymentMethodStyle` for visual concerns:
 
 - `accentColor`
 - Header, label, input, error, and submit button fonts and colors
-- Input background, border, focused state, and corner radius
+- Input SwiftUI font, UIKit font, entered text color, placeholder color,
+  background, border, focused state, and corner radius
 - Submit button enabled/disabled colors, height, padding, and corner radius
-- Layout spacing for headers, fields, paired fields, and labels
+- Layout spacing for headers, sections, vertical input gaps, horizontal input
+  gaps, and labels
 
 Apply it with `.payabliPaymentMethodStyle(...)` to follow SwiftUI's standard
 component styling pattern, or pass `style:` directly to `PayabliPaymentMethodView`
 when a single instance needs an override.
+
+### Font Families And Custom Fonts
+
+iOS provides system font families such as San Francisco through dynamic type
+styles, plus bundled families exposed by `UIFont.familyNames`. To inspect the
+exact families and registered font names available to a host app at runtime:
+
+```swift
+for family in UIFont.familyNames.sorted() {
+    print(family, UIFont.fontNames(forFamilyName: family))
+}
+```
+
+`UIFont(name:size:)` and `Font.custom(_:size:)` require the registered
+face/PostScript name, not necessarily the visible family name. When adding a
+custom `.ttf` or `.otf`, include the file in the app target's Copy Bundle
+Resources, list the file name in `Info.plist` under `UIAppFonts` / "Fonts
+provided by application", then use the registered font name returned by
+`UIFont.fontNames(forFamilyName:)`.
+
+```swift
+let brandedStyle = PayabliPaymentMethodStyle(
+    input: PayabliPaymentMethodInputStyle(
+        font: .custom("Inter-Regular", size: 16),
+        uiFont: UIFont(name: "Inter-Regular", size: 16),
+        textColor: .primary,
+        placeholderColor: Color(uiColor: .secondaryLabel)
+    ),
+    sectionTitle: PayabliPaymentMethodTextStyle(
+        font: .custom("Inter-SemiBold", size: 18),
+        color: .primary
+    )
+)
+```
+
+Set both `font` and `uiFont` for custom input typography. `font` covers
+SwiftUI-rendered text and picker content; `uiFont` covers the UIKit-backed text
+fields used by card, ACH, and customer inputs.
 
 ## Style Samples
 
@@ -432,6 +542,9 @@ color and standard dynamic type.
 let platformDefaultStyle = PayabliPaymentMethodStyle(
     accentColor: Color.accentColor,
     input: PayabliPaymentMethodInputStyle(
+        uiFont: UIFont.preferredFont(forTextStyle: .body),
+        textColor: .primary,
+        placeholderColor: Color(uiColor: .placeholderText),
         backgroundColor: Color(uiColor: .secondarySystemBackground),
         borderColor: Color(uiColor: .separator).opacity(0.45),
         cornerRadius: 8
@@ -476,6 +589,7 @@ let compactCheckoutStyle = PayabliPaymentMethodStyle(
         contentSpacing: 14,
         fieldGroupSpacing: 10,
         pairedFieldSpacing: 8,
+        sectionSpacing: 16,
         labelSpacing: 5
     )
 )

@@ -90,7 +90,7 @@ public extension View {
     }
 }
 
-private struct PayabliPaymentMethodSheetContent: View {
+struct PayabliPaymentMethodSheetContent: View {
     @Binding var isPresented: Bool
     @State private var selectedDetent: PresentationDetent
     @State private var measuredContentHeight: CGFloat = 0
@@ -184,6 +184,8 @@ private struct PayabliPaymentMethodSheetContent: View {
                         Text(title)
                             .font(.title3.weight(.semibold))
                             .foregroundStyle(.primary)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .accessibilityAddTraits(.isHeader)
                     }
 
                     if let subtitle = sheetSubtitle {
@@ -208,11 +210,14 @@ private struct PayabliPaymentMethodSheetContent: View {
             Button {
                 isPresented = false
             } label: {
-                Image(systemName: systemImageName)
-                    .font(.body.weight(.semibold))
-                    .foregroundStyle(Color(uiColor: .secondaryLabel))
-                    .frame(width: 36, height: 36)
-                    .contentShape(Rectangle())
+                    Image(systemName: systemImageName)
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(Color(uiColor: .secondaryLabel))
+                        .frame(
+                            width: PayabliPaymentMethodAccessibility.minimumTouchTarget,
+                            height: PayabliPaymentMethodAccessibility.minimumTouchTarget
+                        )
+                        .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .accessibilityLabel(sheetConfiguration.dismissButton.accessibilityLabel)

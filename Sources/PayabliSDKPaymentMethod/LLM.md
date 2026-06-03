@@ -61,9 +61,24 @@ error handling from scratch.
 - Month/year expiration picker using side-by-side wheel pickers.
 - ACH routing ABA checksum validation by default.
 - Hidden ACH SEC Code value, defaulting to `WEB`.
-- Required CVV and ZIP for card submissions.
+- Required CVV and postal code for card submissions. The API field is still
+  `cardzip`; the default user-facing label is `Postal Code`.
 - Optional visible metadata fields, with selected optional fields configurable
   as required.
+- Independent outward field label visibility and internal placeholder text
+  overrides.
+- Optional field sections for grouping inputs under headings such as
+  "Card Information" and "Customer Information".
+- Section names are configurable through `PayabliPaymentMethodFieldSection.title`;
+  `id` can also be supplied when a stable identifier is needed.
+- Section-level vertical and horizontal input spacing, plus per-field row
+  vertical spacing overrides.
+- Configurable typography and colors, including SwiftUI fonts, UIKit input
+  fonts via `style.input.uiFont`, entered text color, placeholder color, and
+  section/header/label/error/submit text styles.
+- Accessibility support for hidden visual labels, Dynamic Type, VoiceOver
+  labels/hints/announcements, non-placeholder accessibility values, decorative
+  card-brand icons, and 44-point minimum touch targets.
 - Error message rendering at `.top` or `.aboveSubmitButton`.
 - Local QA success and failure mocks in the sample app.
 - Redacted diagnostics for development and QA.
@@ -279,11 +294,12 @@ Card validation and limits:
 | Expiration | Required, accepts `MMYY` or `MM/YY`, normalizes to `MM/YY` |
 | Expiration month | Must be `01` through `12` |
 | CVV | Required, 3 to 4 digits, capped at 4 digits in UI |
-| ZIP/postal code | Required, 12 characters max |
+| Postal code | Required, 12 characters max |
 
 Card UX:
 
-- Default card field order is name on card, card number, expiration, CVV, ZIP.
+- Default card field order is name on card, card number, expiration, CVV,
+  postal code.
 - Card number uses a UIKit-backed text field to enforce entry caps during
   typing.
 - Card number spaces are inserted by default in groups of four.
@@ -355,15 +371,29 @@ behavior.
 | `defaultMethod` | `.card` |
 | `cardFieldOrder` | `[.cardholderName, .cardNumber, .cardExpiration, .cardCvv, .cardZip]` |
 | `achFieldOrder` | `[.achHolder, .achRouting, .achAccount, .achAccountType, .achHolderType]` |
+| `cardSections` | Single untitled section from `cardFieldOrder` |
+| `achSections` | Single untitled section from `achFieldOrder` |
+| `PayabliPaymentMethodFieldSection.inputVerticalSpacing` | nil, falls back to form style |
+| `PayabliPaymentMethodFieldSection.inputHorizontalSpacing` | nil, falls back to form style |
+| `PayabliPaymentMethodFieldSection.fieldVerticalSpacings` | `[:]` |
 | `hiddenValues` | `achSecCode: .web`, all others nil |
 | `options` | All API option fields nil, validation default |
 | `labels.title` | `"Save Payment Method"` |
 | `labels.submitButton` | `"Add Payment Method"` |
+| default `.cardZip` label | `"Postal Code"` |
+| default `.billingZip` label | `"Billing Postal Code"` |
+| `labels.fieldPlaceholders` | `[:]` |
 | `labelLayout` | `.external` |
+| `showsFieldLabels` | `true` for `.external`, `false` for `.placeholder` |
+| `hiddenFieldLabels` | `[]` |
 | `formatting.insertsCardNumberSpaces` | `true` |
 | `formatting.expirationSeparator` | `"/"` |
 | `formatting.masksACHAccountEntry` | `true` |
 | `inputSizing.defaultSize` | width nil, height 52, horizontal padding 14 |
+| `style.input.font` | `.body` for SwiftUI-rendered input/picker content |
+| `style.input.uiFont` | nil, uses preferred body font for UIKit fields |
+| `style.input.textColor` | `.primary` |
+| `style.input.placeholderColor` | `UIColor.placeholderText` |
 | `cardBrandIconPlacement` | `.trailing` |
 | `errorMessagePlacement` | `.aboveSubmitButton` |
 | `requiredFields` | `[]` |
@@ -388,6 +418,76 @@ Special field behavior:
 - `requiredFields` ignores `.achSecCode` because SEC Code is hidden-only.
 - Adjacent expiration/CVV fields render as paired inputs.
 - Adjacent first-name/last-name fields render as paired inputs.
+- Pairing is disabled automatically for accessibility Dynamic Type sizes so
+  fields stack vertically instead of compressing text.
+
+### Labels, placeholders, sections, and spacing
+
+`PayabliPaymentMethodLabels.fieldLabels` controls the outward label text and
+the accessibility label. `fieldPlaceholders` controls placeholder text inside
+inputs. These are independent, so a host app can hide visual labels while still
+keeping accessible control names.
+
+```swift
+PayabliPaymentMethodFormConfiguration(
+    labels: PayabliPaymentMethodLabels(
+        fieldPlaceholders: [
+            .cardholderName: "Name on card",
+            .cardNumber: "Card number",
+            .cardExpiration: "MM/YY",
+            .cardCvv: "CVV",
+            .cardZip: "Postal Code",
+            .firstName: "First name",
+            .lastName: "Last name",
+            .billingEmail: "Billing email"
+        ]
+    ),
+    showsFieldLabels: false
+)
+```
+
+`labelLayout: .placeholder` is still supported for backward compatibility. It
+hides outward labels by default and uses field labels as fallback placeholders
+when no explicit placeholder exists. Prefer explicit `fieldPlaceholders` when
+the placeholder copy should differ from label/accessibility copy.
+
+Use sections to group fields under configurable headings. Passing `title: nil`
+creates an untitled group. Passing `id:` gives the section a stable identity;
+otherwise the SDK derives one from the title or field list.
+
+```swift
+PayabliPaymentMethodFormConfiguration(
+    cardSections: [
+        PayabliPaymentMethodFieldSection(
+            id: "card-info",
+            title: "Card Information",
+            fields: [.cardholderName, .cardNumber, .cardExpiration, .cardCvv, .cardZip],
+            inputVerticalSpacing: 4,
+            inputHorizontalSpacing: 8,
+            fieldVerticalSpacings: [
+                .cardNumber: 2,
+                .cardCvv: 2
+            ]
+        ),
+        PayabliPaymentMethodFieldSection(
+            id: "customer-info",
+            title: "Customer Information",
+            fields: [.firstName, .lastName, .billingEmail]
+        )
+    ]
+)
+```
+
+Spacing resolution:
+
+- `PayabliPaymentMethodStyle.layout.inputVerticalSpacing` defaults to
+  `fieldGroupSpacing`.
+- `PayabliPaymentMethodStyle.layout.inputHorizontalSpacing` defaults to
+  `pairedFieldSpacing`.
+- `PayabliPaymentMethodFieldSection.inputVerticalSpacing` and
+  `inputHorizontalSpacing` override style defaults for that section only.
+- `fieldVerticalSpacings` maps a field to the vertical gap after that field's
+  rendered row; for paired rows, the last field in the row is checked first.
 
 ### Hidden values
 
@@ -421,10 +521,72 @@ Style controls:
 - Accent color.
 - Title, subtitle, label, input, error, and submit button text styles.
 - Input background, focused background, border, focused border, border widths,
-  corner radius, text color, and picker icon color.
+  corner radius, text color, placeholder color, UIKit text field font through
+  `uiFont`, and picker icon color.
 - Submit button enabled and disabled colors, height, padding, font, and corner
   radius.
 - Layout spacing.
+
+### Font families and custom fonts
+
+For system fonts, prefer dynamic type styles such as `.body`, `.callout`, and
+`UIFont.preferredFont(forTextStyle:)`. To list the exact font families and
+registered font names available in a host app at runtime:
+
+```swift
+for family in UIFont.familyNames.sorted() {
+    print(family, UIFont.fontNames(forFamilyName: family))
+}
+```
+
+`Font.custom(_:size:)` and `UIFont(name:size:)` require the registered font
+face/PostScript name, not necessarily the visible family name. To add custom
+fonts, add `.ttf` or `.otf` files to the app target, include them in Copy Bundle
+Resources, list each file name under `UIAppFonts` / "Fonts provided by
+application", then use the registered face names returned by
+`UIFont.fontNames(forFamilyName:)`.
+
+Set both style properties when a custom font should apply everywhere:
+
+```swift
+PayabliPaymentMethodStyle(
+    input: PayabliPaymentMethodInputStyle(
+        font: .custom("Inter-Regular", size: 16),
+        uiFont: UIFont(name: "Inter-Regular", size: 16),
+        textColor: .primary,
+        placeholderColor: Color(uiColor: .secondaryLabel)
+    ),
+    sectionTitle: PayabliPaymentMethodTextStyle(
+        font: .custom("Inter-SemiBold", size: 18),
+        color: .primary
+    )
+)
+```
+
+`font` covers SwiftUI-rendered labels, buttons, picker/menu content, and
+expiration display text. `uiFont` covers the UIKit-backed text fields used for
+card, ACH, and customer text entry.
+
+### Accessibility behavior
+
+The component is designed to pass standard iOS accessibility checks:
+
+- Text inputs and submit/dismiss buttons preserve at least a 44-point touch
+  target through `PayabliPaymentMethodAccessibility.minimumTouchTarget`.
+- Visual labels can be hidden with `showsFieldLabels: false` or
+  `hiddenFieldLabels`, but each input still receives an accessibility label from
+  `PayabliPaymentMethodLabels.label(for:)`.
+- Placeholder text is not exposed as the accessibility value. Empty fields read
+  as `Empty`; secure fields with text read as `Entered`.
+- Expiration, account type, holder type, and submit controls expose labels,
+  values, and hints.
+- Field and form errors use accessible labels and post VoiceOver announcements.
+- Section titles and form titles are marked as headers.
+- Card brand images and fallback icons are decorative and accessibility-hidden.
+- Paired fields stack at accessibility Dynamic Type sizes.
+
+Accessibility tests live in
+`Tests/PayabliSDKPaymentMethodTests/PaymentMethodAccessibilityTests.swift`.
 
 ### Sheet configuration
 
@@ -564,7 +726,7 @@ Diagnostic entry fields:
 - `errorDescription`
 
 Redaction covers bearer tokens, request tokens, access tokens, client secrets,
-PAN, CVV, expiration, ZIP, ACH account/routing/holder fields, stored method
+PAN, CVV, expiration, postal code, ACH account/routing/holder fields, stored method
 identifiers, customer identifiers, names, emails, phones, and addresses.
 
 ### Local QA mocks
@@ -629,7 +791,31 @@ Failure mock:
 | `PayabliPaymentMethodStyle.swift` | Style API and environment modifier |
 | `PayabliPaymentMethodDiagnostics.swift` | Redacted diagnostics |
 | `PayabliPaymentMethodUIKitTextField.swift` | UIKit text field bridge for strict input caps |
+| `PayabliPaymentMethodAccessibility.swift` | Shared accessibility labels, values, hints, announcements, and touch-target constants |
 | `PayabliPaymentMethod+ObjC.swift` | Objective-C-compatible bridge surface |
+
+### Tests and coverage
+
+Use `xcodebuild`, not `swift test`, because the package contains iOS-only
+targets. Focused PaymentMethod tests with coverage:
+
+```bash
+xcodebuild test -scheme PayabliSDK-Package \
+  -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.4.1' \
+  -only-testing:PayabliSDKPaymentMethodTests \
+  -enableCodeCoverage YES \
+  -resultBundlePath build/TestResults/PaymentMethodCoverage.xcresult
+```
+
+Read the coverage report:
+
+```bash
+xcrun xccov view --report build/TestResults/PaymentMethodCoverage.xcresult | \
+  rg -A16 -B1 "PayabliSDKPaymentMethod\\s+"
+```
+
+Current focused component coverage after the accessibility and expansion tests
+were added is about `91.32%` line coverage for `PayabliSDKPaymentMethod`.
 
 ## Solution Engineer Persona
 
@@ -648,7 +834,8 @@ Failure mock:
    - `createAnonymous: false`
    - `forceCustomerCreation: true`
    - `temporary: false`
-7. Configure visible fields, hidden values, labels, style, and error placement.
+7. Configure visible fields, hidden values, labels, placeholders, sections,
+   style, spacing, and error placement.
 8. On success, store `method.storedMethodId` and any safe metadata.
 9. On failure, show the SDK-rendered message or use `onError` for app-level
    handling.
@@ -813,7 +1000,11 @@ PayabliPaymentMethodFormConfiguration(
   confirming `Invalid Card Number` renders without sheet flicker.
 - Test card brand icon placement on both left and right.
 - Test expiration month/year wheel selection.
-- Test card input caps: name 60, PAN 19 digits, CVV 4 digits, ZIP 12 chars.
+- Test card input caps: name 60, PAN 19 digits, CVV 4 digits, postal code
+  12 chars.
+- Test placeholder-only layouts with VoiceOver; labels should be hidden
+  visually but still announced as control names.
+- Test section headings and tight spacing on card and ACH QA configurations.
 - Test ACH input caps: routing 9 digits, account 17 digits, holder 60 chars.
 - Test server failure UX with the local failure mock.
 - Test success navigation or success state with the local success mock.
