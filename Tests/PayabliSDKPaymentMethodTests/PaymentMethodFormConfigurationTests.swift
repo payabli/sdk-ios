@@ -204,6 +204,10 @@ final class PaymentMethodFormConfigurationTests: XCTestCase {
             cardSections: [
                 PayabliPaymentMethodFieldSection(
                     title: "Card Information",
+                    titleStyle: PayabliPaymentMethodTextStyle(
+                        font: .headline,
+                        color: .blue
+                    ),
                     fields: [.cardNumber],
                     inputVerticalSpacing: 4,
                     inputHorizontalSpacing: 8,
@@ -216,6 +220,7 @@ final class PaymentMethodFormConfigurationTests: XCTestCase {
         )
 
         let section = configuration.cardSections[0]
+        XCTAssertNotNil(section.titleStyle)
         XCTAssertEqual(section.inputVerticalSpacing, CGFloat(4))
         XCTAssertEqual(section.inputHorizontalSpacing, CGFloat(8))
         XCTAssertEqual(section.fieldVerticalSpacings[.cardNumber], CGFloat(2))

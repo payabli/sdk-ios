@@ -219,6 +219,10 @@ PayabliPaymentMethodView(
         cardSections: [
             PayabliPaymentMethodFieldSection(
                 title: "Card Information",
+                titleStyle: PayabliPaymentMethodTextStyle(
+                    font: .headline,
+                    color: .primary
+                ),
                 fields: [.cardholderName, .cardNumber, .cardExpiration, .cardCvv, .cardZip],
                 inputVerticalSpacing: 4,
                 inputHorizontalSpacing: 8,
@@ -314,7 +318,10 @@ Use `PayabliPaymentMethodLayoutStyle` for default input spacing across the form.
 Each `PayabliPaymentMethodFieldSection` can override those defaults with
 `inputVerticalSpacing`, `inputHorizontalSpacing`, and `fieldVerticalSpacings`.
 `fieldVerticalSpacings` maps a field to the vertical gap after that field's row;
-for paired rows, the last field in the row is checked first.
+for paired rows, the last field in the row is checked first. Section heading
+copy is configured with `title`; per-section heading font and color are
+configured with `titleStyle`, falling back to the global
+`PayabliPaymentMethodStyle.sectionTitle` when omitted.
 Use `PayabliPaymentMethodLabels(submitButton:)` to override the submit button
 text from the form configuration. The default submit button text is
 "Add Payment Method".
@@ -398,8 +405,8 @@ should be moved into the sheet header.
 | `defaultMethod` | Initial selected method when both are allowed. |
 | `cardFieldOrder` | Visible card fields and order. Required card fields are appended if omitted. |
 | `achFieldOrder` | Visible ACH fields and order. Required ACH fields are appended if omitted. |
-| `cardSections` | Optional card-view field groups with headings and section/field spacing overrides. Overrides flat card rendering when provided. |
-| `achSections` | Optional ACH-view field groups with headings and section/field spacing overrides. Overrides flat ACH rendering when provided. |
+| `cardSections` | Optional card-view field groups with headings, per-section heading style, and section/field spacing overrides. Overrides flat card rendering when provided. |
+| `achSections` | Optional ACH-view field groups with headings, per-section heading style, and section/field spacing overrides. Overrides flat ACH rendering when provided. |
 | `hiddenValues` | Supplies optional values without rendering inputs. |
 | `options` | API options applied to component submissions. |
 | `labels` | Title, subtitle, submit label, per-field label overrides, and per-field placeholder overrides. |

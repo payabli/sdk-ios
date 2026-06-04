@@ -29,7 +29,7 @@ let package = Package(
         // single `.product(name: "PayabliSDK", package: "PayabliSDK")` link.
         // The public Package.swift template under `.github/templates/` is the
         // source of truth for what consumers actually receive — it mirrors
-        // the four shippable products below as `binaryTarget`s pointing at
+        // the five shippable products below as `binaryTarget`s pointing at
         // signed XCFramework zips on Payabli's CDN.
         .library(
             name: "PayabliSDK",
@@ -50,6 +50,11 @@ let package = Package(
             name: "PayabliSDKPaymentMethod",
             type: .dynamic,
             targets: ["PayabliSDKPaymentMethod"]
+        ),
+        .library(
+            name: "PayabliSDKPaymentCapture",
+            type: .dynamic,
+            targets: ["PayabliSDKPaymentCapture"]
         ),
         // `PayabliCardReaderCore` is exposed as a library product in the
         // private Package.swift so `xcodebuild -scheme PayabliCardReaderCore`
@@ -128,6 +133,18 @@ let package = Package(
             ]
         ),
         .target(
+            name: "PayabliSDKPaymentCapture",
+            dependencies: [
+                "PayabliSDKCore",
+                "PayabliSDKPaymentMethod"
+            ],
+            path: "Sources/PayabliSDKPaymentCapture",
+            exclude: [
+                "README.md",
+                "LLM.md"
+            ]
+        ),
+        .target(
             name: "PayabliSDKTestUtils",
             dependencies: [
                 "PayabliSDKCore",
@@ -154,6 +171,15 @@ let package = Package(
             name: "PayabliSDKPaymentMethodTests",
             dependencies: ["PayabliSDKCore", "PayabliSDKPaymentMethod"],
             path: "Tests/PayabliSDKPaymentMethodTests"
+        ),
+        .testTarget(
+            name: "PayabliSDKPaymentCaptureTests",
+            dependencies: [
+                "PayabliSDKCore",
+                "PayabliSDKPaymentMethod",
+                "PayabliSDKPaymentCapture"
+            ],
+            path: "Tests/PayabliSDKPaymentCaptureTests"
         ),
         .testTarget(
             name: "PayabliSDKTestUtilsTests",

@@ -303,30 +303,10 @@ extension PayabliPaymentMethodView {
     }
 
     var cardBrandIcon: some View {
-        let brand = viewModel.detectedCardBrand
-
-        return ZStack {
-            RoundedRectangle(cornerRadius: 5)
-                .fill(brand.brandAssetName == nil ? Color(uiColor: .tertiarySystemBackground) : .white)
-            RoundedRectangle(cornerRadius: 5)
-                .stroke(resolvedStyle.input.borderColor.opacity(0.65), lineWidth: 1)
-
-            if let assetName = brand.brandAssetName {
-                Image(assetName, bundle: .module)
-                    .resizable()
-                    .scaledToFit()
-                    .padding(.horizontal, 5)
-                    .padding(.vertical, 4)
-                    .accessibilityHidden(true)
-            } else {
-                Image(systemName: "creditcard")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(Color(uiColor: .secondaryLabel))
-                    .accessibilityHidden(true)
-            }
-        }
-        .frame(width: 42, height: 26)
-        .accessibilityHidden(true)
+        PayabliPaymentMethodCardBrandIcon(
+            brand: viewModel.detectedCardBrand,
+            borderColor: resolvedStyle.input.borderColor.opacity(0.65)
+        )
     }
 
     func secureField(

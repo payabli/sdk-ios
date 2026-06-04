@@ -136,9 +136,10 @@ public struct PayabliPaymentMethodLabels: Sendable {
     ]
 }
 
-public struct PayabliPaymentMethodFieldSection: Identifiable, Sendable, Equatable {
+public struct PayabliPaymentMethodFieldSection: Identifiable, Sendable {
     public let id: String
     public let title: String?
+    public let titleStyle: PayabliPaymentMethodTextStyle?
     public let fields: [PayabliPaymentMethodField]
     public let inputVerticalSpacing: CGFloat?
     public let inputHorizontalSpacing: CGFloat?
@@ -147,6 +148,7 @@ public struct PayabliPaymentMethodFieldSection: Identifiable, Sendable, Equatabl
     public init(
         id: String? = nil,
         title: String? = nil,
+        titleStyle: PayabliPaymentMethodTextStyle? = nil,
         fields: [PayabliPaymentMethodField],
         inputVerticalSpacing: CGFloat? = nil,
         inputHorizontalSpacing: CGFloat? = nil,
@@ -157,6 +159,7 @@ public struct PayabliPaymentMethodFieldSection: Identifiable, Sendable, Equatabl
             ?? resolvedTitle
             ?? fields.map(\.rawValue).joined(separator: "-")
         self.title = resolvedTitle
+        self.titleStyle = titleStyle
         self.fields = fields
         self.inputVerticalSpacing = inputVerticalSpacing.map { max(0, $0) }
         self.inputHorizontalSpacing = inputHorizontalSpacing.map { max(0, $0) }
@@ -167,6 +170,7 @@ public struct PayabliPaymentMethodFieldSection: Identifiable, Sendable, Equatabl
         PayabliPaymentMethodFieldSection(
             id: id,
             title: title,
+            titleStyle: titleStyle,
             fields: fields,
             inputVerticalSpacing: inputVerticalSpacing,
             inputHorizontalSpacing: inputHorizontalSpacing,

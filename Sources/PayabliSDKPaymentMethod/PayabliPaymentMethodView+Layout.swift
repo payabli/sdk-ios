@@ -8,9 +8,11 @@ extension PayabliPaymentMethodView {
 
         return VStack(alignment: .leading, spacing: section.title == nil ? 0 : resolvedStyle.layout.sectionTitleSpacing) {
             if let title = section.title {
+                let titleStyle = section.titleStyle ?? resolvedStyle.sectionTitle
+
                 Text(title)
-                    .font(resolvedStyle.sectionTitle.font)
-                    .foregroundStyle(resolvedStyle.sectionTitle.color)
+                    .font(titleStyle.font)
+                    .foregroundStyle(titleStyle.color)
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityAddTraits(.isHeader)
             }

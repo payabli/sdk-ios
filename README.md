@@ -3,13 +3,15 @@
 ## Summary
 
 The Payabli iOS SDK enables iPhone applications to accept in-person
-card payments using Apple's Tap to Pay on iPhone and, through the opt-in
-payment method module, save card PAN or ACH account data as Payabli stored
-payment methods. No external card reader is required for Tap to Pay:
+card payments using Apple's Tap to Pay on iPhone and, through opt-in
+MoneyIn modules, save card PAN or ACH account data as Payabli stored
+payment methods or submit v2 auth/capture transactions. No external card
+reader is required for Tap to Pay:
 any iPhone XS or newer running iOS 16.7 or later is supported. The SDK
 handles device attestation, session management, NFC card reading, retry
-logic, payment method request assembly, and reconciliation with the Payabli
-backend; the host application provides the checkout user interface.
+logic, payment method request assembly, transaction auth/capture request
+assembly, and reconciliation with the Payabli backend; the host application
+provides the checkout user interface.
 
 ```swift
 import PayabliSDKTapToPay
@@ -40,6 +42,7 @@ print("Transaction captured. ID:", result.paymentTransId)
 | ----------------------------- | ------------------------------------------------------------------------ |
 | Tap to Pay on iPhone          | Card-present NFC; no external reader required.                           |
 | Card and ACH payment method   | Opt-in SwiftUI component and direct API for stored payment methods.       |
+| Payment capture and auth      | Opt-in direct API for v2 MoneyIn getpaid, authorize, and capture flows.   |
 | Swift and Objective-C APIs    | First-class `@objc` surface for MAUI, Flutter, and React Native hosts.   |
 | Built-in App Attest           | Cold and warm device attestation, cached automatically.                  |
 | Pending-device activation     | Out-of-band OTP flow for first-time devices.                             |
@@ -64,6 +67,7 @@ need `PayabliSDKTapToPay`.
 | `PayabliSDKCore`        | Core building blocks (config, auth, transport).                              |
 | `PayabliSDKTapToPay`    | Tap to Pay on iPhone. The product most applications require.                 |
 | `PayabliSDKPaymentMethod` | Opt-in card PAN and ACH payment method component.                         |
+| `PayabliSDKPaymentCapture` | Opt-in v2 MoneyIn auth and capture transaction component.                |
 | `PayabliCardReaderCore` | Tap to Phone engine. Pulled in transitively; no explicit link required.      |
 | `PayabliSDKTelemetry`   | Optional Sentry and PostHog plumbing; bring your own instance.               |
 | `PayabliSDKTestUtils`   | Test fixtures (`StubURLProtocol`, `InMemorySecureStorage`, mocks). Link in test targets only. |
@@ -198,6 +202,16 @@ See [`Documentation/PaymentMethodOverview.md`](Documentation/PaymentMethodOvervi
 for the complete payment method feature reference and
 [`Documentation/PaymentMethodIntegrationGuide.md`](Documentation/PaymentMethodIntegrationGuide.md)
 for native SwiftUI, Flutter, and MAUI integration paths.
+
+For direct v2 MoneyIn transaction authorization and capture, link the opt-in
+payment capture component:
+
+```swift
+.product(name: "PayabliSDKPaymentCapture", package: "sdk-ios")
+```
+
+See [`Documentation/PaymentCaptureOverview.md`](Documentation/PaymentCaptureOverview.md)
+for endpoint coverage, authentication behavior, and usage examples.
 
 For host-app integration tests, also link `PayabliSDKTestUtils`:
 

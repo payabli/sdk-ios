@@ -107,6 +107,10 @@ PayabliPaymentMethodView(
         cardSections: [
             PayabliPaymentMethodFieldSection(
                 title: "Card Information",
+                titleStyle: PayabliPaymentMethodTextStyle(
+                    font: .headline,
+                    color: .primary
+                ),
                 fields: [.cardholderName, .cardNumber, .cardExpiration, .cardCvv, .cardZip],
                 inputVerticalSpacing: 4,
                 inputHorizontalSpacing: 8,
@@ -220,7 +224,10 @@ if a custom section omits them. Use `PayabliPaymentMethodLayoutStyle` for
 default vertical spacing between input rows and horizontal spacing between
 paired inputs. Each `PayabliPaymentMethodFieldSection` can override those
 defaults with `inputVerticalSpacing`, `inputHorizontalSpacing`, and
-`fieldVerticalSpacings` for spacing after specific field rows.
+`fieldVerticalSpacings` for spacing after specific field rows. Section heading
+text is configured with `title`; per-section heading font and color are
+configured with `titleStyle`, which falls back to the global
+`PayabliPaymentMethodStyle.sectionTitle` when omitted.
 The default submit button text is "Add Payment Method". Card CVV and postal code are always required and cannot be
 supplied as hidden values. The form caps cardholder and ACH holder names at 60
 characters, PAN at 19 digits, CVV at 4 digits, postal code at 12

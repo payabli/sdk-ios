@@ -593,8 +593,8 @@ extension PayabliPaymentMethodInput: Encodable {
     }
 }
 
-extension PayabliPaymentMethodInput {
-    func validate(_ validation: PayabliPaymentMethodValidation) throws {
+public extension PayabliPaymentMethodInput {
+    func validate(_ validation: PayabliPaymentMethodValidation = .default) throws {
         switch self {
         case let .card(data):
             try data.validate(validation)

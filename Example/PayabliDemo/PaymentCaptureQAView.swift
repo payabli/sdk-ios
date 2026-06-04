@@ -1,21 +1,22 @@
-import Dispatch
 import os
-import PayabliSDKPaymentMethod
+import PayabliSDKCore
+import PayabliSDKPaymentCapture
 import SwiftUI
 
-struct PaymentMethodQAView: View {
-    @EnvironmentObject private var paymentMethod: PayabliPaymentMethod
-    @StateObject private var diagnosticsStore = PaymentMethodQADiagnosticsStore.shared
+struct PaymentCaptureQAView: View {
+    @EnvironmentObject private var paymentCapture: PayabliPaymentCapture
+    @StateObject private var diagnosticsStore = PaymentCaptureQADiagnosticsStore.shared
     @State private var resultText = ""
-    @State private var isPaymentMethodAddedViewPresented = false
-    @State private var isPaymentMethodSheetPresented = false
+    @State private var capturedResult: PayabliPaymentCaptureResult?
+    @State private var isPaymentCaptureSheetPresented = false
+    @State private var isPaymentCaptureResultViewPresented = false
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     Button {
-                        isPaymentMethodSheetPresented = true
+                        isPaymentCaptureSheetPresented = true
                     } label: {
                         Label("Open sheet experience", systemImage: "rectangle.bottomthird.inset.filled")
                             .frame(maxWidth: .infinity)
@@ -25,15 +26,15 @@ struct PaymentMethodQAView: View {
                     Text("Inline experience")
                         .font(.headline)
 
-                    PayabliPaymentMethodView(
-                        component: paymentMethod,
+                    PayabliPaymentCaptureView(
+                        component: paymentCapture,
                         configuration: configuration,
-                        onPaymentMethodAdded: handlePaymentMethodAdded,
+                        onPaymentCaptured: handlePaymentCaptured,
                         onError: handleError
                     )
-                    .payabliPaymentMethodStyle(style)
+                    .payabliPaymentCaptureStyle(style)
 
-                    Text(resultText.isEmpty ? "No payment method result yet" : resultText)
+                    Text(resultText.isEmpty ? "No payment capture result yet" : resultText)
                         .font(.footnote)
                         .foregroundColor(.secondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -41,7 +42,7 @@ struct PaymentMethodQAView: View {
                         .background(Color(.secondarySystemBackground))
                         .clipShape(RoundedRectangle(cornerRadius: 8))
 
-                    if Secrets.paymentMethodDiagnosticsEnabled {
+                    if Secrets.paymentCaptureDiagnosticsEnabled {
                         VStack(alignment: .leading, spacing: 8) {
                             Text("Diagnostics")
                                 .font(.headline)
@@ -67,27 +68,29 @@ struct PaymentMethodQAView: View {
                 }
                 .padding(16)
             }
-            .navigationTitle("Payment Method QA")
-            .navigationDestination(isPresented: $isPaymentMethodAddedViewPresented) {
-                PaymentMethodAddedView()
+            .navigationTitle("Payment Capture QA")
+            .navigationDestination(isPresented: $isPaymentCaptureResultViewPresented) {
+                if let capturedResult {
+                    PaymentCaptureResultView(result: capturedResult)
+                }
             }
         }
-        .payabliPaymentMethodSheet(
-            isPresented: $isPaymentMethodSheetPresented,
-            component: paymentMethod,
+        .payabliPaymentCaptureSheet(
+            isPresented: $isPaymentCaptureSheetPresented,
+            component: paymentCapture,
             configuration: configuration,
-            sheetConfiguration: PayabliPaymentMethodSheetConfiguration(
-                title: "Add Payment Method",
+            sheetConfiguration: PayabliPaymentCaptureSheetConfiguration(
+                title: "Submit Payment",
                 dismissButton: .back
             ),
             style: style,
-            onPaymentMethodAdded: handlePaymentMethodAdded,
+            onPaymentCaptured: handlePaymentCaptured,
             onError: handleError
         )
     }
 
-    private var configuration: PayabliPaymentMethodFormConfiguration {
-        PayabliPaymentMethodFormConfiguration(
+    private var configuration: PayabliPaymentCaptureFormConfiguration {
+        PayabliPaymentCaptureFormConfiguration(
             allowedMethods: [.card, .ach],
             defaultMethod: .card,
             cardFieldOrder: [
@@ -104,9 +107,9 @@ struct PaymentMethodQAView: View {
                 .achAccountType
             ],
             cardSections: [
-                PayabliPaymentMethodFieldSection(
+                PayabliPaymentCaptureFieldSection(
                     title: "Card Information",
-                    titleStyle: PayabliPaymentMethodTextStyle(
+                    titleStyle: PayabliPaymentCaptureTextStyle(
                         font: .headline.weight(.semibold),
                         color: .primary
                     ),
@@ -124,9 +127,9 @@ struct PaymentMethodQAView: View {
                         .cardCvv: 2
                     ]
                 ),
-                PayabliPaymentMethodFieldSection(
+                PayabliPaymentCaptureFieldSection(
                     title: "Customer Information",
-                    titleStyle: PayabliPaymentMethodTextStyle(
+                    titleStyle: PayabliPaymentCaptureTextStyle(
                         font: .headline.weight(.semibold),
                         color: .primary
                     ),
@@ -135,12 +138,24 @@ struct PaymentMethodQAView: View {
                         .lastName,
                         .billingEmail
                     ]
+                ),
+                PayabliPaymentCaptureFieldSection(
+                    title: "Payment Information",
+                    titleStyle: PayabliPaymentCaptureTextStyle(
+                        font: .headline.weight(.semibold),
+                        color: .primary
+                    ),
+                    fields: [
+                        .amount,
+                        .serviceFee
+                    ],
+                    inputVerticalSpacing: 6
                 )
             ],
             achSections: [
-                PayabliPaymentMethodFieldSection(
+                PayabliPaymentCaptureFieldSection(
                     title: "Bank Information",
-                    titleStyle: PayabliPaymentMethodTextStyle(
+                    titleStyle: PayabliPaymentCaptureTextStyle(
                         font: .headline.weight(.semibold),
                         color: .primary
                     ),
@@ -157,9 +172,9 @@ struct PaymentMethodQAView: View {
                         .achAccount: 2
                     ]
                 ),
-                PayabliPaymentMethodFieldSection(
+                PayabliPaymentCaptureFieldSection(
                     title: "Customer Information",
-                    titleStyle: PayabliPaymentMethodTextStyle(
+                    titleStyle: PayabliPaymentCaptureTextStyle(
                         font: .headline.weight(.semibold),
                         color: .primary
                     ),
@@ -168,53 +183,70 @@ struct PaymentMethodQAView: View {
                         .lastName,
                         .billingEmail
                     ]
+                ),
+                PayabliPaymentCaptureFieldSection(
+                    title: "Payment Information",
+                    titleStyle: PayabliPaymentCaptureTextStyle(
+                        font: .headline.weight(.semibold),
+                        color: .primary
+                    ),
+                    fields: [
+                        .amount,
+                        .serviceFee
+                    ],
+                    inputVerticalSpacing: 6
                 )
             ],
-            hiddenValues: PayabliPaymentMethodHiddenValues(
+            hiddenValues: PayabliPaymentCaptureHiddenValues(
                 achHolderType: .personal,
                 achSecCode: .web,
-                methodDescription: "Payment Method QA"
+                methodDescription: "Payment Capture QA"
             ),
-            options: PayabliPaymentMethodOptions(
-                achValidation: true,
-                createAnonymous: false,
-                forceCustomerCreation: true,
-                temporary: false,
-                source: "ios-payment-method-qa"
-            ),
-            labels: PayabliPaymentMethodLabels(
-                title: "Save Payment Method",
-                subtitle: "Create a card or ACH token.",
+            labels: PayabliPaymentCaptureLabels(
+                title: "Payment Capture",
+                subtitle: "Submit a card or ACH payment.",
+                submitButton: "Submit Payment",
                 fieldPlaceholders: labelMatchingPlaceholders(for: fieldsWithHiddenLabels)
             ),
             labelLayout: .external,
             showsFieldLabels: true,
             hiddenFieldLabels: Set(fieldsWithHiddenLabels),
-            formatting: PayabliPaymentMethodFormatting(
+            formatting: PayabliPaymentCaptureFormatting(
                 insertsCardNumberSpaces: true,
                 masksACHAccountEntry: true
             ),
-            inputSizing: PayabliPaymentMethodInputSizing(
-                defaultSize: PayabliPaymentMethodInputSize(height: 52),
+            inputSizing: PayabliPaymentCaptureInputSizing(
+                defaultSize: PayabliPaymentCaptureInputSize(height: 52),
                 fieldSizes: [
-                    .cardExpiration: PayabliPaymentMethodInputSize(height: 48),
-                    .cardCvv: PayabliPaymentMethodInputSize(height: 48)
+                    .cardExpiration: PayabliPaymentCaptureInputSize(height: 48),
+                    .cardCvv: PayabliPaymentCaptureInputSize(height: 48)
                 ]
             ),
-            cardBrandIconPlacement: .trailing
+            cardBrandIconPlacement: .trailing,
+            paymentSummary: PayabliPaymentCapturePaymentSummaryConfiguration(
+                labelStyle: PayabliPaymentCapturePaymentSummaryTextStyle(
+                    font: .subheadline,
+                    color: .secondary
+                ),
+                valueStyle: PayabliPaymentCapturePaymentSummaryTextStyle(
+                    font: .subheadline.weight(.semibold),
+                    color: .primary
+                ),
+                rowSpacing: 6
+            )
         )
     }
 
-    private var style: PayabliPaymentMethodStyle {
-        PayabliPaymentMethodStyle(
+    private var style: PayabliPaymentCaptureStyle {
+        PayabliPaymentCaptureStyle(
             accentColor: .green,
-            input: PayabliPaymentMethodInputStyle(
+            input: PayabliPaymentCaptureInputStyle(
                 backgroundColor: Color(.systemBackground),
                 borderColor: Color(.separator).opacity(0.6),
                 cornerRadius: 8
             ),
-            submitButton: PayabliPaymentMethodSubmitButtonStyle(cornerRadius: 8),
-            layout: PayabliPaymentMethodLayoutStyle(
+            submitButton: PayabliPaymentCaptureSubmitButtonStyle(cornerRadius: 8),
+            layout: PayabliPaymentCaptureLayoutStyle(
                 contentSpacing: 18,
                 fieldGroupSpacing: 14,
                 pairedFieldSpacing: 12,
@@ -224,7 +256,7 @@ struct PaymentMethodQAView: View {
         )
     }
 
-    private var fieldsWithHiddenLabels: [PayabliPaymentMethodField] {
+    private var fieldsWithHiddenLabels: [PayabliPaymentCaptureField] {
         [
             .cardholderName,
             .cardNumber,
@@ -242,42 +274,57 @@ struct PaymentMethodQAView: View {
     }
 
     private func labelMatchingPlaceholders(
-        for fields: [PayabliPaymentMethodField]
-    ) -> [PayabliPaymentMethodField: String] {
+        for fields: [PayabliPaymentCaptureField]
+    ) -> [PayabliPaymentCaptureField: String] {
         Dictionary(uniqueKeysWithValues: fields.map { field in
             (
                 field,
-                PayabliPaymentMethodLabels.defaultFieldLabels[field] ?? field.rawValue
+                PayabliPaymentCaptureLabels.defaultFieldLabels[field] ?? field.rawValue
             )
         })
     }
 
-    private func handlePaymentMethodAdded(_ method: PayabliStoredPaymentMethod) {
+    private func handlePaymentCaptured(_ result: PayabliPaymentCaptureResult) {
+        capturedResult = result
         resultText = [
-            "Stored method: \(method.storedMethodId ?? "-")",
-            "Response: \(method.responseText)",
-            "Result: \(method.resultText ?? "-")"
+            "Code: \(result.code)",
+            "Reason: \(result.reason ?? "-")",
+            "Payment trans ID: \(result.transaction?.paymentTransId ?? "-")",
+            "Gateway trans ID: \(result.transaction?.gatewayTransId ?? "-")",
+            "Method: \(result.transaction?.method ?? "-")",
+            "Operation: \(result.transaction?.operation ?? "-")"
         ].joined(separator: "\n")
         Logger(
             subsystem: "com.payabli.demo.paymentmethodqa",
-            category: "PaymentMethodDiagnostics"
-        ).info("Payment method added: \(method.responseText, privacy: .public)")
+            category: "PaymentCaptureDiagnostics"
+        ).info("Payment captured: \(result.code, privacy: .public)")
 
-        if isPaymentMethodSheetPresented {
-            isPaymentMethodSheetPresented = false
+        if isPaymentCaptureSheetPresented {
+            isPaymentCaptureSheetPresented = false
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
-                isPaymentMethodAddedViewPresented = true
+                isPaymentCaptureResultViewPresented = true
             }
         } else {
-            isPaymentMethodAddedViewPresented = true
+            isPaymentCaptureResultViewPresented = true
         }
     }
 
     private func handleError(_ error: Error) {
-        resultText = "Payment method failed: \(error.localizedDescription)"
+        let message = paymentCaptureErrorMessage(error)
+        resultText = "Payment capture failed: \(message)"
         Logger(
             subsystem: "com.payabli.demo.paymentmethodqa",
-            category: "PaymentMethodDiagnostics"
-        ).error("Payment method failed: \(error.localizedDescription, privacy: .public)")
+            category: "PaymentCaptureDiagnostics"
+        ).error("Payment capture failed: \(message, privacy: .public)")
+    }
+
+    private func paymentCaptureErrorMessage(_ error: Error) -> String {
+        if let payabliError = error as? any PayabliError {
+            if let detail = payabliError.detail, !detail.isEmpty, detail != payabliError.reason {
+                return "\(payabliError.reason)\n\(detail)"
+            }
+            return payabliError.reason
+        }
+        return String(describing: error)
     }
 }

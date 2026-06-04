@@ -70,7 +70,8 @@ error handling from scratch.
 - Optional field sections for grouping inputs under headings such as
   "Card Information" and "Customer Information".
 - Section names are configurable through `PayabliPaymentMethodFieldSection.title`;
-  `id` can also be supplied when a stable identifier is needed.
+  `titleStyle` customizes each section heading's font/color, and `id` can also
+  be supplied when a stable identifier is needed.
 - Section-level vertical and horizontal input spacing, plus per-field row
   vertical spacing overrides.
 - Configurable typography and colors, including SwiftUI fonts, UIKit input
@@ -373,6 +374,7 @@ behavior.
 | `achFieldOrder` | `[.achHolder, .achRouting, .achAccount, .achAccountType, .achHolderType]` |
 | `cardSections` | Single untitled section from `cardFieldOrder` |
 | `achSections` | Single untitled section from `achFieldOrder` |
+| `PayabliPaymentMethodFieldSection.titleStyle` | nil, falls back to `PayabliPaymentMethodStyle.sectionTitle` |
 | `PayabliPaymentMethodFieldSection.inputVerticalSpacing` | nil, falls back to form style |
 | `PayabliPaymentMethodFieldSection.inputHorizontalSpacing` | nil, falls back to form style |
 | `PayabliPaymentMethodFieldSection.fieldVerticalSpacings` | `[:]` |
@@ -453,7 +455,9 @@ the placeholder copy should differ from label/accessibility copy.
 
 Use sections to group fields under configurable headings. Passing `title: nil`
 creates an untitled group. Passing `id:` gives the section a stable identity;
-otherwise the SDK derives one from the title or field list.
+otherwise the SDK derives one from the title or field list. Passing
+`titleStyle:` customizes that section heading's font and color; omitted
+section styles fall back to the global `PayabliPaymentMethodStyle.sectionTitle`.
 
 ```swift
 PayabliPaymentMethodFormConfiguration(
@@ -461,6 +465,10 @@ PayabliPaymentMethodFormConfiguration(
         PayabliPaymentMethodFieldSection(
             id: "card-info",
             title: "Card Information",
+            titleStyle: PayabliPaymentMethodTextStyle(
+                font: .headline,
+                color: .primary
+            ),
             fields: [.cardholderName, .cardNumber, .cardExpiration, .cardCvv, .cardZip],
             inputVerticalSpacing: 4,
             inputHorizontalSpacing: 8,

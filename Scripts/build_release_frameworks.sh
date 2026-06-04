@@ -4,7 +4,7 @@
 # ---------------------------
 # Builds the Payabli iOS SDK distribution XCFrameworks
 # (PayabliSDKCore, PayabliSDKTapToPay, PayabliSDKPaymentMethod,
-# PayabliCardReaderCore) for
+# PayabliSDKPaymentCapture, PayabliCardReaderCore) for
 # device + iOS Simulator slices, with distribution-mode settings and a
 # pinned SOURCE_DATE_EPOCH for reproducible zips.
 #
@@ -29,6 +29,7 @@
 #     payabli-ios-sdk-core-${VERSION}.zip
 #     payabli-ios-sdk-taptopay-${VERSION}.zip
 #     payabli-ios-sdk-payment-method-${VERSION}.zip
+#     payabli-ios-sdk-payment-capture-${VERSION}.zip
 #     payabli-ios-sdk-card-reader-core-${VERSION}.zip
 #     checksums.txt           (one sha256 per zip, space-separated lines)
 #     THIRD_PARTY_LICENSES.txt  (bundled copy for the upload/publish step)
@@ -73,6 +74,7 @@ SCHEMES=(
     "PayabliSDKCore"
     "PayabliSDKTapToPay"
     "PayabliSDKPaymentMethod"
+    "PayabliSDKPaymentCapture"
     "PayabliCardReaderCore"
 )
 
@@ -82,6 +84,7 @@ slug_for() {
         PayabliSDKCore)          echo "core" ;;
         PayabliSDKTapToPay)      echo "taptopay" ;;
         PayabliSDKPaymentMethod)  echo "payment-method" ;;
+        PayabliSDKPaymentCapture) echo "payment-capture" ;;
         PayabliCardReaderCore)   echo "card-reader-core" ;;
         *) echo "error: unknown scheme '$1'" >&2; exit 1 ;;
     esac
@@ -169,7 +172,8 @@ for scheme in "${SCHEMES[@]}"; do
     checksum="$(swift package compute-checksum "$BUILD_DIR/$zip_name")"
     printf '%s  %s\n' "$checksum" "$zip_name" >> "$checksums_file"
     # Also expose individual vars for the render step:
-    #   CORE_SHA256, TAPTOPAY_SHA256, PAYMENT_METHOD_SHA256, CARD_READER_CORE_SHA256
+    #   CORE_SHA256, TAPTOPAY_SHA256, PAYMENT_METHOD_SHA256,
+    #   PAYMENT_CAPTURE_SHA256, CARD_READER_CORE_SHA256
     # (matches render_public_manifests.sh's required vars).
     upper="$(echo "${slug//-/_}" | tr '[:lower:]' '[:upper:]')"
     if [[ -n "${GITHUB_ENV:-}" ]]; then

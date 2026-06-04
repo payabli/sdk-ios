@@ -1,7 +1,7 @@
 import SwiftUI
 import UIKit
 
-public struct PayabliPaymentMethodTextStyle {
+public struct PayabliPaymentMethodTextStyle: Sendable {
     public let font: Font
     public let color: Color
 
