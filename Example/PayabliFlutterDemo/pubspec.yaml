@@ -1,5 +1,5 @@
 name: payabli_flutter_demo
-description: Minimal Flutter demo wrapping Tap to Pay and payment method via MethodChannel + EventChannel.
+description: Minimal Flutter demo wrapping Tap to Pay and PayIn payment flow via MethodChannel + EventChannel.
 version: 1.0.0
 publish_to: 'none'
 

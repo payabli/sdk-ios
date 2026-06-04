@@ -1,11 +1,17 @@
 import Foundation
-import UIKit
 import PayabliSDKCore
+import PayabliSDKPayInPaymentFlow
 import PayabliSDKTapToPay
+import UIKit
+
+#if canImport(React)
+    import React
+#endif
 
 /// React Native Native Module bridging the bilingual `@objc` surface of
-/// `PayabliSDKTapToPay` to JavaScript. Inherits `RCTEventEmitter` so we can
-/// push lifecycle events to JS without polling.
+/// `PayabliSDKTapToPay` and `PayabliSDKPayInPaymentFlow` to JavaScript.
+/// Inherits `RCTEventEmitter` so we can push lifecycle events to JS without
+/// polling.
 ///
 /// ## Protocol
 ///
@@ -20,11 +26,21 @@ import PayabliSDKTapToPay
 ///     of the current `PayabliTTPSessionState`.
 ///   - `resolveTokenRefresh(token)` / `rejectTokenRefresh(reason)` —
 ///     responses to the `TTPTokenRefreshRequested` event.
+///   - `configurePayInPaymentFlow(config, resolver, rejecter)` — entryPoint,
+///     environment.
+///   - `addCard(params, resolver, rejecter)`
+///   - `addACH(params, resolver, rejecter)`
+///   - `resolvePayInPaymentFlowAccessToken(token)` /
+///     `rejectPayInPaymentFlowAccessToken(reason)` — responses to the
+///     `PayInPaymentFlowAccessTokenRequested` event.
 ///
 /// Events (RCTEventEmitter):
 ///   - `TTPEvent`: `{code: Int, payload: {...}}` per `PayabliTTPEvent`.
 ///   - `TTPTokenRefreshRequested`: signals JS to fetch a fresh token from
 ///     its own backend; resolve via `resolveTokenRefresh:`.
+///   - `PayInPaymentFlowAccessTokenRequested`: signals JS to fetch a scoped
+///     PayIn token from its own backend; resolve via
+///     `resolvePayInPaymentFlowAccessToken:`.
 ///
 /// ## Authentication
 ///
@@ -35,21 +51,29 @@ import PayabliSDKTapToPay
 /// refresh is single-flight — concurrent refresh requests are coalesced.
 @objc(PayabliSDKModule)
 public final class PayabliSDKModule: RCTEventEmitter {
-
     // MARK: - RCTEventEmitter overrides
 
-    @objc public override static func requiresMainQueueSetup() -> Bool { true }
+    @objc override public static func requiresMainQueueSetup() -> Bool {
+        true
+    }
 
-    @objc public override func supportedEvents() -> [String]! {
-        ["TTPEvent", "TTPTokenRefreshRequested"]
+    @objc override public func supportedEvents() -> [String]! {
+        [
+            "TTPEvent",
+            "TTPTokenRefreshRequested",
+            "PayInPaymentFlowAccessTokenRequested"
+        ]
     }
 
     // MARK: - State
 
     private var ttp: PayabliTTP?
     private var eventToken: PayabliTTPEventToken?
+    private var payInPaymentFlow: PayabliPayInPaymentFlow?
     private var pendingRefresh: CheckedContinuation<String, Error>?
+    private var pendingPayInAccessToken: CheckedContinuation<String, Error>?
     private let refreshQueue = DispatchQueue(label: "com.payabli.sdk.rn.refresh")
+    private let payInAccessTokenQueue = DispatchQueue(label: "com.payabli.sdk.rn.payin-token")
 
     // MARK: - configure
 
@@ -62,7 +86,8 @@ public final class PayabliSDKModule: RCTEventEmitter {
               let entryPoint = config["entryPoint"] as? String,
               let appId = config["appId"] as? String,
               let envRaw = config["environment"] as? Int,
-              let environment = PayabliEnvironment(rawValue: envRaw) else {
+              let environment = PayabliEnvironment(rawValue: envRaw)
+        else {
             reject("INVALID_ARGS", "Missing accessToken/entryPoint/appId/environment", nil)
             return
         }
@@ -145,7 +170,8 @@ public final class PayabliSDKModule: RCTEventEmitter {
             return
         }
         guard let pdDict = params["paymentDetails"] as? [String: Any],
-              let amountValue = (pdDict["amount"] as? NSNumber) else {
+              let amountValue = (pdDict["amount"] as? NSNumber)
+        else {
             reject("INVALID_ARGS", "Missing paymentDetails.amount", nil)
             return
         }
@@ -235,6 +261,162 @@ public final class PayabliSDKModule: RCTEventEmitter {
         }
     }
 
+    // MARK: - PayIn payment flow
+
+    @objc public func configurePayInPaymentFlow(
+        _ config: NSDictionary,
+        resolver resolve: @escaping RCTPromiseResolveBlock,
+        rejecter reject: @escaping RCTPromiseRejectBlock
+    ) {
+        guard let entryPoint = config["entryPoint"] as? String,
+              let envRaw = config["environment"] as? Int,
+              let environment = PayabliEnvironment(rawValue: envRaw)
+        else {
+            reject("INVALID_ARGS", "Missing entryPoint/environment", nil)
+            return
+        }
+
+        let accessTokenProvider: PayabliPayInPaymentFlowAccessTokenProvider = { @Sendable [weak self] in
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<String, Error>) in
+                guard let self else {
+                    continuation.resume(throwing: PayabliGenericError(
+                        code: .missingToken,
+                        reason: "Native module deallocated"
+                    ))
+                    return
+                }
+                self.payInAccessTokenQueue.sync {
+                    if self.pendingPayInAccessToken == nil {
+                        self.pendingPayInAccessToken = continuation
+                        DispatchQueue.main.async {
+                            self.sendEvent(withName: "PayInPaymentFlowAccessTokenRequested", body: nil)
+                        }
+                    } else {
+                        continuation.resume(throwing: PayabliGenericError(
+                            code: .missingToken,
+                            reason: "A PayIn access token request is already in flight"
+                        ))
+                    }
+                }
+            }
+        }
+
+        Task { @MainActor in
+            self.payInPaymentFlow = PayabliPayInPaymentFlow(
+                entryPoint: entryPoint,
+                environment: environment,
+                accessTokenProvider: accessTokenProvider
+            )
+            resolve(nil)
+        }
+    }
+
+    @objc public func addCard(
+        _ params: NSDictionary,
+        resolver resolve: @escaping RCTPromiseResolveBlock,
+        rejecter reject: @escaping RCTPromiseRejectBlock
+    ) {
+        guard let payInPaymentFlow else {
+            reject("NOT_CONFIGURED", "Call PayabliPayInPaymentFlow.configure() before addCard()", nil)
+            return
+        }
+        guard let cardNumber = params["cardNumber"] as? String,
+              let expiration = params["expiration"] as? String,
+              let cardholderName = params["cardholderName"] as? String,
+              let cvv = params["cvv"] as? String,
+              let billingZip = params["billingZip"] as? String
+        else {
+            reject("INVALID_ARGS", "Missing required card fields", nil)
+            return
+        }
+
+        let card = PayabliPayInPaymentFlowCardData(
+            cardNumber: cardNumber,
+            expiration: expiration,
+            cardholderName: cardholderName,
+            cvv: cvv,
+            billingZip: billingZip
+        )
+        addPaymentMethod(
+            .card(card),
+            options: Self.payInOptions(from: params),
+            component: payInPaymentFlow,
+            resolve: resolve,
+            reject: reject
+        )
+    }
+
+    @objc public func addACH(
+        _ params: NSDictionary,
+        resolver resolve: @escaping RCTPromiseResolveBlock,
+        rejecter reject: @escaping RCTPromiseRejectBlock
+    ) {
+        guard let payInPaymentFlow else {
+            reject("NOT_CONFIGURED", "Call PayabliPayInPaymentFlow.configure() before addACH()", nil)
+            return
+        }
+        guard let accountNumber = params["accountNumber"] as? String,
+              let accountType = params["accountType"] as? String,
+              let resolvedAccountType = PayabliPayInPaymentFlowACHAccountType(rawValue: accountType),
+              let holderName = params["holderName"] as? String,
+              let routingNumber = params["routingNumber"] as? String
+        else {
+            reject("INVALID_ARGS", "Missing required ACH fields", nil)
+            return
+        }
+
+        let ach = PayabliPayInPaymentFlowACHData(
+            accountNumber: accountNumber,
+            accountType: resolvedAccountType,
+            holderName: holderName,
+            routingNumber: routingNumber,
+            secCode: (params["secCode"] as? String).flatMap(PayabliPayInPaymentFlowACHSecCode.init(rawValue:)),
+            holderType: (params["holderType"] as? String).flatMap(PayabliPayInPaymentFlowACHHolderType.init(rawValue:))
+        )
+        addPaymentMethod(
+            .ach(ach),
+            options: Self.payInOptions(from: params),
+            component: payInPaymentFlow,
+            resolve: resolve,
+            reject: reject
+        )
+    }
+
+    @objc public func resolvePayInPaymentFlowAccessToken(_ token: NSString) {
+        payInAccessTokenQueue.sync {
+            self.pendingPayInAccessToken?.resume(returning: token as String)
+            self.pendingPayInAccessToken = nil
+        }
+    }
+
+    @objc public func rejectPayInPaymentFlowAccessToken(_ reason: NSString) {
+        payInAccessTokenQueue.sync {
+            self.pendingPayInAccessToken?.resume(throwing: PayabliGenericError(
+                code: .missingToken,
+                reason: reason as String
+            ))
+            self.pendingPayInAccessToken = nil
+        }
+    }
+
+    private func addPaymentMethod(
+        _ input: PayabliPayInPaymentFlowInput,
+        options: PayabliPayInPaymentFlowOptions,
+        component: PayabliPayInPaymentFlow,
+        resolve: @escaping RCTPromiseResolveBlock,
+        reject: @escaping RCTPromiseRejectBlock
+    ) {
+        Task { @MainActor in
+            do {
+                let result = try await component.addPaymentMethod(input, options: options)
+                resolve(Self.storedPaymentMethodMap(result))
+            } catch {
+                let nsError = error as NSError
+                reject(nsError.rnCode(default: "PAYIN_PAYMENT_FLOW_FAILED"), nsError.rnMessage, nsError)
+            }
+        }
+    }
+
     // MARK: - Event subscription
 
     private func subscribeEvents(on ttp: PayabliTTP) {
@@ -281,6 +463,52 @@ public final class PayabliSDKModule: RCTEventEmitter {
             invoiceNumber: dict["invoiceNumber"] as? String
         )
     }
+
+    private static func payInOptions(from params: NSDictionary) -> PayabliPayInPaymentFlowOptions {
+        PayabliPayInPaymentFlowOptions(
+            achValidation: params["achValidation"] as? Bool,
+            createAnonymous: params["createAnonymous"] as? Bool,
+            forceCustomerCreation: params["forceCustomerCreation"] as? Bool,
+            temporary: params["temporary"] as? Bool,
+            source: params["source"] as? String
+        )
+    }
+
+    private static func storedPaymentMethodMap(
+        _ method: PayabliPayInPaymentFlowStoredPaymentMethod
+    ) -> [String: Any] {
+        var map: [String: Any] = [
+            "responseText": method.responseText,
+            "apiResponse": dictionary(from: method.apiResponse)
+        ]
+        if let storedMethodId = method.storedMethodId {
+            map["storedMethodId"] = storedMethodId
+        }
+        if let methodReferenceId = method.methodReferenceId {
+            map["methodReferenceId"] = methodReferenceId
+        }
+        if let resultCode = method.resultCode {
+            map["resultCode"] = resultCode
+        }
+        if let resultText = method.resultText {
+            map["resultText"] = resultText
+        }
+        if let customerId = method.customerId {
+            map["customerId"] = customerId
+        }
+        return map
+    }
+
+    private static func dictionary(
+        from response: PayabliPayInPaymentFlowTokenStorageAPIResponse
+    ) -> [String: Any] {
+        guard let data = try? JSONEncoder().encode(response),
+              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+        else {
+            return ["responseText": response.responseText]
+        }
+        return object
+    }
 }
 
 // MARK: - NSError → RN error code/message
@@ -297,6 +525,7 @@ private extension NSError {
 }
 
 // MARK: - RCTEventEmitter / RCTPromiseResolveBlock stubs
+
 //
 // These typealiases let the module compile when it's pulled into a host
 // project that doesn't import React. The host's React headers (when present)
@@ -314,12 +543,21 @@ private extension NSError {
 // pull a React Pod).
 
 #if !canImport(React)
-public typealias RCTPromiseResolveBlock = (Any?) -> Void
-public typealias RCTPromiseRejectBlock = (String?, String?, Error?) -> Void
+    public typealias RCTPromiseResolveBlock = (Any?) -> Void
+    public typealias RCTPromiseRejectBlock = (String?, String?, Error?) -> Void
 
-open class RCTEventEmitter: NSObject {
-    open func supportedEvents() -> [String]! { [] }
-    open func sendEvent(withName name: String, body: Any?) {}
-    public override init() { super.init() }
-}
+    open class RCTEventEmitter: NSObject {
+        open class func requiresMainQueueSetup() -> Bool {
+            true
+        }
+
+        open func supportedEvents() -> [String]! {
+            []
+        }
+
+        open func sendEvent(withName name: String, body: Any?) {}
+        override public init() {
+            super.init()
+        }
+    }
 #endif

@@ -1,6 +1,6 @@
 # PayabliDemo Local Token Server
 
-Tiny development server for payment method and payment capture QA. It gives the iOS sample a
+Tiny development server for PayIn payment flow QA. It gives the iOS sample a
 backend-shaped endpoint without putting Payabli credentials in the app.
 
 The server supports two local QA modes:
@@ -40,8 +40,8 @@ The iOS Simulator can call:
 http://127.0.0.1:8787/payabli/access-token
 ```
 
-Use that URL for `Secrets.partnerPaymentMethodAccessTokenEndpoint` in the sample app.
-The payment capture QA screen aliases to the same endpoint by default.
+Use that URL for the PayIn access-token endpoint configured in the sample app.
+The capture operation aliases to the same endpoint by default.
 
 ## Credential Exchange Mode
 
@@ -150,5 +150,4 @@ or you can expose the server through an HTTPS tunnel.
 { "accessToken": "..." }
 ```
 
-The sample's `Secrets.fetchPaymentMethodAccessToken()` and
-`Secrets.fetchPaymentCaptureAccessToken()` already expect this response shape.
+The sample's PayIn access-token callbacks already expect this response shape.

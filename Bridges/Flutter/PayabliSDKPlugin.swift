@@ -1,6 +1,6 @@
 import Flutter
 import PayabliSDKCore
-import PayabliSDKPaymentMethod
+import PayabliSDKPayInPaymentFlow
 import PayabliSDKTapToPay
 import UIKit
 
@@ -29,7 +29,7 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
 
     private var ttp: PayabliTTP?
     private var eventToken: PayabliTTPEventToken?
-    private var paymentMethod: PayabliPaymentMethod?
+    private var payInPaymentFlow: PayabliPayInPaymentFlow?
 
     init(methodChannel: FlutterMethodChannel, eventChannel: FlutterEventChannel) {
         self.methodChannel = methodChannel
@@ -65,8 +65,8 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
             handleActivateDevice(call.arguments, result: result)
         case "getSessionState":
             handleGetSessionState(result: result)
-        case "configurePaymentMethod":
-            handleConfigurePaymentMethod(call.arguments, result: result)
+        case "configurePayInPaymentFlow":
+            handleConfigurePayInPaymentFlow(call.arguments, result: result)
         case "addCard":
             handleAddCard(call.arguments, result: result)
         case "addACH":
@@ -255,9 +255,9 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
         }
     }
 
-    // MARK: - Payment Method
+    // MARK: - PayIn payment flow
 
-    private func handleConfigurePaymentMethod(_ arguments: Any?, result: @escaping FlutterResult) {
+    private func handleConfigurePayInPaymentFlow(_ arguments: Any?, result: @escaping FlutterResult) {
         guard let args = arguments as? [String: Any],
               let entryPoint = args["entryPoint"] as? String,
               let envRaw = args["environment"] as? Int,
@@ -272,7 +272,7 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
         }
 
         let methodChannel = self.methodChannel
-        let accessTokenProvider: PayabliPaymentMethodAccessTokenProvider = { @Sendable [methodChannel] in
+        let accessTokenProvider: PayabliPayInPaymentFlowAccessTokenProvider = { @Sendable [methodChannel] in
             try await withCheckedThrowingContinuation { continuation in
                 Task { @MainActor in
                     methodChannel.invokeMethod("accessToken", arguments: nil) { value in
@@ -281,7 +281,7 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
                         } else {
                             continuation.resume(throwing: PayabliGenericError(
                                 code: .missingToken,
-                                reason: "Dart side did not return a payment method access token"
+                                reason: "Dart side did not return a PayIn payment flow access token"
                             ))
                         }
                     }
@@ -290,7 +290,7 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
         }
 
         Task { @MainActor in
-            self.paymentMethod = PayabliPaymentMethod(
+            self.payInPaymentFlow = PayabliPayInPaymentFlow(
                 entryPoint: entryPoint,
                 environment: environment,
                 accessTokenProvider: accessTokenProvider
@@ -300,8 +300,8 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
     }
 
     private func handleAddCard(_ arguments: Any?, result: @escaping FlutterResult) {
-        guard let paymentMethod else {
-            result(FlutterError(code: "NOT_CONFIGURED", message: "Call configurePaymentMethod() first", details: nil))
+        guard let payInPaymentFlow else {
+            result(FlutterError(code: "NOT_CONFIGURED", message: "Call PayabliPayInPaymentFlow.configure() first", details: nil))
             return
         }
         guard let args = arguments as? [String: Any],
@@ -319,7 +319,7 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
             return
         }
 
-        let card = PayabliCardPaymentMethodData(
+        let card = PayabliPayInPaymentFlowCardData(
             cardNumber: cardNumber,
             expiration: expiration,
             cardholderName: cardholderName,
@@ -328,21 +328,21 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
         )
         handleAddPaymentMethod(
             .card(card),
-            options: paymentMethodOptions(from: args),
-            component: paymentMethod,
+            options: payInPaymentFlowOptions(from: args),
+            component: payInPaymentFlow,
             result: result
         )
     }
 
     private func handleAddACH(_ arguments: Any?, result: @escaping FlutterResult) {
-        guard let paymentMethod else {
-            result(FlutterError(code: "NOT_CONFIGURED", message: "Call configurePaymentMethod() first", details: nil))
+        guard let payInPaymentFlow else {
+            result(FlutterError(code: "NOT_CONFIGURED", message: "Call PayabliPayInPaymentFlow.configure() first", details: nil))
             return
         }
         guard let args = arguments as? [String: Any],
               let accountNumber = args["accountNumber"] as? String,
               let accountType = args["accountType"] as? String,
-              let resolvedAccountType = PayabliACHAccountType(rawValue: accountType),
+              let resolvedAccountType = PayabliPayInPaymentFlowACHAccountType(rawValue: accountType),
               let holderName = args["holderName"] as? String,
               let routingNumber = args["routingNumber"] as? String
         else {
@@ -350,40 +350,40 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
             return
         }
 
-        let ach = PayabliACHPaymentMethodData(
+        let ach = PayabliPayInPaymentFlowACHData(
             accountNumber: accountNumber,
             accountType: resolvedAccountType,
             holderName: holderName,
             routingNumber: routingNumber,
-            secCode: (args["secCode"] as? String).flatMap(PayabliACHSecCode.init(rawValue:)),
-            holderType: (args["holderType"] as? String).flatMap(PayabliACHHolderType.init(rawValue:))
+            secCode: (args["secCode"] as? String).flatMap(PayabliPayInPaymentFlowACHSecCode.init(rawValue:)),
+            holderType: (args["holderType"] as? String).flatMap(PayabliPayInPaymentFlowACHHolderType.init(rawValue:))
         )
         handleAddPaymentMethod(
             .ach(ach),
-            options: paymentMethodOptions(from: args),
-            component: paymentMethod,
+            options: payInPaymentFlowOptions(from: args),
+            component: payInPaymentFlow,
             result: result
         )
     }
 
     private func handleAddPaymentMethod(
-        _ paymentMethod: PayabliPaymentMethodInput,
-        options: PayabliPaymentMethodOptions,
-        component: PayabliPaymentMethod,
+        _ payInPaymentFlowInput: PayabliPayInPaymentFlowInput,
+        options: PayabliPayInPaymentFlowOptions,
+        component: PayabliPayInPaymentFlow,
         result: @escaping FlutterResult
     ) {
         Task { @MainActor in
             do {
-                let method = try await component.addPaymentMethod(paymentMethod, options: options)
+                let method = try await component.addPaymentMethod(payInPaymentFlowInput, options: options)
                 result(Self.storedPaymentMethodMap(method))
             } catch {
-                result((error as NSError).toFlutterError(defaultCode: "PAYMENT_METHOD_FAILED"))
+                result((error as NSError).toFlutterError(defaultCode: "PAYIN_PAYMENT_FLOW_FAILED"))
             }
         }
     }
 
-    private func paymentMethodOptions(from args: [String: Any]) -> PayabliPaymentMethodOptions {
-        PayabliPaymentMethodOptions(
+    private func payInPaymentFlowOptions(from args: [String: Any]) -> PayabliPayInPaymentFlowOptions {
+        PayabliPayInPaymentFlowOptions(
             achValidation: args["achValidation"] as? Bool,
             createAnonymous: args["createAnonymous"] as? Bool,
             forceCustomerCreation: args["forceCustomerCreation"] as? Bool,
@@ -443,7 +443,7 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
         )
     }
 
-    private static func storedPaymentMethodMap(_ method: PayabliStoredPaymentMethod) -> [String: Any] {
+    private static func storedPaymentMethodMap(_ method: PayabliPayInPaymentFlowStoredPaymentMethod) -> [String: Any] {
         var map: [String: Any] = [
             "responseText": method.responseText,
             "apiResponse": dictionary(from: method.apiResponse)
@@ -466,7 +466,7 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
         return map
     }
 
-    private static func dictionary(from response: PayabliPaymentMethodAPIResponse) -> [String: Any] {
+    private static func dictionary(from response: PayabliPayInPaymentFlowTokenStorageAPIResponse) -> [String: Any] {
         guard let data = try? JSONEncoder().encode(response),
               let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
         else {

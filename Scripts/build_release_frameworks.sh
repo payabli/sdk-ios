@@ -3,14 +3,14 @@
 # build_release_frameworks.sh
 # ---------------------------
 # Builds the Payabli iOS SDK distribution XCFrameworks
-# (PayabliSDKCore, PayabliSDKTapToPay, PayabliSDKPaymentMethod,
-# PayabliSDKPaymentCapture, PayabliCardReaderCore) for
+# (PayabliSDKCore, PayabliSDKTapToPay, PayabliSDKPayInPaymentFlow,
+# PayabliCardReaderCore) for
 # device + iOS Simulator slices, with distribution-mode settings and a
 # pinned SOURCE_DATE_EPOCH for reproducible zips.
 #
-# Note: this is the TTP-only branch — PayabliSDKPayIn is intentionally
-# absent from the SCHEMES array. The PayIn module (and its release
-# pipeline) still lives unchanged on `develop`.
+# PayInPaymentFlow is shipped as its own opt-in XCFramework. It is not part
+# of the PayabliSDK umbrella product, but it is part of the public release
+# payload below.
 #
 # Environment:
 #   VERSION             required. Used as filename suffix.
@@ -28,8 +28,7 @@
 #   build/release/
 #     payabli-ios-sdk-core-${VERSION}.zip
 #     payabli-ios-sdk-taptopay-${VERSION}.zip
-#     payabli-ios-sdk-payment-method-${VERSION}.zip
-#     payabli-ios-sdk-payment-capture-${VERSION}.zip
+#     payabli-ios-sdk-payin-payment-flow-${VERSION}.zip
 #     payabli-ios-sdk-card-reader-core-${VERSION}.zip
 #     checksums.txt           (one sha256 per zip, space-separated lines)
 #     THIRD_PARTY_LICENSES.txt  (bundled copy for the upload/publish step)
@@ -73,8 +72,7 @@ mkdir -p "$ARCHIVE_DIR" "$XCF_DIR"
 SCHEMES=(
     "PayabliSDKCore"
     "PayabliSDKTapToPay"
-    "PayabliSDKPaymentMethod"
-    "PayabliSDKPaymentCapture"
+    "PayabliSDKPayInPaymentFlow"
     "PayabliCardReaderCore"
 )
 
@@ -83,8 +81,7 @@ slug_for() {
     case "$1" in
         PayabliSDKCore)          echo "core" ;;
         PayabliSDKTapToPay)      echo "taptopay" ;;
-        PayabliSDKPaymentMethod)  echo "payment-method" ;;
-        PayabliSDKPaymentCapture) echo "payment-capture" ;;
+        PayabliSDKPayInPaymentFlow) echo "payin-payment-flow" ;;
         PayabliCardReaderCore)   echo "card-reader-core" ;;
         *) echo "error: unknown scheme '$1'" >&2; exit 1 ;;
     esac
@@ -172,8 +169,8 @@ for scheme in "${SCHEMES[@]}"; do
     checksum="$(swift package compute-checksum "$BUILD_DIR/$zip_name")"
     printf '%s  %s\n' "$checksum" "$zip_name" >> "$checksums_file"
     # Also expose individual vars for the render step:
-    #   CORE_SHA256, TAPTOPAY_SHA256, PAYMENT_METHOD_SHA256,
-    #   PAYMENT_CAPTURE_SHA256, CARD_READER_CORE_SHA256
+    #   CORE_SHA256, TAPTOPAY_SHA256, PAYIN_PAYMENT_FLOW_SHA256,
+    #   CARD_READER_CORE_SHA256
     # (matches render_public_manifests.sh's required vars).
     upper="$(echo "${slug//-/_}" | tr '[:lower:]' '[:upper:]')"
     if [[ -n "${GITHUB_ENV:-}" ]]; then

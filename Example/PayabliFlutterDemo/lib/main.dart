@@ -56,12 +56,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
   PayabliTTPSessionState _state = PayabliTTPSessionState.idle;
   String _lastResult = '';
-  String _paymentMethodResult = '';
+  String _payInPaymentFlowResult = '';
   final List<PayabliTTPEvent> _eventLog = [];
   StreamSubscription<PayabliTTPEvent>? _eventSub;
   bool _configured = false;
   bool _isWorking = false;
-  bool _isSavingPaymentMethod = false;
+  bool _isSubmittingPayInPaymentFlow = false;
 
   @override
   void initState() {
@@ -98,8 +98,8 @@ class _HomeScreenState extends State<HomeScreen> {
         appId: Secrets.appId,
         environment: PayabliEnvironment.sandbox,
       );
-      await PayabliPaymentMethod.configure(
-        accessTokenProvider: Secrets.fetchPaymentMethodAccessToken,
+      await PayabliPayInPaymentFlow.configure(
+        accessTokenProvider: Secrets.fetchPayInPaymentFlowAccessToken,
         entryPoint: Secrets.entryPoint,
         environment: PayabliEnvironment.sandbox,
       );
@@ -111,9 +111,9 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _runAddCard() async {
-    setState(() => _isSavingPaymentMethod = true);
+    setState(() => _isSubmittingPayInPaymentFlow = true);
     try {
-      final method = await PayabliPaymentMethod.addCard(
+      final method = await PayabliPayInPaymentFlow.addCard(
         cardNumber: _cardNumberController.text,
         expiration: _cardExpController.text,
         cardholderName: _cardHolderController.text,
@@ -121,22 +121,22 @@ class _HomeScreenState extends State<HomeScreen> {
         billingZip: _cardZipController.text,
       );
       setState(() {
-        _paymentMethodResult =
+        _payInPaymentFlowResult =
             "Stored method: ${method.storedMethodId ?? '—'}\n"
             'Response: ${method.responseText}\n'
             "Result: ${method.resultText ?? '—'}";
       });
     } on PayabliTTPException catch (e) {
-      setState(() => _paymentMethodResult = '✗ ${e.code}: ${e.message}');
+      setState(() => _payInPaymentFlowResult = '✗ ${e.code}: ${e.message}');
     } finally {
-      setState(() => _isSavingPaymentMethod = false);
+      setState(() => _isSubmittingPayInPaymentFlow = false);
     }
   }
 
   Future<void> _runAddACH() async {
-    setState(() => _isSavingPaymentMethod = true);
+    setState(() => _isSubmittingPayInPaymentFlow = true);
     try {
-      final method = await PayabliPaymentMethod.addACH(
+      final method = await PayabliPayInPaymentFlow.addACH(
         accountNumber: _achAccountController.text,
         accountType: 'Checking',
         holderName: _achHolderController.text,
@@ -145,15 +145,15 @@ class _HomeScreenState extends State<HomeScreen> {
         holderType: 'personal',
       );
       setState(() {
-        _paymentMethodResult =
+        _payInPaymentFlowResult =
             "Stored method: ${method.storedMethodId ?? '—'}\n"
             'Response: ${method.responseText}\n'
             "Result: ${method.resultText ?? '—'}";
       });
     } on PayabliTTPException catch (e) {
-      setState(() => _paymentMethodResult = '✗ ${e.code}: ${e.message}');
+      setState(() => _payInPaymentFlowResult = '✗ ${e.code}: ${e.message}');
     } finally {
-      setState(() => _isSavingPaymentMethod = false);
+      setState(() => _isSubmittingPayInPaymentFlow = false);
     }
   }
 
@@ -266,7 +266,7 @@ class _HomeScreenState extends State<HomeScreen> {
           bottom: const TabBar(
             tabs: [
               Tab(text: 'Tap to Pay'),
-              Tab(text: 'Payment Method'),
+              Tab(text: 'PayIn Payment Flow'),
             ],
           ),
           actions: [
@@ -279,7 +279,7 @@ class _HomeScreenState extends State<HomeScreen> {
         body: !_configured
             ? const Center(child: CircularProgressIndicator())
             : TabBarView(
-                children: [_tapToPayContent(), _paymentMethodContent()],
+                children: [_tapToPayContent(), _payInPaymentFlowContent()],
               ),
       ),
     );
@@ -352,10 +352,10 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       );
 
-  Widget _paymentMethodContent() => ListView(
+  Widget _payInPaymentFlowContent() => ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          _section('Card payment method', [
+          _section('Card payment flow', [
             TextField(
               controller: _cardNumberController,
               keyboardType: TextInputType.number,
@@ -396,18 +396,19 @@ class _HomeScreenState extends State<HomeScreen> {
               controller: _cardZipController,
               keyboardType: TextInputType.number,
               decoration: const InputDecoration(
-                labelText: 'ZIP code',
+                labelText: 'Postal Code',
                 border: OutlineInputBorder(),
               ),
             ),
             const SizedBox(height: 8),
             FilledButton(
-              onPressed: _isSavingPaymentMethod ? null : _runAddCard,
-              child: Text(_isSavingPaymentMethod ? 'Saving…' : 'Add card'),
+              onPressed: _isSubmittingPayInPaymentFlow ? null : _runAddCard,
+              child:
+                  Text(_isSubmittingPayInPaymentFlow ? 'Saving…' : 'Add card'),
             ),
           ]),
           const SizedBox(height: 16),
-          _section('ACH payment method', [
+          _section('ACH payment flow', [
             TextField(
               controller: _achAccountController,
               keyboardType: TextInputType.number,
@@ -435,16 +436,17 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(height: 8),
             FilledButton(
-              onPressed: _isSavingPaymentMethod ? null : _runAddACH,
-              child: Text(_isSavingPaymentMethod ? 'Saving…' : 'Add ACH'),
+              onPressed: _isSubmittingPayInPaymentFlow ? null : _runAddACH,
+              child:
+                  Text(_isSubmittingPayInPaymentFlow ? 'Saving…' : 'Add ACH'),
             ),
           ]),
           const SizedBox(height: 16),
-          _section('Payment Method result', [
+          _section('PayIn Payment Flow result', [
             Text(
-              _paymentMethodResult.isEmpty
-                  ? 'No payment method result yet'
-                  : _paymentMethodResult,
+              _payInPaymentFlowResult.isEmpty
+                  ? 'No payment flow result yet'
+                  : _payInPaymentFlowResult,
             ),
           ]),
         ],
@@ -515,8 +517,8 @@ class Secrets {
   /// — initialize() will fail with a clear error if the token is invalid.
   static Future<String> fetchAccessToken() async => 'placeholder-token';
 
-  static Future<String> fetchPaymentMethodAccessToken() async =>
-      'placeholder-payment-method-access-token';
+  static Future<String> fetchPayInPaymentFlowAccessToken() async =>
+      'placeholder-payin-payment-flow-access-token';
 
   static String get tokenEndpoint => _tokenEndpoint;
 }

@@ -1,6 +1,6 @@
 # PayabliMauiDemo
 
-Minimal .NET MAUI demo wrapping Tap to Pay and payment method through the
+Minimal .NET MAUI demo wrapping Tap to Pay and payment flow through the
 .NET iOS binding library in `Bridges/MAUI/`.
 
 ## What it covers
@@ -14,9 +14,9 @@ Minimal .NET MAUI demo wrapping Tap to Pay and payment method through the
   rendered into a scrollable label.
 - **Session badge** — current `PayabliTTPSessionState` shown in the
   page header.
-- **Card and ACH payment method** — sample forms calling
-  `PayabliPaymentMethodObjC.AddCard(...)` and
-  `PayabliPaymentMethodObjC.AddACH(...)`, then rendering the
+- **Card and ACH payment flow** — sample forms calling
+  `PayabliPayInPaymentFlowObjC.AddCard(...)` and
+  `PayabliPayInPaymentFlowObjC.AddACH(...)`, then rendering the
   stored-method response.
 
 ## Setup
@@ -30,7 +30,7 @@ Minimal .NET MAUI demo wrapping Tap to Pay and payment method through the
    mkdir -p Bridges/MAUI/Frameworks
    cp -R build/release/PayabliSDKCore.xcframework        Bridges/MAUI/Frameworks/
    cp -R build/release/PayabliSDKTapToPay.xcframework    Bridges/MAUI/Frameworks/
-   cp -R build/release/PayabliSDKPaymentMethod.xcframework Bridges/MAUI/Frameworks/
+   cp -R build/release/PayabliSDKPayInPaymentFlow.xcframework Bridges/MAUI/Frameworks/
    cp -R build/release/PayabliCardReaderCore.xcframework Bridges/MAUI/Frameworks/
    ```
 3. Restore and build the demo with the .NET 10 iOS workload:
@@ -47,8 +47,8 @@ Minimal .NET MAUI demo wrapping Tap to Pay and payment method through the
    sudo dotnet workload install maui-ios mobile-librarybuilder
    ```
 4. Wire `FetchAccessTokenFromPartnerBackend()` and
-   `FetchPaymentMethodAccessTokenFromPartnerBackend()` in `MainPage.xaml.cs` to
-   your backend's Tap to Pay token and payment method access-token endpoints,
+   `FetchPayInPaymentFlowAccessTokenFromPartnerBackend()` in `MainPage.xaml.cs` to
+   your backend's Tap to Pay token and payment flow access-token endpoints,
    then update the `Secrets` constants (`EntryPoint`, `AppId`).
 5. Run on a physical iPhone XS or newer.
 
@@ -72,7 +72,7 @@ Tap to Pay only works on **physical iPhone XS or newer running iOS
 16.7+**. Trying to run on the Simulator will fail at the eligibility
 gate during `Initialize`.
 
-The payment method section can be visually exercised in the Simulator.
+The payment flow section can be visually exercised in the Simulator.
 Submitting the form requires a valid Bearer access token from your backend for
 `/api/TokenStorage/add`.
 

@@ -23,6 +23,7 @@ build/
 **/obj/
 
 # Flutter local tool state
+**/node_modules/
 **/.dart_tool/
 **/.flutter-plugins
 **/.flutter-plugins-dependencies

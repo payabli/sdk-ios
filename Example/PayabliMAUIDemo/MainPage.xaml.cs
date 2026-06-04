@@ -13,10 +13,10 @@ namespace PayabliMauiDemo;
 public partial class MainPage : ContentPage
 {
     private PayabliTTP? _ttp;
-    private PayabliPaymentMethodObjC? _paymentMethod;
+    private PayabliPayInPaymentFlowObjC? _payInPaymentFlow;
     private PayabliTTPEventToken? _eventToken;
     private bool _isWorking;
-    private bool _isSavingPaymentMethod;
+    private bool _isSubmittingPayInPaymentFlow;
 
     public MainPage()
     {
@@ -64,14 +64,14 @@ public partial class MainPage : ContentPage
                 appId: Secrets.AppId,
                 environment: PayabliEnvironment.Sandbox
             );
-            _paymentMethod = new PayabliPaymentMethodObjC(
+            _payInPaymentFlow = new PayabliPayInPaymentFlowObjC(
                 accessTokenHandler: (completion) =>
                 {
                     Task.Run(async () =>
                     {
                         try
                         {
-                            var token = await FetchPaymentMethodAccessTokenFromPartnerBackend();
+                            var token = await FetchPayInPaymentFlowAccessTokenFromPartnerBackend();
                             completion(token, null);
                         }
                         catch (System.Exception ex)
@@ -108,12 +108,12 @@ public partial class MainPage : ContentPage
         return await Task.FromResult(Secrets.PlaceholderAccessToken);
     }
 
-    private async Task<string> FetchPaymentMethodAccessTokenFromPartnerBackend()
+    private async Task<string> FetchPayInPaymentFlowAccessTokenFromPartnerBackend()
     {
         // Replace with a real call to your backend that exchanges your
         // server-side clientId + clientSecret for an access_token scoped for
-        // token storage.
-        return await Task.FromResult(Secrets.PlaceholderPaymentMethodAccessToken);
+        // PayIn payment flow submissions.
+        return await Task.FromResult(Secrets.PlaceholderPayInPaymentFlowAccessToken);
     }
 
     // MARK: - Lifecycle handlers
@@ -187,9 +187,9 @@ public partial class MainPage : ContentPage
 
     private void OnAddCardClicked(object? sender, EventArgs e)
     {
-        if (_paymentMethod is null || _isSavingPaymentMethod) return;
-        SetSavingPaymentMethod(true);
-        _paymentMethod.AddCard(
+        if (_payInPaymentFlow is null || _isSubmittingPayInPaymentFlow) return;
+        SetSubmittingPayInPaymentFlow(true);
+        _payInPaymentFlow.AddCard(
             cardNumber: CardNumberEntry.Text ?? "",
             expiration: CardExpirationEntry.Text ?? "",
             cardholderName: CardHolderEntry.Text ?? "",
@@ -201,19 +201,19 @@ public partial class MainPage : ContentPage
             source: "maui-demo",
             completion: (method, error) =>
             {
-                SetSavingPaymentMethod(false);
+                SetSubmittingPayInPaymentFlow(false);
                 ResultLabel.Text = method is not null
                     ? $"✓ Added · stored method {method.StoredMethodId ?? "—"} · {method.ResponseText}"
-                    : $"✗ {error?.LocalizedDescription ?? "unknown payment method error"}";
+                    : $"✗ {error?.LocalizedDescription ?? "unknown payment flow error"}";
             }
         );
     }
 
     private void OnAddAchClicked(object? sender, EventArgs e)
     {
-        if (_paymentMethod is null || _isSavingPaymentMethod) return;
-        SetSavingPaymentMethod(true);
-        _paymentMethod.AddACH(
+        if (_payInPaymentFlow is null || _isSubmittingPayInPaymentFlow) return;
+        SetSubmittingPayInPaymentFlow(true);
+        _payInPaymentFlow.AddACH(
             accountNumber: AchAccountEntry.Text ?? "",
             accountType: "Checking",
             holderName: AchHolderEntry.Text ?? "",
@@ -227,10 +227,10 @@ public partial class MainPage : ContentPage
             source: "maui-demo",
             completion: (method, error) =>
             {
-                SetSavingPaymentMethod(false);
+                SetSubmittingPayInPaymentFlow(false);
                 ResultLabel.Text = method is not null
                     ? $"✓ Added · stored method {method.StoredMethodId ?? "—"} · {method.ResponseText}"
-                    : $"✗ {error?.LocalizedDescription ?? "unknown payment method error"}";
+                    : $"✗ {error?.LocalizedDescription ?? "unknown payment flow error"}";
             }
         );
     }
@@ -263,11 +263,11 @@ public partial class MainPage : ContentPage
         ActivateButton.IsEnabled = !working;
     }
 
-    private void SetSavingPaymentMethod(bool savingPaymentMethod)
+    private void SetSubmittingPayInPaymentFlow(bool isSubmitting)
     {
-        _isSavingPaymentMethod = savingPaymentMethod;
-        AddCardButton.IsEnabled = !savingPaymentMethod;
-        AddAchButton.IsEnabled = !savingPaymentMethod;
+        _isSubmittingPayInPaymentFlow = isSubmitting;
+        AddCardButton.IsEnabled = !isSubmitting;
+        AddAchButton.IsEnabled = !isSubmitting;
     }
 
     private static NSError DemoNSError(string message)
@@ -298,5 +298,5 @@ internal static class Secrets
     public const string EntryPoint = "<YOUR_ENTRY_POINT>";
     public const string AppId = "<TEAM_ID>.<BUNDLE_ID>";
     public const string PlaceholderAccessToken = "placeholder-token";
-    public const string PlaceholderPaymentMethodAccessToken = "placeholder-payment-method-access-token";
+    public const string PlaceholderPayInPaymentFlowAccessToken = "placeholder-payin-payment-flow-access-token";
 }

@@ -1,5 +1,5 @@
 import PayabliSDKCore
-import PayabliSDKPaymentMethod
+import PayabliSDKPayInPaymentFlow
 import PayabliSDKTapToPay
 import SwiftUI
 
@@ -9,10 +9,10 @@ import SwiftUI
 ///   - `activateDevice(activationCode:)` — pending-device activation.
 ///   - `events()` — live event log surfaced via `addEventListener`.
 ///   - `sessionState` — surfaced in the navigation bar as a colored badge.
-///   - `PayabliPaymentMethodView` — configurable card PAN / ACH payment method.
+///   - `PayabliPayInPaymentFlowView` — configurable card PAN / ACH payment method.
 struct HomeView: View {
     @EnvironmentObject private var ttp: PayabliTTP
-    @EnvironmentObject private var paymentMethod: PayabliPaymentMethod
+    @EnvironmentObject private var paymentMethod: PayabliPayInPaymentFlow
 
     @State private var amountText: String = "9.99"
     @State private var activationCode: String = ""
@@ -57,10 +57,14 @@ struct HomeView: View {
         NavigationView {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
-                    PayabliPaymentMethodView(
+                    PayabliPayInPaymentFlowView(
                         component: paymentMethod,
                         configuration: paymentMethodConfiguration,
-                        onPaymentMethodAdded: { method in
+                        onCompleted: { result in
+                            guard let method = result.storedPaymentMethod else {
+                                paymentMethodResult = "Payment flow response did not include a stored method."
+                                return
+                            }
                             paymentMethodResult = [
                                 "Stored method: \(method.storedMethodId ?? "—")",
                                 "Response: \(method.responseText)",
@@ -71,7 +75,7 @@ struct HomeView: View {
                             paymentMethodResult = "Payment method failed: \(error.localizedDescription)"
                         }
                     )
-                    .payabliPaymentMethodStyle(paymentMethodStyle)
+                    .payabliPayInPaymentFlowStyle(paymentMethodStyle)
 
                     Text(paymentMethodResult.isEmpty ? "No payment method result yet" : paymentMethodResult)
                         .font(.footnote)
@@ -112,8 +116,8 @@ struct HomeView: View {
         }
     }
 
-    private var paymentMethodConfiguration: PayabliPaymentMethodFormConfiguration {
-        PayabliPaymentMethodFormConfiguration(
+    private var paymentMethodConfiguration: PayabliPayInPaymentFlowFormConfiguration {
+        PayabliPayInPaymentFlowFormConfiguration(
             allowedMethods: [.card, .ach],
             defaultMethod: .card,
             cardFieldOrder: [
@@ -129,48 +133,48 @@ struct HomeView: View {
                 .achAccount,
                 .achAccountType
             ],
-            hiddenValues: PayabliPaymentMethodHiddenValues(
+            hiddenValues: PayabliPayInPaymentFlowHiddenValues(
                 achHolderType: .personal,
                 achSecCode: .web,
                 methodDescription: "Demo stored method"
             ),
-            options: PayabliPaymentMethodOptions(
+            options: PayabliPayInPaymentFlowOptions(
                 achValidation: true,
                 createAnonymous: false,
                 forceCustomerCreation: true,
                 temporary: false,
                 source: "ios-demo"
             ),
-            labels: PayabliPaymentMethodLabels(
+            labels: PayabliPayInPaymentFlowLabels(
                 title: "Save Payment Method",
                 subtitle: "Create a card or ACH token from sandbox data."
             ),
             labelLayout: .external,
-            formatting: PayabliPaymentMethodFormatting(
+            formatting: PayabliPayInPaymentFlowFormatting(
                 insertsCardNumberSpaces: true,
                 masksACHAccountEntry: true
             ),
-            inputSizing: PayabliPaymentMethodInputSizing(
-                defaultSize: PayabliPaymentMethodInputSize(height: 52),
+            inputSizing: PayabliPayInPaymentFlowInputSizing(
+                defaultSize: PayabliPayInPaymentFlowInputSize(height: 52),
                 fieldSizes: [
-                    .cardExpiration: PayabliPaymentMethodInputSize(height: 48),
-                    .cardCvv: PayabliPaymentMethodInputSize(height: 48)
+                    .cardExpiration: PayabliPayInPaymentFlowInputSize(height: 48),
+                    .cardCvv: PayabliPayInPaymentFlowInputSize(height: 48)
                 ]
             ),
             cardBrandIconPlacement: .trailing
         )
     }
 
-    private var paymentMethodStyle: PayabliPaymentMethodStyle {
-        PayabliPaymentMethodStyle(
+    private var paymentMethodStyle: PayabliPayInPaymentFlowStyle {
+        PayabliPayInPaymentFlowStyle(
             accentColor: .green,
-            input: PayabliPaymentMethodInputStyle(
+            input: PayabliPayInPaymentFlowInputStyle(
                 backgroundColor: Color(.systemBackground),
                 borderColor: Color(.separator).opacity(0.6),
                 cornerRadius: 8
             ),
-            submitButton: PayabliPaymentMethodSubmitButtonStyle(cornerRadius: 8),
-            layout: PayabliPaymentMethodLayoutStyle(contentSpacing: 18, fieldGroupSpacing: 12)
+            submitButton: PayabliPayInPaymentFlowSubmitButtonStyle(cornerRadius: 8),
+            layout: PayabliPayInPaymentFlowLayoutStyle(contentSpacing: 18, fieldGroupSpacing: 12)
         )
     }
 

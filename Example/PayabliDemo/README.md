@@ -1,8 +1,8 @@
 # PayabliDemo
 
 SwiftUI demo app exercising the public `PayabliTTP` and
-`PayabliPaymentMethodView` APIs. Maps to the Tap to Pay manual QA checklist
-and includes a card/ACH payment method sample.
+`PayabliPayInPaymentFlowView` APIs. Maps to the Tap to Pay manual QA checklist
+and includes a card/ACH PayIn payment flow sample.
 
 ## What it covers
 
@@ -18,9 +18,9 @@ and includes a card/ACH payment method sample.
   rendered into a list, including the per-case payload.
 - **Session badge** — the navigation bar shows the current
   `PayabliTTPSessionState` color-coded.
-- **Payment Method** — a SwiftUI `PayabliPaymentMethodView` tab that can render
-  card and ACH forms, hide optional values, apply a custom style, and return
-  the full token-storage API response.
+- **PayIn payment flow** — SwiftUI `PayabliPayInPaymentFlowView` tabs that can
+  render stored-method and capture forms, hide optional values, apply a custom
+  style, and return token-storage or MoneyIn API responses.
 
 ## Setup
 
@@ -29,7 +29,7 @@ and includes a card/ACH payment method sample.
    the language.
 2. Add the local Swift package dependency:
    - **File → Add Packages → Add Local…** and select the repository root.
-   - Pick the `PayabliSDKTapToPay` and `PayabliSDKPaymentMethod` products
+   - Pick the `PayabliSDKTapToPay` and `PayabliSDKPayInPaymentFlow` products
      (not the umbrella `PayabliSDK`, unless you also need `PayabliSDKCore`
      types directly).
 3. Drag `PayabliDemoApp.swift` and `HomeView.swift` into the Xcode project.
@@ -58,91 +58,49 @@ Tap to Pay only works on **physical iPhone XS or newer running iOS
 16.7+**. The demo will fail at the eligibility gate when run on the
 Simulator (you'll see a `notReady` error early in `initialize()`).
 
-The payment method tab can be visually exercised in the Simulator. Submitting
-the form requires `Secrets.fetchPaymentMethodAccessToken()` to call your backend
-for a short-lived Payabli access token.
+The PayIn payment flow tabs can be visually exercised in the Simulator.
+Submitting either form requires the sample's PayIn access-token callbacks to
+call your backend or the bundled `LocalTokenServer` for a short-lived Payabli
+access token.
 
-### Payment Method QA mock responses
+### PayIn Payment Flow QA diagnostics
 
-For local UI/UX validation, the QA sample can bypass sandbox and return a
-mocked payment method response directly from the app. Copy
-`Secrets.swift.sample` to `Secrets.swift`, then enable exactly one of these
-flags:
+The QA sample uses the public `PayabliPayInPaymentFlow` initializers and the
+SDK-owned transport path. This preserves the hosted-form security model: clear
+PAN is not exposed to host-visible text fields, accessibility values,
+diagnostics, callbacks, or custom transports.
 
-```swift
-static let paymentMethodMockSuccessEnabled = true
-static let paymentMethodMockFailureEnabled = false
-```
-
-or:
-
-```swift
-static let paymentMethodMockSuccessEnabled = false
-static let paymentMethodMockFailureEnabled = true
-```
-
-If both are enabled, the failure mock wins so error rendering is explicit.
-Mock mode uses a placeholder bearer token and does not call
-`fetchPaymentMethodAccessToken()`.
-
-The success mock returns:
-
-```json
-{
-  "isSuccess": true,
-  "responseText": "Success",
-  "responseData": {
-    "referenceId": "qa-mock-stored-method",
-    "resultCode": 1,
-    "resultText": "Approved",
-    "methodReferenceId": "qa-mock-method-reference",
-    "customerId": 123456789
-  }
-}
-```
-
-The failure mock returns:
-
-```json
-{
-  "isSuccess": false,
-  "responseText": "Error",
-  "responseCode": 6000,
-  "responseData": {
-    "explanation": "Invalid Card",
-    "todoAction": "Please check your card details and try again."
-  }
-}
-```
+For local QA, enable the PayIn diagnostics flag in `Secrets.swift`.
+Diagnostics are redacted before they are printed or displayed in the app.
 
 ## Architecture notes
 
 `PayabliDemoApp` owns one `PayabliTTP` instance and one
-`PayabliPaymentMethod` instance as `@StateObject`s and injects both into
+`PayabliPayInPaymentFlow` instance as `@StateObject`s and injects both into
 `HomeView` via `@EnvironmentObject`. The Tap to Pay view
 subscribes to the event stream in `onAppear` (via `events()` plus a
 sentinel `addEventListener` token used purely for tear-down on
 `onDisappear`) and updates UI state from the `@Published`
 `sessionState` and `isReady` properties.
 
-The payment method tab renders `PayabliPaymentMethodView` with:
+The stored-method PayIn tab renders `PayabliPayInPaymentFlowView` with:
 - `allowedMethods: [.card, .ach]`
-- required card ZIP input
+- required card postal-code input
 - hidden optional values for ACH holder type and method description
-- local success and failure mock responses for UI/UX QA
+- redacted diagnostics for request/response QA
 - `labelLayout: .external`
 - configurable submit button text
 - per-field input sizing
-- `.payabliPaymentMethodStyle(...)` to demonstrate host-controlled styling
+- `.payabliPayInPaymentFlowStyle(...)` to demonstrate host-controlled styling
 
 Token refresh is handled inside the SDK: when the access token expires,
 `PayabliTTP` invokes the `tokenProvider` closure passed at init, which
 the demo wires to `Secrets.fetchAccessToken()`. Replace that with a call
 to your own backend in production.
 
-Payment Method access tokens use a separate backend callback:
-`Secrets.fetchPaymentMethodAccessToken()`. Keep private Payabli API credentials
-on your server, never in the mobile app binary.
+PayIn payment flow access tokens use separate backend callbacks from Tap to Pay.
+Keep private Payabli API credentials on your server, never in the mobile app
+binary.
 
 ## Not included in this scaffold
 

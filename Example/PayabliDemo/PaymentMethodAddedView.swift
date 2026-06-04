@@ -1,5 +1,5 @@
 import Foundation
-import PayabliSDKPaymentCapture
+import PayabliSDKPayInPaymentFlow
 import SwiftUI
 
 struct PaymentMethodAddedView: View {
@@ -27,7 +27,7 @@ struct PaymentMethodAddedView: View {
 }
 
 struct PaymentCaptureResultView: View {
-    let result: PayabliPaymentCaptureResult
+    let result: PayabliPayInPaymentFlowResult
 
     var body: some View {
         ScrollView {

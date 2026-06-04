@@ -1,10 +1,11 @@
 import Dispatch
 import os
-import PayabliSDKPaymentMethod
+import PayabliSDKPayInPaymentFlow
 import SwiftUI
 
 struct PaymentMethodQAView: View {
-    @EnvironmentObject private var paymentMethod: PayabliPaymentMethod
+    let paymentFlow: PayabliPayInPaymentFlow
+
     @StateObject private var diagnosticsStore = PaymentMethodQADiagnosticsStore.shared
     @State private var resultText = ""
     @State private var isPaymentMethodAddedViewPresented = false
@@ -25,13 +26,13 @@ struct PaymentMethodQAView: View {
                     Text("Inline experience")
                         .font(.headline)
 
-                    PayabliPaymentMethodView(
-                        component: paymentMethod,
+                    PayabliPayInPaymentFlowView(
+                        component: paymentFlow,
                         configuration: configuration,
-                        onPaymentMethodAdded: handlePaymentMethodAdded,
+                        onCompleted: handlePaymentMethodAdded,
                         onError: handleError
                     )
-                    .payabliPaymentMethodStyle(style)
+                    .payabliPayInPaymentFlowStyle(style)
 
                     Text(resultText.isEmpty ? "No payment method result yet" : resultText)
                         .font(.footnote)
@@ -72,22 +73,22 @@ struct PaymentMethodQAView: View {
                 PaymentMethodAddedView()
             }
         }
-        .payabliPaymentMethodSheet(
+        .payabliPayInPaymentFlowSheet(
             isPresented: $isPaymentMethodSheetPresented,
-            component: paymentMethod,
+            component: paymentFlow,
             configuration: configuration,
-            sheetConfiguration: PayabliPaymentMethodSheetConfiguration(
+            sheetConfiguration: PayabliPayInPaymentFlowSheetConfiguration(
                 title: "Add Payment Method",
                 dismissButton: .back
             ),
             style: style,
-            onPaymentMethodAdded: handlePaymentMethodAdded,
+            onCompleted: handlePaymentMethodAdded,
             onError: handleError
         )
     }
 
-    private var configuration: PayabliPaymentMethodFormConfiguration {
-        PayabliPaymentMethodFormConfiguration(
+    private var configuration: PayabliPayInPaymentFlowFormConfiguration {
+        PayabliPayInPaymentFlowFormConfiguration(
             allowedMethods: [.card, .ach],
             defaultMethod: .card,
             cardFieldOrder: [
@@ -104,9 +105,9 @@ struct PaymentMethodQAView: View {
                 .achAccountType
             ],
             cardSections: [
-                PayabliPaymentMethodFieldSection(
+                PayabliPayInPaymentFlowFieldSection(
                     title: "Card Information",
-                    titleStyle: PayabliPaymentMethodTextStyle(
+                    titleStyle: PayabliPayInPaymentFlowTextStyle(
                         font: .headline.weight(.semibold),
                         color: .primary
                     ),
@@ -124,9 +125,9 @@ struct PaymentMethodQAView: View {
                         .cardCvv: 2
                     ]
                 ),
-                PayabliPaymentMethodFieldSection(
+                PayabliPayInPaymentFlowFieldSection(
                     title: "Customer Information",
-                    titleStyle: PayabliPaymentMethodTextStyle(
+                    titleStyle: PayabliPayInPaymentFlowTextStyle(
                         font: .headline.weight(.semibold),
                         color: .primary
                     ),
@@ -138,9 +139,9 @@ struct PaymentMethodQAView: View {
                 )
             ],
             achSections: [
-                PayabliPaymentMethodFieldSection(
+                PayabliPayInPaymentFlowFieldSection(
                     title: "Bank Information",
-                    titleStyle: PayabliPaymentMethodTextStyle(
+                    titleStyle: PayabliPayInPaymentFlowTextStyle(
                         font: .headline.weight(.semibold),
                         color: .primary
                     ),
@@ -157,9 +158,9 @@ struct PaymentMethodQAView: View {
                         .achAccount: 2
                     ]
                 ),
-                PayabliPaymentMethodFieldSection(
+                PayabliPayInPaymentFlowFieldSection(
                     title: "Customer Information",
-                    titleStyle: PayabliPaymentMethodTextStyle(
+                    titleStyle: PayabliPayInPaymentFlowTextStyle(
                         font: .headline.weight(.semibold),
                         color: .primary
                     ),
@@ -170,19 +171,19 @@ struct PaymentMethodQAView: View {
                     ]
                 )
             ],
-            hiddenValues: PayabliPaymentMethodHiddenValues(
+            hiddenValues: PayabliPayInPaymentFlowHiddenValues(
                 achHolderType: .personal,
                 achSecCode: .web,
                 methodDescription: "Payment Method QA"
             ),
-            options: PayabliPaymentMethodOptions(
+            options: PayabliPayInPaymentFlowOptions(
                 achValidation: true,
                 createAnonymous: false,
                 forceCustomerCreation: true,
                 temporary: false,
                 source: "ios-payment-method-qa"
             ),
-            labels: PayabliPaymentMethodLabels(
+            labels: PayabliPayInPaymentFlowLabels(
                 title: "Save Payment Method",
                 subtitle: "Create a card or ACH token.",
                 fieldPlaceholders: labelMatchingPlaceholders(for: fieldsWithHiddenLabels)
@@ -190,31 +191,31 @@ struct PaymentMethodQAView: View {
             labelLayout: .external,
             showsFieldLabels: true,
             hiddenFieldLabels: Set(fieldsWithHiddenLabels),
-            formatting: PayabliPaymentMethodFormatting(
+            formatting: PayabliPayInPaymentFlowFormatting(
                 insertsCardNumberSpaces: true,
                 masksACHAccountEntry: true
             ),
-            inputSizing: PayabliPaymentMethodInputSizing(
-                defaultSize: PayabliPaymentMethodInputSize(height: 52),
+            inputSizing: PayabliPayInPaymentFlowInputSizing(
+                defaultSize: PayabliPayInPaymentFlowInputSize(height: 52),
                 fieldSizes: [
-                    .cardExpiration: PayabliPaymentMethodInputSize(height: 48),
-                    .cardCvv: PayabliPaymentMethodInputSize(height: 48)
+                    .cardExpiration: PayabliPayInPaymentFlowInputSize(height: 48),
+                    .cardCvv: PayabliPayInPaymentFlowInputSize(height: 48)
                 ]
             ),
             cardBrandIconPlacement: .trailing
         )
     }
 
-    private var style: PayabliPaymentMethodStyle {
-        PayabliPaymentMethodStyle(
+    private var style: PayabliPayInPaymentFlowStyle {
+        PayabliPayInPaymentFlowStyle(
             accentColor: .green,
-            input: PayabliPaymentMethodInputStyle(
+            input: PayabliPayInPaymentFlowInputStyle(
                 backgroundColor: Color(.systemBackground),
                 borderColor: Color(.separator).opacity(0.6),
                 cornerRadius: 8
             ),
-            submitButton: PayabliPaymentMethodSubmitButtonStyle(cornerRadius: 8),
-            layout: PayabliPaymentMethodLayoutStyle(
+            submitButton: PayabliPayInPaymentFlowSubmitButtonStyle(cornerRadius: 8),
+            layout: PayabliPayInPaymentFlowLayoutStyle(
                 contentSpacing: 18,
                 fieldGroupSpacing: 14,
                 pairedFieldSpacing: 12,
@@ -224,7 +225,7 @@ struct PaymentMethodQAView: View {
         )
     }
 
-    private var fieldsWithHiddenLabels: [PayabliPaymentMethodField] {
+    private var fieldsWithHiddenLabels: [PayabliPayInPaymentFlowField] {
         [
             .cardholderName,
             .cardNumber,
@@ -242,17 +243,22 @@ struct PaymentMethodQAView: View {
     }
 
     private func labelMatchingPlaceholders(
-        for fields: [PayabliPaymentMethodField]
-    ) -> [PayabliPaymentMethodField: String] {
+        for fields: [PayabliPayInPaymentFlowField]
+    ) -> [PayabliPayInPaymentFlowField: String] {
         Dictionary(uniqueKeysWithValues: fields.map { field in
             (
                 field,
-                PayabliPaymentMethodLabels.defaultFieldLabels[field] ?? field.rawValue
+                PayabliPayInPaymentFlowLabels.defaultFieldLabels[field] ?? field.rawValue
             )
         })
     }
 
-    private func handlePaymentMethodAdded(_ method: PayabliStoredPaymentMethod) {
+    private func handlePaymentMethodAdded(_ result: PayabliPayInPaymentFlowResult) {
+        guard let method = result.storedPaymentMethod else {
+            resultText = "Payment method response did not include a stored method."
+            return
+        }
+
         resultText = [
             "Stored method: \(method.storedMethodId ?? "-")",
             "Response: \(method.responseText)",

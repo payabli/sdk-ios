@@ -1,8 +1,8 @@
 // PayabliBinding — .NET MAUI / .NET iOS binding for PayabliSDKTapToPay
-// and PayabliSDKPaymentMethod.
+// and PayabliSDKPayInPaymentFlow.
 //
 // The C# surface produced by `sharpie bind` against the
-// `PayabliSDKTapToPay.xcframework`, `PayabliSDKPaymentMethod.xcframework`,
+// `PayabliSDKTapToPay.xcframework`, `PayabliSDKPayInPaymentFlow.xcframework`,
 // and `PayabliSDKCore.xcframework` for `PayabliEnvironment`. Host MAUI apps consume this via a binding
 // library project (see `Payabli.MAUI.csproj` next to this file) and
 // drive the Tap to Pay on iPhone flow from C#.
@@ -106,8 +106,8 @@ namespace Payabli.TapToPay
         NSDictionary payload
     );
 
-    public delegate void PayabliPaymentMethodCompletion(
-        [NullAllowed] PayabliStoredPaymentMethodObjC result,
+    public delegate void PayabliPayInPaymentFlowCompletion(
+        [NullAllowed] PayabliPayInPaymentFlowStoredPaymentMethodObjC result,
         [NullAllowed] NSError error
     );
 
@@ -268,11 +268,11 @@ namespace Payabli.TapToPay
         PayabliTTPEventToken AddEventListener(PayabliTTPEventHandler handler);
     }
 
-    // MARK: - Payment Method
+    // MARK: - PayIn Payment Flow
 
     [BaseType(typeof(NSObject))]
     [DisableDefaultCtor]
-    public interface PayabliStoredPaymentMethodObjC
+    public interface PayabliPayInPaymentFlowStoredPaymentMethodObjC
     {
         [NullAllowed, Export("storedMethodId")] string StoredMethodId { get; }
         [NullAllowed, Export("methodReferenceId")] string MethodReferenceId { get; }
@@ -285,7 +285,7 @@ namespace Payabli.TapToPay
 
     [BaseType(typeof(NSObject))]
     [DisableDefaultCtor]
-    public interface PayabliPaymentMethodObjC
+    public interface PayabliPayInPaymentFlowObjC
     {
         [Export("initWithAccessTokenHandler:entryPoint:environment:")]
         IntPtr Constructor(
@@ -305,7 +305,7 @@ namespace Payabli.TapToPay
             bool forceCustomerCreation,
             bool temporary,
             [NullAllowed] string source,
-            PayabliPaymentMethodCompletion completion
+            PayabliPayInPaymentFlowCompletion completion
         );
 
         [Export("addACHWithAccountNumber:accountType:holderName:routingNumber:secCode:holderType:achValidation:createAnonymous:forceCustomerCreation:temporary:source:completion:")]
@@ -321,7 +321,7 @@ namespace Payabli.TapToPay
             bool forceCustomerCreation,
             bool temporary,
             [NullAllowed] string source,
-            PayabliPaymentMethodCompletion completion
+            PayabliPayInPaymentFlowCompletion completion
         );
     }
 }

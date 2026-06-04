@@ -1,0 +1,17 @@
+{
+  "name": "payabli-sdk-react-native",
+  "version": "1.0.0",
+  "private": true,
+  "main": "index.ts",
+  "types": "index.ts",
+  "description": "React Native wrapper for Payabli iOS Tap to Pay and PayIn payment flow.",
+  "files": [
+    "index.ts",
+    "PayabliSDK.ts",
+    "PayabliSDKModule.swift",
+    "PayabliSDKModuleBridge.m"
+  ],
+  "peerDependencies": {
+    "react-native": ">=0.72"
+  }
+}

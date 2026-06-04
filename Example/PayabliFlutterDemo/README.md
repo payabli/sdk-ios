@@ -1,6 +1,6 @@
 # PayabliFlutterDemo
 
-Minimal Flutter app wrapping Tap to Pay and card payment method via the
+Minimal Flutter app wrapping Tap to Pay and card payment flow via the
 MethodChannel + EventChannel bridge in `Bridges/Flutter/`.
 
 ## What it covers
@@ -14,9 +14,9 @@ MethodChannel + EventChannel bridge in `Bridges/Flutter/`.
   rendered into a list.
 - **Session badge** — current `PayabliTTPSessionState` color-coded in
   the app bar.
-- **Card and ACH payment method** — sample Flutter forms calling
-  `PayabliPaymentMethod.addCard(...)` and
-  `PayabliPaymentMethod.addACH(...)`, then rendering the stored-method
+- **Card and ACH payment flow** — sample Flutter forms calling
+  `PayabliPayInPaymentFlow.addCard(...)` and
+  `PayabliPayInPaymentFlow.addACH(...)`, then rendering the stored-method
   response.
 
 ## Setup
@@ -36,7 +36,7 @@ MethodChannel + EventChannel bridge in `Bridges/Flutter/`.
    flutter run -d <device-id>
    ```
 4. Edit `lib/main.dart`'s `Secrets` class to point at your partner backend
-   `/payabli/token` and payment method access-token endpoints.
+   `/payabli/token` and payment flow access-token endpoints.
 
 ### Required iOS entitlements (host app)
 
@@ -58,7 +58,7 @@ Tap to Pay only works on **physical iPhone XS or newer running iOS
 16.7+**. The Simulator will fail at the eligibility gate during
 `initialize()`.
 
-The payment method tab can be visually exercised in the Simulator. Submitting
+The payment flow tab can be visually exercised in the Simulator. Submitting
 the form requires a valid Bearer access token from your backend for
 `/api/TokenStorage/add`.
 
@@ -68,8 +68,8 @@ the form requires a valid Bearer access token from your backend for
   instance and wires the Dart-side `tokenProvider` callback to the
   native `refreshToken` MethodChannel callback. Token refresh stays
   end-to-end in your code.
-- `PayabliPaymentMethod.configure()` sets up the native
-  `PayabliPaymentMethod` component and wires the Dart-side
+- `PayabliPayInPaymentFlow.configure()` sets up the native
+  `PayabliPayInPaymentFlow` component and wires the Dart-side
   `accessTokenProvider` callback to the native `accessToken`
   MethodChannel callback. Keep private Payabli credentials on your backend.
 - Lifecycle events arrive via `PayabliTTP.events()` — a broadcast

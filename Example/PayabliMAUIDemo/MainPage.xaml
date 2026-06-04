@@ -29,20 +29,20 @@
                 </VerticalStackLayout>
             </Frame>
 
-            <!-- Payment Method -->
-            <Label Text="Card payment method" FontAttributes="Bold" FontSize="12" TextColor="Gray" />
+            <!-- PayIn payment flow -->
+            <Label Text="Card PayIn flow" FontAttributes="Bold" FontSize="12" TextColor="Gray" />
             <Frame Padding="12">
                 <VerticalStackLayout Spacing="8">
                     <Entry x:Name="CardNumberEntry" Placeholder="Card number" Text="4111 1111 1111 1111" Keyboard="Numeric" />
                     <Entry x:Name="CardExpirationEntry" Placeholder="Expiration" Text="02/25" Keyboard="Numeric" />
                     <Entry x:Name="CardHolderEntry" Placeholder="Name on card" Text="Jane Doe" />
                     <Entry x:Name="CardCvvEntry" Placeholder="CVV" Text="123" Keyboard="Numeric" IsPassword="True" />
-                    <Entry x:Name="CardZipEntry" Placeholder="ZIP code" Text="33139" Keyboard="Numeric" />
+                    <Entry x:Name="CardZipEntry" Placeholder="Postal Code" Text="33139" Keyboard="Numeric" />
                     <Button x:Name="AddCardButton" Text="Add card" Clicked="OnAddCardClicked" />
                 </VerticalStackLayout>
             </Frame>
 
-            <Label Text="ACH payment method" FontAttributes="Bold" FontSize="12" TextColor="Gray" />
+            <Label Text="ACH PayIn flow" FontAttributes="Bold" FontSize="12" TextColor="Gray" />
             <Frame Padding="12">
                 <VerticalStackLayout Spacing="8">
                     <Entry x:Name="AchAccountEntry" Placeholder="Account number" Text="1111111111111" Keyboard="Numeric" />

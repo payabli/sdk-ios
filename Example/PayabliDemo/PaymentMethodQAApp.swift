@@ -1,8 +1,6 @@
 import Foundation
 import os
-import PayabliSDKCore
-import PayabliSDKPaymentCapture
-import PayabliSDKPaymentMethod
+import PayabliSDKPayInPaymentFlow
 import SwiftUI
 
 @MainActor
@@ -35,29 +33,21 @@ final class PaymentCaptureQADiagnosticsStore: ObservableObject {
 
 @main
 struct PaymentMethodQAApp: App {
-    @StateObject private var paymentMethod = PayabliPaymentMethod(
+    @StateObject private var paymentMethod = PayabliPayInPaymentFlow(
         entryPoint: Secrets.entryPoint,
         environment: PaymentMethodQAConfiguration.environment,
         accessTokenProvider: {
-            if Secrets.paymentMethodMockSuccessEnabled || Secrets.paymentMethodMockFailureEnabled {
-                return "mock-token"
-            }
             return try await Secrets.fetchPaymentMethodAccessToken()
         },
-        transport: Self.paymentMethodMockTransport,
         diagnostics: Self.paymentMethodDiagnostics
     )
 
-    @StateObject private var paymentCapture = PayabliPaymentCapture(
+    @StateObject private var paymentCapture = PayabliPayInPaymentFlow(
         entryPoint: Secrets.entryPoint,
         environment: PaymentMethodQAConfiguration.environment,
         accessTokenProvider: {
-            if Secrets.paymentCaptureMockSuccessEnabled || Secrets.paymentCaptureMockFailureEnabled {
-                return "mock-token"
-            }
             return try await Secrets.fetchPaymentCaptureAccessToken()
         },
-        transport: Self.paymentCaptureMockTransport,
         diagnostics: Self.paymentCaptureDiagnostics,
         operation: .capture,
         requestConfiguration: Self.paymentCaptureRequestConfiguration
@@ -66,44 +56,22 @@ struct PaymentMethodQAApp: App {
     var body: some Scene {
         WindowGroup {
             TabView {
-                PaymentMethodQAView()
+                PaymentMethodQAView(paymentFlow: paymentMethod)
                     .tabItem {
                         Label("Method", systemImage: "creditcard")
                     }
 
-                PaymentCaptureQAView()
+                PaymentCaptureQAView(paymentFlow: paymentCapture)
                     .tabItem {
                         Label("Capture", systemImage: "dollarsign.circle")
                     }
             }
-            .environmentObject(paymentMethod)
-            .environmentObject(paymentCapture)
         }
     }
 
-    private static var paymentMethodMockTransport: (any PayabliTransport)? {
-        if Secrets.paymentMethodMockFailureEnabled {
-            return PaymentMethodQAMockTransport(result: .failure)
-        }
-        if Secrets.paymentMethodMockSuccessEnabled {
-            return PaymentMethodQAMockTransport(result: .success)
-        }
-        return nil
-    }
-
-    private static var paymentCaptureMockTransport: (any PayabliTransport)? {
-        if Secrets.paymentCaptureMockFailureEnabled {
-            return PaymentCaptureQAMockTransport(result: .failure)
-        }
-        if Secrets.paymentCaptureMockSuccessEnabled {
-            return PaymentCaptureQAMockTransport(result: .success)
-        }
-        return nil
-    }
-
-    private static var paymentCaptureRequestConfiguration: PayabliPaymentCaptureRequestConfiguration {
-        PayabliPaymentCaptureRequestConfiguration(
-            paymentDetails: PayabliPaymentCapturePaymentDetails(
+    private static var paymentCaptureRequestConfiguration: PayabliPayInPaymentFlowRequestConfiguration {
+        PayabliPayInPaymentFlowRequestConfiguration(
+            paymentDetails: PayabliPayInPaymentFlowPaymentDetails(
                 totalAmount: 1,
                 serviceFee: 0.10,
                 currency: "USD"
@@ -117,12 +85,12 @@ struct PaymentMethodQAApp: App {
         )
     }
 
-    private static var paymentMethodDiagnostics: PayabliPaymentMethodDiagnostics {
+    private static var paymentMethodDiagnostics: PayabliPayInPaymentFlowDiagnostics {
         guard Secrets.paymentMethodDiagnosticsEnabled else { return .disabled }
 
         return .enabled { entry in
             var lines = [
-                "[PayabliPaymentMethodDiagnostics] \(entry.phase.rawValue.uppercased()) \(entry.method) \(entry.url)"
+                "[PayabliPayInPaymentFlowDiagnostics] \(entry.phase.rawValue.uppercased()) \(entry.method) \(entry.url)"
             ]
             if let statusCode = entry.statusCode {
                 lines.append("statusCode=\(statusCode)")
@@ -149,12 +117,12 @@ struct PaymentMethodQAApp: App {
         }
     }
 
-    private static var paymentCaptureDiagnostics: PayabliPaymentCaptureDiagnostics {
+    private static var paymentCaptureDiagnostics: PayabliPayInPaymentFlowDiagnostics {
         guard Secrets.paymentCaptureDiagnosticsEnabled else { return .disabled }
 
         return .enabled { entry in
             var lines = [
-                "[PayabliPaymentCaptureDiagnostics] \(entry.phase.rawValue.uppercased()) \(entry.method) \(entry.url)"
+                "[PayabliPayInPaymentFlowDiagnostics] \(entry.phase.rawValue.uppercased()) \(entry.method) \(entry.url)"
             ]
             if let statusCode = entry.statusCode {
                 lines.append("statusCode=\(statusCode)")

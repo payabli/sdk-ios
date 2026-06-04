@@ -1,13 +1,14 @@
 import os
 import PayabliSDKCore
-import PayabliSDKPaymentCapture
+import PayabliSDKPayInPaymentFlow
 import SwiftUI
 
 struct PaymentCaptureQAView: View {
-    @EnvironmentObject private var paymentCapture: PayabliPaymentCapture
+    let paymentFlow: PayabliPayInPaymentFlow
+
     @StateObject private var diagnosticsStore = PaymentCaptureQADiagnosticsStore.shared
     @State private var resultText = ""
-    @State private var capturedResult: PayabliPaymentCaptureResult?
+    @State private var capturedResult: PayabliPayInPaymentFlowResult?
     @State private var isPaymentCaptureSheetPresented = false
     @State private var isPaymentCaptureResultViewPresented = false
 
@@ -26,13 +27,13 @@ struct PaymentCaptureQAView: View {
                     Text("Inline experience")
                         .font(.headline)
 
-                    PayabliPaymentCaptureView(
-                        component: paymentCapture,
+                    PayabliPayInPaymentFlowView(
+                        component: paymentFlow,
                         configuration: configuration,
-                        onPaymentCaptured: handlePaymentCaptured,
+                        onCompleted: handlePaymentCaptured,
                         onError: handleError
                     )
-                    .payabliPaymentCaptureStyle(style)
+                    .payabliPayInPaymentFlowStyle(style)
 
                     Text(resultText.isEmpty ? "No payment capture result yet" : resultText)
                         .font(.footnote)
@@ -75,22 +76,22 @@ struct PaymentCaptureQAView: View {
                 }
             }
         }
-        .payabliPaymentCaptureSheet(
+        .payabliPayInPaymentFlowSheet(
             isPresented: $isPaymentCaptureSheetPresented,
-            component: paymentCapture,
+            component: paymentFlow,
             configuration: configuration,
-            sheetConfiguration: PayabliPaymentCaptureSheetConfiguration(
+            sheetConfiguration: PayabliPayInPaymentFlowSheetConfiguration(
                 title: "Submit Payment",
                 dismissButton: .back
             ),
             style: style,
-            onPaymentCaptured: handlePaymentCaptured,
+            onCompleted: handlePaymentCaptured,
             onError: handleError
         )
     }
 
-    private var configuration: PayabliPaymentCaptureFormConfiguration {
-        PayabliPaymentCaptureFormConfiguration(
+    private var configuration: PayabliPayInPaymentFlowFormConfiguration {
+        PayabliPayInPaymentFlowFormConfiguration(
             allowedMethods: [.card, .ach],
             defaultMethod: .card,
             cardFieldOrder: [
@@ -107,9 +108,9 @@ struct PaymentCaptureQAView: View {
                 .achAccountType
             ],
             cardSections: [
-                PayabliPaymentCaptureFieldSection(
+                PayabliPayInPaymentFlowFieldSection(
                     title: "Card Information",
-                    titleStyle: PayabliPaymentCaptureTextStyle(
+                    titleStyle: PayabliPayInPaymentFlowTextStyle(
                         font: .headline.weight(.semibold),
                         color: .primary
                     ),
@@ -127,9 +128,9 @@ struct PaymentCaptureQAView: View {
                         .cardCvv: 2
                     ]
                 ),
-                PayabliPaymentCaptureFieldSection(
+                PayabliPayInPaymentFlowFieldSection(
                     title: "Customer Information",
-                    titleStyle: PayabliPaymentCaptureTextStyle(
+                    titleStyle: PayabliPayInPaymentFlowTextStyle(
                         font: .headline.weight(.semibold),
                         color: .primary
                     ),
@@ -139,9 +140,9 @@ struct PaymentCaptureQAView: View {
                         .billingEmail
                     ]
                 ),
-                PayabliPaymentCaptureFieldSection(
+                PayabliPayInPaymentFlowFieldSection(
                     title: "Payment Information",
-                    titleStyle: PayabliPaymentCaptureTextStyle(
+                    titleStyle: PayabliPayInPaymentFlowTextStyle(
                         font: .headline.weight(.semibold),
                         color: .primary
                     ),
@@ -153,9 +154,9 @@ struct PaymentCaptureQAView: View {
                 )
             ],
             achSections: [
-                PayabliPaymentCaptureFieldSection(
+                PayabliPayInPaymentFlowFieldSection(
                     title: "Bank Information",
-                    titleStyle: PayabliPaymentCaptureTextStyle(
+                    titleStyle: PayabliPayInPaymentFlowTextStyle(
                         font: .headline.weight(.semibold),
                         color: .primary
                     ),
@@ -172,9 +173,9 @@ struct PaymentCaptureQAView: View {
                         .achAccount: 2
                     ]
                 ),
-                PayabliPaymentCaptureFieldSection(
+                PayabliPayInPaymentFlowFieldSection(
                     title: "Customer Information",
-                    titleStyle: PayabliPaymentCaptureTextStyle(
+                    titleStyle: PayabliPayInPaymentFlowTextStyle(
                         font: .headline.weight(.semibold),
                         color: .primary
                     ),
@@ -184,9 +185,9 @@ struct PaymentCaptureQAView: View {
                         .billingEmail
                     ]
                 ),
-                PayabliPaymentCaptureFieldSection(
+                PayabliPayInPaymentFlowFieldSection(
                     title: "Payment Information",
-                    titleStyle: PayabliPaymentCaptureTextStyle(
+                    titleStyle: PayabliPayInPaymentFlowTextStyle(
                         font: .headline.weight(.semibold),
                         color: .primary
                     ),
@@ -197,12 +198,12 @@ struct PaymentCaptureQAView: View {
                     inputVerticalSpacing: 6
                 )
             ],
-            hiddenValues: PayabliPaymentCaptureHiddenValues(
+            hiddenValues: PayabliPayInPaymentFlowHiddenValues(
                 achHolderType: .personal,
                 achSecCode: .web,
                 methodDescription: "Payment Capture QA"
             ),
-            labels: PayabliPaymentCaptureLabels(
+            labels: PayabliPayInPaymentFlowLabels(
                 title: "Payment Capture",
                 subtitle: "Submit a card or ACH payment.",
                 submitButton: "Submit Payment",
@@ -211,24 +212,24 @@ struct PaymentCaptureQAView: View {
             labelLayout: .external,
             showsFieldLabels: true,
             hiddenFieldLabels: Set(fieldsWithHiddenLabels),
-            formatting: PayabliPaymentCaptureFormatting(
+            formatting: PayabliPayInPaymentFlowFormatting(
                 insertsCardNumberSpaces: true,
                 masksACHAccountEntry: true
             ),
-            inputSizing: PayabliPaymentCaptureInputSizing(
-                defaultSize: PayabliPaymentCaptureInputSize(height: 52),
+            inputSizing: PayabliPayInPaymentFlowInputSizing(
+                defaultSize: PayabliPayInPaymentFlowInputSize(height: 52),
                 fieldSizes: [
-                    .cardExpiration: PayabliPaymentCaptureInputSize(height: 48),
-                    .cardCvv: PayabliPaymentCaptureInputSize(height: 48)
+                    .cardExpiration: PayabliPayInPaymentFlowInputSize(height: 48),
+                    .cardCvv: PayabliPayInPaymentFlowInputSize(height: 48)
                 ]
             ),
             cardBrandIconPlacement: .trailing,
-            paymentSummary: PayabliPaymentCapturePaymentSummaryConfiguration(
-                labelStyle: PayabliPaymentCapturePaymentSummaryTextStyle(
+            paymentSummary: PayabliPayInPaymentFlowPaymentSummaryConfiguration(
+                labelStyle: PayabliPayInPaymentFlowPaymentSummaryTextStyle(
                     font: .subheadline,
                     color: .secondary
                 ),
-                valueStyle: PayabliPaymentCapturePaymentSummaryTextStyle(
+                valueStyle: PayabliPayInPaymentFlowPaymentSummaryTextStyle(
                     font: .subheadline.weight(.semibold),
                     color: .primary
                 ),
@@ -237,16 +238,16 @@ struct PaymentCaptureQAView: View {
         )
     }
 
-    private var style: PayabliPaymentCaptureStyle {
-        PayabliPaymentCaptureStyle(
+    private var style: PayabliPayInPaymentFlowStyle {
+        PayabliPayInPaymentFlowStyle(
             accentColor: .green,
-            input: PayabliPaymentCaptureInputStyle(
+            input: PayabliPayInPaymentFlowInputStyle(
                 backgroundColor: Color(.systemBackground),
                 borderColor: Color(.separator).opacity(0.6),
                 cornerRadius: 8
             ),
-            submitButton: PayabliPaymentCaptureSubmitButtonStyle(cornerRadius: 8),
-            layout: PayabliPaymentCaptureLayoutStyle(
+            submitButton: PayabliPayInPaymentFlowSubmitButtonStyle(cornerRadius: 8),
+            layout: PayabliPayInPaymentFlowLayoutStyle(
                 contentSpacing: 18,
                 fieldGroupSpacing: 14,
                 pairedFieldSpacing: 12,
@@ -256,7 +257,7 @@ struct PaymentCaptureQAView: View {
         )
     }
 
-    private var fieldsWithHiddenLabels: [PayabliPaymentCaptureField] {
+    private var fieldsWithHiddenLabels: [PayabliPayInPaymentFlowField] {
         [
             .cardholderName,
             .cardNumber,
@@ -274,17 +275,17 @@ struct PaymentCaptureQAView: View {
     }
 
     private func labelMatchingPlaceholders(
-        for fields: [PayabliPaymentCaptureField]
-    ) -> [PayabliPaymentCaptureField: String] {
+        for fields: [PayabliPayInPaymentFlowField]
+    ) -> [PayabliPayInPaymentFlowField: String] {
         Dictionary(uniqueKeysWithValues: fields.map { field in
             (
                 field,
-                PayabliPaymentCaptureLabels.defaultFieldLabels[field] ?? field.rawValue
+                PayabliPayInPaymentFlowLabels.defaultFieldLabels[field] ?? field.rawValue
             )
         })
     }
 
-    private func handlePaymentCaptured(_ result: PayabliPaymentCaptureResult) {
+    private func handlePaymentCaptured(_ result: PayabliPayInPaymentFlowResult) {
         capturedResult = result
         resultText = [
             "Code: \(result.code)",

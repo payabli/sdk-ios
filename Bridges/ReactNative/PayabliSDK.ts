@@ -1,33 +1,39 @@
 /**
- * TypeScript surface for the React Native bridge to PayabliSDKTapToPay.
+ * TypeScript surface for the React Native bridge to Payabli iOS SDK.
  *
- * Wraps the iOS Native Module declared in `PayabliSDKModule.swift`. Method
- * names, argument shapes, and event names are 1:1 with that file.
- *
- * ## Authentication
- *
- * Your JS app obtains the access token from your **own backend** (which
- * holds the Payabli `clientSecret` server-side) and passes it to
- * {@link configure}. When the SDK needs to refresh it emits
- * `TTPTokenRefreshRequested`; supply a {@link tokenProvider} callback to
- * {@link configure} and the bridge will call it for you.
- *
- * ## Tap to Pay requirements
- *
- *   - Apple's `proximity-reader.payment.acceptance` entitlement on the
- *     iOS host app target (request to Apple).
- *   - `App Attest` entitlement (`devicecheck.appattest-environment`).
- *   - A physical iPhone XS or newer running iOS 16.7+.
+ * Wraps the iOS Native Module declared in `PayabliSDKModule.swift`. Expo Go
+ * cannot load this custom native module; use an Expo development build or a
+ * bare React Native app with the native iOS bridge installed.
  */
 
-import { NativeModules, NativeEventEmitter, EmitterSubscription } from 'react-native';
+import {
+    EmitterSubscription,
+    NativeEventEmitter,
+    NativeModules,
+} from "react-native";
 
-const { PayabliSDKModule } = NativeModules as { PayabliSDKModule: NativePayabliSDKModule };
+const nativeModule = NativeModules.PayabliSDKModule as NativePayabliSDKModule | undefined;
+const emitter = nativeModule ? new NativeEventEmitter(nativeModule as any) : null;
 
-// Singleton emitter — reused across all event subscribers.
-const emitter = new NativeEventEmitter(NativeModules.PayabliSDKModule);
+function requireNativeModule(): NativePayabliSDKModule {
+    if (!nativeModule) {
+        throw new Error(
+            "PayabliSDKModule is not available. Build a custom Expo development client or bare React Native app with the Payabli iOS bridge installed."
+        );
+    }
+    return nativeModule;
+}
 
-// MARK: - Public enums (raw indices match the @objc Int enums on iOS)
+function requireEmitter(): NativeEventEmitter {
+    if (!emitter) {
+        throw new Error(
+            "PayabliSDKModule events are not available. Build a custom Expo development client or bare React Native app with the Payabli iOS bridge installed."
+        );
+    }
+    return emitter;
+}
+
+// MARK: - Public enums
 
 export enum PayabliEnvironment {
     Local = 0,
@@ -73,7 +79,11 @@ export enum PayabliTTPEventCode {
     ActivationFailed = 17,
 }
 
-// MARK: - Data shapes
+export type PayabliPayInPaymentFlowACHAccountType = "Checking" | "Savings";
+export type PayabliPayInPaymentFlowACHHolderType = "personal" | "business";
+export type PayabliPayInPaymentFlowACHSecCode = "PPD" | "WEB" | "TEL" | "CCD" | "BOC";
+
+// MARK: - Tap to Pay data shapes
 
 export interface PayabliTTPCustomerData {
     firstName?: string;
@@ -124,7 +134,6 @@ export interface PayabliTTPConfig {
     entryPoint: string;
     appId: string;
     environment?: PayabliEnvironment;
-    /** Async callback invoked when the SDK needs a fresh access token. */
     tokenProvider: () => Promise<string>;
 }
 
@@ -134,6 +143,49 @@ export interface PayabliTTPChargeRequest {
     customer?: PayabliTTPCustomerData;
     invoice?: PayabliTTPInvoiceData;
     orderDescription?: string;
+}
+
+// MARK: - PayIn payment flow data shapes
+
+export interface PayabliPayInPaymentFlowConfig {
+    entryPoint: string;
+    environment?: PayabliEnvironment;
+    accessTokenProvider: () => Promise<string>;
+}
+
+export interface PayabliPayInPaymentFlowOptions {
+    achValidation?: boolean;
+    createAnonymous?: boolean;
+    forceCustomerCreation?: boolean;
+    temporary?: boolean;
+    source?: string;
+}
+
+export interface PayabliPayInPaymentFlowCardData extends PayabliPayInPaymentFlowOptions {
+    cardNumber: string;
+    expiration: string;
+    cardholderName: string;
+    cvv: string;
+    billingZip: string;
+}
+
+export interface PayabliPayInPaymentFlowACHData extends PayabliPayInPaymentFlowOptions {
+    accountNumber: string;
+    accountType: PayabliPayInPaymentFlowACHAccountType;
+    holderName: string;
+    routingNumber: string;
+    secCode?: PayabliPayInPaymentFlowACHSecCode;
+    holderType?: PayabliPayInPaymentFlowACHHolderType;
+}
+
+export interface PayabliPayInPaymentFlowStoredPaymentMethod {
+    storedMethodId?: string;
+    methodReferenceId?: string;
+    resultCode?: number;
+    resultText?: string;
+    customerId?: number;
+    responseText: string;
+    apiResponse: Record<string, unknown>;
 }
 
 // MARK: - Native module typing
@@ -168,35 +220,44 @@ interface NativePayabliSDKModule {
     resolveTokenRefresh(token: string): void;
 
     rejectTokenRefresh(reason: string): void;
+
+    configurePayInPaymentFlow(config: {
+        entryPoint: string;
+        environment: number;
+    }): Promise<void>;
+
+    addCard(params: PayabliPayInPaymentFlowCardData): Promise<PayabliPayInPaymentFlowStoredPaymentMethod>;
+
+    addACH(params: PayabliPayInPaymentFlowACHData): Promise<PayabliPayInPaymentFlowStoredPaymentMethod>;
+
+    resolvePayInPaymentFlowAccessToken(token: string): void;
+
+    rejectPayInPaymentFlowAccessToken(reason: string): void;
 }
 
-// MARK: - Public API
+// MARK: - Tap to Pay public API
 
 let refreshSubscription: EmitterSubscription | null = null;
 
-/**
- * Configures the underlying `PayabliTTP` instance. Call once per app
- * launch, before {@link initialize}. Wires the JS-side token refresh
- * handler to the native `TTPTokenRefreshRequested` event so the SDK can
- * silently refresh the access token without surfacing `tokenExpired` to
- * the host.
- */
 export async function configure(config: PayabliTTPConfig): Promise<void> {
+    const module = requireNativeModule();
+    const eventEmitter = requireEmitter();
+
     refreshSubscription?.remove();
-    refreshSubscription = emitter.addListener(
-        'TTPTokenRefreshRequested',
+    refreshSubscription = eventEmitter.addListener(
+        "TTPTokenRefreshRequested",
         async () => {
             try {
                 const token = await config.tokenProvider();
-                PayabliSDKModule.resolveTokenRefresh(token);
+                module.resolveTokenRefresh(token);
             } catch (e) {
                 const message = e instanceof Error ? e.message : String(e);
-                PayabliSDKModule.rejectTokenRefresh(message);
+                module.rejectTokenRefresh(message);
             }
         }
     );
 
-    await PayabliSDKModule.configure({
+    await module.configure({
         accessToken: config.accessToken,
         entryPoint: config.entryPoint,
         appId: config.appId,
@@ -204,21 +265,16 @@ export async function configure(config: PayabliTTPConfig): Promise<void> {
     });
 }
 
-/** Runs the cold/warm attestation + config + reader-prepare pipeline. */
 export function initialize(): Promise<void> {
-    return PayabliSDKModule.initialize();
+    return requireNativeModule().initialize();
 }
 
-/** Runs a full sale charge: backend `/initiate` → NFC tap → backend `/update`. */
 export function charge(req: PayabliTTPChargeRequest): Promise<PayabliTTPTransactionResult> {
-    return PayabliSDKModule.charge({
+    return requireNativeModule().charge({
         type: req.type ?? PayabliTTPPaymentType.Sale,
         paymentDetails: {
             amount: req.paymentDetails.amount,
             serviceFee: req.paymentDetails.serviceFee ?? 0,
-            // Pass `currency` through verbatim — when undefined the SDK omits
-            // it from `/initiate` and the backend authorizes in the
-            // merchant's configured processor currency.
             currency: req.paymentDetails.currency,
             paymentDescription: req.paymentDetails.paymentDescription,
         },
@@ -228,25 +284,19 @@ export function charge(req: PayabliTTPChargeRequest): Promise<PayabliTTPTransact
     });
 }
 
-/** Activates a pending device using an out-of-band activation code. */
 export function activateDevice(activationCode: string): Promise<void> {
-    return PayabliSDKModule.activateDevice(activationCode);
+    return requireNativeModule().activateDevice(activationCode);
 }
 
-/** Polls the current session state. */
 export async function getSessionState(): Promise<PayabliTTPSessionState> {
-    const raw = await PayabliSDKModule.getSessionState();
+    const raw = await requireNativeModule().getSessionState();
     return raw as PayabliTTPSessionState;
 }
 
-/**
- * Subscribes to lifecycle events. Returns an `EmitterSubscription` —
- * call `.remove()` to stop receiving events.
- */
 export function addEventListener(
     handler: (event: PayabliTTPEvent) => void
 ): EmitterSubscription {
-    return emitter.addListener('TTPEvent', (raw) => {
+    return requireEmitter().addListener("TTPEvent", (raw: { code: number; payload?: PayabliTTPEvent["payload"] }) => {
         handler({
             code: raw.code as PayabliTTPEventCode,
             payload: raw.payload || {},
@@ -261,6 +311,54 @@ export const PayabliTTP = {
     activateDevice,
     getSessionState,
     addEventListener,
+};
+
+// MARK: - PayIn payment flow public API
+
+let payInAccessTokenSubscription: EmitterSubscription | null = null;
+
+export async function configurePayInPaymentFlow(
+    config: PayabliPayInPaymentFlowConfig
+): Promise<void> {
+    const module = requireNativeModule();
+    const eventEmitter = requireEmitter();
+
+    payInAccessTokenSubscription?.remove();
+    payInAccessTokenSubscription = eventEmitter.addListener(
+        "PayInPaymentFlowAccessTokenRequested",
+        async () => {
+            try {
+                const token = await config.accessTokenProvider();
+                module.resolvePayInPaymentFlowAccessToken(token);
+            } catch (e) {
+                const message = e instanceof Error ? e.message : String(e);
+                module.rejectPayInPaymentFlowAccessToken(message);
+            }
+        }
+    );
+
+    await module.configurePayInPaymentFlow({
+        entryPoint: config.entryPoint,
+        environment: config.environment ?? PayabliEnvironment.Sandbox,
+    });
+}
+
+export function addCard(
+    params: PayabliPayInPaymentFlowCardData
+): Promise<PayabliPayInPaymentFlowStoredPaymentMethod> {
+    return requireNativeModule().addCard(params);
+}
+
+export function addACH(
+    params: PayabliPayInPaymentFlowACHData
+): Promise<PayabliPayInPaymentFlowStoredPaymentMethod> {
+    return requireNativeModule().addACH(params);
+}
+
+export const PayabliPayInPaymentFlow = {
+    configure: configurePayInPaymentFlow,
+    addCard,
+    addACH,
 };
 
 export default PayabliTTP;
