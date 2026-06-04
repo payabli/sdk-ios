@@ -2,8 +2,8 @@ import SwiftUI
 import UIKit
 
 public struct PayabliPaymentMethodTextStyle {
-    public var font: Font
-    public var color: Color
+    public let font: Font
+    public let color: Color
 
     public init(
         font: Font,
@@ -15,18 +15,18 @@ public struct PayabliPaymentMethodTextStyle {
 }
 
 public struct PayabliPaymentMethodInputStyle {
-    public var font: Font
-    public var uiFont: UIFont?
-    public var textColor: Color
-    public var placeholderColor: Color
-    public var backgroundColor: Color
-    public var focusedBackgroundColor: Color?
-    public var borderColor: Color
-    public var focusedBorderColor: Color?
-    public var borderWidth: CGFloat
-    public var focusedBorderWidth: CGFloat
-    public var cornerRadius: CGFloat
-    public var pickerIconColor: Color
+    public let font: Font
+    public let uiFont: UIFont?
+    public let textColor: Color
+    public let placeholderColor: Color
+    public let backgroundColor: Color
+    public let focusedBackgroundColor: Color?
+    public let borderColor: Color
+    public let focusedBorderColor: Color?
+    public let borderWidth: CGFloat
+    public let focusedBorderWidth: CGFloat
+    public let cornerRadius: CGFloat
+    public let pickerIconColor: Color
 
     public init(
         font: Font = .body,
@@ -65,14 +65,14 @@ public struct PayabliPaymentMethodInputStyle {
 }
 
 public struct PayabliPaymentMethodSubmitButtonStyle {
-    public var font: Font
-    public var backgroundColor: Color?
-    public var foregroundColor: Color
-    public var disabledBackgroundColor: Color
-    public var disabledForegroundColor: Color
-    public var cornerRadius: CGFloat
-    public var height: CGFloat
-    public var horizontalPadding: CGFloat
+    public let font: Font
+    public let backgroundColor: Color?
+    public let foregroundColor: Color
+    public let disabledBackgroundColor: Color
+    public let disabledForegroundColor: Color
+    public let cornerRadius: CGFloat
+    public let height: CGFloat
+    public let horizontalPadding: CGFloat
 
     public init(
         font: Font = .body.weight(.semibold),
@@ -96,13 +96,13 @@ public struct PayabliPaymentMethodSubmitButtonStyle {
 }
 
 public struct PayabliPaymentMethodLayoutStyle {
-    public var contentSpacing: CGFloat
-    public var headerSpacing: CGFloat
-    public var fieldGroupSpacing: CGFloat
-    public var pairedFieldSpacing: CGFloat
-    public var labelSpacing: CGFloat
-    public var sectionSpacing: CGFloat
-    public var sectionTitleSpacing: CGFloat
+    public private(set) var contentSpacing: CGFloat
+    public private(set) var headerSpacing: CGFloat
+    public private(set) var fieldGroupSpacing: CGFloat
+    public private(set) var pairedFieldSpacing: CGFloat
+    public private(set) var labelSpacing: CGFloat
+    public private(set) var sectionSpacing: CGFloat
+    public private(set) var sectionTitleSpacing: CGFloat
 
     public var inputVerticalSpacing: CGFloat {
         get { fieldGroupSpacing }
@@ -134,15 +134,15 @@ public struct PayabliPaymentMethodLayoutStyle {
 }
 
 public struct PayabliPaymentMethodStyle {
-    public var accentColor: Color
-    public var title: PayabliPaymentMethodTextStyle
-    public var subtitle: PayabliPaymentMethodTextStyle
-    public var sectionTitle: PayabliPaymentMethodTextStyle
-    public var label: PayabliPaymentMethodTextStyle
-    public var input: PayabliPaymentMethodInputStyle
-    public var submitButton: PayabliPaymentMethodSubmitButtonStyle
-    public var error: PayabliPaymentMethodTextStyle
-    public var layout: PayabliPaymentMethodLayoutStyle
+    public let accentColor: Color
+    public let title: PayabliPaymentMethodTextStyle
+    public let subtitle: PayabliPaymentMethodTextStyle
+    public let sectionTitle: PayabliPaymentMethodTextStyle
+    public let label: PayabliPaymentMethodTextStyle
+    public let input: PayabliPaymentMethodInputStyle
+    public let submitButton: PayabliPaymentMethodSubmitButtonStyle
+    public let error: PayabliPaymentMethodTextStyle
+    public let layout: PayabliPaymentMethodLayoutStyle
 
     public init(
         accentColor: Color = .accentColor,

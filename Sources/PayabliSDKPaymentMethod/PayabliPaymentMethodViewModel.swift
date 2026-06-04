@@ -2,38 +2,38 @@ import PayabliSDKCore
 import SwiftUI
 
 @MainActor
-public final class PayabliPaymentMethodViewModel: ObservableObject {
-    @Published public var selectedMethod: PayabliPaymentMethodType
+final class PayabliPaymentMethodViewModel: ObservableObject {
+    @Published var selectedMethod: PayabliPaymentMethodType
     @Published private var cardholderNameStorage = ""
     @Published private var cardNumberStorage = ""
 
-    @Published public var cardExpiration = ""
-    @Published public var cardExpirationMonth: Int?
-    @Published public var cardExpirationYear: Int?
+    @Published var cardExpiration = ""
+    @Published var cardExpirationMonth: Int?
+    @Published var cardExpirationYear: Int?
     @Published private var cardCvvStorage = ""
     @Published private var cardZipStorage = ""
     @Published private var achHolderStorage = ""
     @Published private var achRoutingStorage = ""
     @Published private var achAccountStorage = ""
 
-    @Published public var achAccountType: PayabliACHAccountType = .checking
-    @Published public var achHolderType: PayabliACHHolderType = .personal
-    @Published public var achSecCode: PayabliACHSecCode = .web
-    @Published public var achDevice = ""
-    @Published public var methodDescription = ""
-    @Published public var firstName = ""
-    @Published public var lastName = ""
-    @Published public var customerNumber = ""
-    @Published public var billingEmail = ""
+    @Published var achAccountType: PayabliACHAccountType = .checking
+    @Published var achHolderType: PayabliACHHolderType = .personal
+    @Published var achSecCode: PayabliACHSecCode = .web
+    @Published var achDevice = ""
+    @Published var methodDescription = ""
+    @Published var firstName = ""
+    @Published var lastName = ""
+    @Published var customerNumber = ""
+    @Published var billingEmail = ""
     @Published private var billingZipStorage = ""
 
-    @Published public private(set) var isSubmitting = false
-    @Published public private(set) var errorMessage: String?
+    @Published private(set) var isSubmitting = false
+    @Published private(set) var errorMessage: String?
 
     private let component: PayabliPaymentMethod
     private let configuration: PayabliPaymentMethodFormConfiguration
 
-    public init(
+    init(
         component: PayabliPaymentMethod,
         configuration: PayabliPaymentMethodFormConfiguration = PayabliPaymentMethodFormConfiguration()
     ) {
@@ -42,7 +42,7 @@ public final class PayabliPaymentMethodViewModel: ObservableObject {
         self.selectedMethod = configuration.defaultMethod
     }
 
-    public var cardholderName: String {
+    var cardholderName: String {
         get { cardholderNameStorage }
         set {
             let limited = limitCardholderName(newValue)
@@ -51,7 +51,7 @@ public final class PayabliPaymentMethodViewModel: ObservableObject {
         }
     }
 
-    public var cardNumber: String {
+    var cardNumber: String {
         get { cardNumberStorage }
         set {
             let formatted = formatCardNumber(newValue)
@@ -60,7 +60,7 @@ public final class PayabliPaymentMethodViewModel: ObservableObject {
         }
     }
 
-    public var cardCvv: String {
+    var cardCvv: String {
         get { cardCvvStorage }
         set {
             let limited = limitCardCvv(newValue)
@@ -69,7 +69,7 @@ public final class PayabliPaymentMethodViewModel: ObservableObject {
         }
     }
 
-    public var cardZip: String {
+    var cardZip: String {
         get { cardZipStorage }
         set {
             let limited = limitPostalCode(newValue)
@@ -78,7 +78,7 @@ public final class PayabliPaymentMethodViewModel: ObservableObject {
         }
     }
 
-    public var achHolder: String {
+    var achHolder: String {
         get { achHolderStorage }
         set {
             let limited = limitACHHolderName(newValue)
@@ -87,7 +87,7 @@ public final class PayabliPaymentMethodViewModel: ObservableObject {
         }
     }
 
-    public var achRouting: String {
+    var achRouting: String {
         get { achRoutingStorage }
         set {
             let limited = limitACHRouting(newValue)
@@ -96,7 +96,7 @@ public final class PayabliPaymentMethodViewModel: ObservableObject {
         }
     }
 
-    public var achAccount: String {
+    var achAccount: String {
         get { achAccountStorage }
         set {
             let limited = limitACHAccount(newValue)
@@ -105,7 +105,7 @@ public final class PayabliPaymentMethodViewModel: ObservableObject {
         }
     }
 
-    public var billingZip: String {
+    var billingZip: String {
         get { billingZipStorage }
         set {
             let limited = limitPostalCode(newValue)
@@ -114,7 +114,7 @@ public final class PayabliPaymentMethodViewModel: ObservableObject {
         }
     }
 
-    public var activeFields: [PayabliPaymentMethodField] {
+    var activeFields: [PayabliPaymentMethodField] {
         switch selectedMethod {
         case .card:
             return configuration.cardFieldOrder
@@ -123,11 +123,11 @@ public final class PayabliPaymentMethodViewModel: ObservableObject {
         }
     }
 
-    public var detectedCardBrand: PayabliPaymentMethodCardBrand {
+    var detectedCardBrand: PayabliPaymentMethodCardBrand {
         PayabliPaymentMethodCardBrand.detect(cardNumber: cardNumber)
     }
 
-    public var cardNumberValidationMessage: String? {
+    var cardNumberValidationMessage: String? {
         let digits = cardNumber.digitsOnly
         guard configuration.options.validation.requiresLuhnCheck,
               digits.count >= PayabliPaymentMethodInputLimits.minimumCardNumberDigits,
@@ -139,7 +139,7 @@ public final class PayabliPaymentMethodViewModel: ObservableObject {
         return "Invalid Card Number"
     }
 
-    public var expirationDisplayText: String {
+    var expirationDisplayText: String {
         switch (selectedExpirationMonth, selectedExpirationYear) {
         case let (.some(month), .some(year)):
             return String(format: "%02d/%02d", month, year % 100)
@@ -152,11 +152,11 @@ public final class PayabliPaymentMethodViewModel: ObservableObject {
         }
     }
 
-    public var hasSelectedExpiration: Bool {
+    var hasSelectedExpiration: Bool {
         selectedExpirationMonth != nil || selectedExpirationYear != nil
     }
 
-    public var canSubmit: Bool {
+    var canSubmit: Bool {
         switch selectedMethod {
         case .card:
             return fieldHasRequiredValue(.cardholderName)
@@ -174,7 +174,7 @@ public final class PayabliPaymentMethodViewModel: ObservableObject {
         }
     }
 
-    public func submit() async throws -> PayabliStoredPaymentMethod {
+    func submit() async throws -> PayabliStoredPaymentMethod {
         errorMessage = nil
         isSubmitting = true
         defer { isSubmitting = false }
@@ -195,7 +195,7 @@ public final class PayabliPaymentMethodViewModel: ObservableObject {
         }
     }
 
-    public func formatCardNumber(_ value: String) -> String {
+    func formatCardNumber(_ value: String) -> String {
         let digits = String(value.digitsOnly.prefix(PayabliPaymentMethodInputLimits.maximumCardNumberDigits))
         guard configuration.formatting.insertsCardNumberSpaces else { return digits }
 
@@ -233,7 +233,7 @@ public final class PayabliPaymentMethodViewModel: ObservableObject {
         String(value.digitsOnly.prefix(PayabliPaymentMethodInputLimits.maximumACHAccountDigits))
     }
 
-    public func formatExpiration(_ value: String) -> String {
+    func formatExpiration(_ value: String) -> String {
         let digits = String(value.digitsOnly.prefix(4))
         guard digits.count > 2 else { return digits }
         let month = digits.prefix(2)
@@ -241,17 +241,17 @@ public final class PayabliPaymentMethodViewModel: ObservableObject {
         return "\(month)\(configuration.formatting.expirationSeparator)\(year)"
     }
 
-    public func selectExpirationMonth(_ month: Int) {
+    func selectExpirationMonth(_ month: Int) {
         cardExpirationMonth = min(max(month, 1), 12)
         synchronizeExpirationText()
     }
 
-    public func selectExpirationYear(_ year: Int) {
+    func selectExpirationYear(_ year: Int) {
         cardExpirationYear = year
         synchronizeExpirationText()
     }
 
-    public func ensureExpirationSelection(defaultDate: Date = Date()) {
+    func ensureExpirationSelection(defaultDate: Date = Date()) {
         let calendar = Calendar.current
         if cardExpirationMonth == nil {
             cardExpirationMonth = selectedExpirationMonth ?? calendar.component(.month, from: defaultDate)
@@ -334,6 +334,17 @@ public final class PayabliPaymentMethodViewModel: ObservableObject {
 
     private func fieldHasRequiredValue(_ field: PayabliPaymentMethodField) -> Bool {
         switch field {
+        case .cardholderName, .cardNumber, .cardExpiration, .cardCvv, .cardZip:
+            return cardFieldHasRequiredValue(field)
+        case .achHolder, .achRouting, .achAccount, .achAccountType, .achHolderType, .achSecCode, .achDevice:
+            return achFieldHasRequiredValue(field)
+        case .methodDescription, .firstName, .lastName, .customerNumber, .billingEmail, .billingZip:
+            return customerFieldHasRequiredValue(field)
+        }
+    }
+
+    private func cardFieldHasRequiredValue(_ field: PayabliPaymentMethodField) -> Bool {
+        switch field {
         case .cardholderName:
             let value = cardholderName.trimmed
             return !value.isEmpty
@@ -351,6 +362,13 @@ public final class PayabliPaymentMethodViewModel: ObservableObject {
             let value = cardZip.trimmed
             return !value.isEmpty
                 && value.count <= PayabliPaymentMethodInputLimits.maximumPostalCodeCharacters
+        default:
+            return false
+        }
+    }
+
+    private func achFieldHasRequiredValue(_ field: PayabliPaymentMethodField) -> Bool {
+        switch field {
         case .achHolder:
             let value = achHolder.trimmed
             return !value.isEmpty
@@ -364,6 +382,13 @@ public final class PayabliPaymentMethodViewModel: ObservableObject {
             return true
         case .achDevice:
             return !achDevice.trimmed.isEmpty
+        default:
+            return false
+        }
+    }
+
+    private func customerFieldHasRequiredValue(_ field: PayabliPaymentMethodField) -> Bool {
+        switch field {
         case .methodDescription:
             return !methodDescription.trimmed.isEmpty
         case .firstName:
@@ -376,6 +401,8 @@ public final class PayabliPaymentMethodViewModel: ObservableObject {
             return !billingEmail.trimmed.isEmpty
         case .billingZip:
             return !billingZip.trimmed.isEmpty
+        default:
+            return false
         }
     }
 

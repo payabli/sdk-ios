@@ -238,6 +238,12 @@ final class PaymentMethodFormConfigurationTests: XCTestCase {
         XCTAssertEqual(layout.pairedFieldSpacing, 9)
         XCTAssertEqual(layout.inputVerticalSpacing, 18)
         XCTAssertEqual(layout.inputHorizontalSpacing, 9)
+
+        layout.inputVerticalSpacing = -1
+        layout.inputHorizontalSpacing = -2
+
+        XCTAssertEqual(layout.fieldGroupSpacing, 0)
+        XCTAssertEqual(layout.pairedFieldSpacing, 0)
     }
 
     func testInputStyleCanConfigureNativeTextFieldFontAndPlaceholderColor() {

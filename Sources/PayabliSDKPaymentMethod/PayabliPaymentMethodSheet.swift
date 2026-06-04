@@ -30,16 +30,16 @@ public enum PayabliPaymentMethodSheetDismissButton: Sendable, Equatable {
 }
 
 public struct PayabliPaymentMethodSheetConfiguration {
-    public var title: String?
-    public var subtitle: String?
-    public var dismissButton: PayabliPaymentMethodSheetDismissButton
-    public var dismissesOnSuccess: Bool
-    public var detents: Set<PresentationDetent>
-    public var dragIndicatorVisibility: Visibility
-    public var contentInsets: EdgeInsets
-    public var movesFormHeaderToSheetHeader: Bool
-    public var sizesToContentWhenPossible: Bool
-    public var expandsToLargeWhenContentDoesNotFit: Bool
+    public let title: String?
+    public let subtitle: String?
+    public let dismissButton: PayabliPaymentMethodSheetDismissButton
+    public let dismissesOnSuccess: Bool
+    public let detents: Set<PresentationDetent>
+    public let dragIndicatorVisibility: Visibility
+    public let contentInsets: EdgeInsets
+    public let movesFormHeaderToSheetHeader: Bool
+    public let sizesToContentWhenPossible: Bool
+    public let expandsToLargeWhenContentDoesNotFit: Bool
 
     public init(
         title: String? = nil,
@@ -150,7 +150,7 @@ struct PayabliPaymentMethodSheetContent: View {
                 .background(
                     GeometryReader { contentProxy in
                         Color.clear.preference(
-                            key: PayabliPaymentMethodSheetContentHeightKey.self,
+                            key: SheetContentHeightKey.self,
                             value: contentProxy.size.height
                         )
                     }
@@ -162,7 +162,7 @@ struct PayabliPaymentMethodSheetContent: View {
             .onChange(of: proxy.size.height) { _ in
                 recordAvailableSheetHeight(from: proxy)
             }
-            .onPreferenceChange(PayabliPaymentMethodSheetContentHeightKey.self) { contentHeight in
+            .onPreferenceChange(SheetContentHeightKey.self) { contentHeight in
                 updateMeasuredContentHeight(contentHeight)
             }
         }
@@ -210,14 +210,14 @@ struct PayabliPaymentMethodSheetContent: View {
             Button {
                 isPresented = false
             } label: {
-                    Image(systemName: systemImageName)
-                        .font(.body.weight(.semibold))
-                        .foregroundStyle(Color(uiColor: .secondaryLabel))
-                        .frame(
-                            width: PayabliPaymentMethodAccessibility.minimumTouchTarget,
-                            height: PayabliPaymentMethodAccessibility.minimumTouchTarget
-                        )
-                        .contentShape(Rectangle())
+                Image(systemName: systemImageName)
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(Color(uiColor: .secondaryLabel))
+                    .frame(
+                        width: PayabliPaymentMethodAccessibility.minimumTouchTarget,
+                        height: PayabliPaymentMethodAccessibility.minimumTouchTarget
+                    )
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .accessibilityLabel(sheetConfiguration.dismissButton.accessibilityLabel)
@@ -247,12 +247,14 @@ struct PayabliPaymentMethodSheetContent: View {
     private var formConfiguration: PayabliPaymentMethodFormConfiguration {
         guard sheetConfiguration.movesFormHeaderToSheetHeader else { return configuration }
 
-        var adjusted = configuration
-        var labels = adjusted.labels
-        labels.title = ""
-        labels.subtitle = nil
-        adjusted.labels = labels
-        return adjusted
+        let labels = PayabliPaymentMethodLabels(
+            title: "",
+            subtitle: nil,
+            submitButton: configuration.labels.submitButton,
+            fieldLabels: configuration.labels.fieldLabels,
+            fieldPlaceholders: configuration.labels.fieldPlaceholders
+        )
+        return configuration.replacingLabels(labels)
     }
 
     private static func initialDetent(
@@ -357,7 +359,7 @@ struct PayabliPaymentMethodSheetContent: View {
     }
 }
 
-private struct PayabliPaymentMethodSheetContentHeightKey: PreferenceKey {
+private struct SheetContentHeightKey: PreferenceKey {
     static let defaultValue: CGFloat = 0
 
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {

@@ -7,13 +7,13 @@ import PayabliSDKCore
 /// the host application's backend. This client intentionally uses a raw
 /// `PayabliTransport` instead of `PayabliSession.transport` because
 /// the payment method component owns the one-off access-token fetch before submit.
-public final class TokenStorageClient: Sendable {
+final class TokenStorageClient: Sendable {
     private let transport: any PayabliTransport
     private let accessTokenProvider: PayabliPaymentMethodAccessTokenProvider
     private let baseURL: URL?
     private let diagnostics: PayabliPaymentMethodDiagnostics
 
-    public init(
+    init(
         transport: any PayabliTransport,
         accessTokenProvider: @escaping PayabliPaymentMethodAccessTokenProvider,
         baseURL: URL? = nil,
@@ -25,7 +25,7 @@ public final class TokenStorageClient: Sendable {
         self.diagnostics = diagnostics
     }
 
-    public func addMethod(
+    func addMethod(
         entryPoint: String,
         paymentMethod: PayabliPaymentMethodInput,
         options: PayabliPaymentMethodOptions = PayabliPaymentMethodOptions()

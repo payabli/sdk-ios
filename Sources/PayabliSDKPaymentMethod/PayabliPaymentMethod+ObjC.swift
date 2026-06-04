@@ -134,6 +134,16 @@ public final class PayabliPaymentMethodObjC: NSObject {
         } else {
             resolvedSecCode = .web
         }
+        let resolvedHolderType: PayabliACHHolderType?
+        if let holderType {
+            guard let holderType = PayabliACHHolderType(rawValue: holderType) else {
+                completion(nil, invalidArgument("holderType must be personal or business"))
+                return
+            }
+            resolvedHolderType = holderType
+        } else {
+            resolvedHolderType = nil
+        }
 
         let ach = PayabliACHPaymentMethodData(
             accountNumber: accountNumber,
@@ -141,7 +151,7 @@ public final class PayabliPaymentMethodObjC: NSObject {
             holderName: holderName,
             routingNumber: routingNumber,
             secCode: resolvedSecCode,
-            holderType: holderType.flatMap(PayabliACHHolderType.init(rawValue:))
+            holderType: resolvedHolderType
         )
         let options = PayabliPaymentMethodOptions(
             achValidation: achValidation,
