@@ -279,39 +279,57 @@ private struct PayInPaymentFlowFailureEnvelope: Decodable {
     }
 
     func failure(httpStatusCode: Int) -> PayabliPayInPaymentFlowFailure {
-        PayabliPayInPaymentFlowFailure(
-            code: code?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty ?? responseData?.resultCode?.payabliCaptureTrimmed
-                .payabliCaptureNilIfEmpty,
-            reason: reason?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty
-                ?? responseData?.resultText?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty
-                ?? title?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty
-                ?? responseText?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty
-                ?? message?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty
-                ?? error?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty,
-            explanation: explanation?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty
-                ?? responseData?.explanation?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty
-                ?? detail?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty
-                ?? responseData?.detail?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty,
-            action: action?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty
-                ?? responseData?.todoAction?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty,
+        let failureCode = Self.firstNonEmpty(code, responseData?.resultCode)
+        let failureReason = Self.firstNonEmpty(
+            reason,
+            responseData?.resultText,
+            title,
+            responseText,
+            message,
+            error
+        )
+        let failureExplanation = Self.firstNonEmpty(
+            explanation,
+            responseData?.explanation,
+            detail,
+            responseData?.detail
+        )
+        let failureAction = Self.firstNonEmpty(action, responseData?.todoAction)
+        let failureDetail = Self.firstNonEmpty(detail, responseData?.detail)
+
+        return PayabliPayInPaymentFlowFailure(
+            code: failureCode,
+            reason: failureReason,
+            explanation: failureExplanation,
+            action: failureAction,
             status: status ?? responseCode,
-            detail: detail?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty
-                ?? responseData?.detail?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty,
+            detail: failureDetail,
             httpStatusCode: httpStatusCode
         )
     }
 
     private var preferredMessage: String? {
-        explanation?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty
-            ?? responseData?.explanation?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty
-            ?? reason?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty
-            ?? responseData?.resultText?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty
-            ?? title?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty
-            ?? detail?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty
-            ?? responseData?.detail?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty
-            ?? responseText?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty
-            ?? message?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty
-            ?? error?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty
+        Self.firstNonEmpty(
+            explanation,
+            responseData?.explanation,
+            reason,
+            responseData?.resultText,
+            title,
+            detail,
+            responseData?.detail,
+            responseText,
+            message,
+            error
+        )
+    }
+
+    private static func firstNonEmpty(_ values: String?...) -> String? {
+        for value in values {
+            if let trimmed = value?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty {
+                return trimmed
+            }
+        }
+        return nil
     }
 }
 
