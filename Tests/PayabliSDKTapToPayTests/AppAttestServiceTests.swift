@@ -137,6 +137,43 @@ final class AppAttestServiceTests: XCTestCase {
         }
     }
 
+    // MARK: - Transactional persistence
+
+    /// A failure partway through attestation (here: `attestKey`) must NOT leave
+    /// a keyId/deviceId in the Keychain. Otherwise `isAlreadyAttested` would
+    /// report `true`, the warm path would skip re-attestation, and
+    /// `generateAssertion` would fail forever on a never-attested key.
+    func testAttestDoesNotPersistIdentityWhenAttestationFails() async throws {
+        StubURLProtocol.handler = { request in
+            switch request.url!.path {
+            case "/api/v2/device/taptopay/challenge":
+                return (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
+                        Self.envelope(responseData: ["challengeId": "c_1", "challenge": "Y2hhbGxlbmdl"]))
+            case "/api/v2/device/taptopay/register":
+                return (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
+                        Self.envelope(responseData: ["deviceId": "dev_1"]))
+            default:
+                XCTFail("attest must not reach \(request.url!.path) once attestKey fails")
+                return (HTTPURLResponse(url: request.url!, statusCode: 500, httpVersion: nil, headerFields: nil)!, Data())
+            }
+        }
+
+        let storage = InMemorySecureStorage()
+        let (sut, attestor, _) = makeAttest(storage: storage)
+        attestor.attestKeyError = NSError(domain: AppAttestService.deviceCheckErrorDomain, code: 2)
+
+        do {
+            _ = try await sut.attest(entry: "myEntry", appId: "x")
+            XCTFail("expected throw")
+        } catch {
+            // expected
+        }
+
+        XCTAssertFalse(sut.isAlreadyAttested)
+        XCTAssertNil(storage.string(forKey: PayabliKeychainKey.keyId))
+        XCTAssertNil(storage.string(forKey: PayabliKeychainKey.deviceId))
+    }
+
     // MARK: - Assertion generation
 
     func testGenerateAssertionProducesHeaders() async throws {
@@ -163,6 +200,47 @@ final class AppAttestServiceTests: XCTestCase {
         } catch {
             XCTFail("wrong error: \(error)")
         }
+    }
+
+    /// A DeviceCheck failure from `generateAssertion` means the cached key is
+    /// unusable (never attested, or the App Attest environment changed). The
+    /// service must clear the cache so the next `initialize()` re-attests.
+    func testGenerateAssertionClearsCacheOnDeviceCheckError() async throws {
+        let storage = InMemorySecureStorage()
+        try storage.set("cached_keyId", forKey: PayabliKeychainKey.keyId)
+        try storage.set("cached_deviceId", forKey: PayabliKeychainKey.deviceId)
+
+        let (sut, attestor, _) = makeAttest(storage: storage)
+        attestor.generateAssertionError = NSError(domain: AppAttestService.deviceCheckErrorDomain, code: 2)
+
+        do {
+            _ = try await sut.generateAssertion()
+            XCTFail("expected throw")
+        } catch {
+            XCTAssertEqual((error as NSError).domain, AppAttestService.deviceCheckErrorDomain)
+        }
+
+        XCTAssertFalse(sut.isAlreadyAttested, "DeviceCheck failure should clear the attestation cache")
+    }
+
+    /// A non-DeviceCheck failure (e.g. a transient wrapper error) must NOT wipe
+    /// a perfectly valid attestation.
+    func testGenerateAssertionKeepsCacheOnNonDeviceCheckError() async throws {
+        let storage = InMemorySecureStorage()
+        try storage.set("cached_keyId", forKey: PayabliKeychainKey.keyId)
+        try storage.set("cached_deviceId", forKey: PayabliKeychainKey.deviceId)
+
+        let (sut, attestor, _) = makeAttest(storage: storage)
+        attestor.generateAssertionError = NSError(domain: "com.example.other", code: 7)
+
+        do {
+            _ = try await sut.generateAssertion()
+            XCTFail("expected throw")
+        } catch {
+            // expected
+        }
+
+        XCTAssertTrue(sut.isAlreadyAttested, "non-DeviceCheck failures must not clear attestation state")
     }
 
     // MARK: - clearCache

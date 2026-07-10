@@ -45,25 +45,49 @@ public final class MockAppAttestor: AppAttestor, @unchecked Sendable {
         lock.withLock { _generateAssertionCalls }
     }
 
+    // Optional error injection: when set, the corresponding call throws instead
+    // of returning its stubbed payload. Used to exercise failure paths (e.g. a
+    // DeviceCheck error from `generateAssertion`).
+    private var _generateKeyError: Error?
+    public var generateKeyError: Error? {
+        get { lock.withLock { _generateKeyError } }
+        set { lock.withLock { _generateKeyError = newValue } }
+    }
+
+    private var _attestKeyError: Error?
+    public var attestKeyError: Error? {
+        get { lock.withLock { _attestKeyError } }
+        set { lock.withLock { _attestKeyError = newValue } }
+    }
+
+    private var _generateAssertionError: Error?
+    public var generateAssertionError: Error? {
+        get { lock.withLock { _generateAssertionError } }
+        set { lock.withLock { _generateAssertionError = newValue } }
+    }
+
     public init() {}
 
     public func generateKey() async throws -> AppAttestKeyId {
-        return lock.withLock {
+        return try lock.withLock {
             _generateKeyCalls += 1
+            if let error = _generateKeyError { throw error }
             return _generatedKeyId
         }
     }
 
     public func attestKey(_ keyId: AppAttestKeyId, clientDataHash: ClientDataHash) async throws -> AttestationObject {
-        return lock.withLock {
+        return try lock.withLock {
             _attestKeyCalls += 1
+            if let error = _attestKeyError { throw error }
             return _attestationPayload
         }
     }
 
     public func generateAssertion(_ keyId: AppAttestKeyId, clientDataHash: ClientDataHash) async throws -> AppAttestAssertion {
-        return lock.withLock {
+        return try lock.withLock {
             _generateAssertionCalls += 1
+            if let error = _generateAssertionError { throw error }
             return _assertionPayload
         }
     }
