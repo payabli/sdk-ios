@@ -107,4 +107,10 @@ public struct KeychainStorage: SecureStorage, Sendable {
 public enum PayabliKeychainKey {
     public static let keyId = "com.payabli.ttp.keyId"
     public static let deviceId = "com.payabli.ttp.deviceId"
+
+    /// Holds a freshly generated App Attest key that has not yet completed
+    /// attestation. Kept separate from `keyId` so a pre-attest retry can reuse
+    /// the same Secure Enclave key without ever tripping `isAlreadyAttested`
+    /// (which only consults `keyId` + `deviceId`).
+    public static let pendingKeyId = "com.payabli.ttp.pendingKeyId"
 }

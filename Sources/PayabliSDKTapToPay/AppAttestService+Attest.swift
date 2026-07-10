@@ -19,16 +19,27 @@ extension AppAttestService {
         // 1. POST /challenge
         let challenge = try await postChallenge(entry: entry)
 
-        // 2. Generate a fresh App Attest key for this attempt.
+        // 2. Resolve the App Attest key for this attempt.
         //
-        //    The keyId is deliberately NOT persisted here. Persisting identity
-        //    before the flow finishes (see step 7) can leave a half-attested
-        //    key in the Keychain: `isAlreadyAttested` would then report `true`,
-        //    the warm path would skip `attest()` on the next launch, and
+        //    The attested `keyId` is deliberately NOT persisted yet. Writing it
+        //    before the flow finishes (step 6) can leave a half-attested key in
+        //    the Keychain: `isAlreadyAttested` would then report `true`, the
+        //    warm path would skip `attest()` on the next launch, and
         //    `generateAssertion()` would fail against Apple with
-        //    `com.apple.devicecheck.error` on a key that was never actually
-        //    attested — with no way to recover short of clearing the Keychain.
-        let keyId = try await attestor.generateKey()
+        //    `com.apple.devicecheck.error` on a key that was never attested.
+        //
+        //    A freshly generated key IS cached in a separate *pending* slot so
+        //    a pre-attest retry (network, `/challenge`, `/register`) can reuse
+        //    the same Secure Enclave key instead of minting a new one every
+        //    attempt. The pending slot is never read by the warm path, so it
+        //    cannot poison assertions.
+        let keyId: AppAttestKeyId
+        if let pendingKeyId = storage.string(forKey: PayabliKeychainKey.pendingKeyId) {
+            keyId = AppAttestKeyId(pendingKeyId)
+        } else {
+            keyId = try await attestor.generateKey()
+            try storage.set(keyId.rawValue, forKey: PayabliKeychainKey.pendingKeyId)
+        }
 
         // 3. POST /register
         let register = try await postRegister(RegisterRequest(
@@ -45,14 +56,19 @@ extension AppAttestService {
             logger.info("Device registered in pending state — completing attestation before prompting for activation code")
         }
 
-        // 4+5. Attest key with SHA256(challenge)
         guard let challengeData = Data(base64Encoded: challenge.challenge) ?? challenge.challenge.data(using: .utf8) else {
             throw PayabliTTPError.attestationFailed(reason: "Could not decode challenge")
         }
+
+        // 4. Attest the key. `attestKey` is single-use per key, so drop the
+        //    pending slot before attesting: a failure here or at `/attest`
+        //    must mint a new key next time rather than replay a burned one.
+        //    Pre-attest failures above keep the pending slot for reuse.
+        storage.remove(forKey: PayabliKeychainKey.pendingKeyId)
         let clientDataHash = ClientDataHash(Data(SHA256.hash(data: challengeData)))
         let attestation = try await attestor.attestKey(keyId, clientDataHash: clientDataHash)
 
-        // 6. POST /attest — required for both Active and Pending devices; it
+        // 5. POST /attest — required for both Active and Pending devices; it
         //    creates the `DeviceAttestations` row that `/activate` verifies.
         try await postAttest(AttestRequest(
             challengeId: challenge.challengeId,
@@ -64,12 +80,18 @@ extension AppAttestService {
             platform: Self.platform
         ))
 
-        // 7. Persist identity ONLY now that the attestation is fully confirmed
-        //    end-to-end. deviceId is written before we surface pending
-        //    activation because `/activate` reads both it and the keyId
-        //    assertion from the Keychain.
-        try storage.set(register.deviceId, forKey: PayabliKeychainKey.deviceId)
-        try storage.set(keyId.rawValue, forKey: PayabliKeychainKey.keyId)
+        // 6. Persist identity only now that attestation is confirmed end-to-end,
+        //    and write it atomically: if either set fails, clear both so we
+        //    never leave a half-written (keyId XOR deviceId) identity behind.
+        //    deviceId lands before we surface pending activation because
+        //    `/activate` reads both it and the keyId assertion from the Keychain.
+        do {
+            try storage.set(register.deviceId, forKey: PayabliKeychainKey.deviceId)
+            try storage.set(keyId.rawValue, forKey: PayabliKeychainKey.keyId)
+        } catch {
+            clearCache()
+            throw error
+        }
 
         if isPending {
             logger.info("Attestation stored — device still pending activation")

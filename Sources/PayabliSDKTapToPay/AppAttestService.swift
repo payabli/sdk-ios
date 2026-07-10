@@ -89,5 +89,6 @@ public final class AppAttestService: DeviceAttestationService, @unchecked Sendab
     public func clearCache() {
         storage.remove(forKey: PayabliKeychainKey.keyId)
         storage.remove(forKey: PayabliKeychainKey.deviceId)
+        storage.remove(forKey: PayabliKeychainKey.pendingKeyId)
     }
 }
