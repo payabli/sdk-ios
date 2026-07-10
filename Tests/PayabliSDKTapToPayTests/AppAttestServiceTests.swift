@@ -137,6 +137,97 @@ final class AppAttestServiceTests: XCTestCase {
         }
     }
 
+    // MARK: - Transactional persistence
+
+    /// A failure partway through attestation (here: `attestKey`) must NOT leave
+    /// a keyId/deviceId in the Keychain. Otherwise `isAlreadyAttested` would
+    /// report `true`, the warm path would skip re-attestation, and
+    /// `generateAssertion` would fail forever on a never-attested key.
+    func testAttestDoesNotPersistIdentityWhenAttestationFails() async throws {
+        StubURLProtocol.handler = { request in
+            switch request.url!.path {
+            case "/api/v2/device/taptopay/challenge":
+                return (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
+                        Self.envelope(responseData: ["challengeId": "c_1", "challenge": "Y2hhbGxlbmdl"]))
+            case "/api/v2/device/taptopay/register":
+                return (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
+                        Self.envelope(responseData: ["deviceId": "dev_1"]))
+            default:
+                XCTFail("attest must not reach \(request.url!.path) once attestKey fails")
+                return (HTTPURLResponse(url: request.url!, statusCode: 500, httpVersion: nil, headerFields: nil)!, Data())
+            }
+        }
+
+        let storage = InMemorySecureStorage()
+        let (sut, attestor, _) = makeAttest(storage: storage)
+        attestor.attestKeyError = NSError(domain: AppAttestService.deviceCheckErrorDomain, code: 2)
+
+        do {
+            _ = try await sut.attest(entry: "myEntry", appId: "x")
+            XCTFail("expected throw")
+        } catch {
+            // expected
+        }
+
+        XCTAssertFalse(sut.isAlreadyAttested)
+        XCTAssertNil(storage.string(forKey: PayabliKeychainKey.keyId))
+        XCTAssertNil(storage.string(forKey: PayabliKeychainKey.deviceId))
+        // `attestKey` burns the key, so the pending slot must be cleared too:
+        // the next attempt must mint a new key rather than replay a burned one.
+        XCTAssertNil(storage.string(forKey: PayabliKeychainKey.pendingKeyId))
+    }
+
+    /// A failure BEFORE `attestKey` (here: `/register`) must keep the freshly
+    /// generated key in the pending slot so the retry reuses it instead of
+    /// minting a new Secure Enclave key on every attempt.
+    func testAttestReusesPendingKeyAcrossPreAttestFailures() async throws {
+        let registerAttempts = CountBox()
+        StubURLProtocol.handler = { request in
+            switch request.url!.path {
+            case "/api/v2/device/taptopay/challenge":
+                return (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
+                        Self.envelope(responseData: ["challengeId": "c_1", "challenge": "Y2hhbGxlbmdl"]))
+            case "/api/v2/device/taptopay/register":
+                // Fail the first /register (pre-attest); succeed the second.
+                if registerAttempts.increment() == 1 {
+                    return (HTTPURLResponse(url: request.url!, statusCode: 500, httpVersion: "HTTP/1.1", headerFields: nil)!, Data())
+                }
+                return (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
+                        Self.envelope(responseData: ["deviceId": "dev_1"]))
+            case "/api/v2/device/taptopay/attest":
+                return (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
+                        Self.envelope(responseData: ["ok": true]))
+            default:
+                XCTFail("unexpected path: \(request.url!.path)")
+                return (HTTPURLResponse(url: request.url!, statusCode: 500, httpVersion: nil, headerFields: nil)!, Data())
+            }
+        }
+
+        let storage = InMemorySecureStorage()
+        let (sut, attestor, _) = makeAttest(storage: storage)
+
+        // Attempt 1 fails at /register (after the key was generated + cached).
+        do {
+            _ = try await sut.attest(entry: "myEntry", appId: "x")
+            XCTFail("expected first attempt to throw")
+        } catch {
+            // expected
+        }
+        XCTAssertEqual(attestor.generateKeyCalls, 1)
+        XCTAssertFalse(sut.isAlreadyAttested)
+        XCTAssertEqual(storage.string(forKey: PayabliKeychainKey.pendingKeyId), "mock_keyId",
+                       "a pre-attest failure must keep the generated key for reuse")
+
+        // Attempt 2 succeeds and must REUSE the pending key — no new generateKey.
+        let result = try await sut.attest(entry: "myEntry", appId: "x")
+        XCTAssertEqual(result.keyId, "mock_keyId")
+        XCTAssertEqual(attestor.generateKeyCalls, 1, "the pending key should be reused, not regenerated")
+        XCTAssertEqual(attestor.attestKeyCalls, 1)
+        XCTAssertTrue(sut.isAlreadyAttested)
+        XCTAssertNil(storage.string(forKey: PayabliKeychainKey.pendingKeyId),
+                     "pending slot must be cleared once attestation completes")
+    }
+
     // MARK: - Assertion generation
 
     func testGenerateAssertionProducesHeaders() async throws {
@@ -165,6 +256,47 @@ final class AppAttestServiceTests: XCTestCase {
         }
     }
 
+    /// A DeviceCheck failure from `generateAssertion` means the cached key is
+    /// unusable (never attested, or the App Attest environment changed). The
+    /// service must clear the cache so the next `initialize()` re-attests.
+    func testGenerateAssertionClearsCacheOnDeviceCheckError() async throws {
+        let storage = InMemorySecureStorage()
+        try storage.set("cached_keyId", forKey: PayabliKeychainKey.keyId)
+        try storage.set("cached_deviceId", forKey: PayabliKeychainKey.deviceId)
+
+        let (sut, attestor, _) = makeAttest(storage: storage)
+        attestor.generateAssertionError = NSError(domain: AppAttestService.deviceCheckErrorDomain, code: 2)
+
+        do {
+            _ = try await sut.generateAssertion()
+            XCTFail("expected throw")
+        } catch {
+            XCTAssertEqual((error as NSError).domain, AppAttestService.deviceCheckErrorDomain)
+        }
+
+        XCTAssertFalse(sut.isAlreadyAttested, "DeviceCheck failure should clear the attestation cache")
+    }
+
+    /// A non-DeviceCheck failure (e.g. a transient wrapper error) must NOT wipe
+    /// a perfectly valid attestation.
+    func testGenerateAssertionKeepsCacheOnNonDeviceCheckError() async throws {
+        let storage = InMemorySecureStorage()
+        try storage.set("cached_keyId", forKey: PayabliKeychainKey.keyId)
+        try storage.set("cached_deviceId", forKey: PayabliKeychainKey.deviceId)
+
+        let (sut, attestor, _) = makeAttest(storage: storage)
+        attestor.generateAssertionError = NSError(domain: "com.example.other", code: 7)
+
+        do {
+            _ = try await sut.generateAssertion()
+            XCTFail("expected throw")
+        } catch {
+            // expected
+        }
+
+        XCTAssertTrue(sut.isAlreadyAttested, "non-DeviceCheck failures must not clear attestation state")
+    }
+
     // MARK: - clearCache
 
     func testClearCacheRemovesKeychainState() async throws {
@@ -189,5 +321,18 @@ private final class PathsBox: @unchecked Sendable {
     func append(_ s: String) {
         lock.lock(); defer { lock.unlock() }
         storage.append(s)
+    }
+}
+
+/// Thread-safe monotonic counter so a stub handler can vary its response by
+/// call ordinal (e.g. fail the first request, succeed the next).
+private final class CountBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var count = 0
+    /// Increments and returns the new value (first call returns 1).
+    func increment() -> Int {
+        lock.lock(); defer { lock.unlock() }
+        count += 1
+        return count
     }
 }
