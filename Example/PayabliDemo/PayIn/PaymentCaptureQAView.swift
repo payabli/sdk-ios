@@ -4,12 +4,13 @@ import PayabliSDKPayInPaymentFlow
 import SwiftUI
 
 struct PaymentCaptureQAView: View {
-    let paymentFlow: PayabliPayInPaymentFlow
+    @ObservedObject var paymentFlow: PayabliPayInPaymentFlow
 
     @StateObject private var diagnosticsStore = DiagnosticsStore.paymentCapture
     @State private var resultText = ""
     @State private var tokenCheckText = ""
     @State private var resultAcknowledged = false
+    @State private var submitFailed = false
     @State private var isCheckingToken = false
     @State private var capturedResult: PayabliPayInPaymentFlowResult?
     @State private var isPaymentCaptureSheetPresented = false
@@ -82,7 +83,7 @@ struct PaymentCaptureQAView: View {
                         VStack(alignment: .leading, spacing: 10) {
                             Text(resultText.isEmpty ? "Nothing captured yet." : resultText)
                                 .font(.footnote)
-                                .foregroundColor(resultText.hasPrefix("✗") ? .payabliError : .payabliOnSurfaceVariant)
+                                .foregroundColor(submitFailed ? .payabliError : .payabliOnSurfaceVariant)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .textSelection(.enabled)
 
@@ -149,7 +150,9 @@ struct PaymentCaptureQAView: View {
     /// Hands the flow back to step 2 for another entry.
     private func startAnother() {
         resultAcknowledged = true
+        submitFailed = false
         resultText = ""
+        paymentFlow.configure(requestConfiguration: Self.freshRequestConfiguration())
     }
 
     private var tokenStepStatus: QAStepStatus {
@@ -162,13 +165,36 @@ struct PaymentCaptureQAView: View {
         // competing with step 1 for attention.
         guard backendProven else { return .blocked }
         if paymentFlow.isSubmitting { return .inProgress }
-        if resultText.hasPrefix("✗") { return .failed }
+        if submitFailed { return .failed }
         return showingFinishedResult ? .done : .current
     }
 
     private var resultStepStatus: QAStepStatus {
-        if resultText.hasPrefix("✗") { return .failed }
+        // A failure belongs to the step that produced it. Marking this one failed
+        // too would give the sequence two actionable failures.
+        if submitFailed { return .blocked }
         return showingFinishedResult ? .current : .blocked
+    }
+
+    /// A capture's request configuration, with a key minted per submission.
+    ///
+    /// The app builds one of these at launch for the initial submit. Reusing that
+    /// key for a second capture would send two distinct payments under one
+    /// idempotency key, which the API may deduplicate or reject.
+    static func freshRequestConfiguration() -> PayabliPayInPaymentFlowRequestConfiguration {
+        PayabliPayInPaymentFlowRequestConfiguration(
+            paymentDetails: PayabliPayInPaymentFlowPaymentDetails(
+                totalAmount: 1,
+                serviceFee: 0.10,
+                currency: "USD"
+            ),
+            orderDescription: "Payment Capture QA",
+            orderId: "ios-payment-capture-qa",
+            source: "ios-payment-capture-qa",
+            idempotencyKey: UUID().uuidString,
+            achValidation: true,
+            forceCustomerCreation: true
+        )
     }
 
     /// Reports only that a token arrived. Never the token itself.
@@ -178,7 +204,7 @@ struct PaymentCaptureQAView: View {
         Task {
             defer { isCheckingToken = false }
             do {
-                _ = try await Secrets.fetchPaymentMethodAccessToken()
+                _ = try await Secrets.fetchPaymentCaptureAccessToken()
                 tokenCheckText = "✓ Token endpoint returned a token"
             } catch {
                 tokenCheckText = "✗ \(error.localizedDescription)"
@@ -188,21 +214,10 @@ struct PaymentCaptureQAView: View {
 
     private var configuration: PayabliPayInPaymentFlowFormConfiguration {
         PayabliPayInPaymentFlowFormConfiguration(
-            allowedMethods: [.card, .ach],
-            defaultMethod: .card,
-            cardFieldOrder: [
-                .cardholderName,
-                .cardNumber,
-                .cardExpiration,
-                .cardCvv,
-                .cardZip
-            ],
-            achFieldOrder: [
-                .achHolder,
-                .achRouting,
-                .achAccount,
-                .achAccountType
-            ],
+            allowedMethods: PayInSharedConfiguration.allowedMethods,
+            defaultMethod: PayInSharedConfiguration.defaultMethod,
+            cardFieldOrder: PayInSharedConfiguration.cardFieldOrder,
+            achFieldOrder: PayInSharedConfiguration.achFieldOrder,
             cardSections: [
                 PayabliPayInPaymentFlowFieldSection(
                     title: "Card Information",
@@ -291,21 +306,12 @@ struct PaymentCaptureQAView: View {
                 submitButton: "Submit Payment",
                 fieldPlaceholders: labelMatchingPlaceholders(for: fieldsWithHiddenLabels)
             ),
-            labelLayout: .external,
-            showsFieldLabels: true,
+            labelLayout: PayInSharedConfiguration.labelLayout,
+            showsFieldLabels: PayInSharedConfiguration.showsFieldLabels,
             hiddenFieldLabels: Set(fieldsWithHiddenLabels),
-            formatting: PayabliPayInPaymentFlowFormatting(
-                insertsCardNumberSpaces: true,
-                masksACHAccountEntry: true
-            ),
-            inputSizing: PayabliPayInPaymentFlowInputSizing(
-                defaultSize: PayabliPayInPaymentFlowInputSize(height: 52),
-                fieldSizes: [
-                    .cardExpiration: PayabliPayInPaymentFlowInputSize(height: 48),
-                    .cardCvv: PayabliPayInPaymentFlowInputSize(height: 48)
-                ]
-            ),
-            cardBrandIconPlacement: .trailing,
+            formatting: PayInSharedConfiguration.formatting,
+            inputSizing: PayInSharedConfiguration.inputSizing,
+            cardBrandIconPlacement: PayInSharedConfiguration.cardBrandIconPlacement,
             paymentSummary: PayabliPayInPaymentFlowPaymentSummaryConfiguration(
                 labelStyle: PayabliPayInPaymentFlowPaymentSummaryTextStyle(
                     font: .subheadline,
@@ -334,6 +340,7 @@ struct PaymentCaptureQAView: View {
 
     private func handlePaymentCaptured(_ result: PayabliPayInPaymentFlowResult) {
         resultAcknowledged = false
+        submitFailed = false
         capturedResult = result
         resultText = [
             "Code: \(result.code)",
@@ -359,6 +366,7 @@ struct PaymentCaptureQAView: View {
     }
 
     private func handleError(_ error: Error) {
+        submitFailed = true
         let message = paymentCaptureErrorMessage(error)
         resultText = "Payment capture failed: \(message)"
         Logger(

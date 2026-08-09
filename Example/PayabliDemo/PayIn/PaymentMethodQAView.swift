@@ -4,12 +4,13 @@ import PayabliSDKPayInPaymentFlow
 import SwiftUI
 
 struct PaymentMethodQAView: View {
-    let paymentFlow: PayabliPayInPaymentFlow
+    @ObservedObject var paymentFlow: PayabliPayInPaymentFlow
 
     @StateObject private var diagnosticsStore = DiagnosticsStore.paymentMethod
     @State private var resultText = ""
     @State private var tokenCheckText = ""
     @State private var resultAcknowledged = false
+    @State private var submitFailed = false
     @State private var isCheckingToken = false
     @State private var isPaymentMethodAddedViewPresented = false
     @State private var isPaymentMethodSheetPresented = false
@@ -81,7 +82,7 @@ struct PaymentMethodQAView: View {
                         VStack(alignment: .leading, spacing: 10) {
                             Text(resultText.isEmpty ? "Nothing stored yet." : resultText)
                                 .font(.footnote)
-                                .foregroundColor(resultText.hasPrefix("✗") ? .payabliError : .payabliOnSurfaceVariant)
+                                .foregroundColor(submitFailed ? .payabliError : .payabliOnSurfaceVariant)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .textSelection(.enabled)
 
@@ -146,6 +147,7 @@ struct PaymentMethodQAView: View {
     /// Hands the flow back to step 2 for another entry.
     private func startAnother() {
         resultAcknowledged = true
+        submitFailed = false
         resultText = ""
     }
 
@@ -159,12 +161,14 @@ struct PaymentMethodQAView: View {
         // competing with step 1 for attention.
         guard backendProven else { return .blocked }
         if paymentFlow.isSubmitting { return .inProgress }
-        if resultText.hasPrefix("✗") { return .failed }
+        if submitFailed { return .failed }
         return showingFinishedResult ? .done : .current
     }
 
     private var resultStepStatus: QAStepStatus {
-        if resultText.hasPrefix("✗") { return .failed }
+        // A failure belongs to the step that produced it. Marking this one failed
+        // too would give the sequence two actionable failures.
+        if submitFailed { return .blocked }
         return showingFinishedResult ? .current : .blocked
     }
 
@@ -185,21 +189,10 @@ struct PaymentMethodQAView: View {
 
     private var configuration: PayabliPayInPaymentFlowFormConfiguration {
         PayabliPayInPaymentFlowFormConfiguration(
-            allowedMethods: [.card, .ach],
-            defaultMethod: .card,
-            cardFieldOrder: [
-                .cardholderName,
-                .cardNumber,
-                .cardExpiration,
-                .cardCvv,
-                .cardZip
-            ],
-            achFieldOrder: [
-                .achHolder,
-                .achRouting,
-                .achAccount,
-                .achAccountType
-            ],
+            allowedMethods: PayInSharedConfiguration.allowedMethods,
+            defaultMethod: PayInSharedConfiguration.defaultMethod,
+            cardFieldOrder: PayInSharedConfiguration.cardFieldOrder,
+            achFieldOrder: PayInSharedConfiguration.achFieldOrder,
             cardSections: [
                 PayabliPayInPaymentFlowFieldSection(
                     title: "Card Information",
@@ -272,21 +265,12 @@ struct PaymentMethodQAView: View {
                 subtitle: "Create a card or ACH token.",
                 fieldPlaceholders: labelMatchingPlaceholders(for: fieldsWithHiddenLabels)
             ),
-            labelLayout: .external,
-            showsFieldLabels: true,
+            labelLayout: PayInSharedConfiguration.labelLayout,
+            showsFieldLabels: PayInSharedConfiguration.showsFieldLabels,
             hiddenFieldLabels: Set(fieldsWithHiddenLabels),
-            formatting: PayabliPayInPaymentFlowFormatting(
-                insertsCardNumberSpaces: true,
-                masksACHAccountEntry: true
-            ),
-            inputSizing: PayabliPayInPaymentFlowInputSizing(
-                defaultSize: PayabliPayInPaymentFlowInputSize(height: 52),
-                fieldSizes: [
-                    .cardExpiration: PayabliPayInPaymentFlowInputSize(height: 48),
-                    .cardCvv: PayabliPayInPaymentFlowInputSize(height: 48)
-                ]
-            ),
-            cardBrandIconPlacement: .trailing
+            formatting: PayInSharedConfiguration.formatting,
+            inputSizing: PayInSharedConfiguration.inputSizing,
+            cardBrandIconPlacement: PayInSharedConfiguration.cardBrandIconPlacement
         )
     }
 
@@ -304,6 +288,7 @@ struct PaymentMethodQAView: View {
 
     private func handlePaymentMethodAdded(_ result: PayabliPayInPaymentFlowResult) {
         resultAcknowledged = false
+        submitFailed = false
         guard let method = result.storedPaymentMethod else {
             resultText = "Payment method response did not include a stored method."
             return
@@ -330,6 +315,7 @@ struct PaymentMethodQAView: View {
     }
 
     private func handleError(_ error: Error) {
+        submitFailed = true
         resultText = "Payment method failed: \(error.localizedDescription)"
         Logger(
             subsystem: "com.payabli.example.app",
