@@ -1,8 +1,11 @@
 # CLAUDE.md
 
-This file provides guidance to LLM-based coding agents when working with code in this repository.
-Cross-platform rules, the design authority, and the Android sibling's contract live in
-`../mobile_sdk_agent/CLAUDE.md`. Read it before changing anything on the public surface.
+Guidance for LLM-based coding agents working in this repository.
+
+The public surface is a shared contract with the Payabli SDK for Android: the same integration
+experience, the same state model, the same error taxonomy. Changing any of them here is a change to
+both, so treat a surface change as a coordinated one and say what the counterpart does, rather than
+landing it on one platform and calling it done.
 
 ## Simulator Setup
 
@@ -113,8 +116,13 @@ channel, so an app that never accepts card-present never links the certified car
 - Guard new TapToPay code with `#if canImport(PayabliCardReaderCore)` or `#if os(iOS)` even though the
   package is iOS-only today.
 - Platform-native only: `URLSession`, CryptoKit and the Secure Enclave, `Codable`. No third-party HTTP
-  client, crypto engine, DI framework, reflection-based JSON mapper or logging framework. The one
-  permitted exception is the instrument-data JWE (see `../mobile_sdk_agent/CLAUDE.md`).
+  client, crypto engine, DI framework, reflection-based JSON mapper or logging framework. Sign JWS,
+  JWT and DPoP proofs on platform primitives rather than pulling in a JOSE library; the only subtlety
+  is DER to raw R||S, which is a small unit-tested helper. The one permitted exception is a reviewed
+  JOSE library for the **instrument-data JWE only**, isolated behind an interface and linked from the
+  instrument-data module alone. Adding anything else requires a capability platform-native code
+  cannot reasonably provide, and a benefit that outweighs the maintenance, audit and certification
+  cost. If the risk removed cannot be named, the answer is no.
 
 ### Key Files and Directories
 

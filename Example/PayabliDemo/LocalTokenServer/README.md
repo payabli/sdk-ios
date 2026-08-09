@@ -233,7 +233,7 @@ the operator; the SDK never requests one, and neither should an app.
 Set the entrypoint once:
 
 ```bash
-PAYABLI_ENTRY=entry3715
+PAYABLI_ENTRY=your-entrypoint
 ```
 
 List the Tap to Pay devices on it, newest first. Only `pending` devices can be
@@ -244,7 +244,7 @@ curl http://127.0.0.1:8787/payabli/devices
 ```
 
 ```json
-{ "entry": "entry3715",
+{ "entry": "your-entrypoint",
   "devices": [
     { "deviceId": "5c8a744e-...", "status": "active",  "model": "iPhone18,1", "createdAt": "..." },
     { "deviceId": "4da924ef-...", "status": "pending", "model": "iPhone18,1", "createdAt": "..." }
@@ -260,9 +260,9 @@ curl -X POST http://127.0.0.1:8787/payabli/activation-code \
 ```
 
 ```json
-{ "entry": "entry3715", "deviceId": "4da924ef-...",
+{ "entry": "your-entrypoint", "deviceId": "4da924ef-...",
   "resolvedFrom": "request",
-  "code": "046192", "expiresAt": "...", "alreadyIssued": false }
+  "code": "123456", "expiresAt": "...", "alreadyIssued": false }
 ```
 
 Pass the `deviceId`. It is the only field that identifies a single device.
@@ -302,7 +302,7 @@ can request one and how it reaches the user.
 | `GET \| POST /payabli/access-token` | `{ "accessToken": "..." }` |
 | `POST /payabli/exchange-token` | `{ "accessToken": "...", "upstreamStatus": 200, "source": "credential-exchange" }` |
 | `GET \| POST /payabli/devices` | `{ "entry": "...", "devices": [ … ] }` |
-| `POST /payabli/activation-code` | `{ "code": "046192", "expiresAt": "...", "alreadyIssued": false, … }` |
+| `POST /payabli/activation-code` | `{ "code": "123456", "expiresAt": "...", "alreadyIssued": false, … }` |
 
 The token shape is what the app's access-token callbacks expect. The two device
 endpoints exist so device setup can be scripted; a production backend decides
