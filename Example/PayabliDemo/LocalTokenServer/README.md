@@ -285,7 +285,7 @@ Device listing uses `/Cloud/list`. `/Device/list` omits pending devices.
 Activation code behavior:
 
 - 6 digits, zero-padded. Keep it a string.
-- Expires in 30 minutes. 5 failed attempts discards it server-side.
+- Expires in 30 minutes. 5 failed attempts discard it server-side.
 - Idempotent within the validity window: an unexpired code is returned again
   with `alreadyIssued: true` rather than reissued, so a resend is a repeat call.
 - A device that is already active returns
