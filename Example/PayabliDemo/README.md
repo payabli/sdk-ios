@@ -22,6 +22,23 @@ and includes a card/ACH PayIn payment flow sample.
   render stored-method and capture forms, hide optional values, apply a custom
   style, and return token-storage or MoneyIn API responses.
 
+## Screens
+
+Four tabs. Every payment tab is a short numbered sequence whose statuses come from
+what the SDK publishes, so the screen cannot disagree with the session it describes.
+
+| Save | Capture |
+|---|---|
+| ![Save](Screenshots/save.png) | ![Capture](Screenshots/capture.png) |
+
+| TapToPay | Config |
+|---|---|
+| ![TapToPay](Screenshots/taptopay.png) | ![Config](Screenshots/config.png) |
+
+The TapToPay shot is a Simulator run, which is why readiness reports **Terminal Not
+Available**: a Simulator cannot attest or read a card. On a device with the
+entitlement it collapses to a single green line and the steps take over.
+
 ## Setup
 
 1. Open `PayabliDemo.xcodeproj`.
