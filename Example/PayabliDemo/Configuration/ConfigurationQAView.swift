@@ -66,9 +66,21 @@ struct ConfigurationQAView: View {
     // MARK: - Token endpoint
 
     private var tokenEndpointSection: some View {
-        section("Token endpoint", note: "Resolved per run — see `DemoConfiguration.TokenServer`.") {
+        section("Token endpoint", note: "The endpoints the app actually calls, per capability.") {
+            // Read from `Secrets` rather than from the local resolver. The two are
+            // separate settings that only happen to share a value in this sample,
+            // so showing the resolver would diagnose a URL the app never calls on
+            // any build that points either endpoint at a real partner backend.
             QADetailRow(
-                label: "URL",
+                label: "Card-present",
+                value: Secrets.partnerTokenEndpoint.absoluteString
+            )
+            QADetailRow(
+                label: "Card-not-present",
+                value: Secrets.partnerPaymentMethodAccessTokenEndpoint.absoluteString
+            )
+            QADetailRow(
+                label: "Local server",
                 value: DemoConfiguration.TokenServer.accessTokenURL.absoluteString
             )
             QADetailRow(label: "Resolved by", value: DemoConfiguration.TokenServer.explanation)
