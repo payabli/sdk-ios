@@ -18,23 +18,24 @@ struct PaymentTapToPayQAView: View {
 
     @State private var amountText = "1.00"
     @State private var activationCode = ""
-    @State private var resultText = ""
+    @State private var enableMessage = ""
+    @State private var activationMessage = ""
+    @State private var chargeMessage = ""
     @State private var tokenCheckText = ""
     @State private var eventLog: [TapToPayQAEventEntry] = []
     @State private var eventToken: PayabliTTPEventToken?
     @State private var isActivationPresented = false
+    @State private var isActivationHelpPresented = false
     @State private var isWorking = false
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
-                    configurationSection
+                    QAContextLine()
                     TerminalReadinessView(configuredAppId: Secrets.appId)
-                    enableTerminalButton
-                    saleSection
-                    activationSection
-                    resultSection
+                    stepsSection
+                    recoverySection
                     eventLogSection
                 }
                 .padding(16)
@@ -50,143 +51,169 @@ struct PaymentTapToPayQAView: View {
         }
     }
 
-    // MARK: - Configuration
+    // MARK: - The sequence
 
-    private var configurationSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Terminal configuration")
+    /// The order the SDK enforces, made visible. Every status is derived from
+    /// `sessionState` rather than tracked separately, so the screen cannot
+    /// disagree with the session it is describing.
+    private var stepsSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Steps")
                 .font(.headline)
 
-            Text("What the SDK needs before it can initialize. Edit these in `Secrets.swift`.")
-                .font(.caption)
-                .foregroundColor(.payabliOnSurfaceVariant)
-
-            QADetailRow(
-                label: "Entry point",
-                value: Secrets.entryPoint,
-                problem: Secrets.entryPoint.isEmpty ? "Empty — /config is keyed by entry point." : nil
-            )
-            QADetailRow(
-                label: "App ID",
-                value: Secrets.appId,
-                problem: nil
-            )
-            QADetailRow(
-                label: "Environment",
-                value: "\(environmentName) · "
-                    + (DemoConfiguration.environment.baseURL.host ?? "—"),
-                problem: nil
-            )
-            QADetailRow(
-                label: "Token endpoint",
-                value: Secrets.partnerTokenEndpoint.absoluteString
-                    + "\n(\(DemoConfiguration.TokenServer.explanation))",
-                problem: nil
-            )
-
-            Button {
-                runTokenCheck()
-            } label: {
-                Label("Check token endpoint", systemImage: "key.horizontal")
+            QAStepRow(
+                index: 1,
+                title: "Reach the token backend",
+                detail: "The SDK calls your backend for a fresh access token whenever it needs one.",
+                status: tokenStepStatus
+            ) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Button { runTokenCheck() } label: {
+                        Label("Check token endpoint", systemImage: "key.horizontal")
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(isWorking)
+                    if !tokenCheckText.isEmpty {
+                        Text(tokenCheckText)
+                            .font(.caption)
+                            .foregroundColor(.payabliOnSurfaceVariant)
+                    }
+                }
             }
-            .buttonStyle(.bordered)
-            .disabled(isWorking)
 
-            if !tokenCheckText.isEmpty {
-                Text(tokenCheckText)
+            QAStepRow(
+                index: 2,
+                title: "Enable the terminal",
+                detail: "Attests the device, fetches the merchant config, and prepares the reader.",
+                status: enableStepStatus
+            ) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Button { runEnableTerminal() } label: {
+                        Label("Enable Terminal", systemImage: "wave.3.right")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(isWorking)
+                    stepOutcome(enableMessage)
+                }
+            }
+
+            QAStepRow(
+                index: 3,
+                title: "Activate the device",
+                detail: activationDetail,
+                status: activationStepStatus
+            ) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Button { isActivationPresented = true } label: {
+                        Label("Enter activation code", systemImage: "checkmark.shield")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(isWorking)
+                    stepOutcome(activationMessage)
+                }
+            }
+
+            QAStepRow(
+                index: 4,
+                title: "Charge a card",
+                detail: "Presents Apple's Tap to Pay sheet. Hold a card to the top of the phone.",
+                status: chargeStepStatus
+            ) {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Text("$")
+                        TextField("Amount", text: $amountText)
+                            .keyboardType(.decimalPad)
+                            .textFieldStyle(.roundedBorder)
+                    }
+                    Button { runCharge() } label: {
+                        Label("Charge (tap card)", systemImage: "creditcard.and.123")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(isWorking)
+                    stepOutcome(chargeMessage)
+                }
+            }
+        }
+    }
+
+    /// Recovery is not part of the sequence, so it only appears when the session
+    /// is in a state it can actually repair.
+    @ViewBuilder
+    private var recoverySection: some View {
+        if isRecoverable {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Recovery")
+                    .font(.headline)
+                Text("The session expired or errored. This re-runs config and reader setup without a fresh attestation.")
                     .font(.caption)
                     .foregroundColor(.payabliOnSurfaceVariant)
+                Button { runReinitialize() } label: {
+                    Label("Re-initialize", systemImage: "arrow.clockwise")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .disabled(isWorking)
             }
+            .padding(12)
+            .background(Color.payabliSurfaceContainer)
+            .clipShape(RoundedRectangle(cornerRadius: 10))
         }
     }
 
-    /// `PayabliEnvironment` is an `@objc Int` enum, so string interpolation prints
-    /// `PayabliEnvironment(rawValue: 1)` rather than the case name.
-    private var environmentName: String {
-        switch DemoConfiguration.environment {
-        case .qa: return "qa"
-        case .sandbox: return "sandbox"
-        case .production: return "production"
-        default: return "other"
+    // MARK: - Step status, derived from the session
+
+    /// True once the backend is known reachable — either because the check was
+    /// run here, or because the SDK already fetched a token to get past `idle`.
+    private var backendProven: Bool {
+        if tokenCheckText.hasPrefix("✓") { return true }
+        return terminal.sessionState != .idle
+    }
+
+    private var tokenStepStatus: QAStepStatus {
+        if tokenCheckText.hasPrefix("✗") { return .failed }
+        return backendProven ? .done : .current
+    }
+
+    private var enableStepStatus: QAStepStatus {
+        // Exactly one step is ever `.current`, so this stays blocked until the
+        // backend is proven rather than competing with step 1 for attention.
+        guard backendProven else { return .blocked }
+        switch terminal.sessionState {
+        case .ready: return .done
+        case .attestingDevice, .fetchingConfig, .initializingReader, .reinitializing: return .inProgress
+        case .pendingActivation: return .done
+        case .error, .sessionExpired: return .failed
+        case .idle: return .current
+        @unknown default: return .current
         }
     }
 
-
-    // MARK: - Readiness
-
-    // MARK: - Lifecycle
-
-    private var enableTerminalButton: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Button {
-                runEnableTerminal()
-            } label: {
-                Label(
-                    terminal.isReady ? "Terminal enabled" : "Enable Terminal",
-                    systemImage: terminal.isReady ? "checkmark.seal.fill" : "wave.3.right"
-                )
-                .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.borderedProminent)
-            .disabled(isWorking || terminal.isReady)
-
-            Button {
-                runReinitialize()
-            } label: {
-                Label("Re-initialize if needed", systemImage: "arrow.clockwise")
-                    .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.bordered)
-            .disabled(isWorking)
+    private var activationStepStatus: QAStepStatus {
+        switch terminal.sessionState {
+        case .pendingActivation: return .current
+        case .ready: return .notNeeded
+        default: return .blocked
         }
     }
 
-    private var saleSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Sale")
-                .font(.headline)
-
-            HStack {
-                Text("$")
-                TextField("Amount", text: $amountText)
-                    .keyboardType(.decimalPad)
-                    .textFieldStyle(.roundedBorder)
-            }
-
-            Button {
-                runCharge()
-            } label: {
-                Label("Charge (tap card)", systemImage: "creditcard.and.123")
-                    .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.borderedProminent)
-            .disabled(isWorking || !terminal.isReady)
-
-            if !terminal.isReady {
-                Text("Enable the terminal first — charging needs a prepared reader.")
-                    .font(.caption)
-                    .foregroundColor(.payabliOnSurfaceVariant)
-            }
-        }
+    private var activationDetail: String {
+        return terminal.sessionState == .pendingActivation
+            ? "Activate the device with the code provided by the Paypoint Device Management dashboard."
+            : "Only when the backend registers the device as pending."
     }
 
-    private var activationSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Activation")
-                .font(.headline)
+    private var chargeStepStatus: QAStepStatus {
+        terminal.isReady ? .current : .blocked
+    }
 
-            Button {
-                isActivationPresented = true
-            } label: {
-                Label("Activate device…", systemImage: "checkmark.shield")
-                    .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.bordered)
-            .disabled(isWorking)
-
-            Text("Needed when the session reports `pendingActivation`. The code comes from Payabli ops.")
-                .font(.caption)
-                .foregroundColor(.payabliOnSurfaceVariant)
+    private var isRecoverable: Bool {
+        switch terminal.sessionState {
+        case .sessionExpired, .error: return true
+        default: return false
         }
     }
 
@@ -194,9 +221,17 @@ struct PaymentTapToPayQAView: View {
         NavigationStack {
             Form {
                 Section("Activation code") {
-                    TextField("Code from Payabli ops", text: $activationCode)
-                        .textInputAutocapitalization(.characters)
+                    TextField("6 digits", text: $activationCode)
+                        .keyboardType(.numberPad)
                         .autocorrectionDisabled()
+                }
+
+                Section {
+                    Text("Provided by the Paypoint Device Management dashboard.")
+                        .font(.caption)
+                        .foregroundColor(.payabliOnSurfaceVariant)
+                    Button("Where do I get a code?") { isActivationHelpPresented = true }
+                        .font(.caption)
                 }
                 Button("Activate") {
                     isActivationPresented = false
@@ -205,6 +240,7 @@ struct PaymentTapToPayQAView: View {
                 .disabled(activationCode.isEmpty)
             }
             .navigationTitle("Activate device")
+            .sheet(isPresented: $isActivationHelpPresented) { activationHelpSheet }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { isActivationPresented = false }
@@ -213,22 +249,88 @@ struct PaymentTapToPayQAView: View {
         }
     }
 
-    // MARK: - Output
-
-    private var resultSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Last result")
-                .font(.headline)
-
-            Text(resultText.isEmpty ? "No Tap to Pay result yet" : resultText)
-                .font(.footnote)
-                .foregroundColor(.payabliOnSurfaceVariant)
+    /// A step's own result, in the step. Previously every outcome went to one
+    /// shared box at the bottom, so a failure said "failed" here and explained
+    /// itself somewhere else.
+    @ViewBuilder
+    private func stepOutcome(_ message: String) -> some View {
+        if !message.isEmpty {
+            Text(message)
+                .font(.caption)
+                .foregroundColor(message.hasPrefix("✗") ? .payabliError : .payabliOnSurfaceVariant)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(12)
-                .background(Color.payabliSurfaceContainer)
-                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .textSelection(.enabled)
         }
     }
+
+    /// Longer than a caption, so it gets its own sheet rather than crowding the
+    /// form. The self-service route is deliberately a pointer, not a recipe —
+    /// the commands live with the server they belong to.
+    ///
+    /// Each paragraph is a single-line literal. A multi-line literal with `\`
+    /// continuations keeps the indentation of every continued line as real
+    /// spaces, which renders as gaps in the middle of sentences.
+    private var activationHelpSheet: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    helpSection(
+                        "From the dashboard",
+                        [
+                            "Payabli paypoint portal → **Device Management** → find this device → options → **Activate device**.",
+                            "The code is issued server-side against this device id, and is never generated on the phone."
+                        ]
+                    )
+
+                    Divider()
+
+                    helpSection(
+                        "Self-service, for local QA",
+                        [
+                            "The bundled token server can list devices and request a code for one.",
+                            "See `LocalTokenServer/README.md`, section “Tap to Pay Device Activation”, for the endpoints and what they return."
+                        ]
+                    )
+
+                    Divider()
+
+                    helpSection(
+                        "Additional constraints",
+                        [
+                            "Six digits, zero-padded. A leading zero matters, so keep it as text.",
+                            "Valid for 30 minutes. Five wrong attempts discard it and a new one must be issued.",
+                            "Requesting again inside the window returns the same code rather than a new one."
+                        ]
+                    )
+                }
+                .padding(20)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .navigationTitle("Getting a code")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { isActivationHelpPresented = false }
+                }
+            }
+        }
+    }
+
+    private func helpSection(_ title: String, _ paragraphs: [LocalizedStringKey]) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .font(.headline)
+            ForEach(Array(paragraphs.enumerated()), id: \.offset) { _, paragraph in
+                Text(paragraph)
+                    .font(.callout)
+                    .foregroundColor(.payabliOnSurface)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+    }
+
+    // MARK: - Output
 
     private var eventLogSection: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -285,9 +387,9 @@ struct PaymentTapToPayQAView: View {
             defer { isWorking = false }
             do {
                 try await terminal.initialize()
-                resultText = "✓ Terminal enabled — reader ready"
+                enableMessage = "✓ Reader ready"
             } catch {
-                resultText = "✗ Enable Terminal failed: \(error.localizedDescription)"
+                enableMessage = "✗ \(error.localizedDescription)"
             }
         }
     }
@@ -298,16 +400,16 @@ struct PaymentTapToPayQAView: View {
             defer { isWorking = false }
             do {
                 try await terminal.reinitializeIfNeeded()
-                resultText = "✓ Re-initialized (or already ready)"
+                enableMessage = "✓ Re-initialized"
             } catch {
-                resultText = "✗ Re-initialize failed: \(error.localizedDescription)"
+                enableMessage = "✗ \(error.localizedDescription)"
             }
         }
     }
 
     private func runCharge() {
         guard let amount = Decimal(string: amountText), amount > 0 else {
-            resultText = "✗ Enter an amount greater than zero"
+            chargeMessage = "✗ Enter an amount greater than zero"
             return
         }
         isWorking = true
@@ -319,9 +421,9 @@ struct PaymentTapToPayQAView: View {
                     paymentDetails: PayabliTTPPaymentDetails(amount: amount),
                     orderDescription: "Tap to Pay QA"
                 )
-                resultText = "✓ Charged · txn \(result.paymentTransId)"
+                chargeMessage = "✓ Charged · txn \(result.paymentTransId)"
             } catch {
-                resultText = "✗ Charge failed: \(error.localizedDescription)"
+                chargeMessage = "✗ \(error.localizedDescription)"
             }
         }
     }
@@ -334,9 +436,15 @@ struct PaymentTapToPayQAView: View {
             defer { isWorking = false }
             do {
                 try await terminal.activateDevice(activationCode: code)
-                resultText = "✓ Device activated"
+                // Activation leaves the session `.idle`, not `.ready` — the
+                // device is approved but nothing has been set up yet. Re-running
+                // initialize here is what the SDK expects, and it keeps the
+                // sequence moving forward instead of dropping back a step.
+                activationMessage = "✓ Activated — enabling the terminal"
+                try await terminal.initialize()
+                activationMessage = "✓ Activated and terminal enabled"
             } catch {
-                resultText = "✗ Activation failed: \(error.localizedDescription)"
+                activationMessage = "✗ \(error.localizedDescription)"
             }
         }
     }

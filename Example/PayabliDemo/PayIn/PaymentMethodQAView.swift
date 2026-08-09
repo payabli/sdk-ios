@@ -8,6 +8,9 @@ struct PaymentMethodQAView: View {
 
     @StateObject private var diagnosticsStore = DiagnosticsStore.paymentMethod
     @State private var resultText = ""
+    @State private var tokenCheckText = ""
+    @State private var resultAcknowledged = false
+    @State private var isCheckingToken = false
     @State private var isPaymentMethodAddedViewPresented = false
     @State private var isPaymentMethodSheetPresented = false
 
@@ -15,42 +18,86 @@ struct PaymentMethodQAView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
-                    Button {
-                        isPaymentMethodSheetPresented = true
-                    } label: {
-                        Label("Open sheet experience", systemImage: "rectangle.bottomthird.inset.filled")
-                            .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.borderedProminent)
+                    QAContextLine()
 
-                    #if DEBUG
-                    DebugPrefillButton()
-                    #endif
-
-                    Text("Inline experience")
+                    Text("Steps")
                         .font(.headline)
 
-                    PayabliPayInPaymentFlowView(
-                        component: paymentFlow,
-                        configuration: configuration,
-                        onCompleted: handlePaymentMethodAdded,
-                        onError: handleError
-                    )
-                    .payabliPayInPaymentFlowStyle(style)
+                    QAStepRow(
+                        index: 1,
+                        title: "Reach the token backend",
+                        detail: "The SDK asks your backend for a short-lived access token before it submits.",
+                        status: tokenStepStatus
+                    ) {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Button { runTokenCheck() } label: {
+                                Label("Check token endpoint", systemImage: "key.horizontal")
+                            }
+                            .buttonStyle(.bordered)
+                            .disabled(isCheckingToken)
+                            if !tokenCheckText.isEmpty {
+                                Text(tokenCheckText)
+                                    .font(.caption)
+                                    .foregroundColor(tokenCheckText.hasPrefix("✗") ? .payabliError : .payabliOnSurfaceVariant)
+                            }
+                        }
+                    }
 
-                    Text(resultText.isEmpty ? "No payment method result yet" : resultText)
-                        .font(.footnote)
-                        .foregroundColor(.payabliOnSurfaceVariant)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(12)
-                        .background(Color.payabliSurfaceContainer)
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                    QAStepRow(
+                        index: 2,
+                        title: "Enter the card or ACH details",
+                        detail: "The SDK owns these fields; clear PAN never reaches the host app.",
+                        status: formStepStatus
+                    ) {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Button {
+                                isPaymentMethodSheetPresented = true
+                            } label: {
+                                Label("Open as a sheet instead", systemImage: "rectangle.bottomthird.inset.filled")
+                                    .frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(.bordered)
+
+                            #if DEBUG
+                            DebugPrefillButton()
+                            #endif
+
+                            PayabliPayInPaymentFlowView(
+                                component: paymentFlow,
+                                configuration: configuration,
+                                onCompleted: handlePaymentMethodAdded,
+                                onError: handleError
+                            )
+                            .payabliPayInPaymentFlowStyle(style)
+                        }
+                    }
+
+                    QAStepRow(
+                        index: 3,
+                        title: "Stored method",
+                        detail: "A successful submit returns a reusable stored-method id.",
+                        status: resultStepStatus
+                    ) {
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text(resultText.isEmpty ? "Nothing stored yet." : resultText)
+                                .font(.footnote)
+                                .foregroundColor(resultText.hasPrefix("✗") ? .payabliError : .payabliOnSurfaceVariant)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .textSelection(.enabled)
+
+                            Button { startAnother() } label: {
+                                Label("Save another method", systemImage: "arrow.counterclockwise")
+                                    .frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(.bordered)
+                        }
+                    }
 
                     DiagnosticsSection(store: diagnosticsStore, isEnabled: Secrets.paymentMethodDiagnosticsEnabled)
                 }
                 .padding(16)
             }
-            .navigationTitle("Payment Method QA")
+            .navigationTitle("Save a method")
             .navigationDestination(isPresented: $isPaymentMethodAddedViewPresented) {
                 PaymentMethodAddedView()
             }
@@ -76,6 +123,64 @@ struct PaymentMethodQAView: View {
             }
         }
         #endif
+    }
+
+    // MARK: - Step status
+
+    /// `PayabliPayInPaymentFlow` publishes only `isSubmitting` and `lastResult`,
+    /// so these three derive from those plus the token check — never from state
+    /// tracked separately, which could disagree with the component.
+    /// True once the backend is known reachable — either the check was run, or
+    /// a submit already succeeded, which proves it just as well.
+    private var backendProven: Bool {
+        tokenCheckText.hasPrefix("✓") || paymentFlow.lastResult != nil
+    }
+
+    /// The component keeps `lastResult` forever and exposes no reset, so a
+    /// finished submit would pin the flow on step 3 with no way back. This
+    /// records that the result has been read and another entry is wanted.
+    private var showingFinishedResult: Bool {
+        paymentFlow.lastResult != nil && !resultAcknowledged
+    }
+
+    /// Hands the flow back to step 2 for another entry.
+    private func startAnother() {
+        resultAcknowledged = true
+        resultText = ""
+    }
+
+    private var tokenStepStatus: QAStepStatus {
+        if tokenCheckText.hasPrefix("✗") { return .failed }
+        return backendProven ? .done : .current
+    }
+
+    private var formStepStatus: QAStepStatus {
+        // Exactly one step is ever `.current`, so this waits rather than
+        // competing with step 1 for attention.
+        guard backendProven else { return .blocked }
+        if paymentFlow.isSubmitting { return .inProgress }
+        if resultText.hasPrefix("✗") { return .failed }
+        return showingFinishedResult ? .done : .current
+    }
+
+    private var resultStepStatus: QAStepStatus {
+        if resultText.hasPrefix("✗") { return .failed }
+        return showingFinishedResult ? .current : .blocked
+    }
+
+    /// Reports only that a token arrived. Never the token itself.
+    private func runTokenCheck() {
+        isCheckingToken = true
+        tokenCheckText = "Checking…"
+        Task {
+            defer { isCheckingToken = false }
+            do {
+                _ = try await Secrets.fetchPaymentMethodAccessToken()
+                tokenCheckText = "✓ Token endpoint returned a token"
+            } catch {
+                tokenCheckText = "✗ \(error.localizedDescription)"
+            }
+        }
     }
 
     private var configuration: PayabliPayInPaymentFlowFormConfiguration {
@@ -198,6 +303,7 @@ struct PaymentMethodQAView: View {
     }
 
     private func handlePaymentMethodAdded(_ result: PayabliPayInPaymentFlowResult) {
+        resultAcknowledged = false
         guard let method = result.storedPaymentMethod else {
             resultText = "Payment method response did not include a stored method."
             return

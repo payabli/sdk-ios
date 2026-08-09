@@ -44,7 +44,7 @@ struct PayabliDemoQAApp: App {
             TabView {
                 PaymentMethodQAView(paymentFlow: paymentMethod)
                     .tabItem {
-                        Label("Method", systemImage: "creditcard")
+                        Label("Save", systemImage: "creditcard")
                     }
 
                 PaymentCaptureQAView(paymentFlow: paymentCapture)
@@ -98,7 +98,7 @@ struct PayabliDemoQAApp: App {
             )
         )
         .tabItem {
-            Label("Method", systemImage: "creditcard")
+            Label("Save", systemImage: "creditcard")
         }
 
         PaymentCaptureQAView(
