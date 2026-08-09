@@ -22,23 +22,6 @@ and includes a card/ACH PayIn payment flow sample.
   render stored-method and capture forms, hide optional values, apply a custom
   style, and return token-storage or MoneyIn API responses.
 
-## Screens
-
-Four tabs. Every payment tab is a short numbered sequence whose statuses come from
-what the SDK publishes, so the screen cannot disagree with the session it describes.
-
-| Save | Capture |
-|---|---|
-| ![Save](Screenshots/save.png) | ![Capture](Screenshots/capture.png) |
-
-| TapToPay | Config |
-|---|---|
-| ![TapToPay](Screenshots/taptopay.png) | ![Config](Screenshots/config.png) |
-
-The TapToPay shot is a Simulator run, which is why readiness reports **Terminal Not
-Available**: a Simulator cannot attest or read a card. On a device with the
-entitlement it collapses to a single green line and the steps take over.
-
 ## Setup
 
 1. Open `PayabliDemo.xcodeproj`.
@@ -112,7 +95,7 @@ Diagnostics are redacted before they are printed or displayed in the app.
 ## Architecture notes
 
 The entry point is **`App/PayabliDemoQAApp.swift`**, a four-tab `TabView`:
-**Method · Capture · TapToPay · Config**. It owns two `PayabliPayInPaymentFlow`
+**Save · Capture · TapToPay · Config**. It owns two `PayabliPayInPaymentFlow`
 instances (stored-method and capture) and one `PayabliTTP` as `@StateObject`s,
 and passes each into its tab. That is the whole file — the diagnostics stores,
 diagnostics wiring and shared form config all live in their own folders now.
@@ -238,8 +221,9 @@ framework it found. Making it real needs a second target with empty
 
 ## Not included
 
-- A real partner backend — the `Secrets.fetchAccessToken()` URL points at the
-  bundled `LocalTokenServer`, which needs your own sandbox credentials.
+- A real partner backend. `Secrets.swift.sample` points the two token endpoints at
+  a placeholder partner backend, so a fresh clone repoints them at the bundled
+  `LocalTokenServer` and gives that server its own sandbox credentials.
 - A Tap to Pay provisioning profile. Without the Apple-granted
   `com.apple.developer.proximity-reader.payment.acceptance` entitlement the app
   still builds and the TapToPay tab still renders, but **Enable Terminal**

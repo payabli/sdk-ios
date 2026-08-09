@@ -44,9 +44,19 @@ The iOS Simulator can call:
 http://127.0.0.1:8787/payabli/access-token
 ```
 
-The app resolves that host itself, so a Simulator run needs no configuration —
-see **Simulator vs physical device** below. Save, Capture and Tap to Pay all
-resolve to the same endpoint.
+The app resolves the *host* itself — loopback in the Simulator, the LAN on a
+device, see **Simulator vs physical device** below. What a fresh clone still has
+to do is point `Secrets.swift` at this server at all: `Secrets.swift.sample`
+ships a placeholder partner backend, so copy it and switch both endpoints to the
+resolver:
+
+```swift
+static var partnerTokenEndpoint: URL { DemoConfiguration.TokenServer.accessTokenURL }
+static var partnerPaymentMethodAccessTokenEndpoint: URL { DemoConfiguration.TokenServer.accessTokenURL }
+```
+
+Both are listed because they are separate settings; a build pointing them at
+different backends is supported and honoured.
 
 ## Credential Exchange Mode
 
