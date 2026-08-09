@@ -14,31 +14,42 @@ struct TerminalReadinessView: View {
 
     /// Computed on appearance rather than per body evaluation: each run does a
     /// `uname`, hits `DCAppAttestService`, and reads the provisioning profile.
-    @State private var checks: [TapToPayPreflight.Check] = []
+    ///
+    /// `nil` until that first run, and deliberately not an empty array. The
+    /// rollup reads "not available if and only if something failed", so an empty
+    /// set of checks is indistinguishable from a set that all passed, and the
+    /// first frame rendered Terminal Ready before a single check had run. A
+    /// terminal that announces itself ready and is not is the one wrong answer
+    /// this view exists to prevent.
+    @State private var checks: [TapToPayPreflight.Check]?
 
-    private var readiness: TapToPayPreflight.Readiness {
-        TapToPayPreflight.readiness(from: checks)
+    private var readiness: TapToPayPreflight.Readiness? {
+        checks.map(TapToPayPreflight.readiness(from:))
     }
 
     /// Everything that is not a clean pass. Empty means nothing to report.
     private var problems: [TapToPayPreflight.Check] {
-        checks.filter { $0.status != .pass }
+        (checks ?? []).filter { $0.status != .pass }
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
-                Image(systemName: readiness == .ready ? "checkmark.seal.fill" : "xmark.octagon.fill")
-                    .foregroundColor(readiness == .ready ? .payabliSuccess : .payabliError)
-                Text(readiness.title)
+                Image(systemName: headerSymbol)
+                    .foregroundColor(headerColor)
+                Text(headerTitle)
                     .font(.headline)
-                    .foregroundColor(readiness == .ready ? .payabliSuccess : .payabliError)
+                    .foregroundColor(headerColor)
                 Spacer()
                 Button("Re-check") { refresh() }
                     .font(.footnote)
             }
 
-            if problems.isEmpty {
+            if readiness == nil {
+                Text("Reading the host, App Attest, the reader and the provisioning profile.")
+                    .font(.caption)
+                    .foregroundColor(.payabliOnSurfaceVariant)
+            } else if problems.isEmpty {
                 Text("Every check passed.")
                     .font(.caption)
                     .foregroundColor(.payabliOnSurfaceVariant)
@@ -63,6 +74,26 @@ struct TerminalReadinessView: View {
             }
         }
         .onAppear(perform: refresh)
+    }
+
+    private var headerTitle: String {
+        readiness?.title ?? "Checking the terminal"
+    }
+
+    private var headerSymbol: String {
+        switch readiness {
+        case .none: return "hourglass"
+        case .ready: return "checkmark.seal.fill"
+        case .notAvailable: return "xmark.octagon.fill"
+        }
+    }
+
+    private var headerColor: Color {
+        switch readiness {
+        case .none: return .payabliOnSurfaceVariant
+        case .ready: return .payabliSuccess
+        case .notAvailable: return .payabliError
+        }
     }
 
     private func refresh() {
