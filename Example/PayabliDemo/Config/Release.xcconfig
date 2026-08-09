@@ -2,3 +2,8 @@
 
 PAYABLI_SDK_LINKAGE = source
 SWIFT_ACTIVE_COMPILATION_CONDITIONS = $(inherited) PAYABLI_LINKAGE_SOURCE
+
+// The debug prefill fixture carries a test PAN, CVV and ACH account.
+// `DebugPrefill.swift` is `#if DEBUG`, but its JSON sits in the resources phase
+// and shipped in Release until this line; verified by inspecting the built bundle.
+EXCLUDED_SOURCE_FILE_NAMES = DebugPrefill.json
