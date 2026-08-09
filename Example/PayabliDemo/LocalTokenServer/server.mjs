@@ -11,6 +11,7 @@ const port = Number.parseInt(process.env.PORT || "8787", 10);
 const bindHost = stringValue(process.env.PAYABLI_LOCAL_TOKEN_SERVER_HOST) || "127.0.0.1";
 const defaultApiBaseUrl = process.env.PAYABLI_API_BASE_URL || "https://api-sandbox.payabli.com/api";
 const defaultTokenPath = process.env.PAYABLI_TOKEN_PATH || "/v2/token/serverside";
+const defaultEntry = (process.env.PAYABLI_ENTRY || "").trim();
 const responseTokenField = (process.env.PAYABLI_RESPONSE_TOKEN_FIELD || "").trim();
 const cacheTtlSeconds = Number.parseInt(process.env.PAYABLI_TOKEN_CACHE_TTL_SECONDS || "300", 10);
 const maxRequestBodyBytes = Number.parseInt(process.env.PAYABLI_MAX_REQUEST_BODY_BYTES || "32768", 10);
@@ -78,12 +79,31 @@ async function handleRequest(req, res) {
     return;
   }
 
+  if (url.pathname === "/payabli/devices" && ["GET", "POST"].includes(req.method || "")) {
+    const body = req.method === "POST" ? await readJsonBody(req) : {};
+    const entry = stringValue(body.entry) || stringValue(url.searchParams.get("entry")) || defaultEntry;
+    const devices = await listTapToPayDevices(entry, body);
+    sendJson(res, 200, { entry, devices });
+    return;
+  }
+
+  if (url.pathname === "/payabli/activation-code" && req.method === "POST") {
+    const body = await readJsonBody(req);
+    sendJson(res, 200, await requestActivationCode(body));
+    return;
+  }
+
   sendJson(res, 404, { error: "Not found" });
 }
 
 server.listen(port, bindHost, () => {
   console.log(`Payabli local token server listening on http://${bindHost}:${port}`);
   console.log(`Access token endpoint: http://${bindHost}:${port}/payabli/access-token`);
+  console.log(`Tap to Pay devices:    http://${bindHost}:${port}/payabli/devices`);
+  console.log(`Activation code:       http://${bindHost}:${port}/payabli/activation-code`);
+  if (!defaultEntry) {
+    console.log("PAYABLI_ENTRY is not set; pass entry in the request body for the Tap to Pay endpoints.");
+  }
 });
 
 async function resolveAccessToken(options = {}) {
@@ -160,6 +180,166 @@ async function exchangeCredentials(options = {}, { forceRefresh = false } = {}) 
   }
 
   return { token, upstreamStatus: upstream.status };
+}
+
+// Authenticated call to the Payabli API with the resolved access token.
+async function payabliApi(path, { method = "GET", body = null, options = {} } = {}) {
+  const apiBaseUrl = normalizeBaseUrl(stringValue(options.apiBaseUrl) || defaultApiBaseUrl);
+  const token = await resolveAccessToken(options);
+  const endpoint = new URL(path.replace(/^\/+/, ""), ensureTrailingSlash(apiBaseUrl));
+
+  const upstream = await fetch(endpoint, {
+    method,
+    headers: {
+      "Accept": "application/json",
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${token}`
+    },
+    body: body === null ? undefined : JSON.stringify(body)
+  });
+
+  const text = await upstream.text();
+  let payload;
+  try {
+    payload = text ? JSON.parse(text) : {};
+  } catch {
+    payload = { raw: text };
+  }
+
+  if (!upstream.ok) {
+    throw new LocalTokenServerError(
+      upstream.status >= 500 ? 502 : upstream.status,
+      `Payabli ${path} failed with HTTP ${upstream.status}: ${safeJson(payload)}`
+    );
+  }
+
+  return payload;
+}
+
+// These endpoints report failure as HTTP 200 with `isSuccess: false`, so the
+// real outcome is in the envelope rather than the transport status.
+function envelopeDecline(payload) {
+  if (!payload || payload.isSuccess !== false) {
+    return null;
+  }
+
+  const data = payload.responseData || {};
+  return {
+    code: Number(data.resultCode) || 0,
+    text: stringValue(data.resultText) || stringValue(payload.responseText) || "Declined"
+  };
+}
+
+// Observed values. Anything else is passed through as its raw number rather
+// than guessed at.
+const DEVICE_STATUS_ACTIVE = 1;
+const DEVICE_STATUS_PENDING = 2;
+
+function deviceStatusLabel(status) {
+  if (status === DEVICE_STATUS_ACTIVE) return "active";
+  if (status === DEVICE_STATUS_PENDING) return "pending";
+  return `status-${status}`;
+}
+
+async function describeDevice(entry, deviceId, options = {}) {
+  const payload = await payabliApi(
+    `/Device/get/${encodeURIComponent(entry)}/${encodeURIComponent(deviceId)}`,
+    { options }
+  );
+  return envelopeDecline(payload) ? null : payload.responseData || null;
+}
+
+// `/Device/list` omits pending devices, which are the only ones that can be
+// activated, so the fuller `/Cloud/list` is the source and each row is then
+// described individually to get its status.
+async function listTapToPayDevices(entry, options = {}) {
+  if (!entry) {
+    throw new LocalTokenServerError(400, "Set PAYABLI_ENTRY in .env, or pass entry in the request.");
+  }
+
+  const payload = await payabliApi(`/Cloud/list/${encodeURIComponent(entry)}`, { options });
+  const decline = envelopeDecline(payload);
+  if (decline) {
+    throw new LocalTokenServerError(400, `Device list declined (${decline.code}): ${decline.text}`);
+  }
+
+  const rows = Array.isArray(payload.responseList) ? payload.responseList : [];
+  const described = [];
+  for (let index = 0; index < rows.length; index += 6) {
+    const batch = await Promise.all(
+      rows.slice(index, index + 6).map((row) => describeDevice(entry, row.deviceId, options))
+    );
+    described.push(...batch);
+  }
+
+  return described
+    .filter((device) => device && stringValue(device.deviceType).toLowerCase() === "softpos")
+    .map((device) => ({
+      deviceId: device.deviceId,
+      status: deviceStatusLabel(device.deviceStatus),
+      deviceStatus: device.deviceStatus,
+      model: device.model,
+      serialNumber: device.serialNumber,
+      friendlyName: device.friendlyName,
+      createdAt: device.createdAt,
+      updatedAt: device.updatedAt
+    }))
+    .sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
+}
+
+// Requests the activation code for a pending device. Idempotent upstream: an
+// unexpired code is returned again rather than reissued.
+async function requestActivationCode(options = {}) {
+  const entry = stringValue(options.entry) || defaultEntry;
+  if (!entry) {
+    throw new LocalTokenServerError(400, "Set PAYABLI_ENTRY in .env, or pass entry in the request.");
+  }
+
+  let deviceId = stringValue(options.deviceId);
+  let resolvedFrom = "request";
+
+  // A serial number is the app's identifierForVendor and is shared by every
+  // record a reinstall leaves behind, so it cannot pick one device out. Only a
+  // deviceId does. Falling back to the newest pending device is a convenience
+  // for a single-device QA setup, and reports itself as such.
+  if (!deviceId) {
+    const devices = await listTapToPayDevices(entry, options);
+    const pending = devices.filter((device) => device.deviceStatus === DEVICE_STATUS_PENDING);
+
+    if (pending.length === 0) {
+      throw new LocalTokenServerError(
+        404,
+        `No pending Tap to Pay devices on ${entry}. Pass deviceId to target a specific device.`
+      );
+    }
+
+    deviceId = stringValue(pending[0].deviceId);
+    resolvedFrom = pending.length === 1 ? "onlyPendingDevice" : `newestOf${pending.length}Pending`;
+  }
+
+  const payload = await payabliApi("/v2/device/taptopay/activate/challenge", {
+    method: "POST",
+    body: { entry, deviceId },
+    options
+  });
+
+  const decline = envelopeDecline(payload);
+  if (decline) {
+    throw new LocalTokenServerError(
+      decline.code === 404 ? 404 : 400,
+      `Activation challenge declined (${decline.code}): ${decline.text}`
+    );
+  }
+
+  const data = payload.responseData || {};
+  return {
+    entry,
+    deviceId,
+    resolvedFrom,
+    code: stringValue(data.code),
+    expiresAt: stringValue(data.expiresAt),
+    alreadyIssued: Boolean(data.alreadyIssued)
+  };
 }
 
 function sendJson(res, status, body) {
@@ -353,6 +533,7 @@ function redactSensitiveText(value) {
       /("(?:access_token|accessToken|token|clientSecret|client_secret|secret)"\s*:\s*)"[^"]*"/gi,
       '$1"[REDACTED]"'
     )
+    .replace(/("(?:code|activationCode)"\s*:\s*)"[^"]*"/gi, '$1"[REDACTED]"')
     .replace(
       /((?:access_token|accessToken|token|clientSecret|client_secret|secret)=)[^\s&]+/gi,
       "$1[REDACTED]"

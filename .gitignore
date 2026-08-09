@@ -28,8 +28,11 @@ build/
 **/.flutter-plugins
 **/.flutter-plugins-dependencies
 
-# Secrets
+# Secrets. Two patterns on purpose: the anchored path broke silently when the
+# demo's files moved into feature folders, leaving a real QA token untracked but
+# no longer ignored. The recursive pattern survives the next move.
 Example/PayabliDemo/Secrets.swift
+Example/PayabliDemo/**/Secrets.swift
 Example/PayabliDemo/Config.xcconfig
 .env
 .env.local
@@ -54,3 +57,8 @@ vendor/
 
 
 docs/
+
+# Agent worktrees. These belong beside the repository, at
+# ios-worktree/ios-<ticket>/, never nested here; this line is only a backstop
+# for when a tool is asked for a bare worktree name out of habit.
+/.claude/worktrees/

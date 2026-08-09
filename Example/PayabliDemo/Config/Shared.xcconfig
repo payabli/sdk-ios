@@ -1,0 +1,17 @@
+// Settings common to every configuration.
+//
+// The project carried no xcconfig at all before this: every build setting lived
+// as a raw entry in a hand-maintained objectVersion = 46 pbxproj, which is
+// neither diffable nor reviewable. Prefer adding settings here.
+
+PRODUCT_BUNDLE_IDENTIFIER = com.payabli.example.app
+IPHONEOS_DEPLOYMENT_TARGET = 16.7
+INFOPLIST_FILE = Resources/Info.plist
+CODE_SIGN_ENTITLEMENTS = Resources/PayabliDemo.entitlements
+
+// How the demo reaches the SDK. Read by the "Payabli SDK linkage" build phase
+// and surfaced in the app's Configuration tab.
+//
+//   source      compile the SDK from Package.swift as part of this build
+//   xcframework link prebuilt XCFrameworks (needs a second target; see below)
+PAYABLI_SDK_LINKAGE = source

@@ -9,19 +9,19 @@ struct PaymentMethodAddedView: View {
 
             Image(systemName: "checkmark.circle.fill")
                 .font(.system(size: 104, weight: .semibold))
-                .foregroundStyle(.green)
+                .foregroundStyle(Color.payabliSuccess)
                 .accessibilityHidden(true)
 
             Text("Added a new payment method.")
                 .font(.title2.weight(.semibold))
                 .multilineTextAlignment(.center)
-                .foregroundStyle(.primary)
+                .foregroundStyle(Color.payabliOnSurface)
 
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(32)
-        .background(Color(.systemBackground))
+        .background(Color.payabliBackground)
         .navigationBarTitleDisplayMode(.inline)
     }
 }
@@ -35,7 +35,7 @@ struct PaymentCaptureResultView: View {
                 HStack(alignment: .center, spacing: 12) {
                     Image(systemName: "checkmark.circle.fill")
                         .font(.system(size: 36, weight: .semibold))
-                        .foregroundStyle(.green)
+                        .foregroundStyle(Color.payabliSuccess)
                         .accessibilityHidden(true)
 
                     VStack(alignment: .leading, spacing: 4) {
@@ -43,7 +43,7 @@ struct PaymentCaptureResultView: View {
                             .font(.title2.weight(.semibold))
                         Text(result.reason ?? result.explanation ?? result.code)
                             .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Color.payabliOnSurfaceVariant)
                     }
                 }
 
@@ -55,11 +55,11 @@ struct PaymentCaptureResultView: View {
 
                     Text(responseJSON)
                         .font(.caption.monospaced())
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.payabliOnSurfaceVariant)
                         .textSelection(.enabled)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(12)
-                        .background(Color(.secondarySystemBackground))
+                        .background(Color.payabliSurfaceContainer)
                         .clipShape(RoundedRectangle(cornerRadius: 8))
                 }
             }
@@ -67,7 +67,7 @@ struct PaymentCaptureResultView: View {
         }
         .navigationTitle("Payment Response")
         .navigationBarTitleDisplayMode(.inline)
-        .background(Color(.systemBackground))
+        .background(Color.payabliBackground)
     }
 
     private var responseSummary: some View {
@@ -79,7 +79,7 @@ struct PaymentCaptureResultView: View {
                 HStack(alignment: .top) {
                     Text(row.label)
                         .font(.subheadline.weight(.medium))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.payabliOnSurfaceVariant)
                     Spacer(minLength: 16)
                     Text(row.value)
                         .font(.subheadline)
@@ -88,7 +88,7 @@ struct PaymentCaptureResultView: View {
             }
         }
         .padding(12)
-        .background(Color(.secondarySystemBackground))
+        .background(Color.payabliSurfaceContainer)
         .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 

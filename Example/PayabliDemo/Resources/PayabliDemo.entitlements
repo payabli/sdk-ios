@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Tap to Pay on iPhone. Apple must approve this entitlement for the
+	     Developer account before a provisioning profile can carry it; request it
+	     at https://developer.apple.com/contact/request/tap-to-pay-on-iphone/
+	     Until then the app still builds, but initialize() fails its eligibility gate. -->
+	<key>com.apple.developer.proximity-reader.payment.acceptance</key>
+	<true/>
+
+	<!-- App Attest, used by the SDK's device attestation before GET /config.
+	     `development` pairs with a debug build and Apple's development attestation
+	     service; ship builds must use `production`. -->
+	<key>com.apple.developer.devicecheck.appattest-environment</key>
+	<string>development</string>
+</dict>
+</plist>

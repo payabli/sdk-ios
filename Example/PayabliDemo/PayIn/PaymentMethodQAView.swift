@@ -6,7 +6,7 @@ import SwiftUI
 struct PaymentMethodQAView: View {
     let paymentFlow: PayabliPayInPaymentFlow
 
-    @StateObject private var diagnosticsStore = PaymentMethodQADiagnosticsStore.shared
+    @StateObject private var diagnosticsStore = DiagnosticsStore.paymentMethod
     @State private var resultText = ""
     @State private var isPaymentMethodAddedViewPresented = false
     @State private var isPaymentMethodSheetPresented = false
@@ -23,6 +23,10 @@ struct PaymentMethodQAView: View {
                     }
                     .buttonStyle(.borderedProminent)
 
+                    #if DEBUG
+                    DebugPrefillButton()
+                    #endif
+
                     Text("Inline experience")
                         .font(.headline)
 
@@ -36,35 +40,13 @@ struct PaymentMethodQAView: View {
 
                     Text(resultText.isEmpty ? "No payment method result yet" : resultText)
                         .font(.footnote)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(.payabliOnSurfaceVariant)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(12)
-                        .background(Color(.secondarySystemBackground))
+                        .background(Color.payabliSurfaceContainer)
                         .clipShape(RoundedRectangle(cornerRadius: 8))
 
-                    if Secrets.paymentMethodDiagnosticsEnabled {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Diagnostics")
-                                .font(.headline)
-
-                            if diagnosticsStore.messages.isEmpty {
-                                Text("No diagnostics yet")
-                                    .font(.footnote)
-                                    .foregroundColor(.secondary)
-                            } else {
-                                ForEach(Array(diagnosticsStore.messages.enumerated()), id: \.offset) { _, message in
-                                    Text(message)
-                                        .font(.caption.monospaced())
-                                        .foregroundColor(.secondary)
-                                        .textSelection(.enabled)
-                                        .frame(maxWidth: .infinity, alignment: .leading)
-                                        .padding(10)
-                                        .background(Color(.tertiarySystemBackground))
-                                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                                }
-                            }
-                        }
-                    }
+                    DiagnosticsSection(store: diagnosticsStore, isEnabled: Secrets.paymentMethodDiagnosticsEnabled)
                 }
                 .padding(16)
             }
@@ -85,6 +67,15 @@ struct PaymentMethodQAView: View {
             onCompleted: handlePaymentMethodAdded,
             onError: handleError
         )
+        #if DEBUG
+        .onChange(of: isPaymentMethodSheetPresented) { isPresented in
+            guard isPresented else { return }
+            // Let the sheet's fields mount before injecting values.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                DebugPrefill.fill()
+            }
+        }
+        #endif
     }
 
     private var configuration: PayabliPayInPaymentFlowFormConfiguration {
@@ -117,12 +108,6 @@ struct PaymentMethodQAView: View {
                         .cardExpiration,
                         .cardCvv,
                         .cardZip
-                    ],
-                    inputVerticalSpacing: 4,
-                    inputHorizontalSpacing: 8,
-                    fieldVerticalSpacings: [
-                        .cardNumber: 2,
-                        .cardCvv: 2
                     ]
                 ),
                 PayabliPayInPaymentFlowFieldSection(
@@ -150,12 +135,6 @@ struct PaymentMethodQAView: View {
                         .achRouting,
                         .achAccount,
                         .achAccountType
-                    ],
-                    inputVerticalSpacing: 4,
-                    inputHorizontalSpacing: 8,
-                    fieldVerticalSpacings: [
-                        .achRouting: 2,
-                        .achAccount: 2
                     ]
                 ),
                 PayabliPayInPaymentFlowFieldSection(
@@ -206,51 +185,16 @@ struct PaymentMethodQAView: View {
         )
     }
 
-    private var style: PayabliPayInPaymentFlowStyle {
-        PayabliPayInPaymentFlowStyle(
-            accentColor: .green,
-            input: PayabliPayInPaymentFlowInputStyle(
-                backgroundColor: Color(.systemBackground),
-                borderColor: Color(.separator).opacity(0.6),
-                cornerRadius: 8
-            ),
-            submitButton: PayabliPayInPaymentFlowSubmitButtonStyle(cornerRadius: 8),
-            layout: PayabliPayInPaymentFlowLayoutStyle(
-                contentSpacing: 18,
-                fieldGroupSpacing: 14,
-                pairedFieldSpacing: 12,
-                sectionSpacing: 20,
-                sectionTitleSpacing: 10
-            )
-        )
-    }
+    private var style: PayabliPayInPaymentFlowStyle { PayInSharedConfiguration.style }
 
     private var fieldsWithHiddenLabels: [PayabliPayInPaymentFlowField] {
-        [
-            .cardholderName,
-            .cardNumber,
-            .cardExpiration,
-            .cardCvv,
-            .cardZip,
-            .achHolder,
-            .achRouting,
-            .achAccount,
-            .achAccountType,
-            .firstName,
-            .lastName,
-            .billingEmail
-        ]
+        PayInSharedConfiguration.fieldsWithHiddenLabels
     }
 
     private func labelMatchingPlaceholders(
         for fields: [PayabliPayInPaymentFlowField]
     ) -> [PayabliPayInPaymentFlowField: String] {
-        Dictionary(uniqueKeysWithValues: fields.map { field in
-            (
-                field,
-                PayabliPayInPaymentFlowLabels.defaultFieldLabels[field] ?? field.rawValue
-            )
-        })
+        PayInSharedConfiguration.labelMatchingPlaceholders(for: fields)
     }
 
     private func handlePaymentMethodAdded(_ result: PayabliPayInPaymentFlowResult) {
@@ -265,7 +209,7 @@ struct PaymentMethodQAView: View {
             "Result: \(method.resultText ?? "-")"
         ].joined(separator: "\n")
         Logger(
-            subsystem: "com.payabli.demo.paymentmethodqa",
+            subsystem: "com.payabli.example.app",
             category: "PaymentMethodDiagnostics"
         ).info("Payment method added: \(method.responseText, privacy: .public)")
 
@@ -282,8 +226,18 @@ struct PaymentMethodQAView: View {
     private func handleError(_ error: Error) {
         resultText = "Payment method failed: \(error.localizedDescription)"
         Logger(
-            subsystem: "com.payabli.demo.paymentmethodqa",
+            subsystem: "com.payabli.example.app",
             category: "PaymentMethodDiagnostics"
         ).error("Payment method failed: \(error.localizedDescription, privacy: .public)")
     }
+}
+
+#Preview {
+    PaymentMethodQAView(
+        paymentFlow: PayabliPayInPaymentFlow(
+            accessToken: "preview-token",
+            entryPoint: "preview-entry",
+            environment: DemoConfiguration.environment
+        )
+    )
 }
