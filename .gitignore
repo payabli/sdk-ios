@@ -58,7 +58,6 @@ vendor/
 
 docs/
 
-# Agent worktrees. These belong beside the repository, at
-# ios-worktree/ios-<ticket>/, never nested here; this line is only a backstop
-# for when a tool is asked for a bare worktree name out of habit.
-/.claude/worktrees/
+# Claude AI settings, and the worktree location every repo in this workspace uses.
+.claude/settings.local.json
+.claude/worktrees/
