@@ -25,7 +25,7 @@ struct PayabliDemoQAApp: App {
         diagnostics: .qaLogging(enabled: Secrets.paymentCaptureDiagnosticsEnabled,
                                 store: .paymentCapture),
         operation: .capture,
-        requestConfiguration: Self.paymentCaptureRequestConfiguration
+        requestConfiguration: PaymentCaptureQAView.freshRequestConfiguration()
     )
 
     /// Card-present terminal. `placeholderAccessToken` only has to survive the
@@ -68,22 +68,6 @@ struct PayabliDemoQAApp: App {
             // actool run for the first time and report it, and the setting is now gone.
             .tint(.payabliPrimary)
         }
-    }
-
-    private static var paymentCaptureRequestConfiguration: PayabliPayInPaymentFlowRequestConfiguration {
-        PayabliPayInPaymentFlowRequestConfiguration(
-            paymentDetails: PayabliPayInPaymentFlowPaymentDetails(
-                totalAmount: 1,
-                serviceFee: 0.10,
-                currency: "USD"
-            ),
-            orderDescription: "Payment Capture QA",
-            orderId: "ios-payment-capture-qa",
-            source: "ios-payment-capture-qa",
-            idempotencyKey: UUID().uuidString,
-            achValidation: true,
-            forceCustomerCreation: true
-        )
     }
 
 }
