@@ -28,6 +28,16 @@ struct PaymentTapToPayQAView: View {
     @State private var isActivationHelpPresented = false
     @State private var activationAttempted = false
     @State private var isWorking = false
+    @FocusState private var focusedField: Field?
+
+    /// The two numeric-keypad fields. A decimal or number pad carries no return
+    /// key, so without an explicit dismissal the keyboard covers the rest of the
+    /// screen with no way back. Measured on device: the tab bar stays hidden and
+    /// the event log is unreachable.
+    private enum Field: Hashable {
+        case amount
+        case activationCode
+    }
 
     var body: some View {
         NavigationStack {
@@ -41,8 +51,15 @@ struct PaymentTapToPayQAView: View {
                 }
                 .padding(16)
             }
+            .scrollDismissesKeyboard(.interactively)
             .navigationTitle("Tap to Pay QA")
             .toolbar { sessionBadge }
+            .toolbar {
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("Done") { focusedField = nil }
+                }
+            }
             .sheet(isPresented: $isActivationPresented) { activationSheet }
             .onAppear(perform: subscribeToEvents)
             .onDisappear {
@@ -127,6 +144,7 @@ struct PaymentTapToPayQAView: View {
                         Text("$")
                         TextField("Amount", text: $amountText)
                             .keyboardType(.decimalPad)
+                            .focused($focusedField, equals: .amount)
                             .textFieldStyle(.roundedBorder)
                     }
                     Button { runCharge() } label: {
@@ -236,6 +254,7 @@ struct PaymentTapToPayQAView: View {
                 Section("Activation code") {
                     TextField("6 digits", text: $activationCode)
                         .keyboardType(.numberPad)
+                        .focused($focusedField, equals: .activationCode)
                         .autocorrectionDisabled()
                 }
 
