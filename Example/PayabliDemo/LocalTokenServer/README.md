@@ -25,7 +25,7 @@ cp .env.example .env
 Edit `.env`:
 
 ```bash
-PAYABLI_ACCESS_TOKEN=<your short-lived sandbox access token>
+PAYABLI_ACCESS_TOKEN=<your short-lived QA access token>
 ```
 
 Start the server:
@@ -60,20 +60,23 @@ different backends is supported and honoured.
 
 ## Credential Exchange Mode
 
-If you want the local endpoint to exchange sandbox credentials, leave
+If you want the local endpoint to exchange credentials, leave
 `PAYABLI_ACCESS_TOKEN` blank and configure:
 
 ```bash
-PAYABLI_CLIENT_ID=<your sandbox client id>
-PAYABLI_CLIENT_SECRET=<your sandbox client secret>
-PAYABLI_API_BASE_URL=https://api-sandbox.payabli.com/api
+PAYABLI_CLIENT_ID=<your QA client id>
+PAYABLI_CLIENT_SECRET=<your QA client secret>
+PAYABLI_API_BASE_URL=https://api-qa.payabli.com/api
 PAYABLI_TOKEN_PATH=/v2/token/serverside
 ```
+
+QA throughout, because that is what the app and `.env.example` ship. See
+**Match this to the app** below before changing either to sandbox.
 
 That maps to Payabli's server-side token call:
 
 ```bash
-curl --location 'https://api-sandbox.payabli.com/api/v2/token/serverside' \
+curl --location 'https://api-qa.payabli.com/api/v2/token/serverside' \
   --header 'Content-Type: application/json' \
   --data '{
     "clientId": "{clientId}",
@@ -81,11 +84,8 @@ curl --location 'https://api-sandbox.payabli.com/api/v2/token/serverside' \
   }'
 ```
 
-For QA, use:
-
-```bash
-PAYABLI_API_BASE_URL=https://api-qa.payabli.com/api
-```
+For sandbox instead, use `https://api-sandbox.payabli.com/api` and change the
+app's environment to match.
 
 **Match this to the app.** A token minted for one Payabli environment is
 rejected by another, and the rejection reads as a credential problem rather than
@@ -122,8 +122,8 @@ You can also pass credentials per request for quick experiments:
 curl -X POST http://127.0.0.1:8787/payabli/exchange-token \
   -H 'Content-Type: application/json' \
   -d '{
-    "clientId": "sandbox-client-id",
-    "clientSecret": "sandbox-client-secret"
+    "clientId": "your-client-id",
+    "clientSecret": "your-client-secret"
   }'
 ```
 
@@ -134,7 +134,7 @@ subject to the allowed-host guard:
 {
   "clientId": "...",
   "clientSecret": "...",
-  "apiBaseUrl": "https://api-sandbox.payabli.com/api",
+  "apiBaseUrl": "https://api-qa.payabli.com/api",
   "tokenPath": "/v2/token/serverside",
   "responseTokenField": "access_token"
 }
@@ -182,7 +182,7 @@ the Mac is on more than one network, use the address on the same network as the
 phone.
 
 Use this only on a trusted network, stop the process when finished, and prefer
-short-lived sandbox credentials. Browser CORS responses are restricted to
+short-lived credentials. Browser CORS responses are restricted to
 localhost origins by default; native iOS requests do not need CORS.
 
 Because this is plain HTTP, the app target needs an ATS local-network exception
