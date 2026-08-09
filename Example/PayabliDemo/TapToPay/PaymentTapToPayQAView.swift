@@ -26,6 +26,7 @@ struct PaymentTapToPayQAView: View {
     @State private var eventToken: PayabliTTPEventToken?
     @State private var isActivationPresented = false
     @State private var isActivationHelpPresented = false
+    @State private var activationAttempted = false
     @State private var isWorking = false
 
     var body: some View {
@@ -170,7 +171,15 @@ struct PaymentTapToPayQAView: View {
     /// run here, or because the SDK already fetched a token to get past `idle`.
     private var backendProven: Bool {
         if tokenCheckText.hasPrefix("✓") { return true }
-        return terminal.sessionState != .idle
+        // Only states the session cannot reach without a successful authenticated
+        // request. `.attestingDevice` is set before that request, and `.error` is
+        // where a failing token provider lands, so neither proves anything.
+        switch terminal.sessionState {
+        case .fetchingConfig, .initializingReader, .ready, .pendingActivation, .reinitializing:
+            return true
+        default:
+            return false
+        }
     }
 
     private var tokenStepStatus: QAStepStatus {
@@ -193,6 +202,10 @@ struct PaymentTapToPayQAView: View {
     }
 
     private var activationStepStatus: QAStepStatus {
+        // A failed activation must stay actionable: `.failed` is the only other
+        // status whose content renders, so blocking it would hide the reason and
+        // the retry together.
+        if activationAttempted, terminal.sessionState == .error { return .failed }
         switch terminal.sessionState {
         case .pendingActivation: return .current
         case .ready: return .notNeeded
@@ -431,6 +444,7 @@ struct PaymentTapToPayQAView: View {
     private func runActivate() {
         let code = activationCode
         activationCode = ""
+        activationAttempted = true
         isWorking = true
         Task {
             defer { isWorking = false }
