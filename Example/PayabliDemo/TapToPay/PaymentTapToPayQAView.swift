@@ -26,7 +26,22 @@ struct PaymentTapToPayQAView: View {
     @State private var eventToken: PayabliTTPEventToken?
     @State private var isActivationPresented = false
     @State private var isActivationHelpPresented = false
-    @State private var activationAttempted = false
+    @State private var activationOutcome = ActivationOutcome.none
+
+    /// Which half of the activation step failed.
+    ///
+    /// Activation is two SDK calls, and a single flag cannot say which one threw.
+    /// It has to, for two reasons. A successful `activateDevice` followed by a
+    /// failing `initialize()` also lands in `.error`, so a flag blames activation
+    /// for a failure that happened after it succeeded. And a revoked attestation
+    /// resets the session to `.idle` rather than `.error`, so a check against
+    /// `.error` misses that failure entirely and hides its reason and retry.
+    private enum ActivationOutcome {
+        case none
+        case activationFailed
+        case enableFailed
+        case succeeded
+    }
     @State private var isWorking = false
     @FocusState private var focusedField: Field?
 
@@ -222,8 +237,10 @@ struct PaymentTapToPayQAView: View {
     private var activationStepStatus: QAStepStatus {
         // A failed activation must stay actionable: `.failed` is the only other
         // status whose content renders, so blocking it would hide the reason and
-        // the retry together.
-        if activationAttempted, terminal.sessionState == .error { return .failed }
+        // the retry together. Read from the recorded outcome rather than from
+        // `sessionState`, which cannot distinguish the two calls this step makes
+        // and reports `.idle` for a revoked attestation.
+        if activationOutcome == .activationFailed { return .failed }
         switch terminal.sessionState {
         case .pendingActivation: return .current
         case .ready: return .notNeeded
@@ -463,21 +480,31 @@ struct PaymentTapToPayQAView: View {
     private func runActivate() {
         let code = activationCode
         activationCode = ""
-        activationAttempted = true
+        activationOutcome = .none
         isWorking = true
         Task {
             defer { isWorking = false }
             do {
                 try await terminal.activateDevice(activationCode: code)
-                // Activation leaves the session `.idle`, not `.ready` — the
-                // device is approved but nothing has been set up yet. Re-running
-                // initialize here is what the SDK expects, and it keeps the
-                // sequence moving forward instead of dropping back a step.
-                activationMessage = "✓ Activated — enabling the terminal"
+            } catch {
+                activationOutcome = .activationFailed
+                activationMessage = "✗ \(error.localizedDescription)"
+                return
+            }
+
+            // Activation leaves the session `.idle`, not `.ready` — the device is
+            // approved but nothing has been set up yet. Re-running initialize here
+            // is what the SDK expects, and it keeps the sequence moving forward
+            // instead of dropping back a step. A failure from here belongs to the
+            // enable step, which reports it, not to activation, which succeeded.
+            activationMessage = "✓ Activated — enabling the terminal"
+            do {
                 try await terminal.initialize()
+                activationOutcome = .succeeded
                 activationMessage = "✓ Activated and terminal enabled"
             } catch {
-                activationMessage = "✗ \(error.localizedDescription)"
+                activationOutcome = .enableFailed
+                activationMessage = "✓ Activated. Enabling the terminal failed — see step 2."
             }
         }
     }
