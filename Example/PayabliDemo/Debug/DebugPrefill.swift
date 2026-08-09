@@ -86,32 +86,63 @@ enum DebugPrefill {
 
     /// Feeds `value` into `textField` through the SDK's own input path.
     ///
-    /// The SDK marks these fields `protectsTextContent`, so its `editingChanged`
-    /// handler ignores direct `.text` assignments — user input only lands via the
-    /// `textField(_:shouldChangeCharactersIn:replacementString:)` delegate call.
-    /// We invoke that delegate method with a range spanning the whole field, which
-    /// is exactly what UIKit does when a value is pasted over a selection, so the
-    /// SDK's formatting/validation and view model update just as if typed.
+    /// A protected field ignores direct `.text` assignment, so input has to arrive
+    /// via `textField(_:shouldChangeCharactersIn:replacementString:)` with a range
+    /// spanning the whole field, which is what UIKit does when a value is pasted
+    /// over a selection. The SDK's formatting and view model then update as if
+    /// typed.
+    ///
+    /// Only some fields are protected, which is why the return value matters. A
+    /// protected field applies the change itself and answers `false`. An
+    /// unprotected one answers `true`, meaning "yes, make this change" — and UIKit
+    /// is what normally makes it. Calling the delegate directly leaves nobody to,
+    /// so every unprotected field silently kept its old value: cardholder name,
+    /// ZIP, both name fields, email, customer number and the ACH holder.
     private static func inject(_ value: String, into textField: UITextField) {
         let current = (textField.text ?? "") as NSString
         let fullRange = NSRange(location: 0, length: current.length)
-        _ = textField.delegate?.textField?(
+        let shouldApply = textField.delegate?.textField?(
             textField,
             shouldChangeCharactersIn: fullRange,
             replacementString: value
-        )
+        ) ?? true
+
+        guard shouldApply else { return }
+        textField.text = current.replacingCharacters(in: fullRange, with: value)
+        textField.sendActions(for: .editingChanged)
     }
 
+    /// Text fields of the frontmost presentation only.
+    ///
+    /// A presented sheet does not unmount the form behind it, and both carry the
+    /// same accessibility identifiers, so searching every window and taking the
+    /// first match could prefill the covered form instead of the sheet. Which one
+    /// won depended on view order, which made the sheet prefill nondeterministic.
     private static func onScreenTextFields() -> [UITextField] {
         let windows = UIApplication.shared.connectedScenes
             .compactMap { $0 as? UIWindowScene }
             .flatMap(\.windows)
 
+        let root = windows.first(where: \.isKeyWindow) ?? windows.last
         var result: [UITextField] = []
-        for window in windows {
-            collectTextFields(in: window, into: &result)
+        if let host = topmostViewController(from: root?.rootViewController) {
+            collectTextFields(in: host.view, into: &result)
+        }
+        // A form outside any view controller still has to be reachable.
+        if result.isEmpty, let root {
+            collectTextFields(in: root, into: &result)
         }
         return result
+    }
+
+    private static func topmostViewController(
+        from controller: UIViewController?
+    ) -> UIViewController? {
+        guard let controller else { return nil }
+        if let presented = controller.presentedViewController {
+            return topmostViewController(from: presented)
+        }
+        return controller
     }
 
     private static func collectTextFields(in view: UIView, into result: inout [UITextField]) {
