@@ -54,3 +54,7 @@ vendor/
 
 
 docs/
+
+# Claude AI settings, and the worktree location every repo in this workspace uses.
+.claude/settings.local.json
+.claude/worktrees/
