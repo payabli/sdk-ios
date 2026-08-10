@@ -66,6 +66,11 @@ public final class PayabliTTP: NSObject, ObservableObject {
     /// attributed to the replacement.
     var readerSessionGeneration = 0
 
+    /// The initialization in progress, if any. A second caller joins it instead
+    /// of starting a competing one, the way `PayabliAuth` deduplicates a token
+    /// refresh.
+    var inFlightInitialize: Task<Void, Error>?
+
     // MARK: - Published state
 
     // Setters are `internal` so companion-file extensions

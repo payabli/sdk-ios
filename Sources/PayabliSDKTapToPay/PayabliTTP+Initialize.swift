@@ -16,6 +16,19 @@ extension PayabliTTP {
     ///   3. Hand credentials to the provider (NFR-5D — runtime only).
     ///   4. Prepare reader, transition to `.ready`.
     public func initialize() async throws {
+        // One initialization at a time. Two interleaving runs each reset the
+        // session under the other, so the one that finishes second decides the
+        // state while the first still reports success.
+        if let existing = inFlightInitialize {
+            return try await existing.value
+        }
+        let task = Task<Void, Error> { @MainActor in try await self.runInitialize() }
+        inFlightInitialize = task
+        defer { inFlightInitialize = nil }
+        return try await task.value
+    }
+
+    private func runInitialize() async throws {
         // 0. Eligibility.
         try await runEligibility()
 

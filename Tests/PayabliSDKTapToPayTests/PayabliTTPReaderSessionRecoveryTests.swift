@@ -189,6 +189,30 @@ final class PayabliTTPReaderSessionRecoveryTests: XCTestCase {
         XCTAssertEqual(provider.prepareReaderCalls, 2)
     }
 
+    /// Two initializations must not run over each other.
+    ///
+    /// Each resets the session, so interleaved runs leave the one that finishes
+    /// second deciding the state while the first still reports success.
+    func testConcurrentInitializeRunsOnce() async throws {
+        let provider = InterleavingProvider()
+        provider.suspendDuringPrepare = true
+        let ttp = makeTTP(provider: provider)
+
+        // Two independent callers, both in flight. Not a nested call: awaiting
+        // an initialization from inside one would wait on the task that is
+        // waiting for it, the same way a `tokenProvider` that refreshed its own
+        // token would.
+        async let first: Void = ttp.initialize()
+        async let second: Void = ttp.initialize()
+        _ = try await (first, second)
+
+        XCTAssertEqual(ttp.sessionState, .ready)
+        XCTAssertEqual(
+            provider.prepareReaderCalls, 1,
+            "the second call started its own initialization instead of joining the first"
+        )
+    }
+
     // MARK: - Error text reaching the host
 
     /// A host shows `localizedDescription`. When the facade re-wraps an error
@@ -389,11 +413,16 @@ private final class InterleavingProvider: TapToPayProvider {
         PayabliTTPError.nfcFailed(reason: "not configured")
     )
     var duringRead: (() async throws -> Void)?
+    var suspendDuringPrepare = false
     private(set) var prepareReaderCalls = 0
 
     func checkEligibility() async -> Result<Void, PayabliTTPError> { .success(()) }
     func configure(credentials: [String: String]) throws {}
-    func prepareReader() async throws { prepareReaderCalls += 1 }
+    func prepareReader() async throws {
+        prepareReaderCalls += 1
+        // Suspend so a second caller genuinely overlaps this one.
+        if suspendDuringPrepare { await Task.yield() }
+    }
     func cancelReading() async {}
     func cleanUp() async {}
 
