@@ -3,30 +3,79 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 46;
+	objectVersion = 60;
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A1B2C3D4E5F60000000000E2 /* QAContextLine.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60000000000E1 /* QAContextLine.swift */; };
+		A1B2C3D4E5F60000000000D2 /* QAStepRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60000000000D1 /* QAStepRow.swift */; };
 		0F5E8CC7E7A24D19A71B0A1C /* PaymentMethodAddedView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F5E8CC6E7A24D19A71B0A1C /* PaymentMethodAddedView.swift */; };
 		1C7A9E9B6D2F4C0F8A1B3D5E /* PaymentCaptureQAView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B1E0F9A8C7D6E5F4A3B2C1D /* PaymentCaptureQAView.swift */; };
-		3F9C8D7E6A5B4C3D2E1F0A9B /* PayabliSDKPayInPaymentFlow in Frameworks */ = {isa = PBXBuildFile; productRef = 4A0D9E8F7B6C5D4E3F2A1B0C /* PayabliSDKPayInPaymentFlow */; };
+		3F9C8D7E6A5B4C3D2E1F0A9B /* PayabliSDKExampleAggregate in Frameworks */ = {isa = PBXBuildFile; productRef = 4A0D9E8F7B6C5D4E3F2A1B0C /* PayabliSDKExampleAggregate */; };
 		60EDCF1CBB535529F6138573 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F201F43C477597B328446F93 /* Foundation.framework */; };
-		6C370DCD5559AB1DE7E823B1 /* PaymentMethodQAConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = F866419FEDEC4373794B0014 /* PaymentMethodQAConfiguration.swift */; };
-		AF77F479977FE319B28EB3D7 /* PaymentMethodQAApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6EA1E9A0909DDC1A7B827C8D /* PaymentMethodQAApp.swift */; };
+		A1B2C3D4E5F60000000000A2 /* PaymentTapToPayQAView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60000000000A1 /* PaymentTapToPayQAView.swift */; };
+		A1B2C3D4E5F60000000000B2 /* TapToPayPreflight.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60000000000B1 /* TapToPayPreflight.swift */; };
+		AF77F479977FE319B28EB3D7 /* PayabliDemoQAApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6EA1E9A0909DDC1A7B827C8D /* PayabliDemoQAApp.swift */; };
 		C9B9D43650B2230A8582B93C /* Secrets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C921D1F3EE7130C23911757 /* Secrets.swift */; };
+		D20000000000000000000001 /* DemoConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000000000000000000001 /* DemoConfiguration.swift */; };
+		D20000000000000000000002 /* DiagnosticsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000000000000000000002 /* DiagnosticsStore.swift */; };
+		D20000000000000000000003 /* DiagnosticsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000000000000000000003 /* DiagnosticsSection.swift */; };
+		D20000000000000000000004 /* PayInSharedConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000000000000000000004 /* PayInSharedConfiguration.swift */; };
+		D20000000000000000000005 /* QADetailRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000000000000000000005 /* QADetailRow.swift */; };
+		D20000000000000000000006 /* TerminalReadinessView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000000000000000000006 /* TerminalReadinessView.swift */; };
+		D20000000000000000000007 /* ConfigurationQAView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000000000000000000007 /* ConfigurationQAView.swift */; };
+		D20000000000000000000020 /* PayabliDemoColors.swift in Sources */ = {isa = PBXBuildFile; fileRef = D20000000000000000000021 /* PayabliDemoColors.swift */; };
+		D20000000000000000000022 /* Payabli-iOS-icon.icon in Resources */ = {isa = PBXBuildFile; fileRef = D20000000000000000000023 /* Payabli-iOS-icon.icon */; };
 		D4DCE94B54535A867D1DDB65 /* PaymentMethodQAView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB9C96115FF840C6491AED9C /* PaymentMethodQAView.swift */; };
+		E1D2C3B4A5960718293A4B01 /* DebugPrefill.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1D2C3B4A5960718293A4B02 /* DebugPrefill.swift */; };
+		E1D2C3B4A5960718293A4B03 /* DebugPrefill.json in Resources */ = {isa = PBXBuildFile; fileRef = E1D2C3B4A5960718293A4B04 /* DebugPrefill.json */; };
+		F10000000000000000000030 /* PayabliSDKExampleAggregate in Embed Frameworks */ = {isa = PBXBuildFile; productRef = 4A0D9E8F7B6C5D4E3F2A1B0C /* PayabliSDKExampleAggregate */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
+/* Begin PBXCopyFilesBuildPhase section */
+		F10000000000000000000031 /* Embed Frameworks */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				F10000000000000000000030 /* PayabliSDKExampleAggregate in Embed Frameworks */,
+			);
+			name = "Embed Frameworks";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
+		A1B2C3D4E5F60000000000E1 /* QAContextLine.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = QAContextLine.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F60000000000D1 /* QAStepRow.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = QAStepRow.swift; sourceTree = "<group>"; };
 		0F5E8CC6E7A24D19A71B0A1C /* PaymentMethodAddedView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PaymentMethodAddedView.swift; sourceTree = "<group>"; };
 		1DADA588F49DF0C4A6611302 /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		4C921D1F3EE7130C23911757 /* Secrets.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Secrets.swift; sourceTree = "<group>"; };
 		5B1E0F9A8C7D6E5F4A3B2C1D /* PaymentCaptureQAView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PaymentCaptureQAView.swift; sourceTree = "<group>"; };
-		6EA1E9A0909DDC1A7B827C8D /* PaymentMethodQAApp.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PaymentMethodQAApp.swift; sourceTree = "<group>"; };
+		6EA1E9A0909DDC1A7B827C8D /* PayabliDemoQAApp.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PayabliDemoQAApp.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F60000000000A1 /* PaymentTapToPayQAView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PaymentTapToPayQAView.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F60000000000A5 /* PayabliDemo.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = PayabliDemo.entitlements; sourceTree = "<group>"; };
+		A1B2C3D4E5F60000000000B1 /* TapToPayPreflight.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TapToPayPreflight.swift; sourceTree = "<group>"; };
 		BB9C96115FF840C6491AED9C /* PaymentMethodQAView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PaymentMethodQAView.swift; sourceTree = "<group>"; };
+		D10000000000000000000001 /* DemoConfiguration.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DemoConfiguration.swift; sourceTree = "<group>"; };
+		D10000000000000000000002 /* DiagnosticsStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DiagnosticsStore.swift; sourceTree = "<group>"; };
+		D10000000000000000000003 /* DiagnosticsSection.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DiagnosticsSection.swift; sourceTree = "<group>"; };
+		D10000000000000000000004 /* PayInSharedConfiguration.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PayInSharedConfiguration.swift; sourceTree = "<group>"; };
+		D10000000000000000000005 /* QADetailRow.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = QADetailRow.swift; sourceTree = "<group>"; };
+		D10000000000000000000006 /* TerminalReadinessView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TerminalReadinessView.swift; sourceTree = "<group>"; };
+		D10000000000000000000007 /* ConfigurationQAView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ConfigurationQAView.swift; sourceTree = "<group>"; };
+		D20000000000000000000021 /* PayabliDemoColors.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PayabliDemoColors.swift; sourceTree = "<group>"; };
+		D20000000000000000000023 /* Payabli-iOS-icon.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = "Payabli-iOS-icon.icon"; sourceTree = "<group>"; };
+		E1D2C3B4A5960718293A4B02 /* DebugPrefill.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DebugPrefill.swift; sourceTree = "<group>"; };
+		E1D2C3B4A5960718293A4B04 /* DebugPrefill.json */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.json; path = DebugPrefill.json; sourceTree = "<group>"; };
+		F1000000000000000000000A /* Shared.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; path = Shared.xcconfig; sourceTree = "<group>"; };
+		F1000000000000000000000B /* Debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; path = Debug.xcconfig; sourceTree = "<group>"; };
+		F1000000000000000000000C /* Release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; path = Release.xcconfig; sourceTree = "<group>"; };
+		F1000000000000000000000D /* Debug-XCFramework.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; path = "Debug-XCFramework.xcconfig"; sourceTree = "<group>"; };
+		F10000000000000000000020 /* check-sdk-linkage.sh */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.script.sh; path = "check-sdk-linkage.sh"; sourceTree = "<group>"; };
 		F201F43C477597B328446F93 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
 		F427A5EA0CEF029F22AF2170 /* PayabliDemo.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PayabliDemo.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		F866419FEDEC4373794B0014 /* PaymentMethodQAConfiguration.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PaymentMethodQAConfiguration.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -35,7 +84,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				60EDCF1CBB535529F6138573 /* Foundation.framework in Frameworks */,
-				3F9C8D7E6A5B4C3D2E1F0A9B /* PayabliSDKPayInPaymentFlow in Frameworks */,
+				3F9C8D7E6A5B4C3D2E1F0A9B /* PayabliSDKExampleAggregate in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -78,16 +127,124 @@
 		B5DAA0EB93D1309AB418DD32 /* PayabliDemo */ = {
 			isa = PBXGroup;
 			children = (
-				6EA1E9A0909DDC1A7B827C8D /* PaymentMethodQAApp.swift */,
-				F866419FEDEC4373794B0014 /* PaymentMethodQAConfiguration.swift */,
-				BB9C96115FF840C6491AED9C /* PaymentMethodQAView.swift */,
-				5B1E0F9A8C7D6E5F4A3B2C1D /* PaymentCaptureQAView.swift */,
-				0F5E8CC6E7A24D19A71B0A1C /* PaymentMethodAddedView.swift */,
-				4C921D1F3EE7130C23911757 /* Secrets.swift */,
-				1DADA588F49DF0C4A6611302 /* Info.plist */,
+				E1000000000000000000000A /* App */,
+				F10000000000000000000010 /* Config */,
+				F10000000000000000000021 /* Scripts */,
+				E1000000000000000000000B /* Configuration */,
+				E1000000000000000000000C /* TapToPay */,
+				E10000000000000000000020 /* Shared */,
+				E1000000000000000000000D /* PayIn */,
+				E1000000000000000000000E /* Diagnostics */,
+				E1000000000000000000000F /* Debug */,
+				E10000000000000000000010 /* Resources */,
+				D20000000000000000000024 /* Theme */,
 			);
 			name = PayabliDemo;
 			path = .;
+			sourceTree = "<group>";
+		};
+		D20000000000000000000024 /* Theme */ = {
+			isa = PBXGroup;
+			children = (
+				D20000000000000000000021 /* PayabliDemoColors.swift */,
+			);
+			path = Theme;
+			sourceTree = "<group>";
+		};
+		E1000000000000000000000A /* App */ = {
+			isa = PBXGroup;
+			children = (
+				6EA1E9A0909DDC1A7B827C8D /* PayabliDemoQAApp.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		E1000000000000000000000B /* Configuration */ = {
+			isa = PBXGroup;
+			children = (
+				D10000000000000000000001 /* DemoConfiguration.swift */,
+				4C921D1F3EE7130C23911757 /* Secrets.swift */,
+				D10000000000000000000007 /* ConfigurationQAView.swift */,
+			);
+			path = Configuration;
+			sourceTree = "<group>";
+		};
+		E1000000000000000000000C /* TapToPay */ = {
+			isa = PBXGroup;
+			children = (
+				A1B2C3D4E5F60000000000A1 /* PaymentTapToPayQAView.swift */,
+				A1B2C3D4E5F60000000000B1 /* TapToPayPreflight.swift */,
+				D10000000000000000000006 /* TerminalReadinessView.swift */,
+			);
+			path = TapToPay;
+			sourceTree = "<group>";
+		};
+		E1000000000000000000000D /* PayIn */ = {
+			isa = PBXGroup;
+			children = (
+				BB9C96115FF840C6491AED9C /* PaymentMethodQAView.swift */,
+				5B1E0F9A8C7D6E5F4A3B2C1D /* PaymentCaptureQAView.swift */,
+				0F5E8CC6E7A24D19A71B0A1C /* PaymentMethodAddedView.swift */,
+				D10000000000000000000004 /* PayInSharedConfiguration.swift */,
+			);
+			path = PayIn;
+			sourceTree = "<group>";
+		};
+		E1000000000000000000000E /* Diagnostics */ = {
+			isa = PBXGroup;
+			children = (
+				D10000000000000000000002 /* DiagnosticsStore.swift */,
+				D10000000000000000000003 /* DiagnosticsSection.swift */,
+			);
+			path = Diagnostics;
+			sourceTree = "<group>";
+		};
+		E1000000000000000000000F /* Debug */ = {
+			isa = PBXGroup;
+			children = (
+				E1D2C3B4A5960718293A4B02 /* DebugPrefill.swift */,
+				E1D2C3B4A5960718293A4B04 /* DebugPrefill.json */,
+			);
+			path = Debug;
+			sourceTree = "<group>";
+		};
+		E10000000000000000000010 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				1DADA588F49DF0C4A6611302 /* Info.plist */,
+				A1B2C3D4E5F60000000000A5 /* PayabliDemo.entitlements */,
+				D20000000000000000000023 /* Payabli-iOS-icon.icon */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		F10000000000000000000010 /* Config */ = {
+			isa = PBXGroup;
+			children = (
+				F1000000000000000000000A /* Shared.xcconfig */,
+				F1000000000000000000000B /* Debug.xcconfig */,
+				F1000000000000000000000C /* Release.xcconfig */,
+				F1000000000000000000000D /* Debug-XCFramework.xcconfig */,
+			);
+			path = Config;
+			sourceTree = "<group>";
+		};
+		F10000000000000000000021 /* Scripts */ = {
+			isa = PBXGroup;
+			children = (
+				F10000000000000000000020 /* check-sdk-linkage.sh */,
+			);
+			path = Scripts;
+			sourceTree = "<group>";
+		};
+		E10000000000000000000020 /* Shared */ = {
+			isa = PBXGroup;
+			children = (
+				D10000000000000000000005 /* QADetailRow.swift */,
+				A1B2C3D4E5F60000000000D1 /* QAStepRow.swift */,
+				A1B2C3D4E5F60000000000E1 /* QAContextLine.swift */,
+			);
+			path = Shared;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -97,9 +254,11 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 87189C26EFA0A693AC05A10A /* Build configuration list for PBXNativeTarget "PayabliDemo" */;
 			buildPhases = (
+				F10000000000000000000011 /* Payabli SDK linkage */,
 				1511487013BC083FF8294541 /* Sources */,
 				57ED6F126A7F63E859E6B9C1 /* Frameworks */,
 				D13F928764B33D67EF47114C /* Resources */,
+				F10000000000000000000031 /* Embed Frameworks */,
 			);
 			buildRules = (
 			);
@@ -107,7 +266,7 @@
 			);
 			name = PayabliDemo;
 			packageProductDependencies = (
-				4A0D9E8F7B6C5D4E3F2A1B0C /* PayabliSDKPayInPaymentFlow */,
+				4A0D9E8F7B6C5D4E3F2A1B0C /* PayabliSDKExampleAggregate */,
 			);
 			productName = PayabliDemo;
 			productReference = F427A5EA0CEF029F22AF2170 /* PayabliDemo.app */;
@@ -131,11 +290,9 @@
 				Base,
 			);
 			mainGroup = 0FD559AE44BA89E2B37DC109;
-			minimizedProjectReferenceProxies = 0;
 			packageReferences = (
-				9D53E7C2DDF2C3C9B8D4F07B /* XCLocalSwiftPackageReference ".." */,
+				9D53E7C2DDF2C3C9B8D4F07B /* XCLocalSwiftPackageReference "../.." */,
 			);
-			preferredProjectObjectVersion = 77;
 			productRefGroup = 451DD9C4B9B34230515DCA0C /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -150,22 +307,56 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				E1D2C3B4A5960718293A4B03 /* DebugPrefill.json in Resources */,
+				D20000000000000000000022 /* Payabli-iOS-icon.icon in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		F10000000000000000000011 /* Payabli SDK linkage */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+				"$(SRCROOT)/Scripts/check-sdk-linkage.sh",
+				"$(SRCROOT)/Config/Shared.xcconfig",
+			);
+			name = "Payabli SDK linkage";
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/bash;
+			shellScript = "\"${SRCROOT}/Scripts/check-sdk-linkage.sh\"\n";
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		1511487013BC083FF8294541 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				AF77F479977FE319B28EB3D7 /* PaymentMethodQAApp.swift in Sources */,
-				6C370DCD5559AB1DE7E823B1 /* PaymentMethodQAConfiguration.swift in Sources */,
+				AF77F479977FE319B28EB3D7 /* PayabliDemoQAApp.swift in Sources */,
+				D20000000000000000000007 /* ConfigurationQAView.swift in Sources */,
+				D20000000000000000000005 /* QADetailRow.swift in Sources */,
+				D20000000000000000000006 /* TerminalReadinessView.swift in Sources */,
+				D20000000000000000000001 /* DemoConfiguration.swift in Sources */,
+				D20000000000000000000002 /* DiagnosticsStore.swift in Sources */,
+				D20000000000000000000003 /* DiagnosticsSection.swift in Sources */,
+				D20000000000000000000004 /* PayInSharedConfiguration.swift in Sources */,
 				D4DCE94B54535A867D1DDB65 /* PaymentMethodQAView.swift in Sources */,
 				1C7A9E9B6D2F4C0F8A1B3D5E /* PaymentCaptureQAView.swift in Sources */,
+				A1B2C3D4E5F60000000000A2 /* PaymentTapToPayQAView.swift in Sources */,
+				A1B2C3D4E5F60000000000B2 /* TapToPayPreflight.swift in Sources */,
+				A1B2C3D4E5F60000000000D2 /* QAStepRow.swift in Sources */,
+				A1B2C3D4E5F60000000000E2 /* QAContextLine.swift in Sources */,
 				0F5E8CC7E7A24D19A71B0A1C /* PaymentMethodAddedView.swift in Sources */,
 				C9B9D43650B2230A8582B93C /* Secrets.swift in Sources */,
+				E1D2C3B4A5960718293A4B01 /* DebugPrefill.swift in Sources */,
+				D20000000000000000000020 /* PayabliDemoColors.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -174,6 +365,7 @@
 /* Begin XCBuildConfiguration section */
 		261639CBD142F4F5DABF734B /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = F1000000000000000000000C /* Release.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				CLANG_ANALYZER_NONNULL = YES;
@@ -231,20 +423,22 @@
 		};
 		26CB9CE4B7C0CA18EF01C50C /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = F1000000000000000000000B /* Debug.xcconfig */;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = "";
-				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_APPICON_NAME = "Payabli-iOS-icon";
 				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = NCGNAZ53CX;
 				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 16.7;
-				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.payabli.demo.paymentmethodqa;
 				PRODUCT_NAME = PayabliDemo;
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				SDKROOT = iphoneos;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -253,6 +447,7 @@
 		};
 		4CA1643E7C2A8E274076362D /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = F1000000000000000000000B /* Debug.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				CLANG_ANALYZER_NONNULL = YES;
@@ -317,26 +512,117 @@
 		};
 		5219F4F09361BFBB57A9B48D /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = F1000000000000000000000C /* Release.xcconfig */;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = "";
-				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_APPICON_NAME = "Payabli-iOS-icon";
 				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = NCGNAZ53CX;
 				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 16.7;
-				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.payabli.demo.paymentmethodqa;
 				PRODUCT_NAME = PayabliDemo;
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				SDKROOT = iphoneos;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				VALIDATE_PRODUCT = YES;
 			};
 			name = Release;
+		};
+		F10000000000000000000012 /* Debug-XCFramework */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = F1000000000000000000000D /* Debug-XCFramework.xcconfig */;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.7;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = "Debug-XCFramework";
+		};
+		F10000000000000000000013 /* Debug-XCFramework */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = F1000000000000000000000D /* Debug-XCFramework.xcconfig */;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = "Payabli-iOS-icon";
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = NCGNAZ53CX;
+				GENERATE_INFOPLIST_FILE = NO;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_NAME = PayabliDemo;
+				PROVISIONING_PROFILE_SPECIFIER = "";
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = "Debug-XCFramework";
 		};
 /* End XCBuildConfiguration section */
 
@@ -346,33 +632,35 @@
 			buildConfigurations = (
 				5219F4F09361BFBB57A9B48D /* Release */,
 				26CB9CE4B7C0CA18EF01C50C /* Debug */,
+				F10000000000000000000013 /* Debug-XCFramework */,
 			);
 			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
+			defaultConfigurationName = Debug;
 		};
 		F888C5A61810442D0895EA97 /* Build configuration list for PBXProject "PayabliDemo" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				4CA1643E7C2A8E274076362D /* Debug */,
+				F10000000000000000000012 /* Debug-XCFramework */,
 				261639CBD142F4F5DABF734B /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
+			defaultConfigurationName = Debug;
 		};
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
-		9D53E7C2DDF2C3C9B8D4F07B /* XCLocalSwiftPackageReference ".." */ = {
+		9D53E7C2DDF2C3C9B8D4F07B /* XCLocalSwiftPackageReference "../.." */ = {
 			isa = XCLocalSwiftPackageReference;
 			relativePath = ../..;
 		};
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		4A0D9E8F7B6C5D4E3F2A1B0C /* PayabliSDKPayInPaymentFlow */ = {
+		4A0D9E8F7B6C5D4E3F2A1B0C /* PayabliSDKExampleAggregate */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 9D53E7C2DDF2C3C9B8D4F07B /* XCLocalSwiftPackageReference ".." */;
-			productName = PayabliSDKPayInPaymentFlow;
+			package = 9D53E7C2DDF2C3C9B8D4F07B /* XCLocalSwiftPackageReference "../.." */;
+			productName = PayabliSDKExampleAggregate;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

@@ -1,0 +1,18 @@
+// Settings common to every configuration. New settings belong here, not in the
+// project file, where they are neither diffable nor reviewable.
+
+PRODUCT_BUNDLE_IDENTIFIER = com.payabli.example.app
+IPHONEOS_DEPLOYMENT_TARGET = 16.7
+INFOPLIST_FILE = Resources/Info.plist
+CODE_SIGN_ENTITLEMENTS = Resources/PayabliDemo.entitlements
+
+// Which Apple App Attest service the app attests against. Read by the
+// entitlements file. Release overrides it to production.
+PAYABLI_APPATTEST_ENV = development
+
+// How the demo reaches the SDK. Read by the "Payabli SDK linkage" build phase
+// and shown in the app's Config tab.
+//
+//   source      compile the SDK from Package.swift as part of this build
+//   xcframework link prebuilt XCFrameworks — see Debug-XCFramework.xcconfig
+PAYABLI_SDK_LINKAGE = source

@@ -1,0 +1,12 @@
+#include "Shared.xcconfig"
+
+PAYABLI_SDK_LINKAGE = source
+SWIFT_ACTIVE_COMPILATION_CONDITIONS = $(inherited) PAYABLI_LINKAGE_SOURCE
+
+// The debug prefill fixture carries a test PAN, CVV and ACH account.
+// DebugPrefill.swift is #if DEBUG, but its JSON is a resource, and resources
+// ship whatever the code around them does.
+EXCLUDED_SOURCE_FILE_NAMES = DebugPrefill.json
+
+// A shipped build attests against Apple's production App Attest service.
+PAYABLI_APPATTEST_ENV = production

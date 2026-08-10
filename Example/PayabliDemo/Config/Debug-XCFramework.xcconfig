@@ -1,0 +1,12 @@
+// Links prebuilt XCFrameworks instead of package sources, the way an integrator
+// consumes the SDK.
+//
+// Every build with this configuration fails, deliberately. What a target links
+// is set on the target, so no configuration can swap it out. Doing this for real
+// needs a second target that links the frameworks, and there isn't one yet.
+
+#include "Shared.xcconfig"
+
+PAYABLI_SDK_LINKAGE = xcframework
+SWIFT_ACTIVE_COMPILATION_CONDITIONS = $(inherited) DEBUG PAYABLI_LINKAGE_XCFRAMEWORK
+FRAMEWORK_SEARCH_PATHS = $(inherited) $(SRCROOT)/../../build/xcframeworks
