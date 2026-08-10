@@ -202,9 +202,11 @@ final class PayabliTTPReaderSessionRecoveryTests: XCTestCase {
         // an initialization from inside one would wait on the task that is
         // waiting for it, the same way a `tokenProvider` that refreshed its own
         // token would.
-        async let first: Void = ttp.initialize()
-        async let second: Void = ttp.initialize()
-        _ = try await (first, second)
+        try await bounded { @MainActor in
+            async let first: Void = ttp.initialize()
+            async let second: Void = ttp.initialize()
+            _ = try await (first, second)
+        }
 
         XCTAssertEqual(ttp.sessionState, .ready)
         XCTAssertEqual(
@@ -279,16 +281,23 @@ final class PayabliTTPReaderSessionRecoveryTests: XCTestCase {
         providerResponseJSON: Data("{}".utf8)
     )
 
-    /// Bounded, so a regression that wedges the charge path fails on the bound
-    /// with a message naming it, rather than running out the suite's clock.
     private func charge(_ ttp: PayabliTTP) async throws -> TransactionResult {
-        try await withThrowingTaskGroup(of: TransactionResult.self) { group in
-            group.addTask { @MainActor in
-                try await ttp.charge(
-                    type: .sale,
-                    paymentDetails: PayabliTTPPaymentDetails(amount: 1, currency: "USD")
-                )
-            }
+        try await bounded {
+            try await ttp.charge(
+                type: .sale,
+                paymentDetails: PayabliTTPPaymentDetails(amount: 1, currency: "USD")
+            )
+        }
+    }
+
+    /// Every SDK call in this file goes through here. These tests cover a wedge
+    /// and two concurrency guards, so their failure mode is not returning, and
+    /// an unbounded one costs a CI job instead of going red.
+    private func bounded<T: Sendable>(
+        _ work: @escaping @Sendable () async throws -> T
+    ) async throws -> T {
+        try await withThrowingTaskGroup(of: T.self) { group in
+            group.addTask { try await work() }
             group.addTask {
                 try await Task.sleep(nanoseconds: 5_000_000_000)
                 throw ChargeTimedOut()
