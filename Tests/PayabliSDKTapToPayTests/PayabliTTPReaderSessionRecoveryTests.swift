@@ -215,6 +215,51 @@ final class PayabliTTPReaderSessionRecoveryTests: XCTestCase {
         )
     }
 
+    /// `charge()` recovers through `reinitializeIfNeeded()`, so a host calling
+    /// `initialize()` during a recovery is two setups against one provider.
+    func testInitializeDoesNotOverlapAReinitialize() async throws {
+        let provider = InterleavingProvider()
+        provider.suspendDuringPrepare = true
+        let ttp = makeTTP(provider: provider)
+        try await bounded { try await ttp.initialize() }
+
+        // Put the session where a recovery is what runs.
+        provider.readingResult = .failure(Self.sessionLevelFailure)
+        await XCTAssertThrowsErrorAsync(try await self.charge(ttp))
+        XCTAssertEqual(ttp.sessionState, .sessionExpired)
+
+        provider.readingResult = .success(Self.cardReadResult)
+        provider.armGate()
+
+        try await bounded { @MainActor in
+            // The recovery stops inside the provider and stays there. If the
+            // second setup is not made to wait, it walks in behind it.
+            async let recovering: Void = { _ = try? await ttp.charge(
+                type: .sale,
+                paymentDetails: PayabliTTPPaymentDetails(amount: 1, currency: "USD")
+            ) }()
+            await Task.yield()
+
+            async let initializing: Void = ttp.initialize()
+            for _ in 0 ..< 20 { await Task.yield() }
+            provider.openGate()
+
+            // The charge may fail: a host that re-initializes mid-charge takes
+            // the session out from under it, and `notReady` is the honest
+            // answer.
+            _ = try await (recovering, initializing)
+        }
+
+        XCTAssertFalse(
+            provider.sawOverlap,
+            "a reinitialize and an initialize were inside the provider at the same time"
+        )
+        XCTAssertEqual(
+            ttp.sessionState, .ready,
+            "the initialization that finished last should decide the state"
+        )
+    }
+
     // MARK: - Error text reaching the host
 
     /// A host shows `localizedDescription`. When the facade re-wraps an error
@@ -293,18 +338,31 @@ final class PayabliTTPReaderSessionRecoveryTests: XCTestCase {
     /// Every SDK call in this file goes through here. These tests cover a wedge
     /// and two concurrency guards, so their failure mode is not returning, and
     /// an unbounded one costs a CI job instead of going red.
+    ///
+    /// Not a task group: a group awaits all of its children before its scope
+    /// exits, and cancellation is cooperative, so work stuck on a lock or an
+    /// in-flight task keeps the group open however early the timer fires. The
+    /// deadline has to return without waiting for the work, which means racing
+    /// two unstructured tasks and resuming on whichever finishes first.
     private func bounded<T: Sendable>(
-        _ work: @escaping @Sendable () async throws -> T
+        _ work: @escaping @MainActor () async throws -> T
     ) async throws -> T {
-        try await withThrowingTaskGroup(of: T.self) { group in
-            group.addTask { try await work() }
-            group.addTask {
-                try await Task.sleep(nanoseconds: 5_000_000_000)
-                throw ChargeTimedOut()
+        let once = ResumeOnce()
+
+        return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<T, Error>) in
+            let workTask = Task { @MainActor in
+                do {
+                    let value = try await work()
+                    if !once.done { once.done = true; continuation.resume(returning: value) }
+                } catch {
+                    if !once.done { once.done = true; continuation.resume(throwing: error) }
+                }
             }
-            defer { group.cancelAll() }
-            guard let first = try await group.next() else { throw ChargeTimedOut() }
-            return first
+            Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 5_000_000_000)
+                if !once.done { once.done = true; continuation.resume(throwing: ChargeTimedOut()) }
+                workTask.cancel()
+            }
         }
     }
 
@@ -389,6 +447,13 @@ final class PayabliTTPReaderSessionRecoveryTests: XCTestCase {
 /// wedge cannot be mistaken for the failure these tests expect.
 private struct ChargeTimedOut: Error {}
 
+/// Guards a continuation so the deadline and the work cannot both resume it.
+/// Only touched from the main actor, which is where both racers run.
+@MainActor
+private final class ResumeOnce {
+    var done = false
+}
+
 // MARK: - Async throwing assertion
 
 /// `XCTAssertThrowsError` has no async form, and an autoclosure cannot be
@@ -423,14 +488,37 @@ private final class InterleavingProvider: TapToPayProvider {
     )
     var duringRead: (() async throws -> Void)?
     var suspendDuringPrepare = false
+    /// Holds `prepareReader` open until the test releases it, so a second setup
+    /// has a real window to enter.
+    private var gate: CheckedContinuation<Void, Never>?
+    private var gateArmed = false
+
+    func armGate() { gateArmed = true }
+
+    func openGate() {
+        gateArmed = false
+        gate?.resume()
+        gate = nil
+    }
     private(set) var prepareReaderCalls = 0
+    private(set) var configureCalls = 0
+    /// True if a second setup entered while one was still inside the provider.
+    private(set) var sawOverlap = false
+    private var inProvider = false
 
     func checkEligibility() async -> Result<Void, PayabliTTPError> { .success(()) }
-    func configure(credentials: [String: String]) throws {}
+    func configure(credentials: [String: String]) throws { configureCalls += 1 }
+
     func prepareReader() async throws {
         prepareReaderCalls += 1
-        // Suspend so a second caller genuinely overlaps this one.
-        if suspendDuringPrepare { await Task.yield() }
+        if inProvider { sawOverlap = true }
+        inProvider = true
+        defer { inProvider = false }
+        if gateArmed {
+            await withCheckedContinuation { self.gate = $0 }
+        } else if suspendDuringPrepare {
+            await Task.yield()
+        }
     }
     func cancelReading() async {}
     func cleanUp() async {}

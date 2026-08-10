@@ -6,6 +6,13 @@ import Combine
 /// State transitions are enforced internally. Host apps observe state via
 /// `@Published sessionState`. All transitions occur on `@MainActor` for safe
 /// SwiftUI observation (§17.4).
+/// Which entry point is building the session, so the two can be told apart when
+/// one is already running.
+internal enum SessionSetupKind {
+    case initialize
+    case reinitialize
+}
+
 @MainActor
 internal final class SessionManager: ObservableObject {
     @Published private(set) var sessionState: PayabliTTPSessionState = .idle

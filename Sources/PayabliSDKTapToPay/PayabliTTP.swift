@@ -66,10 +66,14 @@ public final class PayabliTTP: NSObject, ObservableObject {
     /// attributed to the replacement.
     var readerSessionGeneration = 0
 
-    /// The initialization in progress, if any. A second caller joins it instead
-    /// of starting a competing one, the way `PayabliAuth` deduplicates a token
-    /// refresh.
-    var inFlightInitialize: Task<Void, Error>?
+    /// The session setup in progress, if any, and which entry point started it.
+    /// A caller of the same kind joins it, the way `PayabliAuth` deduplicates a
+    /// token refresh; a caller of the other kind waits for it to finish.
+    var inFlightSessionSetup: (kind: SessionSetupKind, task: Task<Void, Error>, id: Int)?
+
+    /// Identifies a setup so it only clears the slot while it is still the
+    /// current one.
+    var nextSessionSetupID = 0
 
     // MARK: - Published state
 
