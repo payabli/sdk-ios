@@ -6,6 +6,13 @@ import Combine
 /// State transitions are enforced internally. Host apps observe state via
 /// `@Published sessionState`. All transitions occur on `@MainActor` for safe
 /// SwiftUI observation (§17.4).
+/// Which entry point is building the session, so the two can be told apart when
+/// one is already running.
+internal enum SessionSetupKind {
+    case initialize
+    case reinitialize
+}
+
 @MainActor
 internal final class SessionManager: ObservableObject {
     @Published private(set) var sessionState: PayabliTTPSessionState = .idle
@@ -25,8 +32,12 @@ internal final class SessionManager: ObservableObject {
         return true
     }
 
-    /// Forces the session into `.sessionExpired` (called on 401s).
-    func forceSessionExpiry() {
+    /// Forces `.sessionExpired`, bypassing the transition matrix.
+    ///
+    /// Nothing calls this, and its doc claimed "called on 401s", which no code
+    /// did. Scheduled for deletion; use `transition(to:)`, which the matrix
+    /// still governs.
+    private func forceSessionExpiry() {
         if sessionState != .sessionExpired {
             sessionState = .sessionExpired
             isReady = false
@@ -39,9 +50,10 @@ internal final class SessionManager: ObservableObject {
         isReady = false
     }
 
+    /// Returns the session to its starting point. Internal: a host reaches this
+    /// only through `initialize()`, never as an operation of its own.
     func reset() {
-        sessionState = .idle
-        isReady = false
+        transition(to: .idle)
         lastError = nil
     }
 
@@ -55,6 +67,12 @@ internal final class SessionManager: ObservableObject {
         if current == target { return true }
 
         switch (current, target) {
+        // Starting over is always reachable. `initialize()` is the documented
+        // way back to a known state, and it has to work from wherever the
+        // session was left.
+        case (_, .idle):
+            return true
+
         case (.idle, .attestingDevice),
              (.idle, .fetchingConfig):
             return true
@@ -84,12 +102,10 @@ internal final class SessionManager: ObservableObject {
              (.reinitializing, .error):
             return true
 
-        case (.pendingActivation, .idle),
-             (.pendingActivation, .attestingDevice):
+        case (.pendingActivation, .attestingDevice):
             return true
 
-        case (.error, .idle),
-             (.error, .attestingDevice),
+        case (.error, .attestingDevice),
              (.error, .fetchingConfig):
             return true
 

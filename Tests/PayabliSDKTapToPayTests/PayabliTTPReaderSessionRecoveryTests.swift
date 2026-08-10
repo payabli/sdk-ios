@@ -1,0 +1,541 @@
+import XCTest
+import PayabliSDKCore
+@testable import PayabliSDKTapToPay
+import PayabliSDKTestUtils
+
+#if canImport(ProximityReader)
+import ProximityReader
+#endif
+
+/// A reader session that dies must leave the session repairable.
+///
+/// `charge()` begins with `reinitializeIfNeeded()`, which does nothing while the
+/// state says `.ready`, so a failure that leaves it there wedges the session.
+@MainActor
+final class PayabliTTPReaderSessionRecoveryTests: XCTestCase {
+
+    override func setUp() {
+        super.setUp()
+        StubURLProtocol.handler = Self.chargeStubHandler
+    }
+
+    override func tearDown() {
+        StubURLProtocol.handler = nil
+        super.tearDown()
+    }
+
+    // MARK: - The wedge
+
+    func testSessionLevelReaderFailureLeavesTheSessionRepairable() async throws {
+        let (ttp, provider, _) = try await makeReadyTTP()
+        provider.readingResult = .failure(Self.sessionLevelFailure)
+
+        await XCTAssertThrowsErrorAsync(try await self.charge(ttp))
+
+        XCTAssertEqual(
+            ttp.sessionState, .sessionExpired,
+            "a dead reader session must not still report .ready"
+        )
+    }
+
+    func testSecondChargeSucceedsAfterASessionLevelFailure() async throws {
+        let (ttp, provider, _) = try await makeReadyTTP()
+        let preparesAfterInitialize = provider.prepareReaderCalls
+
+        provider.readingResult = .failure(Self.sessionLevelFailure)
+        await XCTAssertThrowsErrorAsync(try await self.charge(ttp))
+
+        // The reader works again; recovery is the SDK's job, not the caller's.
+        provider.readingResult = .success(Self.cardReadResult)
+        let result = try await charge(ttp)
+
+        XCTAssertEqual(result.paymentTransId, Self.paymentTransId)
+        XCTAssertEqual(ttp.sessionState, .ready)
+        XCTAssertGreaterThan(
+            provider.prepareReaderCalls, preparesAfterInitialize,
+            "recovery has to re-prepare the reader, or it is reusing the dead session"
+        )
+    }
+
+    // MARK: - What must not invalidate
+
+    func testCancelledTapKeepsTheSessionReady() async throws {
+        let (ttp, provider, _) = try await makeReadyTTP()
+        let preparesAfterInitialize = provider.prepareReaderCalls
+
+        provider.readingResult = .failure(Self.cancellationFailure)
+        await XCTAssertThrowsErrorAsync(try await self.charge(ttp))
+
+        XCTAssertEqual(
+            ttp.sessionState, .ready,
+            "dismissing the sheet must not cost a /config re-fetch and a reader re-prepare"
+        )
+        XCTAssertEqual(provider.prepareReaderCalls, preparesAfterInitialize)
+    }
+
+    func testCardReadFailureKeepsTheSessionReady() async throws {
+        let (ttp, provider, _) = try await makeReadyTTP()
+        provider.readingResult = .failure(
+            PayabliTTPError.nfcFailed(reason: "Charges: cardReadFailed")
+        )
+
+        await XCTAssertThrowsErrorAsync(try await self.charge(ttp))
+
+        XCTAssertEqual(
+            ttp.sessionState, .ready,
+            "a card that failed to read says nothing about the session"
+        )
+    }
+
+    // MARK: - Both classification tiers
+
+    /// The typed tier. Reachable when the raw error propagates to the facade.
+    #if canImport(ProximityReader)
+    func testTypedReadErrorIsClassified() {
+        XCTAssertTrue(readerFailureInvalidatesSession(PaymentCardReaderSession.ReadError.noReaderSession))
+        XCTAssertTrue(readerFailureInvalidatesSession(PaymentCardReaderSession.ReadError.readerSessionExpired))
+        XCTAssertTrue(readerFailureInvalidatesSession(PaymentCardReaderSession.ReadError.readerTokenExpired))
+        XCTAssertTrue(readerFailureInvalidatesSession(PaymentCardReaderSession.ReadError.readerSessionAuthenticationError))
+
+        XCTAssertFalse(readerFailureInvalidatesSession(PaymentCardReaderSession.ReadError.readCancelled))
+        XCTAssertFalse(readerFailureInvalidatesSession(PaymentCardReaderSession.ReadError.cardReadFailed))
+        XCTAssertFalse(readerFailureInvalidatesSession(PaymentCardReaderSession.ReadError.paymentCardDeclined))
+        XCTAssertFalse(readerFailureInvalidatesSession(PaymentCardReaderSession.ReadError.readerSessionBusy))
+    }
+    #endif
+
+    /// The text tier, which is the one that actually fires on device: the
+    /// vendored reader rebuilds the error as a title plus a description and the
+    /// typed value is gone by the time the facade sees it.
+    func testStringifiedReadErrorIsClassified() {
+        XCTAssertTrue(readerFailureInvalidatesSession(
+            PayabliTTPError.nfcFailed(reason: "noReaderSession: no reader session available or the session isn't ready")
+        ))
+        XCTAssertTrue(readerFailureInvalidatesSession(
+            PayabliTTPError.nfcFailed(reason: "Charges: readerSessionExpired")
+        ))
+
+        XCTAssertFalse(readerFailureInvalidatesSession(
+            PayabliTTPError.nfcFailed(reason: "cancelled: user dismissed Tap to Pay sheet")
+        ))
+        XCTAssertFalse(readerFailureInvalidatesSession(
+            PayabliTTPError.nfcFailed(reason: "Charges: Payment Card data missing or corrupt.")
+        ))
+    }
+
+    /// `readerSessionBusy` shares the `readerSession` prefix with two names that
+    /// do invalidate, so it is the case most likely to be swept up by a looser
+    /// match. It is transient: the session is alive and busy.
+    func testTransientSessionBusyIsNotAnInvalidation() {
+        XCTAssertFalse(readerFailureInvalidatesSession(
+            PayabliTTPError.nfcFailed(reason: "Charges: readerSessionBusy")
+        ))
+    }
+
+    // MARK: - initialize() from a state it did not start in
+
+    /// `initialize()` has to work from wherever the session happens to be.
+    ///
+    /// Its transitions were discarded, so from `.sessionExpired` it did all of
+    /// its work and left the state where it found it.
+    func testInitializeRecoversFromAnExpiredSession() async throws {
+        let (ttp, provider, _) = try await makeReadyTTP()
+
+        provider.readingResult = .failure(Self.sessionLevelFailure)
+        await XCTAssertThrowsErrorAsync(try await self.charge(ttp))
+        XCTAssertEqual(ttp.sessionState, .sessionExpired)
+
+        provider.readingResult = .success(Self.cardReadResult)
+        try await bounded { try await ttp.initialize() }
+
+        XCTAssertEqual(
+            ttp.sessionState, .ready,
+            "initialize() did its work but never moved the state"
+        )
+    }
+
+    /// The same hole from the other direction: re-initializing a healthy session
+    /// must leave it observably ready rather than relying on it already being so.
+    func testInitializeFromReadyStaysReady() async throws {
+        let (ttp, _, _) = try await makeReadyTTP()
+        try await bounded { try await ttp.initialize() }
+        XCTAssertEqual(ttp.sessionState, .ready)
+    }
+
+    // MARK: - A failure from a reader that has been replaced
+
+    /// The read that fails may not be the read the current reader is doing.
+    ///
+    /// `startReading` suspends, so an `initialize()` in that window prepares a
+    /// replacement reader and returns to `.ready`. Expiring on the old read's
+    /// failure would kill the healthy session it just built.
+    func testFailureFromASupersededReaderDoesNotExpireTheNewSession() async throws {
+        let provider = InterleavingProvider()
+        let ttp = makeTTP(provider: provider)
+        try await bounded { try await ttp.initialize() }
+        XCTAssertEqual(ttp.sessionState, .ready)
+
+        // Runs while the charge is suspended inside `startReading`, exactly as a
+        // host calling `initialize()` mid-charge would.
+        provider.duringRead = { try await ttp.initialize() }
+        provider.readingResult = .failure(Self.sessionLevelFailure)
+
+        await XCTAssertThrowsErrorAsync(try await self.charge(ttp))
+
+        XCTAssertEqual(
+            ttp.sessionState, .ready,
+            "the replacement reader was healthy; the old read's failure expired it"
+        )
+        XCTAssertEqual(provider.prepareReaderCalls, 2)
+    }
+
+    /// Two initializations must not run over each other.
+    ///
+    /// Each resets the session, so interleaved runs leave the one that finishes
+    /// second deciding the state while the first still reports success.
+    func testConcurrentInitializeRunsOnce() async throws {
+        let provider = InterleavingProvider()
+        provider.suspendDuringPrepare = true
+        let ttp = makeTTP(provider: provider)
+
+        // Two independent callers, both in flight. Not a nested call: awaiting
+        // an initialization from inside one would wait on the task that is
+        // waiting for it, the same way a `tokenProvider` that refreshed its own
+        // token would.
+        try await bounded { @MainActor in
+            async let first: Void = ttp.initialize()
+            async let second: Void = ttp.initialize()
+            _ = try await (first, second)
+        }
+
+        XCTAssertEqual(ttp.sessionState, .ready)
+        XCTAssertEqual(
+            provider.prepareReaderCalls, 1,
+            "the second call started its own initialization instead of joining the first"
+        )
+    }
+
+    /// `charge()` recovers through `reinitializeIfNeeded()`, so a host calling
+    /// `initialize()` during a recovery is two setups against one provider.
+    func testInitializeDoesNotOverlapAReinitialize() async throws {
+        let provider = InterleavingProvider()
+        provider.suspendDuringPrepare = true
+        let ttp = makeTTP(provider: provider)
+        try await bounded { try await ttp.initialize() }
+
+        // Put the session where a recovery is what runs.
+        provider.readingResult = .failure(Self.sessionLevelFailure)
+        await XCTAssertThrowsErrorAsync(try await self.charge(ttp))
+        XCTAssertEqual(ttp.sessionState, .sessionExpired)
+
+        provider.readingResult = .success(Self.cardReadResult)
+        provider.armGate()
+
+        try await bounded { @MainActor in
+            // The recovery stops inside the provider and stays there. If the
+            // second setup is not made to wait, it walks in behind it.
+            async let recovering: Void = { _ = try? await ttp.charge(
+                type: .sale,
+                paymentDetails: PayabliTTPPaymentDetails(amount: 1, currency: "USD")
+            ) }()
+            await Task.yield()
+
+            async let initializing: Void = ttp.initialize()
+            for _ in 0 ..< 20 { await Task.yield() }
+            provider.openGate()
+
+            // The charge may fail: a host that re-initializes mid-charge takes
+            // the session out from under it, and `notReady` is the honest
+            // answer.
+            _ = try await (recovering, initializing)
+        }
+
+        XCTAssertFalse(
+            provider.sawOverlap,
+            "a reinitialize and an initialize were inside the provider at the same time"
+        )
+        XCTAssertEqual(
+            ttp.sessionState, .ready,
+            "the initialization that finished last should decide the state"
+        )
+    }
+
+    // MARK: - Error text reaching the host
+
+    /// A host shows `localizedDescription`. When the facade re-wraps an error
+    /// that is already a `PayabliTTPError`, that value becomes the whole enum
+    /// printed back — case name, parentheses, and the inner string escaped —
+    /// which is what a person then reads on screen.
+    func testPrepareFailureKeepsTheAdapterMessage() async throws {
+        let provider = MockTapToPayProvider()
+        provider.prepareReaderResult = .failure(
+            PayabliTTPError.readerSetupFailed(
+                reason: "passcodeDisabled: Error that indicates the device doesn't have an active passcode."
+            )
+        )
+        let ttp = makeTTP(provider: provider)
+
+        do {
+            try await bounded { try await ttp.initialize() }
+            XCTFail("expected initialize to fail")
+        } catch {
+            let shown = error.localizedDescription
+            XCTAssertEqual(
+                shown,
+                "passcodeDisabled: Error that indicates the device doesn't have an active passcode."
+            )
+            XCTAssertFalse(shown.contains("readerSetupFailed("), "the enum itself leaked into the message")
+            XCTAssertFalse(shown.contains("\\'"), "the inner string was escaped for display")
+        }
+    }
+
+    func testChargeFailureKeepsTheReaderMessage() async throws {
+        let (ttp, provider, _) = try await makeReadyTTP()
+        provider.readingResult = .failure(Self.sessionLevelFailure)
+
+        do {
+            _ = try await charge(ttp)
+            XCTFail("expected the charge to fail")
+        } catch {
+            XCTAssertEqual(
+                error.localizedDescription,
+                "noReaderSession: no reader session available or the session isn't ready"
+            )
+        }
+    }
+
+    // MARK: - Fixtures
+
+    private static let paymentTransId = "ttp-txn-1"
+
+    /// Shaped as the facade receives it on device: the vendored reader catches
+    /// the ProximityReader error and keeps only `title: description`.
+    private static let sessionLevelFailure = PayabliTTPError.nfcFailed(
+        reason: "noReaderSession: no reader session available or the session isn't ready"
+    )
+
+    private static let cancellationFailure = PayabliTTPError.nfcFailed(
+        reason: "\(FiservCardReader.cancellationReasonPrefix) user dismissed Tap to Pay sheet"
+    )
+
+    private static let cardReadResult = CardReadResult(
+        provider: "mock",
+        encryptedPayload: Data(),
+        cardNetwork: "VISA",
+        providerMetadata: [:],
+        providerResponseJSON: Data("{}".utf8)
+    )
+
+    private func charge(_ ttp: PayabliTTP) async throws -> TransactionResult {
+        try await bounded {
+            try await ttp.charge(
+                type: .sale,
+                paymentDetails: PayabliTTPPaymentDetails(amount: 1, currency: "USD")
+            )
+        }
+    }
+
+    /// How long a call may take before it is treated as never returning. Sized
+    /// for the slowest machine that runs this, not the fastest: an existing test
+    /// in this suite takes eighteen seconds on CI and milliseconds locally.
+    private var boundSeconds: UInt64 { 60 }
+
+    /// Every SDK call in this file goes through here. These tests cover a wedge
+    /// and two concurrency guards, so their failure mode is not returning, and
+    /// an unbounded one costs a CI job instead of going red.
+    ///
+    /// Not a task group: a group awaits all of its children before its scope
+    /// exits, and cancellation is cooperative, so work stuck on a lock or an
+    /// in-flight task keeps the group open however early the timer fires. The
+    /// deadline has to return without waiting for the work, which means racing
+    /// two unstructured tasks and resuming on whichever finishes first.
+    private func bounded<T: Sendable>(
+        _ work: @escaping @MainActor () async throws -> T
+    ) async throws -> T {
+        let once = ResumeOnce()
+
+        return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<T, Error>) in
+            let workTask = Task { @MainActor in
+                do {
+                    let value = try await work()
+                    if !once.done { once.done = true; continuation.resume(returning: value) }
+                } catch {
+                    if !once.done { once.done = true; continuation.resume(throwing: error) }
+                }
+            }
+            Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 5_000_000_000)
+                if !once.done { once.done = true; continuation.resume(throwing: ChargeTimedOut()) }
+                workTask.cancel()
+            }
+        }
+    }
+
+    private func makeTTP(provider: some TapToPayProvider) -> PayabliTTP {
+        PayabliTTP(
+            config: PayabliConfig(accessToken: "seed_token", entryPoint: "e", environment: .sandbox),
+            appId: "appid",
+            provider: provider,
+            attestation: MockDeviceAttestationService(),
+            retryPolicy: RetryPolicy(maxAttempts: 1, baseDelay: 0, maxDelay: 0, multiplier: 1, maxJitter: 0),
+            session: StubURLProtocol.makeSession()
+        )
+    }
+
+    /// A TTP that has been through `initialize()`, so it holds a `deviceId` and
+    /// sits at `.ready` — the only state `charge()` runs from.
+    private func makeReadyTTP() async throws -> (PayabliTTP, MockTapToPayProvider, MockDeviceAttestationService) {
+        let provider = MockTapToPayProvider()
+        let attestation = MockDeviceAttestationService()
+        let config = PayabliConfig(
+            accessToken: "seed_token",
+            entryPoint: "e",
+            environment: .sandbox
+        )
+        let ttp = PayabliTTP(
+            config: config,
+            appId: "appid",
+            provider: provider,
+            attestation: attestation,
+            retryPolicy: RetryPolicy(maxAttempts: 1, baseDelay: 0, maxDelay: 0, multiplier: 1, maxJitter: 0),
+            session: StubURLProtocol.makeSession()
+        )
+        try await bounded { try await ttp.initialize() }
+        XCTAssertEqual(ttp.sessionState, .ready, "the fixture itself is broken if this fails")
+        return (ttp, provider, attestation)
+    }
+
+    /// Answers `/config`, `/initiate` and `/update` by path. The suite's shared
+    /// handler answers every path with a config envelope, which `/initiate`
+    /// cannot decode.
+    private static let chargeStubHandler: StubURLProtocol.Handler = { request in
+        let path = request.url?.path ?? ""
+        let body: [String: Any]
+
+        if path.contains("/MoneyIn/initiate") {
+            body = [
+                "code": "A01",
+                "data": ["paymentTransId": PayabliTTPReaderSessionRecoveryTests.paymentTransId]
+            ]
+        } else if path.contains("/MoneyIn/update/") {
+            body = ["code": "A01", "data": ["paymentTransId": PayabliTTPReaderSessionRecoveryTests.paymentTransId]]
+        } else {
+            body = [
+                "responseCode": 1,
+                "isSuccess": true,
+                "responseData": [
+                    "credentials": [
+                        "secretKey": "s",
+                        "apiKey": "a",
+                        "merchantId": "m",
+                        "terminalId": "t"
+                    ]
+                ],
+                "paymentToken": "payment_tok"
+            ]
+        }
+
+        let data = try JSONSerialization.data(withJSONObject: body)
+        return (
+            HTTPURLResponse(
+                url: request.url!,
+                statusCode: 200,
+                httpVersion: "HTTP/1.1",
+                headerFields: ["Content-Type": "application/json"]
+            )!,
+            data
+        )
+    }
+}
+
+/// Distinguishes "the charge never returned" from "the charge threw", so a
+/// wedge cannot be mistaken for the failure these tests expect.
+private struct ChargeTimedOut: Error {}
+
+/// Guards a continuation so the deadline and the work cannot both resume it.
+/// Only touched from the main actor, which is where both racers run.
+@MainActor
+private final class ResumeOnce {
+    var done = false
+}
+
+// MARK: - Async throwing assertion
+
+/// `XCTAssertThrowsError` has no async form, and an autoclosure cannot be
+/// awaited, so the expression is taken as an async closure.
+private func XCTAssertThrowsErrorAsync<T>(
+    _ expression: @autoclosure () async throws -> T,
+    _ message: String = "expected an error",
+    file: StaticString = #filePath,
+    line: UInt = #line
+) async {
+    do {
+        _ = try await expression()
+        XCTFail(message, file: file, line: line)
+    } catch is ChargeTimedOut {
+        // The bound firing means the call never returned. Accepting it here
+        // would let the wedge these tests exist to catch pass as a success.
+        XCTFail("the charge did not complete within its bound", file: file, line: line)
+    } catch {
+        // Expected.
+    }
+}
+
+
+/// A provider that runs a caller-supplied step while a read is in flight, so the
+/// interleaving is deterministic instead of timing-dependent.
+/// `@unchecked` because every caller is on the main actor: the SDK surface is
+/// `@MainActor` and the tests drive the gate from there. Isolating the class
+/// instead would put the conformance across an isolation boundary, which is an
+/// error under the Swift 6 language mode.
+private final class InterleavingProvider: TapToPayProvider, @unchecked Sendable {
+    static var providerId: String { "interleaving" }
+
+    var readingResult: Result<CardReadResult, Error> = .failure(
+        PayabliTTPError.nfcFailed(reason: "not configured")
+    )
+    var duringRead: (() async throws -> Void)?
+    var suspendDuringPrepare = false
+    /// Holds `prepareReader` open until the test releases it, so a second setup
+    /// has a real window to enter.
+    private var gate: CheckedContinuation<Void, Never>?
+    private var gateArmed = false
+
+    func armGate() { gateArmed = true }
+
+    func openGate() {
+        gateArmed = false
+        gate?.resume()
+        gate = nil
+    }
+    private(set) var prepareReaderCalls = 0
+    private(set) var configureCalls = 0
+    /// True if a second setup entered while one was still inside the provider.
+    private(set) var sawOverlap = false
+    private var inProvider = false
+
+    func checkEligibility() async -> Result<Void, PayabliTTPError> { .success(()) }
+    func configure(credentials: [String: String]) throws { configureCalls += 1 }
+
+    func prepareReader() async throws {
+        prepareReaderCalls += 1
+        if inProvider { sawOverlap = true }
+        inProvider = true
+        defer { inProvider = false }
+        if gateArmed {
+            await withCheckedContinuation { self.gate = $0 }
+        } else if suspendDuringPrepare {
+            await Task.yield()
+        }
+    }
+    func cancelReading() async {}
+    func cleanUp() async {}
+
+    func startReading(_ request: CardReadRequest) async throws -> CardReadResult {
+        if let duringRead {
+            self.duringRead = nil
+            try await duringRead()
+        }
+        return try readingResult.get()
+    }
+}

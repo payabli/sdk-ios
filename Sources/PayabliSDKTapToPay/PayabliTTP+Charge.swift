@@ -78,18 +78,35 @@ extension PayabliTTP {
             invoice: context.invoice
         )
         let readResult: CardReadResult
+        let generation = readerSessionGeneration
         do {
             readResult = try await provider.startReading(readRequest)
             multicaster.emit(.nfcCompleted)
         } catch {
             multicaster.emit(.nfcFailed(error: String(describing: error)))
+
+            // A dead reader session is repaired only by re-initializing, and
+            // `reinitializeIfNeeded()` does nothing while the state says `.ready`.
+            //
+            // Only if the reader that failed is still the current one.
+            // `startReading` suspends, so an `initialize()` in that window can
+            // prepare a replacement and return to `.ready`, and expiring then
+            // would kill a healthy session over a dead one's failure.
+            if generation == readerSessionGeneration,
+               readerFailureInvalidatesSession(error),
+               sessionManager.transition(to: .sessionExpired) {
+                syncPublished()
+                multicaster.emit(.sessionExpired)
+            }
+
             // Best-effort backend notify so the transaction isn't left dangling.
             // Its outcome doesn't change what we report to the caller.
             _ = await tryUpdate(
                 paymentTransId: paymentTransId,
                 payload: .nfcFailure(description: String(describing: error))
             )
-            throw PayabliTTPError.nfcFailed(reason: String(describing: error))
+            throw error as? PayabliTTPError
+                ?? PayabliTTPError.nfcFailed(reason: String(describing: error))
         }
 
         // Step 3 — success update. No offline fallback: on failure the

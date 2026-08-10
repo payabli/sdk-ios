@@ -16,8 +16,53 @@ extension PayabliTTP {
     ///   3. Hand credentials to the provider (NFR-5D — runtime only).
     ///   4. Prepare reader, transition to `.ready`.
     public func initialize() async throws {
+        try await runSessionSetup(.initialize) { try await self.runInitialize() }
+    }
+
+    /// Serialises the two entry points that build a session.
+    ///
+    /// Both reset or advance the same state and both configure and prepare the
+    /// same provider, so overlapping them lets one finish against the other's
+    /// session and report success on transitions that were rejected. A caller of
+    /// the same kind joins the operation in flight; a caller of the other kind
+    /// waits for it and then runs its own, which keeps their meanings distinct:
+    /// re-initializing skips attestation, initializing does not.
+    private func runSessionSetup(
+        _ kind: SessionSetupKind,
+        _ work: @escaping @MainActor () async throws -> Void
+    ) async throws {
+        if let existing = inFlightSessionSetup, existing.kind == kind {
+            return try await existing.task.value
+        }
+
+        // Chain behind an operation of the other kind rather than polling for
+        // it. Re-checking in a loop re-awaits a task that has already finished
+        // and spins the main actor until the slot is cleared, which starves
+        // everything else running on it.
+        let previous = inFlightSessionSetup?.task
+        let id = nextSessionSetupID
+        nextSessionSetupID += 1
+
+        let task = Task<Void, Error> { @MainActor in
+            // Its failure belongs to its own caller.
+            if let previous { _ = try? await previous.value }
+            try await work()
+        }
+        inFlightSessionSetup = (kind, task, id)
+        defer { if inFlightSessionSetup?.id == id { inFlightSessionSetup = nil } }
+        try await task.value
+    }
+
+    private func runInitialize() async throws {
         // 0. Eligibility.
         try await runEligibility()
+
+        // Start from `.idle`, whatever the caller left behind. The matrix is
+        // narrow — from `.sessionExpired` only `.reinitializing` is reachable —
+        // and transition results are discarded, so without this every phase ran
+        // and the state never moved.
+        sessionManager.reset()
+        syncPublished()
 
         // 1. Attestation (cold) or warm deviceId. Transitions us into
         //    `.fetchingConfig` on success.
@@ -63,6 +108,10 @@ extension PayabliTTP {
     /// `initialize()`. NFR-5D forbids providers from caching credentials
     /// across sessions, so every refresh re-fetches `/config`.
     public func reinitializeIfNeeded() async throws {
+        try await runSessionSetup(.reinitialize) { try await self.runReinitializeIfNeeded() }
+    }
+
+    private func runReinitializeIfNeeded() async throws {
         switch sessionState {
         case .ready:
             return
@@ -196,10 +245,12 @@ extension PayabliTTP {
         multicaster.emit(.readerInitializing)
         do {
             try await provider.prepareReader()
+            readerSessionGeneration += 1
         } catch {
             sessionManager.markError(error)
             syncPublished()
-            throw PayabliTTPError.readerSetupFailed(reason: String(describing: error))
+            throw error as? PayabliTTPError
+                ?? PayabliTTPError.readerSetupFailed(reason: String(describing: error))
         }
     }
 
