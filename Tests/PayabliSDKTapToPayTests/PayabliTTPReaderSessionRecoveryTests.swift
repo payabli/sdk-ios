@@ -146,7 +146,7 @@ final class PayabliTTPReaderSessionRecoveryTests: XCTestCase {
         XCTAssertEqual(ttp.sessionState, .sessionExpired)
 
         provider.readingResult = .success(Self.cardReadResult)
-        try await ttp.initialize()
+        try await bounded { try await ttp.initialize() }
 
         XCTAssertEqual(
             ttp.sessionState, .ready,
@@ -158,7 +158,7 @@ final class PayabliTTPReaderSessionRecoveryTests: XCTestCase {
     /// must leave it observably ready rather than relying on it already being so.
     func testInitializeFromReadyStaysReady() async throws {
         let (ttp, _, _) = try await makeReadyTTP()
-        try await ttp.initialize()
+        try await bounded { try await ttp.initialize() }
         XCTAssertEqual(ttp.sessionState, .ready)
     }
 
@@ -172,7 +172,7 @@ final class PayabliTTPReaderSessionRecoveryTests: XCTestCase {
     func testFailureFromASupersededReaderDoesNotExpireTheNewSession() async throws {
         let provider = InterleavingProvider()
         let ttp = makeTTP(provider: provider)
-        try await ttp.initialize()
+        try await bounded { try await ttp.initialize() }
         XCTAssertEqual(ttp.sessionState, .ready)
 
         // Runs while the charge is suspended inside `startReading`, exactly as a
@@ -231,7 +231,7 @@ final class PayabliTTPReaderSessionRecoveryTests: XCTestCase {
         let ttp = makeTTP(provider: provider)
 
         do {
-            try await ttp.initialize()
+            try await bounded { try await ttp.initialize() }
             XCTFail("expected initialize to fail")
         } catch {
             let shown = error.localizedDescription
@@ -337,7 +337,7 @@ final class PayabliTTPReaderSessionRecoveryTests: XCTestCase {
             retryPolicy: RetryPolicy(maxAttempts: 1, baseDelay: 0, maxDelay: 0, multiplier: 1, maxJitter: 0),
             session: StubURLProtocol.makeSession()
         )
-        try await ttp.initialize()
+        try await bounded { try await ttp.initialize() }
         XCTAssertEqual(ttp.sessionState, .ready, "the fixture itself is broken if this fails")
         return (ttp, provider, attestation)
     }
