@@ -348,6 +348,10 @@ private func XCTAssertThrowsErrorAsync<T>(
     do {
         _ = try await expression()
         XCTFail(message, file: file, line: line)
+    } catch is ChargeTimedOut {
+        // The bound firing means the call never returned. Accepting it here
+        // would let the wedge these tests exist to catch pass as a success.
+        XCTFail("the charge did not complete within its bound", file: file, line: line)
     } catch {
         // Expected.
     }
