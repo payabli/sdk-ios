@@ -122,10 +122,9 @@ PayabliDemo/
 
 ### The Config tab
 
-Read-only, and deliberately so: the three SDK facades are `@StateObject`s built
-once at launch, so `entryPoint`, `environment` and `appId` cannot be re-read
-afterwards — an editable field would show a value the SDK never received. Edit
-`Secrets.swift` and relaunch.
+Read-only. The SDK captures `entryPoint`, `environment` and `appId` at launch,
+so an editable field would show a value it never received. Edit `Secrets.swift`
+and relaunch.
 
 It shows Integration, Token endpoint (with **Check token** and **Health**
 probes), card-present readiness, the shared card-not-present settings, the

@@ -86,18 +86,12 @@ enum DebugPrefill {
 
     /// Feeds `value` into `textField` through the SDK's own input path.
     ///
-    /// A protected field ignores direct `.text` assignment, so input has to arrive
-    /// via `textField(_:shouldChangeCharactersIn:replacementString:)` with a range
-    /// spanning the whole field, which is what UIKit does when a value is pasted
-    /// over a selection. The SDK's formatting and view model then update as if
-    /// typed.
+    /// A protected field ignores direct `.text` assignment, so the value goes in
+    /// through the delegate, as a paste over the whole field.
     ///
-    /// Only some fields are protected, which is why the return value matters. A
-    /// protected field applies the change itself and answers `false`. An
-    /// unprotected one answers `true`, meaning "yes, make this change" — and UIKit
-    /// is what normally makes it. Calling the delegate directly leaves nobody to,
-    /// so every unprotected field silently kept its old value: cardholder name,
-    /// ZIP, both name fields, email, customer number and the ACH holder.
+    /// The delegate's answer has to be honoured: a protected field applies the
+    /// change itself and says `false`, an unprotected one says `true` and leaves
+    /// the applying to the caller.
     private static func inject(_ value: String, into textField: UITextField) {
         let current = (textField.text ?? "") as NSString
         let fullRange = NSRange(location: 0, length: current.length)

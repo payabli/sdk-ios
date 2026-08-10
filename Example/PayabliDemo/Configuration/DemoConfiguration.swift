@@ -43,28 +43,17 @@ enum DemoConfiguration {
 
     /// Resolves the bundled `LocalTokenServer` base URL at runtime.
     ///
-    /// The Simulator and a physical device disagree about what `127.0.0.1`
-    /// means — on the phone it is the phone — so the host cannot be a constant.
-    /// This picks it per run, and lets QA override it without a rebuild.
+    /// `127.0.0.1` means the Mac in the Simulator and the phone on a device, so
+    /// the host is resolved per run. First match wins:
     ///
-    /// Resolution order, first match wins:
+    /// 1. `-PayabliTokenHost <host>`, or the same `UserDefaults` key. Takes a
+    ///    bare host, a `host:port`, or a full URL.
+    /// 2. Simulator: `127.0.0.1`.
+    /// 3. Device: `Secrets.localNetworkHost`, the Mac's Bonjour name, which
+    ///    survives a DHCP lease change. Where mDNS is blocked, use (1).
     ///
-    /// 1. **`-PayabliTokenHost <host>`** as a launch argument, or the same key
-    ///    in `UserDefaults`. Beats everything, needs no recompile, and takes a
-    ///    bare host (`192.168.10.42`), a `host:port`, or a full URL.
-    /// 2. **Simulator** → `127.0.0.1`, which reaches the Mac directly.
-    /// 3. **Physical device** → `Secrets.localNetworkHost`, the Mac's Bonjour
-    ///    name. A `.local` name is preferred over a pinned IP because it
-    ///    survives a DHCP lease change; where mDNS is blocked, override with (1).
-    ///
-    /// The device path needs the server bound beyond loopback:
-    ///
-    /// ```bash
-    /// PAYABLI_LOCAL_TOKEN_SERVER_HOST=0.0.0.0 node server.mjs
-    /// ```
-    ///
-    /// and `NSLocalNetworkUsageDescription` in `Info.plist`, since iOS 14 gates
-    /// mDNS and local-subnet traffic behind the Local Network permission prompt.
+    /// Running against a device needs the server bound past loopback and the
+    /// Local Network permission; see `LocalTokenServer/README.md`.
     enum TokenServer {
 
         static let defaultPort = 8787

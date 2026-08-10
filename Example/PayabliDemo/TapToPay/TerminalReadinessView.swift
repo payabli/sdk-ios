@@ -12,15 +12,11 @@ import SwiftUI
 struct TerminalReadinessView: View {
     let configuredAppId: String
 
-    /// Computed on appearance rather than per body evaluation: each run does a
-    /// `uname`, hits `DCAppAttestService`, and reads the provisioning profile.
+    /// Computed on appearance, not per body evaluation: each run does a `uname`,
+    /// hits `DCAppAttestService`, and reads the provisioning profile.
     ///
-    /// `nil` until that first run, and deliberately not an empty array. The
-    /// rollup reads "not available if and only if something failed", so an empty
-    /// set of checks is indistinguishable from a set that all passed, and the
-    /// first frame rendered Terminal Ready before a single check had run. A
-    /// terminal that announces itself ready and is not is the one wrong answer
-    /// this view exists to prevent.
+    /// `nil` before that first run, never an empty array. The rollup fails only
+    /// on a failed check, so an empty set would read as ready.
     @State private var checks: [TapToPayPreflight.Check]?
 
     private var readiness: TapToPayPreflight.Readiness? {

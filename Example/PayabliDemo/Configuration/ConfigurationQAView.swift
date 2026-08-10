@@ -4,10 +4,8 @@ import SwiftUI
 
 /// Every knob the demo runs on, in one read-only place.
 ///
-/// Read-only on purpose. The three SDK facades are `@StateObject`s built once at
-/// launch, so `entryPoint`, `environment` and `appId` cannot be re-read
-/// afterwards — an editable field for those would show a value the SDK never
-/// received. Edit them in `Secrets.swift` and relaunch.
+/// Read-only. The SDK captures these at launch, so an editable field would show
+/// a value it never received. Change them in `Secrets.swift` and relaunch.
 ///
 /// The card-not-present rows read from `PayInSharedConfiguration`, the same
 /// source the forms use, so this screen cannot drift from the real behaviour.

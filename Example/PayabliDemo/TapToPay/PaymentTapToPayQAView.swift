@@ -30,12 +30,8 @@ struct PaymentTapToPayQAView: View {
 
     /// Which half of the activation step failed.
     ///
-    /// Activation is two SDK calls, and a single flag cannot say which one threw.
-    /// It has to, for two reasons. A successful `activateDevice` followed by a
-    /// failing `initialize()` also lands in `.error`, so a flag blames activation
-    /// for a failure that happened after it succeeded. And a revoked attestation
-    /// resets the session to `.idle` rather than `.error`, so a check against
-    /// `.error` misses that failure entirely and hides its reason and retry.
+    /// Activation is two SDK calls. `sessionState` cannot tell them apart: both
+    /// land in `.error`, except a revoked attestation, which lands in `.idle`.
     private enum ActivationOutcome {
         case none
         case activationFailed
