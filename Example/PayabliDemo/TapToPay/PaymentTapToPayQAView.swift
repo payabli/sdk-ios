@@ -424,7 +424,22 @@ struct PaymentTapToPayQAView: View {
 
     // MARK: - Actions
 
+    /// Clears what the previous session said about itself.
+    ///
+    /// Each message describes one attempt, so a charge failure that has since
+    /// been repaired is history: leaving it under a step that is ready to run
+    /// again reports a failure that is no longer true. Seen on device, where a
+    /// dead reader session was recovered and the step still carried the error
+    /// that killed it.
+    private func clearOutcomesForNewSession() {
+        enableMessage = ""
+        chargeMessage = ""
+        activationMessage = ""
+        activationOutcome = .none
+    }
+
     private func runEnableTerminal() {
+        clearOutcomesForNewSession()
         isWorking = true
         Task {
             defer { isWorking = false }
@@ -438,6 +453,7 @@ struct PaymentTapToPayQAView: View {
     }
 
     private func runReinitialize() {
+        clearOutcomesForNewSession()
         isWorking = true
         Task {
             defer { isWorking = false }
@@ -451,6 +467,7 @@ struct PaymentTapToPayQAView: View {
     }
 
     private func runCharge() {
+        chargeMessage = ""
         guard let amount = Decimal(string: amountText), amount > 0 else {
             chargeMessage = "✗ Enter an amount greater than zero"
             return
