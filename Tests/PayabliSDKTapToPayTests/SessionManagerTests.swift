@@ -69,12 +69,14 @@ final class SessionManagerTests: XCTestCase {
 
     // MARK: - Force expiry + error
 
-    func testForceSessionExpiry() {
+    /// The route a live caller takes: `charge()` marks a dead reader session
+    /// expired from `.ready`, which the matrix already permits.
+    func testReadyToSessionExpiredIsPermitted() {
         let sm = SessionManager()
         _ = sm.transition(to: .fetchingConfig)
         _ = sm.transition(to: .initializingReader)
         _ = sm.transition(to: .ready)
-        sm.forceSessionExpiry()
+        XCTAssertTrue(sm.transition(to: .sessionExpired))
         XCTAssertEqual(sm.sessionState, .sessionExpired)
         XCTAssertFalse(sm.isReady)
     }
