@@ -10,10 +10,36 @@ enum DemoConfiguration {
 
     /// Which Payabli backend every SDK facade in this app talks to.
     ///
-    /// Captured by the three facades at launch (`PayabliDemoQAApp`), so changing
-    /// it needs a rebuild — which is why the Configuration screen displays it
-    /// rather than editing it.
-    static let environment: PayabliEnvironment = .qa
+    /// Sandbox by default, because that is the environment an integrator can
+    /// actually reach. Override it per run with `-PayabliEnvironment qa`, or
+    /// `sandbox` or `production`, so a different environment never means editing
+    /// a committed file. In Xcode that goes in Product, Edit Scheme, Run,
+    /// Arguments.
+    ///
+    /// Captured by the three facades at launch (`PayabliDemoQAApp`), so it is
+    /// fixed for the process — which is why the Config screen displays it rather
+    /// than editing it.
+    static let environment: PayabliEnvironment = resolvedEnvironment()
+
+    static let environmentSource: String = {
+        overriddenEnvironment() == nil ? "default" : "-PayabliEnvironment launch argument"
+    }()
+
+    private static func resolvedEnvironment() -> PayabliEnvironment {
+        overriddenEnvironment() ?? .sandbox
+    }
+
+    private static func overriddenEnvironment() -> PayabliEnvironment? {
+        let arguments = ProcessInfo.processInfo.arguments
+        guard let index = arguments.firstIndex(of: "-PayabliEnvironment"),
+              index + 1 < arguments.count else { return nil }
+        switch arguments[index + 1].lowercased() {
+        case "qa": return .qa
+        case "sandbox": return .sandbox
+        case "production": return .production
+        default: return nil
+        }
+    }
 
     /// Resolves the bundled `LocalTokenServer` base URL at runtime.
     ///

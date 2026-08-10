@@ -25,7 +25,7 @@ cp .env.example .env
 Edit `.env`:
 
 ```bash
-PAYABLI_ACCESS_TOKEN=<your short-lived QA access token>
+PAYABLI_ACCESS_TOKEN=<your short-lived sandbox access token>
 ```
 
 Start the server:
@@ -64,19 +64,19 @@ If you want the local endpoint to exchange credentials, leave
 `PAYABLI_ACCESS_TOKEN` blank and configure:
 
 ```bash
-PAYABLI_CLIENT_ID=<your QA client id>
-PAYABLI_CLIENT_SECRET=<your QA client secret>
-PAYABLI_API_BASE_URL=https://api-qa.payabli.com/api
+PAYABLI_CLIENT_ID=<your sandbox client id>
+PAYABLI_CLIENT_SECRET=<your sandbox client secret>
+PAYABLI_API_BASE_URL=https://api-sandbox.payabli.com/api
 PAYABLI_TOKEN_PATH=/v2/token/serverside
 ```
 
-QA throughout, because that is what the app and `.env.example` ship. See
-**Match this to the app** below before changing either to sandbox.
+Sandbox throughout, because that is what the app and `.env.example` ship. See
+**Match this to the app** below before changing environment.
 
 That maps to Payabli's server-side token call:
 
 ```bash
-curl --location 'https://api-qa.payabli.com/api/v2/token/serverside' \
+curl --location 'https://api-sandbox.payabli.com/api/v2/token/serverside' \
   --header 'Content-Type: application/json' \
   --data '{
     "clientId": "{clientId}",
@@ -84,14 +84,19 @@ curl --location 'https://api-qa.payabli.com/api/v2/token/serverside' \
   }'
 ```
 
-For sandbox instead, use `https://api-sandbox.payabli.com/api` and change the
-app's environment to match.
+For another environment, change this and pass the matching
+`-PayabliEnvironment` to the app.
 
 **Match this to the app.** A token minted for one Payabli environment is
 rejected by another, and the rejection reads as a credential problem rather than
-a configuration one. The app's environment is `DemoConfiguration.environment` in
-`Configuration/DemoConfiguration.swift`, and it ships as `.qa` — which is why
-`.env.example` now defaults to `api-qa`. Change both together, or neither.
+a configuration one.
+
+The app ships `.sandbox`, which is what an integrator can reach, so
+`.env.example` defaults to `api-sandbox`. Change them together. The app side
+needs no edit to a committed file: pass `-PayabliEnvironment qa`, `sandbox` or
+`production` as a launch argument, in **Product → Scheme → Edit Scheme → Run →
+Arguments**. The Config tab prints the live environment and whether it came from
+the default or the argument.
 
 The server also accepts `api-sandbox.payabli.com/api` or
 `api-qa.payabli.com/api` and will add `https://` automatically.
@@ -134,7 +139,7 @@ subject to the allowed-host guard:
 {
   "clientId": "...",
   "clientSecret": "...",
-  "apiBaseUrl": "https://api-qa.payabli.com/api",
+  "apiBaseUrl": "https://api-sandbox.payabli.com/api",
   "tokenPath": "/v2/token/serverside",
   "responseTokenField": "access_token"
 }

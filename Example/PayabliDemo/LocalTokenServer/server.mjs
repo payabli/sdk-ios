@@ -9,8 +9,8 @@ loadEnv(join(serverDir, ".env"));
 
 const port = Number.parseInt(process.env.PORT || "8787", 10);
 const bindHost = stringValue(process.env.PAYABLI_LOCAL_TOKEN_SERVER_HOST) || "127.0.0.1";
-// QA, matching what the app and .env.example ship. Override with PAYABLI_API_BASE_URL.
-const defaultApiBaseUrl = process.env.PAYABLI_API_BASE_URL || "https://api-qa.payabli.com/api";
+// Sandbox, matching what the app and .env.example ship. Override with PAYABLI_API_BASE_URL.
+const defaultApiBaseUrl = process.env.PAYABLI_API_BASE_URL || "https://api-sandbox.payabli.com/api";
 const defaultTokenPath = process.env.PAYABLI_TOKEN_PATH || "/v2/token/serverside";
 const defaultEntry = (process.env.PAYABLI_ENTRY || "").trim();
 const responseTokenField = (process.env.PAYABLI_RESPONSE_TOKEN_FIELD || "").trim();

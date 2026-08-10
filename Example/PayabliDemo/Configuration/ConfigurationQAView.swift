@@ -48,6 +48,7 @@ struct ConfigurationQAView: View {
             QADetailRow(
                 label: "Environment",
                 value: "\(environmentName) · " + (DemoConfiguration.environment.baseURL.host ?? "—")
+                    + " · " + DemoConfiguration.environmentSource
             )
         }
     }
