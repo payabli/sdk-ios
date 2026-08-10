@@ -101,7 +101,8 @@ extension PayabliTTP {
                 paymentTransId: paymentTransId,
                 payload: .nfcFailure(description: String(describing: error))
             )
-            throw PayabliTTPError.nfcFailed(reason: String(describing: error))
+            throw error as? PayabliTTPError
+                ?? PayabliTTPError.nfcFailed(reason: String(describing: error))
         }
 
         // Step 3 — success update. No offline fallback: on failure the

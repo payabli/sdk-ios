@@ -19,6 +19,18 @@ extension PayabliTTP {
         // 0. Eligibility.
         try await runEligibility()
 
+        // Start from `.idle`, whatever state the caller left behind.
+        //
+        // The transition matrix is deliberately narrow, so most of the moves
+        // below are illegal from anywhere except the beginning: from
+        // `.sessionExpired`, only `.reinitializing` is reachable. Their results
+        // are discarded, so calling this on a session that had expired ran every
+        // phase — attestation, config, preparing the reader — and then left the
+        // state exactly as it found it, reporting success while the host still
+        // saw a dead session.
+        sessionManager.reset()
+        syncPublished()
+
         // 1. Attestation (cold) or warm deviceId. Transitions us into
         //    `.fetchingConfig` on success.
         let deviceId = try await runAttestationPhase()
@@ -199,7 +211,8 @@ extension PayabliTTP {
         } catch {
             sessionManager.markError(error)
             syncPublished()
-            throw PayabliTTPError.readerSetupFailed(reason: String(describing: error))
+            throw error as? PayabliTTPError
+                ?? PayabliTTPError.readerSetupFailed(reason: String(describing: error))
         }
     }
 

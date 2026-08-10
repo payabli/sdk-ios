@@ -135,6 +135,83 @@ final class PayabliTTPReaderSessionRecoveryTests: XCTestCase {
         ))
     }
 
+    // MARK: - initialize() from a state it did not start in
+
+    /// `initialize()` is the entry point a host is told to call again, so it has
+    /// to work from wherever the session happens to be.
+    ///
+    /// Every transition it makes was being discarded, so from `.sessionExpired`
+    /// it did all of its work — attestation, config, preparing the reader — and
+    /// then left the state exactly where it found it. Success, reported as
+    /// failure, with no way to tell them apart.
+    func testInitializeRecoversFromAnExpiredSession() async throws {
+        let (ttp, provider, _) = try await makeReadyTTP()
+
+        provider.readingResult = .failure(Self.sessionLevelFailure)
+        await XCTAssertThrowsErrorAsync(try await self.charge(ttp))
+        XCTAssertEqual(ttp.sessionState, .sessionExpired)
+
+        provider.readingResult = .success(Self.cardReadResult)
+        try await ttp.initialize()
+
+        XCTAssertEqual(
+            ttp.sessionState, .ready,
+            "initialize() did its work but never moved the state"
+        )
+    }
+
+    /// The same hole from the other direction: re-initializing a healthy session
+    /// must leave it observably ready rather than relying on it already being so.
+    func testInitializeFromReadyStaysReady() async throws {
+        let (ttp, _, _) = try await makeReadyTTP()
+        try await ttp.initialize()
+        XCTAssertEqual(ttp.sessionState, .ready)
+    }
+
+    // MARK: - Error text reaching the host
+
+    /// A host shows `localizedDescription`. When the facade re-wraps an error
+    /// that is already a `PayabliTTPError`, that value becomes the whole enum
+    /// printed back — case name, parentheses, and the inner string escaped —
+    /// which is what a person then reads on screen.
+    func testPrepareFailureKeepsTheAdapterMessage() async throws {
+        let provider = MockTapToPayProvider()
+        provider.prepareReaderResult = .failure(
+            PayabliTTPError.readerSetupFailed(
+                reason: "passcodeDisabled: Error that indicates the device doesn't have an active passcode."
+            )
+        )
+        let ttp = makeTTP(provider: provider)
+
+        do {
+            try await ttp.initialize()
+            XCTFail("expected initialize to fail")
+        } catch {
+            let shown = error.localizedDescription
+            XCTAssertEqual(
+                shown,
+                "passcodeDisabled: Error that indicates the device doesn't have an active passcode."
+            )
+            XCTAssertFalse(shown.contains("readerSetupFailed("), "the enum itself leaked into the message")
+            XCTAssertFalse(shown.contains("\\'"), "the inner string was escaped for display")
+        }
+    }
+
+    func testChargeFailureKeepsTheReaderMessage() async throws {
+        let (ttp, provider, _) = try await makeReadyTTP()
+        provider.readingResult = .failure(Self.sessionLevelFailure)
+
+        do {
+            _ = try await charge(ttp)
+            XCTFail("expected the charge to fail")
+        } catch {
+            XCTAssertEqual(
+                error.localizedDescription,
+                "noReaderSession: no reader session available or the session isn't ready"
+            )
+        }
+    }
+
     // MARK: - Fixtures
 
     private static let paymentTransId = "ttp-txn-1"
@@ -175,6 +252,17 @@ final class PayabliTTPReaderSessionRecoveryTests: XCTestCase {
             guard let first = try await group.next() else { throw ChargeTimedOut() }
             return first
         }
+    }
+
+    private func makeTTP(provider: MockTapToPayProvider) -> PayabliTTP {
+        PayabliTTP(
+            config: PayabliConfig(accessToken: "seed_token", entryPoint: "e", environment: .sandbox),
+            appId: "appid",
+            provider: provider,
+            attestation: MockDeviceAttestationService(),
+            retryPolicy: RetryPolicy(maxAttempts: 1, baseDelay: 0, maxDelay: 0, multiplier: 1, maxJitter: 0),
+            session: StubURLProtocol.makeSession()
+        )
     }
 
     /// A TTP that has been through `initialize()`, so it holds a `deviceId` and
