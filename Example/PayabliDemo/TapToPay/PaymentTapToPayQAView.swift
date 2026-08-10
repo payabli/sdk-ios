@@ -503,7 +503,11 @@ struct PaymentTapToPayQAView: View {
                 activationOutcome = .succeeded
                 activationMessage = "✓ Activated and terminal enabled"
             } catch {
+                // The reason belongs to the step that renders it. Step 2 shows
+                // `enableMessage`, and the activation row is not `.failed` here,
+                // so writing only to `activationMessage` would discard the error.
                 activationOutcome = .enableFailed
+                enableMessage = "✗ \(error.localizedDescription)"
                 activationMessage = "✓ Activated. Enabling the terminal failed — see step 2."
             }
         }
