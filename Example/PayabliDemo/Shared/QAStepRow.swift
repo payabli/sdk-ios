@@ -2,10 +2,8 @@ import SwiftUI
 
 /// One step of a QA flow, with its own status and action.
 ///
-/// Shared by every payment tab so they read the same way. Each screen used to be
-/// a flat set of controls that were all always tappable, which said nothing
-/// about what to do first. These steps mirror the order the SDK enforces, so the
-/// next thing to do is the only thing offered.
+/// Shared by every payment tab so they read the same way. The steps mirror the
+/// order the SDK enforces, so the next thing to do is the only thing offered.
 enum QAStepStatus {
     /// Finished, and nothing more to do here.
     case done

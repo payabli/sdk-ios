@@ -45,10 +45,9 @@ struct PaymentTapToPayQAView: View {
     @State private var isWorking = false
     @FocusState private var focusedField: Field?
 
-    /// The two numeric-keypad fields. A decimal or number pad carries no return
-    /// key, so without an explicit dismissal the keyboard covers the rest of the
-    /// screen with no way back. Measured on device: the tab bar stays hidden and
-    /// the event log is unreachable.
+    /// The two numeric-keypad fields. A decimal or number pad has no return key,
+    /// so the screen has to offer the dismissal itself; without one the keyboard
+    /// covers the tab bar and the event log, and nothing on screen gets it back.
     private enum Field: Hashable {
         case amount
         case activationCode
@@ -298,9 +297,8 @@ struct PaymentTapToPayQAView: View {
         }
     }
 
-    /// A step's own result, in the step. Previously every outcome went to one
-    /// shared box at the bottom, so a failure said "failed" here and explained
-    /// itself somewhere else.
+    /// A step's own result, rendered in the step, so a failure states its reason
+    /// where it happened rather than in a shared box elsewhere.
     @ViewBuilder
     private func stepOutcome(_ message: String) -> some View {
         if !message.isEmpty {
@@ -556,7 +554,6 @@ struct PaymentTapToPayQAView: View {
 
     /// `PayabliTTPEventCode` is an `@objc Int` enum, so `String(describing:)`
     /// renders `PayabliTTPEventCode(rawValue: 0)` rather than the case name.
-    /// Measured on a real `initialize()` run before this existed.
     private func name(for code: PayabliTTPEventCode) -> String {
         switch code {
         case .attestationStarted: return "attestationStarted"

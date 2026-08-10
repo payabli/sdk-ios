@@ -5,8 +5,7 @@ import SwiftUI
 
 /// Rolling in-memory log of redacted PayIn request/response diagnostics.
 ///
-/// One type with a named instance per flow, replacing the two byte-identical
-/// store classes that previously differed only in their name.
+/// One type, with a named instance per flow.
 @MainActor
 final class DiagnosticsStore: ObservableObject {
     static let paymentMethod = DiagnosticsStore(category: "PaymentMethodDiagnostics")
@@ -39,10 +38,11 @@ final class DiagnosticsStore: ObservableObject {
 extension PayabliPayInPaymentFlowDiagnostics {
     /// Builds the diagnostics handler for one flow.
     ///
-    /// The two flows previously carried ~30 duplicated lines each, differing
-    /// only in the gating flag, the logger category, and the destination store.
-    /// The SDK redacts before handing an entry over; nothing here re-redacts,
-    /// and nothing here prints a token.
+    /// Parameterised by the gating flag, the logger category and the destination
+    /// store, which is all the flows differ by.
+    ///
+    /// The SDK redacts before handing an entry over; nothing here re-redacts, and
+    /// nothing here prints a token.
     static func qaLogging(enabled: Bool, store: DiagnosticsStore) -> PayabliPayInPaymentFlowDiagnostics {
         guard enabled else { return .disabled }
 

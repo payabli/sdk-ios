@@ -1,9 +1,6 @@
 import SwiftUI
 
-/// Renders a `DiagnosticsStore`'s rolling log.
-///
-/// Previously duplicated verbatim in the stored-method and capture tabs, which
-/// meant a formatting change had to be made twice to stay consistent.
+/// Renders a `DiagnosticsStore`'s rolling log, for any tab that has one.
 struct DiagnosticsSection: View {
     @ObservedObject var store: DiagnosticsStore
 

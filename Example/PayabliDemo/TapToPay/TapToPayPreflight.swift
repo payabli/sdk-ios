@@ -110,9 +110,8 @@ enum TapToPayPreflight {
     /// `embedded.mobileprovision` is a CMS-signed container, so the XML plist is
     /// sliced out rather than decoded as a whole.
     ///
-    /// Cached: a provisioning profile cannot change during a process lifetime,
-    /// and `checks(configuredAppId:)` used to re-read and re-parse the file on
-    /// every SwiftUI body evaluation.
+    /// Cached, because a provisioning profile cannot change during a process
+    /// lifetime and reading it means slicing a plist out of a CMS container.
     static let provisioningEntitlements: [String: Any]? = loadProvisioningEntitlements()
 
     private static func loadProvisioningEntitlements() -> [String: Any]? {

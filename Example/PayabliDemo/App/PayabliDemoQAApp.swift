@@ -62,10 +62,8 @@ struct PayabliDemoQAApp: App {
                         Label("Config", systemImage: "gearshape")
                     }
             }
-            // The app-wide tint, applied here rather than through an asset catalogue's AccentColor,
-            // so the whole palette stays in one Swift file. The build settings previously named an
-            // AccentColor asset that has never existed in this project; adding the app icon made
-            // actool run for the first time and report it, and the setting is now gone.
+            // The app-wide tint. The palette lives in one Swift file rather than an
+            // asset catalogue, so it is set here instead of by an AccentColor asset.
             .tint(.payabliPrimary)
         }
     }

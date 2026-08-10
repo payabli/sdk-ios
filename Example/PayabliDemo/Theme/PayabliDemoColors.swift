@@ -50,7 +50,7 @@ enum PayabliPalette {
 /// white. The guide has no green, so a passing check reads teal; inventing a green would put a
 /// colour in the app that appears in no token list.
 ///
-/// Every pair used here was measured with the WCAG formula and clears 4.5:1 in both appearances.
+/// Every pair used here clears 4.5:1 in both appearances.
 extension Color {
     // Surfaces.
     static let payabliBackground = dynamic(light: PayabliPalette.neutral8, dark: PayabliPalette.deepBlue)
