@@ -10,9 +10,10 @@
 	<true/>
 
 	<!-- App Attest, used by the SDK's device attestation before GET /config.
-	     `development` pairs with a debug build and Apple's development attestation
-	     service; ship builds must use `production`. -->
+	     Set per configuration by PAYABLI_APPATTEST_ENV in Config/*.xcconfig:
+	     `development` for debug builds, `production` for Release. A Release
+	     archive requesting the development service fails distribution signing. -->
 	<key>com.apple.developer.devicecheck.appattest-environment</key>
-	<string>development</string>
+	<string>$(PAYABLI_APPATTEST_ENV)</string>
 </dict>
 </plist>

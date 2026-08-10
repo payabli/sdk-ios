@@ -7,3 +7,7 @@ SWIFT_ACTIVE_COMPILATION_CONDITIONS = $(inherited) PAYABLI_LINKAGE_SOURCE
 // `DebugPrefill.swift` is `#if DEBUG`, but its JSON sits in the resources phase
 // and shipped in Release until this line; verified by inspecting the built bundle.
 EXCLUDED_SOURCE_FILE_NAMES = DebugPrefill.json
+
+// A shipped build attests against Apple's production App Attest service. The
+// entitlement reads this, so a Release archive cannot inherit the debug value.
+PAYABLI_APPATTEST_ENV = production

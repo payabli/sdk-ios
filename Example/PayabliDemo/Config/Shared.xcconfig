@@ -9,6 +9,9 @@ IPHONEOS_DEPLOYMENT_TARGET = 16.7
 INFOPLIST_FILE = Resources/Info.plist
 CODE_SIGN_ENTITLEMENTS = Resources/PayabliDemo.entitlements
 
+// Which Apple App Attest service the app attests against. Release overrides this.
+PAYABLI_APPATTEST_ENV = development
+
 // How the demo reaches the SDK. Read by the "Payabli SDK linkage" build phase
 // and surfaced in the app's Configuration tab.
 //
