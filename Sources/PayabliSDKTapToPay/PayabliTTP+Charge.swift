@@ -78,6 +78,7 @@ extension PayabliTTP {
             invoice: context.invoice
         )
         let readResult: CardReadResult
+        let generation = readerSessionGeneration
         do {
             readResult = try await provider.startReading(readRequest)
             multicaster.emit(.nfcCompleted)
@@ -87,9 +88,12 @@ extension PayabliTTP {
             // A dead reader session is repaired only by re-initializing, and
             // `reinitializeIfNeeded()` does nothing while the state says `.ready`.
             //
-            // Emit only on an accepted transition: `startReading` suspends, so
-            // the session need not still be `.ready` when this resumes.
-            if readerFailureInvalidatesSession(error),
+            // Only if the reader that failed is still the current one.
+            // `startReading` suspends, so an `initialize()` in that window can
+            // prepare a replacement and return to `.ready`, and expiring then
+            // would kill a healthy session over a dead one's failure.
+            if generation == readerSessionGeneration,
+               readerFailureInvalidatesSession(error),
                sessionManager.transition(to: .sessionExpired) {
                 syncPublished()
                 multicaster.emit(.sessionExpired)

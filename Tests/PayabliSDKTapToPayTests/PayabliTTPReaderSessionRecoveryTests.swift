@@ -162,6 +162,33 @@ final class PayabliTTPReaderSessionRecoveryTests: XCTestCase {
         XCTAssertEqual(ttp.sessionState, .ready)
     }
 
+    // MARK: - A failure from a reader that has been replaced
+
+    /// The read that fails may not be the read the current reader is doing.
+    ///
+    /// `startReading` suspends, so an `initialize()` in that window prepares a
+    /// replacement reader and returns to `.ready`. Expiring on the old read's
+    /// failure would kill the healthy session it just built.
+    func testFailureFromASupersededReaderDoesNotExpireTheNewSession() async throws {
+        let provider = InterleavingProvider()
+        let ttp = makeTTP(provider: provider)
+        try await ttp.initialize()
+        XCTAssertEqual(ttp.sessionState, .ready)
+
+        // Runs while the charge is suspended inside `startReading`, exactly as a
+        // host calling `initialize()` mid-charge would.
+        provider.duringRead = { try await ttp.initialize() }
+        provider.readingResult = .failure(Self.sessionLevelFailure)
+
+        await XCTAssertThrowsErrorAsync(try await self.charge(ttp))
+
+        XCTAssertEqual(
+            ttp.sessionState, .ready,
+            "the replacement reader was healthy; the old read's failure expired it"
+        )
+        XCTAssertEqual(provider.prepareReaderCalls, 2)
+    }
+
     // MARK: - Error text reaching the host
 
     /// A host shows `localizedDescription`. When the facade re-wraps an error
@@ -248,7 +275,7 @@ final class PayabliTTPReaderSessionRecoveryTests: XCTestCase {
         }
     }
 
-    private func makeTTP(provider: MockTapToPayProvider) -> PayabliTTP {
+    private func makeTTP(provider: some TapToPayProvider) -> PayabliTTP {
         PayabliTTP(
             config: PayabliConfig(accessToken: "seed_token", entryPoint: "e", environment: .sandbox),
             appId: "appid",
@@ -348,5 +375,33 @@ private func XCTAssertThrowsErrorAsync<T>(
         XCTFail("the charge did not complete within its bound", file: file, line: line)
     } catch {
         // Expected.
+    }
+}
+
+
+/// A provider that runs a caller-supplied step while a read is in flight, so the
+/// interleaving is deterministic instead of timing-dependent.
+@MainActor
+private final class InterleavingProvider: TapToPayProvider {
+    static var providerId: String { "interleaving" }
+
+    var readingResult: Result<CardReadResult, Error> = .failure(
+        PayabliTTPError.nfcFailed(reason: "not configured")
+    )
+    var duringRead: (() async throws -> Void)?
+    private(set) var prepareReaderCalls = 0
+
+    func checkEligibility() async -> Result<Void, PayabliTTPError> { .success(()) }
+    func configure(credentials: [String: String]) throws {}
+    func prepareReader() async throws { prepareReaderCalls += 1 }
+    func cancelReading() async {}
+    func cleanUp() async {}
+
+    func startReading(_ request: CardReadRequest) async throws -> CardReadResult {
+        if let duringRead {
+            self.duringRead = nil
+            try await duringRead()
+        }
+        return try readingResult.get()
     }
 }

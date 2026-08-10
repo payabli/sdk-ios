@@ -61,6 +61,11 @@ public final class PayabliTTP: NSObject, ObservableObject {
     // Session state
     let sessionManager = SessionManager()
 
+    /// Bumped every time a reader is prepared. A charge captures it before the
+    /// tap so a failure that arrives after the reader was replaced is not
+    /// attributed to the replacement.
+    var readerSessionGeneration = 0
+
     // MARK: - Published state
 
     // Setters are `internal` so companion-file extensions

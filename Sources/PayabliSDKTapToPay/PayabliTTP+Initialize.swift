@@ -203,6 +203,7 @@ extension PayabliTTP {
         multicaster.emit(.readerInitializing)
         do {
             try await provider.prepareReader()
+            readerSessionGeneration += 1
         } catch {
             sessionManager.markError(error)
             syncPublished()
