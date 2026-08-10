@@ -62,7 +62,7 @@ struct PaymentTapToPayQAView: View {
                 .padding(16)
             }
             .scrollDismissesKeyboard(.interactively)
-            .navigationTitle("Tap to Pay QA")
+            .navigationTitle("Tap to Pay")
             .toolbar { sessionBadge }
             .toolbar {
                 ToolbarItemGroup(placement: .keyboard) {
@@ -328,7 +328,7 @@ struct PaymentTapToPayQAView: View {
                     Divider()
 
                     helpSection(
-                        "Self-service, for local QA",
+                        "Self-service, for local testing",
                         [
                             "The bundled token server can list devices and request a code for one.",
                             "See `LocalTokenServer/README.md`, section “Tap to Pay Device Activation”, for the endpoints and what they return."
@@ -462,7 +462,7 @@ struct PaymentTapToPayQAView: View {
                 let result = try await terminal.charge(
                     type: .sale,
                     paymentDetails: PayabliTTPPaymentDetails(amount: amount),
-                    orderDescription: "Tap to Pay QA"
+                    orderDescription: "Tap to Pay sample"
                 )
                 chargeMessage = "✓ Charged · txn \(result.paymentTransId)"
             } catch {

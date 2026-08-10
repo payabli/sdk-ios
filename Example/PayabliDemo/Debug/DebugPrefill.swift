@@ -3,22 +3,18 @@ import PayabliSDKPayInPaymentFlow
 import SwiftUI
 import UIKit
 
-/// Debug-only QA convenience that pre-populates the PayInPaymentFlow form with
-/// test data read from `DebugPrefill.json` at runtime.
+/// Debug-only convenience that fills the PayIn form from `DebugPrefill.json`.
 ///
-/// The SDK renders the form and owns its field state, so there is no public API
-/// to seed values directly. Instead we locate each on-screen text field by the
-/// stable `accessibilityIdentifier` the SDK assigns
-/// (`payabli.payInPaymentFlow.field.<field.rawValue>`), set its text, and fire
-/// `.editingChanged` so the value flows through the SDK's own input path into
-/// its view model — exactly as if a person had typed it.
+/// The SDK owns the form's field state and offers no way to seed it, so each
+/// field is found by the `accessibilityIdentifier` the SDK assigns
+/// (`payabli.payInPaymentFlow.field.<field.rawValue>`) and fed through the SDK's
+/// own input path, as if typed.
 ///
-/// Values live in a JSON resource (never hard-coded here), and this entire file
-/// is compiled only in Debug builds, so nothing ships in Release.
+/// This file is Debug-only, and `Config/Release.xcconfig` keeps the JSON out of
+/// Release builds.
 ///
-/// Limitation: the expiration field is a SwiftUI wheel-picker, not a text field,
-/// so it cannot be prefilled this way — pick `07/30` (or the value from the JSON)
-/// manually.
+/// The expiration field is a wheel picker rather than a text field, so it cannot
+/// be prefilled and has to be chosen by hand.
 enum DebugPrefill {
     /// Runtime-read prefill values. Only the fields that map to editable text
     /// inputs are applied; `cardExpiration` is decoded for documentation but is

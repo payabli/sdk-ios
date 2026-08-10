@@ -251,7 +251,7 @@ struct PaymentMethodQAView: View {
             hiddenValues: PayabliPayInPaymentFlowHiddenValues(
                 achHolderType: .personal,
                 achSecCode: .web,
-                methodDescription: "Payment Method QA"
+                methodDescription: "Payment method sample"
             ),
             options: PayabliPayInPaymentFlowOptions(
                 achValidation: true,

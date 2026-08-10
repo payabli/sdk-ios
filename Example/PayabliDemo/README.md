@@ -1,8 +1,8 @@
 # PayabliDemo
 
 SwiftUI demo app exercising the public `PayabliTTP` and
-`PayabliPayInPaymentFlowView` APIs. Maps to the Tap to Pay manual QA checklist
-and includes a card/ACH PayIn payment flow sample.
+`PayabliPayInPaymentFlowView` APIs, covering card-present and card-not-present
+end to end against sandbox.
 
 ## What it covers
 
@@ -82,14 +82,14 @@ Submitting either form requires the sample's PayIn access-token callbacks to
 call your backend or the bundled `LocalTokenServer` for a short-lived Payabli
 access token.
 
-### PayIn Payment Flow QA diagnostics
+### PayIn payment flow diagnostics
 
-The QA sample uses the public `PayabliPayInPaymentFlow` initializers and the
+The sample uses the public `PayabliPayInPaymentFlow` initializers and the
 SDK-owned transport path. This preserves the hosted-form security model: clear
 PAN is not exposed to host-visible text fields, accessibility values,
 diagnostics, callbacks, or custom transports.
 
-For local QA, enable the PayIn diagnostics flag in `Secrets.swift`.
+For local debugging, enable the PayIn diagnostics flag in `Secrets.swift`.
 Diagnostics are redacted before they are printed or displayed in the app.
 
 ## Architecture notes

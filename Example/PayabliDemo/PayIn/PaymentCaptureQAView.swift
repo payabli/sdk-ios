@@ -188,7 +188,7 @@ struct PaymentCaptureQAView: View {
                 serviceFee: 0.10,
                 currency: "USD"
             ),
-            orderDescription: "Payment Capture QA",
+            orderDescription: "Payment capture sample",
             orderId: "ios-payment-capture-qa",
             source: "ios-payment-capture-qa",
             idempotencyKey: UUID().uuidString,
@@ -298,7 +298,7 @@ struct PaymentCaptureQAView: View {
             hiddenValues: PayabliPayInPaymentFlowHiddenValues(
                 achHolderType: .personal,
                 achSecCode: .web,
-                methodDescription: "Payment Capture QA"
+                methodDescription: "Payment capture sample"
             ),
             labels: PayabliPayInPaymentFlowLabels(
                 title: "Payment Capture",
