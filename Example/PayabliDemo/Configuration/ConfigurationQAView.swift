@@ -45,22 +45,13 @@ struct ConfigurationQAView: View {
             QADetailRow(label: "App ID", value: Secrets.appId)
             QADetailRow(
                 label: "Environment",
-                value: "\(environmentName) · " + (DemoConfiguration.environment.baseURL.host ?? "—")
+                value: "\(DemoConfiguration.nameFor(DemoConfiguration.environment)) · " + (DemoConfiguration.environment.baseURL.host ?? "—")
                     + " · " + DemoConfiguration.environmentSource
             )
         }
     }
 
-    /// `PayabliEnvironment` is an `@objc Int` enum, so string interpolation
-    /// renders `PayabliEnvironment(rawValue: 1)` rather than the case name.
-    private var environmentName: String {
-        switch DemoConfiguration.environment {
-        case .qa: return "qa"
-        case .sandbox: return "sandbox"
-        case .production: return "production"
-        default: return "other"
-        }
-    }
+
 
     // MARK: - Token endpoint
 
