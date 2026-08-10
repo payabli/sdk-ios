@@ -335,6 +335,11 @@ final class PayabliTTPReaderSessionRecoveryTests: XCTestCase {
         }
     }
 
+    /// How long a call may take before it is treated as never returning. Sized
+    /// for the slowest machine that runs this, not the fastest: an existing test
+    /// in this suite takes eighteen seconds on CI and milliseconds locally.
+    private var boundSeconds: UInt64 { 60 }
+
     /// Every SDK call in this file goes through here. These tests cover a wedge
     /// and two concurrency guards, so their failure mode is not returning, and
     /// an unbounded one costs a CI job instead of going red.
@@ -479,8 +484,11 @@ private func XCTAssertThrowsErrorAsync<T>(
 
 /// A provider that runs a caller-supplied step while a read is in flight, so the
 /// interleaving is deterministic instead of timing-dependent.
-@MainActor
-private final class InterleavingProvider: TapToPayProvider {
+/// `@unchecked` because every caller is on the main actor: the SDK surface is
+/// `@MainActor` and the tests drive the gate from there. Isolating the class
+/// instead would put the conformance across an isolation boundary, which is an
+/// error under the Swift 6 language mode.
+private final class InterleavingProvider: TapToPayProvider, @unchecked Sendable {
     static var providerId: String { "interleaving" }
 
     var readingResult: Result<CardReadResult, Error> = .failure(
