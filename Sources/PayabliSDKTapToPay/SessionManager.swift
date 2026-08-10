@@ -43,9 +43,10 @@ internal final class SessionManager: ObservableObject {
         isReady = false
     }
 
+    /// Returns the session to its starting point. Internal: a host reaches this
+    /// only through `initialize()`, never as an operation of its own.
     func reset() {
-        sessionState = .idle
-        isReady = false
+        transition(to: .idle)
         lastError = nil
     }
 
@@ -59,6 +60,12 @@ internal final class SessionManager: ObservableObject {
         if current == target { return true }
 
         switch (current, target) {
+        // Starting over is always reachable. `initialize()` is the documented
+        // way back to a known state, and it has to work from wherever the
+        // session was left.
+        case (_, .idle):
+            return true
+
         case (.idle, .attestingDevice),
              (.idle, .fetchingConfig):
             return true
@@ -88,12 +95,10 @@ internal final class SessionManager: ObservableObject {
              (.reinitializing, .error):
             return true
 
-        case (.pendingActivation, .idle),
-             (.pendingActivation, .attestingDevice):
+        case (.pendingActivation, .attestingDevice):
             return true
 
-        case (.error, .idle),
-             (.error, .attestingDevice),
+        case (.error, .attestingDevice),
              (.error, .fetchingConfig):
             return true
 
