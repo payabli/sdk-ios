@@ -424,13 +424,9 @@ struct PaymentTapToPayQAView: View {
 
     // MARK: - Actions
 
-    /// Clears what the previous session said about itself.
-    ///
-    /// Each message describes one attempt, so a charge failure that has since
-    /// been repaired is history: leaving it under a step that is ready to run
-    /// again reports a failure that is no longer true. Seen on device, where a
-    /// dead reader session was recovered and the step still carried the error
-    /// that killed it.
+    /// Clears what the previous session said about itself. Each message
+    /// describes one attempt, so a failure that has since been repaired must not
+    /// sit under a step that is ready to run again.
     private func clearOutcomesForNewSession() {
         enableMessage = ""
         chargeMessage = ""

@@ -10,21 +10,16 @@ enum DemoConfiguration {
 
     /// Which Payabli backend every SDK facade in this app talks to.
     ///
-    /// Sandbox by default, because that is the environment an integrator can
-    /// actually reach. Pass `-PayabliEnvironment qa`, `sandbox` or `production`
-    /// to use another, so a different environment never means editing a
-    /// committed file. In Xcode that goes in Product, Edit Scheme, Run,
-    /// Arguments.
+    /// Sandbox by default: it is the environment an integrator can reach. Pass
+    /// `-PayabliEnvironment qa`, `sandbox` or `production` in Product, Edit
+    /// Scheme, Run, Arguments to change it.
     ///
-    /// The choice is remembered, because a launch argument only reaches the
-    /// process it launched: reopening the app from the Home screen dropped
-    /// silently back to sandbox, against a device enrolled elsewhere, and the
-    /// only sign was the host name in the header. Pass `sandbox` explicitly to
-    /// go back.
+    /// Remembered, because a launch argument reaches only the process it
+    /// launched and reopening from the Home screen would revert. Pass `sandbox`
+    /// to go back.
     ///
-    /// Captured by the three facades at launch (`PayabliDemoQAApp`), so it is
-    /// fixed for the process — which is why the Config screen displays it rather
-    /// than editing it.
+    /// Captured by the facades at launch, so the Config screen shows it
+    /// read-only.
     static let environment: PayabliEnvironment = resolvedEnvironment()
 
     static let environmentSource: String = {

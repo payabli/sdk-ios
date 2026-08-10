@@ -84,17 +84,11 @@ extension PayabliTTP {
         } catch {
             multicaster.emit(.nfcFailed(error: String(describing: error)))
 
-            // A reader session that has gone away is not repaired by retrying:
-            // `charge()` begins with `reinitializeIfNeeded()`, which does nothing
-            // while the state says `.ready`, so leaving it there means every
-            // later charge reuses the dead session and the host has no way back.
-            // Moving to `.sessionExpired` is what lets that call repair it.
+            // A dead reader session is repaired only by re-initializing, and
+            // `reinitializeIfNeeded()` does nothing while the state says `.ready`.
             //
-            // Emit only if the move was accepted. `startReading` suspends, and
-            // this actor is free to run something else while it does, so the
-            // session need not still be `.ready` when the catch resumes: a host
-            // that called `initialize()` in the meantime would otherwise be told
-            // the session expired while `sessionState` said something else.
+            // Emit only on an accepted transition: `startReading` suspends, so
+            // the session need not still be `.ready` when this resumes.
             if readerFailureInvalidatesSession(error),
                sessionManager.transition(to: .sessionExpired) {
                 syncPublished()

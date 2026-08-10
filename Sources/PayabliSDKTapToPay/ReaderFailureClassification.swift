@@ -3,23 +3,14 @@ import Foundation
 import ProximityReader
 #endif
 
-/// Whether a reader failure means the reader session itself is gone, rather
-/// than that one read did not succeed.
+/// Whether the reader session is gone, or only this read failed. A dead session
+/// needs a fresh config and a reader re-prepare; a failed read needs neither.
 ///
-/// The two need separating because the remedies are opposite. A dead session is
-/// only repaired by fetching a fresh config and preparing the reader again, and
-/// a session left marked usable can never be repaired at all. A read that failed
-/// on a live session needs none of that, and tearing the session down after a
-/// declined card or a dismissed sheet would spend a round trip to fix nothing.
+/// The set is Apple's: `PaymentCardReaderSession.ReadError` draws this line.
 ///
-/// `PaymentCardReaderSession.ReadError` draws exactly this line, so the set
-/// below is Apple's rather than one invented here.
-///
-/// Two tiers, because the typed value does not always survive. The card-reader
-/// component catches the read error and rebuilds it as a title plus a
-/// description, so by the time a charge fails on a device the type is gone and
-/// only the case name remains in the text. The typed check runs first because it
-/// cannot be fooled; the text check is what actually fires in production.
+/// Two tiers, because the type does not always survive. The card-reader
+/// component rebuilds the error as a title plus a description, so on a device
+/// only the case name arrives, in text.
 func readerFailureInvalidatesSession(_ error: Error) -> Bool {
     #if canImport(ProximityReader)
     if let readError = error as? PaymentCardReaderSession.ReadError {
@@ -37,13 +28,9 @@ func readerFailureInvalidatesSession(_ error: Error) -> Bool {
         .contains { sessionLevelReadErrorNames.contains(String($0)) }
 }
 
-/// The `PaymentCardReaderSession.ReadError` cases that mean the session is no
-/// longer usable. Every other case describes a read, not a session.
-///
-/// Deliberately excluded, because they are transient or specific to one read
-/// and the session survives them: `readerSessionBusy`,
-/// `readerSessionNetworkError`, `readCancelled`, `cardReadFailed`,
-/// `paymentReadFailed`, `paymentCardDeclined`, `nfcDisabled`, the `pin` cases.
+/// The `ReadError` cases that mean the session is gone. The session survives
+/// every other case, including `readerSessionBusy`, `readerSessionNetworkError`,
+/// `readCancelled`, `cardReadFailed`, `paymentCardDeclined` and `nfcDisabled`.
 private let sessionLevelReadErrorNames: Set<String> = [
     "noReaderSession",
     "readerSessionExpired",

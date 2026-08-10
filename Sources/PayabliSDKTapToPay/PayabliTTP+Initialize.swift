@@ -19,15 +19,10 @@ extension PayabliTTP {
         // 0. Eligibility.
         try await runEligibility()
 
-        // Start from `.idle`, whatever state the caller left behind.
-        //
-        // The transition matrix is deliberately narrow, so most of the moves
-        // below are illegal from anywhere except the beginning: from
-        // `.sessionExpired`, only `.reinitializing` is reachable. Their results
-        // are discarded, so calling this on a session that had expired ran every
-        // phase — attestation, config, preparing the reader — and then left the
-        // state exactly as it found it, reporting success while the host still
-        // saw a dead session.
+        // Start from `.idle`, whatever the caller left behind. The matrix is
+        // narrow — from `.sessionExpired` only `.reinitializing` is reachable —
+        // and transition results are discarded, so without this every phase ran
+        // and the state never moved.
         sessionManager.reset()
         syncPublished()
 

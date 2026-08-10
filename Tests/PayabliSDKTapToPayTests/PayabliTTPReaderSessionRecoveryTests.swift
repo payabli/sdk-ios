@@ -7,13 +7,10 @@ import PayabliSDKTestUtils
 import ProximityReader
 #endif
 
-/// A reader session that dies under a `.ready` session must leave the session
-/// repairable.
+/// A reader session that dies must leave the session repairable.
 ///
-/// Locking the phone during a charge tears the reader session down. Reporting
-/// that failure without moving `sessionState` wedges the session permanently:
 /// `charge()` begins with `reinitializeIfNeeded()`, which does nothing while the
-/// state says `.ready`, so every later charge reuses the dead session.
+/// state says `.ready`, so a failure that leaves it there wedges the session.
 @MainActor
 final class PayabliTTPReaderSessionRecoveryTests: XCTestCase {
 
@@ -137,13 +134,10 @@ final class PayabliTTPReaderSessionRecoveryTests: XCTestCase {
 
     // MARK: - initialize() from a state it did not start in
 
-    /// `initialize()` is the entry point a host is told to call again, so it has
-    /// to work from wherever the session happens to be.
+    /// `initialize()` has to work from wherever the session happens to be.
     ///
-    /// Every transition it makes was being discarded, so from `.sessionExpired`
-    /// it did all of its work — attestation, config, preparing the reader — and
-    /// then left the state exactly where it found it. Success, reported as
-    /// failure, with no way to tell them apart.
+    /// Its transitions were discarded, so from `.sessionExpired` it did all of
+    /// its work and left the state where it found it.
     func testInitializeRecoversFromAnExpiredSession() async throws {
         let (ttp, provider, _) = try await makeReadyTTP()
 

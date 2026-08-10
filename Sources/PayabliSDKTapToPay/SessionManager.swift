@@ -25,14 +25,11 @@ internal final class SessionManager: ObservableObject {
         return true
     }
 
-    /// Forces the session into `.sessionExpired`, bypassing the transition
-    /// matrix.
+    /// Forces `.sessionExpired`, bypassing the transition matrix.
     ///
-    /// Nothing calls this. Its doc said "called on 401s", which no code did:
-    /// 401 handling lives in `AuthenticatedTransport`, which refreshes and
-    /// retries rather than expiring the session. Scheduled for deletion; a
-    /// caller that needs the state should use `transition(to: .sessionExpired)`
-    /// so the matrix stays the authority on what is reachable.
+    /// Nothing calls this, and its doc claimed "called on 401s", which no code
+    /// did. Scheduled for deletion; use `transition(to:)`, which the matrix
+    /// still governs.
     private func forceSessionExpiry() {
         if sessionState != .sessionExpired {
             sessionState = .sessionExpired
