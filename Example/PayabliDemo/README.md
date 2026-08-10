@@ -212,12 +212,14 @@ tab's Build section.
 | `Release` | `source` | same |
 | `Debug-XCFramework` | `xcframework` | **fails closed** — not wired yet |
 
-`Debug-XCFramework` exists as the hook, not as a working mode. A build
-configuration cannot drop a Swift package product: `packageProductDependencies`
-hangs off the `PBXNativeTarget`, not off a configuration, so that configuration
-would still link `PayabliSDKExampleAggregate` from source *in addition to* any
-framework it found. Making it real needs a second target with empty
-`packageProductDependencies` — tracked with the binary-release work.
+`Debug-XCFramework` is a hook, not a working mode: every build with it fails on
+purpose rather than quietly falling back to source.
+
+It cannot work as one configuration. Which products a target links is set on the
+target, so switching configuration cannot unlink the package and would leave the
+build linking both the package sources and any framework it found. A second
+target that links the frameworks instead is what makes it real, and that belongs
+with the binary-release work.
 
 ## Not included
 

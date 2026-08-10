@@ -1,12 +1,9 @@
-// Consume the SDK the way a real integrator does: prebuilt XCFrameworks rather
-// than package sources.
+// Links prebuilt XCFrameworks instead of package sources, the way an integrator
+// consumes the SDK.
 //
-// NOT WIRED YET, and it fails closed rather than silently falling back. A build
-// configuration cannot drop a Swift package product: packageProductDependencies
-// hangs off the PBXNativeTarget, not off a configuration, so this configuration
-// would still link PayabliSDKExampleAggregate from source *in addition to* any
-// framework it found. Making it real needs a second target whose
-// packageProductDependencies is empty — see the release-pipeline follow-up.
+// Every build with this configuration fails, deliberately. What a target links
+// is set on the target, so no configuration can swap it out. Doing this for real
+// needs a second target that links the frameworks, and there isn't one yet.
 
 #include "Shared.xcconfig"
 

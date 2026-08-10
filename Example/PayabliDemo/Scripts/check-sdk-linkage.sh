@@ -22,38 +22,20 @@ source)
     ;;
 
 xcframework)
-    # Deliberately verify-and-fail rather than build. build_release_frameworks.sh
-    # is six xcodebuild archive invocations, so running it per build would be
-    # unusable, and running it silently would ship stale artifacts.
-    XCF_DIR="${SRCROOT}/../../build/xcframeworks"
-    REQUIRED=(PayabliSDKCore PayabliSDKTapToPay PayabliSDKPayInPaymentFlow)
-
-    missing=()
-    for name in "${REQUIRED[@]}"; do
-        [[ -d "${XCF_DIR}/${name}.xcframework" ]] || missing+=("$name")
-    done
-
-    if [[ ${#missing[@]} -gt 0 ]]; then
-        echo "error: PAYABLI_SDK_LINKAGE=xcframework but these are missing from ${XCF_DIR}: ${missing[*]}"
-        echo "error: build them first —  ./Scripts/build_release_frameworks.sh  (run from the ios/ root)"
-        exit 1
-    fi
-
-    # Stale artifacts are worse than absent ones: the build would succeed against
-    # code that no longer exists.
-    newest_source="$(find "${SRCROOT}/../../Sources" -name '*.swift' -newer "${XCF_DIR}/PayabliSDKCore.xcframework" -print -quit 2>/dev/null || true)"
-    if [[ -n "$newest_source" ]]; then
-        echo "error: XCFrameworks are older than Sources/ (e.g. ${newest_source})"
-        echo "error: rebuild them —  ./Scripts/build_release_frameworks.sh"
-        exit 1
-    fi
-
-    echo "error: xcframework linkage is not wired yet."
-    echo "error: a build configuration cannot drop a Swift package product —"
-    echo "error: packageProductDependencies hangs off the target, not the configuration,"
-    echo "error: so this build would still link PayabliSDKExampleAggregate from source."
-    echo "error: making this real needs a second target whose packageProductDependencies"
-    echo "error: is empty and which links the XCFrameworks instead."
+    # Fails every time, on purpose, rather than quietly building from source.
+    #
+    # Which products a target links is set on the target, so no configuration can
+    # unlink the package: this build would link the package sources and any
+    # framework it found. A second target that links the frameworks instead is
+    # what makes this mode real, and there isn't one yet.
+    #
+    # The checks this branch will need once that target exists — the frameworks
+    # are present, and they are newer than Sources/ — are deliberately not here.
+    # They cannot run ahead of the target, and code that cannot run is not proof
+    # that it works.
+    echo "error: PAYABLI_SDK_LINKAGE=xcframework is not wired up, so this build cannot succeed."
+    echo "error: it needs a target that links the XCFrameworks instead of the package, and there isn't one."
+    echo "error: build with the Debug configuration."
     exit 1
     ;;
 
