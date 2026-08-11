@@ -80,11 +80,19 @@ function xccov_to_generic {
         if [[ $xcresult == *".xcresult"* ]]; then
             xccov_options="--archive"
         fi
+        # Read the list first. In `done < <(...)` the process substitution's
+        # status is not the loop's, so an unreadable archive would be skipped in
+        # silence and the report would come back short but successful. Declared
+        # before assignment because `local x=$(...)` takes the status of
+        # `local`, not of the command.
+        local file_list
+        file_list=$(xcrun xccov view $xccov_options --file-list "$xcresult")
+
         while read -r file_name; do
             [ -z "$file_name" ] && continue
             included "${file_name#"$REPO_ROOT"/}" || continue
             convert_file "$xcresult" "$file_name" "$xccov_options"
-        done < <(xcrun xccov view $xccov_options --file-list "$xcresult")
+        done <<< "$file_list"
     done
     echo '</coverage>'
 
