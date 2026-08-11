@@ -48,6 +48,11 @@ jobs:
     runs-on: macos-15
     if: github.event_name == 'pull_request'
     continue-on-error: true
+    # Naming any scope sets every other one to none, so the checkout's own read
+    # has to be named alongside the write this job is here for.
+    permissions:
+      contents: read
+      pull-requests: write
 
     steps:
       # The classification reads both sides of the change, so it needs history.
@@ -63,7 +68,32 @@ jobs:
           ./Scripts/classify-changes.sh \
             "${{ github.event.pull_request.base.sha }}" \
             "${{ github.event.pull_request.head.sha }}" \
-            >> "$GITHUB_STEP_SUMMARY"
+            > report.md
+          cat report.md >> "$GITHUB_STEP_SUMMARY"
+
+      # One comment that is edited in place, found by the marker the script
+      # writes. A new comment on every push buries the review under reports of
+      # itself. A fork's pull request has a read-only token, so this is allowed
+      # to fail without taking the job with it.
+      - name: Comment on the pull request
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          # jq slurps the pages into one array. --jq would run once per page, so
+          # `last` would be the last match on the last page and not overall.
+          existing=$(gh api "repos/$REPO/issues/$PR/comments" --paginate \
+            | jq -s 'add | map(select(.body | contains("<!-- change-report -->"))) | last | .id // empty')
+          if [ -n "$existing" ]; then
+            gh api -X PATCH "repos/$REPO/issues/comments/$existing" -F body=@report.md >/dev/null
+            echo "updated comment $existing"
+          else
+            gh api -X POST "repos/$REPO/issues/$PR/comments" -F body=@report.md >/dev/null
+            echo "posted a new comment"
+          fi
 
   test-sdk:
     name: SDK tests

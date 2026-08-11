@@ -28,6 +28,9 @@ cd "$REPO_ROOT"
 BASE=$(git merge-base "$BASE_REF" "$HEAD_REF" 2>/dev/null) || BASE="$BASE_REF"
 HEAD_SHA=$(git rev-parse "$HEAD_REF")
 
+# The marker CI finds this comment by, so each run edits the one comment
+# instead of posting another. Invisible when the Markdown renders.
+echo "<!-- change-report -->"
 echo "## Change report"
 echo
 echo "\`$(git rev-parse --short "$BASE")…$(git rev-parse --short "$HEAD_SHA")\`"
