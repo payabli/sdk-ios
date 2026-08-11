@@ -30,11 +30,32 @@ jobs:
       - name: Install xcpretty
         run: gem install xcpretty --no-document
 
+      # Pinned, because both tools decide whether this job passes. .swiftformat
+      # names the version its four disabled rules were checked against, and a
+      # formula bump could change what the formatter does to the tree or redden
+      # every pull request without a commit. Raise these deliberately, and
+      # re-run `swiftformat .` in the same change.
+      - name: Install lint tools
+        env:
+          SWIFTFORMAT_VERSION: 0.62.1
+          SWIFTLINT_VERSION: 0.65.0
+        run: |
+          mkdir -p "$RUNNER_TEMP/tools"
+          curl -sSfL -o /tmp/swiftformat.zip \
+            "https://github.com/nicklockwood/SwiftFormat/releases/download/${SWIFTFORMAT_VERSION}/swiftformat.zip"
+          unzip -q -j -o /tmp/swiftformat.zip -d "$RUNNER_TEMP/tools"
+          curl -sSfL -o /tmp/swiftlint.zip \
+            "https://github.com/realm/SwiftLint/releases/download/${SWIFTLINT_VERSION}/portable_swiftlint.zip"
+          unzip -q -j -o /tmp/swiftlint.zip -d "$RUNNER_TEMP/tools"
+          chmod +x "$RUNNER_TEMP/tools/swiftformat" "$RUNNER_TEMP/tools/swiftlint"
+          echo "$RUNNER_TEMP/tools" >> "$GITHUB_PATH"
+          "$RUNNER_TEMP/tools/swiftformat" --version
+          "$RUNNER_TEMP/tools/swiftlint" version
+
       # No `--config`: naming a config file makes SwiftLint ignore nested ones,
       # and Tests/.swiftlint.yml is what relaxes the rules XCTest fixtures break.
       - name: Lint
         run: |
-          brew install swiftlint swiftformat
           swiftlint
           swiftformat --lint .
 
