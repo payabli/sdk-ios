@@ -39,20 +39,24 @@ jobs:
 
   # Reports, never judges. A branch that runs `swiftformat .` puts hundreds of
   # files in the diff, and the file count alone does not say which of them
-  # changed what the code does. This says so on the run's summary page.
+  # changed what the code does.
   #
   # continue-on-error, and the script exits 0 whatever it finds: a report that
   # can redden a pull request is a gate, and this is not one.
+  #
+  # This job runs the pull request's own code — the local action and the script
+  # under Scripts/ — so it is read-only and holds no token worth taking. The
+  # comment is posted by the job below, which runs none of it. A step can
+  # prepend to $GITHUB_PATH for the steps after it, so code from the branch and
+  # a write token in one job means the code can wrap `gh` and read the token out
+  # of the environment when the later step calls it.
   changes:
     name: Change report
     runs-on: macos-15
     if: github.event_name == 'pull_request'
     continue-on-error: true
-    # Naming any scope sets every other one to none, so the checkout's own read
-    # has to be named alongside the write this job is here for.
     permissions:
       contents: read
-      pull-requests: write
 
     steps:
       # The classification reads both sides of the change, so it needs history.
@@ -70,6 +74,33 @@ jobs:
             "${{ github.event.pull_request.head.sha }}" \
             > report.md
           cat report.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload the report
+        uses: actions/upload-artifact@v4
+        with:
+          name: change-report
+          path: report.md
+
+  # Holds the write token and runs nothing from the pull request: no checkout,
+  # no local action, no script from the branch. `gh` and `jq` come from the
+  # runner image, and the report arrives as an artifact, which is data.
+  #
+  # ubuntu, because nothing here needs Xcode, and a macOS runner bills at ten
+  # times the rate for a step that posts one comment.
+  changes-comment:
+    name: Change report comment
+    runs-on: ubuntu-latest
+    needs: [changes]
+    if: github.event_name == 'pull_request'
+    continue-on-error: true
+    permissions:
+      pull-requests: write
+
+    steps:
+      - name: Download the report
+        uses: actions/download-artifact@v4
+        with:
+          name: change-report
 
       # One comment that is edited in place, found by the marker the script
       # writes. A new comment on every push buries the review under reports of
