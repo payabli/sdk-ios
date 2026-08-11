@@ -30,13 +30,21 @@ jobs:
       - name: Install xcpretty
         run: gem install xcpretty --no-document
 
+      # No `--config`: naming a config file makes SwiftLint ignore nested ones,
+      # and Tests/.swiftlint.yml is what relaxes the rules XCTest fixtures break.
+      - name: Lint
+        run: |
+          brew install swiftlint swiftformat
+          swiftlint
+          swiftformat --lint .
+
       - name: Resolve dependencies
         run: |
           xcodebuild -resolvePackageDependencies \
             -scheme PayabliSDK-Package \
             -clonedSourcePackagesDirPath .build/checkouts
 
-      - name: Test
+      - name: Select simulator
         run: |
           SIMULATOR_ID=$(xcrun simctl list devices available -j \
             | python3 -c "
@@ -54,9 +62,66 @@ jobs:
           print(sorted(iphones, key=lambda x: x['name'])[-1]['udid'])
           ")
           echo "Using simulator: $SIMULATOR_ID"
+          echo "SIMULATOR_ID=$SIMULATOR_ID" >> "$GITHUB_ENV"
+
+      - name: Test the SDK
+        run: |
           xcodebuild test \
             -scheme PayabliSDK-Package \
             -destination "platform=iOS Simulator,id=$SIMULATOR_ID" \
             -clonedSourcePackagesDirPath .build/checkouts \
+            -enableCodeCoverage YES \
+            -resultBundlePath SDKTests.xcresult \
             CODE_SIGNING_ALLOWED=NO \
             | xcpretty && exit ${PIPESTATUS[0]}
+
+      # The sample app's step sequences, which decide what each screen offers
+      # next. A separate scheme, because this bundle has no host application:
+      # Secrets.swift is gitignored and is a member of the app target, so the app
+      # itself cannot be built here.
+      - name: Test the sample app's step sequences
+        run: |
+          xcodebuild test \
+            -project Example/PayabliDemo/PayabliDemo.xcodeproj \
+            -scheme PayabliDemoFlowTests \
+            -destination "platform=iOS Simulator,id=$SIMULATOR_ID" \
+            -clonedSourcePackagesDirPath .build/checkouts \
+            -enableCodeCoverage YES \
+            -resultBundlePath DemoFlowTests.xcresult \
+            CODE_SIGNING_ALLOWED=NO \
+            | xcpretty && exit ${PIPESTATUS[0]}
+
+      - name: Convert coverage
+        run: |
+          ./Scripts/xccov-to-sonarqube-generic.sh \
+            SDKTests.xcresult DemoFlowTests.xcresult > coverage.xml
+
+      - name: Upload coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage.xml
+
+  sonar:
+    name: SonarCloud
+    runs-on: macos-15
+    needs: [test]
+    # A fork's pull request has no access to the token, and the scan would fail
+    # rather than be skipped.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    steps:
+      # Analysis reads the git history to decide what is new code.
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download coverage
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage
+
+      - name: Analyze
+        uses: SonarSource/sonarqube-scan-action@v5
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
