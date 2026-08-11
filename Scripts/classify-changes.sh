@@ -1,19 +1,19 @@
 #!/usr/bin/env bash
 #
-# Reports which paths a change touches, and which of them carry an edit of their
-# own rather than formatter output.
+# Sizes the review surface of a change: how much of a diff is a semantic change
+# to shipped code, and how much is inert.
 #
 #   ./Scripts/classify-changes.sh main HEAD
 #   ./Scripts/classify-changes.sh main HEAD >> "$GITHUB_STEP_SUMMARY"
 #
-# A branch that runs `swiftformat .` puts hundreds of files in the diff, and a
-# reviewer cannot see from the file count which of them changed what the code
-# does. Each file under Sources/ is taken as it was at the base, run through the
-# formatter, and compared against its head version. An exact match means the
-# whole change is what the formatter would have produced.
+# A branch that runs `swiftformat .` puts hundreds of files in the diff and a
+# file count says nothing about what to read. Every modified file under Sources/
+# is normalised by running the formatter over its base revision, so what remains
+# in the diff is the author's edit. Those lines are then split into declarations,
+# executable statements and comments, because only the first two can change
+# behaviour and only the first can break a consumer.
 #
-# This reports and never judges. It writes Markdown, exits 0 whatever it finds,
-# and nothing here is a gate.
+# Reports and never judges. Writes Markdown, exits 0 whatever it finds.
 
 set -uo pipefail
 
@@ -23,8 +23,6 @@ HEAD_REF="${2:?usage: $0 <base-ref> <head-ref>}"
 
 cd "$REPO_ROOT"
 
-# The fork point, so a base branch that moved on does not show up as this
-# change's work.
 BASE=$(git merge-base "$BASE_REF" "$HEAD_REF" 2>/dev/null) || BASE="$BASE_REF"
 HEAD_SHA=$(git rev-parse "$HEAD_REF")
 
@@ -33,51 +31,77 @@ HEAD_SHA=$(git rev-parse "$HEAD_REF")
 echo "<!-- change-report -->"
 echo "## Change report"
 echo
-echo "\`$(git rev-parse --short "$BASE")…$(git rev-parse --short "$HEAD_SHA")\`"
+echo "\`$(git rev-parse --short "$BASE")…$(git rev-parse --short "$HEAD_SHA")\` · $(git diff --name-only "$BASE..$HEAD_SHA" | wc -l | tr -d ' ') files"
 echo
 
-TOTAL=$(git diff --name-only "$BASE..$HEAD_SHA" | wc -l | tr -d ' ')
-echo "$TOTAL files changed."
-echo
+# ---------------------------------------------------------------- review surface
 
-echo "### Where"
+# Sources/ is the library that ships to consumers. Nothing else in the tree is
+# linked into their app, so a change outside it cannot alter released behaviour.
+classify_path() {
+    case "$1" in
+        Sources/*)  echo "Production code (ships in the SDK)" ;;
+        Tests/*)    echo "Test code" ;;
+        Example/*)  echo "Sample app" ;;
+        Bridges/*)  echo "Bridge wrappers" ;;
+        .github/*|Scripts/*|*.yml|*.xcconfig|.swiftformat|.swiftlint.yml|sonar-project.properties|Package.swift|.gitignore)
+                    echo "Build, CI and tooling" ;;
+        *)          echo "Other" ;;
+    esac
+}
+
+echo "### Review surface"
 echo
-echo "| Area | Files |"
+echo "| Category | Files |"
 echo "| --- | ---: |"
-git diff --name-only "$BASE..$HEAD_SHA" \
-    | awk -F/ '{ print (NF > 1 ? $1 "/" $2 : $1) }' \
-    | sort | uniq -c | sort -rn \
-    | awk '{ printf "| `%s` | %d |\n", $2, $1 }'
+while IFS= read -r path; do
+    classify_path "$path"
+done < <(git diff --name-only "$BASE..$HEAD_SHA") | sort | uniq -c | sort -rn \
+    | sed -E 's/^ *([0-9]+) (.*)$/| \2 | \1 |/'
 echo
 
-# Added, deleted and renamed paths, which a file count hides.
-echo "### Paths added, deleted or renamed"
+# ------------------------------------------------------------- lifecycle of files
+
+# A rename similarity below 100 means the file moved and was edited in the same
+# commit, which a reviewer reading only the new path would miss.
+echo "### Files added, deleted and renamed"
 echo
-NOTABLE=$(git diff --name-status --find-renames "$BASE..$HEAD_SHA" | grep -vE '^M' || true)
-if [ -z "$NOTABLE" ]; then
-    echo "None. Every changed file already existed at the base."
+LIFECYCLE=$(git diff --name-status --find-renames "$BASE..$HEAD_SHA" | grep -vE '^M' || true)
+if [ -z "$LIFECYCLE" ]; then
+    echo "None. Every changed file already existed at the base revision, so no"
+    echo "compilation unit entered or left the build."
 else
+    added=$(printf '%s\n' "$LIFECYCLE" | grep -c '^A' || true)
+    deleted=$(printf '%s\n' "$LIFECYCLE" | grep -c '^D' || true)
+    renamed=$(printf '%s\n' "$LIFECYCLE" | grep -c '^R' || true)
+    echo "$added added, $deleted deleted, $renamed renamed."
+    echo
     echo '```'
-    printf '%s\n' "$NOTABLE"
+    printf '%s\n' "$LIFECYCLE"
     echo '```'
+    if printf '%s\n' "$LIFECYCLE" | grep -qE '^R(0[0-9][0-9]|1[0-9][0-9])' ; then
+        echo
+        echo "A rename shown below \`R100\` was edited as well as moved."
+    fi
 fi
 echo
 
-# Only Sources/ ships. Tests/ and Example/ change on purpose and are not in the
-# built product.
+# ------------------------------------------------------------------ shipped code
+
 CHANGED_SOURCES=$(git diff --name-only --diff-filter=M "$BASE..$HEAD_SHA" -- Sources/)
 if [ -z "$CHANGED_SOURCES" ]; then
-    echo "### Shipped code"
+    echo "### Production code"
     echo
-    echo "No file under \`Sources/\` was modified."
+    echo "No existing file under \`Sources/\` was modified, so released behaviour"
+    echo "is unchanged except by any file added or deleted above."
     exit 0
 fi
 
 if ! command -v swiftformat >/dev/null 2>&1; then
-    echo "### Shipped code"
+    echo "### Production code"
     echo
-    echo "swiftformat is not on PATH, so the formatting classification was skipped."
-    echo "Modified under \`Sources/\`:"
+    echo "swiftformat is not on PATH, so the diff could not be normalised and the"
+    echo "semantic classification was skipped. Modified under \`Sources/\`:"
     echo '```'
     printf '%s\n' "$CHANGED_SOURCES"
     echo '```'
@@ -87,37 +111,133 @@ fi
 WORK=$(mktemp -d)
 trap 'rm -rf "$WORK"' EXIT
 
-pure=0
-edited=""
+inert=0            # files whose entire diff the formatter would have produced
+doc_only=0         # files whose remaining diff is comments and blank lines
+semantic=0         # files with a changed declaration or statement
+rows=""            # per-file detail for the files that carry a semantic change
+doc_rows=""
+api_added=""
+api_removed=""
+
 while IFS= read -r path; do
     [ -n "$path" ] || continue
     mkdir -p "$WORK/$(dirname "$path")"
     git show "$BASE:$path" > "$WORK/$path" 2>/dev/null || continue
+    # Normalising the base revision is what separates the author's edit from the
+    # formatter's. Without it every reformatted file looks like a rewrite.
     swiftformat "$WORK/$path" --config "$REPO_ROOT/.swiftformat" --quiet >/dev/null 2>&1
     git show "$HEAD_SHA:$path" > "$WORK/head-version" 2>/dev/null || continue
+
     if cmp -s "$WORK/$path" "$WORK/head-version"; then
-        pure=$((pure + 1))
+        inert=$((inert + 1))
+        continue
+    fi
+
+    changed=$(diff "$WORK/$path" "$WORK/head-version" | grep -E '^[<>]' || true)
+
+    # Net of relocations. A line removed from one place and added unchanged in
+    # another is a move, and a move compiles to what it compiled to before.
+    # Counting both ends of it reports a rewrite where a block shifted.
+    side() {   # $1 = < or >, $2 = keep|drop comments
+        local filter='^(///|//|/\*|\*/|\*)'
+        printf '%s\n' "$changed" | grep -E "^$1" | sed -E 's/^.[[:space:]]*//' \
+            | if [ "$2" = drop ]; then grep -vE "$filter"; else grep -E "$filter"; fi \
+            | grep -v '^[[:space:]]*$' | sed -E 's/[[:space:]]+/ /g' | sort
+    }
+    code=$(comm -3 <(side '<' drop) <(side '>' drop) | grep -c . || true)
+    comments=$(comm -3 <(side '<' keep) <(side '>' keep) | grep -c . || true)
+
+    # A changed declaration carrying `public` or `open` is a change to the
+    # contract consumers compile against, which the repository holds in common
+    # with the SDK for Android.
+    added_api=$(printf '%s\n' "$changed" | grep -E '^>' | grep -E '(^|[[:space:]])(public|open)([[:space:]]|$)' || true)
+    removed_api=$(printf '%s\n' "$changed" | grep -E '^<' | grep -E '(^|[[:space:]])(public|open)([[:space:]]|$)' || true)
+    [ -n "$added_api" ] && api_added="${api_added}${path}"$'\n'"${added_api}"$'\n'
+    [ -n "$removed_api" ] && api_removed="${api_removed}${path}"$'\n'"${removed_api}"$'\n'
+
+    if [ "$code" -gt 0 ]; then
+        semantic=$((semantic + 1))
+        rows="${rows}${code}	${comments}	${path}"$'\n'
     else
-        lines=$(diff "$WORK/$path" "$WORK/head-version" | grep -cE '^[<>]')
-        edited="${edited}${lines}	${path}"$'\n'
+        doc_only=$((doc_only + 1))
+        doc_rows="${doc_rows}${comments}	${path}"$'\n'
     fi
 done <<< "$CHANGED_SOURCES"
 
-edited_count=$(printf '%s' "$edited" | grep -c . || true)
+modified_total=$(printf '%s\n' "$CHANGED_SOURCES" | grep -c . || true)
 
-echo "### Shipped code (\`Sources/\`)"
+echo "### Production code (\`Sources/\`)"
 echo
-echo "| | Files |"
-echo "| --- | ---: |"
-echo "| Formatter output only, no edit of its own | $pure |"
-echo "| Carry an edit of their own | $edited_count |"
+echo "$modified_total modified files, classified by whether the change can alter behaviour."
+echo
+echo "| Classification | Files | Reviewer action |"
+echo "| --- | ---: | --- |"
+echo "| Formatting only, semantically inert | $inert | None. Reproduced by running the formatter over the base revision. |"
+echo "| Comments and documentation only | $doc_only | Read for accuracy. Compiles to the same code. |"
+echo "| Declarations or statements changed | $semantic | Review. This is where behaviour can change. |"
 echo
 
-if [ "$edited_count" -gt 0 ]; then
-    echo "These are the files to read. The count is lines that differ once formatting"
-    echo "is accounted for, and it counts a comment the same as a statement."
+if [ "$semantic" -gt 0 ]; then
+    echo "#### Files that can change behaviour"
     echo
-    echo "| Changed lines | File |"
+    echo "\`Code\` counts declarations and executable statements that differ once"
+    echo "formatting is normalised and relocations are netted out: a line moved"
+    echo "without being altered compiles to what it compiled to before. \`Docs\` is"
+    echo "the same count for comments."
+    echo
+    echo "| Code | Docs | File |"
+    echo "| ---: | ---: | --- |"
+    printf '%s' "$rows" | sort -rn | awk -F'\t' 'NF == 3 { printf "| %s | %s | `%s` |\n", $1, $2, $3 }'
+    echo
+fi
+
+if [ "$doc_only" -gt 0 ]; then
+    echo "#### Documentation-only files"
+    echo
+    echo "| Docs | File |"
     echo "| ---: | --- |"
-    printf '%s' "$edited" | sort -rn | awk -F'\t' 'NF == 2 { printf "| %s | `%s` |\n", $1, $2 }'
+    printf '%s' "$doc_rows" | sort -rn | awk -F'\t' 'NF == 2 { printf "| %s | `%s` |\n", $1, $2 }'
+    echo
+fi
+
+# ------------------------------------------------------------ public API surface
+
+echo "### Public API surface"
+echo
+if [ -z "$api_added" ] && [ -z "$api_removed" ]; then
+    echo "No line carrying \`public\` or \`open\` was added or removed in a modified file."
+    echo "Nothing a consumer compiles against moved, so this change is source compatible"
+    echo "by that measure and needs no matching change in the SDK for Android."
+else
+    echo "Lines carrying \`public\` or \`open\` moved. The public surface is a contract"
+    echo "shared with the SDK for Android, so a change here is a change to both."
+    if [ -n "$api_removed" ]; then
+        echo
+        echo "Removed or altered:"
+        echo '```'
+        printf '%s' "$api_removed"
+        echo '```'
+    fi
+    if [ -n "$api_added" ]; then
+        echo
+        echo "Added or altered:"
+        echo '```'
+        printf '%s' "$api_added"
+        echo '```'
+    fi
+fi
+echo
+
+# ------------------------------------------------------------------ test balance
+
+TEST_FILES=$(git diff --name-only "$BASE..$HEAD_SHA" -- Tests/ Example/PayabliDemo/FlowTests/ | grep -c . || true)
+echo "### Tests"
+echo
+if [ "$semantic" -eq 0 ]; then
+    echo "No production file changed a declaration or a statement, so no new test is implied."
+elif [ "$TEST_FILES" -eq 0 ]; then
+    echo "$semantic production files changed behaviour and no test file changed. Worth"
+    echo "confirming the existing suite covers the new paths."
+else
+    echo "$semantic production files changed behaviour, alongside $TEST_FILES changed test files."
 fi
