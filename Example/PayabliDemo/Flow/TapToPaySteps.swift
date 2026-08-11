@@ -19,22 +19,32 @@ struct TapToPayFlowSteps {
     let activation: FlowStep
     let charge: FlowStep
 
-    /// Whether the activation step offers its code control.
+    /// The one control the screen offers, or none while the SDK is working.
     ///
-    /// `activateDevice` throws `.invalidState` for any session but
-    /// `.pendingActivation`, and a refused activation leaves the session
-    /// `.error`. The step still reports the failure; what it stops offering is a
-    /// control the SDK would reject, which the screen shows beside the
-    /// Re-initialize the same session state puts on screen.
-    let acceptsActivationCode: Bool
-
-    /// Whether the screen offers Re-initialize. An action outside the sequence,
-    /// so the steps have to know it exists.
-    let offersRecovery: Bool
+    /// A step reports where it has got to; this says which control a person can
+    /// press. They are separate because a step reports a failure it cannot
+    /// retry: a refused activation leaves the session `.error`, and
+    /// `activateDevice` throws `.invalidState` for anything but
+    /// `.pendingActivation`, so the activation step shows the reason while
+    /// Re-initialize is the way forward.
+    ///
+    /// Recovery lives here for the same reason. It is not a step, and while it
+    /// was a flag of its own it could appear beside a step still asking for
+    /// something.
+    let nextAction: TapToPayAction?
 
     var all: [FlowStep] {
         [token, enable, activation, charge]
     }
+}
+
+/// A control on the Tap to Pay screen.
+enum TapToPayAction {
+    case checkToken
+    case enableTerminal
+    case enterActivationCode
+    case charge
+    case reinitialize
 }
 
 /// What taking a contactless payment asks for.
@@ -114,6 +124,29 @@ enum TapToPaySteps {
             return session == .ready ? .current : .blocked
         }()
 
+        // Ordered like the steps, and for the same reason: the first thing that
+        // wants attention is the only thing offered. Re-initialize sits behind
+        // the token step because it re-runs config, which a backend known to be
+        // down cannot answer.
+        let nextAction: TapToPayAction? = {
+            if token.isActionable {
+                return .checkToken
+            }
+            guard token.isFinished else { return nil }
+            if session == .error || session == .sessionExpired {
+                return .reinitialize
+            }
+            if enable == .current {
+                return .enableTerminal
+            }
+            guard enable.isFinished else { return nil }
+            if activation == .current {
+                return .enterActivationCode
+            }
+            guard activation.isFinished else { return nil }
+            return charge == .current ? .charge : nil
+        }()
+
         return TapToPayFlowSteps(
             token: FlowStep(
                 title: "Reach the token backend",
@@ -137,8 +170,7 @@ enum TapToPaySteps {
                 detail: "Presents Apple's Tap to Pay sheet. Hold a card to the top of the phone.",
                 status: charge
             ),
-            acceptsActivationCode: session == .pendingActivation,
-            offersRecovery: session == .error || session == .sessionExpired
+            nextAction: nextAction
         )
     }
 }

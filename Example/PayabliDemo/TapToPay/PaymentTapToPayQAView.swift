@@ -102,23 +102,21 @@ struct PaymentTapToPayQAView: View {
 
             StepRow(index: 2, step: steps.enable) {
                 VStack(alignment: .leading, spacing: 6) {
-                    Button { runEnableTerminal() } label: {
-                        Label("Enable Terminal", systemImage: "wave.3.right")
-                            .frame(maxWidth: .infinity)
+                    if steps.nextAction == .enableTerminal {
+                        Button { runEnableTerminal() } label: {
+                            Label("Enable Terminal", systemImage: "wave.3.right")
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(isWorking)
                     }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(isWorking)
                     stepOutcome(enableMessage)
                 }
             }
 
             StepRow(index: 3, step: steps.activation) {
                 VStack(alignment: .leading, spacing: 6) {
-                    // `activateDevice` throws `.invalidState` unless the session
-                    // is `.pendingActivation`, so a refused activation reports
-                    // its reason without the control that would throw. The
-                    // recovery section owns the way forward from there.
-                    if steps.acceptsActivationCode {
+                    if steps.nextAction == .enterActivationCode {
                         Button { isActivationPresented = true } label: {
                             Label("Enter activation code", systemImage: "checkmark.shield")
                                 .frame(maxWidth: .infinity)
@@ -139,12 +137,14 @@ struct PaymentTapToPayQAView: View {
                             .focused($focusedField, equals: .amount)
                             .textFieldStyle(.roundedBorder)
                     }
-                    Button { runCharge() } label: {
-                        Label("Charge (tap card)", systemImage: "creditcard.and.123")
-                            .frame(maxWidth: .infinity)
+                    if steps.nextAction == .charge {
+                        Button { runCharge() } label: {
+                            Label("Charge (tap card)", systemImage: "creditcard.and.123")
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(isWorking)
                     }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(isWorking)
                     stepOutcome(chargeMessage)
                 }
             }
@@ -155,7 +155,7 @@ struct PaymentTapToPayQAView: View {
     /// is in a state it can actually repair.
     @ViewBuilder
     private var recoverySection: some View {
-        if steps.offersRecovery {
+        if steps.nextAction == .reinitialize {
             VStack(alignment: .leading, spacing: 8) {
                 Text("Recovery")
                     .font(.headline)

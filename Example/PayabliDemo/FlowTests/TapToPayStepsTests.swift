@@ -105,9 +105,10 @@ final class TapToPayStepsTests: XCTestCase {
 
     func testTheActivationCodeIsOfferedOnlyWhereTheSDKAcceptsIt() {
         // `activateDevice` throws `.invalidState` for any session but
-        // `.pendingActivation`, so offering the control anywhere else hands over
-        // a button that cannot work.
-        for combination in everyCombination where steps(combination).acceptsActivationCode {
+        // `.pendingActivation`.
+        for combination in everyCombination
+            where steps(combination).nextAction == .enterActivationCode
+        {
             XCTAssertEqual(
                 combination.session, .pendingActivation,
                 "\(combination) offered the activation code"
@@ -115,13 +116,34 @@ final class TapToPayStepsTests: XCTestCase {
         }
     }
 
-    func testRecoveryIsNeverOfferedBesideAControlThatCannotRun() {
-        for combination in everyCombination {
+    func testAChargeIsOfferedOnlyByAReadyTerminal() {
+        for combination in everyCombination where steps(combination).nextAction == .charge {
+            XCTAssertEqual(combination.session, .ready, "\(combination) offered a charge")
+        }
+    }
+
+    func testRecoveryWaitsForTheTokenStepLikeEverythingElse() {
+        // Re-initialize re-runs config, which a backend known to be down cannot
+        // answer, and offering it beside the probe's own retry is two next
+        // actions again.
+        for combination in everyCombination where steps(combination).nextAction == .reinitialize {
             let sequence = steps(combination)
-            guard sequence.offersRecovery else { continue }
-            XCTAssertFalse(
-                sequence.acceptsActivationCode,
-                "\(combination) offered Re-initialize and the activation code together"
+            XCTAssertTrue(sequence.token.status.isFinished, "\(combination) offered Re-initialize")
+            XCTAssertTrue(
+                combination.session == .error || combination.session == .sessionExpired,
+                "\(combination) offered Re-initialize"
+            )
+        }
+    }
+
+    func testAFailedProbeKeepsTheOnlyActionOnTheProbe() {
+        for session in everyTapToPaySession {
+            let sequence = TapToPaySteps.forCharging(
+                tokenCheck: .unreachable, session: session, activation: .activationFailed
+            )
+            XCTAssertEqual(
+                sequence.nextAction, .checkToken,
+                "session \(sessionName(session)) moved past a failed probe"
             )
         }
     }
@@ -194,10 +216,8 @@ final class TapToPayStepsTests: XCTestCase {
         XCTAssertEqual(sequence.activation.status, .failed)
         XCTAssertTrue(sequence.activation.status.showsContent)
         XCTAssertEqual(sequence.charge.status, .blocked)
-        // The reason shows; the control that would throw does not, and Recovery
-        // is the one way forward.
-        XCTAssertFalse(sequence.acceptsActivationCode)
-        XCTAssertTrue(sequence.offersRecovery)
+        // The reason shows; Re-initialize is the way forward.
+        XCTAssertEqual(sequence.nextAction, .reinitialize)
     }
 
     func testNoRecordedActivationFailureIsAnsweredByAnEarlierStep() {
