@@ -1,0 +1,21 @@
+// The step sequences under Flow/, tested on their own.
+//
+// No TEST_HOST: the app target cannot compile on a clean checkout, because
+// Secrets.swift is gitignored and is a member of its Sources phase. The settings
+// below clear what Shared.xcconfig sets for the app.
+
+PRODUCT_BUNDLE_IDENTIFIER = com.payabli.example.app.flowtests
+GENERATE_INFOPLIST_FILE = YES
+INFOPLIST_FILE =
+CODE_SIGN_ENTITLEMENTS =
+
+IPHONEOS_DEPLOYMENT_TARGET = 16.7
+SDKROOT = iphoneos
+TARGETED_DEVICE_FAMILY = 1,2
+SWIFT_VERSION = 5.0
+
+CODE_SIGNING_ALLOWED = NO
+CODE_SIGN_STYLE = Manual
+DEVELOPMENT_TEAM =
+
+LD_RUNPATH_SEARCH_PATHS = $(inherited) @executable_path/Frameworks @loader_path/Frameworks

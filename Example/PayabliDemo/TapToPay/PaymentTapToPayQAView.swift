@@ -26,18 +26,7 @@ struct PaymentTapToPayQAView: View {
     @State private var eventToken: PayabliTTPEventToken?
     @State private var isActivationPresented = false
     @State private var isActivationHelpPresented = false
-    @State private var activationOutcome = ActivationOutcome.none
-
-    /// Which half of the activation step failed.
-    ///
-    /// Activation is two SDK calls. `sessionState` cannot tell them apart: both
-    /// land in `.error`, except a revoked attestation, which lands in `.idle`.
-    private enum ActivationOutcome {
-        case none
-        case activationFailed
-        case enableFailed
-        case succeeded
-    }
+    @State private var activationOutcome = TapToPayActivationOutcome.none
     @State private var isWorking = false
     @FocusState private var focusedField: Field?
 
@@ -81,20 +70,22 @@ struct PaymentTapToPayQAView: View {
 
     // MARK: - The sequence
 
-    /// The order the SDK enforces, made visible. Every status is derived from
-    /// `sessionState` rather than tracked separately, so the screen cannot
-    /// disagree with the session it is describing.
+    /// The order the SDK enforces, made visible. Derived in one place, so no two
+    /// steps can disagree about which is next.
+    private var steps: TapToPayFlowSteps {
+        TapToPaySteps.forCharging(
+            tokenCheck: TokenCheck.classify(tokenCheckText),
+            session: terminal.sessionState,
+            activation: activationOutcome
+        )
+    }
+
     private var stepsSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Steps")
                 .font(.headline)
 
-            QAStepRow(
-                index: 1,
-                title: "Reach the token backend",
-                detail: "The SDK calls your backend for a fresh access token whenever it needs one.",
-                status: tokenStepStatus
-            ) {
+            StepRow(index: 1, step: steps.token) {
                 VStack(alignment: .leading, spacing: 6) {
                     Button { runTokenCheck() } label: {
                         Label("Check token endpoint", systemImage: "key.horizontal")
@@ -109,12 +100,7 @@ struct PaymentTapToPayQAView: View {
                 }
             }
 
-            QAStepRow(
-                index: 2,
-                title: "Enable the terminal",
-                detail: "Attests the device, fetches the merchant config, and prepares the reader.",
-                status: enableStepStatus
-            ) {
+            StepRow(index: 2, step: steps.enable) {
                 VStack(alignment: .leading, spacing: 6) {
                     Button { runEnableTerminal() } label: {
                         Label("Enable Terminal", systemImage: "wave.3.right")
@@ -126,12 +112,7 @@ struct PaymentTapToPayQAView: View {
                 }
             }
 
-            QAStepRow(
-                index: 3,
-                title: "Activate the device",
-                detail: activationDetail,
-                status: activationStepStatus
-            ) {
+            StepRow(index: 3, step: steps.activation) {
                 VStack(alignment: .leading, spacing: 6) {
                     Button { isActivationPresented = true } label: {
                         Label("Enter activation code", systemImage: "checkmark.shield")
@@ -143,12 +124,7 @@ struct PaymentTapToPayQAView: View {
                 }
             }
 
-            QAStepRow(
-                index: 4,
-                title: "Charge a card",
-                detail: "Presents Apple's Tap to Pay sheet. Hold a card to the top of the phone.",
-                status: chargeStepStatus
-            ) {
+            StepRow(index: 4, step: steps.charge) {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
                         Text("$")
@@ -191,66 +167,6 @@ struct PaymentTapToPayQAView: View {
             .background(Color.payabliSurfaceContainer)
             .clipShape(RoundedRectangle(cornerRadius: 10))
         }
-    }
-
-    // MARK: - Step status, derived from the session
-
-    /// True once the backend is known reachable — either because the check was
-    /// run here, or because the SDK already fetched a token to get past `idle`.
-    private var backendProven: Bool {
-        if tokenCheckText.hasPrefix("✓") { return true }
-        // Only states the session cannot reach without a successful authenticated
-        // request. `.attestingDevice` is set before that request, and `.error` is
-        // where a failing token provider lands, so neither proves anything.
-        switch terminal.sessionState {
-        case .fetchingConfig, .initializingReader, .ready, .pendingActivation, .reinitializing:
-            return true
-        default:
-            return false
-        }
-    }
-
-    private var tokenStepStatus: QAStepStatus {
-        if tokenCheckText.hasPrefix("✗") { return .failed }
-        return backendProven ? .done : .current
-    }
-
-    private var enableStepStatus: QAStepStatus {
-        // Exactly one step is ever `.current`, so this stays blocked until the
-        // backend is proven rather than competing with step 1 for attention.
-        guard backendProven else { return .blocked }
-        switch terminal.sessionState {
-        case .ready: return .done
-        case .attestingDevice, .fetchingConfig, .initializingReader, .reinitializing: return .inProgress
-        case .pendingActivation: return .done
-        case .error, .sessionExpired: return .failed
-        case .idle: return .current
-        @unknown default: return .current
-        }
-    }
-
-    private var activationStepStatus: QAStepStatus {
-        // A failed activation must stay actionable: `.failed` is the only other
-        // status whose content renders, so blocking it would hide the reason and
-        // the retry together. Read from the recorded outcome rather than from
-        // `sessionState`, which cannot distinguish the two calls this step makes
-        // and reports `.idle` for a revoked attestation.
-        if activationOutcome == .activationFailed { return .failed }
-        switch terminal.sessionState {
-        case .pendingActivation: return .current
-        case .ready: return .notNeeded
-        default: return .blocked
-        }
-    }
-
-    private var activationDetail: String {
-        return terminal.sessionState == .pendingActivation
-            ? "Activate the device with the code provided by the Paypoint Device Management dashboard."
-            : "Only when the backend registers the device as pending."
-    }
-
-    private var chargeStepStatus: QAStepStatus {
-        terminal.isReady ? .current : .blocked
     }
 
     private var isRecoverable: Bool {

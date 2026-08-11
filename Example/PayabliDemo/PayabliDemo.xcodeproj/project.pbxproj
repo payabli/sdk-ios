@@ -8,7 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		A1B2C3D4E5F60000000000E2 /* QAContextLine.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60000000000E1 /* QAContextLine.swift */; };
-		A1B2C3D4E5F60000000000D2 /* QAStepRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60000000000D1 /* QAStepRow.swift */; };
+		A1B2C3D4E5F60000000000D2 /* StepRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60000000000D1 /* StepRow.swift */; };
 		0F5E8CC7E7A24D19A71B0A1C /* PaymentMethodAddedView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F5E8CC6E7A24D19A71B0A1C /* PaymentMethodAddedView.swift */; };
 		1C7A9E9B6D2F4C0F8A1B3D5E /* PaymentCaptureQAView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B1E0F9A8C7D6E5F4A3B2C1D /* PaymentCaptureQAView.swift */; };
 		3F9C8D7E6A5B4C3D2E1F0A9B /* PayabliSDKExampleAggregate in Frameworks */ = {isa = PBXBuildFile; productRef = 4A0D9E8F7B6C5D4E3F2A1B0C /* PayabliSDKExampleAggregate */; };
@@ -30,9 +30,31 @@
 		E1D2C3B4A5960718293A4B01 /* DebugPrefill.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1D2C3B4A5960718293A4B02 /* DebugPrefill.swift */; };
 		E1D2C3B4A5960718293A4B03 /* DebugPrefill.json in Resources */ = {isa = PBXBuildFile; fileRef = E1D2C3B4A5960718293A4B04 /* DebugPrefill.json */; };
 		F10000000000000000000030 /* PayabliSDKExampleAggregate in Embed Frameworks */ = {isa = PBXBuildFile; productRef = 4A0D9E8F7B6C5D4E3F2A1B0C /* PayabliSDKExampleAggregate */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		F20000000000000000000002 /* StepStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000001 /* StepStatus.swift */; };
+		F20000000000000000000004 /* TapToPaySteps.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000003 /* TapToPaySteps.swift */; };
+		F20000000000000000000006 /* PayInSteps.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000005 /* PayInSteps.swift */; };
+		F20000000000000000000012 /* StepStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000001 /* StepStatus.swift */; };
+		F20000000000000000000013 /* TapToPaySteps.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000003 /* TapToPaySteps.swift */; };
+		F20000000000000000000014 /* PayInSteps.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000005 /* PayInSteps.swift */; };
+		F20000000000000000000022 /* StepStatusTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000021 /* StepStatusTests.swift */; };
+		F20000000000000000000024 /* TapToPayStepsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000023 /* TapToPayStepsTests.swift */; };
+		F20000000000000000000026 /* PayInStepsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000025 /* PayInStepsTests.swift */; };
+		F20000000000000000000040 /* PayabliSDKExampleAggregate in Frameworks */ = {isa = PBXBuildFile; productRef = F20000000000000000000041 /* PayabliSDKExampleAggregate */; };
+		F20000000000000000000042 /* PayabliSDKExampleAggregate in Embed Frameworks */ = {isa = PBXBuildFile; productRef = F20000000000000000000041 /* PayabliSDKExampleAggregate */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
+		F20000000000000000000043 /* Embed Frameworks */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				F20000000000000000000042 /* PayabliSDKExampleAggregate in Embed Frameworks */,
+			);
+			name = "Embed Frameworks";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		F10000000000000000000031 /* Embed Frameworks */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
@@ -48,7 +70,7 @@
 
 /* Begin PBXFileReference section */
 		A1B2C3D4E5F60000000000E1 /* QAContextLine.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = QAContextLine.swift; sourceTree = "<group>"; };
-		A1B2C3D4E5F60000000000D1 /* QAStepRow.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = QAStepRow.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F60000000000D1 /* StepRow.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = StepRow.swift; sourceTree = "<group>"; };
 		0F5E8CC6E7A24D19A71B0A1C /* PaymentMethodAddedView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PaymentMethodAddedView.swift; sourceTree = "<group>"; };
 		1DADA588F49DF0C4A6611302 /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		4C921D1F3EE7130C23911757 /* Secrets.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Secrets.swift; sourceTree = "<group>"; };
@@ -75,10 +97,26 @@
 		F1000000000000000000000D /* Debug-XCFramework.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; path = "Debug-XCFramework.xcconfig"; sourceTree = "<group>"; };
 		F10000000000000000000020 /* check-sdk-linkage.sh */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.script.sh; path = "check-sdk-linkage.sh"; sourceTree = "<group>"; };
 		F201F43C477597B328446F93 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
+		F20000000000000000000001 /* StepStatus.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = StepStatus.swift; sourceTree = "<group>"; };
+		F20000000000000000000003 /* TapToPaySteps.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TapToPaySteps.swift; sourceTree = "<group>"; };
+		F20000000000000000000005 /* PayInSteps.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PayInSteps.swift; sourceTree = "<group>"; };
+		F20000000000000000000021 /* StepStatusTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = StepStatusTests.swift; sourceTree = "<group>"; };
+		F20000000000000000000023 /* TapToPayStepsTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TapToPayStepsTests.swift; sourceTree = "<group>"; };
+		F20000000000000000000025 /* PayInStepsTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PayInStepsTests.swift; sourceTree = "<group>"; };
+		F20000000000000000000030 /* FlowTests.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; path = FlowTests.xcconfig; sourceTree = "<group>"; };
+		F20000000000000000000050 /* PayabliDemoFlowTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PayabliDemoFlowTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		F427A5EA0CEF029F22AF2170 /* PayabliDemo.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PayabliDemo.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		F20000000000000000000044 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				F20000000000000000000040 /* PayabliSDKExampleAggregate in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		57ED6F126A7F63E859E6B9C1 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -112,6 +150,7 @@
 			isa = PBXGroup;
 			children = (
 				F427A5EA0CEF029F22AF2170 /* PayabliDemo.app */,
+				F20000000000000000000050 /* PayabliDemoFlowTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -130,6 +169,8 @@
 				E1000000000000000000000A /* App */,
 				F10000000000000000000010 /* Config */,
 				F10000000000000000000021 /* Scripts */,
+				F20000000000000000000010 /* Flow */,
+				F20000000000000000000020 /* FlowTests */,
 				E1000000000000000000000B /* Configuration */,
 				E1000000000000000000000C /* TapToPay */,
 				E10000000000000000000020 /* Shared */,
@@ -225,6 +266,7 @@
 				F1000000000000000000000B /* Debug.xcconfig */,
 				F1000000000000000000000C /* Release.xcconfig */,
 				F1000000000000000000000D /* Debug-XCFramework.xcconfig */,
+				F20000000000000000000030 /* FlowTests.xcconfig */,
 			);
 			path = Config;
 			sourceTree = "<group>";
@@ -241,15 +283,55 @@
 			isa = PBXGroup;
 			children = (
 				D10000000000000000000005 /* QADetailRow.swift */,
-				A1B2C3D4E5F60000000000D1 /* QAStepRow.swift */,
+				A1B2C3D4E5F60000000000D1 /* StepRow.swift */,
 				A1B2C3D4E5F60000000000E1 /* QAContextLine.swift */,
 			);
 			path = Shared;
 			sourceTree = "<group>";
 		};
+		F20000000000000000000010 /* Flow */ = {
+			isa = PBXGroup;
+			children = (
+				F20000000000000000000001 /* StepStatus.swift */,
+				F20000000000000000000003 /* TapToPaySteps.swift */,
+				F20000000000000000000005 /* PayInSteps.swift */,
+			);
+			path = Flow;
+			sourceTree = "<group>";
+		};
+		F20000000000000000000020 /* FlowTests */ = {
+			isa = PBXGroup;
+			children = (
+				F20000000000000000000021 /* StepStatusTests.swift */,
+				F20000000000000000000023 /* TapToPayStepsTests.swift */,
+				F20000000000000000000025 /* PayInStepsTests.swift */,
+			);
+			path = FlowTests;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		F20000000000000000000060 /* PayabliDemoFlowTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = F20000000000000000000070 /* Build configuration list for PBXNativeTarget "PayabliDemoFlowTests" */;
+			buildPhases = (
+				F20000000000000000000045 /* Sources */,
+				F20000000000000000000044 /* Frameworks */,
+				F20000000000000000000043 /* Embed Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = PayabliDemoFlowTests;
+			packageProductDependencies = (
+				F20000000000000000000041 /* PayabliSDKExampleAggregate */,
+			);
+			productName = PayabliDemoFlowTests;
+			productReference = F20000000000000000000050 /* PayabliDemoFlowTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 		475485E1E243C7CA6B159E47 /* PayabliDemo */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 87189C26EFA0A693AC05A10A /* Build configuration list for PBXNativeTarget "PayabliDemo" */;
@@ -298,6 +380,7 @@
 			projectRoot = "";
 			targets = (
 				475485E1E243C7CA6B159E47 /* PayabliDemo */,
+				F20000000000000000000060 /* PayabliDemoFlowTests */,
 			);
 		};
 /* End PBXProject section */
@@ -335,6 +418,19 @@
 /* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		F20000000000000000000045 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				F20000000000000000000012 /* StepStatus.swift in Sources */,
+				F20000000000000000000013 /* TapToPaySteps.swift in Sources */,
+				F20000000000000000000014 /* PayInSteps.swift in Sources */,
+				F20000000000000000000022 /* StepStatusTests.swift in Sources */,
+				F20000000000000000000024 /* TapToPayStepsTests.swift in Sources */,
+				F20000000000000000000026 /* PayInStepsTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		1511487013BC083FF8294541 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -351,7 +447,10 @@
 				1C7A9E9B6D2F4C0F8A1B3D5E /* PaymentCaptureQAView.swift in Sources */,
 				A1B2C3D4E5F60000000000A2 /* PaymentTapToPayQAView.swift in Sources */,
 				A1B2C3D4E5F60000000000B2 /* TapToPayPreflight.swift in Sources */,
-				A1B2C3D4E5F60000000000D2 /* QAStepRow.swift in Sources */,
+				F20000000000000000000002 /* StepStatus.swift in Sources */,
+				F20000000000000000000004 /* TapToPaySteps.swift in Sources */,
+				F20000000000000000000006 /* PayInSteps.swift in Sources */,
+				A1B2C3D4E5F60000000000D2 /* StepRow.swift in Sources */,
 				A1B2C3D4E5F60000000000E2 /* QAContextLine.swift in Sources */,
 				0F5E8CC7E7A24D19A71B0A1C /* PaymentMethodAddedView.swift in Sources */,
 				C9B9D43650B2230A8582B93C /* Secrets.swift in Sources */,
@@ -363,6 +462,30 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin XCBuildConfiguration section */
+		F20000000000000000000071 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = F20000000000000000000030 /* FlowTests.xcconfig */;
+			buildSettings = {
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = Debug;
+		};
+		F20000000000000000000072 /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = F20000000000000000000030 /* FlowTests.xcconfig */;
+			buildSettings = {
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = Release;
+		};
+		F20000000000000000000073 /* Debug-XCFramework */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = F20000000000000000000030 /* FlowTests.xcconfig */;
+			buildSettings = {
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = "Debug-XCFramework";
+		};
 		261639CBD142F4F5DABF734B /* Release */ = {
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = F1000000000000000000000C /* Release.xcconfig */;
@@ -627,6 +750,16 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		F20000000000000000000070 /* Build configuration list for PBXNativeTarget "PayabliDemoFlowTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				F20000000000000000000071 /* Debug */,
+				F20000000000000000000072 /* Release */,
+				F20000000000000000000073 /* Debug-XCFramework */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
 		87189C26EFA0A693AC05A10A /* Build configuration list for PBXNativeTarget "PayabliDemo" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
@@ -657,6 +790,11 @@
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		F20000000000000000000041 /* PayabliSDKExampleAggregate */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 9D53E7C2DDF2C3C9B8D4F07B /* XCLocalSwiftPackageReference "../.." */;
+			productName = PayabliSDKExampleAggregate;
+		};
 		4A0D9E8F7B6C5D4E3F2A1B0C /* PayabliSDKExampleAggregate */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 9D53E7C2DDF2C3C9B8D4F07B /* XCLocalSwiftPackageReference "../.." */;
