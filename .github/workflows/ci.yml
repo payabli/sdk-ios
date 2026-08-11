@@ -10,25 +10,23 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+# Three jobs, run at once. The two suites are the whole cost of this workflow
+# and neither reads anything the other writes, so run in sequence they only add
+# up. They cannot share a build: both compile the SDK, but one is the package's
+# own test action and the other consumes the package as a dependency of
+# Example/PayabliDemo.xcodeproj, and Xcode compiles a dependency with
+# -suppress-warnings. Same intermediates path, different flags, so pointing both
+# at one -derivedDataPath makes them invalidate each other's objects rather than
+# reuse them.
+
 jobs:
-  test:
-    name: Build & Test
+  lint:
+    name: Lint
     runs-on: macos-15
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Select latest Xcode
-        run: |
-          XCODE=$(ls /Applications | grep -E '^Xcode_[0-9]' | sort -V | tail -1)
-          sudo xcode-select -s "/Applications/$XCODE/Contents/Developer"
-          echo "Using $XCODE"
-          xcodebuild -version
-          swift --version
-
-      - name: Install xcpretty
-        run: gem install xcpretty --no-document
 
       # Pinned by content, not by name. Both tools decide whether this job
       # passes, and .swiftformat names the version its four disabled rules were
@@ -72,31 +70,15 @@ jobs:
           swiftlint
           swiftformat --lint .
 
-      - name: Resolve dependencies
-        run: |
-          xcodebuild -resolvePackageDependencies \
-            -scheme PayabliSDK-Package \
-            -clonedSourcePackagesDirPath .build/checkouts
+  test-sdk:
+    name: SDK tests
+    runs-on: macos-15
 
-      - name: Select simulator
-        run: |
-          SIMULATOR_ID=$(xcrun simctl list devices available -j \
-            | python3 -c "
-          import json, sys
-          d = json.load(sys.stdin)['devices']
-          iphones = [
-            v for k, vals in d.items()
-            if 'iOS' in k
-            for v in vals
-            if 'iPhone' in v['name'] and v['isAvailable']
-          ]
-          if not iphones:
-            print('error: no available iPhone simulator found', file=sys.stderr)
-            sys.exit(1)
-          print(sorted(iphones, key=lambda x: x['name'])[-1]['udid'])
-          ")
-          echo "Using simulator: $SIMULATOR_ID"
-          echo "SIMULATOR_ID=$SIMULATOR_ID" >> "$GITHUB_ENV"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - uses: ./.github/actions/ios-toolchain
 
       - name: Test the SDK
         run: |
@@ -106,22 +88,6 @@ jobs:
             -clonedSourcePackagesDirPath .build/checkouts \
             -enableCodeCoverage YES \
             -resultBundlePath SDKTests.xcresult \
-            CODE_SIGNING_ALLOWED=NO \
-            | xcpretty && exit ${PIPESTATUS[0]}
-
-      # The sample app's step sequences, which decide what each screen offers
-      # next. A separate scheme, because this bundle has no host application:
-      # Secrets.swift is gitignored and is a member of the app target, so the app
-      # itself cannot be built here.
-      - name: Test the sample app's step sequences
-        run: |
-          xcodebuild test \
-            -project Example/PayabliDemo/PayabliDemo.xcodeproj \
-            -scheme PayabliDemoFlowTests \
-            -destination "platform=iOS Simulator,id=$SIMULATOR_ID" \
-            -clonedSourcePackagesDirPath .build/checkouts \
-            -enableCodeCoverage YES \
-            -resultBundlePath DemoFlowTests.xcresult \
             CODE_SIGNING_ALLOWED=NO \
             | xcpretty && exit ${PIPESTATUS[0]}
 
@@ -139,10 +105,38 @@ jobs:
           name: coverage
           path: coverage.xml
 
+  test-demo:
+    name: Sample app step sequences
+    runs-on: macos-15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - uses: ./.github/actions/ios-toolchain
+
+      # The sample app's step sequences, which decide what each screen offers
+      # next. A separate scheme, because this bundle has no host application:
+      # Secrets.swift is gitignored and is a member of the app target, so the app
+      # itself cannot be built here.
+      - name: Test the sample app's step sequences
+        run: |
+          xcodebuild test \
+            -project Example/PayabliDemo/PayabliDemo.xcodeproj \
+            -scheme PayabliDemoFlowTests \
+            -destination "platform=iOS Simulator,id=$SIMULATOR_ID" \
+            -clonedSourcePackagesDirPath .build/checkouts \
+            -enableCodeCoverage YES \
+            -resultBundlePath DemoFlowTests.xcresult \
+            CODE_SIGNING_ALLOWED=NO \
+            | xcpretty && exit ${PIPESTATUS[0]}
+
   sonar:
     name: SonarCloud
     runs-on: macos-15
-    needs: [test]
+    # Only the SDK suite's coverage is analysed, so this does not wait on the
+    # sample app.
+    needs: [test-sdk]
     # A fork's pull request has no access to the token, and the scan would fail
     # rather than be skipped.
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository

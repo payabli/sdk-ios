@@ -1,0 +1,50 @@
+name: iOS toolchain
+description: Selects Xcode and a simulator, and resolves the package graph.
+
+# The test jobs run in parallel and each needs the same four steps. A composite
+# action keeps the Xcode selection and the simulator lookup written once, so the
+# jobs cannot drift onto different runtimes and disagree about a failure.
+
+runs:
+  using: composite
+  steps:
+    - name: Select latest Xcode
+      shell: bash
+      run: |
+        XCODE=$(ls /Applications | grep -E '^Xcode_[0-9]' | sort -V | tail -1)
+        sudo xcode-select -s "/Applications/$XCODE/Contents/Developer"
+        echo "Using $XCODE"
+        xcodebuild -version
+        swift --version
+
+    - name: Install xcpretty
+      shell: bash
+      run: gem install xcpretty --no-document
+
+    - name: Resolve dependencies
+      shell: bash
+      run: |
+        xcodebuild -resolvePackageDependencies \
+          -scheme PayabliSDK-Package \
+          -clonedSourcePackagesDirPath .build/checkouts
+
+    - name: Select simulator
+      shell: bash
+      run: |
+        SIMULATOR_ID=$(xcrun simctl list devices available -j \
+          | python3 -c "
+        import json, sys
+        d = json.load(sys.stdin)['devices']
+        iphones = [
+          v for k, vals in d.items()
+          if 'iOS' in k
+          for v in vals
+          if 'iPhone' in v['name'] and v['isAvailable']
+        ]
+        if not iphones:
+          print('error: no available iPhone simulator found', file=sys.stderr)
+          sys.exit(1)
+        print(sorted(iphones, key=lambda x: x['name'])[-1]['udid'])
+        ")
+        echo "Using simulator: $SIMULATOR_ID"
+        echo "SIMULATOR_ID=$SIMULATOR_ID" >> "$GITHUB_ENV"
