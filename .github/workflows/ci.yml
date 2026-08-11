@@ -88,8 +88,14 @@ jobs:
             -clonedSourcePackagesDirPath .build/checkouts \
             -enableCodeCoverage YES \
             -resultBundlePath SDKTests.xcresult \
-            CODE_SIGNING_ALLOWED=NO \
-            | xcpretty && exit ${PIPESTATUS[0]}
+            -quiet \
+            CODE_SIGNING_ALLOWED=NO
+
+      # -quiet names the failing tests and stops there, so the assertion comes
+      # back out of the result bundle.
+      - name: Report test failures
+        if: failure()
+        run: ./Scripts/print-test-failures.sh SDKTests.xcresult
 
       # Sources only. sonar-project.properties measures that root, and an
       # .xcresult also covers the test files themselves and the vendored
@@ -128,8 +134,12 @@ jobs:
             -clonedSourcePackagesDirPath .build/checkouts \
             -enableCodeCoverage YES \
             -resultBundlePath DemoFlowTests.xcresult \
-            CODE_SIGNING_ALLOWED=NO \
-            | xcpretty && exit ${PIPESTATUS[0]}
+            -quiet \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Report test failures
+        if: failure()
+        run: ./Scripts/print-test-failures.sh DemoFlowTests.xcresult
 
   sonar:
     name: SonarCloud

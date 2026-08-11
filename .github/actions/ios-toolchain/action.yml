@@ -17,10 +17,6 @@ runs:
         xcodebuild -version
         swift --version
 
-    - name: Install xcpretty
-      shell: bash
-      run: gem install xcpretty --no-document
-
     - name: Resolve dependencies
       shell: bash
       run: |
