@@ -56,8 +56,9 @@ public final class TTPConfigClient: Sendable {
 
         let response = try await transport.perform(request)
 
-        let responseBody = String(data: response.body, encoding: .utf8) ?? "<non-utf8 \(response.body.count) bytes>"
-        logger.info("[config] ← [\(response.statusCode)] body: \(responseBody)")
+        // Shape, not contents. This body is `ConfigCredentialsPayload`, whose
+        // `credentials` block carries the card reader's secretKey and apiKey.
+        logger.info("[config] ← [\(response.statusCode)] bytes=\(response.body.count)")
 
         try mapPayabliHTTPError(response: response) { code in
             if code == 403 {
