@@ -254,20 +254,23 @@ extension PayabliTTP {
         invoice: PayabliTTPInvoiceData,
         orderDescription: String?
     ) {
+        // Charge metadata only. The single-argument overload renders the whole
+        // string `.public`, so anything naming the customer belongs in the
+        // `private:` call below rather than here.
         logger.info(
             "[charge] → amount=\(paymentDetails.amount) serviceFee=\(paymentDetails.serviceFee) " +
                 "currency=\(paymentDetails.currency ?? "<nil>") " +
-                "customer={firstName=\(customer.firstName ?? "<nil>") " +
-                "lastName=\(customer.lastName ?? "<nil>") " +
-                "customerNumber=\(customer.customerNumber ?? "<nil>") " +
-                "customerId=\(customer.customerId.map(String.init) ?? "<nil>") " +
-                "company=\(customer.company ?? "<nil>")} " +
                 "invoice={invoiceNumber=\(invoice.invoiceNumber ?? "<nil>")} " +
                 "orderDescription=\(orderDescription ?? "<nil>")"
         )
 
         guard !customer.isEmpty else { return }
-        let pii = "email=\(customer.email ?? "<nil>") " +
+        let pii = "firstName=\(customer.firstName ?? "<nil>") " +
+            "lastName=\(customer.lastName ?? "<nil>") " +
+            "customerNumber=\(customer.customerNumber ?? "<nil>") " +
+            "customerId=\(customer.customerId.map(String.init) ?? "<nil>") " +
+            "company=\(customer.company ?? "<nil>") " +
+            "email=\(customer.email ?? "<nil>") " +
             "phone=\(customer.phone ?? "<nil>") " +
             "billing.address1=\(customer.billingAddress1 ?? "<nil>") " +
             "billing.address2=\(customer.billingAddress2 ?? "<nil>") " +

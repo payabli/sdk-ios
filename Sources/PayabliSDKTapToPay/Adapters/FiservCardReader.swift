@@ -197,14 +197,10 @@ public final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
                     "merchantOrderId=\(request.merchantOrderId ?? "<nil>") " +
                     "invoice=\(request.merchantInvoiceNumber ?? "<nil>")"
             )
-            logger.info(
-                "[fiserv.charges] customer={firstName=\(request.customer.firstName ?? "<nil>") " +
-                    "lastName=\(request.customer.lastName ?? "<nil>") " +
-                    "customerNumber=\(request.customer.customerNumber ?? "<nil>")} " +
-                    "invoice={invoiceNumber=\(request.invoice.invoiceNumber ?? "<nil>")}"
-            )
-            // The atomic card-reader API has no slot for customer data; it
-            // ships only at /initiate and in the logs above.
+            // The atomic card-reader API has no slot for customer data; it ships
+            // at /initiate only. It is not logged here: this logger renders a
+            // single-argument message `.public`, and the invoice number the line
+            // above carries is the part that is safe to publish.
 
             let started = Date()
             let response: Models.CommerceHubResponse
@@ -221,10 +217,11 @@ public final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
             let elapsedMs = Int(Date().timeIntervalSince(started) * 1000)
             let responseJSON = try Self.encode(response)
             let cardNetwork = Self.extractCardNetwork(from: responseJSON)
+            // Shape, not contents. `CommerceHubResponse` carries
+            // `paymentTokens.tokenData` and the card's expiry, so the body never
+            // reaches the log; elapsed time, size and network are what a reader
+            // diagnosing a charge actually needs.
             logger.info("[fiserv.charges] ← OK (\(elapsedMs)ms) bytes=\(responseJSON.count) cardNetwork=\(cardNetwork ?? "<nil>")")
-            if let pretty = Self.prettyPrintJSON(responseJSON) {
-                logger.info("[fiserv.charges] responseBody:\n\(pretty)")
-            }
             return CardReadResult(
                 provider: Self.providerId,
                 encryptedPayload: Data(),
@@ -311,19 +308,6 @@ public final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
                     reason: "Failed to encode provider response: \(error.localizedDescription)"
                 )
             }
-        }
-
-        /// Re-encodes `json` with `.prettyPrinted` + `.sortedKeys` for log output.
-        /// Returns `nil` if `json` isn't valid JSON.
-        private static func prettyPrintJSON(_ json: Data) -> String? {
-            guard
-                let obj = try? JSONSerialization.jsonObject(with: json),
-                let pretty = try? JSONSerialization.data(
-                    withJSONObject: obj,
-                    options: [.prettyPrinted, .sortedKeys]
-                )
-            else { return nil }
-            return String(data: pretty, encoding: .utf8)
         }
 
         /// Pulls `card.brand` out of the CommerceHub response for
