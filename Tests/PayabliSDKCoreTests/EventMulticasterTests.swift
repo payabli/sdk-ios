@@ -1,8 +1,7 @@
-import XCTest
 import PayabliSDKCore
+import XCTest
 
 final class EventMulticasterTests: XCTestCase {
-
     func testSingleSubscriberReceivesEvents() async {
         let multicaster = EventMulticaster<Int>()
         let stream = multicaster.stream()
@@ -31,12 +30,16 @@ final class EventMulticasterTests: XCTestCase {
 
         let collect1 = Task {
             var events: [Int] = []
-            for await evt in stream1 { events.append(evt) }
+            for await evt in stream1 {
+                events.append(evt)
+            }
             return events
         }
         let collect2 = Task {
             var events: [Int] = []
-            for await evt in stream2 { events.append(evt) }
+            for await evt in stream2 {
+                events.append(evt)
+            }
             return events
         }
 
@@ -58,7 +61,9 @@ final class EventMulticasterTests: XCTestCase {
 
         let collectTask = Task {
             var events: [String] = []
-            for await evt in stream { events.append(evt) }
+            for await evt in stream {
+                events.append(evt)
+            }
             return events
         }
 

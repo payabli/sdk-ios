@@ -69,7 +69,7 @@ private extension PayabliPayInPaymentFlowPaymentSummaryConfiguration {
     }
 }
 
-private extension Dictionary where Key == PayabliPayInPaymentFlowField, Value == String {
+private extension [PayabliPayInPaymentFlowField: String] {
     var payabliViewModelSignature: String {
         map { "\($0.key.rawValue)=\($0.value)" }
             .sorted()

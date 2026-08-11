@@ -7,7 +7,6 @@ import PayabliSDKCore
 /// credentials, so it must not become the home of ordinary settings. Anything
 /// here is safe to commit and safe to show on the Configuration screen.
 enum DemoConfiguration {
-
     /// Which Payabli backend every SDK facade in this app talks to.
     ///
     /// Sandbox by default: it is the environment an integrator can reach. Pass
@@ -23,8 +22,12 @@ enum DemoConfiguration {
     static let environment: PayabliEnvironment = resolvedEnvironment()
 
     static let environmentSource: String = {
-        if argumentEnvironment() != nil { return "launch argument" }
-        if rememberedEnvironment() != nil { return "remembered from a launch argument" }
+        if argumentEnvironment() != nil {
+            return "launch argument"
+        }
+        if rememberedEnvironment() != nil {
+            return "remembered from a launch argument"
+        }
         return "default"
     }()
 
@@ -82,7 +85,6 @@ enum DemoConfiguration {
     /// Running against a device needs the server bound past loopback and the
     /// Local Network permission; see `LocalTokenServer/README.md`.
     enum TokenServer {
-
         static let defaultPort = 8787
         static let accessTokenPath = "/payabli/access-token"
 
@@ -97,7 +99,8 @@ enum DemoConfiguration {
 
         static var source: Source {
             if let raw = UserDefaults.standard.string(forKey: overrideKey),
-               !raw.trimmingCharacters(in: .whitespaces).isEmpty {
+               !raw.trimmingCharacters(in: .whitespaces).isEmpty
+            {
                 return .override(raw.trimmingCharacters(in: .whitespaces))
             }
             return TapToPayPreflight.runtimeEnvironment == .simulator
@@ -108,7 +111,7 @@ enum DemoConfiguration {
         /// Base URL, e.g. `http://127.0.0.1:8787`.
         static var baseURL: URL {
             switch source {
-            case .override(let raw):
+            case let .override(raw):
                 return normalized(raw)
             case .simulatorLoopback:
                 return url(host: "127.0.0.1", port: defaultPort)
@@ -149,7 +152,8 @@ enum DemoConfiguration {
                 return parsed
             }
             if let colon = raw.lastIndex(of: ":"),
-               let port = Int(raw[raw.index(after: colon)...]) {
+               let port = Int(raw[raw.index(after: colon)...])
+            {
                 return url(host: String(raw[raw.startIndex ..< colon]), port: port)
             }
             return url(host: raw, port: defaultPort)

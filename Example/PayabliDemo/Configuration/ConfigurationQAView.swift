@@ -45,13 +45,12 @@ struct ConfigurationQAView: View {
             QADetailRow(label: "App ID", value: Secrets.appId)
             QADetailRow(
                 label: "Environment",
-                value: "\(DemoConfiguration.nameFor(DemoConfiguration.environment)) · " + (DemoConfiguration.environment.baseURL.host ?? "—")
+                value: "\(DemoConfiguration.nameFor(DemoConfiguration.environment)) · " +
+                    (DemoConfiguration.environment.baseURL.host ?? "—")
                     + " · " + DemoConfiguration.environmentSource
             )
         }
     }
-
-
 
     // MARK: - Token endpoint
 
@@ -189,7 +188,6 @@ struct ConfigurationQAView: View {
 
     // MARK: - Chrome
 
-    @ViewBuilder
     private func section(
         _ title: String,
         note: String?,

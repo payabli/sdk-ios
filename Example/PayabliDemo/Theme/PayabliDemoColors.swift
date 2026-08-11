@@ -7,34 +7,34 @@ import UIKit
 /// its source. The Android sample app carries the same values under the same names; the two demos
 /// are meant to screenshot as one product.
 enum PayabliPalette {
-    static let black: UInt32 = 0x00_00_00
-    static let white: UInt32 = 0xFF_FF_FF
-    static let deepBlue: UInt32 = 0x02_0B_27
+    static let black: UInt32 = 0x000000
+    static let white: UInt32 = 0xFFFFFF
+    static let deepBlue: UInt32 = 0x020B27
 
-    static let blue1: UInt32 = 0x04_C3_FF
-    static let blue3: UInt32 = 0xDD_F7_FF
-    static let blue4: UInt32 = 0x00_1C_6E
+    static let blue1: UInt32 = 0x04C3FF
+    static let blue3: UInt32 = 0xDDF7FF
+    static let blue4: UInt32 = 0x001C6E
 
-    static let teal2: UInt32 = 0xA7_FC_FF
-    static let teal4: UInt32 = 0x00_55_58
+    static let teal2: UInt32 = 0xA7FCFF
+    static let teal4: UInt32 = 0x005558
 
-    static let cinnamon2: UInt32 = 0xFF_AE_B7
-    static let cinnamon4: UInt32 = 0x68_0A_04
+    static let cinnamon2: UInt32 = 0xFFAEB7
+    static let cinnamon4: UInt32 = 0x680A04
 
-    static let lemon1: UInt32 = 0xFF_C8_5C
-    static let lemon4: UInt32 = 0x63_42_00
+    static let lemon1: UInt32 = 0xFFC85C
+    static let lemon4: UInt32 = 0x634200
 
-    static let neutral1: UInt32 = 0x13_1D_3A
-    static let neutral3: UInt32 = 0x3C_47_6B
-    static let neutral4: UInt32 = 0x57_61_80
-    static let neutral5: UInt32 = 0x89_92_AC
-    static let neutral6: UInt32 = 0xC5_CB_DB
-    static let neutral7: UInt32 = 0xEF_F0_F7
-    static let neutral8: UInt32 = 0xF9_F9_FF
+    static let neutral1: UInt32 = 0x131D3A
+    static let neutral3: UInt32 = 0x3C476B
+    static let neutral4: UInt32 = 0x576180
+    static let neutral5: UInt32 = 0x8992AC
+    static let neutral6: UInt32 = 0xC5CBDB
+    static let neutral7: UInt32 = 0xEFF0F7
+    static let neutral8: UInt32 = 0xF9F9FF
 
     /// Two steps the guide does not name, blended between the tones on either side of them.
-    static let lightContainerHigh: UInt32 = 0xDD_E0_EB
-    static let darkContainerHigh: UInt32 = 0x1A_26_4A
+    static let lightContainerHigh: UInt32 = 0xDDE0EB
+    static let darkContainerHigh: UInt32 = 0x1A264A
 }
 
 /// The roles the demo draws with.

@@ -1,9 +1,8 @@
-import XCTest
 @testable import PayabliSDKTapToPay
 import PayabliSDKTestUtils
+import XCTest
 
 final class SecureStorageTests: XCTestCase {
-
     // MARK: - InMemorySecureStorage
 
     func testInMemoryRoundTrip() throws {
@@ -35,24 +34,24 @@ final class SecureStorageTests: XCTestCase {
     /// round-trip is covered by on-device QA (PRD §12.3).
     func testKeychainRoundTripIfAvailable() throws {
         #if os(macOS) && !targetEnvironment(simulator)
-        throw XCTSkip("Keychain services require a running keychaind; covered by device QA (§12.3).")
+            throw XCTSkip("Keychain services require a running keychaind; covered by device QA (§12.3).")
         #else
-        let storage = KeychainStorage(service: "com.payabli.tests.\(UUID().uuidString)")
-        defer { storage.removeAll() }
+            let storage = KeychainStorage(service: "com.payabli.tests.\(UUID().uuidString)")
+            defer { storage.removeAll() }
 
-        do {
-            try storage.set("hello_keychain", forKey: "sample_key")
-        } catch KeychainStorage.KeychainError.underlying(let status) {
-            throw XCTSkip("""
+            do {
+                try storage.set("hello_keychain", forKey: "sample_key")
+            } catch let KeychainStorage.KeychainError.underlying(status) {
+                throw XCTSkip("""
                 Keychain unavailable in this test host (OSStatus \(status)); \
                 covered by device QA (§12.3).
                 """)
-        }
+            }
 
-        XCTAssertEqual(storage.string(forKey: "sample_key"), "hello_keychain")
+            XCTAssertEqual(storage.string(forKey: "sample_key"), "hello_keychain")
 
-        storage.remove(forKey: "sample_key")
-        XCTAssertNil(storage.string(forKey: "sample_key"))
+            storage.remove(forKey: "sample_key")
+            XCTAssertNil(storage.string(forKey: "sample_key"))
         #endif
     }
 

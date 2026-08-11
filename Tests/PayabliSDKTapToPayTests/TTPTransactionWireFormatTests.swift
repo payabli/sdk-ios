@@ -1,5 +1,5 @@
-import XCTest
 @testable import PayabliSDKTapToPay
+import XCTest
 
 /// Contract tests for the backend `PATCH /MoneyIn/update/{id}` wire format.
 /// The backend still expects the top-level key `fiservResponse`; the SDK's
@@ -7,7 +7,6 @@ import XCTest
 /// `UpdateSuccessBody.CodingKeys`. These tests fail loudly if someone
 /// removes or changes the mapping without a coordinated backend rollout.
 final class TTPTransactionWireFormatTests: XCTestCase {
-
     func test_updateSuccessBody_serializesOpaqueJSONUnderFiservResponseKey() throws {
         let innerJSON = Data(#"{"transactionId":"abc","status":"approved"}"#.utf8)
         let payload = ProviderResponsePayload.opaqueJSON(innerJSON)

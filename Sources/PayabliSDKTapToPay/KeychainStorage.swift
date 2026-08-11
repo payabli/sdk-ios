@@ -35,7 +35,7 @@ public struct KeychainStorage: SecureStorage, Sendable {
         return String(data: data, encoding: .utf8)
     }
 
-    internal func data(forKey key: String) -> Data? {
+    func data(forKey key: String) -> Data? {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
@@ -58,7 +58,7 @@ public struct KeychainStorage: SecureStorage, Sendable {
         try set(data, forKey: key)
     }
 
-    internal func set(_ data: Data, forKey key: String) throws {
+    func set(_ data: Data, forKey key: String) throws {
         let baseQuery: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
@@ -93,7 +93,7 @@ public struct KeychainStorage: SecureStorage, Sendable {
         _ = SecItemDelete(query as CFDictionary)
     }
 
-    internal func removeAll() {
+    func removeAll() {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service

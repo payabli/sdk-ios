@@ -7,16 +7,16 @@ import Foundation
 ///
 /// Endpoint clients that need bearer auth depend on this transport rather
 /// than open-coding the header / retry dance themselves.
-internal struct AuthenticatedTransport: PayabliTransport {
+struct AuthenticatedTransport: PayabliTransport {
     private let base: any PayabliTransport
     private let auth: PayabliAuth
 
-    internal init(base: any PayabliTransport, auth: PayabliAuth) {
+    init(base: any PayabliTransport, auth: PayabliAuth) {
         self.base = base
         self.auth = auth
     }
 
-    public func perform(_ request: PayabliRequest) async throws -> PayabliResponse {
+    func perform(_ request: PayabliRequest) async throws -> PayabliResponse {
         let token = await auth.currentAccessToken()
         let firstAttempt = try await base.perform(authorize(request, with: token))
 
@@ -33,7 +33,7 @@ internal struct AuthenticatedTransport: PayabliTransport {
         return secondAttempt
     }
 
-    public func performV2<T: Decodable & Sendable>(
+    func performV2<T: Decodable & Sendable>(
         _ request: PayabliRequest,
         decoding: T.Type
     ) async throws -> PayabliV2Envelope<T> {

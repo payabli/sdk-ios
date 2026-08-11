@@ -74,8 +74,13 @@ public struct PayabliValidationError: PayabliError, Decodable {
     public let errors: [String: [PayabliFieldError]]?
     public let token: String?
 
-    public var code: PayabliErrorCode { .validation }
-    public var reason: String { title ?? "Validation failed" }
+    public var code: PayabliErrorCode {
+        .validation
+    }
+
+    public var reason: String {
+        title ?? "Validation failed"
+    }
 
     enum CodingKeys: String, CodingKey {
         case type, title, status, detail, instance, errors, token
@@ -90,8 +95,13 @@ public struct PayabliServerError: PayabliError, Decodable {
     public let detail: String?
     public let instance: String?
 
-    public var code: PayabliErrorCode { .unknown }
-    public var reason: String { title ?? "Internal server error" }
+    public var code: PayabliErrorCode {
+        .unknown
+    }
+
+    public var reason: String {
+        title ?? "Internal server error"
+    }
 }
 
 /// HTTP 402 declined payment. See PRD §8.1.1 "Declined Response".
@@ -101,8 +111,13 @@ public struct PayabliDeclineError: PayabliError, Decodable {
     public let explanation: String?
     public let action: String?
 
-    public var code: PayabliErrorCode { .unknown }
-    public var detail: String? { explanation }
+    public var code: PayabliErrorCode {
+        .unknown
+    }
+
+    public var detail: String? {
+        explanation
+    }
 
     enum CodingKeys: String, CodingKey {
         case reason, explanation, action
@@ -120,10 +135,10 @@ public enum PayabliPaymentError: Error, Sendable {
 
     public var asPayabliError: any PayabliError {
         switch self {
-        case .decline(let err): return err
-        case .validation(let err): return err
-        case .server(let err): return err
-        case .generic(let err): return err
+        case let .decline(err): return err
+        case let .validation(err): return err
+        case let .server(err): return err
+        case let .generic(err): return err
         }
     }
 }

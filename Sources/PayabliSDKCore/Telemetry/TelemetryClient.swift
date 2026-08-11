@@ -1,5 +1,5 @@
-import Foundation
 import CryptoKit
+import Foundation
 
 /// Transport abstraction — production uses `URLSession` to POST to the Payabli
 /// telemetry endpoint; tests inject an in-memory sink.
@@ -89,5 +89,7 @@ public actor TelemetryClient {
         await transport.send(batch)
     }
 
-    public var bufferedCount: Int { buffer.count }
+    public var bufferedCount: Int {
+        buffer.count
+    }
 }

@@ -48,7 +48,7 @@ public struct RetryPolicy: Sendable {
         guard attempt > 1 else { return 0 }
         let exponent = Double(attempt - 2)
         let backoff = min(baseDelay * pow(multiplier, exponent), maxDelay)
-        let jitter = Double.random(in: 0...maxJitter)
+        let jitter = Double.random(in: 0 ... maxJitter)
         return backoff + jitter
     }
 
@@ -58,7 +58,7 @@ public struct RetryPolicy: Sendable {
         // Non-retryable: 400, 401, 403, 404.
         switch statusCode {
         case 408: return true // request timeout
-        case 500...599: return true
+        case 500 ... 599: return true
         default: return false
         }
     }
@@ -71,7 +71,9 @@ public struct RetryPolicy: Sendable {
 /// `policy.maxAttempts`. Other errors propagate immediately.
 public struct RetryableError: Error {
     public let underlying: Error
-    public init(_ underlying: Error) { self.underlying = underlying }
+    public init(_ underlying: Error) {
+        self.underlying = underlying
+    }
 }
 
 public enum Retry {
@@ -80,7 +82,7 @@ public enum Retry {
         _ operation: @Sendable (_ attempt: Int) async throws -> T
     ) async throws -> T {
         var lastUnderlying: Error?
-        for attempt in 1...policy.maxAttempts {
+        for attempt in 1 ... policy.maxAttempts {
             let delay = policy.delay(forAttempt: attempt)
             if delay > 0 {
                 try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
@@ -89,7 +91,9 @@ public enum Retry {
                 return try await operation(attempt)
             } catch let retryable as RetryableError {
                 lastUnderlying = retryable.underlying
-                if attempt == policy.maxAttempts { throw retryable.underlying }
+                if attempt == policy.maxAttempts {
+                    throw retryable.underlying
+                }
                 continue
             } catch {
                 throw error

@@ -66,7 +66,10 @@ public final class TTPTransactionClient: Sendable {
             throw error
         }
 
-        logger.info("[initiate] ← isApproved=\(envelope.isApproved) code=\(envelope.code) paymentTransId=\(envelope.data?.paymentTransId ?? "<nil>")")
+        logger
+            .info(
+                "[initiate] ← isApproved=\(envelope.isApproved) code=\(envelope.code) paymentTransId=\(envelope.data?.paymentTransId ?? "<nil>")"
+            )
 
         guard envelope.isApproved, let data = envelope.data else {
             throw PayabliTTPError.initiateFailed(reason: envelope.reason ?? envelope.code)
@@ -121,11 +124,11 @@ public final class TTPTransactionClient: Sendable {
     static func updateBody(for payload: TTPUpdatePayload) -> Data {
         let encoder = JSONEncoder()
         switch payload {
-        case .success(let result):
+        case let .success(result):
             let body = UpdateSuccessBody(providerResponse: providerResponse(from: result))
             return (try? encoder.encode(body)) ?? Data()
 
-        case .nfcFailure(let description):
+        case let .nfcFailure(description):
             let body = UpdateErrorBody(error: .init(
                 title: "NFC Tap Failed",
                 description: description,

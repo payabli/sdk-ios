@@ -1,5 +1,5 @@
-import XCTest
 import PayabliSDKTapToPay
+import XCTest
 
 /// Guards the public mapping between `PayabliTTPEvent` (Swift enum with
 /// associated values) and `PayabliTTPEventCode` (`@objc Int` enum) plus the
@@ -11,7 +11,6 @@ import PayabliSDKTapToPay
 /// renumber the rest, breaking ObjC consumers that compare against literal
 /// codes — these tests fail loudly if that happens.
 final class PayabliTTPEventCodeMappingTests: XCTestCase {
-
     func testEventCodeRawValuesAreStable() {
         XCTAssertEqual(PayabliTTPEventCode.attestationStarted.rawValue, 0)
         XCTAssertEqual(PayabliTTPEventCode.attestationCompleted.rawValue, 1)
@@ -66,8 +65,10 @@ final class PayabliTTPEventCodeMappingTests: XCTestCase {
             .devicePendingActivation, .activationStarted, .activationCompleted
         ]
         for event in emptyCases {
-            XCTAssertTrue(event.payload.isEmpty,
-                          "Expected empty payload for \(event.code)")
+            XCTAssertTrue(
+                event.payload.isEmpty,
+                "Expected empty payload for \(event.code)"
+            )
         }
     }
 

@@ -1,9 +1,8 @@
-import XCTest
 @testable import PayabliSDKTapToPay
+import XCTest
 
 @MainActor
 final class SessionManagerTests: XCTestCase {
-
     func testInitialStateIsIdle() {
         let sm = SessionManager()
         XCTAssertEqual(sm.sessionState, .idle)

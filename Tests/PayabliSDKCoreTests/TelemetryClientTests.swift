@@ -1,9 +1,8 @@
-import XCTest
 import PayabliSDKCore
 import PayabliSDKTestUtils
+import XCTest
 
 final class TelemetryClientTests: XCTestCase {
-
     private func makeClient(
         enabled: Bool = true,
         batchSize: Int = 20

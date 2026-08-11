@@ -1,5 +1,5 @@
-import XCTest
 import PayabliSDKCore
+import XCTest
 
 final class PayabliSDKCoreTests: XCTestCase {
     func testVersionIsPopulated() {

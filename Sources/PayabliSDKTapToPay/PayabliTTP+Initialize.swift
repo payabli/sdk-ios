@@ -5,7 +5,6 @@ import PayabliSDKCore
 
 @MainActor
 extension PayabliTTP {
-
     // MARK: - Public entrypoints
 
     /// One-call startup:
@@ -45,11 +44,17 @@ extension PayabliTTP {
 
         let task = Task<Void, Error> { @MainActor in
             // Its failure belongs to its own caller.
-            if let previous { _ = try? await previous.value }
+            if let previous {
+                _ = try? await previous.value
+            }
             try await work()
         }
         inFlightSessionSetup = (kind, task, id)
-        defer { if inFlightSessionSetup?.id == id { inFlightSessionSetup = nil } }
+        defer {
+            if inFlightSessionSetup?.id == id {
+                inFlightSessionSetup = nil
+            }
+        }
         try await task.value
     }
 
@@ -160,7 +165,7 @@ extension PayabliTTP {
     // MARK: - Phase 0 — eligibility
 
     private func runEligibility() async throws {
-        guard case .failure(let err) = await provider.checkEligibility() else { return }
+        guard case let .failure(err) = await provider.checkEligibility() else { return }
         sessionManager.markError(err)
         syncPublished()
         throw err

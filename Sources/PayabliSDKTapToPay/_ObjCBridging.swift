@@ -11,7 +11,9 @@ import Foundation
 /// the check explicitly at the boundary.
 struct UncheckedSendableBox<Value>: @unchecked Sendable {
     let value: Value
-    init(_ value: Value) { self.value = value }
+    init(_ value: Value) {
+        self.value = value
+    }
 }
 
 /// Tiny `NSLock`-backed reference cell used as a one-shot guard when
@@ -24,7 +26,9 @@ final class Locked<Value>: @unchecked Sendable {
     private let lock = NSLock()
     private var value: Value
 
-    init(_ value: Value) { self.value = value }
+    init(_ value: Value) {
+        self.value = value
+    }
 
     /// Mutates and returns whatever the caller derives from the protected
     /// state, atomically. Use the inout argument to read+write.

@@ -515,7 +515,9 @@ public final class PayabliSDKModule: RCTEventEmitter {
 
 private extension NSError {
     func rnCode(default fallback: String) -> String {
-        if domain == "com.payabli.ttp" { return "TTP_\(self.code)" }
+        if domain == "com.payabli.ttp" {
+            return "TTP_\(self.code)"
+        }
         return fallback
     }
 

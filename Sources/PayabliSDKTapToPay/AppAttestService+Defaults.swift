@@ -1,36 +1,36 @@
 import Foundation
 
 #if canImport(UIKit)
-import UIKit
+    import UIKit
 #endif
 
 // MARK: - Default hardware identifier providers
+
 //
 // Injectable `@Sendable` closures; macOS test builds fall back to stand-ins.
 
 extension AppAttestService {
-
-    internal static var defaultHardwareId: @Sendable () -> String {
+    static var defaultHardwareId: @Sendable () -> String {
         {
             #if canImport(UIKit)
-            return UIDevice.current.identifierForVendor?.uuidString ?? UUID().uuidString
+                return UIDevice.current.identifierForVendor?.uuidString ?? UUID().uuidString
             #else
-            return UUID().uuidString
+                return UUID().uuidString
             #endif
         }
     }
 
-    internal static var defaultDeviceName: @Sendable () -> String {
+    static var defaultDeviceName: @Sendable () -> String {
         {
             #if canImport(UIKit)
-            return UIDevice.current.name
+                return UIDevice.current.name
             #else
-            return "macOS"
+                return "macOS"
             #endif
         }
     }
 
-    internal static var defaultModel: @Sendable () -> String {
+    static var defaultModel: @Sendable () -> String {
         {
             var sysinfo = utsname()
             uname(&sysinfo)
@@ -41,12 +41,12 @@ extension AppAttestService {
         }
     }
 
-    internal static var defaultOSVersion: @Sendable () -> String {
+    static var defaultOSVersion: @Sendable () -> String {
         {
             #if canImport(UIKit)
-            return UIDevice.current.systemVersion
+                return UIDevice.current.systemVersion
             #else
-            return ProcessInfo.processInfo.operatingSystemVersionString
+                return ProcessInfo.processInfo.operatingSystemVersionString
             #endif
         }
     }

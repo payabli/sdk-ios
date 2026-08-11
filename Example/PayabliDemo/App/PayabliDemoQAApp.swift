@@ -12,8 +12,10 @@ struct PayabliDemoQAApp: App {
         accessTokenProvider: {
             return try await Secrets.fetchPaymentMethodAccessToken()
         },
-        diagnostics: .qaLogging(enabled: Secrets.paymentMethodDiagnosticsEnabled,
-                                store: .paymentMethod)
+        diagnostics: .qaLogging(
+            enabled: Secrets.paymentMethodDiagnosticsEnabled,
+            store: .paymentMethod
+        )
     )
 
     @StateObject private var paymentCapture = PayabliPayInPaymentFlow(
@@ -22,8 +24,10 @@ struct PayabliDemoQAApp: App {
         accessTokenProvider: {
             return try await Secrets.fetchPaymentCaptureAccessToken()
         },
-        diagnostics: .qaLogging(enabled: Secrets.paymentCaptureDiagnosticsEnabled,
-                                store: .paymentCapture),
+        diagnostics: .qaLogging(
+            enabled: Secrets.paymentCaptureDiagnosticsEnabled,
+            store: .paymentCapture
+        ),
         operation: .capture,
         requestConfiguration: PaymentCaptureQAView.freshRequestConfiguration()
     )
@@ -67,7 +71,6 @@ struct PayabliDemoQAApp: App {
             .tint(.payabliPrimary)
         }
     }
-
 }
 
 #Preview {
@@ -127,4 +130,3 @@ struct PayabliDemoQAApp: App {
             }
     }
 }
-

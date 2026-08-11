@@ -60,7 +60,9 @@ public final class TTPConfigClient: Sendable {
         logger.info("[config] ← [\(response.statusCode)] body: \(responseBody)")
 
         try mapPayabliHTTPError(response: response) { code in
-            if code == 403 { return PayabliTTPError.devicePendingActivation }
+            if code == 403 {
+                return PayabliTTPError.devicePendingActivation
+            }
             return nil
         }
 
@@ -81,10 +83,11 @@ public final class TTPConfigClient: Sendable {
 
         let decoder = JSONDecoder()
         guard let envelope = try? decoder.decode(
-                PayabliEnvelope.Success<ConfigCredentialsPayload>.self,
-                from: response.body
-              ),
-              let credentials = envelope.responseData?.credentials else {
+            PayabliEnvelope.Success<ConfigCredentialsPayload>.self,
+            from: response.body
+        ),
+            let credentials = envelope.responseData?.credentials
+        else {
             logger.error("[config] payload decode failed")
             throw PayabliTTPError.configFailed(reason: "Invalid config envelope")
         }

@@ -72,10 +72,10 @@ public enum PayabliTTPError: Error, Sendable {
     case activationFailed = 17
 }
 
-extension PayabliTTPEvent {
+public extension PayabliTTPEvent {
     /// Returns the `PayabliTTPEventCode` for this event — used by the
     /// `addEventListener(handler:)` ObjC bridge.
-    public var code: PayabliTTPEventCode {
+    var code: PayabliTTPEventCode {
         switch self {
         case .attestationStarted: return .attestationStarted
         case .attestationCompleted: return .attestationCompleted
@@ -106,15 +106,15 @@ extension PayabliTTPEvent {
     ///   - `.nfcFailed`, `.activationFailed` → `["error": String]`
     ///   - `.updateFailed` → `["paymentTransId": String, "error": String]`
     ///   - all other cases → empty `[:]`
-    public var payload: [String: Any] {
+    var payload: [String: Any] {
         switch self {
-        case .chargeInitiated(let paymentTransId),
-             .updateCompleted(let paymentTransId):
+        case let .chargeInitiated(paymentTransId),
+             let .updateCompleted(paymentTransId):
             return ["paymentTransId": paymentTransId]
-        case .nfcFailed(let error),
-             .activationFailed(let error):
+        case let .nfcFailed(error),
+             let .activationFailed(error):
             return ["error": error]
-        case .updateFailed(let paymentTransId, let error):
+        case let .updateFailed(paymentTransId, error):
             return ["paymentTransId": paymentTransId, "error": error]
         case .attestationStarted,
              .attestationCompleted,
@@ -142,7 +142,9 @@ extension PayabliTTPEvent {
 /// part of the public API: do not reorder or renumber. New cases must be
 /// appended at the end with a new code.
 extension PayabliTTPError: CustomNSError, LocalizedError {
-    public static var errorDomain: String { "com.payabli.ttp" }
+    public static var errorDomain: String {
+        "com.payabli.ttp"
+    }
 
     public var errorCode: Int {
         switch self {
@@ -167,23 +169,23 @@ extension PayabliTTPError: CustomNSError, LocalizedError {
         switch self {
         case .notInitialized:
             return [NSLocalizedDescriptionKey: "PayabliTTP has not been initialized"]
-        case .invalidState(let current, let attempted):
+        case let .invalidState(current, attempted):
             return [NSLocalizedDescriptionKey: "Invalid state \(current) for \(attempted)"]
-        case .notReady(let current):
+        case let .notReady(current):
             return [NSLocalizedDescriptionKey: "Reader not ready (state: \(current))"]
         case .devicePendingActivation:
             return [NSLocalizedDescriptionKey: "Device is pending activation"]
         case .tokenExpired:
             return [NSLocalizedDescriptionKey: "Access token expired"]
-        case .attestationRevoked(let reason),
-             .attestationFailed(let reason),
-             .configFailed(let reason),
-             .readerSetupFailed(let reason),
-             .nfcFailed(let reason),
-             .initiateFailed(let reason),
-             .updateFailed(let reason),
-             .activationFailed(let reason),
-             .networkError(let reason):
+        case let .attestationRevoked(reason),
+             let .attestationFailed(reason),
+             let .configFailed(reason),
+             let .readerSetupFailed(reason),
+             let .nfcFailed(reason),
+             let .initiateFailed(reason),
+             let .updateFailed(reason),
+             let .activationFailed(reason),
+             let .networkError(reason):
             return [NSLocalizedDescriptionKey: reason]
         }
     }

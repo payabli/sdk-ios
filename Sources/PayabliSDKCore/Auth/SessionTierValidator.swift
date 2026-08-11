@@ -12,8 +12,7 @@ import Foundation
 ///
 /// Components pass in their static requirements; a mismatch throws
 /// `PayabliGenericError(.permissionDenied)`.
-internal enum SessionTierValidator {
-
+enum SessionTierValidator {
     static func validate(
         component: any PayabliComponent.Type,
         against config: PayabliConfig

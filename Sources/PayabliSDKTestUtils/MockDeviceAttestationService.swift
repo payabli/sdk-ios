@@ -56,13 +56,13 @@ public final class MockDeviceAttestationService: DeviceAttestationService, @unch
             return _attestResult
         }
         switch result {
-        case .success(let value):
+        case let .success(value):
             lock.withLock {
                 _isAlreadyAttested = true
                 _cachedDeviceId = value.deviceId
             }
             return value
-        case .failure(let err):
+        case let .failure(err):
             throw err
         }
     }
@@ -82,7 +82,9 @@ public final class MockDeviceAttestationService: DeviceAttestationService, @unch
             _activateCalls += 1
             return _activationResult
         }
-        if case .failure(let err) = result { throw err }
+        if case let .failure(err) = result {
+            throw err
+        }
     }
 
     public func clearCache() {

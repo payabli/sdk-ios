@@ -1,8 +1,7 @@
-import XCTest
 @testable import PayabliSDKTapToPay
+import XCTest
 
 final class FiservCardReaderTests: XCTestCase {
-
     func testProviderId() {
         XCTAssertEqual(FiservCardReader.providerId, "fiserv")
     }
@@ -10,29 +9,29 @@ final class FiservCardReaderTests: XCTestCase {
     /// Eligibility is platform/hardware-only (PRD FR-11J.2) and is called before
     /// `/config` delivers credentials — so a fresh reader on a supported device
     /// must report `success`.
-    func testEligibilityIsPlatformOnly() async throws {
+    func testEligibilityIsPlatformOnly() async {
         let reader = FiservCardReader()
         let result = await reader.checkEligibility()
         #if os(iOS)
-        if #available(iOS 16.7, *) {
-            // On a real iPhone `success`; on an incompatible device
-            // `readerSetupFailed` — both are acceptable. We just assert the
-            // error (if any) is not about missing credentials.
-            if case .failure(let err) = result, case .readerSetupFailed(let reason) = err {
-                XCTAssertFalse(
-                    reason.lowercased().contains("credentials"),
-                    "eligibility should not require credentials"
-                )
+            if #available(iOS 16.7, *) {
+                // On a real iPhone `success`; on an incompatible device
+                // `readerSetupFailed` — both are acceptable. We just assert the
+                // error (if any) is not about missing credentials.
+                if case let .failure(err) = result, case let .readerSetupFailed(reason) = err {
+                    XCTAssertFalse(
+                        reason.lowercased().contains("credentials"),
+                        "eligibility should not require credentials"
+                    )
+                }
+            } else {
+                if case .success = result {
+                    XCTFail("iOS < 16.7 must fail eligibility")
+                }
             }
-        } else {
-            if case .success = result {
-                XCTFail("iOS < 16.7 must fail eligibility")
-            }
-        }
         #else
-        if case .success = result {
-            XCTFail("non-iOS must fail eligibility")
-        }
+            if case .success = result {
+                XCTFail("non-iOS must fail eligibility")
+            }
         #endif
     }
 
@@ -41,7 +40,7 @@ final class FiservCardReaderTests: XCTestCase {
         do {
             try await reader.prepareReader()
             XCTFail("expected readerSetupFailed")
-        } catch PayabliTTPError.readerSetupFailed(let reason) {
+        } catch let PayabliTTPError.readerSetupFailed(reason) {
             XCTAssertTrue(
                 reason.lowercased().contains("credentials") || reason.lowercased().contains("ios-only"),
                 "unexpected reason: \(reason)"
@@ -76,7 +75,7 @@ final class FiservCardReaderTests: XCTestCase {
                 "apiKey": "a"
             ])
             XCTFail("expected readerSetupFailed")
-        } catch PayabliTTPError.readerSetupFailed(let reason) {
+        } catch let PayabliTTPError.readerSetupFailed(reason) {
             XCTAssertTrue(reason.contains("merchantId"))
             XCTAssertTrue(reason.contains("terminalId"))
         } catch {
@@ -94,7 +93,7 @@ final class FiservCardReaderTests: XCTestCase {
                 "terminalId": "t"
             ])
             XCTFail("expected readerSetupFailed")
-        } catch PayabliTTPError.readerSetupFailed(let reason) {
+        } catch let PayabliTTPError.readerSetupFailed(reason) {
             XCTAssertTrue(reason.contains("merchantId"))
         } catch {
             XCTFail("wrong error: \(error)")

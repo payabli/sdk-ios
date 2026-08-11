@@ -4,8 +4,7 @@ import PayabliSDKCore
 // MARK: - Device activation (PRD §9.7)
 
 @MainActor
-extension PayabliTTP {
-
+public extension PayabliTTP {
     /// Activate a pending device using an activation code supplied by the
     /// partner out-of-band (e.g. an admin dashboard).
     ///
@@ -14,7 +13,7 @@ extension PayabliTTP {
     /// `.attestationRevoked` the session is reset to `.idle` (not `.error`)
     /// so the caller can immediately re-run `initialize()` for a fresh cold
     /// attestation — `.sessionExpired` is also emitted in that sub-case.
-    public func activateDevice(activationCode: String) async throws {
+    func activateDevice(activationCode: String) async throws {
         guard sessionState == .pendingActivation else {
             throw PayabliTTPError.invalidState(
                 current: sessionState,
@@ -59,7 +58,7 @@ extension PayabliTTP {
     ///
     /// The completion handler is always invoked on the main thread because
     /// the entire `PayabliTTP` surface is `@MainActor`.
-    @objc public func activateDevice(
+    @objc func activateDevice(
         activationCode: String,
         completion: @escaping (NSError?) -> Void
     ) {

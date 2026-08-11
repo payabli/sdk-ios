@@ -10,5 +10,16 @@
 --trimwhitespace always
 --semicolons never
 --header ignore
---disable redundantSelf,redundantReturn
+# Four rules below rewrite code, not layout. Verified on swiftformat 0.62.1.
+#
+# hoistAwait, hoistTry move the keyword to the start of the expression. Across an
+# async autoclosure that changes what the code means:
+# `await XCTAssertThrowsErrorAsync(try await charge(ttp))` loses its inner await
+# and stops compiling, because the autoclosure is its own async context.
+#
+# noForceUnwrapInTests, noForceTryInTests rewrite `Decimal(string: "25.00")!` as
+# `try XCTUnwrap(...)`. That is a different test — a nil fails it instead of
+# crashing it — and it needs the case to be `throws`. A formatting pass is the
+# wrong place to decide either.
+--disable redundantSelf,redundantReturn,hoistAwait,hoistTry,noForceUnwrapInTests,noForceTryInTests
 --exclude .build,.swiftpm,Example/PayabliDemo/build,ThirdParty

@@ -28,7 +28,7 @@ public final class PayabliService: PayabliTransport, Sendable {
         self.logger = PayabliLogger(category: .network)
     }
 
-    internal static func makeDefaultSession() -> URLSession {
+    static func makeDefaultSession() -> URLSession {
         let config = URLSessionConfiguration.ephemeral
         config.timeoutIntervalForRequest = defaultRequestTimeout
         config.timeoutIntervalForResource = defaultRequestTimeout * 3
@@ -150,7 +150,7 @@ public func mapPayabliHTTPError(
     response: PayabliResponse,
     override: ((Int) -> (any Error)?)? = nil
 ) throws {
-    guard !(200..<300).contains(response.statusCode) else { return }
+    guard !(200 ..< 300).contains(response.statusCode) else { return }
 
     // Component-specific override takes priority.
     if let customError = override?(response.statusCode) {

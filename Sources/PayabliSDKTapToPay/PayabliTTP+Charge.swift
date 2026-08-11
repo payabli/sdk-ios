@@ -12,7 +12,6 @@ private enum TTPUpdateOutcome {
 
 @MainActor
 extension PayabliTTP {
-
     /// Charge a transaction. v1.0 supports `.sale` only (FR-11D.1).
     ///
     /// Threads the `paymentDetails` / `customer` / `invoice` / `orderDescription`
@@ -94,7 +93,8 @@ extension PayabliTTP {
             // would kill a healthy session over a dead one's failure.
             if generation == readerSessionGeneration,
                readerFailureInvalidatesSession(error),
-               sessionManager.transition(to: .sessionExpired) {
+               sessionManager.transition(to: .sessionExpired)
+            {
                 syncPublished()
                 multicaster.emit(.sessionExpired)
             }
@@ -116,7 +116,7 @@ extension PayabliTTP {
         case .succeeded:
             multicaster.emit(.updateCompleted(paymentTransId: paymentTransId))
             return TransactionResult(paymentTransId: paymentTransId)
-        case .failed(let reason):
+        case let .failed(reason):
             throw PayabliTTPError.updateFailed(reason: reason)
         }
     }
@@ -226,7 +226,9 @@ extension PayabliTTP {
             try await Retry.run(policy: retryPolicy) { [retryPolicy] attempt in
                 let response = try await performOnce(attempt: String(attempt))
 
-                if (200..<300).contains(response.statusCode) { return }
+                if (200 ..< 300).contains(response.statusCode) {
+                    return
+                }
                 if retryPolicy.isRetryable(statusCode: response.statusCode) {
                     throw RetryableError(PayabliTTPError.updateFailed(
                         reason: "HTTP \(response.statusCode)"
@@ -254,14 +256,14 @@ extension PayabliTTP {
     ) {
         logger.info(
             "[charge] → amount=\(paymentDetails.amount) serviceFee=\(paymentDetails.serviceFee) " +
-            "currency=\(paymentDetails.currency ?? "<nil>") " +
-            "customer={firstName=\(customer.firstName ?? "<nil>") " +
-            "lastName=\(customer.lastName ?? "<nil>") " +
-            "customerNumber=\(customer.customerNumber ?? "<nil>") " +
-            "customerId=\(customer.customerId.map(String.init) ?? "<nil>") " +
-            "company=\(customer.company ?? "<nil>")} " +
-            "invoice={invoiceNumber=\(invoice.invoiceNumber ?? "<nil>")} " +
-            "orderDescription=\(orderDescription ?? "<nil>")"
+                "currency=\(paymentDetails.currency ?? "<nil>") " +
+                "customer={firstName=\(customer.firstName ?? "<nil>") " +
+                "lastName=\(customer.lastName ?? "<nil>") " +
+                "customerNumber=\(customer.customerNumber ?? "<nil>") " +
+                "customerId=\(customer.customerId.map(String.init) ?? "<nil>") " +
+                "company=\(customer.company ?? "<nil>")} " +
+                "invoice={invoiceNumber=\(invoice.invoiceNumber ?? "<nil>")} " +
+                "orderDescription=\(orderDescription ?? "<nil>")"
         )
 
         guard !customer.isEmpty else { return }

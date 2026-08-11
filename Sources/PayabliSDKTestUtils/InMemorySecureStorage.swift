@@ -12,17 +12,20 @@ public final class InMemorySecureStorage: SecureStorage, @unchecked Sendable {
     public init() {}
 
     public func string(forKey key: String) -> String? {
-        lock.lock(); defer { lock.unlock() }
+        lock.lock()
+        defer { lock.unlock() }
         return store[key]
     }
 
     public func set(_ value: String, forKey key: String) throws {
-        lock.lock(); defer { lock.unlock() }
+        lock.lock()
+        defer { lock.unlock() }
         store[key] = value
     }
 
     public func remove(forKey key: String) {
-        lock.lock(); defer { lock.unlock() }
+        lock.lock()
+        defer { lock.unlock() }
         store.removeValue(forKey: key)
     }
 }
