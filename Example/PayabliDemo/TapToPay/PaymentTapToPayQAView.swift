@@ -155,10 +155,8 @@ struct PaymentTapToPayQAView: View {
         switch recovery {
         case .sessionExpired:
             "The session expired. This re-runs config and reader setup without a fresh attestation."
-        case .activationRefused:
-            "Activation was refused. The attested identity is intact, so this re-runs config and reader setup."
         case .sessionErrored:
-            "The session errored. A config 401 clears the attested identity, so this runs the full setup."
+            "The session errored. This runs the full setup, re-using the attested identity when it is still held and attesting again when it is not."
         }
     }
 

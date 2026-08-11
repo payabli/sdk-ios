@@ -27,7 +27,7 @@ enum StepStatus {
         self == .current || self == .failed
     }
 
-    /// Whether the step after this one may proceed. A skipped step counts as
+    /// Whether the step after this one is free to proceed. A skipped step counts as
     /// finished.
     ///
     /// A step that reads the state underneath instead can offer itself alongside

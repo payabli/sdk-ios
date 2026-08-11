@@ -30,18 +30,20 @@ struct TapToPayFlowSteps {
     /// retry: a refused activation leaves the session `.error`, and
     /// `activateDevice` throws `.invalidState` for anything but
     /// `.pendingActivation`, so the activation step shows the reason while
-    /// Re-initialize is the way forward.
+    /// recovery is the way forward.
     ///
     /// Recovery lives here for the same reason. It is not a step, and while it
-    /// was a flag of its own it could appear beside a step still asking for
+    /// was a flag of its own it appeared beside a step still asking for
     /// something.
     let nextAction: TapToPayAction?
 
     /// Why recovery is on offer, which is what the section says out loud.
     ///
-    /// `nextAction` cannot say it. `.reinitialize` is the way out of an expired
-    /// session and of a refused activation both, and those are different
-    /// sentences: one session expired and the other never did.
+    /// Two reasons and two controls, one each, as it stands. The sentence is
+    /// keyed on the reason because a control serves whichever reasons share it:
+    /// `.reinitialize` answered both an expired session and a refused activation
+    /// until the DeviceCheck path was traced, and the sentence beside it named
+    /// expiry for both.
     let recovery: TapToPayRecovery?
 
     var all: [FlowStep] {
@@ -53,11 +55,16 @@ struct TapToPayFlowSteps {
 enum TapToPayRecovery {
     /// The session expired holding its attested identity.
     case sessionExpired
-    /// Activation was refused. The request reached the backend, so the attested
-    /// identity is intact.
-    case activationRefused
-    /// Any other `.error`, which may be the config 401 that clears the attested
-    /// identity.
+    /// The session errored. Some of the paths here clear the attested identity
+    /// and the rest keep it, and which one ran is not knowable from the outside,
+    /// so recovery runs the setup that works for both.
+    ///
+    /// A failed activation is one of them. `.activationFailed` does not
+    /// establish that `/activate` reached the backend: `generateAssertion`
+    /// clears the cached key and device on a DeviceCheck error and throws before
+    /// the request is sent, and that error is not a `PayabliTTPError`, so it
+    /// arrives as a plain `.activationFailed` with the identity already gone.
+    /// Only a 401 from `/activate` itself is reported as `.attestationRevoked`.
     case sessionErrored
 }
 
@@ -71,8 +78,8 @@ enum TapToPayAction {
     /// attestation. Only sound where the attested identity is still held.
     case reinitialize
     /// `initialize`, the full setup. It re-uses a cached attestation and runs a
-    /// cold one when there is none, so it is the way back from a session whose
-    /// identity may have been cleared.
+    /// cold one when there is none, so it is the way back from a session that
+    /// still holds its attested identity and from one that has lost it.
     case reattest
 }
 
@@ -175,7 +182,7 @@ enum TapToPaySteps {
                 return .sessionExpired
             }
             if session == .error {
-                return outcome == .activationFailed ? .activationRefused : .sessionErrored
+                return .sessionErrored
             }
             return nil
         }()

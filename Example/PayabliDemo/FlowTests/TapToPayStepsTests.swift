@@ -88,6 +88,7 @@ final class TapToPayStepsTests: XCTestCase {
             let sequence = steps(combination)
             guard let recovery = sequence.recovery else { continue }
             let expected: TapToPayAction = recovery == .sessionErrored ? .reattest : .reinitialize
+            // Two reasons, two controls, and the mapping is total.
             XCTAssertEqual(
                 sequence.nextAction, expected,
                 "\(combination) pairs \(recovery) with \(String(describing: sequence.nextAction))"
@@ -95,19 +96,7 @@ final class TapToPayStepsTests: XCTestCase {
         }
     }
 
-    // MARK: - The three reasons, one at a time
-
-    func testARefusedActivationDoesNotClaimTheSessionExpired() {
-        // Both this and an expired session offer Re-initialize, so the control
-        // cannot tell them apart and the reason is what the screen reads from.
-        let sequence = TapToPaySteps.forCharging(
-            tokenCheck: .reachable,
-            session: .error,
-            activation: .activationFailed
-        )
-        XCTAssertEqual(sequence.recovery, .activationRefused)
-        XCTAssertEqual(sequence.nextAction, .reinitialize)
-    }
+    // MARK: - Each reason, one at a time
 
     func testAnExpiredSessionSaysItExpired() {
         let sequence = TapToPaySteps.forCharging(
@@ -212,12 +201,12 @@ final class TapToPayStepsTests: XCTestCase {
     }
 
     func testAnErroredSessionIsOfferedTheFullSetup() {
-        // A config 401 clears the attested identity and marks the session
-        // `.error`. `reinitializeIfNeeded` skips attestation and asserts against
-        // an identity that is gone, so it would fail and offer itself again.
-        for combination in everyCombination
-            where combination.session == .error && combination.outcome != .activationFailed
-        {
+        // Two paths clear the attested identity and mark the session `.error`:
+        // a config 401, and a `generateAssertion` that fails on a DeviceCheck
+        // error, which surfaces as `.activationFailed`. `reinitializeIfNeeded`
+        // skips attestation and asserts against an identity that is gone, so it
+        // would fail and offer itself again.
+        for combination in everyCombination where combination.session == .error {
             let sequence = steps(combination)
             // A failed probe holds the sequence, and one in flight offers
             // nothing at all.
@@ -226,13 +215,18 @@ final class TapToPayStepsTests: XCTestCase {
         }
     }
 
-    func testARefusedActivationKeepsTheCheaperRecovery() {
-        // Reaching the backend at all means the device attested, and only a
-        // revoked attestation clears that identity.
+    func testAFailedActivationIsOfferedTheFullSetup() {
+        // `.activationFailed` does not establish that `/activate` reached the
+        // backend. `generateAssertion` clears the cached key and device on a
+        // DeviceCheck error and throws before the request is sent, and that error
+        // is not a `PayabliTTPError`, so it arrives here indistinguishable from a
+        // decline. Only a 401 from `/activate` is reported as
+        // `.attestationRevoked`.
         let sequence = TapToPaySteps.forCharging(
             tokenCheck: .reachable, session: .error, activation: .activationFailed
         )
-        XCTAssertEqual(sequence.nextAction, .reinitialize)
+        XCTAssertEqual(sequence.recovery, .sessionErrored)
+        XCTAssertEqual(sequence.nextAction, .reattest)
     }
 
     func testAnExpiredSessionKeepsTheCheaperRecovery() {
@@ -379,8 +373,8 @@ final class TapToPayStepsTests: XCTestCase {
         XCTAssertEqual(sequence.activation.status, .failed)
         XCTAssertTrue(sequence.activation.status.showsContent)
         XCTAssertEqual(sequence.charge.status, .blocked)
-        // The reason shows; Re-initialize is the way forward.
-        XCTAssertEqual(sequence.nextAction, .reinitialize)
+        // The reason shows; the full setup is the way forward.
+        XCTAssertEqual(sequence.nextAction, .reattest)
     }
 
     func testNoRecordedActivationFailureIsAnsweredByAnEarlierStep() {
