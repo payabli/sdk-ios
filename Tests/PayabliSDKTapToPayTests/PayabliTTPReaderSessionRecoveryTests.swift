@@ -373,7 +373,7 @@ final class PayabliTTPReaderSessionRecoveryTests: XCTestCase {
                 }
             }
             Task { @MainActor in
-                try? await Task.sleep(nanoseconds: 5_000_000_000)
+                try? await Task.sleep(nanoseconds: boundSeconds * 1_000_000_000)
                 if !once.done {
                     once.done = true
                     continuation.resume(throwing: ChargeTimedOut())
