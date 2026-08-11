@@ -86,8 +86,12 @@ enum TapToPaySteps {
             switch session {
             case .ready: return .done
             case .attestingDevice, .fetchingConfig, .initializingReader, .reinitializing: return .inProgress
-            // Activation is a separate step, so reaching it means this one finished.
-            case .pendingActivation: return .done
+            // Activation is a separate step, so reaching it means this one
+            // finished — unless the enable that follows a successful activation
+            // is what failed. `/config` answering 403 again puts the session back
+            // to `.pendingActivation`, and the reason for that failure is written
+            // to this step.
+            case .pendingActivation: return outcome == .enableFailed ? .failed : .done
             // `activateDevice` calls markError when it is refused, so the session
             // reads `.error` for a failure that belongs to the step after this
             // one. Taking it here would block activation, which is where the
@@ -136,7 +140,10 @@ enum TapToPaySteps {
             if session == .error || session == .sessionExpired {
                 return .reinitialize
             }
-            if enable == .current {
+            // `.failed` as well as `.current`: an enable that failed is retried
+            // from its own row, and this is the state a broken session does not
+            // cover.
+            if enable.isActionable {
                 return .enableTerminal
             }
             guard enable.isFinished else { return nil }

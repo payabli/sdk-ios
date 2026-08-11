@@ -148,6 +148,32 @@ final class TapToPayStepsTests: XCTestCase {
         }
     }
 
+    func testAnEnableThatFailedAfterActivationKeepsItsOwnStep() {
+        // Activation succeeded and the enable that follows it did not. `/config`
+        // answering 403 again leaves the session `.pendingActivation`, and the
+        // reason is written to the enable step, which says so: "see step 2".
+        let sequence = TapToPaySteps.forCharging(
+            tokenCheck: .reachable, session: .pendingActivation, activation: .enableFailed
+        )
+        XCTAssertEqual(sequence.enable.status, .failed)
+        XCTAssertTrue(sequence.enable.status.showsContent)
+        XCTAssertEqual(sequence.activation.status, .blocked)
+        XCTAssertEqual(sequence.nextAction, .enableTerminal)
+    }
+
+    func testARecordedEnableFailureIsAnsweredByTheEnableStep() {
+        for combination in everyCombination
+            where combination.outcome == .enableFailed && steps(combination).token.status.isFinished
+        {
+            let sequence = steps(combination)
+            guard sequence.enable.status.isFinished else { continue }
+            XCTAssertNotEqual(
+                combination.session, .pendingActivation,
+                "\(combination) finished the enable step over a recorded enable failure"
+            )
+        }
+    }
+
     func testEveryStepSaysWhatItIs() {
         for combination in everyCombination {
             let all = steps(combination).all
