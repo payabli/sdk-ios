@@ -157,7 +157,10 @@ enum TapToPaySteps {
                 return .enableTerminal
             }
             guard enable.isFinished else { return nil }
-            if activation == .current {
+            // `.failed` as well as `.current`, as with the enable step above: a
+            // refused code leaves the session `.pendingActivation`, which is the
+            // one state `activateDevice` accepts, so another code is the way on.
+            if activation.isActionable {
                 return .enterActivationCode
             }
             guard activation.isFinished else { return nil }

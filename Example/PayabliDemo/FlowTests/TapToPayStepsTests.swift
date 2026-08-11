@@ -190,6 +190,19 @@ final class TapToPayStepsTests: XCTestCase {
         }
     }
 
+    func testNoCombinationShowsAFailureWithNothingToDo() {
+        // A step that reports a failure and offers no control, with no recovery
+        // either, is a screen a person cannot leave.
+        for combination in everyCombination {
+            let sequence = steps(combination)
+            guard sequence.all.contains(where: { $0.status == .failed }) else { continue }
+            XCTAssertNotNil(
+                sequence.nextAction,
+                "\(combination) reports a failure and offers nothing"
+            )
+        }
+    }
+
     func testEveryStepSaysWhatItIs() {
         for combination in everyCombination {
             let all = steps(combination).all
@@ -294,6 +307,9 @@ final class TapToPayStepsTests: XCTestCase {
         XCTAssertEqual(sequence.activation.status, .failed)
         XCTAssertTrue(sequence.activation.status.showsContent)
         XCTAssertEqual(sequence.charge.status, .blocked)
+        // The session is still the one state `activateDevice` accepts, so the
+        // reason comes with another go rather than a dead end.
+        XCTAssertEqual(sequence.nextAction, .enterActivationCode)
     }
 
     func testARecordedActivationFailureStaysQuietUntilTheSequenceReachesActivation() {
