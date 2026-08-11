@@ -11,6 +11,7 @@ import SwiftUI
 /// source the forms use, so this screen cannot drift from the real behaviour.
 struct ConfigurationQAView: View {
     @State private var tokenCheckText = ""
+    @State private var cardNotPresentCheckText = ""
     @State private var healthCheckText = ""
     @State private var isWorking = false
 
@@ -74,21 +75,34 @@ struct ConfigurationQAView: View {
             )
             QADetailRow(label: "Resolved by", value: DemoConfiguration.TokenServer.explanation)
 
-            HStack(spacing: 12) {
-                Button { runTokenCheck() } label: {
-                    Label("Check token", systemImage: "key.horizontal")
-                }
-                .buttonStyle(.bordered)
-                .disabled(isWorking)
-
-                Button { runHealthCheck() } label: {
-                    Label("Health", systemImage: "heart.text.square")
-                }
-                .buttonStyle(.bordered)
-                .disabled(isWorking)
+            // Both probes live here, outside any step sequence, so either can be
+            // re-run at any time. The sequence on a payment tab hides its own
+            // probe once the step is done, and a stored method or a captured
+            // payment leaves it that way for the rest of the run.
+            // One per row, each sized to its label. Side by side the longer
+            // label wraps mid-word at this width.
+            Button { runTokenCheck() } label: {
+                Label("Check card-present token", systemImage: "key.horizontal")
             }
+            .buttonStyle(.bordered)
+            .disabled(isWorking)
 
-            ForEach([tokenCheckText, healthCheckText].filter { !$0.isEmpty }, id: \.self) { line in
+            Button { runCardNotPresentTokenCheck() } label: {
+                Label("Check card-not-present token", systemImage: "key.horizontal")
+            }
+            .buttonStyle(.bordered)
+            .disabled(isWorking)
+
+            Button { runHealthCheck() } label: {
+                Label("Local server health", systemImage: "heart.text.square")
+            }
+            .buttonStyle(.bordered)
+            .disabled(isWorking)
+
+            ForEach(
+                [tokenCheckText, cardNotPresentCheckText, healthCheckText].filter { !$0.isEmpty },
+                id: \.self
+            ) { line in
                 Text(line)
                     .font(.caption)
                     .foregroundColor(.payabliOnSurfaceVariant)
@@ -215,9 +229,25 @@ struct ConfigurationQAView: View {
             defer { isWorking = false }
             do {
                 _ = try await Secrets.fetchAccessToken()
-                tokenCheckText = "✓ Token endpoint returned a token"
+                tokenCheckText = "✓ Card-present token endpoint returned a token"
             } catch {
-                tokenCheckText = "✗ Token endpoint failed: \(error.localizedDescription)"
+                tokenCheckText = "✗ Card-present token endpoint failed: \(error.localizedDescription)"
+            }
+        }
+    }
+
+    /// The endpoint both card-not-present tabs call. `fetchPaymentCaptureAccessToken`
+    /// forwards to this one, so a single probe answers for both.
+    private func runCardNotPresentTokenCheck() {
+        isWorking = true
+        cardNotPresentCheckText = "Checking token…"
+        Task {
+            defer { isWorking = false }
+            do {
+                _ = try await Secrets.fetchPaymentMethodAccessToken()
+                cardNotPresentCheckText = "✓ Card-not-present token endpoint returned a token"
+            } catch {
+                cardNotPresentCheckText = "✗ Card-not-present token endpoint failed: \(error.localizedDescription)"
             }
         }
     }
