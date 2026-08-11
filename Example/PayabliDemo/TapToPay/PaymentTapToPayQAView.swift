@@ -155,16 +155,23 @@ struct PaymentTapToPayQAView: View {
     /// is in a state it can actually repair.
     @ViewBuilder
     private var recoverySection: some View {
-        if steps.nextAction == .reinitialize {
+        if steps.nextAction == .reinitialize || steps.nextAction == .reattest {
             VStack(alignment: .leading, spacing: 8) {
                 Text("Recovery")
                     .font(.headline)
-                Text("The session expired or errored. This re-runs config and reader setup without a fresh attestation.")
+                Text(steps.nextAction == .reinitialize
+                    ? "The session expired. This re-runs config and reader setup without a fresh attestation."
+                    : "The session errored. A config 401 clears the attested identity, so this runs the full setup.")
                     .font(.caption)
                     .foregroundColor(.payabliOnSurfaceVariant)
-                Button { runReinitialize() } label: {
-                    Label("Re-initialize", systemImage: "arrow.clockwise")
-                        .frame(maxWidth: .infinity)
+                Button {
+                    steps.nextAction == .reinitialize ? runReinitialize() : runEnableTerminal()
+                } label: {
+                    Label(
+                        steps.nextAction == .reinitialize ? "Re-initialize" : "Run full setup",
+                        systemImage: "arrow.clockwise"
+                    )
+                    .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.bordered)
                 .disabled(isWorking)

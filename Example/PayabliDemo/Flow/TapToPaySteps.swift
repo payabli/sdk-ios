@@ -48,7 +48,13 @@ enum TapToPayAction {
     case enableTerminal
     case enterActivationCode
     case charge
+    /// `reinitializeIfNeeded`, which re-runs config and the reader and skips
+    /// attestation. Only sound where the attested identity is still held.
     case reinitialize
+    /// `initialize`, the full setup. It re-uses a cached attestation and runs a
+    /// cold one when there is none, so it is the way back from a session whose
+    /// identity may have been cleared.
+    case reattest
 }
 
 /// What taking a contactless payment asks for.
@@ -147,8 +153,19 @@ enum TapToPaySteps {
                 return .checkToken
             }
             guard token.isFinished else { return nil }
-            if session == .error || session == .sessionExpired {
+            // A session that expired still holds its attested identity, so
+            // re-running config and the reader is enough. `.error` is where a
+            // config 401 lands, and that path clears the attestation cache, so
+            // skipping attestation would fail on the assertion every time and
+            // offer the same control again.
+            if session == .sessionExpired {
                 return .reinitialize
+            }
+            if session == .error {
+                // A refused activation reached the backend, so the attested
+                // identity is intact and config plus reader is enough. Any other
+                // `.error` may be the config 401, which clears it.
+                return outcome == .activationFailed ? .reinitialize : .reattest
             }
             // `.failed` as well as `.current`: an enable that failed is retried
             // from its own row, and this is the state a broken session does not

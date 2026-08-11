@@ -124,16 +124,53 @@ final class TapToPayStepsTests: XCTestCase {
     }
 
     func testRecoveryWaitsForTheTokenStepLikeEverythingElse() {
-        // Re-initialize re-runs config, which a backend known to be down cannot
+        // Recovery re-runs config, which a backend known to be down cannot
         // answer, and offering it beside the probe's own retry is two next
         // actions again.
-        for combination in everyCombination where steps(combination).nextAction == .reinitialize {
+        for combination in everyCombination
+            where steps(combination).nextAction == .reinitialize
+            || steps(combination).nextAction == .reattest
+        {
             let sequence = steps(combination)
-            XCTAssertTrue(sequence.token.status.isFinished, "\(combination) offered Re-initialize")
+            XCTAssertTrue(sequence.token.status.isFinished, "\(combination) offered recovery")
             XCTAssertTrue(
                 combination.session == .error || combination.session == .sessionExpired,
-                "\(combination) offered Re-initialize"
+                "\(combination) offered recovery"
             )
+        }
+    }
+
+    func testAnErroredSessionIsOfferedTheFullSetup() {
+        // A config 401 clears the attested identity and marks the session
+        // `.error`. `reinitializeIfNeeded` skips attestation and asserts against
+        // an identity that is gone, so it would fail and offer itself again.
+        for combination in everyCombination
+            where combination.session == .error && combination.outcome != .activationFailed
+        {
+            let sequence = steps(combination)
+            // A failed probe holds the sequence, and one in flight offers
+            // nothing at all.
+            guard sequence.token.status.isFinished else { continue }
+            XCTAssertEqual(sequence.nextAction, .reattest, "\(combination)")
+        }
+    }
+
+    func testARefusedActivationKeepsTheCheaperRecovery() {
+        // Reaching the backend at all means the device attested, and only a
+        // revoked attestation clears that identity.
+        let sequence = TapToPaySteps.forCharging(
+            tokenCheck: .reachable, session: .error, activation: .activationFailed
+        )
+        XCTAssertEqual(sequence.nextAction, .reinitialize)
+    }
+
+    func testAnExpiredSessionKeepsTheCheaperRecovery() {
+        // Expiry does not touch the attested identity, so config and the reader
+        // are all that need re-running.
+        for combination in everyCombination where combination.session == .sessionExpired {
+            let sequence = steps(combination)
+            guard sequence.token.status.isFinished else { continue }
+            XCTAssertEqual(sequence.nextAction, .reinitialize, "\(combination)")
         }
     }
 
