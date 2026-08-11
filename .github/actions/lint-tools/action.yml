@@ -1,0 +1,42 @@
+name: Lint tools
+description: Installs swiftformat and swiftlint, verified by checksum.
+
+# Pinned by content, not by name. Both tools decide whether the lint job passes,
+# and .swiftformat names the version its four disabled rules were checked
+# against, so a change in either would alter the tree or redden every pull
+# request without a commit here.
+#
+# A release tag is not immutable: a publisher can delete an asset and upload
+# another under the same URL. The checksums below are what makes the bytes
+# fixed, and they are verified before anything is unpacked or run. Raising a
+# version means replacing its checksum in the same change, with `swiftformat .`
+# re-run alongside it.
+
+runs:
+  using: composite
+  steps:
+    - name: Install lint tools
+      shell: bash
+      env:
+        SWIFTFORMAT_VERSION: 0.62.1
+        SWIFTFORMAT_SHA256: 7cb1cb1fae04932047c7015441c543848e8e60e1572d808d080e0a1f1661114a
+        SWIFTLINT_VERSION: 0.65.0
+        SWIFTLINT_SHA256: d6cb0aa7a2f5f1ef306fc9e37bcb54dc9a26facc8f7784ac0c3dd3eccf5c6ba6
+      run: |
+        set -euo pipefail
+        mkdir -p "$RUNNER_TEMP/tools"
+
+        curl -sSfL -o "$RUNNER_TEMP/swiftformat.zip" \
+          "https://github.com/nicklockwood/SwiftFormat/releases/download/${SWIFTFORMAT_VERSION}/swiftformat.zip"
+        echo "${SWIFTFORMAT_SHA256}  ${RUNNER_TEMP}/swiftformat.zip" | shasum -a 256 -c -
+
+        curl -sSfL -o "$RUNNER_TEMP/swiftlint.zip" \
+          "https://github.com/realm/SwiftLint/releases/download/${SWIFTLINT_VERSION}/portable_swiftlint.zip"
+        echo "${SWIFTLINT_SHA256}  ${RUNNER_TEMP}/swiftlint.zip" | shasum -a 256 -c -
+
+        unzip -q -j -o "$RUNNER_TEMP/swiftformat.zip" -d "$RUNNER_TEMP/tools"
+        unzip -q -j -o "$RUNNER_TEMP/swiftlint.zip" -d "$RUNNER_TEMP/tools"
+        chmod +x "$RUNNER_TEMP/tools/swiftformat" "$RUNNER_TEMP/tools/swiftlint"
+        echo "$RUNNER_TEMP/tools" >> "$GITHUB_PATH"
+        "$RUNNER_TEMP/tools/swiftformat" --version
+        "$RUNNER_TEMP/tools/swiftlint" version
