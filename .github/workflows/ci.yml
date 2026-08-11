@@ -91,10 +91,10 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             | xcpretty && exit ${PIPESTATUS[0]}
 
+      # The SDK bundle only: sonar-project.properties measures Sources and Tests,
+      # so demo coverage would name files the analysis does not know about.
       - name: Convert coverage
-        run: |
-          ./Scripts/xccov-to-sonarqube-generic.sh \
-            SDKTests.xcresult DemoFlowTests.xcresult > coverage.xml
+        run: ./Scripts/xccov-to-sonarqube-generic.sh SDKTests.xcresult > coverage.xml
 
       - name: Upload coverage
         uses: actions/upload-artifact@v4
