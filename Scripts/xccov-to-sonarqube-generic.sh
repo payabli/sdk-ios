@@ -14,8 +14,10 @@
 #
 # Adapted from SonarSource's reference script for Xcode projects. Nothing else
 # reads xccov, so a change to Xcode's output shows up here first: the script
-# exits non-zero if it produced no <file> element, rather than handing Sonar an
-# empty report that reads as zero coverage.
+# exits non-zero unless it emitted at least one <lineToCover>, rather than
+# handing Sonar a report that reads as zero coverage. Counting files rather than
+# lines would not catch it — a per-line format change leaves the file list intact
+# and every <file> element empty.
 
 set -euo pipefail
 
@@ -41,6 +43,9 @@ function included {
     return 1
 }
 
+# Total <lineToCover> elements emitted, which is what the guard at the end reads.
+LINES_EMITTED=0
+
 function convert_file {
     local xccovarchive_file="$1"
     local file_name="$2"
@@ -50,13 +55,21 @@ function convert_file {
     # job and read in another.
     local relative_name="${file_name#"$REPO_ROOT"/}"
 
-    echo "  <file path=\"$relative_name\">"
-    xcrun xccov view $xccov_options --file "$file_name" "$xccovarchive_file" \
+    local lines
+    lines=$(xcrun xccov view $xccov_options --file "$file_name" "$xccovarchive_file" \
         | sed -n '
         s/^ *\([0-9][0-9]*\): *0.*$/    <lineToCover lineNumber="\1" covered="false"\/>/p;
         s/^ *\([0-9][0-9]*\): *[1-9].*$/    <lineToCover lineNumber="\1" covered="true"\/>/p
-        '
+        ')
+
+    # A file with nothing coverable contributes no element. Emitting an empty
+    # <file> would still count toward a file-based guard.
+    [ -n "$lines" ] || return 0
+
+    echo "  <file path=\"$relative_name\">"
+    printf '%s\n' "$lines"
     echo '  </file>'
+    LINES_EMITTED=$((LINES_EMITTED + $(printf '%s\n' "$lines" | wc -l)))
 }
 
 function xccov_to_generic {
@@ -71,13 +84,12 @@ function xccov_to_generic {
             [ -z "$file_name" ] && continue
             included "${file_name#"$REPO_ROOT"/}" || continue
             convert_file "$xcresult" "$file_name" "$xccov_options"
-            files=$((files + 1))
         done < <(xcrun xccov view $xccov_options --file-list "$xcresult")
     done
     echo '</coverage>'
 
-    if [ "$files" -eq 0 ]; then
-        echo "error: no covered files found in $* after --include filtering" >&2
+    if [ "$LINES_EMITTED" -eq 0 ]; then
+        echo "error: no coverable lines parsed from $* after --include filtering" >&2
         return 1
     fi
 }
