@@ -54,22 +54,24 @@ enum PayInSteps {
         resultTitle: String,
         resultDetail: String
     ) -> PayInFlowSteps {
-        // True once the backend is known reachable — either the probe was run, or
-        // a submit already succeeded, which proves it just as well.
-        let backendProven = progress.tokenCheck == .reachable || progress.hasResult
         let showingFinishedResult = progress.hasResult && !progress.resultAcknowledged
 
         let backend: StepStatus = {
-            if progress.tokenCheck == .unreachable {
-                return .failed
+            switch progress.tokenCheck {
+            // Before the outcome, or the step offers its button over a request
+            // already in flight.
+            case .checking: return .inProgress
+            // The probe outranks a submission that succeeded earlier. The
+            // component never clears `lastResult`, so one payment would otherwise
+            // prove the backend for the life of the app.
+            case .unreachable: return .failed
+            case .reachable: return .done
+            case .notRun: return progress.hasResult ? .done : .current
             }
-            return backendProven ? .done : .current
         }()
 
         let form: StepStatus = {
-            // Exactly one step is ever `.current`, so this waits rather than
-            // competing with step 1 for attention.
-            guard backendProven else { return .blocked }
+            guard backend.isFinished else { return .blocked }
             if progress.isSubmitting {
                 return .inProgress
             }
@@ -79,14 +81,9 @@ enum PayInSteps {
             return showingFinishedResult ? .done : .current
         }()
 
-        let result: StepStatus = {
-            // A failure belongs to the step that produced it. Marking this one
-            // failed too would give the sequence two actionable failures.
-            if progress.submitFailed {
-                return .blocked
-            }
-            return showingFinishedResult ? .current : .blocked
-        }()
+        // From the step before, not from `hasResult`, which can be true while the
+        // form is still asking for something.
+        let result: StepStatus = form.isFinished ? .current : .blocked
 
         return PayInFlowSteps(
             backend: FlowStep(

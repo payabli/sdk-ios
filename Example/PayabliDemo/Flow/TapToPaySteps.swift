@@ -35,30 +35,31 @@ enum TapToPaySteps {
         session: PayabliTTPSessionState,
         activation outcome: TapToPayActivationOutcome
     ) -> TapToPayFlowSteps {
-        // True once the backend is known reachable — either because the probe was
-        // run, or because the SDK already fetched a token to get past `idle`.
-        //
-        // Only states the session cannot reach without a successful authenticated
+        // States the session cannot reach without a successful authenticated
         // request. `.attestingDevice` is set before that request, and `.error` is
-        // where a failing token provider lands, so neither proves anything.
-        let backendProven = switch session {
+        // where a failing token provider lands.
+        let sessionProvesBackend = switch session {
         case .fetchingConfig, .initializingReader, .ready, .pendingActivation, .reinitializing:
             true
         default:
-            tokenCheck == .reachable
+            false
         }
 
         let token: StepStatus = {
-            if tokenCheck == .unreachable {
-                return .failed
+            switch tokenCheck {
+            // Before the outcome, or the step offers its button over a request
+            // already in flight.
+            case .checking: return .inProgress
+            // The probe outranks the session, which says only that the backend
+            // answered at some point in the past.
+            case .unreachable: return .failed
+            case .reachable: return .done
+            case .notRun: return sessionProvesBackend ? .done : .current
             }
-            return backendProven ? .done : .current
         }()
 
         let enable: StepStatus = {
-            // Exactly one step is ever `.current`, so this stays blocked until the
-            // backend is proven rather than competing with step 1 for attention.
-            guard backendProven else { return .blocked }
+            guard token.isFinished else { return .blocked }
             switch session {
             case .ready: return .done
             case .attestingDevice, .fetchingConfig, .initializingReader, .reinitializing: return .inProgress
@@ -71,22 +72,28 @@ enum TapToPaySteps {
         }()
 
         let activation: StepStatus = {
-            // A failed activation must stay actionable: `.failed` is the only other
-            // status whose content renders, so blocking it would hide the reason and
-            // the retry together. Read from the recorded outcome rather than from
-            // `sessionState`, which cannot distinguish the two calls this step makes
-            // and reports `.idle` for a revoked attestation.
-            if outcome == .activationFailed {
-                return .failed
+            // Ordered. The outcome outlives the session it belongs to, so reading
+            // it first lets a stale failure report itself while the sequence is
+            // still on the step before.
+            guard enable == .done else { return .blocked }
+            // A session reports `.ready` for a device that was activated and for
+            // one that never had to be. Only the caller can tell them apart.
+            if outcome == .succeeded {
+                return .done
             }
-            switch session {
-            case .pendingActivation: return .current
-            case .ready: return .notNeeded
-            default: return .blocked
+            if session == .ready {
+                return .notNeeded
             }
+            // `.ready` and `.pendingActivation` are the two states that finish the
+            // step before, so this is `.pendingActivation`.
+            return outcome == .activationFailed ? .failed : .current
         }()
 
-        let charge: StepStatus = session == .ready ? .current : .blocked
+        // From the step before, not the session.
+        let charge: StepStatus = {
+            guard activation.isFinished else { return .blocked }
+            return session == .ready ? .current : .blocked
+        }()
 
         return TapToPayFlowSteps(
             token: FlowStep(

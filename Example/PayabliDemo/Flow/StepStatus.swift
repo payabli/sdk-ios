@@ -14,8 +14,11 @@ enum StepStatus {
     case failed
 
     /// Whether this step shows its controls.
+    ///
+    /// A working step keeps them: the SDK's form owns its typed values in a
+    /// `@StateObject`, so hiding the row discards them.
     var showsContent: Bool {
-        self == .current || self == .failed
+        self == .current || self == .failed || self == .inProgress
     }
 
     /// Whether this step is the one asking for something. Narrower than
