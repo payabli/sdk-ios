@@ -4,6 +4,13 @@
 # format, which is what `sonar.coverageReportPaths` reads.
 #
 #   ./Scripts/xccov-to-sonarqube-generic.sh TestResults.xcresult > coverage.xml
+#   ./Scripts/xccov-to-sonarqube-generic.sh --include Sources/ a.xcresult b.xcresult
+#
+# `--include` is repeatable and keeps only files under the given repo-relative
+# prefixes. A coverage report should describe what the analysis measures: an
+# .xcresult also covers the test files themselves and any vendored source the
+# suite touched, and handing those to Sonar asks it to reconcile files it holds
+# as tests, or does not hold at all.
 #
 # Adapted from SonarSource's reference script for Xcode projects. Nothing else
 # reads xccov, so a change to Xcode's output shows up here first: the script
@@ -13,6 +20,26 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+INCLUDE=()
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --include)
+            [ $# -ge 2 ] || { echo "error: --include needs a prefix" >&2; exit 2; }
+            INCLUDE+=("$2"); shift 2 ;;
+        *) break ;;
+    esac
+done
+
+# No --include keeps everything, so the script stays usable on its own.
+function included {
+    [ ${#INCLUDE[@]} -eq 0 ] && return 0
+    local path="$1" prefix
+    for prefix in "${INCLUDE[@]}"; do
+        case "$path" in "$prefix"*) return 0 ;; esac
+    done
+    return 1
+}
 
 function convert_file {
     local xccovarchive_file="$1"
@@ -42,6 +69,7 @@ function xccov_to_generic {
         fi
         while read -r file_name; do
             [ -z "$file_name" ] && continue
+            included "${file_name#"$REPO_ROOT"/}" || continue
             convert_file "$xcresult" "$file_name" "$xccov_options"
             files=$((files + 1))
         done < <(xcrun xccov view $xccov_options --file-list "$xcresult")
@@ -49,13 +77,13 @@ function xccov_to_generic {
     echo '</coverage>'
 
     if [ "$files" -eq 0 ]; then
-        echo "error: no covered files found in $*" >&2
+        echo "error: no covered files found in $* after --include filtering" >&2
         return 1
     fi
 }
 
 if [ $# -eq 0 ]; then
-    echo "usage: $0 <path-to-.xcresult> [...]" >&2
+    echo "usage: $0 [--include <prefix>]... <path-to-.xcresult> [...]" >&2
     exit 2
 fi
 
