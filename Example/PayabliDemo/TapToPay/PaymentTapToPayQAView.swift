@@ -408,6 +408,19 @@ struct PaymentTapToPayQAView: View {
             defer { isWorking = false }
             do {
                 try await terminal.activateDevice(activationCode: code)
+            } catch let error as PayabliTTPError {
+                // A revoked attestation resets the session to `.idle`, and the
+                // way out is a fresh cold attestation. The reason goes to the
+                // step that offers it.
+                if case .attestationRevoked = error {
+                    activationOutcome = .attestationRevoked
+                    enableMessage = "✗ \(error.localizedDescription)"
+                    activationMessage = "✗ Attestation revoked — re-enable the terminal, see step 2."
+                } else {
+                    activationOutcome = .activationFailed
+                    activationMessage = "✗ \(error.localizedDescription)"
+                }
+                return
             } catch {
                 activationOutcome = .activationFailed
                 activationMessage = "✗ \(error.localizedDescription)"

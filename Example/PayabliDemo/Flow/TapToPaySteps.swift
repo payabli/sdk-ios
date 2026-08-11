@@ -7,6 +7,10 @@ import PayabliSDKTapToPay
 enum TapToPayActivationOutcome {
     case none
     case activationFailed
+    /// The attestation behind the activation was revoked. `activateDevice`
+    /// resets the session to `.idle` for this case alone, and the way out is a
+    /// fresh cold attestation, which is the enable step's job.
+    case attestationRevoked
     case enableFailed
     case succeeded
 }
@@ -99,7 +103,13 @@ enum TapToPaySteps {
             // doing, so a stale outcome does not move it.
             case .error: return outcome == .activationFailed ? .done : .failed
             case .sessionExpired: return .failed
-            case .idle: return .current
+            // A recorded activation failure at `.idle` is a revoked attestation:
+            // it is the one failure `activateDevice` resets rather than marks,
+            // and re-attesting from scratch is this step's own action.
+            case .idle:
+                return outcome == .attestationRevoked || outcome == .activationFailed
+                    ? .failed
+                    : .current
             @unknown default: return .current
             }
         }()

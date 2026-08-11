@@ -16,7 +16,8 @@ final class TapToPayStepsTests: XCTestCase {
 
     private let everyCombination: [Combination] = {
         let checks: [TokenCheck] = [.notRun, .checking, .reachable, .unreachable]
-        let outcomes: [TapToPayActivationOutcome] = [.none, .activationFailed, .enableFailed, .succeeded]
+        let outcomes: [TapToPayActivationOutcome] =
+            [.none, .activationFailed, .attestationRevoked, .enableFailed, .succeeded]
         return checks.flatMap { check in
             everyTapToPaySession.flatMap { session in
                 outcomes.map { Combination(tokenCheck: check, session: session, outcome: $0) }
@@ -33,7 +34,7 @@ final class TapToPayStepsTests: XCTestCase {
     }
 
     func testTheSpaceIsTheSizeItClaims() {
-        XCTAssertEqual(everyCombination.count, 4 * 9 * 4)
+        XCTAssertEqual(everyCombination.count, 4 * 9 * 5)
     }
 
     // MARK: - Invariants, over the whole space
@@ -174,6 +175,21 @@ final class TapToPayStepsTests: XCTestCase {
         }
     }
 
+    func testARevokedAttestationIsTheEnableStepsFailure() {
+        // `activateDevice` resets to `.idle` for a revoked attestation and marks
+        // an error for every other refusal, so this is the one activation
+        // failure whose remedy is a fresh cold attestation.
+        for outcome in [TapToPayActivationOutcome.attestationRevoked, .activationFailed] {
+            let sequence = TapToPaySteps.forCharging(
+                tokenCheck: .reachable, session: .idle, activation: outcome
+            )
+            XCTAssertEqual(sequence.enable.status, .failed, "\(outcome)")
+            XCTAssertTrue(sequence.enable.status.showsContent, "\(outcome)")
+            XCTAssertEqual(sequence.activation.status, .blocked, "\(outcome)")
+            XCTAssertEqual(sequence.nextAction, .enableTerminal, "\(outcome)")
+        }
+    }
+
     func testEveryStepSaysWhatItIs() {
         for combination in everyCombination {
             let all = steps(combination).all
@@ -281,11 +297,15 @@ final class TapToPayStepsTests: XCTestCase {
     }
 
     func testARecordedActivationFailureStaysQuietUntilTheSequenceReachesActivation() {
+        // Stale here: the terminal is starting, so the outcome describes a
+        // session that is gone. `.idle` is not stale and is covered separately —
+        // it is the state a revoked attestation leaves behind.
         let sequence = TapToPaySteps.forCharging(
-            tokenCheck: .reachable, session: .idle, activation: .activationFailed
+            tokenCheck: .reachable, session: .attestingDevice, activation: .activationFailed
         )
-        XCTAssertEqual(sequence.enable.status, .current)
+        XCTAssertEqual(sequence.enable.status, .inProgress)
         XCTAssertEqual(sequence.activation.status, .blocked)
+        XCTAssertNil(sequence.nextAction)
     }
 
     func testAnActivationThatSucceededReadsAsDoneNotAsOneThatNeverApplied() {
