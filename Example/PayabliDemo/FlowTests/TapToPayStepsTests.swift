@@ -159,6 +159,45 @@ final class TapToPayStepsTests: XCTestCase {
         XCTAssertEqual(sequence.charge.status, .blocked)
     }
 
+    func testARefusedActivationIsReportedByTheActivationStepWhenTheSessionRecordsTheError() {
+        // `activateDevice` calls markError on failure, so the session reads
+        // `.error` while the step that failed is activation. Blaming the enable
+        // step for it blocks activation, which is where the reason and the retry
+        // are rendered.
+        let sequence = TapToPaySteps.forCharging(
+            tokenCheck: .reachable, session: .error, activation: .activationFailed
+        )
+        XCTAssertEqual(sequence.enable.status, .done)
+        XCTAssertEqual(sequence.activation.status, .failed)
+        XCTAssertTrue(sequence.activation.status.showsContent)
+        XCTAssertEqual(sequence.charge.status, .blocked)
+    }
+
+    func testNoRecordedActivationFailureIsAnsweredByAnEarlierStep() {
+        for combination in everyCombination
+            where combination.outcome == .activationFailed && combination.session == .error
+        {
+            let sequence = steps(combination)
+            // A probe that failed legitimately holds the whole sequence.
+            guard sequence.token.status.isFinished else { continue }
+            XCTAssertEqual(
+                sequence.activation.status, .failed,
+                "\(combination) answered an activation failure somewhere else"
+            )
+            XCTAssertTrue(sequence.activation.status.showsContent, "\(combination)")
+        }
+    }
+
+    func testAnExpiredSessionIsStillTheEnableStepsFailure() {
+        // Session expiry is not activation's doing, so a stale outcome must not
+        // move that failure onto the step after it.
+        let sequence = TapToPaySteps.forCharging(
+            tokenCheck: .reachable, session: .sessionExpired, activation: .activationFailed
+        )
+        XCTAssertEqual(sequence.enable.status, .failed)
+        XCTAssertEqual(sequence.activation.status, .blocked)
+    }
+
     func testARefusedActivationKeepsItsOwnStepAndBlocksTheCharge() {
         let sequence = TapToPaySteps.forCharging(
             tokenCheck: .reachable, session: .pendingActivation, activation: .activationFailed

@@ -65,7 +65,13 @@ enum TapToPaySteps {
             case .attestingDevice, .fetchingConfig, .initializingReader, .reinitializing: return .inProgress
             // Activation is a separate step, so reaching it means this one finished.
             case .pendingActivation: return .done
-            case .error, .sessionExpired: return .failed
+            // `activateDevice` calls markError when it is refused, so the session
+            // reads `.error` for a failure that belongs to the step after this
+            // one. Taking it here would block activation, which is where the
+            // reason and the retry are rendered. Expiry is not activation's
+            // doing, so a stale outcome does not move it.
+            case .error: return outcome == .activationFailed ? .done : .failed
+            case .sessionExpired: return .failed
             case .idle: return .current
             @unknown default: return .current
             }
@@ -84,8 +90,8 @@ enum TapToPaySteps {
             if session == .ready {
                 return .notNeeded
             }
-            // `.ready` and `.pendingActivation` are the two states that finish the
-            // step before, so this is `.pendingActivation`.
+            // What is left is `.pendingActivation`, or the `.error` the step
+            // before handed on because a refused activation put it there.
             return outcome == .activationFailed ? .failed : .current
         }()
 
