@@ -37,9 +37,28 @@ struct TapToPayFlowSteps {
     /// something.
     let nextAction: TapToPayAction?
 
+    /// Why recovery is on offer, which is what the section says out loud.
+    ///
+    /// `nextAction` cannot say it. `.reinitialize` is the way out of an expired
+    /// session and of a refused activation both, and those are different
+    /// sentences: one session expired and the other never did.
+    let recovery: TapToPayRecovery?
+
     var all: [FlowStep] {
         [token, enable, activation, charge]
     }
+}
+
+/// What the screen is recovering from.
+enum TapToPayRecovery {
+    /// The session expired holding its attested identity.
+    case sessionExpired
+    /// Activation was refused. The request reached the backend, so the attested
+    /// identity is intact.
+    case activationRefused
+    /// Any other `.error`, which may be the config 401 that clears the attested
+    /// identity.
+    case sessionErrored
 }
 
 /// A control on the Tap to Pay screen.
@@ -148,24 +167,32 @@ enum TapToPaySteps {
         // wants attention is the only thing offered. Re-initialize sits behind
         // the token step because it re-runs config, which a backend known to be
         // down cannot answer.
+        // Derived before `nextAction`, which reads it, so the control and the
+        // sentence beside it cannot disagree about what went wrong.
+        let recovery: TapToPayRecovery? = {
+            guard !token.isActionable, token.isFinished else { return nil }
+            if session == .sessionExpired {
+                return .sessionExpired
+            }
+            if session == .error {
+                return outcome == .activationFailed ? .activationRefused : .sessionErrored
+            }
+            return nil
+        }()
+
         let nextAction: TapToPayAction? = {
             if token.isActionable {
                 return .checkToken
             }
             guard token.isFinished else { return nil }
             // A session that expired still holds its attested identity, so
-            // re-running config and the reader is enough. `.error` is where a
-            // config 401 lands, and that path clears the attestation cache, so
-            // skipping attestation would fail on the assertion every time and
-            // offer the same control again.
-            if session == .sessionExpired {
-                return .reinitialize
-            }
-            if session == .error {
-                // A refused activation reached the backend, so the attested
-                // identity is intact and config plus reader is enough. Any other
-                // `.error` may be the config 401, which clears it.
-                return outcome == .activationFailed ? .reinitialize : .reattest
+            // re-running config and the reader is enough, and so does a refused
+            // activation, whose request reached the backend. `.error` otherwise
+            // is where a config 401 lands, and that path clears the attestation
+            // cache, so skipping attestation would fail on the assertion every
+            // time and offer the same control again.
+            if let recovery {
+                return recovery == .sessionErrored ? .reattest : .reinitialize
             }
             // `.failed` as well as `.current`: an enable that failed is retried
             // from its own row, and this is the state a broken session does not
@@ -207,7 +234,8 @@ enum TapToPaySteps {
                 detail: "Presents Apple's Tap to Pay sheet. Hold a card to the top of the phone.",
                 status: charge
             ),
-            nextAction: nextAction
+            nextAction: nextAction,
+            recovery: recovery
         )
     }
 }

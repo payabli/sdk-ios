@@ -69,6 +69,77 @@ final class TapToPayStepsTests: XCTestCase {
         }
     }
 
+    func testRecoveryIsGivenAReasonExactlyWhenItIsOffered() {
+        for combination in everyCombination {
+            let sequence = steps(combination)
+            let offered = sequence.nextAction == .reinitialize || sequence.nextAction == .reattest
+            XCTAssertEqual(
+                sequence.recovery != nil, offered,
+                "\(combination) offers \(String(describing: sequence.nextAction)) "
+                    + "with reason \(String(describing: sequence.recovery))"
+            )
+        }
+    }
+
+    func testEveryRecoveryReasonMatchesTheControlBesideIt() {
+        // The screen writes one sentence per reason, so a reason paired with the
+        // wrong control is a sentence describing something that did not happen.
+        for combination in everyCombination {
+            let sequence = steps(combination)
+            guard let recovery = sequence.recovery else { continue }
+            let expected: TapToPayAction = recovery == .sessionErrored ? .reattest : .reinitialize
+            XCTAssertEqual(
+                sequence.nextAction, expected,
+                "\(combination) pairs \(recovery) with \(String(describing: sequence.nextAction))"
+            )
+        }
+    }
+
+    // MARK: - The three reasons, one at a time
+
+    func testARefusedActivationDoesNotClaimTheSessionExpired() {
+        // Both this and an expired session offer Re-initialize, so the control
+        // cannot tell them apart and the reason is what the screen reads from.
+        let sequence = TapToPaySteps.forCharging(
+            tokenCheck: .reachable,
+            session: .error,
+            activation: .activationFailed
+        )
+        XCTAssertEqual(sequence.recovery, .activationRefused)
+        XCTAssertEqual(sequence.nextAction, .reinitialize)
+    }
+
+    func testAnExpiredSessionSaysItExpired() {
+        let sequence = TapToPaySteps.forCharging(
+            tokenCheck: .reachable,
+            session: .sessionExpired,
+            activation: .none
+        )
+        XCTAssertEqual(sequence.recovery, .sessionExpired)
+        XCTAssertEqual(sequence.nextAction, .reinitialize)
+    }
+
+    func testAnyOtherErrorRunsTheFullSetup() {
+        let sequence = TapToPaySteps.forCharging(
+            tokenCheck: .reachable,
+            session: .error,
+            activation: .none
+        )
+        XCTAssertEqual(sequence.recovery, .sessionErrored)
+        XCTAssertEqual(sequence.nextAction, .reattest)
+    }
+
+    func testAFailingTokenProbeOffersNoRecovery() {
+        // Recovery sits behind the token step, which is the first thing to fix.
+        let sequence = TapToPaySteps.forCharging(
+            tokenCheck: .unreachable,
+            session: .sessionExpired,
+            activation: .none
+        )
+        XCTAssertNil(sequence.recovery)
+        XCTAssertEqual(sequence.nextAction, .checkToken)
+    }
+
     func testEveryStepAfterAnUnfinishedOneIsBlocked() {
         for combination in everyCombination {
             let all = steps(combination).all

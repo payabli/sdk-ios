@@ -151,17 +151,26 @@ struct PaymentTapToPayQAView: View {
         }
     }
 
+    private func recoveryDetail(_ recovery: TapToPayRecovery) -> String {
+        switch recovery {
+        case .sessionExpired:
+            "The session expired. This re-runs config and reader setup without a fresh attestation."
+        case .activationRefused:
+            "Activation was refused. The attested identity is intact, so this re-runs config and reader setup."
+        case .sessionErrored:
+            "The session errored. A config 401 clears the attested identity, so this runs the full setup."
+        }
+    }
+
     /// Recovery is not part of the sequence, so it only appears when the session
     /// is in a state it can actually repair.
     @ViewBuilder
     private var recoverySection: some View {
-        if steps.nextAction == .reinitialize || steps.nextAction == .reattest {
+        if let recovery = steps.recovery {
             VStack(alignment: .leading, spacing: 8) {
                 Text("Recovery")
                     .font(.headline)
-                Text(steps.nextAction == .reinitialize
-                    ? "The session expired. This re-runs config and reader setup without a fresh attestation."
-                    : "The session errored. A config 401 clears the attested identity, so this runs the full setup.")
+                Text(recoveryDetail(recovery))
                     .font(.caption)
                     .foregroundColor(.payabliOnSurfaceVariant)
                 Button {
