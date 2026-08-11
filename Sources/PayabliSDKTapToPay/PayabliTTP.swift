@@ -130,19 +130,19 @@ public final class PayabliTTP: NSObject, ObservableObject {
         )
     }
 
-    // PRD §19.1 convenience init. Wires the default `FiservCardReader`
-    // provider and a real `AppAttestService` with Keychain-backed storage.
-    //
-    // The host supplies the server-minted `accessToken` and an optional
-    // `tokenProvider` callback for refreshes (see `PayabliConfig`).
-    //
-    // Only available where Apple's `DeviceCheck` framework is importable.
-    // The package minimums (iOS 16.7 from PayabliCardReaderCore / ProximityReader,
-    // and macOS 12 from `Package.swift`) are both well above `DCAppAttestService`'s
-    // own floor (iOS 14 / macOS 11.3), so no extra `@available` gate is needed.
-    // Platforms without `DeviceCheck` must use the designated init with a
-    // custom `DeviceAttestationService`.
     #if canImport(DeviceCheck)
+        /// PRD §19.1 convenience init. Wires the default `FiservCardReader`
+        /// provider and a real `AppAttestService` with Keychain-backed storage.
+        ///
+        /// The host supplies the server-minted `accessToken` and an optional
+        /// `tokenProvider` callback for refreshes (see `PayabliConfig`).
+        ///
+        /// Only available where Apple's `DeviceCheck` framework is importable.
+        /// The package minimum of iOS 16.7, set by PayabliCardReaderCore and
+        /// ProximityReader, is well above `DCAppAttestService`'s own floor of
+        /// iOS 14, so no extra `@available` gate is needed. A platform without
+        /// `DeviceCheck` uses the designated init with a custom
+        /// `DeviceAttestationService`.
         public convenience init(
             accessToken: String,
             tokenProvider: PayabliTokenRefresh? = nil,
@@ -172,21 +172,21 @@ public final class PayabliTTP: NSObject, ObservableObject {
         }
     #endif
 
-    // `@objc`-friendly convenience init for ObjC / MAUI / sharpie consumers
-    // that can't represent the Swift `PayabliTokenRefresh` (`@Sendable () async
-    // throws -> String`) closure.
-    //
-    // Token refresh is exposed here as a completion-style block:
-    // `tokenRefreshHandler` receives a `(token, error) -> Void` callback that
-    // the host invokes exactly once with either a fresh access token or an
-    // `NSError` — the SDK bridges that to the underlying async closure
-    // internally. Pass `nil` to disable silent refresh; the SDK will surface
-    // `tokenExpired` instead.
-    //
-    // All other parameters mirror the Swift convenience init exactly. Swift
-    // callers that need an `async throws` token provider should keep using
-    // the Swift-only convenience init above.
     #if canImport(DeviceCheck)
+        /// `@objc`-friendly convenience init for ObjC / MAUI / sharpie consumers
+        /// that can't represent the Swift `PayabliTokenRefresh` (`@Sendable ()
+        /// async throws -> String`) closure.
+        ///
+        /// Token refresh is exposed here as a completion-style block:
+        /// `tokenRefreshHandler` receives a `(token, error) -> Void` callback
+        /// that the host invokes exactly once with either a fresh access token
+        /// or an `NSError` — the SDK bridges that to the underlying async
+        /// closure internally. Pass `nil` to disable silent refresh; the SDK
+        /// surfaces `tokenExpired` instead.
+        ///
+        /// All other parameters mirror the Swift convenience init exactly. A
+        /// Swift caller that needs an `async throws` token provider uses the
+        /// Swift-only convenience init above.
         @objc public convenience init(
             accessToken: String,
             tokenRefreshHandler: ((@escaping (String?, NSError?) -> Void) -> Void)?,
