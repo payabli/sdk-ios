@@ -47,12 +47,8 @@ public final class TTPConfigClient: Sendable {
             headers: headers.asDictionary
         )
 
-        let headersDump = headers.asDictionary
-            .map { "\($0.key): \($0.value)" }
-            .sorted()
-            .joined(separator: " | ")
+        // The headers carry the App Attest assertion, key id and device id.
         logger.info("[config] → GET \(request.path)")
-        logger.info("[config] headers: \(headersDump)")
 
         let response = try await transport.perform(request)
 

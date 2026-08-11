@@ -117,14 +117,10 @@ extension AppAttestService {
             jsonBody: body
         )
 
-        let headersDump = request.headers
-            .map { "\($0.key): \($0.value)" }
-            .sorted()
-            .joined(separator: " | ")
-        let bodyDump = request.body.flatMap { String(data: $0, encoding: .utf8) } ?? "<nil>"
-        logger.info("[\(label)] → POST \(request.path)")
-        logger.info("[\(label)] headers: \(headersDump)")
-        logger.info("[\(label)] body: \(bodyDump)")
+        // These bodies and headers are authentication material: `/activate`
+        // carries the activation code, the others carry the App Attest key,
+        // attestation and assertion. Endpoint and size only.
+        logger.info("[\(label)] → POST \(request.path) bytes=\(request.body?.count ?? 0)")
 
         let response: PayabliResponse
         do {
@@ -134,8 +130,7 @@ extension AppAttestService {
             throw error
         }
 
-        let responseBody = String(data: response.body, encoding: .utf8) ?? "<non-utf8 \(response.body.count) bytes>"
-        logger.info("[\(label)] ← [\(response.statusCode)] body: \(responseBody)")
+        logger.info("[\(label)] ← [\(response.statusCode)] bytes=\(response.body.count)")
 
         do {
             try mapPayabliHTTPError(response: response)

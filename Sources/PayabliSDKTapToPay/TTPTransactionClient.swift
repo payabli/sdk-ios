@@ -47,13 +47,9 @@ public final class TTPTransactionClient: Sendable {
             jsonBody: body
         )
 
-        let headersDump = request.headers
-            .map { "\($0.key): \($0.value)" }
-            .sorted()
-            .joined(separator: " | ")
         let bodyDump = request.body.flatMap { String(data: $0, encoding: .utf8) } ?? "<nil>"
+        // The headers carry the App Attest assertion, key id and device id.
         logger.info("[initiate] → POST \(request.path)")
-        logger.info("[initiate] headers: \(headersDump)")
         // Body carries PII (billing/shipping/email/phone) — keep redacted in
         // shared OS logs.
         logger.info("[initiate] body", private: bodyDump)

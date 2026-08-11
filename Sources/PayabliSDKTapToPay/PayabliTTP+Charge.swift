@@ -198,7 +198,6 @@ extension PayabliTTP {
     ) async -> TTPUpdateOutcome {
         let body = TTPTransactionClient.updateBody(for: payload)
         let logger = self.logger
-        let bodyDump = String(data: body, encoding: .utf8) ?? "<non-utf8 \(body.count) bytes>"
         let path = "/api/v2/MoneyIn/update/\(paymentTransId)"
         let transport = self.session.transport
 
@@ -209,16 +208,11 @@ extension PayabliTTP {
                 headers: ["Content-Type": "application/json"],
                 body: body
             )
-            let headersDump = request.headers
-                .map { "\($0.key): \($0.value)" }
-                .sorted()
-                .joined(separator: " | ")
-            logger.info("[update/\(attempt)] → PATCH \(path)")
-            logger.info("[update/\(attempt)] headers: \(headersDump)")
-            logger.info("[update/\(attempt)] body: \(bodyDump)")
+            // The success body carries the provider's whole response, and with
+            // it `paymentTokens.tokenData` and the card's expiry. Size only.
+            logger.info("[update/\(attempt)] → PATCH \(path) bytes=\(body.count)")
             let response = try await transport.perform(request)
-            let responseBody = String(data: response.body, encoding: .utf8) ?? "<non-utf8 \(response.body.count) bytes>"
-            logger.info("[update/\(attempt)] ← [\(response.statusCode)] body: \(responseBody)")
+            logger.info("[update/\(attempt)] ← [\(response.statusCode)] bytes=\(response.body.count)")
             return response
         }
 
