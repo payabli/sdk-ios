@@ -79,7 +79,7 @@ else
     echo '```'
     printf '%s\n' "$LIFECYCLE"
     echo '```'
-    if printf '%s\n' "$LIFECYCLE" | grep -qE '^R(0[0-9][0-9]|1[0-9][0-9])' ; then
+    if printf '%s\n' "$LIFECYCLE" | grep -qE '^R0[0-9][0-9]' ; then
         echo
         echo "A rename shown below \`R100\` was edited as well as moved."
     fi
@@ -88,12 +88,16 @@ echo
 
 # ------------------------------------------------------------------ shipped code
 
-CHANGED_SOURCES=$(git diff --name-only --diff-filter=M "$BASE..$HEAD_SHA" -- Sources/)
-if [ -z "$CHANGED_SOURCES" ]; then
+# Swift only. Sources/ also carries Markdown, and prose about a public type
+# reads as a declaration to a grep.
+CHANGED_SOURCES=$(git diff --name-only --diff-filter=M "$BASE..$HEAD_SHA" -- Sources/ | grep '\.swift$' || true)
+ADDED_SOURCES=$(git diff --name-only --diff-filter=A "$BASE..$HEAD_SHA" -- Sources/ | grep '\.swift$' || true)
+DELETED_SOURCES=$(git diff --name-only --diff-filter=D "$BASE..$HEAD_SHA" -- Sources/ | grep '\.swift$' || true)
+if [ -z "$CHANGED_SOURCES" ] && [ -z "$ADDED_SOURCES" ] && [ -z "$DELETED_SOURCES" ]; then
     echo "### Production code"
     echo
-    echo "No existing file under \`Sources/\` was modified, so released behaviour"
-    echo "is unchanged except by any file added or deleted above."
+    echo "Nothing under \`Sources/\` changed, so released behaviour is unchanged and"
+    echo "the public surface is untouched."
     exit 0
 fi
 
@@ -164,17 +168,42 @@ while IFS= read -r path; do
     fi
 done <<< "$CHANGED_SOURCES"
 
+# A file that entered or left the build carries its whole contents as added or
+# removed API. The classification above speaks only for modified files, so
+# without this the report would call a new public type source compatible.
+while IFS= read -r path; do
+    [ -n "$path" ] || continue
+    decls=$(git show "$HEAD_SHA:$path" 2>/dev/null \
+        | grep -E '(^|[[:space:]])(public|open)([[:space:]]|$)' || true)
+    [ -n "$decls" ] && api_added="${api_added}${path} (file added)"$'\n'"${decls}"$'\n'
+done <<< "$ADDED_SOURCES"
+
+while IFS= read -r path; do
+    [ -n "$path" ] || continue
+    decls=$(git show "$BASE:$path" 2>/dev/null \
+        | grep -E '(^|[[:space:]])(public|open)([[:space:]]|$)' || true)
+    [ -n "$decls" ] && api_removed="${api_removed}${path} (file deleted)"$'\n'"${decls}"$'\n'
+done <<< "$DELETED_SOURCES"
+
 modified_total=$(printf '%s\n' "$CHANGED_SOURCES" | grep -c . || true)
+added_total=$(printf '%s\n' "$ADDED_SOURCES" | grep -c . || true)
+deleted_total=$(printf '%s\n' "$DELETED_SOURCES" | grep -c . || true)
 
 echo "### Production code (\`Sources/\`)"
 echo
-echo "$modified_total modified files, classified by whether the change can alter behaviour."
+echo "$modified_total modified, $added_total added, $deleted_total deleted, classified by whether the change can alter behaviour."
 echo
 echo "| Classification | Files | Reviewer action |"
 echo "| --- | ---: | --- |"
 echo "| Formatting only, semantically inert | $inert | None. Reproduced by running the formatter over the base revision. |"
 echo "| Comments and documentation only | $doc_only | Read for accuracy. Compiles to the same code. |"
 echo "| Declarations or statements changed | $semantic | Review. This is where behaviour can change. |"
+if [ "$added_total" -gt 0 ]; then
+    echo "| Files added | $added_total | Review in full. Every line is new. |"
+fi
+if [ "$deleted_total" -gt 0 ]; then
+    echo "| Files deleted | $deleted_total | Confirm nothing depended on them. |"
+fi
 echo
 
 if [ "$semantic" -gt 0 ]; then
@@ -205,7 +234,8 @@ fi
 echo "### Public API surface"
 echo
 if [ -z "$api_added" ] && [ -z "$api_removed" ]; then
-    echo "No line carrying \`public\` or \`open\` was added or removed in a modified file."
+    echo "No line carrying \`public\` or \`open\` was added or removed, across modified"
+    echo "files and the full contents of any file added or deleted under \`Sources/\`."
     echo "Nothing a consumer compiles against moved, so this change is source compatible"
     echo "by that measure and needs no matching change in the SDK for Android."
 else
