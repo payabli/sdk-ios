@@ -60,6 +60,18 @@ struct PaymentMethodQAView: View {
                                 onError: handleError
                             )
                             .payabliPayInPaymentFlowStyle(style)
+
+                            // The step that failed shows why. A failed form
+                            // blocks the result row, which is the only other
+                            // place this text renders, so leaving it there
+                            // offers a retry with no reason beside it.
+                            if submitFailed {
+                                Text(resultText)
+                                    .font(.footnote)
+                                    .foregroundColor(.payabliError)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .textSelection(.enabled)
+                            }
                         }
                     }
 
@@ -67,7 +79,7 @@ struct PaymentMethodQAView: View {
                         VStack(alignment: .leading, spacing: 10) {
                             Text(resultText.isEmpty ? "Nothing stored yet." : resultText)
                                 .font(.footnote)
-                                .foregroundColor(submitFailed ? .payabliError : .payabliOnSurfaceVariant)
+                                .foregroundColor(.payabliOnSurfaceVariant)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .textSelection(.enabled)
 
