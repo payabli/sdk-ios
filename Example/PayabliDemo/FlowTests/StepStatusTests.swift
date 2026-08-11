@@ -12,6 +12,26 @@ final class StepStatusTests: XCTestCase {
         XCTAssertFalse(StepStatus.failed.isFinished)
     }
 
+    // MARK: - The text the screens actually hold
+
+    func testClassifyReadsTheStringsTheScreensWrite() {
+        // Every screen stores the probe's outcome as display text and passes it
+        // through here. The combinatorial suites construct `TokenCheck` values
+        // directly, so this boundary is the one place a changed prefix would go
+        // unnoticed while every invariant stayed green.
+        XCTAssertEqual(TokenCheck.classify(""), .notRun)
+        XCTAssertEqual(TokenCheck.classify("Checking…"), .checking)
+        XCTAssertEqual(TokenCheck.classify("✓ Token endpoint returned a token"), .reachable)
+        XCTAssertEqual(TokenCheck.classify("✗ Token endpoint failed: timed out"), .unreachable)
+    }
+
+    func testClassifyTreatsAnythingElseAsNotRun() {
+        for text in ["checking", "Checked", "OK", "✓", "✗", " ✓ leading space", "error"] {
+            let expected: TokenCheck = text == "✓" ? .reachable : text == "✗" ? .unreachable : .notRun
+            XCTAssertEqual(TokenCheck.classify(text), expected, "\(text)")
+        }
+    }
+
     func testTheDemoKnowsEverySessionStateTheSDKHas() {
         // `PayabliTTPSessionState` is `@objc`, so it cannot be `CaseIterable` and
         // the list below is written out. A tenth state fails here first.
