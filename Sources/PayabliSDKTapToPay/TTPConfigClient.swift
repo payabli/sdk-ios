@@ -56,8 +56,8 @@ public final class TTPConfigClient: Sendable {
 
         let response = try await transport.perform(request)
 
-        // Shape, not contents. This body is `ConfigCredentialsPayload`, whose
-        // `credentials` block carries the card reader's secretKey and apiKey.
+        // This body is `ConfigCredentialsPayload`, whose `credentials` block
+        // carries the card reader's secretKey and apiKey. The log gets its shape.
         logger.info("[config] ← [\(response.statusCode)] bytes=\(response.body.count)")
 
         try mapPayabliHTTPError(response: response) { code in

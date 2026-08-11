@@ -198,9 +198,9 @@ public final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
                     "invoice=\(request.merchantInvoiceNumber ?? "<nil>")"
             )
             // The atomic card-reader API has no slot for customer data; it ships
-            // at /initiate only. It is not logged here: this logger renders a
-            // single-argument message `.public`, and the invoice number the line
-            // above carries is the part that is safe to publish.
+            // at /initiate only. A single-argument message renders `.public`, so
+            // the line above carries the invoice number and nothing naming the
+            // customer.
 
             let started = Date()
             let response: Models.CommerceHubResponse
@@ -217,10 +217,8 @@ public final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
             let elapsedMs = Int(Date().timeIntervalSince(started) * 1000)
             let responseJSON = try Self.encode(response)
             let cardNetwork = Self.extractCardNetwork(from: responseJSON)
-            // Shape, not contents. `CommerceHubResponse` carries
-            // `paymentTokens.tokenData` and the card's expiry, so the body never
-            // reaches the log; elapsed time, size and network are what a reader
-            // diagnosing a charge actually needs.
+            // `CommerceHubResponse` carries `paymentTokens.tokenData` and the
+            // card's expiry, so the log gets the shape of the response.
             logger.info("[fiserv.charges] ← OK (\(elapsedMs)ms) bytes=\(responseJSON.count) cardNetwork=\(cardNetwork ?? "<nil>")")
             return CardReadResult(
                 provider: Self.providerId,

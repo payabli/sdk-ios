@@ -254,9 +254,9 @@ extension PayabliTTP {
         invoice: PayabliTTPInvoiceData,
         orderDescription: String?
     ) {
-        // Charge metadata only. The single-argument overload renders the whole
-        // string `.public`, so anything naming the customer belongs in the
-        // `private:` call below rather than here.
+        // Charge metadata. The single-argument overload renders the whole string
+        // `.public`; anything naming the customer goes to the `private:` call
+        // below.
         logger.info(
             "[charge] → amount=\(paymentDetails.amount) serviceFee=\(paymentDetails.serviceFee) " +
                 "currency=\(paymentDetails.currency ?? "<nil>") " +

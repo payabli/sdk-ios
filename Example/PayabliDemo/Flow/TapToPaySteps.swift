@@ -108,7 +108,7 @@ enum TapToPaySteps {
             return outcome == .activationFailed ? .failed : .current
         }()
 
-        // From the step before, not the session.
+        // From the step before.
         let charge: StepStatus = {
             guard activation.isFinished else { return .blocked }
             return session == .ready ? .current : .blocked

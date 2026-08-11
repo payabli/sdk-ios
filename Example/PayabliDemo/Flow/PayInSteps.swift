@@ -81,8 +81,8 @@ enum PayInSteps {
             return showingFinishedResult ? .done : .current
         }()
 
-        // From the step before, not from `hasResult`, which can be true while the
-        // form is still asking for something.
+        // From the step before. `hasResult` can be true while the form is still
+        // asking for something.
         let result: StepStatus = form.isFinished ? .current : .blocked
 
         return PayInFlowSteps(
