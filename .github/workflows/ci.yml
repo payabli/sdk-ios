@@ -158,7 +158,10 @@ jobs:
         with:
           name: coverage
 
+      # Pinned to a commit, not a tag. `v5` is mutable, and this step is handed
+      # SONAR_TOKEN, so a replaced action would hold a repository secret. Same
+      # reasoning as the checksummed tool downloads above.
       - name: Analyze
-        uses: SonarSource/sonarqube-scan-action@v5
+        uses: SonarSource/sonarqube-scan-action@2f77a1ec69fb1d595b06f35ab27e97605bdef703 # v5.3.2
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
