@@ -19,6 +19,19 @@ struct TapToPayFlowSteps {
     let activation: FlowStep
     let charge: FlowStep
 
+    /// Whether the activation step offers its code control.
+    ///
+    /// `activateDevice` throws `.invalidState` for any session but
+    /// `.pendingActivation`, and a refused activation leaves the session
+    /// `.error`. The step still reports the failure; what it stops offering is a
+    /// control the SDK would reject, which the screen shows beside the
+    /// Re-initialize the same session state puts on screen.
+    let acceptsActivationCode: Bool
+
+    /// Whether the screen offers Re-initialize. An action outside the sequence,
+    /// so the steps have to know it exists.
+    let offersRecovery: Bool
+
     var all: [FlowStep] {
         [token, enable, activation, charge]
     }
@@ -123,7 +136,9 @@ enum TapToPaySteps {
                 title: "Charge a card",
                 detail: "Presents Apple's Tap to Pay sheet. Hold a card to the top of the phone.",
                 status: charge
-            )
+            ),
+            acceptsActivationCode: session == .pendingActivation,
+            offersRecovery: session == .error || session == .sessionExpired
         )
     }
 }

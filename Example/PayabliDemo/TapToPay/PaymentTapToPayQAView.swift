@@ -114,12 +114,18 @@ struct PaymentTapToPayQAView: View {
 
             StepRow(index: 3, step: steps.activation) {
                 VStack(alignment: .leading, spacing: 6) {
-                    Button { isActivationPresented = true } label: {
-                        Label("Enter activation code", systemImage: "checkmark.shield")
-                            .frame(maxWidth: .infinity)
+                    // `activateDevice` throws `.invalidState` unless the session
+                    // is `.pendingActivation`, so a refused activation reports
+                    // its reason without the control that would throw. The
+                    // recovery section owns the way forward from there.
+                    if steps.acceptsActivationCode {
+                        Button { isActivationPresented = true } label: {
+                            Label("Enter activation code", systemImage: "checkmark.shield")
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(isWorking)
                     }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(isWorking)
                     stepOutcome(activationMessage)
                 }
             }
@@ -149,7 +155,7 @@ struct PaymentTapToPayQAView: View {
     /// is in a state it can actually repair.
     @ViewBuilder
     private var recoverySection: some View {
-        if isRecoverable {
+        if steps.offersRecovery {
             VStack(alignment: .leading, spacing: 8) {
                 Text("Recovery")
                     .font(.headline)
@@ -166,13 +172,6 @@ struct PaymentTapToPayQAView: View {
             .padding(12)
             .background(Color.payabliSurfaceContainer)
             .clipShape(RoundedRectangle(cornerRadius: 10))
-        }
-    }
-
-    private var isRecoverable: Bool {
-        switch terminal.sessionState {
-        case .sessionExpired, .error: return true
-        default: return false
         }
     }
 

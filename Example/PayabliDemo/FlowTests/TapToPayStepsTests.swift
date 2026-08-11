@@ -103,6 +103,29 @@ final class TapToPayStepsTests: XCTestCase {
         }
     }
 
+    func testTheActivationCodeIsOfferedOnlyWhereTheSDKAcceptsIt() {
+        // `activateDevice` throws `.invalidState` for any session but
+        // `.pendingActivation`, so offering the control anywhere else hands over
+        // a button that cannot work.
+        for combination in everyCombination where steps(combination).acceptsActivationCode {
+            XCTAssertEqual(
+                combination.session, .pendingActivation,
+                "\(combination) offered the activation code"
+            )
+        }
+    }
+
+    func testRecoveryIsNeverOfferedBesideAControlThatCannotRun() {
+        for combination in everyCombination {
+            let sequence = steps(combination)
+            guard sequence.offersRecovery else { continue }
+            XCTAssertFalse(
+                sequence.acceptsActivationCode,
+                "\(combination) offered Re-initialize and the activation code together"
+            )
+        }
+    }
+
     func testEveryStepSaysWhatItIs() {
         for combination in everyCombination {
             let all = steps(combination).all
@@ -171,6 +194,10 @@ final class TapToPayStepsTests: XCTestCase {
         XCTAssertEqual(sequence.activation.status, .failed)
         XCTAssertTrue(sequence.activation.status.showsContent)
         XCTAssertEqual(sequence.charge.status, .blocked)
+        // The reason shows; the control that would throw does not, and Recovery
+        // is the one way forward.
+        XCTAssertFalse(sequence.acceptsActivationCode)
+        XCTAssertTrue(sequence.offersRecovery)
     }
 
     func testNoRecordedActivationFailureIsAnsweredByAnEarlierStep() {
