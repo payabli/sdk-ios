@@ -73,10 +73,18 @@ jobs:
             echo "the triggering run named no pull request" >&2
             exit 1
           }
+          # The marker alone is not enough to delete by: a reviewer quoting the
+          # report would be quoting the marker, and this holds a write token. Only
+          # this workflow's own comments are ever removed.
+          #
           # jq slurps the pages into one array. --jq would run once per page, so
           # a match on an earlier page would be missed.
           existing=$(gh api "repos/$REPO/issues/$pr/comments" --paginate \
-            | jq -s 'add | map(select(.body | contains("<!-- change-report -->")) | .id) | .[]')
+            | jq -s 'add
+                | map(select(.user.login == "github-actions[bot]"
+                        and (.body | contains("<!-- change-report -->")))
+                    | .id)
+                | .[]')
           for id in $existing; do
             gh api -X DELETE "repos/$REPO/issues/comments/$id" >/dev/null
             echo "deleted comment $id"
