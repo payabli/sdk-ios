@@ -30,6 +30,8 @@ final class PayabliTTPEventCodeMappingTests: XCTestCase {
         XCTAssertEqual(PayabliTTPEventCode.activationStarted.rawValue, 15)
         XCTAssertEqual(PayabliTTPEventCode.activationCompleted.rawValue, 16)
         XCTAssertEqual(PayabliTTPEventCode.activationFailed.rawValue, 17)
+        XCTAssertEqual(PayabliTTPEventCode.attestationFailed.rawValue, 18)
+        XCTAssertEqual(PayabliTTPEventCode.configFailed.rawValue, 19)
     }
 
     // MARK: - .code mapping
@@ -53,6 +55,8 @@ final class PayabliTTPEventCodeMappingTests: XCTestCase {
         XCTAssertEqual(PayabliTTPEvent.activationStarted.code, .activationStarted)
         XCTAssertEqual(PayabliTTPEvent.activationCompleted.code, .activationCompleted)
         XCTAssertEqual(PayabliTTPEvent.activationFailed(error: "x").code, .activationFailed)
+        XCTAssertEqual(PayabliTTPEvent.attestationFailed(error: "x").code, .attestationFailed)
+        XCTAssertEqual(PayabliTTPEvent.configFailed(error: "x").code, .configFailed)
     }
 
     // MARK: - .payload schema
@@ -94,6 +98,20 @@ final class PayabliTTPEventCodeMappingTests: XCTestCase {
         let payload = PayabliTTPEvent.activationFailed(error: "bad code").payload
         XCTAssertEqual(payload.count, 1)
         XCTAssertEqual(payload["error"] as? String, "bad code")
+    }
+
+    func testInitializePhaseFailurePayloadsCarryError() {
+        for event in [
+            PayabliTTPEvent.attestationFailed(error: "DeviceCheck code 4"),
+            PayabliTTPEvent.configFailed(error: "Config rejected (401)")
+        ] {
+            let payload = event.payload
+            XCTAssertEqual(payload.count, 1, "unexpected payload for \(event.code)")
+            XCTAssertFalse(
+                (payload["error"] as? String ?? "").isEmpty,
+                "expected an error string for \(event.code)"
+            )
+        }
     }
 
     func testUpdateFailedPayloadCarriesBothFields() {

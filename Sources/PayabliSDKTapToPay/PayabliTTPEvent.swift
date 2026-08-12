@@ -20,6 +20,10 @@ public enum PayabliTTPEvent: Sendable {
     case activationStarted
     case activationCompleted
     case activationFailed(error: String)
+    // Appended after `activationFailed` to keep declaration order aligned with
+    // the `PayabliTTPEventCode` raw values, which are public API.
+    case attestationFailed(error: String)
+    case configFailed(error: String)
 }
 
 /// TTP-specific errors (PRD §20.2).
@@ -70,6 +74,8 @@ public enum PayabliTTPError: Error, Sendable {
     case activationStarted = 15
     case activationCompleted = 16
     case activationFailed = 17
+    case attestationFailed = 18
+    case configFailed = 19
 }
 
 public extension PayabliTTPEvent {
@@ -95,6 +101,8 @@ public extension PayabliTTPEvent {
         case .activationStarted: return .activationStarted
         case .activationCompleted: return .activationCompleted
         case .activationFailed: return .activationFailed
+        case .attestationFailed: return .attestationFailed
+        case .configFailed: return .configFailed
         }
     }
 
@@ -103,7 +111,8 @@ public extension PayabliTTPEvent {
     ///
     /// Schema by case:
     ///   - `.chargeInitiated`, `.updateCompleted` → `["paymentTransId": String]`
-    ///   - `.nfcFailed`, `.activationFailed` → `["error": String]`
+    ///   - `.nfcFailed`, `.activationFailed`, `.attestationFailed`,
+    ///     `.configFailed` → `["error": String]`
     ///   - `.updateFailed` → `["paymentTransId": String, "error": String]`
     ///   - all other cases → empty `[:]`
     var payload: [String: Any] {
@@ -112,7 +121,9 @@ public extension PayabliTTPEvent {
              let .updateCompleted(paymentTransId):
             return ["paymentTransId": paymentTransId]
         case let .nfcFailed(error),
-             let .activationFailed(error):
+             let .activationFailed(error),
+             let .attestationFailed(error),
+             let .configFailed(error):
             return ["error": error]
         case let .updateFailed(paymentTransId, error):
             return ["paymentTransId": paymentTransId, "error": error]

@@ -198,6 +198,7 @@ extension PayabliTTP {
         } catch {
             sessionManager.markError(error)
             syncPublished()
+            multicaster.emit(.attestationFailed(error: String(describing: error)))
             throw error
         }
     }
@@ -218,12 +219,16 @@ extension PayabliTTP {
             attestation.clearCache()
             sessionManager.markError(err)
             syncPublished()
-            throw PayabliTTPError.configFailed(reason: "Config rejected (401) — attestation cleared")
+            let failure = PayabliTTPError.configFailed(reason: "Config rejected (401) — attestation cleared")
+            multicaster.emit(.configFailed(error: String(describing: failure)))
+            throw failure
         } catch {
             sessionManager.markError(error)
             syncPublished()
-            throw error as? PayabliTTPError
+            let failure = error as? PayabliTTPError
                 ?? PayabliTTPError.configFailed(reason: String(describing: error))
+            multicaster.emit(.configFailed(error: String(describing: failure)))
+            throw failure
         }
     }
 

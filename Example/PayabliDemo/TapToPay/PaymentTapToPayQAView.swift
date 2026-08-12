@@ -521,6 +521,8 @@ struct PaymentTapToPayQAView: View {
         case .activationStarted: return "activationStarted"
         case .activationCompleted: return "activationCompleted"
         case .activationFailed: return "activationFailed"
+        case .attestationFailed: return "attestationFailed"
+        case .configFailed: return "configFailed"
         @unknown default: return "event(\(code.rawValue))"
         }
     }
