@@ -84,13 +84,19 @@ struct ConfigurationQAView: View {
                 Label("Check card-present token", systemImage: "key.horizontal")
             }
             .buttonStyle(.bordered)
-            .disabled(isWorking)
+            // `isWorking` is this screen's own. A probe started on a tab is in
+            // flight here too, and only the shared answer says so.
+            .disabled(isWorking || isChecking(tokenProbes.cardPresent))
 
             Button { runCardNotPresentTokenCheck() } label: {
                 Label("Check card-not-present tokens", systemImage: "key.horizontal")
             }
             .buttonStyle(.bordered)
-            .disabled(isWorking)
+            .disabled(
+                isWorking
+                    || isChecking(tokenProbes.storedMethod)
+                    || isChecking(tokenProbes.capture)
+            )
 
             Button { runHealthCheck() } label: {
                 Label("Local server health", systemImage: "heart.text.square")
@@ -221,6 +227,10 @@ struct ConfigurationQAView: View {
             }
             content()
         }
+    }
+
+    private func isChecking(_ answer: String) -> Bool {
+        TokenCheck.classify(answer) == .checking
     }
 
     // MARK: - Actions

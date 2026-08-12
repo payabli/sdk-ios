@@ -91,7 +91,10 @@ struct PaymentTapToPayQAView: View {
                         Label("Check token endpoint", systemImage: "key.horizontal")
                     }
                     .buttonStyle(.bordered)
-                    .disabled(isWorking)
+                    // `isWorking` covers this screen's own operations. The probe
+                    // is shared, so a run started on another tab is this step's
+                    // `.inProgress` and only the derived step knows it.
+                    .disabled(isWorking || !steps.token.status.isActionable)
                     if !tokenProbes.cardPresent.isEmpty {
                         Text(tokenProbes.cardPresent)
                             .font(.caption)

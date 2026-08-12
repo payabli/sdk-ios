@@ -11,7 +11,6 @@ struct PaymentCaptureQAView: View {
     @State private var resultText = ""
     @State private var resultAcknowledged = false
     @State private var submitFailed = false
-    @State private var isCheckingToken = false
     @State private var capturedResult: PayabliPayInPaymentFlowResult?
     @State private var isPaymentCaptureSheetPresented = false
     @State private var isPaymentCaptureResultViewPresented = false
@@ -31,7 +30,10 @@ struct PaymentCaptureQAView: View {
                                 Label("Check token endpoint", systemImage: "key.horizontal")
                             }
                             .buttonStyle(.bordered)
-                            .disabled(isCheckingToken)
+                            // The probe is shared, so a run started on another
+                            // tab is this step's `.inProgress` too. The derived
+                            // step is what knows that; a local flag does not.
+                            .disabled(!steps.backend.status.isActionable)
                             if !tokenProbes.capture.isEmpty {
                                 Text(tokenProbes.capture)
                                     .font(.caption)
@@ -174,11 +176,7 @@ struct PaymentCaptureQAView: View {
     }
 
     private func runTokenCheck() {
-        isCheckingToken = true
-        Task {
-            defer { isCheckingToken = false }
-            await tokenProbes.probeCapture()
-        }
+        Task { await tokenProbes.probeCapture() }
     }
 
     private var configuration: PayabliPayInPaymentFlowFormConfiguration {
