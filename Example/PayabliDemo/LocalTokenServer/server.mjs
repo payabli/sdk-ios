@@ -159,14 +159,32 @@ async function exchangeCredentials(options = {}, { forceRefresh = false } = {}) 
   }
 
   const endpoint = new URL(tokenPath.replace(/^\/+/, ""), ensureTrailingSlash(apiBaseUrl));
+  assertAllowedEndpoint(endpoint, "The resolved token endpoint");
+
+  // redirect: "manual" so a 3xx comes back as a response instead of being followed. fetch follows
+  // redirects by default, and a 307 or 308 replays the method and body, so an allowed host answering
+  // with a Location on another origin would hand it the client id and secret. The check above cannot
+  // see that: it runs before the request, and a redirect target only exists afterwards. "manual"
+  // rather than "error" because it keeps the target readable, where a bare fetch rejection reports
+  // "fetch failed" and cannot be told apart from the host being down.
   const upstream = await fetch(endpoint, {
     method: "POST",
+    redirect: "manual",
     headers: {
       "Accept": "application/json",
       "Content-Type": "application/json"
     },
     body: JSON.stringify({ clientId, clientSecret })
   });
+
+  if (upstream.status >= 300 && upstream.status < 400) {
+    throw new LocalTokenServerError(
+      502,
+      `Token exchange to ${endpoint.origin} answered HTTP ${upstream.status} redirecting to ` +
+        `${upstream.headers.get("location") || "an unnamed target"}. The redirect was not followed, ` +
+        "because the credential would be sent to the target."
+    );
+  }
 
   const text = await upstream.text();
   let payload;
@@ -206,8 +224,11 @@ async function payabliApi(path, { method = "GET", body = null, options = {} } = 
   const endpoint = new URL(path.replace(/^\/+/, ""), ensureTrailingSlash(apiBaseUrl));
   assertAllowedEndpoint(endpoint, "The resolved API endpoint");
 
+  // redirect: "manual", as the credential exchange does and for the same reason: a 307 or 308 replays
+  // the method, body and Authorization header to whatever origin the Location names.
   const upstream = await fetch(endpoint, {
     method,
+    redirect: "manual",
     headers: {
       "Accept": "application/json",
       "Content-Type": "application/json",
