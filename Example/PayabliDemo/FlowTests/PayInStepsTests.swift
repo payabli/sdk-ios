@@ -160,6 +160,25 @@ final class PayInStepsTests: XCTestCase {
         XCTAssertFalse(steps.form.status.isActionable)
     }
 
+    func testAProbeLandingMidSubmissionDoesNotHideTheForm() {
+        // The Configuration tab shares this probe, so it can answer while a
+        // submission is in flight here. A blocked form is a deallocated view
+        // model and the typed values go with it.
+        for check in [TokenCheck.unreachable, .checking, .notRun, .reachable] {
+            let steps = PayInSteps.forCapture(PayInProgress(tokenCheck: check, isSubmitting: true))
+            XCTAssertEqual(steps.backend.status, .done, "token \(check)")
+            XCTAssertEqual(steps.form.status, .inProgress, "token \(check)")
+            XCTAssertTrue(steps.form.status.showsContent, "token \(check)")
+            XCTAssertFalse(steps.form.status.isActionable, "token \(check)")
+        }
+    }
+
+    func testAProbeFailureAppliesOnceTheSubmissionFinishes() {
+        let steps = PayInSteps.forCapture(PayInProgress(tokenCheck: .unreachable, isSubmitting: false))
+        XCTAssertEqual(steps.backend.status, .failed)
+        XCTAssertEqual(steps.form.status, .blocked)
+    }
+
     func testAFailedSubmissionIsReportedByTheStepThatTookIt() {
         let steps = PayInSteps.forCapture(PayInProgress(tokenCheck: .reachable, submitFailed: true))
         XCTAssertEqual(steps.form.status, .failed)

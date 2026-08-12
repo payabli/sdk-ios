@@ -32,10 +32,10 @@ struct PaymentCaptureQAView: View {
                             }
                             .buttonStyle(.bordered)
                             .disabled(isCheckingToken)
-                            if !tokenProbes.cardNotPresent.isEmpty {
-                                Text(tokenProbes.cardNotPresent)
+                            if !tokenProbes.capture.isEmpty {
+                                Text(tokenProbes.capture)
                                     .font(.caption)
-                                    .foregroundColor(tokenProbes.cardNotPresent.hasPrefix("✗") ? .payabliError : .payabliOnSurfaceVariant)
+                                    .foregroundColor(tokenProbes.capture.hasPrefix("✗") ? .payabliError : .payabliOnSurfaceVariant)
                             }
                         }
                     }
@@ -133,7 +133,7 @@ struct PaymentCaptureQAView: View {
     private var steps: PayInFlowSteps {
         PayInSteps.forCapture(
             PayInProgress(
-                tokenCheck: TokenCheck.classify(tokenProbes.cardNotPresent),
+                tokenCheck: TokenCheck.classify(tokenProbes.capture),
                 hasResult: paymentFlow.lastResult != nil,
                 resultAcknowledged: resultAcknowledged,
                 isSubmitting: paymentFlow.isSubmitting,
@@ -177,7 +177,7 @@ struct PaymentCaptureQAView: View {
         isCheckingToken = true
         Task {
             defer { isCheckingToken = false }
-            await tokenProbes.probeCardNotPresent()
+            await tokenProbes.probeCapture()
         }
     }
 
@@ -377,5 +377,5 @@ struct PaymentCaptureQAView: View {
             )
         )
     )
-    .environmentObject(TokenProbeResults())
+    .environmentObject(TokenProbeResults.inert())
 }

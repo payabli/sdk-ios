@@ -57,6 +57,16 @@ enum PayInSteps {
         let showingFinishedResult = progress.hasResult && !progress.resultAcknowledged
 
         let backend: StepStatus = {
+            // A submission in flight got a token to submit with, so this step is
+            // finished for as long as it lasts. The probe is shared, so another
+            // tab can answer for this endpoint mid-submit; letting that unfinish
+            // this step would block the form, hide the row, and deallocate the
+            // view model holding what was typed. The answer applies once the
+            // submission is over, which is when it says anything about the next
+            // one.
+            if progress.isSubmitting {
+                return .done
+            }
             switch progress.tokenCheck {
             // Before the outcome, or the step offers its button over a request
             // already in flight.

@@ -44,8 +44,13 @@ struct PayabliDemoQAApp: App {
     )
 
     /// One owner for the token probes, so a tab that has finished its backend
-    /// step still reflects an answer another tab has since had.
-    @StateObject private var tokenProbes = TokenProbeResults()
+    /// step still reflects an answer another tab has since had. One entry per
+    /// token function, because a backend may scope them separately.
+    @StateObject private var tokenProbes = TokenProbeResults(
+        fetchCardPresent: { try await Secrets.fetchAccessToken() },
+        fetchStoredMethod: { try await Secrets.fetchPaymentMethodAccessToken() },
+        fetchCapture: { try await Secrets.fetchPaymentCaptureAccessToken() }
+    )
 
     var body: some Scene {
         WindowGroup {
@@ -134,5 +139,5 @@ struct PayabliDemoQAApp: App {
                 Label("Config", systemImage: "gearshape")
             }
     }
-    .environmentObject(TokenProbeResults())
+    .environmentObject(TokenProbeResults.inert())
 }

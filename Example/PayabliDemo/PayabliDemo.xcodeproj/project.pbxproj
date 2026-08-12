@@ -10,6 +10,8 @@
 		A1B2C3D4E5F60000000000E2 /* QAContextLine.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60000000000E1 /* QAContextLine.swift */; };
 		A1B2C3D4E5F60000000000D2 /* StepRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60000000000D1 /* StepRow.swift */; };
 		A1B2C3D4E5F60000000000F2 /* TokenProbeResults.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60000000000F1 /* TokenProbeResults.swift */; };
+		A1B2C3D4E5F60000000000F3 /* TokenProbeResults.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60000000000F1 /* TokenProbeResults.swift */; };
+		A1B2C3D4E5F60000000000F5 /* TokenProbeResultsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60000000000F4 /* TokenProbeResultsTests.swift */; };
 		0F5E8CC7E7A24D19A71B0A1C /* PaymentMethodAddedView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F5E8CC6E7A24D19A71B0A1C /* PaymentMethodAddedView.swift */; };
 		1C7A9E9B6D2F4C0F8A1B3D5E /* PaymentCaptureQAView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B1E0F9A8C7D6E5F4A3B2C1D /* PaymentCaptureQAView.swift */; };
 		3F9C8D7E6A5B4C3D2E1F0A9B /* PayabliSDKExampleAggregate in Frameworks */ = {isa = PBXBuildFile; productRef = 4A0D9E8F7B6C5D4E3F2A1B0C /* PayabliSDKExampleAggregate */; };
@@ -73,6 +75,7 @@
 		A1B2C3D4E5F60000000000E1 /* QAContextLine.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = QAContextLine.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F60000000000D1 /* StepRow.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = StepRow.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F60000000000F1 /* TokenProbeResults.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TokenProbeResults.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F60000000000F4 /* TokenProbeResultsTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TokenProbeResultsTests.swift; sourceTree = "<group>"; };
 		0F5E8CC6E7A24D19A71B0A1C /* PaymentMethodAddedView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PaymentMethodAddedView.swift; sourceTree = "<group>"; };
 		1DADA588F49DF0C4A6611302 /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		4C921D1F3EE7130C23911757 /* Secrets.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Secrets.swift; sourceTree = "<group>"; };
@@ -308,6 +311,7 @@
 				F20000000000000000000021 /* StepStatusTests.swift */,
 				F20000000000000000000023 /* TapToPayStepsTests.swift */,
 				F20000000000000000000025 /* PayInStepsTests.swift */,
+				A1B2C3D4E5F60000000000F4 /* TokenProbeResultsTests.swift */,
 			);
 			path = FlowTests;
 			sourceTree = "<group>";
@@ -431,6 +435,8 @@
 				F20000000000000000000022 /* StepStatusTests.swift in Sources */,
 				F20000000000000000000024 /* TapToPayStepsTests.swift in Sources */,
 				F20000000000000000000026 /* PayInStepsTests.swift in Sources */,
+				A1B2C3D4E5F60000000000F3 /* TokenProbeResults.swift in Sources */,
+				A1B2C3D4E5F60000000000F5 /* TokenProbeResultsTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

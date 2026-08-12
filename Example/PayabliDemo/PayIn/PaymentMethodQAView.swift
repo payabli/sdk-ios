@@ -31,10 +31,10 @@ struct PaymentMethodQAView: View {
                             }
                             .buttonStyle(.bordered)
                             .disabled(isCheckingToken)
-                            if !tokenProbes.cardNotPresent.isEmpty {
-                                Text(tokenProbes.cardNotPresent)
+                            if !tokenProbes.storedMethod.isEmpty {
+                                Text(tokenProbes.storedMethod)
                                     .font(.caption)
-                                    .foregroundColor(tokenProbes.cardNotPresent.hasPrefix("✗") ? .payabliError : .payabliOnSurfaceVariant)
+                                    .foregroundColor(tokenProbes.storedMethod.hasPrefix("✗") ? .payabliError : .payabliOnSurfaceVariant)
                             }
                         }
                     }
@@ -130,7 +130,7 @@ struct PaymentMethodQAView: View {
     private var steps: PayInFlowSteps {
         PayInSteps.forStoringMethod(
             PayInProgress(
-                tokenCheck: TokenCheck.classify(tokenProbes.cardNotPresent),
+                tokenCheck: TokenCheck.classify(tokenProbes.storedMethod),
                 hasResult: paymentFlow.lastResult != nil,
                 resultAcknowledged: resultAcknowledged,
                 isSubmitting: paymentFlow.isSubmitting,
@@ -152,7 +152,7 @@ struct PaymentMethodQAView: View {
         isCheckingToken = true
         Task {
             defer { isCheckingToken = false }
-            await tokenProbes.probeCardNotPresent()
+            await tokenProbes.probeStoredMethod()
         }
     }
 
@@ -303,5 +303,5 @@ struct PaymentMethodQAView: View {
             environment: DemoConfiguration.environment
         )
     )
-    .environmentObject(TokenProbeResults())
+    .environmentObject(TokenProbeResults.inert())
 }

@@ -87,7 +87,7 @@ struct ConfigurationQAView: View {
             .disabled(isWorking)
 
             Button { runCardNotPresentTokenCheck() } label: {
-                Label("Check card-not-present token", systemImage: "key.horizontal")
+                Label("Check card-not-present tokens", systemImage: "key.horizontal")
             }
             .buttonStyle(.bordered)
             .disabled(isWorking)
@@ -99,7 +99,12 @@ struct ConfigurationQAView: View {
             .disabled(isWorking)
 
             ForEach(
-                [tokenProbes.cardPresent, tokenProbes.cardNotPresent, healthCheckText].filter { !$0.isEmpty },
+                [
+                    tokenProbes.cardPresent,
+                    tokenProbes.storedMethod,
+                    tokenProbes.capture,
+                    healthCheckText
+                ].filter { !$0.isEmpty },
                 id: \.self
             ) { line in
                 Text(line)
@@ -228,11 +233,14 @@ struct ConfigurationQAView: View {
         }
     }
 
+    /// Both card-not-present endpoints, because the two tabs submit with
+    /// different token functions and this screen answers for both.
     private func runCardNotPresentTokenCheck() {
         isWorking = true
         Task {
             defer { isWorking = false }
-            await tokenProbes.probeCardNotPresent()
+            await tokenProbes.probeStoredMethod()
+            await tokenProbes.probeCapture()
         }
     }
 
@@ -258,5 +266,5 @@ struct ConfigurationQAView: View {
 
 #Preview {
     ConfigurationQAView()
-        .environmentObject(TokenProbeResults())
+        .environmentObject(TokenProbeResults.inert())
 }
