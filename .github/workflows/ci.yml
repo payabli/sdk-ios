@@ -10,14 +10,21 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
-# Three jobs, run at once. The two suites are the whole cost of this workflow
-# and neither reads anything the other writes, so run in sequence they only add
-# up. They cannot share a build: both compile the SDK, but one is the package's
-# own test action and the other consumes the package as a dependency of
+# Four jobs, run at once. The two suites are the whole cost of this workflow and
+# neither reads anything the other writes, so run in sequence they only add up.
+# They cannot share a build: both compile the SDK, but one is the package's own
+# test action and the other consumes the package as a dependency of
 # Example/PayabliDemo.xcodeproj, and Xcode compiles a dependency with
 # -suppress-warnings. Same intermediates path, different flags, so pointing both
 # at one -derivedDataPath makes them invalidate each other's objects rather than
 # reuse them.
+#
+# Nothing here is granted a secret or a write. Posting the change report and
+# running the analysis both need one, and both live in `pr-reports.yml`, which
+# this run triggers when it finishes. That file is read from the default branch,
+# so a pull request cannot edit the jobs that hold the tokens; every job below
+# is read from the pull request's own revision, which is why none of them may
+# hold one.
 
 jobs:
   lint:
@@ -45,11 +52,9 @@ jobs:
   # can redden a pull request is a gate, and this is not one.
   #
   # This job runs the pull request's own code — the local action and the script
-  # under Scripts/ — so it is read-only and holds no token worth taking. The
-  # comment is posted by the job below, which runs none of it. A step can
-  # prepend to $GITHUB_PATH for the steps after it, so code from the branch and
-  # a write token in one job means the code can wrap `gh` and read the token out
-  # of the environment when the later step calls it.
+  # under Scripts/ — so it is read-only and holds no token. Posting the report
+  # needs one, and that happens in `pr-reports.yml`, which runs from the default
+  # branch where this branch cannot edit it.
   changes:
     name: Change report
     runs-on: macos-15
@@ -75,62 +80,30 @@ jobs:
             > report.md
           cat report.md >> "$GITHUB_STEP_SUMMARY"
 
+      # `pr-reports.yml` is triggered by this run finishing and has no pull
+      # request of its own to read, so the identifiers travel with the report.
+      #
+      # Through `env` and `jq`, never interpolated into the script. A branch name
+      # is chosen by whoever opens the pull request, and `${{ }}` pastes it into
+      # the shell before the shell sees it, so a branch called `$(...)` would run
+      # as a command. JSON also means the reader does not have to `source` it.
+      - name: Record the pull request
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_BRANCH: ${{ github.event.pull_request.head.ref }}
+          PR_BASE: ${{ github.event.pull_request.base.ref }}
+        run: |
+          set -euo pipefail
+          jq -n --arg number "$PR_NUMBER" --arg branch "$PR_BRANCH" --arg base "$PR_BASE" \
+            '{number: $number, branch: $branch, base: $base}' > pr.json
+
       - name: Upload the report
         uses: actions/upload-artifact@v4
         with:
           name: change-report
-          path: report.md
-
-  # Holds the write token and runs nothing from the pull request: no checkout,
-  # no local action, no script from the branch. `gh` and `jq` come from the
-  # runner image, and the report arrives as an artifact, which is data.
-  #
-  # ubuntu, because nothing here needs Xcode, and a macOS runner bills at ten
-  # times the rate for a step that posts one comment.
-  changes-comment:
-    name: Change report comment
-    runs-on: ubuntu-latest
-    needs: [changes]
-    # A fork's pull request gets a read-only token, so skip it there rather than
-    # let it fail. `continue-on-error` used to cover that case, on the job and on
-    # the step, which made every outcome green: a report that had stopped posting
-    # was indistinguishable from one that posted, and the only signal was a
-    # comment nobody noticed was stale. Skipping the case that cannot work leaves
-    # a same-repository failure loud.
-    if: >-
-      github.event_name == 'pull_request'
-      && github.event.pull_request.head.repo.full_name == github.repository
-    permissions:
-      pull-requests: write
-
-    steps:
-      - name: Download the report
-        uses: actions/download-artifact@v4
-        with:
-          name: change-report
-
-      # One report on the pull request, and always the newest thing on the page.
-      # Editing in place kept it to one comment but left it wherever it was first
-      # posted, so on a long review it sits pages above the discussion, marked
-      # only "edited". Every earlier copy is deleted and a fresh one posted, so
-      # there is still exactly one and it is where a reader will see it.
-      - name: Comment on the pull request
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PR: ${{ github.event.pull_request.number }}
-          REPO: ${{ github.repository }}
-        run: |
-          set -euo pipefail
-          # jq slurps the pages into one array. --jq would run once per page, so
-          # a match on an earlier page would be missed.
-          existing=$(gh api "repos/$REPO/issues/$PR/comments" --paginate \
-            | jq -s 'add | map(select(.body | contains("<!-- change-report -->")) | .id) | .[]')
-          for id in $existing; do
-            gh api -X DELETE "repos/$REPO/issues/comments/$id" >/dev/null
-            echo "deleted comment $id"
-          done
-          gh api -X POST "repos/$REPO/issues/$PR/comments" -F body=@report.md >/dev/null
-          echo "posted the report"
+          path: |
+            report.md
+            pr.json
 
   test-sdk:
     name: SDK tests
@@ -167,11 +140,28 @@ jobs:
           ./Scripts/xccov-to-sonarqube-generic.sh --include Sources/ \
             SDKTests.xcresult > coverage.xml
 
+      # As in the report job: the analysis runs from `pr-reports.yml`, which is
+      # triggered by this run finishing and has no pull request of its own. On a
+      # push there is none to record and the file is simply absent, which is how
+      # that workflow tells a branch analysis from a pull request one.
+      - name: Record the pull request
+        if: github.event_name == 'pull_request'
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_BRANCH: ${{ github.event.pull_request.head.ref }}
+          PR_BASE: ${{ github.event.pull_request.base.ref }}
+        run: |
+          set -euo pipefail
+          jq -n --arg number "$PR_NUMBER" --arg branch "$PR_BRANCH" --arg base "$PR_BASE" \
+            '{number: $number, branch: $branch, base: $base}' > pr.json
+
       - name: Upload coverage
         uses: actions/upload-artifact@v4
         with:
           name: coverage
-          path: coverage.xml
+          path: |
+            coverage.xml
+            pr.json
 
   test-demo:
     name: Sample app step sequences
@@ -202,32 +192,3 @@ jobs:
       - name: Report test failures
         if: failure()
         run: ./Scripts/print-test-failures.sh DemoFlowTests.xcresult
-
-  sonar:
-    name: SonarCloud
-    runs-on: macos-15
-    # Only the SDK suite's coverage is analysed, so this does not wait on the
-    # sample app.
-    needs: [test-sdk]
-    # A fork's pull request has no access to the token, and the scan would fail
-    # rather than be skipped.
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
-    steps:
-      # Analysis reads the git history to decide what is new code.
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Download coverage
-        uses: actions/download-artifact@v4
-        with:
-          name: coverage
-
-      # Pinned to a commit, not a tag. `v5` is mutable, and this step is handed
-      # SONAR_TOKEN, so a replaced action would hold a repository secret. Same
-      # reasoning as the checksummed tool downloads above.
-      - name: Analyze
-        uses: SonarSource/sonarqube-scan-action@2f77a1ec69fb1d595b06f35ab27e97605bdef703 # v5.3.2
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
