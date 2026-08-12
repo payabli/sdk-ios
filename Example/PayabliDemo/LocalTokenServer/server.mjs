@@ -1,11 +1,20 @@
 import { createServer } from "node:http";
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname, isAbsolute, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const serverDir = dirname(fileURLToPath(import.meta.url));
-loadEnv(join(serverDir, ".env"));
+// PAYABLI_ENV_FILE picks the file, so a second environment is a second file rather than an edit to
+// this one. A relative name resolves beside this server. An explicitly named file that is not there
+// is fatal: the alternative is falling back to the sandbox defaults below and reporting nothing.
+const envFileName = (process.env.PAYABLI_ENV_FILE || ".env").trim();
+const envFilePath = isAbsolute(envFileName) ? envFileName : join(serverDir, envFileName);
+if (process.env.PAYABLI_ENV_FILE && !existsSync(envFilePath)) {
+  console.error(`PAYABLI_ENV_FILE=${envFileName} does not exist at ${envFilePath}`);
+  process.exit(1);
+}
+loadEnv(envFilePath);
 
 const port = Number.parseInt(process.env.PORT || "8787", 10);
 const bindHost = stringValue(process.env.PAYABLI_LOCAL_TOKEN_SERVER_HOST) || "127.0.0.1";
@@ -99,6 +108,13 @@ async function handleRequest(req, res) {
 
 server.listen(port, bindHost, () => {
   console.log(`Payabli local token server listening on http://${bindHost}:${port}`);
+  // The upstream and the file it came from. Without these, two runs on two environments are
+  // indistinguishable in the log, and a refusal from the wrong one reads as a bad entry point.
+  console.log(`Upstream:              ${defaultApiBaseUrl}`);
+  console.log(`Env file:              ${envFilePath}`);
+  if (defaultEntry) {
+    console.log(`Entry point:           ${defaultEntry}`);
+  }
   console.log(`Access token endpoint: http://${bindHost}:${port}/payabli/access-token`);
   console.log(`Tap to Pay devices:    http://${bindHost}:${port}/payabli/devices`);
   console.log(`Activation code:       http://${bindHost}:${port}/payabli/activation-code`);
