@@ -47,12 +47,10 @@ public final class TTPTransactionClient: Sendable {
             jsonBody: body
         )
 
-        let bodyDump = request.body.flatMap { String(data: $0, encoding: .utf8) } ?? "<nil>"
-        // The headers carry the App Attest assertion, key id and device id.
-        logger.info("[initiate] → POST \(request.path)")
-        // Body carries PII (billing/shipping/email/phone) — keep redacted in
-        // shared OS logs.
-        logger.info("[initiate] body", private: bodyDump)
+        // `customerData` is the caller's whole customer record, so the body is
+        // reported by size. The headers carry the App Attest assertion, key id
+        // and device id, and are not logged either.
+        logger.info("[initiate] → POST \(request.path) bytes=\(request.body?.count ?? 0)")
 
         let envelope: PayabliV2Envelope<InitiateData>
         do {
