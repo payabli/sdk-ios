@@ -22,10 +22,6 @@ export function normalizeBaseUrl(url) {
 // Checks a URL that is about to receive the credentials. Applied to the configured base and, more
 // importantly, to the endpoint actually resolved from base + path: a path can steer that resolution
 // onto another origin, so validating the base alone leaves the credential reachable.
-
-// Checks a URL that is about to receive the credentials. Applied to the configured base and, more
-// importantly, to the endpoint actually resolved from base + path: a path can steer that resolution
-// onto another origin, so validating the base alone leaves the credential reachable.
 export function assertAllowedEndpoint(parsed, label) {
   if (parsed.protocol !== "https:" && !allowInsecureUpstream) {
     throw new LocalTokenServerError(400, `${label} must use https.`);

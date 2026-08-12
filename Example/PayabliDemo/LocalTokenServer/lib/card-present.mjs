@@ -7,7 +7,6 @@ import { payabliApi } from "./payabli-api.mjs";
 // Observed values. Anything else is passed through as its raw number rather
 // than guessed at.
 const DEVICE_STATUS_ACTIVE = 1;
-
 const DEVICE_STATUS_PENDING = 2;
 
 // These endpoints report failure as HTTP 200 with `isSuccess: false`, so the
@@ -23,9 +22,6 @@ function envelopeDecline(payload) {
     text: stringValue(data.resultText) || stringValue(payload.responseText) || "Declined"
   };
 }
-
-// Observed values. Anything else is passed through as its raw number rather
-// than guessed at.
 
 function deviceStatusLabel(status) {
   if (status === DEVICE_STATUS_ACTIVE) return "active";
@@ -45,10 +41,6 @@ async function describeDevice(entry, deviceId, options = {}) {
   const decline = envelopeDecline(payload);
   return decline ? { deviceId, decline } : { deviceId, device: payload.responseData || null };
 }
-
-// `/Device/list` omits pending devices, which are the only ones that can be
-// activated, so the fuller `/Cloud/list` is the source and each row is then
-// described individually to get its status.
 
 // `/Device/list` omits pending devices, which are the only ones that can be
 // activated, so the fuller `/Cloud/list` is the source and each row is then
@@ -97,9 +89,6 @@ export async function listTapToPayDevices(entry, options = {}) {
 
   return { devices, unavailable };
 }
-
-// Requests the activation code for a pending device. Idempotent upstream: an
-// unexpired code is returned again rather than reissued.
 
 // Requests the activation code for a pending device. Idempotent upstream: an
 // unexpired code is returned again rather than reissued.

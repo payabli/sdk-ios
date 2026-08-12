@@ -25,15 +25,11 @@ if (process.env.PAYABLI_ENV_FILE && !existsSync(envFilePath)) {
 }
 loadEnv(envFilePath);
 
-loadEnv(envFilePath);
-
 export { envFilePath };
 
 export const port = Number.parseInt(process.env.PORT || "8787", 10);
 
 export const bindHost = stringValue(process.env.PAYABLI_LOCAL_TOKEN_SERVER_HOST) || "127.0.0.1";
-// Sandbox, matching what the app and .env.example ship. Override with PAYABLI_API_BASE_URL.
-
 // Sandbox, matching what the app and .env.example ship. Override with PAYABLI_API_BASE_URL.
 export const defaultApiBaseUrl = process.env.PAYABLI_API_BASE_URL || "https://api-sandbox.payabli.com/api";
 
