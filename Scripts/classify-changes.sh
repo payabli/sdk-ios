@@ -126,6 +126,84 @@ fi
 WORK=$(mktemp -d)
 trap 'rm -rf "$WORK"' EXIT
 
+# Every declaration in a file that a consumer can see, one per line.
+#
+# Searching changed lines for the word `public` finds a minority of the surface.
+# An enum's cases carry the enum's visibility and name it nowhere, so all of
+# `PayabliTTPEvent` is invisible to that search; so is `activateDevice`, a member
+# of a `public extension` that needs no keyword of its own. Swift's default
+# differs by container, so the container is what gets tracked:
+#
+#   public extension, public protocol   a member is public
+#   public enum                         a `case` is public, a `func` is internal
+#   public struct, class, actor         a member is internal
+#
+# An explicit `private`, `fileprivate` or `internal` always wins.
+#
+# A text scan, not a compiler: it does not resolve conditional compilation, and
+# a declaration split across lines is read by its first line. It is enough to
+# say which declarations to look at, which is what the section it feeds claims.
+public_surface() {
+    awk '
+    function trim(s) { gsub(/^[[:space:]]+|[[:space:]]+$/, "", s); return s }
+    # Braces inside a string literal are text, not scope. Counting them shifts
+    # the depth for the rest of the file and every later visibility with it.
+    function scan(s,   i, c, inq, esc) {
+        opens = 0; closes = 0; inq = 0; esc = 0
+        for (i = 1; i <= length(s); i++) {
+            c = substr(s, i, 1)
+            if (esc) { esc = 0; continue }
+            if (c == "\\") { esc = 1; continue }
+            if (c == "\"") { inq = !inq; continue }
+            if (inq) continue
+            if (c == "{") opens++
+            if (c == "}") closes++
+        }
+    }
+    BEGIN { depth = 0; memberpub[0] = 0; casepub[0] = 0 }
+    {
+        line = $0
+        if (inblock) {
+            if (line ~ /\*\//) { sub(/^.*\*\//, "", line); inblock = 0 } else { next }
+        }
+        gsub(/\/\*[^*]*\*\//, "", line)
+        if (line ~ /\/\*/) { sub(/\/\*.*$/, "", line); inblock = 1 }
+        sub(/\/\/.*$/, "", line)
+        t = trim(line)
+        if (t == "") next
+
+        lowered = (t ~ /(^|[[:space:]])(private|fileprivate|internal)([[:space:](]|$)/)
+        raised  = (t ~ /(^|[[:space:]])(public|open)([[:space:]]|$)/)
+        is_case = (t ~ /^case[[:space:]]/)
+        is_decl = (t ~ /(^|[[:space:]])(func|var|let|init|subscript|typealias|associatedtype|class|struct|enum|protocol|extension|actor)([[:space:]<(:]|$)/)
+
+        visible = 0
+        if (raised && !lowered) visible = 1
+        else if (!lowered) {
+            if (is_case && casepub[depth]) visible = 1
+            else if (is_decl && memberpub[depth]) visible = 1
+        }
+
+        if (visible && (is_decl || is_case)) print t
+
+        scan(line)
+        if (opens > 0) {
+            newmember = 0; newcase = 0
+            if (visible) {
+                if (t ~ /(^|[[:space:]])(extension|protocol)([[:space:]]|$)/) newmember = 1
+                else if (t ~ /(^|[[:space:]])enum([[:space:]]|$)/) newcase = 1
+            }
+            for (i = 0; i < opens; i++) {
+                depth++
+                memberpub[depth] = newmember
+                casepub[depth] = newcase
+            }
+        }
+        for (i = 0; i < closes; i++) if (depth > 0) depth--
+    }
+    ' "$1"
+}
+
 inert=0            # files whose entire diff the formatter would have produced
 doc_only=0         # files whose remaining diff is comments and blank lines
 semantic=0         # files with a changed declaration or statement
@@ -162,11 +240,14 @@ while IFS=$'\t' read -r old_path path; do
     code=$(comm -3 <(side '<' drop) <(side '>' drop) | grep -c . || true)
     comments=$(comm -3 <(side '<' keep) <(side '>' keep) | grep -c . || true)
 
-    # A changed declaration carrying `public` or `open` is a change to the
-    # contract consumers compile against, which the repository holds in common
-    # with the SDK for Android.
-    added_api=$(printf '%s\n' "$changed" | grep -E '^>' | grep -E '(^|[[:space:]])(public|open)([[:space:]]|$)' || true)
-    removed_api=$(printf '%s\n' "$changed" | grep -E '^<' | grep -E '(^|[[:space:]])(public|open)([[:space:]]|$)' || true)
+    # The contract consumers compile against, which the repository holds in
+    # common with the SDK for Android. Both sides are the whole visible surface
+    # of the file, so a declaration that moved within it is not reported as a
+    # change, and one that changed shape is reported from both ends.
+    public_surface "$WORK/$old_path" | sort > "$WORK/api-base"
+    public_surface "$WORK/head-version" | sort > "$WORK/api-head"
+    added_api=$(comm -13 "$WORK/api-base" "$WORK/api-head")
+    removed_api=$(comm -23 "$WORK/api-base" "$WORK/api-head")
     [ -n "$added_api" ] && api_added="${api_added}${path}"$'\n'"${added_api}"$'\n'
     [ -n "$removed_api" ] && api_removed="${api_removed}${path}"$'\n'"${removed_api}"$'\n'
 
@@ -184,15 +265,15 @@ done <<< "$SOURCE_PAIRS"
 # without this the report would call a new public type source compatible.
 while IFS= read -r path; do
     [ -n "$path" ] || continue
-    decls=$(git show "$HEAD_SHA:$path" 2>/dev/null \
-        | grep -E '(^|[[:space:]])(public|open)([[:space:]]|$)' || true)
+    git show "$HEAD_SHA:$path" > "$WORK/lifecycle-version" 2>/dev/null || continue
+    decls=$(public_surface "$WORK/lifecycle-version")
     [ -n "$decls" ] && api_added="${api_added}${path} (file added)"$'\n'"${decls}"$'\n'
 done <<< "$ADDED_SOURCES"
 
 while IFS= read -r path; do
     [ -n "$path" ] || continue
-    decls=$(git show "$BASE:$path" 2>/dev/null \
-        | grep -E '(^|[[:space:]])(public|open)([[:space:]]|$)' || true)
+    git show "$BASE:$path" > "$WORK/lifecycle-version" 2>/dev/null || continue
+    decls=$(public_surface "$WORK/lifecycle-version")
     [ -n "$decls" ] && api_removed="${api_removed}${path} (file deleted)"$'\n'"${decls}"$'\n'
 done <<< "$DELETED_SOURCES"
 
@@ -245,13 +326,14 @@ fi
 echo "### Public API surface"
 echo
 if [ -z "$api_added" ] && [ -z "$api_removed" ]; then
-    echo "No line carrying \`public\` or \`open\` was added or removed, across modified"
-    echo "files and the full contents of any file added or deleted under \`Sources/\`."
-    echo "Nothing a consumer compiles against moved, so this change is source compatible"
-    echo "by that measure and needs no matching change in the SDK for Android."
+    echo "No declaration a consumer can see was added or removed, across modified,"
+    echo "renamed, added and deleted files under \`Sources/\`. This counts a member of a"
+    echo "\`public extension\` and an enum's cases, neither of which carries the keyword."
+    echo "It is a text scan rather than a compiled comparison, so read it as nothing"
+    echo "found to look at, not as a source-compatibility guarantee."
 else
-    echo "Lines carrying \`public\` or \`open\` moved. The public surface is a contract"
-    echo "shared with the SDK for Android, so a change here is a change to both."
+    echo "Declarations a consumer can see were added or removed. The public surface is a"
+    echo "contract shared with the SDK for Android, so a change here is a change to both."
     if [ -n "$api_removed" ]; then
         echo
         echo "Removed or altered:"
