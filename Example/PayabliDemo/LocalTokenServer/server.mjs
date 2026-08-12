@@ -95,8 +95,8 @@ async function handleRequest(req, res) {
     // The entry only. Anything else on the body would reach payabliApi as upstream options, where
     // apiBaseUrl, accessToken, clientId and clientSecret are all honoured, so a caller could spend
     // the env file's credential against any allowed host, production included.
-    const devices = await listTapToPayDevices(entry, {});
-    sendJson(res, 200, { entry, devices });
+    const { devices, unavailable } = await listTapToPayDevices(entry, {});
+    sendJson(res, 200, { entry, devices, unavailable });
     return;
   }
 
@@ -292,7 +292,12 @@ async function describeDevice(entry, deviceId, options = {}) {
     `/Device/get/${encodeURIComponent(entry)}/${encodeURIComponent(deviceId)}`,
     { options }
   );
-  return envelopeDecline(payload) ? null : payload.responseData || null;
+  // Reported rather than dropped. Returning null removed the device from the list with nothing
+  // said, so a lookup declined for provisioning or authorisation looked the same as a device that
+  // is not there. Which decline codes mean a stale row is documented nowhere this server can read,
+  // so it names what it skipped instead of deciding.
+  const decline = envelopeDecline(payload);
+  return decline ? { deviceId, decline } : { deviceId, device: payload.responseData || null };
 }
 
 // `/Device/list` omits pending devices, which are the only ones that can be
@@ -300,7 +305,10 @@ async function describeDevice(entry, deviceId, options = {}) {
 // described individually to get its status.
 async function listTapToPayDevices(entry, options = {}) {
   if (!entry) {
-    throw new LocalTokenServerError(400, "Set PAYABLI_ENTRY in .env, or pass entry in the request.");
+    throw new LocalTokenServerError(
+      400,
+      `Set PAYABLI_ENTRY in ${envFilePath}, or pass entry in the request.`
+    );
   }
 
   const payload = await payabliApi(`/Cloud/list/${encodeURIComponent(entry)}`, { options });
@@ -318,7 +326,12 @@ async function listTapToPayDevices(entry, options = {}) {
     described.push(...batch);
   }
 
-  return described
+  const unavailable = described
+    .filter((row) => row.decline)
+    .map((row) => ({ deviceId: row.deviceId, code: row.decline.code, text: row.decline.text }));
+
+  const devices = described
+    .map((row) => row.device)
     .filter((device) => device && stringValue(device.deviceType).toLowerCase() === "softpos")
     .map((device) => ({
       deviceId: device.deviceId,
@@ -331,6 +344,8 @@ async function listTapToPayDevices(entry, options = {}) {
       updatedAt: device.updatedAt
     }))
     .sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
+
+  return { devices, unavailable };
 }
 
 // Requests the activation code for a pending device. Idempotent upstream: an
@@ -338,7 +353,10 @@ async function listTapToPayDevices(entry, options = {}) {
 async function requestActivationCode(options = {}) {
   const entry = stringValue(options.entry) || defaultEntry;
   if (!entry) {
-    throw new LocalTokenServerError(400, "Set PAYABLI_ENTRY in .env, or pass entry in the request.");
+    throw new LocalTokenServerError(
+      400,
+      `Set PAYABLI_ENTRY in ${envFilePath}, or pass entry in the request.`
+    );
   }
 
   let deviceId = stringValue(options.deviceId);
@@ -349,7 +367,7 @@ async function requestActivationCode(options = {}) {
   // deviceId does. Falling back to the newest pending device is a convenience
   // for a single-device QA setup, and reports itself as such.
   if (!deviceId) {
-    const devices = await listTapToPayDevices(entry, options);
+    const { devices } = await listTapToPayDevices(entry, options);
     const pending = devices.filter((device) => device.deviceStatus === DEVICE_STATUS_PENDING);
 
     if (pending.length === 0) {
