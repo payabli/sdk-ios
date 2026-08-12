@@ -263,11 +263,16 @@ echo
 TEST_FILES=$(git diff --name-only "$BASE..$HEAD_SHA" -- Tests/ Example/PayabliDemo/FlowTests/ | grep -c . || true)
 echo "### Tests"
 echo
-if [ "$semantic" -eq 0 ]; then
+# An added or deleted production file is a behaviour change with no counterpart
+# in `semantic`, which counts edits to files that existed on both sides. Reading
+# `semantic` alone lets a change that adds a whole implementation with no test
+# report that no test is implied.
+production_changed=$((semantic + added_total + deleted_total))
+if [ "$production_changed" -eq 0 ]; then
     echo "No production file changed a declaration or a statement, so no new test is implied."
 elif [ "$TEST_FILES" -eq 0 ]; then
-    echo "$semantic production files changed behaviour and no test file changed. Worth"
+    echo "$production_changed production files changed behaviour and no test file changed. Worth"
     echo "confirming the existing suite covers the new paths."
 else
-    echo "$semantic production files changed behaviour, alongside $TEST_FILES changed test files."
+    echo "$production_changed production files changed behaviour, alongside $TEST_FILES changed test files."
 fi
