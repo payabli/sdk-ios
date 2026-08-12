@@ -142,8 +142,23 @@ jobs:
           PR_BASE: ${{ github.event.workflow_run.pull_requests[0].base.ref }}
         run: |
           set -euo pipefail
+          # Where the analysis goes is decided here, not by the branch. The
+          # scanner reads `sonar-project.properties` out of the revision it is
+          # analysing, and that file names the server and the project: a branch
+          # could point `sonar.host.url` at one of its own and be handed
+          # SONAR_TOKEN, or change the identity and publish into another project.
+          # A property given on the command line wins over the file, and this file
+          # is the one a pull request cannot edit.
+          #
+          # These three duplicate `sonar-project.properties` on purpose. What the
+          # branch may still choose is what gets measured, which is the rest of
+          # that file.
+          trusted="-Dsonar.host.url=https://sonarcloud.io"
+          trusted="$trusted -Dsonar.organization=payabli"
+          trusted="$trusted -Dsonar.projectKey=payabli_sdk-ios"
+
           if [ -z "$PR" ]; then
-            echo "args=" >> "$GITHUB_OUTPUT"
+            echo "args=$trusted" >> "$GITHUB_OUTPUT"
             echo "analysing a branch, not a pull request"
             exit 0
           fi
@@ -154,7 +169,7 @@ jobs:
             echo "the triggering run named a pull request this cannot use" >&2
             exit 1
           fi
-          echo "args=-Dsonar.pullrequest.key=$number -Dsonar.pullrequest.branch=$branch -Dsonar.pullrequest.base=$base" >> "$GITHUB_OUTPUT"
+          echo "args=$trusted -Dsonar.pullrequest.key=$number -Dsonar.pullrequest.branch=$branch -Dsonar.pullrequest.base=$base" >> "$GITHUB_OUTPUT"
 
       # Pinned to a commit, not a tag. `v5` is mutable, and this step is handed
       # SONAR_TOKEN, so a replaced action would hold a repository secret.
