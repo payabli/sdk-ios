@@ -1,11 +1,20 @@
 import { createServer } from "node:http";
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname, isAbsolute, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const serverDir = dirname(fileURLToPath(import.meta.url));
-loadEnv(join(serverDir, ".env"));
+// PAYABLI_ENV_FILE picks the file, so a second environment is a second file rather than an edit to
+// this one. A relative name resolves beside this server. An explicitly named file that is not there
+// is fatal: the alternative is falling back to the sandbox defaults below and reporting nothing.
+const envFileName = (process.env.PAYABLI_ENV_FILE || ".env").trim();
+const envFilePath = isAbsolute(envFileName) ? envFileName : join(serverDir, envFileName);
+if (process.env.PAYABLI_ENV_FILE && !existsSync(envFilePath)) {
+  console.error(`PAYABLI_ENV_FILE=${envFileName} does not exist at ${envFilePath}`);
+  process.exit(1);
+}
+loadEnv(envFilePath);
 
 const port = Number.parseInt(process.env.PORT || "8787", 10);
 const bindHost = stringValue(process.env.PAYABLI_LOCAL_TOKEN_SERVER_HOST) || "127.0.0.1";
@@ -83,14 +92,21 @@ async function handleRequest(req, res) {
   if (url.pathname === "/payabli/devices" && ["GET", "POST"].includes(req.method || "")) {
     const body = req.method === "POST" ? await readJsonBody(req) : {};
     const entry = stringValue(body.entry) || stringValue(url.searchParams.get("entry")) || defaultEntry;
-    const devices = await listTapToPayDevices(entry, body);
-    sendJson(res, 200, { entry, devices });
+    // The entry only. Anything else on the body would reach payabliApi as upstream options, where
+    // apiBaseUrl, accessToken, clientId and clientSecret are all honoured, so a caller could spend
+    // the env file's credential against any allowed host, production included.
+    const { devices, unavailable } = await listTapToPayDevices(entry, {});
+    sendJson(res, 200, { entry, devices, unavailable });
     return;
   }
 
   if (url.pathname === "/payabli/activation-code" && req.method === "POST") {
     const body = await readJsonBody(req);
-    sendJson(res, 200, await requestActivationCode(body));
+    // The two fields this route documents, for the reason above.
+    sendJson(res, 200, await requestActivationCode({
+      entry: stringValue(body.entry),
+      deviceId: stringValue(body.deviceId)
+    }));
     return;
   }
 
@@ -99,6 +115,13 @@ async function handleRequest(req, res) {
 
 server.listen(port, bindHost, () => {
   console.log(`Payabli local token server listening on http://${bindHost}:${port}`);
+  // The upstream and the file it came from. Without these, two runs on two environments are
+  // indistinguishable in the log, and a refusal from the wrong one reads as a bad entry point.
+  console.log(`Upstream:              ${defaultApiBaseUrl}`);
+  console.log(`Env file:              ${envFilePath}`);
+  if (defaultEntry) {
+    console.log(`Entry point:           ${defaultEntry}`);
+  }
   console.log(`Access token endpoint: http://${bindHost}:${port}/payabli/access-token`);
   console.log(`Tap to Pay devices:    http://${bindHost}:${port}/payabli/devices`);
   console.log(`Activation code:       http://${bindHost}:${port}/payabli/activation-code`);
@@ -143,14 +166,32 @@ async function exchangeCredentials(options = {}, { forceRefresh = false } = {}) 
   }
 
   const endpoint = new URL(tokenPath.replace(/^\/+/, ""), ensureTrailingSlash(apiBaseUrl));
+  assertAllowedEndpoint(endpoint, "The resolved token endpoint");
+
+  // redirect: "manual" so a 3xx comes back as a response instead of being followed. fetch follows
+  // redirects by default, and a 307 or 308 replays the method and body, so an allowed host answering
+  // with a Location on another origin would hand it the client id and secret. The check above cannot
+  // see that: it runs before the request, and a redirect target only exists afterwards. "manual"
+  // rather than "error" because it keeps the target readable, where a bare fetch rejection reports
+  // "fetch failed" and cannot be told apart from the host being down.
   const upstream = await fetch(endpoint, {
     method: "POST",
+    redirect: "manual",
     headers: {
       "Accept": "application/json",
       "Content-Type": "application/json"
     },
     body: JSON.stringify({ clientId, clientSecret })
   });
+
+  if (upstream.status >= 300 && upstream.status < 400) {
+    throw new LocalTokenServerError(
+      502,
+      `Token exchange to ${endpoint.origin} answered HTTP ${upstream.status} redirecting to ` +
+        `${upstream.headers.get("location") || "an unnamed target"}. The redirect was not followed, ` +
+        "because the credential would be sent to the target."
+    );
+  }
 
   const text = await upstream.text();
   let payload;
@@ -188,9 +229,13 @@ async function payabliApi(path, { method = "GET", body = null, options = {} } = 
   const apiBaseUrl = normalizeBaseUrl(stringValue(options.apiBaseUrl) || defaultApiBaseUrl);
   const token = await resolveAccessToken(options);
   const endpoint = new URL(path.replace(/^\/+/, ""), ensureTrailingSlash(apiBaseUrl));
+  assertAllowedEndpoint(endpoint, "The resolved API endpoint");
 
+  // redirect: "manual", as the credential exchange does and for the same reason: a 307 or 308 replays
+  // the method, body and Authorization header to whatever origin the Location names.
   const upstream = await fetch(endpoint, {
     method,
+    redirect: "manual",
     headers: {
       "Accept": "application/json",
       "Content-Type": "application/json",
@@ -247,7 +292,12 @@ async function describeDevice(entry, deviceId, options = {}) {
     `/Device/get/${encodeURIComponent(entry)}/${encodeURIComponent(deviceId)}`,
     { options }
   );
-  return envelopeDecline(payload) ? null : payload.responseData || null;
+  // Reported rather than dropped. Returning null removed the device from the list with nothing
+  // said, so a lookup declined for provisioning or authorisation looked the same as a device that
+  // is not there. Which decline codes mean a stale row is documented nowhere this server can read,
+  // so it names what it skipped instead of deciding.
+  const decline = envelopeDecline(payload);
+  return decline ? { deviceId, decline } : { deviceId, device: payload.responseData || null };
 }
 
 // `/Device/list` omits pending devices, which are the only ones that can be
@@ -255,7 +305,10 @@ async function describeDevice(entry, deviceId, options = {}) {
 // described individually to get its status.
 async function listTapToPayDevices(entry, options = {}) {
   if (!entry) {
-    throw new LocalTokenServerError(400, "Set PAYABLI_ENTRY in .env, or pass entry in the request.");
+    throw new LocalTokenServerError(
+      400,
+      `Set PAYABLI_ENTRY in ${envFilePath}, or pass entry in the request.`
+    );
   }
 
   const payload = await payabliApi(`/Cloud/list/${encodeURIComponent(entry)}`, { options });
@@ -273,7 +326,12 @@ async function listTapToPayDevices(entry, options = {}) {
     described.push(...batch);
   }
 
-  return described
+  const unavailable = described
+    .filter((row) => row.decline)
+    .map((row) => ({ deviceId: row.deviceId, code: row.decline.code, text: row.decline.text }));
+
+  const devices = described
+    .map((row) => row.device)
     .filter((device) => device && stringValue(device.deviceType).toLowerCase() === "softpos")
     .map((device) => ({
       deviceId: device.deviceId,
@@ -286,6 +344,8 @@ async function listTapToPayDevices(entry, options = {}) {
       updatedAt: device.updatedAt
     }))
     .sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
+
+  return { devices, unavailable };
 }
 
 // Requests the activation code for a pending device. Idempotent upstream: an
@@ -293,7 +353,10 @@ async function listTapToPayDevices(entry, options = {}) {
 async function requestActivationCode(options = {}) {
   const entry = stringValue(options.entry) || defaultEntry;
   if (!entry) {
-    throw new LocalTokenServerError(400, "Set PAYABLI_ENTRY in .env, or pass entry in the request.");
+    throw new LocalTokenServerError(
+      400,
+      `Set PAYABLI_ENTRY in ${envFilePath}, or pass entry in the request.`
+    );
   }
 
   let deviceId = stringValue(options.deviceId);
@@ -304,7 +367,7 @@ async function requestActivationCode(options = {}) {
   // deviceId does. Falling back to the newest pending device is a convenience
   // for a single-device QA setup, and reports itself as such.
   if (!deviceId) {
-    const devices = await listTapToPayDevices(entry, options);
+    const { devices } = await listTapToPayDevices(entry, options);
     const pending = devices.filter((device) => device.deviceStatus === DEVICE_STATUS_PENDING);
 
     if (pending.length === 0) {
@@ -333,11 +396,21 @@ async function requestActivationCode(options = {}) {
   }
 
   const data = payload.responseData || {};
+  // An envelope that reports success and carries no code is an upstream fault, not an activation.
+  // Returned as 200 with an empty code it reads as issuance, and the device is never activated.
+  const code = stringValue(data.code);
+  if (!code) {
+    throw new LocalTokenServerError(
+      502,
+      `Activation challenge for ${deviceId} on ${entry} reported success and returned no code.`
+    );
+  }
+
   return {
     entry,
     deviceId,
     resolvedFrom,
-    code: stringValue(data.code),
+    code,
     expiresAt: stringValue(data.expiresAt),
     alreadyIssued: Boolean(data.alreadyIssued)
   };
@@ -439,15 +512,22 @@ function normalizeBaseUrl(url) {
   const trimmed = url.trim();
   const normalized = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
   const parsed = new URL(normalized);
+  assertAllowedEndpoint(parsed, "PAYABLI_API_BASE_URL");
+  return parsed.toString();
+}
 
+// Checks a URL that is about to receive the credentials. Applied to the configured base and, more
+// importantly, to the endpoint actually resolved from base + path: a path can steer that resolution
+// onto another origin, so validating the base alone leaves the credential reachable.
+function assertAllowedEndpoint(parsed, label) {
   if (parsed.protocol !== "https:" && process.env.PAYABLI_ALLOW_INSECURE_UPSTREAM !== "true") {
-    throw new LocalTokenServerError(400, "PAYABLI_API_BASE_URL must use https.");
+    throw new LocalTokenServerError(400, `${label} must use https.`);
   }
 
   if (!allowedApiHosts.has(parsed.hostname.toLowerCase())) {
     throw new LocalTokenServerError(
       400,
-      `PAYABLI_API_BASE_URL host is not allowed. Allowed hosts: ${Array.from(allowedApiHosts).join(", ")}`
+      `${label} host is not allowed. Allowed hosts: ${Array.from(allowedApiHosts).join(", ")}`
     );
   }
 
