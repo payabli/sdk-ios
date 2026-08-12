@@ -103,20 +103,3 @@ server.listen(port, bindHost, () => {
     console.log("PAYABLI_ENTRY is not set; pass entry in the request body for the Tap to Pay endpoints.");
   }
 });
-
-server.listen(port, bindHost, () => {
-  console.log(`Payabli local token server listening on http://${bindHost}:${port}`);
-  // The upstream and the file it came from. Without these, two runs on two environments are
-  // indistinguishable in the log, and a refusal from the wrong one reads as a bad entry point.
-  console.log(`Upstream:              ${defaultApiBaseUrl}`);
-  console.log(`Env file:              ${envFilePath}`);
-  if (defaultEntry) {
-    console.log(`Entry point:           ${defaultEntry}`);
-  }
-  console.log(`Access token endpoint: http://${bindHost}:${port}/payabli/access-token`);
-  console.log(`Tap to Pay devices:    http://${bindHost}:${port}/payabli/devices`);
-  console.log(`Activation code:       http://${bindHost}:${port}/payabli/activation-code`);
-  if (!defaultEntry) {
-    console.log("PAYABLI_ENTRY is not set; pass entry in the request body for the Tap to Pay endpoints.");
-  }
-});
