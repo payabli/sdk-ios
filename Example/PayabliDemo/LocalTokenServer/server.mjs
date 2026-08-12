@@ -92,14 +92,21 @@ async function handleRequest(req, res) {
   if (url.pathname === "/payabli/devices" && ["GET", "POST"].includes(req.method || "")) {
     const body = req.method === "POST" ? await readJsonBody(req) : {};
     const entry = stringValue(body.entry) || stringValue(url.searchParams.get("entry")) || defaultEntry;
-    const devices = await listTapToPayDevices(entry, body);
+    // The entry only. Anything else on the body would reach payabliApi as upstream options, where
+    // apiBaseUrl, accessToken, clientId and clientSecret are all honoured, so a caller could spend
+    // the env file's credential against any allowed host, production included.
+    const devices = await listTapToPayDevices(entry, {});
     sendJson(res, 200, { entry, devices });
     return;
   }
 
   if (url.pathname === "/payabli/activation-code" && req.method === "POST") {
     const body = await readJsonBody(req);
-    sendJson(res, 200, await requestActivationCode(body));
+    // The two fields this route documents, for the reason above.
+    sendJson(res, 200, await requestActivationCode({
+      entry: stringValue(body.entry),
+      deviceId: stringValue(body.deviceId)
+    }));
     return;
   }
 
