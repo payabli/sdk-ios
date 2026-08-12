@@ -90,7 +90,18 @@ echo
 
 # Swift only. Sources/ also carries Markdown, and prose about a public type
 # reads as a declaration to a grep.
-CHANGED_SOURCES=$(git diff --name-only --diff-filter=M "$BASE..$HEAD_SHA" -- Sources/ | grep '\.swift$' || true)
+#
+# A modified file and a renamed one both carry an edit, and git reports the
+# rename as `R` rather than `M`. Reading only `M` skips a file that was renamed
+# and edited in the same commit, which is the case most in need of review. Each
+# is therefore held as an old path at the base and a new path at the head; for a
+# modified file the two are the same.
+SOURCE_PAIRS=$(git diff --name-status --find-renames "$BASE..$HEAD_SHA" -- Sources/ \
+    | awk -F'\t' '
+        $1 ~ /^M/ && $2 ~ /\.swift$/ { print $2 "\t" $2 }
+        $1 ~ /^R/ && $3 ~ /\.swift$/ { print $2 "\t" $3 }
+    ' || true)
+CHANGED_SOURCES=$(printf '%s\n' "$SOURCE_PAIRS" | awk -F'\t' 'NF == 2 { print $2 }' | grep . || true)
 ADDED_SOURCES=$(git diff --name-only --diff-filter=A "$BASE..$HEAD_SHA" -- Sources/ | grep '\.swift$' || true)
 DELETED_SOURCES=$(git diff --name-only --diff-filter=D "$BASE..$HEAD_SHA" -- Sources/ | grep '\.swift$' || true)
 if [ -z "$CHANGED_SOURCES" ] && [ -z "$ADDED_SOURCES" ] && [ -z "$DELETED_SOURCES" ]; then
@@ -123,21 +134,21 @@ doc_rows=""
 api_added=""
 api_removed=""
 
-while IFS= read -r path; do
+while IFS=$'\t' read -r old_path path; do
     [ -n "$path" ] || continue
-    mkdir -p "$WORK/$(dirname "$path")"
-    git show "$BASE:$path" > "$WORK/$path" 2>/dev/null || continue
+    mkdir -p "$WORK/$(dirname "$old_path")"
+    git show "$BASE:$old_path" > "$WORK/$old_path" 2>/dev/null || continue
     # Normalising the base revision is what separates the author's edit from the
     # formatter's. Without it every reformatted file looks like a rewrite.
-    swiftformat "$WORK/$path" --config "$REPO_ROOT/.swiftformat" --quiet >/dev/null 2>&1
+    swiftformat "$WORK/$old_path" --config "$REPO_ROOT/.swiftformat" --quiet >/dev/null 2>&1
     git show "$HEAD_SHA:$path" > "$WORK/head-version" 2>/dev/null || continue
 
-    if cmp -s "$WORK/$path" "$WORK/head-version"; then
+    if cmp -s "$WORK/$old_path" "$WORK/head-version"; then
         inert=$((inert + 1))
         continue
     fi
 
-    changed=$(diff "$WORK/$path" "$WORK/head-version" | grep -E '^[<>]' || true)
+    changed=$(diff "$WORK/$old_path" "$WORK/head-version" | grep -E '^[<>]' || true)
 
     # Net of relocations. A line removed from one place and added unchanged in
     # another is a move, and a move compiles to what it compiled to before.
@@ -166,7 +177,7 @@ while IFS= read -r path; do
         doc_only=$((doc_only + 1))
         doc_rows="${doc_rows}${comments}	${path}"$'\n'
     fi
-done <<< "$CHANGED_SOURCES"
+done <<< "$SOURCE_PAIRS"
 
 # A file that entered or left the build carries its whole contents as added or
 # removed API. The classification above speaks only for modified files, so
