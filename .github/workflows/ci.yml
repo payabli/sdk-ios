@@ -80,30 +80,14 @@ jobs:
             > report.md
           cat report.md >> "$GITHUB_STEP_SUMMARY"
 
-      # `pr-reports.yml` is triggered by this run finishing and has no pull
-      # request of its own to read, so the identifiers travel with the report.
-      #
-      # Through `env` and `jq`, never interpolated into the script. A branch name
-      # is chosen by whoever opens the pull request, and `${{ }}` pastes it into
-      # the shell before the shell sees it, so a branch called `$(...)` would run
-      # as a command. JSON also means the reader does not have to `source` it.
-      - name: Record the pull request
-        env:
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          PR_BRANCH: ${{ github.event.pull_request.head.ref }}
-          PR_BASE: ${{ github.event.pull_request.base.ref }}
-        run: |
-          set -euo pipefail
-          jq -n --arg number "$PR_NUMBER" --arg branch "$PR_BRANCH" --arg base "$PR_BASE" \
-            '{number: $number, branch: $branch, base: $base}' > pr.json
-
+      # Only the report. Which pull request it belongs to is read from the
+      # triggering run's event by `pr-reports.yml`, because anything uploaded
+      # here is chosen by the branch, and that workflow holds the tokens.
       - name: Upload the report
         uses: actions/upload-artifact@v4
         with:
           name: change-report
-          path: |
-            report.md
-            pr.json
+          path: report.md
 
   test-sdk:
     name: SDK tests
@@ -140,28 +124,12 @@ jobs:
           ./Scripts/xccov-to-sonarqube-generic.sh --include Sources/ \
             SDKTests.xcresult > coverage.xml
 
-      # As in the report job: the analysis runs from `pr-reports.yml`, which is
-      # triggered by this run finishing and has no pull request of its own. On a
-      # push there is none to record and the file is simply absent, which is how
-      # that workflow tells a branch analysis from a pull request one.
-      - name: Record the pull request
-        if: github.event_name == 'pull_request'
-        env:
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          PR_BRANCH: ${{ github.event.pull_request.head.ref }}
-          PR_BASE: ${{ github.event.pull_request.base.ref }}
-        run: |
-          set -euo pipefail
-          jq -n --arg number "$PR_NUMBER" --arg branch "$PR_BRANCH" --arg base "$PR_BASE" \
-            '{number: $number, branch: $branch, base: $base}' > pr.json
-
+      # Only the coverage, for the same reason as the report above.
       - name: Upload coverage
         uses: actions/upload-artifact@v4
         with:
           name: coverage
-          path: |
-            coverage.xml
-            pr.json
+          path: coverage.xml
 
   test-demo:
     name: Sample app step sequences

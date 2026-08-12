@@ -30,9 +30,14 @@ jobs:
     # `ci.yml` builds the report on pull requests only, and `ci.yml` cancels a
     # run in progress when the next push arrives, which leaves no artifact to
     # download. A failed run still has one, because the report job is not a gate.
+    #
+    # Same-repository only. A branch in a fork has no entry in `pull_requests`
+    # below, and this job would have nothing it could trust to say which pull
+    # request it is reporting on.
     if: >-
       github.event.workflow_run.event == 'pull_request'
       && github.event.workflow_run.conclusion != 'cancelled'
+      && github.event.workflow_run.head_repository.full_name == github.repository
     permissions:
       pull-requests: write
       actions: read
@@ -51,16 +56,23 @@ jobs:
       # Editing in place kept it to one comment and left it wherever it was first
       # posted, which on a long review is pages above the discussion and marked
       # only "edited". Every earlier copy is deleted and a fresh one posted.
+      # Which pull request this is comes from the event, never from the artifact.
+      # `ci.yml` runs from the branch, so anything it uploads is chosen by whoever
+      # opened the pull request: a number in a file would let one branch aim this
+      # job's write token at a different pull request and rewrite its comments.
+      # GitHub fills in `pull_requests` from the triggering run, and a branch
+      # cannot write to it.
       - name: Comment on the pull request
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
+          PR: ${{ github.event.workflow_run.pull_requests[0].number }}
         run: |
           set -euo pipefail
-          # Read, not sourced. The file carries a branch name chosen by whoever
-          # opened the pull request, and this job holds a write token.
-          pr=$(jq -r '.number | select(test("^[0-9]+$"))' pr.json)
-          [ -n "$pr" ] || { echo "pr.json carried no pull request number" >&2; exit 1; }
+          pr=$(printf '%s' "$PR" | grep -E '^[0-9]+$') || {
+            echo "the triggering run named no pull request" >&2
+            exit 1
+          }
           # jq slurps the pages into one array. --jq would run once per page, so
           # a match on an earlier page would be missed.
           existing=$(gh api "repos/$REPO/issues/$pr/comments" --paginate \
@@ -75,8 +87,13 @@ jobs:
   sonar:
     name: SonarCloud
     runs-on: macos-15
-    # No coverage is produced by a run whose suite failed.
-    if: github.event.workflow_run.conclusion == 'success'
+    # No coverage is produced by a run whose suite failed. Same-repository only:
+    # a fork's pull request has no entry in `pull_requests`, so there would be
+    # nothing trustworthy to decorate, and this job would be checking a fork's
+    # revision out while holding the analysis token.
+    if: >-
+      github.event.workflow_run.conclusion == 'success'
+      && github.event.workflow_run.head_repository.full_name == github.repository
     permissions:
       contents: read
       actions: read
@@ -101,27 +118,32 @@ jobs:
           run-id: ${{ github.event.workflow_run.id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      # `ci.yml` writes pr.json on a pull request and not on a push, so its
-      # presence is what decides between decorating a pull request and analysing
-      # a branch. Without these the scanner would file a pull request's numbers
-      # against the branch and the decoration would never appear.
+      # From the event, never from the artifact. `ci.yml` runs from the branch, so
+      # a number it uploaded would be one the branch chose, and the scanner would
+      # decorate whichever pull request that named while analysing this revision.
+      # A `push` run names none, and that is what selects a branch analysis.
       #
-      # Read, not sourced, and a ref carrying anything but the characters git
-      # needs is refused rather than pasted into an argument list.
-      - name: Read the pull request
+      # Refs are checked rather than trusted: they reach the scanner as command
+      # arguments, and a ref carrying anything but the characters git needs is
+      # refused instead of pasted into the list.
+      - name: Identify the pull request
         id: pr
+        env:
+          PR: ${{ github.event.workflow_run.pull_requests[0].number }}
+          PR_BRANCH: ${{ github.event.workflow_run.pull_requests[0].head.ref }}
+          PR_BASE: ${{ github.event.workflow_run.pull_requests[0].base.ref }}
         run: |
           set -euo pipefail
-          if [ ! -f pr.json ]; then
+          if [ -z "$PR" ]; then
             echo "args=" >> "$GITHUB_OUTPUT"
             echo "analysing a branch, not a pull request"
             exit 0
           fi
-          number=$(jq -r '.number | select(test("^[0-9]+$"))' pr.json)
-          branch=$(jq -r '.branch | select(test("^[A-Za-z0-9._/-]+$"))' pr.json)
-          base=$(jq -r '.base | select(test("^[A-Za-z0-9._/-]+$"))' pr.json)
+          number=$(printf '%s' "$PR" | grep -E '^[0-9]+$') || number=""
+          branch=$(printf '%s' "$PR_BRANCH" | grep -E '^[A-Za-z0-9._/-]+$') || branch=""
+          base=$(printf '%s' "$PR_BASE" | grep -E '^[A-Za-z0-9._/-]+$') || base=""
           if [ -z "$number" ] || [ -z "$branch" ] || [ -z "$base" ]; then
-            echo "pr.json did not carry a usable pull request" >&2
+            echo "the triggering run named a pull request this cannot use" >&2
             exit 1
           fi
           echo "args=-Dsonar.pullrequest.key=$number -Dsonar.pullrequest.branch=$branch -Dsonar.pullrequest.base=$base" >> "$GITHUB_OUTPUT"
