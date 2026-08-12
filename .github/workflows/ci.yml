@@ -91,8 +91,14 @@ jobs:
     name: Change report comment
     runs-on: ubuntu-latest
     needs: [changes]
-    if: github.event_name == 'pull_request'
-    continue-on-error: true
+    # A fork's pull request gets a read-only token, so skip it there rather than
+    # let it fail. `continue-on-error` used to cover that case, on the job and on
+    # the step, which made every outcome green: a report that had stopped posting
+    # was indistinguishable from one that posted. Skipping the case that cannot
+    # work leaves a same-repository failure loud.
+    if: >-
+      github.event_name == 'pull_request'
+      && github.event.pull_request.head.repo.full_name == github.repository
     permissions:
       pull-requests: write
 
@@ -107,7 +113,6 @@ jobs:
       # itself. A fork's pull request has a read-only token, so this is allowed
       # to fail without taking the job with it.
       - name: Comment on the pull request
-        continue-on-error: true
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR: ${{ github.event.pull_request.number }}
