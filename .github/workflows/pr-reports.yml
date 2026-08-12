@@ -38,6 +38,15 @@ jobs:
       github.event.workflow_run.event == 'pull_request'
       && github.event.workflow_run.conclusion != 'cancelled'
       && github.event.workflow_run.head_repository.full_name == github.repository
+    # One of these at a time per pull request. `ci.yml` cancels a superseded run,
+    # but cancelling is not instant: a run already at its last step finishes, and
+    # the push that superseded it produces a second. Both would then list the
+    # comments, both delete what they found, and the loser of that race deletes a
+    # comment that is already gone and reddens on it. The newer report is the one
+    # worth having, so it takes the older one's place.
+    concurrency:
+      group: change-report-${{ github.event.workflow_run.pull_requests[0].number }}
+      cancel-in-progress: true
     permissions:
       pull-requests: write
       actions: read
@@ -102,6 +111,15 @@ jobs:
     if: >-
       github.event.workflow_run.conclusion == 'success'
       && github.event.workflow_run.head_repository.full_name == github.repository
+    # The same race, for the same reason. Two analyses of one pull request reach
+    # the server in whichever order they finish, so the later revision's numbers
+    # can be overwritten by the earlier one's. A push run names no pull request
+    # and is keyed by its branch instead.
+    concurrency:
+      group: >-
+        sonar-${{ github.event.workflow_run.pull_requests[0].number
+          || github.event.workflow_run.head_branch }}
+      cancel-in-progress: true
     permissions:
       contents: read
       actions: read
