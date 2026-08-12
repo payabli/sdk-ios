@@ -94,8 +94,9 @@ jobs:
     # A fork's pull request gets a read-only token, so skip it there rather than
     # let it fail. `continue-on-error` used to cover that case, on the job and on
     # the step, which made every outcome green: a report that had stopped posting
-    # was indistinguishable from one that posted. Skipping the case that cannot
-    # work leaves a same-repository failure loud.
+    # was indistinguishable from one that posted, and the only signal was a
+    # comment nobody noticed was stale. Skipping the case that cannot work leaves
+    # a same-repository failure loud.
     if: >-
       github.event_name == 'pull_request'
       && github.event.pull_request.head.repo.full_name == github.repository
@@ -108,10 +109,11 @@ jobs:
         with:
           name: change-report
 
-      # One comment that is edited in place, found by the marker the script
-      # writes. A new comment on every push buries the review under reports of
-      # itself. A fork's pull request has a read-only token, so this is allowed
-      # to fail without taking the job with it.
+      # One report on the pull request, and always the newest thing on the page.
+      # Editing in place kept it to one comment but left it wherever it was first
+      # posted, so on a long review it sits pages above the discussion, marked
+      # only "edited". Every earlier copy is deleted and a fresh one posted, so
+      # there is still exactly one and it is where a reader will see it.
       - name: Comment on the pull request
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -120,16 +122,15 @@ jobs:
         run: |
           set -euo pipefail
           # jq slurps the pages into one array. --jq would run once per page, so
-          # `last` would be the last match on the last page and not overall.
+          # a match on an earlier page would be missed.
           existing=$(gh api "repos/$REPO/issues/$PR/comments" --paginate \
-            | jq -s 'add | map(select(.body | contains("<!-- change-report -->"))) | last | .id // empty')
-          if [ -n "$existing" ]; then
-            gh api -X PATCH "repos/$REPO/issues/comments/$existing" -F body=@report.md >/dev/null
-            echo "updated comment $existing"
-          else
-            gh api -X POST "repos/$REPO/issues/$PR/comments" -F body=@report.md >/dev/null
-            echo "posted a new comment"
-          fi
+            | jq -s 'add | map(select(.body | contains("<!-- change-report -->")) | .id) | .[]')
+          for id in $existing; do
+            gh api -X DELETE "repos/$REPO/issues/comments/$id" >/dev/null
+            echo "deleted comment $id"
+          done
+          gh api -X POST "repos/$REPO/issues/$PR/comments" -F body=@report.md >/dev/null
+          echo "posted the report"
 
   test-sdk:
     name: SDK tests
