@@ -5,7 +5,7 @@
 // reachable.
 
 import { LocalTokenServerError } from "./errors.mjs";
-import { allowedApiHosts } from "./settings.mjs";
+import { allowInsecureUpstream, allowedApiHosts } from "./settings.mjs";
 
 export function ensureTrailingSlash(url) {
   return url.endsWith("/") ? url : `${url}/`;
@@ -27,7 +27,7 @@ export function normalizeBaseUrl(url) {
 // importantly, to the endpoint actually resolved from base + path: a path can steer that resolution
 // onto another origin, so validating the base alone leaves the credential reachable.
 export function assertAllowedEndpoint(parsed, label) {
-  if (parsed.protocol !== "https:" && process.env.PAYABLI_ALLOW_INSECURE_UPSTREAM !== "true") {
+  if (parsed.protocol !== "https:" && !allowInsecureUpstream) {
     throw new LocalTokenServerError(400, `${label} must use https.`);
   }
 

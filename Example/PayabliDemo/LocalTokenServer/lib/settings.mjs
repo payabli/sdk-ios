@@ -1,7 +1,11 @@
-// Everything read from the environment, resolved once, at import.
+// Loads the env file, and exports the settings shared across the server.
 //
-// The env file is loaded here rather than in server.mjs so that importing any module below reads the
-// same settings whatever the import order. Nothing else in this server touches process.env.
+// Loading happens here rather than in server.mjs so that importing any module below reads the same
+// values whatever the import order.
+//
+// Not every read of process.env lives here. tokens.mjs reads the access token and the client
+// credentials where it uses them, because a request can override each of them and exporting them
+// would put the secret in a module every other one imports.
 
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, isAbsolute, join } from "node:path";
@@ -47,6 +51,7 @@ export const allowedApiHosts = parseCsvSet(
   process.env.PAYABLI_ALLOWED_API_HOSTS ||
     "api-sandbox.payabli.com,api-qa.payabli.com,api.payabli.com"
 );
+export const allowInsecureUpstream = process.env.PAYABLI_ALLOW_INSECURE_UPSTREAM === "true";
 
 export const configuredCorsOrigins = parseCsvSet(process.env.PAYABLI_ALLOWED_CORS_ORIGINS || "");
 
