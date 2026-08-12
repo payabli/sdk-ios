@@ -228,17 +228,20 @@ while IFS=$'\t' read -r old_path path; do
 
     changed=$(diff "$WORK/$old_path" "$WORK/head-version" | grep -E '^[<>]' || true)
 
-    # Net of relocations. A line removed from one place and added unchanged in
-    # another is a move, and a move compiles to what it compiled to before.
-    # Counting both ends of it reports a rewrite where a block shifted.
+    # Both sides of the diff, counted. An earlier version netted out a line that
+    # was removed from one place and added unchanged in another, on the grounds
+    # that a move compiles to what it compiled to before. That is not true of a
+    # statement: order is behaviour, so validation moved to after the network
+    # call it guards is a change made entirely of unaltered lines, and netting
+    # reported it as nothing to read.
     side() {   # $1 = < or >, $2 = keep|drop comments
         local filter='^(///|//|/\*|\*/|\*)'
         printf '%s\n' "$changed" | grep -E "^$1" | sed -E 's/^.[[:space:]]*//' \
             | if [ "$2" = drop ]; then grep -vE "$filter"; else grep -E "$filter"; fi \
             | grep -v '^[[:space:]]*$' | sed -E 's/[[:space:]]+/ /g' | sort
     }
-    code=$(comm -3 <(side '<' drop) <(side '>' drop) | grep -c . || true)
-    comments=$(comm -3 <(side '<' keep) <(side '>' keep) | grep -c . || true)
+    code=$(( $(side '<' drop | grep -c . || true) + $(side '>' drop | grep -c . || true) ))
+    comments=$(( $(side '<' keep | grep -c . || true) + $(side '>' keep | grep -c . || true) ))
 
     # The contract consumers compile against, which the repository holds in
     # common with the SDK for Android. Both sides are the whole visible surface
@@ -302,9 +305,10 @@ if [ "$semantic" -gt 0 ]; then
     echo "#### Files that can change behaviour"
     echo
     echo "\`Code\` counts declarations and executable statements that differ once"
-    echo "formatting is normalised and relocations are netted out: a line moved"
-    echo "without being altered compiles to what it compiled to before. \`Docs\` is"
-    echo "the same count for comments."
+    echo "formatting is normalised, on both sides of the diff, so an altered line"
+    echo "counts twice and a line that only moved still counts. Order is behaviour:"
+    echo "validation moved to after the network call it guards is a change made"
+    echo "entirely of unaltered lines. \`Docs\` is the same count for comments."
     echo
     echo "| Code | Docs | File |"
     echo "| ---: | ---: | --- |"
