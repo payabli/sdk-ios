@@ -10,6 +10,14 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+# Every job here runs the pull request's own code, so the token it inherits is
+# pinned rather than left to the repository's default. That default is read-only
+# today and is a setting, not a property of this file; without this line, raising
+# it would silently hand a write to code the branch controls, which `checkout`
+# leaves in `.git/config` for whatever runs next.
+permissions:
+  contents: read
+
 # Four jobs, run at once. The two suites are the whole cost of this workflow and
 # neither reads anything the other writes, so run in sequence they only add up.
 # They cannot share a build: both compile the SDK, but one is the package's own
@@ -34,6 +42,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # Nothing here pushes, so the token is not left in `.git/config` for
+          # the branch's own scripts to find.
+          persist-credentials: false
 
       - uses: ./.github/actions/lint-tools
 
@@ -69,6 +81,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - uses: ./.github/actions/lint-tools
 
@@ -96,6 +109,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # Nothing here pushes, so the token is not left in `.git/config` for
+          # the branch's own scripts to find.
+          persist-credentials: false
 
       - uses: ./.github/actions/ios-toolchain
 
@@ -138,6 +155,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # Nothing here pushes, so the token is not left in `.git/config` for
+          # the branch's own scripts to find.
+          persist-credentials: false
 
       - uses: ./.github/actions/ios-toolchain
 
