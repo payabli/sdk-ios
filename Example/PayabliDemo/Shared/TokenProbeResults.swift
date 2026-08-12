@@ -33,9 +33,18 @@ final class TokenProbeResults: ObservableObject {
         case capture
     }
 
+    /// The last answer each probe settled on. A run in flight does not clear it:
+    /// the probe is shared, so a run started on the Configuration tab would
+    /// otherwise retract a verdict a payment tab had already acted on, and a
+    /// backend step that stops being finished takes the form row down with it,
+    /// along with the `@StateObject` holding what a payer had typed.
     @Published private(set) var cardPresent = ""
     @Published private(set) var storedMethod = ""
     @Published private(set) var capture = ""
+
+    /// Which probes are in flight, kept apart from the answers for the reason
+    /// above. A screen reads it to disable the control that would start another.
+    @Published private(set) var running: Set<Probe> = []
 
     private let fetches: [Probe: Fetch]
 
@@ -75,6 +84,29 @@ final class TokenProbeResults: ObservableObject {
         }
     }
 
+    func isRunning(_ probe: Probe) -> Bool {
+        running.contains(probe)
+    }
+
+    /// What a step sequence should read. A run in flight is the answer only while
+    /// there is no earlier one to keep; after that the earlier verdict stands
+    /// until the new one lands, so the sequence does not step backwards and take
+    /// the form down while a payer is filling it in.
+    func check(_ probe: Probe) -> TokenCheck {
+        let answer = answer(for: probe)
+        if answer.isEmpty, isRunning(probe) {
+            return .checking
+        }
+        return TokenCheck.classify(answer)
+    }
+
+    /// What a step row should show. Unlike `check`, this does report a run in
+    /// flight over an earlier answer, because a row a person is looking at should
+    /// say the button they pressed is doing something.
+    func display(for probe: Probe) -> String {
+        isRunning(probe) ? "Checking…" : answer(for: probe)
+    }
+
     func probeCardPresent() async {
         await run(.cardPresent, named: "Card-present token endpoint")
     }
@@ -90,7 +122,7 @@ final class TokenProbeResults: ObservableObject {
     private func run(_ probe: Probe, named name: String) async {
         let generation = (generations[probe] ?? 0) + 1
         generations[probe] = generation
-        publish("Checking…", to: probe)
+        running.insert(probe)
 
         let answer: String
         do {
@@ -100,8 +132,10 @@ final class TokenProbeResults: ObservableObject {
             answer = "✗ \(name) failed: \(error.localizedDescription)"
         }
 
-        // A later run of this probe has already answered, so this one is stale.
+        // A later run of this probe has already answered, so this one is stale
+        // and leaves both the answer and the in-flight set to that later run.
         guard generations[probe] == generation else { return }
+        running.remove(probe)
         publish(answer, to: probe)
     }
 

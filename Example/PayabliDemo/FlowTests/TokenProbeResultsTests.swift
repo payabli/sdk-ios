@@ -92,6 +92,64 @@ final class TokenProbeResultsTests: XCTestCase {
         )
     }
 
+    /// The probe is shared, so this run can have been started from another tab
+    /// while a payer is part way through the form here. A backend step that stops
+    /// being finished blocks the form row, and `StepRow` takes the row's content
+    /// down with the `@StateObject` holding what was typed.
+    func testARunInFlightKeepsTheAnswerTheLastOneSettledOn() async {
+        let latch = Latch()
+        let store = TokenProbeResults(
+            fetchCardPresent: {
+                let run = await latch.hold()
+                _ = run
+                return "token"
+            },
+            fetchStoredMethod: { "" },
+            fetchCapture: { "" }
+        )
+
+        let first = Task { await store.probeCardPresent() }
+        await waitUntil("the first run registers") { await latch.count() >= 1 }
+        await latch.release(1)
+        await first.value
+        XCTAssertEqual(store.check(.cardPresent), .reachable)
+
+        let second = Task { await store.probeCardPresent() }
+        await waitUntil("the second run registers") { await latch.count() >= 2 }
+
+        XCTAssertTrue(store.isRunning(.cardPresent))
+        XCTAssertEqual(
+            store.check(.cardPresent), .reachable,
+            "a run in flight retracted the answer the step had already acted on"
+        )
+        XCTAssertEqual(store.display(for: .cardPresent), "Checking…")
+
+        await latch.release(2)
+        await second.value
+        XCTAssertFalse(store.isRunning(.cardPresent))
+        XCTAssertEqual(store.check(.cardPresent), .reachable)
+    }
+
+    func testTheFirstRunOfAllReportsItselfAsChecking() async {
+        let latch = Latch()
+        let store = TokenProbeResults(
+            fetchCardPresent: {
+                _ = await latch.hold()
+                return "token"
+            },
+            fetchStoredMethod: { "" },
+            fetchCapture: { "" }
+        )
+
+        let run = Task { await store.probeCardPresent() }
+        await waitUntil("the run registers") { await latch.count() >= 1 }
+
+        XCTAssertEqual(store.check(.cardPresent), .checking)
+
+        await latch.release(1)
+        await run.value
+    }
+
     func testASingleRunStillPublishes() async {
         let store = TokenProbeResults(
             fetchCardPresent: { "token" },

@@ -31,13 +31,14 @@ struct PaymentCaptureQAView: View {
                             }
                             .buttonStyle(.bordered)
                             // The probe is shared, so a run started on another
-                            // tab is this step's `.inProgress` too. The derived
-                            // step is what knows that; a local flag does not.
-                            .disabled(!steps.backend.status.isActionable)
-                            if !tokenProbes.capture.isEmpty {
-                                Text(tokenProbes.capture)
+                            // tab is in flight here too. The store is what knows
+                            // that; a local flag does not.
+                            .disabled(tokenProbes.isRunning(.capture))
+                            if !tokenProbes.display(for: .capture).isEmpty {
+                                Text(tokenProbes.display(for: .capture))
                                     .font(.caption)
-                                    .foregroundColor(tokenProbes.capture.hasPrefix("✗") ? .payabliError : .payabliOnSurfaceVariant)
+                                    .foregroundColor(tokenProbes.display(for: .capture)
+                                        .hasPrefix("✗") ? .payabliError : .payabliOnSurfaceVariant)
                             }
                         }
                     }
@@ -135,7 +136,7 @@ struct PaymentCaptureQAView: View {
     private var steps: PayInFlowSteps {
         PayInSteps.forCapture(
             PayInProgress(
-                tokenCheck: TokenCheck.classify(tokenProbes.capture),
+                tokenCheck: tokenProbes.check(.capture),
                 hasResult: paymentFlow.lastResult != nil,
                 resultAcknowledged: resultAcknowledged,
                 isSubmitting: paymentFlow.isSubmitting,

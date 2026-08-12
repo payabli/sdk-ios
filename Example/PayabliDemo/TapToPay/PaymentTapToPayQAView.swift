@@ -74,7 +74,7 @@ struct PaymentTapToPayQAView: View {
     /// steps can disagree about which is next.
     private var steps: TapToPayFlowSteps {
         TapToPaySteps.forCharging(
-            tokenCheck: TokenCheck.classify(tokenProbes.cardPresent),
+            tokenCheck: tokenProbes.check(.cardPresent),
             session: terminal.sessionState,
             activation: activationOutcome
         )
@@ -94,9 +94,9 @@ struct PaymentTapToPayQAView: View {
                     // `isWorking` covers this screen's own operations. The probe
                     // is shared, so a run started on another tab is this step's
                     // `.inProgress` and only the derived step knows it.
-                    .disabled(isWorking || !steps.token.status.isActionable)
-                    if !tokenProbes.cardPresent.isEmpty {
-                        Text(tokenProbes.cardPresent)
+                    .disabled(isWorking || tokenProbes.isRunning(.cardPresent))
+                    if !tokenProbes.display(for: .cardPresent).isEmpty {
+                        Text(tokenProbes.display(for: .cardPresent))
                             .font(.caption)
                             .foregroundColor(.payabliOnSurfaceVariant)
                     }

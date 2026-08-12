@@ -30,13 +30,14 @@ struct PaymentMethodQAView: View {
                             }
                             .buttonStyle(.bordered)
                             // The probe is shared, so a run started on another
-                            // tab is this step's `.inProgress` too. The derived
-                            // step is what knows that; a local flag does not.
-                            .disabled(!steps.backend.status.isActionable)
-                            if !tokenProbes.storedMethod.isEmpty {
-                                Text(tokenProbes.storedMethod)
+                            // tab is in flight here too. The store is what knows
+                            // that; a local flag does not.
+                            .disabled(tokenProbes.isRunning(.storedMethod))
+                            if !tokenProbes.display(for: .storedMethod).isEmpty {
+                                Text(tokenProbes.display(for: .storedMethod))
                                     .font(.caption)
-                                    .foregroundColor(tokenProbes.storedMethod.hasPrefix("✗") ? .payabliError : .payabliOnSurfaceVariant)
+                                    .foregroundColor(tokenProbes.display(for: .storedMethod)
+                                        .hasPrefix("✗") ? .payabliError : .payabliOnSurfaceVariant)
                             }
                         }
                     }
@@ -132,7 +133,7 @@ struct PaymentMethodQAView: View {
     private var steps: PayInFlowSteps {
         PayInSteps.forStoringMethod(
             PayInProgress(
-                tokenCheck: TokenCheck.classify(tokenProbes.storedMethod),
+                tokenCheck: tokenProbes.check(.storedMethod),
                 hasResult: paymentFlow.lastResult != nil,
                 resultAcknowledged: resultAcknowledged,
                 isSubmitting: paymentFlow.isSubmitting,

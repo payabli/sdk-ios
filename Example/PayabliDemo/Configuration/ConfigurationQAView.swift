@@ -86,7 +86,7 @@ struct ConfigurationQAView: View {
             .buttonStyle(.bordered)
             // `isWorking` is this screen's own. A probe started on a tab is in
             // flight here too, and only the shared answer says so.
-            .disabled(isWorking || isChecking(tokenProbes.cardPresent))
+            .disabled(isWorking || tokenProbes.isRunning(.cardPresent))
 
             Button { runCardNotPresentTokenCheck() } label: {
                 Label("Check card-not-present tokens", systemImage: "key.horizontal")
@@ -94,8 +94,8 @@ struct ConfigurationQAView: View {
             .buttonStyle(.bordered)
             .disabled(
                 isWorking
-                    || isChecking(tokenProbes.storedMethod)
-                    || isChecking(tokenProbes.capture)
+                    || tokenProbes.isRunning(.storedMethod)
+                    || tokenProbes.isRunning(.capture)
             )
 
             Button { runHealthCheck() } label: {
@@ -106,9 +106,9 @@ struct ConfigurationQAView: View {
 
             ForEach(
                 [
-                    tokenProbes.cardPresent,
-                    tokenProbes.storedMethod,
-                    tokenProbes.capture,
+                    tokenProbes.display(for: .cardPresent),
+                    tokenProbes.display(for: .storedMethod),
+                    tokenProbes.display(for: .capture),
                     healthCheckText
                 ].filter { !$0.isEmpty },
                 id: \.self
@@ -227,10 +227,6 @@ struct ConfigurationQAView: View {
             }
             content()
         }
-    }
-
-    private func isChecking(_ answer: String) -> Bool {
-        TokenCheck.classify(answer) == .checking
     }
 
     // MARK: - Actions
