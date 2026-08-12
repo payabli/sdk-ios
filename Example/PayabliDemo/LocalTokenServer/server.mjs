@@ -378,11 +378,21 @@ async function requestActivationCode(options = {}) {
   }
 
   const data = payload.responseData || {};
+  // An envelope that reports success and carries no code is an upstream fault, not an activation.
+  // Returned as 200 with an empty code it reads as issuance, and the device is never activated.
+  const code = stringValue(data.code);
+  if (!code) {
+    throw new LocalTokenServerError(
+      502,
+      `Activation challenge for ${deviceId} on ${entry} reported success and returned no code.`
+    );
+  }
+
   return {
     entry,
     deviceId,
     resolvedFrom,
-    code: stringValue(data.code),
+    code,
     expiresAt: stringValue(data.expiresAt),
     alreadyIssued: Boolean(data.alreadyIssued)
   };
