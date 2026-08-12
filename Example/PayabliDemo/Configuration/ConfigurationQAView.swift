@@ -10,8 +10,7 @@ import SwiftUI
 /// The card-not-present rows read from `PayInSharedConfiguration`, the same
 /// source the forms use, so this screen cannot drift from the real behaviour.
 struct ConfigurationQAView: View {
-    @State private var tokenCheckText = ""
-    @State private var cardNotPresentCheckText = ""
+    @EnvironmentObject private var tokenProbes: TokenProbeResults
     @State private var healthCheckText = ""
     @State private var isWorking = false
 
@@ -100,7 +99,7 @@ struct ConfigurationQAView: View {
             .disabled(isWorking)
 
             ForEach(
-                [tokenCheckText, cardNotPresentCheckText, healthCheckText].filter { !$0.isEmpty },
+                [tokenProbes.cardPresent, tokenProbes.cardNotPresent, healthCheckText].filter { !$0.isEmpty },
                 id: \.self
             ) { line in
                 Text(line)
@@ -221,34 +220,19 @@ struct ConfigurationQAView: View {
 
     // MARK: - Actions
 
-    /// Reports only *that* a token arrived. Never the value.
     private func runTokenCheck() {
         isWorking = true
-        tokenCheckText = "Checking token…"
         Task {
             defer { isWorking = false }
-            do {
-                _ = try await Secrets.fetchAccessToken()
-                tokenCheckText = "✓ Card-present token endpoint returned a token"
-            } catch {
-                tokenCheckText = "✗ Card-present token endpoint failed: \(error.localizedDescription)"
-            }
+            await tokenProbes.probeCardPresent()
         }
     }
 
-    /// The endpoint both card-not-present tabs call. `fetchPaymentCaptureAccessToken`
-    /// forwards to this one, so a single probe answers for both.
     private func runCardNotPresentTokenCheck() {
         isWorking = true
-        cardNotPresentCheckText = "Checking token…"
         Task {
             defer { isWorking = false }
-            do {
-                _ = try await Secrets.fetchPaymentMethodAccessToken()
-                cardNotPresentCheckText = "✓ Card-not-present token endpoint returned a token"
-            } catch {
-                cardNotPresentCheckText = "✗ Card-not-present token endpoint failed: \(error.localizedDescription)"
-            }
+            await tokenProbes.probeCardNotPresent()
         }
     }
 
@@ -274,4 +258,5 @@ struct ConfigurationQAView: View {
 
 #Preview {
     ConfigurationQAView()
+        .environmentObject(TokenProbeResults())
 }

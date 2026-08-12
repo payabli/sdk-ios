@@ -43,6 +43,10 @@ struct PayabliDemoQAApp: App {
         environment: DemoConfiguration.environment
     )
 
+    /// One owner for the token probes, so a tab that has finished its backend
+    /// step still reflects an answer another tab has since had.
+    @StateObject private var tokenProbes = TokenProbeResults()
+
     var body: some Scene {
         WindowGroup {
             TabView {
@@ -69,6 +73,7 @@ struct PayabliDemoQAApp: App {
             // The app-wide tint. The palette lives in one Swift file rather than an
             // asset catalogue, so it is set here instead of by an AccentColor asset.
             .tint(.payabliPrimary)
+            .environmentObject(tokenProbes)
         }
     }
 }
@@ -129,4 +134,5 @@ struct PayabliDemoQAApp: App {
                 Label("Config", systemImage: "gearshape")
             }
     }
+    .environmentObject(TokenProbeResults())
 }

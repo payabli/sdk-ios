@@ -16,12 +16,12 @@ import SwiftUI
 struct PaymentTapToPayQAView: View {
     @ObservedObject var terminal: PayabliTTP
 
+    @EnvironmentObject private var tokenProbes: TokenProbeResults
     @State private var amountText = "1.00"
     @State private var activationCode = ""
     @State private var enableMessage = ""
     @State private var activationMessage = ""
     @State private var chargeMessage = ""
-    @State private var tokenCheckText = ""
     @State private var eventLog: [TapToPayQAEventEntry] = []
     @State private var eventToken: PayabliTTPEventToken?
     @State private var isActivationPresented = false
@@ -74,7 +74,7 @@ struct PaymentTapToPayQAView: View {
     /// steps can disagree about which is next.
     private var steps: TapToPayFlowSteps {
         TapToPaySteps.forCharging(
-            tokenCheck: TokenCheck.classify(tokenCheckText),
+            tokenCheck: TokenCheck.classify(tokenProbes.cardPresent),
             session: terminal.sessionState,
             activation: activationOutcome
         )
@@ -92,8 +92,8 @@ struct PaymentTapToPayQAView: View {
                     }
                     .buttonStyle(.bordered)
                     .disabled(isWorking)
-                    if !tokenCheckText.isEmpty {
-                        Text(tokenCheckText)
+                    if !tokenProbes.cardPresent.isEmpty {
+                        Text(tokenProbes.cardPresent)
                             .font(.caption)
                             .foregroundColor(.payabliOnSurfaceVariant)
                     }
@@ -463,18 +463,11 @@ struct PaymentTapToPayQAView: View {
     }
 
     /// Confirms the partner backend answers before `initialize()` depends on it.
-    /// Reports only that a token arrived — never the token itself.
     private func runTokenCheck() {
         isWorking = true
-        tokenCheckText = "Checking…"
         Task {
             defer { isWorking = false }
-            do {
-                _ = try await Secrets.fetchAccessToken()
-                tokenCheckText = "✓ Token endpoint returned a token"
-            } catch {
-                tokenCheckText = "✗ Token endpoint failed: \(error.localizedDescription)"
-            }
+            await tokenProbes.probeCardPresent()
         }
     }
 

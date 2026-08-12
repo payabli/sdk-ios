@@ -7,8 +7,8 @@ struct PaymentCaptureQAView: View {
     @ObservedObject var paymentFlow: PayabliPayInPaymentFlow
 
     @StateObject private var diagnosticsStore = DiagnosticsStore.paymentCapture
+    @EnvironmentObject private var tokenProbes: TokenProbeResults
     @State private var resultText = ""
-    @State private var tokenCheckText = ""
     @State private var resultAcknowledged = false
     @State private var submitFailed = false
     @State private var isCheckingToken = false
@@ -32,10 +32,10 @@ struct PaymentCaptureQAView: View {
                             }
                             .buttonStyle(.bordered)
                             .disabled(isCheckingToken)
-                            if !tokenCheckText.isEmpty {
-                                Text(tokenCheckText)
+                            if !tokenProbes.cardNotPresent.isEmpty {
+                                Text(tokenProbes.cardNotPresent)
                                     .font(.caption)
-                                    .foregroundColor(tokenCheckText.hasPrefix("✗") ? .payabliError : .payabliOnSurfaceVariant)
+                                    .foregroundColor(tokenProbes.cardNotPresent.hasPrefix("✗") ? .payabliError : .payabliOnSurfaceVariant)
                             }
                         }
                     }
@@ -133,7 +133,7 @@ struct PaymentCaptureQAView: View {
     private var steps: PayInFlowSteps {
         PayInSteps.forCapture(
             PayInProgress(
-                tokenCheck: TokenCheck.classify(tokenCheckText),
+                tokenCheck: TokenCheck.classify(tokenProbes.cardNotPresent),
                 hasResult: paymentFlow.lastResult != nil,
                 resultAcknowledged: resultAcknowledged,
                 isSubmitting: paymentFlow.isSubmitting,
@@ -173,18 +173,11 @@ struct PaymentCaptureQAView: View {
         )
     }
 
-    /// Reports only that a token arrived. Never the token itself.
     private func runTokenCheck() {
         isCheckingToken = true
-        tokenCheckText = "Checking…"
         Task {
             defer { isCheckingToken = false }
-            do {
-                _ = try await Secrets.fetchPaymentCaptureAccessToken()
-                tokenCheckText = "✓ Token endpoint returned a token"
-            } catch {
-                tokenCheckText = "✗ \(error.localizedDescription)"
-            }
+            await tokenProbes.probeCardNotPresent()
         }
     }
 
@@ -384,4 +377,5 @@ struct PaymentCaptureQAView: View {
             )
         )
     )
+    .environmentObject(TokenProbeResults())
 }
