@@ -8,20 +8,24 @@ final class TokenProbeResultsTests: XCTestCase {
     /// Holds each fetch until the test releases it, so the finishing order is the
     /// test's choice. Ordering asserted against real timing would be a coin toss.
     private actor Latch {
-        private var entered = 0
+        private var registered = 0
         private var held: [Int: CheckedContinuation<Void, Never>] = [:]
 
-        func enter() -> Int {
-            entered += 1
-            return entered
+        /// Takes the next run number and registers it in one call. Numbering in
+        /// one call and registering in another lets a `release` land in between,
+        /// where it finds nothing to resume and is dropped, and the run it was
+        /// meant for then waits for a release that has already happened. Nothing
+        /// suspends between the two lines below, so a run the test can count is
+        /// a run the test can release.
+        func hold() async -> Int {
+            registered += 1
+            let run = registered
+            await withCheckedContinuation { held[run] = $0 }
+            return run
         }
 
         func count() -> Int {
-            entered
-        }
-
-        func hold(_ run: Int) async {
-            await withCheckedContinuation { held[run] = $0 }
+            registered
         }
 
         func release(_ run: Int) {
@@ -61,8 +65,7 @@ final class TokenProbeResultsTests: XCTestCase {
         // is visible in the text rather than inferred.
         let store = TokenProbeResults(
             fetchCardPresent: {
-                let run = await latch.enter()
-                await latch.hold(run)
+                let run = await latch.hold()
                 if run == 1 {
                     throw Refused()
                 }
@@ -73,9 +76,9 @@ final class TokenProbeResultsTests: XCTestCase {
         )
 
         let first = Task { await store.probeCardPresent() }
-        await waitUntil("the first run reaches its fetch") { await latch.count() >= 1 }
+        await waitUntil("the first run registers") { await latch.count() >= 1 }
         let second = Task { await store.probeCardPresent() }
-        await waitUntil("the second run reaches its fetch") { await latch.count() >= 2 }
+        await waitUntil("the second run registers") { await latch.count() >= 2 }
 
         await latch.release(2)
         await second.value
