@@ -24,7 +24,7 @@ public enum PayabliErrorCode: String, Sendable {
 /// this with domain-specific error types (e.g. `PayabliTTPError`).
 ///
 /// See PRD §8 and §20.2.
-public protocol PayabliError: Error, Sendable {
+public protocol PayabliError: LocalizedError, Sendable {
     /// Machine-readable code.
     var code: PayabliErrorCode { get }
 
@@ -33,6 +33,17 @@ public protocol PayabliError: Error, Sendable {
 
     /// Optional detailed explanation.
     var detail: String? { get }
+}
+
+public extension PayabliError {
+    /// What `localizedDescription` returns, which is what a host app puts in
+    /// front of a merchant. Without this every one of these reads "The
+    /// operation couldn't be completed. (Module.Type error N.)", and the
+    /// `reason` the SDK went to the trouble of parsing never leaves the SDK.
+    var errorDescription: String? {
+        guard let detail, !detail.isEmpty, detail != reason else { return reason }
+        return "\(reason): \(detail)"
+    }
 }
 
 /// A generic transport or client-side error.
@@ -82,6 +93,23 @@ public struct PayabliValidationError: PayabliError, Decodable {
         title ?? "Validation failed"
     }
 
+    /// Appends the per-field messages, which are the part that says which
+    /// field the server rejected. The title alone is usually "Validation
+    /// failed", which tells a merchant nothing. Field *names* only — the
+    /// suggestions are left out rather than risk echoing a submitted value.
+    public var errorDescription: String? {
+        var parts = [reason]
+        if let detail, !detail.isEmpty, detail != reason {
+            parts.append(detail)
+        }
+        for (field, entries) in (errors ?? [:]).sorted(by: { $0.key < $1.key }) {
+            for entry in entries {
+                parts.append("\(field): \(entry.message)")
+            }
+        }
+        return parts.joined(separator: " · ")
+    }
+
     enum CodingKeys: String, CodingKey {
         case type, title, status, detail, instance, errors, token
         case rawCode = "code"
@@ -119,6 +147,19 @@ public struct PayabliDeclineError: PayabliError, Decodable {
         explanation
     }
 
+    /// A decline carries the one thing the payer can act on, so `action` is
+    /// worth more here than anywhere else and the default drops it.
+    public var errorDescription: String? {
+        var parts = [reason]
+        if let explanation, !explanation.isEmpty, explanation != reason {
+            parts.append(explanation)
+        }
+        if let action, !action.isEmpty {
+            parts.append(action)
+        }
+        return parts.joined(separator: " · ")
+    }
+
     enum CodingKeys: String, CodingKey {
         case reason, explanation, action
         case rawCode = "code"
@@ -127,7 +168,7 @@ public struct PayabliDeclineError: PayabliError, Decodable {
 
 /// Umbrella error for payment-processing flows. Host apps switch on this to
 /// distinguish decline, validation, server, or generic errors.
-public enum PayabliPaymentError: Error, Sendable {
+public enum PayabliPaymentError: LocalizedError, Sendable {
     case decline(PayabliDeclineError)
     case validation(PayabliValidationError)
     case server(PayabliServerError)
@@ -140,5 +181,12 @@ public enum PayabliPaymentError: Error, Sendable {
         case let .server(err): return err
         case let .generic(err): return err
         }
+    }
+
+    /// Defers to the wrapped error. An enum that only conforms to `Error`
+    /// renders as its case index, so this surfaced as
+    /// "PayabliPaymentError error 1" with the parsed reason discarded.
+    public var errorDescription: String? {
+        asPayabliError.errorDescription
     }
 }
