@@ -1,0 +1,26 @@
+// The walkthrough under UITests/, which drives the app rather than calling into it.
+//
+// TEST_TARGET_NAME rather than TEST_HOST: a UI test launches the app as a separate process, so this
+// target compiles none of the app's sources and shares none of its state. That is also why it can only
+// read the app through what the screen exposes.
+//
+// The app target cannot compile on a clean checkout, because Secrets.swift is gitignored and is a member
+// of its Sources phase, so this target builds only where that file exists. CI opens neither: it builds
+// the PayabliSDK-Package scheme alone.
+
+PRODUCT_BUNDLE_IDENTIFIER = com.payabli.example.app.uitests
+TEST_TARGET_NAME = PayabliDemo
+GENERATE_INFOPLIST_FILE = YES
+INFOPLIST_FILE =
+CODE_SIGN_ENTITLEMENTS =
+
+IPHONEOS_DEPLOYMENT_TARGET = 16.7
+SDKROOT = iphoneos
+TARGETED_DEVICE_FAMILY = 1,2
+SWIFT_VERSION = 5.0
+
+CODE_SIGNING_ALLOWED = NO
+CODE_SIGN_STYLE = Manual
+DEVELOPMENT_TEAM =
+
+LD_RUNPATH_SEARCH_PATHS = $(inherited) @executable_path/Frameworks @loader_path/Frameworks
