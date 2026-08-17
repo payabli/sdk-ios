@@ -1,11 +1,10 @@
-import Foundation
 import CryptoKit
+import Foundation
 import PayabliSDKCore
 
 // MARK: - Attestation flow (PRD §18.1) & per-request assertions (PRD §18.2)
 
 extension AppAttestService {
-
     /// Apple's DeviceCheck / App Attest error domain (`DCError`). Bridged as a
     /// string so this file needs no `import DeviceCheck` and stays testable on
     /// hosts where `DCAppAttestService` is unavailable.
@@ -104,7 +103,8 @@ extension AppAttestService {
 
     public func generateAssertion() async throws -> AssertionHeaders {
         guard let storedKeyId = storage.string(forKey: PayabliKeychainKey.keyId),
-              let deviceId = storage.string(forKey: PayabliKeychainKey.deviceId) else {
+              let deviceId = storage.string(forKey: PayabliKeychainKey.deviceId)
+        else {
             throw PayabliTTPError.attestationFailed(reason: "Missing attestation state")
         }
         let keyId = AppAttestKeyId(storedKeyId)

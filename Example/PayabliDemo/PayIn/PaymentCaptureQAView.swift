@@ -7,11 +7,10 @@ struct PaymentCaptureQAView: View {
     @ObservedObject var paymentFlow: PayabliPayInPaymentFlow
 
     @StateObject private var diagnosticsStore = DiagnosticsStore.paymentCapture
+    @EnvironmentObject private var tokenProbes: TokenProbeResults
     @State private var resultText = ""
-    @State private var tokenCheckText = ""
     @State private var resultAcknowledged = false
     @State private var submitFailed = false
-    @State private var isCheckingToken = false
     @State private var capturedResult: PayabliPayInPaymentFlowResult?
     @State private var isPaymentCaptureSheetPresented = false
     @State private var isPaymentCaptureResultViewPresented = false
@@ -25,32 +24,26 @@ struct PaymentCaptureQAView: View {
                     Text("Steps")
                         .font(.headline)
 
-                    QAStepRow(
-                        index: 1,
-                        title: "Reach the token backend",
-                        detail: "The SDK asks your backend for a short-lived access token before it submits.",
-                        status: tokenStepStatus
-                    ) {
+                    StepRow(index: 1, step: steps.backend) {
                         VStack(alignment: .leading, spacing: 6) {
                             Button { runTokenCheck() } label: {
                                 Label("Check token endpoint", systemImage: "key.horizontal")
                             }
                             .buttonStyle(.bordered)
-                            .disabled(isCheckingToken)
-                            if !tokenCheckText.isEmpty {
-                                Text(tokenCheckText)
+                            // The probe is shared, so a run started on another
+                            // tab is in flight here too. The store is what knows
+                            // that; a local flag does not.
+                            .disabled(tokenProbes.isRunning(.capture))
+                            if !tokenProbes.display(for: .capture).isEmpty {
+                                Text(tokenProbes.display(for: .capture))
                                     .font(.caption)
-                                    .foregroundColor(tokenCheckText.hasPrefix("✗") ? .payabliError : .payabliOnSurfaceVariant)
+                                    .foregroundColor(tokenProbes.display(for: .capture)
+                                        .hasPrefix("✗") ? .payabliError : .payabliOnSurfaceVariant)
                             }
                         }
                     }
 
-                    QAStepRow(
-                        index: 2,
-                        title: "Enter the payment details",
-                        detail: "The SDK owns these fields; clear PAN never reaches the host app.",
-                        status: formStepStatus
-                    ) {
+                    StepRow(index: 2, step: steps.form) {
                         VStack(alignment: .leading, spacing: 12) {
                             Button {
                                 isPaymentCaptureSheetPresented = true
@@ -61,7 +54,7 @@ struct PaymentCaptureQAView: View {
                             .buttonStyle(.bordered)
 
                             #if DEBUG
-                            DebugPrefillButton()
+                                DebugPrefillButton()
                             #endif
 
                             PayabliPayInPaymentFlowView(
@@ -71,19 +64,26 @@ struct PaymentCaptureQAView: View {
                                 onError: handleError
                             )
                             .payabliPayInPaymentFlowStyle(style)
+
+                            // The step that failed shows why. A failed form
+                            // blocks the result row, which is the only other
+                            // place this text renders, so leaving it there
+                            // offers a retry with no reason beside it.
+                            if submitFailed {
+                                Text(resultText)
+                                    .font(.footnote)
+                                    .foregroundColor(.payabliError)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .textSelection(.enabled)
+                            }
                         }
                     }
 
-                    QAStepRow(
-                        index: 3,
-                        title: "Transaction",
-                        detail: "A successful submit returns an approved transaction id.",
-                        status: resultStepStatus
-                    ) {
+                    StepRow(index: 3, step: steps.result) {
                         VStack(alignment: .leading, spacing: 10) {
                             Text(resultText.isEmpty ? "Nothing captured yet." : resultText)
                                 .font(.footnote)
-                                .foregroundColor(submitFailed ? .payabliError : .payabliOnSurfaceVariant)
+                                .foregroundColor(.payabliOnSurfaceVariant)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .textSelection(.enabled)
 
@@ -120,60 +120,39 @@ struct PaymentCaptureQAView: View {
         )
         #if DEBUG
         .onChange(of: isPaymentCaptureSheetPresented) { isPresented in
-            guard isPresented else { return }
-            // Let the sheet's fields mount before injecting values.
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-                DebugPrefill.fill()
+                guard isPresented else { return }
+                // Let the sheet's fields mount before injecting values.
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                    DebugPrefill.fill()
+                }
             }
-        }
         #endif
     }
 
-    // MARK: - Step status
+    // MARK: - The sequence
 
     /// `PayabliPayInPaymentFlow` publishes only `isSubmitting` and `lastResult`,
-    /// so these three derive from those plus the token check — never from state
-    /// tracked separately, which could disagree with the component.
-    /// True once the backend is known reachable — either the check was run, or
-    /// a submit already succeeded, which proves it just as well.
-    private var backendProven: Bool {
-        tokenCheckText.hasPrefix("✓") || paymentFlow.lastResult != nil
+    /// so the sequence derives from those plus the token probe.
+    private var steps: PayInFlowSteps {
+        PayInSteps.forCapture(
+            PayInProgress(
+                tokenCheck: tokenProbes.check(.capture),
+                hasResult: paymentFlow.lastResult != nil,
+                resultAcknowledged: resultAcknowledged,
+                isSubmitting: paymentFlow.isSubmitting,
+                submitFailed: submitFailed
+            )
+        )
     }
 
-    /// The component keeps `lastResult` forever and exposes no reset, so a
-    /// finished submit would pin the flow on step 3 with no way back. This
-    /// records that the result has been read and another entry is wanted.
-    private var showingFinishedResult: Bool {
-        paymentFlow.lastResult != nil && !resultAcknowledged
-    }
-
-    /// Hands the flow back to step 2 for another entry.
+    /// Hands the flow back to step 2 for another entry. The component keeps
+    /// `lastResult` forever and exposes no reset, so a finished submit would
+    /// otherwise pin the sequence on step 3.
     private func startAnother() {
         resultAcknowledged = true
         submitFailed = false
         resultText = ""
         paymentFlow.configure(requestConfiguration: Self.freshRequestConfiguration())
-    }
-
-    private var tokenStepStatus: QAStepStatus {
-        if tokenCheckText.hasPrefix("✗") { return .failed }
-        return backendProven ? .done : .current
-    }
-
-    private var formStepStatus: QAStepStatus {
-        // Exactly one step is ever `.current`, so this waits rather than
-        // competing with step 1 for attention.
-        guard backendProven else { return .blocked }
-        if paymentFlow.isSubmitting { return .inProgress }
-        if submitFailed { return .failed }
-        return showingFinishedResult ? .done : .current
-    }
-
-    private var resultStepStatus: QAStepStatus {
-        // A failure belongs to the step that produced it. Marking this one failed
-        // too would give the sequence two actionable failures.
-        if submitFailed { return .blocked }
-        return showingFinishedResult ? .current : .blocked
     }
 
     /// A capture's request configuration, with a key minted per submission.
@@ -197,19 +176,8 @@ struct PaymentCaptureQAView: View {
         )
     }
 
-    /// Reports only that a token arrived. Never the token itself.
     private func runTokenCheck() {
-        isCheckingToken = true
-        tokenCheckText = "Checking…"
-        Task {
-            defer { isCheckingToken = false }
-            do {
-                _ = try await Secrets.fetchPaymentCaptureAccessToken()
-                tokenCheckText = "✓ Token endpoint returned a token"
-            } catch {
-                tokenCheckText = "✗ \(error.localizedDescription)"
-            }
-        }
+        Task { await tokenProbes.probeCapture() }
     }
 
     private var configuration: PayabliPayInPaymentFlowFormConfiguration {
@@ -326,7 +294,9 @@ struct PaymentCaptureQAView: View {
         )
     }
 
-    private var style: PayabliPayInPaymentFlowStyle { PayInSharedConfiguration.style }
+    private var style: PayabliPayInPaymentFlowStyle {
+        PayInSharedConfiguration.style
+    }
 
     private var fieldsWithHiddenLabels: [PayabliPayInPaymentFlowField] {
         PayInSharedConfiguration.fieldsWithHiddenLabels
@@ -386,7 +356,6 @@ struct PaymentCaptureQAView: View {
     }
 }
 
-
 #Preview {
     PaymentCaptureQAView(
         paymentFlow: PayabliPayInPaymentFlow(
@@ -407,5 +376,5 @@ struct PaymentCaptureQAView: View {
             )
         )
     )
+    .environmentObject(TokenProbeResults.inert())
 }
-

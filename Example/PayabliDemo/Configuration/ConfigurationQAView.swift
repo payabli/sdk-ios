@@ -10,7 +10,7 @@ import SwiftUI
 /// The card-not-present rows read from `PayInSharedConfiguration`, the same
 /// source the forms use, so this screen cannot drift from the real behaviour.
 struct ConfigurationQAView: View {
-    @State private var tokenCheckText = ""
+    @EnvironmentObject private var tokenProbes: TokenProbeResults
     @State private var healthCheckText = ""
     @State private var isWorking = false
 
@@ -45,13 +45,12 @@ struct ConfigurationQAView: View {
             QADetailRow(label: "App ID", value: Secrets.appId)
             QADetailRow(
                 label: "Environment",
-                value: "\(DemoConfiguration.nameFor(DemoConfiguration.environment)) · " + (DemoConfiguration.environment.baseURL.host ?? "—")
+                value: "\(DemoConfiguration.nameFor(DemoConfiguration.environment)) · " +
+                    (DemoConfiguration.environment.baseURL.host ?? "—")
                     + " · " + DemoConfiguration.environmentSource
             )
         }
     }
-
-
 
     // MARK: - Token endpoint
 
@@ -75,21 +74,45 @@ struct ConfigurationQAView: View {
             )
             QADetailRow(label: "Resolved by", value: DemoConfiguration.TokenServer.explanation)
 
-            HStack(spacing: 12) {
-                Button { runTokenCheck() } label: {
-                    Label("Check token", systemImage: "key.horizontal")
-                }
-                .buttonStyle(.bordered)
-                .disabled(isWorking)
-
-                Button { runHealthCheck() } label: {
-                    Label("Health", systemImage: "heart.text.square")
-                }
-                .buttonStyle(.bordered)
-                .disabled(isWorking)
+            // Both probes live here, outside any step sequence, so either can be
+            // re-run at any time. The sequence on a payment tab hides its own
+            // probe once the step is done, and a stored method or a captured
+            // payment leaves it that way for the rest of the run.
+            // One per row, each sized to its label. Side by side the longer
+            // label wraps mid-word at this width.
+            Button { runTokenCheck() } label: {
+                Label("Check card-present token", systemImage: "key.horizontal")
             }
+            .buttonStyle(.bordered)
+            // `isWorking` is this screen's own. A probe started on a tab is in
+            // flight here too, and only the shared answer says so.
+            .disabled(isWorking || tokenProbes.isRunning(.cardPresent))
 
-            ForEach([tokenCheckText, healthCheckText].filter { !$0.isEmpty }, id: \.self) { line in
+            Button { runCardNotPresentTokenCheck() } label: {
+                Label("Check card-not-present tokens", systemImage: "key.horizontal")
+            }
+            .buttonStyle(.bordered)
+            .disabled(
+                isWorking
+                    || tokenProbes.isRunning(.storedMethod)
+                    || tokenProbes.isRunning(.capture)
+            )
+
+            Button { runHealthCheck() } label: {
+                Label("Local server health", systemImage: "heart.text.square")
+            }
+            .buttonStyle(.bordered)
+            .disabled(isWorking)
+
+            ForEach(
+                [
+                    tokenProbes.display(for: .cardPresent),
+                    tokenProbes.display(for: .storedMethod),
+                    tokenProbes.display(for: .capture),
+                    healthCheckText
+                ].filter { !$0.isEmpty },
+                id: \.self
+            ) { line in
                 Text(line)
                     .font(.caption)
                     .foregroundColor(.payabliOnSurfaceVariant)
@@ -189,7 +212,6 @@ struct ConfigurationQAView: View {
 
     // MARK: - Chrome
 
-    @ViewBuilder
     private func section(
         _ title: String,
         note: String?,
@@ -209,18 +231,22 @@ struct ConfigurationQAView: View {
 
     // MARK: - Actions
 
-    /// Reports only *that* a token arrived. Never the value.
     private func runTokenCheck() {
         isWorking = true
-        tokenCheckText = "Checking token…"
         Task {
             defer { isWorking = false }
-            do {
-                _ = try await Secrets.fetchAccessToken()
-                tokenCheckText = "✓ Token endpoint returned a token"
-            } catch {
-                tokenCheckText = "✗ Token endpoint failed: \(error.localizedDescription)"
-            }
+            await tokenProbes.probeCardPresent()
+        }
+    }
+
+    /// Both card-not-present endpoints, because the two tabs submit with
+    /// different token functions and this screen answers for both.
+    private func runCardNotPresentTokenCheck() {
+        isWorking = true
+        Task {
+            defer { isWorking = false }
+            await tokenProbes.probeStoredMethod()
+            await tokenProbes.probeCapture()
         }
     }
 
@@ -246,4 +272,5 @@ struct ConfigurationQAView: View {
 
 #Preview {
     ConfigurationQAView()
+        .environmentObject(TokenProbeResults.inert())
 }

@@ -1,0 +1,199 @@
+name: PR reports
+
+# Everything that needs a token, kept out of reach of the code it reports on.
+#
+# A `pull_request` workflow runs the head revision's copy of its own file, and a
+# same-repository pull request is granted the repository's secrets, so a branch
+# can add a step to a job in `ci.yml` and read whatever that job holds. Splitting
+# the token into a job that checks out nothing does not close it: the job's steps
+# are still written in the branch's copy of the file.
+#
+# GitHub triggers `workflow_run` only for a workflow file that exists on the
+# default branch, and runs that copy. So the two jobs below cannot be edited by
+# the pull request they are reporting on.
+#
+# The consequence to know: a change to this file does not take effect until it
+# is on the default branch, and cannot be exercised from a pull request.
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+
+# Granted per job, never here.
+permissions: {}
+
+jobs:
+  comment:
+    name: Change report comment
+    runs-on: ubuntu-latest
+    # `ci.yml` builds the report on pull requests only, and `ci.yml` cancels a
+    # run in progress when the next push arrives, which leaves no artifact to
+    # download. A failed run still has one, because the report job is not a gate.
+    #
+    # Same-repository only. A branch in a fork has no entry in `pull_requests`
+    # below, and this job would have nothing it could trust to say which pull
+    # request it is reporting on.
+    if: >-
+      github.event.workflow_run.event == 'pull_request'
+      && github.event.workflow_run.conclusion != 'cancelled'
+      && github.event.workflow_run.head_repository.full_name == github.repository
+    # One of these at a time per pull request. `ci.yml` cancels a superseded run,
+    # but cancelling is not instant: a run already at its last step finishes, and
+    # the push that superseded it produces a second. Both would then list the
+    # comments, both delete what they found, and the loser of that race deletes a
+    # comment that is already gone and reddens on it. The newer report is the one
+    # worth having, so it takes the older one's place.
+    concurrency:
+      group: change-report-${{ github.event.workflow_run.pull_requests[0].number }}
+      cancel-in-progress: true
+    permissions:
+      pull-requests: write
+      actions: read
+
+    steps:
+      # From the run that triggered this one, which is not the run this job is
+      # part of, so the id and a token are both required.
+      - name: Download the report
+        uses: actions/download-artifact@v4
+        with:
+          name: change-report
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      # One report on the pull request, and always the newest thing on the page.
+      # Editing in place kept it to one comment and left it wherever it was first
+      # posted, which on a long review is pages above the discussion and marked
+      # only "edited". Every earlier copy is deleted and a fresh one posted.
+      # Which pull request this is comes from the event, never from the artifact.
+      # `ci.yml` runs from the branch, so anything it uploads is chosen by whoever
+      # opened the pull request: a number in a file would let one branch aim this
+      # job's write token at a different pull request and rewrite its comments.
+      # GitHub fills in `pull_requests` from the triggering run, and a branch
+      # cannot write to it.
+      - name: Comment on the pull request
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.workflow_run.pull_requests[0].number }}
+        run: |
+          set -euo pipefail
+          pr=$(printf '%s' "$PR" | grep -E '^[0-9]+$') || {
+            echo "the triggering run named no pull request" >&2
+            exit 1
+          }
+          # The marker alone is not enough to delete by: a reviewer quoting the
+          # report would be quoting the marker, and this holds a write token. Only
+          # this workflow's own comments are ever removed.
+          #
+          # jq slurps the pages into one array. --jq would run once per page, so
+          # a match on an earlier page would be missed.
+          existing=$(gh api "repos/$REPO/issues/$pr/comments" --paginate \
+            | jq -s 'add
+                | map(select(.user.login == "github-actions[bot]"
+                        and (.body | contains("<!-- change-report -->")))
+                    | .id)
+                | .[]')
+          for id in $existing; do
+            gh api -X DELETE "repos/$REPO/issues/comments/$id" >/dev/null
+            echo "deleted comment $id"
+          done
+          gh api -X POST "repos/$REPO/issues/$pr/comments" -F body=@report.md >/dev/null
+          echo "posted the report"
+
+  sonar:
+    name: SonarCloud
+    runs-on: macos-15
+    # No coverage is produced by a run whose suite failed. Same-repository only:
+    # a fork's pull request has no entry in `pull_requests`, so there would be
+    # nothing trustworthy to decorate, and this job would be checking a fork's
+    # revision out while holding the analysis token.
+    if: >-
+      github.event.workflow_run.conclusion == 'success'
+      && github.event.workflow_run.head_repository.full_name == github.repository
+    # The same race, for the same reason. Two analyses of one pull request reach
+    # the server in whichever order they finish, so the later revision's numbers
+    # can be overwritten by the earlier one's. A push run names no pull request
+    # and is keyed by its branch instead.
+    concurrency:
+      group: >-
+        sonar-${{ github.event.workflow_run.pull_requests[0].number
+          || github.event.workflow_run.head_branch }}
+      cancel-in-progress: true
+    permissions:
+      contents: read
+      actions: read
+
+    steps:
+      # The revision the triggering run tested, not the default branch this
+      # workflow is read from. Analysis reads the history to decide what is new.
+      #
+      # Checking the branch out is not running it: no step here builds or
+      # executes anything from the tree, and the coverage the scanner reads was
+      # produced by the run that triggered this one.
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0
+
+      - name: Download coverage
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      # From the event, never from the artifact. `ci.yml` runs from the branch, so
+      # a number it uploaded would be one the branch chose, and the scanner would
+      # decorate whichever pull request that named while analysing this revision.
+      # A `push` run names none, and that is what selects a branch analysis.
+      #
+      # Refs are checked rather than trusted: they reach the scanner as command
+      # arguments, and a ref carrying anything but the characters git needs is
+      # refused instead of pasted into the list.
+      - name: Identify the pull request
+        id: pr
+        env:
+          PR: ${{ github.event.workflow_run.pull_requests[0].number }}
+          PR_BRANCH: ${{ github.event.workflow_run.pull_requests[0].head.ref }}
+          PR_BASE: ${{ github.event.workflow_run.pull_requests[0].base.ref }}
+        run: |
+          set -euo pipefail
+          # Where the analysis goes is decided here, not by the branch. The
+          # scanner reads `sonar-project.properties` out of the revision it is
+          # analysing, and that file names the server and the project: a branch
+          # could point `sonar.host.url` at one of its own and be handed
+          # SONAR_TOKEN, or change the identity and publish into another project.
+          # A property given on the command line wins over the file, and this file
+          # is the one a pull request cannot edit.
+          #
+          # These three duplicate `sonar-project.properties` on purpose. What the
+          # branch may still choose is what gets measured, which is the rest of
+          # that file.
+          trusted="-Dsonar.host.url=https://sonarcloud.io"
+          trusted="$trusted -Dsonar.organization=payabli"
+          trusted="$trusted -Dsonar.projectKey=payabli_sdk-ios"
+
+          if [ -z "$PR" ]; then
+            echo "args=$trusted" >> "$GITHUB_OUTPUT"
+            echo "analysing a branch, not a pull request"
+            exit 0
+          fi
+          number=$(printf '%s' "$PR" | grep -E '^[0-9]+$') || number=""
+          branch=$(printf '%s' "$PR_BRANCH" | grep -E '^[A-Za-z0-9._/-]+$') || branch=""
+          base=$(printf '%s' "$PR_BASE" | grep -E '^[A-Za-z0-9._/-]+$') || base=""
+          if [ -z "$number" ] || [ -z "$branch" ] || [ -z "$base" ]; then
+            echo "the triggering run named a pull request this cannot use" >&2
+            exit 1
+          fi
+          echo "args=$trusted -Dsonar.pullrequest.key=$number -Dsonar.pullrequest.branch=$branch -Dsonar.pullrequest.base=$base" >> "$GITHUB_OUTPUT"
+
+      # Pinned to a commit, not a tag. `v5` is mutable, and this step is handed
+      # SONAR_TOKEN, so a replaced action would hold a repository secret.
+      - name: Analyze
+        uses: SonarSource/sonarqube-scan-action@2f77a1ec69fb1d595b06f35ab27e97605bdef703 # v5.3.2
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+          args: ${{ steps.pr.outputs.args }}

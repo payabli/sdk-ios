@@ -1,10 +1,10 @@
-import XCTest
 import PayabliSDKCore
 @testable import PayabliSDKTapToPay
 import PayabliSDKTestUtils
+import XCTest
 
 #if canImport(ProximityReader)
-import ProximityReader
+    import ProximityReader
 #endif
 
 /// A reader session that dies must leave the session repairable.
@@ -13,7 +13,6 @@ import ProximityReader
 /// state says `.ready`, so a failure that leaves it there wedges the session.
 @MainActor
 final class PayabliTTPReaderSessionRecoveryTests: XCTestCase {
-
     override func setUp() {
         super.setUp()
         StubURLProtocol.handler = Self.chargeStubHandler
@@ -89,19 +88,19 @@ final class PayabliTTPReaderSessionRecoveryTests: XCTestCase {
 
     // MARK: - Both classification tiers
 
-    /// The typed tier. Reachable when the raw error propagates to the facade.
+    // The typed tier. Reachable when the raw error propagates to the facade.
     #if canImport(ProximityReader)
-    func testTypedReadErrorIsClassified() {
-        XCTAssertTrue(readerFailureInvalidatesSession(PaymentCardReaderSession.ReadError.noReaderSession))
-        XCTAssertTrue(readerFailureInvalidatesSession(PaymentCardReaderSession.ReadError.readerSessionExpired))
-        XCTAssertTrue(readerFailureInvalidatesSession(PaymentCardReaderSession.ReadError.readerTokenExpired))
-        XCTAssertTrue(readerFailureInvalidatesSession(PaymentCardReaderSession.ReadError.readerSessionAuthenticationError))
+        func testTypedReadErrorIsClassified() {
+            XCTAssertTrue(readerFailureInvalidatesSession(PaymentCardReaderSession.ReadError.noReaderSession))
+            XCTAssertTrue(readerFailureInvalidatesSession(PaymentCardReaderSession.ReadError.readerSessionExpired))
+            XCTAssertTrue(readerFailureInvalidatesSession(PaymentCardReaderSession.ReadError.readerTokenExpired))
+            XCTAssertTrue(readerFailureInvalidatesSession(PaymentCardReaderSession.ReadError.readerSessionAuthenticationError))
 
-        XCTAssertFalse(readerFailureInvalidatesSession(PaymentCardReaderSession.ReadError.readCancelled))
-        XCTAssertFalse(readerFailureInvalidatesSession(PaymentCardReaderSession.ReadError.cardReadFailed))
-        XCTAssertFalse(readerFailureInvalidatesSession(PaymentCardReaderSession.ReadError.paymentCardDeclined))
-        XCTAssertFalse(readerFailureInvalidatesSession(PaymentCardReaderSession.ReadError.readerSessionBusy))
-    }
+            XCTAssertFalse(readerFailureInvalidatesSession(PaymentCardReaderSession.ReadError.readCancelled))
+            XCTAssertFalse(readerFailureInvalidatesSession(PaymentCardReaderSession.ReadError.cardReadFailed))
+            XCTAssertFalse(readerFailureInvalidatesSession(PaymentCardReaderSession.ReadError.paymentCardDeclined))
+            XCTAssertFalse(readerFailureInvalidatesSession(PaymentCardReaderSession.ReadError.readerSessionBusy))
+        }
     #endif
 
     /// The text tier, which is the one that actually fires on device: the
@@ -241,7 +240,9 @@ final class PayabliTTPReaderSessionRecoveryTests: XCTestCase {
             await Task.yield()
 
             async let initializing: Void = ttp.initialize()
-            for _ in 0 ..< 20 { await Task.yield() }
+            for _ in 0 ..< 20 {
+                await Task.yield()
+            }
             provider.openGate()
 
             // The charge may fail: a host that re-initializes mid-charge takes
@@ -338,7 +339,9 @@ final class PayabliTTPReaderSessionRecoveryTests: XCTestCase {
     /// How long a call may take before it is treated as never returning. Sized
     /// for the slowest machine that runs this, not the fastest: an existing test
     /// in this suite takes eighteen seconds on CI and milliseconds locally.
-    private var boundSeconds: UInt64 { 60 }
+    private var boundSeconds: UInt64 {
+        60
+    }
 
     /// Every SDK call in this file goes through here. These tests cover a wedge
     /// and two concurrency guards, so their failure mode is not returning, and
@@ -358,14 +361,23 @@ final class PayabliTTPReaderSessionRecoveryTests: XCTestCase {
             let workTask = Task { @MainActor in
                 do {
                     let value = try await work()
-                    if !once.done { once.done = true; continuation.resume(returning: value) }
+                    if !once.done {
+                        once.done = true
+                        continuation.resume(returning: value)
+                    }
                 } catch {
-                    if !once.done { once.done = true; continuation.resume(throwing: error) }
+                    if !once.done {
+                        once.done = true
+                        continuation.resume(throwing: error)
+                    }
                 }
             }
             Task { @MainActor in
-                try? await Task.sleep(nanoseconds: 5_000_000_000)
-                if !once.done { once.done = true; continuation.resume(throwing: ChargeTimedOut()) }
+                try? await Task.sleep(nanoseconds: boundSeconds * 1_000_000_000)
+                if !once.done {
+                    once.done = true
+                    continuation.resume(throwing: ChargeTimedOut())
+                }
                 workTask.cancel()
             }
         }
@@ -410,17 +422,15 @@ final class PayabliTTPReaderSessionRecoveryTests: XCTestCase {
     /// cannot decode.
     private static let chargeStubHandler: StubURLProtocol.Handler = { request in
         let path = request.url?.path ?? ""
-        let body: [String: Any]
-
-        if path.contains("/MoneyIn/initiate") {
-            body = [
+        let body: [String: Any] = if path.contains("/MoneyIn/initiate") {
+            [
                 "code": "A01",
                 "data": ["paymentTransId": PayabliTTPReaderSessionRecoveryTests.paymentTransId]
             ]
         } else if path.contains("/MoneyIn/update/") {
-            body = ["code": "A01", "data": ["paymentTransId": PayabliTTPReaderSessionRecoveryTests.paymentTransId]]
+            ["code": "A01", "data": ["paymentTransId": PayabliTTPReaderSessionRecoveryTests.paymentTransId]]
         } else {
-            body = [
+            [
                 "responseCode": 1,
                 "isSuccess": true,
                 "responseData": [
@@ -463,8 +473,8 @@ private final class ResumeOnce {
 
 /// `XCTAssertThrowsError` has no async form, and an autoclosure cannot be
 /// awaited, so the expression is taken as an async closure.
-private func XCTAssertThrowsErrorAsync<T>(
-    _ expression: @autoclosure () async throws -> T,
+private func XCTAssertThrowsErrorAsync(
+    _ expression: @autoclosure () async throws -> some Any,
     _ message: String = "expected an error",
     file: StaticString = #filePath,
     line: UInt = #line
@@ -481,7 +491,6 @@ private func XCTAssertThrowsErrorAsync<T>(
     }
 }
 
-
 /// A provider that runs a caller-supplied step while a read is in flight, so the
 /// interleaving is deterministic instead of timing-dependent.
 /// `@unchecked` because every caller is on the main actor: the SDK surface is
@@ -489,7 +498,9 @@ private func XCTAssertThrowsErrorAsync<T>(
 /// instead would put the conformance across an isolation boundary, which is an
 /// error under the Swift 6 language mode.
 private final class InterleavingProvider: TapToPayProvider, @unchecked Sendable {
-    static var providerId: String { "interleaving" }
+    static var providerId: String {
+        "interleaving"
+    }
 
     var readingResult: Result<CardReadResult, Error> = .failure(
         PayabliTTPError.nfcFailed(reason: "not configured")
@@ -501,25 +512,35 @@ private final class InterleavingProvider: TapToPayProvider, @unchecked Sendable 
     private var gate: CheckedContinuation<Void, Never>?
     private var gateArmed = false
 
-    func armGate() { gateArmed = true }
+    func armGate() {
+        gateArmed = true
+    }
 
     func openGate() {
         gateArmed = false
         gate?.resume()
         gate = nil
     }
+
     private(set) var prepareReaderCalls = 0
     private(set) var configureCalls = 0
     /// True if a second setup entered while one was still inside the provider.
     private(set) var sawOverlap = false
     private var inProvider = false
 
-    func checkEligibility() async -> Result<Void, PayabliTTPError> { .success(()) }
-    func configure(credentials: [String: String]) throws { configureCalls += 1 }
+    func checkEligibility() async -> Result<Void, PayabliTTPError> {
+        .success(())
+    }
+
+    func configure(credentials: [String: String]) throws {
+        configureCalls += 1
+    }
 
     func prepareReader() async throws {
         prepareReaderCalls += 1
-        if inProvider { sawOverlap = true }
+        if inProvider {
+            sawOverlap = true
+        }
         inProvider = true
         defer { inProvider = false }
         if gateArmed {
@@ -528,6 +549,7 @@ private final class InterleavingProvider: TapToPayProvider, @unchecked Sendable 
             await Task.yield()
         }
     }
+
     func cancelReading() async {}
     func cleanUp() async {}
 

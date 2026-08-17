@@ -9,8 +9,8 @@ public actor PayabliAuth {
     /// other callers await the same Task result.
     private var inFlightRefresh: Task<String, Error>?
 
-    // Multicasts every successful token rotation. Producers append on every
-    // refresh; consumers iterate as long as they want.
+    /// Multicasts every successful token rotation. Producers append on every
+    /// refresh; consumers iterate as long as they want.
     private var tokenChangeContinuations: [UUID: AsyncStream<String>.Continuation] = [:]
 
     public init(config: PayabliConfig) {
@@ -45,8 +45,7 @@ public actor PayabliAuth {
 
         let task = Task<String, Error> { [logger] in
             logger.info("Refreshing access token via partner tokenProvider")
-            let fresh = try await provider()
-            return fresh
+            return try await provider()
         }
         inFlightRefresh = task
 

@@ -1,8 +1,7 @@
-import XCTest
 @testable import PayabliSDKCore
+import XCTest
 
 final class AuthenticatedTransportTests: XCTestCase {
-
     func testInjectsBearerHeaderOnEveryRequest() async throws {
         let mock = MockTransport(scripted: [
             .response(statusCode: 200, body: Data("{}".utf8))
@@ -104,7 +103,9 @@ actor MockTransport: PayabliTransport {
         self.scripted = scripted
     }
 
-    func captured() -> [PayabliRequest] { requests }
+    func captured() -> [PayabliRequest] {
+        requests
+    }
 
     func perform(_ request: PayabliRequest) async throws -> PayabliResponse {
         requests.append(request)

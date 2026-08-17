@@ -16,28 +16,17 @@ import SwiftUI
 struct PaymentTapToPayQAView: View {
     @ObservedObject var terminal: PayabliTTP
 
+    @EnvironmentObject private var tokenProbes: TokenProbeResults
     @State private var amountText = "1.00"
     @State private var activationCode = ""
     @State private var enableMessage = ""
     @State private var activationMessage = ""
     @State private var chargeMessage = ""
-    @State private var tokenCheckText = ""
     @State private var eventLog: [TapToPayQAEventEntry] = []
     @State private var eventToken: PayabliTTPEventToken?
     @State private var isActivationPresented = false
     @State private var isActivationHelpPresented = false
-    @State private var activationOutcome = ActivationOutcome.none
-
-    /// Which half of the activation step failed.
-    ///
-    /// Activation is two SDK calls. `sessionState` cannot tell them apart: both
-    /// land in `.error`, except a revoked attestation, which lands in `.idle`.
-    private enum ActivationOutcome {
-        case none
-        case activationFailed
-        case enableFailed
-        case succeeded
-    }
+    @State private var activationOutcome = TapToPayActivationOutcome.none
     @State private var isWorking = false
     @FocusState private var focusedField: Field?
 
@@ -81,74 +70,68 @@ struct PaymentTapToPayQAView: View {
 
     // MARK: - The sequence
 
-    /// The order the SDK enforces, made visible. Every status is derived from
-    /// `sessionState` rather than tracked separately, so the screen cannot
-    /// disagree with the session it is describing.
+    /// The order the SDK enforces, made visible. Derived in one place, so no two
+    /// steps can disagree about which is next.
+    private var steps: TapToPayFlowSteps {
+        TapToPaySteps.forCharging(
+            tokenCheck: tokenProbes.check(.cardPresent),
+            session: terminal.sessionState,
+            activation: activationOutcome
+        )
+    }
+
     private var stepsSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Steps")
                 .font(.headline)
 
-            QAStepRow(
-                index: 1,
-                title: "Reach the token backend",
-                detail: "The SDK calls your backend for a fresh access token whenever it needs one.",
-                status: tokenStepStatus
-            ) {
+            StepRow(index: 1, step: steps.token) {
                 VStack(alignment: .leading, spacing: 6) {
                     Button { runTokenCheck() } label: {
                         Label("Check token endpoint", systemImage: "key.horizontal")
                     }
                     .buttonStyle(.bordered)
-                    .disabled(isWorking)
-                    if !tokenCheckText.isEmpty {
-                        Text(tokenCheckText)
+                    // `isWorking` covers this screen's own operations. The probe
+                    // is shared, so a run started on another tab is this step's
+                    // `.inProgress` and only the derived step knows it.
+                    .disabled(isWorking || tokenProbes.isRunning(.cardPresent))
+                    if !tokenProbes.display(for: .cardPresent).isEmpty {
+                        Text(tokenProbes.display(for: .cardPresent))
                             .font(.caption)
                             .foregroundColor(.payabliOnSurfaceVariant)
                     }
                 }
             }
 
-            QAStepRow(
-                index: 2,
-                title: "Enable the terminal",
-                detail: "Attests the device, fetches the merchant config, and prepares the reader.",
-                status: enableStepStatus
-            ) {
+            StepRow(index: 2, step: steps.enable) {
                 VStack(alignment: .leading, spacing: 6) {
-                    Button { runEnableTerminal() } label: {
-                        Label("Enable Terminal", systemImage: "wave.3.right")
-                            .frame(maxWidth: .infinity)
+                    if steps.nextAction == .enableTerminal {
+                        Button { runEnableTerminal() } label: {
+                            Label("Enable Terminal", systemImage: "wave.3.right")
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(isWorking)
                     }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(isWorking)
                     stepOutcome(enableMessage)
                 }
             }
 
-            QAStepRow(
-                index: 3,
-                title: "Activate the device",
-                detail: activationDetail,
-                status: activationStepStatus
-            ) {
+            StepRow(index: 3, step: steps.activation) {
                 VStack(alignment: .leading, spacing: 6) {
-                    Button { isActivationPresented = true } label: {
-                        Label("Enter activation code", systemImage: "checkmark.shield")
-                            .frame(maxWidth: .infinity)
+                    if steps.nextAction == .enterActivationCode {
+                        Button { isActivationPresented = true } label: {
+                            Label("Enter activation code", systemImage: "checkmark.shield")
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(isWorking)
                     }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(isWorking)
                     stepOutcome(activationMessage)
                 }
             }
 
-            QAStepRow(
-                index: 4,
-                title: "Charge a card",
-                detail: "Presents Apple's Tap to Pay sheet. Hold a card to the top of the phone.",
-                status: chargeStepStatus
-            ) {
+            StepRow(index: 4, step: steps.charge) {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
                         Text("$")
@@ -157,15 +140,26 @@ struct PaymentTapToPayQAView: View {
                             .focused($focusedField, equals: .amount)
                             .textFieldStyle(.roundedBorder)
                     }
-                    Button { runCharge() } label: {
-                        Label("Charge (tap card)", systemImage: "creditcard.and.123")
-                            .frame(maxWidth: .infinity)
+                    if steps.nextAction == .charge {
+                        Button { runCharge() } label: {
+                            Label("Charge (tap card)", systemImage: "creditcard.and.123")
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(isWorking)
                     }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(isWorking)
                     stepOutcome(chargeMessage)
                 }
             }
+        }
+    }
+
+    private func recoveryDetail(_ recovery: TapToPayRecovery) -> String {
+        switch recovery {
+        case .sessionExpired:
+            "The session expired. This re-runs config and reader setup without a fresh attestation."
+        case .sessionErrored:
+            "The session errored. This runs the full setup, re-using the attested identity when it is still held and attesting again when it is not."
         }
     }
 
@@ -173,16 +167,21 @@ struct PaymentTapToPayQAView: View {
     /// is in a state it can actually repair.
     @ViewBuilder
     private var recoverySection: some View {
-        if isRecoverable {
+        if let recovery = steps.recovery {
             VStack(alignment: .leading, spacing: 8) {
                 Text("Recovery")
                     .font(.headline)
-                Text("The session expired or errored. This re-runs config and reader setup without a fresh attestation.")
+                Text(recoveryDetail(recovery))
                     .font(.caption)
                     .foregroundColor(.payabliOnSurfaceVariant)
-                Button { runReinitialize() } label: {
-                    Label("Re-initialize", systemImage: "arrow.clockwise")
-                        .frame(maxWidth: .infinity)
+                Button {
+                    steps.nextAction == .reinitialize ? runReinitialize() : runEnableTerminal()
+                } label: {
+                    Label(
+                        steps.nextAction == .reinitialize ? "Re-initialize" : "Run full setup",
+                        systemImage: "arrow.clockwise"
+                    )
+                    .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.bordered)
                 .disabled(isWorking)
@@ -190,73 +189,6 @@ struct PaymentTapToPayQAView: View {
             .padding(12)
             .background(Color.payabliSurfaceContainer)
             .clipShape(RoundedRectangle(cornerRadius: 10))
-        }
-    }
-
-    // MARK: - Step status, derived from the session
-
-    /// True once the backend is known reachable — either because the check was
-    /// run here, or because the SDK already fetched a token to get past `idle`.
-    private var backendProven: Bool {
-        if tokenCheckText.hasPrefix("✓") { return true }
-        // Only states the session cannot reach without a successful authenticated
-        // request. `.attestingDevice` is set before that request, and `.error` is
-        // where a failing token provider lands, so neither proves anything.
-        switch terminal.sessionState {
-        case .fetchingConfig, .initializingReader, .ready, .pendingActivation, .reinitializing:
-            return true
-        default:
-            return false
-        }
-    }
-
-    private var tokenStepStatus: QAStepStatus {
-        if tokenCheckText.hasPrefix("✗") { return .failed }
-        return backendProven ? .done : .current
-    }
-
-    private var enableStepStatus: QAStepStatus {
-        // Exactly one step is ever `.current`, so this stays blocked until the
-        // backend is proven rather than competing with step 1 for attention.
-        guard backendProven else { return .blocked }
-        switch terminal.sessionState {
-        case .ready: return .done
-        case .attestingDevice, .fetchingConfig, .initializingReader, .reinitializing: return .inProgress
-        case .pendingActivation: return .done
-        case .error, .sessionExpired: return .failed
-        case .idle: return .current
-        @unknown default: return .current
-        }
-    }
-
-    private var activationStepStatus: QAStepStatus {
-        // A failed activation must stay actionable: `.failed` is the only other
-        // status whose content renders, so blocking it would hide the reason and
-        // the retry together. Read from the recorded outcome rather than from
-        // `sessionState`, which cannot distinguish the two calls this step makes
-        // and reports `.idle` for a revoked attestation.
-        if activationOutcome == .activationFailed { return .failed }
-        switch terminal.sessionState {
-        case .pendingActivation: return .current
-        case .ready: return .notNeeded
-        default: return .blocked
-        }
-    }
-
-    private var activationDetail: String {
-        return terminal.sessionState == .pendingActivation
-            ? "Activate the device with the code provided by the Paypoint Device Management dashboard."
-            : "Only when the backend registers the device as pending."
-    }
-
-    private var chargeStepStatus: QAStepStatus {
-        terminal.isReady ? .current : .blocked
-    }
-
-    private var isRecoverable: Bool {
-        switch terminal.sessionState {
-        case .sessionExpired, .error: return true
-        default: return false
         }
     }
 
@@ -493,6 +425,19 @@ struct PaymentTapToPayQAView: View {
             defer { isWorking = false }
             do {
                 try await terminal.activateDevice(activationCode: code)
+            } catch let error as PayabliTTPError {
+                // A revoked attestation resets the session to `.idle`, and the
+                // way out is a fresh cold attestation. The reason goes to the
+                // step that offers it.
+                if case .attestationRevoked = error {
+                    activationOutcome = .attestationRevoked
+                    enableMessage = "✗ \(error.localizedDescription)"
+                    activationMessage = "✗ Attestation revoked — re-enable the terminal, see step 2."
+                } else {
+                    activationOutcome = .activationFailed
+                    activationMessage = "✗ \(error.localizedDescription)"
+                }
+                return
             } catch {
                 activationOutcome = .activationFailed
                 activationMessage = "✗ \(error.localizedDescription)"
@@ -521,18 +466,11 @@ struct PaymentTapToPayQAView: View {
     }
 
     /// Confirms the partner backend answers before `initialize()` depends on it.
-    /// Reports only that a token arrived — never the token itself.
     private func runTokenCheck() {
         isWorking = true
-        tokenCheckText = "Checking…"
         Task {
             defer { isWorking = false }
-            do {
-                _ = try await Secrets.fetchAccessToken()
-                tokenCheckText = "✓ Token endpoint returned a token"
-            } catch {
-                tokenCheckText = "✗ Token endpoint failed: \(error.localizedDescription)"
-            }
+            await tokenProbes.probeCardPresent()
         }
     }
 

@@ -1,8 +1,8 @@
 import Foundation
 import PayabliSDKCore
 #if canImport(PayabliCardReaderCore)
-import PayabliCardReaderCore
-import ProximityReader
+    import PayabliCardReaderCore
+    import ProximityReader
 #endif
 
 /// Card-reader adapter for `TapToPayProvider` (PRD FR-11B), backed by the
@@ -18,11 +18,12 @@ import ProximityReader
 ///
 /// Error mapping: see `FiservCardReader+Errors.swift`.
 public final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
-
-    public static var providerId: String { "fiserv" }
+    public static var providerId: String {
+        "fiserv"
+    }
 
     /// `/config` `credentials` block — maps 1:1 to `FiservTTPConfig`.
-    internal struct Credentials: Sendable {
+    struct Credentials: Sendable {
         let secretKey: String
         let apiKey: String
         let environment: String
@@ -64,13 +65,13 @@ public final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
     private let logger = PayabliLogger(category: .taptopay)
 
     #if canImport(PayabliCardReaderCore)
-    private var reader: FiservTTPCardReader?
+        private var reader: FiservTTPCardReader?
     #endif
 
     public init() {}
 
     /// Injects `Credentials` directly. Facade path uses `configure(credentials:)`.
-    internal func setCredentials(_ credentials: Credentials) {
+    func setCredentials(_ credentials: Credentials) {
         lock.lock()
         self.credentials = credentials
         lock.unlock()
@@ -127,112 +128,107 @@ public final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
     /// is fetched, so must not require credentials.
     public func checkEligibility() async -> Result<Void, PayabliTTPError> {
         #if canImport(PayabliCardReaderCore)
-        if #available(iOS 16.7, *) {
-            guard PaymentCardReader.isSupported else {
-                return .failure(.readerSetupFailed(
-                    reason: "Tap to Pay hardware not supported on this device"
-                ))
+            if #available(iOS 16.7, *) {
+                guard PaymentCardReader.isSupported else {
+                    return .failure(.readerSetupFailed(
+                        reason: "Tap to Pay hardware not supported on this device"
+                    ))
+                }
+                return .success(())
             }
-            return .success(())
-        }
-        return .failure(.readerSetupFailed(reason: "Tap to Pay requires iOS 16.7+"))
+            return .failure(.readerSetupFailed(reason: "Tap to Pay requires iOS 16.7+"))
         #else
-        return .failure(.readerSetupFailed(reason: "Tap to Pay is iOS-only"))
+            return .failure(.readerSetupFailed(reason: "Tap to Pay is iOS-only"))
         #endif
     }
 
     public func prepareReader() async throws {
         #if canImport(PayabliCardReaderCore)
-        let creds = try requireCredentials()
-        let newReader = try buildReader(credentials: creds)
+            let creds = try requireCredentials()
+            let newReader = try buildReader(credentials: creds)
 
-        // Drop our copy; credentials now live inside `newReader` (NFR-5D).
-        lock.lock()
-        credentials = nil
-        lock.unlock()
+            // Drop our copy; credentials now live inside `newReader` (NFR-5D).
+            lock.lock()
+            credentials = nil
+            lock.unlock()
 
-        logger.info("[fiserv.prepare] → requesting session")
-        do {
-            try await newReader.requestSessionToken()
+            logger.info("[fiserv.prepare] → requesting session")
+            do {
+                try await newReader.requestSessionToken()
 
-            let linked = try await newReader.isAccountLinked()
-            if !linked {
-                try await newReader.linkAccount()
+                let linked = try await newReader.isAccountLinked()
+                if !linked {
+                    try await newReader.linkAccount()
+                }
+
+                try await newReader.initializeSession()
+                logger.info("[fiserv.prepare] ← reader ready (linked=\(linked))")
+            } catch {
+                clearAllState()
+                throw Self.mapError(error) { .readerSetupFailed(reason: $0) }
             }
-
-            try await newReader.initializeSession()
-            logger.info("[fiserv.prepare] ← reader ready (linked=\(linked))")
-        } catch {
-            clearAllState()
-            throw Self.mapError(error) { .readerSetupFailed(reason: $0) }
-        }
         #else
-        throw PayabliTTPError.readerSetupFailed(reason: "Tap to Pay is iOS-only")
+            throw PayabliTTPError.readerSetupFailed(reason: "Tap to Pay is iOS-only")
         #endif
     }
 
     public func startReading(_ request: CardReadRequest) async throws -> CardReadResult {
         #if canImport(PayabliCardReaderCore)
-        lock.lock()
-        let activeReader = reader
-        lock.unlock()
-        guard let reader = activeReader else {
-            throw PayabliTTPError.readerSetupFailed(reason: "Reader not prepared")
-        }
+            lock.lock()
+            let activeReader = reader
+            lock.unlock()
+            guard let reader = activeReader else {
+                throw PayabliTTPError.readerSetupFailed(reason: "Reader not prepared")
+            }
 
-        let amount = request.amount.rounded(2, .bankers)
-        let details = Models.TransactionDetailsRequest(
-            merchantTransactionId: request.merchantTransactionId,
-            merchantOrderId: request.merchantOrderId ?? request.merchantTransactionId,
-            merchantInvoiceNumber: request.merchantInvoiceNumber,
-            captureFlag: true,
-            createToken: false
-        )
-
-        logger.info(
-            "[fiserv.charges] → amount=\(amount) " +
-            "currency=\(credentials?.currencyCode ?? "?") " +
-            "merchantTxId=\(request.merchantTransactionId) " +
-            "merchantOrderId=\(request.merchantOrderId ?? "<nil>") " +
-            "invoice=\(request.merchantInvoiceNumber ?? "<nil>")"
-        )
-        logger.info(
-            "[fiserv.charges] customer={firstName=\(request.customer.firstName ?? "<nil>") " +
-            "lastName=\(request.customer.lastName ?? "<nil>") " +
-            "customerNumber=\(request.customer.customerNumber ?? "<nil>")} " +
-            "invoice={invoiceNumber=\(request.invoice.invoiceNumber ?? "<nil>")}"
-        )
-        // The atomic card-reader API has no slot for customer data; it
-        // ships only at /initiate and in the logs above.
-
-        let started = Date()
-        let response: Models.CommerceHubResponse
-        do {
-            response = try await reader.charges(
-                amount: amount,
-                transactionType: .sale,
-                transactionDetailsRequest: details
+            let amount = request.amount.rounded(2, .bankers)
+            let details = Models.TransactionDetailsRequest(
+                merchantTransactionId: request.merchantTransactionId,
+                merchantOrderId: request.merchantOrderId ?? request.merchantTransactionId,
+                merchantInvoiceNumber: request.merchantInvoiceNumber,
+                captureFlag: true,
+                createToken: false
             )
-        } catch {
-            throw Self.mapError(error) { .nfcFailed(reason: $0) }
-        }
 
-        let elapsedMs = Int(Date().timeIntervalSince(started) * 1000)
-        let responseJSON = try Self.encode(response)
-        let cardNetwork = Self.extractCardNetwork(from: responseJSON)
-        logger.info("[fiserv.charges] ← OK (\(elapsedMs)ms) bytes=\(responseJSON.count) cardNetwork=\(cardNetwork ?? "<nil>")")
-        if let pretty = Self.prettyPrintJSON(responseJSON) {
-            logger.info("[fiserv.charges] responseBody:\n\(pretty)")
-        }
-        return CardReadResult(
-            provider: Self.providerId,
-            encryptedPayload: Data(),
-            cardNetwork: cardNetwork,
-            providerMetadata: [:],
-            providerResponseJSON: responseJSON
-        )
+            logger.info(
+                "[fiserv.charges] → amount=\(amount) " +
+                    "currency=\(credentials?.currencyCode ?? "?") " +
+                    "merchantTxId=\(request.merchantTransactionId) " +
+                    "merchantOrderId=\(request.merchantOrderId ?? "<nil>") " +
+                    "invoice=\(request.merchantInvoiceNumber ?? "<nil>")"
+            )
+            // The atomic card-reader API has no slot for customer data; it ships
+            // at /initiate only. A single-argument message renders `.public`, so
+            // the line above carries the invoice number and nothing naming the
+            // customer.
+
+            let started = Date()
+            let response: Models.CommerceHubResponse
+            do {
+                response = try await reader.charges(
+                    amount: amount,
+                    transactionType: .sale,
+                    transactionDetailsRequest: details
+                )
+            } catch {
+                throw Self.mapError(error) { .nfcFailed(reason: $0) }
+            }
+
+            let elapsedMs = Int(Date().timeIntervalSince(started) * 1000)
+            let responseJSON = try Self.encode(response)
+            let cardNetwork = Self.extractCardNetwork(from: responseJSON)
+            // `CommerceHubResponse` carries `paymentTokens.tokenData` and the
+            // card's expiry, so the log gets the shape of the response.
+            logger.info("[fiserv.charges] ← OK (\(elapsedMs)ms) bytes=\(responseJSON.count) cardNetwork=\(cardNetwork ?? "<nil>")")
+            return CardReadResult(
+                provider: Self.providerId,
+                encryptedPayload: Data(),
+                cardNetwork: cardNetwork,
+                providerMetadata: [:],
+                providerResponseJSON: responseJSON
+            )
         #else
-        throw PayabliTTPError.nfcFailed(reason: "Tap to Pay is iOS-only")
+            throw PayabliTTPError.nfcFailed(reason: "Tap to Pay is iOS-only")
         #endif
     }
 
@@ -254,90 +250,80 @@ public final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
     private func clearAllState() {
         lock.lock()
         #if canImport(PayabliCardReaderCore)
-        reader?.finalize()
-        reader = nil
+            reader?.finalize()
+            reader = nil
         #endif
         credentials = nil
         lock.unlock()
     }
 
     #if canImport(PayabliCardReaderCore)
-    private func requireCredentials() throws -> Credentials {
-        lock.lock(); defer { lock.unlock() }
-        guard let creds = credentials else {
-            throw PayabliTTPError.readerSetupFailed(reason: "Missing provider credentials")
+        private func requireCredentials() throws -> Credentials {
+            lock.lock()
+            defer { lock.unlock() }
+            guard let creds = credentials else {
+                throw PayabliTTPError.readerSetupFailed(reason: "Missing provider credentials")
+            }
+            return creds
         }
-        return creds
-    }
 
-    /// Builds a fresh `FiservTTPCardReader` (vendored from PayabliCardReaderCore).
-    /// Tears down the previous instance first — Apple's `PaymentCardReader`
-    /// allows only one per process.
-    private func buildReader(credentials creds: Credentials) throws -> FiservTTPCardReader {
-        lock.lock()
-        reader?.finalize()
-        reader = nil
-        lock.unlock()
+        /// Builds a fresh `FiservTTPCardReader` (vendored from PayabliCardReaderCore).
+        /// Tears down the previous instance first — Apple's `PaymentCardReader`
+        /// allows only one per process.
+        private func buildReader(credentials creds: Credentials) throws -> FiservTTPCardReader {
+            lock.lock()
+            reader?.finalize()
+            reader = nil
+            lock.unlock()
 
-        let config = FiservTTPConfig(
-            secretKey: creds.secretKey,
-            apiKey: creds.apiKey,
-            environment: creds.environment.lowercased() == "production" ? .Production : .Sandbox,
-            currencyCode: creds.currencyCode,
-            merchantId: creds.merchantId,
-            appleTtpMerchantId: creds.appleTtpMerchantId,
-            merchantName: creds.merchantName,
-            merchantCategoryCode: creds.merchantCategoryCode,
-            terminalId: creds.terminalId,
-            terminalProfileId: creds.terminalProfileId
-        )
-
-        let newReader = FiservTTPCardReader(configuration: config)
-
-        lock.lock()
-        reader = newReader
-        lock.unlock()
-
-        return newReader
-    }
-
-    private static func encode<T: Encodable>(_ value: T) throws -> Data {
-        do {
-            return try JSONEncoder().encode(value)
-        } catch {
-            throw PayabliTTPError.nfcFailed(
-                reason: "Failed to encode provider response: \(error.localizedDescription)"
+            let config = FiservTTPConfig(
+                secretKey: creds.secretKey,
+                apiKey: creds.apiKey,
+                environment: creds.environment.lowercased() == "production" ? .Production : .Sandbox,
+                currencyCode: creds.currencyCode,
+                merchantId: creds.merchantId,
+                appleTtpMerchantId: creds.appleTtpMerchantId,
+                merchantName: creds.merchantName,
+                merchantCategoryCode: creds.merchantCategoryCode,
+                terminalId: creds.terminalId,
+                terminalProfileId: creds.terminalProfileId
             )
+
+            let newReader = FiservTTPCardReader(configuration: config)
+
+            lock.lock()
+            reader = newReader
+            lock.unlock()
+
+            return newReader
         }
-    }
 
-    /// Re-encodes `json` with `.prettyPrinted` + `.sortedKeys` for log output.
-    /// Returns `nil` if `json` isn't valid JSON.
-    private static func prettyPrintJSON(_ json: Data) -> String? {
-        guard
-            let obj = try? JSONSerialization.jsonObject(with: json),
-            let pretty = try? JSONSerialization.data(
-                withJSONObject: obj,
-                options: [.prettyPrinted, .sortedKeys]
-            )
-        else { return nil }
-        return String(data: pretty, encoding: .utf8)
-    }
-
-    /// Pulls `card.brand` out of the CommerceHub response for
-    /// `CardReadResult.cardNetwork`. Tolerates minor schema drift.
-    private static func extractCardNetwork(from json: Data) -> String? {
-        guard
-            let obj = try? JSONSerialization.jsonObject(with: json) as? [String: Any]
-        else { return nil }
-        if let pm = (obj["source"] as? [String: Any]) ?? (obj["paymentSources"] as? [String: Any]) {
-            if let brand = pm["brand"] as? String { return brand }
-            if let card = pm["card"] as? [String: Any], let brand = card["brand"] as? String {
-                return brand
+        private static func encode(_ value: some Encodable) throws -> Data {
+            do {
+                return try JSONEncoder().encode(value)
+            } catch {
+                throw PayabliTTPError.nfcFailed(
+                    reason: "Failed to encode provider response: \(error.localizedDescription)"
+                )
             }
         }
-        return nil
-    }
+
+        /// Pulls `card.brand` out of the CommerceHub response for
+        /// `CardReadResult.cardNetwork`. Tolerates minor schema drift.
+        private static func extractCardNetwork(from json: Data) -> String? {
+            guard
+                let obj = try? JSONSerialization.jsonObject(with: json) as? [String: Any]
+            else { return nil }
+            if let pm = (obj["source"] as? [String: Any]) ?? (obj["paymentSources"] as? [String: Any]) {
+                if let brand = pm["brand"] as? String {
+                    return brand
+                }
+                if let card = pm["card"] as? [String: Any], let brand = card["brand"] as? String {
+                    return brand
+                }
+            }
+            return nil
+        }
     #endif
 }
 

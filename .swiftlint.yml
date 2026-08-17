@@ -6,9 +6,9 @@
 #     relaxes rules that conflict with idiomatic XCTest patterns (force
 #     unwraps on fixtures, large fixture tuples, etc.).
 #
-# CI runs `swiftlint --strict`, so every warning is treated as an error.
-# Keep warning thresholds calibrated to the real shape of the codebase so
-# strict mode stays useful instead of getting disabled.
+# CI runs `swiftlint`, which fails on a serious violation and reports the rest.
+# `--strict`, which would treat every warning as an error, exits 2 on the 29
+# warnings currently in the tree.
 
 disabled_rules:
   - trailing_whitespace

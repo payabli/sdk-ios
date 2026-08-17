@@ -1,6 +1,7 @@
 import Foundation
 
 // MARK: - ObjC companions for transaction-data structs
+
 //
 // These `*ObjC` classes are thin wrappers around the Swift value types in
 // `PayabliTTPTransactionData.swift` / `PayabliTTPTypes.swift` so ObjC, MAUI

@@ -1,11 +1,11 @@
-import XCTest
-@testable import PayabliSDKTapToPay
 @testable import PayabliSDKCore
+@testable import PayabliSDKTapToPay
 import PayabliSDKTestUtils
+import XCTest
 
 @MainActor
 final class PayabliTTPSessionInitTests: XCTestCase {
-    func testTwoFacadesShareTheSameSession() async {
+    func testTwoFacadesShareTheSameSession() {
         let config = PayabliConfig(
             accessToken: "shared-token",
             entryPoint: "demo",

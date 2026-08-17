@@ -12,8 +12,10 @@ struct PayabliDemoQAApp: App {
         accessTokenProvider: {
             return try await Secrets.fetchPaymentMethodAccessToken()
         },
-        diagnostics: .qaLogging(enabled: Secrets.paymentMethodDiagnosticsEnabled,
-                                store: .paymentMethod)
+        diagnostics: .qaLogging(
+            enabled: Secrets.paymentMethodDiagnosticsEnabled,
+            store: .paymentMethod
+        )
     )
 
     @StateObject private var paymentCapture = PayabliPayInPaymentFlow(
@@ -22,8 +24,10 @@ struct PayabliDemoQAApp: App {
         accessTokenProvider: {
             return try await Secrets.fetchPaymentCaptureAccessToken()
         },
-        diagnostics: .qaLogging(enabled: Secrets.paymentCaptureDiagnosticsEnabled,
-                                store: .paymentCapture),
+        diagnostics: .qaLogging(
+            enabled: Secrets.paymentCaptureDiagnosticsEnabled,
+            store: .paymentCapture
+        ),
         operation: .capture,
         requestConfiguration: PaymentCaptureQAView.freshRequestConfiguration()
     )
@@ -37,6 +41,15 @@ struct PayabliDemoQAApp: App {
         entryPoint: Secrets.entryPoint,
         appId: Secrets.appId,
         environment: DemoConfiguration.environment
+    )
+
+    /// One owner for the token probes, so a tab that has finished its backend
+    /// step still reflects an answer another tab has since had. One entry per
+    /// token function, because a backend may scope them separately.
+    @StateObject private var tokenProbes = TokenProbeResults(
+        fetchCardPresent: { try await Secrets.fetchAccessToken() },
+        fetchStoredMethod: { try await Secrets.fetchPaymentMethodAccessToken() },
+        fetchCapture: { try await Secrets.fetchPaymentCaptureAccessToken() }
     )
 
     var body: some Scene {
@@ -65,9 +78,9 @@ struct PayabliDemoQAApp: App {
             // The app-wide tint. The palette lives in one Swift file rather than an
             // asset catalogue, so it is set here instead of by an AccentColor asset.
             .tint(.payabliPrimary)
+            .environmentObject(tokenProbes)
         }
     }
-
 }
 
 #Preview {
@@ -126,5 +139,5 @@ struct PayabliDemoQAApp: App {
                 Label("Config", systemImage: "gearshape")
             }
     }
+    .environmentObject(TokenProbeResults.inert())
 }
-

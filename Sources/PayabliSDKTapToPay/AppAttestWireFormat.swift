@@ -1,6 +1,7 @@
 import Foundation
 
 // MARK: - Backend wire types (PRD §8.2)
+
 //
 // Endpoint-specific DTOs for the attestation family. Generic envelope
 // scaffolding lives in `PayabliSDKCore.PayabliEnvelope`.

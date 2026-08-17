@@ -11,7 +11,6 @@ import SwiftUI
 /// The Configuration screen reads these same values, so what it displays cannot
 /// drift from what the forms actually use.
 enum PayInSharedConfiguration {
-
     // MARK: - Methods
 
     static let allowedMethods: [PayabliPayInPaymentFlowMethodType] = [.card, .ach]

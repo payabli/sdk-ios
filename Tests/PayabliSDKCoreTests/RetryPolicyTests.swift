@@ -1,8 +1,7 @@
-import XCTest
 import PayabliSDKCore
+import XCTest
 
 final class RetryPolicyTests: XCTestCase {
-
     func testDefaultParameters() {
         let policy = RetryPolicy.default
         XCTAssertEqual(policy.maxAttempts, 3)
@@ -33,7 +32,7 @@ final class RetryPolicyTests: XCTestCase {
 
     func testJitterBounds() {
         let policy = RetryPolicy(maxAttempts: 3, baseDelay: 1, maxDelay: 8, multiplier: 2, maxJitter: 0.5)
-        for _ in 0..<20 {
+        for _ in 0 ..< 20 {
             let delay = policy.delay(forAttempt: 2)
             XCTAssertTrue(delay >= 1.0 && delay <= 1.5)
         }
@@ -57,7 +56,13 @@ final class RetryPolicyTests: XCTestCase {
 
     func testRetryRunSucceedsOnFirstAttempt() async throws {
         var attempts = 0
-        let result = try await Retry.run(policy: RetryPolicy(maxAttempts: 3, baseDelay: 0, maxDelay: 0, multiplier: 1, maxJitter: 0)) { attempt in
+        let result = try await Retry.run(policy: RetryPolicy(
+            maxAttempts: 3,
+            baseDelay: 0,
+            maxDelay: 0,
+            multiplier: 1,
+            maxJitter: 0
+        )) { attempt in
             attempts += 1
             return attempt
         }
@@ -67,7 +72,13 @@ final class RetryPolicyTests: XCTestCase {
 
     func testRetryRunRetriesRetryableErrors() async throws {
         var attempts = 0
-        let result = try await Retry.run(policy: RetryPolicy(maxAttempts: 3, baseDelay: 0, maxDelay: 0, multiplier: 1, maxJitter: 0)) { attempt in
+        let result = try await Retry.run(policy: RetryPolicy(
+            maxAttempts: 3,
+            baseDelay: 0,
+            maxDelay: 0,
+            multiplier: 1,
+            maxJitter: 0
+        )) { attempt in
             attempts += 1
             if attempt < 3 {
                 throw RetryableError(NSError(domain: "test", code: 500))

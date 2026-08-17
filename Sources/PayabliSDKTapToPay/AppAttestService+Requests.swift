@@ -2,13 +2,13 @@ import Foundation
 import PayabliSDKCore
 
 // MARK: - Attestation networking helpers
+
 //
 // Concrete-endpoint wrappers (`postChallenge`, `postRegister`, `postAttest`)
 // plus the shared machinery used by every authenticated POST in the
 // attestation/activation family.
 
 extension AppAttestService {
-
     func postChallenge(entry: String) async throws -> ChallengeResponse {
         try await postAttestationRequest(
             path: "/api/v2/device/taptopay/challenge",
@@ -35,9 +35,9 @@ extension AppAttestService {
 
     /// Authenticated POST that expects a non-empty `responseData` of type
     /// `Payload`. Throws if the envelope is missing it.
-    func postAttestationRequest<Body: Encodable, Payload: Decodable>(
+    func postAttestationRequest<Payload: Decodable>(
         path: String,
-        body: Body,
+        body: some Encodable,
         label: String,
         assertion: AssertionHeaders? = nil,
         makeDeclineError: @escaping (_ code: Int?, _ reason: String) -> PayabliTTPError = { _, reason in
@@ -71,9 +71,9 @@ extension AppAttestService {
 
     /// Authenticated POST for endpoints that do not return a `responseData`
     /// body (only an `isSuccess` acknowledgement).
-    func postAttestationRequestExpectingNoBody<Body: Encodable>(
+    func postAttestationRequestExpectingNoBody(
         path: String,
-        body: Body,
+        body: some Encodable,
         label: String,
         assertion: AssertionHeaders? = nil,
         makeDeclineError: @escaping (_ code: Int?, _ reason: String) -> PayabliTTPError = { _, reason in
@@ -99,9 +99,9 @@ extension AppAttestService {
     /// `transport` decorator (`AuthenticatedTransport`); this method only
     /// appends the App Attest assertion headers that are specific to the
     /// attestation/activation endpoint family.
-    private func performAuthenticatedPOST<Body: Encodable>(
+    private func performAuthenticatedPOST(
         path: String,
-        body: Body,
+        body: some Encodable,
         label: String,
         assertion: AssertionHeaders?,
         makeDeclineError: (_ code: Int?, _ reason: String) -> PayabliTTPError
@@ -117,14 +117,10 @@ extension AppAttestService {
             jsonBody: body
         )
 
-        let headersDump = request.headers
-            .map { "\($0.key): \($0.value)" }
-            .sorted()
-            .joined(separator: " | ")
-        let bodyDump = request.body.flatMap { String(data: $0, encoding: .utf8) } ?? "<nil>"
-        logger.info("[\(label)] → POST \(request.path)")
-        logger.info("[\(label)] headers: \(headersDump)")
-        logger.info("[\(label)] body: \(bodyDump)")
+        // These bodies and headers are authentication material: `/activate`
+        // carries the activation code, the others carry the App Attest key,
+        // attestation and assertion. Endpoint and size only.
+        logger.info("[\(label)] → POST \(request.path) bytes=\(request.body?.count ?? 0)")
 
         let response: PayabliResponse
         do {
@@ -134,8 +130,7 @@ extension AppAttestService {
             throw error
         }
 
-        let responseBody = String(data: response.body, encoding: .utf8) ?? "<non-utf8 \(response.body.count) bytes>"
-        logger.info("[\(label)] ← [\(response.statusCode)] body: \(responseBody)")
+        logger.info("[\(label)] ← [\(response.statusCode)] bytes=\(response.body.count)")
 
         do {
             try mapPayabliHTTPError(response: response)

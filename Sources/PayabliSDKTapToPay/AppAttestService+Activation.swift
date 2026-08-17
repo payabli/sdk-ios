@@ -3,9 +3,8 @@ import PayabliSDKCore
 
 // MARK: - Device activation (PRD §9.7)
 
-extension AppAttestService {
-
-    public func activateDevice(activationCode: String, entry: String) async throws {
+public extension AppAttestService {
+    func activateDevice(activationCode: String, entry: String) async throws {
         guard let deviceId = storage.string(forKey: PayabliKeychainKey.deviceId) else {
             throw PayabliTTPError.attestationFailed(reason: "Missing deviceId — run initialize() before activateDevice")
         }

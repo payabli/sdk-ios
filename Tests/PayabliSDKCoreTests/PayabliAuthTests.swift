@@ -1,8 +1,7 @@
-import XCTest
 import PayabliSDKCore
+import XCTest
 
 final class PayabliAuthTests: XCTestCase {
-
     // MARK: - Helpers
 
     private func makeConfig(
@@ -19,7 +18,7 @@ final class PayabliAuthTests: XCTestCase {
 
     // MARK: - Initial token
 
-    func testInitialTokenComesFromConfig() async throws {
+    func testInitialTokenComesFromConfig() async {
         let auth = PayabliAuth(config: makeConfig(accessToken: "seed"))
         let token = await auth.currentAccessToken()
         XCTAssertEqual(token, "seed")
@@ -122,5 +121,7 @@ final class PayabliAuthTests: XCTestCase {
 /// Simple actor counter for tracking concurrent calls in tests.
 private actor Counter {
     private(set) var value: Int = 0
-    func increment() { value += 1 }
+    func increment() {
+        value += 1
+    }
 }

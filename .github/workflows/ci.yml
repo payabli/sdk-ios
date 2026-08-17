@@ -10,53 +10,174 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+# Every job here runs the pull request's own code, so the token it inherits is
+# pinned rather than left to the repository's default. That default is read-only
+# today and is a setting, not a property of this file; without this line, raising
+# it would silently hand a write to code the branch controls, which `checkout`
+# leaves in `.git/config` for whatever runs next.
+permissions:
+  contents: read
+
+# Four jobs, run at once. The two suites are the whole cost of this workflow and
+# neither reads anything the other writes, so run in sequence they only add up.
+# They cannot share a build: both compile the SDK, but one is the package's own
+# test action and the other consumes the package as a dependency of
+# Example/PayabliDemo.xcodeproj, and Xcode compiles a dependency with
+# -suppress-warnings. Same intermediates path, different flags, so pointing both
+# at one -derivedDataPath makes them invalidate each other's objects rather than
+# reuse them.
+#
+# Nothing here is granted a secret or a write. Posting the change report and
+# running the analysis both need one, and both live in `pr-reports.yml`, which
+# this run triggers when it finishes. That file is read from the default branch,
+# so a pull request cannot edit the jobs that hold the tokens; every job below
+# is read from the pull request's own revision, which is why none of them may
+# hold one.
+
 jobs:
-  test:
-    name: Build & Test
+  lint:
+    name: Lint
     runs-on: macos-15
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # Nothing here pushes, so the token is not left in `.git/config` for
+          # the branch's own scripts to find.
+          persist-credentials: false
 
-      - name: Select latest Xcode
+      - uses: ./.github/actions/lint-tools
+
+      # No `--config`: naming a config file makes SwiftLint ignore nested ones,
+      # and Tests/.swiftlint.yml is what relaxes the rules XCTest fixtures break.
+      - name: Lint
         run: |
-          XCODE=$(ls /Applications | grep -E '^Xcode_[0-9]' | sort -V | tail -1)
-          sudo xcode-select -s "/Applications/$XCODE/Contents/Developer"
-          echo "Using $XCODE"
-          xcodebuild -version
-          swift --version
+          swiftlint
+          swiftformat --lint .
 
-      - name: Install xcpretty
-        run: gem install xcpretty --no-document
+  # Reports, never judges. A branch that runs `swiftformat .` puts hundreds of
+  # files in the diff, and the file count alone does not say which of them
+  # changed what the code does.
+  #
+  # continue-on-error, and the script exits 0 whatever it finds: a report that
+  # can redden a pull request is a gate, and this is not one.
+  #
+  # This job runs the pull request's own code — the local action and the script
+  # under Scripts/ — so it is read-only and holds no token. Posting the report
+  # needs one, and that happens in `pr-reports.yml`, which runs from the default
+  # branch where this branch cannot edit it.
+  changes:
+    name: Change report
+    runs-on: macos-15
+    if: github.event_name == 'pull_request'
+    continue-on-error: true
+    permissions:
+      contents: read
 
-      - name: Resolve dependencies
+    steps:
+      # The classification reads both sides of the change, so it needs history.
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: ./.github/actions/lint-tools
+
+      - name: Classify the diff
         run: |
-          xcodebuild -resolvePackageDependencies \
-            -scheme PayabliSDK-Package \
-            -clonedSourcePackagesDirPath .build/checkouts
+          ./Scripts/classify-changes.sh \
+            "${{ github.event.pull_request.base.sha }}" \
+            "${{ github.event.pull_request.head.sha }}" \
+            > report.md
+          cat report.md >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Test
+      # Only the report. Which pull request it belongs to is read from the
+      # triggering run's event by `pr-reports.yml`, because anything uploaded
+      # here is chosen by the branch, and that workflow holds the tokens.
+      - name: Upload the report
+        uses: actions/upload-artifact@v4
+        with:
+          name: change-report
+          path: report.md
+
+  test-sdk:
+    name: SDK tests
+    runs-on: macos-15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # Nothing here pushes, so the token is not left in `.git/config` for
+          # the branch's own scripts to find.
+          persist-credentials: false
+
+      - uses: ./.github/actions/ios-toolchain
+
+      - name: Test the SDK
         run: |
-          SIMULATOR_ID=$(xcrun simctl list devices available -j \
-            | python3 -c "
-          import json, sys
-          d = json.load(sys.stdin)['devices']
-          iphones = [
-            v for k, vals in d.items()
-            if 'iOS' in k
-            for v in vals
-            if 'iPhone' in v['name'] and v['isAvailable']
-          ]
-          if not iphones:
-            print('error: no available iPhone simulator found', file=sys.stderr)
-            sys.exit(1)
-          print(sorted(iphones, key=lambda x: x['name'])[-1]['udid'])
-          ")
-          echo "Using simulator: $SIMULATOR_ID"
           xcodebuild test \
             -scheme PayabliSDK-Package \
             -destination "platform=iOS Simulator,id=$SIMULATOR_ID" \
             -clonedSourcePackagesDirPath .build/checkouts \
-            CODE_SIGNING_ALLOWED=NO \
-            | xcpretty && exit ${PIPESTATUS[0]}
+            -enableCodeCoverage YES \
+            -resultBundlePath SDKTests.xcresult \
+            -quiet \
+            CODE_SIGNING_ALLOWED=NO
+
+      # -quiet names the failing tests and stops there, so the assertion comes
+      # back out of the result bundle.
+      - name: Report test failures
+        if: failure()
+        run: ./Scripts/print-test-failures.sh SDKTests.xcresult
+
+      # Sources only. sonar-project.properties measures that root, and an
+      # .xcresult also covers the test files themselves and the vendored
+      # card-reader source the suite touches.
+      - name: Convert coverage
+        run: |
+          ./Scripts/xccov-to-sonarqube-generic.sh --include Sources/ \
+            SDKTests.xcresult > coverage.xml
+
+      # Only the coverage, for the same reason as the report above.
+      - name: Upload coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage.xml
+
+  test-demo:
+    name: Sample app step sequences
+    runs-on: macos-15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # Nothing here pushes, so the token is not left in `.git/config` for
+          # the branch's own scripts to find.
+          persist-credentials: false
+
+      - uses: ./.github/actions/ios-toolchain
+
+      # The sample app's step sequences, which decide what each screen offers
+      # next. A separate scheme, because this bundle has no host application:
+      # Secrets.swift is gitignored and is a member of the app target, so the app
+      # itself cannot be built here.
+      - name: Test the sample app's step sequences
+        run: |
+          xcodebuild test \
+            -project Example/PayabliDemo/PayabliDemo.xcodeproj \
+            -scheme PayabliDemoFlowTests \
+            -destination "platform=iOS Simulator,id=$SIMULATOR_ID" \
+            -clonedSourcePackagesDirPath .build/checkouts \
+            -enableCodeCoverage YES \
+            -resultBundlePath DemoFlowTests.xcresult \
+            -quiet \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Report test failures
+        if: failure()
+        run: ./Scripts/print-test-failures.sh DemoFlowTests.xcresult

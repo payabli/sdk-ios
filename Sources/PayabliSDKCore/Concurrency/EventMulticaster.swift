@@ -3,7 +3,6 @@ import Foundation
 /// Multicast emitter for any `Sendable` event type. Every concurrent caller
 /// of `stream()` receives all subsequent events.
 public final class EventMulticaster<Event: Sendable>: @unchecked Sendable {
-
     private final class Subscription: @unchecked Sendable {
         let id = UUID()
         let continuation: AsyncStream<Event>.Continuation
@@ -41,7 +40,9 @@ public final class EventMulticaster<Event: Sendable>: @unchecked Sendable {
         lock.lock()
         let snapshot = subscribers
         lock.unlock()
-        for sub in snapshot { sub.continuation.yield(event) }
+        for sub in snapshot {
+            sub.continuation.yield(event)
+        }
     }
 
     /// Terminates every active stream. Typical use is during SDK teardown so
@@ -52,11 +53,14 @@ public final class EventMulticaster<Event: Sendable>: @unchecked Sendable {
         let snapshot = subscribers
         subscribers.removeAll()
         lock.unlock()
-        for sub in snapshot { sub.continuation.finish() }
+        for sub in snapshot {
+            sub.continuation.finish()
+        }
     }
 
     private func remove(_ id: UUID) {
-        lock.lock(); defer { lock.unlock() }
+        lock.lock()
+        defer { lock.unlock() }
         subscribers.removeAll { $0.id == id }
     }
 }

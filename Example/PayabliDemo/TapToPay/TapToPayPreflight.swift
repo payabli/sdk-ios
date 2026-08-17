@@ -1,7 +1,7 @@
 import DeviceCheck
 import Foundation
 #if canImport(ProximityReader)
-import ProximityReader
+    import ProximityReader
 #endif
 
 /// Credential-independent pre-flight checks for the Tap to Pay tab.
@@ -14,7 +14,6 @@ import ProximityReader
 ///
 /// Nothing in here reaches the network and nothing reads a secret.
 enum TapToPayPreflight {
-
     // MARK: - Result model
 
     struct Check: Identifiable {
@@ -54,15 +53,15 @@ enum TapToPayPreflight {
     ///      (`arm64` / `x86_64`); a device reports a model such as `iPhone17,1`.
     static var runtimeEnvironment: RuntimeEnvironment {
         #if targetEnvironment(simulator)
-        return .simulator
+            return .simulator
         #else
-        if ProcessInfo.processInfo.environment["SIMULATOR_DEVICE_NAME"] != nil {
-            return .simulator
-        }
-        if ["arm64", "x86_64", "i386"].contains(machineIdentifier) {
-            return .simulator
-        }
-        return .physicalDevice
+            if ProcessInfo.processInfo.environment["SIMULATOR_DEVICE_NAME"] != nil {
+                return .simulator
+            }
+            if ["arm64", "x86_64", "i386"].contains(machineIdentifier) {
+                return .simulator
+            }
+            return .physicalDevice
         #endif
     }
 
@@ -93,12 +92,12 @@ enum TapToPayPreflight {
     /// against `runtimeEnvironment`.
     static var tapToPayHardwareSupported: Bool? {
         #if canImport(ProximityReader)
-        if #available(iOS 16.7, *) {
-            return PaymentCardReader.isSupported
-        }
-        return false
+            if #available(iOS 16.7, *) {
+                return PaymentCardReader.isSupported
+            }
+            return false
         #else
-        return nil
+            return nil
         #endif
     }
 
@@ -157,7 +156,8 @@ enum TapToPayPreflight {
             return team
         }
         if let applicationIdentifier = entitlements["application-identifier"] as? String,
-           let prefix = applicationIdentifier.split(separator: ".").first {
+           let prefix = applicationIdentifier.split(separator: ".").first
+        {
             return String(prefix)
         }
         return nil
@@ -204,8 +204,8 @@ enum TapToPayPreflight {
                 title: "Host: \(environment.label)",
                 detail: environment == .simulator
                     ? "uname reports \(machineIdentifier). Tap to Pay needs a physical iPhone XS "
-                        + "or later on iOS 16.7+; a Simulator cannot attest or read a card even "
-                        + "with a valid team, token, and entitlement."
+                    + "or later on iOS 16.7+; a Simulator cannot attest or read a card even "
+                    + "with a valid team, token, and entitlement."
                     : "uname reports \(machineIdentifier).",
                 status: environment == .simulator ? .fail : .pass
             )

@@ -1,6 +1,7 @@
 import Foundation
 
 // MARK: - /config wire types (PRD §8.2)
+
 //
 // Generic envelope scaffolding (`Status`, `DeclineEnvelope`, `Success<T>`,
 // `declineOutcome(from:)`) lives in `PayabliSDKCore/Networking/ResponseEnvelope.swift`

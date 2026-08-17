@@ -1,6 +1,6 @@
 import Foundation
 #if canImport(ProximityReader)
-import ProximityReader
+    import ProximityReader
 #endif
 
 /// Whether the reader session is gone, or only this read failed. A dead session
@@ -13,9 +13,9 @@ import ProximityReader
 /// only the case name arrives, in text.
 func readerFailureInvalidatesSession(_ error: Error) -> Bool {
     #if canImport(ProximityReader)
-    if let readError = error as? PaymentCardReaderSession.ReadError {
-        return sessionLevelReadErrorNames.contains(String(describing: readError))
-    }
+        if let readError = error as? PaymentCardReaderSession.ReadError {
+            return sessionLevelReadErrorNames.contains(String(describing: readError))
+        }
     #endif
 
     let text = failureText(of: error)
@@ -43,8 +43,8 @@ private let sessionLevelReadErrorNames: Set<String> = [
 private func failureText(of error: Error) -> String {
     if let ttpError = error as? PayabliTTPError {
         switch ttpError {
-        case .nfcFailed(let reason),
-             .readerSetupFailed(let reason):
+        case let .nfcFailed(reason),
+             let .readerSetupFailed(reason):
             return reason
         default:
             return String(describing: ttpError)

@@ -1,6 +1,6 @@
-import XCTest
 import PayabliSDKCore
 import PayabliSDKTestUtils
+import XCTest
 
 private struct FakeData: Decodable, Sendable {
     let paymentTransId: String
@@ -60,7 +60,7 @@ final class PayabliServiceTests: XCTestCase {
         do {
             _ = try await service().performV2(request, decoding: FakeData.self)
             XCTFail("Expected error")
-        } catch PayabliPaymentError.validation(let err) {
+        } catch let PayabliPaymentError.validation(err) {
             XCTAssertEqual(err.status, 400)
             XCTAssertNotNil(err.errors?["paymentMethod.cardnumber"])
         } catch {
@@ -104,7 +104,7 @@ final class PayabliServiceTests: XCTestCase {
         do {
             _ = try await service().performV2(request, decoding: FakeData.self)
             XCTFail("Expected error")
-        } catch PayabliPaymentError.decline(let err) {
+        } catch let PayabliPaymentError.decline(err) {
             XCTAssertEqual(err.rawCode, "D0001")
             XCTAssertEqual(err.reason, "Card Declined")
         } catch {
@@ -125,7 +125,7 @@ final class PayabliServiceTests: XCTestCase {
         do {
             _ = try await service().performV2(request, decoding: FakeData.self)
             XCTFail("Expected error")
-        } catch PayabliPaymentError.server(let err) {
+        } catch let PayabliPaymentError.server(err) {
             XCTAssertEqual(err.status, 500)
         } catch {
             XCTFail("Wrong error: \(error)")

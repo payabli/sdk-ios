@@ -47,16 +47,10 @@ public final class TTPTransactionClient: Sendable {
             jsonBody: body
         )
 
-        let headersDump = request.headers
-            .map { "\($0.key): \($0.value)" }
-            .sorted()
-            .joined(separator: " | ")
-        let bodyDump = request.body.flatMap { String(data: $0, encoding: .utf8) } ?? "<nil>"
-        logger.info("[initiate] → POST \(request.path)")
-        logger.info("[initiate] headers: \(headersDump)")
-        // Body carries PII (billing/shipping/email/phone) — keep redacted in
-        // shared OS logs.
-        logger.info("[initiate] body", private: bodyDump)
+        // `customerData` is the caller's whole customer record, so the body is
+        // reported by size. The headers carry the App Attest assertion, key id
+        // and device id, and are not logged either.
+        logger.info("[initiate] → POST \(request.path) bytes=\(request.body?.count ?? 0)")
 
         let envelope: PayabliV2Envelope<InitiateData>
         do {
@@ -66,7 +60,10 @@ public final class TTPTransactionClient: Sendable {
             throw error
         }
 
-        logger.info("[initiate] ← isApproved=\(envelope.isApproved) code=\(envelope.code) paymentTransId=\(envelope.data?.paymentTransId ?? "<nil>")")
+        logger
+            .info(
+                "[initiate] ← isApproved=\(envelope.isApproved) code=\(envelope.code) paymentTransId=\(envelope.data?.paymentTransId ?? "<nil>")"
+            )
 
         guard envelope.isApproved, let data = envelope.data else {
             throw PayabliTTPError.initiateFailed(reason: envelope.reason ?? envelope.code)
@@ -121,11 +118,11 @@ public final class TTPTransactionClient: Sendable {
     static func updateBody(for payload: TTPUpdatePayload) -> Data {
         let encoder = JSONEncoder()
         switch payload {
-        case .success(let result):
+        case let .success(result):
             let body = UpdateSuccessBody(providerResponse: providerResponse(from: result))
             return (try? encoder.encode(body)) ?? Data()
 
-        case .nfcFailure(let description):
+        case let .nfcFailure(description):
             let body = UpdateErrorBody(error: .init(
                 title: "NFC Tap Failed",
                 description: description,

@@ -71,7 +71,9 @@ public final class MockAppAttestor: AppAttestor, @unchecked Sendable {
     public func generateKey() async throws -> AppAttestKeyId {
         return try lock.withLock {
             _generateKeyCalls += 1
-            if let error = _generateKeyError { throw error }
+            if let error = _generateKeyError {
+                throw error
+            }
             return _generatedKeyId
         }
     }
@@ -79,7 +81,9 @@ public final class MockAppAttestor: AppAttestor, @unchecked Sendable {
     public func attestKey(_ keyId: AppAttestKeyId, clientDataHash: ClientDataHash) async throws -> AttestationObject {
         return try lock.withLock {
             _attestKeyCalls += 1
-            if let error = _attestKeyError { throw error }
+            if let error = _attestKeyError {
+                throw error
+            }
             return _attestationPayload
         }
     }
@@ -87,7 +91,9 @@ public final class MockAppAttestor: AppAttestor, @unchecked Sendable {
     public func generateAssertion(_ keyId: AppAttestKeyId, clientDataHash: ClientDataHash) async throws -> AppAttestAssertion {
         return try lock.withLock {
             _generateAssertionCalls += 1
-            if let error = _generateAssertionError { throw error }
+            if let error = _generateAssertionError {
+                throw error
+            }
             return _assertionPayload
         }
     }

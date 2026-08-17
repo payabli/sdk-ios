@@ -29,7 +29,6 @@ import PayabliSDKCore
 ///   - `AppAttestService+Defaults.swift`   — hardware-identifier providers
 ///   - `AppAttestWireFormat.swift`         — request/response DTOs
 public final class AppAttestService: DeviceAttestationService, @unchecked Sendable {
-
     let transport: any PayabliTransport
     let attestor: AppAttestor
     let storage: SecureStorage
@@ -57,7 +56,7 @@ public final class AppAttestService: DeviceAttestationService, @unchecked Sendab
         )
     }
 
-    internal init(
+    init(
         transport: any PayabliTransport,
         attestor: AppAttestor,
         storage: SecureStorage,

@@ -18,8 +18,13 @@ public final class StubURLProtocol: URLProtocol {
 
     public nonisolated(unsafe) static var handler: Handler?
 
-    override public class func canInit(with request: URLRequest) -> Bool { true }
-    override public class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override public class func canInit(with request: URLRequest) -> Bool {
+        true
+    }
+
+    override public class func canonicalRequest(for request: URLRequest) -> URLRequest {
+        request
+    }
 
     override public func startLoading() {
         guard let handler = Self.handler else {
@@ -61,7 +66,9 @@ public final class StubURLProtocol: URLProtocol {
         var buffer = [UInt8](repeating: 0, count: 4096)
         while stream.hasBytesAvailable {
             let read = stream.read(&buffer, maxLength: buffer.count)
-            if read <= 0 { break }
+            if read <= 0 {
+                break
+            }
             data.append(buffer, count: read)
         }
         return data

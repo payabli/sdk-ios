@@ -4,7 +4,9 @@ import PayabliSDKTapToPay
 /// Mock `TapToPayProvider` for unit tests that exercise the TTP session and
 /// charge flows without requiring a physical NFC reader.
 public final class MockTapToPayProvider: TapToPayProvider, @unchecked Sendable {
-    public static var providerId: String { "mock" }
+    public static var providerId: String {
+        "mock"
+    }
 
     private let lock = NSLock()
 
@@ -82,7 +84,9 @@ public final class MockTapToPayProvider: TapToPayProvider, @unchecked Sendable {
             _lastConfiguredCredentials = credentials
             return _configureResult
         }
-        if case .failure(let err) = result { throw err }
+        if case let .failure(err) = result {
+            throw err
+        }
     }
 
     public func prepareReader() async throws {
@@ -90,7 +94,9 @@ public final class MockTapToPayProvider: TapToPayProvider, @unchecked Sendable {
             _prepareReaderCalls += 1
             return _prepareReaderResult
         }
-        if case .failure(let err) = result { throw err }
+        if case let .failure(err) = result {
+            throw err
+        }
     }
 
     public func startReading(_ request: CardReadRequest) async throws -> CardReadResult {
@@ -99,8 +105,8 @@ public final class MockTapToPayProvider: TapToPayProvider, @unchecked Sendable {
             return _readingResult
         }
         switch result {
-        case .success(let value): return value
-        case .failure(let err): throw err
+        case let .success(value): return value
+        case let .failure(err): throw err
         }
     }
 

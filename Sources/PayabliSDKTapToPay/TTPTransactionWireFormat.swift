@@ -87,8 +87,8 @@ struct InitiateCustomerData: Encodable {
 }
 
 struct InitiatePaymentMethod: Encodable {
-    let method: String           // "device" (POI-device-backed TTP flow)
-    let device: String           // Payabli deviceId (from /attest or /activate)
+    let method: String // "device" (POI-device-backed TTP flow)
+    let device: String // Payabli deviceId (from /attest or /activate)
 }
 
 struct InitiateInvoiceData: Encodable {
@@ -155,6 +155,7 @@ struct UpdateErrorBody: Encodable {
         let description: String
         let failureReason: String
     }
+
     let error: ErrorDetail
 }
 
@@ -175,13 +176,13 @@ enum ProviderResponsePayload: Encodable {
 
     func encode(to encoder: Encoder) throws {
         switch self {
-        case .opaqueJSON(let json):
+        case let .opaqueJSON(json):
             // Re-parse the provider's JSON bytes into a `JSONValue` tree so it
             // merges cleanly into the outer encoder (same output as writing
             // the bytes directly, but type-safe).
             let value = try JSONDecoder().decode(JSONValue.self, from: json)
             try value.encode(to: encoder)
-        case .payloadOnly(let payload):
+        case let .payloadOnly(payload):
             try payload.encode(to: encoder)
         }
     }
@@ -190,7 +191,7 @@ enum ProviderResponsePayload: Encodable {
 /// Structured shape sent by payload-only adapters.
 struct PayloadOnlyProviderResponse: Encodable {
     let provider: String
-    let encryptedPayload: String        // base64
+    let encryptedPayload: String // base64
     let cardNetwork: String?
     let providerMetadata: [String: String]
 }
@@ -208,12 +209,30 @@ private enum JSONValue: Codable {
 
     init(from decoder: Decoder) throws {
         let c = try decoder.singleValueContainer()
-        if c.decodeNil() { self = .null; return }
-        if let v = try? c.decode(Bool.self) { self = .bool(v); return }
-        if let v = try? c.decode(Double.self) { self = .number(v); return }
-        if let v = try? c.decode(String.self) { self = .string(v); return }
-        if let v = try? c.decode([JSONValue].self) { self = .array(v); return }
-        if let v = try? c.decode([String: JSONValue].self) { self = .object(v); return }
+        if c.decodeNil() {
+            self = .null
+            return
+        }
+        if let v = try? c.decode(Bool.self) {
+            self = .bool(v)
+            return
+        }
+        if let v = try? c.decode(Double.self) {
+            self = .number(v)
+            return
+        }
+        if let v = try? c.decode(String.self) {
+            self = .string(v)
+            return
+        }
+        if let v = try? c.decode([JSONValue].self) {
+            self = .array(v)
+            return
+        }
+        if let v = try? c.decode([String: JSONValue].self) {
+            self = .object(v)
+            return
+        }
         throw DecodingError.dataCorruptedError(
             in: c, debugDescription: "Unknown JSON value"
         )
@@ -223,11 +242,11 @@ private enum JSONValue: Codable {
         var c = encoder.singleValueContainer()
         switch self {
         case .null: try c.encodeNil()
-        case .bool(let v): try c.encode(v)
-        case .number(let v): try c.encode(v)
-        case .string(let v): try c.encode(v)
-        case .array(let v): try c.encode(v)
-        case .object(let v): try c.encode(v)
+        case let .bool(v): try c.encode(v)
+        case let .number(v): try c.encode(v)
+        case let .string(v): try c.encode(v)
+        case let .array(v): try c.encode(v)
+        case let .object(v): try c.encode(v)
         }
     }
 }

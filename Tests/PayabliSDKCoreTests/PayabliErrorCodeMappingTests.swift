@@ -1,8 +1,7 @@
-import XCTest
 import PayabliSDKCore
+import XCTest
 
 final class PayabliErrorCodeMappingTests: XCTestCase {
-
     func testValidationErrorCodeMapsToValidation() throws {
         // Construct a PayabliValidationError via JSON decoding (the only
         // way to build one — it has no public memberwise init).

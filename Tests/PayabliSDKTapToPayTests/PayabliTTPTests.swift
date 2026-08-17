@@ -1,11 +1,10 @@
-import XCTest
 import PayabliSDKCore
 @testable import PayabliSDKTapToPay
 import PayabliSDKTestUtils
+import XCTest
 
 @MainActor
 final class PayabliTTPTests: XCTestCase {
-
     override func setUp() {
         super.setUp()
         // Default config stub — individual tests may override.
@@ -34,9 +33,12 @@ final class PayabliTTPTests: XCTestCase {
             "paymentToken": "payment_tok"
         ]
         let data = try JSONSerialization.data(withJSONObject: body)
-        return (HTTPURLResponse(url: request.url!, statusCode: 200,
-                                httpVersion: "HTTP/1.1",
-                                headerFields: ["Content-Type": "application/json"])!, data)
+        return (HTTPURLResponse(
+            url: request.url!,
+            statusCode: 200,
+            httpVersion: "HTTP/1.1",
+            headerFields: ["Content-Type": "application/json"]
+        )!, data)
     }
 
     private func makeTTP(

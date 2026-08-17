@@ -12,7 +12,6 @@ private enum TTPUpdateOutcome {
 
 @MainActor
 extension PayabliTTP {
-
     /// Charge a transaction. v1.0 supports `.sale` only (FR-11D.1).
     ///
     /// Threads the `paymentDetails` / `customer` / `invoice` / `orderDescription`
@@ -94,7 +93,8 @@ extension PayabliTTP {
             // would kill a healthy session over a dead one's failure.
             if generation == readerSessionGeneration,
                readerFailureInvalidatesSession(error),
-               sessionManager.transition(to: .sessionExpired) {
+               sessionManager.transition(to: .sessionExpired)
+            {
                 syncPublished()
                 multicaster.emit(.sessionExpired)
             }
@@ -116,7 +116,7 @@ extension PayabliTTP {
         case .succeeded:
             multicaster.emit(.updateCompleted(paymentTransId: paymentTransId))
             return TransactionResult(paymentTransId: paymentTransId)
-        case .failed(let reason):
+        case let .failed(reason):
             throw PayabliTTPError.updateFailed(reason: reason)
         }
     }
@@ -198,7 +198,6 @@ extension PayabliTTP {
     ) async -> TTPUpdateOutcome {
         let body = TTPTransactionClient.updateBody(for: payload)
         let logger = self.logger
-        let bodyDump = String(data: body, encoding: .utf8) ?? "<non-utf8 \(body.count) bytes>"
         let path = "/api/v2/MoneyIn/update/\(paymentTransId)"
         let transport = self.session.transport
 
@@ -209,16 +208,11 @@ extension PayabliTTP {
                 headers: ["Content-Type": "application/json"],
                 body: body
             )
-            let headersDump = request.headers
-                .map { "\($0.key): \($0.value)" }
-                .sorted()
-                .joined(separator: " | ")
-            logger.info("[update/\(attempt)] → PATCH \(path)")
-            logger.info("[update/\(attempt)] headers: \(headersDump)")
-            logger.info("[update/\(attempt)] body: \(bodyDump)")
+            // The success body carries the provider's whole response, and with
+            // it `paymentTokens.tokenData` and the card's expiry. Size only.
+            logger.info("[update/\(attempt)] → PATCH \(path) bytes=\(body.count)")
             let response = try await transport.perform(request)
-            let responseBody = String(data: response.body, encoding: .utf8) ?? "<non-utf8 \(response.body.count) bytes>"
-            logger.info("[update/\(attempt)] ← [\(response.statusCode)] body: \(responseBody)")
+            logger.info("[update/\(attempt)] ← [\(response.statusCode)] bytes=\(response.body.count)")
             return response
         }
 
@@ -226,7 +220,9 @@ extension PayabliTTP {
             try await Retry.run(policy: retryPolicy) { [retryPolicy] attempt in
                 let response = try await performOnce(attempt: String(attempt))
 
-                if (200..<300).contains(response.statusCode) { return }
+                if (200 ..< 300).contains(response.statusCode) {
+                    return
+                }
                 if retryPolicy.isRetryable(statusCode: response.statusCode) {
                     throw RetryableError(PayabliTTPError.updateFailed(
                         reason: "HTTP \(response.statusCode)"
@@ -242,45 +238,62 @@ extension PayabliTTP {
         }
     }
 
-    /// Two-line log: a `.public` summary that lands in shared OS logs, plus
-    /// a `.private` detail line carrying PII (billing/shipping/email/phone)
-    /// that's redacted in shared logs but visible in the developer's local
-    /// stream.
+    /// Two lines: the charge summary, then which customer fields the caller
+    /// populated. No customer value is emitted at any privacy level.
     private func logChargeStart(
         paymentDetails: PayabliTTPPaymentDetails,
         customer: PayabliTTPCustomerData,
         invoice: PayabliTTPInvoiceData,
         orderDescription: String?
     ) {
+        // Charge metadata. The single-argument overload renders the whole string
+        // `.public`, so only fields that carry no subject belong in it.
         logger.info(
             "[charge] → amount=\(paymentDetails.amount) serviceFee=\(paymentDetails.serviceFee) " +
-            "currency=\(paymentDetails.currency ?? "<nil>") " +
-            "customer={firstName=\(customer.firstName ?? "<nil>") " +
-            "lastName=\(customer.lastName ?? "<nil>") " +
-            "customerNumber=\(customer.customerNumber ?? "<nil>") " +
-            "customerId=\(customer.customerId.map(String.init) ?? "<nil>") " +
-            "company=\(customer.company ?? "<nil>")} " +
-            "invoice={invoiceNumber=\(invoice.invoiceNumber ?? "<nil>")} " +
-            "orderDescription=\(orderDescription ?? "<nil>")"
+                "currency=\(paymentDetails.currency ?? "<nil>") " +
+                "invoice={invoiceNumber=\(invoice.invoiceNumber ?? "<nil>")} " +
+                "orderDescription=\(orderDescription ?? "<nil>")"
         )
 
         guard !customer.isEmpty else { return }
-        let pii = "email=\(customer.email ?? "<nil>") " +
-            "phone=\(customer.phone ?? "<nil>") " +
-            "billing.address1=\(customer.billingAddress1 ?? "<nil>") " +
-            "billing.address2=\(customer.billingAddress2 ?? "<nil>") " +
-            "billing.city=\(customer.billingCity ?? "<nil>") " +
-            "billing.state=\(customer.billingState ?? "<nil>") " +
-            "billing.zip=\(customer.billingZip ?? "<nil>") " +
-            "billing.country=\(customer.billingCountry ?? "<nil>") " +
-            "billing.email=\(customer.billingEmail ?? "<nil>") " +
-            "billing.phone=\(customer.billingPhone ?? "<nil>") " +
-            "shipping.address1=\(customer.shippingAddress1 ?? "<nil>") " +
-            "shipping.address2=\(customer.shippingAddress2 ?? "<nil>") " +
-            "shipping.city=\(customer.shippingCity ?? "<nil>") " +
-            "shipping.state=\(customer.shippingState ?? "<nil>") " +
-            "shipping.zip=\(customer.shippingZip ?? "<nil>") " +
-            "shipping.country=\(customer.shippingCountry ?? "<nil>")"
-        logger.info("[charge] customerPII", private: pii)
+        logger.info("[charge] customer \(customer.redactedFieldSummary)")
+    }
+}
+
+extension PayabliTTPCustomerData {
+    /// Which fields the caller set, never what they hold: each renders
+    /// `[REDACTED]` when set and `[nil]` when not.
+    ///
+    /// `.private` redacts a value in a shared log and still delivers it to a
+    /// local stream and to a sysdiagnose, so a cardholder name has no privacy
+    /// level it may be logged at. The same holds for the contact and address
+    /// fields beside it, which the Android core also emits redacted.
+    var redactedFieldSummary: String {
+        let fields: [(String, String?)] = [
+            ("firstName", firstName),
+            ("lastName", lastName),
+            ("customerNumber", customerNumber),
+            ("customerId", customerId.map(String.init)),
+            ("company", company),
+            ("email", email),
+            ("phone", phone),
+            ("billing.address1", billingAddress1),
+            ("billing.address2", billingAddress2),
+            ("billing.city", billingCity),
+            ("billing.state", billingState),
+            ("billing.zip", billingZip),
+            ("billing.country", billingCountry),
+            ("billing.email", billingEmail),
+            ("billing.phone", billingPhone),
+            ("shipping.address1", shippingAddress1),
+            ("shipping.address2", shippingAddress2),
+            ("shipping.city", shippingCity),
+            ("shipping.state", shippingState),
+            ("shipping.zip", shippingZip),
+            ("shipping.country", shippingCountry)
+        ]
+        return fields
+            .map { "\($0.0)=\(PayabliLogger.redactFully($0.1))" }
+            .joined(separator: " ")
     }
 }

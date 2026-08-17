@@ -1,5 +1,5 @@
-import XCTest
 @testable import PayabliSDKTapToPay
+import XCTest
 
 /// Verifies that every `PayabliTTPError` case bridges to an `NSError` with
 /// the documented domain `"com.payabli.ttp"`, the documented stable per-case
@@ -9,7 +9,6 @@ import XCTest
 /// in the middle of `PayabliTTPError` would silently renumber the rest, so
 /// these tests fail loudly to remind us to append-only.
 final class PayabliTTPErrorNSErrorTests: XCTestCase {
-
     // MARK: - Domain
 
     func testAllErrorsUseTheTTPDomain() {
@@ -41,8 +40,10 @@ final class PayabliTTPErrorNSErrorTests: XCTestCase {
             let nsError = sample.error as NSError
             let description = nsError.userInfo[NSLocalizedDescriptionKey] as? String
             XCTAssertNotNil(description, "Missing description for \(sample.error)")
-            XCTAssertFalse(description?.isEmpty ?? true,
-                           "Empty description for \(sample.error)")
+            XCTAssertFalse(
+                description?.isEmpty ?? true,
+                "Empty description for \(sample.error)"
+            )
         }
     }
 
@@ -50,8 +51,10 @@ final class PayabliTTPErrorNSErrorTests: XCTestCase {
         let err = PayabliTTPError.invalidState(current: .ready, attempted: "charge")
         let description = (err as NSError).userInfo[NSLocalizedDescriptionKey] as? String
         XCTAssertNotNil(description)
-        XCTAssertTrue(description?.contains("charge") ?? false,
-                      "Expected description to include attempted operation; got: \(description ?? "<nil>")")
+        XCTAssertTrue(
+            description?.contains("charge") ?? false,
+            "Expected description to include attempted operation; got: \(description ?? "<nil>")"
+        )
         XCTAssertTrue(description?.contains("Invalid state") ?? false)
     }
 
@@ -59,8 +62,10 @@ final class PayabliTTPErrorNSErrorTests: XCTestCase {
         let err = PayabliTTPError.notReady(current: .attestingDevice)
         let description = (err as NSError).userInfo[NSLocalizedDescriptionKey] as? String
         XCTAssertNotNil(description)
-        XCTAssertTrue(description?.contains("not ready") ?? false,
-                      "Expected description to mention reader not ready; got: \(description ?? "<nil>")")
+        XCTAssertTrue(
+            description?.contains("not ready") ?? false,
+            "Expected description to mention reader not ready; got: \(description ?? "<nil>")"
+        )
     }
 
     func testReasonBearingErrorsForwardTheirReason() {

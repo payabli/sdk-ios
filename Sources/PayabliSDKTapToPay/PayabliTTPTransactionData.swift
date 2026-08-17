@@ -188,7 +188,9 @@ public struct PayabliTTPInvoiceData: Sendable, Equatable {
         self.invoiceNumber = PayabliTTPInvoiceData.sanitize(invoiceNumber)
     }
 
-    public var isEmpty: Bool { invoiceNumber == nil }
+    public var isEmpty: Bool {
+        invoiceNumber == nil
+    }
 
     private static func sanitize(_ value: String?) -> String? {
         guard let value else { return nil }

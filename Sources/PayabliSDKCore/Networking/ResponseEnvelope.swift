@@ -1,6 +1,7 @@
 import Foundation
 
 // MARK: - Legacy "isSuccess / responseData" envelope
+
 //
 // Used by the `/api/v2/device/...` family (attestation, activation) and by
 // `/api/v2/device/taptopay/config/{entry}`. Business-level failures come back
@@ -25,7 +26,6 @@ import Foundation
 /// }
 /// ```
 public enum PayabliEnvelope {
-
     /// Thin "peek" of the response body: only `isSuccess` and the top-level
     /// `responseText`. Used to decide between the success and decline decodes
     /// without committing to the full payload shape.
@@ -109,8 +109,12 @@ public struct PayabliV2Envelope<Data: Decodable>: Decodable {
     public let data: Data?
 
     /// `true` if `code` starts with `"A"` (Approved family).
-    public var isApproved: Bool { code.hasPrefix("A") }
+    public var isApproved: Bool {
+        code.hasPrefix("A")
+    }
 
     /// `true` if `code` starts with `"D"` (Declined family).
-    public var isDeclined: Bool { code.hasPrefix("D") }
+    public var isDeclined: Bool {
+        code.hasPrefix("D")
+    }
 }

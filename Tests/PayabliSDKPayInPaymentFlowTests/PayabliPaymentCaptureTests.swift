@@ -1,6 +1,5 @@
 @testable import PayabliSDKCore
 @testable import PayabliSDKPayInPaymentFlow
-import PayabliSDKPayInPaymentFlow
 import SwiftUI
 import XCTest
 

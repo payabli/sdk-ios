@@ -1,7 +1,7 @@
-import XCTest
 @testable import PayabliSDKCore
 @testable import PayabliSDKTapToPay
 import PayabliSDKTestUtils
+import XCTest
 
 final class AppAttestServiceTests: XCTestCase {
     override func tearDown() {
@@ -35,8 +35,12 @@ final class AppAttestServiceTests: XCTestCase {
     }
 
     private func response(_ status: Int, body: Data, url: URL) -> (HTTPURLResponse, Data) {
-        (HTTPURLResponse(url: url, statusCode: status, httpVersion: "HTTP/1.1",
-                         headerFields: ["Content-Type": "application/json"])!, body)
+        (HTTPURLResponse(
+            url: url,
+            statusCode: status,
+            httpVersion: "HTTP/1.1",
+            headerFields: ["Content-Type": "application/json"]
+        )!, body)
     }
 
     private static func envelope(responseData: [String: Any]) -> Data {
@@ -57,14 +61,20 @@ final class AppAttestServiceTests: XCTestCase {
             pathsBox.append(request.url!.path)
             switch request.url!.path {
             case "/api/v2/device/taptopay/challenge":
-                return (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
-                        Self.envelope(responseData: ["challengeId": "c_1", "challenge": "Y2hhbGxlbmdl"]))
+                return (
+                    HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
+                    Self.envelope(responseData: ["challengeId": "c_1", "challenge": "Y2hhbGxlbmdl"])
+                )
             case "/api/v2/device/taptopay/register":
-                return (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
-                        Self.envelope(responseData: ["deviceId": "dev_1"]))
+                return (
+                    HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
+                    Self.envelope(responseData: ["deviceId": "dev_1"])
+                )
             case "/api/v2/device/taptopay/attest":
-                return (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
-                        Self.envelope(responseData: ["ok": true]))
+                return (
+                    HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
+                    Self.envelope(responseData: ["ok": true])
+                )
             default:
                 XCTFail("unexpected path: \(request.url!.path)")
                 return (HTTPURLResponse(url: request.url!, statusCode: 500, httpVersion: nil, headerFields: nil)!, Data())
@@ -101,14 +111,20 @@ final class AppAttestServiceTests: XCTestCase {
             pathsBox.append(request.url!.path)
             switch request.url!.path {
             case "/api/v2/device/taptopay/challenge":
-                return (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
-                        Self.envelope(responseData: ["challengeId": "c", "challenge": "Y2hhbGxlbmdl"]))
+                return (
+                    HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
+                    Self.envelope(responseData: ["challengeId": "c", "challenge": "Y2hhbGxlbmdl"])
+                )
             case "/api/v2/device/taptopay/register":
-                return (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
-                        Self.envelope(responseData: ["deviceId": "dev_pending", "status": "pending"]))
+                return (
+                    HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
+                    Self.envelope(responseData: ["deviceId": "dev_pending", "status": "pending"])
+                )
             case "/api/v2/device/taptopay/attest":
-                return (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
-                        Self.envelope(responseData: ["ok": true]))
+                return (
+                    HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
+                    Self.envelope(responseData: ["ok": true])
+                )
             default:
                 XCTFail("unexpected path: \(request.url!.path)")
                 return (HTTPURLResponse(url: request.url!, statusCode: 500, httpVersion: nil, headerFields: nil)!, Data())
@@ -147,11 +163,15 @@ final class AppAttestServiceTests: XCTestCase {
         StubURLProtocol.handler = { request in
             switch request.url!.path {
             case "/api/v2/device/taptopay/challenge":
-                return (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
-                        Self.envelope(responseData: ["challengeId": "c_1", "challenge": "Y2hhbGxlbmdl"]))
+                return (
+                    HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
+                    Self.envelope(responseData: ["challengeId": "c_1", "challenge": "Y2hhbGxlbmdl"])
+                )
             case "/api/v2/device/taptopay/register":
-                return (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
-                        Self.envelope(responseData: ["deviceId": "dev_1"]))
+                return (
+                    HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
+                    Self.envelope(responseData: ["deviceId": "dev_1"])
+                )
             default:
                 XCTFail("attest must not reach \(request.url!.path) once attestKey fails")
                 return (HTTPURLResponse(url: request.url!, statusCode: 500, httpVersion: nil, headerFields: nil)!, Data())
@@ -185,18 +205,24 @@ final class AppAttestServiceTests: XCTestCase {
         StubURLProtocol.handler = { request in
             switch request.url!.path {
             case "/api/v2/device/taptopay/challenge":
-                return (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
-                        Self.envelope(responseData: ["challengeId": "c_1", "challenge": "Y2hhbGxlbmdl"]))
+                return (
+                    HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
+                    Self.envelope(responseData: ["challengeId": "c_1", "challenge": "Y2hhbGxlbmdl"])
+                )
             case "/api/v2/device/taptopay/register":
                 // Fail the first /register (pre-attest); succeed the second.
                 if registerAttempts.increment() == 1 {
                     return (HTTPURLResponse(url: request.url!, statusCode: 500, httpVersion: "HTTP/1.1", headerFields: nil)!, Data())
                 }
-                return (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
-                        Self.envelope(responseData: ["deviceId": "dev_1"]))
+                return (
+                    HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
+                    Self.envelope(responseData: ["deviceId": "dev_1"])
+                )
             case "/api/v2/device/taptopay/attest":
-                return (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
-                        Self.envelope(responseData: ["ok": true]))
+                return (
+                    HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
+                    Self.envelope(responseData: ["ok": true])
+                )
             default:
                 XCTFail("unexpected path: \(request.url!.path)")
                 return (HTTPURLResponse(url: request.url!, statusCode: 500, httpVersion: nil, headerFields: nil)!, Data())
@@ -215,8 +241,11 @@ final class AppAttestServiceTests: XCTestCase {
         }
         XCTAssertEqual(attestor.generateKeyCalls, 1)
         XCTAssertFalse(sut.isAlreadyAttested)
-        XCTAssertEqual(storage.string(forKey: PayabliKeychainKey.pendingKeyId), "mock_keyId",
-                       "a pre-attest failure must keep the generated key for reuse")
+        XCTAssertEqual(
+            storage.string(forKey: PayabliKeychainKey.pendingKeyId),
+            "mock_keyId",
+            "a pre-attest failure must keep the generated key for reuse"
+        )
 
         // Attempt 2 succeeds and must REUSE the pending key — no new generateKey.
         let result = try await sut.attest(entry: "myEntry", appId: "x")
@@ -224,8 +253,10 @@ final class AppAttestServiceTests: XCTestCase {
         XCTAssertEqual(attestor.generateKeyCalls, 1, "the pending key should be reused, not regenerated")
         XCTAssertEqual(attestor.attestKeyCalls, 1)
         XCTAssertTrue(sut.isAlreadyAttested)
-        XCTAssertNil(storage.string(forKey: PayabliKeychainKey.pendingKeyId),
-                     "pending slot must be cleared once attestation completes")
+        XCTAssertNil(
+            storage.string(forKey: PayabliKeychainKey.pendingKeyId),
+            "pending slot must be cleared once attestation completes"
+        )
     }
 
     // MARK: - Assertion generation
@@ -299,7 +330,7 @@ final class AppAttestServiceTests: XCTestCase {
 
     // MARK: - clearCache
 
-    func testClearCacheRemovesKeychainState() async throws {
+    func testClearCacheRemovesKeychainState() throws {
         let storage = InMemorySecureStorage()
         try storage.set("a", forKey: PayabliKeychainKey.keyId)
         try storage.set("b", forKey: PayabliKeychainKey.deviceId)
@@ -315,11 +346,14 @@ private final class PathsBox: @unchecked Sendable {
     private let lock = NSLock()
     private var storage: [String] = []
     var values: [String] {
-        lock.lock(); defer { lock.unlock() }
+        lock.lock()
+        defer { lock.unlock() }
         return storage
     }
+
     func append(_ s: String) {
-        lock.lock(); defer { lock.unlock() }
+        lock.lock()
+        defer { lock.unlock() }
         storage.append(s)
     }
 }
@@ -331,7 +365,8 @@ private final class CountBox: @unchecked Sendable {
     private var count = 0
     /// Increments and returns the new value (first call returns 1).
     func increment() -> Int {
-        lock.lock(); defer { lock.unlock() }
+        lock.lock()
+        defer { lock.unlock() }
         count += 1
         return count
     }

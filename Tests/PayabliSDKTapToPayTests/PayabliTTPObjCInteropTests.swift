@@ -1,5 +1,5 @@
-import XCTest
 @testable import PayabliSDKTapToPay
+import XCTest
 
 /// Round-trip tests for the ObjC companion classes that wrap
 /// `PayabliTTPCustomerData`, `PayabliTTPPaymentDetails`,
@@ -10,7 +10,6 @@ import XCTest
 /// hold the same fields with the same labels as the Swift structs and that
 /// `toSwift()` produces an equivalent value.
 final class PayabliTTPObjCInteropTests: XCTestCase {
-
     // MARK: - PayabliTTPCustomerDataObjC
 
     func testCustomerDataObjCRoundTripPreservesAllFields() {
@@ -319,7 +318,7 @@ final class PayabliTTPObjCInteropTests: XCTestCase {
     /// truncate any customer record id above `Int32.max`, attaching the
     /// charge to the wrong customer.
     func testCustomerDataObjCCustomerIdPreserves64BitValue() {
-        let big = Int64(Int32.max) + 1   // 2_147_483_648 — overflows Int32
+        let big = Int64(Int32.max) + 1 // 2_147_483_648 — overflows Int32
         let objc = PayabliTTPCustomerDataObjC(
             firstName: nil, lastName: nil, customerNumber: nil,
             email: nil, phone: nil,

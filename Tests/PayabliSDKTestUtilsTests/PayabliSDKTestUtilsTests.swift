@@ -1,5 +1,5 @@
-import XCTest
 import PayabliSDKTestUtils
+import XCTest
 
 final class PayabliSDKTestUtilsTests: XCTestCase {
     func testStubURLProtocolMakeSessionReturnsConfiguredSession() {

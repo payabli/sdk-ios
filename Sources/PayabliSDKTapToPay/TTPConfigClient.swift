@@ -47,20 +47,19 @@ public final class TTPConfigClient: Sendable {
             headers: headers.asDictionary
         )
 
-        let headersDump = headers.asDictionary
-            .map { "\($0.key): \($0.value)" }
-            .sorted()
-            .joined(separator: " | ")
+        // The headers carry the App Attest assertion, key id and device id.
         logger.info("[config] → GET \(request.path)")
-        logger.info("[config] headers: \(headersDump)")
 
         let response = try await transport.perform(request)
 
-        let responseBody = String(data: response.body, encoding: .utf8) ?? "<non-utf8 \(response.body.count) bytes>"
-        logger.info("[config] ← [\(response.statusCode)] body: \(responseBody)")
+        // This body is `ConfigCredentialsPayload`, whose `credentials` block
+        // carries the card reader's secretKey and apiKey. The log gets its shape.
+        logger.info("[config] ← [\(response.statusCode)] bytes=\(response.body.count)")
 
         try mapPayabliHTTPError(response: response) { code in
-            if code == 403 { return PayabliTTPError.devicePendingActivation }
+            if code == 403 {
+                return PayabliTTPError.devicePendingActivation
+            }
             return nil
         }
 
@@ -81,10 +80,11 @@ public final class TTPConfigClient: Sendable {
 
         let decoder = JSONDecoder()
         guard let envelope = try? decoder.decode(
-                PayabliEnvelope.Success<ConfigCredentialsPayload>.self,
-                from: response.body
-              ),
-              let credentials = envelope.responseData?.credentials else {
+            PayabliEnvelope.Success<ConfigCredentialsPayload>.self,
+            from: response.body
+        ),
+            let credentials = envelope.responseData?.credentials
+        else {
             logger.error("[config] payload decode failed")
             throw PayabliTTPError.configFailed(reason: "Invalid config envelope")
         }

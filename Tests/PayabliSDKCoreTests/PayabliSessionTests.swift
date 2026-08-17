@@ -1,6 +1,6 @@
-import XCTest
 import PayabliSDKCore
 import PayabliSDKTestUtils
+import XCTest
 
 final class PayabliSessionTests: XCTestCase {
     func testSessionExposesAuthAndService() async {

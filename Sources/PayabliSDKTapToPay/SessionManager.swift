@@ -1,5 +1,5 @@
-import Foundation
 import Combine
+import Foundation
 
 /// Manages the 9-state TTP session lifecycle (PRD §17).
 ///
@@ -8,13 +8,13 @@ import Combine
 /// SwiftUI observation (§17.4).
 /// Which entry point is building the session, so the two can be told apart when
 /// one is already running.
-internal enum SessionSetupKind {
+enum SessionSetupKind {
     case initialize
     case reinitialize
 }
 
 @MainActor
-internal final class SessionManager: ObservableObject {
+final class SessionManager: ObservableObject {
     @Published private(set) var sessionState: PayabliTTPSessionState = .idle
     @Published private(set) var isReady: Bool = false
     private(set) var lastError: Error?
@@ -64,7 +64,9 @@ internal final class SessionManager: ObservableObject {
         to target: PayabliTTPSessionState
     ) -> Bool {
         // Identity (re-entering same state) is allowed but not counted.
-        if current == target { return true }
+        if current == target {
+            return true
+        }
 
         switch (current, target) {
         // Starting over is always reachable. `initialize()` is the documented
