@@ -185,6 +185,10 @@ struct PaymentMethodQAView: View {
                     fields: [
                         .firstName,
                         .lastName,
+                        // A stored method belongs to a customer, and the number is what a later
+                        // charge finds it by. The capture form leaves it out for the opposite
+                        // reason: nothing is being stored against a customer there.
+                        .customerNumber,
                         .billingEmail
                     ]
                 )
@@ -212,6 +216,10 @@ struct PaymentMethodQAView: View {
                     fields: [
                         .firstName,
                         .lastName,
+                        // A stored method belongs to a customer, and the number is what a later
+                        // charge finds it by. The capture form leaves it out for the opposite
+                        // reason: nothing is being stored against a customer there.
+                        .customerNumber,
                         .billingEmail
                     ]
                 )
@@ -219,10 +227,13 @@ struct PaymentMethodQAView: View {
             hiddenValues: PayabliPayInPaymentFlowHiddenValues(
                 achHolderType: .personal,
                 achSecCode: .web,
-                methodDescription: "Payment method sample"
+                methodDescription: QAIdentity.current.note("save")
             ),
             options: PayabliPayInPaymentFlowOptions(
-                achValidation: true,
+                // Off, as the Android sample's store options are, so a published
+                // test routing and account pair can be stored. An integrator
+                // holding an account that validates turns it on.
+                achValidation: false,
                 createAnonymous: false,
                 forceCustomerCreation: true,
                 temporary: false,

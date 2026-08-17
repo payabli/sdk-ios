@@ -19,6 +19,10 @@
         /// Runtime-read prefill values. Only the fields that map to editable text
         /// inputs are applied; `cardExpiration` is decoded for documentation but is
         /// entered manually (picker field).
+        ///
+        /// The keys naming the payer are decoded and unread: the identity supplies
+        /// those fields, and a JSON file carrying them still decodes rather than
+        /// failing the whole prefill over a key nothing uses.
         struct Values: Decodable {
             var cardholderName: String?
             var cardNumber: String?
@@ -51,20 +55,26 @@
 
         /// Fills every visible text field whose identifier matches a value in the
         /// JSON. Safe to call repeatedly; missing fields are skipped.
+        ///
+        /// Every field naming the payer comes from ``QAIdentity`` rather than the
+        /// JSON, because several devices run these flows at once and one shared name
+        /// leaves a dashboard unable to say which of them sent what. The instrument
+        /// stays in the JSON: it is the same test card everywhere.
         @MainActor
         static func fill() {
             guard let values else { return }
 
+            let identity = QAIdentity.current
             let mapping: [(PayabliPayInPaymentFlowField, String?)] = [
-                (.cardholderName, values.cardholderName),
+                (.cardholderName, identity.holderName),
                 (.cardNumber, values.cardNumber),
                 (.cardCvv, values.cardCvv),
                 (.cardZip, values.cardZip),
-                (.firstName, values.firstName),
-                (.lastName, values.lastName),
-                (.billingEmail, values.billingEmail),
-                (.customerNumber, values.customerNumber),
-                (.achHolder, values.achHolder),
+                (.firstName, identity.firstName),
+                (.lastName, identity.lastName),
+                (.billingEmail, identity.billingEmail),
+                (.customerNumber, identity.customerNumber),
+                (.achHolder, identity.holderName),
                 (.achRouting, values.achRouting),
                 (.achAccount, values.achAccount)
             ]
