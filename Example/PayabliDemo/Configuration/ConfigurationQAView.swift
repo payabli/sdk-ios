@@ -11,6 +11,7 @@ import SwiftUI
 /// source the forms use, so this screen cannot drift from the real behaviour.
 struct ConfigurationQAView: View {
     @EnvironmentObject private var tokenProbes: TokenProbeResults
+    @EnvironmentObject private var demoCustomer: DemoCustomerSetting
     @State private var healthCheckText = ""
     @State private var isWorking = false
 
@@ -127,6 +128,19 @@ struct ConfigurationQAView: View {
             Text("Card present")
                 .font(.title3.weight(.semibold))
             TerminalReadinessView(configuredAppId: Secrets.appId)
+
+            Toggle("Send a demo customer", isOn: $demoCustomer.suppliesDemoCustomer)
+                .font(.subheadline)
+            Text(
+                demoCustomer.suppliesDemoCustomer
+                    ? "Charging sends \(DemoCustomerSetting.demoCustomerSummary). "
+                    + "A paypoint with custom identifiers rejects a sale that names nobody."
+                    : "Charging asks for the customer on the Tap to Pay tab. Leave the fields "
+                    + "empty for a paypoint with no custom identifiers, which records no customer."
+            )
+            .font(.caption)
+            .foregroundColor(.payabliOnSurfaceVariant)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
@@ -165,6 +179,19 @@ struct ConfigurationQAView: View {
                     + ", ACH masking "
                     + (PayInSharedConfiguration.formatting.masksACHAccountEntry ? "on" : "off")
             )
+
+            Toggle("Send a customer number", isOn: $demoCustomer.suppliesPayInCustomer)
+                .font(.subheadline)
+            Text(
+                demoCustomer.suppliesPayInCustomer
+                    ? "Capturing sends \(DemoCustomerSetting.payInCustomerSummary), so every payment "
+                    + "from this device lands on one customer."
+                    : "Capturing sends the name and email typed into the form and no customer number, so "
+                    + "the paypoint has nothing to match on and files a new customer for every payment."
+            )
+            .font(.caption)
+            .foregroundColor(.payabliOnSurfaceVariant)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
@@ -273,4 +300,5 @@ struct ConfigurationQAView: View {
 #Preview {
     ConfigurationQAView()
         .environmentObject(TokenProbeResults.inert())
+        .environmentObject(DemoCustomerSetting())
 }
