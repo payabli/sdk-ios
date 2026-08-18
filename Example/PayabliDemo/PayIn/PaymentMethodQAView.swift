@@ -230,10 +230,10 @@ struct PaymentMethodQAView: View {
                 methodDescription: QAIdentity.current.note("save")
             ),
             options: PayabliPayInPaymentFlowOptions(
-                // Off, as the Android sample's store options are, so a published
-                // test routing and account pair can be stored. An integrator
-                // holding an account that validates turns it on.
-                achValidation: false,
+                // Not sent at all, which is what the Android sample's store options
+                // do and what the paypoint's own setting then decides. Sending
+                // `false` would have the sample opt out of a check on an
+                // integrator's behalf.
                 createAnonymous: false,
                 forceCustomerCreation: true,
                 temporary: false,

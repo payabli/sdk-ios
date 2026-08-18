@@ -280,7 +280,6 @@ struct PaymentCaptureQAView: View {
             orderId: identity.orderId(at: Date()),
             source: "ios-payment-capture-qa",
             idempotencyKey: UUID().uuidString,
-            achValidation: true,
             forceCustomerCreation: true
         )
     }
