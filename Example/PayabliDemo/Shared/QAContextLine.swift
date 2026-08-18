@@ -9,7 +9,7 @@ struct QAContextLine: View {
     var body: some View {
         HStack(spacing: 6) {
             Image(systemName: "dot.radiowaves.left.and.right")
-            Text(DemoConfiguration.entryPoint)
+            Text(DemoConfiguration.entryPoint.isEmpty ? "—" : DemoConfiguration.entryPoint)
                 .fontWeight(.semibold)
             Text("·")
             Text(DemoConfiguration.environment.baseURL.host ?? "—")
