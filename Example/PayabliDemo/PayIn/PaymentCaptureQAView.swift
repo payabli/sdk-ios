@@ -151,13 +151,16 @@ struct PaymentCaptureQAView: View {
     private var totalRow: some View {
         QADetailRow(
             label: "Total",
-            value: formattedTotal(paymentFlow.requestConfiguration?.paymentDetails.totalAmount)
+            value: formattedTotal(paymentFlow.requestConfiguration?.paymentDetails)
         )
     }
 
-    private func formattedTotal(_ value: Double?) -> String {
-        guard let value else { return "-" }
-        return String(format: "$ %.2f", value)
+    /// The currency comes from the same payment details as the figure, so the
+    /// two cannot disagree, and the reader's own locale decides the grouping and
+    /// the decimal mark.
+    private func formattedTotal(_ details: PayabliPayInPaymentFlowPaymentDetails?) -> String {
+        guard let details else { return "-" }
+        return details.totalAmount.formatted(.currency(code: details.currency ?? "USD"))
     }
 
     // MARK: - The sequence

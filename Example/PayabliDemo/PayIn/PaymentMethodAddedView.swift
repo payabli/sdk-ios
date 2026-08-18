@@ -123,8 +123,10 @@ struct PaymentCaptureResultView: View {
         return text
     }
 
+    /// The response carries no currency, so this names one. The reader's own
+    /// locale decides the grouping and the decimal mark.
     private func formattedAmount(_ value: Double?) -> String {
         guard let value else { return "-" }
-        return String(format: "$ %.2f", value)
+        return value.formatted(.currency(code: "USD"))
     }
 }
