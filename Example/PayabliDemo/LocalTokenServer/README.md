@@ -66,7 +66,7 @@ If you want the local endpoint to exchange credentials, leave
 ```bash
 PAYABLI_CLIENT_ID=<your sandbox client id>
 PAYABLI_CLIENT_SECRET=<your sandbox client secret>
-PAYABLI_API_BASE_URL=https://api-sandbox.payabli.com/api
+PAYABLI_API_BASE_URL=<the Payabli API base URL for that environment>
 PAYABLI_TOKEN_PATH=/v2/token/serverside
 ```
 
@@ -76,7 +76,7 @@ Sandbox throughout, because that is what the app and `.env.example` ship. See
 That maps to Payabli's server-side token call:
 
 ```bash
-curl --location 'https://api-sandbox.payabli.com/api/v2/token/serverside' \
+curl --location '<PAYABLI_API_BASE_URL>/v2/token/serverside' \
   --header 'Content-Type: application/json' \
   --data '{
     "clientId": "{clientId}",
@@ -103,12 +103,12 @@ You do not have to keep them in agreement by hand. The Config tab's health check
 reads the server's own upstream and entry point from `/health` and says so when
 they differ from the app's.
 
-The server also accepts `api-sandbox.payabli.com/api` or
-`api-qa.payabli.com/api` and will add `https://` automatically.
-Token exchange is restricted to Payabli hosts by default:
+A bare host with a path is accepted too, and `https://` is added automatically.
+Token exchange is restricted to Payabli hosts by default, and `.env.example` ships
+that list along with every base URL this page leaves as a placeholder:
 
 ```bash
-PAYABLI_ALLOWED_API_HOSTS=api-sandbox.payabli.com,api-qa.payabli.com,api.payabli.com
+PAYABLI_ALLOWED_API_HOSTS=<comma-separated hosts>
 ```
 
 This page covers the settings you normally touch. `.env.example` carries all
@@ -144,7 +144,7 @@ subject to the allowed-host guard:
 {
   "clientId": "...",
   "clientSecret": "...",
-  "apiBaseUrl": "https://api-sandbox.payabli.com/api",
+  "apiBaseUrl": "<the Payabli API base URL>",
   "tokenPath": "/v2/token/serverside",
   "responseTokenField": "access_token"
 }
