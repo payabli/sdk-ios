@@ -95,7 +95,15 @@ final class QAWalkthroughUITests: XCTestCase {
     /// it was when it never arrives.
     private func tap(_ element: XCUIElement, named name: String) {
         XCTAssertTrue(element.waitForExistence(timeout: answers), "\(name) never appeared")
-        XCTAssertTrue(element.isHittable, "\(name) appeared but could not be tapped")
+
+        // Hittability is waited for, not asserted once: an element exists before it
+        // settles, so a single check reads whatever the animation was doing.
+        let hittable = expectation(for: NSPredicate(format: "hittable == true"), evaluatedWith: element)
+        XCTAssertEqual(
+            XCTWaiter.wait(for: [hittable], timeout: composes),
+            .completed,
+            "\(name) appeared but never became tappable"
+        )
         element.tap()
     }
 
@@ -155,8 +163,9 @@ final class QAWalkthroughUITests: XCTestCase {
             if succeeded.exists {
                 return
             }
-            if refused.count > 0 {
-                XCTFail("the service refused it: \(refused.firstMatch.label)")
+            let refusal = refused.firstMatch
+            if refusal.exists {
+                XCTFail("the service refused it: \(refusal.label)")
                 return
             }
             _ = succeeded.waitForExistence(timeout: 1)
