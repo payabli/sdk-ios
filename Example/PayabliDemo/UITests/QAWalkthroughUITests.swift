@@ -97,16 +97,19 @@ final class QAWalkthroughUITests: XCTestCase {
         tap(app.tabBars.buttons[tab], named: "the \(tab) tab")
         tap(app.buttons["Check token endpoint"], named: "the token endpoint button")
 
-        // The token answer, not the submit button: the form is on screen from
-        // launch, so its button exists before anything has been fetched and
-        // waiting for it would pass whether or not the endpoint replied.
-        let answered = app.staticTexts.matching(
-            NSPredicate(format: "label BEGINSWITH %@", "✓")
-        ).firstMatch
-        XCTAssertTrue(
-            answered.waitForExistence(timeout: answers),
-            "the token endpoint did not answer. Is the server up on 8787?"
-        )
+        // The button's absence, not the submit button and not the answer text: the
+        // form is on screen from launch, so its button exists before anything has
+        // been fetched, and a step that finishes hides its own content, so the ✓
+        // the probe writes leaves with the button that asked for it. A refusal
+        // keeps both, which is what the failure below reads.
+        if !app.buttons["Check token endpoint"].waitForNonExistence(timeout: answers) {
+            let refusal = app.staticTexts.matching(
+                NSPredicate(format: "label BEGINSWITH %@", "✗")
+            ).firstMatch
+            XCTFail(refusal.exists
+                ? refusal.label
+                : "the token endpoint neither answered nor refused. Is the server up on 8787?")
+        }
         XCTAssertTrue(
             app.buttons[submit].waitForExistence(timeout: composes),
             "the form has no \(submit) button"
@@ -117,7 +120,7 @@ final class QAWalkthroughUITests: XCTestCase {
     /// it was when it never arrives.
     private func tap(_ element: XCUIElement, named name: String) {
         // Nothing tapped in the walk waits on a request: the two that do are the
-        // token answer and the outcome, and both wait for themselves.
+        // token step and the outcome, and both wait for themselves.
         XCTAssertTrue(element.waitForExistence(timeout: composes), "\(name) never appeared")
 
         // Hittability is waited for, not asserted once: an element exists before it
