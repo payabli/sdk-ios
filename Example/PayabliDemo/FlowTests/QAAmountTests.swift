@@ -2,7 +2,9 @@ import XCTest
 
 final class QAAmountTests: XCTestCase {
     func testEveryAmountIsInsideTheRangeAndIsWholeCents() {
-        // Swept rather than sampled: a bound off by a cent shows up in one draw out of thirteen hundred.
+        // Ten thousand draws over thirteen hundred possible values, so a bound off by a
+        // cent is near certain to be drawn. Random, so this is heavy sampling rather
+        // than a sweep, and no single run proves every value was seen.
         for _ in 0 ..< 10000 {
             let amount = QAAmount.random()
 
