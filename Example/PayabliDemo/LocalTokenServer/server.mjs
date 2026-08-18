@@ -41,7 +41,11 @@ async function handleRequest(req, res) {
   }
 
   if (url.pathname === "/health" && req.method === "GET") {
-    sendJson(res, 200, { ok: true });
+    // The upstream and entry point as well as liveness, so the app can report
+    // "this server is on another environment" rather than leaving a token to be
+    // refused later as an invalid signature. Neither is a secret: both are in
+    // the startup banner already, and /payabli/devices echoes the entry.
+    sendJson(res, 200, { ok: true, upstream: defaultApiBaseUrl, entry: defaultEntry || null });
     return;
   }
 

@@ -84,19 +84,24 @@ curl --location 'https://api-sandbox.payabli.com/api/v2/token/serverside' \
   }'
 ```
 
-For another environment, change this and pass the matching
-`-PayabliEnvironment` to the app.
+For another environment, change this and pick the matching scheme in the app.
 
 **Match this to the app.** A token minted for one Payabli environment is
 rejected by another, and the rejection reads as a credential problem rather than
 a configuration one.
 
 The app ships `.sandbox`, which is what an integrator can reach, so
-`.env.example` defaults to `api-sandbox`. Change them together. The app side
-needs no edit to a committed file: pass `-PayabliEnvironment qa`, `sandbox` or
-`production` as a launch argument, in **Product → Scheme → Edit Scheme → Run →
-Arguments**. The Config tab prints the live environment and whether it came from
-the default or the argument.
+`.env.example` defaults to `api-sandbox`. Change them together. On the app side
+that is the scheme: pick **PayabliDemo qa**, **PayabliDemo sandbox** or
+**PayabliDemo production** in Xcode's scheme selector. Each passes
+`-PayabliEnvironment`, and the entry point follows from `Secrets.entryPoints`,
+so choosing a scheme cannot leave one environment's paypoint pointed at
+another's host. The plain **PayabliDemo** scheme passes nothing and runs
+whichever environment was chosen last.
+
+You do not have to keep them in agreement by hand. The Config tab's health check
+reads the server's own upstream and entry point from `/health` and says so when
+they differ from the app's.
 
 The server also accepts `api-sandbox.payabli.com/api` or
 `api-qa.payabli.com/api` and will add `https://` automatically.
@@ -214,7 +219,7 @@ These fail as connection errors on the device while the server works on the Mac.
 
   ```bash
   lsof -nP -iTCP:8787 -sTCP:LISTEN
-  curl -s http://<mac-lan-ip>:8787/health      # {"ok":true}
+  curl -s http://<mac-lan-ip>:8787/health      # upstream and entry, so a wrong environment shows here
   ```
 
 ## Tap to Pay Device Activation
@@ -303,7 +308,7 @@ can request one and how it reaches the user.
 
 | Endpoint | Returns |
 |---|---|
-| `GET /health` | `{ "ok": true }` |
+| `GET /health` | `{ "ok": true, "upstream": "<the configured upstream>", "entry": "<the configured entry point>" }` |
 | `GET \| POST /payabli/access-token` | `{ "accessToken": "..." }` |
 | `POST /payabli/exchange-token` | `{ "accessToken": "...", "upstreamStatus": 200, "source": "credential-exchange" }` |
 | `GET \| POST /payabli/devices` | `{ "entry": "...", "devices": [ … ] }` |

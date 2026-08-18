@@ -287,13 +287,18 @@ struct ConfigurationQAView: View {
         Task {
             defer { isWorking = false }
             do {
-                let (_, response) = try await URLSession.shared.data(
+                let (body, response) = try await URLSession.shared.data(
                     from: DemoConfiguration.TokenServer.healthURL
                 )
                 let code = (response as? HTTPURLResponse)?.statusCode ?? 0
-                healthCheckText = code == 200
-                    ? "✓ Local token server healthy"
-                    : "✗ Local token server returned HTTP \(code)"
+                guard code == 200 else {
+                    healthCheckText = "✗ Local token server returned HTTP \(code)"
+                    return
+                }
+                healthCheckText = TokenServerHealth(body: body).report(
+                    appHost: DemoConfiguration.environment.baseURL.host,
+                    appEntryPoint: DemoConfiguration.entryPoint
+                )
             } catch {
                 healthCheckText = "✗ Local token server unreachable: \(error.localizedDescription)"
             }
