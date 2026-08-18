@@ -86,6 +86,26 @@ final class TokenServerHealthTests: XCTestCase {
 
     // MARK: - Parsing
 
+    /// The server adds the scheme when it calls, not when it reports, so a base URL
+    /// configured as a bare host reaches this parser without one.
+    func testSchemeLessUpstreamStillYieldsAHost() {
+        let parsed = health(#"{"ok":true,"upstream":"api.two.example/api","entry":"entryONE"}"#)
+
+        XCTAssertEqual(parsed.upstreamHost, "api.two.example")
+
+        let report = parsed.report(appHost: "api.one.example", appEntryPoint: "entryONE")
+
+        XCTAssertTrue(report.hasPrefix("✗"), report)
+        XCTAssertTrue(report.contains("serving api.two.example"), report)
+    }
+
+    func testUpstreamOfWhitespaceIsNoInformation() {
+        let report = health(#"{"ok":true,"upstream":"   ","entry":"entryONE"}"#)
+            .report(appHost: "api.one.example", appEntryPoint: "entryONE")
+
+        XCTAssertEqual(report, "✓ Local token server healthy · environment not reported")
+    }
+
     func testUpstreamIsComparedByHostNotByWholeURL() {
         let parsed = health(#"{"ok":true,"upstream":"https://api.one.example/api","entry":" entryONE "}"#)
 

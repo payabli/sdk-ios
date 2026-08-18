@@ -15,8 +15,21 @@ struct TokenServerHealth {
 
     init(body: Data) {
         let json = (try? JSONSerialization.jsonObject(with: body)) as? [String: Any]
-        upstreamHost = (json?["upstream"] as? String).flatMap { URL(string: $0)?.host }
+        upstreamHost = (json?["upstream"] as? String).flatMap(TokenServerHealth.host)
         entry = (json?["entry"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// The server takes its upstream from configuration and adds the scheme only
+    /// when it makes the call, so what it reports can arrive as `host/api`.
+    /// `URL(string:)` reads that as a path and answers no host at all, which would
+    /// leave a real mismatch reported as an environment nobody named.
+    private static func host(of upstream: String) -> String? {
+        let trimmed = upstream.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        let absolute = trimmed.range(of: "^https?://", options: [.regularExpression, .caseInsensitive]) == nil
+            ? "https://" + trimmed
+            : trimmed
+        return URL(string: absolute)?.host
     }
 
     /// One line for the Configuration screen.
