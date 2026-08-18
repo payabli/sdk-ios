@@ -24,6 +24,7 @@ final class QAWalkthroughUITests: XCTestCase {
     private var app: XCUIApplication!
 
     override func setUp() {
+        super.setUp()
         continueAfterFailure = false
         app = XCUIApplication()
         // The environment is remembered, so it is passed every launch rather than relied on from the last one.
@@ -79,13 +80,23 @@ final class QAWalkthroughUITests: XCTestCase {
 
     /// Up to the form, which is the second step and stays blocked until the token endpoint has answered.
     private func openTheForm(tab: String, submit: String) {
-        app.tabBars.buttons[tab].tap()
-        app.buttons["Check token endpoint"].tap()
+        // A launch is not an appearance, so each control is waited for rather
+        // than tapped at whatever is on screen when the walk reaches it.
+        tap(app.tabBars.buttons[tab], named: "the \(tab) tab")
+        tap(app.buttons["Check token endpoint"], named: "the token endpoint button")
 
         XCTAssertTrue(
             app.buttons[submit].waitForExistence(timeout: answers),
             "the form never unlocked: the token endpoint did not answer. Is the server up on 8787?"
         )
+    }
+
+    /// Waits for an element to be there and to accept a tap, and says which one
+    /// it was when it never arrives.
+    private func tap(_ element: XCUIElement, named name: String) {
+        XCTAssertTrue(element.waitForExistence(timeout: answers), "\(name) never appeared")
+        XCTAssertTrue(element.isHittable, "\(name) appeared but could not be tapped")
+        element.tap()
     }
 
     /// The instrument the form is on, which the prefill then fills.
@@ -94,13 +105,13 @@ final class QAWalkthroughUITests: XCTestCase {
     /// a frame. Prefilled too early it fills the card boxes it can still see, the bank ones stay empty, and the
     /// form refuses itself. Measured on Android, where three of four devices lost that race.
     private func chooseTheBankAccount() {
-        app.buttons["ACH"].tap()
+        tap(app.buttons["ACH"], named: "the bank-account option")
         let routing = app.textFields["payabli.payInPaymentFlow.field.achRouting"]
         XCTAssertTrue(routing.waitForExistence(timeout: composes), "the form never switched to the bank account")
     }
 
     private func prefill() {
-        app.buttons["Prefill test data (Debug)"].tap()
+        tap(app.buttons["Prefill test data (Debug)"], named: "the prefill button")
 
         // That the fields naming the payer were filled, which is what makes the row this produces
         // attributable. Not *what* they were filled with: a field's accessibility value is "Entered" or
@@ -121,15 +132,12 @@ final class QAWalkthroughUITests: XCTestCase {
     /// The field preselects a valid month when it opens, so accepting is the whole interaction. ACH has no
     /// expiry, which is why this is a step of the card flows only.
     private func chooseAnExpiry() {
-        app.buttons["payabli.payInPaymentFlow.field.cardExpiration"].tap()
-        let done = app.buttons["Done"]
-        XCTAssertTrue(done.waitForExistence(timeout: composes))
-        done.tap()
+        tap(app.buttons["payabli.payInPaymentFlow.field.cardExpiration"], named: "the expiry field")
+        tap(app.buttons["Done"], named: "the expiry picker's Done button")
     }
 
     private func submit(_ button: String) {
-        let control = app.buttons[button]
-        control.tap()
+        tap(app.buttons[button], named: "the \(button) button")
     }
 
     /// Waits for the outcome and, if it is a refusal, fails naming what the screen said.
