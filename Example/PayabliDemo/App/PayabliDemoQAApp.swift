@@ -29,7 +29,9 @@ struct PayabliDemoQAApp: App {
             store: .paymentCapture
         ),
         operation: .capture,
-        requestConfiguration: PaymentCaptureQAView.freshRequestConfiguration()
+        // The switch that governs this does not exist yet at this point, and its own default
+        // is the same answer, so the launch request states it rather than reading it.
+        requestConfiguration: PaymentCaptureQAView.freshRequestConfiguration(suppliesCustomer: true)
     )
 
     /// Card-present terminal. `placeholderAccessToken` only has to survive the
@@ -51,6 +53,10 @@ struct PayabliDemoQAApp: App {
         fetchStoredMethod: { try await Secrets.fetchPaymentMethodAccessToken() },
         fetchCapture: { try await Secrets.fetchPaymentCaptureAccessToken() }
     )
+
+    /// Shared so the Configuration tab can set it and the payment tabs can
+    /// read it. In memory only.
+    @StateObject private var demoCustomer = DemoCustomerSetting()
 
     var body: some Scene {
         WindowGroup {
@@ -79,6 +85,7 @@ struct PayabliDemoQAApp: App {
             // asset catalogue, so it is set here instead of by an AccentColor asset.
             .tint(.payabliPrimary)
             .environmentObject(tokenProbes)
+            .environmentObject(demoCustomer)
         }
     }
 }
@@ -140,4 +147,5 @@ struct PayabliDemoQAApp: App {
             }
     }
     .environmentObject(TokenProbeResults.inert())
+    .environmentObject(DemoCustomerSetting())
 }
