@@ -1,7 +1,7 @@
 import PayabliSDKCore
 import SwiftUI
 
-/// "What am I pointed at", in one line.
+/// Which paypoint and which host this build runs against, in one line.
 ///
 /// The full set of values lives on the Config tab. Repeating them on every
 /// payment tab is what turned those screens into walls of read-only rows.

@@ -3,9 +3,9 @@ import PayabliSDKCore
 
 /// Non-secret demo settings, in one place.
 ///
-/// Split deliberately from `Secrets`: that file is gitignored and holds
-/// credentials, so it must not become the home of ordinary settings. Anything
-/// here is safe to commit and safe to show on the Configuration screen.
+/// `Secrets` is gitignored and holds credentials, so ordinary settings cannot
+/// live there. Anything here is safe to commit and safe to show on the
+/// Configuration screen.
 enum DemoConfiguration {
     /// Which Payabli backend every SDK facade in this app talks to.
     ///
