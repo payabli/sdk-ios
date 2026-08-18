@@ -124,10 +124,15 @@ struct PaymentCaptureQAView: View {
         // The request is built when the app launches and the switch is on another tab,
         // so a flip after that would otherwise apply to the payment after this one.
         // Not while a submission is in flight: replacing the configuration then loses
-        // the key that makes its retry safe.
+        // the key that makes its retry safe. Only the customer changes, so the figure
+        // on screen and the identifiers stay as they were.
         .onChange(of: demoCustomer.suppliesPayInCustomer) { _ in
             guard !paymentFlow.isSubmitting else { return }
-            paymentFlow.configure(requestConfiguration: nextRequest())
+            guard let current = paymentFlow.requestConfiguration else {
+                paymentFlow.configure(requestConfiguration: nextRequest())
+                return
+            }
+            paymentFlow.configure(requestConfiguration: requestWithCurrentCustomer(current))
         }
         #if DEBUG
         .onChange(of: isPaymentCaptureSheetPresented) { isPresented in
@@ -192,6 +197,26 @@ struct PaymentCaptureQAView: View {
     /// The next attempt: a fresh amount, a fresh key, and whatever the switch says now.
     private func nextRequest() -> PayabliPayInPaymentFlowRequestConfiguration {
         Self.freshRequestConfiguration(suppliesCustomer: demoCustomer.suppliesPayInCustomer)
+    }
+
+    /// The attempt already on screen, carrying the customer the switch now names.
+    ///
+    /// The amount, the order identifier and the idempotency key are the attempt'''s
+    /// identity: moving the switch answers a different question, and redrawing them
+    /// would change the figure a payer is about to confirm.
+    private func requestWithCurrentCustomer(
+        _ current: PayabliPayInPaymentFlowRequestConfiguration
+    ) -> PayabliPayInPaymentFlowRequestConfiguration {
+        PayabliPayInPaymentFlowRequestConfiguration(
+            paymentDetails: current.paymentDetails,
+            customerData: demoCustomer.suppliesPayInCustomer ? DemoCustomerSetting.payInCustomer : nil,
+            orderDescription: current.orderDescription,
+            orderId: current.orderId,
+            source: current.source,
+            idempotencyKey: current.idempotencyKey,
+            achValidation: current.achValidation,
+            forceCustomerCreation: current.forceCustomerCreation
+        )
     }
 
     /// A capture's request configuration, with a key minted per submission.
