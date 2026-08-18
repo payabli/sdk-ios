@@ -88,7 +88,13 @@ final class QAIdentityTests: XCTestCase {
     }
 
     /// 2026-08-14 in the current zone, which is what `orderId(at:)` formats in.
+    ///
+    /// Gregorian explicitly: under another calendar these components name a
+    /// different instant, and the assertion above is an exact string. The zone
+    /// stays local, because that is the zone the identifier is formatted in.
     private func date(hour: Int, minute: Int, second: Int) -> Date {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = .current
         var components = DateComponents()
         components.year = 2026
         components.month = 8
@@ -96,6 +102,6 @@ final class QAIdentityTests: XCTestCase {
         components.hour = hour
         components.minute = minute
         components.second = second
-        return Calendar.current.date(from: components)!
+        return calendar.date(from: components)!
     }
 }

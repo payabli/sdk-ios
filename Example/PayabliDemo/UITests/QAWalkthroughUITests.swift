@@ -85,9 +85,19 @@ final class QAWalkthroughUITests: XCTestCase {
         tap(app.tabBars.buttons[tab], named: "the \(tab) tab")
         tap(app.buttons["Check token endpoint"], named: "the token endpoint button")
 
+        // The token answer, not the submit button: the form is on screen from
+        // launch, so its button exists before anything has been fetched and
+        // waiting for it would pass whether or not the endpoint replied.
+        let answered = app.staticTexts.matching(
+            NSPredicate(format: "label BEGINSWITH %@", "✓")
+        ).firstMatch
         XCTAssertTrue(
-            app.buttons[submit].waitForExistence(timeout: answers),
-            "the form never unlocked: the token endpoint did not answer. Is the server up on 8787?"
+            answered.waitForExistence(timeout: answers),
+            "the token endpoint did not answer. Is the server up on 8787?"
+        )
+        XCTAssertTrue(
+            app.buttons[submit].waitForExistence(timeout: composes),
+            "the form has no \(submit) button"
         )
     }
 
