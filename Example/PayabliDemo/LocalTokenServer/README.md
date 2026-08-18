@@ -308,7 +308,7 @@ can request one and how it reaches the user.
 
 | Endpoint | Returns |
 |---|---|
-| `GET /health` | `{ "ok": true, "upstream": "<the configured upstream>", "entry": "<the configured entry point>" }` |
+| `GET /health` | `{ "ok": true, "upstream": "<the configured upstream>", "entry": "<the configured entry point>" }`, `entry` null when none is configured |
 | `GET \| POST /payabli/access-token` | `{ "accessToken": "..." }` |
 | `POST /payabli/exchange-token` | `{ "accessToken": "...", "upstreamStatus": 200, "source": "credential-exchange" }` |
 | `GET \| POST /payabli/devices` | `{ "entry": "...", "devices": [ … ] }` |
