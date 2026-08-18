@@ -243,11 +243,12 @@ struct PaymentCaptureQAView: View {
         )
     }
 
-    /// A capture's request configuration, with a key minted per submission.
+    /// A capture's request configuration, with a key minted per attempt.
     ///
-    /// The app builds one of these at launch for the initial submit. Reusing that
-    /// key for a second capture would send two distinct payments under one
-    /// idempotency key, which the API may deduplicate or reject.
+    /// One attempt is one payment, however many times it is submitted: a retry
+    /// carries the same key, so the service answers from the attempt that already
+    /// reached it. A payment of its own is a new configuration, which is what this
+    /// builds, and the app builds the first at launch.
     ///
     /// The amount is drawn per attempt and the identifiers name this device and the
     /// moment, so a run over several devices at once produces rows a dashboard can
@@ -458,8 +459,10 @@ struct PaymentCaptureQAView: View {
 
     private func paymentCaptureErrorMessage(_ error: Error) -> String {
         if isDuplicateSubmission(error) {
-            return "Duplicate submission (409): the attempt before this one used the same "
-                + "idempotency key. A new key is set, so submitting again sends a new payment."
+            return "Duplicate submission (409): this attempt's idempotency key has already "
+                + "been used, so the service answered from the earlier one rather than taking "
+                + "a payment. Submitting again does the same. Start a new attempt to send a "
+                + "payment of its own."
         }
         if let payabliError = error as? any PayabliError {
             if let detail = payabliError.detail, !detail.isEmpty, detail != payabliError.reason {
