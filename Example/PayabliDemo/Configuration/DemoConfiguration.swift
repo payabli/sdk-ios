@@ -9,17 +9,42 @@ import PayabliSDKCore
 enum DemoConfiguration {
     /// Which Payabli backend every SDK facade in this app talks to.
     ///
-    /// Sandbox by default: it is the environment an integrator can reach. Pass
-    /// `-PayabliEnvironment qa`, `sandbox` or `production` in Product, Edit
-    /// Scheme, Run, Arguments to change it.
+    /// Pick it with the scheme: `PayabliDemo qa`, `PayabliDemo sandbox` and
+    /// `PayabliDemo production` each pass `-PayabliEnvironment`, and the plain
+    /// `PayabliDemo` scheme passes nothing and runs whatever was chosen last.
+    /// Sandbox until something chooses, as the environment an integrator can
+    /// reach.
     ///
     /// Remembered, because a launch argument reaches only the process it
-    /// launched and reopening from the Home screen would revert. Pass `sandbox`
-    /// to go back.
+    /// launched: a Home-screen tap or a `devicectl` launch passes none, and
+    /// without the memory those would revert mid-test.
     ///
     /// Captured by the facades at launch, so the Config screen shows it
     /// read-only.
     static let environment: PayabliEnvironment = resolvedEnvironment()
+
+    /// The paypoint for whichever environment is running, from
+    /// `Secrets.entryPoints`.
+    ///
+    /// Derived rather than declared alongside the environment, so choosing a
+    /// scheme cannot leave one paypoint's identifier pointed at another
+    /// environment's host — a pairing that fails as `401 "The signature key was
+    /// not found"` and reads like a bad credential.
+    static var entryPoint: String {
+        Secrets.entryPoints[environment] ?? ""
+    }
+
+    /// Set when the running environment has no paypoint configured, so the
+    /// Config screen can say which one is missing instead of showing a blank.
+    static var entryPointProblem: String? {
+        guard Secrets.entryPoints[environment] == nil else { return nil }
+        let configured = Secrets.entryPoints.keys
+            .map(nameFor)
+            .sorted()
+            .joined(separator: ", ")
+        return "No entry point for \(nameFor(environment)) in Secrets.entryPoints"
+            + (configured.isEmpty ? "." : ". Configured: \(configured).")
+    }
 
     static let environmentSource: String = {
         if argumentEnvironment() != nil {

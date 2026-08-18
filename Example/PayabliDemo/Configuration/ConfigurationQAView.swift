@@ -2,10 +2,12 @@ import PayabliSDKCore
 import PayabliSDKPayInPaymentFlow
 import SwiftUI
 
-/// Every knob the demo runs on, in one read-only place.
+/// Every knob the demo runs on, in one place.
 ///
-/// Read-only. The SDK captures these at launch, so an editable field would show
-/// a value it never received. Change them in `Secrets.swift` and relaunch.
+/// The rows are read-only: the SDK captures those at launch, so an editable
+/// field would show a value it never received. Change them in `Secrets.swift`
+/// and relaunch. The one control that is editable describes the paypoint rather
+/// than the SDK, and says so where it sits.
 ///
 /// The card-not-present rows read from `PayInSharedConfiguration`, the same
 /// source the forms use, so this screen cannot drift from the real behaviour.
@@ -35,13 +37,15 @@ struct ConfigurationQAView: View {
     // MARK: - Integration
 
     private var integrationSection: some View {
-        section("Integration", note: "Set in `Secrets.swift`; captured by the SDK at launch.") {
+        section(
+            "Integration",
+            note: "The scheme picks the environment; the entry point follows it, from "
+                + "`Secrets.entryPoints`. Captured by the SDK at launch."
+        ) {
             QADetailRow(
                 label: "Entry point",
-                value: Secrets.entryPoint,
-                problem: Secrets.entryPoint.isEmpty
-                    ? "Empty — /config is keyed by entry point."
-                    : nil
+                value: DemoConfiguration.entryPoint,
+                problem: DemoConfiguration.entryPointProblem
             )
             QADetailRow(label: "App ID", value: Secrets.appId)
             QADetailRow(
