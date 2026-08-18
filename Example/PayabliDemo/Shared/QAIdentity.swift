@@ -103,8 +103,13 @@ struct QAIdentity {
     private static func machineIdentifier() -> String {
         var system = utsname()
         uname(&system)
-        return withUnsafePointer(to: &system.machine) { pointer in
-            pointer.withMemoryRebound(to: CChar.self, capacity: Int(_SYS_NAMELEN)) { String(cString: $0) }
+        // The field's own bytes, as `TapToPayPreflight.machineIdentifier` reads
+        // them. Naming a capacity means naming a length the field defines, and
+        // `_SYS_NAMELEN` is a C macro the Swift overlay is under no obligation to
+        // keep exporting.
+        return withUnsafeBytes(of: &system.machine) { raw in
+            guard let base = raw.baseAddress else { return "" }
+            return String(cString: base.assumingMemoryBound(to: CChar.self))
         }
     }
 
