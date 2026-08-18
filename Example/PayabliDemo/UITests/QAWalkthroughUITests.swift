@@ -123,6 +123,15 @@ final class QAWalkthroughUITests: XCTestCase {
         // token step and the outcome, and both wait for themselves.
         XCTAssertTrue(element.waitForExistence(timeout: composes), "\(name) never appeared")
 
+        // The form is taller than the screen, so it holds its own submit button
+        // below the fold, and an element off screen is never hittable. Existing is
+        // therefore not enough to tap: the page is brought to the control.
+        var swipes = 0
+        while !element.isHittable, swipes < scrolls {
+            app.swipeUp()
+            swipes += 1
+        }
+
         // Hittability is waited for, not asserted once: an element exists before it
         // settles, so a single check reads whatever the animation was doing.
         let hittable = expectation(for: NSPredicate(format: "hittable == true"), evaluatedWith: element)
@@ -219,4 +228,7 @@ final class QAWalkthroughUITests: XCTestCase {
 
     /// No network in it: a control on its way to the screen, or form state the next frame draws.
     private let composes: TimeInterval = 5
+
+    /// Enough to cross the longest form the walk meets, which is ACH with a customer number.
+    private let scrolls = 6
 }
