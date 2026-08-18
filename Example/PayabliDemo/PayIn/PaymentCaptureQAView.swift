@@ -423,13 +423,18 @@ struct PaymentCaptureQAView: View {
     /// default branch as the bare reason `HTTP 409`, which names a status and no
     /// cause. The typed failure carries the code where the API answered with a
     /// body; the generic error is what an empty one becomes.
+    private static let bareConflictReason = "HTTP 409"
+
     private func isDuplicateSubmission(_ error: Error) -> Bool {
         if case let PayabliPayInPaymentFlowError.transactionFailed(failure) = error,
            failure.httpStatusCode == 409
         {
             return true
         }
-        if let payabliError = error as? any PayabliError, payabliError.reason.contains("409") {
+        // The exact string the transport builds for a status it does not map, not
+        // a substring: a validation failure's reason is the server's own title,
+        // which can carry those three digits for its own reasons.
+        if let payabliError = error as? any PayabliError, payabliError.reason == Self.bareConflictReason {
             return true
         }
         return false
