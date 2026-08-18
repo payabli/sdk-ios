@@ -8,9 +8,8 @@ import Foundation
 /// is ``QAIdentity`` and the order identifier; the figure narrows a list by eye
 /// and is not what a reader should key on.
 ///
-/// Whole cents, between two and fifteen dollars: above the range where a
-/// paypoint's own minimum could refuse it, and small enough that a run of them
-/// costs nothing.
+/// Whole cents from $2.00 to $14.99: above the range where a paypoint's own
+/// minimum could refuse it, and small enough that a run of them costs nothing.
 enum QAAmount {
     private static let minimumCents = 200
     private static let maximumCents = 1499

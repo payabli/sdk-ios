@@ -10,7 +10,10 @@ import XCTest
 /// What makes the resulting rows attributable is the prefill: it fills the form from `QAIdentity`, so no two
 /// devices submit the same customer.
 ///
+/// Every test skips unless `PAYABLI_QA_LIVE` is `1`, so opening the scheme and pressing run charges nothing.
+///
 /// ```
+/// TEST_RUNNER_PAYABLI_QA_LIVE=1 \
 /// xcodebuild test -project Example/PayabliDemo/PayabliDemo.xcodeproj -scheme 'PayabliDemo qa' \
 ///   -only-testing:PayabliDemoUITests -destination 'id=<simulator udid>'
 /// ```
@@ -23,8 +26,17 @@ import XCTest
 final class QAWalkthroughUITests: XCTestCase {
     private var app: XCUIApplication!
 
-    override func setUp() {
-        super.setUp()
+    override func setUpWithError() throws {
+        try super.setUpWithError()
+
+        // These submit real payments, so a run is opted into rather than assumed.
+        // Without this an operator opening the scheme and pressing run charges a
+        // paypoint. The sibling platform excludes its walkthrough the same way.
+        try XCTSkipUnless(
+            ProcessInfo.processInfo.environment["PAYABLI_QA_LIVE"] == "1",
+            "set TEST_RUNNER_PAYABLI_QA_LIVE=1 to submit against a real paypoint"
+        )
+
         continueAfterFailure = false
         app = XCUIApplication()
         // The environment is remembered, so it is passed every launch rather than relied on from the last one.
@@ -35,7 +47,7 @@ final class QAWalkthroughUITests: XCTestCase {
     func testSavingACardThePayerEntered() {
         openTheForm(tab: "Save", submit: save)
 
-        prefill()
+        prefill(customerNumber: true)
         chooseAnExpiry()
         submit(save)
 
@@ -46,7 +58,7 @@ final class QAWalkthroughUITests: XCTestCase {
         openTheForm(tab: "Save", submit: save)
 
         chooseTheBankAccount()
-        prefill()
+        prefill(customerNumber: true)
         submit(save)
 
         expectOutcome("Added a new payment method.", failurePrefix: methodFailure)
@@ -128,17 +140,17 @@ final class QAWalkthroughUITests: XCTestCase {
         XCTAssertTrue(routing.waitForExistence(timeout: composes), "the form never switched to the bank account")
     }
 
-    private func prefill() {
+    /// - Parameter customerNumber: whether the form carries that box. The save form
+    ///   collects it and a capture names its customer through the request, so the
+    ///   two flows expect different fields filled.
+    private func prefill(customerNumber: Bool = false) {
         tap(app.buttons["Prefill test data (Debug)"], named: "the prefill button")
 
         // That the fields naming the payer were filled, which is what makes the row this produces
         // attributable. Not *what* they were filled with: a field's accessibility value is "Entered" or
         // "Empty", never its text, so a card number cannot be read back out of the form. Which values the
         // identity produces is covered by `QAIdentityTests`.
-        //
-        // The customer number is on the save form only. A stored method belongs to a customer; a capture
-        // names one through the request.
-        for field in ["lastName", "billingEmail"] {
+        for field in ["lastName", "billingEmail"] + (customerNumber ? ["customerNumber"] : []) {
             let box = app.textFields["payabli.payInPaymentFlow.field.\(field)"]
             XCTAssertTrue(box.waitForExistence(timeout: composes), "the form has no \(field) box")
             XCTAssertEqual(box.value as? String, "Entered", "the prefill left \(field) empty")
