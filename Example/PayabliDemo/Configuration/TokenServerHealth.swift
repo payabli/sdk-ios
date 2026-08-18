@@ -39,7 +39,11 @@ struct TokenServerHealth {
     /// server can be on the right host with the wrong paypoint.
     func report(appHost: String?, appEntryPoint: String) -> String {
         var problems: [String] = []
-        if let upstreamHost, let appHost, upstreamHost != appHost {
+        // A host differing only in case is the same host, and `URL.host` reports
+        // whatever case the server was configured in. The entry point below is
+        // compared exactly, because that one is an identifier rather than a name
+        // the resolver folds.
+        if let upstreamHost, let appHost, upstreamHost.lowercased() != appHost.lowercased() {
             problems.append("serving \(upstreamHost), app is on \(appHost)")
         }
         if let entry, !entry.isEmpty, !appEntryPoint.isEmpty, entry != appEntryPoint {

@@ -99,6 +99,24 @@ final class TokenServerHealthTests: XCTestCase {
         XCTAssertTrue(report.contains("serving api.two.example"), report)
     }
 
+    /// `URL.host` keeps the case it was given, and a resolver does not, so a base
+    /// URL configured in capitals would otherwise cry wolf on every press.
+    func testHostCaseIsNotAMismatch() {
+        let report = health(#"{"ok":true,"upstream":"https://API.ONE.EXAMPLE/api","entry":"entryONE"}"#)
+            .report(appHost: "api.one.example", appEntryPoint: "entryONE")
+
+        XCTAssertEqual(report, "✓ Local token server healthy · API.ONE.EXAMPLE")
+    }
+
+    /// An entry point names one merchant and is compared as given.
+    func testEntryPointCaseIsAMismatch() {
+        let report = health(#"{"ok":true,"upstream":"https://api.one.example/api","entry":"ENTRYONE"}"#)
+            .report(appHost: "api.one.example", appEntryPoint: "entryONE")
+
+        XCTAssertTrue(report.hasPrefix("✗"), report)
+        XCTAssertTrue(report.contains("entry ENTRYONE"), report)
+    }
+
     func testUpstreamOfWhitespaceIsNoInformation() {
         let report = health(#"{"ok":true,"upstream":"   ","entry":"entryONE"}"#)
             .report(appHost: "api.one.example", appEntryPoint: "entryONE")
