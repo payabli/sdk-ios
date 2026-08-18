@@ -19,8 +19,12 @@ SDKROOT = iphoneos
 TARGETED_DEVICE_FAMILY = 1,2
 SWIFT_VERSION = 5.0
 
-CODE_SIGNING_ALLOWED = NO
-CODE_SIGN_STYLE = Manual
-DEVELOPMENT_TEAM =
+// Simulator only. A runner is installed on a device like any other app, so it
+// must be signed there, and disabling signing for every SDK leaves the
+// walkthrough unable to run on hardware at all. A device build inherits the
+// app target's automatic signing.
+CODE_SIGNING_ALLOWED[sdk=iphonesimulator*] = NO
+CODE_SIGN_STYLE[sdk=iphonesimulator*] = Manual
+DEVELOPMENT_TEAM[sdk=iphonesimulator*] =
 
 LD_RUNPATH_SEARCH_PATHS = $(inherited) @executable_path/Frameworks @loader_path/Frameworks
