@@ -116,7 +116,9 @@ final class QAWalkthroughUITests: XCTestCase {
     /// Waits for an element to be there and to accept a tap, and says which one
     /// it was when it never arrives.
     private func tap(_ element: XCUIElement, named name: String) {
-        XCTAssertTrue(element.waitForExistence(timeout: answers), "\(name) never appeared")
+        // Nothing tapped in the walk waits on a request: the two that do are the
+        // token answer and the outcome, and both wait for themselves.
+        XCTAssertTrue(element.waitForExistence(timeout: composes), "\(name) never appeared")
 
         // Hittability is waited for, not asserted once: an element exists before it
         // settles, so a single check reads whatever the animation was doing.
@@ -212,6 +214,6 @@ final class QAWalkthroughUITests: XCTestCase {
     /// A real request over a real link, so this is a network timeout rather than a composition one.
     private let answers: TimeInterval = 30
 
-    /// No network in it: the prefill writes the form state and the next frame draws it.
+    /// No network in it: a control on its way to the screen, or form state the next frame draws.
     private let composes: TimeInterval = 5
 }
