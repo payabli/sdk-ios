@@ -220,15 +220,22 @@ struct PaymentCaptureQAView: View {
         customerData: PayabliPayInPaymentFlowCustomerData?,
         idempotencyKey: String?
     ) -> PayabliPayInPaymentFlowRequestConfiguration {
+        // Every field, not the ones this sample happens to set: anything omitted
+        // here is silently reset the moment the switch moves.
         PayabliPayInPaymentFlowRequestConfiguration(
             paymentDetails: current.paymentDetails,
+            accountId: current.accountId,
             customerData: customerData,
+            ipAddress: current.ipAddress,
             orderDescription: current.orderDescription,
             orderId: current.orderId,
             source: current.source,
+            subdomain: current.subdomain,
+            subscriptionId: current.subscriptionId,
             idempotencyKey: idempotencyKey,
             achValidation: current.achValidation,
-            forceCustomerCreation: current.forceCustomerCreation
+            forceCustomerCreation: current.forceCustomerCreation,
+            validation: current.validation
         )
     }
 
