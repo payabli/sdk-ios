@@ -78,6 +78,15 @@ struct PaymentCaptureQAView: View {
                                     .foregroundColor(.payabliError)
                                     .frame(maxWidth: .infinity, alignment: .leading)
                                     .textSelection(.enabled)
+
+                                // Submitting again retries this payment. This
+                                // abandons it and draws another, which is the
+                                // one action that may charge a second time.
+                                Button { startAnother() } label: {
+                                    Label("Start a new attempt", systemImage: "arrow.counterclockwise")
+                                        .frame(maxWidth: .infinity)
+                                }
+                                .buttonStyle(.bordered)
                             }
                         }
                     }
@@ -201,10 +210,11 @@ struct PaymentCaptureQAView: View {
 
     /// The attempt on screen with one thing changed.
     ///
-    /// The amount and the order identifier are the attempt's identity. Moving the
-    /// customer switch answers a different question, and a retry is the same
-    /// payment sent again, so neither redraws them: doing so would change the
-    /// figure a payer is about to confirm.
+    /// The amount, the order identifier and the key are the attempt's identity.
+    /// Moving the customer switch answers a different question, so it changes the
+    /// customer alone: redrawing the amount would change the figure a payer is
+    /// about to confirm, and a new key would make the next submit a second
+    /// payment rather than a retry of this one.
     private func sameAttempt(
         as current: PayabliPayInPaymentFlowRequestConfiguration,
         customerData: PayabliPayInPaymentFlowCustomerData?,
@@ -231,13 +241,6 @@ struct PaymentCaptureQAView: View {
             customerData: demoCustomer.suppliesPayInCustomer ? DemoCustomerSetting.payInCustomer : nil,
             idempotencyKey: current.idempotencyKey
         )
-    }
-
-    /// The same payment, under a key it can be sent with.
-    private func retryOf(
-        _ current: PayabliPayInPaymentFlowRequestConfiguration
-    ) -> PayabliPayInPaymentFlowRequestConfiguration {
-        sameAttempt(as: current, customerData: current.customerData, idempotencyKey: UUID().uuidString)
     }
 
     /// A capture's request configuration, with a key minted per submission.
@@ -438,18 +441,13 @@ struct PaymentCaptureQAView: View {
 
     private func handleError(_ error: Error) {
         submitFailed = true
-        // An idempotency key is spent once submitted, and a failed form stays
-        // retryable, so the retry needs a key of its own to be a payment rather
-        // than a duplicate. A failed form blocks the result row, so this is the
-        // only place one can be minted.
+        // The request keeps its idempotency key. A failure does not say whether
+        // the service accepted the payment: a lost response and a refused card
+        // arrive the same way, and a submit carrying the same key is answered
+        // from the attempt that already reached it.
         //
-        // The key alone: a retry is the payment that just failed, sent again, so
-        // the amount and the order identifier are the ones the payer saw.
-        if let current = paymentFlow.requestConfiguration {
-            paymentFlow.configure(requestConfiguration: retryOf(current))
-        } else {
-            paymentFlow.configure(requestConfiguration: nextRequest())
-        }
+        // Drawing a fresh attempt is the button beside this message, and it is
+        // the only place a key is minted.
         let message = paymentCaptureErrorMessage(error)
         resultText = "Payment capture failed: \(message)"
         Logger(
