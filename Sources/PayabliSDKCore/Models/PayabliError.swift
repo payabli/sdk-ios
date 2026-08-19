@@ -93,10 +93,16 @@ public struct PayabliValidationError: PayabliError, Decodable {
         title ?? "Validation failed"
     }
 
-    /// Appends the per-field messages, which are the part that says which
-    /// field the server rejected. The title alone is usually "Validation
-    /// failed", which tells a merchant nothing. Field *names* only — the
-    /// suggestions are left out rather than risk echoing a submitted value.
+    /// Appends each rejected field and the message the server sent for it, which
+    /// is the part that says what to correct. The title alone is usually
+    /// "Validation failed", which tells a merchant nothing.
+    ///
+    /// `suggestion` is left out: it can quote a corrected value, and a value is
+    /// what this must not carry.
+    ///
+    /// For display. A message is server text and can echo request data, so it
+    /// belongs in front of a person rather than in a log, which is the rule the
+    /// sibling platform states on its own error root.
     public var errorDescription: String? {
         var parts = [reason]
         if let detail, !detail.isEmpty, detail != reason {
