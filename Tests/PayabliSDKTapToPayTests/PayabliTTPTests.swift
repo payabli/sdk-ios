@@ -146,6 +146,97 @@ final class PayabliTTPTests: XCTestCase {
         }
     }
 
+    /// Starts reading the stream for the first event `match` accepts.
+    ///
+    /// Bounded, because an event that never arrives would otherwise leave the
+    /// reader awaiting forever, and a missing event has to fail a test rather
+    /// than hang it.
+    private func collect(
+        from stream: AsyncStream<PayabliTTPEvent>,
+        match: @escaping @Sendable (PayabliTTPEvent) -> String?
+    ) -> Task<String?, Never> {
+        Task {
+            for await event in stream {
+                if let found = match(event) {
+                    return found
+                }
+            }
+            return nil
+        }
+    }
+
+    private func value(of collector: Task<String?, Never>, named name: String) async throws -> String {
+        let deadline = Task {
+            try? await Task.sleep(nanoseconds: 2_000_000_000)
+            collector.cancel()
+        }
+        let found = await collector.value
+        deadline.cancel()
+        return try XCTUnwrap(found, "no \(name) event arrived")
+    }
+
+    /// An `initialize()` that fails in the attestation phase says which phase
+    /// failed and why, which is what an observer reads the log for.
+    func testAttestationFailureEmitsAnEventCarryingTheReason() async throws {
+        let (ttp, _, attestation) = makeTTP()
+        attestation.attestResult = .failure(PayabliTTPError.attestationFailed(reason: "key unusable"))
+        let stream = ttp.events()
+
+        let collector = collect(from: stream) { event in
+            if case let .attestationFailed(error) = event {
+                return error
+            }
+            return nil
+        }
+
+        try await Task.sleep(nanoseconds: 30_000_000)
+        _ = try? await ttp.initialize()
+        let reported = try await value(of: collector, named: "attestationFailed")
+
+        XCTAssertTrue(reported.contains("key unusable"), reported)
+        XCTAssertEqual(ttp.sessionState, .error)
+    }
+
+    /// The event, the published state and the thrown error carry one value, so a
+    /// reader comparing a screen against a log sees the same failure twice.
+    func testConfigFailureEmitsAnEventAndMarksWhatItThrows() async throws {
+        let (ttp, _, _) = makeTTP()
+        StubURLProtocol.handler = { request in
+            (HTTPURLResponse(
+                url: request.url!,
+                statusCode: 500,
+                httpVersion: "HTTP/1.1",
+                headerFields: ["Content-Type": "application/json"]
+            )!, Data("{\"title\":\"Server error\"}".utf8))
+        }
+        let stream = ttp.events()
+
+        let collector = collect(from: stream) { event in
+            if case let .configFailed(error) = event {
+                return error
+            }
+            return nil
+        }
+
+        try await Task.sleep(nanoseconds: 30_000_000)
+        var thrown: Error?
+        do {
+            try await ttp.initialize()
+            XCTFail("expected the config phase to fail")
+        } catch {
+            thrown = error
+        }
+        let reported = try await value(of: collector, named: "configFailed")
+
+        XCTAssertEqual(ttp.sessionState, .error)
+        XCTAssertEqual(reported, String(describing: thrown!), "the event must carry what was thrown")
+        XCTAssertEqual(
+            String(describing: ttp.sessionManager.lastError!),
+            String(describing: thrown!),
+            "the published state must hold what was thrown"
+        )
+    }
+
     func testEventsStreamDeliversLifecycle() async throws {
         let (ttp, _, _) = makeTTP()
         let stream = ttp.events()
@@ -165,7 +256,7 @@ final class PayabliTTPTests: XCTestCase {
             return events
         }
 
-        // Start iterating before we emit.
+        // Iteration has to start before the first event is emitted.
         try await Task.sleep(nanoseconds: 30_000_000)
         try await ttp.initialize()
         let received = await collector.value
