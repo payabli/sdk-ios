@@ -271,11 +271,72 @@ final class PayabliTTPTests: XCTestCase {
             return nil
         }
 
-        _ = try? await ttp.initialize()
+        var thrown: Error?
+        do {
+            try await ttp.initialize()
+            XCTFail("expected the config phase to fail")
+        } catch {
+            thrown = error
+        }
         let reported = try await value(of: collector, named: "configFailed")
 
+        XCTAssertEqual(reported, "configFailed")
         XCTAssertFalse(reported.contains(serversWords), reported)
-        XCTAssertTrue(reported.contains(PayabliErrorCode.validation.rawValue), reported)
+
+        // The other half of the split: what the event withholds, the caller gets.
+        let raised = try XCTUnwrap(thrown)
+        XCTAssertTrue(raised.localizedDescription.contains(serversWords), raised.localizedDescription)
+        XCTAssertTrue(raised is PayabliTTPError, "the bridges read the domain of this type")
+    }
+
+    /// The 401 branch does four things and had a test for none of them: it clears
+    /// the attestation cache, marks, emits and throws. A missing clear leaves the
+    /// next call re-sending a handle the service has already refused.
+    func testConfigRejectionClearsTheAttestationCacheAndReportsItOnce() async throws {
+        let (ttp, _, attestation) = makeTTP()
+        attestation.isAlreadyAttested = true
+        StubURLProtocol.handler = { request in
+            (
+                HTTPURLResponse(
+                    url: request.url!,
+                    statusCode: 200,
+                    httpVersion: "HTTP/1.1",
+                    headerFields: ["Content-Type": "application/json"]
+                )!,
+                Data(
+                    #"{"isSuccess":false,"responseText":"attestation revoked","responseData":{"resultCode":401,"resultText":"attestation revoked"}}"#
+                        .utf8
+                )
+            )
+        }
+        let stream = ttp.events()
+
+        let collector = collect(from: stream) { event in
+            if case let .configFailed(error) = event {
+                return error
+            }
+            return nil
+        }
+
+        var thrown: Error?
+        do {
+            try await ttp.initialize()
+            XCTFail("expected the config phase to reject")
+        } catch {
+            thrown = error
+        }
+        let reported = try await value(of: collector, named: "configFailed")
+        let raised = try XCTUnwrap(thrown)
+        let marked = try XCTUnwrap(ttp.sessionManager.lastError)
+
+        XCTAssertFalse(attestation.isAlreadyAttested, "a refused handle must not be sent again")
+        XCTAssertEqual(ttp.sessionState, .error)
+        XCTAssertEqual(reported, "configFailed")
+        XCTAssertTrue(
+            raised.localizedDescription.contains("attestation cleared"),
+            raised.localizedDescription
+        )
+        XCTAssertEqual(String(describing: marked), String(describing: raised))
     }
 
     func testEventsStreamDeliversLifecycle() async throws {
