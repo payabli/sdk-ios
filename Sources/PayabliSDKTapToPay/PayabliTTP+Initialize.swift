@@ -217,16 +217,19 @@ extension PayabliTTP {
             throw PayabliTTPError.devicePendingActivation
         } catch let err as PayabliGenericError where err.code == .tokenExpired {
             attestation.clearCache()
-            sessionManager.markError(err)
-            syncPublished()
             let failure = PayabliTTPError.configFailed(reason: "Config rejected (401) — attestation cleared")
+            // One value through all three channels. Marking the raw 401 while
+            // throwing the rewrapped failure left the published state and the
+            // caller describing the same failure differently.
+            sessionManager.markError(failure)
+            syncPublished()
             multicaster.emit(.configFailed(error: String(describing: failure)))
             throw failure
         } catch {
-            sessionManager.markError(error)
-            syncPublished()
             let failure = error as? PayabliTTPError
                 ?? PayabliTTPError.configFailed(reason: String(describing: error))
+            sessionManager.markError(failure)
+            syncPublished()
             multicaster.emit(.configFailed(error: String(describing: failure)))
             throw failure
         }
