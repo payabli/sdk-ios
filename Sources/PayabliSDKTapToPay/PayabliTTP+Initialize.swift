@@ -198,7 +198,7 @@ extension PayabliTTP {
         } catch {
             sessionManager.markError(error)
             syncPublished()
-            multicaster.emit(.attestationFailed(error: String(describing: error)))
+            multicaster.emit(.attestationFailed(error: ErrorSummary.of(error)))
             throw error
         }
     }
@@ -223,14 +223,14 @@ extension PayabliTTP {
             // caller describing the same failure differently.
             sessionManager.markError(failure)
             syncPublished()
-            multicaster.emit(.configFailed(error: String(describing: failure)))
+            multicaster.emit(.configFailed(error: ErrorSummary.of(failure)))
             throw failure
         } catch {
             let failure = error as? PayabliTTPError
-                ?? PayabliTTPError.configFailed(reason: String(describing: error))
+                ?? PayabliTTPError.configFailed(reason: ErrorSummary.of(error))
             sessionManager.markError(failure)
             syncPublished()
-            multicaster.emit(.configFailed(error: String(describing: failure)))
+            multicaster.emit(.configFailed(error: ErrorSummary.of(failure)))
             throw failure
         }
     }

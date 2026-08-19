@@ -99,19 +99,6 @@ extension AppAttestService {
     /// `transport` decorator (`AuthenticatedTransport`); this method only
     /// appends the App Attest assertion headers that are specific to the
     /// attestation/activation endpoint family.
-    /// What a log may say about a mapped error: its classification.
-    ///
-    /// `localizedDescription` is now the server's own title, detail and per-field
-    /// messages, and `PayabliLogger` writes every message as public. Server text
-    /// can echo request data, so it goes in front of a person and not into the
-    /// unified log.
-    private static func classification(of error: Error) -> String {
-        if let payabli = error as? any PayabliError {
-            return payabli.code.rawValue
-        }
-        return String(describing: type(of: error))
-    }
-
     private func performAuthenticatedPOST(
         path: String,
         body: some Encodable,
@@ -148,7 +135,7 @@ extension AppAttestService {
         do {
             try mapPayabliHTTPError(response: response)
         } catch {
-            logger.error("[\(label)] HTTP error: \(Self.classification(of: error))")
+            logger.error("[\(label)] HTTP error: \(ErrorSummary.of(error))")
             throw error
         }
 
