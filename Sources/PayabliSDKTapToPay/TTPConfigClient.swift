@@ -5,7 +5,7 @@ import PayabliSDKCore
 /// `GET /api/v2/device/taptopay/config/{entry}`.
 ///
 /// The PRD leaves the exact shape flexible because it contains processor-specific
-/// credentials (Fiserv in v1.0). We model it as a loose dictionary that the
+/// credentials (Fiserv in v1.0), so it arrives as a loose dictionary that the
 /// concrete provider adapter interprets. See FR-11B.3, NFR-5D.
 public struct TTPConfig: Sendable {
     public let paymentToken: String?
@@ -66,7 +66,8 @@ public final class TTPConfigClient: Sendable {
         // Shared envelope helpers live in `PayabliSDKCore/Networking/ResponseEnvelope.swift`.
         if let (rawCode, reason) = PayabliEnvelope.declineOutcome(from: response.body) {
             let code = rawCode ?? 0
-            logger.error("[config] declined (isSuccess=false code=\(code)): \(reason)")
+            // Same as the attestation path: the code, not the service's sentence.
+            logger.error("[config] declined (isSuccess=false code=\(code))")
             // 401 semantics from the server body: attestation was revoked or
             // device not attested → caller should clear cache and re-attest.
             if code == 401 {
