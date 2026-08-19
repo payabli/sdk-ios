@@ -199,7 +199,10 @@ final class PayabliTTPTests: XCTestCase {
         _ = try? await ttp.initialize()
         let reported = try await value(of: collector, named: "attestationFailed")
 
-        XCTAssertTrue(reported.contains("key unusable"), reported)
+        // The phase, not the sentence: a reason on this case is the SDK's words on
+        // one path and the service's on another, so none of them travel.
+        XCTAssertEqual(reported, "attestationFailed")
+        XCTAssertFalse(reported.contains("key unusable"), reported)
         XCTAssertEqual(ttp.sessionState, .error)
     }
 

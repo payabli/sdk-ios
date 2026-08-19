@@ -8,15 +8,21 @@ import XCTest
 /// validation message can quote what was submitted, and both channels reach
 /// places a person did not choose to send them.
 final class ErrorSummaryTests: XCTestCase {
-    func testTheSDKsOwnFailureTextTravels() {
-        let summary = ErrorSummary.of(PayabliTTPError.attestationFailed(reason: "key unusable"))
+    /// The same case carries this SDK's words on one path and the service's on
+    /// another, so no reason is repeated and the case is what the summary says.
+    func testNoReasonIsRepeated() {
+        let sdksOwnWords = "key unusable"
+        let serversWords = "Card belongs to another merchant"
 
-        XCTAssertTrue(summary.contains("key unusable"), summary)
+        XCTAssertEqual(ErrorSummary.of(PayabliTTPError.attestationFailed(reason: sdksOwnWords)), "attestationFailed")
+        XCTAssertEqual(ErrorSummary.of(PayabliTTPError.configFailed(reason: serversWords)), "configFailed")
+        XCTAssertEqual(ErrorSummary.of(PayabliTTPError.readerSetupFailed(reason: sdksOwnWords)), "readerSetupFailed")
+        XCTAssertEqual(ErrorSummary.of(PayabliTTPError.activationFailed(reason: serversWords)), "activationFailed")
     }
 
-    /// A charge failure's reason is what the service said about it, so the case is
-    /// named without one. `TTPTransactionClient` builds these from the envelope.
-    func testACaseCarryingServiceTextIsNamedWithoutIt() {
+    /// The charge cases carry what the service said about a charge, taken from the
+    /// envelope in `TTPTransactionClient`.
+    func testChargeFailuresAreNamedWithoutTheirReason() {
         let serversWords = "Card belongs to another merchant"
 
         XCTAssertEqual(ErrorSummary.of(PayabliTTPError.initiateFailed(reason: serversWords)), "initiateFailed")

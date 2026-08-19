@@ -26,12 +26,19 @@ enum ErrorSummary {
         }
     }
 
-    /// Written out case by case rather than reflected over, for two reasons.
+    /// The case, and details that are not free text. No `reason` reaches this
+    /// string.
     ///
-    /// A reflected description is whatever the compiler renders today, and this
-    /// string reaches host apps. And the reasons are not all the SDK's own words:
-    /// `initiateFailed` and `updateFailed` carry what the service said about a
-    /// charge, so they are named without one.
+    /// A reason cannot be classified by the case that holds it. The same
+    /// `attestationFailed` carries this SDK's own words from `AppAttestService`
+    /// and the service's from a decline body; `configFailed` carries a sentence
+    /// written here and a `resultText` from `TTPConfigClient`; `readerSetupFailed`
+    /// and `activationFailed` carry `String(describing:)` of whatever was caught.
+    /// The reason still reaches the caller and the screen, on the error itself.
+    ///
+    /// Written out case by case rather than reflected over, because this string
+    /// reaches host apps and a reflected one is whatever the compiler renders
+    /// today.
     static func of(_ error: PayabliTTPError) -> String {
         switch error {
         case .notInitialized:
@@ -44,20 +51,20 @@ enum ErrorSummary {
             return "devicePendingActivation"
         case .tokenExpired:
             return "tokenExpired"
-        case let .attestationRevoked(reason):
-            return "attestationRevoked(\(reason))"
-        case let .attestationFailed(reason):
-            return "attestationFailed(\(reason))"
-        case let .configFailed(reason):
-            return "configFailed(\(reason))"
-        case let .readerSetupFailed(reason):
-            return "readerSetupFailed(\(reason))"
-        case let .nfcFailed(reason):
-            return "nfcFailed(\(reason))"
-        case let .activationFailed(reason):
-            return "activationFailed(\(reason))"
-        case let .networkError(reason):
-            return "networkError(\(reason))"
+        case .attestationRevoked:
+            return "attestationRevoked"
+        case .attestationFailed:
+            return "attestationFailed"
+        case .configFailed:
+            return "configFailed"
+        case .readerSetupFailed:
+            return "readerSetupFailed"
+        case .nfcFailed:
+            return "nfcFailed"
+        case .activationFailed:
+            return "activationFailed"
+        case .networkError:
+            return "networkError"
         case .initiateFailed:
             return "initiateFailed"
         case .updateFailed:
