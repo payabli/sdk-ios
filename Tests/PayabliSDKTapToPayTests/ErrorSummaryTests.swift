@@ -4,9 +4,11 @@ import XCTest
 
 /// What may be repeated about an error in a log or an event payload.
 ///
-/// The rule these hold to: this SDK's own words travel, the service's do not. A
-/// validation message can quote what was submitted, and both channels reach
-/// places a person did not choose to send them.
+/// The rule these hold to: no reason travels, whoever wrote it. Classifying by
+/// case was tried and does not hold, because the same case carries this SDK's own
+/// words on one path and the service's on another, and the service's can quote
+/// what was submitted. Both channels reach places a person did not choose to send
+/// them, so what they carry is the case and details that are not free text.
 final class ErrorSummaryTests: XCTestCase {
     /// The same case carries this SDK's words on one path and the service's on
     /// another, so no reason is repeated and the case is what the summary says.
