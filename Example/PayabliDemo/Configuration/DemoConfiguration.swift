@@ -31,19 +31,13 @@ enum DemoConfiguration {
     /// environment's host — a pairing that fails as `401 "The signature key was
     /// not found"` and reads like a bad credential.
     static var entryPoint: String {
-        Secrets.entryPoints[environment] ?? ""
+        EntryPointLookup.entryPoint(from: Secrets.entryPoints, for: environment) ?? ""
     }
 
     /// Set when the running environment has no paypoint configured, so the
     /// Config screen can say which one is missing instead of showing a blank.
     static var entryPointProblem: String? {
-        guard Secrets.entryPoints[environment] == nil else { return nil }
-        let configured = Secrets.entryPoints.keys
-            .map(nameFor)
-            .sorted()
-            .joined(separator: ", ")
-        return "No entry point for \(nameFor(environment)) in Secrets.entryPoints"
-            + (configured.isEmpty ? "." : ". Configured: \(configured).")
+        EntryPointLookup.problem(from: Secrets.entryPoints, for: environment)
     }
 
     static let environmentSource: String = {
@@ -88,12 +82,7 @@ enum DemoConfiguration {
     }
 
     static func nameFor(_ environment: PayabliEnvironment) -> String {
-        switch environment {
-        case .qa: return "qa"
-        case .sandbox: return "sandbox"
-        case .production: return "production"
-        default: return "other"
-        }
+        EntryPointLookup.name(for: environment)
     }
 
     /// Resolves the bundled `LocalTokenServer` base URL at runtime.

@@ -21,6 +21,9 @@
 		A1B2C3D4E5F600000000BB02 /* TokenServerHealth.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F600000000BB01 /* TokenServerHealth.swift */; };
 		A1B2C3D4E5F600000000BB03 /* TokenServerHealth.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F600000000BB01 /* TokenServerHealth.swift */; };
 		A1B2C3D4E5F600000000BB12 /* TokenServerHealthTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F600000000BB11 /* TokenServerHealthTests.swift */; };
+		A1B2C3D4E5F600000000BB32 /* EntryPointLookup.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F600000000BB31 /* EntryPointLookup.swift */; };
+		A1B2C3D4E5F600000000BB33 /* EntryPointLookup.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F600000000BB31 /* EntryPointLookup.swift */; };
+		A1B2C3D4E5F600000000BB42 /* EntryPointLookupTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F600000000BB41 /* EntryPointLookupTests.swift */; };
 		A1B2C3D4E5F60000000000F3 /* TokenProbeResults.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60000000000F1 /* TokenProbeResults.swift */; };
 		A1B2C3D4E5F60000000000F5 /* TokenProbeResultsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60000000000F4 /* TokenProbeResultsTests.swift */; };
 		0F5E8CC7E7A24D19A71B0A1C /* PaymentMethodAddedView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F5E8CC6E7A24D19A71B0A1C /* PaymentMethodAddedView.swift */; };
@@ -104,6 +107,8 @@
 		A1B2C3D4E5F60000000000A5 /* PayabliDemo.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = PayabliDemo.entitlements; sourceTree = "<group>"; };
 		A1B2C3D4E5F60000000000B1 /* TapToPayPreflight.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TapToPayPreflight.swift; sourceTree = "<group>"; };
 		BB9C96115FF840C6491AED9C /* PaymentMethodQAView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PaymentMethodQAView.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F600000000BB31 /* EntryPointLookup.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = EntryPointLookup.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F600000000BB41 /* EntryPointLookupTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = EntryPointLookupTests.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F600000000BB01 /* TokenServerHealth.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TokenServerHealth.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F600000000BB11 /* TokenServerHealthTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TokenServerHealthTests.swift; sourceTree = "<group>"; };
 		D10000000000000000000001 /* DemoConfiguration.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DemoConfiguration.swift; sourceTree = "<group>"; };
@@ -233,6 +238,7 @@
 			children = (
 				D10000000000000000000001 /* DemoConfiguration.swift */,
 				A1B2C3D4E5F600000000BB01 /* TokenServerHealth.swift */,
+				A1B2C3D4E5F600000000BB31 /* EntryPointLookup.swift */,
 				4C921D1F3EE7130C23911757 /* Secrets.swift */,
 				D10000000000000000000007 /* ConfigurationQAView.swift */,
 			);
@@ -349,6 +355,7 @@
 				F20000000000000000000025 /* PayInStepsTests.swift */,
 				A1B2C3D4E5F60000000000F4 /* TokenProbeResultsTests.swift */,
 				A1B2C3D4E5F600000000BB11 /* TokenServerHealthTests.swift */,
+				A1B2C3D4E5F600000000BB41 /* EntryPointLookupTests.swift */,
 				A1B2C3D4E5F600000000AC11 /* QAAmountTests.swift */,
 				A1B2C3D4E5F600000000AC01 /* QAIdentityTests.swift */,
 			);
@@ -527,6 +534,8 @@
 				A1B2C3D4E5F60000000000F5 /* TokenProbeResultsTests.swift in Sources */,
 				A1B2C3D4E5F600000000BB03 /* TokenServerHealth.swift in Sources */,
 				A1B2C3D4E5F600000000BB12 /* TokenServerHealthTests.swift in Sources */,
+				A1B2C3D4E5F600000000BB33 /* EntryPointLookup.swift in Sources */,
+				A1B2C3D4E5F600000000BB42 /* EntryPointLookupTests.swift in Sources */,
 				A1B2C3D4E5F600000000AC02 /* QAIdentityTests.swift in Sources */,
 				A1B2C3D4E5F600000000AC12 /* QAAmountTests.swift in Sources */,
 				A1B2C3D4E5F600000000AD02 /* QAIdentity.swift in Sources */,
@@ -557,6 +566,7 @@
 				A1B2C3D4E5F60000000000E2 /* QAContextLine.swift in Sources */,
 				A1B2C3D4E5F60000000000F2 /* TokenProbeResults.swift in Sources */,
 				A1B2C3D4E5F600000000BB02 /* TokenServerHealth.swift in Sources */,
+				A1B2C3D4E5F600000000BB32 /* EntryPointLookup.swift in Sources */,
 				A1B2C3D4E5F600000000AA02 /* DemoCustomerSetting.swift in Sources */,
 				A1B2C3D4E5F600000000AB12 /* QAAmount.swift in Sources */,
 				A1B2C3D4E5F600000000AB02 /* QAIdentity.swift in Sources */,
