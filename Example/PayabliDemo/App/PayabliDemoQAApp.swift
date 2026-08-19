@@ -7,7 +7,7 @@ import SwiftUI
 @main
 struct PayabliDemoQAApp: App {
     @StateObject private var paymentMethod = PayabliPayInPaymentFlow(
-        entryPoint: Secrets.entryPoint,
+        entryPoint: DemoConfiguration.entryPoint,
         environment: DemoConfiguration.environment,
         accessTokenProvider: {
             return try await Secrets.fetchPaymentMethodAccessToken()
@@ -19,7 +19,7 @@ struct PayabliDemoQAApp: App {
     )
 
     @StateObject private var paymentCapture = PayabliPayInPaymentFlow(
-        entryPoint: Secrets.entryPoint,
+        entryPoint: DemoConfiguration.entryPoint,
         environment: DemoConfiguration.environment,
         accessTokenProvider: {
             return try await Secrets.fetchPaymentCaptureAccessToken()
@@ -40,7 +40,7 @@ struct PayabliDemoQAApp: App {
     @StateObject private var terminal = PayabliTTP(
         accessToken: Secrets.placeholderAccessToken,
         tokenProvider: { try await Secrets.fetchAccessToken() },
-        entryPoint: Secrets.entryPoint,
+        entryPoint: DemoConfiguration.entryPoint,
         appId: Secrets.appId,
         environment: DemoConfiguration.environment
     )
