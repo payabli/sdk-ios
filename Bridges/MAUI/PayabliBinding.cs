@@ -76,6 +76,8 @@ namespace Payabli.TapToPay
         ActivationStarted = 15,
         ActivationCompleted = 16,
         ActivationFailed = 17,
+        AttestationFailed = 18,
+        ConfigFailed = 19,
     }
 
     // MARK: - Completion delegates
