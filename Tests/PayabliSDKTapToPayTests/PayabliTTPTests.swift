@@ -146,6 +146,11 @@ final class PayabliTTPTests: XCTestCase {
         }
     }
 
+    /// How long an event has to arrive before the test says it never did. Long
+    /// enough that a loaded machine is not the reason, short enough that the
+    /// failure is read rather than waited out.
+    private static let eventWait: UInt64 = 2_000_000_000
+
     /// Starts reading the stream for the first event `match` accepts.
     ///
     /// Bounded, because an event that never arrives would otherwise leave the
@@ -169,7 +174,7 @@ final class PayabliTTPTests: XCTestCase {
         let deadline = Task {
             // A cancelled sleep throws, and swallowing that would cancel the
             // collector after it had already answered.
-            guard (try? await Task.sleep(nanoseconds: 2_000_000_000)) != nil else { return }
+            guard (try? await Task.sleep(nanoseconds: Self.eventWait)) != nil else { return }
             collector.cancel()
         }
         let found = await collector.value
@@ -289,8 +294,6 @@ final class PayabliTTPTests: XCTestCase {
             return events
         }
 
-        // Iteration has to start before the first event is emitted.
-        try await Task.sleep(nanoseconds: 30_000_000)
         try await ttp.initialize()
         let received = await collector.value
 
