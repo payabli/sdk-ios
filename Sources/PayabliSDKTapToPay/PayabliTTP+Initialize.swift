@@ -208,7 +208,8 @@ extension PayabliTTP {
     /// Pre: session is in `.fetchingConfig`. Error handling:
     ///   - backend says pending → `.pendingActivation`
     ///   - 401 (stale assertion) → clear attestation cache, rewrap as `.configFailed`
-    ///   - anything else → `.error`, and the error reaches the caller as it arrived
+    ///   - anything else → `.error`, rewrapped as `.configFailed` so the domain and
+    ///     code stay what the bridges read, keeping the parsed reason
     private func runFetchConfigPhase() async throws -> TTPConfig {
         do {
             return try await configClient.fetchConfig(entry: entryPoint)
@@ -226,14 +227,20 @@ extension PayabliTTP {
             multicaster.emit(.configFailed(error: ErrorSummary.of(failure)))
             throw failure
         } catch {
-            // Thrown as it arrived. Rewrapping it as `.configFailed` cost the
-            // caller the parsed reason and the fields the service named, which is
-            // the whole of what this error is for; the phase it failed in is said
-            // by the event rather than by the type.
-            sessionManager.markError(error)
+            // Wrapped, because the domain and code are a contract: `configFailed`
+            // bridges as `com.payabli.ttp` code 6, and the Flutter plugin reads
+            // `TTP_6` from it. An error thrown as it arrived carries another
+            // domain, and every bridge reports it as a bare initialize failure.
+            //
+            // The reason is the error's own parsed description, so the fields the
+            // service named still reach the merchant. `String(describing:)` renders
+            // every stored property instead, the page token among them.
+            let failure = error as? PayabliTTPError
+                ?? PayabliTTPError.configFailed(reason: error.localizedDescription)
+            sessionManager.markError(failure)
             syncPublished()
-            multicaster.emit(.configFailed(error: ErrorSummary.of(error)))
-            throw error
+            multicaster.emit(.configFailed(error: ErrorSummary.of(failure)))
+            throw failure
         }
     }
 
