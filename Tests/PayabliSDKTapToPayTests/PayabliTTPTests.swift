@@ -167,7 +167,9 @@ final class PayabliTTPTests: XCTestCase {
 
     private func value(of collector: Task<String?, Never>, named name: String) async throws -> String {
         let deadline = Task {
-            try? await Task.sleep(nanoseconds: 2_000_000_000)
+            // A cancelled sleep throws, and swallowing that would cancel the
+            // collector after it had already answered.
+            guard (try? await Task.sleep(nanoseconds: 2_000_000_000)) != nil else { return }
             collector.cancel()
         }
         let found = await collector.value
@@ -189,7 +191,6 @@ final class PayabliTTPTests: XCTestCase {
             return nil
         }
 
-        try await Task.sleep(nanoseconds: 30_000_000)
         _ = try? await ttp.initialize()
         let reported = try await value(of: collector, named: "attestationFailed")
 
@@ -218,7 +219,6 @@ final class PayabliTTPTests: XCTestCase {
             return nil
         }
 
-        try await Task.sleep(nanoseconds: 30_000_000)
         var thrown: Error?
         do {
             try await ttp.initialize()
@@ -229,12 +229,45 @@ final class PayabliTTPTests: XCTestCase {
         let reported = try await value(of: collector, named: "configFailed")
 
         XCTAssertEqual(ttp.sessionState, .error)
-        XCTAssertEqual(reported, String(describing: thrown!), "the event must carry what was thrown")
+        let raised = try XCTUnwrap(thrown, "initialize() returned instead of failing")
+        let marked = try XCTUnwrap(ttp.sessionManager.lastError, "the session recorded no error")
+
+        XCTAssertEqual(reported, ErrorSummary.of(raised), "the event must summarise what was thrown")
         XCTAssertEqual(
-            String(describing: ttp.sessionManager.lastError!),
-            String(describing: thrown!),
+            String(describing: marked),
+            String(describing: raised),
             "the published state must hold what was thrown"
         )
+    }
+
+    /// An event payload is forwarded to whatever logging a host app has, so the
+    /// service's own wording must not ride along in one. The caller still gets it,
+    /// through the thrown error.
+    func testConfigFailureEventCarriesTheCodeRatherThanTheServersWords() async throws {
+        let (ttp, _, _) = makeTTP()
+        let serversWords = "Card number belongs to another merchant"
+        StubURLProtocol.handler = { request in
+            (HTTPURLResponse(
+                url: request.url!,
+                statusCode: 400,
+                httpVersion: "HTTP/1.1",
+                headerFields: ["Content-Type": "application/json"]
+            )!, Data(#"{"title":"\#(serversWords)","status":400}"#.utf8))
+        }
+        let stream = ttp.events()
+
+        let collector = collect(from: stream) { event in
+            if case let .configFailed(error) = event {
+                return error
+            }
+            return nil
+        }
+
+        _ = try? await ttp.initialize()
+        let reported = try await value(of: collector, named: "configFailed")
+
+        XCTAssertFalse(reported.contains(serversWords), reported)
+        XCTAssertTrue(reported.contains(PayabliErrorCode.validation.rawValue), reported)
     }
 
     func testEventsStreamDeliversLifecycle() async throws {
