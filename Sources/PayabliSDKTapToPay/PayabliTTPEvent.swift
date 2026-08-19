@@ -22,9 +22,9 @@ public enum PayabliTTPEvent: Sendable {
     case activationFailed(error: String)
     // Appended after `activationFailed` to keep declaration order aligned with
     // the `PayabliTTPEventCode` raw values, which are public API. Cases arrive at
-    // the end as the SDK grows, so a `switch` over this type wants an
-    // `@unknown default`, which the binary framework's clients are required to
-    // write and a source client should write anyway.
+    // the end as the SDK grows. A client of the binary framework has to cover
+    // cases it cannot see, by either `default` or `@unknown default`; the latter
+    // keeps the warning that says a new case arrived, which is the point of it.
     case attestationFailed(error: String)
     case configFailed(error: String)
 }
