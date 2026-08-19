@@ -69,7 +69,7 @@ extension PayabliTTP {
         sessionManager.reset()
         syncPublished()
 
-        // 1. Attestation (cold) or warm deviceId. Transitions us into
+        // 1. Attestation (cold) or warm deviceId. The session reaches
         //    `.fetchingConfig` on success.
         let deviceId = try await runAttestationPhase()
 
