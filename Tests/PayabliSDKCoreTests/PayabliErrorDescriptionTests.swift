@@ -39,7 +39,9 @@ final class PayabliErrorDescriptionTests: XCTestCase {
           "title": "Validation failed",
           "status": 400,
           "errors": {
-            "paymentMethod.cardexp": [{"message": "is not a valid expiration"}],
+            "paymentMethod.cardexp": [
+              {"message": "is not a valid expiration", "suggestion": "try 12/2029"}
+            ],
             "customerData": [{"message": "is required"}]
           }
         }
@@ -49,6 +51,10 @@ final class PayabliErrorDescriptionTests: XCTestCase {
 
         XCTAssertTrue(message.contains("customerData: is required"), message)
         XCTAssertTrue(message.contains("paymentMethod.cardexp: is not a valid expiration"), message)
+
+        // A suggestion can quote a corrected value, so it stays out of the string a
+        // host app displays and logs.
+        XCTAssertFalse(message.contains("12/2029"), message)
     }
 
     func testValidationErrorWithoutFieldsStillReadsAsTheTitle() throws {
