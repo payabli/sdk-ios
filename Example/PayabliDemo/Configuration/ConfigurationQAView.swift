@@ -264,7 +264,7 @@ struct ConfigurationQAView: View {
 
     private func runTokenCheck() {
         isWorking = true
-        Task {
+        Task { @MainActor in
             defer { isWorking = false }
             await tokenProbes.probeCardPresent()
         }
@@ -274,7 +274,7 @@ struct ConfigurationQAView: View {
     /// different token functions and this screen answers for both.
     private func runCardNotPresentTokenCheck() {
         isWorking = true
-        Task {
+        Task { @MainActor in
             defer { isWorking = false }
             await tokenProbes.probeStoredMethod()
             await tokenProbes.probeCapture()
@@ -284,7 +284,7 @@ struct ConfigurationQAView: View {
     private func runHealthCheck() {
         isWorking = true
         healthCheckText = "Checking health…"
-        Task {
+        Task { @MainActor in
             defer { isWorking = false }
             do {
                 let (body, response) = try await URLSession.shared.data(
