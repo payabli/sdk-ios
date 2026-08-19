@@ -37,6 +37,58 @@ final class ErrorSummaryTests: XCTestCase {
         XCTAssertEqual(summary, "notReady(current: idle)")
     }
 
+    /// Every case, with what it publishes. The summary is a contract with host
+    /// apps, so a case whose text changes should fail here rather than reach one.
+    ///
+    /// A reason is passed wherever the case takes one, and none of them appears in
+    /// what is published.
+    func testEveryCasePublishesItsName() {
+        let reason = "Card belongs to another merchant"
+        let expected: [(PayabliTTPError, String)] = [
+            (.notInitialized, "notInitialized"),
+            (.invalidState(current: .ready, attempted: "charge"), "invalidState(current: ready, attempted: charge)"),
+            (.notReady(current: .attestingDevice), "notReady(current: attestingDevice)"),
+            (.devicePendingActivation, "devicePendingActivation"),
+            (.tokenExpired, "tokenExpired"),
+            (.attestationRevoked(reason: reason), "attestationRevoked"),
+            (.attestationFailed(reason: reason), "attestationFailed"),
+            (.configFailed(reason: reason), "configFailed"),
+            (.readerSetupFailed(reason: reason), "readerSetupFailed"),
+            (.nfcFailed(reason: reason), "nfcFailed"),
+            (.activationFailed(reason: reason), "activationFailed"),
+            (.networkError(reason: reason), "networkError"),
+            (.initiateFailed(reason: reason), "initiateFailed"),
+            (.updateFailed(reason: reason), "updateFailed")
+        ]
+
+        for (error, published) in expected {
+            let summary = ErrorSummary.of(error)
+
+            XCTAssertEqual(summary, published)
+            XCTAssertFalse(summary.contains(reason), summary)
+        }
+    }
+
+    /// Each state by name, because an `@objc` enum renders as its raw value and a
+    /// log that says `rawValue: 6` costs the reader a trip to the source.
+    func testEveryStateIsNamed() {
+        let expected: [(PayabliTTPSessionState, String)] = [
+            (.idle, "idle"),
+            (.attestingDevice, "attestingDevice"),
+            (.fetchingConfig, "fetchingConfig"),
+            (.initializingReader, "initializingReader"),
+            (.ready, "ready"),
+            (.sessionExpired, "sessionExpired"),
+            (.reinitializing, "reinitializing"),
+            (.pendingActivation, "pendingActivation"),
+            (.error, "error")
+        ]
+
+        for (state, name) in expected {
+            XCTAssertEqual(ErrorSummary.of(PayabliTTPError.notReady(current: state)), "notReady(current: \(name))")
+        }
+    }
+
     func testATypedServiceErrorReducesToItsCode() {
         let error = PayabliGenericError(code: .tokenExpired, reason: "The signature key was not found")
 
