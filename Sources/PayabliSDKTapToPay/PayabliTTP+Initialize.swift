@@ -208,7 +208,7 @@ extension PayabliTTP {
     /// Pre: session is in `.fetchingConfig`. Error handling:
     ///   - backend says pending → `.pendingActivation`
     ///   - 401 (stale assertion) → clear attestation cache, rewrap as `.configFailed`
-    ///   - anything else → `.error`, rewrap non-typed errors as `.configFailed`
+    ///   - anything else → `.error`, and the error reaches the caller as it arrived
     private func runFetchConfigPhase() async throws -> TTPConfig {
         do {
             return try await configClient.fetchConfig(entry: entryPoint)
@@ -226,12 +226,14 @@ extension PayabliTTP {
             multicaster.emit(.configFailed(error: ErrorSummary.of(failure)))
             throw failure
         } catch {
-            let failure = error as? PayabliTTPError
-                ?? PayabliTTPError.configFailed(reason: ErrorSummary.of(error))
-            sessionManager.markError(failure)
+            // Thrown as it arrived. Rewrapping it as `.configFailed` cost the
+            // caller the parsed reason and the fields the service named, which is
+            // the whole of what this error is for; the phase it failed in is said
+            // by the event rather than by the type.
+            sessionManager.markError(error)
             syncPublished()
-            multicaster.emit(.configFailed(error: ErrorSummary.of(failure)))
-            throw failure
+            multicaster.emit(.configFailed(error: ErrorSummary.of(error)))
+            throw error
         }
     }
 
