@@ -21,7 +21,10 @@ public enum PayabliTTPEvent: Sendable {
     case activationCompleted
     case activationFailed(error: String)
     // Appended after `activationFailed` to keep declaration order aligned with
-    // the `PayabliTTPEventCode` raw values, which are public API.
+    // the `PayabliTTPEventCode` raw values, which are public API. Cases arrive at
+    // the end as the SDK grows, so a `switch` over this type wants an
+    // `@unknown default`, which the binary framework's clients are required to
+    // write and a source client should write anyway.
     case attestationFailed(error: String)
     case configFailed(error: String)
 }
@@ -113,6 +116,12 @@ public extension PayabliTTPEvent {
     ///   - `.chargeInitiated`, `.updateCompleted` → `["paymentTransId": String]`
     ///   - `.nfcFailed`, `.activationFailed`, `.attestationFailed`,
     ///     `.configFailed` → `["error": String]`
+    ///
+    /// The `error` string on `.attestationFailed` and `.configFailed` is a
+    /// summary safe to log: this SDK's own failure text, or a wire code for a
+    /// failure the service described. The service's own wording reaches the
+    /// caller through the thrown error instead, because it can quote what was
+    /// submitted.
     ///   - `.updateFailed` → `["paymentTransId": String, "error": String]`
     ///   - all other cases → empty `[:]`
     var payload: [String: Any] {
