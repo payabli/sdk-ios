@@ -182,9 +182,9 @@ final class PayabliTTPTests: XCTestCase {
         return try XCTUnwrap(found, "no \(name) event arrived")
     }
 
-    /// An `initialize()` that fails in the attestation phase says which phase
-    /// failed and why, which is what an observer reads the log for.
-    func testAttestationFailureEmitsAnEventCarryingTheReason() async throws {
+    /// An `initialize()` that fails in the attestation phase says so on the event
+    /// stream, which was silent before, and says it without repeating the reason.
+    func testAttestationFailureEmitsAnEventNamingThePhase() async throws {
         let (ttp, _, attestation) = makeTTP()
         attestation.attestResult = .failure(PayabliTTPError.attestationFailed(reason: "key unusable"))
         let stream = ttp.events()
