@@ -239,8 +239,8 @@ struct PaymentTapToPayQAView: View {
     }
 
     /// Longer than a caption, so it gets its own sheet rather than crowding the
-    /// form. The self-service route is deliberately a pointer, not a recipe —
-    /// the commands live with the server they belong to.
+    /// form. The self-service route is a pointer rather than a recipe: the
+    /// commands live with the server they belong to.
     ///
     /// Each paragraph is a single-line literal. A multi-line literal with `\`
     /// continuations keeps the indentation of every continued line as real
