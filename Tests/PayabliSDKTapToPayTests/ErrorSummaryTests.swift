@@ -14,6 +14,23 @@ final class ErrorSummaryTests: XCTestCase {
         XCTAssertTrue(summary.contains("key unusable"), summary)
     }
 
+    /// A charge failure's reason is what the service said about it, so the case is
+    /// named without one. `TTPTransactionClient` builds these from the envelope.
+    func testACaseCarryingServiceTextIsNamedWithoutIt() {
+        let serversWords = "Card belongs to another merchant"
+
+        XCTAssertEqual(ErrorSummary.of(PayabliTTPError.initiateFailed(reason: serversWords)), "initiateFailed")
+        XCTAssertEqual(ErrorSummary.of(PayabliTTPError.updateFailed(reason: serversWords)), "updateFailed")
+    }
+
+    /// Written out case by case, so a value the compiler renders differently one
+    /// release to the next cannot change what host apps receive.
+    func testTheSummaryIsNotAReflectedDescription() {
+        let summary = ErrorSummary.of(PayabliTTPError.notReady(current: .idle))
+
+        XCTAssertEqual(summary, "notReady(current: idle)")
+    }
+
     func testATypedServiceErrorReducesToItsCode() {
         let error = PayabliGenericError(code: .tokenExpired, reason: "The signature key was not found")
 
