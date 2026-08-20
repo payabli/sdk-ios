@@ -51,10 +51,13 @@ PayabliPayInPaymentFlowView(
     configuration: configuration,
     style: style,
     onCompleted: { result in
-        print(result.code)
+        outcome = result.code
     },
     onError: { error in
-        print(error.localizedDescription)
+        // Show this: it names what the service rejected. Do not log it. The
+        // description carries the service's own wording, which can quote what was
+        // submitted; log `(error as? any PayabliError)?.code` instead.
+        message = error.localizedDescription
     }
 )
 ```
@@ -129,7 +132,8 @@ Button("Add Payment Method") {
     ),
     style: payabliStyle,
     onCompleted: { result in
-        print(result.storedPaymentMethod?.storedMethodId ?? "")
+        // A stored-method id is a token: keep it, do not log it.
+        storedMethodId = result.storedPaymentMethod?.storedMethodId
     }
 )
 ```
