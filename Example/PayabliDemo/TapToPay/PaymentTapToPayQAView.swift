@@ -315,6 +315,7 @@ struct PaymentTapToPayQAView: View {
                 Spacer()
                 Button("Clear", role: .destructive) { eventLog.removeAll() }
                     .font(.footnote)
+                    .frame(minWidth: 44, minHeight: 44)
                     .disabled(eventLog.isEmpty)
             }
 
@@ -349,11 +350,14 @@ struct PaymentTapToPayQAView: View {
         if focusedField != nil {
             HStack {
                 Spacer()
+                // The frame is on the button rather than the row: padding around a
+                // text button leaves its own target the size of the word, which is
+                // under the 44 points a finger is measured against.
                 Button("Done") { focusedField = nil }
                     .font(.body.weight(.semibold))
+                    .frame(minWidth: 44, minHeight: 44)
             }
             .padding(.horizontal, 16)
-            .padding(.vertical, 8)
             .background(.bar)
         }
     }
