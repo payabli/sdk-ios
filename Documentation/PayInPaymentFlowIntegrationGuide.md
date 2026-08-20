@@ -18,6 +18,7 @@ Add the Swift package product to the host app target:
 Import it where the form or direct API is used:
 
 ```swift
+import PayabliSDKCore
 import PayabliSDKPayInPaymentFlow
 ```
 
@@ -51,10 +52,13 @@ PayabliPayInPaymentFlowView(
     configuration: configuration,
     style: style,
     onCompleted: { result in
-        print(result.code)
+        outcome = result.code
     },
     onError: { error in
-        print(error.localizedDescription)
+        // Show this: it names what the service rejected. Do not log it. The
+        // description carries the service's own wording, which can quote what was
+        // submitted; log `(error as? any PayabliError)?.code` instead.
+        message = error.localizedDescription
     }
 )
 ```
@@ -107,7 +111,8 @@ PayabliPayInPaymentFlowView(
     style: payabliStyle,
     onCompleted: { result in
         guard let stored = result.storedPaymentMethod else { return }
-        print("Stored method:", stored.storedMethodId ?? "")
+        // A stored-method id is a token: keep it, do not log it.
+        storedMethodId = stored.storedMethodId
     }
 )
 ```
@@ -129,7 +134,8 @@ Button("Add Payment Method") {
     ),
     style: payabliStyle,
     onCompleted: { result in
-        print(result.storedPaymentMethod?.storedMethodId ?? "")
+        // A stored-method id is a token: keep it, do not log it.
+        storedMethodId = result.storedPaymentMethod?.storedMethodId
     }
 )
 ```
@@ -791,12 +797,11 @@ Fields:
 func handle(_ result: PayabliPayInPaymentFlowResult) {
     switch result.kind {
     case .storedPaymentMethod:
-        let stored = result.storedPaymentMethod
-        print(stored?.storedMethodId ?? "")
+        // A stored-method id is a token: keep it, do not log it.
+        storedMethodId = result.storedPaymentMethod?.storedMethodId
 
     case .transaction:
-        let transaction = result.transaction
-        print(transaction?.paymentTransId ?? "")
+        paymentTransId = result.transaction?.paymentTransId
     }
 }
 ```

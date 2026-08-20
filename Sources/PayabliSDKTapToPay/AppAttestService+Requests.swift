@@ -126,7 +126,10 @@ extension AppAttestService {
         do {
             response = try await transport.perform(request)
         } catch {
-            logger.error("[\(label)] transport error: \(error.localizedDescription)")
+            // `AuthenticatedTransport` answers a spent token as a typed error, so
+            // this catch is not only URLSession failures and not only Foundation's
+            // words.
+            logger.error("[\(label)] transport error: \(ErrorSummary.of(error))")
             throw error
         }
 
@@ -135,14 +138,16 @@ extension AppAttestService {
         do {
             try mapPayabliHTTPError(response: response)
         } catch {
-            logger.error("[\(label)] HTTP error: \(error.localizedDescription)")
+            logger.error("[\(label)] HTTP error: \(ErrorSummary.of(error))")
             throw error
         }
 
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         if let (code, reason) = PayabliEnvelope.declineOutcome(from: response.body, decoder: decoder) {
-            logger.error("[\(label)] declined (code=\(code.map(String.init) ?? "nil")): \(reason)")
+            // The reason is the service's `resultText`, which can quote what was
+            // sent. The code says which decline this was.
+            logger.error("[\(label)] declined (code=\(code.map(String.init) ?? "nil"))")
             throw makeDeclineError(code, reason)
         }
 

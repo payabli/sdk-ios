@@ -21,6 +21,29 @@ final class EventMulticasterTests: XCTestCase {
         XCTAssertEqual(received, [1, 2])
     }
 
+    /// Subscription happens when `stream()` returns, not when iteration starts,
+    /// and what arrives in between is held rather than dropped.
+    ///
+    /// Tests of event-emitting code lean on this: without it every one of them
+    /// would have to sleep between subscribing and acting, and would go flaky on a
+    /// loaded machine instead of failing honestly.
+    func testEventsEmittedBeforeIterationAreStillDelivered() async {
+        let multicaster = EventMulticaster<Int>()
+        let stream = multicaster.stream()
+
+        // Emitted with nothing yet reading the stream.
+        multicaster.emit(1)
+        multicaster.emit(2)
+        multicaster.finishAll()
+
+        var received: [Int] = []
+        for await event in stream {
+            received.append(event)
+        }
+
+        XCTAssertEqual(received, [1, 2])
+    }
+
     func testMultipleSubscribersReceiveAllEvents() async {
         let multicaster = EventMulticaster<Int>()
 

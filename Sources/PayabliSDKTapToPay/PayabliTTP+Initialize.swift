@@ -69,7 +69,7 @@ extension PayabliTTP {
         sessionManager.reset()
         syncPublished()
 
-        // 1. Attestation (cold) or warm deviceId. Transitions us into
+        // 1. Attestation (cold) or warm deviceId. The session reaches
         //    `.fetchingConfig` on success.
         let deviceId = try await runAttestationPhase()
 
@@ -198,6 +198,7 @@ extension PayabliTTP {
         } catch {
             sessionManager.markError(error)
             syncPublished()
+            multicaster.emit(.attestationFailed(error: ErrorSummary.of(error)))
             throw error
         }
     }
@@ -207,7 +208,8 @@ extension PayabliTTP {
     /// Pre: session is in `.fetchingConfig`. Error handling:
     ///   - backend says pending → `.pendingActivation`
     ///   - 401 (stale assertion) → clear attestation cache, rewrap as `.configFailed`
-    ///   - anything else → `.error`, rewrap non-typed errors as `.configFailed`
+    ///   - anything else → `.error`, rewrapped as `.configFailed` so the domain and
+    ///     code stay what the bridges read, keeping the parsed reason
     private func runFetchConfigPhase() async throws -> TTPConfig {
         do {
             return try await configClient.fetchConfig(entry: entryPoint)
@@ -216,14 +218,29 @@ extension PayabliTTP {
             throw PayabliTTPError.devicePendingActivation
         } catch let err as PayabliGenericError where err.code == .tokenExpired {
             attestation.clearCache()
-            sessionManager.markError(err)
+            let failure = PayabliTTPError.configFailed(reason: "Config rejected (401) — attestation cleared")
+            // One value through all three channels. Marking the raw 401 while
+            // throwing the rewrapped failure left the published state and the
+            // caller describing the same failure differently.
+            sessionManager.markError(failure)
             syncPublished()
-            throw PayabliTTPError.configFailed(reason: "Config rejected (401) — attestation cleared")
+            multicaster.emit(.configFailed(error: ErrorSummary.of(failure)))
+            throw failure
         } catch {
-            sessionManager.markError(error)
+            // Wrapped, because the domain and code are a contract: `configFailed`
+            // bridges as `com.payabli.ttp` code 6, and the Flutter plugin reads
+            // `TTP_6` from it. An error thrown as it arrived carries another
+            // domain, and every bridge reports it as a bare initialize failure.
+            //
+            // The reason is the error's own parsed description, so the fields the
+            // service named still reach the merchant. `String(describing:)` renders
+            // every stored property instead, the page token among them.
+            let failure = error as? PayabliTTPError
+                ?? PayabliTTPError.configFailed(reason: error.localizedDescription)
+            sessionManager.markError(failure)
             syncPublished()
-            throw error as? PayabliTTPError
-                ?? PayabliTTPError.configFailed(reason: String(describing: error))
+            multicaster.emit(.configFailed(error: ErrorSummary.of(failure)))
+            throw failure
         }
     }
 

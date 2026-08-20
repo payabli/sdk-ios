@@ -283,7 +283,7 @@ struct PaymentMethodQAView: View {
         Logger(
             subsystem: "com.payabli.example.app",
             category: "PaymentMethodDiagnostics"
-        ).info("Payment method added: \(method.responseText, privacy: .public)")
+        ).info("Payment method added: result=\(method.resultCode ?? 0, privacy: .public)")
 
         if isPaymentMethodSheetPresented {
             isPaymentMethodSheetPresented = false
@@ -301,7 +301,7 @@ struct PaymentMethodQAView: View {
         Logger(
             subsystem: "com.payabli.example.app",
             category: "PaymentMethodDiagnostics"
-        ).error("Payment method failed: \(error.localizedDescription, privacy: .public)")
+        ).error("Payment method failed: \(LoggableError.label(for: error), privacy: .public)")
     }
 }
 

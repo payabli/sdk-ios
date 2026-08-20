@@ -146,6 +146,225 @@ final class PayabliTTPTests: XCTestCase {
         }
     }
 
+    /// How long an event has to arrive before the test says it never did. Long
+    /// enough that a loaded machine is not the reason, short enough that the
+    /// failure is read rather than waited out.
+    private static let eventWait: UInt64 = 2_000_000_000
+
+    /// Starts reading the stream for the first event `match` accepts.
+    ///
+    /// Bounded, because an event that never arrives would otherwise leave the
+    /// reader awaiting forever, and a missing event has to fail a test rather
+    /// than hang it.
+    private func collect(
+        from stream: AsyncStream<PayabliTTPEvent>,
+        match: @escaping @Sendable (PayabliTTPEvent) -> String?
+    ) -> Task<String?, Never> {
+        Task {
+            for await event in stream {
+                if let found = match(event) {
+                    return found
+                }
+            }
+            return nil
+        }
+    }
+
+    private func value(of collector: Task<String?, Never>, named name: String) async throws -> String {
+        let deadline = Task {
+            // A cancelled sleep throws, and swallowing that would cancel the
+            // collector after it had already answered.
+            guard (try? await Task.sleep(nanoseconds: Self.eventWait)) != nil else { return }
+            collector.cancel()
+        }
+        let found = await collector.value
+        deadline.cancel()
+        return try XCTUnwrap(found, "no \(name) event arrived")
+    }
+
+    /// An `initialize()` that fails in the attestation phase says so on the event
+    /// stream, which was silent before, and says it without repeating the reason.
+    func testAttestationFailureEmitsAnEventNamingThePhase() async throws {
+        let (ttp, _, attestation) = makeTTP()
+        attestation.attestResult = .failure(PayabliTTPError.attestationFailed(reason: "key unusable"))
+        let stream = ttp.events()
+
+        let collector = collect(from: stream) { event in
+            if case let .attestationFailed(error) = event {
+                return error
+            }
+            return nil
+        }
+
+        _ = try? await ttp.initialize()
+        let reported = try await value(of: collector, named: "attestationFailed")
+
+        // The phase, not the sentence: a reason on this case is the SDK's words on
+        // one path and the service's on another, so none of them travel.
+        XCTAssertEqual(reported, "attestationFailed")
+        XCTAssertFalse(reported.contains("key unusable"), reported)
+        XCTAssertEqual(ttp.sessionState, .error)
+    }
+
+    /// The event, the published state and the thrown error carry one value, so a
+    /// reader comparing a screen against a log sees the same failure twice.
+    func testConfigFailureEmitsAnEventAndMarksWhatItThrows() async throws {
+        let (ttp, _, _) = makeTTP()
+        StubURLProtocol.handler = { request in
+            (HTTPURLResponse(
+                url: request.url!,
+                statusCode: 500,
+                httpVersion: "HTTP/1.1",
+                headerFields: ["Content-Type": "application/json"]
+            )!, Data("{\"title\":\"Server error\"}".utf8))
+        }
+        let stream = ttp.events()
+
+        let collector = collect(from: stream) { event in
+            if case let .configFailed(error) = event {
+                return error
+            }
+            return nil
+        }
+
+        var thrown: Error?
+        do {
+            try await ttp.initialize()
+            XCTFail("expected the config phase to fail")
+        } catch {
+            thrown = error
+        }
+        let reported = try await value(of: collector, named: "configFailed")
+
+        XCTAssertEqual(ttp.sessionState, .error)
+        let raised = try XCTUnwrap(thrown, "initialize() returned instead of failing")
+        let marked = try XCTUnwrap(ttp.sessionManager.lastError, "the session recorded no error")
+
+        XCTAssertEqual(reported, ErrorSummary.of(raised), "the event must summarise what was thrown")
+        XCTAssertEqual(
+            String(describing: marked),
+            String(describing: raised),
+            "the published state must hold what was thrown"
+        )
+    }
+
+    /// An event payload is forwarded to whatever logging a host app has, so the
+    /// service's own wording must not ride along in one. The caller still gets it,
+    /// through the thrown error.
+    func testConfigFailureEventCarriesTheCodeRatherThanTheServersWords() async throws {
+        let (ttp, _, _) = makeTTP()
+        let serversWords = "Card number belongs to another merchant"
+        StubURLProtocol.handler = { request in
+            (HTTPURLResponse(
+                url: request.url!,
+                statusCode: 400,
+                httpVersion: "HTTP/1.1",
+                headerFields: ["Content-Type": "application/json"]
+            )!, Data(#"{"title":"\#(serversWords)","status":400}"#.utf8))
+        }
+        let stream = ttp.events()
+
+        let collector = collect(from: stream) { event in
+            if case let .configFailed(error) = event {
+                return error
+            }
+            return nil
+        }
+
+        var thrown: Error?
+        do {
+            try await ttp.initialize()
+            XCTFail("expected the config phase to fail")
+        } catch {
+            thrown = error
+        }
+        let reported = try await value(of: collector, named: "configFailed")
+
+        XCTAssertEqual(reported, "configFailed")
+        XCTAssertFalse(reported.contains(serversWords), reported)
+
+        // The other half of the split: what the event withholds, the caller gets.
+        let raised = try XCTUnwrap(thrown)
+        XCTAssertTrue(raised.localizedDescription.contains(serversWords), raised.localizedDescription)
+        XCTAssertTrue(raised is PayabliTTPError, "the bridges read the domain of this type")
+    }
+
+    /// The 401 branch does four things and had a test for none of them: it clears
+    /// the attestation cache, marks, emits and throws. A missing clear leaves the
+    /// next call re-sending a handle the service has already refused.
+    func testConfigRejectionClearsTheAttestationCacheAndReportsItOnce() async throws {
+        let (ttp, _, attestation) = makeTTP()
+        attestation.isAlreadyAttested = true
+        StubURLProtocol.handler = { request in
+            (
+                HTTPURLResponse(
+                    url: request.url!,
+                    statusCode: 200,
+                    httpVersion: "HTTP/1.1",
+                    headerFields: ["Content-Type": "application/json"]
+                )!,
+                Data(
+                    #"{"isSuccess":false,"responseText":"attestation revoked","responseData":{"resultCode":401,"resultText":"attestation revoked"}}"#
+                        .utf8
+                )
+            )
+        }
+        let stream = ttp.events()
+
+        let collector = collect(from: stream) { event in
+            if case let .configFailed(error) = event {
+                return error
+            }
+            return nil
+        }
+
+        var thrown: Error?
+        do {
+            try await ttp.initialize()
+            XCTFail("expected the config phase to reject")
+        } catch {
+            thrown = error
+        }
+        let reported = try await value(of: collector, named: "configFailed")
+        let raised = try XCTUnwrap(thrown)
+        let marked = try XCTUnwrap(ttp.sessionManager.lastError)
+
+        XCTAssertFalse(attestation.isAlreadyAttested, "a refused handle must not be sent again")
+        XCTAssertEqual(ttp.sessionState, .error)
+        XCTAssertEqual(reported, "configFailed")
+        XCTAssertTrue(
+            raised.localizedDescription.contains("attestation cleared"),
+            raised.localizedDescription
+        )
+        XCTAssertEqual(String(describing: marked), String(describing: raised))
+    }
+
+    /// The rule reaches the events that predate it. An activation failure's reason
+    /// can be the service's own, since the decline body is where it comes from.
+    func testActivationFailureEventNamesTheCaseWithoutItsReason() async throws {
+        let (ttp, _, attestation) = makeTTP()
+        let serversWords = "Device belongs to another merchant"
+        attestation.attestResult = .failure(PayabliTTPError.devicePendingActivation)
+        _ = try? await ttp.initialize()
+        attestation.activationResult = .failure(
+            PayabliTTPError.activationFailed(reason: serversWords)
+        )
+        let stream = ttp.events()
+
+        let collector = collect(from: stream) { event in
+            if case let .activationFailed(error) = event {
+                return error
+            }
+            return nil
+        }
+
+        _ = try? await ttp.activateDevice(activationCode: "ABC123")
+        let reported = try await value(of: collector, named: "activationFailed")
+
+        XCTAssertEqual(reported, "activationFailed")
+        XCTAssertFalse(reported.contains(serversWords), reported)
+    }
+
     func testEventsStreamDeliversLifecycle() async throws {
         let (ttp, _, _) = makeTTP()
         let stream = ttp.events()
@@ -165,8 +384,6 @@ final class PayabliTTPTests: XCTestCase {
             return events
         }
 
-        // Start iterating before we emit.
-        try await Task.sleep(nanoseconds: 30_000_000)
         try await ttp.initialize()
         let received = await collector.value
 

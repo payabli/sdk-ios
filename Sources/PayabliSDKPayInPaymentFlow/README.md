@@ -13,6 +13,7 @@ Use it to:
 ## Component
 
 ```swift
+import PayabliSDKCore
 import PayabliSDKPayInPaymentFlow
 
 @StateObject private var paymentFlow = PayabliPayInPaymentFlow(
@@ -46,14 +47,18 @@ PayabliPayInPaymentFlowView(
     component: paymentFlow,
     configuration: configuration,
     onCompleted: { result in
+        // Keep the identifiers, do not log them: a stored-method id is a token.
         if let storedMethod = result.storedPaymentMethod {
-            print(storedMethod.storedMethodId ?? "")
+            storedMethodId = storedMethod.storedMethodId
         } else {
-            print(result.transaction?.paymentTransId ?? "")
+            paymentTransId = result.transaction?.paymentTransId
         }
     },
     onError: { error in
-        print(error.localizedDescription)
+        // Show this: it names what the service rejected. Do not log it. The
+        // description carries the service's own wording, which can quote what was
+        // submitted; log `(error as? any PayabliError)?.code` instead.
+        message = error.localizedDescription
     }
 )
 .payabliPayInPaymentFlowStyle(style)

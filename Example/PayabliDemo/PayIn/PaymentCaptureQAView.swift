@@ -460,7 +460,7 @@ struct PaymentCaptureQAView: View {
         Logger(
             subsystem: "com.payabli.example.app",
             category: "PaymentCaptureDiagnostics"
-        ).error("Payment capture failed: \(message, privacy: .public)")
+        ).error("Payment capture failed: \(LoggableError.label(for: error), privacy: .public)")
     }
 
     private func paymentCaptureErrorMessage(_ error: Error) -> String {

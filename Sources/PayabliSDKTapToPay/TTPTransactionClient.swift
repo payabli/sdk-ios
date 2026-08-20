@@ -56,7 +56,7 @@ public final class TTPTransactionClient: Sendable {
         do {
             envelope = try await transport.performV2(request, decoding: InitiateData.self)
         } catch {
-            logger.error("[initiate] transport/decode error: \(String(describing: error))")
+            logger.error("[initiate] transport/decode error: \(ErrorSummary.of(error))")
             throw error
         }
 

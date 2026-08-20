@@ -82,7 +82,7 @@ extension PayabliTTP {
             readResult = try await provider.startReading(readRequest)
             multicaster.emit(.nfcCompleted)
         } catch {
-            multicaster.emit(.nfcFailed(error: String(describing: error)))
+            multicaster.emit(.nfcFailed(error: ErrorSummary.of(error)))
 
             // A dead reader session is repaired only by re-initializing, and
             // `reinitializeIfNeeded()` does nothing while the state says `.ready`.
@@ -100,7 +100,7 @@ extension PayabliTTP {
             }
 
             // Best-effort backend notify so the transaction isn't left dangling.
-            // Its outcome doesn't change what we report to the caller.
+            // Its outcome does not change what the caller is told.
             _ = await tryUpdate(
                 paymentTransId: paymentTransId,
                 payload: .nfcFailure(description: String(describing: error))
@@ -232,9 +232,10 @@ extension PayabliTTP {
             }
             return .succeeded
         } catch {
-            let reason = String(describing: error)
-            multicaster.emit(.updateFailed(paymentTransId: paymentTransId, error: reason))
-            return .failed(reason: reason)
+            // The event carries a summary and the caller the description: one goes
+            // wherever a host app forwards its telemetry, the other to a person.
+            multicaster.emit(.updateFailed(paymentTransId: paymentTransId, error: ErrorSummary.of(error)))
+            return .failed(reason: error.localizedDescription)
         }
     }
 

@@ -20,6 +20,13 @@ public enum PayabliTTPEvent: Sendable {
     case activationStarted
     case activationCompleted
     case activationFailed(error: String)
+    // Appended after `activationFailed` to keep declaration order aligned with
+    // the `PayabliTTPEventCode` raw values, which are public API. Cases arrive at
+    // the end as the SDK grows. A client of the binary framework has to cover
+    // cases it cannot see, by either `default` or `@unknown default`; the latter
+    // keeps the warning that says a new case arrived, which is the point of it.
+    case attestationFailed(error: String)
+    case configFailed(error: String)
 }
 
 /// TTP-specific errors (PRD §20.2).
@@ -70,6 +77,8 @@ public enum PayabliTTPError: Error, Sendable {
     case activationStarted = 15
     case activationCompleted = 16
     case activationFailed = 17
+    case attestationFailed = 18
+    case configFailed = 19
 }
 
 public extension PayabliTTPEvent {
@@ -95,6 +104,8 @@ public extension PayabliTTPEvent {
         case .activationStarted: return .activationStarted
         case .activationCompleted: return .activationCompleted
         case .activationFailed: return .activationFailed
+        case .attestationFailed: return .attestationFailed
+        case .configFailed: return .configFailed
         }
     }
 
@@ -103,16 +114,29 @@ public extension PayabliTTPEvent {
     ///
     /// Schema by case:
     ///   - `.chargeInitiated`, `.updateCompleted` → `["paymentTransId": String]`
-    ///   - `.nfcFailed`, `.activationFailed` → `["error": String]`
+    ///   - `.nfcFailed`, `.activationFailed`, `.attestationFailed`,
+    ///     `.configFailed` → `["error": String]`
     ///   - `.updateFailed` → `["paymentTransId": String, "error": String]`
     ///   - all other cases → empty `[:]`
+    ///
+    /// Every `error` string here names the failure and nothing else: the case, or a
+    /// wire code where the service described it. No reason travels in one, because
+    /// the same case carries this SDK's words on one path and the service's on
+    /// another, and the service's can quote what was submitted. The wording reaches
+    /// the caller on the thrown error, which is where it can be shown to the person
+    /// who can act on it.
+    ///
+    /// `paymentTransId` is not free text and does travel: it is what a payment is
+    /// looked up by.
     var payload: [String: Any] {
         switch self {
         case let .chargeInitiated(paymentTransId),
              let .updateCompleted(paymentTransId):
             return ["paymentTransId": paymentTransId]
         case let .nfcFailed(error),
-             let .activationFailed(error):
+             let .activationFailed(error),
+             let .attestationFailed(error),
+             let .configFailed(error):
             return ["error": error]
         case let .updateFailed(paymentTransId, error):
             return ["paymentTransId": paymentTransId, "error": error]

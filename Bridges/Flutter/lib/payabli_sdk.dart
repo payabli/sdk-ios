@@ -173,8 +173,11 @@ class PayabliTTP {
     final codeRaw = (map['code'] as int?) ?? 0;
     final payload =
         (map['payload'] as Map?)?.cast<String, dynamic>() ?? const {};
+    final known = codeRaw >= 0 && codeRaw < PayabliTTPEventCode.unknown.index;
     return PayabliTTPEvent(
-      code: PayabliTTPEventCode.values[codeRaw],
+      code: known
+          ? PayabliTTPEventCode.values[codeRaw]
+          : PayabliTTPEventCode.unknown,
       payload: payload,
     );
   }
@@ -346,6 +349,12 @@ enum PayabliTTPEventCode {
   activationStarted,
   activationCompleted,
   activationFailed,
+  attestationFailed,
+  configFailed,
+
+  /// A code this mirror has not been taught yet. The SDK appends cases, and a
+  /// bridge that indexes blindly turns a newer SDK into a crash.
+  unknown,
 }
 
 /// One lifecycle event emitted by [PayabliTTP.events]. Use [code] for
