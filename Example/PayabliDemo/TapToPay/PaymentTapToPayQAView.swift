@@ -369,7 +369,7 @@ struct PaymentTapToPayQAView: View {
     private func runEnableTerminal() {
         clearOutcomesForNewSession()
         isWorking = true
-        Task {
+        Task { @MainActor in
             defer { isWorking = false }
             do {
                 try await terminal.initialize()
@@ -383,7 +383,7 @@ struct PaymentTapToPayQAView: View {
     private func runReinitialize() {
         clearOutcomesForNewSession()
         isWorking = true
-        Task {
+        Task { @MainActor in
             defer { isWorking = false }
             do {
                 try await terminal.reinitializeIfNeeded()
@@ -401,7 +401,7 @@ struct PaymentTapToPayQAView: View {
             return
         }
         isWorking = true
-        Task {
+        Task { @MainActor in
             defer { isWorking = false }
             do {
                 let result = try await terminal.charge(
@@ -421,7 +421,7 @@ struct PaymentTapToPayQAView: View {
         activationCode = ""
         activationOutcome = .none
         isWorking = true
-        Task {
+        Task { @MainActor in
             defer { isWorking = false }
             do {
                 try await terminal.activateDevice(activationCode: code)
@@ -468,7 +468,7 @@ struct PaymentTapToPayQAView: View {
     /// Confirms the partner backend answers before `initialize()` depends on it.
     private func runTokenCheck() {
         isWorking = true
-        Task {
+        Task { @MainActor in
             defer { isWorking = false }
             await tokenProbes.probeCardPresent()
         }
