@@ -183,6 +183,20 @@ extension PayabliPayInPaymentFlowDiagnostics {
             .lowercased()
             .filter { $0.isLetter || $0.isNumber }
 
+        // Verification outcomes, checked before the rules below because the
+        // substring `cvv` catches them. These carry a result code, never a
+        // cardholder value: `cvvresponse` is `M`, `N` or `P`, and its text is the
+        // sentence that goes with it. They are also the only fields that say why a
+        // transaction was declined, so redacting them left a diagnostics log that
+        // reported a failure and withheld its reason.
+        let verificationResultKeys: Set = [
+            "cvvresponse",
+            "cvvresponsetext"
+        ]
+        if verificationResultKeys.contains(normalized) {
+            return false
+        }
+
         let exactKeys: Set = [
             "authorization",
             "requesttoken",
