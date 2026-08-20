@@ -52,6 +52,19 @@ struct PayabliPayInPaymentFlowUIKitTextField: UIViewRepresentable {
         self.sanitize = sanitize
     }
 
+    /// Keyboards that carry no return key. A field using one cannot end its own
+    /// editing, so nothing on screen takes the keyboard back and it covers
+    /// whatever sits below the field, including the button that submits the form.
+    /// Every other keyboard here already has a way out.
+    static func requiresDoneAccessory(_ keyboardType: UIKeyboardType) -> Bool {
+        switch keyboardType {
+        case .numberPad, .decimalPad, .phonePad, .asciiCapableNumberPad:
+            true
+        default:
+            false
+        }
+    }
+
     func makeCoordinator() -> Coordinator {
         Coordinator(self)
     }
@@ -59,6 +72,7 @@ struct PayabliPayInPaymentFlowUIKitTextField: UIViewRepresentable {
     func makeUIView(context: Context) -> UITextField {
         let textField = UITextField(frame: .zero)
         textField.delegate = context.coordinator
+        context.coordinator.textField = textField
         textField.borderStyle = .none
         textField.backgroundColor = .clear
         textField.clearButtonMode = .never
@@ -102,6 +116,16 @@ struct PayabliPayInPaymentFlowUIKitTextField: UIViewRepresentable {
         )
         textField.accessibilityHint = accessibilityHint
         textField.accessibilityIdentifier = PayabliPayInPaymentFlowAccessibility.fieldIdentifier(field)
+
+        // Compared by identity so a field that is already carrying the bar keeps
+        // the same one: reassigning it while the field is first responder makes
+        // UIKit rebuild the input views underneath the person typing.
+        let accessory: UIView? = Self.requiresDoneAccessory(keyboardType)
+            ? context.coordinator.doneAccessoryView()
+            : nil
+        if textField.inputAccessoryView !== accessory {
+            textField.inputAccessoryView = accessory
+        }
     }
 
     private var attributedPlaceholder: NSAttributedString? {
@@ -137,9 +161,33 @@ struct PayabliPayInPaymentFlowUIKitTextField: UIViewRepresentable {
 
     final class Coordinator: NSObject, UITextFieldDelegate {
         var parent: PayabliPayInPaymentFlowUIKitTextField
+        weak var textField: UITextField?
+        private var doneAccessory: UIToolbar?
 
         init(_ parent: PayabliPayInPaymentFlowUIKitTextField) {
             self.parent = parent
+        }
+
+        /// Built once and reused. `.done` rather than a string of our own, so the
+        /// title and its accessibility label come from UIKit already translated.
+        func doneAccessoryView() -> UIToolbar {
+            if let doneAccessory {
+                return doneAccessory
+            }
+            let bar = UIToolbar()
+            bar.items = [
+                UIBarButtonItem(barButtonSystemItem: .flexibleSpace, target: nil, action: nil),
+                UIBarButtonItem(barButtonSystemItem: .done, target: self, action: #selector(endEditing))
+            ]
+            bar.sizeToFit()
+            doneAccessory = bar
+            return bar
+        }
+
+        /// Resigns the field that owns this bar rather than asking the application
+        /// to end editing everywhere, so the SDK reaches only its own responder.
+        @objc func endEditing() {
+            textField?.resignFirstResponder()
         }
 
         @objc func editingChanged(_ textField: UITextField) {
