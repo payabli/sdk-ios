@@ -168,8 +168,8 @@ struct PayabliPayInPaymentFlowUIKitTextField: UIViewRepresentable {
             self.parent = parent
         }
 
-        /// Built once and reused. `.done` rather than a string of our own, so the
-        /// title and its accessibility label come from UIKit already translated.
+        /// Built once and reused. `.done` rather than a literal title, so the title
+        /// and its accessibility label come from UIKit already translated.
         func doneAccessoryView() -> UIToolbar {
             if let doneAccessory {
                 return doneAccessory
