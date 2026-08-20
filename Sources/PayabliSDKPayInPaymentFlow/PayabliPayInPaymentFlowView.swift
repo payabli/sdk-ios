@@ -587,6 +587,7 @@ public struct PayabliPayInPaymentFlowView: View {
                     isExpirationPickerPresented = false
                 }
                 .font(.body.weight(.semibold))
+                .accessibilityIdentifier(PayabliPayInPaymentFlowAccessibility.expirationDoneIdentifier)
             }
             .padding(.horizontal, 20)
             .padding(.top, 18)

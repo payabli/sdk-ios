@@ -177,7 +177,10 @@ final class QAWalkthroughUITests: XCTestCase {
     /// expiry, which is why this is a step of the card flows only.
     private func chooseAnExpiry() {
         tap(app.buttons["payabli.payInPaymentFlow.field.cardExpiration"], named: "the expiry field")
-        tap(app.buttons["Done"], named: "the expiry picker's Done button")
+        tap(
+            app.buttons["payabli.payInPaymentFlow.control.expirationDone"],
+            named: "the expiry picker's Done button"
+        )
     }
 
     private func submit(_ button: String) {

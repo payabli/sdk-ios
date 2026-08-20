@@ -7,6 +7,11 @@ enum PayabliPayInPaymentFlowAccessibility {
         "payabli.payInPaymentFlow.field.\(field.rawValue)"
     }
 
+    /// The control that accepts the expiry wheel. Every field in that view can be
+    /// addressed by identifier and this button could only be found by its title,
+    /// which is a visible string and the one thing a caller should not depend on.
+    static let expirationDoneIdentifier = "payabli.payInPaymentFlow.control.expirationDone"
+
     static func textFieldValue(
         text: String,
         isSecure: Bool
