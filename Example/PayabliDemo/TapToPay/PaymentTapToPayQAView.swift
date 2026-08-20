@@ -53,12 +53,9 @@ struct PaymentTapToPayQAView: View {
             .scrollDismissesKeyboard(.interactively)
             .navigationTitle("Tap to Pay")
             .toolbar { sessionBadge }
-            .toolbar {
-                ToolbarItemGroup(placement: .keyboard) {
-                    Spacer()
-                    Button("Done") { focusedField = nil }
-                }
-            }
+            // Not `ToolbarItemGroup(placement: .keyboard)`, which was declared
+            // here and never appeared, leaving the number pad with no way out.
+            .safeAreaInset(edge: .bottom) { keyboardDismissBar }
             .sheet(isPresented: $isActivationPresented) { activationSheet }
             .onAppear(perform: subscribeToEvents)
             .onDisappear {
@@ -217,6 +214,9 @@ struct PaymentTapToPayQAView: View {
             }
             .navigationTitle("Activate device")
             .sheet(isPresented: $isActivationHelpPresented) { activationHelpSheet }
+            // A sheet is its own hierarchy, so the bar on the screen behind it does
+            // not reach the number pad this field raises.
+            .safeAreaInset(edge: .bottom) { keyboardDismissBar }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { isActivationPresented = false }
@@ -339,6 +339,22 @@ struct PaymentTapToPayQAView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 8))
                 }
             }
+        }
+    }
+
+    /// Shown only while a field is being edited, so it takes no height from the
+    /// form the rest of the time.
+    @ViewBuilder
+    private var keyboardDismissBar: some View {
+        if focusedField != nil {
+            HStack {
+                Spacer()
+                Button("Done") { focusedField = nil }
+                    .font(.body.weight(.semibold))
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+            .background(.bar)
         }
     }
 
