@@ -346,6 +346,39 @@ final class PayInPaymentFlowClientTests: XCTestCase {
         XCTAssertFalse(body.contains("456"), body)
     }
 
+    /// `additionalData` takes any key a caller puts in it, so the verification
+    /// allowlist has to be the response's alone: on a request those names are a
+    /// submitted value wearing the answer's name.
+    func testDiagnosticsHidesAVerificationNameCarryingASubmittedValueOnARequest() async throws {
+        let expectation = expectation(description: "diagnostic request emitted")
+        let transport = MockPaymentCaptureTransport(responseBody: Self.approvedResponse)
+        let requestEntry = LockedDiagnosticEntry()
+        let diagnostics = PayabliPayInPaymentFlowDiagnostics.enabled { entry in
+            if entry.phase == .request {
+                requestEntry.set(entry)
+                expectation.fulfill()
+            }
+        }
+        let client = PayInPaymentFlowClient(
+            transport: transport,
+            accessTokenProvider: { "secret-token" },
+            diagnostics: diagnostics
+        )
+        let request = cardRequest(additionalData: [
+            "cvvresponse": "321",
+            "CVVResponse_Text": "654"
+        ])
+
+        _ = try? await client.capture(entryPoint: "entry", request: request)
+
+        await fulfillment(of: [expectation], timeout: 1)
+        let body = try XCTUnwrap(try XCTUnwrap(requestEntry.value).body)
+
+        XCTAssertFalse(body.contains("321"), body)
+        XCTAssertFalse(body.contains("654"), body)
+        XCTAssertTrue(body.contains(#""cvvresponse":"[REDACTED]""#), body)
+    }
+
     func testDiagnosticsRedactsBearerAndSensitivePaymentFields() async throws {
         let expectation = expectation(description: "diagnostic request emitted")
         let transport = MockPaymentCaptureTransport(responseBody: Self.approvedResponse)
@@ -381,7 +414,8 @@ final class PayInPaymentFlowClientTests: XCTestCase {
         serviceFee: Double? = 5,
         achValidation: Bool? = nil,
         forceCustomerCreation: Bool? = nil,
-        idempotencyKey: String? = nil
+        idempotencyKey: String? = nil,
+        additionalData: [String: String]? = nil
     ) -> PayabliPayInPaymentFlowRequest {
         PayabliPayInPaymentFlowRequest(
             paymentDetails: PayabliPayInPaymentFlowPaymentDetails(
@@ -399,7 +433,10 @@ final class PayInPaymentFlowClientTests: XCTestCase {
                 ),
                 saveIfSuccess: true
             )),
-            customerData: PayabliPayInPaymentFlowCustomerData(customerId: 4440),
+            customerData: PayabliPayInPaymentFlowCustomerData(
+                additionalData: additionalData,
+                customerId: 4440
+            ),
             ipAddress: "255.255.255.255",
             orderDescription: "SDK test transaction",
             orderId: "order-123",
