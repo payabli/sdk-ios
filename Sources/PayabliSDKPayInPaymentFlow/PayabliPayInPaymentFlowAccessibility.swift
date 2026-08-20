@@ -12,6 +12,11 @@ enum PayabliPayInPaymentFlowAccessibility {
     /// which is a visible string and the one thing a caller should not depend on.
     static let expirationDoneIdentifier = "payabli.payInPaymentFlow.control.expirationDone"
 
+    /// The Done item on the accessory a keyboard with no return key carries. The
+    /// title comes from UIKit and arrives translated, so it is not what a caller
+    /// should aim at.
+    static let keyboardDoneIdentifier = "payabli.payInPaymentFlow.control.keyboardDone"
+
     static func textFieldValue(
         text: String,
         isSecure: Bool

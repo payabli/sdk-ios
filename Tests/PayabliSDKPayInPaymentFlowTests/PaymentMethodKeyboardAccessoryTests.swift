@@ -1,4 +1,5 @@
 @testable import PayabliSDKPayInPaymentFlow
+import SwiftUI
 import UIKit
 import XCTest
 
@@ -43,5 +44,56 @@ final class PaymentMethodKeyboardAccessoryTests: XCTestCase {
         XCTAssertTrue(Field.requiresDoneAccessory(.numberPad))
         XCTAssertFalse(Field.requiresDoneAccessory(.numbersAndPunctuation))
         XCTAssertFalse(Field.requiresDoneAccessory(.emailAddress))
+    }
+
+    // MARK: - The bar itself, and what its Done does
+
+    /// The predicate tests above decide which keyboards want a bar. These cover the
+    /// bar that gets built and the control on it, which is what a payer taps.
+    func testTheBarCarriesADoneControlAddressableByIdentifier() throws {
+        let coordinator = numberPadField().makeCoordinator()
+
+        let bar = coordinator.doneAccessoryView()
+        let done = try XCTUnwrap(bar.items?.last)
+
+        XCTAssertEqual(bar.items?.count, 2, "a spacer and the control")
+        XCTAssertEqual(done.accessibilityIdentifier, PayabliPayInPaymentFlowAccessibility.keyboardDoneIdentifier)
+        XCTAssertNotNil(done.action, "the control does nothing without an action")
+    }
+
+    /// One bar per coordinator: reassigning `inputAccessoryView` while the field is
+    /// first responder makes UIKit rebuild the input views under whoever is typing.
+    func testTheBarIsBuiltOnceAndReused() {
+        let coordinator = numberPadField().makeCoordinator()
+
+        XCTAssertTrue(coordinator.doneAccessoryView() === coordinator.doneAccessoryView())
+    }
+
+    /// Done resigns the field that owns the bar rather than ending editing across
+    /// the application, so the SDK reaches only its own responder.
+    func testDoneResignsTheFieldThatOwnsTheBar() {
+        let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 320, height: 480))
+        let textField = UITextField(frame: CGRect(x: 0, y: 0, width: 320, height: 44))
+        window.addSubview(textField)
+        window.makeKeyAndVisible()
+        let coordinator = numberPadField().makeCoordinator()
+        coordinator.textField = textField
+
+        XCTAssertTrue(textField.becomeFirstResponder(), "the field never took first responder")
+
+        coordinator.endEditing()
+
+        XCTAssertFalse(textField.isFirstResponder)
+    }
+
+    private func numberPadField() -> PayabliPayInPaymentFlowUIKitTextField {
+        PayabliPayInPaymentFlowUIKitTextField(
+            text: .constant(""),
+            placeholder: "",
+            field: .cardNumber,
+            focusedField: .constant(nil),
+            keyboardType: .numberPad,
+            accessibilityLabel: "Card number"
+        )
     }
 }

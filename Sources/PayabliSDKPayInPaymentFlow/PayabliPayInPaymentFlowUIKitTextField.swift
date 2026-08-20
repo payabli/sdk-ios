@@ -175,9 +175,11 @@ struct PayabliPayInPaymentFlowUIKitTextField: UIViewRepresentable {
                 return doneAccessory
             }
             let bar = UIToolbar()
+            let done = UIBarButtonItem(barButtonSystemItem: .done, target: self, action: #selector(endEditing))
+            done.accessibilityIdentifier = PayabliPayInPaymentFlowAccessibility.keyboardDoneIdentifier
             bar.items = [
                 UIBarButtonItem(barButtonSystemItem: .flexibleSpace, target: nil, action: nil),
-                UIBarButtonItem(barButtonSystemItem: .done, target: self, action: #selector(endEditing))
+                done
             ]
             bar.sizeToFit()
             doneAccessory = bar
