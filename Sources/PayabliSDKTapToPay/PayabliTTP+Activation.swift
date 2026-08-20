@@ -43,11 +43,13 @@ public extension PayabliTTP {
             multicaster.emit(.activationFailed(error: ErrorSummary.of(err)))
             throw err
         } catch {
-            sessionManager.markError(error)
-            syncPublished()
             // The reason is what the caller and the screen get, so it is the
             // error's parsed description rather than a rendering of its fields.
             let mapped = PayabliTTPError.activationFailed(reason: error.localizedDescription)
+            // Marked before it is emitted or thrown: the state a screen reads and
+            // the error a caller catches are the same failure.
+            sessionManager.markError(mapped)
+            syncPublished()
             multicaster.emit(.activationFailed(error: ErrorSummary.of(mapped)))
             throw mapped
         }
