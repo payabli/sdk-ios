@@ -100,6 +100,36 @@ final class ErrorSummaryTests: XCTestCase {
         XCTAssertFalse(summary.contains("signature key"), summary)
     }
 
+    /// A decline and a server failure both answer `.unknown` for their code, so
+    /// reading the code alone cannot tell a refused card from a broken service.
+    func testADeclineIsNotTheSameSummaryAsAServerFailure() throws {
+        let decline = try JSONDecoder().decode(
+            PayabliDeclineError.self,
+            from: Data(#"{"code":"D2001","reason":"Do not honor","explanation":"Contact issuer"}"#.utf8)
+        )
+        let server = try JSONDecoder().decode(
+            PayabliServerError.self,
+            from: Data(#"{"title":"Internal server error","status":503}"#.utf8)
+        )
+
+        let declineSummary = ErrorSummary.of(PayabliPaymentError.decline(decline))
+        let serverSummary = ErrorSummary.of(PayabliPaymentError.server(server))
+
+        XCTAssertEqual(declineSummary, "decline(D2001)")
+        XCTAssertEqual(serverSummary, "server(503)")
+        XCTAssertFalse(declineSummary.contains("Do not honor"), declineSummary)
+        XCTAssertFalse(serverSummary.contains("Internal server error"), serverSummary)
+    }
+
+    func testAServerFailureWithoutAStatusSaysSo() throws {
+        let server = try JSONDecoder().decode(
+            PayabliServerError.self,
+            from: Data(#"{"title":"Internal server error"}"#.utf8)
+        )
+
+        XCTAssertEqual(ErrorSummary.of(PayabliPaymentError.server(server)), "server(no status)")
+    }
+
     /// The umbrella bridges to a domain and an ordinal on its own, which is the
     /// `error 1` shape this SDK stopped showing anyone.
     func testTheUmbrellaIsUnwrappedBeforeItsCodeIsRead() throws {

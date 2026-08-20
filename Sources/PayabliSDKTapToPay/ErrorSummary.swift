@@ -12,15 +12,34 @@ enum ErrorSummary {
         switch error {
         case let ttp as PayabliTTPError:
             return of(ttp)
+        case let payment as PayabliPaymentError:
+            return of(payment)
         case let payabli as any PayabliError:
-            // `PayabliPaymentError` arrives here too, and answers the code of
-            // whichever error it wraps.
             return payabli.code.rawValue
         default:
             // `NSError` on its own says nothing; the domain and code are what
             // identify a platform failure, and neither is server text.
             let ns = error as NSError
             return "\(ns.domain)(\(ns.code))"
+        }
+    }
+
+    /// A decline and a server failure both answer `.unknown` for their `code`,
+    /// there being no case for either in `PayabliErrorCode`, so reading the code
+    /// alone tells a reader that a charge failed and nothing more.
+    ///
+    /// Both carry a structured value that says which: the decline's wire code and
+    /// the server's status. Neither is free text.
+    static func of(_ error: PayabliPaymentError) -> String {
+        switch error {
+        case let .decline(decline):
+            return "decline(\(decline.rawCode))"
+        case let .server(server):
+            return "server(\(server.status.map(String.init) ?? "no status"))"
+        case let .validation(validation):
+            return validation.code.rawValue
+        case let .generic(generic):
+            return generic.code.rawValue
         }
     }
 
