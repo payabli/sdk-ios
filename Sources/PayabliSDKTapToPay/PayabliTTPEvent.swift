@@ -119,12 +119,15 @@ public extension PayabliTTPEvent {
     ///   - `.updateFailed` → `["paymentTransId": String, "error": String]`
     ///   - all other cases → empty `[:]`
     ///
-    /// The `error` string on `.attestationFailed` and `.configFailed` names the
-    /// failure and nothing else: the case, or a wire code where the service
-    /// described it. No reason travels in one, because the same case carries this
-    /// SDK's words on one path and the service's on another, and the service's can
-    /// quote what was submitted. The wording reaches the caller on the thrown
-    /// error, which is where it can be shown to the person who can act on it.
+    /// Every `error` string here names the failure and nothing else: the case, or a
+    /// wire code where the service described it. No reason travels in one, because
+    /// the same case carries this SDK's words on one path and the service's on
+    /// another, and the service's can quote what was submitted. The wording reaches
+    /// the caller on the thrown error, which is where it can be shown to the person
+    /// who can act on it.
+    ///
+    /// `paymentTransId` is not free text and does travel: it is what a payment is
+    /// looked up by.
     var payload: [String: Any] {
         switch self {
         case let .chargeInitiated(paymentTransId),

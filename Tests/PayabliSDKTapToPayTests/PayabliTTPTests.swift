@@ -339,6 +339,32 @@ final class PayabliTTPTests: XCTestCase {
         XCTAssertEqual(String(describing: marked), String(describing: raised))
     }
 
+    /// The rule reaches the events that predate it. An activation failure's reason
+    /// can be the service's own, since the decline body is where it comes from.
+    func testActivationFailureEventNamesTheCaseWithoutItsReason() async throws {
+        let (ttp, _, attestation) = makeTTP()
+        let serversWords = "Device belongs to another merchant"
+        attestation.attestResult = .failure(PayabliTTPError.devicePendingActivation)
+        _ = try? await ttp.initialize()
+        attestation.activationResult = .failure(
+            PayabliTTPError.activationFailed(reason: serversWords)
+        )
+        let stream = ttp.events()
+
+        let collector = collect(from: stream) { event in
+            if case let .activationFailed(error) = event {
+                return error
+            }
+            return nil
+        }
+
+        _ = try? await ttp.activateDevice(activationCode: "ABC123")
+        let reported = try await value(of: collector, named: "activationFailed")
+
+        XCTAssertEqual(reported, "activationFailed")
+        XCTAssertFalse(reported.contains(serversWords), reported)
+    }
+
     func testEventsStreamDeliversLifecycle() async throws {
         let (ttp, _, _) = makeTTP()
         let stream = ttp.events()
