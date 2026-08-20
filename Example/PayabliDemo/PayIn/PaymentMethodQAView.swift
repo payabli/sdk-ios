@@ -2,7 +2,6 @@ import Dispatch
 import os
 import PayabliSDKPayInPaymentFlow
 import SwiftUI
-import UIKit
 
 struct PaymentMethodQAView: View {
     @ObservedObject var paymentFlow: PayabliPayInPaymentFlow
@@ -101,12 +100,6 @@ struct PaymentMethodQAView: View {
             }
             .navigationTitle("Save a method")
             .scrollDismissesKeyboard(.interactively)
-            .toolbar {
-                ToolbarItemGroup(placement: .keyboard) {
-                    Spacer()
-                    Button("Done") { dismissKeyboard() }
-                }
-            }
             .navigationDestination(isPresented: $isPaymentMethodAddedViewPresented) {
                 PaymentMethodAddedView()
             }
@@ -301,18 +294,6 @@ struct PaymentMethodQAView: View {
         } else {
             isPaymentMethodAddedViewPresented = true
         }
-    }
-
-    /// The card fields belong to the SDK, which holds their focus, so the host has
-    /// no `@FocusState` to clear. A number pad carries no return key, so nothing on
-    /// screen took the keyboard back and it covered the form and the submit button.
-    private func dismissKeyboard() {
-        UIApplication.shared.sendAction(
-            #selector(UIResponder.resignFirstResponder),
-            to: nil,
-            from: nil,
-            for: nil
-        )
     }
 
     private func handleError(_ error: Error) {
