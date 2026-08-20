@@ -15,6 +15,7 @@
 		A1B2C3D4E5F600000000AD02 /* QAIdentity.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F600000000AB01 /* QAIdentity.swift */; };
 		A1B2C3D4E5F600000000AD12 /* QAAmount.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F600000000AB11 /* QAAmount.swift */; };
 		F30000000000000000000022 /* QAWalkthroughUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F30000000000000000000021 /* QAWalkthroughUITests.swift */; };
+		A1B2C3D4E5F600000000BB62 /* KeyboardDismissalUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F600000000BB61 /* KeyboardDismissalUITests.swift */; };
 		A1B2C3D4E5F600000000AA02 /* DemoCustomerSetting.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F600000000AA01 /* DemoCustomerSetting.swift */; };
 		A1B2C3D4E5F600000000AB12 /* QAAmount.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F600000000AB11 /* QAAmount.swift */; };
 		A1B2C3D4E5F600000000AB02 /* QAIdentity.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F600000000AB01 /* QAIdentity.swift */; };
@@ -92,6 +93,7 @@
 		A1B2C3D4E5F60000000000F1 /* TokenProbeResults.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TokenProbeResults.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F600000000AC01 /* QAIdentityTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = QAIdentityTests.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F600000000AC11 /* QAAmountTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = QAAmountTests.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F600000000BB61 /* KeyboardDismissalUITests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = KeyboardDismissalUITests.swift; sourceTree = "<group>"; };
 		F30000000000000000000021 /* QAWalkthroughUITests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = QAWalkthroughUITests.swift; sourceTree = "<group>"; };
 		F30000000000000000000030 /* UITests.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; path = UITests.xcconfig; sourceTree = "<group>"; };
 		F30000000000000000000050 /* PayabliDemoUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PayabliDemoUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -346,6 +348,7 @@
 			isa = PBXGroup;
 			children = (
 				F30000000000000000000021 /* QAWalkthroughUITests.swift */,
+				A1B2C3D4E5F600000000BB61 /* KeyboardDismissalUITests.swift */,
 			);
 			path = UITests;
 			sourceTree = "<group>";
@@ -513,6 +516,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				F30000000000000000000022 /* QAWalkthroughUITests.swift in Sources */,
+				A1B2C3D4E5F600000000BB62 /* KeyboardDismissalUITests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
