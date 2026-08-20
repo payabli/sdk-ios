@@ -137,11 +137,22 @@ struct PayabliPayInPaymentFlowUIKitTextField: UIViewRepresentable {
         textField.accessibilityHint = accessibilityHint
         textField.accessibilityIdentifier = PayabliPayInPaymentFlowAccessibility.fieldIdentifier(field)
 
+        Self.applyAccessory(to: textField, keyboardType: keyboardType, from: context.coordinator)
+    }
+
+    /// Separate from `updateUIView` because a `Context` cannot be built outside
+    /// SwiftUI, and an accessory's contents never enter the accessibility tree, so
+    /// this is the only place the assignment can be checked.
+    static func applyAccessory(
+        to textField: UITextField,
+        keyboardType: UIKeyboardType,
+        from coordinator: Coordinator
+    ) {
         // Compared by identity so a field that is already carrying the bar keeps
         // the same one: reassigning it while the field is first responder makes
         // UIKit rebuild the input views underneath the person typing.
-        let accessory: UIView? = Self.requiresDoneAccessory(keyboardType)
-            ? context.coordinator.doneAccessoryView()
+        let accessory: UIView? = requiresDoneAccessory(keyboardType)
+            ? coordinator.doneAccessoryView()
             : nil
         if textField.inputAccessoryView !== accessory {
             textField.inputAccessoryView = accessory

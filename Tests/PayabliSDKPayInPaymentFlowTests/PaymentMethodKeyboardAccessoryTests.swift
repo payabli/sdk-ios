@@ -161,6 +161,33 @@ final class PaymentMethodKeyboardAccessoryTests: XCTestCase {
         XCTAssertFalse(textField.isFirstResponder)
     }
 
+    /// The assignment itself, which the screenshot in `KeyboardDismissalUITests`
+    /// shows but cannot assert: a keyboard with no return key gets the bar, and one
+    /// that has a return key is left alone.
+    func testAFieldGetsTheBarOnlyWhenItsKeyboardHasNoReturnKey() {
+        let textField = UITextField()
+        let coordinator = numberPadField().makeCoordinator()
+
+        Field.applyAccessory(to: textField, keyboardType: .numberPad, from: coordinator)
+        XCTAssertNotNil(textField.inputAccessoryView, "a number pad has no other way back")
+
+        Field.applyAccessory(to: textField, keyboardType: .emailAddress, from: coordinator)
+        XCTAssertNil(textField.inputAccessoryView, "a keyboard with a return key needs no bar")
+    }
+
+    /// Reassigning it while the field is first responder makes UIKit rebuild the
+    /// input views under whoever is typing, so the same field keeps the same bar.
+    func testAFieldKeepsTheBarItAlreadyCarries() {
+        let textField = UITextField()
+        let coordinator = numberPadField().makeCoordinator()
+
+        Field.applyAccessory(to: textField, keyboardType: .numberPad, from: coordinator)
+        let first = textField.inputAccessoryView
+        Field.applyAccessory(to: textField, keyboardType: .numberPad, from: coordinator)
+
+        XCTAssertTrue(first === textField.inputAccessoryView)
+    }
+
     private func numberPadField() -> PayabliPayInPaymentFlowUIKitTextField {
         PayabliPayInPaymentFlowUIKitTextField(
             text: .constant(""),
