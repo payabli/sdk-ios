@@ -33,6 +33,34 @@ final class PayabliErrorDescriptionTests: XCTestCase {
         )
     }
 
+    /// `mapPayabliHTTPError` throws this umbrella, so every `error as? any
+    /// PayabliError` in the SDK, in a host app and in this SDK's documentation
+    /// depends on it conforming.
+    func testTheUmbrellaAnswersTheWrappedErrorsCode() throws {
+        let validation = try decode(PayabliValidationError.self, """
+        {"title": "Validation failed", "status": 400}
+        """)
+
+        let umbrella: Error = PayabliPaymentError.validation(validation)
+
+        XCTAssertEqual((umbrella as? any PayabliError)?.code, .validation)
+        XCTAssertEqual((umbrella as? any PayabliError)?.reason, "Validation failed")
+    }
+
+    /// The fallback the conformance removes. Without it these paths reached
+    /// `String(describing:)`, which renders every stored property of the wrapped
+    /// error, `token` included, and the SDK puts that string on a screen.
+    func testTheUmbrellaNeverFallsBackToADumpOfItsFields() throws {
+        let validation = try decode(PayabliValidationError.self, """
+        {"title": "Validation failed", "status": 400, "token": "page-token-9f2"}
+        """)
+
+        let umbrella: Error = PayabliPaymentError.validation(validation)
+        let described = (umbrella as? any PayabliError)?.reason ?? String(describing: umbrella)
+
+        XCTAssertFalse(described.contains("page-token-9f2"), described)
+    }
+
     func testValidationErrorNamesTheRejectedFields() throws {
         let error = try decode(PayabliValidationError.self, """
         {

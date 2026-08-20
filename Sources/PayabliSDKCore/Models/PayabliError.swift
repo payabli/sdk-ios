@@ -174,7 +174,13 @@ public struct PayabliDeclineError: PayabliError, Decodable {
 
 /// Umbrella error for payment-processing flows. Host apps switch on this to
 /// distinguish decline, validation, server, or generic errors.
-public enum PayabliPaymentError: LocalizedError, Sendable {
+///
+/// A `PayabliError` as well, delegating to whichever error it holds, because this
+/// is the type `mapPayabliHTTPError` throws: without the conformance every
+/// `error as? any PayabliError` in the SDK, in a host app and in this SDK's own
+/// documentation misses the failures it was written for, and falls back to
+/// `String(describing:)`, which renders each stored property of the wrapped error.
+public enum PayabliPaymentError: PayabliError, Sendable {
     case decline(PayabliDeclineError)
     case validation(PayabliValidationError)
     case server(PayabliServerError)
@@ -187,6 +193,18 @@ public enum PayabliPaymentError: LocalizedError, Sendable {
         case let .server(err): return err
         case let .generic(err): return err
         }
+    }
+
+    public var code: PayabliErrorCode {
+        asPayabliError.code
+    }
+
+    public var reason: String {
+        asPayabliError.reason
+    }
+
+    public var detail: String? {
+        asPayabliError.detail
     }
 
     /// Defers to the wrapped error. An enum that only conforms to `Error`

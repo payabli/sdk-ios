@@ -12,11 +12,9 @@ enum ErrorSummary {
         switch error {
         case let ttp as PayabliTTPError:
             return of(ttp)
-        case let payment as PayabliPaymentError:
-            // The umbrella carries the typed error; on its own it bridges to a
-            // domain and an ordinal, which is the shape this SDK stopped showing.
-            return payment.asPayabliError.code.rawValue
         case let payabli as any PayabliError:
+            // `PayabliPaymentError` arrives here too, and answers the code of
+            // whichever error it wraps.
             return payabli.code.rawValue
         default:
             // `NSError` on its own says nothing; the domain and code are what
