@@ -12,10 +12,12 @@ enum PayabliPayInPaymentFlowAccessibility {
     /// which is a visible string and the one thing a caller should not depend on.
     static let expirationDoneIdentifier = "payabli.payInPaymentFlow.control.expirationDone"
 
-    /// The Done item on the accessory a keyboard with no return key carries. The
-    /// title comes from UIKit and arrives translated, so it is not what a caller
-    /// should aim at.
+    /// The button on the accessory a keyboard with no return key carries. It shows
+    /// a checkmark, so an identifier is the only way to address it.
     static let keyboardDoneIdentifier = "payabli.payInPaymentFlow.control.keyboardDone"
+
+    /// What the checkmark is called, since a glyph carries no name of its own.
+    static let keyboardDoneLabel = "Done"
 
     static func textFieldValue(
         text: String,

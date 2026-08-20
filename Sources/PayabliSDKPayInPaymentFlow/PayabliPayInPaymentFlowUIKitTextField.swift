@@ -162,29 +162,63 @@ struct PayabliPayInPaymentFlowUIKitTextField: UIViewRepresentable {
     final class Coordinator: NSObject, UITextFieldDelegate {
         var parent: PayabliPayInPaymentFlowUIKitTextField
         weak var textField: UITextField?
-        private var doneAccessory: UIToolbar?
+        private var doneAccessory: UIInputView?
 
         init(_ parent: PayabliPayInPaymentFlowUIKitTextField) {
             self.parent = parent
         }
 
-        /// Built once and reused. `.done` rather than a literal title, so the title
-        /// and its accessibility label come from UIKit already translated.
-        func doneAccessoryView() -> UIToolbar {
+        /// Built once and reused. A `UIToolbar` cannot be used here: as an input
+        /// accessory it draws no background and lays its items out floating, so
+        /// the control appears alone over the form rather than on a bar. This is a
+        /// keyboard-styled input view instead, which spans the keyboard's width
+        /// and follows its material in both appearances.
+        func doneAccessoryView() -> UIInputView {
             if let doneAccessory {
                 return doneAccessory
             }
-            let bar = UIToolbar()
-            let done = UIBarButtonItem(barButtonSystemItem: .done, target: self, action: #selector(endEditing))
+            let bar = UIInputView(
+                frame: CGRect(x: 0, y: 0, width: 0, height: Self.accessoryHeight),
+                inputViewStyle: .keyboard
+            )
+            // UIKit stretches the width to the keyboard's and keeps the height.
+            bar.autoresizingMask = .flexibleWidth
+
+            // The keyboard style paints nothing of its own, so the bar carries the
+            // same chrome material the keyboard is drawn on. That follows both
+            // appearances without a fixed colour in between.
+            let material = UIVisualEffectView(effect: UIBlurEffect(style: .systemChromeMaterial))
+            material.translatesAutoresizingMaskIntoConstraints = false
+            bar.addSubview(material)
+            NSLayoutConstraint.activate([
+                material.leadingAnchor.constraint(equalTo: bar.leadingAnchor),
+                material.trailingAnchor.constraint(equalTo: bar.trailingAnchor),
+                material.topAnchor.constraint(equalTo: bar.topAnchor),
+                material.bottomAnchor.constraint(equalTo: bar.bottomAnchor)
+            ])
+
+            let done = UIButton(type: .system)
+            done.setImage(UIImage(systemName: "checkmark"), for: .normal)
+            done.accessibilityLabel = PayabliPayInPaymentFlowAccessibility.keyboardDoneLabel
             done.accessibilityIdentifier = PayabliPayInPaymentFlowAccessibility.keyboardDoneIdentifier
-            bar.items = [
-                UIBarButtonItem(barButtonSystemItem: .flexibleSpace, target: nil, action: nil),
-                done
-            ]
-            bar.sizeToFit()
+            done.addTarget(self, action: #selector(endEditing), for: .touchUpInside)
+            done.translatesAutoresizingMaskIntoConstraints = false
+            bar.addSubview(done)
+
+            let target = PayabliPayInPaymentFlowAccessibility.minimumTouchTarget
+            NSLayoutConstraint.activate([
+                done.trailingAnchor.constraint(equalTo: bar.layoutMarginsGuide.trailingAnchor),
+                done.centerYAnchor.constraint(equalTo: bar.centerYAnchor),
+                done.widthAnchor.constraint(greaterThanOrEqualToConstant: target),
+                done.heightAnchor.constraint(greaterThanOrEqualToConstant: target)
+            ])
+
             doneAccessory = bar
             return bar
         }
+
+        /// Tall enough for the button's own minimum target and the margin around it.
+        static let accessoryHeight: CGFloat = 48
 
         /// Resigns the field that owns this bar rather than asking the application
         /// to end editing everywhere, so the SDK reaches only its own responder.

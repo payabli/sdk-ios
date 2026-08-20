@@ -54,11 +54,45 @@ final class PaymentMethodKeyboardAccessoryTests: XCTestCase {
         let coordinator = numberPadField().makeCoordinator()
 
         let bar = coordinator.doneAccessoryView()
-        let done = try XCTUnwrap(bar.items?.last)
+        let done = try XCTUnwrap(
+            bar.subviews.compactMap { $0 as? UIButton }.first,
+            "the bar carries no button"
+        )
 
-        XCTAssertEqual(bar.items?.count, 2, "a spacer and the control")
         XCTAssertEqual(done.accessibilityIdentifier, PayabliPayInPaymentFlowAccessibility.keyboardDoneIdentifier)
-        XCTAssertNotNil(done.action, "the control does nothing without an action")
+        XCTAssertEqual(done.accessibilityLabel, PayabliPayInPaymentFlowAccessibility.keyboardDoneLabel)
+        XCTAssertNotNil(done.image(for: .normal), "the control shows nothing without an image")
+        XCTAssertFalse(
+            done.actions(forTarget: coordinator, forControlEvent: .touchUpInside)?.isEmpty ?? true,
+            "the control does nothing when tapped"
+        )
+    }
+
+    /// A bar with no height of its own lays out at zero, which puts a keyboard on
+    /// screen with a strip above it and nothing in it.
+    func testTheBarIsTallEnoughForItsControl() {
+        let bar = numberPadField().makeCoordinator().doneAccessoryView()
+
+        XCTAssertGreaterThanOrEqual(
+            bar.frame.height,
+            PayabliPayInPaymentFlowAccessibility.minimumTouchTarget
+        )
+    }
+
+    /// It spans the keyboard rather than floating over the form: a toolbar used as
+    /// an accessory draws no background and lays its items out free of one, so this
+    /// carries its own material across the full width.
+    func testTheBarFillsItsWidthWithTheKeyboardsMaterial() throws {
+        let bar = numberPadField().makeCoordinator().doneAccessoryView()
+        bar.frame = CGRect(x: 0, y: 0, width: 390, height: bar.frame.height)
+        bar.layoutIfNeeded()
+
+        let material = try XCTUnwrap(
+            bar.subviews.compactMap { $0 as? UIVisualEffectView }.first,
+            "the bar has no material, so it reads as a control floating over the form"
+        )
+
+        XCTAssertEqual(material.frame, bar.bounds)
     }
 
     /// One bar per coordinator: reassigning `inputAccessoryView` while the field is
