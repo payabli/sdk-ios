@@ -38,13 +38,35 @@ final class PaymentMethodKeyboardAccessoryTests: XCTestCase {
         }
     }
 
-    /// The form's own choices, so this fails if a field is moved onto a keyboard
-    /// whose dismissal is not covered.
-    func testTheFormsNumericFieldsAreCovered() {
-        XCTAssertTrue(Field.requiresDoneAccessory(.numberPad))
-        XCTAssertFalse(Field.requiresDoneAccessory(.numbersAndPunctuation))
-        XCTAssertFalse(Field.requiresDoneAccessory(.emailAddress))
+    /// Every field the form renders, against the keyboard the form actually gives
+    /// it: one with a return key, or one carrying the bar. Moving a field onto a
+    /// keyboard with neither fails here rather than shipping a trapped keyboard.
+    func testEveryFieldHasAWayBack() {
+        for field in PayabliPayInPaymentFlowField.allCases {
+            let keyboard = field.keyboardType
+
+            XCTAssertTrue(
+                Field.requiresDoneAccessory(keyboard) || Self.keyboardsWithAReturnKey.contains(keyboard),
+                "\(field.rawValue) has no way back from its keyboard"
+            )
+        }
     }
+
+    /// The form's numeric fields, named, so a field moved off a number pad shows up
+    /// here as well as in the sweep above.
+    func testTheFormsNumericFieldsAreOnANumberPad() {
+        let numeric: [PayabliPayInPaymentFlowField] = [.cardNumber, .cardCvv, .achRouting, .achAccount]
+        for field in numeric {
+            XCTAssertEqual(field.keyboardType, .numberPad, field.rawValue)
+        }
+    }
+
+    /// A keyboard that has one dismisses on it, since the coordinator resigns the
+    /// field when it is pressed.
+    private static let keyboardsWithAReturnKey: [UIKeyboardType] = [
+        .default, .asciiCapable, .numbersAndPunctuation, .URL, .emailAddress,
+        .namePhonePad, .twitter, .webSearch
+    ]
 
     // MARK: - The bar itself, and what its Done does
 

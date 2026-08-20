@@ -286,14 +286,12 @@ public struct PayabliPayInPaymentFlowView: View {
             secureField(
                 field,
                 text: cardCvvBinding,
-                keyboardType: .numberPad,
                 sanitize: viewModel.limitCardCvv
             )
         case .cardZip:
             textField(
                 field,
                 text: cardZipBinding,
-                keyboardType: .numbersAndPunctuation,
                 sanitize: viewModel.limitPostalCode
             )
         default:
@@ -313,12 +311,12 @@ public struct PayabliPayInPaymentFlowView: View {
                 sanitize: viewModel.limitACHHolderName
             )
         case .achRouting:
-            textField(field, text: achRoutingBinding, keyboardType: .numberPad, sanitize: viewModel.limitACHRouting)
+            textField(field, text: achRoutingBinding, sanitize: viewModel.limitACHRouting)
         case .achAccount:
             if configuration.formatting.masksACHAccountEntry {
-                secureField(field, text: achAccountBinding, keyboardType: .numberPad, sanitize: viewModel.limitACHAccount)
+                secureField(field, text: achAccountBinding, sanitize: viewModel.limitACHAccount)
             } else {
-                textField(field, text: achAccountBinding, keyboardType: .numberPad, sanitize: viewModel.limitACHAccount)
+                textField(field, text: achAccountBinding, sanitize: viewModel.limitACHAccount)
             }
         case .achAccountType:
             pickerField(field, selection: $viewModel.achAccountType, values: PayabliPayInPaymentFlowACHAccountType.allCases)
@@ -355,12 +353,11 @@ public struct PayabliPayInPaymentFlowView: View {
         case .customerNumber:
             textField(field, text: $viewModel.customerNumber)
         case .billingEmail:
-            textField(field, text: $viewModel.billingEmail, keyboardType: .emailAddress, textContentType: .emailAddress)
+            textField(field, text: $viewModel.billingEmail, textContentType: .emailAddress)
         case .billingZip:
             textField(
                 field,
                 text: billingZipBinding,
-                keyboardType: .numbersAndPunctuation,
                 sanitize: viewModel.limitPostalCode
             )
         default:
@@ -407,7 +404,6 @@ public struct PayabliPayInPaymentFlowView: View {
     func textField(
         _ field: PayabliPayInPaymentFlowField,
         text: Binding<String>,
-        keyboardType: UIKeyboardType = .default,
         textContentType: UITextContentType? = nil,
         autocapitalization: UITextAutocapitalizationType = .none,
         sanitize: @escaping (String) -> String = { $0 }
@@ -421,7 +417,7 @@ public struct PayabliPayInPaymentFlowView: View {
                 placeholder: placeholder(for: field),
                 field: field,
                 focusedField: focusedFieldBinding,
-                keyboardType: keyboardType,
+                keyboardType: field.keyboardType,
                 textContentType: textContentType,
                 autocapitalization: autocapitalization,
                 isSecure: false,
@@ -446,7 +442,6 @@ public struct PayabliPayInPaymentFlowView: View {
     func secureField(
         _ field: PayabliPayInPaymentFlowField,
         text: Binding<String>,
-        keyboardType: UIKeyboardType = .default,
         sanitize: @escaping (String) -> String = { $0 }
     ) -> some View {
         let label = configuration.labels.label(for: field)
@@ -458,7 +453,7 @@ public struct PayabliPayInPaymentFlowView: View {
                 placeholder: placeholder(for: field),
                 field: field,
                 focusedField: focusedFieldBinding,
-                keyboardType: keyboardType,
+                keyboardType: field.keyboardType,
                 autocapitalization: .none,
                 isSecure: true,
                 font: inputUIKitFont,
@@ -503,7 +498,7 @@ public struct PayabliPayInPaymentFlowView: View {
                     placeholder: placeholder(for: field),
                     field: field,
                     focusedField: focusedFieldBinding,
-                    keyboardType: .numberPad,
+                    keyboardType: field.keyboardType,
                     textContentType: .creditCardNumber,
                     autocapitalization: .none,
                     isSecure: false,

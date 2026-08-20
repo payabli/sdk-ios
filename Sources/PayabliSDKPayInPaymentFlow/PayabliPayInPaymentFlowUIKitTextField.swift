@@ -1,6 +1,26 @@
 import SwiftUI
 import UIKit
 
+extension PayabliPayInPaymentFlowField {
+    /// The keyboard this field raises. Held here rather than at each call site so
+    /// the form cannot put a field on a keyboard whose dismissal is untested.
+    ///
+    /// `cardExpiration` opens a wheel and `amount` and `serviceFee` are read back
+    /// rather than typed, so none of them raises one at all.
+    var keyboardType: UIKeyboardType {
+        switch self {
+        case .cardNumber, .cardCvv, .achRouting, .achAccount:
+            .numberPad
+        case .cardZip, .billingZip:
+            .numbersAndPunctuation
+        case .billingEmail:
+            .emailAddress
+        default:
+            .default
+        }
+    }
+}
+
 struct PayabliPayInPaymentFlowUIKitTextField: UIViewRepresentable {
     @Binding var text: String
     var placeholder: String
