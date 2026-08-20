@@ -249,6 +249,14 @@ struct PayabliPayInPaymentFlowUIKitTextField: UIViewRepresentable {
             apply(textField.text ?? "", to: textField)
         }
 
+        /// A return key does nothing on its own: `UITextField` keeps first
+        /// responder unless a delegate gives it up. Without this, the keyboards
+        /// that carry no accessory would have no way back either.
+        func textFieldShouldReturn(_ textField: UITextField) -> Bool {
+            textField.resignFirstResponder()
+            return false
+        }
+
         func textField(
             _ textField: UITextField,
             shouldChangeCharactersIn range: NSRange,

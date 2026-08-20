@@ -120,6 +120,25 @@ final class PaymentMethodKeyboardAccessoryTests: XCTestCase {
         XCTAssertFalse(textField.isFirstResponder)
     }
 
+    /// A return key resigns the field, so a keyboard that has one needs no bar.
+    func testTheReturnKeyResignsTheField() {
+        let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 320, height: 480))
+        let textField = UITextField(frame: CGRect(x: 0, y: 0, width: 320, height: 44))
+        window.addSubview(textField)
+        window.makeKeyAndVisible()
+        let coordinator = numberPadField().makeCoordinator()
+        textField.delegate = coordinator
+        coordinator.textField = textField
+
+        XCTAssertTrue(textField.becomeFirstResponder(), "the field never took first responder")
+
+        XCTAssertFalse(
+            coordinator.textFieldShouldReturn(textField),
+            "returning true lets UIKit insert a newline into a single-line field"
+        )
+        XCTAssertFalse(textField.isFirstResponder)
+    }
+
     private func numberPadField() -> PayabliPayInPaymentFlowUIKitTextField {
         PayabliPayInPaymentFlowUIKitTextField(
             text: .constant(""),
