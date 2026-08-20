@@ -350,12 +350,18 @@ struct PaymentTapToPayQAView: View {
         if focusedField != nil {
             HStack {
                 Spacer()
-                // The frame is on the button rather than the row: padding around a
-                // text button leaves its own target the size of the word, which is
-                // under the 44 points a finger is measured against.
-                Button("Done") { focusedField = nil }
-                    .font(.body.weight(.semibold))
-                    .frame(minWidth: 44, minHeight: 44)
+                // A checkmark, matching the accessory the SDK's own fields carry,
+                // and it needs no translation. The frame is on the button rather
+                // than the row: padding around it leaves its own target smaller
+                // than the 44 points a finger is measured against.
+                Button {
+                    focusedField = nil
+                } label: {
+                    Image(systemName: "checkmark")
+                        .font(.body.weight(.semibold))
+                }
+                .accessibilityLabel("Done")
+                .frame(minWidth: 44, minHeight: 44)
             }
             .padding(.horizontal, 16)
             .background(.bar)
