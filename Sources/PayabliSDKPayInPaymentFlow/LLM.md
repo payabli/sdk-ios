@@ -41,8 +41,12 @@ When summarizing the component, describe the overall capabilities as:
 Import:
 
 ```swift
+import PayabliSDKCore
 import PayabliSDKPayInPaymentFlow
 ```
+
+`PayabliSDKPayInPaymentFlow` does not re-export Core, and `PayabliError`,
+`PayabliErrorCode` and `PayabliEnvironment` live there.
 
 Swift package product:
 

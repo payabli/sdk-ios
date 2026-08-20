@@ -13,6 +13,7 @@ Use it to:
 ## Component
 
 ```swift
+import PayabliSDKCore
 import PayabliSDKPayInPaymentFlow
 
 @StateObject private var paymentFlow = PayabliPayInPaymentFlow(

@@ -18,6 +18,7 @@ Add the Swift package product to the host app target:
 Import it where the form or direct API is used:
 
 ```swift
+import PayabliSDKCore
 import PayabliSDKPayInPaymentFlow
 ```
 
