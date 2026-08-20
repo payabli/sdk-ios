@@ -111,7 +111,8 @@ PayabliPayInPaymentFlowView(
     style: payabliStyle,
     onCompleted: { result in
         guard let stored = result.storedPaymentMethod else { return }
-        print("Stored method:", stored.storedMethodId ?? "")
+        // A stored-method id is a token: keep it, do not log it.
+        storedMethodId = stored.storedMethodId
     }
 )
 ```
@@ -796,12 +797,11 @@ Fields:
 func handle(_ result: PayabliPayInPaymentFlowResult) {
     switch result.kind {
     case .storedPaymentMethod:
-        let stored = result.storedPaymentMethod
-        print(stored?.storedMethodId ?? "")
+        // A stored-method id is a token: keep it, do not log it.
+        storedMethodId = result.storedPaymentMethod?.storedMethodId
 
     case .transaction:
-        let transaction = result.transaction
-        print(transaction?.paymentTransId ?? "")
+        paymentTransId = result.transaction?.paymentTransId
     }
 }
 ```
