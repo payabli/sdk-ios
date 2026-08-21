@@ -24,8 +24,11 @@ public struct KeychainStorage: SecureStorage, Sendable {
 
     private let service: String
 
+    /// Opening the store corrects what an older version of the SDK wrote, since
+    /// nothing else will: see `migrateAccessibility(forKeys:)`.
     public init(service: String = KeychainStorage.service) {
         self.service = service
+        migrateAccessibility(forKeys: PayabliKeychainKey.all)
     }
 
     // MARK: - Read
@@ -91,6 +94,26 @@ public struct KeychainStorage: SecureStorage, Sendable {
         }
     }
 
+    // MARK: - Migration
+
+    /// Rewrites what is already stored, so an install that attested before this
+    /// attribute existed stops being carried by a backup.
+    ///
+    /// Correcting an item is its next write, and the warm path only reads: a phone
+    /// that has already attested never writes again, so without this it keeps the
+    /// old attribute for as long as the install lasts. Rewriting the same bytes is
+    /// what changes the attribute.
+    ///
+    /// Runs whenever the store is opened rather than once behind a flag, since the
+    /// flag would be another stored item and a locked Keychain makes any single
+    /// attempt a no-op. An item that cannot be read yet waits for the next one.
+    func migrateAccessibility(forKeys keys: [String]) {
+        for key in keys {
+            guard let data = data(forKey: key) else { continue }
+            try? set(data, forKey: key)
+        }
+    }
+
     // MARK: - Delete
 
     public func remove(forKey key: String) {
@@ -122,4 +145,7 @@ public enum PayabliKeychainKey {
     /// the same Secure Enclave key without ever tripping `isAlreadyAttested`
     /// (which only consults `keyId` + `deviceId`).
     public static let pendingKeyId = "com.payabli.ttp.pendingKeyId"
+
+    /// Every key the SDK writes, so a sweep over them cannot miss one.
+    static let all = [keyId, deviceId, pendingKeyId]
 }

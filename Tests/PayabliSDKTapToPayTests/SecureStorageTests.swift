@@ -143,6 +143,70 @@ final class SecureStorageTests: XCTestCase {
         #endif
     }
 
+    /// The warm path only reads, so an install that already attested never writes
+    /// again and would keep the old attribute for good. The sweep is what rewrites
+    /// it, and it has to cover every key the SDK stores.
+    func testTheSweepCoversEveryKeyTheSDKStores() {
+        XCTAssertEqual(
+            Set(PayabliKeychainKey.all),
+            [PayabliKeychainKey.keyId, PayabliKeychainKey.deviceId, PayabliKeychainKey.pendingKeyId]
+        )
+    }
+
+    /// Skips on the same terms as the round trip above.
+    func testTheSweepRewritesAStoredItemAndKeepsItsValueIfAvailable() throws {
+        #if os(macOS) && !targetEnvironment(simulator)
+            throw XCTSkip("Keychain services require a running keychaind; covered by device QA (§12.3).")
+        #else
+            let service = "com.payabli.tests.\(UUID().uuidString)"
+            let base: [String: Any] = [
+                kSecClass as String: kSecClassGenericPassword,
+                kSecAttrService as String: service,
+                kSecAttrAccount as String: PayabliKeychainKey.deviceId
+            ]
+            defer { SecItemDelete(base as CFDictionary) }
+
+            var legacy = base
+            legacy[kSecValueData as String] = Data("device-77".utf8)
+            legacy[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlock
+            let seeded = SecItemAdd(legacy as CFDictionary, nil)
+            try XCTSkipUnless(
+                seeded == errSecSuccess,
+                "Keychain unavailable in this test host (OSStatus \(seeded)); covered by device QA (§12.3)."
+            )
+
+            // Opening the store is what runs the sweep.
+            let storage = KeychainStorage(service: service)
+
+            var item: CFTypeRef?
+            var query = base
+            query[kSecReturnAttributes as String] = true
+            XCTAssertEqual(SecItemCopyMatching(query as CFDictionary, &item), errSecSuccess)
+            let attributes = try XCTUnwrap(item as? [String: Any])
+            XCTAssertEqual(
+                attributes[kSecAttrAccessible as String] as? String,
+                kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly as String,
+                "the sweep left the item with the attribute a backup can carry"
+            )
+            XCTAssertEqual(storage.string(forKey: PayabliKeychainKey.deviceId), "device-77")
+        #endif
+    }
+
+    /// A key with nothing stored under it is skipped, so a fresh install does not
+    /// write empty items.
+    func testTheSweepStoresNothingForAKeyThatHasNoItemIfAvailable() throws {
+        #if os(macOS) && !targetEnvironment(simulator)
+            throw XCTSkip("Keychain services require a running keychaind; covered by device QA (§12.3).")
+        #else
+            let storage = KeychainStorage(service: "com.payabli.tests.\(UUID().uuidString)")
+            defer { storage.removeAll() }
+
+            for key in PayabliKeychainKey.all {
+                XCTAssertNil(storage.string(forKey: key), key)
+            }
+        #endif
+    }
+
     // MARK: - Storage key constants
 
     func testStorageKeyConstantsMatchPRD() {
