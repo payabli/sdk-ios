@@ -55,6 +55,46 @@ final class SecureStorageTests: XCTestCase {
         #endif
     }
 
+    /// The attribute the item was written with, read back from the Keychain
+    /// itself. Every item here names one device, so an item that travels on a
+    /// backup arrives on a handset whose Secure Enclave key did not come with it.
+    ///
+    /// Skips on the same terms as the round trip above, and for the same reason.
+    func testKeychainItemsAreWrittenForThisDeviceOnlyIfAvailable() throws {
+        #if os(macOS) && !targetEnvironment(simulator)
+            throw XCTSkip("Keychain services require a running keychaind; covered by device QA (§12.3).")
+        #else
+            let service = "com.payabli.tests.\(UUID().uuidString)"
+            let storage = KeychainStorage(service: service)
+            defer { storage.removeAll() }
+
+            do {
+                try storage.set("hello_keychain", forKey: "sample_key")
+            } catch let KeychainStorage.KeychainError.underlying(status) {
+                throw XCTSkip("""
+                Keychain unavailable in this test host (OSStatus \(status)); \
+                covered by device QA (§12.3).
+                """)
+            }
+
+            var item: CFTypeRef?
+            let status = SecItemCopyMatching([
+                kSecClass as String: kSecClassGenericPassword,
+                kSecAttrService as String: service,
+                kSecAttrAccount as String: "sample_key",
+                kSecReturnAttributes as String: true
+            ] as CFDictionary, &item)
+
+            XCTAssertEqual(status, errSecSuccess, "the item just written could not be read back")
+            let attributes = try XCTUnwrap(item as? [String: Any])
+            XCTAssertEqual(
+                attributes[kSecAttrAccessible as String] as? String,
+                kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly as String,
+                "the item is written to travel"
+            )
+        #endif
+    }
+
     // MARK: - Storage key constants
 
     func testStorageKeyConstantsMatchPRD() {

@@ -58,6 +58,14 @@ public struct KeychainStorage: SecureStorage, Sendable {
         try set(data, forKey: key)
     }
 
+    /// `AfterFirstUnlock` because the SDK reads these outside a foreground
+    /// session; `ThisDeviceOnly` because they must not travel. Every item here
+    /// names one device: an attestation identity restored onto a second handset is
+    /// an identity whose Secure Enclave key did not come with it, and a
+    /// `hardwareId` that travels would let the new phone supersede the old phone's
+    /// device record.
+    private static let accessibility = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+
     func set(_ data: Data, forKey key: String) throws {
         let baseQuery: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
@@ -68,13 +76,13 @@ public struct KeychainStorage: SecureStorage, Sendable {
         // Update in place if it exists; otherwise add.
         let updateAttributes: [String: Any] = [
             kSecValueData as String: data,
-            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock
+            kSecAttrAccessible as String: Self.accessibility
         ]
         var status = SecItemUpdate(baseQuery as CFDictionary, updateAttributes as CFDictionary)
         if status == errSecItemNotFound {
             var addQuery = baseQuery
             addQuery[kSecValueData as String] = data
-            addQuery[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlock
+            addQuery[kSecAttrAccessible as String] = Self.accessibility
             status = SecItemAdd(addQuery as CFDictionary, nil)
         }
         guard status == errSecSuccess else {
