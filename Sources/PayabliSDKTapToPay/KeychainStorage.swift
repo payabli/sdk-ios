@@ -59,11 +59,9 @@ public struct KeychainStorage: SecureStorage, Sendable {
     }
 
     /// `AfterFirstUnlock` because the SDK reads these outside a foreground
-    /// session; `ThisDeviceOnly` because they must not travel. Every item here
-    /// names one device: an attestation identity restored onto a second handset is
-    /// an identity whose Secure Enclave key did not come with it, and a
-    /// `hardwareId` that travels would let the new phone supersede the old phone's
-    /// device record.
+    /// session. `ThisDeviceOnly` because `keyId` names a Secure Enclave key no
+    /// backup carries, so a restored copy is an identity the new phone cannot
+    /// sign for.
     private static let accessibility = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
 
     func set(_ data: Data, forKey key: String) throws {
