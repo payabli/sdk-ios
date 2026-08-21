@@ -34,12 +34,16 @@ extension AppAttestService {
         }
     }
 
+    /// Read over the field's own bytes. `utsname.machine` is 256 of them, and
+    /// rebinding a pointer with a claimed capacity of one leaves reading the C
+    /// string past what the call bound. Same string, defined this way.
     static var defaultModel: @Sendable () -> String {
         {
             var sysinfo = utsname()
             uname(&sysinfo)
-            let raw = withUnsafePointer(to: &sysinfo.machine) {
-                $0.withMemoryRebound(to: CChar.self, capacity: 1) { String(cString: $0) }
+            let raw = withUnsafeBytes(of: &sysinfo.machine) { raw -> String in
+                guard let base = raw.baseAddress else { return "" }
+                return String(cString: base.assumingMemoryBound(to: CChar.self))
             }
             return raw.trimmingCharacters(in: .controlCharacters)
         }
