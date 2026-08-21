@@ -74,8 +74,8 @@ extension PayabliPayInPaymentFlowDiagnostics {
             phase: .request,
             method: request.method.rawValue,
             url: Self.urlString(for: request, baseURL: baseURL),
-            headers: Self.redactedHeaders(request.headers),
-            body: Self.redactedBodyString(request.body)
+            headers: Self.redactedHeaders(request.headers, phase: .request),
+            body: Self.redactedBodyString(request.body, phase: .request)
         ))
     }
 
@@ -91,8 +91,8 @@ extension PayabliPayInPaymentFlowDiagnostics {
             method: request.method.rawValue,
             url: Self.urlString(for: request, baseURL: baseURL),
             statusCode: response.statusCode,
-            headers: Self.redactedHeaders(response.headers),
-            body: Self.redactedBodyString(response.body),
+            headers: Self.redactedHeaders(response.headers, phase: .response),
+            body: Self.redactedBodyString(response.body, phase: .response),
             durationMilliseconds: durationMilliseconds
         ))
     }
@@ -108,7 +108,7 @@ extension PayabliPayInPaymentFlowDiagnostics {
             phase: .failure,
             method: request.method.rawValue,
             url: Self.urlString(for: request, baseURL: baseURL),
-            headers: Self.redactedHeaders(request.headers),
+            headers: Self.redactedHeaders(request.headers, phase: .failure),
             durationMilliseconds: durationMilliseconds,
             errorDescription: Self.diagnosticMessage(for: error)
         ))
@@ -136,21 +136,27 @@ extension PayabliPayInPaymentFlowDiagnostics {
         return components.url?.absoluteString ?? request.path
     }
 
-    private static func redactedHeaders(_ headers: [String: String]) -> [String: String] {
+    private static func redactedHeaders(
+        _ headers: [String: String],
+        phase: PayabliPayInPaymentFlowDiagnosticEntry.Phase
+    ) -> [String: String] {
         Dictionary(uniqueKeysWithValues: headers.map { key, value in
-            if isSensitiveKey(key) {
+            if isSensitiveKey(key, phase: phase) {
                 return (key, PayabliLogger.redactFully(value))
             }
             return (key, value)
         })
     }
 
-    private static func redactedBodyString(_ body: Data?) -> String? {
+    private static func redactedBodyString(
+        _ body: Data?,
+        phase: PayabliPayInPaymentFlowDiagnosticEntry.Phase
+    ) -> String? {
         guard let body, !body.isEmpty else { return nil }
 
         do {
             let object = try JSONSerialization.jsonObject(with: body)
-            let redacted = redactJSONValue(object, key: nil)
+            let redacted = redactJSONValue(object, key: nil, phase: phase)
             let data = try PayInPaymentFlowJSONBody.data(
                 from: PayInPaymentFlowJSONBody.normalizingCurrencyFields(in: redacted)
             )
@@ -160,28 +166,53 @@ extension PayabliPayInPaymentFlowDiagnostics {
         }
     }
 
-    private static func redactJSONValue(_ value: Any, key: String?) -> Any {
-        if let key, isSensitiveKey(key) {
+    private static func redactJSONValue(
+        _ value: Any,
+        key: String?,
+        phase: PayabliPayInPaymentFlowDiagnosticEntry.Phase
+    ) -> Any {
+        if let key, isSensitiveKey(key, phase: phase) {
             return "[REDACTED]"
         }
 
         if let dictionary = value as? [String: Any] {
             return dictionary.reduce(into: [String: Any]()) { result, pair in
-                result[pair.key] = redactJSONValue(pair.value, key: pair.key)
+                result[pair.key] = redactJSONValue(pair.value, key: pair.key, phase: phase)
             }
         }
 
         if let array = value as? [Any] {
-            return array.map { redactJSONValue($0, key: nil) }
+            return array.map { redactJSONValue($0, key: nil, phase: phase) }
         }
 
         return value
     }
 
-    private static func isSensitiveKey(_ key: String) -> Bool {
+    private static func isSensitiveKey(
+        _ key: String,
+        phase: PayabliPayInPaymentFlowDiagnosticEntry.Phase
+    ) -> Bool {
         let normalized = key
             .lowercased()
             .filter { $0.isLetter || $0.isNumber }
+
+        // Verification outcomes, checked before the rules below because the
+        // substring `cvv` catches them. These carry a result code, never a
+        // cardholder value: `cvvresponse` is `M`, `N` or `P`, and its text is the
+        // sentence that goes with it. They are also the only fields that say why a
+        // transaction was declined, so redacting them left a diagnostics log that
+        // reported a failure and withheld its reason.
+        //
+        // A response only, because they are the gateway's answer. `additionalData`
+        // takes any key a caller puts in it, so on a request these names are a
+        // submitted value wearing the answer's name.
+        let verificationResultKeys: Set = [
+            "cvvresponse",
+            "cvvresponsetext"
+        ]
+        if phase == .response, verificationResultKeys.contains(normalized) {
+            return false
+        }
 
         let exactKeys: Set = [
             "authorization",

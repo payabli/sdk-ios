@@ -1,6 +1,26 @@
 import SwiftUI
 import UIKit
 
+extension PayabliPayInPaymentFlowField {
+    /// The keyboard this field raises. Held here rather than at each call site so
+    /// the form cannot put a field on a keyboard whose dismissal is untested.
+    ///
+    /// `cardExpiration` opens a wheel and `amount` and `serviceFee` are read back
+    /// rather than typed, so none of them raises one at all.
+    var keyboardType: UIKeyboardType {
+        switch self {
+        case .cardNumber, .cardCvv, .achRouting, .achAccount:
+            .numberPad
+        case .cardZip, .billingZip:
+            .numbersAndPunctuation
+        case .billingEmail:
+            .emailAddress
+        default:
+            .default
+        }
+    }
+}
+
 struct PayabliPayInPaymentFlowUIKitTextField: UIViewRepresentable {
     @Binding var text: String
     var placeholder: String
@@ -52,6 +72,19 @@ struct PayabliPayInPaymentFlowUIKitTextField: UIViewRepresentable {
         self.sanitize = sanitize
     }
 
+    /// Keyboards that carry no return key. A field using one cannot end its own
+    /// editing, so nothing on screen takes the keyboard back and it covers
+    /// whatever sits below the field, including the button that submits the form.
+    /// Every other keyboard here already has a way out.
+    static func requiresDoneAccessory(_ keyboardType: UIKeyboardType) -> Bool {
+        switch keyboardType {
+        case .numberPad, .decimalPad, .phonePad, .asciiCapableNumberPad:
+            true
+        default:
+            false
+        }
+    }
+
     func makeCoordinator() -> Coordinator {
         Coordinator(self)
     }
@@ -59,6 +92,7 @@ struct PayabliPayInPaymentFlowUIKitTextField: UIViewRepresentable {
     func makeUIView(context: Context) -> UITextField {
         let textField = UITextField(frame: .zero)
         textField.delegate = context.coordinator
+        context.coordinator.textField = textField
         textField.borderStyle = .none
         textField.backgroundColor = .clear
         textField.clearButtonMode = .never
@@ -102,6 +136,27 @@ struct PayabliPayInPaymentFlowUIKitTextField: UIViewRepresentable {
         )
         textField.accessibilityHint = accessibilityHint
         textField.accessibilityIdentifier = PayabliPayInPaymentFlowAccessibility.fieldIdentifier(field)
+
+        Self.applyAccessory(to: textField, keyboardType: keyboardType, from: context.coordinator)
+    }
+
+    /// Separate from `updateUIView` because a `Context` cannot be built outside
+    /// SwiftUI, and an accessory's contents never enter the accessibility tree, so
+    /// this is the only place the assignment can be checked.
+    static func applyAccessory(
+        to textField: UITextField,
+        keyboardType: UIKeyboardType,
+        from coordinator: Coordinator
+    ) {
+        // Compared by identity so a field that is already carrying the bar keeps
+        // the same one: reassigning it while the field is first responder makes
+        // UIKit rebuild the input views underneath the person typing.
+        let accessory: UIView? = requiresDoneAccessory(keyboardType)
+            ? coordinator.doneAccessoryView()
+            : nil
+        if textField.inputAccessoryView !== accessory {
+            textField.inputAccessoryView = accessory
+        }
     }
 
     private var attributedPlaceholder: NSAttributedString? {
@@ -137,9 +192,69 @@ struct PayabliPayInPaymentFlowUIKitTextField: UIViewRepresentable {
 
     final class Coordinator: NSObject, UITextFieldDelegate {
         var parent: PayabliPayInPaymentFlowUIKitTextField
+        weak var textField: UITextField?
+        private var doneAccessory: UIInputView?
 
         init(_ parent: PayabliPayInPaymentFlowUIKitTextField) {
             self.parent = parent
+        }
+
+        /// Built once and reused. A `UIToolbar` cannot be used here: as an input
+        /// accessory it draws no background and lays its items out floating, so
+        /// the control appears alone over the form rather than on a bar. This is a
+        /// keyboard-styled input view instead, which spans the keyboard's width
+        /// and follows its material in both appearances.
+        func doneAccessoryView() -> UIInputView {
+            if let doneAccessory {
+                return doneAccessory
+            }
+            let bar = UIInputView(
+                frame: CGRect(x: 0, y: 0, width: 0, height: Self.accessoryHeight),
+                inputViewStyle: .keyboard
+            )
+            // UIKit stretches the width to the keyboard's and keeps the height.
+            bar.autoresizingMask = .flexibleWidth
+
+            // The keyboard style paints nothing of its own, so the bar carries the
+            // same chrome material the keyboard is drawn on. That follows both
+            // appearances without a fixed colour in between.
+            let material = UIVisualEffectView(effect: UIBlurEffect(style: .systemChromeMaterial))
+            material.translatesAutoresizingMaskIntoConstraints = false
+            bar.addSubview(material)
+            NSLayoutConstraint.activate([
+                material.leadingAnchor.constraint(equalTo: bar.leadingAnchor),
+                material.trailingAnchor.constraint(equalTo: bar.trailingAnchor),
+                material.topAnchor.constraint(equalTo: bar.topAnchor),
+                material.bottomAnchor.constraint(equalTo: bar.bottomAnchor)
+            ])
+
+            let done = UIButton(type: .system)
+            done.setImage(UIImage(systemName: "checkmark"), for: .normal)
+            done.accessibilityLabel = PayabliPayInPaymentFlowAccessibility.keyboardDoneLabel
+            done.accessibilityIdentifier = PayabliPayInPaymentFlowAccessibility.keyboardDoneIdentifier
+            done.addTarget(self, action: #selector(endEditing), for: .touchUpInside)
+            done.translatesAutoresizingMaskIntoConstraints = false
+            bar.addSubview(done)
+
+            let target = PayabliPayInPaymentFlowAccessibility.minimumTouchTarget
+            NSLayoutConstraint.activate([
+                done.trailingAnchor.constraint(equalTo: bar.layoutMarginsGuide.trailingAnchor),
+                done.centerYAnchor.constraint(equalTo: bar.centerYAnchor),
+                done.widthAnchor.constraint(greaterThanOrEqualToConstant: target),
+                done.heightAnchor.constraint(greaterThanOrEqualToConstant: target)
+            ])
+
+            doneAccessory = bar
+            return bar
+        }
+
+        /// Tall enough for the button's own minimum target and the margin around it.
+        static let accessoryHeight: CGFloat = 48
+
+        /// Resigns the field that owns this bar rather than asking the application
+        /// to end editing everywhere, so the SDK reaches only its own responder.
+        @objc func endEditing() {
+            textField?.resignFirstResponder()
         }
 
         @objc func editingChanged(_ textField: UITextField) {
@@ -163,6 +278,14 @@ struct PayabliPayInPaymentFlowUIKitTextField: UIViewRepresentable {
                 return
             }
             apply(textField.text ?? "", to: textField)
+        }
+
+        /// A return key does nothing on its own: `UITextField` keeps first
+        /// responder unless a delegate gives it up. Without this, the keyboards
+        /// that carry no accessory would have no way back either.
+        func textFieldShouldReturn(_ textField: UITextField) -> Bool {
+            textField.resignFirstResponder()
+            return false
         }
 
         func textField(

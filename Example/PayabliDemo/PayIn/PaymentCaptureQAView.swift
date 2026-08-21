@@ -112,6 +112,7 @@ struct PaymentCaptureQAView: View {
                 .padding(16)
             }
             .navigationTitle("Capture a payment")
+            .scrollDismissesKeyboard(.interactively)
             .navigationDestination(isPresented: $isPaymentCaptureResultViewPresented) {
                 if let capturedResult {
                     PaymentCaptureResultView(result: capturedResult)

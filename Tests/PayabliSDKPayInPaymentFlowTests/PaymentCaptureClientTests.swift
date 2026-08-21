@@ -296,6 +296,89 @@ final class PayInPaymentFlowClientTests: XCTestCase {
         }
     }
 
+    /// The verification answer is the field that says why a card was refused, and
+    /// the value a cardholder typed is next to it under a name one character apart.
+    func testDiagnosticsShowsTheVerificationAnswerAndStillHidesTheSubmittedCVV() async throws {
+        let declined = """
+        {
+          "isSuccess": false,
+          "responseText": "Declined",
+          "responseData": {
+            "resultCode": 2,
+            "resultText": "AVS or CVV failed",
+            "cvvresponse": "N",
+            "CVVResponse_Text": "no match",
+            "avsresponse": "Z",
+            "cvv": "123",
+            "cardcvv": "456"
+          }
+        }
+        """
+        let expectation = expectation(description: "diagnostic response emitted")
+        let transport = MockPaymentCaptureTransport(responseBody: declined)
+        let responseEntry = LockedDiagnosticEntry()
+        let diagnostics = PayabliPayInPaymentFlowDiagnostics.enabled { entry in
+            if entry.phase == .response {
+                responseEntry.set(entry)
+                expectation.fulfill()
+            }
+        }
+        let client = PayInPaymentFlowClient(
+            transport: transport,
+            accessTokenProvider: { "secret-token" },
+            diagnostics: diagnostics
+        )
+
+        _ = try? await client.capture(entryPoint: "entry", request: cardRequest())
+
+        await fulfillment(of: [expectation], timeout: 1)
+        let body = try XCTUnwrap(try XCTUnwrap(responseEntry.value).body)
+
+        // Allowed: the answer, whatever case and punctuation the service spells it in.
+        XCTAssertTrue(body.contains(#""cvvresponse":"N""#), body)
+        XCTAssertTrue(body.contains("no match"), body)
+        XCTAssertTrue(body.contains(#""avsresponse":"Z""#), body)
+
+        // Redacted: what was submitted, matched by the rules the allowlist runs before.
+        XCTAssertTrue(body.contains(#""cvv":"[REDACTED]""#), body)
+        XCTAssertTrue(body.contains(#""cardcvv":"[REDACTED]""#), body)
+        XCTAssertFalse(body.contains("123"), body)
+        XCTAssertFalse(body.contains("456"), body)
+    }
+
+    /// `additionalData` takes any key a caller puts in it, so the verification
+    /// allowlist has to be the response's alone: on a request those names are a
+    /// submitted value wearing the answer's name.
+    func testDiagnosticsHidesAVerificationNameCarryingASubmittedValueOnARequest() async throws {
+        let expectation = expectation(description: "diagnostic request emitted")
+        let transport = MockPaymentCaptureTransport(responseBody: Self.approvedResponse)
+        let requestEntry = LockedDiagnosticEntry()
+        let diagnostics = PayabliPayInPaymentFlowDiagnostics.enabled { entry in
+            if entry.phase == .request {
+                requestEntry.set(entry)
+                expectation.fulfill()
+            }
+        }
+        let client = PayInPaymentFlowClient(
+            transport: transport,
+            accessTokenProvider: { "secret-token" },
+            diagnostics: diagnostics
+        )
+        let request = cardRequest(additionalData: [
+            "cvvresponse": "321",
+            "CVVResponse_Text": "654"
+        ])
+
+        _ = try? await client.capture(entryPoint: "entry", request: request)
+
+        await fulfillment(of: [expectation], timeout: 1)
+        let body = try XCTUnwrap(try XCTUnwrap(requestEntry.value).body)
+
+        XCTAssertFalse(body.contains("321"), body)
+        XCTAssertFalse(body.contains("654"), body)
+        XCTAssertTrue(body.contains(#""cvvresponse":"[REDACTED]""#), body)
+    }
+
     func testDiagnosticsRedactsBearerAndSensitivePaymentFields() async throws {
         let expectation = expectation(description: "diagnostic request emitted")
         let transport = MockPaymentCaptureTransport(responseBody: Self.approvedResponse)
@@ -331,7 +414,8 @@ final class PayInPaymentFlowClientTests: XCTestCase {
         serviceFee: Double? = 5,
         achValidation: Bool? = nil,
         forceCustomerCreation: Bool? = nil,
-        idempotencyKey: String? = nil
+        idempotencyKey: String? = nil,
+        additionalData: [String: String]? = nil
     ) -> PayabliPayInPaymentFlowRequest {
         PayabliPayInPaymentFlowRequest(
             paymentDetails: PayabliPayInPaymentFlowPaymentDetails(
@@ -349,7 +433,10 @@ final class PayInPaymentFlowClientTests: XCTestCase {
                 ),
                 saveIfSuccess: true
             )),
-            customerData: PayabliPayInPaymentFlowCustomerData(customerId: 4440),
+            customerData: PayabliPayInPaymentFlowCustomerData(
+                additionalData: additionalData,
+                customerId: 4440
+            ),
             ipAddress: "255.255.255.255",
             orderDescription: "SDK test transaction",
             orderId: "order-123",

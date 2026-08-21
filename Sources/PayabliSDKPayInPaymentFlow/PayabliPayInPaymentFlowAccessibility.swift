@@ -7,6 +7,18 @@ enum PayabliPayInPaymentFlowAccessibility {
         "payabli.payInPaymentFlow.field.\(field.rawValue)"
     }
 
+    /// The control that accepts the expiry wheel. Every field in that view can be
+    /// addressed by identifier and this button could only be found by its title,
+    /// which is a visible string and the one thing a caller should not depend on.
+    static let expirationDoneIdentifier = "payabli.payInPaymentFlow.control.expirationDone"
+
+    /// The button on the accessory a keyboard with no return key carries. It shows
+    /// a checkmark, so an identifier is the only way to address it.
+    static let keyboardDoneIdentifier = "payabli.payInPaymentFlow.control.keyboardDone"
+
+    /// What the checkmark is called, since a glyph carries no name of its own.
+    static let keyboardDoneLabel = "Done"
+
     static func textFieldValue(
         text: String,
         isSecure: Bool

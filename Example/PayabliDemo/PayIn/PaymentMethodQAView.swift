@@ -99,6 +99,7 @@ struct PaymentMethodQAView: View {
                 .padding(16)
             }
             .navigationTitle("Save a method")
+            .scrollDismissesKeyboard(.interactively)
             .navigationDestination(isPresented: $isPaymentMethodAddedViewPresented) {
                 PaymentMethodAddedView()
             }

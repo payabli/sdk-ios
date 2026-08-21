@@ -52,29 +52,34 @@ extension PayabliPayInPaymentFlowDiagnostics {
         )
 
         return .enabled { entry in
-            var lines = [
-                "[PayabliPayInPaymentFlowDiagnostics] "
-                    + "\(entry.phase.rawValue.uppercased()) \(entry.method) \(entry.url)"
-            ]
+            let request = "[PayabliPayInPaymentFlowDiagnostics] "
+                + "\(entry.phase.rawValue.uppercased()) \(entry.method) \(entry.url)"
+            var summary = [request]
             if let statusCode = entry.statusCode {
-                lines.append("statusCode=\(statusCode)")
+                summary.append("statusCode=\(statusCode)")
             }
             if let durationMilliseconds = entry.durationMilliseconds {
-                lines.append("durationMilliseconds=\(durationMilliseconds)")
-            }
-            lines.append("headers=\(entry.headers)")
-            if let body = entry.body {
-                lines.append("body=\(body)")
-            }
-            if let errorDescription = entry.errorDescription {
-                lines.append("error=\(errorDescription)")
+                summary.append("durationMilliseconds=\(durationMilliseconds)")
             }
 
-            let message = lines.joined(separator: "\n")
-            print(message)
-            logger.info("\(message, privacy: .public)")
+            var detail = summary
+            detail.append("headers=\(entry.headers)")
+            if let body = entry.body {
+                detail.append("body=\(body)")
+            }
+            if let errorDescription = entry.errorDescription {
+                detail.append("error=\(errorDescription)")
+            }
+
+            // The screen gets the whole entry, which is what a developer opened
+            // this tab for. The log gets what the request was and how it went: an
+            // entry holds headers, a body and an error description, redacted by the
+            // SDK but not empty of the service's own words, and `os.Logger` marks
+            // every message public.
+            let full = detail.joined(separator: "\n")
+            logger.info("\(summary.joined(separator: " "), privacy: .public)")
             Task { @MainActor in
-                store.append(message)
+                store.append(full)
             }
         }
     }

@@ -53,12 +53,9 @@ struct PaymentTapToPayQAView: View {
             .scrollDismissesKeyboard(.interactively)
             .navigationTitle("Tap to Pay")
             .toolbar { sessionBadge }
-            .toolbar {
-                ToolbarItemGroup(placement: .keyboard) {
-                    Spacer()
-                    Button("Done") { focusedField = nil }
-                }
-            }
+            // Not `ToolbarItemGroup(placement: .keyboard)`, which was declared
+            // here and never appeared, leaving the number pad with no way out.
+            .safeAreaInset(edge: .bottom) { keyboardDismissBar }
             .sheet(isPresented: $isActivationPresented) { activationSheet }
             .onAppear(perform: subscribeToEvents)
             .onDisappear {
@@ -217,6 +214,9 @@ struct PaymentTapToPayQAView: View {
             }
             .navigationTitle("Activate device")
             .sheet(isPresented: $isActivationHelpPresented) { activationHelpSheet }
+            // A sheet is its own hierarchy, so the bar on the screen behind it does
+            // not reach the number pad this field raises.
+            .safeAreaInset(edge: .bottom) { keyboardDismissBar }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { isActivationPresented = false }
@@ -315,6 +315,7 @@ struct PaymentTapToPayQAView: View {
                 Spacer()
                 Button("Clear", role: .destructive) { eventLog.removeAll() }
                     .font(.footnote)
+                    .frame(minWidth: 44, minHeight: 44)
                     .disabled(eventLog.isEmpty)
             }
 
@@ -339,6 +340,31 @@ struct PaymentTapToPayQAView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 8))
                 }
             }
+        }
+    }
+
+    /// Shown only while a field is being edited, so it takes no height from the
+    /// form the rest of the time.
+    @ViewBuilder
+    private var keyboardDismissBar: some View {
+        if focusedField != nil {
+            HStack {
+                Spacer()
+                // A checkmark, matching the accessory the SDK's own fields carry,
+                // and it needs no translation. The frame is on the button rather
+                // than the row: padding around it leaves its own target smaller
+                // than the 44 points a finger is measured against.
+                Button {
+                    focusedField = nil
+                } label: {
+                    Image(systemName: "checkmark")
+                        .font(.body.weight(.semibold))
+                }
+                .accessibilityLabel("Done")
+                .frame(minWidth: 44, minHeight: 44)
+            }
+            .padding(.horizontal, 16)
+            .background(.bar)
         }
     }
 
@@ -369,7 +395,7 @@ struct PaymentTapToPayQAView: View {
     private func runEnableTerminal() {
         clearOutcomesForNewSession()
         isWorking = true
-        Task {
+        Task { @MainActor in
             defer { isWorking = false }
             do {
                 try await terminal.initialize()
@@ -383,7 +409,7 @@ struct PaymentTapToPayQAView: View {
     private func runReinitialize() {
         clearOutcomesForNewSession()
         isWorking = true
-        Task {
+        Task { @MainActor in
             defer { isWorking = false }
             do {
                 try await terminal.reinitializeIfNeeded()
@@ -401,7 +427,7 @@ struct PaymentTapToPayQAView: View {
             return
         }
         isWorking = true
-        Task {
+        Task { @MainActor in
             defer { isWorking = false }
             do {
                 let result = try await terminal.charge(
@@ -421,7 +447,7 @@ struct PaymentTapToPayQAView: View {
         activationCode = ""
         activationOutcome = .none
         isWorking = true
-        Task {
+        Task { @MainActor in
             defer { isWorking = false }
             do {
                 try await terminal.activateDevice(activationCode: code)
@@ -468,7 +494,7 @@ struct PaymentTapToPayQAView: View {
     /// Confirms the partner backend answers before `initialize()` depends on it.
     private func runTokenCheck() {
         isWorking = true
-        Task {
+        Task { @MainActor in
             defer { isWorking = false }
             await tokenProbes.probeCardPresent()
         }
