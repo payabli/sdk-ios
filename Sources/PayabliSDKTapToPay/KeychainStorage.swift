@@ -146,15 +146,22 @@ public struct KeychainStorage: SecureStorage, Sendable {
 // MARK: - Storage keys used by the SDK (§22.1)
 
 public enum PayabliKeychainKey {
-    public static let keyId = "com.payabli.ttp.keyId"
-    public static let deviceId = "com.payabli.ttp.deviceId"
+    public static let keyId = Stored.keyId.rawValue
+    public static let deviceId = Stored.deviceId.rawValue
 
     /// Holds a freshly generated App Attest key that has not yet completed
     /// attestation. Kept separate from `keyId` so a pre-attest retry can reuse
     /// the same Secure Enclave key without ever tripping `isAlreadyAttested`
     /// (which only consults `keyId` + `deviceId`).
-    public static let pendingKeyId = "com.payabli.ttp.pendingKeyId"
+    public static let pendingKeyId = Stored.pendingKeyId.rawValue
 
-    /// Every key the SDK writes, so a sweep over them cannot miss one.
-    static let all = [keyId, deviceId, pendingKeyId]
+    /// The keys themselves. The constants above are the names callers use, and a
+    /// key added here joins `all` by being a case, so a sweep cannot miss one.
+    enum Stored: String, CaseIterable {
+        case keyId = "com.payabli.ttp.keyId"
+        case deviceId = "com.payabli.ttp.deviceId"
+        case pendingKeyId = "com.payabli.ttp.pendingKeyId"
+    }
+
+    static let all = Stored.allCases.map(\.rawValue)
 }

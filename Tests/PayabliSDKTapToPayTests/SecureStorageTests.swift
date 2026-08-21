@@ -156,14 +156,19 @@ final class SecureStorageTests: XCTestCase {
         #endif
     }
 
-    /// The warm path only reads, so an install that already attested never writes
-    /// again and would keep the old attribute for good. The sweep is what rewrites
-    /// it, and it has to cover every key the SDK stores.
-    func testTheSweepCoversEveryKeyTheSDKStores() {
-        XCTAssertEqual(
-            Set(PayabliKeychainKey.all),
-            [PayabliKeychainKey.keyId, PayabliKeychainKey.deviceId, PayabliKeychainKey.pendingKeyId]
-        )
+    /// The sweep runs over `all`, and the names callers use come from the same
+    /// cases, so a key cannot be stored under a name the sweep does not visit.
+    func testEveryNameCallersUseIsSwept() {
+        let names = [
+            PayabliKeychainKey.keyId,
+            PayabliKeychainKey.deviceId,
+            PayabliKeychainKey.pendingKeyId
+        ]
+
+        for name in names {
+            XCTAssertTrue(PayabliKeychainKey.all.contains(name), name)
+        }
+        XCTAssertEqual(PayabliKeychainKey.all.count, PayabliKeychainKey.Stored.allCases.count)
     }
 
     /// Skips on the same terms as the round trip above.
@@ -225,5 +230,6 @@ final class SecureStorageTests: XCTestCase {
     func testStorageKeyConstantsMatchPRD() {
         XCTAssertEqual(PayabliKeychainKey.keyId, "com.payabli.ttp.keyId")
         XCTAssertEqual(PayabliKeychainKey.deviceId, "com.payabli.ttp.deviceId")
+        XCTAssertEqual(PayabliKeychainKey.pendingKeyId, "com.payabli.ttp.pendingKeyId")
     }
 }
