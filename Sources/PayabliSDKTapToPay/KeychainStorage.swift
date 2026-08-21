@@ -24,8 +24,11 @@ public struct KeychainStorage: SecureStorage, Sendable {
 
     private let service: String
 
+    /// Opening the store corrects what an older version of the SDK wrote, since
+    /// nothing else will: see `migrateAccessibility(forKeys:)`.
     public init(service: String = KeychainStorage.service) {
         self.service = service
+        migrateAccessibility(forKeys: PayabliKeychainKey.all)
     }
 
     // MARK: - Read
@@ -58,27 +61,65 @@ public struct KeychainStorage: SecureStorage, Sendable {
         try set(data, forKey: key)
     }
 
+    /// `AfterFirstUnlock` because the SDK reads these outside a foreground
+    /// session. `ThisDeviceOnly` because `keyId` names a Secure Enclave key no
+    /// backup carries, so a restored copy is an identity the new phone cannot
+    /// sign for.
+    private static let accessibility = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+
+    /// What both write paths carry, built once so neither can be given a
+    /// different attribute from the other.
+    static func writeAttributes(_ data: Data) -> [String: Any] {
+        [
+            kSecValueData as String: data,
+            kSecAttrAccessible as String: accessibility
+        ]
+    }
+
     func set(_ data: Data, forKey key: String) throws {
         let baseQuery: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrAccount as String: key
         ]
+        let attributes = Self.writeAttributes(data)
 
         // Update in place if it exists; otherwise add.
-        let updateAttributes: [String: Any] = [
-            kSecValueData as String: data,
-            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock
-        ]
-        var status = SecItemUpdate(baseQuery as CFDictionary, updateAttributes as CFDictionary)
+        var status = SecItemUpdate(baseQuery as CFDictionary, attributes as CFDictionary)
         if status == errSecItemNotFound {
-            var addQuery = baseQuery
-            addQuery[kSecValueData as String] = data
-            addQuery[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlock
-            status = SecItemAdd(addQuery as CFDictionary, nil)
+            status = SecItemAdd(baseQuery.merging(attributes) { _, new in new } as CFDictionary, nil)
         }
         guard status == errSecSuccess else {
             throw KeychainError.underlying(status)
+        }
+    }
+
+    // MARK: - Migration
+
+    /// Corrects the attribute on what is already stored, so an install that
+    /// attested before this attribute existed stops being carried by a backup.
+    ///
+    /// Correcting an item is its next write, and the warm path only reads: a phone
+    /// that has already attested never writes again, so without this it keeps the
+    /// old attribute for as long as the install lasts.
+    ///
+    /// The attribute is changed on its own, without reading the value or writing it
+    /// back. Reading and rewriting would let a value deleted in between be put back
+    /// from the copy in hand, and `pendingKeyId` is deleted once attestation ends.
+    ///
+    /// Runs whenever the store is opened rather than once behind a flag, since the
+    /// flag would be another stored item and a locked Keychain makes any single
+    /// attempt a no-op. An item it cannot reach waits for the next one.
+    func migrateAccessibility(forKeys keys: [String]) {
+        for key in keys {
+            let query: [String: Any] = [
+                kSecClass as String: kSecClassGenericPassword,
+                kSecAttrService as String: service,
+                kSecAttrAccount as String: key
+            ]
+            _ = SecItemUpdate(query as CFDictionary, [
+                kSecAttrAccessible as String: Self.accessibility
+            ] as CFDictionary)
         }
     }
 
@@ -105,12 +146,22 @@ public struct KeychainStorage: SecureStorage, Sendable {
 // MARK: - Storage keys used by the SDK (§22.1)
 
 public enum PayabliKeychainKey {
-    public static let keyId = "com.payabli.ttp.keyId"
-    public static let deviceId = "com.payabli.ttp.deviceId"
+    public static let keyId = Stored.keyId.rawValue
+    public static let deviceId = Stored.deviceId.rawValue
 
     /// Holds a freshly generated App Attest key that has not yet completed
     /// attestation. Kept separate from `keyId` so a pre-attest retry can reuse
     /// the same Secure Enclave key without ever tripping `isAlreadyAttested`
     /// (which only consults `keyId` + `deviceId`).
-    public static let pendingKeyId = "com.payabli.ttp.pendingKeyId"
+    public static let pendingKeyId = Stored.pendingKeyId.rawValue
+
+    /// The keys themselves. The constants above are the names callers use, and a
+    /// key added here joins `all` by being a case, so a sweep cannot miss one.
+    enum Stored: String, CaseIterable {
+        case keyId = "com.payabli.ttp.keyId"
+        case deviceId = "com.payabli.ttp.deviceId"
+        case pendingKeyId = "com.payabli.ttp.pendingKeyId"
+    }
+
+    static let all = Stored.allCases.map(\.rawValue)
 }
