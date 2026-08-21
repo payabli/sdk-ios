@@ -55,11 +55,7 @@ final class SecureStorageTests: XCTestCase {
         #endif
     }
 
-    /// The attribute the item was written with, read back from the Keychain
-    /// itself. Every item here names one device, so an item that travels on a
-    /// backup arrives on a handset whose Secure Enclave key did not come with it.
-    ///
-    /// Skips on the same terms as the round trip above, and for the same reason.
+    /// Skips on the same terms as the round trip above.
     func testKeychainItemsAreWrittenForThisDeviceOnlyIfAvailable() throws {
         #if os(macOS) && !targetEnvironment(simulator)
             throw XCTSkip("Keychain services require a running keychaind; covered by device QA (§12.3).")
@@ -90,7 +86,45 @@ final class SecureStorageTests: XCTestCase {
             XCTAssertEqual(
                 attributes[kSecAttrAccessible as String] as? String,
                 kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly as String,
-                "the item is written to travel"
+                "the item was written with an attribute that lets a backup carry it to another device"
+            )
+        #endif
+    }
+
+    /// An existing item is corrected by its next write, which takes the update
+    /// path rather than the add path the test above covers.
+    func testRewritingALegacyItemStopsItTravellingIfAvailable() throws {
+        #if os(macOS) && !targetEnvironment(simulator)
+            throw XCTSkip("Keychain services require a running keychaind; covered by device QA (§12.3).")
+        #else
+            let service = "com.payabli.tests.\(UUID().uuidString)"
+            let base: [String: Any] = [
+                kSecClass as String: kSecClassGenericPassword,
+                kSecAttrService as String: service,
+                kSecAttrAccount as String: "sample_key"
+            ]
+            defer { SecItemDelete(base as CFDictionary) }
+
+            var legacy = base
+            legacy[kSecValueData as String] = Data("before".utf8)
+            legacy[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlock
+            let seeded = SecItemAdd(legacy as CFDictionary, nil)
+            try XCTSkipUnless(
+                seeded == errSecSuccess,
+                "Keychain unavailable in this test host (OSStatus \(seeded)); covered by device QA (§12.3)."
+            )
+
+            try KeychainStorage(service: service).set("after", forKey: "sample_key")
+
+            var item: CFTypeRef?
+            var query = base
+            query[kSecReturnAttributes as String] = true
+            XCTAssertEqual(SecItemCopyMatching(query as CFDictionary, &item), errSecSuccess)
+            let attributes = try XCTUnwrap(item as? [String: Any])
+            XCTAssertEqual(
+                attributes[kSecAttrAccessible as String] as? String,
+                kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly as String,
+                "rewriting an existing item left it with the attribute a backup can carry"
             )
         #endif
     }
