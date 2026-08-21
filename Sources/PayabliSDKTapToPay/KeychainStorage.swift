@@ -64,24 +64,27 @@ public struct KeychainStorage: SecureStorage, Sendable {
     /// sign for.
     private static let accessibility = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
 
+    /// What both write paths carry, built once so neither can be given a
+    /// different attribute from the other.
+    static func writeAttributes(_ data: Data) -> [String: Any] {
+        [
+            kSecValueData as String: data,
+            kSecAttrAccessible as String: accessibility
+        ]
+    }
+
     func set(_ data: Data, forKey key: String) throws {
         let baseQuery: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrAccount as String: key
         ]
+        let attributes = Self.writeAttributes(data)
 
         // Update in place if it exists; otherwise add.
-        let updateAttributes: [String: Any] = [
-            kSecValueData as String: data,
-            kSecAttrAccessible as String: Self.accessibility
-        ]
-        var status = SecItemUpdate(baseQuery as CFDictionary, updateAttributes as CFDictionary)
+        var status = SecItemUpdate(baseQuery as CFDictionary, attributes as CFDictionary)
         if status == errSecItemNotFound {
-            var addQuery = baseQuery
-            addQuery[kSecValueData as String] = data
-            addQuery[kSecAttrAccessible as String] = Self.accessibility
-            status = SecItemAdd(addQuery as CFDictionary, nil)
+            status = SecItemAdd(baseQuery.merging(attributes) { _, new in new } as CFDictionary, nil)
         }
         guard status == errSecSuccess else {
             throw KeychainError.underlying(status)

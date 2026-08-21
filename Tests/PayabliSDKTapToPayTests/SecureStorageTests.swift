@@ -55,6 +55,19 @@ final class SecureStorageTests: XCTestCase {
         #endif
     }
 
+    /// The attribute both write paths carry, asserted without a Keychain, since no
+    /// test host here has one to answer with.
+    func testWritesCarryTheDeviceOnlyAttribute() {
+        let attributes = KeychainStorage.writeAttributes(Data("v".utf8))
+
+        XCTAssertEqual(
+            attributes[kSecAttrAccessible as String] as? String,
+            kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly as String,
+            "an item written with this attribute can be carried to another device by a backup"
+        )
+        XCTAssertEqual(attributes[kSecValueData as String] as? Data, Data("v".utf8))
+    }
+
     /// Skips on the same terms as the round trip above.
     func testKeychainItemsAreWrittenForThisDeviceOnlyIfAvailable() throws {
         #if os(macOS) && !targetEnvironment(simulator)
