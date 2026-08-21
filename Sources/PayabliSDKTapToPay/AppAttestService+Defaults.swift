@@ -10,12 +10,16 @@ import Foundation
 // Injectable `@Sendable` closures; macOS test builds fall back to stand-ins.
 
 extension AppAttestService {
+    /// Blank when the platform has no identifier to give, which registration
+    /// refuses. A value invented here is not an identifier: it differs per call,
+    /// so every call registers a device and the failure never surfaces. The
+    /// sibling SDK returns a blank for the same reason.
     static var defaultHardwareId: @Sendable () -> String {
         {
             #if canImport(UIKit)
-                return UIDevice.current.identifierForVendor?.uuidString ?? UUID().uuidString
+                return UIDevice.current.identifierForVendor?.uuidString ?? ""
             #else
-                return UUID().uuidString
+                return ""
             #endif
         }
     }
