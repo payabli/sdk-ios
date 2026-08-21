@@ -197,7 +197,11 @@ final class SecureStorageTests: XCTestCase {
                 kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly as String,
                 "the sweep left the item with the attribute a backup can carry"
             )
-            XCTAssertEqual(storage.string(forKey: PayabliKeychainKey.deviceId), "device-77")
+            XCTAssertEqual(
+                storage.string(forKey: PayabliKeychainKey.deviceId),
+                "device-77",
+                "the sweep changed the value, which it never reads"
+            )
         #endif
     }
 

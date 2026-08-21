@@ -96,21 +96,30 @@ public struct KeychainStorage: SecureStorage, Sendable {
 
     // MARK: - Migration
 
-    /// Rewrites what is already stored, so an install that attested before this
-    /// attribute existed stops being carried by a backup.
+    /// Corrects the attribute on what is already stored, so an install that
+    /// attested before this attribute existed stops being carried by a backup.
     ///
     /// Correcting an item is its next write, and the warm path only reads: a phone
     /// that has already attested never writes again, so without this it keeps the
-    /// old attribute for as long as the install lasts. Rewriting the same bytes is
-    /// what changes the attribute.
+    /// old attribute for as long as the install lasts.
+    ///
+    /// The attribute is changed on its own, without reading the value or writing it
+    /// back. Reading and rewriting would let a value deleted in between be put back
+    /// from the copy in hand, and `pendingKeyId` is deleted once attestation ends.
     ///
     /// Runs whenever the store is opened rather than once behind a flag, since the
     /// flag would be another stored item and a locked Keychain makes any single
-    /// attempt a no-op. An item that cannot be read yet waits for the next one.
+    /// attempt a no-op. An item it cannot reach waits for the next one.
     func migrateAccessibility(forKeys keys: [String]) {
         for key in keys {
-            guard let data = data(forKey: key) else { continue }
-            try? set(data, forKey: key)
+            let query: [String: Any] = [
+                kSecClass as String: kSecClassGenericPassword,
+                kSecAttrService as String: service,
+                kSecAttrAccount as String: key
+            ]
+            _ = SecItemUpdate(query as CFDictionary, [
+                kSecAttrAccessible as String: Self.accessibility
+            ] as CFDictionary)
         }
     }
 
