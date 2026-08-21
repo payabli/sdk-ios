@@ -45,15 +45,18 @@ public struct AssertionHeaders: Sendable {
 /// this protocol isolates it so the rest of the TTP flow is unit-testable
 /// without iOS entitlements or network access.
 public protocol DeviceAttestationService: AnyObject, Sendable {
-    /// Whether attestation has already been performed on this device (i.e.
-    /// `keyId` + `deviceId` are cached). Used to pick warm vs cold path
-    /// during `initialize()` (PRD §18.3).
-    var isAlreadyAttested: Bool { get }
+    /// Whether this device holds a binding **for this entry point**. Used to pick
+    /// warm versus cold path during `initialize()` (PRD §18.3).
+    ///
+    /// Scoped to the entry point: a handle issued under another one is not this
+    /// device's enrolment here, and presenting it is refused. The sibling SDK
+    /// scopes the same question the same way.
+    func isAttested(for entry: String) -> Bool
 
-    /// The backend-assigned `deviceId` persisted from a prior successful
-    /// attestation, or `nil` if the device has not been attested yet. The
-    /// facade uses this on the warm path where `attest()` is skipped.
-    var cachedDeviceId: String? { get }
+    /// The backend-assigned `deviceId` this entry point was registered under, or
+    /// `nil` when it holds no binding. The facade uses this on the warm path
+    /// where `attest()` is skipped.
+    func cachedDeviceId(for entry: String) -> String?
 
     /// Runs the first-run attestation flow: challenge → register → attest.
     /// Throws `PayabliTTPError.devicePendingActivation` if the backend returns
@@ -62,7 +65,10 @@ public protocol DeviceAttestationService: AnyObject, Sendable {
 
     /// Produces fresh `AssertionHeaders` (signed over a current timestamp) for
     /// the next protected request. PRD §18.2.
-    func generateAssertion() async throws -> AssertionHeaders
+    ///
+    /// Takes the entry point because the headers name the handle this device
+    /// holds for it, and a handle from another paypoint is refused.
+    func generateAssertion(for entry: String) async throws -> AssertionHeaders
 
     /// Activates a pending device with an activation code issued out-of-band
     /// by the partner (e.g. from their admin dashboard). The SDK does not
@@ -70,7 +76,8 @@ public protocol DeviceAttestationService: AnyObject, Sendable {
     /// to the device user. PRD §9.7.
     func activateDevice(activationCode: String, entry: String) async throws
 
-    /// Clears cached attestation state (triggers a full re-attestation on next
-    /// `initialize()`). Called on 401 from the config endpoint (PRD §18.4).
-    func clearCache()
+    /// Drops this entry point's binding, so the next `initialize()` for it runs
+    /// the cold sequence. Called on 401 from the config endpoint (PRD §18.4).
+    /// Every other entry point's binding is left alone.
+    func clearCache(for entry: String)
 }

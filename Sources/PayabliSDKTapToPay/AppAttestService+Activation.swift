@@ -5,7 +5,7 @@ import PayabliSDKCore
 
 public extension AppAttestService {
     func activateDevice(activationCode: String, entry: String) async throws {
-        guard let deviceId = storage.string(forKey: PayabliKeychainKey.deviceId) else {
+        guard let deviceId = cachedDeviceId(for: entry) else {
             throw PayabliTTPError.attestationFailed(reason: "Missing deviceId — run initialize() before activateDevice")
         }
 
@@ -14,7 +14,7 @@ public extension AppAttestService {
         // assertion is signed over a fresh timestamp, not the challenge.
         _ = try await postChallenge(entry: entry)
 
-        let assertion = try await generateAssertion()
+        let assertion = try await generateAssertion(for: entry)
 
         try await postAttestationRequestExpectingNoBody(
             path: "/api/v2/device/taptopay/activate",
@@ -28,7 +28,7 @@ public extension AppAttestService {
                 // are useless; wipe them and force a fresh `initialize()`.
                 if code == 401 {
                     self.logger.error("[activate] clearing local attestation cache and signaling attestationRevoked")
-                    self.clearCache()
+                    self.clearCache(for: entry)
                     return .attestationRevoked(reason: reason)
                 }
                 return .activationFailed(reason: reason)

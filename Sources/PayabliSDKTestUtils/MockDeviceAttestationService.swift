@@ -7,16 +7,37 @@ import PayabliSDKTapToPay
 public final class MockDeviceAttestationService: DeviceAttestationService, @unchecked Sendable {
     private let lock = NSLock()
 
-    private var _isAlreadyAttested = false
-    public var isAlreadyAttested: Bool {
-        get { lock.withLock { _isAlreadyAttested } }
-        set { lock.withLock { _isAlreadyAttested = newValue } }
+    /// Which entry points hold a binding, and the handle each was registered
+    /// under. Keyed, so a test can set one entry point up and check that another
+    /// reads as unenrolled.
+    private var _bindings: [String: String] = [:]
+    public var bindings: [String: String] {
+        get { lock.withLock { _bindings } }
+        set { lock.withLock { _bindings = newValue } }
     }
 
-    private var _cachedDeviceId: String?
+    /// Sets or clears the binding every entry point sees. For tests that only
+    /// care whether the device is enrolled, not for which paypoint.
+    public var isAlreadyAttested: Bool {
+        get { lock.withLock { !_bindings.isEmpty } }
+        set { lock.withLock { _bindings = newValue ? [Self.anyEntry: "mock_device"] : [:] } }
+    }
+
+    /// The handle any entry point would read, when only one was set up.
     public var cachedDeviceId: String? {
-        get { lock.withLock { _cachedDeviceId } }
-        set { lock.withLock { _cachedDeviceId = newValue } }
+        get { lock.withLock { _bindings.values.first } }
+        set { lock.withLock { _bindings = newValue.map { [Self.anyEntry: $0] } ?? [:] } }
+    }
+
+    /// The entry point the unkeyed setters above stand in for.
+    public static let anyEntry = "mockEntry"
+
+    public func isAttested(for entry: String) -> Bool {
+        lock.withLock { _bindings[entry] != nil || _bindings[Self.anyEntry] != nil }
+    }
+
+    public func cachedDeviceId(for entry: String) -> String? {
+        lock.withLock { _bindings[entry] ?? _bindings[Self.anyEntry] }
     }
 
     private var _attestResult: Result<AttestationResult, Error> = .success(
@@ -57,17 +78,14 @@ public final class MockDeviceAttestationService: DeviceAttestationService, @unch
         }
         switch result {
         case let .success(value):
-            lock.withLock {
-                _isAlreadyAttested = true
-                _cachedDeviceId = value.deviceId
-            }
+            lock.withLock { _bindings[entry] = value.deviceId }
             return value
         case let .failure(err):
             throw err
         }
     }
 
-    public func generateAssertion() async throws -> AssertionHeaders {
+    public func generateAssertion(for entry: String) async throws -> AssertionHeaders {
         lock.withLock { _assertionCalls += 1 }
         return AssertionHeaders(
             assertion: "mock_assertion",
@@ -87,7 +105,10 @@ public final class MockDeviceAttestationService: DeviceAttestationService, @unch
         }
     }
 
-    public func clearCache() {
-        lock.withLock { _isAlreadyAttested = false }
+    public func clearCache(for entry: String) {
+        lock.withLock {
+            _bindings[entry] = nil
+            _bindings[Self.anyEntry] = nil
+        }
     }
 }

@@ -38,7 +38,7 @@ public final class TTPConfigClient: Sendable {
     /// The SDK flattens `credentials` into `TTPConfig.providerCredentials`
     /// for the TapToPayProvider to consume.
     public func fetchConfig(entry: String) async throws -> TTPConfig {
-        let headers = try await assertionHeaders()
+        let headers = try await assertionHeaders(entry: entry)
 
         // Attestation headers are component-specific; bearer is added by the transport.
         let request = PayabliRequest(
@@ -96,7 +96,7 @@ public final class TTPConfigClient: Sendable {
         )
     }
 
-    private func assertionHeaders() async throws -> AssertionHeaders {
-        try await attestation.generateAssertion()
+    private func assertionHeaders(entry: String) async throws -> AssertionHeaders {
+        try await attestation.generateAssertion(for: entry)
     }
 }

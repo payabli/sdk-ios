@@ -34,6 +34,18 @@ final class AppAttestServiceTests: XCTestCase {
         return (sut, attestor, auth)
     }
 
+    /// Writes a binding the way the service does, so a test starts warm.
+    private func seedBinding(
+        entry: String,
+        deviceId: String,
+        keyId: String,
+        in storage: SecureStorage
+    ) throws {
+        let bindings = DeviceBindings([AttestedDevice(entry: entry, deviceId: deviceId, keyId: keyId)])
+        let data = try JSONEncoder().encode(bindings)
+        try storage.set(XCTUnwrap(String(bytes: data, encoding: .utf8)), forKey: PayabliKeychainKey.deviceBindings)
+    }
+
     private func response(_ status: Int, body: Data, url: URL) -> (HTTPURLResponse, Data) {
         (HTTPURLResponse(
             url: url,
@@ -84,7 +96,7 @@ final class AppAttestServiceTests: XCTestCase {
         let storage = InMemorySecureStorage()
         let (sut, attestor, _) = makeAttest(storage: storage)
 
-        XCTAssertFalse(sut.isAlreadyAttested)
+        XCTAssertFalse(sut.isAttested(for: "myEntry"))
         let result = try await sut.attest(entry: "myEntry", appId: "TEAM.bundle.id")
 
         XCTAssertEqual(result.deviceId, "dev_1")
@@ -98,9 +110,9 @@ final class AppAttestServiceTests: XCTestCase {
         ])
 
         // Persistence
-        XCTAssertTrue(sut.isAlreadyAttested)
-        XCTAssertEqual(storage.string(forKey: PayabliKeychainKey.keyId), "mock_keyId")
-        XCTAssertEqual(storage.string(forKey: PayabliKeychainKey.deviceId), "dev_1")
+        XCTAssertTrue(sut.isAttested(for: "myEntry"))
+        XCTAssertEqual(sut.binding(for: "myEntry")?.keyId, "mock_keyId")
+        XCTAssertEqual(sut.binding(for: "myEntry")?.deviceId, "dev_1")
     }
 
     // MARK: - Pending activation
@@ -147,7 +159,7 @@ final class AppAttestServiceTests: XCTestCase {
             ])
             XCTAssertEqual(attestor.generateKeyCalls, 1)
             XCTAssertEqual(attestor.attestKeyCalls, 1)
-            XCTAssertEqual(storage.string(forKey: PayabliKeychainKey.deviceId), "dev_pending")
+            XCTAssertEqual(sut.binding(for: "myEntry")?.deviceId, "dev_pending")
         } catch {
             XCTFail("wrong error: \(error)")
         }
@@ -189,9 +201,9 @@ final class AppAttestServiceTests: XCTestCase {
             // expected
         }
 
-        XCTAssertFalse(sut.isAlreadyAttested)
-        XCTAssertNil(storage.string(forKey: PayabliKeychainKey.keyId))
-        XCTAssertNil(storage.string(forKey: PayabliKeychainKey.deviceId))
+        XCTAssertFalse(sut.isAttested(for: "myEntry"))
+        XCTAssertNil(sut.binding(for: "myEntry")?.keyId)
+        XCTAssertNil(sut.binding(for: "myEntry")?.deviceId)
         // `attestKey` burns the key, so the pending slot must be cleared too:
         // the next attempt must mint a new key rather than replay a burned one.
         XCTAssertNil(storage.string(forKey: PayabliKeychainKey.pendingKeyId))
@@ -240,7 +252,7 @@ final class AppAttestServiceTests: XCTestCase {
             // expected
         }
         XCTAssertEqual(attestor.generateKeyCalls, 1)
-        XCTAssertFalse(sut.isAlreadyAttested)
+        XCTAssertFalse(sut.isAttested(for: "myEntry"))
         XCTAssertEqual(
             storage.string(forKey: PayabliKeychainKey.pendingKeyId),
             "mock_keyId",
@@ -252,7 +264,7 @@ final class AppAttestServiceTests: XCTestCase {
         XCTAssertEqual(result.keyId, "mock_keyId")
         XCTAssertEqual(attestor.generateKeyCalls, 1, "the pending key should be reused, not regenerated")
         XCTAssertEqual(attestor.attestKeyCalls, 1)
-        XCTAssertTrue(sut.isAlreadyAttested)
+        XCTAssertTrue(sut.isAttested(for: "myEntry"))
         XCTAssertNil(
             storage.string(forKey: PayabliKeychainKey.pendingKeyId),
             "pending slot must be cleared once attestation completes"
@@ -263,11 +275,10 @@ final class AppAttestServiceTests: XCTestCase {
 
     func testGenerateAssertionProducesHeaders() async throws {
         let storage = InMemorySecureStorage()
-        try storage.set("cached_keyId", forKey: PayabliKeychainKey.keyId)
-        try storage.set("cached_deviceId", forKey: PayabliKeychainKey.deviceId)
+        try seedBinding(entry: "myEntry", deviceId: "cached_deviceId", keyId: "cached_keyId", in: storage)
 
         let (sut, attestor, _) = makeAttest(storage: storage)
-        let headers = try await sut.generateAssertion()
+        let headers = try await sut.generateAssertion(for: "myEntry")
         XCTAssertEqual(headers.keyId, "cached_keyId")
         XCTAssertEqual(headers.deviceId, "cached_deviceId")
         XCTAssertFalse(headers.assertion.isEmpty)
@@ -278,7 +289,7 @@ final class AppAttestServiceTests: XCTestCase {
     func testGenerateAssertionFailsWithoutState() async throws {
         let (sut, _, _) = makeAttest()
         do {
-            _ = try await sut.generateAssertion()
+            _ = try await sut.generateAssertion(for: "myEntry")
             XCTFail("expected throw")
         } catch PayabliTTPError.attestationFailed {
             // ok
@@ -292,52 +303,93 @@ final class AppAttestServiceTests: XCTestCase {
     /// service must clear the cache so the next `initialize()` re-attests.
     func testGenerateAssertionClearsCacheOnDeviceCheckError() async throws {
         let storage = InMemorySecureStorage()
-        try storage.set("cached_keyId", forKey: PayabliKeychainKey.keyId)
-        try storage.set("cached_deviceId", forKey: PayabliKeychainKey.deviceId)
+        try seedBinding(entry: "myEntry", deviceId: "cached_deviceId", keyId: "cached_keyId", in: storage)
 
         let (sut, attestor, _) = makeAttest(storage: storage)
         attestor.generateAssertionError = NSError(domain: AppAttestService.deviceCheckErrorDomain, code: 2)
 
         do {
-            _ = try await sut.generateAssertion()
+            _ = try await sut.generateAssertion(for: "myEntry")
             XCTFail("expected throw")
         } catch {
             XCTAssertEqual((error as NSError).domain, AppAttestService.deviceCheckErrorDomain)
         }
 
-        XCTAssertFalse(sut.isAlreadyAttested, "DeviceCheck failure should clear the attestation cache")
+        XCTAssertFalse(sut.isAttested(for: "myEntry"), "DeviceCheck failure should clear the attestation cache")
     }
 
     /// A non-DeviceCheck failure (e.g. a transient wrapper error) must NOT wipe
     /// a perfectly valid attestation.
     func testGenerateAssertionKeepsCacheOnNonDeviceCheckError() async throws {
         let storage = InMemorySecureStorage()
-        try storage.set("cached_keyId", forKey: PayabliKeychainKey.keyId)
-        try storage.set("cached_deviceId", forKey: PayabliKeychainKey.deviceId)
+        try seedBinding(entry: "myEntry", deviceId: "cached_deviceId", keyId: "cached_keyId", in: storage)
 
         let (sut, attestor, _) = makeAttest(storage: storage)
         attestor.generateAssertionError = NSError(domain: "com.example.other", code: 7)
 
         do {
-            _ = try await sut.generateAssertion()
+            _ = try await sut.generateAssertion(for: "myEntry")
             XCTFail("expected throw")
         } catch {
             // expected
         }
 
-        XCTAssertTrue(sut.isAlreadyAttested, "non-DeviceCheck failures must not clear attestation state")
+        XCTAssertTrue(sut.isAttested(for: "myEntry"), "non-DeviceCheck failures must not clear attestation state")
     }
 
     // MARK: - clearCache
 
-    func testClearCacheRemovesKeychainState() throws {
+    func testClearCacheRemovesThisEntryPointsBinding() throws {
         let storage = InMemorySecureStorage()
-        try storage.set("a", forKey: PayabliKeychainKey.keyId)
-        try storage.set("b", forKey: PayabliKeychainKey.deviceId)
+        try seedBinding(entry: "myEntry", deviceId: "b", keyId: "a", in: storage)
         let (sut, _, _) = makeAttest(storage: storage)
 
-        sut.clearCache()
-        XCTAssertFalse(sut.isAlreadyAttested)
+        sut.clearCache(for: "myEntry")
+
+        XCTAssertFalse(sut.isAttested(for: "myEntry"))
+    }
+
+    /// A refusal is about the paypoint that refused. Dropping the rest would
+    /// re-enrol devices nothing was wrong with, each at the cost of a code.
+    func testClearCacheLeavesEveryOtherBindingAlone() {
+        let storage = InMemorySecureStorage()
+        let (sut, _, _) = makeAttest(storage: storage)
+        sut.remember(AttestedDevice(entry: "entryA", deviceId: "devA", keyId: "keyA"))
+        sut.remember(AttestedDevice(entry: "entryB", deviceId: "devB", keyId: "keyB"))
+
+        sut.clearCache(for: "entryA")
+
+        XCTAssertFalse(sut.isAttested(for: "entryA"))
+        XCTAssertEqual(sut.cachedDeviceId(for: "entryB"), "devB")
+    }
+
+    /// The defect this ticket names: a session configured for one paypoint while
+    /// holding another's handle must report not enrolled, so nothing is sent and
+    /// the other paypoint's record is left intact.
+    func testAHandleFromAnotherPaypointIsNotThisOnesEnrolment() {
+        let storage = InMemorySecureStorage()
+        let (sut, _, _) = makeAttest(storage: storage)
+        sut.remember(AttestedDevice(entry: "entryA", deviceId: "devA", keyId: "keyA"))
+
+        XCTAssertFalse(sut.isAttested(for: "entryB"))
+        XCTAssertNil(sut.cachedDeviceId(for: "entryB"))
+        XCTAssertEqual(sut.cachedDeviceId(for: "entryA"), "devA")
+    }
+
+    /// An identity stored before the paypoint was recorded cannot be adopted:
+    /// nothing says which paypoint issued it, and presenting it to the wrong one
+    /// is what retires a device that was still active. It goes, and the device
+    /// enrols once.
+    func testAnIdentityStoredWithoutItsPaypointIsDiscarded() throws {
+        let storage = InMemorySecureStorage()
+        try storage.set("old_key", forKey: "com.payabli.ttp.keyId")
+        try storage.set("old_device", forKey: "com.payabli.ttp.deviceId")
+
+        let (sut, _, _) = makeAttest(storage: storage)
+
+        XCTAssertFalse(sut.isAttested(for: "myEntry"))
+        XCTAssertNil(storage.string(forKey: "com.payabli.ttp.keyId"))
+        XCTAssertNil(storage.string(forKey: "com.payabli.ttp.deviceId"))
     }
 }
 

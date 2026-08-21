@@ -32,6 +32,7 @@ public final class AppAttestService: DeviceAttestationService, @unchecked Sendab
     let transport: any PayabliTransport
     let attestor: AppAttestor
     let storage: SecureStorage
+    let bindingStore: AttestedDeviceStore
     let logger = PayabliLogger(category: .taptopay)
 
     // Injected so tests on macOS can substitute deterministic values.
@@ -68,26 +69,41 @@ public final class AppAttestService: DeviceAttestationService, @unchecked Sendab
         self.transport = transport
         self.attestor = attestor
         self.storage = storage
+        bindingStore = AttestedDeviceStore(storage: storage)
         self.hardwareIdProvider = hardwareIdProvider
         self.deviceNameProvider = deviceNameProvider
         self.modelProvider = modelProvider
         self.osVersionProvider = osVersionProvider
     }
 
-    // MARK: DeviceAttestationService — cached state
+    // MARK: DeviceAttestationService — the binding this device holds
 
-    public var isAlreadyAttested: Bool {
-        storage.string(forKey: PayabliKeychainKey.keyId) != nil
-            && storage.string(forKey: PayabliKeychainKey.deviceId) != nil
+    /// Whether this device is enrolled **for this entry point**. A handle issued
+    /// under another one answers false: the device is not enrolled here, and
+    /// sending that handle is what gets it refused and its record retired.
+    public func isAttested(for entry: String) -> Bool {
+        bindingStore.load().binding(for: entry) != nil
     }
 
-    public var cachedDeviceId: String? {
-        storage.string(forKey: PayabliKeychainKey.deviceId)
+    public func cachedDeviceId(for entry: String) -> String? {
+        bindingStore.load().binding(for: entry)?.deviceId
     }
 
-    public func clearCache() {
-        storage.remove(forKey: PayabliKeychainKey.keyId)
-        storage.remove(forKey: PayabliKeychainKey.deviceId)
+    /// Drops this entry point's binding and leaves every other one alone. A
+    /// refusal is about the paypoint that refused; discarding the rest would
+    /// re-enrol devices nothing was wrong with.
+    public func clearCache(for entry: String) {
+        bindingStore.save(bindingStore.load().without(entry: entry))
         storage.remove(forKey: PayabliKeychainKey.pendingKeyId)
+    }
+
+    /// The binding held for an entry point, for tests and for the two accessors
+    /// above.
+    func binding(for entry: String) -> AttestedDevice? {
+        bindingStore.load().binding(for: entry)
+    }
+
+    func remember(_ record: AttestedDevice) {
+        bindingStore.save(bindingStore.load().with(record))
     }
 }

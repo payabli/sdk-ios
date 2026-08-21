@@ -160,8 +160,7 @@ final class SecureStorageTests: XCTestCase {
     /// cases, so a key cannot be stored under a name the sweep does not visit.
     func testEveryNameCallersUseIsSwept() {
         let names = [
-            PayabliKeychainKey.keyId,
-            PayabliKeychainKey.deviceId,
+            PayabliKeychainKey.deviceBindings,
             PayabliKeychainKey.pendingKeyId
         ]
 
@@ -180,7 +179,7 @@ final class SecureStorageTests: XCTestCase {
             let base: [String: Any] = [
                 kSecClass as String: kSecClassGenericPassword,
                 kSecAttrService as String: service,
-                kSecAttrAccount as String: PayabliKeychainKey.deviceId
+                kSecAttrAccount as String: PayabliKeychainKey.deviceBindings
             ]
             defer { SecItemDelete(base as CFDictionary) }
 
@@ -203,7 +202,7 @@ final class SecureStorageTests: XCTestCase {
                 "the sweep left the item with the attribute a backup can carry"
             )
             XCTAssertEqual(
-                storage.string(forKey: PayabliKeychainKey.deviceId),
+                storage.string(forKey: PayabliKeychainKey.deviceBindings),
                 "device-77",
                 "the sweep changed the value, which it never reads"
             )
@@ -228,8 +227,16 @@ final class SecureStorageTests: XCTestCase {
     // MARK: - Storage key constants
 
     func testStorageKeyConstantsMatchPRD() {
-        XCTAssertEqual(PayabliKeychainKey.keyId, "com.payabli.ttp.keyId")
-        XCTAssertEqual(PayabliKeychainKey.deviceId, "com.payabli.ttp.deviceId")
+        XCTAssertEqual(PayabliKeychainKey.deviceBindings, "com.payabli.ttp.deviceBindings")
         XCTAssertEqual(PayabliKeychainKey.pendingKeyId, "com.payabli.ttp.pendingKeyId")
+    }
+
+    /// The two items an install from before the bindings item may hold. Named
+    /// here so removing one from the discard list fails.
+    func testTheSupersededNamesAreTheOnesAlreadyOnDevices() {
+        XCTAssertEqual(PayabliKeychainKey.superseded, [
+            "com.payabli.ttp.keyId",
+            "com.payabli.ttp.deviceId"
+        ])
     }
 }

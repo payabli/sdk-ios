@@ -176,10 +176,10 @@ extension PayabliTTP {
     /// Returns the `deviceId` to cache. On success leaves the session in
     /// `.fetchingConfig`. `.devicePendingActivation` maps to `.pendingActivation`.
     private func runAttestationPhase() async throws -> String? {
-        if attestation.isAlreadyAttested {
+        if attestation.isAttested(for: entryPoint) {
             _ = sessionManager.transition(to: .fetchingConfig)
             syncPublished()
-            return attestation.cachedDeviceId
+            return attestation.cachedDeviceId(for: entryPoint)
         }
 
         _ = sessionManager.transition(to: .attestingDevice)
@@ -217,7 +217,7 @@ extension PayabliTTP {
             markPendingActivation()
             throw PayabliTTPError.devicePendingActivation
         } catch let err as PayabliGenericError where err.code == .tokenExpired {
-            attestation.clearCache()
+            attestation.clearCache(for: entryPoint)
             let failure = PayabliTTPError.configFailed(reason: "Config rejected (401) — attestation cleared")
             // One value through all three channels. Marking the raw 401 while
             // throwing the rewrapped failure left the published state and the

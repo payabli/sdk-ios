@@ -79,18 +79,11 @@ extension AppAttestService {
             platform: Self.platform
         ))
 
-        // 6. Persist identity only now that attestation is confirmed end-to-end,
-        //    and write it atomically: if either set fails, clear both so we
-        //    never leave a half-written (keyId XOR deviceId) identity behind.
-        //    deviceId lands before we surface pending activation because
-        //    `/activate` reads both it and the keyId assertion from the Keychain.
-        do {
-            try storage.set(register.deviceId, forKey: PayabliKeychainKey.deviceId)
-            try storage.set(keyId.rawValue, forKey: PayabliKeychainKey.keyId)
-        } catch {
-            clearCache()
-            throw error
-        }
+        // 6. Record the binding only now that attestation is confirmed end to
+        //    end. One item, so there is no window in which half an identity is
+        //    stored and reads as a whole one. It lands before pending activation
+        //    is surfaced, because `/activate` reads the handle back.
+        remember(AttestedDevice(entry: entry, deviceId: register.deviceId, keyId: keyId.rawValue))
 
         if isPending {
             logger.info("Attestation stored — device still pending activation")
@@ -101,13 +94,12 @@ extension AppAttestService {
         return AttestationResult(keyId: keyId.rawValue, deviceId: register.deviceId)
     }
 
-    public func generateAssertion() async throws -> AssertionHeaders {
-        guard let storedKeyId = storage.string(forKey: PayabliKeychainKey.keyId),
-              let deviceId = storage.string(forKey: PayabliKeychainKey.deviceId)
-        else {
+    public func generateAssertion(for entry: String) async throws -> AssertionHeaders {
+        guard let binding = bindingStore.load().binding(for: entry) else {
             throw PayabliTTPError.attestationFailed(reason: "Missing attestation state")
         }
-        let keyId = AppAttestKeyId(storedKeyId)
+        let keyId = AppAttestKeyId(binding.keyId)
+        let deviceId = binding.deviceId
 
         // The server verifies the assertion against `X-Assertion-Timestamp`, so
         // client-data is the SHA-256 of the same ISO-8601 string we send.
@@ -131,7 +123,7 @@ extension AppAttestService {
             if (error as NSError).domain == Self.deviceCheckErrorDomain {
                 let code = (error as NSError).code
                 logger.error("generateAssertion failed with DeviceCheck error (code \(code)) — clearing attestation cache")
-                clearCache()
+                clearCache(for: entry)
             }
             throw error
         }
