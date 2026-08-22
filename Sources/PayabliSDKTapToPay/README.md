@@ -261,8 +261,7 @@ The SDK handles two data classes with different persistence rules:
 
 | Data | Where it lives | Lifetime | Reference |
 |---|---|---|---|
-| Device bindings: `entry`, `deviceId`, `keyId`, one per paypoint | Keychain (`KeychainStorage`), one item | Until `clearCache(for:)`, a reinstall, or device wipe | NFR-5E, PRD §22.1 |
-| Installation stamp | Keychain **and** the app container, written together | The app container half dies with the installation | — |
+| Device bindings: `entry`, `deviceId`, `keyId`, one per paypoint | Keychain (`KeychainStorage`), one item | Until `clearCache(for:)`, the key it names is gone, or device wipe | NFR-5E, PRD §22.1 |
 | Access token, provider credentials (Fiserv), assertions, in-flight transaction bodies | RAM only, adapter + auth objects | Seconds to minutes | NFR-5D |
 
 Nothing else persists to disk. Adapters must drop `self.credentials = nil`
