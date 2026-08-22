@@ -147,6 +147,34 @@ public final class AppAttestService: DeviceAttestationService, @unchecked Sendab
 
     /// The binding held for an entry point, for tests and for the two accessors
     /// above.
+    // MARK: - The key an attestation is part way through
+
+    /// Which entry point minted the pending key, and the key. Held as one item so
+    /// the two cannot disagree.
+    struct PendingKey: Codable {
+        let entry: String
+        let keyId: String
+    }
+
+    func pendingKey() -> PendingKey? {
+        guard let raw = storage.string(forKey: PayabliKeychainKey.pendingKeyId),
+              let data = raw.data(using: .utf8)
+        else {
+            return nil
+        }
+        return try? JSONDecoder().decode(PendingKey.self, from: data)
+    }
+
+    func rememberPendingKey(_ keyId: String, for entry: String) throws {
+        let pending = PendingKey(entry: entry, keyId: keyId)
+        guard let data = try? JSONEncoder().encode(pending),
+              let raw = String(bytes: data, encoding: .utf8)
+        else {
+            throw PayabliTTPError.attestationFailed(reason: "The pending key could not be encoded")
+        }
+        try storage.set(raw, forKey: PayabliKeychainKey.pendingKeyId)
+    }
+
     func allBindings() -> DeviceBindings {
         bindingStore.bindings()
     }

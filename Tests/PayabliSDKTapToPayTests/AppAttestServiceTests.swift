@@ -267,7 +267,7 @@ final class AppAttestServiceTests: XCTestCase {
         XCTAssertEqual(attestor.generateKeyCalls, 1)
         await assertAttested(sut, "myEntry", false)
         XCTAssertEqual(
-            storage.string(forKey: PayabliKeychainKey.pendingKeyId),
+            sut.pendingKey()?.keyId,
             "mock_keyId",
             "a pre-attest failure must keep the generated key for reuse"
         )
@@ -282,6 +282,51 @@ final class AppAttestServiceTests: XCTestCase {
             storage.string(forKey: PayabliKeychainKey.pendingKeyId),
             "pending slot must be cleared once attestation completes"
         )
+    }
+
+    // MARK: - The key an attestation is part way through
+
+    /// A key can be attested once, so two paypoints must not share one. The slot
+    /// records who minted it and only its owner reuses it.
+    func testAPendingKeyIsReusedOnlyByTheEntryPointThatMintedIt() throws {
+        let (sut, _, _) = makeAttest()
+        try sut.rememberPendingKey("key_for_a", for: "entryA")
+
+        XCTAssertEqual(sut.pendingKey()?.keyId, "key_for_a")
+        XCTAssertEqual(sut.pendingKey()?.entry, "entryA")
+    }
+
+    /// A retry inside one entry point still reuses its own key rather than minting
+    /// another on every attempt.
+    func testTheSameEntryPointReusesItsPendingKey() async throws {
+        let storage = InMemorySecureStorage()
+        let (sut, attestor, _) = makeAttest(storage: storage)
+        try sut.rememberPendingKey("already_minted", for: "myEntry")
+
+        StubURLProtocol.handler = { request in
+            switch request.url!.path {
+            case "/api/v2/device/taptopay/challenge":
+                return (
+                    HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
+                    Self.envelope(responseData: ["challengeId": "c_1", "challenge": "Y2hhbGxlbmdl"])
+                )
+            case "/api/v2/device/taptopay/register":
+                return (
+                    HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
+                    Self.envelope(responseData: ["deviceId": "dev_1"])
+                )
+            default:
+                return (
+                    HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
+                    Self.envelope(responseData: ["ok": true])
+                )
+            }
+        }
+
+        let result = try await sut.attest(entry: "myEntry", appId: "TEAM.bundle.id")
+
+        XCTAssertEqual(result.keyId, "already_minted")
+        XCTAssertEqual(attestor.generateKeyCalls, 0, "a retry minted a second key")
     }
 
     // MARK: - Retention
