@@ -10,7 +10,8 @@ final class AppAttestServiceTests: XCTestCase {
     }
 
     private func makeAttest(
-        storage: SecureStorage = InMemorySecureStorage()
+        storage: SecureStorage = InMemorySecureStorage(),
+        installStorage: InstallScopedStorage = InMemoryInstallStorage()
     ) -> (AppAttestService, MockAppAttestor, PayabliAuth) {
         let urlSession = StubURLProtocol.makeSession()
         let service = PayabliService(environment: .sandbox, session: urlSession)
@@ -26,6 +27,7 @@ final class AppAttestServiceTests: XCTestCase {
             transport: transport,
             attestor: attestor,
             storage: storage,
+            installStorage: installStorage,
             hardwareIdProvider: { "fixed-hw-id" },
             deviceNameProvider: { "iPhone" },
             modelProvider: { "iPhone15,2" },
@@ -39,11 +41,18 @@ final class AppAttestServiceTests: XCTestCase {
         entry: String,
         deviceId: String,
         keyId: String,
-        in storage: SecureStorage
+        in storage: SecureStorage,
+        installStorage: InstallScopedStorage? = nil
     ) throws {
         let bindings = DeviceBindings([AttestedDevice(entry: entry, deviceId: deviceId, keyId: keyId)])
         let data = try JSONEncoder().encode(bindings)
         try storage.set(XCTUnwrap(String(bytes: data, encoding: .utf8)), forKey: PayabliKeychainKey.deviceBindings)
+
+        // A binding with no matching stamp is a previous installation's, so a
+        // test that means to start warm has to stamp this one.
+        let stamp = "install-1"
+        try storage.set(stamp, forKey: PayabliKeychainKey.installId)
+        installStorage?.set(stamp, forKey: PayabliInstallKey.installId)
     }
 
     private func response(_ status: Int, body: Data, url: URL) -> (HTTPURLResponse, Data) {
@@ -275,9 +284,16 @@ final class AppAttestServiceTests: XCTestCase {
 
     func testGenerateAssertionProducesHeaders() async throws {
         let storage = InMemorySecureStorage()
-        try seedBinding(entry: "myEntry", deviceId: "cached_deviceId", keyId: "cached_keyId", in: storage)
+        let installs = InMemoryInstallStorage()
+        try seedBinding(
+            entry: "myEntry",
+            deviceId: "cached_deviceId",
+            keyId: "cached_keyId",
+            in: storage,
+            installStorage: installs
+        )
 
-        let (sut, attestor, _) = makeAttest(storage: storage)
+        let (sut, attestor, _) = makeAttest(storage: storage, installStorage: installs)
         let headers = try await sut.generateAssertion(for: "myEntry")
         XCTAssertEqual(headers.keyId, "cached_keyId")
         XCTAssertEqual(headers.deviceId, "cached_deviceId")
@@ -298,14 +314,78 @@ final class AppAttestServiceTests: XCTestCase {
         }
     }
 
+    // MARK: - A binding a previous installation left behind
+
+    /// The Keychain outlives app deletion and the Secure Enclave key it names does
+    /// not, so a reinstall finds a binding it cannot sign for. Reading that as this
+    /// device's enrolment sends every request into a failure with nothing to
+    /// recover from.
+    func testABindingFromAPreviousInstallIsNotThisOnesEnrolment() throws {
+        let storage = InMemorySecureStorage()
+        try seedBinding(entry: "myEntry", deviceId: "dev", keyId: "key", in: storage)
+
+        // A fresh container is what a reinstall leaves: the Keychain half of the
+        // stamp is there and its twin is gone.
+        let (sut, _, _) = makeAttest(storage: storage, installStorage: InMemoryInstallStorage())
+
+        XCTAssertFalse(sut.isAttested(for: "myEntry"))
+    }
+
+    /// Within one installation the stamps match, so a warm start stays warm.
+    func testABindingFromThisInstallIsRead() throws {
+        let storage = InMemorySecureStorage()
+        let installs = InMemoryInstallStorage()
+        try seedBinding(entry: "myEntry", deviceId: "dev", keyId: "key", in: storage, installStorage: installs)
+
+        let (sut, _, _) = makeAttest(storage: storage, installStorage: installs)
+
+        XCTAssertTrue(sut.isAttested(for: "myEntry"))
+        XCTAssertEqual(sut.cachedDeviceId(for: "myEntry"), "dev")
+    }
+
+    /// Attesting after a reinstall drops what the previous one left, including its
+    /// pending key: reusing that slot hands the new install a key it never
+    /// attested.
+    func testAttestingAfterAReinstallDiscardsTheOldStateAndItsPendingKey() throws {
+        let storage = InMemorySecureStorage()
+        try seedBinding(entry: "myEntry", deviceId: "dev", keyId: "key", in: storage)
+        try storage.set("stale_pending", forKey: PayabliKeychainKey.pendingKeyId)
+        let (sut, _, _) = makeAttest(storage: storage, installStorage: InMemoryInstallStorage())
+
+        sut.beginInstallGeneration()
+
+        XCTAssertNil(storage.string(forKey: PayabliKeychainKey.deviceBindings))
+        XCTAssertNil(storage.string(forKey: PayabliKeychainKey.pendingKeyId))
+        XCTAssertTrue(sut.isCurrentInstall, "the stamp has to be written, or every attempt re-runs this")
+    }
+
+    /// Twice in one installation is a retry, and a retry keeps its pending key.
+    func testBeginningTheSameInstallTwiceKeepsThePendingKey() throws {
+        let storage = InMemorySecureStorage()
+        let (sut, _, _) = makeAttest(storage: storage, installStorage: InMemoryInstallStorage())
+        sut.beginInstallGeneration()
+        try storage.set("pending_from_first_attempt", forKey: PayabliKeychainKey.pendingKeyId)
+
+        sut.beginInstallGeneration()
+
+        XCTAssertEqual(storage.string(forKey: PayabliKeychainKey.pendingKeyId), "pending_from_first_attempt")
+    }
+
     /// A DeviceCheck failure from `generateAssertion` means the cached key is
     /// unusable (never attested, or the App Attest environment changed). The
     /// service must clear the cache so the next `initialize()` re-attests.
     func testGenerateAssertionClearsTheBindingOnAnInvalidKey() async throws {
         let storage = InMemorySecureStorage()
-        try seedBinding(entry: "myEntry", deviceId: "cached_deviceId", keyId: "cached_keyId", in: storage)
+        let installs = InMemoryInstallStorage()
+        try seedBinding(
+            entry: "myEntry",
+            deviceId: "cached_deviceId",
+            keyId: "cached_keyId",
+            in: storage,
+            installStorage: installs
+        )
 
-        let (sut, attestor, _) = makeAttest(storage: storage)
+        let (sut, attestor, _) = makeAttest(storage: storage, installStorage: installs)
         attestor.generateAssertionError = NSError(
             domain: AppAttestService.deviceCheckErrorDomain,
             code: AppAttestService.deviceCheckInvalidKeyCode
@@ -327,8 +407,15 @@ final class AppAttestServiceTests: XCTestCase {
     func testGenerateAssertionKeepsTheBindingOnEveryOtherDeviceCheckError() async throws {
         for code in [0, 1, 2, 4] {
             let storage = InMemorySecureStorage()
-            try seedBinding(entry: "myEntry", deviceId: "cached_deviceId", keyId: "cached_keyId", in: storage)
-            let (sut, attestor, _) = makeAttest(storage: storage)
+            let installs = InMemoryInstallStorage()
+            try seedBinding(
+                entry: "myEntry",
+                deviceId: "cached_deviceId",
+                keyId: "cached_keyId",
+                in: storage,
+                installStorage: installs
+            )
+            let (sut, attestor, _) = makeAttest(storage: storage, installStorage: installs)
             attestor.generateAssertionError = NSError(
                 domain: AppAttestService.deviceCheckErrorDomain,
                 code: code
@@ -349,9 +436,16 @@ final class AppAttestServiceTests: XCTestCase {
     /// a perfectly valid attestation.
     func testGenerateAssertionKeepsCacheOnNonDeviceCheckError() async throws {
         let storage = InMemorySecureStorage()
-        try seedBinding(entry: "myEntry", deviceId: "cached_deviceId", keyId: "cached_keyId", in: storage)
+        let installs = InMemoryInstallStorage()
+        try seedBinding(
+            entry: "myEntry",
+            deviceId: "cached_deviceId",
+            keyId: "cached_keyId",
+            in: storage,
+            installStorage: installs
+        )
 
-        let (sut, attestor, _) = makeAttest(storage: storage)
+        let (sut, attestor, _) = makeAttest(storage: storage, installStorage: installs)
         attestor.generateAssertionError = NSError(domain: "com.example.other", code: 7)
 
         do {
@@ -368,8 +462,9 @@ final class AppAttestServiceTests: XCTestCase {
 
     func testClearCacheRemovesThisEntryPointsBinding() throws {
         let storage = InMemorySecureStorage()
-        try seedBinding(entry: "myEntry", deviceId: "b", keyId: "a", in: storage)
-        let (sut, _, _) = makeAttest(storage: storage)
+        let installs = InMemoryInstallStorage()
+        try seedBinding(entry: "myEntry", deviceId: "b", keyId: "a", in: storage, installStorage: installs)
+        let (sut, _, _) = makeAttest(storage: storage, installStorage: installs)
 
         sut.clearCache(for: "myEntry")
 

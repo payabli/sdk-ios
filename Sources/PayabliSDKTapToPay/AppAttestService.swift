@@ -32,6 +32,7 @@ public final class AppAttestService: DeviceAttestationService, @unchecked Sendab
     let transport: any PayabliTransport
     let attestor: AppAttestor
     let storage: SecureStorage
+    let installStorage: InstallScopedStorage
     let bindingStore: AttestedDeviceStore
     let logger = PayabliLogger(category: .taptopay)
 
@@ -44,12 +45,14 @@ public final class AppAttestService: DeviceAttestationService, @unchecked Sendab
     public convenience init(
         transport: any PayabliTransport,
         attestor: AppAttestor,
-        storage: SecureStorage
+        storage: SecureStorage,
+        installStorage: InstallScopedStorage = UserDefaultsInstallStorage()
     ) {
         self.init(
             transport: transport,
             attestor: attestor,
             storage: storage,
+            installStorage: installStorage,
             hardwareIdProvider: AppAttestService.defaultHardwareId,
             deviceNameProvider: AppAttestService.defaultDeviceName,
             modelProvider: AppAttestService.defaultModel,
@@ -61,6 +64,7 @@ public final class AppAttestService: DeviceAttestationService, @unchecked Sendab
         transport: any PayabliTransport,
         attestor: AppAttestor,
         storage: SecureStorage,
+        installStorage: InstallScopedStorage = UserDefaultsInstallStorage(),
         hardwareIdProvider: @Sendable @escaping () -> String,
         deviceNameProvider: @Sendable @escaping () -> String,
         modelProvider: @Sendable @escaping () -> String,
@@ -69,6 +73,7 @@ public final class AppAttestService: DeviceAttestationService, @unchecked Sendab
         self.transport = transport
         self.attestor = attestor
         self.storage = storage
+        self.installStorage = installStorage
         bindingStore = AttestedDeviceStore(storage: storage)
         self.hardwareIdProvider = hardwareIdProvider
         self.deviceNameProvider = deviceNameProvider
@@ -81,8 +86,13 @@ public final class AppAttestService: DeviceAttestationService, @unchecked Sendab
     /// Whether this device is enrolled **for this entry point**. A handle issued
     /// under another one answers false: the device is not enrolled here, and
     /// sending that handle is what gets it refused and its record retired.
+    /// The binding also has to belong to this installation. The Keychain outlives
+    /// app deletion and the Secure Enclave key it names does not, so a reinstall
+    /// finds a complete-looking binding whose key Apple will never sign with
+    /// again. Answering true there sends every request into a failure with nothing
+    /// to recover from.
     public func isAttested(for entry: String) -> Bool {
-        bindingStore.load().binding(for: entry) != nil
+        isCurrentInstall && bindingStore.load().binding(for: entry) != nil
     }
 
     public func cachedDeviceId(for entry: String) -> String? {
@@ -101,6 +111,36 @@ public final class AppAttestService: DeviceAttestationService, @unchecked Sendab
     /// above.
     func binding(for entry: String) -> AttestedDevice? {
         bindingStore.load().binding(for: entry)
+    }
+
+    // MARK: - Which installation wrote this
+
+    /// Whether the stored bindings were written by the installation running now.
+    /// The two halves are written together and disagree only after a reinstall.
+    var isCurrentInstall: Bool {
+        guard let container = installStorage.string(forKey: PayabliInstallKey.installId) else {
+            return false
+        }
+        return container == storage.string(forKey: PayabliKeychainKey.installId)
+    }
+
+    /// Discards bindings a previous installation left behind, then stamps this
+    /// one. Called at the top of `attest()`, the only path that mints a key, so
+    /// within one installation the stamp matches and a retry keeps its pending
+    /// key.
+    func beginInstallGeneration() {
+        if !isCurrentInstall {
+            let stale = !bindingStore.load().bindings.isEmpty
+                || storage.string(forKey: PayabliKeychainKey.pendingKeyId) != nil
+            if stale {
+                logger.info("[attest] bindings predate this install — discarding them and attesting cold")
+                storage.remove(forKey: PayabliKeychainKey.deviceBindings)
+                storage.remove(forKey: PayabliKeychainKey.pendingKeyId)
+            }
+            let stamp = UUID().uuidString
+            try? storage.set(stamp, forKey: PayabliKeychainKey.installId)
+            installStorage.set(stamp, forKey: PayabliInstallKey.installId)
+        }
     }
 
     func remember(_ record: AttestedDevice) {

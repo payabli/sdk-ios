@@ -159,9 +159,15 @@ public enum PayabliKeychainKey {
     /// between them.
     public static let deviceBindings = Stored.deviceBindings.rawValue
 
+    /// Written with its twin in the app container. The two are compared before a
+    /// binding is trusted: the Keychain outlives app deletion and a Secure
+    /// Enclave key does not.
+    public static let installId = Stored.installId.rawValue
+
     enum Stored: String, CaseIterable {
         case deviceBindings = "com.payabli.ttp.deviceBindings"
         case pendingKeyId = "com.payabli.ttp.pendingKeyId"
+        case installId = "com.payabli.ttp.installId"
     }
 
     /// What an install from before the bindings item may still be carrying. Read
