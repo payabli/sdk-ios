@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 import PayabliSDKCore
 
@@ -32,7 +33,6 @@ public final class AppAttestService: DeviceAttestationService, @unchecked Sendab
     let transport: any PayabliTransport
     let attestor: AppAttestor
     let storage: SecureStorage
-    let installStorage: InstallScopedStorage
     let bindingStore: AttestedDeviceStore
     let logger = PayabliLogger(category: .taptopay)
 
@@ -45,14 +45,12 @@ public final class AppAttestService: DeviceAttestationService, @unchecked Sendab
     public convenience init(
         transport: any PayabliTransport,
         attestor: AppAttestor,
-        storage: SecureStorage,
-        installStorage: InstallScopedStorage = UserDefaultsInstallStorage()
+        storage: SecureStorage
     ) {
         self.init(
             transport: transport,
             attestor: attestor,
             storage: storage,
-            installStorage: installStorage,
             hardwareIdProvider: AppAttestService.defaultHardwareId,
             deviceNameProvider: AppAttestService.defaultDeviceName,
             modelProvider: AppAttestService.defaultModel,
@@ -64,7 +62,6 @@ public final class AppAttestService: DeviceAttestationService, @unchecked Sendab
         transport: any PayabliTransport,
         attestor: AppAttestor,
         storage: SecureStorage,
-        installStorage: InstallScopedStorage = UserDefaultsInstallStorage(),
         hardwareIdProvider: @Sendable @escaping () -> String,
         deviceNameProvider: @Sendable @escaping () -> String,
         modelProvider: @Sendable @escaping () -> String,
@@ -73,7 +70,6 @@ public final class AppAttestService: DeviceAttestationService, @unchecked Sendab
         self.transport = transport
         self.attestor = attestor
         self.storage = storage
-        self.installStorage = installStorage
         bindingStore = AttestedDeviceStore(storage: storage)
         self.hardwareIdProvider = hardwareIdProvider
         self.deviceNameProvider = deviceNameProvider
@@ -86,14 +82,56 @@ public final class AppAttestService: DeviceAttestationService, @unchecked Sendab
     /// Whether this device is enrolled **for this entry point**. A handle issued
     /// under another one answers false: the device is not enrolled here, and
     /// sending that handle is what gets it refused and its record retired.
-    /// The binding also has to belong to this installation. The Keychain outlives
-    /// app deletion and the Secure Enclave key it names does not, so a reinstall
-    /// finds a complete-looking binding whose key Apple will never sign with
-    /// again. Answering true there sends every request into a failure with nothing
-    /// to recover from.
-    public func isAttested(for entry: String) -> Bool {
-        isCurrentInstall && bindingStore.load().binding(for: entry) != nil
+    /// The binding also has to name a key this device still holds. The sibling SDK
+    /// compares the stored thumbprint against the key at the handle; App Attest
+    /// hands back an opaque identifier and no way to read a key back, so the
+    /// question is put to the key itself: it signs, or the platform says it is not
+    /// a key this device has.
+    ///
+    /// A key can go for several reasons — the app was deleted and reinstalled, the
+    /// device was restored, the platform invalidated it — and none of them leaves
+    /// anything on the device to read. Asking covers all of them. Without it a
+    /// binding that looks whole sends every request into a failure with nothing to
+    /// recover from.
+    public func isAttested(for entry: String) async -> Bool {
+        guard let binding = bindingStore.load().binding(for: entry) else {
+            return false
+        }
+        return await keyIsStillHeld(binding)
     }
+
+    /// Whether the platform will still sign with this binding's key.
+    ///
+    /// Signs over a fixed hash that is sent nowhere: the answer is whether the
+    /// call throws, not what it returns.
+    ///
+    /// Only `DCErrorInvalidKey` means the key is gone. Anything else is this
+    /// device having a bad moment, and re-enrolling on it would cost an enrolment
+    /// for a key that was working.
+    private func keyIsStillHeld(_ binding: AttestedDevice) async -> Bool {
+        do {
+            _ = try await attestor.generateAssertion(
+                AppAttestKeyId(binding.keyId),
+                clientDataHash: Self.keyProbeHash
+            )
+            return true
+        } catch {
+            let nsError = error as NSError
+            guard nsError.domain == Self.deviceCheckErrorDomain,
+                  nsError.code == Self.deviceCheckInvalidKeyCode
+            else {
+                logger.info("[attest] the key could not be checked; keeping the binding")
+                return true
+            }
+            logger.info("[attest] the stored binding names a key this device no longer holds")
+            clearCache(for: binding.entry)
+            return false
+        }
+    }
+
+    /// Constant, because nothing verifies this signature. A hash is required and
+    /// its content is immaterial.
+    static let keyProbeHash = ClientDataHash(Data(SHA256.hash(data: Data("payabli.keyProbe".utf8))))
 
     public func cachedDeviceId(for entry: String) -> String? {
         bindingStore.load().binding(for: entry)?.deviceId
@@ -111,36 +149,6 @@ public final class AppAttestService: DeviceAttestationService, @unchecked Sendab
     /// above.
     func binding(for entry: String) -> AttestedDevice? {
         bindingStore.load().binding(for: entry)
-    }
-
-    // MARK: - Which installation wrote this
-
-    /// Whether the stored bindings were written by the installation running now.
-    /// The two halves are written together and disagree only after a reinstall.
-    var isCurrentInstall: Bool {
-        guard let container = installStorage.string(forKey: PayabliInstallKey.installId) else {
-            return false
-        }
-        return container == storage.string(forKey: PayabliKeychainKey.installId)
-    }
-
-    /// Discards bindings a previous installation left behind, then stamps this
-    /// one. Called at the top of `attest()`, the only path that mints a key, so
-    /// within one installation the stamp matches and a retry keeps its pending
-    /// key.
-    func beginInstallGeneration() {
-        if !isCurrentInstall {
-            let stale = !bindingStore.load().bindings.isEmpty
-                || storage.string(forKey: PayabliKeychainKey.pendingKeyId) != nil
-            if stale {
-                logger.info("[attest] bindings predate this install — discarding them and attesting cold")
-                storage.remove(forKey: PayabliKeychainKey.deviceBindings)
-                storage.remove(forKey: PayabliKeychainKey.pendingKeyId)
-            }
-            let stamp = UUID().uuidString
-            try? storage.set(stamp, forKey: PayabliKeychainKey.installId)
-            installStorage.set(stamp, forKey: PayabliInstallKey.installId)
-        }
     }
 
     func remember(_ record: AttestedDevice) {

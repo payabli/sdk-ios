@@ -51,7 +51,11 @@ public protocol DeviceAttestationService: AnyObject, Sendable {
     /// Scoped to the entry point: a handle issued under another one is not this
     /// device's enrolment here, and presenting it is refused. The sibling SDK
     /// scopes the same question the same way.
-    func isAttested(for entry: String) -> Bool
+    ///
+    /// Asynchronous because answering it means asking the platform whether the
+    /// key the binding names is still held, which is the same check the sibling
+    /// SDK makes by comparing thumbprints.
+    func isAttested(for entry: String) async -> Bool
 
     /// The backend-assigned `deviceId` this entry point was registered under, or
     /// `nil` when it holds no binding. The facade uses this on the warm path

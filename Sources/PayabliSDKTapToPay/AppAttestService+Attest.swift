@@ -15,10 +15,6 @@ extension AppAttestService {
             throw PayabliTTPError.attestationFailed(reason: "App Attest not supported on this device")
         }
 
-        // Before anything is minted: state from a previous installation names a
-        // key that no longer exists, and its pending slot would be reused.
-        beginInstallGeneration()
-
         // 1. POST /challenge
         let challenge = try await postChallenge(entry: entry)
 

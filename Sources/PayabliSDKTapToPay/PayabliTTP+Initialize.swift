@@ -176,7 +176,7 @@ extension PayabliTTP {
     /// Returns the `deviceId` to cache. On success leaves the session in
     /// `.fetchingConfig`. `.devicePendingActivation` maps to `.pendingActivation`.
     private func runAttestationPhase() async throws -> String? {
-        if attestation.isAttested(for: entryPoint) {
+        if await attestation.isAttested(for: entryPoint) {
             _ = sessionManager.transition(to: .fetchingConfig)
             syncPublished()
             return attestation.cachedDeviceId(for: entryPoint)

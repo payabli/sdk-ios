@@ -32,7 +32,7 @@ public final class MockDeviceAttestationService: DeviceAttestationService, @unch
     /// The entry point the unkeyed setters above stand in for.
     public static let anyEntry = "mockEntry"
 
-    public func isAttested(for entry: String) -> Bool {
+    public func isAttested(for entry: String) async -> Bool {
         lock.withLock { _bindings[entry] != nil || _bindings[Self.anyEntry] != nil }
     }
 
