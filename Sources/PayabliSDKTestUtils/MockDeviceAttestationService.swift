@@ -85,12 +85,20 @@ public final class MockDeviceAttestationService: DeviceAttestationService, @unch
         }
     }
 
+    /// Refuses a paypoint with no binding, as the real service does. Succeeding
+    /// regardless let a test pass where production throws.
     public func generateAssertion(for entry: String) async throws -> AssertionHeaders {
-        lock.withLock { _assertionCalls += 1 }
+        let deviceId: String? = lock.withLock {
+            _assertionCalls += 1
+            return _bindings[entry] ?? _bindings[Self.anyEntry]
+        }
+        guard let deviceId else {
+            throw PayabliTTPError.attestationFailed(reason: "Missing attestation state")
+        }
         return AssertionHeaders(
             assertion: "mock_assertion",
             keyId: "mock_key",
-            deviceId: "mock_device",
+            deviceId: deviceId,
             timestamp: "2026-04-21T00:00:00Z"
         )
     }
