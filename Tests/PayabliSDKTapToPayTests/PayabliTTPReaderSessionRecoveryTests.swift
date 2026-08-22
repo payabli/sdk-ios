@@ -509,7 +509,12 @@ private final class InterleavingProvider: TapToPayProvider, @unchecked Sendable 
     var suspendDuringPrepare = false
     /// Holds `prepareReader` open until the test releases it, so a second setup
     /// has a real window to enter.
-    private var gate: CheckedContinuation<Void, Never>?
+    /// Every caller held at the gate, not the newest. One slot leaked a
+    /// continuation the moment two callers were inside: the second overwrote the
+    /// first, `openGate` resumed only one, and the other never returned. That
+    /// turned an overlap — the thing this file asserts — into a sixty second
+    /// timeout with nothing named.
+    private var gate: [CheckedContinuation<Void, Never>] = []
     private var gateArmed = false
 
     func armGate() {
@@ -518,8 +523,11 @@ private final class InterleavingProvider: TapToPayProvider, @unchecked Sendable 
 
     func openGate() {
         gateArmed = false
-        gate?.resume()
-        gate = nil
+        let waiting = gate
+        gate = []
+        for continuation in waiting {
+            continuation.resume()
+        }
     }
 
     private(set) var prepareReaderCalls = 0
@@ -544,7 +552,7 @@ private final class InterleavingProvider: TapToPayProvider, @unchecked Sendable 
         inProvider = true
         defer { inProvider = false }
         if gateArmed {
-            await withCheckedContinuation { self.gate = $0 }
+            await withCheckedContinuation { self.gate.append($0) }
         } else if suspendDuringPrepare {
             await Task.yield()
         }
