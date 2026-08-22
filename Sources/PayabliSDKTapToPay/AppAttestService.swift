@@ -94,7 +94,7 @@ public final class AppAttestService: DeviceAttestationService, @unchecked Sendab
     /// binding that looks whole sends every request into a failure with nothing to
     /// recover from.
     public func isAttested(for entry: String) async -> Bool {
-        guard let binding = bindingStore.load().binding(for: entry) else {
+        guard let binding = bindingStore.binding(for: entry) else {
             return false
         }
         return await keyIsStillHeld(binding)
@@ -134,24 +134,28 @@ public final class AppAttestService: DeviceAttestationService, @unchecked Sendab
     static let keyProbeHash = ClientDataHash(Data(SHA256.hash(data: Data("payabli.keyProbe".utf8))))
 
     public func cachedDeviceId(for entry: String) -> String? {
-        bindingStore.load().binding(for: entry)?.deviceId
+        bindingStore.binding(for: entry)?.deviceId
     }
 
     /// Drops this entry point's binding and leaves every other one alone: a
     /// refusal is about the paypoint that refused, and the other bindings still
     /// name keys that work.
     public func clearCache(for entry: String) {
-        bindingStore.save(bindingStore.load().without(entry: entry))
+        bindingStore.forget(entry: entry)
         storage.remove(forKey: PayabliKeychainKey.pendingKeyId)
     }
 
     /// The binding held for an entry point, for tests and for the two accessors
     /// above.
-    func binding(for entry: String) -> AttestedDevice? {
-        bindingStore.load().binding(for: entry)
+    func allBindings() -> DeviceBindings {
+        bindingStore.bindings()
     }
 
-    func remember(_ record: AttestedDevice) {
-        bindingStore.save(bindingStore.load().with(record))
+    func binding(for entry: String) -> AttestedDevice? {
+        bindingStore.binding(for: entry)
+    }
+
+    func remember(_ record: AttestedDevice) throws {
+        try bindingStore.remember(record)
     }
 }

@@ -83,7 +83,7 @@ extension AppAttestService {
         //    end. One item, so there is no window in which half an identity is
         //    stored and reads as a whole one. It lands before pending activation
         //    is surfaced, because `/activate` reads the handle back.
-        remember(AttestedDevice(entry: entry, deviceId: register.deviceId, keyId: keyId.rawValue))
+        try remember(AttestedDevice(entry: entry, deviceId: register.deviceId, keyId: keyId.rawValue))
 
         if isPending {
             logger.info("Attestation stored — device still pending activation")
@@ -95,7 +95,7 @@ extension AppAttestService {
     }
 
     public func generateAssertion(for entry: String) async throws -> AssertionHeaders {
-        guard let binding = bindingStore.load().binding(for: entry) else {
+        guard let binding = bindingStore.binding(for: entry) else {
             throw PayabliTTPError.attestationFailed(reason: "Missing attestation state")
         }
         let keyId = AppAttestKeyId(binding.keyId)

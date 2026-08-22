@@ -284,6 +284,49 @@ final class AppAttestServiceTests: XCTestCase {
         )
     }
 
+    // MARK: - Retention
+
+    /// Reading is what makes a binding recent. Ordering by enrolment instead
+    /// evicts the binding every session uses in favour of one that enrolled later.
+    func testUsingABindingMovesItToTheFront() throws {
+        let (sut, _, _) = makeAttest()
+        for name in ["a", "b", "c", "d"] {
+            try sut.remember(AttestedDevice(entry: name, deviceId: "dev-\(name)", keyId: "key-\(name)"))
+        }
+
+        // "a" is the coldest by enrolment, and using it makes it the newest.
+        XCTAssertNotNil(sut.binding(for: "a"))
+        try sut.remember(AttestedDevice(entry: "e", deviceId: "dev-e", keyId: "key-e"))
+
+        XCTAssertNotNil(sut.binding(for: "a"), "the binding just used was the one evicted")
+        XCTAssertNil(sut.binding(for: "b"), "the coldest binding should have gone")
+    }
+
+    /// Four, so a device moved between paypoints finds each where it left it.
+    func testOnlyFourBindingsAreKept() throws {
+        let (sut, _, _) = makeAttest()
+
+        for index in 0 ..< 6 {
+            try sut.remember(AttestedDevice(entry: "e\(index)", deviceId: "d\(index)", keyId: "k\(index)"))
+        }
+
+        XCTAssertEqual(sut.allBindings().bindings.count, DeviceBindings.maximum)
+        XCTAssertNil(sut.binding(for: "e0"))
+        XCTAssertNotNil(sut.binding(for: "e5"))
+    }
+
+    /// A write that fails has to be raised. Nothing keeps an in-memory copy, so
+    /// reporting the enrolment as done leaves the service holding a device this
+    /// one cannot name: the next request fails for a missing binding, and a device
+    /// awaiting activation cannot activate at all.
+    func testAWriteThatFailsIsRaised() {
+        let (sut, _, _) = makeAttest(storage: FailingStorage())
+
+        XCTAssertThrowsError(
+            try sut.remember(AttestedDevice(entry: "e", deviceId: "d", keyId: "k"))
+        )
+    }
+
     // MARK: - Whether the key is still there
 
     /// The check the sibling SDK makes by comparing thumbprints. App Attest hands
@@ -456,11 +499,11 @@ final class AppAttestServiceTests: XCTestCase {
 
     /// A refusal is about the paypoint that refused. The other bindings still
     /// name keys that work, and each one dropped costs an enrolment.
-    func testClearCacheLeavesEveryOtherBindingAlone() async {
+    func testClearCacheLeavesEveryOtherBindingAlone() async throws {
         let storage = InMemorySecureStorage()
         let (sut, _, _) = makeAttest(storage: storage)
-        sut.remember(AttestedDevice(entry: "entryA", deviceId: "devA", keyId: "keyA"))
-        sut.remember(AttestedDevice(entry: "entryB", deviceId: "devB", keyId: "keyB"))
+        try sut.remember(AttestedDevice(entry: "entryA", deviceId: "devA", keyId: "keyA"))
+        try sut.remember(AttestedDevice(entry: "entryB", deviceId: "devB", keyId: "keyB"))
 
         sut.clearCache(for: "entryA")
 
@@ -471,10 +514,10 @@ final class AppAttestServiceTests: XCTestCase {
     /// The defect this ticket names: a session configured for one paypoint while
     /// holding another's handle must report not enrolled, so nothing is sent and
     /// the other paypoint's record is left intact.
-    func testAHandleFromAnotherPaypointIsNotThisOnesEnrolment() async {
+    func testAHandleFromAnotherPaypointIsNotThisOnesEnrolment() async throws {
         let storage = InMemorySecureStorage()
         let (sut, _, _) = makeAttest(storage: storage)
-        sut.remember(AttestedDevice(entry: "entryA", deviceId: "devA", keyId: "keyA"))
+        try sut.remember(AttestedDevice(entry: "entryA", deviceId: "devA", keyId: "keyA"))
 
         await assertAttested(sut, "entryB", false)
         XCTAssertNil(sut.cachedDeviceId(for: "entryB"))
@@ -499,6 +542,19 @@ final class AppAttestServiceTests: XCTestCase {
 }
 
 /// Thread-safe box so the stub handler can record the order of paths it sees.
+/// A store whose writes always fail, for the one case that has to be raised.
+private struct FailingStorage: SecureStorage {
+    func string(forKey _: String) -> String? {
+        nil
+    }
+
+    func set(_: String, forKey _: String) throws {
+        throw KeychainStorage.KeychainError.decoding
+    }
+
+    func remove(forKey _: String) {}
+}
+
 private final class PathsBox: @unchecked Sendable {
     private let lock = NSLock()
     private var storage: [String] = []
