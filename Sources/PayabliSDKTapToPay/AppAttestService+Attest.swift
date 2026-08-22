@@ -115,21 +115,34 @@ extension AppAttestService {
                 timestamp: timestamp
             )
         } catch {
-            // Apple refused to sign with the cached key. This happens when the
-            // key was never fully attested (legacy half-attested cache) or when
-            // the App Attest environment changed (e.g. development ↔ production).
-            // Drop the cached identity so the next `initialize()` runs a clean
-            // cold attestation instead of looping forever on an unusable key.
-            if (error as NSError).domain == Self.deviceCheckErrorDomain {
-                let code = (error as NSError).code
-                logger.error("generateAssertion failed with DeviceCheck error (code \(code)) — clearing attestation cache")
-                clearCache(for: entry)
+            // Clear only when the key itself is rejected — never fully attested,
+            // or minted in a different App Attest environment — so the next
+            // `initialize()` runs a clean cold attestation instead of looping.
+            //
+            // `DCErrorServerUnavailable` asks for the opposite: retry "using the
+            // same key and the same value for the clientDataHash parameter", which
+            // "helps to preserve the risk metric for a given device". Clearing
+            // there throws away a good key.
+            let nsError = error as NSError
+            if nsError.domain == Self.deviceCheckErrorDomain {
+                if nsError.code == Self.deviceCheckInvalidKeyCode {
+                    logger.error("generateAssertion rejected the cached key — clearing this paypoint's binding")
+                    clearCache(for: entry)
+                } else {
+                    logger.error(
+                        "generateAssertion failed with DeviceCheck error (code \(nsError.code)) — binding kept"
+                    )
+                }
             }
             throw error
         }
     }
 
     // MARK: - Attest helpers
+
+    /// `DCErrorInvalidKey` in `DeviceCheck.framework/Headers/DCError.h`, the one
+    /// DeviceCheck error that means the cached key itself is unusable.
+    static let deviceCheckInvalidKeyCode = 3
 
     static let platform = "Ios"
 

@@ -301,12 +301,15 @@ final class AppAttestServiceTests: XCTestCase {
     /// A DeviceCheck failure from `generateAssertion` means the cached key is
     /// unusable (never attested, or the App Attest environment changed). The
     /// service must clear the cache so the next `initialize()` re-attests.
-    func testGenerateAssertionClearsCacheOnDeviceCheckError() async throws {
+    func testGenerateAssertionClearsTheBindingOnAnInvalidKey() async throws {
         let storage = InMemorySecureStorage()
         try seedBinding(entry: "myEntry", deviceId: "cached_deviceId", keyId: "cached_keyId", in: storage)
 
         let (sut, attestor, _) = makeAttest(storage: storage)
-        attestor.generateAssertionError = NSError(domain: AppAttestService.deviceCheckErrorDomain, code: 2)
+        attestor.generateAssertionError = NSError(
+            domain: AppAttestService.deviceCheckErrorDomain,
+            code: AppAttestService.deviceCheckInvalidKeyCode
+        )
 
         do {
             _ = try await sut.generateAssertion(for: "myEntry")
@@ -315,7 +318,31 @@ final class AppAttestServiceTests: XCTestCase {
             XCTAssertEqual((error as NSError).domain, AppAttestService.deviceCheckErrorDomain)
         }
 
-        XCTAssertFalse(sut.isAttested(for: "myEntry"), "DeviceCheck failure should clear the attestation cache")
+        XCTAssertFalse(sut.isAttested(for: "myEntry"), "a rejected key has to be re-attested")
+    }
+
+    /// Every other DeviceCheck error keeps the binding. `DCErrorServerUnavailable`
+    /// asks for a retry with the same key, which preserves the device's risk
+    /// metric, so clearing throws away a key that was working.
+    func testGenerateAssertionKeepsTheBindingOnEveryOtherDeviceCheckError() async throws {
+        for code in [0, 1, 2, 4] {
+            let storage = InMemorySecureStorage()
+            try seedBinding(entry: "myEntry", deviceId: "cached_deviceId", keyId: "cached_keyId", in: storage)
+            let (sut, attestor, _) = makeAttest(storage: storage)
+            attestor.generateAssertionError = NSError(
+                domain: AppAttestService.deviceCheckErrorDomain,
+                code: code
+            )
+
+            do {
+                _ = try await sut.generateAssertion(for: "myEntry")
+                XCTFail("expected throw for code \(code)")
+            } catch {
+                XCTAssertEqual((error as NSError).code, code)
+            }
+
+            XCTAssertTrue(sut.isAttested(for: "myEntry"), "code \(code) is not a reason to re-attest")
+        }
     }
 
     /// A non-DeviceCheck failure (e.g. a transient wrapper error) must NOT wipe
