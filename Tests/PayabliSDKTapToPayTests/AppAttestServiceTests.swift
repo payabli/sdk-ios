@@ -291,26 +291,31 @@ final class AppAttestServiceTests: XCTestCase {
     /// will not sign with it says the binding names a key this device no longer
     /// holds, whatever the reason.
     func testABindingWhoseKeyIsGoneIsNotAnEnrolment() async throws {
-        let storage = InMemorySecureStorage()
-        try seedBinding(entry: "myEntry", deviceId: "dev", keyId: "key", in: storage)
-        let (sut, attestor, _) = makeAttest(storage: storage)
-        attestor.generateAssertionError = NSError(
-            domain: AppAttestService.deviceCheckErrorDomain,
-            code: AppAttestService.deviceCheckInvalidKeyCode
-        )
+        // 2 is what a key that no longer exists reports, measured on a device
+        // after a reinstall; 3 is the code the platform documents for a key it
+        // rejects. Both mean this binding cannot produce an assertion.
+        for code in [2, 3] {
+            let storage = InMemorySecureStorage()
+            try seedBinding(entry: "myEntry", deviceId: "dev", keyId: "key", in: storage)
+            let (sut, attestor, _) = makeAttest(storage: storage)
+            attestor.generateAssertionError = NSError(
+                domain: AppAttestService.deviceCheckErrorDomain,
+                code: code
+            )
 
-        await assertAttested(sut, "myEntry", false)
+            await assertAttested(sut, "myEntry", false, "code \(code)")
 
-        XCTAssertNil(
-            sut.binding(for: "myEntry"),
-            "a binding naming a key that is gone has to be dropped, not asked again every start"
-        )
+            XCTAssertNil(
+                sut.binding(for: "myEntry"),
+                "a binding naming a key that is gone has to be dropped, not asked again every start"
+            )
+        }
     }
 
     /// Every other failure is this device having a bad moment. Re-enrolling on one
     /// costs an enrolment for a key that was working.
     func testABindingSurvivesAKeyCheckThatCouldNotBeMade() async throws {
-        for code in [0, 1, 2, 4] {
+        for code in [0, 1, 4] {
             let storage = InMemorySecureStorage()
             try seedBinding(entry: "myEntry", deviceId: "dev", keyId: "key", in: storage)
             let (sut, attestor, _) = makeAttest(storage: storage)
@@ -381,7 +386,7 @@ final class AppAttestServiceTests: XCTestCase {
         let (sut, attestor, _) = makeAttest(storage: storage)
         attestor.generateAssertionError = NSError(
             domain: AppAttestService.deviceCheckErrorDomain,
-            code: AppAttestService.deviceCheckInvalidKeyCode
+            code: 3
         )
 
         do {
@@ -398,7 +403,7 @@ final class AppAttestServiceTests: XCTestCase {
     /// asks for a retry with the same key, which preserves the device's risk
     /// metric, so clearing throws away a key that was working.
     func testGenerateAssertionKeepsTheBindingOnEveryOtherDeviceCheckError() async throws {
-        for code in [0, 1, 2, 4] {
+        for code in [0, 1, 4] {
             let storage = InMemorySecureStorage()
             try seedBinding(entry: "myEntry", deviceId: "cached_deviceId", keyId: "cached_keyId", in: storage)
             let (sut, attestor, _) = makeAttest(storage: storage)

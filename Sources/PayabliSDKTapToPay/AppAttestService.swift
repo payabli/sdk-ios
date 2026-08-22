@@ -105,9 +105,9 @@ public final class AppAttestService: DeviceAttestationService, @unchecked Sendab
     /// Signs over a fixed hash that is sent nowhere: the answer is whether the
     /// call throws, not what it returns.
     ///
-    /// Only `DCErrorInvalidKey` means the key is gone. Anything else is this
-    /// device having a bad moment, and re-enrolling on it would cost an enrolment
-    /// for a key that was working.
+    /// Two codes mean the key cannot be used and the rest do not: see
+    /// `deviceCheckUnusableKeyCodes`. Re-enrolling on any other answer would cost
+    /// an enrolment for a key that was working.
     private func keyIsStillHeld(_ binding: AttestedDevice) async -> Bool {
         do {
             _ = try await attestor.generateAssertion(
@@ -118,7 +118,7 @@ public final class AppAttestService: DeviceAttestationService, @unchecked Sendab
         } catch {
             let nsError = error as NSError
             guard nsError.domain == Self.deviceCheckErrorDomain,
-                  nsError.code == Self.deviceCheckInvalidKeyCode
+                  Self.deviceCheckUnusableKeyCodes.contains(nsError.code)
             else {
                 logger.info("[attest] the key could not be checked; keeping the binding")
                 return true

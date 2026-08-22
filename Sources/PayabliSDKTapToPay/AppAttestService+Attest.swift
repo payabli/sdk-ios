@@ -125,8 +125,8 @@ extension AppAttestService {
             // there throws away a good key.
             let nsError = error as NSError
             if nsError.domain == Self.deviceCheckErrorDomain {
-                if nsError.code == Self.deviceCheckInvalidKeyCode {
-                    logger.error("generateAssertion rejected the cached key — clearing this paypoint's binding")
+                if Self.deviceCheckUnusableKeyCodes.contains(nsError.code) {
+                    logger.error("generateAssertion cannot use the stored key — clearing this paypoint's binding")
                     clearCache(for: entry)
                 } else {
                     logger.error(
@@ -140,9 +140,23 @@ extension AppAttestService {
 
     // MARK: - Attest helpers
 
-    /// `DCErrorInvalidKey` in `DeviceCheck.framework/Headers/DCError.h`, the one
-    /// DeviceCheck error that means the cached key itself is unusable.
-    static let deviceCheckInvalidKeyCode = 3
+    /// The DeviceCheck codes that say this device cannot produce an assertion for
+    /// the key it was asked about, from `DeviceCheck.framework/Headers/DCError.h`.
+    ///
+    /// `DCErrorInvalidKey` is the documented one: the key was rejected, or was
+    /// never attested. `DCErrorInvalidInput` is the one a key that no longer
+    /// exists actually reports, measured on an iPhone 11 Pro by minting a key,
+    /// keeping its identifier in the Keychain, deleting the app and asking again.
+    /// Its own description covers data that is not formatted correctly, and the
+    /// only data here besides the identifier is a SHA-256 hash, so the identifier
+    /// is what it objects to.
+    ///
+    /// `DCErrorUnknownSystemFailure` is not among them: that is what a key that
+    /// exists but has not been attested reports, measured in the same run, and
+    /// that key is the pending slot's business rather than a reason to re-enrol.
+    /// Neither is `DCErrorServerUnavailable`, which asks for a retry with the same
+    /// key to preserve the device's risk metric.
+    static let deviceCheckUnusableKeyCodes: Set<Int> = [2, 3]
 
     static let platform = "Ios"
 
