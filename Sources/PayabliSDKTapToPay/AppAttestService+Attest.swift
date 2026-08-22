@@ -24,9 +24,9 @@ extension AppAttestService {
 
         // 2. Resolve the App Attest key for this attempt.
         //
-        //    The attested `keyId` is deliberately NOT persisted yet. Writing it
-        //    before the flow finishes (step 6) can leave a half-attested key in
-        //    the Keychain: `isAlreadyAttested` would then report `true`, the
+        //    The attested `keyId` is not persisted yet. Writing it before the
+        //    flow finishes (step 6) can leave a half-attested key in the
+        //    Keychain: the binding would then read as complete, the
         //    warm path would skip `attest()` on the next launch, and
         //    `generateAssertion()` would fail against Apple with
         //    `com.apple.devicecheck.error` on a key that was never attested.
@@ -106,7 +106,7 @@ extension AppAttestService {
         let deviceId = binding.deviceId
 
         // The server verifies the assertion against `X-Assertion-Timestamp`, so
-        // client-data is the SHA-256 of the same ISO-8601 string we send.
+        // client-data is the SHA-256 of the same ISO-8601 string that is sent.
         let timestamp = Self.iso8601WithFractional.string(from: Date())
         let clientDataHash = ClientDataHash(Data(SHA256.hash(data: Data(timestamp.utf8))))
 

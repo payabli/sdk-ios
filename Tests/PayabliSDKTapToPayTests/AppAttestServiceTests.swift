@@ -471,8 +471,8 @@ final class AppAttestServiceTests: XCTestCase {
         XCTAssertFalse(sut.isAttested(for: "myEntry"))
     }
 
-    /// A refusal is about the paypoint that refused. Dropping the rest would
-    /// re-enrol devices nothing was wrong with, each at the cost of a code.
+    /// A refusal is about the paypoint that refused. The other bindings still
+    /// name keys that work, and each one dropped costs an enrolment.
     func testClearCacheLeavesEveryOtherBindingAlone() {
         let storage = InMemorySecureStorage()
         let (sut, _, _) = makeAttest(storage: storage)

@@ -99,9 +99,9 @@ public final class AppAttestService: DeviceAttestationService, @unchecked Sendab
         bindingStore.load().binding(for: entry)?.deviceId
     }
 
-    /// Drops this entry point's binding and leaves every other one alone. A
-    /// refusal is about the paypoint that refused; discarding the rest would
-    /// re-enrol devices nothing was wrong with.
+    /// Drops this entry point's binding and leaves every other one alone: a
+    /// refusal is about the paypoint that refused, and the other bindings still
+    /// name keys that work.
     public func clearCache(for entry: String) {
         bindingStore.save(bindingStore.load().without(entry: entry))
         storage.remove(forKey: PayabliKeychainKey.pendingKeyId)
