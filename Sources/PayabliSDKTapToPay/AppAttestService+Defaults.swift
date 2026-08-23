@@ -17,11 +17,18 @@ extension AppAttestService {
     static var defaultHardwareId: @Sendable () -> String {
         {
             #if canImport(UIKit)
-                return UIDevice.current.identifierForVendor?.uuidString ?? ""
+                return hardwareId(from: UIDevice.current.identifierForVendor?.uuidString)
             #else
-                return ""
+                return hardwareId(from: nil)
             #endif
         }
+    }
+
+    /// Separate from the platform call so the branch that matters can be reached
+    /// without one: on any host that has an identifier to give, the closure above
+    /// never takes it.
+    static func hardwareId(from identifier: String?) -> String {
+        identifier ?? ""
     }
 
     static var defaultDeviceName: @Sendable () -> String {
