@@ -18,7 +18,17 @@ import PayabliSDKCore
 final class AttestedDeviceStore {
     private let storage: SecureStorage
     private let logger = PayabliLogger(category: .taptopay)
-    private let lock = NSLock()
+
+    /// One lock for every store in the process, not one per store.
+    ///
+    /// A facade builds its own service and its own store, and a host that talks to
+    /// two paypoints builds two facades, so a per-store lock leaves exactly the
+    /// case these bindings exist for unguarded: both stores read the same list from
+    /// the same Keychain namespace and the second write drops the first binding.
+    ///
+    /// Broader than the namespace it protects, and that costs nothing: what it
+    /// serializes is a Keychain read and write measured in microseconds.
+    private static let lock = NSLock()
 
     init(storage: SecureStorage) {
         self.storage = storage
@@ -44,7 +54,7 @@ final class AttestedDeviceStore {
     /// a write alone would order them by enrolment instead, and evict a binding
     /// that every session uses in favour of one that enrolled later.
     func binding(for entry: String) -> AttestedDevice? {
-        lock.withLock {
+        Self.lock.withLock {
             let held = load()
             guard let record = held.binding(for: entry) else { return nil }
             if held.bindings.first != record {
@@ -55,7 +65,7 @@ final class AttestedDeviceStore {
     }
 
     func bindings() -> DeviceBindings {
-        lock.withLock { load() }
+        Self.lock.withLock { load() }
     }
 
     /// Adds or replaces this record's binding, leaving every other one alone.
@@ -65,13 +75,13 @@ final class AttestedDeviceStore {
     /// nothing: the next request reloads an empty store and fails for a missing
     /// binding, and a device awaiting activation cannot activate at all.
     func remember(_ record: AttestedDevice) throws {
-        try lock.withLock {
+        try Self.lock.withLock {
             try write(load().with(record))
         }
     }
 
     func forget(entry: String) {
-        lock.withLock {
+        Self.lock.withLock {
             let remaining = load().without(entry: entry)
             do {
                 try write(remaining)
@@ -79,6 +89,58 @@ final class AttestedDeviceStore {
                 logger.info("[attest] the binding could not be dropped")
             }
         }
+    }
+
+    // MARK: - Keys an attestation is part way through
+
+    /// The key this entry point minted and has not finished attesting.
+    func pendingKey(for entry: String) -> String? {
+        Self.lock.withLock { loadPending()[entry] }
+    }
+
+    /// Kept per entry point. A key can be attested once, so one entry point's key
+    /// is no use to another, and a single slot let whichever started second
+    /// overwrite the first: its owner's retry then minted another key and
+    /// registered another device.
+    func rememberPendingKey(_ keyId: String, for entry: String) throws {
+        try Self.lock.withLock {
+            var pending = loadPending()
+            pending[entry] = keyId
+            try writePending(pending)
+        }
+    }
+
+    /// Only this entry point's. Removing every one takes away a retry another
+    /// paypoint is part way through.
+    func forgetPendingKey(for entry: String) {
+        Self.lock.withLock {
+            var pending = loadPending()
+            guard pending.removeValue(forKey: entry) != nil else { return }
+            try? writePending(pending)
+        }
+    }
+
+    private func loadPending() -> [String: String] {
+        guard let raw = storage.string(forKey: PayabliKeychainKey.pendingKeyId),
+              let data = raw.data(using: .utf8),
+              let decoded = try? JSONDecoder().decode([String: String].self, from: data)
+        else {
+            return [:]
+        }
+        return decoded
+    }
+
+    private func writePending(_ pending: [String: String]) throws {
+        guard !pending.isEmpty else {
+            storage.remove(forKey: PayabliKeychainKey.pendingKeyId)
+            return
+        }
+        guard let data = try? JSONEncoder().encode(pending),
+              let raw = String(bytes: data, encoding: .utf8)
+        else {
+            throw PayabliTTPError.attestationFailed(reason: "The pending key could not be encoded")
+        }
+        try storage.set(raw, forKey: PayabliKeychainKey.pendingKeyId)
     }
 
     // MARK: - Under the lock

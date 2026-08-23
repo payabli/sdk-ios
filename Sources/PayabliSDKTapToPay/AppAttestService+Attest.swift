@@ -32,14 +32,13 @@ extension AppAttestService {
         //    the same Secure Enclave key instead of minting a new one every
         //    attempt. The pending slot is never read by the warm path, so it
         //    cannot poison assertions.
-        //    The slot records which entry point minted the key. A key can be
-        //    attested once, so two paypoints enrolling cannot share one: the
-        //    second would register a key the first is about to attest, and one of
-        //    the two attempts would be refused. A pending key belonging to
-        //    another entry point is left alone and this one mints its own.
+        //    Kept per entry point. A key can be attested once, so two paypoints
+        //    enrolling cannot share one: the second would register a key the first
+        //    is about to attest and one of the attempts would be refused. Another
+        //    entry point's pending key is neither read nor overwritten here.
         let keyId: AppAttestKeyId
-        if let pending = pendingKey(), pending.entry == entry {
-            keyId = AppAttestKeyId(pending.keyId)
+        if let pending = pendingKey(for: entry) {
+            keyId = AppAttestKeyId(pending)
         } else {
             keyId = try await attestor.generateKey()
             try rememberPendingKey(keyId.rawValue, for: entry)
@@ -68,7 +67,7 @@ extension AppAttestService {
         //    pending slot before attesting: a failure here or at `/attest`
         //    must mint a new key next time rather than replay a burned one.
         //    Pre-attest failures above keep the pending slot for reuse.
-        storage.remove(forKey: PayabliKeychainKey.pendingKeyId)
+        bindingStore.forgetPendingKey(for: entry)
         let clientDataHash = ClientDataHash(Data(SHA256.hash(data: challengeData)))
         let attestation = try await attestor.attestKey(keyId, clientDataHash: clientDataHash)
 

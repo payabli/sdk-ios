@@ -267,7 +267,7 @@ final class AppAttestServiceTests: XCTestCase {
         XCTAssertEqual(attestor.generateKeyCalls, 1)
         await assertAttested(sut, "myEntry", false)
         XCTAssertEqual(
-            sut.pendingKey()?.keyId,
+            sut.pendingKey(for: "myEntry"),
             "mock_keyId",
             "a pre-attest failure must keep the generated key for reuse"
         )
@@ -286,14 +286,17 @@ final class AppAttestServiceTests: XCTestCase {
 
     // MARK: - The key an attestation is part way through
 
-    /// A key can be attested once, so two paypoints must not share one. The slot
-    /// records who minted it and only its owner reuses it.
+    /// A key can be attested once, so two paypoints must not share one, and
+    /// starting one must not take the other's away.
     func testAPendingKeyIsReusedOnlyByTheEntryPointThatMintedIt() throws {
         let (sut, _, _) = makeAttest()
         try sut.rememberPendingKey("key_for_a", for: "entryA")
+        try sut.rememberPendingKey("key_for_b", for: "entryB")
 
-        XCTAssertEqual(sut.pendingKey()?.keyId, "key_for_a")
-        XCTAssertEqual(sut.pendingKey()?.entry, "entryA")
+        XCTAssertEqual(sut.pendingKey(for: "entryB"), "key_for_b")
+
+        XCTAssertEqual(sut.pendingKey(for: "entryA"), "key_for_a", "one entry point's key was overwritten")
+        XCTAssertNil(sut.pendingKey(for: "entryC"), "an entry point that minted nothing must read nothing")
     }
 
     /// A retry inside one entry point still reuses its own key rather than minting
@@ -327,6 +330,19 @@ final class AppAttestServiceTests: XCTestCase {
 
         XCTAssertEqual(result.keyId, "already_minted")
         XCTAssertEqual(attestor.generateKeyCalls, 0, "a retry minted a second key")
+    }
+
+    /// Clearing one paypoint must leave another's retry alone: taking it away
+    /// makes the next attempt mint a key and register another device.
+    func testClearingOnePaypointKeepsAnothersPendingKey() throws {
+        let (sut, _, _) = makeAttest()
+        try sut.rememberPendingKey("key_for_a", for: "entryA")
+        try sut.rememberPendingKey("key_for_b", for: "entryB")
+
+        sut.clearCache(for: "entryA")
+
+        XCTAssertNil(sut.pendingKey(for: "entryA"))
+        XCTAssertEqual(sut.pendingKey(for: "entryB"), "key_for_b")
     }
 
     // MARK: - Retention
