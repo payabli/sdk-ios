@@ -83,7 +83,7 @@ extension AppAttestService {
         let register = try await postRegister(RegisterRequest(
             entry: entry,
             keyId: keyId,
-            hardwareId: try hardwareIdProvider(),
+            hardwareId: try hardwareId(),
             model: modelProvider(),
             osVersion: osVersionProvider(),
             platform: Self.platform

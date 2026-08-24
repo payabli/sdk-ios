@@ -198,6 +198,15 @@ public final class AppAttestService: DeviceAttestationService, @unchecked Sendab
         try reportingStorageFailure { try bindingStore.remember(record) }
     }
 
+    /// The value registration identifies this install by.
+    ///
+    /// Wrapped like every other store access: the default provider reads the
+    /// Keychain and mints into it, so it fails the same way the binding reads do
+    /// and has to reach a caller as the same error.
+    func hardwareId() throws -> String {
+        try reportingStorageFailure { try hardwareIdProvider() }
+    }
+
     func forgetPendingKey(for entry: String) throws {
         try reportingStorageFailure { try bindingStore.forgetPendingKey(for: entry) }
     }

@@ -11,7 +11,8 @@ final class AppAttestServiceTests: XCTestCase {
     }
 
     private func makeAttest(
-        storage: SecureStorage = InMemorySecureStorage()
+        storage: SecureStorage = InMemorySecureStorage(),
+        hardwareIdProvider: @Sendable @escaping () throws -> String = { "fixed-hw-id" }
     ) -> (AppAttestService, MockAppAttestor, PayabliAuth) {
         let urlSession = StubURLProtocol.makeSession()
         let service = PayabliService(environment: .sandbox, session: urlSession)
@@ -27,7 +28,7 @@ final class AppAttestServiceTests: XCTestCase {
             transport: transport,
             attestor: attestor,
             storage: storage,
-            hardwareIdProvider: { "fixed-hw-id" },
+            hardwareIdProvider: hardwareIdProvider,
             modelProvider: { "iPhone15,2" },
             osVersionProvider: { "17.0" }
         )
@@ -801,6 +802,30 @@ final class AppAttestServiceTests: XCTestCase {
 
         XCTAssertEqual(result.deviceId, "dev_fresh", "a binding naming a key this device lost was answered from")
         XCTAssertEqual(attestor.generateKeyCalls, 1)
+    }
+
+    /// A store that could not be read reaches a caller as this SDK's own error from
+    /// the identifier too, not only from the binding reads beside it.
+    func testAStorageFailureFromTheIdentifierIsReportedAsThisSDKsOwnError() async throws {
+        StubURLProtocol.handler = { request in
+            (
+                HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
+                Self.envelope(responseData: ["challengeId": "c_1", "challenge": "Y2hhbGxlbmdl"])
+            )
+        }
+
+        let (sut, _, _) = makeAttest(hardwareIdProvider: { () throws -> String in
+            throw KeychainStorage.KeychainError.underlying(errSecInteractionNotAllowed)
+        })
+
+        do {
+            _ = try await sut.attest(entry: "myEntry", appId: "TEAM.bundle.id")
+            XCTFail("the attempt continued with an identifier that could not be produced")
+        } catch is PayabliTTPError {
+            // The domain the bridges map.
+        } catch {
+            XCTFail("the Keychain's own error crossed the SDK boundary: \(error)")
+        }
     }
 
     /// Different entry points are what the bindings exist for, so they never wait
