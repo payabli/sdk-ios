@@ -20,13 +20,14 @@ extension AppAttestService {
     /// only the later of them. Serializing the store's own operations cannot close
     /// that, because the gap is between two of them.
     ///
-    /// A caller for an entry point already being attested waits for that attempt and
-    /// takes its answer, which is the answer it was going to produce. Its pending
-    /// state and its outcome both belong to that attempt, including the refusal a
-    /// device awaiting activation reports. Different entry points never wait for
-    /// each other.
+    /// A caller for an entry point already being attested waits for that attempt to
+    /// end and then runs its own, which reads the store first and returns what the
+    /// attempt ahead wrote. Waiting rather than taking that attempt's answer is what
+    /// keeps two services over different storage apart: each decides from the store
+    /// it will have to produce assertions from. Different entry points never wait
+    /// for each other.
     public func attest(entry: String, appId: String) async throws -> AttestationResult {
-        try await Self.attestations.joining(entry) {
+        try await Self.attestations.takingTurns(entry) {
             try await self.runAttest(entry: entry, appId: appId)
         }
     }

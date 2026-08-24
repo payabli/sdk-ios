@@ -828,6 +828,52 @@ final class AppAttestServiceTests: XCTestCase {
         }
     }
 
+    /// Two services over different stores are two devices, whatever entry point they
+    /// name. They queue behind each other, and each then decides from its own store,
+    /// so neither is handed a handle it cannot produce an assertion for.
+    func testTwoServicesOverDifferentStoresEachGetTheirOwnDevice() async throws {
+        let deviceIds = PathsBox()
+        StubURLProtocol.handler = { request in
+            switch request.url!.path {
+            case "/api/v2/device/taptopay/challenge":
+                return (
+                    HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
+                    Self.envelope(responseData: ["challengeId": "c_1", "challenge": "Y2hhbGxlbmdl"])
+                )
+            case "/api/v2/device/taptopay/register":
+                let issued = "dev_\(UUID().uuidString)"
+                deviceIds.append(issued)
+                return (
+                    HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
+                    Self.envelope(responseData: ["deviceId": issued])
+                )
+            default:
+                return (
+                    HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
+                    Self.envelope(responseData: ["ok": true])
+                )
+            }
+        }
+
+        // Separate stores, as a caller building the service directly with its own
+        // storage has. The entry point is the same, which is all the queue keys on.
+        let firstStorage = InMemorySecureStorage()
+        let secondStorage = InMemorySecureStorage()
+        let (first, _, _) = makeAttest(storage: firstStorage)
+        let (second, _, _) = makeAttest(storage: secondStorage)
+
+        async let a = first.attest(entry: "myEntry", appId: "TEAM.bundle.id")
+        async let b = second.attest(entry: "myEntry", appId: "TEAM.bundle.id")
+        let results = try await [a, b]
+
+        XCTAssertEqual(deviceIds.values.count, 2, "one service was handed the other's device")
+        XCTAssertNotEqual(results[0].deviceId, results[1].deviceId)
+
+        // What each was told matches what it can actually assert for.
+        XCTAssertEqual(try first.binding(for: "myEntry")?.deviceId, results[0].deviceId)
+        XCTAssertEqual(try second.binding(for: "myEntry")?.deviceId, results[1].deviceId)
+    }
+
     /// Different entry points are what the bindings exist for, so they never wait
     /// for each other.
     func testTwoEntryPointsAttestWithoutWaitingForEachOther() async throws {
