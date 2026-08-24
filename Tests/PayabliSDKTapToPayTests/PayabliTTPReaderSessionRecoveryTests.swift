@@ -507,33 +507,58 @@ private final class InterleavingProvider: TapToPayProvider, @unchecked Sendable 
     )
     var duringRead: (() async throws -> Void)?
     var suspendDuringPrepare = false
+    /// Guards every field below.
+    ///
+    /// `prepareReader` is a `nonisolated` protocol witness, so calling it from the
+    /// `@MainActor` SDK does not keep it on the main actor and two preparations run
+    /// against this object at once. Unguarded, two appends to the gate lose one of
+    /// them, and a continuation nothing holds is a continuation nothing resumes:
+    /// the call waits out the sixty second bound and reports a timeout naming
+    /// nothing, which is the overlap this file exists to assert arriving as a
+    /// failure that describes something else.
+    private let lock = NSLock()
+
     /// Holds `prepareReader` open until the test releases it, so a second setup
     /// has a real window to enter.
+    ///
     /// Every caller held at the gate, not the newest. One slot leaked a
     /// continuation the moment two callers were inside: the second overwrote the
-    /// first, `openGate` resumed only one, and the other never returned. That
-    /// turned an overlap — the thing this file asserts — into a sixty second
-    /// timeout with nothing named.
+    /// first, `openGate` resumed only one, and the other never returned.
     private var gate: [CheckedContinuation<Void, Never>] = []
     private var gateArmed = false
 
     func armGate() {
-        gateArmed = true
+        lock.withLock { gateArmed = true }
     }
 
     func openGate() {
-        gateArmed = false
-        let waiting = gate
-        gate = []
+        let waiting: [CheckedContinuation<Void, Never>] = lock.withLock {
+            gateArmed = false
+            let held = gate
+            gate = []
+            return held
+        }
         for continuation in waiting {
             continuation.resume()
         }
     }
 
-    private(set) var prepareReaderCalls = 0
-    private(set) var configureCalls = 0
+    private var storedPrepareReaderCalls = 0
+    var prepareReaderCalls: Int {
+        lock.withLock { storedPrepareReaderCalls }
+    }
+
+    private var storedConfigureCalls = 0
+    var configureCalls: Int {
+        lock.withLock { storedConfigureCalls }
+    }
+
     /// True if a second setup entered while one was still inside the provider.
-    private(set) var sawOverlap = false
+    private var storedSawOverlap = false
+    var sawOverlap: Bool {
+        lock.withLock { storedSawOverlap }
+    }
+
     private var inProvider = false
 
     func checkEligibility() async -> Result<Void, PayabliTTPError> {
@@ -541,18 +566,34 @@ private final class InterleavingProvider: TapToPayProvider, @unchecked Sendable 
     }
 
     func configure(credentials: [String: String]) throws {
-        configureCalls += 1
+        lock.withLock { storedConfigureCalls += 1 }
     }
 
     func prepareReader() async throws {
-        prepareReaderCalls += 1
-        if inProvider {
-            sawOverlap = true
+        let held: Bool = lock.withLock {
+            storedPrepareReaderCalls += 1
+            if inProvider {
+                storedSawOverlap = true
+            }
+            inProvider = true
+            return gateArmed
         }
-        inProvider = true
-        defer { inProvider = false }
-        if gateArmed {
-            await withCheckedContinuation { self.gate.append($0) }
+        defer { lock.withLock { inProvider = false } }
+
+        if held {
+            await withCheckedContinuation { continuation in
+                // Armed-ness re-read with the append, under one lock, so a gate
+                // opened between the two resumes this caller instead of leaving it
+                // on a list nothing will drain.
+                let resumeNow: Bool = lock.withLock {
+                    guard gateArmed else { return true }
+                    gate.append(continuation)
+                    return false
+                }
+                if resumeNow {
+                    continuation.resume()
+                }
+            }
         } else if suspendDuringPrepare {
             await Task.yield()
         }
