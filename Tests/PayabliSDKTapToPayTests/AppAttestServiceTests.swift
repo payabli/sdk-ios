@@ -10,43 +10,6 @@ final class AppAttestServiceTests: XCTestCase {
         super.tearDown()
     }
 
-    private func makeAttest(
-        storage: SecureStorage = InMemorySecureStorage(),
-        hardwareIdProvider: @Sendable @escaping () throws -> String = { "fixed-hw-id" }
-    ) -> (AppAttestService, MockAppAttestor, PayabliAuth) {
-        let urlSession = StubURLProtocol.makeSession()
-        let service = PayabliService(environment: .sandbox, session: urlSession)
-        let config = PayabliConfig(
-            accessToken: "seed",
-            entryPoint: "myEntry",
-            environment: .sandbox
-        )
-        let auth = PayabliAuth(config: config)
-        let transport = AuthenticatedTransport(base: service, auth: auth)
-        let attestor = MockAppAttestor()
-        let sut = AppAttestService(
-            transport: transport,
-            attestor: attestor,
-            storage: storage,
-            hardwareIdProvider: hardwareIdProvider,
-            modelProvider: { "iPhone15,2" },
-            osVersionProvider: { "17.0" }
-        )
-        return (sut, attestor, auth)
-    }
-
-    /// Writes a binding the way the service does, so a test starts warm.
-    private func seedBinding(
-        entry: String,
-        deviceId: String,
-        keyId: String,
-        in storage: SecureStorage
-    ) throws {
-        let bindings = DeviceBindings([AttestedDevice(entry: entry, deviceId: deviceId, keyId: keyId)])
-        let data = try JSONEncoder().encode(bindings)
-        try storage.set(XCTUnwrap(String(bytes: data, encoding: .utf8)), forKey: PayabliKeychainKey.deviceBindings)
-    }
-
     /// `XCTAssertTrue` takes an autoclosure, which cannot await, so the answer is
     /// read first and asserted second.
     private func assertAttested(
@@ -69,16 +32,6 @@ final class AppAttestServiceTests: XCTestCase {
         )!, body)
     }
 
-    private static func envelope(responseData: [String: Any]) -> Data {
-        let payload: [String: Any] = [
-            "responseCode": 1,
-            "isSuccess": true,
-            "responseText": "OK",
-            "responseData": responseData
-        ]
-        return try! JSONSerialization.data(withJSONObject: payload)
-    }
-
     // MARK: - First-run flow
 
     func testFirstRunAttestHitsAllThreeEndpoints() async throws {
@@ -89,17 +42,17 @@ final class AppAttestServiceTests: XCTestCase {
             case "/api/v2/device/taptopay/challenge":
                 return (
                     HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
-                    Self.envelope(responseData: ["challengeId": "c_1", "challenge": "Y2hhbGxlbmdl"])
+                    AttestFixture.envelope(responseData: ["challengeId": "c_1", "challenge": "Y2hhbGxlbmdl"])
                 )
             case "/api/v2/device/taptopay/register":
                 return (
                     HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
-                    Self.envelope(responseData: ["deviceId": "dev_1"])
+                    AttestFixture.envelope(responseData: ["deviceId": "dev_1"])
                 )
             case "/api/v2/device/taptopay/attest":
                 return (
                     HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
-                    Self.envelope(responseData: ["ok": true])
+                    AttestFixture.envelope(responseData: ["ok": true])
                 )
             default:
                 XCTFail("unexpected path: \(request.url!.path)")
@@ -108,7 +61,7 @@ final class AppAttestServiceTests: XCTestCase {
         }
 
         let storage = InMemorySecureStorage()
-        let (sut, attestor, _) = makeAttest(storage: storage)
+        let (sut, attestor, _) = AttestFixture.makeService(storage: storage)
 
         try await assertAttested(sut, "myEntry", false)
         let result = try await sut.attest(entry: "myEntry", appId: "TEAM.bundle.id")
@@ -139,17 +92,17 @@ final class AppAttestServiceTests: XCTestCase {
             case "/api/v2/device/taptopay/challenge":
                 return (
                     HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
-                    Self.envelope(responseData: ["challengeId": "c", "challenge": "Y2hhbGxlbmdl"])
+                    AttestFixture.envelope(responseData: ["challengeId": "c", "challenge": "Y2hhbGxlbmdl"])
                 )
             case "/api/v2/device/taptopay/register":
                 return (
                     HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
-                    Self.envelope(responseData: ["deviceId": "dev_pending", "status": "pending"])
+                    AttestFixture.envelope(responseData: ["deviceId": "dev_pending", "status": "pending"])
                 )
             case "/api/v2/device/taptopay/attest":
                 return (
                     HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
-                    Self.envelope(responseData: ["ok": true])
+                    AttestFixture.envelope(responseData: ["ok": true])
                 )
             default:
                 XCTFail("unexpected path: \(request.url!.path)")
@@ -158,7 +111,7 @@ final class AppAttestServiceTests: XCTestCase {
         }
 
         let storage = InMemorySecureStorage()
-        let (sut, attestor, _) = makeAttest(storage: storage)
+        let (sut, attestor, _) = AttestFixture.makeService(storage: storage)
         do {
             _ = try await sut.attest(entry: "myEntry", appId: "x")
             XCTFail("expected throw")
@@ -191,12 +144,12 @@ final class AppAttestServiceTests: XCTestCase {
             case "/api/v2/device/taptopay/challenge":
                 return (
                     HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
-                    Self.envelope(responseData: ["challengeId": "c_1", "challenge": "Y2hhbGxlbmdl"])
+                    AttestFixture.envelope(responseData: ["challengeId": "c_1", "challenge": "Y2hhbGxlbmdl"])
                 )
             case "/api/v2/device/taptopay/register":
                 return (
                     HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
-                    Self.envelope(responseData: ["deviceId": "dev_1"])
+                    AttestFixture.envelope(responseData: ["deviceId": "dev_1"])
                 )
             default:
                 XCTFail("attest must not reach \(request.url!.path) once attestKey fails")
@@ -205,7 +158,7 @@ final class AppAttestServiceTests: XCTestCase {
         }
 
         let storage = InMemorySecureStorage()
-        let (sut, attestor, _) = makeAttest(storage: storage)
+        let (sut, attestor, _) = AttestFixture.makeService(storage: storage)
         attestor.attestKeyError = NSError(domain: AppAttestService.deviceCheckErrorDomain, code: 2)
 
         do {
@@ -233,7 +186,7 @@ final class AppAttestServiceTests: XCTestCase {
             case "/api/v2/device/taptopay/challenge":
                 return (
                     HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
-                    Self.envelope(responseData: ["challengeId": "c_1", "challenge": "Y2hhbGxlbmdl"])
+                    AttestFixture.envelope(responseData: ["challengeId": "c_1", "challenge": "Y2hhbGxlbmdl"])
                 )
             case "/api/v2/device/taptopay/register":
                 // Fail the first /register (pre-attest); succeed the second.
@@ -242,12 +195,12 @@ final class AppAttestServiceTests: XCTestCase {
                 }
                 return (
                     HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
-                    Self.envelope(responseData: ["deviceId": "dev_1"])
+                    AttestFixture.envelope(responseData: ["deviceId": "dev_1"])
                 )
             case "/api/v2/device/taptopay/attest":
                 return (
                     HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
-                    Self.envelope(responseData: ["ok": true])
+                    AttestFixture.envelope(responseData: ["ok": true])
                 )
             default:
                 XCTFail("unexpected path: \(request.url!.path)")
@@ -256,7 +209,7 @@ final class AppAttestServiceTests: XCTestCase {
         }
 
         let storage = InMemorySecureStorage()
-        let (sut, attestor, _) = makeAttest(storage: storage)
+        let (sut, attestor, _) = AttestFixture.makeService(storage: storage)
 
         // Attempt 1 fails at /register (after the key was generated + cached).
         do {
@@ -290,7 +243,7 @@ final class AppAttestServiceTests: XCTestCase {
     /// A key can be attested once, so two paypoints must not share one, and
     /// starting one must not take the other's away.
     func testAPendingKeyIsReusedOnlyByTheEntryPointThatMintedIt() throws {
-        let (sut, _, _) = makeAttest()
+        let (sut, _, _) = AttestFixture.makeService()
         try sut.rememberPendingKey("key_for_a", for: "entryA")
         try sut.rememberPendingKey("key_for_b", for: "entryB")
 
@@ -304,7 +257,7 @@ final class AppAttestServiceTests: XCTestCase {
     /// another on every attempt.
     func testTheSameEntryPointReusesItsPendingKey() async throws {
         let storage = InMemorySecureStorage()
-        let (sut, attestor, _) = makeAttest(storage: storage)
+        let (sut, attestor, _) = AttestFixture.makeService(storage: storage)
         try sut.rememberPendingKey("already_minted", for: "myEntry")
 
         StubURLProtocol.handler = { request in
@@ -312,17 +265,17 @@ final class AppAttestServiceTests: XCTestCase {
             case "/api/v2/device/taptopay/challenge":
                 return (
                     HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
-                    Self.envelope(responseData: ["challengeId": "c_1", "challenge": "Y2hhbGxlbmdl"])
+                    AttestFixture.envelope(responseData: ["challengeId": "c_1", "challenge": "Y2hhbGxlbmdl"])
                 )
             case "/api/v2/device/taptopay/register":
                 return (
                     HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
-                    Self.envelope(responseData: ["deviceId": "dev_1"])
+                    AttestFixture.envelope(responseData: ["deviceId": "dev_1"])
                 )
             default:
                 return (
                     HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
-                    Self.envelope(responseData: ["ok": true])
+                    AttestFixture.envelope(responseData: ["ok": true])
                 )
             }
         }
@@ -336,7 +289,7 @@ final class AppAttestServiceTests: XCTestCase {
     /// Clearing one paypoint must leave another's retry alone: taking it away
     /// makes the next attempt mint a key and register another device.
     func testClearingOnePaypointKeepsAnothersPendingKey() throws {
-        let (sut, _, _) = makeAttest()
+        let (sut, _, _) = AttestFixture.makeService()
         try sut.rememberPendingKey("key_for_a", for: "entryA")
         try sut.rememberPendingKey("key_for_b", for: "entryB")
 
@@ -351,7 +304,7 @@ final class AppAttestServiceTests: XCTestCase {
     /// Reading is what makes a binding recent. Ordering by enrolment instead
     /// evicts the binding every session uses in favour of one that enrolled later.
     func testUsingABindingMovesItToTheFront() throws {
-        let (sut, _, _) = makeAttest()
+        let (sut, _, _) = AttestFixture.makeService()
         for name in ["a", "b", "c", "d"] {
             try sut.remember(AttestedDevice(entry: name, deviceId: "dev-\(name)", keyId: "key-\(name)"))
         }
@@ -366,7 +319,7 @@ final class AppAttestServiceTests: XCTestCase {
 
     /// Four, so a device moved between paypoints finds each where it left it.
     func testOnlyFourBindingsAreKept() throws {
-        let (sut, _, _) = makeAttest()
+        let (sut, _, _) = AttestFixture.makeService()
 
         for index in 0 ..< 6 {
             try sut.remember(AttestedDevice(entry: "e\(index)", deviceId: "d\(index)", keyId: "k\(index)"))
@@ -382,7 +335,7 @@ final class AppAttestServiceTests: XCTestCase {
     /// one cannot name: the next request fails for a missing binding, and a device
     /// awaiting activation cannot activate at all.
     func testAWriteThatFailsIsRaised() {
-        let (sut, _, _) = makeAttest(storage: FailingStorage())
+        let (sut, _, _) = AttestFixture.makeService(storage: FailingStorage())
 
         XCTAssertThrowsError(
             try sut.remember(AttestedDevice(entry: "e", deviceId: "d", keyId: "k"))
@@ -401,8 +354,8 @@ final class AppAttestServiceTests: XCTestCase {
         // rejects. Both mean this binding cannot produce an assertion.
         for code in [2, 3] {
             let storage = InMemorySecureStorage()
-            try seedBinding(entry: "myEntry", deviceId: "dev", keyId: "key", in: storage)
-            let (sut, attestor, _) = makeAttest(storage: storage)
+            try AttestFixture.seedBinding(entry: "myEntry", deviceId: "dev", keyId: "key", in: storage)
+            let (sut, attestor, _) = AttestFixture.makeService(storage: storage)
             attestor.generateAssertionError = NSError(
                 domain: AppAttestService.deviceCheckErrorDomain,
                 code: code
@@ -422,8 +375,8 @@ final class AppAttestServiceTests: XCTestCase {
     func testABindingSurvivesAKeyCheckThatCouldNotBeMade() async throws {
         for code in [0, 1, 4] {
             let storage = InMemorySecureStorage()
-            try seedBinding(entry: "myEntry", deviceId: "dev", keyId: "key", in: storage)
-            let (sut, attestor, _) = makeAttest(storage: storage)
+            try AttestFixture.seedBinding(entry: "myEntry", deviceId: "dev", keyId: "key", in: storage)
+            let (sut, attestor, _) = AttestFixture.makeService(storage: storage)
             attestor.generateAssertionError = NSError(
                 domain: AppAttestService.deviceCheckErrorDomain,
                 code: code
@@ -437,8 +390,8 @@ final class AppAttestServiceTests: XCTestCase {
     /// A key that signs is a key this device holds.
     func testABindingWhoseKeySignsIsAnEnrolment() async throws {
         let storage = InMemorySecureStorage()
-        try seedBinding(entry: "myEntry", deviceId: "dev", keyId: "key", in: storage)
-        let (sut, _, _) = makeAttest(storage: storage)
+        try AttestFixture.seedBinding(entry: "myEntry", deviceId: "dev", keyId: "key", in: storage)
+        let (sut, _, _) = AttestFixture.makeService(storage: storage)
 
         try await assertAttested(sut, "myEntry", true)
         XCTAssertEqual(try sut.cachedDeviceId(for: "myEntry"), "dev")
@@ -447,7 +400,7 @@ final class AppAttestServiceTests: XCTestCase {
     /// Asking about a paypoint with no binding asks the platform nothing: there is
     /// no key to ask about, and a signature attempt would be wasted.
     func testNoBindingAsksThePlatformNothing() async throws {
-        let (sut, attestor, _) = makeAttest()
+        let (sut, attestor, _) = AttestFixture.makeService()
 
         try await assertAttested(sut, "myEntry", false)
 
@@ -458,9 +411,9 @@ final class AppAttestServiceTests: XCTestCase {
 
     func testGenerateAssertionProducesHeaders() async throws {
         let storage = InMemorySecureStorage()
-        try seedBinding(entry: "myEntry", deviceId: "cached_deviceId", keyId: "cached_keyId", in: storage)
+        try AttestFixture.seedBinding(entry: "myEntry", deviceId: "cached_deviceId", keyId: "cached_keyId", in: storage)
 
-        let (sut, attestor, _) = makeAttest(storage: storage)
+        let (sut, attestor, _) = AttestFixture.makeService(storage: storage)
         let headers = try await sut.generateAssertion(for: "myEntry")
         XCTAssertEqual(headers.keyId, "cached_keyId")
         XCTAssertEqual(headers.deviceId, "cached_deviceId")
@@ -470,7 +423,7 @@ final class AppAttestServiceTests: XCTestCase {
     }
 
     func testGenerateAssertionFailsWithoutState() async throws {
-        let (sut, _, _) = makeAttest()
+        let (sut, _, _) = AttestFixture.makeService()
         do {
             _ = try await sut.generateAssertion(for: "myEntry")
             XCTFail("expected throw")
@@ -486,9 +439,9 @@ final class AppAttestServiceTests: XCTestCase {
     /// service must clear the cache so the next `initialize()` re-attests.
     func testGenerateAssertionClearsTheBindingOnAnInvalidKey() async throws {
         let storage = InMemorySecureStorage()
-        try seedBinding(entry: "myEntry", deviceId: "cached_deviceId", keyId: "cached_keyId", in: storage)
+        try AttestFixture.seedBinding(entry: "myEntry", deviceId: "cached_deviceId", keyId: "cached_keyId", in: storage)
 
-        let (sut, attestor, _) = makeAttest(storage: storage)
+        let (sut, attestor, _) = AttestFixture.makeService(storage: storage)
         attestor.generateAssertionError = NSError(
             domain: AppAttestService.deviceCheckErrorDomain,
             code: 3
@@ -510,8 +463,8 @@ final class AppAttestServiceTests: XCTestCase {
     func testGenerateAssertionKeepsTheBindingOnEveryOtherDeviceCheckError() async throws {
         for code in [0, 1, 4] {
             let storage = InMemorySecureStorage()
-            try seedBinding(entry: "myEntry", deviceId: "cached_deviceId", keyId: "cached_keyId", in: storage)
-            let (sut, attestor, _) = makeAttest(storage: storage)
+            try AttestFixture.seedBinding(entry: "myEntry", deviceId: "cached_deviceId", keyId: "cached_keyId", in: storage)
+            let (sut, attestor, _) = AttestFixture.makeService(storage: storage)
             attestor.generateAssertionError = NSError(
                 domain: AppAttestService.deviceCheckErrorDomain,
                 code: code
@@ -532,9 +485,9 @@ final class AppAttestServiceTests: XCTestCase {
     /// a perfectly valid attestation.
     func testGenerateAssertionKeepsCacheOnNonDeviceCheckError() async throws {
         let storage = InMemorySecureStorage()
-        try seedBinding(entry: "myEntry", deviceId: "cached_deviceId", keyId: "cached_keyId", in: storage)
+        try AttestFixture.seedBinding(entry: "myEntry", deviceId: "cached_deviceId", keyId: "cached_keyId", in: storage)
 
-        let (sut, attestor, _) = makeAttest(storage: storage)
+        let (sut, attestor, _) = AttestFixture.makeService(storage: storage)
         attestor.generateAssertionError = NSError(domain: "com.example.other", code: 7)
 
         do {
@@ -551,8 +504,8 @@ final class AppAttestServiceTests: XCTestCase {
 
     func testClearCacheRemovesThisEntryPointsBinding() async throws {
         let storage = InMemorySecureStorage()
-        try seedBinding(entry: "myEntry", deviceId: "b", keyId: "a", in: storage)
-        let (sut, _, _) = makeAttest(storage: storage)
+        try AttestFixture.seedBinding(entry: "myEntry", deviceId: "b", keyId: "a", in: storage)
+        let (sut, _, _) = AttestFixture.makeService(storage: storage)
 
         sut.clearCache(for: "myEntry")
 
@@ -563,7 +516,7 @@ final class AppAttestServiceTests: XCTestCase {
     /// name keys that work, and each one dropped costs an enrolment.
     func testClearCacheLeavesEveryOtherBindingAlone() async throws {
         let storage = InMemorySecureStorage()
-        let (sut, _, _) = makeAttest(storage: storage)
+        let (sut, _, _) = AttestFixture.makeService(storage: storage)
         try sut.remember(AttestedDevice(entry: "entryA", deviceId: "devA", keyId: "keyA"))
         try sut.remember(AttestedDevice(entry: "entryB", deviceId: "devB", keyId: "keyB"))
 
@@ -578,7 +531,7 @@ final class AppAttestServiceTests: XCTestCase {
     /// the other paypoint's record is left intact.
     func testAHandleFromAnotherPaypointIsNotThisOnesEnrolment() async throws {
         let storage = InMemorySecureStorage()
-        let (sut, _, _) = makeAttest(storage: storage)
+        let (sut, _, _) = AttestFixture.makeService(storage: storage)
         try sut.remember(AttestedDevice(entry: "entryA", deviceId: "devA", keyId: "keyA"))
 
         try await assertAttested(sut, "entryB", false)
@@ -595,11 +548,47 @@ final class AppAttestServiceTests: XCTestCase {
         try storage.set("old_key", forKey: "com.payabli.ttp.keyId")
         try storage.set("old_device", forKey: "com.payabli.ttp.deviceId")
 
-        let (sut, _, _) = makeAttest(storage: storage)
+        let (sut, _, _) = AttestFixture.makeService(storage: storage)
 
         try await assertAttested(sut, "myEntry", false)
         XCTAssertNil(try storage.string(forKey: "com.payabli.ttp.keyId"))
         XCTAssertNil(try storage.string(forKey: "com.payabli.ttp.deviceId"))
+    }
+
+    /// The probe suspends, so the answer can arrive after another attempt has
+    /// enrolled this paypoint. What it refuses is the binding it asked about, and
+    /// dropping by entry point alone would take the newer one instead, leaving a
+    /// device that enrolled moments ago holding nothing.
+    func testAProbeAnsweringLateDropsOnlyTheBindingItAskedAbout() async throws {
+        let storage = InMemorySecureStorage()
+        let (sut, attestor, _) = AttestFixture.makeService(storage: storage)
+
+        // What the probe read, before it went away to ask.
+        let probed = AttestedDevice(entry: "myEntry", deviceId: "dev_old", keyId: "old_key")
+
+        // What the entry point holds by the time the answer lands.
+        try sut.remember(AttestedDevice(entry: "myEntry", deviceId: "dev_new", keyId: "new_key"))
+        try sut.rememberPendingKey("pending_for_new", for: "myEntry")
+
+        attestor.generateAssertionError = NSError(
+            domain: AppAttestService.deviceCheckErrorDomain,
+            code: 2,
+            userInfo: nil
+        )
+
+        let stillHeld = await sut.keyIsStillHeld(probed)
+
+        XCTAssertFalse(stillHeld, "the probed key was refused and the answer said otherwise")
+        XCTAssertEqual(
+            try sut.binding(for: "myEntry")?.deviceId,
+            "dev_new",
+            "the newer binding was dropped for a key it never named"
+        )
+        XCTAssertEqual(
+            try sut.pendingKey(for: "myEntry"),
+            "pending_for_new",
+            "a pending key belonging to a newer attempt was dropped"
+        )
     }
 
     // MARK: - What a storage failure looks like to a caller
@@ -610,10 +599,10 @@ final class AppAttestServiceTests: XCTestCase {
     /// bridge as a bare failure with nothing naming the cause.
     func testAStorageFailureIsReportedAsThisSDKsOwnError() async throws {
         let storage = InMemorySecureStorage()
-        try seedBinding(entry: "myEntry", deviceId: "dev", keyId: "key", in: storage)
+        try AttestFixture.seedBinding(entry: "myEntry", deviceId: "dev", keyId: "key", in: storage)
         storage.readFailure = KeychainStorage.KeychainError.underlying(errSecInteractionNotAllowed)
 
-        let (sut, _, _) = makeAttest(storage: storage)
+        let (sut, _, _) = AttestFixture.makeService(storage: storage)
 
         do {
             _ = try await sut.isAttested(for: "myEntry")
@@ -639,18 +628,18 @@ final class AppAttestServiceTests: XCTestCase {
             case "/api/v2/device/taptopay/challenge":
                 return (
                     HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
-                    Self.envelope(responseData: ["challengeId": "c_1", "challenge": "Y2hhbGxlbmdl"])
+                    AttestFixture.envelope(responseData: ["challengeId": "c_1", "challenge": "Y2hhbGxlbmdl"])
                 )
             default:
                 return (
                     HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
-                    Self.envelope(responseData: ["deviceId": "dev_1"])
+                    AttestFixture.envelope(responseData: ["deviceId": "dev_1"])
                 )
             }
         }
 
         let storage = WriteRefusingStorage()
-        let (sut, attestor, _) = makeAttest(storage: storage)
+        let (sut, attestor, _) = AttestFixture.makeService(storage: storage)
 
         // The mint's own write is the first refusal, so reach the drop with the key
         // already in the slot.
@@ -666,155 +655,17 @@ final class AppAttestServiceTests: XCTestCase {
         XCTAssertEqual(attestor.attestKeyCalls, 0, "the single-use key was spent after a drop that did not land")
     }
 
-    // MARK: - Two callers, one entry point
-
-    /// App Attest issues a fresh key on every call, so two attestations for one
-    /// entry point mint two keys and register two devices, leaving the paypoint with
-    /// a device no binding names. A second caller takes the first's answer.
-    func testTwoAttestationsForOneEntryPointRegisterOneDevice() async throws {
-        let pathsBox = PathsBox()
-        StubURLProtocol.handler = { request in
-            pathsBox.append(request.url!.path)
-            switch request.url!.path {
-            case "/api/v2/device/taptopay/challenge":
-                return (
-                    HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
-                    Self.envelope(responseData: ["challengeId": "c_1", "challenge": "Y2hhbGxlbmdl"])
-                )
-            case "/api/v2/device/taptopay/register":
-                return (
-                    HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
-                    Self.envelope(responseData: ["deviceId": "dev_1"])
-                )
-            default:
-                return (
-                    HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
-                    Self.envelope(responseData: ["ok": true])
-                )
-            }
-        }
-
-        // Two services over one Keychain namespace, which is what a host talking to
-        // one paypoint from two places builds.
-        let storage = InMemorySecureStorage()
-        let (first, firstAttestor, _) = makeAttest(storage: storage)
-        let (second, secondAttestor, _) = makeAttest(storage: storage)
-
-        async let a = first.attest(entry: "myEntry", appId: "TEAM.bundle.id")
-        async let b = second.attest(entry: "myEntry", appId: "TEAM.bundle.id")
-        let results = try await [a, b]
-
-        XCTAssertEqual(results[0].deviceId, results[1].deviceId, "the two callers hold different devices")
-        XCTAssertEqual(
-            firstAttestor.generateKeyCalls + secondAttestor.generateKeyCalls,
-            1,
-            "both callers minted a key, so each registered its own device"
-        )
-        XCTAssertEqual(
-            pathsBox.values.filter { $0 == "/api/v2/device/taptopay/register" }.count,
-            1,
-            "the paypoint was registered twice and one device has no binding naming it"
-        )
-        XCTAssertEqual(try first.allBindings().bindings.count, 1)
-    }
-
-    /// The gate holds callers that arrive while an attempt is running. This is the
-    /// one that arrives just after it ends: its warm check ran before the binding
-    /// existed, so without a read inside the gate it registers a second device for
-    /// a paypoint that now has one.
-    func testAnAttestationAfterAnotherFinishedRegistersNoSecondDevice() async throws {
-        let pathsBox = PathsBox()
-        StubURLProtocol.handler = { request in
-            pathsBox.append(request.url!.path)
-            switch request.url!.path {
-            case "/api/v2/device/taptopay/challenge":
-                return (
-                    HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
-                    Self.envelope(responseData: ["challengeId": "c_1", "challenge": "Y2hhbGxlbmdl"])
-                )
-            case "/api/v2/device/taptopay/register":
-                return (
-                    HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
-                    Self.envelope(responseData: ["deviceId": "dev_1"])
-                )
-            default:
-                return (
-                    HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
-                    Self.envelope(responseData: ["ok": true])
-                )
-            }
-        }
-
-        // Two services over one store, as two facades for one paypoint are.
-        let storage = InMemorySecureStorage()
-        let (first, firstAttestor, _) = makeAttest(storage: storage)
-        let (second, secondAttestor, _) = makeAttest(storage: storage)
-
-        // Sequential, so the second is never inside the gate with the first. Its
-        // caller decided to attest before the first had written anything.
-        let a = try await first.attest(entry: "myEntry", appId: "TEAM.bundle.id")
-        let b = try await second.attest(entry: "myEntry", appId: "TEAM.bundle.id")
-
-        XCTAssertEqual(a.deviceId, b.deviceId, "the second attempt registered its own device")
-        XCTAssertEqual(
-            pathsBox.values.filter { $0 == "/api/v2/device/taptopay/register" }.count,
-            1,
-            "the paypoint was registered twice and one device has no binding naming it"
-        )
-        XCTAssertEqual(secondAttestor.generateKeyCalls, 0, "the second attempt minted a key it did not need")
-        XCTAssertEqual(firstAttestor.generateKeyCalls, 1)
-        XCTAssertEqual(try first.allBindings().bindings.count, 1)
-    }
-
-    /// A binding whose key the platform no longer holds does not answer for a new
-    /// attempt: the read inside the gate asks the key, as the warm path does.
-    func testABindingNamingADeadKeyStillRunsTheColdSequence() async throws {
-        StubURLProtocol.handler = { request in
-            switch request.url!.path {
-            case "/api/v2/device/taptopay/challenge":
-                return (
-                    HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
-                    Self.envelope(responseData: ["challengeId": "c_1", "challenge": "Y2hhbGxlbmdl"])
-                )
-            case "/api/v2/device/taptopay/register":
-                return (
-                    HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
-                    Self.envelope(responseData: ["deviceId": "dev_fresh"])
-                )
-            default:
-                return (
-                    HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
-                    Self.envelope(responseData: ["ok": true])
-                )
-            }
-        }
-
-        let storage = InMemorySecureStorage()
-        try seedBinding(entry: "myEntry", deviceId: "dev_stale", keyId: "dead_key", in: storage)
-        let (sut, attestor, _) = makeAttest(storage: storage)
-        attestor.generateAssertionError = NSError(
-            domain: AppAttestService.deviceCheckErrorDomain,
-            code: 2,
-            userInfo: nil
-        )
-
-        let result = try await sut.attest(entry: "myEntry", appId: "TEAM.bundle.id")
-
-        XCTAssertEqual(result.deviceId, "dev_fresh", "a binding naming a key this device lost was answered from")
-        XCTAssertEqual(attestor.generateKeyCalls, 1)
-    }
-
     /// A store that could not be read reaches a caller as this SDK's own error from
     /// the identifier too, not only from the binding reads beside it.
     func testAStorageFailureFromTheIdentifierIsReportedAsThisSDKsOwnError() async throws {
         StubURLProtocol.handler = { request in
             (
                 HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
-                Self.envelope(responseData: ["challengeId": "c_1", "challenge": "Y2hhbGxlbmdl"])
+                AttestFixture.envelope(responseData: ["challengeId": "c_1", "challenge": "Y2hhbGxlbmdl"])
             )
         }
 
-        let (sut, _, _) = makeAttest(hardwareIdProvider: { () throws -> String in
+        let (sut, _, _) = AttestFixture.makeService(hardwareIdProvider: { () throws -> String in
             throw KeychainStorage.KeychainError.underlying(errSecInteractionNotAllowed)
         })
 
@@ -826,87 +677,6 @@ final class AppAttestServiceTests: XCTestCase {
         } catch {
             XCTFail("the Keychain's own error crossed the SDK boundary: \(error)")
         }
-    }
-
-    /// Two services over different stores are two devices, whatever entry point they
-    /// name. They queue behind each other, and each then decides from its own store,
-    /// so neither is handed a handle it cannot produce an assertion for.
-    func testTwoServicesOverDifferentStoresEachGetTheirOwnDevice() async throws {
-        let deviceIds = PathsBox()
-        StubURLProtocol.handler = { request in
-            switch request.url!.path {
-            case "/api/v2/device/taptopay/challenge":
-                return (
-                    HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
-                    Self.envelope(responseData: ["challengeId": "c_1", "challenge": "Y2hhbGxlbmdl"])
-                )
-            case "/api/v2/device/taptopay/register":
-                let issued = "dev_\(UUID().uuidString)"
-                deviceIds.append(issued)
-                return (
-                    HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
-                    Self.envelope(responseData: ["deviceId": issued])
-                )
-            default:
-                return (
-                    HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
-                    Self.envelope(responseData: ["ok": true])
-                )
-            }
-        }
-
-        // Separate stores, as a caller building the service directly with its own
-        // storage has. The entry point is the same, which is all the queue keys on.
-        let firstStorage = InMemorySecureStorage()
-        let secondStorage = InMemorySecureStorage()
-        let (first, _, _) = makeAttest(storage: firstStorage)
-        let (second, _, _) = makeAttest(storage: secondStorage)
-
-        async let a = first.attest(entry: "myEntry", appId: "TEAM.bundle.id")
-        async let b = second.attest(entry: "myEntry", appId: "TEAM.bundle.id")
-        let results = try await [a, b]
-
-        XCTAssertEqual(deviceIds.values.count, 2, "one service was handed the other's device")
-        XCTAssertNotEqual(results[0].deviceId, results[1].deviceId)
-
-        // What each was told matches what it can actually assert for.
-        XCTAssertEqual(try first.binding(for: "myEntry")?.deviceId, results[0].deviceId)
-        XCTAssertEqual(try second.binding(for: "myEntry")?.deviceId, results[1].deviceId)
-    }
-
-    /// Different entry points are what the bindings exist for, so they never wait
-    /// for each other.
-    func testTwoEntryPointsAttestWithoutWaitingForEachOther() async throws {
-        StubURLProtocol.handler = { request in
-            switch request.url!.path {
-            case "/api/v2/device/taptopay/challenge":
-                return (
-                    HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
-                    Self.envelope(responseData: ["challengeId": "c_1", "challenge": "Y2hhbGxlbmdl"])
-                )
-            case "/api/v2/device/taptopay/register":
-                return (
-                    HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
-                    Self.envelope(responseData: ["deviceId": "dev_\(UUID().uuidString)"])
-                )
-            default:
-                return (
-                    HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
-                    Self.envelope(responseData: ["ok": true])
-                )
-            }
-        }
-
-        let storage = InMemorySecureStorage()
-        let (sut, attestor, _) = makeAttest(storage: storage)
-
-        async let a = sut.attest(entry: "entryA", appId: "TEAM.bundle.id")
-        async let b = sut.attest(entry: "entryB", appId: "TEAM.bundle.id")
-        let results = try await [a, b]
-
-        XCTAssertNotEqual(results[0].deviceId, results[1].deviceId)
-        XCTAssertEqual(attestor.generateKeyCalls, 2, "one entry point took the other's attestation")
-        XCTAssertEqual(try sut.allBindings().bindings.count, 2)
     }
 }
 
@@ -921,24 +691,6 @@ private struct FailingStorage: SecureStorage {
     }
 
     func remove(forKey _: String) throws {}
-}
-
-// Thread-safe box so the stub handler can record the order of paths it sees.
-
-private final class PathsBox: @unchecked Sendable {
-    private let lock = NSLock()
-    private var storage: [String] = []
-    var values: [String] {
-        lock.lock()
-        defer { lock.unlock() }
-        return storage
-    }
-
-    func append(_ s: String) {
-        lock.lock()
-        defer { lock.unlock() }
-        storage.append(s)
-    }
 }
 
 /// Thread-safe monotonic counter so a stub handler can vary its response by
