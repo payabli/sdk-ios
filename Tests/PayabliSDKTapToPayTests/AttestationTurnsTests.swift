@@ -198,36 +198,100 @@ final class AttestationTurnsTests: XCTestCase {
 
     /// Different entry points are what the bindings exist for, so they never wait
     /// for each other.
-    func testTwoEntryPointsAttestWithoutWaitingForEachOther() async throws {
+    /// One entry point held open, and the other has to get all the way through
+    /// while it is held.
+    ///
+    /// Asserting the outcomes alone proves nothing here: a queue that serialized
+    /// every entry point together would still end with two devices, two keys and
+    /// two bindings. What separates the two is whether the second could finish
+    /// before the first was let go, so the first is held inside its own attestation
+    /// and the second is required to complete against a bound.
+    func testAnEntryPointCompletesWhileAnotherIsHeldOpen() async throws {
         StubURLProtocol.handler = { request in
             switch request.url!.path {
             case "/api/v2/device/taptopay/challenge":
-                return (
-                    HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
-                    AttestFixture.envelope(responseData: ["challengeId": "c_1", "challenge": "Y2hhbGxlbmdl"])
-                )
+                return AttestFixture.ok(request, ["challengeId": "c_1", "challenge": "Y2hhbGxlbmdl"])
             case "/api/v2/device/taptopay/register":
-                return (
-                    HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
-                    AttestFixture.envelope(responseData: ["deviceId": "dev_\(UUID().uuidString)"])
-                )
+                return AttestFixture.ok(request, ["deviceId": "dev_\(UUID().uuidString)"])
             default:
-                return (
-                    HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
-                    AttestFixture.envelope(responseData: ["ok": true])
-                )
+                return AttestFixture.ok(request, ["ok": true])
             }
         }
 
         let storage = InMemorySecureStorage()
-        let (sut, attestor, _) = AttestFixture.makeService(storage: storage)
+        let (holder, holdingAttestor, _) = AttestFixture.makeService(storage: storage)
+        let (other, otherAttestor, _) = AttestFixture.makeService(storage: storage)
 
-        async let a = sut.attest(entry: "entryA", appId: "TEAM.bundle.id")
-        async let b = sut.attest(entry: "entryB", appId: "TEAM.bundle.id")
-        let results = try await [a, b]
+        let held = AsyncGate()
+        let reached = AsyncGate()
+        holdingAttestor.beforeGenerateKey = {
+            reached.open()
+            await held.wait()
+        }
 
-        XCTAssertNotEqual(results[0].deviceId, results[1].deviceId)
-        XCTAssertEqual(attestor.generateKeyCalls, 2, "one entry point took the other's attestation")
-        XCTAssertEqual(try sut.allBindings().bindings.count, 2)
+        async let holdersResult = holder.attest(entry: "entryA", appId: "TEAM.bundle.id")
+
+        // Held for certain before the other one starts, so this is not a race the
+        // test happens to win.
+        await reached.wait()
+        XCTAssertEqual(holdingAttestor.generateKeyCalls, 1)
+
+        // An expectation rather than a racing task: a task group waits for its
+        // children while a throw unwinds, and the child here is the caller queued
+        // behind the held one, so the release that would free it can never run and
+        // the failure never arrives. This records the failure, then the release
+        // below drains both callers.
+        let finished = expectation(description: "entryB completed while entryA was held")
+        let othersAttestation = Task {
+            let result = try await other.attest(entry: "entryB", appId: "TEAM.bundle.id")
+            finished.fulfill()
+            return result
+        }
+        await fulfillment(of: [finished], timeout: 5)
+
+        held.open()
+        let othersResult = try await othersAttestation.value
+        XCTAssertEqual(otherAttestor.generateKeyCalls, 1)
+        XCTAssertEqual(
+            try other.binding(for: "entryB")?.deviceId,
+            othersResult.deviceId,
+            "entryB finished without a binding of its own"
+        )
+
+        let holders = try await holdersResult
+        XCTAssertNotEqual(holders.deviceId, othersResult.deviceId)
+        XCTAssertEqual(try holder.allBindings().bindings.count, 2)
+    }
+}
+
+/// One-shot gate a test can hold work behind.
+private final class AsyncGate: @unchecked Sendable {
+    private let lock = NSLock()
+    private var waiting: [CheckedContinuation<Void, Never>] = []
+    private var opened = false
+
+    func wait() async {
+        await withCheckedContinuation { continuation in
+            let resumeNow: Bool = lock.withLock {
+                guard !opened else { return true }
+                waiting.append(continuation)
+                return false
+            }
+            if resumeNow {
+                continuation.resume()
+            }
+        }
+    }
+
+    func open() {
+        let held: [CheckedContinuation<Void, Never>] = lock.withLock {
+            opened = true
+            let held = waiting
+            waiting = []
+            return held
+        }
+        for continuation in held {
+            continuation.resume()
+        }
     }
 }

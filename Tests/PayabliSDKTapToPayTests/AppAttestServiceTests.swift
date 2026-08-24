@@ -293,7 +293,7 @@ final class AppAttestServiceTests: XCTestCase {
         try sut.rememberPendingKey("key_for_a", for: "entryA")
         try sut.rememberPendingKey("key_for_b", for: "entryB")
 
-        sut.clearCache(for: "entryA")
+        try sut.clearCache(for: "entryA")
 
         XCTAssertNil(try sut.pendingKey(for: "entryA"))
         XCTAssertEqual(try sut.pendingKey(for: "entryB"), "key_for_b")
@@ -507,7 +507,7 @@ final class AppAttestServiceTests: XCTestCase {
         try AttestFixture.seedBinding(entry: "myEntry", deviceId: "b", keyId: "a", in: storage)
         let (sut, _, _) = AttestFixture.makeService(storage: storage)
 
-        sut.clearCache(for: "myEntry")
+        try sut.clearCache(for: "myEntry")
 
         try await assertAttested(sut, "myEntry", false)
     }
@@ -520,7 +520,7 @@ final class AppAttestServiceTests: XCTestCase {
         try sut.remember(AttestedDevice(entry: "entryA", deviceId: "devA", keyId: "keyA"))
         try sut.remember(AttestedDevice(entry: "entryB", deviceId: "devB", keyId: "keyB"))
 
-        sut.clearCache(for: "entryA")
+        try sut.clearCache(for: "entryA")
 
         try await assertAttested(sut, "entryA", false)
         XCTAssertEqual(try sut.cachedDeviceId(for: "entryB"), "devB")
@@ -588,6 +588,59 @@ final class AppAttestServiceTests: XCTestCase {
             try sut.pendingKey(for: "myEntry"),
             "pending_for_new",
             "a pending key belonging to a newer attempt was dropped"
+        )
+    }
+
+    /// The same shape one call along. `generateAssertion` reads the binding, then
+    /// suspends asking the platform to sign with its key; a refusal arriving after
+    /// another attempt enrolled this paypoint must not take the binding that
+    /// attempt wrote.
+    func testAnAssertionFailingLateDropsOnlyTheBindingItUsed() async throws {
+        let storage = InMemorySecureStorage()
+        try AttestFixture.seedBinding(entry: "myEntry", deviceId: "dev_old", keyId: "old_key", in: storage)
+        let (sut, attestor, _) = AttestFixture.makeService(storage: storage)
+
+        // Written inside the window the signature attempt suspends for.
+        attestor.beforeGenerateAssertion = { [weak sut] in
+            try? sut?.remember(AttestedDevice(entry: "myEntry", deviceId: "dev_new", keyId: "new_key"))
+        }
+        attestor.generateAssertionError = NSError(
+            domain: AppAttestService.deviceCheckErrorDomain,
+            code: 2,
+            userInfo: nil
+        )
+
+        do {
+            _ = try await sut.generateAssertion(for: "myEntry")
+            XCTFail("a refused key produced an assertion")
+        } catch {}
+
+        XCTAssertEqual(
+            try sut.binding(for: "myEntry")?.deviceId,
+            "dev_new",
+            "the binding written while the signature was in flight was dropped for the older key"
+        )
+    }
+
+    /// A drop the store refused is raised, because a caller's own correctness rests
+    /// on it. A binding the service refused still names a key the platform signs
+    /// with, so one left behind is read as sound on the next warm check and sent
+    /// again, and a caller told it was cleared cannot tell that apart.
+    func testAClearTheStoreRefusedIsRaised() throws {
+        let storage = WriteRefusingStorage()
+        let (sut, _, _) = AttestFixture.makeService(storage: storage)
+        try sut.remember(AttestedDevice(entry: "myEntry", deviceId: "dev", keyId: "key"))
+
+        storage.refusesWrites = true
+        XCTAssertThrowsError(try sut.clearCache(for: "myEntry")) { error in
+            XCTAssertTrue(error is PayabliTTPError, "the Keychain's own error crossed the boundary: \(error)")
+        }
+
+        storage.refusesWrites = false
+        XCTAssertEqual(
+            try sut.binding(for: "myEntry")?.deviceId,
+            "dev",
+            "the drop was reported as refused and the binding is gone, so there is nothing to raise about"
         )
     }
 
