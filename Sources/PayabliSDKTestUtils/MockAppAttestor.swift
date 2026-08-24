@@ -68,9 +68,26 @@ public final class MockAppAttestor: AppAttestor, @unchecked Sendable {
 
     public init() {}
 
+    /// Awaited before a key is minted, so a test can hold one attestation open and
+    /// assert what another can do while it is held.
+    ///
+    /// Ordering asserted by holding rather than by timing: a test that only checks
+    /// outcomes cannot tell work that ran at once from work that was serialized,
+    /// because both produce the same devices and the same bindings.
+    public var beforeGenerateKey: (@Sendable () async -> Void)? {
+        get { lock.withLock { storedBeforeGenerateKey } }
+        set { lock.withLock { storedBeforeGenerateKey = newValue } }
+    }
+
+    private var storedBeforeGenerateKey: (@Sendable () async -> Void)?
+
     public func generateKey() async throws -> AppAttestKeyId {
+        // Counted on the way in, before the hook can hold the call, so the count
+        // says how many callers asked rather than how many got an answer. A test
+        // holding one open reads it to see that the caller arrived.
+        lock.withLock { _generateKeyCalls += 1 }
+        await beforeGenerateKey?()
         return try lock.withLock {
-            _generateKeyCalls += 1
             if let error = _generateKeyError {
                 throw error
             }
@@ -88,7 +105,17 @@ public final class MockAppAttestor: AppAttestor, @unchecked Sendable {
         }
     }
 
+    /// Awaited before an assertion is produced, so a test can act inside the window
+    /// the real call suspends for.
+    public var beforeGenerateAssertion: (@Sendable () async -> Void)? {
+        get { lock.withLock { storedBeforeGenerateAssertion } }
+        set { lock.withLock { storedBeforeGenerateAssertion = newValue } }
+    }
+
+    private var storedBeforeGenerateAssertion: (@Sendable () async -> Void)?
+
     public func generateAssertion(_ keyId: AppAttestKeyId, clientDataHash: ClientDataHash) async throws -> AppAttestAssertion {
+        await beforeGenerateAssertion?()
         return try lock.withLock {
             _generateAssertionCalls += 1
             if let error = _generateAssertionError {

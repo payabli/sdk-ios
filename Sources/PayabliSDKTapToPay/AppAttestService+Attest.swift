@@ -170,7 +170,11 @@ extension AppAttestService {
             if nsError.domain == Self.deviceCheckErrorDomain {
                 if Self.deviceCheckUnusableKeyCodes.contains(nsError.code) {
                     logger.error("generateAssertion cannot use the stored key — clearing this paypoint's binding")
-                    clearCache(for: entry)
+                    // The binding read at the top of this call, not whatever the
+                    // entry point holds now: the signature attempt suspends, and an
+                    // attestation finishing in that window leaves a binding this
+                    // answer says nothing about.
+                    forgetIfUnchanged(binding)
                 } else {
                     logger.error(
                         "generateAssertion failed with DeviceCheck error (code \(nsError.code)) — binding kept"
