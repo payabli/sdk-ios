@@ -666,6 +666,92 @@ final class AppAttestServiceTests: XCTestCase {
         XCTAssertEqual(attestor.attestKeyCalls, 0, "the single-use key was spent after a drop that did not land")
     }
 
+    // MARK: - Two callers, one entry point
+
+    /// App Attest issues a fresh key on every call, so two attestations for one
+    /// entry point mint two keys and register two devices, leaving the paypoint with
+    /// a device no binding names. A second caller takes the first's answer.
+    func testTwoAttestationsForOneEntryPointRegisterOneDevice() async throws {
+        let pathsBox = PathsBox()
+        StubURLProtocol.handler = { request in
+            pathsBox.append(request.url!.path)
+            switch request.url!.path {
+            case "/api/v2/device/taptopay/challenge":
+                return (
+                    HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
+                    Self.envelope(responseData: ["challengeId": "c_1", "challenge": "Y2hhbGxlbmdl"])
+                )
+            case "/api/v2/device/taptopay/register":
+                return (
+                    HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
+                    Self.envelope(responseData: ["deviceId": "dev_1"])
+                )
+            default:
+                return (
+                    HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
+                    Self.envelope(responseData: ["ok": true])
+                )
+            }
+        }
+
+        // Two services over one Keychain namespace, which is what a host talking to
+        // one paypoint from two places builds.
+        let storage = InMemorySecureStorage()
+        let (first, firstAttestor, _) = makeAttest(storage: storage)
+        let (second, secondAttestor, _) = makeAttest(storage: storage)
+
+        async let a = first.attest(entry: "myEntry", appId: "TEAM.bundle.id")
+        async let b = second.attest(entry: "myEntry", appId: "TEAM.bundle.id")
+        let results = try await [a, b]
+
+        XCTAssertEqual(results[0].deviceId, results[1].deviceId, "the two callers hold different devices")
+        XCTAssertEqual(
+            firstAttestor.generateKeyCalls + secondAttestor.generateKeyCalls,
+            1,
+            "both callers minted a key, so each registered its own device"
+        )
+        XCTAssertEqual(
+            pathsBox.values.filter { $0 == "/api/v2/device/taptopay/register" }.count,
+            1,
+            "the paypoint was registered twice and one device has no binding naming it"
+        )
+        XCTAssertEqual(try first.allBindings().bindings.count, 1)
+    }
+
+    /// Different entry points are what the bindings exist for, so they never wait
+    /// for each other.
+    func testTwoEntryPointsAttestWithoutWaitingForEachOther() async throws {
+        StubURLProtocol.handler = { request in
+            switch request.url!.path {
+            case "/api/v2/device/taptopay/challenge":
+                return (
+                    HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
+                    Self.envelope(responseData: ["challengeId": "c_1", "challenge": "Y2hhbGxlbmdl"])
+                )
+            case "/api/v2/device/taptopay/register":
+                return (
+                    HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
+                    Self.envelope(responseData: ["deviceId": "dev_\(UUID().uuidString)"])
+                )
+            default:
+                return (
+                    HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
+                    Self.envelope(responseData: ["ok": true])
+                )
+            }
+        }
+
+        let storage = InMemorySecureStorage()
+        let (sut, attestor, _) = makeAttest(storage: storage)
+
+        async let a = sut.attest(entry: "entryA", appId: "TEAM.bundle.id")
+        async let b = sut.attest(entry: "entryB", appId: "TEAM.bundle.id")
+        let results = try await [a, b]
+
+        XCTAssertNotEqual(results[0].deviceId, results[1].deviceId)
+        XCTAssertEqual(attestor.generateKeyCalls, 2, "one entry point took the other's attestation")
+        XCTAssertEqual(try sut.allBindings().bindings.count, 2)
+    }
 }
 
 /// A store whose writes always fail, for the one case that has to be raised.

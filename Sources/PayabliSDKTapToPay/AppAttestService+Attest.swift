@@ -10,7 +10,28 @@ extension AppAttestService {
     /// hosts where `DCAppAttestService` is unavailable.
     static let deviceCheckErrorDomain = "com.apple.devicecheck.error"
 
+    /// One attestation at a time per entry point, across every service in the
+    /// process.
+    ///
+    /// The pending-key lookup and the mint that follows it are separated by an
+    /// `await`, and App Attest issues a fresh key on every call. Two callers for one
+    /// entry point therefore both read no pending key, both mint a different one,
+    /// and both register: the paypoint ends up with two devices and a binding naming
+    /// only the later of them. Serializing the store's own operations cannot close
+    /// that, because the gap is between two of them.
+    ///
+    /// A caller for an entry point already being attested waits for that attempt and
+    /// takes its answer, which is the answer it was going to produce. Its pending
+    /// state and its outcome both belong to that attempt, including the refusal a
+    /// device awaiting activation reports. Different entry points never wait for
+    /// each other.
     public func attest(entry: String, appId: String) async throws -> AttestationResult {
+        try await Self.attestations.joining(entry) {
+            try await self.runAttest(entry: entry, appId: appId)
+        }
+    }
+
+    private func runAttest(entry: String, appId: String) async throws -> AttestationResult {
         guard attestor.isSupported else {
             throw PayabliTTPError.attestationFailed(reason: "App Attest not supported on this device")
         }
@@ -167,6 +188,11 @@ extension AppAttestService {
     static let deviceCheckUnusableKeyCodes: Set<Int> = [2, 3]
 
     static let platform = "Ios"
+
+    /// Shared by every service in the process, because two of them are what the
+    /// per-entry-point gate exists to serialize: a facade builds its own service,
+    /// and a host talking to one paypoint from two places builds two.
+    static let attestations = AttestationsInFlight()
 
     static let iso8601WithFractional: ISO8601DateFormatter = {
         let f = ISO8601DateFormatter()
