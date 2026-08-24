@@ -32,6 +32,20 @@ extension AppAttestService {
     }
 
     private func runAttest(entry: String, appId: String) async throws -> AttestationResult {
+        // Read inside the gate, because the caller's warm check ran outside it. An
+        // attempt that finished in between has left a binding this one would
+        // otherwise register a second device to replace. Waiting is not enough on
+        // its own: the gate holds callers that arrive while an attempt is running,
+        // and this is the one that arrives just after it ends.
+        //
+        // No activation is claimed by answering from the binding. It records none,
+        // and `/config` answers for it exactly as it does on the warm path, which
+        // reaches this same state by skipping attestation altogether.
+        if let held = try binding(for: entry), await keyIsStillHeld(held) {
+            logger.info("[attest] this paypoint was enrolled while this attempt waited")
+            return AttestationResult(keyId: held.keyId, deviceId: held.deviceId)
+        }
+
         guard attestor.isSupported else {
             throw PayabliTTPError.attestationFailed(reason: "App Attest not supported on this device")
         }

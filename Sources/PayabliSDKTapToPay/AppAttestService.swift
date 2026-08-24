@@ -110,7 +110,7 @@ public final class AppAttestService: DeviceAttestationService, @unchecked Sendab
     /// Two codes mean the key cannot be used and the rest do not: see
     /// `deviceCheckUnusableKeyCodes`. Re-enrolling on any other answer would cost
     /// an enrolment for a key that was working.
-    private func keyIsStillHeld(_ binding: AttestedDevice) async -> Bool {
+    func keyIsStillHeld(_ binding: AttestedDevice) async -> Bool {
         do {
             _ = try await attestor.generateAssertion(
                 AppAttestKeyId(binding.keyId),

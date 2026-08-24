@@ -717,6 +717,92 @@ final class AppAttestServiceTests: XCTestCase {
         XCTAssertEqual(try first.allBindings().bindings.count, 1)
     }
 
+    /// The gate holds callers that arrive while an attempt is running. This is the
+    /// one that arrives just after it ends: its warm check ran before the binding
+    /// existed, so without a read inside the gate it registers a second device for
+    /// a paypoint that now has one.
+    func testAnAttestationAfterAnotherFinishedRegistersNoSecondDevice() async throws {
+        let pathsBox = PathsBox()
+        StubURLProtocol.handler = { request in
+            pathsBox.append(request.url!.path)
+            switch request.url!.path {
+            case "/api/v2/device/taptopay/challenge":
+                return (
+                    HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
+                    Self.envelope(responseData: ["challengeId": "c_1", "challenge": "Y2hhbGxlbmdl"])
+                )
+            case "/api/v2/device/taptopay/register":
+                return (
+                    HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
+                    Self.envelope(responseData: ["deviceId": "dev_1"])
+                )
+            default:
+                return (
+                    HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
+                    Self.envelope(responseData: ["ok": true])
+                )
+            }
+        }
+
+        // Two services over one store, as two facades for one paypoint are.
+        let storage = InMemorySecureStorage()
+        let (first, firstAttestor, _) = makeAttest(storage: storage)
+        let (second, secondAttestor, _) = makeAttest(storage: storage)
+
+        // Sequential, so the second is never inside the gate with the first. Its
+        // caller decided to attest before the first had written anything.
+        let a = try await first.attest(entry: "myEntry", appId: "TEAM.bundle.id")
+        let b = try await second.attest(entry: "myEntry", appId: "TEAM.bundle.id")
+
+        XCTAssertEqual(a.deviceId, b.deviceId, "the second attempt registered its own device")
+        XCTAssertEqual(
+            pathsBox.values.filter { $0 == "/api/v2/device/taptopay/register" }.count,
+            1,
+            "the paypoint was registered twice and one device has no binding naming it"
+        )
+        XCTAssertEqual(secondAttestor.generateKeyCalls, 0, "the second attempt minted a key it did not need")
+        XCTAssertEqual(firstAttestor.generateKeyCalls, 1)
+        XCTAssertEqual(try first.allBindings().bindings.count, 1)
+    }
+
+    /// A binding whose key the platform no longer holds does not answer for a new
+    /// attempt: the read inside the gate asks the key, as the warm path does.
+    func testABindingNamingADeadKeyStillRunsTheColdSequence() async throws {
+        StubURLProtocol.handler = { request in
+            switch request.url!.path {
+            case "/api/v2/device/taptopay/challenge":
+                return (
+                    HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
+                    Self.envelope(responseData: ["challengeId": "c_1", "challenge": "Y2hhbGxlbmdl"])
+                )
+            case "/api/v2/device/taptopay/register":
+                return (
+                    HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
+                    Self.envelope(responseData: ["deviceId": "dev_fresh"])
+                )
+            default:
+                return (
+                    HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
+                    Self.envelope(responseData: ["ok": true])
+                )
+            }
+        }
+
+        let storage = InMemorySecureStorage()
+        try seedBinding(entry: "myEntry", deviceId: "dev_stale", keyId: "dead_key", in: storage)
+        let (sut, attestor, _) = makeAttest(storage: storage)
+        attestor.generateAssertionError = NSError(
+            domain: AppAttestService.deviceCheckErrorDomain,
+            code: 2,
+            userInfo: nil
+        )
+
+        let result = try await sut.attest(entry: "myEntry", appId: "TEAM.bundle.id")
+
+        XCTAssertEqual(result.deviceId, "dev_fresh", "a binding naming a key this device lost was answered from")
+        XCTAssertEqual(attestor.generateKeyCalls, 1)
+    }
+
     /// Different entry points are what the bindings exist for, so they never wait
     /// for each other.
     func testTwoEntryPointsAttestWithoutWaitingForEachOther() async throws {
