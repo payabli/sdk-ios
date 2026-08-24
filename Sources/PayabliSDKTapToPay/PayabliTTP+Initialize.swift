@@ -176,17 +176,21 @@ extension PayabliTTP {
     /// Returns the `deviceId` to cache. On success leaves the session in
     /// `.fetchingConfig`. `.devicePendingActivation` maps to `.pendingActivation`.
     private func runAttestationPhase() async throws -> String? {
-        if await attestation.isAttested(for: entryPoint) {
-            _ = sessionManager.transition(to: .fetchingConfig)
-            syncPublished()
-            return attestation.cachedDeviceId(for: entryPoint)
-        }
-
-        _ = sessionManager.transition(to: .attestingDevice)
-        syncPublished()
-        multicaster.emit(.attestationStarted)
-
         do {
+            // Inside the handling below, because reading the binding can fail and a
+            // failure that skipped it would throw out of `initialize()` while the
+            // published state stayed where `reset()` left it, and emit nothing. The
+            // caller and the observable state would then describe different things.
+            if try await attestation.isAttested(for: entryPoint) {
+                _ = sessionManager.transition(to: .fetchingConfig)
+                syncPublished()
+                return try attestation.cachedDeviceId(for: entryPoint)
+            }
+
+            _ = sessionManager.transition(to: .attestingDevice)
+            syncPublished()
+            multicaster.emit(.attestationStarted)
+
             let result = try await attestation.attest(entry: entryPoint, appId: appId)
             multicaster.emit(.attestationCompleted)
             _ = sessionManager.transition(to: .fetchingConfig)

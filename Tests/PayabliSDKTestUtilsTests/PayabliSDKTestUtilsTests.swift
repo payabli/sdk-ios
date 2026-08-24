@@ -11,9 +11,9 @@ final class PayabliSDKTestUtilsTests: XCTestCase {
     func testInMemorySecureStorageRoundTrips() throws {
         let storage = InMemorySecureStorage()
         try storage.set("hello", forKey: "key")
-        XCTAssertEqual(storage.string(forKey: "key"), "hello")
-        storage.remove(forKey: "key")
-        XCTAssertNil(storage.string(forKey: "key"))
+        XCTAssertEqual(try storage.string(forKey: "key"), "hello")
+        try storage.remove(forKey: "key")
+        XCTAssertNil(try storage.string(forKey: "key"))
     }
 
     func testMockTapToPayProviderHasMockProviderId() {

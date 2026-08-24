@@ -4,9 +4,9 @@ import Security
 /// Lightweight wrapper over the iOS Keychain for storing non-secret identity
 /// tokens (PRD NFR-5E, §22.1).
 ///
-/// Used by `AppAttestService` to persist `keyId` and `deviceId` across app
-/// launches. **Must not** be used for true secrets (`clientSecret`, access
-/// tokens, Fiserv credentials) — those live in RAM only (NFR-5D).
+/// Used by `AppAttestService` to hold the device's bindings across app launches.
+/// **Must not** be used for true secrets (`clientSecret`, access tokens, Fiserv
+/// credentials) — those live in RAM only (NFR-5D).
 ///
 /// Items are stored as `kSecClassGenericPassword` with the SDK's bundle-level
 /// service identifier so they're namespaced away from the host app's own
@@ -33,12 +33,20 @@ public struct KeychainStorage: SecureStorage, Sendable {
 
     // MARK: - Read
 
-    public func string(forKey key: String) -> String? {
-        guard let data = data(forKey: key) else { return nil }
+    public func string(forKey key: String) throws -> String? {
+        guard let data = try data(forKey: key) else { return nil }
         return String(data: data, encoding: .utf8)
     }
 
-    func data(forKey key: String) -> Data? {
+    /// The stored bytes, `nil` when the item is not there, and a raise for every
+    /// other answer the Keychain can give.
+    ///
+    /// `errSecItemNotFound` is the only status that means nothing is stored. The
+    /// rest are conditions that can pass: `errSecInteractionNotAllowed` is what a
+    /// read gets before the first unlock after a boot, and these items are written
+    /// `AfterFirstUnlock`, so it is reachable by anything that runs that early.
+    /// Answering `nil` there reports an enrolled device as a new one.
+    func data(forKey key: String) throws -> Data? {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
@@ -48,8 +56,19 @@ public struct KeychainStorage: SecureStorage, Sendable {
         ]
         var item: AnyObject?
         let status = SecItemCopyMatching(query as CFDictionary, &item)
-        guard status == errSecSuccess else { return nil }
+        if Self.isMissing(status) {
+            return nil
+        }
+        try Self.check(status)
         return item as? Data
+    }
+
+    /// The only status that means nothing is stored, so the only one a read answers
+    /// `nil` for. Its own function because no test host here has a Keychain to
+    /// answer with, and the list is what decides whether an enrolled device is
+    /// reported as a new one.
+    static func isMissing(_ status: OSStatus) -> Bool {
+        status == errSecItemNotFound
     }
 
     // MARK: - Write
@@ -125,21 +144,28 @@ public struct KeychainStorage: SecureStorage, Sendable {
 
     // MARK: - Delete
 
-    public func remove(forKey key: String) {
+    /// Deleting what is not there is a success, so `errSecItemNotFound` passes: the
+    /// caller asked for the item to be gone and it is.
+    public func remove(forKey key: String) throws {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrAccount as String: key
         ]
-        _ = SecItemDelete(query as CFDictionary)
+        try Self.check(SecItemDelete(query as CFDictionary))
     }
 
-    func removeAll() {
+    func removeAll() throws {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service
         ]
-        _ = SecItemDelete(query as CFDictionary)
+        try Self.check(SecItemDelete(query as CFDictionary))
+    }
+
+    static func check(_ status: OSStatus) throws {
+        guard status != errSecSuccess, status != errSecItemNotFound else { return }
+        throw KeychainError.underlying(status)
     }
 }
 
@@ -152,13 +178,13 @@ public enum PayabliKeychainKey {
     /// enrolled device.
     public static let pendingKeyId = Stored.pendingKeyId.rawValue
 
-    /// The keys themselves. The constants above are the names callers use, and a
-    /// key added here joins `all` by being a case, so a sweep cannot miss one.
     /// Every binding this device holds, as one item. Replaces `keyId` and
     /// `deviceId`, which recorded no paypoint and were two writes with a window
     /// between them.
     public static let deviceBindings = Stored.deviceBindings.rawValue
 
+    /// The keys themselves. The constants above are the names callers use, and a
+    /// key added here joins `all` by being a case, so a sweep cannot miss one.
     enum Stored: String, CaseIterable {
         case deviceBindings = "com.payabli.ttp.deviceBindings"
         case pendingKeyId = "com.payabli.ttp.pendingKeyId"

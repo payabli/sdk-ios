@@ -37,7 +37,7 @@ extension AppAttestService {
         //    is about to attest and one of the attempts would be refused. Another
         //    entry point's pending key is neither read nor overwritten here.
         let keyId: AppAttestKeyId
-        if let pending = pendingKey(for: entry) {
+        if let pending = try pendingKey(for: entry) {
             keyId = AppAttestKeyId(pending)
         } else {
             keyId = try await attestor.generateKey()
@@ -67,7 +67,11 @@ extension AppAttestService {
         //    pending slot before attesting: a failure here or at `/attest`
         //    must mint a new key next time rather than replay a burned one.
         //    Pre-attest failures above keep the pending slot for reuse.
-        bindingStore.forgetPendingKey(for: entry)
+        //
+        //    Raises rather than proceeding on a drop that did not land, because the
+        //    key is about to be spent and a surviving record is one the next attempt
+        //    reuses, which is refused every time.
+        try forgetPendingKey(for: entry)
         let clientDataHash = ClientDataHash(Data(SHA256.hash(data: challengeData)))
         let attestation = try await attestor.attestKey(keyId, clientDataHash: clientDataHash)
 
@@ -99,7 +103,7 @@ extension AppAttestService {
     }
 
     public func generateAssertion(for entry: String) async throws -> AssertionHeaders {
-        guard let binding = bindingStore.binding(for: entry) else {
+        guard let binding = try binding(for: entry) else {
             throw PayabliTTPError.attestationFailed(reason: "Missing attestation state")
         }
         let keyId = AppAttestKeyId(binding.keyId)

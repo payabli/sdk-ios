@@ -9,19 +9,19 @@ final class SecureStorageTests: XCTestCase {
     func testInMemoryRoundTrip() throws {
         let storage: SecureStorage = InMemorySecureStorage()
         try storage.set("value_xyz", forKey: "key_a")
-        XCTAssertEqual(storage.string(forKey: "key_a"), "value_xyz")
+        XCTAssertEqual(try storage.string(forKey: "key_a"), "value_xyz")
     }
 
     func testInMemoryRemove() throws {
         let storage = InMemorySecureStorage()
         try storage.set("v", forKey: "k")
-        storage.remove(forKey: "k")
-        XCTAssertNil(storage.string(forKey: "k"))
+        try storage.remove(forKey: "k")
+        XCTAssertNil(try storage.string(forKey: "k"))
     }
 
-    func testInMemoryMissingKeyReturnsNil() {
+    func testInMemoryMissingKeyReturnsNil() throws {
         let storage = InMemorySecureStorage()
-        XCTAssertNil(storage.string(forKey: "never_set"))
+        XCTAssertNil(try storage.string(forKey: "never_set"))
     }
 
     // MARK: - What a missing Keychain looks like
@@ -59,7 +59,7 @@ final class SecureStorageTests: XCTestCase {
             throw XCTSkip("Keychain services require a running keychaind; covered by device QA (§12.3).")
         #else
             let storage = KeychainStorage(service: "com.payabli.tests.\(UUID().uuidString)")
-            defer { storage.removeAll() }
+            defer { try? storage.removeAll() }
 
             do {
                 try storage.set("hello_keychain", forKey: "sample_key")
@@ -68,11 +68,88 @@ final class SecureStorageTests: XCTestCase {
                 return
             }
 
-            XCTAssertEqual(storage.string(forKey: "sample_key"), "hello_keychain")
+            XCTAssertEqual(try storage.string(forKey: "sample_key"), "hello_keychain")
 
-            storage.remove(forKey: "sample_key")
-            XCTAssertNil(storage.string(forKey: "sample_key"))
+            try storage.remove(forKey: "sample_key")
+            XCTAssertNil(try storage.string(forKey: "sample_key"))
         #endif
+    }
+
+    /// Which statuses a read answers `nil` for, asserted without a Keychain, since
+    /// no test host here has one to answer with.
+    ///
+    /// Only the item being absent means nothing is stored. Every other status is a
+    /// condition that passes, and answering `nil` for one reports a device that is
+    /// already enrolled as a new one, which enrols it again.
+    func testOnlyAMissingItemReadsAsNothingStored() {
+        XCTAssertTrue(KeychainStorage.isMissing(errSecItemNotFound))
+
+        for status in [
+            errSecInteractionNotAllowed,
+            errSecMissingEntitlement,
+            errSecNotAvailable,
+            errSecAuthFailed,
+            errSecIO
+        ] {
+            XCTAssertFalse(
+                KeychainStorage.isMissing(status),
+                "OSStatus \(status) reads as nothing stored, so a device already enrolled enrols again"
+            )
+        }
+    }
+
+    /// Deleting what is not there is what the caller asked for, so it passes. Every
+    /// other status is a store that could not be reached.
+    func testOnlySuccessAndAnAbsentItemPassAWrite() {
+        XCTAssertNoThrow(try KeychainStorage.check(errSecSuccess))
+        XCTAssertNoThrow(try KeychainStorage.check(errSecItemNotFound))
+
+        for status in [errSecInteractionNotAllowed, errSecMissingEntitlement, errSecIO] {
+            XCTAssertThrowsError(
+                try KeychainStorage.check(status),
+                "OSStatus \(status) passed, so a mutation that never landed reads as done"
+            )
+        }
+    }
+
+    /// The read reports what the Keychain answered, on any host.
+    ///
+    /// `isMissing` and `check` are asserted above; this is the call site that has to
+    /// use them, and it cannot be reached by a host-specific test. A tool-hosted
+    /// target cannot run on a device at all, so there is no host here whose Keychain
+    /// answers normally, and asserting `nil` for a key never written passes equally
+    /// on a host that refused the call. Asking the Keychain the same question
+    /// directly is what makes the two distinguishable.
+    func testAReadReportsWhatTheKeychainAnswered() throws {
+        let service = "com.payabli.tests.\(UUID().uuidString)"
+        let storage = KeychainStorage(service: service)
+
+        var probe: AnyObject?
+        let status = SecItemCopyMatching([
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: "never_written",
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne
+        ] as CFDictionary, &probe)
+
+        // Read outside the assertion: `XCTAssertNil` catches a throw from its own
+        // autoclosure and records it as a failure, so the branch below is never
+        // reached if the read is made inside one.
+        let value: String?
+        do {
+            value = try storage.string(forKey: "never_written")
+        } catch let KeychainStorage.KeychainError.underlying(raised) {
+            XCTAssertEqual(raised, status, "the read raised a status the Keychain did not report")
+            XCTAssertFalse(KeychainStorage.isMissing(status))
+            return
+        }
+
+        XCTAssertNil(value)
+        XCTAssertTrue(
+            KeychainStorage.isMissing(status),
+            "the Keychain answered OSStatus \(status) and the read reported nothing stored"
+        )
     }
 
     /// The attribute both write paths carry, asserted without a Keychain, since no
@@ -95,7 +172,7 @@ final class SecureStorageTests: XCTestCase {
         #else
             let service = "com.payabli.tests.\(UUID().uuidString)"
             let storage = KeychainStorage(service: service)
-            defer { storage.removeAll() }
+            defer { try? storage.removeAll() }
 
             do {
                 try storage.set("hello_keychain", forKey: "sample_key")
@@ -202,7 +279,7 @@ final class SecureStorageTests: XCTestCase {
                 "the sweep left the item with the attribute a backup can carry"
             )
             XCTAssertEqual(
-                storage.string(forKey: PayabliKeychainKey.deviceBindings),
+                try storage.string(forKey: PayabliKeychainKey.deviceBindings),
                 "device-77",
                 "the sweep changed the value, which it never reads"
             )
@@ -211,15 +288,29 @@ final class SecureStorageTests: XCTestCase {
 
     /// A key with nothing stored under it is skipped, so a fresh install does not
     /// write empty items.
+    ///
+    /// Skips on the same terms as the round trip above, and has to: a host with no
+    /// entitlement reports that from the read rather than answering nil, so without
+    /// the skip this asserts nothing is stored on a host that cannot say.
     func testTheSweepStoresNothingForAKeyThatHasNoItemIfAvailable() throws {
         #if os(macOS) && !targetEnvironment(simulator)
             throw XCTSkip("Keychain services require a running keychaind; covered by device QA (§12.3).")
         #else
             let storage = KeychainStorage(service: "com.payabli.tests.\(UUID().uuidString)")
-            defer { storage.removeAll() }
+            defer { try? storage.removeAll() }
 
             for key in PayabliKeychainKey.all {
-                XCTAssertNil(storage.string(forKey: key), key)
+                // Read outside the assertion. `XCTAssertNil` takes an autoclosure,
+                // so a throw inside one is caught by XCTest and reported as a
+                // failure, and the skip below is never reached.
+                let stored: String?
+                do {
+                    stored = try storage.string(forKey: key)
+                } catch let KeychainStorage.KeychainError.underlying(status) {
+                    try skipIfHostHasNoKeychain(status, whileDoing: "reading a key the sweep skipped")
+                    return
+                }
+                XCTAssertNil(stored, key)
             }
         #endif
     }

@@ -5,7 +5,7 @@ import PayabliSDKCore
 
 public extension AppAttestService {
     func activateDevice(activationCode: String, entry: String) async throws {
-        guard let deviceId = cachedDeviceId(for: entry) else {
+        guard let deviceId = try cachedDeviceId(for: entry) else {
             throw PayabliTTPError.attestationFailed(reason: "Missing deviceId — run initialize() before activateDevice")
         }
 

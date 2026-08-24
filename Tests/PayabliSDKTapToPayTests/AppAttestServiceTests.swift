@@ -1,6 +1,7 @@
 @testable import PayabliSDKCore
 @testable import PayabliSDKTapToPay
 import PayabliSDKTestUtils
+import Security
 import XCTest
 
 final class AppAttestServiceTests: XCTestCase {
@@ -54,8 +55,8 @@ final class AppAttestServiceTests: XCTestCase {
         _ expected: Bool,
         _ message: String = "",
         line: UInt = #line
-    ) async {
-        let actual = await sut.isAttested(for: entry)
+    ) async throws {
+        let actual = try await sut.isAttested(for: entry)
         XCTAssertEqual(actual, expected, message, line: line)
     }
 
@@ -109,7 +110,7 @@ final class AppAttestServiceTests: XCTestCase {
         let storage = InMemorySecureStorage()
         let (sut, attestor, _) = makeAttest(storage: storage)
 
-        await assertAttested(sut, "myEntry", false)
+        try await assertAttested(sut, "myEntry", false)
         let result = try await sut.attest(entry: "myEntry", appId: "TEAM.bundle.id")
 
         XCTAssertEqual(result.deviceId, "dev_1")
@@ -123,9 +124,9 @@ final class AppAttestServiceTests: XCTestCase {
         ])
 
         // Persistence
-        await assertAttested(sut, "myEntry", true)
-        XCTAssertEqual(sut.binding(for: "myEntry")?.keyId, "mock_keyId")
-        XCTAssertEqual(sut.binding(for: "myEntry")?.deviceId, "dev_1")
+        try await assertAttested(sut, "myEntry", true)
+        XCTAssertEqual(try sut.binding(for: "myEntry")?.keyId, "mock_keyId")
+        XCTAssertEqual(try sut.binding(for: "myEntry")?.deviceId, "dev_1")
     }
 
     // MARK: - Pending activation
@@ -172,7 +173,7 @@ final class AppAttestServiceTests: XCTestCase {
             ])
             XCTAssertEqual(attestor.generateKeyCalls, 1)
             XCTAssertEqual(attestor.attestKeyCalls, 1)
-            XCTAssertEqual(sut.binding(for: "myEntry")?.deviceId, "dev_pending")
+            XCTAssertEqual(try sut.binding(for: "myEntry")?.deviceId, "dev_pending")
         } catch {
             XCTFail("wrong error: \(error)")
         }
@@ -214,12 +215,12 @@ final class AppAttestServiceTests: XCTestCase {
             // expected
         }
 
-        await assertAttested(sut, "myEntry", false)
-        XCTAssertNil(sut.binding(for: "myEntry")?.keyId)
-        XCTAssertNil(sut.binding(for: "myEntry")?.deviceId)
+        try await assertAttested(sut, "myEntry", false)
+        XCTAssertNil(try sut.binding(for: "myEntry")?.keyId)
+        XCTAssertNil(try sut.binding(for: "myEntry")?.deviceId)
         // `attestKey` burns the key, so the pending slot must be cleared too:
         // the next attempt must mint a new key rather than replay a burned one.
-        XCTAssertNil(storage.string(forKey: PayabliKeychainKey.pendingKeyId))
+        XCTAssertNil(try storage.string(forKey: PayabliKeychainKey.pendingKeyId))
     }
 
     /// A failure BEFORE `attestKey` (here: `/register`) must keep the freshly
@@ -265,9 +266,9 @@ final class AppAttestServiceTests: XCTestCase {
             // expected
         }
         XCTAssertEqual(attestor.generateKeyCalls, 1)
-        await assertAttested(sut, "myEntry", false)
+        try await assertAttested(sut, "myEntry", false)
         XCTAssertEqual(
-            sut.pendingKey(for: "myEntry"),
+            try sut.pendingKey(for: "myEntry"),
             "mock_keyId",
             "a pre-attest failure must keep the generated key for reuse"
         )
@@ -277,9 +278,9 @@ final class AppAttestServiceTests: XCTestCase {
         XCTAssertEqual(result.keyId, "mock_keyId")
         XCTAssertEqual(attestor.generateKeyCalls, 1, "the pending key should be reused, not regenerated")
         XCTAssertEqual(attestor.attestKeyCalls, 1)
-        await assertAttested(sut, "myEntry", true)
+        try await assertAttested(sut, "myEntry", true)
         XCTAssertNil(
-            storage.string(forKey: PayabliKeychainKey.pendingKeyId),
+            try storage.string(forKey: PayabliKeychainKey.pendingKeyId),
             "pending slot must be cleared once attestation completes"
         )
     }
@@ -293,10 +294,10 @@ final class AppAttestServiceTests: XCTestCase {
         try sut.rememberPendingKey("key_for_a", for: "entryA")
         try sut.rememberPendingKey("key_for_b", for: "entryB")
 
-        XCTAssertEqual(sut.pendingKey(for: "entryB"), "key_for_b")
+        XCTAssertEqual(try sut.pendingKey(for: "entryB"), "key_for_b")
 
-        XCTAssertEqual(sut.pendingKey(for: "entryA"), "key_for_a", "one entry point's key was overwritten")
-        XCTAssertNil(sut.pendingKey(for: "entryC"), "an entry point that minted nothing must read nothing")
+        XCTAssertEqual(try sut.pendingKey(for: "entryA"), "key_for_a", "one entry point's key was overwritten")
+        XCTAssertNil(try sut.pendingKey(for: "entryC"), "an entry point that minted nothing must read nothing")
     }
 
     /// A retry inside one entry point still reuses its own key rather than minting
@@ -341,8 +342,8 @@ final class AppAttestServiceTests: XCTestCase {
 
         sut.clearCache(for: "entryA")
 
-        XCTAssertNil(sut.pendingKey(for: "entryA"))
-        XCTAssertEqual(sut.pendingKey(for: "entryB"), "key_for_b")
+        XCTAssertNil(try sut.pendingKey(for: "entryA"))
+        XCTAssertEqual(try sut.pendingKey(for: "entryB"), "key_for_b")
     }
 
     // MARK: - Retention
@@ -356,11 +357,11 @@ final class AppAttestServiceTests: XCTestCase {
         }
 
         // "a" is the coldest by enrolment, and using it makes it the newest.
-        XCTAssertNotNil(sut.binding(for: "a"))
+        XCTAssertNotNil(try sut.binding(for: "a"))
         try sut.remember(AttestedDevice(entry: "e", deviceId: "dev-e", keyId: "key-e"))
 
-        XCTAssertNotNil(sut.binding(for: "a"), "the binding just used was the one evicted")
-        XCTAssertNil(sut.binding(for: "b"), "the coldest binding should have gone")
+        XCTAssertNotNil(try sut.binding(for: "a"), "the binding just used was the one evicted")
+        XCTAssertNil(try sut.binding(for: "b"), "the coldest binding should have gone")
     }
 
     /// Four, so a device moved between paypoints finds each where it left it.
@@ -371,9 +372,9 @@ final class AppAttestServiceTests: XCTestCase {
             try sut.remember(AttestedDevice(entry: "e\(index)", deviceId: "d\(index)", keyId: "k\(index)"))
         }
 
-        XCTAssertEqual(sut.allBindings().bindings.count, DeviceBindings.maximum)
-        XCTAssertNil(sut.binding(for: "e0"))
-        XCTAssertNotNil(sut.binding(for: "e5"))
+        XCTAssertEqual(try sut.allBindings().bindings.count, DeviceBindings.maximum)
+        XCTAssertNil(try sut.binding(for: "e0"))
+        XCTAssertNotNil(try sut.binding(for: "e5"))
     }
 
     /// A write that fails has to be raised. Nothing keeps an in-memory copy, so
@@ -407,10 +408,10 @@ final class AppAttestServiceTests: XCTestCase {
                 code: code
             )
 
-            await assertAttested(sut, "myEntry", false, "code \(code)")
+            try await assertAttested(sut, "myEntry", false, "code \(code)")
 
             XCTAssertNil(
-                sut.binding(for: "myEntry"),
+                try sut.binding(for: "myEntry"),
                 "a binding naming a key that is gone has to be dropped, not asked again every start"
             )
         }
@@ -428,8 +429,8 @@ final class AppAttestServiceTests: XCTestCase {
                 code: code
             )
 
-            await assertAttested(sut, "myEntry", true, "code \(code) is not a reason to re-enrol")
-            XCTAssertNotNil(sut.binding(for: "myEntry"), "code \(code)")
+            try await assertAttested(sut, "myEntry", true, "code \(code) is not a reason to re-enrol")
+            XCTAssertNotNil(try sut.binding(for: "myEntry"), "code \(code)")
         }
     }
 
@@ -439,16 +440,16 @@ final class AppAttestServiceTests: XCTestCase {
         try seedBinding(entry: "myEntry", deviceId: "dev", keyId: "key", in: storage)
         let (sut, _, _) = makeAttest(storage: storage)
 
-        await assertAttested(sut, "myEntry", true)
-        XCTAssertEqual(sut.cachedDeviceId(for: "myEntry"), "dev")
+        try await assertAttested(sut, "myEntry", true)
+        XCTAssertEqual(try sut.cachedDeviceId(for: "myEntry"), "dev")
     }
 
     /// Asking about a paypoint with no binding asks the platform nothing: there is
     /// no key to ask about, and a signature attempt would be wasted.
-    func testNoBindingAsksThePlatformNothing() async {
+    func testNoBindingAsksThePlatformNothing() async throws {
         let (sut, attestor, _) = makeAttest()
 
-        await assertAttested(sut, "myEntry", false)
+        try await assertAttested(sut, "myEntry", false)
 
         XCTAssertEqual(attestor.generateAssertionCalls, 0)
     }
@@ -500,7 +501,7 @@ final class AppAttestServiceTests: XCTestCase {
             XCTAssertEqual((error as NSError).domain, AppAttestService.deviceCheckErrorDomain)
         }
 
-        await assertAttested(sut, "myEntry", false, "a rejected key has to be re-attested")
+        try await assertAttested(sut, "myEntry", false, "a rejected key has to be re-attested")
     }
 
     /// Every other DeviceCheck error keeps the binding. `DCErrorServerUnavailable`
@@ -523,7 +524,7 @@ final class AppAttestServiceTests: XCTestCase {
                 XCTAssertEqual((error as NSError).code, code)
             }
 
-            await assertAttested(sut, "myEntry", true, "code \(code) is not a reason to re-attest")
+            try await assertAttested(sut, "myEntry", true, "code \(code) is not a reason to re-attest")
         }
     }
 
@@ -543,7 +544,7 @@ final class AppAttestServiceTests: XCTestCase {
             // expected
         }
 
-        await assertAttested(sut, "myEntry", true, "non-DeviceCheck failures must not clear attestation state")
+        try await assertAttested(sut, "myEntry", true, "non-DeviceCheck failures must not clear attestation state")
     }
 
     // MARK: - clearCache
@@ -555,7 +556,7 @@ final class AppAttestServiceTests: XCTestCase {
 
         sut.clearCache(for: "myEntry")
 
-        await assertAttested(sut, "myEntry", false)
+        try await assertAttested(sut, "myEntry", false)
     }
 
     /// A refusal is about the paypoint that refused. The other bindings still
@@ -568,8 +569,8 @@ final class AppAttestServiceTests: XCTestCase {
 
         sut.clearCache(for: "entryA")
 
-        await assertAttested(sut, "entryA", false)
-        XCTAssertEqual(sut.cachedDeviceId(for: "entryB"), "devB")
+        try await assertAttested(sut, "entryA", false)
+        XCTAssertEqual(try sut.cachedDeviceId(for: "entryB"), "devB")
     }
 
     /// The defect this ticket names: a session configured for one paypoint while
@@ -580,9 +581,9 @@ final class AppAttestServiceTests: XCTestCase {
         let (sut, _, _) = makeAttest(storage: storage)
         try sut.remember(AttestedDevice(entry: "entryA", deviceId: "devA", keyId: "keyA"))
 
-        await assertAttested(sut, "entryB", false)
-        XCTAssertNil(sut.cachedDeviceId(for: "entryB"))
-        XCTAssertEqual(sut.cachedDeviceId(for: "entryA"), "devA")
+        try await assertAttested(sut, "entryB", false)
+        XCTAssertNil(try sut.cachedDeviceId(for: "entryB"))
+        XCTAssertEqual(try sut.cachedDeviceId(for: "entryA"), "devA")
     }
 
     /// An identity stored before the paypoint was recorded cannot be adopted:
@@ -596,16 +597,80 @@ final class AppAttestServiceTests: XCTestCase {
 
         let (sut, _, _) = makeAttest(storage: storage)
 
-        await assertAttested(sut, "myEntry", false)
-        XCTAssertNil(storage.string(forKey: "com.payabli.ttp.keyId"))
-        XCTAssertNil(storage.string(forKey: "com.payabli.ttp.deviceId"))
+        try await assertAttested(sut, "myEntry", false)
+        XCTAssertNil(try storage.string(forKey: "com.payabli.ttp.keyId"))
+        XCTAssertNil(try storage.string(forKey: "com.payabli.ttp.deviceId"))
     }
+
+    // MARK: - What a storage failure looks like to a caller
+
+    /// A store that could not be read reports this SDK's own error, not the
+    /// Keychain's. The domain and the code are what the ObjC, MAUI, Flutter and
+    /// React Native bridges map, so an error thrown as it arrived reaches every
+    /// bridge as a bare failure with nothing naming the cause.
+    func testAStorageFailureIsReportedAsThisSDKsOwnError() async throws {
+        let storage = InMemorySecureStorage()
+        try seedBinding(entry: "myEntry", deviceId: "dev", keyId: "key", in: storage)
+        storage.readFailure = KeychainStorage.KeychainError.underlying(errSecInteractionNotAllowed)
+
+        let (sut, _, _) = makeAttest(storage: storage)
+
+        do {
+            _ = try await sut.isAttested(for: "myEntry")
+            XCTFail("a store that could not be read answered that the device is not enrolled")
+        } catch let error as PayabliTTPError {
+            guard case let .attestationFailed(reason) = error else {
+                return XCTFail("unexpected case: \(error)")
+            }
+            XCTAssertFalse(reason.isEmpty)
+        } catch {
+            XCTFail("the Keychain's own error crossed the SDK boundary: \(error)")
+        }
+    }
+
+    // MARK: - The pending slot and the key it names
+
+    /// The slot is dropped immediately before the key it names is spent, and a key
+    /// can be attested once. A drop reported as done while the record survives
+    /// leaves the next attempt reusing a key that is refused every time.
+    func testAPendingDropThatDidNotLandStopsTheKeyBeingSpent() async throws {
+        StubURLProtocol.handler = { request in
+            switch request.url!.path {
+            case "/api/v2/device/taptopay/challenge":
+                return (
+                    HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
+                    Self.envelope(responseData: ["challengeId": "c_1", "challenge": "Y2hhbGxlbmdl"])
+                )
+            default:
+                return (
+                    HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
+                    Self.envelope(responseData: ["deviceId": "dev_1"])
+                )
+            }
+        }
+
+        let storage = WriteRefusingStorage()
+        let (sut, attestor, _) = makeAttest(storage: storage)
+
+        // The mint's own write is the first refusal, so reach the drop with the key
+        // already in the slot.
+        storage.refusesWrites = false
+        try sut.rememberPendingKey("minted_key", for: "myEntry")
+        storage.refusesWrites = true
+
+        do {
+            _ = try await sut.attest(entry: "myEntry", appId: "TEAM.bundle.id")
+            XCTFail("attestation spent the key while its pending record was still readable")
+        } catch {}
+
+        XCTAssertEqual(attestor.attestKeyCalls, 0, "the single-use key was spent after a drop that did not land")
+    }
+
 }
 
-/// Thread-safe box so the stub handler can record the order of paths it sees.
 /// A store whose writes always fail, for the one case that has to be raised.
 private struct FailingStorage: SecureStorage {
-    func string(forKey _: String) -> String? {
+    func string(forKey _: String) throws -> String? {
         nil
     }
 
@@ -613,8 +678,10 @@ private struct FailingStorage: SecureStorage {
         throw KeychainStorage.KeychainError.decoding
     }
 
-    func remove(forKey _: String) {}
+    func remove(forKey _: String) throws {}
 }
+
+// Thread-safe box so the stub handler can record the order of paths it sees.
 
 private final class PathsBox: @unchecked Sendable {
     private let lock = NSLock()

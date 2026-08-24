@@ -55,12 +55,16 @@ public protocol DeviceAttestationService: AnyObject, Sendable {
     /// Asynchronous because answering it means asking the platform whether the
     /// key the binding names is still held, which is the same check the sibling
     /// SDK makes by comparing thumbprints.
-    func isAttested(for entry: String) async -> Bool
+    ///
+    /// Raises when the store could not be read. That is a third answer and not a
+    /// `false`: `false` runs the cold sequence, and running it against a paypoint
+    /// that is already enrolled registers a second device for it.
+    func isAttested(for entry: String) async throws -> Bool
 
     /// The backend-assigned `deviceId` this entry point was registered under, or
     /// `nil` when it holds no binding. The facade uses this on the warm path
     /// where `attest()` is skipped.
-    func cachedDeviceId(for entry: String) -> String?
+    func cachedDeviceId(for entry: String) throws -> String?
 
     /// Runs the first-run attestation flow: challenge → register → attest.
     /// Throws `PayabliTTPError.devicePendingActivation` if the backend returns

@@ -10,75 +10,94 @@ public final class MockDeviceAttestationService: DeviceAttestationService, @unch
     /// Which entry points hold a binding, and the handle each was registered
     /// under. Keyed, so a test can set one entry point up and check that another
     /// reads as unenrolled.
-    private var _bindings: [String: String] = [:]
+    private var storedBindings: [String: String] = [:]
     public var bindings: [String: String] {
-        get { lock.withLock { _bindings } }
-        set { lock.withLock { _bindings = newValue } }
+        get { lock.withLock { storedBindings } }
+        set { lock.withLock { storedBindings = newValue } }
     }
 
     /// Sets or clears the binding every entry point sees. For tests that only
     /// care whether the device is enrolled, not for which paypoint.
     public var isAlreadyAttested: Bool {
-        get { lock.withLock { !_bindings.isEmpty } }
-        set { lock.withLock { _bindings = newValue ? [Self.anyEntry: "mock_device"] : [:] } }
+        get { lock.withLock { !storedBindings.isEmpty } }
+        set { lock.withLock { storedBindings = newValue ? [Self.anyEntry: "mock_device"] : [:] } }
     }
 
     /// The handle any entry point would read, when only one was set up.
     public var cachedDeviceId: String? {
-        get { lock.withLock { _bindings.values.first } }
-        set { lock.withLock { _bindings = newValue.map { [Self.anyEntry: $0] } ?? [:] } }
+        get { lock.withLock { storedBindings.values.first } }
+        set { lock.withLock { storedBindings = newValue.map { [Self.anyEntry: $0] } ?? [:] } }
     }
 
     /// The entry point the unkeyed setters above stand in for.
     public static let anyEntry = "mockEntry"
 
-    public func isAttested(for entry: String) async -> Bool {
-        lock.withLock { _bindings[entry] != nil || _bindings[Self.anyEntry] != nil }
+    /// Raised by the two reads below while it is set, so a test can drive the
+    /// warm path failing before the cold sequence is ever reached.
+    public var readFailure: Error? {
+        get { lock.withLock { storedReadFailure } }
+        set { lock.withLock { storedReadFailure = newValue } }
     }
 
-    public func cachedDeviceId(for entry: String) -> String? {
-        lock.withLock { _bindings[entry] ?? _bindings[Self.anyEntry] }
+    private var storedReadFailure: Error?
+
+    public func isAttested(for entry: String) async throws -> Bool {
+        try lock.withLock {
+            if let storedReadFailure {
+                throw storedReadFailure
+            }
+            return storedBindings[entry] != nil || storedBindings[Self.anyEntry] != nil
+        }
     }
 
-    private var _attestResult: Result<AttestationResult, Error> = .success(
+    public func cachedDeviceId(for entry: String) throws -> String? {
+        try lock.withLock {
+            if let storedReadFailure {
+                throw storedReadFailure
+            }
+            return storedBindings[entry] ?? storedBindings[Self.anyEntry]
+        }
+    }
+
+    private var storedAttestResult: Result<AttestationResult, Error> = .success(
         AttestationResult(keyId: "mock_key", deviceId: "mock_device")
     )
     public var attestResult: Result<AttestationResult, Error> {
-        get { lock.withLock { _attestResult } }
-        set { lock.withLock { _attestResult = newValue } }
+        get { lock.withLock { storedAttestResult } }
+        set { lock.withLock { storedAttestResult = newValue } }
     }
 
-    private var _activationResult: Result<Void, Error> = .success(())
+    private var storedActivationResult: Result<Void, Error> = .success(())
     public var activationResult: Result<Void, Error> {
-        get { lock.withLock { _activationResult } }
-        set { lock.withLock { _activationResult = newValue } }
+        get { lock.withLock { storedActivationResult } }
+        set { lock.withLock { storedActivationResult = newValue } }
     }
 
-    private var _attestCalls = 0
+    private var storedAttestCalls = 0
     public var attestCalls: Int {
-        lock.withLock { _attestCalls }
+        lock.withLock { storedAttestCalls }
     }
 
-    private var _assertionCalls = 0
+    private var storedAssertionCalls = 0
     public var assertionCalls: Int {
-        lock.withLock { _assertionCalls }
+        lock.withLock { storedAssertionCalls }
     }
 
-    private var _activateCalls = 0
+    private var storedActivateCalls = 0
     public var activateCalls: Int {
-        lock.withLock { _activateCalls }
+        lock.withLock { storedActivateCalls }
     }
 
     public init() {}
 
     public func attest(entry: String, appId: String) async throws -> AttestationResult {
         let result: Result<AttestationResult, Error> = lock.withLock {
-            _attestCalls += 1
-            return _attestResult
+            storedAttestCalls += 1
+            return storedAttestResult
         }
         switch result {
         case let .success(value):
-            lock.withLock { _bindings[entry] = value.deviceId }
+            lock.withLock { storedBindings[entry] = value.deviceId }
             return value
         case let .failure(err):
             throw err
@@ -89,8 +108,8 @@ public final class MockDeviceAttestationService: DeviceAttestationService, @unch
     /// regardless let a test pass where production throws.
     public func generateAssertion(for entry: String) async throws -> AssertionHeaders {
         let deviceId: String? = lock.withLock {
-            _assertionCalls += 1
-            return _bindings[entry] ?? _bindings[Self.anyEntry]
+            storedAssertionCalls += 1
+            return storedBindings[entry] ?? storedBindings[Self.anyEntry]
         }
         guard let deviceId else {
             throw PayabliTTPError.attestationFailed(reason: "Missing attestation state")
@@ -105,8 +124,8 @@ public final class MockDeviceAttestationService: DeviceAttestationService, @unch
 
     public func activateDevice(activationCode: String, entry: String) async throws {
         let result: Result<Void, Error> = lock.withLock {
-            _activateCalls += 1
-            return _activationResult
+            storedActivateCalls += 1
+            return storedActivationResult
         }
         if case let .failure(err) = result {
             throw err
@@ -115,8 +134,8 @@ public final class MockDeviceAttestationService: DeviceAttestationService, @unch
 
     public func clearCache(for entry: String) {
         lock.withLock {
-            _bindings[entry] = nil
-            _bindings[Self.anyEntry] = nil
+            storedBindings[entry] = nil
+            storedBindings[Self.anyEntry] = nil
         }
     }
 }

@@ -10,11 +10,11 @@ import PayabliSDKCore
 /// session can prove it runs on a genuine, unmodified iOS app:
 ///
 /// - First-run flow (`attest`): challenge → register → generate key →
-///   attest key → post attestation. Persists `keyId` + `deviceId` in the
+///   attest key → post attestation. Records the paypoint's binding in the
 ///   Keychain (PRD §22.1).
-/// - Warm path: when both identifiers are already cached, `attest` is
-///   skipped and per-request assertions are produced by
-///   `generateAssertion()` (PRD §18.2).
+/// - Warm path: when this paypoint holds a binding whose key the platform will
+///   still sign with, `attest` is skipped and per-request assertions are
+///   produced by `generateAssertion()` (PRD §18.2).
 /// - Activation (`activateDevice`) consumes an out-of-band code supplied by
 ///   the partner to drive the pending-device → active-device transition
 ///   (PRD §9.7). The SDK does not request the code itself.
@@ -93,8 +93,11 @@ public final class AppAttestService: DeviceAttestationService, @unchecked Sendab
     /// anything on the device to read. Asking covers all of them. Without it a
     /// binding that looks whole sends every request into a failure with nothing to
     /// recover from.
-    public func isAttested(for entry: String) async -> Bool {
-        guard let binding = bindingStore.binding(for: entry) else {
+    /// Raises when the store could not be read, which is not the same answer as
+    /// `false`: `false` runs the cold sequence, and running it against a paypoint
+    /// that is already enrolled registers a second device for it.
+    public func isAttested(for entry: String) async throws -> Bool {
+        guard let binding = try binding(for: entry) else {
             return false
         }
         return await keyIsStillHeld(binding)
@@ -133,39 +136,70 @@ public final class AppAttestService: DeviceAttestationService, @unchecked Sendab
     /// its content is immaterial.
     static let keyProbeHash = ClientDataHash(Data(SHA256.hash(data: Data("payabli.keyProbe".utf8))))
 
-    public func cachedDeviceId(for entry: String) -> String? {
-        bindingStore.binding(for: entry)?.deviceId
+    public func cachedDeviceId(for entry: String) throws -> String? {
+        try binding(for: entry)?.deviceId
     }
 
     /// Drops this entry point's binding and leaves every other one alone: a
     /// refusal is about the paypoint that refused, and the other bindings still
     /// name keys that work.
+    ///
+    /// Every caller is already reporting a failure of its own and cannot carry a
+    /// second one, so a store that refuses the drop is recorded and not raised. The
+    /// binding is not left to be trusted: it names a key the platform has just
+    /// refused, so the next warm check reads it, is refused again, and re-enrols,
+    /// and the enrolment overwrites the entry.
     public func clearCache(for entry: String) {
-        bindingStore.forget(entry: entry)
-        bindingStore.forgetPendingKey(for: entry)
+        do {
+            try bindingStore.forget(entry: entry)
+            try bindingStore.forgetPendingKey(for: entry)
+        } catch {
+            logger.info("[attest] the binding for this paypoint could not be dropped")
+        }
     }
 
-    /// The binding held for an entry point, for tests and for the two accessors
-    /// above.
+    /// Runs a store operation and reports a failure as this SDK's own error.
+    ///
+    /// Everything crossing this protocol is a `PayabliTTPError`, because the domain
+    /// and the code are what the ObjC, MAUI, Flutter and React Native bridges map.
+    /// A `KeychainError` thrown as it arrived carries another domain, and every
+    /// bridge reports it as a bare failure with nothing naming the cause.
+    private func reportingStorageFailure<T>(_ work: () throws -> T) throws -> T {
+        do {
+            return try work()
+        } catch let error as PayabliTTPError {
+            throw error
+        } catch {
+            throw PayabliTTPError.attestationFailed(
+                reason: "The stored device binding could not be read or written"
+            )
+        }
+    }
+
     // MARK: - The key an attestation is part way through
 
-    func pendingKey(for entry: String) -> String? {
-        bindingStore.pendingKey(for: entry)
+    func pendingKey(for entry: String) throws -> String? {
+        try reportingStorageFailure { try bindingStore.pendingKey(for: entry) }
     }
 
     func rememberPendingKey(_ keyId: String, for entry: String) throws {
-        try bindingStore.rememberPendingKey(keyId, for: entry)
+        try reportingStorageFailure { try bindingStore.rememberPendingKey(keyId, for: entry) }
     }
 
-    func allBindings() -> DeviceBindings {
-        bindingStore.bindings()
+    func allBindings() throws -> DeviceBindings {
+        try reportingStorageFailure { try bindingStore.bindings() }
     }
 
-    func binding(for entry: String) -> AttestedDevice? {
-        bindingStore.binding(for: entry)
+    /// The binding held for an entry point, for tests and for the accessors above.
+    func binding(for entry: String) throws -> AttestedDevice? {
+        try reportingStorageFailure { try bindingStore.binding(for: entry) }
     }
 
     func remember(_ record: AttestedDevice) throws {
-        try bindingStore.remember(record)
+        try reportingStorageFailure { try bindingStore.remember(record) }
+    }
+
+    func forgetPendingKey(for entry: String) throws {
+        try reportingStorageFailure { try bindingStore.forgetPendingKey(for: entry) }
     }
 }

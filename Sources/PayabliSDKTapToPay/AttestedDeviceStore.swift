@@ -10,11 +10,14 @@ import PayabliSDKCore
 /// removed on the way out. Whatever wrote it is not this version, and a device
 /// that re-enrolls once is cheaper than one that trusts a shape it cannot parse.
 ///
+/// **A store that could not be read is not a store holding nothing.** Every read
+/// below raises for the first and answers empty for the second, because a mutation
+/// starts from what it read: an operational failure taken as empty writes back a
+/// list with one binding in it and drops every other paypoint's.
+///
 /// Every mutation holds the lock across its read and its write. Unlocked, two
 /// enrolments for different paypoints read the same list and the second write drops
 /// the first binding, costing an enrolment for a paypoint with a key that works.
-/// The lock is per store and one store is built per service, so two services
-/// sharing the Keychain namespace still race, which is why the facade builds one.
 final class AttestedDeviceStore {
     private let storage: SecureStorage
     private let logger = PayabliLogger(category: .taptopay)
@@ -28,6 +31,9 @@ final class AttestedDeviceStore {
     ///
     /// Broader than the namespace it protects, and that costs nothing: what it
     /// serializes is a Keychain read and write measured in microseconds.
+    ///
+    /// Two processes are outside it. Nothing in this SDK produces that, and the
+    /// Keychain offers no compare-and-swap to build on.
     private static let lock = NSLock()
 
     init(storage: SecureStorage) {
@@ -39,10 +45,15 @@ final class AttestedDeviceStore {
     /// records the paypoint it was issued for, so neither can be adopted: a handle
     /// presented to the wrong paypoint is refused, and the refusal retires a
     /// device that was still active. The device enrolls once instead.
+    ///
+    /// Never fails the caller. These are items nothing reads, so a store that
+    /// cannot be reached leaves them for the next one rather than refusing to build
+    /// a store at all.
     private func discardSuperseded() {
-        for key in PayabliKeychainKey.superseded where storage.string(forKey: key) != nil {
+        for key in PayabliKeychainKey.superseded {
+            guard let read = try? storage.string(forKey: key), read != nil else { continue }
             logger.info("[attest] discarding an identity stored without its paypoint")
-            storage.remove(forKey: key)
+            try? storage.remove(forKey: key)
         }
     }
 
@@ -53,19 +64,23 @@ final class AttestedDeviceStore {
     /// last used and the one that falls off the back is the coldest. Promoting on
     /// a write alone would order them by enrolment instead, and evict a binding
     /// that every session uses in favour of one that enrolled later.
-    func binding(for entry: String) -> AttestedDevice? {
-        Self.lock.withLock {
-            let held = load()
+    func binding(for entry: String) throws -> AttestedDevice? {
+        try Self.lock.withLock {
+            let held = try load()
             guard let record = held.binding(for: entry) else { return nil }
             if held.bindings.first != record {
+                // The order decides only which binding is discarded first when the
+                // store is full, so losing this write costs a worse choice of which
+                // to drop and the next enrolment repairs it. Raising would turn a
+                // read that already has its answer into a cold start.
                 try? write(held.with(record))
             }
             return record
         }
     }
 
-    func bindings() -> DeviceBindings {
-        Self.lock.withLock { load() }
+    func bindings() throws -> DeviceBindings {
+        try Self.lock.withLock { try load() }
     }
 
     /// Adds or replaces this record's binding, leaving every other one alone.
@@ -80,22 +95,22 @@ final class AttestedDeviceStore {
         }
     }
 
-    func forget(entry: String) {
-        Self.lock.withLock {
-            let remaining = load().without(entry: entry)
-            do {
-                try write(remaining)
-            } catch {
-                logger.info("[attest] the binding could not be dropped")
-            }
+    /// Drops this entry point's binding.
+    ///
+    /// Throws when the rewrite fails, so a caller is never told a binding was
+    /// dropped while it is still readable. A binding that outlives its own removal
+    /// sends the same refused handle on the next warm start.
+    func forget(entry: String) throws {
+        try Self.lock.withLock {
+            try write(load().without(entry: entry))
         }
     }
 
     // MARK: - Keys an attestation is part way through
 
     /// The key this entry point minted and has not finished attesting.
-    func pendingKey(for entry: String) -> String? {
-        Self.lock.withLock { loadPending()[entry] }
+    func pendingKey(for entry: String) throws -> String? {
+        try Self.lock.withLock { try loadPending()[entry] }
     }
 
     /// Kept per entry point. A key can be attested once, so one entry point's key
@@ -104,7 +119,7 @@ final class AttestedDeviceStore {
     /// registered another device.
     func rememberPendingKey(_ keyId: String, for entry: String) throws {
         try Self.lock.withLock {
-            var pending = loadPending()
+            var pending = try loadPending()
             pending[entry] = keyId
             try writePending(pending)
         }
@@ -112,19 +127,28 @@ final class AttestedDeviceStore {
 
     /// Only this entry point's. Removing every one takes away a retry another
     /// paypoint is part way through.
-    func forgetPendingKey(for entry: String) {
-        Self.lock.withLock {
-            var pending = loadPending()
+    ///
+    /// Throws, because the caller drops the pending slot immediately before burning
+    /// the key it names, and the key can be attested only once. A removal reported
+    /// as done while the record survives leaves the next attempt reusing a spent
+    /// key, which is refused every time it is tried.
+    func forgetPendingKey(for entry: String) throws {
+        try Self.lock.withLock {
+            var pending = try loadPending()
             guard pending.removeValue(forKey: entry) != nil else { return }
-            try? writePending(pending)
+            try writePending(pending)
         }
     }
 
-    private func loadPending() -> [String: String] {
-        guard let raw = storage.string(forKey: PayabliKeychainKey.pendingKeyId),
-              let data = raw.data(using: .utf8),
+    private func loadPending() throws -> [String: String] {
+        guard let raw = try storage.string(forKey: PayabliKeychainKey.pendingKeyId) else {
+            return [:]
+        }
+        guard let data = raw.data(using: .utf8),
               let decoded = try? JSONDecoder().decode([String: String].self, from: data)
         else {
+            logger.info("[attest] stored pending keys could not be decoded; discarding")
+            try? storage.remove(forKey: PayabliKeychainKey.pendingKeyId)
             return [:]
         }
         return decoded
@@ -132,7 +156,7 @@ final class AttestedDeviceStore {
 
     private func writePending(_ pending: [String: String]) throws {
         guard !pending.isEmpty else {
-            storage.remove(forKey: PayabliKeychainKey.pendingKeyId)
+            try storage.remove(forKey: PayabliKeychainKey.pendingKeyId)
             return
         }
         guard let data = try? JSONEncoder().encode(pending),
@@ -145,21 +169,32 @@ final class AttestedDeviceStore {
 
     // MARK: - Under the lock
 
-    private func load() -> DeviceBindings {
-        guard let raw = storage.string(forKey: PayabliKeychainKey.deviceBindings) else {
+    /// Everything stored, empty when there is nothing to read, and a raise when the
+    /// store could not answer.
+    ///
+    /// A record that will not decode is gone, so it answers empty and the item goes
+    /// with it. The removal is best effort: the record is already dead, and raising
+    /// here would strand the item, because a read that raises never reaches the
+    /// removal on the next attempt either.
+    private func load() throws -> DeviceBindings {
+        guard let raw = try storage.string(forKey: PayabliKeychainKey.deviceBindings) else {
             return DeviceBindings()
         }
         guard let data = raw.data(using: .utf8),
               let decoded = try? JSONDecoder().decode(DeviceBindings.self, from: data)
         else {
             logger.info("[attest] stored bindings could not be decoded; discarding")
-            storage.remove(forKey: PayabliKeychainKey.deviceBindings)
+            try? storage.remove(forKey: PayabliKeychainKey.deviceBindings)
             return DeviceBindings()
         }
         return decoded
     }
 
     private func write(_ bindings: DeviceBindings) throws {
+        guard !bindings.bindings.isEmpty else {
+            try storage.remove(forKey: PayabliKeychainKey.deviceBindings)
+            return
+        }
         guard let data = try? JSONEncoder().encode(bindings),
               let raw = String(bytes: data, encoding: .utf8)
         else {

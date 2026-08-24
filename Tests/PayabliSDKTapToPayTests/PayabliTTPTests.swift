@@ -206,6 +206,29 @@ final class PayabliTTPTests: XCTestCase {
         XCTAssertEqual(ttp.sessionState, .error)
     }
 
+    /// A warm-path read that fails is reported through all three channels, not just
+    /// the thrown one. Read outside the phase's own handling it threw out of
+    /// `initialize()` while the published state stayed where `reset()` left it, so a
+    /// host observing `state` saw an idle session and a caller saw a failure.
+    func testAWarmReadFailureMarksTheStateAndEmitsTheEvent() async throws {
+        let (ttp, _, attestation) = makeTTP()
+        attestation.readFailure = PayabliTTPError.attestationFailed(reason: "unreadable")
+        let stream = ttp.events()
+
+        let collector = collect(from: stream) { event in
+            if case let .attestationFailed(error) = event {
+                return error
+            }
+            return nil
+        }
+
+        _ = try? await ttp.initialize()
+        let reported = try await value(of: collector, named: "attestationFailed")
+
+        XCTAssertEqual(reported, "attestationFailed")
+        XCTAssertEqual(ttp.sessionState, .error, "the caller saw a failure and the published state did not")
+    }
+
     /// The event, the published state and the thrown error carry one value, so a
     /// reader comparing a screen against a log sees the same failure twice.
     func testConfigFailureEmitsAnEventAndMarksWhatItThrows() async throws {
