@@ -6,16 +6,17 @@ final class DeviceDescriptionDefaultsTests: XCTestCase {
     /// The model string, against the same field decoded independently. The wire
     /// value must not change: a device already registered under one model that
     /// starts sending another is a different device to the service.
-    func testTheModelIsTheMachineFieldDecodedWhole() {
+    func testTheModelIsTheMachineFieldDecodedWhole() throws {
         var info = utsname()
         uname(&info)
-        let expected = withUnsafeBytes(of: &info.machine) { raw -> String in
+        let expected = withUnsafeBytes(of: &info.machine) { raw -> String? in
             let bytes = raw.prefix { $0 != 0 }
-            return String(decoding: bytes, as: UTF8.self)
+            return String(bytes: bytes, encoding: .utf8)
         }
 
-        XCTAssertFalse(expected.isEmpty, "uname reported no machine field")
-        XCTAssertEqual(AppAttestService.defaultModel(), expected)
+        let machine = try XCTUnwrap(expected, "the machine field is not UTF-8")
+        XCTAssertFalse(machine.isEmpty, "uname reported no machine field")
+        XCTAssertEqual(AppAttestService.defaultModel(), machine)
     }
 
     /// A hardware identifier the platform will not give is blank, and blank is
