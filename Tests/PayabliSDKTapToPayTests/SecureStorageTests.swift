@@ -238,7 +238,8 @@ final class SecureStorageTests: XCTestCase {
     func testEveryNameCallersUseIsSwept() {
         let names = [
             PayabliKeychainKey.deviceBindings,
-            PayabliKeychainKey.pendingKeyId
+            PayabliKeychainKey.pendingKeyId,
+            PayabliKeychainKey.installId
         ]
 
         for name in names {
