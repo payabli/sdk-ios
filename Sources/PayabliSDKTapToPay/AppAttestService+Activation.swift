@@ -27,7 +27,17 @@ public extension AppAttestService {
                 // next `initialize()` enrol.
                 if code == 401 {
                     self.logger.error("[activate] clearing local attestation cache and signaling attestationRevoked")
-                    self.clearCache(for: entry)
+                    do {
+                        try self.clearCache(for: entry)
+                    } catch {
+                        // Revoked either way, and the caller is told which. A
+                        // binding left behind names a key the platform still signs
+                        // with, so the next warm check trusts it and presents the
+                        // same refused handle.
+                        return .attestationRevoked(
+                            reason: "\(reason) — the stored binding could not be dropped"
+                        )
+                    }
                     return .attestationRevoked(reason: reason)
                 }
                 return .activationFailed(reason: reason)

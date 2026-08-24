@@ -140,7 +140,7 @@ public final class AppAttestService: DeviceAttestationService, @unchecked Sendab
     ///
     /// The pending key is left alone for the same reason: it belongs to whatever
     /// attempt is running now, not to the one this answer is about.
-    private func forgetIfUnchanged(_ binding: AttestedDevice) {
+    func forgetIfUnchanged(_ binding: AttestedDevice) {
         do {
             let dropped = try bindingStore.forget(entry: binding.entry, ifStill: binding)
             if !dropped {
@@ -163,17 +163,20 @@ public final class AppAttestService: DeviceAttestationService, @unchecked Sendab
     /// refusal is about the paypoint that refused, and the other bindings still
     /// name keys that work.
     ///
-    /// Every caller is already reporting a failure of its own and cannot carry a
-    /// second one, so a store that refuses the drop is recorded and not raised. The
-    /// binding is not left to be trusted: it names a key the platform has just
-    /// refused, so the next warm check reads it, is refused again, and re-enrols,
-    /// and the enrolment overwrites the entry.
-    public func clearCache(for entry: String) {
-        do {
+    /// Raises when the store refuses, because one caller's correctness rests on the
+    /// drop having happened. A binding refused by the service names a key the
+    /// platform is still perfectly willing to sign with, so a warm check reads it,
+    /// finds the key sound, trusts it, and sends the same refused binding again.
+    /// Nothing about that repeats itself into a fix, and a caller told the binding
+    /// was cleared cannot tell the difference.
+    ///
+    /// A caller acting on a refused *key* has the opposite problem and uses
+    /// `forgetIfUnchanged` instead: it holds the record its answer is about, and the
+    /// entry point may hold a newer one by the time the answer lands.
+    public func clearCache(for entry: String) throws {
+        try reportingStorageFailure {
             try bindingStore.forget(entry: entry)
             try bindingStore.forgetPendingKey(for: entry)
-        } catch {
-            logger.info("[attest] the binding for this paypoint could not be dropped")
         }
     }
 

@@ -87,5 +87,10 @@ public protocol DeviceAttestationService: AnyObject, Sendable {
     /// Drops this entry point's binding, so the next `initialize()` for it runs
     /// the cold sequence. Called on 401 from the config endpoint (PRD §18.4).
     /// Every other entry point's binding is left alone.
-    func clearCache(for entry: String)
+    ///
+    /// Raises when the store refuses the drop. The caller's own correctness rests
+    /// on it: a binding the service refused still names a key the platform signs
+    /// with, so a warm check finds it sound and sends the same refused binding
+    /// again, and nothing in that repeats itself into a fix.
+    func clearCache(for entry: String) throws
 }

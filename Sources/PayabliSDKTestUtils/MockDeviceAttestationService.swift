@@ -132,8 +132,20 @@ public final class MockDeviceAttestationService: DeviceAttestationService, @unch
         }
     }
 
-    public func clearCache(for entry: String) {
-        lock.withLock {
+    /// Raised by `clearCache` while it is set, so a test can drive a caller whose
+    /// correctness rests on the drop having happened.
+    public var clearFailure: Error? {
+        get { lock.withLock { storedClearFailure } }
+        set { lock.withLock { storedClearFailure = newValue } }
+    }
+
+    private var storedClearFailure: Error?
+
+    public func clearCache(for entry: String) throws {
+        try lock.withLock {
+            if let storedClearFailure {
+                throw storedClearFailure
+            }
             storedBindings[entry] = nil
             storedBindings[Self.anyEntry] = nil
         }

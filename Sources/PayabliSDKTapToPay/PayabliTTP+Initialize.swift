@@ -221,8 +221,23 @@ extension PayabliTTP {
             markPendingActivation()
             throw PayabliTTPError.devicePendingActivation
         } catch let err as PayabliGenericError where err.code == .tokenExpired {
-            attestation.clearCache(for: entryPoint)
-            let failure = PayabliTTPError.configFailed(reason: "Config rejected (401) — attestation cleared")
+            // What the reason says has to be what happened. A binding the service
+            // refused still names a key the platform signs with, so one left behind
+            // is read as sound on the next warm check and sent again; a caller told
+            // it was cleared has no way to tell that apart from a cold start that
+            // failed for its own reasons.
+            let cleared: Bool
+            do {
+                try attestation.clearCache(for: entryPoint)
+                cleared = true
+            } catch {
+                cleared = false
+            }
+            let failure = PayabliTTPError.configFailed(
+                reason: cleared
+                    ? "Config rejected (401) — attestation cleared"
+                    : "Config rejected (401) — the stored binding could not be dropped"
+            )
             // One value through all three channels. Marking the raw 401 while
             // throwing the rewrapped failure left the published state and the
             // caller describing the same failure differently.

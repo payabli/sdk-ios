@@ -229,6 +229,41 @@ final class PayabliTTPTests: XCTestCase {
         XCTAssertEqual(ttp.sessionState, .error, "the caller saw a failure and the published state did not")
     }
 
+    /// A 401 that could not drop the binding says so. Reported as cleared, the
+    /// caller cannot tell it from a cold start that failed on its own: the binding
+    /// the service refused still names a key the platform signs with, so the next
+    /// warm check trusts it and presents the same refused handle.
+    func testAConfigRefusalSaysWhenTheBindingCouldNotBeDropped() async throws {
+        let (ttp, _, attestation) = makeTTP()
+        attestation.isAlreadyAttested = true
+        attestation.clearFailure = PayabliTTPError.attestationFailed(reason: "unwritable")
+        StubURLProtocol.handler = { request in
+            (
+                HTTPURLResponse(
+                    url: request.url!,
+                    statusCode: 200,
+                    httpVersion: "HTTP/1.1",
+                    headerFields: ["Content-Type": "application/json"]
+                )!,
+                Data(
+                    #"{"isSuccess":false,"responseText":"attestation revoked","responseData":{"resultCode":401,"resultText":"attestation revoked"}}"#
+                        .utf8
+                )
+            )
+        }
+
+        do {
+            try await ttp.initialize()
+            XCTFail("a refused config answered successfully")
+        } catch let PayabliTTPError.configFailed(reason) {
+            XCTAssertTrue(
+                reason.contains("could not be dropped"),
+                "the caller was told the binding was cleared: \(reason)"
+            )
+        }
+        XCTAssertEqual(ttp.sessionState, .error)
+    }
+
     /// The event, the published state and the thrown error carry one value, so a
     /// reader comparing a screen against a log sees the same failure twice.
     func testConfigFailureEmitsAnEventAndMarksWhatItThrows() async throws {
