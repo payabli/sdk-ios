@@ -10,37 +10,13 @@ import Foundation
 // Injectable `@Sendable` closures; macOS test builds fall back to stand-ins.
 
 extension AppAttestService {
-    /// Blank when the platform has no identifier to give, which registration
-    /// refuses. A value invented here is not an identifier: it differs per call,
-    /// so every call registers a device and the failure never surfaces. The
-    /// sibling SDK returns a blank for the same reason.
-    static var defaultHardwareId: @Sendable () -> String {
-        {
-            #if canImport(UIKit)
-                return hardwareId(from: UIDevice.current.identifierForVendor?.uuidString)
-            #else
-                return hardwareId(from: nil)
-            #endif
-        }
-    }
-
-    /// Separate from the platform call so the branch that matters can be reached
-    /// without one: on any host that has an identifier to give, the closure above
-    /// never takes it.
-    static func hardwareId(from identifier: String?) -> String {
-        identifier ?? ""
-    }
-
-    static var defaultDeviceName: @Sendable () -> String {
-        {
-            #if canImport(UIKit)
-                return UIDevice.current.name
-            #else
-                return "macOS"
-            #endif
-        }
-    }
-
+    /// `deviceName` is not sent, and there is no provider for it.
+    ///
+    /// The field is optional on the wire and descriptive only. On the versions this
+    /// SDK supports the platform answers the model name, which `model` already
+    /// carries, and an app holding the user-assigned-device-name entitlement gets
+    /// the name its owner typed, which is routinely a person's. The sibling SDK
+    /// omits it and says the same.
     static var defaultModel: @Sendable () -> String {
         { model() }
     }

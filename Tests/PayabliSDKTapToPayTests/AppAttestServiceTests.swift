@@ -28,7 +28,6 @@ final class AppAttestServiceTests: XCTestCase {
             attestor: attestor,
             storage: storage,
             hardwareIdProvider: { "fixed-hw-id" },
-            deviceNameProvider: { "iPhone" },
             modelProvider: { "iPhone15,2" },
             osVersionProvider: { "17.0" }
         )

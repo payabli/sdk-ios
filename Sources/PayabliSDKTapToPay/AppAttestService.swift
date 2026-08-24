@@ -37,8 +37,10 @@ public final class AppAttestService: DeviceAttestationService, @unchecked Sendab
     let logger = PayabliLogger(category: .taptopay)
 
     // Injected so tests on macOS can substitute deterministic values.
-    let hardwareIdProvider: @Sendable () -> String
-    let deviceNameProvider: @Sendable () -> String
+    //
+    // The hardware identifier reads and may write the store, so it raises. The
+    // others read the platform and cannot fail.
+    let hardwareIdProvider: @Sendable () throws -> String
     let modelProvider: @Sendable () -> String
     let osVersionProvider: @Sendable () -> String
 
@@ -51,8 +53,7 @@ public final class AppAttestService: DeviceAttestationService, @unchecked Sendab
             transport: transport,
             attestor: attestor,
             storage: storage,
-            hardwareIdProvider: AppAttestService.defaultHardwareId,
-            deviceNameProvider: AppAttestService.defaultDeviceName,
+            hardwareIdProvider: { try InstallIdentifier.hardwareId(storage: storage) },
             modelProvider: AppAttestService.defaultModel,
             osVersionProvider: AppAttestService.defaultOSVersion
         )
@@ -62,8 +63,7 @@ public final class AppAttestService: DeviceAttestationService, @unchecked Sendab
         transport: any PayabliTransport,
         attestor: AppAttestor,
         storage: SecureStorage,
-        hardwareIdProvider: @Sendable @escaping () -> String,
-        deviceNameProvider: @Sendable @escaping () -> String,
+        hardwareIdProvider: @Sendable @escaping () throws -> String,
         modelProvider: @Sendable @escaping () -> String,
         osVersionProvider: @Sendable @escaping () -> String
     ) {
@@ -72,7 +72,6 @@ public final class AppAttestService: DeviceAttestationService, @unchecked Sendab
         self.storage = storage
         bindingStore = AttestedDeviceStore(storage: storage)
         self.hardwareIdProvider = hardwareIdProvider
-        self.deviceNameProvider = deviceNameProvider
         self.modelProvider = modelProvider
         self.osVersionProvider = osVersionProvider
     }

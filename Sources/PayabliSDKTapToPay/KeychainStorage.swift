@@ -183,11 +183,17 @@ public enum PayabliKeychainKey {
     /// between them.
     public static let deviceBindings = Stored.deviceBindings.rawValue
 
+    /// The UUID this install was first seen with, which the value `/register`
+    /// receives is derived from. It outlives every binding: an install that lost it
+    /// registers as a new device. See `InstallIdentifier`.
+    public static let installId = Stored.installId.rawValue
+
     /// The keys themselves. The constants above are the names callers use, and a
     /// key added here joins `all` by being a case, so a sweep cannot miss one.
     enum Stored: String, CaseIterable {
         case deviceBindings = "com.payabli.ttp.deviceBindings"
         case pendingKeyId = "com.payabli.ttp.pendingKeyId"
+        case installId = "com.payabli.ttp.installId"
     }
 
     /// What an install from before the bindings item may still be carrying. Read
