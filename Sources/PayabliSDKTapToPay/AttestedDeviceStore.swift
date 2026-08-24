@@ -106,6 +106,25 @@ final class AttestedDeviceStore {
         }
     }
 
+    /// Drops this entry point's binding only while it is still the one given.
+    ///
+    /// For a caller that read a binding, went away to ask about it, and came back
+    /// with an answer. What it holds is what it asked about, and the entry point may
+    /// hold something else by now: a newly attested binding written while the answer
+    /// was on its way. Removing by entry point alone would drop that one on the
+    /// strength of a question nobody asked about it.
+    ///
+    /// Answers whether it dropped anything, so the caller can say what happened.
+    @discardableResult
+    func forget(entry: String, ifStill record: AttestedDevice) throws -> Bool {
+        try Self.lock.withLock {
+            let held = try load()
+            guard held.binding(for: entry) == record else { return false }
+            try write(held.without(entry: entry))
+            return true
+        }
+    }
+
     // MARK: - Keys an attestation is part way through
 
     /// The key this entry point minted and has not finished attesting.

@@ -126,8 +126,28 @@ public final class AppAttestService: DeviceAttestationService, @unchecked Sendab
                 return true
             }
             logger.info("[attest] the stored binding names a key this device no longer holds")
-            clearCache(for: binding.entry)
+            forgetIfUnchanged(binding)
             return false
+        }
+    }
+
+    /// Drops the binding this probe asked about, and only that one.
+    ///
+    /// The probe suspends, so what the entry point holds on the way back can be a
+    /// binding attested while the answer was travelling. Dropping by entry point
+    /// would take that one for a key it never named, leaving a device that enrolled
+    /// moments ago holding nothing.
+    ///
+    /// The pending key is left alone for the same reason: it belongs to whatever
+    /// attempt is running now, not to the one this answer is about.
+    private func forgetIfUnchanged(_ binding: AttestedDevice) {
+        do {
+            let dropped = try bindingStore.forget(entry: binding.entry, ifStill: binding)
+            if !dropped {
+                logger.info("[attest] this paypoint holds a newer binding; the probed one is already gone")
+            }
+        } catch {
+            logger.info("[attest] the binding for this paypoint could not be dropped")
         }
     }
 

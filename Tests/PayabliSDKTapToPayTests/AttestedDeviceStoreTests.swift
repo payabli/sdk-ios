@@ -141,6 +141,34 @@ final class AttestedDeviceStoreTests: XCTestCase {
         XCTAssertEqual(try store.pendingKey(for: "entryA"), "key_a")
     }
 
+    /// A conditional drop takes the record it was given and nothing else.
+    func testAConditionalDropTakesTheRecordItWasGiven() throws {
+        let store = AttestedDeviceStore(storage: InMemorySecureStorage())
+        let record = AttestedDevice(entry: "entryA", deviceId: "dev_a", keyId: "key_a")
+        try store.remember(record)
+
+        XCTAssertTrue(try store.forget(entry: "entryA", ifStill: record))
+        XCTAssertNil(try store.binding(for: "entryA"))
+    }
+
+    /// A record replaced since it was read is not the record the caller asked
+    /// about, so it stays. This is the caller that read a binding, went away to ask
+    /// the platform about it, and came back to an entry point holding something
+    /// newer.
+    func testAConditionalDropLeavesARecordReplacedSinceItWasRead() throws {
+        let store = AttestedDeviceStore(storage: InMemorySecureStorage())
+        let read = AttestedDevice(entry: "entryA", deviceId: "dev_old", keyId: "key_old")
+        try store.remember(read)
+        try store.remember(AttestedDevice(entry: "entryA", deviceId: "dev_new", keyId: "key_new"))
+
+        XCTAssertFalse(try store.forget(entry: "entryA", ifStill: read))
+        XCTAssertEqual(
+            try store.binding(for: "entryA")?.deviceId,
+            "dev_new",
+            "the newer binding was dropped for a question asked about the older one"
+        )
+    }
+
     /// Dropping the only binding removes the item rather than storing an empty
     /// list, so nothing is left for a later read to carry forward.
     func testDroppingTheLastBindingRemovesTheItem() throws {
