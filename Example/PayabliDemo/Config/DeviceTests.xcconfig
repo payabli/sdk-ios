@@ -1,0 +1,35 @@
+// The checks under DeviceTests/, which need a Keychain that answers.
+//
+// TEST_HOST rather than nothing: a tool-hosted bundle has no app bundle and no
+// entitlement, so every Keychain call comes back errSecMissingEntitlement, and
+// Xcode refuses to run one on a device at all. Hosting the bundle in the demo app
+// is what gives these checks the platform's answers instead of a stand-in's.
+//
+// That is also why this is a target of its own rather than a setting on
+// PayabliDemoFlowTests. The app cannot compile on a clean checkout, because
+// Secrets.swift is gitignored and is a member of its Sources phase, and hosting
+// the flow tests would take them down with it. They stay runnable without secrets;
+// these do not, and say so here.
+
+PRODUCT_BUNDLE_IDENTIFIER = com.payabli.example.app.devicetests
+TEST_HOST = $(BUILT_PRODUCTS_DIR)/PayabliDemo.app/PayabliDemo
+BUNDLE_LOADER = $(TEST_HOST)
+GENERATE_INFOPLIST_FILE = YES
+INFOPLIST_FILE =
+CODE_SIGN_ENTITLEMENTS =
+
+IPHONEOS_DEPLOYMENT_TARGET = 16.7
+// Load-bearing: without it the target resolves to macOS and no iOS destination
+// matches, so a run fails before it builds.
+SDKROOT = iphoneos
+TARGETED_DEVICE_FAMILY = 1,2
+SWIFT_VERSION = 5.0
+
+// Simulator only, as the walkthrough does. A bundle hosted by the app is
+// installed on a device alongside it, so it must be signed there, and a device
+// build inherits the app target's automatic signing.
+CODE_SIGNING_ALLOWED[sdk=iphonesimulator*] = NO
+CODE_SIGN_STYLE[sdk=iphonesimulator*] = Manual
+DEVELOPMENT_TEAM[sdk=iphonesimulator*] =
+
+LD_RUNPATH_SEARCH_PATHS = $(inherited) @executable_path/Frameworks @loader_path/Frameworks
