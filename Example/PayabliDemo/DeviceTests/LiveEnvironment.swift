@@ -4,16 +4,29 @@ import XCTest
 
 /// Which environment this run is against, and the credentials for it.
 ///
-/// Chosen by `PAYABLI_ENV` in the test process's environment, which `xcodebuild`
-/// fills from `TEST_RUNNER_PAYABLI_ENV`, so one build runs against QA and against
-/// sandbox without a scheme per environment. A run with nothing set is refused
-/// rather than defaulted: registering a device is a write, and it should land in
-/// the environment somebody named.
+/// Two things are required, and the environment alone is not enough. `PAYABLI_ENV`
+/// names which paypoint, and `PAYABLI_QA_LIVE` opts the run in. Everything reached
+/// from here registers a device and moves money, and the scheme carries the
+/// environment, so without the second one an operator opening the scheme and
+/// pressing Test charges a paypoint. `QAWalkthroughUITests` gates its walkthrough
+/// on the same variable for the same reason.
+///
+/// Both come from the scheme's environment for an app-hosted bundle: the
+/// `TEST_RUNNER_` prefix reaches a UI-test runner and not a host application.
 enum LiveEnvironment {
+    /// The name the walkthrough already uses, so one flag opts into every live run
+    /// rather than one per suite.
+    static let liveRunKey = "PAYABLI_QA_LIVE"
+
     static func named() throws -> (environment: PayabliEnvironment, entry: String, name: String) {
+        try XCTSkipUnless(
+            ProcessInfo.processInfo.environment[liveRunKey] == "1",
+            "set \(liveRunKey)=1 in the scheme to register a device and move money"
+        )
+
         let requested = ProcessInfo.processInfo.environment["PAYABLI_ENV"]
         guard let requested, !requested.isEmpty else {
-            throw XCTSkip("no PAYABLI_ENV; pass TEST_RUNNER_PAYABLI_ENV=qa or =sandbox")
+            throw XCTSkip("no PAYABLI_ENV; set it in the scheme to qa or sandbox")
         }
         let environment: PayabliEnvironment
         switch requested.lowercased() {
