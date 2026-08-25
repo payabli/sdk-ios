@@ -48,8 +48,8 @@ public final class TTPTransactionClient: Sendable {
         )
 
         // `customerData` is the caller's whole customer record, so the body is
-        // reported by size. The headers carry the App Attest assertion, key id
-        // and device id, and are not logged either.
+        // reported by size rather than by content. This route carries no assertion
+        // headers; the transport's bearer is what authenticates it.
         logger.info("[initiate] → POST \(request.path) bytes=\(request.body?.count ?? 0)")
 
         let envelope: PayabliV2Envelope<InitiateData>
