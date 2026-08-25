@@ -11,10 +11,6 @@ import XCTest
 /// identifier is built from a stored UUID rather than from the platform's vendor
 /// identifier.
 final class InstallIdentifierOnDeviceTests: XCTestCase {
-    /// Printed so an install cycle can compare two runs of this bundle. The
-    /// comparison is the shell's: a single test run cannot span an uninstall.
-    static let marker = "PAYABLI_HARDWARE_ID="
-
     /// Everything except the install-cycle report runs over its own service. The
     /// checks below delete the stored value, and doing that to the SDK's own item
     /// would change the identity of the install the cycle is measuring.
@@ -70,9 +66,13 @@ final class InstallIdentifierOnDeviceTests: XCTestCase {
     /// It asserts what it can on its own — that there is a value to compare — and
     /// leaves the comparison to the caller, since a single run cannot span an
     /// uninstall.
+    ///
+    /// The value needs `PAYABLI_REPORT_IDENTIFIERS`, as every device identifier a
+    /// run prints does: this one is stable per install, and Xcode and CI retain what
+    /// a test writes.
     func testReportTheIdentifierForAnInstallCycle() throws {
         let id = try InstallIdentifier.hardwareId(storage: KeychainStorage())
         XCTAssertFalse(id.isEmpty, "nothing was built from")
-        print("\(Self.marker)\(id)")
+        LiveEnvironment.reportIdentifier("HARDWARE_ID", id, env: "install-cycle")
     }
 }
