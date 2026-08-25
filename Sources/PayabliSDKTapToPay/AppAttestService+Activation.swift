@@ -33,8 +33,14 @@ public extension AppAttestService {
                 // next `initialize()` enrol.
                 if code == 401 {
                     self.logger.error("[activate] clearing local attestation cache and signaling attestationRevoked")
+                    // The binding this assertion named, not whatever is held now.
+                    let refused = AttestedDevice(
+                        entry: entry,
+                        deviceId: assertion.deviceId,
+                        keyId: assertion.keyId
+                    )
                     do {
-                        try self.clearCache(for: entry)
+                        try self.forgetRefused(refused)
                     } catch {
                         // Revoked either way, and the caller is told which. A
                         // binding left behind names a key the platform still signs

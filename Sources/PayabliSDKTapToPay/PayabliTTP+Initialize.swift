@@ -74,7 +74,7 @@ extension PayabliTTP {
         let deviceId = try await runAttestationPhase()
 
         // 2. Fetch /config.
-        let config = try await runFetchConfigPhase()
+        let config = try await runFetchConfigPhase(presenting: deviceId)
         cachedDeviceId = deviceId
         multicaster.emit(.configReceived)
 
@@ -133,7 +133,7 @@ extension PayabliTTP {
         syncPublished()
 
         // 2. Fresh /config (credentials never survive between sessions).
-        let config = try await runFetchConfigPhase()
+        let config = try await runFetchConfigPhase(presenting: cachedDeviceId)
         multicaster.emit(.configReceived)
 
         // 3. Re-configure provider.
@@ -214,30 +214,29 @@ extension PayabliTTP {
     ///   - 401 (stale assertion) → clear attestation cache, rewrap as `.configFailed`
     ///   - anything else → `.error`, rewrapped as `.configFailed` so the domain and
     ///     code stay what the bridges read, keeping the parsed reason
-    private func runFetchConfigPhase() async throws -> TTPConfig {
+    private func runFetchConfigPhase(presenting deviceId: String?) async throws -> TTPConfig {
         do {
             return try await configClient.fetchConfig(entry: entryPoint)
         } catch PayabliTTPError.devicePendingActivation {
             markPendingActivation()
             throw PayabliTTPError.devicePendingActivation
         } catch let err as PayabliGenericError where err.code == .tokenExpired {
-            // What the reason says has to be what happened. A binding the service
-            // refused still names a key the platform signs with, so one left behind
-            // is read as sound on the next warm check and sent again; a caller told
-            // it was cleared has no way to tell that apart from a cold start that
-            // failed for its own reasons.
-            let cleared: Bool
+            // Only the handle this attempt presented, and the reason says which of
+            // the three happened. Declining to drop is the safer way to be wrong:
+            // the next attempt refuses the newer handle on its own answer, where
+            // dropping takes a device that just enrolled.
+            let outcome: String
             do {
-                try attestation.clearCache(for: entryPoint)
-                cleared = true
+                if try attestation.cachedDeviceId(for: entryPoint) == deviceId {
+                    try attestation.clearCache(for: entryPoint)
+                    outcome = "attestation cleared"
+                } else {
+                    outcome = "a newer binding for this paypoint was kept"
+                }
             } catch {
-                cleared = false
+                outcome = "the stored binding could not be dropped"
             }
-            let failure = PayabliTTPError.configFailed(
-                reason: cleared
-                    ? "Config rejected (401) — attestation cleared"
-                    : "Config rejected (401) — the stored binding could not be dropped"
-            )
+            let failure = PayabliTTPError.configFailed(reason: "Config rejected (401) — \(outcome)")
             // One value through all three channels. Marking the raw 401 while
             // throwing the rewrapped failure left the published state and the
             // caller describing the same failure differently.

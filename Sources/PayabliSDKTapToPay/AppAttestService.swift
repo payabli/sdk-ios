@@ -131,6 +131,16 @@ public final class AppAttestService: DeviceAttestationService, @unchecked Sendab
         }
     }
 
+    /// Drops the binding a refusal was about, while it is still the one held, and
+    /// raises if the store refuses. The pending key belongs to whatever is running
+    /// now, so it stays.
+    @discardableResult
+    func forgetRefused(_ binding: AttestedDevice) throws -> Bool {
+        try reportingStorageFailure {
+            try bindingStore.forget(entry: binding.entry, ifStill: binding)
+        }
+    }
+
     /// Drops the binding this probe asked about, and only that one.
     ///
     /// The probe suspends, so what the entry point holds on the way back can be a

@@ -264,6 +264,38 @@ final class PayabliTTPTests: XCTestCase {
         XCTAssertEqual(ttp.sessionState, .error)
     }
 
+    /// A config 401 answering one handle leaves a binding enrolled since.
+    func testAConfigRefusalLeavesABindingEnrolledSince() async throws {
+        let (ttp, _, attestation) = makeTTP()
+        attestation.isAlreadyAttested = true
+        attestation.bindings = [MockDeviceAttestationService.anyEntry: "dev_old"]
+
+        StubURLProtocol.handler = { request in
+            // Enrolled again while the config request is in flight.
+            attestation.bindings = [MockDeviceAttestationService.anyEntry: "dev_new"]
+            return (
+                HTTPURLResponse(
+                    url: request.url!,
+                    statusCode: 200,
+                    httpVersion: "HTTP/1.1",
+                    headerFields: ["Content-Type": "application/json"]
+                )!,
+                Data(
+                    #"{"isSuccess":false,"responseText":"revoked","responseData":{"resultCode":401,"resultText":"revoked"}}"#
+                        .utf8
+                )
+            )
+        }
+
+        _ = try? await ttp.initialize()
+
+        XCTAssertEqual(
+            try attestation.cachedDeviceId(for: "e"),
+            "dev_new",
+            "the binding enrolled while the request was in flight was cleared by a refusal about the older one"
+        )
+    }
+
     /// The event, the published state and the thrown error carry one value, so a
     /// reader comparing a screen against a log sees the same failure twice.
     func testConfigFailureEmitsAnEventAndMarksWhatItThrows() async throws {
