@@ -17,6 +17,7 @@ struct PaymentTapToPayQAView: View {
     @ObservedObject var terminal: PayabliTTP
 
     @EnvironmentObject private var tokenProbes: TokenProbeResults
+    @EnvironmentObject private var demoCustomer: DemoCustomerSetting
     @State private var amountText = "1.00"
     @State private var activationCode = ""
     @State private var enableMessage = ""
@@ -433,6 +434,9 @@ struct PaymentTapToPayQAView: View {
                 let result = try await terminal.charge(
                     type: .sale,
                     paymentDetails: PayabliTTPPaymentDetails(amount: amount),
+                    customer: demoCustomer.suppliesDemoCustomer
+                        ? DemoCustomerSetting.demoCustomer
+                        : PayabliTTPCustomerData(),
                     orderDescription: "Tap to Pay sample"
                 )
                 chargeMessage = "✓ Charged · txn \(result.paymentTransId)"
