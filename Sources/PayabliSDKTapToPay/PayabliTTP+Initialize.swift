@@ -222,9 +222,9 @@ extension PayabliTTP {
             throw PayabliTTPError.devicePendingActivation
         } catch let err as PayabliGenericError where err.code == .tokenExpired {
             // The refused binding is dropped by the config call, which knows which
-            // handle it presented. The reason claims nothing about that: this is not
-            // where it is decided.
-            let failure = PayabliTTPError.configFailed(reason: "Config rejected (401)")
+            // handle it presented, so its reason is relayed: whether the drop landed
+            // is decided there and this layer only carries it.
+            let failure = PayabliTTPError.configFailed(reason: "Config rejected (401): \(err.reason)")
             // One value through all three channels. Marking the raw 401 while
             // throwing the rewrapped failure left the published state and the
             // caller describing the same failure differently.

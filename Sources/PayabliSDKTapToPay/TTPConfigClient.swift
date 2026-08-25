@@ -71,7 +71,12 @@ public final class TTPConfigClient: Sendable {
             // A 401 in the body refuses the binding this request presented, so
             // it is dropped here, where which handle that was is known.
             if code == 401 {
-                dropRefusedBinding(entry: entry, presented: headers.deviceId)
+                guard dropRefusedBinding(entry: entry, presented: headers) else {
+                    throw PayabliGenericError(
+                        code: .tokenExpired,
+                        reason: "\(reason) — the stored binding could not be dropped"
+                    )
+                }
                 throw PayabliGenericError(code: .tokenExpired, reason: reason)
             }
             if code == 403 {
@@ -101,17 +106,26 @@ public final class TTPConfigClient: Sendable {
         try await attestation.generateAssertion(for: entry)
     }
 
-    /// Drops the refused binding while it is still the one held, and never fails
-    /// the caller, which is already reporting the refusal.
-    private func dropRefusedBinding(entry: String, presented deviceId: String) {
+    /// Drops the refused binding while it is still the one held.
+    ///
+    /// The handle and the key both come from the assertion this request carried,
+    /// so the comparison names the device the service answered about. False means
+    /// the binding is still readable, which the caller reports: an App Attest key
+    /// that still signs makes the next warm check trust it and present it again.
+    private func dropRefusedBinding(entry: String, presented headers: AssertionHeaders) -> Bool {
         do {
-            guard try attestation.cachedDeviceId(for: entry) == deviceId else {
+            let dropped = try attestation.forgetRefusedBinding(
+                entry: entry,
+                deviceId: headers.deviceId,
+                keyId: headers.keyId
+            )
+            if !dropped {
                 logger.info("[config] a newer binding is held for this paypoint; keeping it")
-                return
             }
-            try attestation.clearCache(for: entry)
+            return true
         } catch {
-            logger.info("[config] the refused binding could not be dropped")
+            logger.error("[config] the refused binding could not be dropped")
+            return false
         }
     }
 }

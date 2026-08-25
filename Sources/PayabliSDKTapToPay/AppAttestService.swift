@@ -167,6 +167,11 @@ public final class AppAttestService: DeviceAttestationService, @unchecked Sendab
         }
     }
 
+    @discardableResult
+    public func forgetRefusedBinding(entry: String, deviceId: String, keyId: String) throws -> Bool {
+        try forgetRefused(AttestedDevice(entry: entry, deviceId: deviceId, keyId: keyId))
+    }
+
     /// Runs a store operation and reports a failure as this SDK's own error.
     ///
     /// Everything crossing this protocol is a `PayabliTTPError`: the domain and the

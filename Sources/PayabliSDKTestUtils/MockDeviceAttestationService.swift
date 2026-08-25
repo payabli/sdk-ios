@@ -150,4 +150,20 @@ public final class MockDeviceAttestationService: DeviceAttestationService, @unch
             storedBindings[Self.anyEntry] = nil
         }
     }
+
+    /// Compares and removes under the one lock the bindings are read through, so a
+    /// test can replace a binding mid-request and the drop still sees one of the
+    /// two values rather than a torn state.
+    @discardableResult
+    public func forgetRefusedBinding(entry: String, deviceId: String, keyId _: String) throws -> Bool {
+        try lock.withLock {
+            if let storedClearFailure {
+                throw storedClearFailure
+            }
+            let key = storedBindings[entry] != nil ? entry : Self.anyEntry
+            guard storedBindings[key] == deviceId else { return false }
+            storedBindings[key] = nil
+            return true
+        }
+    }
 }

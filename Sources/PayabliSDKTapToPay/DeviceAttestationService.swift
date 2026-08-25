@@ -85,4 +85,15 @@ public protocol DeviceAttestationService: AnyObject, Sendable {
     /// names a key the platform signs with, so one left behind reads as sound on
     /// the next warm check and is sent again.
     func clearCache(for entry: String) throws
+
+    /// Drops the binding a refusal was about, while it is still the one held.
+    ///
+    /// For a caller that presented a handle, went away, and came back with a
+    /// refusal: the entry point may hold a binding attested in that window, and
+    /// dropping by entry point takes that one for an answer about a different
+    /// device. The comparison and the removal happen under one lock.
+    ///
+    /// Answers whether it dropped anything, and raises when the store refuses.
+    @discardableResult
+    func forgetRefusedBinding(entry: String, deviceId: String, keyId: String) throws -> Bool
 }

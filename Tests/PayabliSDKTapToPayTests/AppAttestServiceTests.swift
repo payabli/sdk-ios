@@ -512,6 +512,44 @@ final class AppAttestServiceTests: XCTestCase {
         try await assertAttested(sut, "myEntry", false)
     }
 
+    /// A refusal drops the binding it was about.
+    func testForgetRefusedBindingDropsTheBindingItNames() throws {
+        let storage = InMemorySecureStorage()
+        let (sut, _, _) = AttestFixture.makeService(storage: storage)
+        try sut.remember(AttestedDevice(entry: "entryA", deviceId: "devA", keyId: "keyA"))
+        try sut.remember(AttestedDevice(entry: "entryB", deviceId: "devB", keyId: "keyB"))
+
+        XCTAssertTrue(try sut.forgetRefusedBinding(entry: "entryA", deviceId: "devA", keyId: "keyA"))
+
+        XCTAssertNil(try sut.cachedDeviceId(for: "entryA"))
+        XCTAssertEqual(try sut.cachedDeviceId(for: "entryB"), "devB")
+    }
+
+    /// A refusal about a handle this paypoint no longer holds drops nothing. The
+    /// binding enrolled since names a key that works, and dropping it costs the
+    /// enrolment on the strength of an answer about a different device.
+    func testForgetRefusedBindingKeepsABindingEnrolledSince() throws {
+        let storage = InMemorySecureStorage()
+        let (sut, _, _) = AttestFixture.makeService(storage: storage)
+        try sut.remember(AttestedDevice(entry: "entryA", deviceId: "devNew", keyId: "keyNew"))
+
+        XCTAssertFalse(try sut.forgetRefusedBinding(entry: "entryA", deviceId: "devOld", keyId: "keyOld"))
+
+        XCTAssertEqual(try sut.cachedDeviceId(for: "entryA"), "devNew")
+    }
+
+    /// The key is part of what a refusal named, so a handle that survives a key
+    /// rotation is not the binding the service answered about.
+    func testForgetRefusedBindingKeepsABindingWhoseKeyChanged() throws {
+        let storage = InMemorySecureStorage()
+        let (sut, _, _) = AttestFixture.makeService(storage: storage)
+        try sut.remember(AttestedDevice(entry: "entryA", deviceId: "devA", keyId: "keyNew"))
+
+        XCTAssertFalse(try sut.forgetRefusedBinding(entry: "entryA", deviceId: "devA", keyId: "keyOld"))
+
+        XCTAssertEqual(try sut.cachedDeviceId(for: "entryA"), "devA")
+    }
+
     /// A refusal is about the paypoint that refused. The other bindings still
     /// name keys that work, and each one dropped costs an enrolment.
     func testClearCacheLeavesEveryOtherBindingAlone() async throws {

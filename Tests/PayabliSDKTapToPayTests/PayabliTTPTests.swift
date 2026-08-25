@@ -229,6 +229,44 @@ final class PayabliTTPTests: XCTestCase {
         XCTAssertEqual(ttp.sessionState, .error, "the caller saw a failure and the published state did not")
     }
 
+    /// A refusal whose drop did not land says so, since the binding is still
+    /// readable and its key still signs, so the next warm check presents it again.
+    func testAConfigRefusalThatCouldNotDropTheBindingSaysSo() async throws {
+        let (ttp, _, attestation) = makeTTP()
+        attestation.isAlreadyAttested = true
+        attestation.clearFailure = PayabliTTPError.attestationFailed(reason: "keychain unavailable")
+
+        StubURLProtocol.handler = { request in
+            (
+                HTTPURLResponse(
+                    url: request.url!,
+                    statusCode: 200,
+                    httpVersion: "HTTP/1.1",
+                    headerFields: ["Content-Type": "application/json"]
+                )!,
+                Data(
+                    #"{"isSuccess":false,"responseText":"revoked","responseData":{"resultCode":401,"resultText":"revoked"}}"#
+                        .utf8
+                )
+            )
+        }
+
+        var thrown: Error?
+        do {
+            try await ttp.initialize()
+            XCTFail("expected the config phase to reject")
+        } catch {
+            thrown = error
+        }
+
+        let raised = try XCTUnwrap(thrown)
+        XCTAssertTrue(
+            raised.localizedDescription.contains("could not be dropped"),
+            raised.localizedDescription
+        )
+        XCTAssertTrue(attestation.isAlreadyAttested, "the binding is still readable")
+    }
+
     /// A config 401 answering one handle leaves a binding enrolled since.
     func testAConfigRefusalLeavesABindingEnrolledSince() async throws {
         let (ttp, _, attestation) = makeTTP()
