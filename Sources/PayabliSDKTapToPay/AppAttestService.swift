@@ -175,8 +175,7 @@ public final class AppAttestService: DeviceAttestationService, @unchecked Sendab
     /// entry point may hold a newer one by the time the answer lands.
     public func clearCache(for entry: String) throws {
         try reportingStorageFailure {
-            try bindingStore.forget(entry: entry)
-            try bindingStore.forgetPendingKey(for: entry)
+            try bindingStore.forgetEverything(for: entry)
         }
     }
 

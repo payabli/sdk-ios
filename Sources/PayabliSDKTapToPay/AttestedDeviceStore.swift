@@ -125,6 +125,24 @@ final class AttestedDeviceStore {
         }
     }
 
+    /// Drops this entry point's binding and its pending key together.
+    ///
+    /// One turn of the lock, because the two are one decision: this paypoint is
+    /// being started over. Taken separately the lock is released between them, and
+    /// an attestation that mints a key in that window has it deleted by the second
+    /// half of a clear that was never about it. Its retry then mints another key
+    /// and registers another device, which is the outcome the pending slot exists
+    /// to prevent.
+    func forgetEverything(for entry: String) throws {
+        try Self.lock.withLock {
+            try write(load().without(entry: entry))
+
+            var pending = try loadPending()
+            guard pending.removeValue(forKey: entry) != nil else { return }
+            try writePending(pending)
+        }
+    }
+
     // MARK: - Keys an attestation is part way through
 
     /// The key this entry point minted and has not finished attesting.
