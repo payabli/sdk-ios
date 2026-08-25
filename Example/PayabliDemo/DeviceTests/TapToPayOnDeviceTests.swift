@@ -5,8 +5,14 @@ import XCTest
 
 /// What this branch changed, exercised against a live paypoint on real hardware.
 ///
-/// Everything up to the tap. `charge()` needs a card held to the phone, so it is a
-/// written step somebody walks, and nothing on this branch touches the tap itself.
+/// Everything up to the tap. `charge()` needs a card held to the phone, so the read
+/// is abandoned once the backend has minted a `paymentTransId`, which is the last
+/// thing that happens before the reader waits for a card.
+///
+/// Each test establishes what it needs and assumes nothing about what ran before
+/// it. XCTest runs methods in name order by default and does not have to: a run can
+/// select one method or reorder them, and a test that reads what its neighbour
+/// wrote then passes or fails on that choice rather than on the code.
 ///
 /// These register a device against the paypoint the run names, which is a write.
 @MainActor
@@ -30,124 +36,139 @@ final class TapToPayOnDeviceTests: XCTestCase {
         )
     }
 
-    /// Spends an activation code on this device, when the run supplies one.
-    ///
-    /// A paypoint that issues codes leaves a newly registered device pending, and
-    /// nothing after this reaches `.ready` until it is activated. The code is
-    /// short-lived and issued out of band, so it arrives in the environment rather
-    /// than living in the file.
-    func test0ActivateThisDeviceWhenACodeIsGiven() async throws {
-        let code = ProcessInfo.processInfo.environment["PAYABLI_ACTIVATION_CODE"] ?? ""
-        try XCTSkipIf(code.isEmpty, "no PAYABLI_ACTIVATION_CODE for this run")
+    private func attestation() -> AppAttestService {
+        AppAttestService(
+            transport: PayabliSession(config: LiveEnvironment.config(for: named)).transport,
+            attestor: RealAppAttestor(),
+            storage: KeychainStorage()
+        )
+    }
 
+    /// Brings this device to `.ready` and answers the handle it holds, so a test
+    /// that needs an enrolled device says so rather than reading what another one
+    /// left behind.
+    ///
+    /// A paypoint that issues activation codes leaves a device it has not seen
+    /// pending, and no code can be minted from in here, so a run against one needs
+    /// `PAYABLI_ACTIVATION_CODE`. That is reported as a skip rather than a pass.
+    ///
+    /// The session it readied comes back with the handle, because preparing a reader
+    /// on a device costs minutes: a caller that made its own would pay for a second
+    /// one to do the same thing.
+    @discardableResult
+    private func enrolledDevice() async throws -> (session: PayabliTTP, handle: String) {
         let ttp = makeTTP()
-        _ = try? await ttp.initialize()
-        guard ttp.sessionState == .pendingActivation else {
-            XCTAssertEqual(ttp.sessionState, .ready, "this device is neither pending nor ready")
-            return
+        do {
+            try await ttp.initialize()
+        } catch PayabliTTPError.devicePendingActivation {
+            let code = ProcessInfo.processInfo.environment["PAYABLI_ACTIVATION_CODE"] ?? ""
+            guard !code.isEmpty else {
+                throw XCTSkip(
+                    "this device is pending activation on \(named.entry); "
+                        + "set PAYABLI_ACTIVATION_CODE to a code minted for its handle"
+                )
+            }
+            do {
+                try await ttp.activateDevice(activationCode: code)
+            } catch let error as PayabliTTPError {
+                // A code is minted for one handle. A device that registered again
+                // since holds a different one, and no code for it can be obtained
+                // from in here, so this is the run's state rather than a defect.
+                guard case let .activationFailed(reason) = error,
+                      reason.localizedCaseInsensitiveContains("no active challenge")
+                else {
+                    throw error
+                }
+                throw XCTSkip(
+                    "PAYABLI_ACTIVATION_CODE was minted for another handle; "
+                        + "mint one for the handle testReportTheHandleThisDeviceHolds prints"
+                )
+            }
+            try await ttp.initialize()
         }
-
-        try await ttp.activateDevice(activationCode: code)
-        XCTAssertEqual(ttp.sessionState, .idle, "activation left the session somewhere else")
-
-        try await ttp.initialize()
-        XCTAssertEqual(ttp.sessionState, .ready, "an activated device did not reach ready")
-        print("PAYABLI_ACTIVATED env=\(named.name)")
+        XCTAssertEqual(ttp.sessionState, .ready, "the session never became ready")
+        let handle = try XCTUnwrap(
+            try attestation().cachedDeviceId(for: named.entry),
+            "reaching ready stored no binding for \(named.entry)"
+        )
+        return (ttp, handle)
     }
 
-    /// A cold start enrols this device against the paypoint and reaches `.ready`.
-    ///
-    /// The whole sequence on real hardware: App Attest mints and attests a key,
-    /// `/register` is given the digest this branch derives, `/config` is answered
-    /// for the binding, and the reader is prepared.
-    func testAColdStartEnrolsAndReachesReady() async throws {
-        let ttp = makeTTP()
-        try await ttp.initialize()
+    /// Reaching `.ready` stores a binding that names this paypoint.
+    func testReachingReadyStoresABindingForThisPaypoint() async throws {
+        let held = try await enrolledDevice().handle
 
-        XCTAssertEqual(ttp.sessionState, .ready)
-        XCTAssertTrue(ttp.isReady)
-
-        let held = try XCTUnwrap(
+        let stored = try XCTUnwrap(
             try KeychainStorage().string(forKey: PayabliKeychainKey.deviceBindings),
-            "reaching ready stored no binding"
+            "reaching ready stored no bindings item"
         )
-        XCTAssertTrue(held.contains(named.entry), "the stored binding does not name this paypoint")
+        XCTAssertTrue(stored.contains(named.entry), "the stored binding does not name this paypoint")
+        XCTAssertFalse(held.isEmpty)
+        LiveEnvironment.reportIdentifier("DEVICE_HANDLE", held, env: named.name)
     }
 
-    /// A second session on the same device reuses the binding rather than
-    /// registering again, which is the defect this ticket names.
+    /// A second session holds the handle the first one did, which is the claim: a
+    /// device registers once for a paypoint rather than once per call.
     ///
-    /// Runs after the cold start above, so it reads what that one wrote. The
-    /// device this build registered is the one it keeps using.
-    func testBAWarmStartReusesTheBinding() async throws {
-        let attestation = AppAttestService(
-            transport: PayabliSession(config: LiveEnvironment.config(for: named)).transport,
-            attestor: RealAppAttestor(),
-            storage: KeychainStorage()
-        )
+    /// Both sessions in one test, so the reuse does not rest on the order two tests
+    /// happen to run in.
+    ///
+    /// This does not drop the binding first, and so does not prove the first session
+    /// was the cold one. It cannot: dropping it makes the next registration mint a
+    /// handle, an activation code is minted for a handle, and a paypoint that gates
+    /// new devices then needs a code that could only be obtained after the drop.
+    /// The cold sequence is what enrolled this device, and re-running it needs a
+    /// person with the handle in hand.
+    func testTheSessionAfterAnEnrolmentHoldsTheSameHandle() async throws {
+        let store = attestation()
+        let first = try await enrolledDevice().handle
 
-        let before = try XCTUnwrap(
-            try attestation.cachedDeviceId(for: named.entry),
-            "no binding to warm-start from; the cold-start test has to run first"
-        )
-        let enrolled = try await attestation.isAttested(for: named.entry)
-        XCTAssertTrue(
-            enrolled,
-            "a binding this device holds, whose key the platform still signs with, read as not enrolled"
-        )
+        let second = makeTTP()
+        try await second.initialize()
 
-        let ttp = makeTTP()
-        try await ttp.initialize()
-
-        XCTAssertEqual(ttp.sessionState, .ready)
+        XCTAssertEqual(second.sessionState, .ready)
         XCTAssertEqual(
-            try attestation.cachedDeviceId(for: named.entry),
-            before,
-            "a warm start registered a second device for this paypoint"
+            try store.cachedDeviceId(for: named.entry),
+            first,
+            "a second session registered another device for this paypoint"
         )
-        print("PAYABLI_DEVICE_HANDLE env=\(named.name) deviceId=\(before)")
     }
 
-    /// Reports the handle this device holds for the paypoint, so an activation
-    /// code can be requested for it by name.
-    ///
-    /// The service's device list is the other way to find it, and a paypoint with
-    /// no card-present service configured declines that call while still holding
-    /// the registration this made.
-    func testC0ReportTheStoredHandle() throws {
-        let attestation = AppAttestService(
-            transport: PayabliSession(config: LiveEnvironment.config(for: named)).transport,
-            attestor: RealAppAttestor(),
-            storage: KeychainStorage()
-        )
-        let held = try XCTUnwrap(
-            try attestation.cachedDeviceId(for: named.entry),
-            "this device holds no binding for \(named.entry)"
-        )
-        print("PAYABLI_DEVICE_HANDLE env=\(named.name) deviceId=\(held)")
-    }
-
-    /// The paypoint is part of the binding: this device is not enrolled for a
-    /// paypoint it never registered against, and asking does not disturb the one
-    /// it did.
-    func testCAnotherPaypointIsNotThisDevicesEnrolment() async throws {
-        let attestation = AppAttestService(
-            transport: PayabliSession(config: LiveEnvironment.config(for: named)).transport,
-            attestor: RealAppAttestor(),
-            storage: KeychainStorage()
-        )
-        let held = try XCTUnwrap(try attestation.cachedDeviceId(for: named.entry))
+    /// The paypoint is part of the binding: this device is not enrolled for one it
+    /// never registered against, and asking does not disturb the one it did.
+    func testAnotherPaypointIsNotThisDevicesEnrolment() async throws {
+        let held = try await enrolledDevice().handle
+        let store = attestation()
 
         let other = "\(named.entry)_notARealPaypoint"
-        let enrolledElsewhere = try await attestation.isAttested(for: other)
+        let enrolledElsewhere = try await store.isAttested(for: other)
         XCTAssertFalse(enrolledElsewhere)
-        XCTAssertNil(try attestation.cachedDeviceId(for: other))
-        XCTAssertEqual(try attestation.cachedDeviceId(for: named.entry), held)
+        XCTAssertNil(try store.cachedDeviceId(for: other))
+        XCTAssertEqual(try store.cachedDeviceId(for: named.entry), held)
     }
 
-    /// The value registration identifies this install by is the digest, is the
-    /// same on every call, and is not the stored UUID.
-    func testDTheRegistrationIdentifierIsTheDigest() throws {
+    /// Reports the handle this device holds, registering first if it holds none.
+    ///
+    /// An activation code is minted for a handle, and a paypoint whose card-present
+    /// service is not configured declines the service's own device list, so this is
+    /// the way to learn one. Registration stores the binding before pending
+    /// activation is surfaced, so a device that cannot reach `.ready` still has a
+    /// handle to report.
+    func testReportTheHandleThisDeviceHolds() async throws {
+        let store = attestation()
+        if try store.cachedDeviceId(for: named.entry) == nil {
+            _ = try? await makeTTP().initialize()
+        }
+        let held = try XCTUnwrap(
+            try store.cachedDeviceId(for: named.entry),
+            "this device holds no binding for \(named.entry) and registering stored none"
+        )
+        LiveEnvironment.reportIdentifier("DEVICE_HANDLE", held, env: named.name)
+    }
+
+    /// The value registration identifies this install by is the digest, is the same
+    /// on every call, and is not the stored UUID.
+    func testTheRegistrationIdentifierIsTheDigest() throws {
         let storage = KeychainStorage()
         let first = try InstallIdentifier.hardwareId(storage: storage)
         let second = try InstallIdentifier.hardwareId(storage: storage)
@@ -158,46 +179,78 @@ final class TapToPayOnDeviceTests: XCTestCase {
 
         let stored = try XCTUnwrap(storage.string(forKey: PayabliKeychainKey.installId))
         XCTAssertNotEqual(first, stored)
-        print("PAYABLI_HARDWARE_ID env=\(named.name) hardwareId=\(first)")
+        LiveEnvironment.reportIdentifier("HARDWARE_ID", first, env: named.name)
     }
 
-    /// A charge reaches the tap, which is as far as this can go on its own.
+    /// A reader that reached `.ready` can be re-prepared without re-attesting,
+    /// which is the path a host re-entry takes.
+    func testReinitializeKeepsTheBinding() async throws {
+        let (ttp, before) = try await enrolledDevice()
+
+        try await ttp.reinitializeIfNeeded()
+
+        XCTAssertEqual(ttp.sessionState, .ready)
+        XCTAssertEqual(try attestation().cachedDeviceId(for: named.entry), before)
+    }
+
+    /// A charge reaches the tap with the customer the demo's setting names.
     ///
     /// `charge()` is three steps: `POST /MoneyIn/initiate`, the tap, then
     /// `PATCH /MoneyIn/update`. Only the tap needs a person, so stopping at
     /// `.ready` leaves the initiate untested, and the initiate is where the
-    /// customer, the amount and the device handle are sent. This runs it and
-    /// stops when the reader asks for a card.
-    ///
-    /// The customer is the demo's own, which is what the Configuration screen says
-    /// a charge sends.
-    func testFAChargeReachesTheTapWithTheDemoCustomer() async throws {
+    /// customer, the amount and the device handle are sent.
+    func testAChargeReachesTheTapWithTheDemoCustomer() async throws {
         try await assertChargeReachesTheTap(
             customer: DemoCustomerSetting.demoCustomer,
             label: "demoCustomer"
         )
     }
 
-    /// The same, with the customer the app's own charge button sends, which is
-    /// none. A paypoint that matches on an identifier refuses this at the
-    /// initiate, before any card is presented.
-    func testFBChargeReachesTheTapWithNoCustomer() async throws {
-        try await assertChargeReachesTheTap(
+    /// The same, with no customer. A paypoint that matches on an identifier refuses
+    /// this at the initiate, before any card is presented.
+    func testAChargeWithNoCustomerIsRefusedBeforeTheTap() async throws {
+        try await assertChargeIsRefusedBeforeTheTap(
             customer: PayabliTTPCustomerData(),
             label: "noCustomer"
         )
     }
 
     /// Drives `charge()` and returns once the backend has minted a
-    /// `paymentTransId`, which is the last thing that happens before the reader
-    /// waits for a card.
+    /// `paymentTransId`, which is the last thing before the reader waits for a card.
     private func assertChargeReachesTheTap(
         customer: PayabliTTPCustomerData,
         label: String
     ) async throws {
-        let ttp = makeTTP()
-        try await ttp.initialize()
-        XCTAssertEqual(ttp.sessionState, .ready, "the session never became ready")
+        let outcome = try await runChargeToTheTap(customer: customer, label: label)
+        XCTAssertEqual(
+            outcome.result,
+            .completed,
+            "the charge never reached the tap with \(label): \(outcome.reported)"
+        )
+    }
+
+    /// The other direction: the initiate refuses this and no card is ever asked for.
+    private func assertChargeIsRefusedBeforeTheTap(
+        customer: PayabliTTPCustomerData,
+        label: String
+    ) async throws {
+        let outcome = try await runChargeToTheTap(customer: customer, label: label)
+        XCTAssertNotEqual(
+            outcome.result,
+            .completed,
+            "a charge naming nobody reached the tap on a paypoint that matches on an identifier"
+        )
+        XCTAssertTrue(
+            outcome.reported.lowercased().contains("customer"),
+            "refused for something other than the customer: \(outcome.reported)"
+        )
+    }
+
+    private func runChargeToTheTap(
+        customer: PayabliTTPCustomerData,
+        label: String
+    ) async throws -> (result: XCTWaiter.Result, reported: String) {
+        let (ttp, _) = try await enrolledDevice()
 
         let stream = ttp.events()
         let reachedTheTap = expectation(description: "the charge reached the tap")
@@ -205,8 +258,8 @@ final class TapToPayOnDeviceTests: XCTestCase {
 
         let collector = Task {
             for await event in stream {
-                if case let .chargeInitiated(paymentTransId) = event {
-                    seen.record("initiated \(paymentTransId)")
+                if case .chargeInitiated = event {
+                    seen.record("initiated")
                     reachedTheTap.fulfill()
                     return
                 }
@@ -226,38 +279,20 @@ final class TapToPayOnDeviceTests: XCTestCase {
             }
         }
 
-        let outcome = await XCTWaiter().fulfillment(of: [reachedTheTap], timeout: 30)
+        let result = await XCTWaiter().fulfillment(of: [reachedTheTap], timeout: 30)
 
-        // The tap is a person's to make, so the read is abandoned here. The reader
-        // sheet on the phone closes with it.
+        // The tap is a person's to make, so the read is ended here. Cancelling the
+        // task is not enough on its own: the reader keeps its sheet up waiting for a
+        // card, and the next test cannot prepare a reader while it is there, so a
+        // run wedges on whichever charge test happens to go first. `cancelReading`
+        // is what closes it, and the facade offers no public way to reach it.
+        await ttp.provider.cancelReading()
         charging.cancel()
         collector.cancel()
         _ = await charging.value
 
-        print("PAYABLI_CHARGE env=\(named.name) customer=\(label) outcome=\(seen.value)")
-        XCTAssertEqual(
-            outcome,
-            .completed,
-            "the charge never reached the tap with \(label): \(seen.value)"
-        )
-    }
-
-    /// A reader that reached `.ready` can be re-prepared without re-attesting,
-    /// which is the path a host re-entry takes.
-    func testEReinitializeKeepsTheBinding() async throws {
-        let attestation = AppAttestService(
-            transport: PayabliSession(config: LiveEnvironment.config(for: named)).transport,
-            attestor: RealAppAttestor(),
-            storage: KeychainStorage()
-        )
-        let before = try XCTUnwrap(try attestation.cachedDeviceId(for: named.entry))
-
-        let ttp = makeTTP()
-        try await ttp.initialize()
-        try await ttp.reinitializeIfNeeded()
-
-        XCTAssertEqual(ttp.sessionState, .ready)
-        XCTAssertEqual(try attestation.cachedDeviceId(for: named.entry), before)
+        LiveEnvironment.report("PAYABLI_CHARGE env=\(named.name) customer=\(label) outcome=\(seen.value)")
+        return (result, seen.value)
     }
 }
 
