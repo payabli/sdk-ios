@@ -25,17 +25,41 @@ final class InstallIdentifierTests: XCTestCase {
         XCTAssertFalse(first.isEmpty)
     }
 
-    /// A reinstall keeps the Keychain item and loses the app's container, so the
-    /// stored UUID is what a returning install still has. Reading it through a
-    /// second store over the same Keychain is that install.
+    /// A reinstall keeps the Keychain and loses everything the app itself held, so
+    /// the returning install reads the same Keychain through objects it built fresh.
+    ///
+    /// Two stores over one backing, not one store asked twice: asked twice, this is
+    /// the test above it under another name, and it would pass just as well if what
+    /// survived lived in the instance rather than in the Keychain.
     func testAReturningInstallAnswersWhatItAnsweredBefore() throws {
-        let storage = InMemorySecureStorage()
-        let before = try InstallIdentifier.hardwareId(storage: storage, bundleIdentifier: bundleA)
+        let keychain = DurableBacking()
+        let before = try InstallIdentifier.hardwareId(
+            storage: KeychainStandIn(backing: keychain),
+            bundleIdentifier: bundleA
+        )
 
-        // Nothing else survives a reinstall, so nothing else is carried over here.
-        let after = try InstallIdentifier.hardwareId(storage: storage, bundleIdentifier: bundleA)
+        // Everything the install held is gone; the Keychain is not.
+        let after = try InstallIdentifier.hardwareId(
+            storage: KeychainStandIn(backing: keychain),
+            bundleIdentifier: bundleA
+        )
 
-        XCTAssertEqual(before, after, "a returning install registers as a second device")
+        XCTAssertEqual(before, after, "a returning install registers as a device never seen before")
+    }
+
+    /// The counterpart, so the test above cannot pass by the value being fixed: a
+    /// returning install whose Keychain went too is a new device.
+    func testAnInstallWhoseKeychainWentTooIsANewDevice() throws {
+        let before = try InstallIdentifier.hardwareId(
+            storage: KeychainStandIn(backing: DurableBacking()),
+            bundleIdentifier: bundleA
+        )
+        let after = try InstallIdentifier.hardwareId(
+            storage: KeychainStandIn(backing: DurableBacking()),
+            bundleIdentifier: bundleA
+        )
+
+        XCTAssertNotEqual(before, after)
     }
 
     /// An install that lost the stored UUID is a new device, and says so.
