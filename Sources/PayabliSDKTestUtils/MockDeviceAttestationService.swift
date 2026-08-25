@@ -32,6 +32,20 @@ public final class MockDeviceAttestationService: DeviceAttestationService, @unch
     /// The entry point the unkeyed setters above stand in for.
     public static let anyEntry = "mockEntry"
 
+    /// The key each entry point's binding names, for the drop that compares both.
+    /// An entry point with none set answers `defaultKeyId`, which is what
+    /// `generateAssertion` hands out, so a test that never mentions a key sees a
+    /// binding and an assertion that agree.
+    private var storedKeys: [String: String] = [:]
+    public var bindingKeys: [String: String] {
+        get { lock.withLock { storedKeys } }
+        set { lock.withLock { storedKeys = newValue } }
+    }
+
+    /// What `generateAssertion` signs with, and what a binding names when a test
+    /// sets no key of its own.
+    public static let defaultKeyId = "mock_key"
+
     /// Raised by the two reads below while it is set, so a test can drive the
     /// warm path failing before the cold sequence is ever reached.
     public var readFailure: Error? {
@@ -107,16 +121,19 @@ public final class MockDeviceAttestationService: DeviceAttestationService, @unch
     /// Refuses a paypoint with no binding, as the real service does. Succeeding
     /// regardless let a test pass where production throws.
     public func generateAssertion(for entry: String) async throws -> AssertionHeaders {
-        let deviceId: String? = lock.withLock {
+        let held: (deviceId: String, keyId: String)? = lock.withLock {
             storedAssertionCalls += 1
-            return storedBindings[entry] ?? storedBindings[Self.anyEntry]
+            let key = storedBindings[entry] != nil ? entry : Self.anyEntry
+            guard let deviceId = storedBindings[key] else { return nil }
+            return (deviceId, storedKeys[key] ?? Self.defaultKeyId)
         }
-        guard let deviceId else {
+        guard let held else {
             throw PayabliTTPError.attestationFailed(reason: "Missing attestation state")
         }
+        let (deviceId, keyId) = held
         return AssertionHeaders(
             assertion: "mock_assertion",
-            keyId: "mock_key",
+            keyId: keyId,
             deviceId: deviceId,
             timestamp: "2026-04-21T00:00:00Z"
         )
@@ -148,21 +165,33 @@ public final class MockDeviceAttestationService: DeviceAttestationService, @unch
             }
             storedBindings[entry] = nil
             storedBindings[Self.anyEntry] = nil
+            storedKeys[entry] = nil
+            storedKeys[Self.anyEntry] = nil
         }
     }
 
     /// Compares and removes under the one lock the bindings are read through, so a
     /// test can replace a binding mid-request and the drop still sees one of the
     /// two values rather than a torn state.
+    ///
+    /// The key is compared alongside the handle, as `AppAttestService` does: a
+    /// binding that kept its handle across a key rotation is not the one a refusal
+    /// was about, and a double that dropped it anyway would pass a facade test for
+    /// behaviour production does not have.
     @discardableResult
-    public func forgetRefusedBinding(entry: String, deviceId: String, keyId _: String) throws -> Bool {
+    public func forgetRefusedBinding(entry: String, deviceId: String, keyId: String) throws -> Bool {
         try lock.withLock {
             if let storedClearFailure {
                 throw storedClearFailure
             }
             let key = storedBindings[entry] != nil ? entry : Self.anyEntry
-            guard storedBindings[key] == deviceId else { return false }
+            guard storedBindings[key] == deviceId,
+                  storedKeys[key] ?? Self.defaultKeyId == keyId
+            else {
+                return false
+            }
             storedBindings[key] = nil
+            storedKeys[key] = nil
             return true
         }
     }
