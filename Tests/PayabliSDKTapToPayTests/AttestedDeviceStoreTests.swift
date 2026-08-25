@@ -103,6 +103,63 @@ final class AttestedDeviceStoreTests: XCTestCase {
         XCTAssertEqual(try store.pendingKey(for: "entryA"), "key_a")
     }
 
+    // MARK: - What the pending keys retain
+
+    /// The pending keys are bounded the way the bindings are. Every paypoint that
+    /// began an attestation and stopped before the key was spent left one behind,
+    /// and nothing removed them, so the item they share grew without limit and a
+    /// write that outgrows the Keychain blocks enrolment for all of them.
+    func testThePendingKeysAreBounded() throws {
+        let store = AttestedDeviceStore(storage: InMemorySecureStorage())
+        let overBy = 3
+        let entries = (0 ..< PendingKeys.maximum + overBy).map { "entry\($0)" }
+
+        for entry in entries {
+            try store.rememberPendingKey("key_\(entry)", for: entry)
+        }
+
+        let held = try entries.filter { try store.pendingKey(for: $0) != nil }
+        XCTAssertEqual(held.count, PendingKeys.maximum)
+    }
+
+    /// The most recent mints are the ones kept, so the paypoint attesting now holds
+    /// its key and the ones that stopped longest ago fall off.
+    func testTheOldestPendingKeysAreTheOnesDropped() throws {
+        let store = AttestedDeviceStore(storage: InMemorySecureStorage())
+        let entries = (0 ..< PendingKeys.maximum + 1).map { "entry\($0)" }
+
+        for entry in entries {
+            try store.rememberPendingKey("key_\(entry)", for: entry)
+        }
+
+        XCTAssertNil(try store.pendingKey(for: entries.first!), "the oldest mint survived the bound")
+        XCTAssertEqual(
+            try store.pendingKey(for: entries.last!),
+            "key_\(entries.last!)",
+            "the newest mint was dropped"
+        )
+    }
+
+    /// Minting again for a paypoint that already holds one replaces it rather than
+    /// spending a place in the bound, so a paypoint retrying cannot evict three
+    /// others.
+    func testMintingAgainForOnePaypointKeepsTheRest() throws {
+        let store = AttestedDeviceStore(storage: InMemorySecureStorage())
+        let entries = (0 ..< PendingKeys.maximum).map { "entry\($0)" }
+        for entry in entries {
+            try store.rememberPendingKey("key_\(entry)", for: entry)
+        }
+
+        for attempt in 0 ..< 5 {
+            try store.rememberPendingKey("retry_\(attempt)", for: entries.first!)
+        }
+
+        for entry in entries {
+            XCTAssertNotNil(try store.pendingKey(for: entry), "\(entry) lost its key to a retry")
+        }
+        XCTAssertEqual(try store.pendingKey(for: entries.first!), "retry_4")
+    }
+
     // MARK: - A mutation the store refused
 
     /// A drop the store refused is raised, so nothing tells a caller the binding is

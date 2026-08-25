@@ -63,3 +63,55 @@ struct DeviceBindings: Codable, Equatable, CustomStringConvertible, Sendable {
         DeviceBindings(bindings.filter { $0.entry != entry })
     }
 }
+
+/// A key minted for an entry point whose attestation has not finished.
+struct PendingKey: Codable, Equatable, Sendable {
+    let entry: String
+    let keyId: String
+}
+
+/// Every key an attestation started and did not spend, most recently minted first.
+///
+/// Bounded the way `DeviceBindings` is, and for the reason that structure gives: a
+/// per-entry map grows with every paypoint that ever began an attestation and
+/// stopped before the key was spent, and nothing ever removed those. The item they
+/// share grows with them, and a write that outgrows the Keychain blocks enrolment
+/// for every paypoint in it.
+///
+/// The cost of the bound is the case it evicts: a paypoint whose key falls off the
+/// back mints a new one on its next attempt, which is what a single slot did for
+/// every paypoint before this became per-entry. It applies past `maximum`
+/// simultaneously unfinished attestations, where the same limit already decides
+/// which binding a device keeps.
+///
+/// Order carries the meaning, so this is an array; the front is the most recent
+/// mint, and no field records a time, since the SDK controls no clock.
+struct PendingKeys: Codable, Equatable, CustomStringConvertible, Sendable {
+    /// The same limit the bindings keep, so a device cannot hold a pending key for a
+    /// paypoint whose binding it would not have kept.
+    static let maximum = DeviceBindings.maximum
+
+    let keys: [PendingKey]
+
+    var description: String {
+        "PendingKeys(count: \(keys.count))"
+    }
+
+    init(_ keys: [PendingKey] = []) {
+        self.keys = keys
+    }
+
+    func keyId(for entry: String) -> String? {
+        keys.first { $0.entry == entry }?.keyId
+    }
+
+    /// `keyId` at the front, replacing any key held for the same entry point.
+    func with(_ keyId: String, for entry: String) -> PendingKeys {
+        let record = PendingKey(entry: entry, keyId: keyId)
+        return PendingKeys(([record] + keys.filter { $0.entry != entry }).prefix(Self.maximum).map { $0 })
+    }
+
+    func without(entry: String) -> PendingKeys {
+        PendingKeys(keys.filter { $0.entry != entry })
+    }
+}

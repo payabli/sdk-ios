@@ -100,9 +100,9 @@ final class AttestedDeviceStore {
         try Self.lock.withLock {
             try write(load().without(entry: entry))
 
-            var pending = try loadPending()
-            guard pending.removeValue(forKey: entry) != nil else { return }
-            try writePending(pending)
+            let held = try loadPending()
+            guard held.keyId(for: entry) != nil else { return }
+            try writePending(held.without(entry: entry))
         }
     }
 
@@ -110,7 +110,7 @@ final class AttestedDeviceStore {
 
     /// The key this entry point minted and has not finished attesting.
     func pendingKey(for entry: String) throws -> String? {
-        try Self.lock.withLock { try loadPending()[entry] }
+        try Self.lock.withLock { try loadPending().keyId(for: entry) }
     }
 
     /// Kept per entry point. A key can be attested once, so one entry point's key is
@@ -118,9 +118,7 @@ final class AttestedDeviceStore {
     /// the first.
     func rememberPendingKey(_ keyId: String, for entry: String) throws {
         try Self.lock.withLock {
-            var pending = try loadPending()
-            pending[entry] = keyId
-            try writePending(pending)
+            try writePending(try loadPending().with(keyId, for: entry))
         }
     }
 
@@ -131,28 +129,28 @@ final class AttestedDeviceStore {
     /// it names, and a spent key is refused every time it is reused.
     func forgetPendingKey(for entry: String) throws {
         try Self.lock.withLock {
-            var pending = try loadPending()
-            guard pending.removeValue(forKey: entry) != nil else { return }
-            try writePending(pending)
+            let held = try loadPending()
+            guard held.keyId(for: entry) != nil else { return }
+            try writePending(held.without(entry: entry))
         }
     }
 
-    private func loadPending() throws -> [String: String] {
+    private func loadPending() throws -> PendingKeys {
         guard let raw = try storage.string(forKey: PayabliKeychainKey.pendingKeyId) else {
-            return [:]
+            return PendingKeys()
         }
         guard let data = raw.data(using: .utf8),
-              let decoded = try? JSONDecoder().decode([String: String].self, from: data)
+              let decoded = try? JSONDecoder().decode(PendingKeys.self, from: data)
         else {
             logger.info("[attest] stored pending keys could not be decoded; discarding")
             try? storage.remove(forKey: PayabliKeychainKey.pendingKeyId)
-            return [:]
+            return PendingKeys()
         }
         return decoded
     }
 
-    private func writePending(_ pending: [String: String]) throws {
-        guard !pending.isEmpty else {
+    private func writePending(_ pending: PendingKeys) throws {
+        guard !pending.keys.isEmpty else {
             try storage.remove(forKey: PayabliKeychainKey.pendingKeyId)
             return
         }
