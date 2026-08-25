@@ -47,6 +47,21 @@ final class PayabliSDKTestUtilsTests: XCTestCase {
         XCTAssertEqual(try attestation.cachedDeviceId(for: "entryA"), "devA")
     }
 
+    /// An attestation records the key it was issued for, so the assertion that
+    /// follows names it. A double that kept only the handle answered with its
+    /// default key, and a test driving a custom result then asserted against a
+    /// binding and an assertion no device could hold.
+    func testTheAttestationDoubleRecordsTheKeyItIssued() async throws {
+        let attestation = MockDeviceAttestationService()
+        attestation.attestResult = .success(AttestationResult(keyId: "issuedKey", deviceId: "issuedDevice"))
+
+        _ = try await attestation.attest(entry: "entryA", appId: "appId")
+
+        let headers = try await attestation.generateAssertion(for: "entryA")
+        XCTAssertEqual(headers.deviceId, "issuedDevice")
+        XCTAssertEqual(headers.keyId, "issuedKey")
+    }
+
     /// A refusal about a handle this paypoint no longer holds drops nothing.
     func testTheAttestationDoubleKeepsABindingEnrolledSince() throws {
         let attestation = MockDeviceAttestationService()

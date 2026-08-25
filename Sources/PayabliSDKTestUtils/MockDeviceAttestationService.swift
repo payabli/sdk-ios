@@ -111,7 +111,13 @@ public final class MockDeviceAttestationService: DeviceAttestationService, @unch
         }
         switch result {
         case let .success(value):
-            lock.withLock { storedBindings[entry] = value.deviceId }
+            // Both fields, under one turn of the lock: an attestation that recorded
+            // the handle without the key it was issued for leaves a binding whose
+            // assertion names a different key, which no device can hold.
+            lock.withLock {
+                storedBindings[entry] = value.deviceId
+                storedKeys[entry] = value.keyId
+            }
             return value
         case let .failure(err):
             throw err
