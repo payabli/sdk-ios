@@ -139,8 +139,8 @@ struct ConfigurationQAView: View {
                 demoCustomer.suppliesDemoCustomer
                     ? "Charging sends \(DemoCustomerSetting.demoCustomerSummary). "
                     + "A paypoint with custom identifiers rejects a sale that names nobody."
-                    : "Charging asks for the customer on the Tap to Pay tab. Leave the fields "
-                    + "empty for a paypoint with no custom identifiers, which records no customer."
+                    : "Charging names nobody, for a paypoint with no custom identifiers, and "
+                    + "records no customer. A paypoint that has them rejects the sale."
             )
             .font(.caption)
             .foregroundColor(.payabliOnSurfaceVariant)

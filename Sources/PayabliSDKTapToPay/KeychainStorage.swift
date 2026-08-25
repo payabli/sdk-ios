@@ -4,9 +4,9 @@ import Security
 /// Lightweight wrapper over the iOS Keychain for storing non-secret identity
 /// tokens (PRD NFR-5E, §22.1).
 ///
-/// Used by `AppAttestService` to persist `keyId` and `deviceId` across app
-/// launches. **Must not** be used for true secrets (`clientSecret`, access
-/// tokens, Fiserv credentials) — those live in RAM only (NFR-5D).
+/// Used by `AppAttestService` to hold the device's bindings across app launches.
+/// **Must not** be used for true secrets (`clientSecret`, access tokens, Fiserv
+/// credentials) — those live in RAM only (NFR-5D).
 ///
 /// Items are stored as `kSecClassGenericPassword` with the SDK's bundle-level
 /// service identifier so they're namespaced away from the host app's own
@@ -33,12 +33,19 @@ public struct KeychainStorage: SecureStorage, Sendable {
 
     // MARK: - Read
 
-    public func string(forKey key: String) -> String? {
-        guard let data = data(forKey: key) else { return nil }
+    public func string(forKey key: String) throws -> String? {
+        guard let data = try data(forKey: key) else { return nil }
         return String(data: data, encoding: .utf8)
     }
 
-    func data(forKey key: String) -> Data? {
+    /// The stored bytes, `nil` when the item is not there, and a raise for every
+    /// other answer the Keychain can give.
+    ///
+    /// `errSecItemNotFound` is the only status that means nothing is stored. The
+    /// rest can pass: `errSecInteractionNotAllowed` is what a read gets before the
+    /// first unlock after a boot, and answering `nil` there reports an enrolled
+    /// device as a new one.
+    func data(forKey key: String) throws -> Data? {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
@@ -48,8 +55,17 @@ public struct KeychainStorage: SecureStorage, Sendable {
         ]
         var item: AnyObject?
         let status = SecItemCopyMatching(query as CFDictionary, &item)
-        guard status == errSecSuccess else { return nil }
+        if Self.isMissing(status) {
+            return nil
+        }
+        try Self.check(status)
         return item as? Data
+    }
+
+    /// The only status that means nothing is stored, so the only one a read answers
+    /// `nil` for.
+    static func isMissing(_ status: OSStatus) -> Bool {
+        status == errSecItemNotFound
     }
 
     // MARK: - Write
@@ -96,20 +112,17 @@ public struct KeychainStorage: SecureStorage, Sendable {
 
     // MARK: - Migration
 
-    /// Corrects the attribute on what is already stored, so an install that
-    /// attested before this attribute existed stops being carried by a backup.
+    /// Corrects the attribute on what is already stored, so an install that attested
+    /// before this attribute existed stops being carried by a backup. Correcting an
+    /// item is its next write, and a phone that has already attested never writes
+    /// again.
     ///
-    /// Correcting an item is its next write, and the warm path only reads: a phone
-    /// that has already attested never writes again, so without this it keeps the
-    /// old attribute for as long as the install lasts.
+    /// The attribute is changed on its own: reading the value and writing it back
+    /// would restore one deleted in between, and `pendingKeyId` is deleted once
+    /// attestation ends.
     ///
-    /// The attribute is changed on its own, without reading the value or writing it
-    /// back. Reading and rewriting would let a value deleted in between be put back
-    /// from the copy in hand, and `pendingKeyId` is deleted once attestation ends.
-    ///
-    /// Runs whenever the store is opened rather than once behind a flag, since the
-    /// flag would be another stored item and a locked Keychain makes any single
-    /// attempt a no-op. An item it cannot reach waits for the next one.
+    /// Runs whenever the store is opened, since a locked Keychain makes any single
+    /// attempt a no-op and an item it cannot reach waits for the next one.
     func migrateAccessibility(forKeys keys: [String]) {
         for key in keys {
             let query: [String: Any] = [
@@ -125,43 +138,65 @@ public struct KeychainStorage: SecureStorage, Sendable {
 
     // MARK: - Delete
 
-    public func remove(forKey key: String) {
+    /// Deleting what is not there is a success, so `errSecItemNotFound` passes: the
+    /// caller asked for the item to be gone and it is.
+    public func remove(forKey key: String) throws {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrAccount as String: key
         ]
-        _ = SecItemDelete(query as CFDictionary)
+        try Self.check(SecItemDelete(query as CFDictionary))
     }
 
-    func removeAll() {
+    func removeAll() throws {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service
         ]
-        _ = SecItemDelete(query as CFDictionary)
+        try Self.check(SecItemDelete(query as CFDictionary))
+    }
+
+    static func check(_ status: OSStatus) throws {
+        guard status != errSecSuccess, status != errSecItemNotFound else { return }
+        throw KeychainError.underlying(status)
     }
 }
 
 // MARK: - Storage keys used by the SDK (§22.1)
 
 public enum PayabliKeychainKey {
-    public static let keyId = Stored.keyId.rawValue
-    public static let deviceId = Stored.deviceId.rawValue
-
     /// Holds a freshly generated App Attest key that has not yet completed
-    /// attestation. Kept separate from `keyId` so a pre-attest retry can reuse
-    /// the same Secure Enclave key without ever tripping `isAlreadyAttested`
-    /// (which only consults `keyId` + `deviceId`).
+    /// attestation. Kept separate from the binding so a pre-attest retry can
+    /// reuse the same Secure Enclave key without the warm path reading it as an
+    /// enrolled device.
     public static let pendingKeyId = Stored.pendingKeyId.rawValue
+
+    /// Every binding this device holds, as one item. Replaces `keyId` and
+    /// `deviceId`, which recorded no paypoint and were two writes with a window
+    /// between them.
+    public static let deviceBindings = Stored.deviceBindings.rawValue
+
+    /// The UUID this install was first seen with, which the value `/register`
+    /// receives is derived from. It outlives every binding: an install that lost it
+    /// registers as a new device. See `InstallIdentifier`.
+    public static let installId = Stored.installId.rawValue
 
     /// The keys themselves. The constants above are the names callers use, and a
     /// key added here joins `all` by being a case, so a sweep cannot miss one.
     enum Stored: String, CaseIterable {
-        case keyId = "com.payabli.ttp.keyId"
-        case deviceId = "com.payabli.ttp.deviceId"
+        case deviceBindings = "com.payabli.ttp.deviceBindings"
         case pendingKeyId = "com.payabli.ttp.pendingKeyId"
+        case installId = "com.payabli.ttp.installId"
     }
+
+    /// What an install from before the bindings item may still be carrying. Read
+    /// by nothing: the paypoint each belongs to was never recorded, so neither can
+    /// be adopted, and they are removed the first time the store is opened.
+    static let superseded = [
+        "com.payabli.ttp.keyId",
+        "com.payabli.ttp.deviceId"
+    ]
 
     static let all = Stored.allCases.map(\.rawValue)
 }

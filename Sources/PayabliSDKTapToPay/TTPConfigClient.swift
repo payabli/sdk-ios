@@ -31,14 +31,25 @@ public final class TTPConfigClient: Sendable {
         self.attestation = attestation
     }
 
-    /// Fetches the TTP config for the given `entry`. On 401 (after transport
-    /// refresh-and-retry exhaustion), the underlying `PayabliGenericError(.tokenExpired)`
-    /// propagates — callers should clear attestation cache and re-attest (PRD §18.4).
+    /// Fetches the TTP config for the given `entry`.
+    ///
+    /// Two failures reach a caller as `PayabliGenericError(.tokenExpired)`, and they
+    /// ask for different things (PRD §18.4):
+    ///
+    /// - **The service refused the binding**, as a 401 in the envelope of a 200. The
+    ///   binding is dropped here, where the handle the assertion was signed for is
+    ///   known, and the next `initialize()` enrols. A caller does nothing.
+    /// - **The transport refused the bearer**, as an HTTP 401 surviving its refresh
+    ///   and retry. Nothing is dropped: an expired access token says nothing about
+    ///   the device, and clearing on it retires an enrolled device. A caller obtains
+    ///   a token.
+    ///
+    /// The reason names which happened.
     ///
     /// The SDK flattens `credentials` into `TTPConfig.providerCredentials`
     /// for the TapToPayProvider to consume.
     public func fetchConfig(entry: String) async throws -> TTPConfig {
-        let headers = try await assertionHeaders()
+        let headers = try await assertionHeaders(entry: entry)
 
         // Attestation headers are component-specific; bearer is added by the transport.
         let request = PayabliRequest(
@@ -68,9 +79,15 @@ public final class TTPConfigClient: Sendable {
             let code = rawCode ?? 0
             // Same as the attestation path: the code, not the service's sentence.
             logger.error("[config] declined (isSuccess=false code=\(code))")
-            // 401 semantics from the server body: attestation was revoked or
-            // device not attested → caller should clear cache and re-attest.
+            // A 401 in the body refuses the binding this request presented, so
+            // it is dropped here, where which handle that was is known.
             if code == 401 {
+                guard dropRefusedBinding(entry: entry, presented: headers) else {
+                    throw PayabliGenericError(
+                        code: .tokenExpired,
+                        reason: "\(reason) — the stored binding could not be dropped"
+                    )
+                }
                 throw PayabliGenericError(code: .tokenExpired, reason: reason)
             }
             if code == 403 {
@@ -96,7 +113,44 @@ public final class TTPConfigClient: Sendable {
         )
     }
 
-    private func assertionHeaders() async throws -> AssertionHeaders {
-        try await attestation.generateAssertion()
+    private func assertionHeaders(entry: String) async throws -> AssertionHeaders {
+        try await attestation.generateAssertion(for: entry)
+    }
+
+    /// Drops the refused binding while it is still the one held, and answers whether
+    /// the paypoint was left in a state the caller need not report.
+    ///
+    /// The handle and the key both come from the assertion this request carried, so
+    /// the comparison names the device the service answered about.
+    ///
+    /// **True covers two outcomes, and one of them dropped nothing.** The binding was
+    /// removed, or a newer one is held and stays: a refusal about the handle this
+    /// request presented says nothing about a binding attested since, and dropping it
+    /// would retire a device that just enrolled. Neither is a failure, so neither is
+    /// reported.
+    ///
+    /// **False is a store that refused the operation**, and only that. The binding is
+    /// still readable and its App Attest key still signs, so the next warm check
+    /// trusts it and presents the refused handle again, which is what the caller
+    /// reports.
+    ///
+    /// Narrowing true to "removed" turns the safeguard into a reported failure, and
+    /// widening the removal to drop whatever the entry point holds is the defect the
+    /// comparison exists to prevent.
+    private func dropRefusedBinding(entry: String, presented headers: AssertionHeaders) -> Bool {
+        do {
+            let dropped = try attestation.forgetRefusedBinding(
+                entry: entry,
+                deviceId: headers.deviceId,
+                keyId: headers.keyId
+            )
+            if !dropped {
+                logger.info("[config] a newer binding is held for this paypoint; keeping it")
+            }
+            return true
+        } catch {
+            logger.error("[config] the refused binding could not be dropped")
+            return false
+        }
     }
 }

@@ -21,7 +21,6 @@ struct RegisterRequest: Encodable {
     let entry: String
     let keyId: AppAttestKeyId
     let hardwareId: String
-    let deviceName: String
     let model: String
     let osVersion: String
     let platform: String

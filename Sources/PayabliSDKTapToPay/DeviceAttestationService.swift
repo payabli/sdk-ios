@@ -45,24 +45,31 @@ public struct AssertionHeaders: Sendable {
 /// this protocol isolates it so the rest of the TTP flow is unit-testable
 /// without iOS entitlements or network access.
 public protocol DeviceAttestationService: AnyObject, Sendable {
-    /// Whether attestation has already been performed on this device (i.e.
-    /// `keyId` + `deviceId` are cached). Used to pick warm vs cold path
-    /// during `initialize()` (PRD §18.3).
-    var isAlreadyAttested: Bool { get }
+    /// Whether this device holds a binding for this entry point, which picks the
+    /// warm or cold path during `initialize()` (PRD §18.3). A handle issued under
+    /// another entry point is not this device's enrolment here.
+    ///
+    /// Asynchronous because answering it means asking the platform whether the key
+    /// the binding names is still held.
+    ///
+    /// Raises when the store could not be read, which is a third answer: `false`
+    /// runs the cold sequence and registers a second device for a paypoint that is
+    /// already enrolled.
+    func isAttested(for entry: String) async throws -> Bool
 
-    /// The backend-assigned `deviceId` persisted from a prior successful
-    /// attestation, or `nil` if the device has not been attested yet. The
-    /// facade uses this on the warm path where `attest()` is skipped.
-    var cachedDeviceId: String? { get }
+    /// The backend-assigned `deviceId` this entry point was registered under, or
+    /// `nil` when it holds no binding.
+    func cachedDeviceId(for entry: String) throws -> String?
 
     /// Runs the first-run attestation flow: challenge → register → attest.
     /// Throws `PayabliTTPError.devicePendingActivation` if the backend returns
     /// `status == "pending"` (PRD FR-11F.1).
     func attest(entry: String, appId: String) async throws -> AttestationResult
 
-    /// Produces fresh `AssertionHeaders` (signed over a current timestamp) for
-    /// the next protected request. PRD §18.2.
-    func generateAssertion() async throws -> AssertionHeaders
+    /// Produces fresh `AssertionHeaders` (signed over a current timestamp) for the
+    /// next protected request, naming the handle this device holds for `entry`.
+    /// PRD §18.2.
+    func generateAssertion(for entry: String) async throws -> AssertionHeaders
 
     /// Activates a pending device with an activation code issued out-of-band
     /// by the partner (e.g. from their admin dashboard). The SDK does not
@@ -70,7 +77,29 @@ public protocol DeviceAttestationService: AnyObject, Sendable {
     /// to the device user. PRD §9.7.
     func activateDevice(activationCode: String, entry: String) async throws
 
-    /// Clears cached attestation state (triggers a full re-attestation on next
-    /// `initialize()`). Called on 401 from the config endpoint (PRD §18.4).
-    func clearCache()
+    /// Drops this entry point's binding unconditionally, so the next `initialize()`
+    /// for it runs the cold sequence. Every other entry point's binding is left
+    /// alone.
+    ///
+    /// A reset for a host that wants this device enrolled again. Nothing in the SDK
+    /// calls it: a refusal is a statement about the binding that was presented, and
+    /// dropping by entry point alone takes a binding attested since. Refusals use
+    /// `forgetRefusedBinding(entry:deviceId:keyId:)`, and a conformer that puts its
+    /// cleanup here will not see one.
+    ///
+    /// Raises when the store refuses the drop. A binding left behind names a key the
+    /// platform signs with, so it reads as sound on the next warm check and is sent
+    /// again.
+    func clearCache(for entry: String) throws
+
+    /// Drops the binding a refusal was about, while it is still the one held.
+    ///
+    /// For a caller that presented a handle, went away, and came back with a
+    /// refusal: the entry point may hold a binding attested in that window, and
+    /// dropping by entry point takes that one for an answer about a different
+    /// device. The comparison and the removal happen under one lock.
+    ///
+    /// Answers whether it dropped anything, and raises when the store refuses.
+    @discardableResult
+    func forgetRefusedBinding(entry: String, deviceId: String, keyId: String) throws -> Bool
 }

@@ -34,10 +34,9 @@ extension PayabliTTP {
             return try await existing.task.value
         }
 
-        // Chain behind an operation of the other kind rather than polling for
-        // it. Re-checking in a loop re-awaits a task that has already finished
-        // and spins the main actor until the slot is cleared, which starves
-        // everything else running on it.
+        // Chains behind an operation of the other kind. Re-checking in a loop
+        // re-awaits a task that has already finished and spins the main actor
+        // until the slot is cleared, starving everything else on it.
         let previous = inFlightSessionSetup?.task
         let id = nextSessionSetupID
         nextSessionSetupID += 1
@@ -71,11 +70,10 @@ extension PayabliTTP {
 
         // 1. Attestation (cold) or warm deviceId. The session reaches
         //    `.fetchingConfig` on success.
-        let deviceId = try await runAttestationPhase()
+        try await runAttestationPhase()
 
         // 2. Fetch /config.
         let config = try await runFetchConfigPhase()
-        cachedDeviceId = deviceId
         multicaster.emit(.configReceived)
 
         // 3. Configure provider.
@@ -173,25 +171,31 @@ extension PayabliTTP {
 
     // MARK: - Phase 1 — attestation (cold) or warm start
 
-    /// Returns the `deviceId` to cache. On success leaves the session in
-    /// `.fetchingConfig`. `.devicePendingActivation` maps to `.pendingActivation`.
-    private func runAttestationPhase() async throws -> String? {
-        if attestation.isAlreadyAttested {
-            _ = sessionManager.transition(to: .fetchingConfig)
-            syncPublished()
-            return attestation.cachedDeviceId
-        }
-
-        _ = sessionManager.transition(to: .attestingDevice)
-        syncPublished()
-        multicaster.emit(.attestationStarted)
-
+    /// On success leaves the session in `.fetchingConfig`.
+    /// `.devicePendingActivation` maps to `.pendingActivation`.
+    ///
+    /// Returns nothing: the handle worth keeping is the one the config call's
+    /// assertion is signed for, which this phase cannot know.
+    private func runAttestationPhase() async throws {
         do {
-            let result = try await attestation.attest(entry: entryPoint, appId: appId)
+            // Inside the handling below, because reading the binding can fail and a
+            // failure that skipped it would throw out of `initialize()` while the
+            // published state stayed where `reset()` left it, and emit nothing. The
+            // caller and the observable state would then describe different things.
+            if try await attestation.isAttested(for: entryPoint) {
+                _ = sessionManager.transition(to: .fetchingConfig)
+                syncPublished()
+                return
+            }
+
+            _ = sessionManager.transition(to: .attestingDevice)
+            syncPublished()
+            multicaster.emit(.attestationStarted)
+
+            _ = try await attestation.attest(entry: entryPoint, appId: appId)
             multicaster.emit(.attestationCompleted)
             _ = sessionManager.transition(to: .fetchingConfig)
             syncPublished()
-            return result.deviceId
         } catch PayabliTTPError.devicePendingActivation {
             markPendingActivation()
             throw PayabliTTPError.devicePendingActivation
@@ -207,7 +211,9 @@ extension PayabliTTP {
 
     /// Pre: session is in `.fetchingConfig`. Error handling:
     ///   - backend says pending → `.pendingActivation`
-    ///   - 401 (stale assertion) → clear attestation cache, rewrap as `.configFailed`
+    ///   - 401, either a refused binding or a refused bearer → rewrap as
+    ///     `.configFailed`, relaying the reason. Dropping a binding is the config
+    ///     call's, which knows which of the two it is holding
     ///   - anything else → `.error`, rewrapped as `.configFailed` so the domain and
     ///     code stay what the bridges read, keeping the parsed reason
     private func runFetchConfigPhase() async throws -> TTPConfig {
@@ -217,8 +223,13 @@ extension PayabliTTP {
             markPendingActivation()
             throw PayabliTTPError.devicePendingActivation
         } catch let err as PayabliGenericError where err.code == .tokenExpired {
-            attestation.clearCache()
-            let failure = PayabliTTPError.configFailed(reason: "Config rejected (401) — attestation cleared")
+            // Two failures arrive as `.tokenExpired` here: the service refusing the
+            // binding the request presented, and the transport refusing the bearer
+            // after its retry. The first is dropped by the config call, which knows
+            // which handle it presented; the second is about a token and drops
+            // nothing. The reason is relayed either way, so it names which happened
+            // instead of this layer claiming an outcome for both.
+            let failure = PayabliTTPError.configFailed(reason: "Config rejected (401): \(err.reason)")
             // One value through all three channels. Marking the raw 401 while
             // throwing the rewrapped failure left the published state and the
             // caller describing the same failure differently.

@@ -1,6 +1,7 @@
 @testable import PayabliSDKCore
 @testable import PayabliSDKTapToPay
 import PayabliSDKTestUtils
+import Security
 import XCTest
 
 final class AppAttestServiceTests: XCTestCase {
@@ -9,29 +10,17 @@ final class AppAttestServiceTests: XCTestCase {
         super.tearDown()
     }
 
-    private func makeAttest(
-        storage: SecureStorage = InMemorySecureStorage()
-    ) -> (AppAttestService, MockAppAttestor, PayabliAuth) {
-        let urlSession = StubURLProtocol.makeSession()
-        let service = PayabliService(environment: .sandbox, session: urlSession)
-        let config = PayabliConfig(
-            accessToken: "seed",
-            entryPoint: "myEntry",
-            environment: .sandbox
-        )
-        let auth = PayabliAuth(config: config)
-        let transport = AuthenticatedTransport(base: service, auth: auth)
-        let attestor = MockAppAttestor()
-        let sut = AppAttestService(
-            transport: transport,
-            attestor: attestor,
-            storage: storage,
-            hardwareIdProvider: { "fixed-hw-id" },
-            deviceNameProvider: { "iPhone" },
-            modelProvider: { "iPhone15,2" },
-            osVersionProvider: { "17.0" }
-        )
-        return (sut, attestor, auth)
+    /// `XCTAssertTrue` takes an autoclosure, which cannot await, so the answer is
+    /// read first and asserted second.
+    private func assertAttested(
+        _ sut: AppAttestService,
+        _ entry: String,
+        _ expected: Bool,
+        _ message: String = "",
+        line: UInt = #line
+    ) async throws {
+        let actual = try await sut.isAttested(for: entry)
+        XCTAssertEqual(actual, expected, message, line: line)
     }
 
     private func response(_ status: Int, body: Data, url: URL) -> (HTTPURLResponse, Data) {
@@ -41,16 +30,6 @@ final class AppAttestServiceTests: XCTestCase {
             httpVersion: "HTTP/1.1",
             headerFields: ["Content-Type": "application/json"]
         )!, body)
-    }
-
-    private static func envelope(responseData: [String: Any]) -> Data {
-        let payload: [String: Any] = [
-            "responseCode": 1,
-            "isSuccess": true,
-            "responseText": "OK",
-            "responseData": responseData
-        ]
-        return try! JSONSerialization.data(withJSONObject: payload)
     }
 
     // MARK: - First-run flow
@@ -63,17 +42,17 @@ final class AppAttestServiceTests: XCTestCase {
             case "/api/v2/device/taptopay/challenge":
                 return (
                     HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
-                    Self.envelope(responseData: ["challengeId": "c_1", "challenge": "Y2hhbGxlbmdl"])
+                    AttestFixture.envelope(responseData: ["challengeId": "c_1", "challenge": "Y2hhbGxlbmdl"])
                 )
             case "/api/v2/device/taptopay/register":
                 return (
                     HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
-                    Self.envelope(responseData: ["deviceId": "dev_1"])
+                    AttestFixture.envelope(responseData: ["deviceId": "dev_1"])
                 )
             case "/api/v2/device/taptopay/attest":
                 return (
                     HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
-                    Self.envelope(responseData: ["ok": true])
+                    AttestFixture.envelope(responseData: ["ok": true])
                 )
             default:
                 XCTFail("unexpected path: \(request.url!.path)")
@@ -82,9 +61,9 @@ final class AppAttestServiceTests: XCTestCase {
         }
 
         let storage = InMemorySecureStorage()
-        let (sut, attestor, _) = makeAttest(storage: storage)
+        let (sut, attestor, _) = AttestFixture.makeService(storage: storage)
 
-        XCTAssertFalse(sut.isAlreadyAttested)
+        try await assertAttested(sut, "myEntry", false)
         let result = try await sut.attest(entry: "myEntry", appId: "TEAM.bundle.id")
 
         XCTAssertEqual(result.deviceId, "dev_1")
@@ -98,9 +77,9 @@ final class AppAttestServiceTests: XCTestCase {
         ])
 
         // Persistence
-        XCTAssertTrue(sut.isAlreadyAttested)
-        XCTAssertEqual(storage.string(forKey: PayabliKeychainKey.keyId), "mock_keyId")
-        XCTAssertEqual(storage.string(forKey: PayabliKeychainKey.deviceId), "dev_1")
+        try await assertAttested(sut, "myEntry", true)
+        XCTAssertEqual(try sut.binding(for: "myEntry")?.keyId, "mock_keyId")
+        XCTAssertEqual(try sut.binding(for: "myEntry")?.deviceId, "dev_1")
     }
 
     // MARK: - Pending activation
@@ -113,17 +92,17 @@ final class AppAttestServiceTests: XCTestCase {
             case "/api/v2/device/taptopay/challenge":
                 return (
                     HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
-                    Self.envelope(responseData: ["challengeId": "c", "challenge": "Y2hhbGxlbmdl"])
+                    AttestFixture.envelope(responseData: ["challengeId": "c", "challenge": "Y2hhbGxlbmdl"])
                 )
             case "/api/v2/device/taptopay/register":
                 return (
                     HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
-                    Self.envelope(responseData: ["deviceId": "dev_pending", "status": "pending"])
+                    AttestFixture.envelope(responseData: ["deviceId": "dev_pending", "status": "pending"])
                 )
             case "/api/v2/device/taptopay/attest":
                 return (
                     HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
-                    Self.envelope(responseData: ["ok": true])
+                    AttestFixture.envelope(responseData: ["ok": true])
                 )
             default:
                 XCTFail("unexpected path: \(request.url!.path)")
@@ -132,7 +111,7 @@ final class AppAttestServiceTests: XCTestCase {
         }
 
         let storage = InMemorySecureStorage()
-        let (sut, attestor, _) = makeAttest(storage: storage)
+        let (sut, attestor, _) = AttestFixture.makeService(storage: storage)
         do {
             _ = try await sut.attest(entry: "myEntry", appId: "x")
             XCTFail("expected throw")
@@ -147,7 +126,7 @@ final class AppAttestServiceTests: XCTestCase {
             ])
             XCTAssertEqual(attestor.generateKeyCalls, 1)
             XCTAssertEqual(attestor.attestKeyCalls, 1)
-            XCTAssertEqual(storage.string(forKey: PayabliKeychainKey.deviceId), "dev_pending")
+            XCTAssertEqual(try sut.binding(for: "myEntry")?.deviceId, "dev_pending")
         } catch {
             XCTFail("wrong error: \(error)")
         }
@@ -165,12 +144,12 @@ final class AppAttestServiceTests: XCTestCase {
             case "/api/v2/device/taptopay/challenge":
                 return (
                     HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
-                    Self.envelope(responseData: ["challengeId": "c_1", "challenge": "Y2hhbGxlbmdl"])
+                    AttestFixture.envelope(responseData: ["challengeId": "c_1", "challenge": "Y2hhbGxlbmdl"])
                 )
             case "/api/v2/device/taptopay/register":
                 return (
                     HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
-                    Self.envelope(responseData: ["deviceId": "dev_1"])
+                    AttestFixture.envelope(responseData: ["deviceId": "dev_1"])
                 )
             default:
                 XCTFail("attest must not reach \(request.url!.path) once attestKey fails")
@@ -179,7 +158,7 @@ final class AppAttestServiceTests: XCTestCase {
         }
 
         let storage = InMemorySecureStorage()
-        let (sut, attestor, _) = makeAttest(storage: storage)
+        let (sut, attestor, _) = AttestFixture.makeService(storage: storage)
         attestor.attestKeyError = NSError(domain: AppAttestService.deviceCheckErrorDomain, code: 2)
 
         do {
@@ -189,12 +168,12 @@ final class AppAttestServiceTests: XCTestCase {
             // expected
         }
 
-        XCTAssertFalse(sut.isAlreadyAttested)
-        XCTAssertNil(storage.string(forKey: PayabliKeychainKey.keyId))
-        XCTAssertNil(storage.string(forKey: PayabliKeychainKey.deviceId))
+        try await assertAttested(sut, "myEntry", false)
+        XCTAssertNil(try sut.binding(for: "myEntry")?.keyId)
+        XCTAssertNil(try sut.binding(for: "myEntry")?.deviceId)
         // `attestKey` burns the key, so the pending slot must be cleared too:
         // the next attempt must mint a new key rather than replay a burned one.
-        XCTAssertNil(storage.string(forKey: PayabliKeychainKey.pendingKeyId))
+        XCTAssertNil(try storage.string(forKey: PayabliKeychainKey.pendingKeyId))
     }
 
     /// A failure BEFORE `attestKey` (here: `/register`) must keep the freshly
@@ -207,7 +186,7 @@ final class AppAttestServiceTests: XCTestCase {
             case "/api/v2/device/taptopay/challenge":
                 return (
                     HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
-                    Self.envelope(responseData: ["challengeId": "c_1", "challenge": "Y2hhbGxlbmdl"])
+                    AttestFixture.envelope(responseData: ["challengeId": "c_1", "challenge": "Y2hhbGxlbmdl"])
                 )
             case "/api/v2/device/taptopay/register":
                 // Fail the first /register (pre-attest); succeed the second.
@@ -216,12 +195,12 @@ final class AppAttestServiceTests: XCTestCase {
                 }
                 return (
                     HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
-                    Self.envelope(responseData: ["deviceId": "dev_1"])
+                    AttestFixture.envelope(responseData: ["deviceId": "dev_1"])
                 )
             case "/api/v2/device/taptopay/attest":
                 return (
                     HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
-                    Self.envelope(responseData: ["ok": true])
+                    AttestFixture.envelope(responseData: ["ok": true])
                 )
             default:
                 XCTFail("unexpected path: \(request.url!.path)")
@@ -230,7 +209,7 @@ final class AppAttestServiceTests: XCTestCase {
         }
 
         let storage = InMemorySecureStorage()
-        let (sut, attestor, _) = makeAttest(storage: storage)
+        let (sut, attestor, _) = AttestFixture.makeService(storage: storage)
 
         // Attempt 1 fails at /register (after the key was generated + cached).
         do {
@@ -240,9 +219,9 @@ final class AppAttestServiceTests: XCTestCase {
             // expected
         }
         XCTAssertEqual(attestor.generateKeyCalls, 1)
-        XCTAssertFalse(sut.isAlreadyAttested)
+        try await assertAttested(sut, "myEntry", false)
         XCTAssertEqual(
-            storage.string(forKey: PayabliKeychainKey.pendingKeyId),
+            try sut.pendingKey(for: "myEntry"),
             "mock_keyId",
             "a pre-attest failure must keep the generated key for reuse"
         )
@@ -252,22 +231,190 @@ final class AppAttestServiceTests: XCTestCase {
         XCTAssertEqual(result.keyId, "mock_keyId")
         XCTAssertEqual(attestor.generateKeyCalls, 1, "the pending key should be reused, not regenerated")
         XCTAssertEqual(attestor.attestKeyCalls, 1)
-        XCTAssertTrue(sut.isAlreadyAttested)
+        try await assertAttested(sut, "myEntry", true)
         XCTAssertNil(
-            storage.string(forKey: PayabliKeychainKey.pendingKeyId),
+            try storage.string(forKey: PayabliKeychainKey.pendingKeyId),
             "pending slot must be cleared once attestation completes"
         )
+    }
+
+    // MARK: - The key an attestation is part way through
+
+    /// A key can be attested once, so two paypoints must not share one, and
+    /// starting one must not take the other's away.
+    func testAPendingKeyIsReusedOnlyByTheEntryPointThatMintedIt() throws {
+        let (sut, _, _) = AttestFixture.makeService()
+        try sut.rememberPendingKey("key_for_a", for: "entryA")
+        try sut.rememberPendingKey("key_for_b", for: "entryB")
+
+        XCTAssertEqual(try sut.pendingKey(for: "entryB"), "key_for_b")
+
+        XCTAssertEqual(try sut.pendingKey(for: "entryA"), "key_for_a", "one entry point's key was overwritten")
+        XCTAssertNil(try sut.pendingKey(for: "entryC"), "an entry point that minted nothing must read nothing")
+    }
+
+    /// A retry inside one entry point still reuses its own key rather than minting
+    /// another on every attempt.
+    func testTheSameEntryPointReusesItsPendingKey() async throws {
+        let storage = InMemorySecureStorage()
+        let (sut, attestor, _) = AttestFixture.makeService(storage: storage)
+        try sut.rememberPendingKey("already_minted", for: "myEntry")
+
+        StubURLProtocol.handler = { request in
+            switch request.url!.path {
+            case "/api/v2/device/taptopay/challenge":
+                return (
+                    HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
+                    AttestFixture.envelope(responseData: ["challengeId": "c_1", "challenge": "Y2hhbGxlbmdl"])
+                )
+            case "/api/v2/device/taptopay/register":
+                return (
+                    HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
+                    AttestFixture.envelope(responseData: ["deviceId": "dev_1"])
+                )
+            default:
+                return (
+                    HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
+                    AttestFixture.envelope(responseData: ["ok": true])
+                )
+            }
+        }
+
+        let result = try await sut.attest(entry: "myEntry", appId: "TEAM.bundle.id")
+
+        XCTAssertEqual(result.keyId, "already_minted")
+        XCTAssertEqual(attestor.generateKeyCalls, 0, "a retry minted a second key")
+    }
+
+    /// Clearing one paypoint must leave another's retry alone: taking it away
+    /// makes the next attempt mint a key and register another device.
+    func testClearingOnePaypointKeepsAnothersPendingKey() throws {
+        let (sut, _, _) = AttestFixture.makeService()
+        try sut.rememberPendingKey("key_for_a", for: "entryA")
+        try sut.rememberPendingKey("key_for_b", for: "entryB")
+
+        try sut.clearCache(for: "entryA")
+
+        XCTAssertNil(try sut.pendingKey(for: "entryA"))
+        XCTAssertEqual(try sut.pendingKey(for: "entryB"), "key_for_b")
+    }
+
+    // MARK: - Retention
+
+    /// Reading is what makes a binding recent. Ordering by enrolment instead
+    /// evicts the binding every session uses in favour of one that enrolled later.
+    func testUsingABindingMovesItToTheFront() throws {
+        let (sut, _, _) = AttestFixture.makeService()
+        for name in ["a", "b", "c", "d"] {
+            try sut.remember(AttestedDevice(entry: name, deviceId: "dev-\(name)", keyId: "key-\(name)"))
+        }
+
+        // "a" is the coldest by enrolment, and using it makes it the newest.
+        XCTAssertNotNil(try sut.binding(for: "a"))
+        try sut.remember(AttestedDevice(entry: "e", deviceId: "dev-e", keyId: "key-e"))
+
+        XCTAssertNotNil(try sut.binding(for: "a"), "the binding just used was the one evicted")
+        XCTAssertNil(try sut.binding(for: "b"), "the coldest binding should have gone")
+    }
+
+    /// Four, so a device moved between paypoints finds each where it left it.
+    func testOnlyFourBindingsAreKept() throws {
+        let (sut, _, _) = AttestFixture.makeService()
+
+        for index in 0 ..< 6 {
+            try sut.remember(AttestedDevice(entry: "e\(index)", deviceId: "d\(index)", keyId: "k\(index)"))
+        }
+
+        XCTAssertEqual(try sut.allBindings().bindings.count, DeviceBindings.maximum)
+        XCTAssertNil(try sut.binding(for: "e0"))
+        XCTAssertNotNil(try sut.binding(for: "e5"))
+    }
+
+    /// A write that fails has to be raised. Nothing keeps an in-memory copy, so
+    /// reporting the enrolment as done leaves the service holding a device this
+    /// one cannot name: the next request fails for a missing binding, and a device
+    /// awaiting activation cannot activate at all.
+    func testAWriteThatFailsIsRaised() {
+        let (sut, _, _) = AttestFixture.makeService(storage: FailingStorage())
+
+        XCTAssertThrowsError(
+            try sut.remember(AttestedDevice(entry: "e", deviceId: "d", keyId: "k"))
+        )
+    }
+
+    // MARK: - Whether the key is still there
+
+    /// The check the sibling SDK makes by comparing thumbprints. App Attest hands
+    /// back an opaque identifier, so the key is asked instead: a platform that
+    /// will not sign with it says the binding names a key this device no longer
+    /// holds, whatever the reason.
+    func testABindingWhoseKeyIsGoneIsNotAnEnrolment() async throws {
+        // 2 is what a key that no longer exists reports, measured on a device
+        // after a reinstall; 3 is the code the platform documents for a key it
+        // rejects. Both mean this binding cannot produce an assertion.
+        for code in [2, 3] {
+            let storage = InMemorySecureStorage()
+            try AttestFixture.seedBinding(entry: "myEntry", deviceId: "dev", keyId: "key", in: storage)
+            let (sut, attestor, _) = AttestFixture.makeService(storage: storage)
+            attestor.generateAssertionError = NSError(
+                domain: AppAttestService.deviceCheckErrorDomain,
+                code: code
+            )
+
+            try await assertAttested(sut, "myEntry", false, "code \(code)")
+
+            XCTAssertNil(
+                try sut.binding(for: "myEntry"),
+                "a binding naming a key that is gone has to be dropped, not asked again every start"
+            )
+        }
+    }
+
+    /// Every other failure is this device having a bad moment. Re-enrolling on one
+    /// costs an enrolment for a key that was working.
+    func testABindingSurvivesAKeyCheckThatCouldNotBeMade() async throws {
+        for code in [0, 1, 4] {
+            let storage = InMemorySecureStorage()
+            try AttestFixture.seedBinding(entry: "myEntry", deviceId: "dev", keyId: "key", in: storage)
+            let (sut, attestor, _) = AttestFixture.makeService(storage: storage)
+            attestor.generateAssertionError = NSError(
+                domain: AppAttestService.deviceCheckErrorDomain,
+                code: code
+            )
+
+            try await assertAttested(sut, "myEntry", true, "code \(code) is not a reason to re-enrol")
+            XCTAssertNotNil(try sut.binding(for: "myEntry"), "code \(code)")
+        }
+    }
+
+    /// A key that signs is a key this device holds.
+    func testABindingWhoseKeySignsIsAnEnrolment() async throws {
+        let storage = InMemorySecureStorage()
+        try AttestFixture.seedBinding(entry: "myEntry", deviceId: "dev", keyId: "key", in: storage)
+        let (sut, _, _) = AttestFixture.makeService(storage: storage)
+
+        try await assertAttested(sut, "myEntry", true)
+        XCTAssertEqual(try sut.cachedDeviceId(for: "myEntry"), "dev")
+    }
+
+    /// Asking about a paypoint with no binding asks the platform nothing: there is
+    /// no key to ask about, and a signature attempt would be wasted.
+    func testNoBindingAsksThePlatformNothing() async throws {
+        let (sut, attestor, _) = AttestFixture.makeService()
+
+        try await assertAttested(sut, "myEntry", false)
+
+        XCTAssertEqual(attestor.generateAssertionCalls, 0)
     }
 
     // MARK: - Assertion generation
 
     func testGenerateAssertionProducesHeaders() async throws {
         let storage = InMemorySecureStorage()
-        try storage.set("cached_keyId", forKey: PayabliKeychainKey.keyId)
-        try storage.set("cached_deviceId", forKey: PayabliKeychainKey.deviceId)
+        try AttestFixture.seedBinding(entry: "myEntry", deviceId: "cached_deviceId", keyId: "cached_keyId", in: storage)
 
-        let (sut, attestor, _) = makeAttest(storage: storage)
-        let headers = try await sut.generateAssertion()
+        let (sut, attestor, _) = AttestFixture.makeService(storage: storage)
+        let headers = try await sut.generateAssertion(for: "myEntry")
         XCTAssertEqual(headers.keyId, "cached_keyId")
         XCTAssertEqual(headers.deviceId, "cached_deviceId")
         XCTAssertFalse(headers.assertion.isEmpty)
@@ -276,9 +423,9 @@ final class AppAttestServiceTests: XCTestCase {
     }
 
     func testGenerateAssertionFailsWithoutState() async throws {
-        let (sut, _, _) = makeAttest()
+        let (sut, _, _) = AttestFixture.makeService()
         do {
-            _ = try await sut.generateAssertion()
+            _ = try await sut.generateAssertion(for: "myEntry")
             XCTFail("expected throw")
         } catch PayabliTTPError.attestationFailed {
             // ok
@@ -290,72 +437,351 @@ final class AppAttestServiceTests: XCTestCase {
     /// A DeviceCheck failure from `generateAssertion` means the cached key is
     /// unusable (never attested, or the App Attest environment changed). The
     /// service must clear the cache so the next `initialize()` re-attests.
-    func testGenerateAssertionClearsCacheOnDeviceCheckError() async throws {
+    func testGenerateAssertionClearsTheBindingOnAnInvalidKey() async throws {
         let storage = InMemorySecureStorage()
-        try storage.set("cached_keyId", forKey: PayabliKeychainKey.keyId)
-        try storage.set("cached_deviceId", forKey: PayabliKeychainKey.deviceId)
+        try AttestFixture.seedBinding(entry: "myEntry", deviceId: "cached_deviceId", keyId: "cached_keyId", in: storage)
 
-        let (sut, attestor, _) = makeAttest(storage: storage)
-        attestor.generateAssertionError = NSError(domain: AppAttestService.deviceCheckErrorDomain, code: 2)
+        let (sut, attestor, _) = AttestFixture.makeService(storage: storage)
+        attestor.generateAssertionError = NSError(
+            domain: AppAttestService.deviceCheckErrorDomain,
+            code: 3
+        )
 
         do {
-            _ = try await sut.generateAssertion()
+            _ = try await sut.generateAssertion(for: "myEntry")
             XCTFail("expected throw")
         } catch {
             XCTAssertEqual((error as NSError).domain, AppAttestService.deviceCheckErrorDomain)
         }
 
-        XCTAssertFalse(sut.isAlreadyAttested, "DeviceCheck failure should clear the attestation cache")
+        try await assertAttested(sut, "myEntry", false, "a rejected key has to be re-attested")
+    }
+
+    /// Every other DeviceCheck error keeps the binding. `DCErrorServerUnavailable`
+    /// asks for a retry with the same key, which preserves the device's risk
+    /// metric, so clearing throws away a key that was working.
+    func testGenerateAssertionKeepsTheBindingOnEveryOtherDeviceCheckError() async throws {
+        for code in [0, 1, 4] {
+            let storage = InMemorySecureStorage()
+            try AttestFixture.seedBinding(entry: "myEntry", deviceId: "cached_deviceId", keyId: "cached_keyId", in: storage)
+            let (sut, attestor, _) = AttestFixture.makeService(storage: storage)
+            attestor.generateAssertionError = NSError(
+                domain: AppAttestService.deviceCheckErrorDomain,
+                code: code
+            )
+
+            do {
+                _ = try await sut.generateAssertion(for: "myEntry")
+                XCTFail("expected throw for code \(code)")
+            } catch {
+                XCTAssertEqual((error as NSError).code, code)
+            }
+
+            try await assertAttested(sut, "myEntry", true, "code \(code) is not a reason to re-attest")
+        }
     }
 
     /// A non-DeviceCheck failure (e.g. a transient wrapper error) must NOT wipe
     /// a perfectly valid attestation.
     func testGenerateAssertionKeepsCacheOnNonDeviceCheckError() async throws {
         let storage = InMemorySecureStorage()
-        try storage.set("cached_keyId", forKey: PayabliKeychainKey.keyId)
-        try storage.set("cached_deviceId", forKey: PayabliKeychainKey.deviceId)
+        try AttestFixture.seedBinding(entry: "myEntry", deviceId: "cached_deviceId", keyId: "cached_keyId", in: storage)
 
-        let (sut, attestor, _) = makeAttest(storage: storage)
+        let (sut, attestor, _) = AttestFixture.makeService(storage: storage)
         attestor.generateAssertionError = NSError(domain: "com.example.other", code: 7)
 
         do {
-            _ = try await sut.generateAssertion()
+            _ = try await sut.generateAssertion(for: "myEntry")
             XCTFail("expected throw")
         } catch {
             // expected
         }
 
-        XCTAssertTrue(sut.isAlreadyAttested, "non-DeviceCheck failures must not clear attestation state")
+        try await assertAttested(sut, "myEntry", true, "non-DeviceCheck failures must not clear attestation state")
     }
 
     // MARK: - clearCache
 
-    func testClearCacheRemovesKeychainState() throws {
+    func testClearCacheRemovesThisEntryPointsBinding() async throws {
         let storage = InMemorySecureStorage()
-        try storage.set("a", forKey: PayabliKeychainKey.keyId)
-        try storage.set("b", forKey: PayabliKeychainKey.deviceId)
-        let (sut, _, _) = makeAttest(storage: storage)
+        try AttestFixture.seedBinding(entry: "myEntry", deviceId: "b", keyId: "a", in: storage)
+        let (sut, _, _) = AttestFixture.makeService(storage: storage)
 
-        sut.clearCache()
-        XCTAssertFalse(sut.isAlreadyAttested)
+        try sut.clearCache(for: "myEntry")
+
+        try await assertAttested(sut, "myEntry", false)
+    }
+
+    /// A refusal drops the binding it was about.
+    func testForgetRefusedBindingDropsTheBindingItNames() throws {
+        let storage = InMemorySecureStorage()
+        let (sut, _, _) = AttestFixture.makeService(storage: storage)
+        try sut.remember(AttestedDevice(entry: "entryA", deviceId: "devA", keyId: "keyA"))
+        try sut.remember(AttestedDevice(entry: "entryB", deviceId: "devB", keyId: "keyB"))
+
+        XCTAssertTrue(try sut.forgetRefusedBinding(entry: "entryA", deviceId: "devA", keyId: "keyA"))
+
+        XCTAssertNil(try sut.cachedDeviceId(for: "entryA"))
+        XCTAssertEqual(try sut.cachedDeviceId(for: "entryB"), "devB")
+    }
+
+    /// A refusal about a handle this paypoint no longer holds drops nothing. The
+    /// binding enrolled since names a key that works, and dropping it costs the
+    /// enrolment on the strength of an answer about a different device.
+    func testForgetRefusedBindingKeepsABindingEnrolledSince() throws {
+        let storage = InMemorySecureStorage()
+        let (sut, _, _) = AttestFixture.makeService(storage: storage)
+        try sut.remember(AttestedDevice(entry: "entryA", deviceId: "devNew", keyId: "keyNew"))
+
+        XCTAssertFalse(try sut.forgetRefusedBinding(entry: "entryA", deviceId: "devOld", keyId: "keyOld"))
+
+        XCTAssertEqual(try sut.cachedDeviceId(for: "entryA"), "devNew")
+    }
+
+    /// The key is part of what a refusal named, so a handle that survives a key
+    /// rotation is not the binding the service answered about.
+    func testForgetRefusedBindingKeepsABindingWhoseKeyChanged() throws {
+        let storage = InMemorySecureStorage()
+        let (sut, _, _) = AttestFixture.makeService(storage: storage)
+        try sut.remember(AttestedDevice(entry: "entryA", deviceId: "devA", keyId: "keyNew"))
+
+        XCTAssertFalse(try sut.forgetRefusedBinding(entry: "entryA", deviceId: "devA", keyId: "keyOld"))
+
+        XCTAssertEqual(try sut.cachedDeviceId(for: "entryA"), "devA")
+    }
+
+    /// A refusal is about the paypoint that refused. The other bindings still
+    /// name keys that work, and each one dropped costs an enrolment.
+    func testClearCacheLeavesEveryOtherBindingAlone() async throws {
+        let storage = InMemorySecureStorage()
+        let (sut, _, _) = AttestFixture.makeService(storage: storage)
+        try sut.remember(AttestedDevice(entry: "entryA", deviceId: "devA", keyId: "keyA"))
+        try sut.remember(AttestedDevice(entry: "entryB", deviceId: "devB", keyId: "keyB"))
+
+        try sut.clearCache(for: "entryA")
+
+        try await assertAttested(sut, "entryA", false)
+        XCTAssertEqual(try sut.cachedDeviceId(for: "entryB"), "devB")
+    }
+
+    /// The defect this ticket names: a session configured for one paypoint while
+    /// holding another's handle must report not enrolled, so nothing is sent and
+    /// the other paypoint's record is left intact.
+    func testAHandleFromAnotherPaypointIsNotThisOnesEnrolment() async throws {
+        let storage = InMemorySecureStorage()
+        let (sut, _, _) = AttestFixture.makeService(storage: storage)
+        try sut.remember(AttestedDevice(entry: "entryA", deviceId: "devA", keyId: "keyA"))
+
+        try await assertAttested(sut, "entryB", false)
+        XCTAssertNil(try sut.cachedDeviceId(for: "entryB"))
+        XCTAssertEqual(try sut.cachedDeviceId(for: "entryA"), "devA")
+    }
+
+    /// An identity stored before the paypoint was recorded cannot be adopted:
+    /// nothing says which paypoint issued it, and presenting it to the wrong one
+    /// is what retires a device that was still active. It goes, and the device
+    /// enrols once.
+    func testAnIdentityStoredWithoutItsPaypointIsDiscarded() async throws {
+        let storage = InMemorySecureStorage()
+        try storage.set("old_key", forKey: "com.payabli.ttp.keyId")
+        try storage.set("old_device", forKey: "com.payabli.ttp.deviceId")
+
+        let (sut, _, _) = AttestFixture.makeService(storage: storage)
+
+        try await assertAttested(sut, "myEntry", false)
+        XCTAssertNil(try storage.string(forKey: "com.payabli.ttp.keyId"))
+        XCTAssertNil(try storage.string(forKey: "com.payabli.ttp.deviceId"))
+    }
+
+    /// The probe suspends, so the answer can arrive after another attempt has
+    /// enrolled this paypoint. What it refuses is the binding it asked about, and
+    /// dropping by entry point alone would take the newer one instead, leaving a
+    /// device that enrolled moments ago holding nothing.
+    func testAProbeAnsweringLateDropsOnlyTheBindingItAskedAbout() async throws {
+        let storage = InMemorySecureStorage()
+        let (sut, attestor, _) = AttestFixture.makeService(storage: storage)
+
+        // What the probe read, before it went away to ask.
+        let probed = AttestedDevice(entry: "myEntry", deviceId: "dev_old", keyId: "old_key")
+
+        // What the entry point holds by the time the answer lands.
+        try sut.remember(AttestedDevice(entry: "myEntry", deviceId: "dev_new", keyId: "new_key"))
+        try sut.rememberPendingKey("pending_for_new", for: "myEntry")
+
+        attestor.generateAssertionError = NSError(
+            domain: AppAttestService.deviceCheckErrorDomain,
+            code: 2,
+            userInfo: nil
+        )
+
+        let stillHeld = await sut.keyIsStillHeld(probed)
+
+        XCTAssertFalse(stillHeld, "the probed key was refused and the answer said otherwise")
+        XCTAssertEqual(
+            try sut.binding(for: "myEntry")?.deviceId,
+            "dev_new",
+            "the newer binding was dropped for a key it never named"
+        )
+        XCTAssertEqual(
+            try sut.pendingKey(for: "myEntry"),
+            "pending_for_new",
+            "a pending key belonging to a newer attempt was dropped"
+        )
+    }
+
+    /// The same shape one call along. `generateAssertion` reads the binding, then
+    /// suspends asking the platform to sign with its key; a refusal arriving after
+    /// another attempt enrolled this paypoint must not take the binding that
+    /// attempt wrote.
+    func testAnAssertionFailingLateDropsOnlyTheBindingItUsed() async throws {
+        let storage = InMemorySecureStorage()
+        try AttestFixture.seedBinding(entry: "myEntry", deviceId: "dev_old", keyId: "old_key", in: storage)
+        let (sut, attestor, _) = AttestFixture.makeService(storage: storage)
+
+        // Written inside the window the signature attempt suspends for.
+        attestor.beforeGenerateAssertion = { [weak sut] in
+            try? sut?.remember(AttestedDevice(entry: "myEntry", deviceId: "dev_new", keyId: "new_key"))
+        }
+        attestor.generateAssertionError = NSError(
+            domain: AppAttestService.deviceCheckErrorDomain,
+            code: 2,
+            userInfo: nil
+        )
+
+        do {
+            _ = try await sut.generateAssertion(for: "myEntry")
+            XCTFail("a refused key produced an assertion")
+        } catch {}
+
+        XCTAssertEqual(
+            try sut.binding(for: "myEntry")?.deviceId,
+            "dev_new",
+            "the binding written while the signature was in flight was dropped for the older key"
+        )
+    }
+
+    /// A drop the store refused is raised, because a caller's own correctness rests
+    /// on it. A binding the service refused still names a key the platform signs
+    /// with, so one left behind is read as sound on the next warm check and sent
+    /// again, and a caller told it was cleared cannot tell that apart.
+    func testAClearTheStoreRefusedIsRaised() throws {
+        let storage = WriteRefusingStorage()
+        let (sut, _, _) = AttestFixture.makeService(storage: storage)
+        try sut.remember(AttestedDevice(entry: "myEntry", deviceId: "dev", keyId: "key"))
+
+        storage.refusesWrites = true
+        XCTAssertThrowsError(try sut.clearCache(for: "myEntry")) { error in
+            XCTAssertTrue(error is PayabliTTPError, "the Keychain's own error crossed the boundary: \(error)")
+        }
+
+        storage.refusesWrites = false
+        XCTAssertEqual(
+            try sut.binding(for: "myEntry")?.deviceId,
+            "dev",
+            "the drop was reported as refused and the binding is gone, so there is nothing to raise about"
+        )
+    }
+
+    // MARK: - What a storage failure looks like to a caller
+
+    /// A store that could not be read reports this SDK's own error, not the
+    /// Keychain's. The domain and the code are what the ObjC, MAUI, Flutter and
+    /// React Native bridges map, so an error thrown as it arrived reaches every
+    /// bridge as a bare failure with nothing naming the cause.
+    func testAStorageFailureIsReportedAsThisSDKsOwnError() async throws {
+        let storage = InMemorySecureStorage()
+        try AttestFixture.seedBinding(entry: "myEntry", deviceId: "dev", keyId: "key", in: storage)
+        storage.readFailure = KeychainStorage.KeychainError.underlying(errSecInteractionNotAllowed)
+
+        let (sut, _, _) = AttestFixture.makeService(storage: storage)
+
+        do {
+            _ = try await sut.isAttested(for: "myEntry")
+            XCTFail("a store that could not be read answered that the device is not enrolled")
+        } catch let error as PayabliTTPError {
+            guard case let .attestationFailed(reason) = error else {
+                return XCTFail("unexpected case: \(error)")
+            }
+            XCTAssertFalse(reason.isEmpty)
+        } catch {
+            XCTFail("the Keychain's own error crossed the SDK boundary: \(error)")
+        }
+    }
+
+    // MARK: - The pending slot and the key it names
+
+    /// The slot is dropped immediately before the key it names is spent, and a key
+    /// can be attested once. A drop reported as done while the record survives
+    /// leaves the next attempt reusing a key that is refused every time.
+    func testAPendingDropThatDidNotLandStopsTheKeyBeingSpent() async throws {
+        StubURLProtocol.handler = { request in
+            switch request.url!.path {
+            case "/api/v2/device/taptopay/challenge":
+                return (
+                    HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
+                    AttestFixture.envelope(responseData: ["challengeId": "c_1", "challenge": "Y2hhbGxlbmdl"])
+                )
+            default:
+                return (
+                    HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
+                    AttestFixture.envelope(responseData: ["deviceId": "dev_1"])
+                )
+            }
+        }
+
+        let storage = WriteRefusingStorage()
+        let (sut, attestor, _) = AttestFixture.makeService(storage: storage)
+
+        // The mint's own write is the first refusal, so reach the drop with the key
+        // already in the slot.
+        storage.refusesWrites = false
+        try sut.rememberPendingKey("minted_key", for: "myEntry")
+        storage.refusesWrites = true
+
+        do {
+            _ = try await sut.attest(entry: "myEntry", appId: "TEAM.bundle.id")
+            XCTFail("attestation spent the key while its pending record was still readable")
+        } catch {}
+
+        XCTAssertEqual(attestor.attestKeyCalls, 0, "the single-use key was spent after a drop that did not land")
+    }
+
+    /// A store that could not be read reaches a caller as this SDK's own error from
+    /// the identifier too, not only from the binding reads beside it.
+    func testAStorageFailureFromTheIdentifierIsReportedAsThisSDKsOwnError() async throws {
+        StubURLProtocol.handler = { request in
+            (
+                HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
+                AttestFixture.envelope(responseData: ["challengeId": "c_1", "challenge": "Y2hhbGxlbmdl"])
+            )
+        }
+
+        let (sut, _, _) = AttestFixture.makeService(hardwareIdProvider: { () throws -> String in
+            throw KeychainStorage.KeychainError.underlying(errSecInteractionNotAllowed)
+        })
+
+        do {
+            _ = try await sut.attest(entry: "myEntry", appId: "TEAM.bundle.id")
+            XCTFail("the attempt continued with an identifier that could not be produced")
+        } catch is PayabliTTPError {
+            // The domain the bridges map.
+        } catch {
+            XCTFail("the Keychain's own error crossed the SDK boundary: \(error)")
+        }
     }
 }
 
-/// Thread-safe box so the stub handler can record the order of paths it sees.
-private final class PathsBox: @unchecked Sendable {
-    private let lock = NSLock()
-    private var storage: [String] = []
-    var values: [String] {
-        lock.lock()
-        defer { lock.unlock() }
-        return storage
+/// A store whose writes always fail, for the one case that has to be raised.
+private struct FailingStorage: SecureStorage {
+    func string(forKey _: String) throws -> String? {
+        nil
     }
 
-    func append(_ s: String) {
-        lock.lock()
-        defer { lock.unlock() }
-        storage.append(s)
+    func set(_: String, forKey _: String) throws {
+        throw KeychainStorage.KeychainError.decoding
     }
+
+    func remove(forKey _: String) throws {}
 }
 
 /// Thread-safe monotonic counter so a stub handler can vary its response by

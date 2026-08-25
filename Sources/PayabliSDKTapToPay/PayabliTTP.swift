@@ -54,9 +54,6 @@ public final class PayabliTTP: NSObject, ObservableObject {
     let transactionClient: TTPTransactionClient
     let configClient: TTPConfigClient
 
-    /// Deviceid cached from attestation state (used as initiate `device:`).
-    var cachedDeviceId: String?
-
     /// Session state
     let sessionManager = SessionManager()
 
@@ -201,13 +198,10 @@ public final class PayabliTTP: NSObject, ObservableObject {
                 let sendable = UncheckedSendableBox(handler)
                 return { @Sendable in
                     try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<String, Error>) in
-                        // Guard against the ObjC host invoking the completion
-                        // block more than once — that would resume the same
-                        // continuation twice and crash. We honor only the first
-                        // invocation (success or failure) and silently drop any
-                        // subsequent calls. A `Locked<Bool>` keeps this thread-
-                        // safe in case the host dispatches the callback from a
-                        // background queue.
+                        // An ObjC host that invokes the completion block more
+                        // than once would resume the same continuation twice and
+                        // crash, so only the first invocation is honored. The
+                        // lock is because the host may call back from any queue.
                         let resumed = Locked(false)
                         sendable.value { token, error in
                             let firstCall = resumed.withLock { hasResumed in

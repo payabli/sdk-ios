@@ -261,8 +261,15 @@ The SDK handles two data classes with different persistence rules:
 
 | Data | Where it lives | Lifetime | Reference |
 |---|---|---|---|
-| `keyId`, `deviceId` | Keychain (`KeychainStorage`) | Until `clearCache()` or device wipe | NFR-5E, PRD §22.1 |
+| Device bindings: `entry`, `deviceId`, `keyId`, one per paypoint | Keychain (`KeychainStorage`), one item | Until a refusal drops it, `clearCache(for:)` resets it, the key it names is gone, or device wipe | NFR-5E, PRD §22.1 |
+| Install identifier: a UUID minted on first use (`InstallIdentifier`) | Keychain (`KeychainStorage`), one item | Until device wipe or the app's Keychain items are removed. Outlives every binding, and `clearCache(for:)` does not touch it | NFR-5E, PRD §22.1 |
+| Pending App Attest key id, one per entry point | Keychain (`KeychainStorage`), one item | Until that key is attested or the paypoint's binding is cleared | NFR-5E, PRD §22.1 |
 | Access token, provider credentials (Fiserv), assertions, in-flight transaction bodies | RAM only, adapter + auth objects | Seconds to minutes | NFR-5D |
+
+The install identifier is never sent. What registration receives is a digest of
+it with the bundle identifier and this module's name, so the stored value stays
+on the device and the value sent differs per app. It has to outlive a binding:
+an install that lost it registers as a device that has never been seen.
 
 Nothing else persists to disk. Adapters must drop `self.credentials = nil`
 as soon as the processor SDK has its own copy (typically the same call
