@@ -79,9 +79,12 @@ final class CardNotPresentOnDeviceTests: XCTestCase {
             )
         )
 
+        // The token itself is never printed. `PayabliLogger`'s rules put tokens
+        // outside every privacy level, and a stored method is reusable, so a run's
+        // output would carry a way to charge the card again.
         let token = try XCTUnwrap(stored.storedMethodId ?? stored.methodReferenceId, "no stored token came back")
         XCTAssertFalse(token.isEmpty)
-        print("PAYABLI_STORED_METHOD env=\(named.name) token=\(token)")
+        LiveEnvironment.report("PAYABLI_STORED_METHOD env=\(named.name) returned=yes")
     }
 
     /// An authorization is taken and then voided, so nothing settles.
@@ -91,7 +94,7 @@ final class CardNotPresentOnDeviceTests: XCTestCase {
             authorized.transaction?.paymentTransId,
             "authorize returned no paymentTransId: code=\(authorized.code) reason=\(authorized.reason ?? "<nil>")"
         )
-        print("PAYABLI_AUTHORIZED env=\(named.name) transId=\(transId) code=\(authorized.code)")
+        LiveEnvironment.report("PAYABLI_AUTHORIZED env=\(named.name) transId=\(transId) code=\(authorized.code)")
 
         let voided = try await void(transId)
         XCTAssertTrue(voided, "the authorization was left open and needs voiding by hand: \(transId)")
@@ -105,7 +108,7 @@ final class CardNotPresentOnDeviceTests: XCTestCase {
             captured.transaction?.paymentTransId,
             "capture returned no paymentTransId: code=\(captured.code) reason=\(captured.reason ?? "<nil>")"
         )
-        print("PAYABLI_CAPTURED env=\(named.name) transId=\(transId) code=\(captured.code)")
+        LiveEnvironment.report("PAYABLI_CAPTURED env=\(named.name) transId=\(transId) code=\(captured.code)")
 
         let voided = try await void(transId)
         XCTAssertTrue(voided, "the transaction was left standing and needs voiding by hand: \(transId)")
@@ -142,7 +145,7 @@ final class CardNotPresentOnDeviceTests: XCTestCase {
             authorized.transaction?.paymentTransId,
             "the toggle-off shape was refused: code=\(authorized.code) reason=\(authorized.reason ?? "<nil>")"
         )
-        print("PAYABLI_TOGGLE_OFF env=\(named.name) transId=\(transId) code=\(authorized.code)")
+        LiveEnvironment.report("PAYABLI_TOGGLE_OFF env=\(named.name) transId=\(transId) code=\(authorized.code)")
 
         let voided = try await void(transId)
         XCTAssertTrue(voided, "left open and needs voiding by hand: \(transId)")
@@ -168,8 +171,11 @@ final class CardNotPresentOnDeviceTests: XCTestCase {
 
         let (data, response) = try await URLSession.shared.data(for: request)
         let status = (response as? HTTPURLResponse)?.statusCode ?? 0
-        let body = String(decoding: data, as: UTF8.self)
-        print("PAYABLI_VOID env=\(named.name) transId=\(transId) status=\(status) body=\(body.prefix(120))")
+        // The status and the size, not the body: a money-in response carries the
+        // processor's whole answer, `paymentTokens.tokenData` among it.
+        LiveEnvironment.report(
+            "PAYABLI_VOID env=\(named.name) transId=\(transId) status=\(status) bytes=\(data.count)"
+        )
         return (200 ..< 300).contains(status)
     }
 }

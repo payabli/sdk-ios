@@ -79,4 +79,26 @@ enum LiveEnvironment {
     static func announce(_ named: (environment: PayabliEnvironment, entry: String, name: String)) {
         print("PAYABLI_RUN env=\(named.name) entry=\(named.entry)")
     }
+
+    /// What a run may print, following `PayabliLogger`'s rules: a transaction id, a
+    /// code or a state is public, a device identifier is not, and a token is never
+    /// logged at any level.
+    ///
+    /// Test output is retained by Xcode and by CI, so the identifiers a run needs in
+    /// order to be acted on — the handle an activation code is requested for — are
+    /// printed only when a run asks for them.
+    static func report(_ line: String) {
+        print(line)
+    }
+
+    /// A device identifier, printed only when `PAYABLI_REPORT_IDENTIFIERS` is set.
+    static func reportIdentifier(_ name: String, _ value: String, env: String) {
+        guard let ask = ProcessInfo.processInfo.environment["PAYABLI_REPORT_IDENTIFIERS"],
+              !ask.isEmpty
+        else {
+            print("PAYABLI_\(name) env=\(env) withheld=set PAYABLI_REPORT_IDENTIFIERS to print it")
+            return
+        }
+        print("PAYABLI_\(name) env=\(env) value=\(value)")
+    }
 }
