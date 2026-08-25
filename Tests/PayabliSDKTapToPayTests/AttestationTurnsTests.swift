@@ -151,6 +151,55 @@ final class AttestationTurnsTests: XCTestCase {
     }
 
     /// A caller cancelled while queued registers nothing when its turn arrives.
+    /// A cancelled caller is released while the turn ahead is still running.
+    ///
+    /// Bounded, because the failure is a caller that never returns: without the
+    /// bound this waits for the holder that the test itself is holding open, and
+    /// reports a hang instead of the defect.
+    func testACancelledCallerIsReleasedBeforeTheTurnAheadEnds() async {
+        StubURLProtocol.handler = { request in
+            if request.url!.path == "/api/v2/device/taptopay/register" {
+                return AttestFixture.ok(request, ["deviceId": "dev_\(UUID().uuidString)"])
+            }
+            return AttestFixture.ok(request, ["challengeId": "c_1", "challenge": "Y2hhbGxlbmdl"])
+        }
+
+        let storage = InMemorySecureStorage()
+        let (holder, holdingAttestor, _) = AttestFixture.makeService(storage: storage)
+        let (waiter, _, _) = AttestFixture.makeService(storage: storage)
+
+        let held = AsyncGate()
+        let reached = AsyncGate()
+        holdingAttestor.beforeGenerateKey = {
+            reached.open()
+            await held.wait()
+        }
+
+        async let holdersResult = holder.attest(entry: "myEntry", appId: "TEAM.bundle.id")
+        await reached.wait()
+
+        let released = expectation(description: "the cancelled caller returned")
+        let queued = Task { try await waiter.attest(entry: "myEntry", appId: "TEAM.bundle.id") }
+        Task {
+            _ = try? await queued.value
+            released.fulfill()
+        }
+        queued.cancel()
+
+        // The holder is still held, so this can only complete if the cancellation
+        // released the queued caller rather than leaving it behind the turn ahead.
+        let outcome = await XCTWaiter().fulfillment(of: [released], timeout: 3)
+
+        held.open()
+        _ = try? await holdersResult
+
+        XCTAssertEqual(
+            outcome,
+            .completed,
+            "a cancelled caller stayed queued behind the attestation it was waiting for"
+        )
+    }
+
     func testACancelledCallerWaitingForATurnRegistersNothing() async {
         let paths = PathsBox()
         StubURLProtocol.handler = { request in
