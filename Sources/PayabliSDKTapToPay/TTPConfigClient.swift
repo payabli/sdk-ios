@@ -117,12 +117,26 @@ public final class TTPConfigClient: Sendable {
         try await attestation.generateAssertion(for: entry)
     }
 
-    /// Drops the refused binding while it is still the one held.
+    /// Drops the refused binding while it is still the one held, and answers whether
+    /// the paypoint was left in a state the caller need not report.
     ///
-    /// The handle and the key both come from the assertion this request carried,
-    /// so the comparison names the device the service answered about. False means
-    /// the binding is still readable, which the caller reports: an App Attest key
-    /// that still signs makes the next warm check trust it and present it again.
+    /// The handle and the key both come from the assertion this request carried, so
+    /// the comparison names the device the service answered about.
+    ///
+    /// **True covers two outcomes, and one of them dropped nothing.** The binding was
+    /// removed, or a newer one is held and stays: a refusal about the handle this
+    /// request presented says nothing about a binding attested since, and dropping it
+    /// would retire a device that just enrolled. Neither is a failure, so neither is
+    /// reported.
+    ///
+    /// **False is a store that refused the operation**, and only that. The binding is
+    /// still readable and its App Attest key still signs, so the next warm check
+    /// trusts it and presents the refused handle again, which is what the caller
+    /// reports.
+    ///
+    /// Narrowing true to "removed" turns the safeguard into a reported failure, and
+    /// widening the removal to drop whatever the entry point holds is the defect the
+    /// comparison exists to prevent.
     private func dropRefusedBinding(entry: String, presented headers: AssertionHeaders) -> Bool {
         do {
             let dropped = try attestation.forgetRefusedBinding(
