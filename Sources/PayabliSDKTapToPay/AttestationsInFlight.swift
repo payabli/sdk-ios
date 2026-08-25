@@ -33,6 +33,10 @@ actor AttestationsInFlight {
             // to its own caller, and a caller that failed leaves the next one a
             // store to read exactly as a caller that succeeded does.
             await ahead?.value
+
+            // A caller cancelled while queued must not register a device once its
+            // turn arrives.
+            try Task.checkCancellation()
             return try await work()
         }
 
@@ -47,6 +51,12 @@ actor AttestationsInFlight {
                 tail[entry] = nil
             }
         }
-        return try await mine.value
+        // The turn is a task of its own, so it sits outside the caller's
+        // cancellation until this reconnects them.
+        return try await withTaskCancellationHandler {
+            try await mine.value
+        } onCancel: {
+            mine.cancel()
+        }
     }
 }

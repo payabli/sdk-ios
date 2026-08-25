@@ -150,6 +150,51 @@ final class AttestationTurnsTests: XCTestCase {
         XCTAssertEqual(attestor.generateKeyCalls, 1)
     }
 
+    /// A caller cancelled while queued registers nothing when its turn arrives.
+    func testACancelledCallerWaitingForATurnRegistersNothing() async {
+        let paths = PathsBox()
+        StubURLProtocol.handler = { request in
+            paths.append(request.url!.path)
+            if request.url!.path == "/api/v2/device/taptopay/register" {
+                return AttestFixture.ok(request, ["deviceId": "dev_\(UUID().uuidString)"])
+            }
+            return AttestFixture.ok(request, ["challengeId": "c_1", "challenge": "Y2hhbGxlbmdl"])
+        }
+
+        let storage = InMemorySecureStorage()
+        let (holder, holdingAttestor, _) = AttestFixture.makeService(storage: storage)
+        let (waiter, waitingAttestor, _) = AttestFixture.makeService(storage: storage)
+
+        let held = AsyncGate()
+        let reached = AsyncGate()
+        holdingAttestor.beforeGenerateKey = {
+            reached.open()
+            await held.wait()
+        }
+
+        async let holdersResult = holder.attest(entry: "myEntry", appId: "TEAM.bundle.id")
+        await reached.wait()
+
+        let queued = Task { try await waiter.attest(entry: "myEntry", appId: "TEAM.bundle.id") }
+        queued.cancel()
+
+        held.open()
+        _ = try? await holdersResult
+
+        // The caller's own outcome, not a count: work that ignored the cancellation
+        // finishes after the counts are read, so counting is a race and this is not.
+        do {
+            _ = try await queued.value
+            XCTFail("a cancelled caller was given an attestation")
+        } catch is CancellationError {
+            // What a cancelled caller gets.
+        } catch {
+            XCTFail("a cancelled caller got \(error) rather than a cancellation")
+        }
+
+        XCTAssertEqual(waitingAttestor.generateKeyCalls, 0, "a cancelled caller minted a key")
+    }
+
     /// Two services over different stores are two devices, whatever entry point they
     /// name. They queue behind each other, and each then decides from its own store,
     /// so neither is handed a handle it cannot produce an assertion for.
