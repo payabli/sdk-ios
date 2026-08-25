@@ -229,41 +229,6 @@ final class PayabliTTPTests: XCTestCase {
         XCTAssertEqual(ttp.sessionState, .error, "the caller saw a failure and the published state did not")
     }
 
-    /// A 401 that could not drop the binding says so. Reported as cleared, the
-    /// caller cannot tell it from a cold start that failed on its own: the binding
-    /// the service refused still names a key the platform signs with, so the next
-    /// warm check trusts it and presents the same refused handle.
-    func testAConfigRefusalSaysWhenTheBindingCouldNotBeDropped() async throws {
-        let (ttp, _, attestation) = makeTTP()
-        attestation.isAlreadyAttested = true
-        attestation.clearFailure = PayabliTTPError.attestationFailed(reason: "unwritable")
-        StubURLProtocol.handler = { request in
-            (
-                HTTPURLResponse(
-                    url: request.url!,
-                    statusCode: 200,
-                    httpVersion: "HTTP/1.1",
-                    headerFields: ["Content-Type": "application/json"]
-                )!,
-                Data(
-                    #"{"isSuccess":false,"responseText":"attestation revoked","responseData":{"resultCode":401,"resultText":"attestation revoked"}}"#
-                        .utf8
-                )
-            )
-        }
-
-        do {
-            try await ttp.initialize()
-            XCTFail("a refused config answered successfully")
-        } catch let PayabliTTPError.configFailed(reason) {
-            XCTAssertTrue(
-                reason.contains("could not be dropped"),
-                "the caller was told the binding was cleared: \(reason)"
-            )
-        }
-        XCTAssertEqual(ttp.sessionState, .error)
-    }
-
     /// A config 401 answering one handle leaves a binding enrolled since.
     func testAConfigRefusalLeavesABindingEnrolledSince() async throws {
         let (ttp, _, attestation) = makeTTP()
@@ -294,6 +259,43 @@ final class PayabliTTPTests: XCTestCase {
             "dev_new",
             "the binding enrolled while the request was in flight was cleared by a refusal about the older one"
         )
+    }
+
+    /// A charge names the binding held when it is sent, not the one held when the
+    /// session was built.
+    func testAChargeSendsTheBindingHeldWhenItIsSent() async throws {
+        let (ttp, _, attestation) = makeTTP()
+        attestation.bindings = [MockDeviceAttestationService.anyEntry: "dev_old"]
+
+        let sent = BodyBox()
+        StubURLProtocol.handler = { request in
+            guard request.url?.path.contains("MoneyIn/initiate") == true else {
+                return try Self.defaultStubHandler(request)
+            }
+            sent.append(request.payabliTestBody)
+            return (
+                HTTPURLResponse(
+                    url: request.url!,
+                    statusCode: 200,
+                    httpVersion: "HTTP/1.1",
+                    headerFields: ["Content-Type": "application/json"]
+                )!,
+                Data(#"{"isSuccess":false,"responseText":"declined","responseData":0}"#.utf8)
+            )
+        }
+
+        try await ttp.initialize()
+        attestation.bindings = [MockDeviceAttestationService.anyEntry: "dev_new"]
+
+        _ = try? await ttp.charge(
+            type: .sale,
+            paymentDetails: PayabliTTPPaymentDetails(amount: 1.00)
+        )
+
+        let body = try XCTUnwrap(sent.values.first ?? nil, "no initiate request was sent")
+        let text = String(decoding: body, as: UTF8.self)
+        XCTAssertTrue(text.contains("dev_new"), text)
+        XCTAssertFalse(text.contains("dev_old"), "a handle captured during initialize() was sent")
     }
 
     /// The event, the published state and the thrown error carry one value, so a
@@ -422,9 +424,13 @@ final class PayabliTTPTests: XCTestCase {
         XCTAssertFalse(attestation.isAlreadyAttested, "a refused handle must not be sent again")
         XCTAssertEqual(ttp.sessionState, .error)
         XCTAssertEqual(reported, "configFailed")
-        XCTAssertTrue(
-            raised.localizedDescription.contains("attestation cleared"),
-            raised.localizedDescription
+        XCTAssertTrue(raised.localizedDescription.contains("401"), raised.localizedDescription)
+        // The drop is the config call's to make, so the reason claims nothing about
+        // it. Claiming it here is what told a caller the binding was gone when it
+        // was not.
+        XCTAssertFalse(
+            raised.localizedDescription.contains("cleared"),
+            "the reason claims an outcome this layer does not decide"
         )
         XCTAssertEqual(String(describing: marked), String(describing: raised))
     }

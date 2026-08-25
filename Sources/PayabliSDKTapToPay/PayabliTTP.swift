@@ -54,9 +54,6 @@ public final class PayabliTTP: NSObject, ObservableObject {
     let transactionClient: TTPTransactionClient
     let configClient: TTPConfigClient
 
-    /// Deviceid cached from attestation state (used as initiate `device:`).
-    var cachedDeviceId: String?
-
     /// Session state
     let sessionManager = SessionManager()
 

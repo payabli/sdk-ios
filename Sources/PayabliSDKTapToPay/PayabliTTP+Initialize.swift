@@ -71,11 +71,10 @@ extension PayabliTTP {
 
         // 1. Attestation (cold) or warm deviceId. The session reaches
         //    `.fetchingConfig` on success.
-        let deviceId = try await runAttestationPhase()
+        try await runAttestationPhase()
 
         // 2. Fetch /config.
-        let config = try await runFetchConfigPhase(presenting: deviceId)
-        cachedDeviceId = deviceId
+        let config = try await runFetchConfigPhase()
         multicaster.emit(.configReceived)
 
         // 3. Configure provider.
@@ -133,7 +132,7 @@ extension PayabliTTP {
         syncPublished()
 
         // 2. Fresh /config (credentials never survive between sessions).
-        let config = try await runFetchConfigPhase(presenting: cachedDeviceId)
+        let config = try await runFetchConfigPhase()
         multicaster.emit(.configReceived)
 
         // 3. Re-configure provider.
@@ -173,9 +172,12 @@ extension PayabliTTP {
 
     // MARK: - Phase 1 — attestation (cold) or warm start
 
-    /// Returns the `deviceId` to cache. On success leaves the session in
-    /// `.fetchingConfig`. `.devicePendingActivation` maps to `.pendingActivation`.
-    private func runAttestationPhase() async throws -> String? {
+    /// On success leaves the session in `.fetchingConfig`.
+    /// `.devicePendingActivation` maps to `.pendingActivation`.
+    ///
+    /// Returns nothing: the handle worth keeping is the one the config call's
+    /// assertion is signed for, which this phase cannot know.
+    private func runAttestationPhase() async throws {
         do {
             // Inside the handling below, because reading the binding can fail and a
             // failure that skipped it would throw out of `initialize()` while the
@@ -184,18 +186,17 @@ extension PayabliTTP {
             if try await attestation.isAttested(for: entryPoint) {
                 _ = sessionManager.transition(to: .fetchingConfig)
                 syncPublished()
-                return try attestation.cachedDeviceId(for: entryPoint)
+                return
             }
 
             _ = sessionManager.transition(to: .attestingDevice)
             syncPublished()
             multicaster.emit(.attestationStarted)
 
-            let result = try await attestation.attest(entry: entryPoint, appId: appId)
+            _ = try await attestation.attest(entry: entryPoint, appId: appId)
             multicaster.emit(.attestationCompleted)
             _ = sessionManager.transition(to: .fetchingConfig)
             syncPublished()
-            return result.deviceId
         } catch PayabliTTPError.devicePendingActivation {
             markPendingActivation()
             throw PayabliTTPError.devicePendingActivation
@@ -214,29 +215,17 @@ extension PayabliTTP {
     ///   - 401 (stale assertion) → clear attestation cache, rewrap as `.configFailed`
     ///   - anything else → `.error`, rewrapped as `.configFailed` so the domain and
     ///     code stay what the bridges read, keeping the parsed reason
-    private func runFetchConfigPhase(presenting deviceId: String?) async throws -> TTPConfig {
+    private func runFetchConfigPhase() async throws -> TTPConfig {
         do {
             return try await configClient.fetchConfig(entry: entryPoint)
         } catch PayabliTTPError.devicePendingActivation {
             markPendingActivation()
             throw PayabliTTPError.devicePendingActivation
         } catch let err as PayabliGenericError where err.code == .tokenExpired {
-            // Only the handle this attempt presented, and the reason says which of
-            // the three happened. Declining to drop is the safer way to be wrong:
-            // the next attempt refuses the newer handle on its own answer, where
-            // dropping takes a device that just enrolled.
-            let outcome: String
-            do {
-                if try attestation.cachedDeviceId(for: entryPoint) == deviceId {
-                    try attestation.clearCache(for: entryPoint)
-                    outcome = "attestation cleared"
-                } else {
-                    outcome = "a newer binding for this paypoint was kept"
-                }
-            } catch {
-                outcome = "the stored binding could not be dropped"
-            }
-            let failure = PayabliTTPError.configFailed(reason: "Config rejected (401) — \(outcome)")
+            // The refused binding is dropped by the config call, which knows which
+            // handle it presented. The reason claims nothing about that: this is not
+            // where it is decided.
+            let failure = PayabliTTPError.configFailed(reason: "Config rejected (401)")
             // One value through all three channels. Marking the raw 401 while
             // throwing the rewrapped failure left the published state and the
             // caller describing the same failure differently.

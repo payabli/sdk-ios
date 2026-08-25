@@ -68,9 +68,10 @@ public final class TTPConfigClient: Sendable {
             let code = rawCode ?? 0
             // Same as the attestation path: the code, not the service's sentence.
             logger.error("[config] declined (isSuccess=false code=\(code))")
-            // 401 semantics from the server body: attestation was revoked or
-            // device not attested → caller should clear cache and re-attest.
+            // A 401 in the body refuses the binding this request presented, so
+            // it is dropped here, where which handle that was is known.
             if code == 401 {
+                dropRefusedBinding(entry: entry, presented: headers.deviceId)
                 throw PayabliGenericError(code: .tokenExpired, reason: reason)
             }
             if code == 403 {
@@ -98,5 +99,19 @@ public final class TTPConfigClient: Sendable {
 
     private func assertionHeaders(entry: String) async throws -> AssertionHeaders {
         try await attestation.generateAssertion(for: entry)
+    }
+
+    /// Drops the refused binding while it is still the one held, and never fails
+    /// the caller, which is already reporting the refusal.
+    private func dropRefusedBinding(entry: String, presented deviceId: String) {
+        do {
+            guard try attestation.cachedDeviceId(for: entry) == deviceId else {
+                logger.info("[config] a newer binding is held for this paypoint; keeping it")
+                return
+            }
+            try attestation.clearCache(for: entry)
+        } catch {
+            logger.info("[config] the refused binding could not be dropped")
+        }
     }
 }
