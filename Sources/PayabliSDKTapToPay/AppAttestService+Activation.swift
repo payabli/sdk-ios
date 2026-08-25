@@ -5,7 +5,9 @@ import PayabliSDKCore
 
 public extension AppAttestService {
     func activateDevice(activationCode: String, entry: String) async throws {
-        guard let deviceId = try cachedDeviceId(for: entry) else {
+        // Read only to refuse a paypoint that holds no binding. The handle sent is
+        // the assertion's, below.
+        guard try cachedDeviceId(for: entry) != nil else {
             throw PayabliTTPError.attestationFailed(reason: "Missing deviceId — run initialize() before activateDevice")
         }
 
@@ -16,9 +18,13 @@ public extension AppAttestService {
 
         let assertion = try await generateAssertion(for: entry)
 
+        // The assertion's handle, not one read before two suspensions. It comes
+        // from the same binding as the key that signed, so the body and the headers
+        // describe one device. Read separately they can name two, and a request
+        // whose body and signature disagree is refused for a reason neither names.
         try await postAttestationRequestExpectingNoBody(
             path: "/api/v2/device/taptopay/activate",
-            body: ActivateRequest(entry: entry, deviceId: deviceId, activationCode: activationCode),
+            body: ActivateRequest(entry: entry, deviceId: assertion.deviceId, activationCode: activationCode),
             label: "activate",
             assertion: assertion,
             makeDeclineError: { code, reason in

@@ -70,6 +70,98 @@ enum AttestFixture {
     }
 }
 
+/// Thread-safe box for the request bodies a stub handler saw.
+final class BodyBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var storage: [Data?] = []
+
+    var values: [Data?] {
+        lock.lock()
+        defer { lock.unlock() }
+        return storage
+    }
+
+    func append(_ value: Data?) {
+        lock.lock()
+        defer { lock.unlock() }
+        storage.append(value)
+    }
+}
+
+extension URLRequest {
+    /// The body as a `URLProtocol` subclass actually receives it.
+    ///
+    /// `httpBody` is nil by the time a request reaches a protocol handler whenever
+    /// the loader turned it into a stream, which it does for the bodies here. A test
+    /// reading `httpBody` alone finds nothing and asserts nothing while looking like
+    /// it checked the wire.
+    var payabliTestBody: Data? {
+        if let httpBody {
+            return httpBody
+        }
+        guard let stream = httpBodyStream else { return nil }
+        stream.open()
+        defer { stream.close() }
+
+        var data = Data()
+        let size = 4096
+        var buffer = [UInt8](repeating: 0, count: size)
+        while stream.hasBytesAvailable {
+            let read = stream.read(&buffer, maxLength: size)
+            if read <= 0 {
+                break
+            }
+            data.append(buffer, count: read)
+        }
+        return data.isEmpty ? nil : data
+    }
+}
+
+/// What a Keychain keeps when the install that wrote it is gone.
+///
+/// Held separately from the store so a test can build a second store over it, which
+/// is what a reinstall is: the app's own objects are new, the Keychain is not.
+final class DurableBacking: @unchecked Sendable {
+    private let lock = NSLock()
+    private var items: [String: String] = [:]
+
+    func value(forKey key: String) -> String? {
+        lock.lock()
+        defer { lock.unlock() }
+        return items[key]
+    }
+
+    func set(_ value: String, forKey key: String) {
+        lock.lock()
+        defer { lock.unlock() }
+        items[key] = value
+    }
+
+    func remove(forKey key: String) {
+        lock.lock()
+        defer { lock.unlock() }
+        items.removeValue(forKey: key)
+    }
+}
+
+/// A store holding nothing of its own, so building a new one models an install
+/// that reads a Keychain it did not write.
+struct KeychainStandIn: SecureStorage {
+    let backing: DurableBacking
+
+    func string(forKey key: String) throws -> String? {
+        backing.value(forKey: key)
+    }
+
+    func set(_ value: String, forKey key: String) throws {
+        backing.set(value, forKey: key)
+    }
+
+    func remove(forKey key: String) throws {
+        backing.remove(forKey: key)
+    }
+}
+
 /// Thread-safe box so a stub handler can record what it saw, in order.
 final class PathsBox: @unchecked Sendable {
     private let lock = NSLock()
