@@ -36,10 +36,8 @@ public final class AppAttestService: DeviceAttestationService, @unchecked Sendab
     let bindingStore: AttestedDeviceStore
     let logger = PayabliLogger(category: .taptopay)
 
-    // Injected so tests on macOS can substitute deterministic values.
-    //
-    // The hardware identifier reads and may write the store, so it raises. The
-    // others read the platform and cannot fail.
+    // Injected so tests on macOS can substitute deterministic values. The hardware
+    // identifier reads and may write the store, so it raises.
     let hardwareIdProvider: @Sendable () throws -> String
     let modelProvider: @Sendable () -> String
     let osVersionProvider: @Sendable () -> String
@@ -78,23 +76,14 @@ public final class AppAttestService: DeviceAttestationService, @unchecked Sendab
 
     // MARK: DeviceAttestationService — the binding this device holds
 
-    /// Whether this device is enrolled **for this entry point**. A handle issued
-    /// under another one answers false: the device is not enrolled here, and
-    /// sending that handle is what gets it refused and its record retired.
-    /// The binding also has to name a key this device still holds. The sibling SDK
-    /// compares the stored thumbprint against the key at the handle; App Attest
-    /// hands back an opaque identifier and no way to read a key back, so the
-    /// question is put to the key itself: it signs, or the platform says it is not
-    /// a key this device has.
+    /// Whether this device is enrolled for this entry point. A handle issued under
+    /// another one answers false, and the binding also has to name a key this device
+    /// still holds — a key can go on reinstall, restore or platform invalidation,
+    /// and none of those leaves anything on the device to read.
     ///
-    /// A key can go for several reasons — the app was deleted and reinstalled, the
-    /// device was restored, the platform invalidated it — and none of them leaves
-    /// anything on the device to read. Asking covers all of them. Without it a
-    /// binding that looks whole sends every request into a failure with nothing to
-    /// recover from.
     /// Raises when the store could not be read, which is not the same answer as
-    /// `false`: `false` runs the cold sequence, and running it against a paypoint
-    /// that is already enrolled registers a second device for it.
+    /// `false`: `false` runs the cold sequence and registers a second device for a
+    /// paypoint that is already enrolled.
     public func isAttested(for entry: String) async throws -> Bool {
         guard let binding = try binding(for: entry) else {
             return false
@@ -104,12 +93,9 @@ public final class AppAttestService: DeviceAttestationService, @unchecked Sendab
 
     /// Whether the platform will still sign with this binding's key.
     ///
-    /// Signs over a fixed hash that is sent nowhere: the answer is whether the
-    /// call throws, not what it returns.
-    ///
-    /// Two codes mean the key cannot be used and the rest do not: see
-    /// `deviceCheckUnusableKeyCodes`. Re-enrolling on any other answer would cost
-    /// an enrolment for a key that was working.
+    /// Signs over a fixed hash that is sent nowhere: the answer is whether the call
+    /// throws. Only `deviceCheckUnusableKeyCodes` mean the key cannot be used;
+    /// re-enrolling on any other answer costs an enrolment for a working key.
     func keyIsStillHeld(_ binding: AttestedDevice) async -> Bool {
         do {
             _ = try await attestor.generateAssertion(
@@ -131,9 +117,9 @@ public final class AppAttestService: DeviceAttestationService, @unchecked Sendab
         }
     }
 
-    /// Drops the binding a refusal was about, while it is still the one held, and
+    /// Drops the binding a refusal was about while it is still the one held, and
     /// raises if the store refuses. The pending key belongs to whatever is running
-    /// now, so it stays.
+    /// now.
     @discardableResult
     func forgetRefused(_ binding: AttestedDevice) throws -> Bool {
         try reportingStorageFailure {
@@ -143,13 +129,9 @@ public final class AppAttestService: DeviceAttestationService, @unchecked Sendab
 
     /// Drops the binding this probe asked about, and only that one.
     ///
-    /// The probe suspends, so what the entry point holds on the way back can be a
-    /// binding attested while the answer was travelling. Dropping by entry point
-    /// would take that one for a key it never named, leaving a device that enrolled
-    /// moments ago holding nothing.
-    ///
-    /// The pending key is left alone for the same reason: it belongs to whatever
-    /// attempt is running now, not to the one this answer is about.
+    /// The probe suspends, so the entry point can hold a binding attested while the
+    /// answer was travelling, and dropping by entry point would take that one for a
+    /// key it never named. The pending key is left alone for the same reason.
     func forgetIfUnchanged(_ binding: AttestedDevice) {
         do {
             let dropped = try bindingStore.forget(entry: binding.entry, ifStill: binding)
@@ -173,16 +155,12 @@ public final class AppAttestService: DeviceAttestationService, @unchecked Sendab
     /// refusal is about the paypoint that refused, and the other bindings still
     /// name keys that work.
     ///
-    /// Raises when the store refuses, because one caller's correctness rests on the
-    /// drop having happened. A binding refused by the service names a key the
-    /// platform is still perfectly willing to sign with, so a warm check reads it,
-    /// finds the key sound, trusts it, and sends the same refused binding again.
-    /// Nothing about that repeats itself into a fix, and a caller told the binding
-    /// was cleared cannot tell the difference.
+    /// Raises when the store refuses. A binding refused by the service names a key
+    /// the platform still signs with, so a warm check finds it sound and sends the
+    /// same refused binding again.
     ///
-    /// A caller acting on a refused *key* has the opposite problem and uses
-    /// `forgetIfUnchanged` instead: it holds the record its answer is about, and the
-    /// entry point may hold a newer one by the time the answer lands.
+    /// A caller acting on a refused key uses `forgetIfUnchanged` instead: it holds
+    /// the record its answer is about, and the entry point may hold a newer one.
     public func clearCache(for entry: String) throws {
         try reportingStorageFailure {
             try bindingStore.forgetEverything(for: entry)
@@ -191,10 +169,9 @@ public final class AppAttestService: DeviceAttestationService, @unchecked Sendab
 
     /// Runs a store operation and reports a failure as this SDK's own error.
     ///
-    /// Everything crossing this protocol is a `PayabliTTPError`, because the domain
-    /// and the code are what the ObjC, MAUI, Flutter and React Native bridges map.
-    /// A `KeychainError` thrown as it arrived carries another domain, and every
-    /// bridge reports it as a bare failure with nothing naming the cause.
+    /// Everything crossing this protocol is a `PayabliTTPError`: the domain and the
+    /// code are what the ObjC, MAUI, Flutter and React Native bridges map, and a
+    /// `KeychainError` carries another domain they all report as a bare failure.
     private func reportingStorageFailure<T>(_ work: () throws -> T) throws -> T {
         do {
             return try work()
@@ -233,8 +210,7 @@ public final class AppAttestService: DeviceAttestationService, @unchecked Sendab
     /// The value registration identifies this install by.
     ///
     /// Wrapped like every other store access: the default provider reads the
-    /// Keychain and mints into it, so it fails the same way the binding reads do
-    /// and has to reach a caller as the same error.
+    /// Keychain and mints into it, so it fails the same way the binding reads do.
     func hardwareId() throws -> String {
         try reportingStorageFailure { try hardwareIdProvider() }
     }

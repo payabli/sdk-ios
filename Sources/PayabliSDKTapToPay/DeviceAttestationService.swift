@@ -45,25 +45,20 @@ public struct AssertionHeaders: Sendable {
 /// this protocol isolates it so the rest of the TTP flow is unit-testable
 /// without iOS entitlements or network access.
 public protocol DeviceAttestationService: AnyObject, Sendable {
-    /// Whether this device holds a binding **for this entry point**. Used to pick
-    /// warm versus cold path during `initialize()` (PRD §18.3).
+    /// Whether this device holds a binding for this entry point, which picks the
+    /// warm or cold path during `initialize()` (PRD §18.3). A handle issued under
+    /// another entry point is not this device's enrolment here.
     ///
-    /// Scoped to the entry point: a handle issued under another one is not this
-    /// device's enrolment here, and presenting it is refused. The sibling SDK
-    /// scopes the same question the same way.
+    /// Asynchronous because answering it means asking the platform whether the key
+    /// the binding names is still held.
     ///
-    /// Asynchronous because answering it means asking the platform whether the
-    /// key the binding names is still held, which is the same check the sibling
-    /// SDK makes by comparing thumbprints.
-    ///
-    /// Raises when the store could not be read. That is a third answer and not a
-    /// `false`: `false` runs the cold sequence, and running it against a paypoint
-    /// that is already enrolled registers a second device for it.
+    /// Raises when the store could not be read, which is a third answer: `false`
+    /// runs the cold sequence and registers a second device for a paypoint that is
+    /// already enrolled.
     func isAttested(for entry: String) async throws -> Bool
 
     /// The backend-assigned `deviceId` this entry point was registered under, or
-    /// `nil` when it holds no binding. The facade uses this on the warm path
-    /// where `attest()` is skipped.
+    /// `nil` when it holds no binding.
     func cachedDeviceId(for entry: String) throws -> String?
 
     /// Runs the first-run attestation flow: challenge → register → attest.
@@ -71,11 +66,9 @@ public protocol DeviceAttestationService: AnyObject, Sendable {
     /// `status == "pending"` (PRD FR-11F.1).
     func attest(entry: String, appId: String) async throws -> AttestationResult
 
-    /// Produces fresh `AssertionHeaders` (signed over a current timestamp) for
-    /// the next protected request. PRD §18.2.
-    ///
-    /// Takes the entry point because the headers name the handle this device
-    /// holds for it, and a handle from another paypoint is refused.
+    /// Produces fresh `AssertionHeaders` (signed over a current timestamp) for the
+    /// next protected request, naming the handle this device holds for `entry`.
+    /// PRD §18.2.
     func generateAssertion(for entry: String) async throws -> AssertionHeaders
 
     /// Activates a pending device with an activation code issued out-of-band
@@ -88,9 +81,8 @@ public protocol DeviceAttestationService: AnyObject, Sendable {
     /// the cold sequence. Called on 401 from the config endpoint (PRD §18.4).
     /// Every other entry point's binding is left alone.
     ///
-    /// Raises when the store refuses the drop. The caller's own correctness rests
-    /// on it: a binding the service refused still names a key the platform signs
-    /// with, so a warm check finds it sound and sends the same refused binding
-    /// again, and nothing in that repeats itself into a fix.
+    /// Raises when the store refuses the drop. A binding the service refused still
+    /// names a key the platform signs with, so one left behind reads as sound on
+    /// the next warm check and is sent again.
     func clearCache(for entry: String) throws
 }

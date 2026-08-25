@@ -71,9 +71,8 @@ public final class MockAppAttestor: AppAttestor, @unchecked Sendable {
     /// Awaited before a key is minted, so a test can hold one attestation open and
     /// assert what another can do while it is held.
     ///
-    /// Ordering asserted by holding rather than by timing: a test that only checks
-    /// outcomes cannot tell work that ran at once from work that was serialized,
-    /// because both produce the same devices and the same bindings.
+    /// Ordering asserted by holding, since a test that only checks outcomes cannot
+    /// tell work that ran at once from work that was serialized.
     public var beforeGenerateKey: (@Sendable () async -> Void)? {
         get { lock.withLock { storedBeforeGenerateKey } }
         set { lock.withLock { storedBeforeGenerateKey = newValue } }
@@ -83,8 +82,7 @@ public final class MockAppAttestor: AppAttestor, @unchecked Sendable {
 
     public func generateKey() async throws -> AppAttestKeyId {
         // Counted on the way in, before the hook can hold the call, so the count
-        // says how many callers asked rather than how many got an answer. A test
-        // holding one open reads it to see that the caller arrived.
+        // says how many callers asked rather than how many got an answer.
         lock.withLock { _generateKeyCalls += 1 }
         await beforeGenerateKey?()
         return try lock.withLock {

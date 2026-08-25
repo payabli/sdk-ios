@@ -18,10 +18,8 @@ public extension AppAttestService {
 
         let assertion = try await generateAssertion(for: entry)
 
-        // The assertion's handle, not one read before two suspensions. It comes
-        // from the same binding as the key that signed, so the body and the headers
-        // describe one device. Read separately they can name two, and a request
-        // whose body and signature disagree is refused for a reason neither names.
+        // The assertion's handle, so the body and the headers come from one
+        // binding. Read separately they can name two devices.
         try await postAttestationRequestExpectingNoBody(
             path: "/api/v2/device/taptopay/activate",
             body: ActivateRequest(entry: entry, deviceId: assertion.deviceId, activationCode: activationCode),
@@ -43,9 +41,8 @@ public extension AppAttestService {
                         try self.forgetRefused(refused)
                     } catch {
                         // Revoked either way, and the caller is told which. A
-                        // binding left behind names a key the platform still signs
-                        // with, so the next warm check trusts it and presents the
-                        // same refused handle.
+                        // binding left behind is presented again on the next warm
+                        // check.
                         return .attestationRevoked(
                             reason: "\(reason) — the stored binding could not be dropped"
                         )

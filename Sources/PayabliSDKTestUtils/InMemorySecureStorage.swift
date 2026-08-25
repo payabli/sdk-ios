@@ -15,9 +15,7 @@ public final class InMemorySecureStorage: SecureStorage, @unchecked Sendable {
     /// Raised by every read while it is set.
     ///
     /// Nothing in memory fails on its own, so without this the paths that separate
-    /// a store holding nothing from one that could not be read are unreachable in a
-    /// test — and those are the paths that decide whether an enrolled device
-    /// enrolls a second time.
+    /// a store holding nothing from one that could not be read are unreachable.
     public var readFailure: Error? {
         get {
             lock.lock()

@@ -173,9 +173,8 @@ extension PayabliTTP {
     /// otherwise any later `PATCH /update/{id}` would 400 on a non-existent
     /// transaction.
     private func runInitiate(context: TTPTransactionContext) async throws -> String {
-        // Read here rather than carried from `initialize()`: the binding can be
-        // replaced in between, and a copy taken then names a device this request
-        // cannot produce an assertion for.
+        // Read at the point of use: the binding can be replaced between calls, and
+        // a copy taken earlier names a device this request cannot sign for.
         guard let deviceId = try attestation.cachedDeviceId(for: entryPoint) else {
             throw PayabliTTPError.initiateFailed(
                 reason: "Missing deviceId — run initialize() before charge()"

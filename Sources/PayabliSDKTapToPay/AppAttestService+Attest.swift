@@ -14,18 +14,11 @@ extension AppAttestService {
     /// process.
     ///
     /// The pending-key lookup and the mint that follows it are separated by an
-    /// `await`, and App Attest issues a fresh key on every call. Two callers for one
-    /// entry point therefore both read no pending key, both mint a different one,
-    /// and both register: the paypoint ends up with two devices and a binding naming
-    /// only the later of them. Serializing the store's own operations cannot close
-    /// that, because the gap is between two of them.
-    ///
-    /// A caller for an entry point already being attested waits for that attempt to
-    /// end and then runs its own, which reads the store first and returns what the
-    /// attempt ahead wrote. Waiting rather than taking that attempt's answer is what
-    /// keeps two services over different storage apart: each decides from the store
-    /// it will have to produce assertions from. Different entry points never wait
-    /// for each other.
+    /// `await`, and App Attest issues a fresh key on every call, so two callers for
+    /// one entry point both mint and both register. A caller for an entry point
+    /// already being attested waits for that attempt to end and then runs its own,
+    /// which reads the store first. Different entry points never wait for each
+    /// other.
     public func attest(entry: String, appId: String) async throws -> AttestationResult {
         try await Self.attestations.takingTurns(entry) {
             try await self.runAttest(entry: entry, appId: appId)
@@ -33,15 +26,11 @@ extension AppAttestService {
     }
 
     private func runAttest(entry: String, appId: String) async throws -> AttestationResult {
-        // Read inside the gate, because the caller's warm check ran outside it. An
-        // attempt that finished in between has left a binding this one would
-        // otherwise register a second device to replace. Waiting is not enough on
-        // its own: the gate holds callers that arrive while an attempt is running,
-        // and this is the one that arrives just after it ends.
-        //
-        // No activation is claimed by answering from the binding. It records none,
-        // and `/config` answers for it exactly as it does on the warm path, which
-        // reaches this same state by skipping attestation altogether.
+        // Read inside the gate: the caller's warm check ran outside it, and an
+        // attempt that finished in between leaves a binding this one would
+        // otherwise register a second device to replace. Answering from the binding
+        // claims no activation; `/config` answers for it as it does on the warm
+        // path.
         if let held = try binding(for: entry), await keyIsStillHeld(held) {
             logger.info("[attest] this paypoint was enrolled while this attempt waited")
             return AttestationResult(keyId: held.keyId, deviceId: held.deviceId)
@@ -56,22 +45,14 @@ extension AppAttestService {
 
         // 2. Resolve the App Attest key for this attempt.
         //
-        //    The attested `keyId` is not persisted yet. Writing it before the
-        //    flow finishes (step 6) can leave a half-attested key in the
-        //    Keychain: the binding would then read as complete, the
-        //    warm path would skip `attest()` on the next launch, and
-        //    `generateAssertion()` would fail against Apple with
-        //    `com.apple.devicecheck.error` on a key that was never attested.
+        //    The attested `keyId` is not persisted until step 6: a binding written
+        //    earlier reads as complete, so the next launch skips `attest()` and
+        //    signs with a key that was never attested.
         //
-        //    A freshly generated key IS cached in a separate *pending* slot so
-        //    a pre-attest retry (network, `/challenge`, `/register`) can reuse
-        //    the same Secure Enclave key instead of minting a new one every
-        //    attempt. The pending slot is never read by the warm path, so it
-        //    cannot poison assertions.
-        //    Kept per entry point. A key can be attested once, so two paypoints
-        //    enrolling cannot share one: the second would register a key the first
-        //    is about to attest and one of the attempts would be refused. Another
-        //    entry point's pending key is neither read nor overwritten here.
+        //    A freshly generated key is kept in a separate pending slot, per entry
+        //    point, so a pre-attest retry reuses the same Secure Enclave key. A key
+        //    can be attested once, so two paypoints enrolling cannot share one. The
+        //    warm path never reads the slot.
         let keyId: AppAttestKeyId
         if let pending = try pendingKey(for: entry) {
             keyId = AppAttestKeyId(pending)
@@ -99,13 +80,12 @@ extension AppAttestService {
         }
 
         // 4. Attest the key. `attestKey` is single-use per key, so drop the
-        //    pending slot before attesting: a failure here or at `/attest`
-        //    must mint a new key next time rather than replay a burned one.
-        //    Pre-attest failures above keep the pending slot for reuse.
+        //    pending slot before attesting: a failure here or at `/attest` mints
+        //    a new key next time, since a burned one is refused. Pre-attest
+        //    failures above keep the slot for reuse.
         //
-        //    Raises rather than proceeding on a drop that did not land, because the
-        //    key is about to be spent and a surviving record is one the next attempt
-        //    reuses, which is refused every time.
+        //    Raises on a drop that did not land: the key is about to be spent, and
+        //    a surviving record is one the next attempt reuses and is refused for.
         try forgetPendingKey(for: entry)
         let clientDataHash = ClientDataHash(Data(SHA256.hash(data: challengeData)))
         let attestation = try await attestor.attestKey(keyId, clientDataHash: clientDataHash)
@@ -122,10 +102,10 @@ extension AppAttestService {
             platform: Self.platform
         ))
 
-        // 6. Record the binding only now that attestation is confirmed end to
-        //    end. One item, so there is no window in which half an identity is
-        //    stored and reads as a whole one. It lands before pending activation
-        //    is surfaced, because `/activate` reads the handle back.
+        // 6. Record the binding once attestation is confirmed end to end. One item,
+        //    so no window stores half an identity that reads as a whole one, and it
+        //    lands before pending activation is surfaced: `/activate` reads the
+        //    handle back.
         try remember(AttestedDevice(entry: entry, deviceId: register.deviceId, keyId: keyId.rawValue))
 
         if isPending {
@@ -158,22 +138,15 @@ extension AppAttestService {
                 timestamp: timestamp
             )
         } catch {
-            // Clear only when the key itself is rejected — never fully attested,
-            // or minted in a different App Attest environment — so the next
-            // `initialize()` runs a clean cold attestation instead of looping.
-            //
-            // `DCErrorServerUnavailable` asks for the opposite: retry "using the
-            // same key and the same value for the clientDataHash parameter", which
-            // "helps to preserve the risk metric for a given device". Clearing
-            // there throws away a good key.
+            // Clear only when the key itself is rejected, so the next
+            // `initialize()` runs a cold attestation.
             let nsError = error as NSError
             if nsError.domain == Self.deviceCheckErrorDomain {
                 if Self.deviceCheckUnusableKeyCodes.contains(nsError.code) {
                     logger.error("generateAssertion cannot use the stored key — clearing this paypoint's binding")
-                    // The binding read at the top of this call, not whatever the
-                    // entry point holds now: the signature attempt suspends, and an
-                    // attestation finishing in that window leaves a binding this
-                    // answer says nothing about.
+                    // The binding read at the top of this call: the attempt
+                    // suspends, and one finishing in that window leaves a
+                    // binding this answer is not about.
                     forgetIfUnchanged(binding)
                 } else {
                     logger.error(
@@ -190,26 +163,18 @@ extension AppAttestService {
     /// The DeviceCheck codes that say this device cannot produce an assertion for
     /// the key it was asked about, from `DeviceCheck.framework/Headers/DCError.h`.
     ///
-    /// `DCErrorInvalidKey` is the documented one: the key was rejected, or was
-    /// never attested. `DCErrorInvalidInput` is the one a key that no longer
-    /// exists actually reports, measured on an iPhone 11 Pro by minting a key,
-    /// keeping its identifier in the Keychain, deleting the app and asking again.
-    /// Its own description covers data that is not formatted correctly, and the
-    /// only data here besides the identifier is a SHA-256 hash, so the identifier
-    /// is what it objects to.
-    ///
-    /// `DCErrorUnknownSystemFailure` is not among them: that is what a key that
-    /// exists but has not been attested reports, measured in the same run, and
-    /// that key is the pending slot's business rather than a reason to re-enrol.
-    /// Neither is `DCErrorServerUnavailable`, which asks for a retry with the same
-    /// key to preserve the device's risk metric.
+    /// `DCErrorInvalidKey` is the documented one. A key that no longer exists
+    /// reports `DCErrorInvalidInput`, which the documentation describes as
+    /// malformed data; the only data here besides the identifier is a SHA-256 hash.
+    /// `DCErrorUnknownSystemFailure` is what an unattested key reports and belongs
+    /// to the pending slot, and `DCErrorServerUnavailable` asks for a retry with
+    /// the same key to preserve the device's risk metric.
     static let deviceCheckUnusableKeyCodes: Set<Int> = [2, 3]
 
     static let platform = "Ios"
 
-    /// Shared by every service in the process, because two of them are what the
-    /// per-entry-point gate exists to serialize: a facade builds its own service,
-    /// and a host talking to one paypoint from two places builds two.
+    /// Shared by every service in the process: a facade builds its own, and a host
+    /// talking to one paypoint from two places builds two.
     static let attestations = AttestationsInFlight()
 
     static let iso8601WithFractional: ISO8601DateFormatter = {

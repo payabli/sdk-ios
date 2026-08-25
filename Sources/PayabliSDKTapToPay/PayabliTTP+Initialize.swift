@@ -34,10 +34,9 @@ extension PayabliTTP {
             return try await existing.task.value
         }
 
-        // Chain behind an operation of the other kind rather than polling for
-        // it. Re-checking in a loop re-awaits a task that has already finished
-        // and spins the main actor until the slot is cleared, which starves
-        // everything else running on it.
+        // Chains behind an operation of the other kind. Re-checking in a loop
+        // re-awaits a task that has already finished and spins the main actor
+        // until the slot is cleared, starving everything else on it.
         let previous = inFlightSessionSetup?.task
         let id = nextSessionSetupID
         nextSessionSetupID += 1

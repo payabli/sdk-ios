@@ -42,10 +42,9 @@ public struct KeychainStorage: SecureStorage, Sendable {
     /// other answer the Keychain can give.
     ///
     /// `errSecItemNotFound` is the only status that means nothing is stored. The
-    /// rest are conditions that can pass: `errSecInteractionNotAllowed` is what a
-    /// read gets before the first unlock after a boot, and these items are written
-    /// `AfterFirstUnlock`, so it is reachable by anything that runs that early.
-    /// Answering `nil` there reports an enrolled device as a new one.
+    /// rest can pass: `errSecInteractionNotAllowed` is what a read gets before the
+    /// first unlock after a boot, and answering `nil` there reports an enrolled
+    /// device as a new one.
     func data(forKey key: String) throws -> Data? {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
@@ -64,9 +63,7 @@ public struct KeychainStorage: SecureStorage, Sendable {
     }
 
     /// The only status that means nothing is stored, so the only one a read answers
-    /// `nil` for. Its own function because no test host here has a Keychain to
-    /// answer with, and the list is what decides whether an enrolled device is
-    /// reported as a new one.
+    /// `nil` for.
     static func isMissing(_ status: OSStatus) -> Bool {
         status == errSecItemNotFound
     }
@@ -115,20 +112,17 @@ public struct KeychainStorage: SecureStorage, Sendable {
 
     // MARK: - Migration
 
-    /// Corrects the attribute on what is already stored, so an install that
-    /// attested before this attribute existed stops being carried by a backup.
+    /// Corrects the attribute on what is already stored, so an install that attested
+    /// before this attribute existed stops being carried by a backup. Correcting an
+    /// item is its next write, and a phone that has already attested never writes
+    /// again.
     ///
-    /// Correcting an item is its next write, and the warm path only reads: a phone
-    /// that has already attested never writes again, so without this it keeps the
-    /// old attribute for as long as the install lasts.
+    /// The attribute is changed on its own: reading the value and writing it back
+    /// would restore one deleted in between, and `pendingKeyId` is deleted once
+    /// attestation ends.
     ///
-    /// The attribute is changed on its own, without reading the value or writing it
-    /// back. Reading and rewriting would let a value deleted in between be put back
-    /// from the copy in hand, and `pendingKeyId` is deleted once attestation ends.
-    ///
-    /// Runs whenever the store is opened rather than once behind a flag, since the
-    /// flag would be another stored item and a locked Keychain makes any single
-    /// attempt a no-op. An item it cannot reach waits for the next one.
+    /// Runs whenever the store is opened, since a locked Keychain makes any single
+    /// attempt a no-op and an item it cannot reach waits for the next one.
     func migrateAccessibility(forKeys keys: [String]) {
         for key in keys {
             let query: [String: Any] = [
