@@ -77,13 +77,19 @@ public protocol DeviceAttestationService: AnyObject, Sendable {
     /// to the device user. PRD §9.7.
     func activateDevice(activationCode: String, entry: String) async throws
 
-    /// Drops this entry point's binding, so the next `initialize()` for it runs
-    /// the cold sequence. Called on 401 from the config endpoint (PRD §18.4).
-    /// Every other entry point's binding is left alone.
+    /// Drops this entry point's binding unconditionally, so the next `initialize()`
+    /// for it runs the cold sequence. Every other entry point's binding is left
+    /// alone.
     ///
-    /// Raises when the store refuses the drop. A binding the service refused still
-    /// names a key the platform signs with, so one left behind reads as sound on
-    /// the next warm check and is sent again.
+    /// A reset for a host that wants this device enrolled again. Nothing in the SDK
+    /// calls it: a refusal is a statement about the binding that was presented, and
+    /// dropping by entry point alone takes a binding attested since. Refusals use
+    /// `forgetRefusedBinding(entry:deviceId:keyId:)`, and a conformer that puts its
+    /// cleanup here will not see one.
+    ///
+    /// Raises when the store refuses the drop. A binding left behind names a key the
+    /// platform signs with, so it reads as sound on the next warm check and is sent
+    /// again.
     func clearCache(for entry: String) throws
 
     /// Drops the binding a refusal was about, while it is still the one held.

@@ -31,9 +31,20 @@ public final class TTPConfigClient: Sendable {
         self.attestation = attestation
     }
 
-    /// Fetches the TTP config for the given `entry`. On 401 (after transport
-    /// refresh-and-retry exhaustion), the underlying `PayabliGenericError(.tokenExpired)`
-    /// propagates — callers should clear attestation cache and re-attest (PRD §18.4).
+    /// Fetches the TTP config for the given `entry`.
+    ///
+    /// Two failures reach a caller as `PayabliGenericError(.tokenExpired)`, and they
+    /// ask for different things (PRD §18.4):
+    ///
+    /// - **The service refused the binding**, as a 401 in the envelope of a 200. The
+    ///   binding is dropped here, where the handle the assertion was signed for is
+    ///   known, and the next `initialize()` enrols. A caller does nothing.
+    /// - **The transport refused the bearer**, as an HTTP 401 surviving its refresh
+    ///   and retry. Nothing is dropped: an expired access token says nothing about
+    ///   the device, and clearing on it retires an enrolled device. A caller obtains
+    ///   a token.
+    ///
+    /// The reason names which happened.
     ///
     /// The SDK flattens `credentials` into `TTPConfig.providerCredentials`
     /// for the TapToPayProvider to consume.

@@ -211,7 +211,9 @@ extension PayabliTTP {
 
     /// Pre: session is in `.fetchingConfig`. Error handling:
     ///   - backend says pending → `.pendingActivation`
-    ///   - 401 (stale assertion) → clear attestation cache, rewrap as `.configFailed`
+    ///   - 401, either a refused binding or a refused bearer → rewrap as
+    ///     `.configFailed`, relaying the reason. Dropping a binding is the config
+    ///     call's, which knows which of the two it is holding
     ///   - anything else → `.error`, rewrapped as `.configFailed` so the domain and
     ///     code stay what the bridges read, keeping the parsed reason
     private func runFetchConfigPhase() async throws -> TTPConfig {
