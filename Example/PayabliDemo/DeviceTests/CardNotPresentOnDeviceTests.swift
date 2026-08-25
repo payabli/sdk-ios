@@ -6,31 +6,34 @@ import XCTest
 /// The card-not-present surface against a live paypoint on real hardware:
 /// store a card, authorize against it, and void the authorization.
 ///
-/// These move money in the environment the run names. The void is what keeps an
-/// authorization from sitting open afterwards, and it runs whatever the
-/// authorization did, so a failure part way through does not leave one behind.
+/// The card, the customer and the request shape are the app's own, from
+/// `DebugPrefill.json`, `DemoCustomerSetting` and `PaymentCaptureQAView`. A second
+/// set here would be a second thing to keep true of the paypoint, and it was: a
+/// request assembled separately went out with no customer at all and was refused.
+///
+/// These move money in the environment the run names. The void runs whatever the
+/// authorization did, so a failure part way through leaves nothing standing.
 @MainActor
 final class CardNotPresentOnDeviceTests: XCTestCase {
     private var named: (environment: PayabliEnvironment, entry: String, name: String)!
-
-    /// The card every environment's test data accepts, from the demo's own
-    /// prefill fixture.
-    private static let card = PayabliPayInPaymentFlowCardData(
-        cardNumber: "4111111111111111",
-        expiration: "07/30",
-        cardholderName: "Name On Card Test1",
-        cvv: "999",
-        billingZip: "22039"
-    )
-
-    /// Small enough that a settled one is noise if a void ever fails.
-    private static let amount = 1.00
 
     override func setUp() async throws {
         try await super.setUp()
         named = try LiveEnvironment.named()
         LiveEnvironment.announce(named)
         _ = try await LiveEnvironment.requireAToken()
+    }
+
+    /// The test card, from the file the app prefills its form from.
+    private func card() throws -> PayabliPayInPaymentFlowCardData {
+        let values = try XCTUnwrap(DebugPrefill.values, "DebugPrefill.json is not in the bundle")
+        return PayabliPayInPaymentFlowCardData(
+            cardNumber: try XCTUnwrap(values.cardNumber).filter(\.isNumber),
+            expiration: try XCTUnwrap(values.cardExpiration),
+            cardholderName: QAIdentity.current.holderName,
+            cvv: try XCTUnwrap(values.cardCvv),
+            billingZip: try XCTUnwrap(values.cardZip)
+        )
     }
 
     private func makeFlow() -> PayabliPayInPaymentFlow {
@@ -41,9 +44,40 @@ final class CardNotPresentOnDeviceTests: XCTestCase {
         )
     }
 
+    /// The request the app's capture screen builds, with this run's card in it.
+    ///
+    /// `forceCustomerCreation` and the customer number are what a paypoint's
+    /// identifier list is satisfied by, and they belong to the app's configuration
+    /// rather than to this file.
+    private func request(with card: PayabliPayInPaymentFlowCardData) -> PayabliPayInPaymentFlowRequest {
+        let configured = PaymentCaptureQAView.freshRequestConfiguration(suppliesCustomer: true)
+        return PayabliPayInPaymentFlowRequest(
+            paymentDetails: configured.paymentDetails,
+            paymentMethod: .card(PayabliPayInPaymentFlowCardMethod(data: card)),
+            accountId: configured.accountId,
+            customerData: configured.customerData,
+            ipAddress: configured.ipAddress,
+            orderDescription: configured.orderDescription,
+            orderId: configured.orderId,
+            source: configured.source,
+            subdomain: configured.subdomain,
+            subscriptionId: configured.subscriptionId,
+            idempotencyKey: configured.idempotencyKey,
+            achValidation: configured.achValidation,
+            forceCustomerCreation: configured.forceCustomerCreation,
+            validation: configured.validation
+        )
+    }
+
     /// A card is stored and comes back with a token to charge later.
     func testAStoringACardReturnsAToken() async throws {
-        let stored = try await makeFlow().addCard(Self.card)
+        let stored = try await makeFlow().addCard(
+            try card(),
+            options: PayabliPayInPaymentFlowTokenStorageOptions(
+                forceCustomerCreation: true,
+                customerData: DemoCustomerSetting.payInCustomer
+            )
+        )
 
         let token = try XCTUnwrap(stored.storedMethodId ?? stored.methodReferenceId, "no stored token came back")
         XCTAssertFalse(token.isEmpty)
@@ -52,15 +86,7 @@ final class CardNotPresentOnDeviceTests: XCTestCase {
 
     /// An authorization is taken and then voided, so nothing settles.
     func testBAuthorizeThenVoid() async throws {
-        let flow = makeFlow()
-        let request = PayabliPayInPaymentFlowRequest(
-            paymentDetails: PayabliPayInPaymentFlowPaymentDetails(totalAmount: Self.amount),
-            paymentMethod: .card(PayabliPayInPaymentFlowCardMethod(data: Self.card)),
-            orderDescription: "PLA-2509 device check",
-            idempotencyKey: UUID().uuidString
-        )
-
-        let authorized = try await flow.authorize(request)
+        let authorized = try await makeFlow().authorize(request(with: try card()))
         let transId = try XCTUnwrap(
             authorized.transaction?.paymentTransId,
             "authorize returned no paymentTransId: code=\(authorized.code) reason=\(authorized.reason ?? "<nil>")"
@@ -71,18 +97,10 @@ final class CardNotPresentOnDeviceTests: XCTestCase {
         XCTAssertTrue(voided, "the authorization was left open and needs voiding by hand: \(transId)")
     }
 
-    /// The whole card-present-less path in one call, so the combined endpoint is
-    /// exercised as well as the split one. Voided the same way.
+    /// Authorize and capture in one call, so the combined endpoint is exercised as
+    /// well as the split one. Voided the same way.
     func testCCaptureThenVoid() async throws {
-        let flow = makeFlow()
-        let request = PayabliPayInPaymentFlowRequest(
-            paymentDetails: PayabliPayInPaymentFlowPaymentDetails(totalAmount: Self.amount),
-            paymentMethod: .card(PayabliPayInPaymentFlowCardMethod(data: Self.card)),
-            orderDescription: "PLA-2509 device check",
-            idempotencyKey: UUID().uuidString
-        )
-
-        let captured = try await flow.capture(request)
+        let captured = try await makeFlow().capture(request(with: try card()))
         let transId = try XCTUnwrap(
             captured.transaction?.paymentTransId,
             "capture returned no paymentTransId: code=\(captured.code) reason=\(captured.reason ?? "<nil>")"
@@ -93,24 +111,65 @@ final class CardNotPresentOnDeviceTests: XCTestCase {
         XCTAssertTrue(voided, "the transaction was left standing and needs voiding by hand: \(transId)")
     }
 
+    /// The shape the capture screen sends with "Send a customer number" off: no
+    /// customer number, and the payer named by the form's own fields.
+    ///
+    /// Which of the two is refused decides where a customer-data failure comes
+    /// from. A paypoint matching on a number refuses this outright; a paypoint
+    /// matching on email takes it, and an empty form is then what fails.
+    func testDTheToggleOffShapeNamesAPayerWithoutANumber() async throws {
+        let identity = QAIdentity.current
+        let configured = PaymentCaptureQAView.freshRequestConfiguration(suppliesCustomer: false)
+        let payer = PayabliPayInPaymentFlowCustomerData(
+            billingEmail: identity.billingEmail,
+            firstName: identity.firstName,
+            lastName: identity.lastName
+        )
+        let request = PayabliPayInPaymentFlowRequest(
+            paymentDetails: configured.paymentDetails,
+            paymentMethod: .card(PayabliPayInPaymentFlowCardMethod(data: try card())),
+            customerData: payer,
+            orderDescription: configured.orderDescription,
+            orderId: configured.orderId,
+            source: configured.source,
+            idempotencyKey: configured.idempotencyKey,
+            forceCustomerCreation: configured.forceCustomerCreation,
+            validation: configured.validation
+        )
+
+        let authorized = try await makeFlow().authorize(request)
+        let transId = try XCTUnwrap(
+            authorized.transaction?.paymentTransId,
+            "the toggle-off shape was refused: code=\(authorized.code) reason=\(authorized.reason ?? "<nil>")"
+        )
+        print("PAYABLI_TOGGLE_OFF env=\(named.name) transId=\(transId) code=\(authorized.code)")
+
+        let voided = try await void(transId)
+        XCTAssertTrue(voided, "left open and needs voiding by hand: \(transId)")
+    }
+
     // MARK: - Void
 
-    /// `POST /api/v2/MoneyIn/void/{transId}`, direct rather than through the SDK,
-    /// which exposes no void. The transaction id is printed either way, so one
-    /// left open can be found.
+    /// `POST /api/v2/MoneyIn/void/{transId}`, direct because the SDK exposes no
+    /// void. The transaction id is printed either way, so one left standing can be
+    /// found.
+    ///
+    /// `PayabliEnvironment.baseURL` is the host alone, so the `api` segment belongs
+    /// here; without it a void answers 404 and reads as a route that is not there.
     private func void(_ transId: String) async throws -> Bool {
         let token = try await Secrets.fetchPaymentMethodAccessToken()
         var request = URLRequest(
-            url: named.environment.baseURL.appendingPathComponent("v2/MoneyIn/void/\(transId)")
+            url: named.environment.baseURL
+                .appendingPathComponent("api/v2/MoneyIn/void")
+                .appendingPathComponent(transId)
         )
         request.httpMethod = "POST"
-        request.setValue(token, forHTTPHeaderField: "requestToken")
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
 
         let (data, response) = try await URLSession.shared.data(for: request)
         let status = (response as? HTTPURLResponse)?.statusCode ?? 0
         let body = String(decoding: data, as: UTF8.self)
-        print("PAYABLI_VOID env=\(named.name) transId=\(transId) status=\(status) body=\(body.prefix(200))")
+        print("PAYABLI_VOID env=\(named.name) transId=\(transId) status=\(status) body=\(body.prefix(120))")
         return (200 ..< 300).contains(status)
     }
 }

@@ -161,6 +161,87 @@ final class TapToPayOnDeviceTests: XCTestCase {
         print("PAYABLI_HARDWARE_ID env=\(named.name) hardwareId=\(first)")
     }
 
+    /// A charge reaches the tap, which is as far as this can go on its own.
+    ///
+    /// `charge()` is three steps: `POST /MoneyIn/initiate`, the tap, then
+    /// `PATCH /MoneyIn/update`. Only the tap needs a person, so stopping at
+    /// `.ready` leaves the initiate untested, and the initiate is where the
+    /// customer, the amount and the device handle are sent. This runs it and
+    /// stops when the reader asks for a card.
+    ///
+    /// The customer is the demo's own, which is what the Configuration screen says
+    /// a charge sends.
+    func testFAChargeReachesTheTapWithTheDemoCustomer() async throws {
+        try await assertChargeReachesTheTap(
+            customer: DemoCustomerSetting.demoCustomer,
+            label: "demoCustomer"
+        )
+    }
+
+    /// The same, with the customer the app's own charge button sends, which is
+    /// none. A paypoint that matches on an identifier refuses this at the
+    /// initiate, before any card is presented.
+    func testFBChargeReachesTheTapWithNoCustomer() async throws {
+        try await assertChargeReachesTheTap(
+            customer: PayabliTTPCustomerData(),
+            label: "noCustomer"
+        )
+    }
+
+    /// Drives `charge()` and returns once the backend has minted a
+    /// `paymentTransId`, which is the last thing that happens before the reader
+    /// waits for a card.
+    private func assertChargeReachesTheTap(
+        customer: PayabliTTPCustomerData,
+        label: String
+    ) async throws {
+        let ttp = makeTTP()
+        try await ttp.initialize()
+        XCTAssertEqual(ttp.sessionState, .ready, "the session never became ready")
+
+        let stream = ttp.events()
+        let reachedTheTap = expectation(description: "the charge reached the tap")
+        let seen = OutcomeBox()
+
+        let collector = Task {
+            for await event in stream {
+                if case let .chargeInitiated(paymentTransId) = event {
+                    seen.record("initiated \(paymentTransId)")
+                    reachedTheTap.fulfill()
+                    return
+                }
+            }
+        }
+
+        let charging = Task { @MainActor in
+            do {
+                _ = try await ttp.charge(
+                    type: .sale,
+                    paymentDetails: PayabliTTPPaymentDetails(amount: 1.00),
+                    customer: customer,
+                    orderDescription: "device tests"
+                )
+            } catch {
+                seen.record("failed \(error.localizedDescription)")
+            }
+        }
+
+        let outcome = await XCTWaiter().fulfillment(of: [reachedTheTap], timeout: 30)
+
+        // The tap is a person's to make, so the read is abandoned here. The reader
+        // sheet on the phone closes with it.
+        charging.cancel()
+        collector.cancel()
+        _ = await charging.value
+
+        print("PAYABLI_CHARGE env=\(named.name) customer=\(label) outcome=\(seen.value)")
+        XCTAssertEqual(
+            outcome,
+            .completed,
+            "the charge never reached the tap with \(label): \(seen.value)"
+        )
+    }
+
     /// A reader that reached `.ready` can be re-prepared without re-attesting,
     /// which is the path a host re-entry takes.
     func testEReinitializeKeepsTheBinding() async throws {
@@ -177,5 +258,23 @@ final class TapToPayOnDeviceTests: XCTestCase {
 
         XCTAssertEqual(ttp.sessionState, .ready)
         XCTAssertEqual(try attestation.cachedDeviceId(for: named.entry), before)
+    }
+}
+
+/// What a charge reported, written from one task and read from another.
+private final class OutcomeBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var storage = "nothing was reported"
+
+    var value: String {
+        lock.lock()
+        defer { lock.unlock() }
+        return storage
+    }
+
+    func record(_ outcome: String) {
+        lock.lock()
+        defer { lock.unlock() }
+        storage = outcome
     }
 }
