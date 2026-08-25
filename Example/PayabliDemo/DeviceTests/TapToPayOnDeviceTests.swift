@@ -108,6 +108,25 @@ final class TapToPayOnDeviceTests: XCTestCase {
         print("PAYABLI_DEVICE_HANDLE env=\(named.name) deviceId=\(before)")
     }
 
+    /// Reports the handle this device holds for the paypoint, so an activation
+    /// code can be requested for it by name.
+    ///
+    /// The service's device list is the other way to find it, and a paypoint with
+    /// no card-present service configured declines that call while still holding
+    /// the registration this made.
+    func testC0ReportTheStoredHandle() throws {
+        let attestation = AppAttestService(
+            transport: PayabliSession(config: LiveEnvironment.config(for: named)).transport,
+            attestor: RealAppAttestor(),
+            storage: KeychainStorage()
+        )
+        let held = try XCTUnwrap(
+            try attestation.cachedDeviceId(for: named.entry),
+            "this device holds no binding for \(named.entry)"
+        )
+        print("PAYABLI_DEVICE_HANDLE env=\(named.name) deviceId=\(held)")
+    }
+
     /// The paypoint is part of the binding: this device is not enrolled for a
     /// paypoint it never registered against, and asking does not disturb the one
     /// it did.
