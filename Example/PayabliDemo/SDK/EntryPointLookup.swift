@@ -7,15 +7,19 @@ import PayabliSDKCore
 /// it: that type reads `Secrets`, which is gitignored and belongs to the app
 /// target alone, and a lookup nobody can run against a map of their own is a
 /// lookup nobody can check.
+///
+/// The map is keyed by the environment's name rather than by `PayabliEnvironment`,
+/// so the credentials file that supplies it needs no SDK type. That file is the
+/// one an integrator copies and the one thing here that is not committed.
 enum EntryPointLookup {
     /// A row present but blank is not a paypoint, so it reads as missing here
     /// rather than reaching the SDK as an empty identifier and coming back as a
     /// rejected credential, several screens from the line that holds the blank.
     static func entryPoint(
-        from entryPoints: [PayabliEnvironment: String],
+        from entryPoints: [String: String],
         for environment: PayabliEnvironment
     ) -> String? {
-        guard let configured = entryPoints[environment] else { return nil }
+        guard let configured = entryPoints[name(for: environment)] else { return nil }
         let trimmed = configured.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? nil : trimmed
     }
@@ -23,13 +27,13 @@ enum EntryPointLookup {
     /// Names the environment that has no paypoint, and the ones that do, because
     /// the answer is almost always that the scheme and the map disagree.
     static func problem(
-        from entryPoints: [PayabliEnvironment: String],
+        from entryPoints: [String: String],
         for environment: PayabliEnvironment
     ) -> String? {
         guard entryPoint(from: entryPoints, for: environment) == nil else { return nil }
-        let configured = entryPoints.keys
-            .filter { entryPoint(from: entryPoints, for: $0) != nil }
-            .map(name)
+        let configured = entryPoints
+            .filter { !$0.value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+            .keys
             .sorted()
             .joined(separator: ", ")
         return "No entry point for \(name(for: environment)) in Secrets.entryPoints"
