@@ -7,6 +7,18 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		5DC00000000000000000BB02 /* TapToPaySessions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DC00000000000000000BB01 /* TapToPaySessions.swift */; };
+		5DC00000000000000000BA02 /* TapToPayTerminal.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DC00000000000000000BA01 /* TapToPayTerminal.swift */; };
+		5DC00000000000000000B903 /* TapToPaySessionStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DC00000000000000000B901 /* TapToPaySessionStatus.swift */; };
+		5DC00000000000000000B902 /* TapToPaySessionStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DC00000000000000000B901 /* TapToPaySessionStatus.swift */; };
+		5DC00000000000000000B802 /* DemoCustomerData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DC00000000000000000B801 /* DemoCustomerData.swift */; };
+		5DC00000000000000000B702 /* PayInDiagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DC00000000000000000B701 /* PayInDiagnostics.swift */; };
+		5DC00000000000000000B602 /* PayInSessions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DC00000000000000000B601 /* PayInSessions.swift */; };
+		5DC00000000000000000B502 /* PayInRequests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DC00000000000000000B501 /* PayInRequests.swift */; };
+		5DC00000000000000000B402 /* PayInForms.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DC00000000000000000B401 /* PayInForms.swift */; };
+		5DC00000000000000000B302 /* PaymentFormHost.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DC00000000000000000B301 /* PaymentFormHost.swift */; };
+		5DC00000000000000000B202 /* PayInFlowHandle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DC00000000000000000B201 /* PayInFlowHandle.swift */; };
+		5DC00000000000000000B102 /* PayInOutcome.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DC00000000000000000B101 /* PayInOutcome.swift */; };
 		A1B2C3D4E5F60000000000E2 /* QAContextLine.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60000000000E1 /* QAContextLine.swift */; };
 		A1B2C3D4E5F60000000000D2 /* StepRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60000000000D1 /* StepRow.swift */; };
 		A1B2C3D4E5F60000000000F2 /* TokenProbeResults.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60000000000F1 /* TokenProbeResults.swift */; };
@@ -94,6 +106,17 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		5DC00000000000000000BB01 /* TapToPaySessions.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TapToPaySessions.swift; sourceTree = "<group>"; };
+		5DC00000000000000000BA01 /* TapToPayTerminal.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TapToPayTerminal.swift; sourceTree = "<group>"; };
+		5DC00000000000000000B901 /* TapToPaySessionStatus.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TapToPaySessionStatus.swift; sourceTree = "<group>"; };
+		5DC00000000000000000B801 /* DemoCustomerData.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DemoCustomerData.swift; sourceTree = "<group>"; };
+		5DC00000000000000000B701 /* PayInDiagnostics.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PayInDiagnostics.swift; sourceTree = "<group>"; };
+		5DC00000000000000000B601 /* PayInSessions.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PayInSessions.swift; sourceTree = "<group>"; };
+		5DC00000000000000000B501 /* PayInRequests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PayInRequests.swift; sourceTree = "<group>"; };
+		5DC00000000000000000B401 /* PayInForms.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PayInForms.swift; sourceTree = "<group>"; };
+		5DC00000000000000000B301 /* PaymentFormHost.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PaymentFormHost.swift; sourceTree = "<group>"; };
+		5DC00000000000000000B201 /* PayInFlowHandle.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PayInFlowHandle.swift; sourceTree = "<group>"; };
+		5DC00000000000000000B101 /* PayInOutcome.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PayInOutcome.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F60000000000E1 /* QAContextLine.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = QAContextLine.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F60000000000D1 /* StepRow.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = StepRow.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F60000000000F1 /* TokenProbeResults.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TokenProbeResults.swift; sourceTree = "<group>"; };
@@ -256,6 +279,19 @@
 		5DC0000000000000000000A0 /* SDK */ = {
 			isa = PBXGroup;
 			children = (
+				5DC00000000000000000BB01 /* TapToPaySessions.swift */,
+				5DC00000000000000000BA01 /* TapToPayTerminal.swift */,
+				5DC00000000000000000B901 /* TapToPaySessionStatus.swift */,
+				5DC00000000000000000B801 /* DemoCustomerData.swift */,
+				5DC00000000000000000B701 /* PayInDiagnostics.swift */,
+				5DC00000000000000000B601 /* PayInSessions.swift */,
+				5DC00000000000000000B501 /* PayInRequests.swift */,
+				5DC00000000000000000B401 /* PayInForms.swift */,
+				5DC00000000000000000B301 /* PaymentFormHost.swift */,
+				5DC00000000000000000B201 /* PayInFlowHandle.swift */,
+				5DC00000000000000000B101 /* PayInOutcome.swift */,
+				D10000000000000000000004 /* PayInSharedConfiguration.swift */,
+				A1B2C3D4E5F600000000BB51 /* LoggableError.swift */,
 				A1B2C3D4E5F600000000BB31 /* EntryPointLookup.swift */,
 				D10000000000000000000001 /* DemoConfiguration.swift */,
 			);
@@ -288,7 +324,6 @@
 				BB9C96115FF840C6491AED9C /* PaymentMethodQAView.swift */,
 				5B1E0F9A8C7D6E5F4A3B2C1D /* PaymentCaptureQAView.swift */,
 				0F5E8CC6E7A24D19A71B0A1C /* PaymentMethodAddedView.swift */,
-				D10000000000000000000004 /* PayInSharedConfiguration.swift */,
 			);
 			path = PayIn;
 			sourceTree = "<group>";
@@ -351,7 +386,6 @@
 				A1B2C3D4E5F60000000000E1 /* QAContextLine.swift */,
 				A1B2C3D4E5F60000000000F1 /* TokenProbeResults.swift */,
 				A1B2C3D4E5F600000000AA01 /* DemoCustomerSetting.swift */,
-				A1B2C3D4E5F600000000BB51 /* LoggableError.swift */,
 				A1B2C3D4E5F600000000AB11 /* QAAmount.swift */,
 				A1B2C3D4E5F600000000AB01 /* QAIdentity.swift */,
 			);
@@ -620,6 +654,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				5DC00000000000000000B903 /* TapToPaySessionStatus.swift in Sources */,
 				F20000000000000000000012 /* StepStatus.swift in Sources */,
 				F20000000000000000000013 /* TapToPaySteps.swift in Sources */,
 				F20000000000000000000014 /* PayInSteps.swift in Sources */,
@@ -643,6 +678,17 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				5DC00000000000000000BB02 /* TapToPaySessions.swift in Sources */,
+				5DC00000000000000000BA02 /* TapToPayTerminal.swift in Sources */,
+				5DC00000000000000000B902 /* TapToPaySessionStatus.swift in Sources */,
+				5DC00000000000000000B802 /* DemoCustomerData.swift in Sources */,
+				5DC00000000000000000B702 /* PayInDiagnostics.swift in Sources */,
+				5DC00000000000000000B602 /* PayInSessions.swift in Sources */,
+				5DC00000000000000000B502 /* PayInRequests.swift in Sources */,
+				5DC00000000000000000B402 /* PayInForms.swift in Sources */,
+				5DC00000000000000000B302 /* PaymentFormHost.swift in Sources */,
+				5DC00000000000000000B202 /* PayInFlowHandle.swift in Sources */,
+				5DC00000000000000000B102 /* PayInOutcome.swift in Sources */,
 				AF77F479977FE319B28EB3D7 /* PayabliDemoQAApp.swift in Sources */,
 				D20000000000000000000007 /* ConfigurationQAView.swift in Sources */,
 				D20000000000000000000005 /* QADetailRow.swift in Sources */,

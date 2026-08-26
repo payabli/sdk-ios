@@ -37,9 +37,22 @@ final class StepStatusTests: XCTestCase {
         // the list below is written out. A tenth state fails here first.
         XCTAssertEqual(everyTapToPaySession.count, 9)
         XCTAssertNil(PayabliTTPSessionState(rawValue: 9))
+        for status in everyTapToPayStatus {
+            if case let .unrecognised(raw) = status {
+                XCTFail("the app does not name the SDK state with raw value \(raw)")
+            }
+        }
     }
 }
 
 /// The nine session states, by raw value, since the enum is `@objc`.
 let everyTapToPaySession: [PayabliTTPSessionState] =
     (0 ... 8).compactMap(PayabliTTPSessionState.init(rawValue:))
+
+/// The same nine as this app names them.
+///
+/// Derived rather than written out, so a state the app has not mapped arrives here
+/// as `unrecognised` and fails the assertion beside it rather than reaching a
+/// screen as `state(9)`.
+let everyTapToPayStatus: [TapToPaySessionStatus] =
+    everyTapToPaySession.map(TapToPaySessionStatus.init)

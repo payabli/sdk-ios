@@ -85,6 +85,17 @@ enum DemoConfiguration {
         EntryPointLookup.name(for: environment)
     }
 
+    /// The host the running environment resolves to, as a string, so a screen can
+    /// show which service this build talks to without holding the environment.
+    static var host: String {
+        environment.baseURL.host ?? "—"
+    }
+
+    /// Which SDK this build links, for the Config tab.
+    static var sdkVersion: String {
+        PayabliCore.version
+    }
+
     /// Resolves the bundled `LocalTokenServer` base URL at runtime.
     ///
     /// `127.0.0.1` means the Mac in the Simulator and the phone on a device, so

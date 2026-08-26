@@ -201,7 +201,7 @@ final class TapToPayOnDeviceTests: XCTestCase {
     /// customer, the amount and the device handle are sent.
     func testAChargeReachesTheTapWithTheDemoCustomer() async throws {
         try await assertChargeReachesTheTap(
-            customer: DemoCustomerSetting.demoCustomer,
+            customer: TapToPayDemoCustomer.customerData,
             label: "demoCustomer"
         )
     }

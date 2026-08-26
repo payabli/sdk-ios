@@ -1,10 +1,9 @@
 import Dispatch
 import os
-import PayabliSDKPayInPaymentFlow
 import SwiftUI
 
 struct PaymentMethodQAView: View {
-    @ObservedObject var paymentFlow: PayabliPayInPaymentFlow
+    @ObservedObject var paymentFlow: PayInFlowHandle
 
     @StateObject private var diagnosticsStore = DiagnosticsStore.paymentMethod
     @EnvironmentObject private var tokenProbes: TokenProbeResults
@@ -56,13 +55,12 @@ struct PaymentMethodQAView: View {
                                 DebugPrefillButton()
                             #endif
 
-                            PayabliPayInPaymentFlowView(
-                                component: paymentFlow,
-                                configuration: configuration,
+                            PaymentFormHost(
+                                flow: paymentFlow,
+                                form: PayInForms.storedMethod,
                                 onCompleted: handlePaymentMethodAdded,
-                                onError: handleError
+                                onFailed: handleError
                             )
-                            .payabliPayInPaymentFlowStyle(style)
 
                             // The step that failed shows why. A failed form
                             // blocks the result row, which is the only other
@@ -104,17 +102,13 @@ struct PaymentMethodQAView: View {
                 PaymentMethodAddedView()
             }
         }
-        .payabliPayInPaymentFlowSheet(
+        .paymentFormSheet(
             isPresented: $isPaymentMethodSheetPresented,
-            component: paymentFlow,
-            configuration: configuration,
-            sheetConfiguration: PayabliPayInPaymentFlowSheetConfiguration(
-                title: "Add Payment Method",
-                dismissButton: .back
-            ),
-            style: style,
+            flow: paymentFlow,
+            form: PayInForms.storedMethod,
+            title: "Add Payment Method",
             onCompleted: handlePaymentMethodAdded,
-            onError: handleError
+            onFailed: handleError
         )
         #if DEBUG
         .onChange(of: isPaymentMethodSheetPresented) { isPresented in
@@ -129,13 +123,13 @@ struct PaymentMethodQAView: View {
 
     // MARK: - The sequence
 
-    /// `PayabliPayInPaymentFlow` publishes only `isSubmitting` and `lastResult`,
-    /// so the sequence derives from those plus the token probe.
+    /// The flow answers only whether it is submitting and whether it holds a
+    /// result, so the sequence derives from those plus the token probe.
     private var steps: PayInFlowSteps {
         PayInSteps.forStoringMethod(
             PayInProgress(
                 tokenCheck: tokenProbes.check(.storedMethod),
-                hasResult: paymentFlow.lastResult != nil,
+                hasResult: paymentFlow.hasResult,
                 resultAcknowledged: resultAcknowledged,
                 isSubmitting: paymentFlow.isSubmitting,
                 submitFailed: submitFailed
@@ -156,122 +150,10 @@ struct PaymentMethodQAView: View {
         Task { await tokenProbes.probeStoredMethod() }
     }
 
-    private var configuration: PayabliPayInPaymentFlowFormConfiguration {
-        PayabliPayInPaymentFlowFormConfiguration(
-            allowedMethods: PayInSharedConfiguration.allowedMethods,
-            defaultMethod: PayInSharedConfiguration.defaultMethod,
-            cardFieldOrder: PayInSharedConfiguration.cardFieldOrder,
-            achFieldOrder: PayInSharedConfiguration.achFieldOrder,
-            cardSections: [
-                PayabliPayInPaymentFlowFieldSection(
-                    title: "Card Information",
-                    titleStyle: PayabliPayInPaymentFlowTextStyle(
-                        font: .headline.weight(.semibold),
-                        color: .primary
-                    ),
-                    fields: [
-                        .cardholderName,
-                        .cardNumber,
-                        .cardExpiration,
-                        .cardCvv,
-                        .cardZip
-                    ]
-                ),
-                PayabliPayInPaymentFlowFieldSection(
-                    title: "Customer Information",
-                    titleStyle: PayabliPayInPaymentFlowTextStyle(
-                        font: .headline.weight(.semibold),
-                        color: .primary
-                    ),
-                    fields: [
-                        .firstName,
-                        .lastName,
-                        // A stored method belongs to a customer, and the number is what a later
-                        // charge finds it by. The capture form leaves it out for the opposite
-                        // reason: nothing is being stored against a customer there.
-                        .customerNumber,
-                        .billingEmail
-                    ]
-                )
-            ],
-            achSections: [
-                PayabliPayInPaymentFlowFieldSection(
-                    title: "Bank Information",
-                    titleStyle: PayabliPayInPaymentFlowTextStyle(
-                        font: .headline.weight(.semibold),
-                        color: .primary
-                    ),
-                    fields: [
-                        .achHolder,
-                        .achRouting,
-                        .achAccount,
-                        .achAccountType
-                    ]
-                ),
-                PayabliPayInPaymentFlowFieldSection(
-                    title: "Customer Information",
-                    titleStyle: PayabliPayInPaymentFlowTextStyle(
-                        font: .headline.weight(.semibold),
-                        color: .primary
-                    ),
-                    fields: [
-                        .firstName,
-                        .lastName,
-                        // A stored method belongs to a customer, and the number is what a later
-                        // charge finds it by. The capture form leaves it out for the opposite
-                        // reason: nothing is being stored against a customer there.
-                        .customerNumber,
-                        .billingEmail
-                    ]
-                )
-            ],
-            hiddenValues: PayabliPayInPaymentFlowHiddenValues(
-                achHolderType: .personal,
-                achSecCode: .web,
-                methodDescription: QAIdentity.current.note("save")
-            ),
-            options: PayabliPayInPaymentFlowOptions(
-                // Not sent at all, which is what the Android sample's store options
-                // do and what the paypoint's own setting then decides. Sending
-                // `false` would have the sample opt out of a check on an
-                // integrator's behalf.
-                createAnonymous: false,
-                forceCustomerCreation: true,
-                temporary: false,
-                source: "ios-payment-method-qa"
-            ),
-            labels: PayabliPayInPaymentFlowLabels(
-                title: "Save Payment Method",
-                subtitle: "Create a card or ACH token.",
-                fieldPlaceholders: labelMatchingPlaceholders(for: fieldsWithHiddenLabels)
-            ),
-            labelLayout: PayInSharedConfiguration.labelLayout,
-            showsFieldLabels: PayInSharedConfiguration.showsFieldLabels,
-            hiddenFieldLabels: Set(fieldsWithHiddenLabels),
-            formatting: PayInSharedConfiguration.formatting,
-            inputSizing: PayInSharedConfiguration.inputSizing,
-            cardBrandIconPlacement: PayInSharedConfiguration.cardBrandIconPlacement
-        )
-    }
-
-    private var style: PayabliPayInPaymentFlowStyle {
-        PayInSharedConfiguration.style
-    }
-
-    private var fieldsWithHiddenLabels: [PayabliPayInPaymentFlowField] {
-        PayInSharedConfiguration.fieldsWithHiddenLabels
-    }
-
-    private func labelMatchingPlaceholders(
-        for fields: [PayabliPayInPaymentFlowField]
-    ) -> [PayabliPayInPaymentFlowField: String] {
-        PayInSharedConfiguration.labelMatchingPlaceholders(for: fields)
-    }
-
-    private func handlePaymentMethodAdded(_ result: PayabliPayInPaymentFlowResult) {
+    private func handlePaymentMethodAdded(_ outcome: PayInOutcome) {
         resultAcknowledged = false
         submitFailed = false
-        guard let method = result.storedPaymentMethod else {
+        guard let method = outcome.storedMethod else {
             resultText = "Payment method response did not include a stored method."
             return
         }
@@ -296,23 +178,17 @@ struct PaymentMethodQAView: View {
         }
     }
 
-    private func handleError(_ error: Error) {
+    private func handleError(_ failure: PayInFailure) {
         submitFailed = true
-        resultText = "Payment method failed: \(error.localizedDescription)"
+        resultText = "Payment method failed: \(failure.message)"
         Logger(
             subsystem: "com.payabli.example.app",
             category: "PaymentMethodDiagnostics"
-        ).error("Payment method failed: \(LoggableError.label(for: error), privacy: .public)")
+        ).error("Payment method failed: \(failure.logLabel, privacy: .public)")
     }
 }
 
 #Preview {
-    PaymentMethodQAView(
-        paymentFlow: PayabliPayInPaymentFlow(
-            accessToken: "preview-token",
-            entryPoint: "preview-entry",
-            environment: DemoConfiguration.environment
-        )
-    )
-    .environmentObject(TokenProbeResults.inert())
+    PaymentMethodQAView(paymentFlow: PayInSessions.preview())
+        .environmentObject(TokenProbeResults.inert())
 }

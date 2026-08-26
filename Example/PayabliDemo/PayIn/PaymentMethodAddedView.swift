@@ -1,5 +1,4 @@
 import Foundation
-import PayabliSDKPayInPaymentFlow
 import SwiftUI
 
 struct PaymentMethodAddedView: View {
@@ -27,7 +26,7 @@ struct PaymentMethodAddedView: View {
 }
 
 struct PaymentCaptureResultView: View {
-    let result: PayabliPayInPaymentFlowResult
+    let outcome: PayInOutcome
 
     var body: some View {
         ScrollView {
@@ -41,7 +40,7 @@ struct PaymentCaptureResultView: View {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Payment submitted")
                             .font(.title2.weight(.semibold))
-                        Text(result.reason ?? result.explanation ?? result.code)
+                        Text(outcome.headline)
                             .font(.subheadline)
                             .foregroundStyle(Color.payabliOnSurfaceVariant)
                     }
@@ -53,7 +52,7 @@ struct PaymentCaptureResultView: View {
                     Text("Response")
                         .font(.headline)
 
-                    Text(responseJSON)
+                    Text(outcome.responseJSON)
                         .font(.caption.monospaced())
                         .foregroundStyle(Color.payabliOnSurfaceVariant)
                         .textSelection(.enabled)
@@ -75,7 +74,7 @@ struct PaymentCaptureResultView: View {
             Text("Summary")
                 .font(.headline)
 
-            ForEach(summaryRows, id: \.label) { row in
+            ForEach(outcome.summaryRows) { row in
                 HStack(alignment: .top) {
                     Text(row.label)
                         .font(.subheadline.weight(.medium))
@@ -90,43 +89,5 @@ struct PaymentCaptureResultView: View {
         .padding(12)
         .background(Color.payabliSurfaceContainer)
         .clipShape(RoundedRectangle(cornerRadius: 8))
-    }
-
-    private var summaryRows: [(label: String, value: String)] {
-        let transaction = result.transaction
-        return [
-            ("Code", result.code),
-            ("Reason", result.reason ?? "-"),
-            ("Explanation", result.explanation ?? "-"),
-            ("Action", result.action ?? "-"),
-            ("Payment trans ID", transaction?.paymentTransId ?? "-"),
-            ("Gateway trans ID", transaction?.gatewayTransId ?? "-"),
-            ("Order ID", transaction?.orderId ?? "-"),
-            ("Method", transaction?.method ?? "-"),
-            ("Operation", transaction?.operation ?? "-"),
-            ("Status", transaction?.transStatus.map(String.init) ?? "-"),
-            ("Total amount", formattedAmount(transaction?.totalAmount)),
-            ("Fee amount", formattedAmount(transaction?.feeAmount)),
-            ("Source", transaction?.source ?? "-")
-        ]
-    }
-
-    private var responseJSON: String {
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        guard
-            let data = try? encoder.encode(result.apiResponse),
-            let text = String(data: data, encoding: .utf8)
-        else {
-            return "Unable to render response JSON."
-        }
-        return text
-    }
-
-    /// The response carries no currency, so this names one. The reader's own
-    /// locale decides the grouping and the decimal mark.
-    private func formattedAmount(_ value: Double?) -> String {
-        guard let value else { return "-" }
-        return value.formatted(.currency(code: "USD"))
     }
 }

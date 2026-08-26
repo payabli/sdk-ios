@@ -1,5 +1,3 @@
-import PayabliSDKCore
-import PayabliSDKPayInPaymentFlow
 import SwiftUI
 
 /// Every knob the demo runs on, in one place.
@@ -137,7 +135,7 @@ struct ConfigurationQAView: View {
                 .font(.subheadline)
             Text(
                 demoCustomer.suppliesDemoCustomer
-                    ? "Charging sends \(DemoCustomerSetting.demoCustomerSummary). "
+                    ? "Charging sends \(TapToPayDemoCustomer.summary). "
                     + "A paypoint with custom identifiers rejects a sale that names nobody."
                     : "Charging names nobody, for a paypoint with no custom identifiers, and "
                     + "records no customer. A paypoint that has them rejects the sale."
@@ -188,7 +186,7 @@ struct ConfigurationQAView: View {
                 .font(.subheadline)
             Text(
                 demoCustomer.suppliesPayInCustomer
-                    ? "Capturing sends \(DemoCustomerSetting.payInCustomerSummary), so every payment "
+                    ? "Capturing sends \(PayInDemoCustomer.summary), so every payment "
                     + "from this device lands on one customer."
                     : "Capturing sends the name and email typed into the form and no customer number, so "
                     + "the paypoint has nothing to match on and files a new customer for every payment."
@@ -237,7 +235,7 @@ struct ConfigurationQAView: View {
                 value: "\(DemoConfiguration.Linkage.current)\n"
                     + "(\(DemoConfiguration.Linkage.explanation))"
             )
-            QADetailRow(label: "SDK version", value: PayabliCore.version)
+            QADetailRow(label: "SDK version", value: DemoConfiguration.sdkVersion)
         }
     }
 

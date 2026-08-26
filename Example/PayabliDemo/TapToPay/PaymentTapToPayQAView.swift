@@ -1,10 +1,8 @@
-import PayabliSDKCore
-import PayabliSDKTapToPay
 import SwiftUI
 
 /// Tap to Pay QA screen.
 ///
-/// Shows every input `PayabliTTP` needs before it can reach `.ready`, flags the
+/// Shows every input the reader needs before it can become ready, flags the
 /// ones that are still placeholders, and drives the lifecycle:
 ///   - **Enable Terminal** — `initialize()`: eligibility → App Attest → `GET /config` →
 ///     hand credentials to the reader → prepare reader → `.ready`.
@@ -12,9 +10,9 @@ import SwiftUI
 ///   - **Activate device** — `activateDevice(activationCode:)` for `.pendingActivation`.
 ///
 /// The values themselves come from `Secrets.swift`; they are read-only here because
-/// `PayabliTTP` is constructed once at launch in `PaymentMethodQAApp`.
+/// The terminal is constructed once at launch, in the app's entry point.
 struct PaymentTapToPayQAView: View {
-    @ObservedObject var terminal: PayabliTTP
+    @ObservedObject var terminal: TapToPayTerminal
 
     @EnvironmentObject private var tokenProbes: TokenProbeResults
     @EnvironmentObject private var demoCustomer: DemoCustomerSetting
@@ -24,7 +22,7 @@ struct PaymentTapToPayQAView: View {
     @State private var activationMessage = ""
     @State private var chargeMessage = ""
     @State private var eventLog: [TapToPayQAEventEntry] = []
-    @State private var eventToken: PayabliTTPEventToken?
+    @State private var eventToken: TapToPayEventSubscription?
     @State private var isActivationPresented = false
     @State private var isActivationHelpPresented = false
     @State private var activationOutcome = TapToPayActivationOutcome.none
@@ -73,7 +71,7 @@ struct PaymentTapToPayQAView: View {
     private var steps: TapToPayFlowSteps {
         TapToPaySteps.forCharging(
             tokenCheck: tokenProbes.check(.cardPresent),
-            session: terminal.sessionState,
+            session: terminal.status,
             activation: activationOutcome
         )
     }
@@ -371,12 +369,12 @@ struct PaymentTapToPayQAView: View {
 
     private var sessionBadge: some ToolbarContent {
         ToolbarItem(placement: .navigationBarTrailing) {
-            Text(stateLabel(terminal.sessionState))
+            Text(terminal.status.label)
                 .font(.caption.bold())
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
-                .background(stateColor(terminal.sessionState).opacity(0.2))
-                .foregroundColor(stateColor(terminal.sessionState))
+                .background(color(for: terminal.status.severity).opacity(0.2))
+                .foregroundColor(color(for: terminal.status.severity))
                 .clipShape(Capsule())
         }
     }
@@ -431,15 +429,11 @@ struct PaymentTapToPayQAView: View {
         Task { @MainActor in
             defer { isWorking = false }
             do {
-                let result = try await terminal.charge(
-                    type: .sale,
-                    paymentDetails: PayabliTTPPaymentDetails(amount: amount),
-                    customer: demoCustomer.suppliesDemoCustomer
-                        ? DemoCustomerSetting.demoCustomer
-                        : PayabliTTPCustomerData(),
-                    orderDescription: "Tap to Pay sample"
+                let paymentTransId = try await terminal.charge(
+                    amount: amount,
+                    suppliesCustomer: demoCustomer.suppliesDemoCustomer
                 )
-                chargeMessage = "✓ Charged · txn \(result.paymentTransId)"
+                chargeMessage = "✓ Charged · txn \(paymentTransId)"
             } catch {
                 chargeMessage = "✗ \(error.localizedDescription)"
             }
@@ -454,23 +448,19 @@ struct PaymentTapToPayQAView: View {
         Task { @MainActor in
             defer { isWorking = false }
             do {
-                try await terminal.activateDevice(activationCode: code)
-            } catch let error as PayabliTTPError {
-                // A revoked attestation resets the session to `.idle`, and the
-                // way out is a fresh cold attestation. The reason goes to the
-                // step that offers it.
-                if case .attestationRevoked = error {
+                try await terminal.activate(code: code)
+            } catch let failure as TapToPayFailure {
+                // A revoked attestation resets the session to idle, and the way
+                // out is a fresh cold attestation. The reason goes to the step
+                // that offers it.
+                if failure.isAttestationRevoked {
                     activationOutcome = .attestationRevoked
-                    enableMessage = "✗ \(error.localizedDescription)"
+                    enableMessage = "✗ \(failure.message)"
                     activationMessage = "✗ Attestation revoked — re-enable the terminal, see step 2."
                 } else {
                     activationOutcome = .activationFailed
-                    activationMessage = "✗ \(error.localizedDescription)"
+                    activationMessage = "✗ \(failure.message)"
                 }
-                return
-            } catch {
-                activationOutcome = .activationFailed
-                activationMessage = "✗ \(error.localizedDescription)"
                 return
             }
 
@@ -511,13 +501,10 @@ struct PaymentTapToPayQAView: View {
         // The token owns both the subscription and its tear-down (cancelled in
         // onDisappear). A detached Task over events() would leak across view
         // appearances, since SwiftUI gives no handle to cancel it.
-        eventToken = terminal.addEventListener { code, payload in
-            let detail = payload.count == 0
-                ? ""
-                : payload.map { "\($0.key): \($0.value)" }.sorted().joined(separator: ", ")
+        eventToken = terminal.addEventListener { event in
             DispatchQueue.main.async {
                 eventLog.insert(
-                    TapToPayQAEventEntry(label: name(for: code), detail: detail),
+                    TapToPayQAEventEntry(label: event.label, detail: event.detail),
                     at: 0
                 )
                 if eventLog.count > 100 {
@@ -529,55 +516,12 @@ struct PaymentTapToPayQAView: View {
 
     // MARK: - Cosmetics
 
-    /// `PayabliTTPEventCode` is an `@objc Int` enum, so `String(describing:)`
-    /// renders `PayabliTTPEventCode(rawValue: 0)` rather than the case name.
-    private func name(for code: PayabliTTPEventCode) -> String {
-        switch code {
-        case .attestationStarted: return "attestationStarted"
-        case .attestationCompleted: return "attestationCompleted"
-        case .configReceived: return "configReceived"
-        case .readerInitializing: return "readerInitializing"
-        case .readerReady: return "readerReady"
-        case .chargeInitiated: return "chargeInitiated"
-        case .nfcStarted: return "nfcStarted"
-        case .nfcCompleted: return "nfcCompleted"
-        case .nfcFailed: return "nfcFailed"
-        case .updateCompleted: return "updateCompleted"
-        case .updateFailed: return "updateFailed"
-        case .sessionExpired: return "sessionExpired"
-        case .reinitializeStarted: return "reinitializeStarted"
-        case .reinitializeCompleted: return "reinitializeCompleted"
-        case .devicePendingActivation: return "devicePendingActivation"
-        case .activationStarted: return "activationStarted"
-        case .activationCompleted: return "activationCompleted"
-        case .activationFailed: return "activationFailed"
-        case .attestationFailed: return "attestationFailed"
-        case .configFailed: return "configFailed"
-        @unknown default: return "event(\(code.rawValue))"
-        }
-    }
-
-    private func stateLabel(_ state: PayabliTTPSessionState) -> String {
-        switch state {
-        case .idle: return "idle"
-        case .attestingDevice: return "attesting"
-        case .fetchingConfig: return "config"
-        case .initializingReader: return "reader"
-        case .ready: return "ready"
-        case .sessionExpired: return "expired"
-        case .reinitializing: return "reinit"
-        case .pendingActivation: return "pending"
-        case .error: return "error"
-        @unknown default: return "?"
-        }
-    }
-
-    private func stateColor(_ state: PayabliTTPSessionState) -> Color {
-        switch state {
+    private func color(for severity: TapToPayStatusSeverity) -> Color {
+        switch severity {
         case .ready: return .payabliSuccess
-        case .error, .sessionExpired: return .payabliError
-        case .pendingActivation: return .payabliWarning
-        default: return .payabliNeutral
+        case .failed: return .payabliError
+        case .waiting: return .payabliWarning
+        case .working: return .payabliNeutral
         }
     }
 }

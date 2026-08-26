@@ -1,4 +1,3 @@
-import PayabliSDKCore
 import SwiftUI
 
 /// Which paypoint and which host this build runs against, in one line.
@@ -12,7 +11,7 @@ struct QAContextLine: View {
             Text(DemoConfiguration.entryPoint.isEmpty ? "—" : DemoConfiguration.entryPoint)
                 .fontWeight(.semibold)
             Text("·")
-            Text(DemoConfiguration.environment.baseURL.host ?? "—")
+            Text(DemoConfiguration.host)
             Spacer()
             Text("details in Config")
         }
