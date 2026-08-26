@@ -36,8 +36,9 @@ enum LiveEnvironment {
             XCTFail("PAYABLI_ENV=\(requested) names no environment this run can reach")
             throw XCTSkip("unusable PAYABLI_ENV")
         }
+        // Keyed by name, because the credentials file names no SDK type.
         let entry = try XCTUnwrap(
-            Secrets.entryPoints[environment],
+            EntryPointLookup.entryPoint(from: Secrets.entryPoints, for: environment),
             "no paypoint configured for \(requested)"
         )
         pointAtTheServerFor(requested.lowercased())

@@ -3,12 +3,11 @@ import SwiftUI
 /// The latest answer from each token probe, shared by every screen that runs one
 /// or derives a step from one.
 ///
-/// Each screen used to keep its own copy, which made the answer unshareable in
-/// both directions. A probe run on the Configuration tab could not reach the tab
-/// whose sequence reads it, and a tab whose backend step had already finished
-/// renders no content, so its own probe button was gone. Between them a failing
-/// probe could not be made to outrank an earlier success anywhere except a unit
-/// test.
+/// One owner, so the answer travels in both directions: a probe run on the
+/// Configuration tab reaches the tab whose sequence reads it, and a tab whose
+/// backend step has finished renders no content and so offers no probe button of
+/// its own. It also lets a failing probe outrank an earlier success everywhere
+/// rather than only in a unit test.
 ///
 /// Three probes, because they are three token functions. `Secrets.swift.sample`
 /// forwards the capture one to the stored-method one and says that holds for the

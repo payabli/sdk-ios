@@ -16,8 +16,9 @@ end to end against sandbox.
   code via `ttp.activateDevice(activationCode:)`.
 - **Live event log** — every `PayabliTTPEvent` from the multicaster
   rendered into a list, including the per-case payload.
-- **Session badge** — the navigation bar shows the current
-  `PayabliTTPSessionState` color-coded.
+- **Session badge** — the navigation bar shows where the reader has got to,
+  color-coded, as `TapToPaySessionStatus`: the SDK's nine states in this app's
+  own words.
 - **PayIn payment flow** — SwiftUI `PayabliPayInPaymentFlowView` tabs that can
   render stored-method and capture forms, hide optional values, apply a custom
   style, and return token-storage or MoneyIn API responses.
@@ -25,7 +26,8 @@ end to end against sandbox.
 ## Setup
 
 1. Open `PayabliDemo.xcodeproj`.
-2. Copy `Secrets.swift.sample` to `Secrets.swift` and fill in your sandbox
+2. Copy `App/Configuration/Secrets.swift.sample` to `Secrets.swift` beside it and
+   fill in your sandbox
    credentials. `Secrets.swift` is gitignored.
 3. Set `DEVELOPMENT_TEAM` on the target, and set `Secrets.appId` to
    `<TEAM_ID>.com.payabli.example.app`. The Tap to Pay tab flags a
@@ -95,30 +97,59 @@ Diagnostics are redacted before they are printed or displayed in the app.
 ## Architecture notes
 
 The entry point is **`App/PayabliDemoQAApp.swift`**, a four-tab `TabView`:
-**Save · Capture · TapToPay · Config**. It owns two `PayabliPayInPaymentFlow`
-instances (stored-method and capture) and one `PayabliTTP` as `@StateObject`s,
-and passes each into its tab. That is the whole file — the diagnostics stores,
-diagnostics wiring and shared form config all live in their own folders now.
+**Save · Capture · TapToPay · Config**. It holds two PayIn flow handles
+(stored-method and capture) and one terminal handle as `@StateObject`s, each built
+by `SDK/`, and passes them into their tabs. That is the whole file: the flows
+themselves, the diagnostics wiring and the form configuration live in `SDK/`.
 
 ```
 PayabliDemo/
+  SDK/            every call this app makes into the SDK, and nothing else
+                  PayInSessions.swift           builds the two card-not-present flows
+                  PayInFlowHandle.swift         owns one flow, hands screens answers
+                  PayInForms.swift              what each form collects
+                  PayInRequests.swift           what a capture attempt asks for
+                  PaymentFormHost.swift         where the SDK's form mounts
+                  PayInOutcome.swift            the app's own result and failure
+                  PayInDiagnostics.swift        the redacted request log
+                  TapToPaySessions.swift        builds the card reader
+                  TapToPayTerminal.swift        owns the reader, hands screens answers
+                  TapToPaySessionStatus.swift   the nine states, in this app's words
+                  DemoConfiguration.swift       environment + token-host resolution
+                  EntryPointLookup.swift        which paypoint each environment uses
+                  DemoCustomerData.swift        the stand-in customer each surface sends
+                  PayInSharedConfiguration.swift  what both forms share
+                  LoggableError.swift           what a log line may say about a failure
   App/            PayabliDemoQAApp.swift        @main + the tab shell
+    Configuration/  ConfigurationQAView.swift   the Config tab
+                    Secrets.swift               credentials only (gitignored)
+                    TokenServerHealth.swift
+    TapToPay/       PaymentTapToPayQAView.swift
+                    TapToPayPreflight.swift     the checks
+                    TerminalReadinessView.swift the verdict
+    PayIn/          PaymentMethodQAView.swift, PaymentCaptureQAView.swift,
+                    PaymentMethodAddedView.swift
+    Flow/           the step sequences each screen renders
+    Diagnostics/    DiagnosticsStore.swift, DiagnosticsSection.swift
+    Debug/          DebugPrefill.swift, DebugPrefill.json
+    Shared/         rows, identity, amounts, token probes
+    Theme/          the palette
   Config/         *.xcconfig                    build settings, per configuration
-  Configuration/  DemoConfiguration.swift       environment + token-host resolution
-                  Secrets.swift                 credentials only (gitignored)
-                  ConfigurationQAView.swift     the Config tab
-                  QADetailRow.swift             shared read-only row
-  TapToPay/       PaymentTapToPayQAView.swift
-                  TapToPayPreflight.swift       the checks
-                  TerminalReadinessView.swift   the verdict
-  PayIn/          PaymentMethodQAView.swift, PaymentCaptureQAView.swift,
-                  PaymentMethodAddedView.swift, PayInSharedConfiguration.swift
-  Diagnostics/    DiagnosticsStore.swift, DiagnosticsSection.swift
-  Debug/          DebugPrefill.swift, DebugPrefill.json
   Resources/      Info.plist, PayabliDemo.entitlements
   Scripts/        check-sdk-linkage.sh
   LocalTokenServer/  Node token broker
 ```
+
+`SDK/` is the point of this layout. Every call into `PayabliSDKCore`,
+`PayabliSDKTapToPay` and `PayabliSDKPayInPaymentFlow` is in there, and nothing
+outside it imports an SDK module — `Scripts/check-example-sdk-boundary.sh` fails
+the build if that stops being true. So the answer to "how do I call this thing"
+is one directory, not a search through the screens. The Android sample keeps the
+same rule in `example/src/main/java/com/payabli/example/app/sdk/`.
+
+The screens hold this app's own types. A form's result reaches a screen as
+`PayInOutcome`, a failure as `PayInFailure`, and the reader's state as
+`TapToPaySessionStatus`, each translated at the boundary.
 
 ### The Config tab
 
