@@ -216,6 +216,7 @@
 		B5DAA0EB93D1309AB418DD32 /* PayabliDemo */ = {
 			isa = PBXGroup;
 			children = (
+				5DC0000000000000000000A0 /* SDK */,
 				E1000000000000000000000A /* App */,
 				F10000000000000000000010 /* Config */,
 				F10000000000000000000021 /* Scripts */,
@@ -252,12 +253,19 @@
 			path = App;
 			sourceTree = "<group>";
 		};
+		5DC0000000000000000000A0 /* SDK */ = {
+			isa = PBXGroup;
+			children = (
+				A1B2C3D4E5F600000000BB31 /* EntryPointLookup.swift */,
+				D10000000000000000000001 /* DemoConfiguration.swift */,
+			);
+			path = SDK;
+			sourceTree = "<group>";
+		};
 		E1000000000000000000000B /* Configuration */ = {
 			isa = PBXGroup;
 			children = (
-				D10000000000000000000001 /* DemoConfiguration.swift */,
 				A1B2C3D4E5F600000000BB01 /* TokenServerHealth.swift */,
-				A1B2C3D4E5F600000000BB31 /* EntryPointLookup.swift */,
 				4C921D1F3EE7130C23911757 /* Secrets.swift */,
 				D10000000000000000000007 /* ConfigurationQAView.swift */,
 			);
