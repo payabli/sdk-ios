@@ -90,9 +90,17 @@ final class TapToPayTerminal: ObservableObject {
 }
 
 /// Something the reader refused.
-struct TapToPayFailure: Error {
+///
+/// `LocalizedError`, because the screens show `localizedDescription`. Without it
+/// Foundation answers a generic "operation couldn't be completed" for a struct
+/// error and the reason the reader gave never reaches the payer.
+struct TapToPayFailure: LocalizedError {
     /// Displayable, and what a screen shows.
     let message: String
+
+    var errorDescription: String? {
+        message
+    }
 
     /// Whether the binding this device held has been revoked. A revoked
     /// attestation resets the session to idle, and the way out is a fresh cold
