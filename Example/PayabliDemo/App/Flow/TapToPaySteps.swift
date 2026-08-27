@@ -141,7 +141,9 @@ enum TapToPaySteps {
                 return outcome == .attestationRevoked || outcome == .activationFailed
                     ? .failed
                     : .current
-            @unknown default: return .current
+            // A state this app does not name says nothing about whether the reader
+            // came up, so the step stays the one to act on.
+            case .unrecognised: return .current
             }
         }()
 
