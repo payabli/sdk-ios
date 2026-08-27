@@ -163,7 +163,9 @@ extension PayInFailure {
             }
             return payabliError.reason
         }
-        return String(describing: error)
+        // A token provider throws `URLError`, which carries a sentence a payer can
+        // read. Its debug representation does not.
+        return error.localizedDescription
     }
 
     private static func isDuplicateSubmission(_ error: Error) -> Bool {
