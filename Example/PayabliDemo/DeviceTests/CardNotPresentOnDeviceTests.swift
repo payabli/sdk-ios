@@ -7,9 +7,9 @@ import XCTest
 /// store a card, authorize against it, and void the authorization.
 ///
 /// The card, the customer and the request shape are the app's own, from
-/// `DebugPrefill.json`, `DemoCustomerSetting` and `PaymentCaptureQAView`. A second
-/// set here would be a second thing to keep true of the paypoint, and it was: a
-/// request assembled separately went out with no customer at all and was refused.
+/// `DebugPrefill.json`, `PayInDemoCustomer` and `PayInRequests`. A second set here
+/// would be a second thing to keep true of the paypoint, and it was: a request
+/// assembled separately went out with no customer at all and was refused.
 ///
 /// These move money in the environment the run names. The void runs whatever the
 /// authorization did, so a failure part way through leaves nothing standing.
