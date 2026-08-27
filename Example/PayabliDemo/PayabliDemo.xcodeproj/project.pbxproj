@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		5DC00000000000000000BC02 /* PayInPrefill.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DC00000000000000000BC01 /* PayInPrefill.swift */; };
 		5DC00000000000000000BB02 /* TapToPaySessions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DC00000000000000000BB01 /* TapToPaySessions.swift */; };
 		5DC00000000000000000BA02 /* TapToPayTerminal.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DC00000000000000000BA01 /* TapToPayTerminal.swift */; };
 		5DC00000000000000000B903 /* TapToPaySessionStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DC00000000000000000B901 /* TapToPaySessionStatus.swift */; };
@@ -106,6 +107,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		5DC00000000000000000BC01 /* PayInPrefill.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PayInPrefill.swift; sourceTree = "<group>"; };
 		5DC00000000000000000BB01 /* TapToPaySessions.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TapToPaySessions.swift; sourceTree = "<group>"; };
 		5DC00000000000000000BA01 /* TapToPayTerminal.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TapToPayTerminal.swift; sourceTree = "<group>"; };
 		5DC00000000000000000B901 /* TapToPaySessionStatus.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TapToPaySessionStatus.swift; sourceTree = "<group>"; };
@@ -279,6 +281,7 @@
 		5DC0000000000000000000A0 /* SDK */ = {
 			isa = PBXGroup;
 			children = (
+				5DC00000000000000000BC01 /* PayInPrefill.swift */,
 				5DC00000000000000000BB01 /* TapToPaySessions.swift */,
 				5DC00000000000000000BA01 /* TapToPayTerminal.swift */,
 				5DC00000000000000000B901 /* TapToPaySessionStatus.swift */,
@@ -678,6 +681,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				5DC00000000000000000BC02 /* PayInPrefill.swift in Sources */,
 				5DC00000000000000000BB02 /* TapToPaySessions.swift in Sources */,
 				5DC00000000000000000BA02 /* TapToPayTerminal.swift in Sources */,
 				5DC00000000000000000B902 /* TapToPaySessionStatus.swift in Sources */,

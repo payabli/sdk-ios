@@ -1,14 +1,12 @@
 #if DEBUG
-    import PayabliSDKPayInPaymentFlow
     import SwiftUI
     import UIKit
 
     /// Debug-only convenience that fills the PayIn form from `DebugPrefill.json`.
     ///
     /// The SDK owns the form's field state and offers no way to seed it, so each
-    /// field is found by the `accessibilityIdentifier` the SDK assigns
-    /// (`payabli.payInPaymentFlow.field.<field.rawValue>`) and fed through the SDK's
-    /// own input path, as if typed.
+    /// field is found by its accessibility identifier, which ``PayInPrefillField``
+    /// names, and fed through the SDK's own input path, as if typed.
     ///
     /// This file is Debug-only, and `Config/Release.xcconfig` keeps the JSON out of
     /// Release builds.
@@ -65,7 +63,7 @@
             guard let values else { return }
 
             let identity = QAIdentity.current
-            let mapping: [(PayabliPayInPaymentFlowField, String?)] = [
+            let mapping: [(PayInPrefillField, String?)] = [
                 (.cardholderName, identity.holderName),
                 (.cardNumber, values.cardNumber),
                 (.cardCvv, values.cardCvv),
@@ -82,7 +80,7 @@
             let textFields = onScreenTextFields()
             for (field, value) in mapping {
                 guard let value, !value.isEmpty else { continue }
-                let identifier = "payabli.payInPaymentFlow.field.\(field.rawValue)"
+                let identifier = field.accessibilityIdentifier
                 guard let textField = textFields.first(where: { $0.accessibilityIdentifier == identifier }) else {
                     continue
                 }

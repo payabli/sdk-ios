@@ -25,8 +25,10 @@ cd "$REPO_ROOT"
 
 APP="Example/PayabliDemo"
 
+# Leading whitespace matters: an import inside `#if DEBUG` is indented by the
+# formatter, and anchoring at column zero walked straight past one.
 leaks="$(
-    grep -rl '^import PayabliSDK' --include='*.swift' "$APP" 2>/dev/null \
+    grep -rlE '^[[:space:]]*import PayabliSDK' --include='*.swift' "$APP" 2>/dev/null \
         | grep -v "^$APP/SDK/" \
         | grep -vE "^$APP/(DeviceTests|FlowTests|UITests)/" \
         | sort
