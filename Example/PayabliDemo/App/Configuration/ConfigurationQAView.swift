@@ -48,8 +48,8 @@ struct ConfigurationQAView: View {
             QADetailRow(label: "App ID", value: Secrets.appId)
             QADetailRow(
                 label: "Environment",
-                value: "\(DemoConfiguration.nameFor(DemoConfiguration.environment)) · " +
-                    (DemoConfiguration.environment.baseURL.host ?? "—")
+                value: "\(DemoConfiguration.environment.label) · "
+                    + (DemoConfiguration.environment.host ?? "—")
                     + " · " + DemoConfiguration.environmentSource
             )
         }
@@ -235,7 +235,7 @@ struct ConfigurationQAView: View {
                 value: "\(DemoConfiguration.Linkage.current)\n"
                     + "(\(DemoConfiguration.Linkage.explanation))"
             )
-            QADetailRow(label: "SDK version", value: DemoConfiguration.sdkVersion)
+            QADetailRow(label: "SDK version", value: PayabliSDKBuild.version)
         }
     }
 
@@ -294,7 +294,7 @@ struct ConfigurationQAView: View {
                     return
                 }
                 healthCheckText = TokenServerHealth(body: body).report(
-                    appHost: DemoConfiguration.environment.baseURL.host,
+                    appHost: DemoConfiguration.environment.host,
                     appEntryPoint: DemoConfiguration.entryPoint
                 )
             } catch {

@@ -16,7 +16,7 @@ enum TapToPaySessions {
                 tokenProvider: { try await Secrets.fetchAccessToken() },
                 entryPoint: DemoConfiguration.entryPoint,
                 appId: Secrets.appId,
-                environment: DemoConfiguration.environment
+                environment: DemoConfiguration.environment.sdkEnvironment
             )
         )
     }
@@ -31,7 +31,7 @@ enum TapToPaySessions {
                 tokenProvider: { "preview-token" },
                 entryPoint: "preview-entry",
                 appId: "PREVIEW0000.\(Bundle.main.bundleIdentifier ?? "preview")",
-                environment: DemoConfiguration.environment
+                environment: DemoConfiguration.environment.sdkEnvironment
             )
         )
     }

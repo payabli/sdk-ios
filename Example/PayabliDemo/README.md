@@ -115,13 +115,15 @@ PayabliDemo/
                   TapToPaySessions.swift        builds the card reader
                   TapToPayTerminal.swift        owns the reader, hands screens answers
                   TapToPaySessionStatus.swift   the nine states, in this app's words
-                  DemoConfiguration.swift       environment + token-host resolution
-                  EntryPointLookup.swift        which paypoint each environment uses
+                  PayabliEnvironmentMapping.swift  the demo's environment, in the SDK's terms
                   DemoCustomerData.swift        the stand-in customer each surface sends
                   PayInSharedConfiguration.swift  what both forms share
                   LoggableError.swift           what a log line may say about a failure
   App/            PayabliDemoQAApp.swift        @main + the tab shell
     Configuration/  ConfigurationQAView.swift   the Config tab
+                    DemoEnvironment.swift       the environments this app offers
+                    DemoConfiguration.swift     which one runs, and the token host
+                    EntryPointLookup.swift      which paypoint each one uses
                     Secrets.swift               credentials only (gitignored)
                     TokenServerHealth.swift
     TapToPay/       PaymentTapToPayQAView.swift
@@ -152,6 +154,12 @@ one of this app's own types. The Android sample follows the same rule in
 The screens hold this app's own types. A form's result reaches a screen as
 `PayInOutcome`, a failure as `PayInFailure`, and the reader's state as
 `TapToPaySessionStatus`, each translated at the boundary.
+
+The environment works the same way and is worth calling out, because it is the one
+an integrator changes first. This app owns `DemoEnvironment` and decides which one
+runs; `SDK/PayabliEnvironmentMapping.swift` says what the SDK calls it, and nothing
+above holds an SDK environment to point a session somewhere. The Android sample
+splits it the same way, mapping in `app/sdk/PayInSessionSource.kt`.
 
 ### The Config tab
 

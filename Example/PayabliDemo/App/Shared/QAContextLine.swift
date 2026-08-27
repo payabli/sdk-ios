@@ -11,7 +11,7 @@ struct QAContextLine: View {
             Text(DemoConfiguration.entryPoint.isEmpty ? "—" : DemoConfiguration.entryPoint)
                 .fontWeight(.semibold)
             Text("·")
-            Text(DemoConfiguration.host)
+            Text(DemoConfiguration.environment.host ?? "—")
             Spacer()
             Text("details in Config")
         }

@@ -28,21 +28,20 @@ enum LiveEnvironment {
         guard let requested, !requested.isEmpty else {
             throw XCTSkip("no PAYABLI_ENV; set it in the scheme to qa or sandbox")
         }
-        let environment: PayabliEnvironment
-        switch requested.lowercased() {
-        case "qa": environment = .qa
-        case "sandbox": environment = .sandbox
-        default:
+        // The demo's own environment, which is what the lookup and the app are
+        // keyed on. Production is refused: these tests move money.
+        guard let demoEnvironment = DemoEnvironment.named(requested),
+              demoEnvironment != .production
+        else {
             XCTFail("PAYABLI_ENV=\(requested) names no environment this run can reach")
             throw XCTSkip("unusable PAYABLI_ENV")
         }
-        // Keyed by name, because the credentials file names no SDK type.
         let entry = try XCTUnwrap(
-            EntryPointLookup.entryPoint(from: Secrets.entryPoints, for: environment),
+            EntryPointLookup.entryPoint(from: Secrets.entryPoints, for: demoEnvironment),
             "no paypoint configured for \(requested)"
         )
-        pointAtTheServerFor(requested.lowercased())
-        return (environment, entry, requested.lowercased())
+        pointAtTheServerFor(demoEnvironment.label)
+        return (demoEnvironment.sdkEnvironment, entry, demoEnvironment.label)
     }
 
     /// One token server per environment, since a server holds one upstream, so the

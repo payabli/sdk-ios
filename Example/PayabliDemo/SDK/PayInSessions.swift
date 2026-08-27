@@ -11,7 +11,7 @@ enum PayInSessions {
         PayInFlowHandle(
             PayabliPayInPaymentFlow(
                 entryPoint: DemoConfiguration.entryPoint,
-                environment: DemoConfiguration.environment,
+                environment: DemoConfiguration.environment.sdkEnvironment,
                 accessTokenProvider: {
                     try await Secrets.fetchPaymentMethodAccessToken()
                 },
@@ -32,7 +32,7 @@ enum PayInSessions {
         PayInFlowHandle(
             PayabliPayInPaymentFlow(
                 entryPoint: DemoConfiguration.entryPoint,
-                environment: DemoConfiguration.environment,
+                environment: DemoConfiguration.environment.sdkEnvironment,
                 accessTokenProvider: {
                     try await Secrets.fetchPaymentCaptureAccessToken()
                 },
@@ -52,7 +52,7 @@ enum PayInSessions {
             PayabliPayInPaymentFlow(
                 accessToken: "preview-token",
                 entryPoint: "preview-entry",
-                environment: DemoConfiguration.environment,
+                environment: DemoConfiguration.environment.sdkEnvironment,
                 operation: capturing ? .capture : .storePaymentMethod,
                 requestConfiguration: capturing
                     ? PayabliPayInPaymentFlowRequestConfiguration(
