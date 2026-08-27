@@ -49,6 +49,16 @@ enum PayInForms {
                     achSecCode: .web,
                     methodDescription: QAIdentity.current.note("save")
                 ),
+                options: PayabliPayInPaymentFlowOptions(
+                    // Not sent at all, which is what the Android sample's store options
+                    // do and what the paypoint's own setting then decides. Sending
+                    // `false` would have the sample opt out of a check on an
+                    // integrator's behalf.
+                    createAnonymous: false,
+                    forceCustomerCreation: true,
+                    temporary: false,
+                    source: "ios-payment-method-qa"
+                ),
                 labels: PayabliPayInPaymentFlowLabels(
                     title: "Save Payment Method",
                     subtitle: "Create a card or ACH token.",
