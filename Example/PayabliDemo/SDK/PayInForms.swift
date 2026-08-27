@@ -56,13 +56,12 @@ enum PayInForms {
                     methodDescription: QAIdentity.current.note("save")
                 ),
                 options: PayabliPayInPaymentFlowOptions(
-                    // Not sent at all, which is what the Android sample's store options
-                    // do and what the paypoint's own setting then decides. Sending
-                    // `false` would have the sample opt out of a check on an
-                    // integrator's behalf.
-                    createAnonymous: false,
+                    // `createAnonymous` and `temporary` are left unset so the paypoint's
+                    // own settings decide them. The encoder omits only nil, so passing
+                    // `false` sends `createAnonymous=false` and `temporary=false`, which
+                    // opts the sample out of two behaviours on an integrator's behalf.
+                    // The sibling's store options set neither.
                     forceCustomerCreation: true,
-                    temporary: false,
                     source: "ios-payment-method-qa"
                 ),
                 labels: PayabliPayInPaymentFlowLabels(
