@@ -10,7 +10,7 @@ import SwiftUI
 ///   - **Activate device** — `activateDevice(activationCode:)` for `.pendingActivation`.
 ///
 /// The values themselves come from `Secrets.swift`; they are read-only here because
-/// The terminal is constructed once at launch, in the app's entry point.
+/// the terminal is constructed once at launch, in the app's entry point.
 struct PaymentTapToPayQAView: View {
     @ObservedObject var terminal: TapToPayTerminal
 
