@@ -96,24 +96,32 @@ extension PayInOutcome {
         responseJSON = Self.json(for: result)
     }
 
+    /// Built row by row rather than as one array of pairs mapped into rows. Thirteen
+    /// heterogeneous literals and a `map` is enough for the type checker to give up
+    /// on a slower machine, which it did in CI while compiling here.
     private static func rows(for result: PayabliPayInPaymentFlowResult) -> [PayInSummaryRow] {
         let transaction = result.transaction
-        return [
-            ("Code", result.code),
-            ("Reason", result.reason ?? "-"),
-            ("Explanation", result.explanation ?? "-"),
-            ("Action", result.action ?? "-"),
-            ("Payment trans ID", transaction?.paymentTransId ?? "-"),
-            ("Gateway trans ID", transaction?.gatewayTransId ?? "-"),
-            ("Order ID", transaction?.orderId ?? "-"),
-            ("Method", transaction?.method ?? "-"),
-            ("Operation", transaction?.operation ?? "-"),
-            ("Status", transaction?.transStatus.map(String.init) ?? "-"),
-            ("Total amount", amount(transaction?.totalAmount)),
-            ("Fee amount", amount(transaction?.feeAmount)),
-            ("Source", transaction?.source ?? "-")
-        ]
-        .map { PayInSummaryRow(label: $0.0, value: $0.1) }
+        var rows: [PayInSummaryRow] = []
+        rows.append(PayInSummaryRow(label: "Code", value: result.code))
+        rows.append(PayInSummaryRow(label: "Reason", value: text(result.reason)))
+        rows.append(PayInSummaryRow(label: "Explanation", value: text(result.explanation)))
+        rows.append(PayInSummaryRow(label: "Action", value: text(result.action)))
+        rows.append(PayInSummaryRow(label: "Payment trans ID", value: text(transaction?.paymentTransId)))
+        rows.append(PayInSummaryRow(label: "Gateway trans ID", value: text(transaction?.gatewayTransId)))
+        rows.append(PayInSummaryRow(label: "Order ID", value: text(transaction?.orderId)))
+        rows.append(PayInSummaryRow(label: "Method", value: text(transaction?.method)))
+        rows.append(PayInSummaryRow(label: "Operation", value: text(transaction?.operation)))
+        rows.append(PayInSummaryRow(label: "Status", value: text(transaction?.transStatus.map(String.init))))
+        rows.append(PayInSummaryRow(label: "Total amount", value: amount(transaction?.totalAmount)))
+        rows.append(PayInSummaryRow(label: "Fee amount", value: amount(transaction?.feeAmount)))
+        rows.append(PayInSummaryRow(label: "Source", value: text(transaction?.source)))
+        return rows
+    }
+
+    /// A dash where the service answered nothing, so every row renders.
+    private static func text(_ value: String?) -> String {
+        guard let value, !value.isEmpty else { return "-" }
+        return value
     }
 
     private static func json(for result: PayabliPayInPaymentFlowResult) -> String {
