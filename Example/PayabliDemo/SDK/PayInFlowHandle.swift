@@ -15,9 +15,8 @@ final class PayInFlowHandle: ObservableObject {
 
     init(_ flow: PayabliPayInPaymentFlow) {
         self.flow = flow
-        // Screens observe this object rather than the flow, so the flow's own
-        // publishes have to arrive here. Without this a submission changes
-        // `isSubmitting` and redraws nothing.
+        // Screens observe this object, so the flow's publishes have to arrive here
+        // or a submission redraws nothing.
         forwarding = flow.objectWillChange.sink { [weak self] _ in
             self?.objectWillChange.send()
         }

@@ -20,8 +20,7 @@ final class TapToPayTerminal: ObservableObject {
     init(_ terminal: PayabliTTP) {
         self.terminal = terminal
         status = TapToPaySessionStatus(terminal.sessionState)
-        // `sink` and not `assign(to:on:)`, which would retain this object through
-        // the subscription this object holds.
+        // This object holds the subscription, so the subscription holds it weakly.
         forwarding = terminal.$sessionState
             .map(TapToPaySessionStatus.init)
             .removeDuplicates()

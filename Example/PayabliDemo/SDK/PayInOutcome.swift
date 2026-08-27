@@ -166,8 +166,6 @@ extension PayInFailure {
             }
             return payabliError.reason
         }
-        // A token provider throws `URLError`, which carries a sentence a payer can
-        // read. Its debug representation does not.
         return error.localizedDescription
     }
 
