@@ -218,7 +218,7 @@ final class TapToPayStepsTests: XCTestCase {
         // `.activationFailed` does not establish that `/activate` reached the
         // backend. `generateAssertion` clears the cached key and device on a
         // DeviceCheck error and throws before the request is sent, and that error
-        // is not a a reader failure, so it arrives here indistinguishable from a
+        // is not a reader failure, so it arrives here indistinguishable from a
         // decline. Only a 401 from `/activate` is reported as
         // `.attestationRevoked`.
         let sequence = TapToPaySteps.forCharging(
