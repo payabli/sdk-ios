@@ -149,8 +149,11 @@ extension PayInFailure {
             + "a payment. Submitting again does the same. Start a new attempt to send a "
             + "payment of its own."
 
-    init(_ error: Error) {
-        let duplicate = Self.isDuplicateSubmission(error)
+    /// - Parameter operation: what the form was for. A stored method sends no
+    ///   idempotency key and offers no new attempt, so a conflict on that flow is
+    ///   not the duplicate this message describes.
+    init(_ error: Error, operation: PayInOperation) {
+        let duplicate = operation == .capture && Self.isDuplicateSubmission(error)
         isDuplicateSubmission = duplicate
         logLabel = LoggableError.label(for: error)
         message = duplicate ? Self.duplicateMessage : Self.describe(error)

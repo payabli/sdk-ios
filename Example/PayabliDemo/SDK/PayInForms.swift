@@ -5,9 +5,22 @@ import PayabliSDKPayInPaymentFlow
 /// Two values because the SDK separates them: the configuration is what to
 /// collect, the style is how it is drawn. A screen holds one of these and names
 /// neither type.
+///
+/// It also carries what the form is for, because a failure reads differently on
+/// each: only a capture sends an idempotency key, so only a capture can be
+/// answered from an attempt that already reached the service.
 struct PayInFormSetup {
+    let operation: PayInOperation
     let configuration: PayabliPayInPaymentFlowFormConfiguration
     let style: PayabliPayInPaymentFlowStyle
+}
+
+/// What a form is for.
+enum PayInOperation {
+    /// Store an instrument for later. Sends no idempotency key.
+    case storedMethod
+    /// Take a payment now, under a key that makes a resubmission a retry.
+    case capture
 }
 
 /// The two forms this app shows.
@@ -20,6 +33,7 @@ enum PayInForms {
     /// being charged.
     static var storedMethod: PayInFormSetup {
         PayInFormSetup(
+            operation: .storedMethod,
             configuration: PayabliPayInPaymentFlowFormConfiguration(
                 allowedMethods: PayInSharedConfiguration.allowedMethods,
                 defaultMethod: PayInSharedConfiguration.defaultMethod,
@@ -79,6 +93,7 @@ enum PayInForms {
     /// under the fields.
     static var capture: PayInFormSetup {
         PayInFormSetup(
+            operation: .capture,
             configuration: PayabliPayInPaymentFlowFormConfiguration(
                 allowedMethods: PayInSharedConfiguration.allowedMethods,
                 defaultMethod: PayInSharedConfiguration.defaultMethod,

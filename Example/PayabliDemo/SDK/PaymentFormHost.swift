@@ -21,7 +21,7 @@ struct PaymentFormHost: View {
             component: flow.flow,
             configuration: form.configuration,
             onCompleted: { onCompleted(PayInOutcome($0)) },
-            onError: { onFailed(PayInFailure($0)) }
+            onError: { onFailed(PayInFailure($0, operation: form.operation)) }
         )
         .payabliPayInPaymentFlowStyle(form.style)
     }
@@ -47,7 +47,7 @@ extension View {
             ),
             style: form.style,
             onCompleted: { onCompleted(PayInOutcome($0)) },
-            onError: { onFailed(PayInFailure($0)) }
+            onError: { onFailed(PayInFailure($0, operation: form.operation)) }
         )
     }
 }
