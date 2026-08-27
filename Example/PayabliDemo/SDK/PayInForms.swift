@@ -173,10 +173,7 @@ enum PayInForms {
     ) -> PayabliPayInPaymentFlowFieldSection {
         PayabliPayInPaymentFlowFieldSection(
             title: title,
-            titleStyle: PayabliPayInPaymentFlowTextStyle(
-                font: .headline.weight(.semibold),
-                color: .primary
-            ),
+            titleStyle: PayInSharedConfiguration.sectionTitleStyle,
             fields: fields
         )
     }
