@@ -157,24 +157,21 @@ extension PayInFailure {
             + "a payment. Submitting again does the same. Start a new attempt to send a "
             + "payment of its own."
 
+    /// Every failure reads as `localizedDescription`, which each SDK error type
+    /// writes for a merchant: a validation failure appends the rejected fields, a
+    /// decline appends the action the payer can take, and the rest fall back to the
+    /// reason and its detail. Reducing them here to reason and detail dropped
+    /// exactly the part worth showing.
+    ///
     /// - Parameter operation: what the form was for. A stored method sends no
     ///   idempotency key and offers no new attempt, so a conflict on that flow is
-    ///   not the duplicate this message describes.
+    ///   not the duplicate this message describes, and it reads as the service's own
+    ///   answer.
     init(_ error: Error, operation: PayInOperation) {
         let duplicate = operation == .capture && Self.isDuplicateSubmission(error)
         isDuplicateSubmission = duplicate
         logLabel = LoggableError.label(for: error)
-        message = duplicate ? Self.duplicateMessage : Self.describe(error)
-    }
-
-    private static func describe(_ error: Error) -> String {
-        if let payabliError = error as? any PayabliError {
-            if let detail = payabliError.detail, !detail.isEmpty, detail != payabliError.reason {
-                return "\(payabliError.reason)\n\(detail)"
-            }
-            return payabliError.reason
-        }
-        return error.localizedDescription
+        message = duplicate ? Self.duplicateMessage : error.localizedDescription
     }
 
     private static func isDuplicateSubmission(_ error: Error) -> Bool {

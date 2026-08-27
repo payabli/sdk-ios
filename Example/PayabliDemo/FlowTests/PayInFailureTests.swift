@@ -66,12 +66,58 @@ final class PayInFailureTests: XCTestCase {
         XCTAssertFalse(failure.message.contains("idempotency key"), failure.message)
     }
 
+    /// A validation failure's own description names each rejected field, which is
+    /// the part saying what to correct. The title alone is usually "Validation
+    /// failed", which tells a merchant nothing.
+    func testAValidationFailureKeepsTheFieldsItRejected() throws {
+        let json = Data(#"""
+        {
+          "title": "Validation failed",
+          "detail": "one or more fields were rejected",
+          "errors": { "cardNumber": [ { "message": "is not a valid card number" } ] }
+        }
+        """#.utf8)
+        let validation = try JSONDecoder().decode(PayabliValidationError.self, from: json)
+
+        let failure = PayInFailure(validation, operation: .storedMethod)
+
+        XCTAssertTrue(failure.message.contains("cardNumber"), failure.message)
+        XCTAssertTrue(failure.message.contains("is not a valid card number"), failure.message)
+    }
+
+    /// The same for a failure whose description carries an action.
+    func testAFailureKeepsTheActionItNames() {
+        let failure = PayInFailure(ActionableDecline(), operation: .storedMethod)
+
+        XCTAssertTrue(failure.message.contains("Ask for another card"), failure.message)
+    }
+
     // MARK: -
 
     private var typedConflict: Error {
         PayabliPayInPaymentFlowError.transactionFailed(
             PayabliPayInPaymentFlowFailure(reason: "Conflict", httpStatusCode: 409)
         )
+    }
+}
+
+/// A failure whose own description carries more than its reason, which is what the
+/// SDK's validation and decline types do.
+private struct ActionableDecline: PayabliError {
+    var reason: String {
+        "Declined"
+    }
+
+    var code: PayabliErrorCode {
+        .unknown
+    }
+
+    var detail: String? {
+        nil
+    }
+
+    var errorDescription: String? {
+        "Declined · Ask for another card"
     }
 }
 
