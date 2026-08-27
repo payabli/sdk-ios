@@ -6,7 +6,7 @@ import PayabliSDKPayInPaymentFlow
 ///
 /// The form calls back with the SDK's own result and error types. These are what
 /// the screens are handed instead, so no view holds a type it would have to
-/// follow when the SDK's changes.
+/// follow when the SDK changes.
 ///
 /// The rows and the response text are derived here rather than transcribed by a
 /// screen: a result carries a dozen fields and an encodable response, and a
