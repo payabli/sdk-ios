@@ -38,13 +38,4 @@ enum EntryPointLookup {
         return "No entry point for \(environment.label) in Secrets.entryPoints"
             + (configured.isEmpty ? "." : ". Configured: \(configured).")
     }
-
-    static func name(for environment: DemoEnvironment) -> String {
-        switch environment {
-        case .qa: return "qa"
-        case .sandbox: return "sandbox"
-        case .production: return "production"
-        default: return "other"
-        }
-    }
 }
