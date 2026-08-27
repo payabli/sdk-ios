@@ -47,7 +47,13 @@ final class PayInFlowHandle: ObservableObject {
     /// Draws a new attempt: a fresh amount, a fresh idempotency key, and whatever
     /// the customer switch says now. This is the one place a key is minted, and it
     /// is the only action here that may charge a second time.
+    ///
+    /// Not while a submission is in flight. Its outcome is unknown until it answers,
+    /// and the key is what lets the next submit be read as a repeat of it; minting
+    /// another makes that submit a payment of its own. The screen keeps offering
+    /// this while a retry runs, so the refusal lives here rather than on the button.
     func startNewAttempt(suppliesCustomer: Bool) {
+        guard !flow.isSubmitting else { return }
         flow.configure(
             requestConfiguration: PayInRequests.freshCapture(suppliesCustomer: suppliesCustomer)
         )
