@@ -175,10 +175,15 @@ struct PaymentCaptureQAView: View {
     /// here that may charge a second time: submitting again retries the attempt
     /// that already has a key, and this mints a new one.
     private func startAnother() {
+        // The flow refuses while a submission is in flight, and this row keeps
+        // offering the button through one. Clearing first would report an attempt
+        // that was never drawn, over a request still holding the earlier key.
+        guard paymentFlow.startNewAttempt(suppliesCustomer: demoCustomer.suppliesPayInCustomer) else {
+            return
+        }
         resultAcknowledged = true
         submitFailed = false
         resultText = ""
-        paymentFlow.startNewAttempt(suppliesCustomer: demoCustomer.suppliesPayInCustomer)
     }
 
     private func runTokenCheck() {

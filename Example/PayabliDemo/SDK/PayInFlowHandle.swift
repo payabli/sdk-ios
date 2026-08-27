@@ -52,11 +52,16 @@ final class PayInFlowHandle: ObservableObject {
     /// and the key is what lets the next submit be read as a repeat of it; minting
     /// another makes that submit a payment of its own. The screen keeps offering
     /// this while a retry runs, so the refusal lives here rather than on the button.
-    func startNewAttempt(suppliesCustomer: Bool) {
-        guard !flow.isSubmitting else { return }
+    ///
+    /// - Returns: whether an attempt was drawn. A screen showing the last failure
+    ///   clears it on `true` only: cleared on a refusal it would report an attempt
+    ///   that was never made, over a request still holding the earlier key.
+    func startNewAttempt(suppliesCustomer: Bool) -> Bool {
+        guard !flow.isSubmitting else { return false }
         flow.configure(
             requestConfiguration: PayInRequests.freshCapture(suppliesCustomer: suppliesCustomer)
         )
+        return true
     }
 
     /// Puts the customer the switch now names onto the attempt already on screen,
