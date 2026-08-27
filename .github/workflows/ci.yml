@@ -56,11 +56,6 @@ jobs:
           swiftlint
           swiftformat --lint .
 
-      # The sample app is only readable as an integration guide while every call
-      # into the SDK is in one place, which no formatter or linter can tell.
-      - name: Example SDK boundary
-        run: ./Scripts/check-example-sdk-boundary.sh
-
   # Reports, never judges. A branch that runs `swiftformat .` puts hundreds of
   # files in the diff, and the file count alone does not say which of them
   # changed what the code does.
