@@ -7,6 +7,11 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		5DC00000000000000000C503 /* PayInOperation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DC00000000000000000C501 /* PayInOperation.swift */; };
+		5DC00000000000000000C502 /* PayInOperation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DC00000000000000000C501 /* PayInOperation.swift */; };
+		5DC00000000000000000C402 /* LoggableError.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F600000000BB51 /* LoggableError.swift */; };
+		5DC00000000000000000C401 /* PayInOutcome.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DC00000000000000000B101 /* PayInOutcome.swift */; };
+		5DC00000000000000000C302 /* PayInFailureTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DC00000000000000000C301 /* PayInFailureTests.swift */; };
 		5DC00000000000000000C203 /* DemoCustomerData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DC00000000000000000B801 /* DemoCustomerData.swift */; };
 		5DC00000000000000000C202 /* PayInRequests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DC00000000000000000B501 /* PayInRequests.swift */; };
 		5DC00000000000000000C201 /* PayInFlowHandle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DC00000000000000000B201 /* PayInFlowHandle.swift */; };
@@ -116,6 +121,8 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		5DC00000000000000000C501 /* PayInOperation.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PayInOperation.swift; sourceTree = "<group>"; };
+		5DC00000000000000000C301 /* PayInFailureTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PayInFailureTests.swift; sourceTree = "<group>"; };
 		5DC00000000000000000C101 /* PayInFlowHandleTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PayInFlowHandleTests.swift; sourceTree = "<group>"; };
 		5DC00000000000000000C001 /* DemoEnvironmentTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DemoEnvironmentTests.swift; sourceTree = "<group>"; };
 		5DC00000000000000000BF01 /* PayabliEnvironmentMapping.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PayabliEnvironmentMapping.swift; sourceTree = "<group>"; };
@@ -294,6 +301,7 @@
 		5DC0000000000000000000A0 /* SDK */ = {
 			isa = PBXGroup;
 			children = (
+				5DC00000000000000000C501 /* PayInOperation.swift */,
 				5DC00000000000000000BF01 /* PayabliEnvironmentMapping.swift */,
 				5DC00000000000000000BC01 /* PayInPrefill.swift */,
 				5DC00000000000000000BB01 /* TapToPaySessions.swift */,
@@ -444,6 +452,7 @@
 		F20000000000000000000020 /* FlowTests */ = {
 			isa = PBXGroup;
 			children = (
+				5DC00000000000000000C301 /* PayInFailureTests.swift */,
 				5DC00000000000000000C101 /* PayInFlowHandleTests.swift */,
 				5DC00000000000000000C001 /* DemoEnvironmentTests.swift */,
 				F20000000000000000000021 /* StepStatusTests.swift */,
@@ -674,6 +683,10 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				5DC00000000000000000C503 /* PayInOperation.swift in Sources */,
+				5DC00000000000000000C402 /* LoggableError.swift in Sources */,
+				5DC00000000000000000C401 /* PayInOutcome.swift in Sources */,
+				5DC00000000000000000C302 /* PayInFailureTests.swift in Sources */,
 				5DC00000000000000000C203 /* DemoCustomerData.swift in Sources */,
 				5DC00000000000000000C202 /* PayInRequests.swift in Sources */,
 				5DC00000000000000000C201 /* PayInFlowHandle.swift in Sources */,
@@ -705,6 +718,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				5DC00000000000000000C502 /* PayInOperation.swift in Sources */,
 				5DC00000000000000000BF02 /* PayabliEnvironmentMapping.swift in Sources */,
 				5DC00000000000000000BE02 /* DemoEnvironment.swift in Sources */,
 				5DC00000000000000000BC02 /* PayInPrefill.swift in Sources */,

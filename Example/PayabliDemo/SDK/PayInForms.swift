@@ -15,14 +15,6 @@ struct PayInFormSetup {
     let style: PayabliPayInPaymentFlowStyle
 }
 
-/// What a form is for.
-enum PayInOperation {
-    /// Store an instrument for later. Sends no idempotency key.
-    case storedMethod
-    /// Take a payment now, under a key that makes a resubmission a retry.
-    case capture
-}
-
 /// The two forms this app shows.
 ///
 /// Written the way an integrator would write them: the fields and sections they
