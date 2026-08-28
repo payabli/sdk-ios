@@ -44,11 +44,18 @@ opt_in_rules:
 included:
   - Sources
   - Tests
+  # The sample app too. The sensitive-field rule below names it as a place a leak
+  # was found, and a rule that does not read the file it cites guarantees nothing.
+  - Example/PayabliDemo
 
 excluded:
   - .build
   - .swiftpm
   - Example/PayabliDemo/build
+  # Gitignored, and a symlink to the developer's own copy, so it is neither this
+  # repository's code nor at a path inside it. Linting it puts an absolute path
+  # into the baseline that no other machine can resolve.
+  - Example/PayabliDemo/App/Configuration/Secrets.swift
   # Vendored Fiserv/TTPPackage source is carried byte-identical to upstream
   # (see Scripts/refresh_vendored_ttp.sh). Linting it would either force us to
   # fork the style or re-apply diffs on every refresh — neither is worth it.
@@ -115,12 +122,22 @@ custom_rules:
   # sample app and a checked-in example. `.private` is not the fix and is not
   # accepted here: the field does not go into the payload at all. Names only —
   # no attempt to match a value, which would be guesswork on a variable name.
-  # `[^\n]*` rather than `.*`: SwiftLint applies a custom regex with
-  # dot-matches-line-separators, so `.*` matched a log call on one line against a
-  # field name hundreds of lines later and reported three false positives.
+  #
+  # The span between the call and the field is bounded and lazy, and both halves
+  # matter. Unbounded `.*` matched a log call against a field name hundreds of
+  # lines below it. Bounding it to one line missed the multi-line calls this repo
+  # writes, where the argument opens on the line after `logger.info(`. And greedy
+  # `{0,160}` reads as if it works while hiding violations: the span runs forward
+  # to the furthest field it can reach, so one match swallows the next log call
+  # and that call never gets a match of its own. Lazy takes the nearest field,
+  # which is the one being logged.
+  #
+  # The names are the repository's own, not a generic list: `holderName`,
+  # `achHolder`, `achAccount`, `achRouting`, `cardCvv` and `cardExpiration` all
+  # appear here, and `cardCvv` is not matched by a lowercase `cvv`.
   sensitive_field_in_log:
     name: "Sensitive field in a log statement"
-    regex: '\.(debug|info|notice|warning|error|fault|critical)\([^\n]*(cardholder|cardHolder|cardNumber|accountNumber|routingNumber|customerName|firstName|lastName|cvv|CVV|expiryMonth|expiryYear)'
+    regex: '\.(debug|info|notice|warning|error|fault|critical)\([\s\S]{0,160}?(cardholderName|cardHolder|holderName|achHolder|customerName|firstName|lastName|cardNumber|accountNumber|routingNumber|achAccount|achRouting|cardCvv|cvv|CVV|[Ee]xpiration|expiryMonth|expiryYear|storedMethodId|paymentToken)'
     message: "Do not log a cardholder name, card value or account identifier. Leave the field out of the payload; `.private` redacts a view of the log and is not sufficient."
     severity: error
     excluded:
