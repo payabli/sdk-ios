@@ -6,9 +6,19 @@
 #     relaxes rules that conflict with idiomatic XCTest patterns (force
 #     unwraps on fixtures, large fixture tuples, etc.).
 #
-# CI runs `swiftlint`, which fails on a serious violation and reports the rest.
-# `--strict`, which would treat every warning as an error, exits 2 on the 29
-# warnings currently in the tree.
+# CI runs `swiftlint --strict --baseline .swiftlint-baseline.json`, so every
+# warning is an error and the baseline holds the violations that predate the
+# gate. A new violation fails; an existing one does not. Regenerate the
+# baseline only when a violation has actually been fixed, never to make a new
+# one go away:
+#   swiftlint --write-baseline .swiftlint-baseline.json
+#   python3 Scripts/relativise-lint-baseline.py
+#
+# The second command is not optional. `--write-baseline` records the absolute
+# path of every violation, which is the path on the machine that wrote it, so a
+# baseline left as written matches nothing on a CI runner and every violation in
+# it fires. Matching is by path: a baseline whose paths do not resolve suppresses
+# nothing, which is what makes this silent rather than obvious.
 
 disabled_rules:
   - trailing_whitespace
@@ -27,9 +37,9 @@ opt_in_rules:
   - force_unwrapping
   - implicitly_unwrapped_optional
 
-analyzer_rules:
-  - unused_import
-  - unused_declaration
+# `analyzer_rules` are deliberately absent. They run only under
+# `swiftlint analyze`, which needs a compiler log, and no invocation here
+# produces one — so declaring them read as coverage while enforcing nothing.
 
 included:
   - Sources
@@ -98,3 +108,22 @@ identifier_name:
     - x
 
 reporter: "xcode"
+
+custom_rules:
+  # A cardholder name, an account identifier or a card value reaching a log
+  # statement was found in four successive places on one branch, in the SDK, the
+  # sample app and a checked-in example. `.private` is not the fix and is not
+  # accepted here: the field does not go into the payload at all. Names only —
+  # no attempt to match a value, which would be guesswork on a variable name.
+  # `[^\n]*` rather than `.*`: SwiftLint applies a custom regex with
+  # dot-matches-line-separators, so `.*` matched a log call on one line against a
+  # field name hundreds of lines later and reported three false positives.
+  sensitive_field_in_log:
+    name: "Sensitive field in a log statement"
+    regex: '\.(debug|info|notice|warning|error|fault|critical)\([^\n]*(cardholder|cardHolder|cardNumber|accountNumber|routingNumber|customerName|firstName|lastName|cvv|CVV|expiryMonth|expiryYear)'
+    message: "Do not log a cardholder name, card value or account identifier. Leave the field out of the payload; `.private` redacts a view of the log and is not sufficient."
+    severity: error
+    excluded:
+      # The logger and the redactor name these fields in order to remove them.
+      - ".*/PayabliLogger\\.swift"
+      - ".*SensitiveDataRedactor\\.swift"
