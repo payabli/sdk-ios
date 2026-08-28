@@ -7,9 +7,9 @@ import XCTest
 /// store a card, authorize against it, and void the authorization.
 ///
 /// The card, the customer and the request shape are the app's own, from
-/// `DebugPrefill.json`, `DemoCustomerSetting` and `PaymentCaptureQAView`. A second
-/// set here would be a second thing to keep true of the paypoint, and it was: a
-/// request assembled separately went out with no customer at all and was refused.
+/// `DebugPrefill.json`, `PayInDemoCustomer` and `PayInRequests`. A second set here
+/// would be a second thing to keep true of the paypoint, and it was: a request
+/// assembled separately went out with no customer at all and was refused.
 ///
 /// These move money in the environment the run names. The void runs whatever the
 /// authorization did, so a failure part way through leaves nothing standing.
@@ -50,7 +50,7 @@ final class CardNotPresentOnDeviceTests: XCTestCase {
     /// identifier list is satisfied by, and they belong to the app's configuration
     /// rather than to this file.
     private func request(with card: PayabliPayInPaymentFlowCardData) -> PayabliPayInPaymentFlowRequest {
-        let configured = PaymentCaptureQAView.freshRequestConfiguration(suppliesCustomer: true)
+        let configured = PayInRequests.freshCapture(suppliesCustomer: true)
         return PayabliPayInPaymentFlowRequest(
             paymentDetails: configured.paymentDetails,
             paymentMethod: .card(PayabliPayInPaymentFlowCardMethod(data: card)),
@@ -75,7 +75,7 @@ final class CardNotPresentOnDeviceTests: XCTestCase {
             try card(),
             options: PayabliPayInPaymentFlowTokenStorageOptions(
                 forceCustomerCreation: true,
-                customerData: DemoCustomerSetting.payInCustomer
+                customerData: PayInDemoCustomer.customerData
             )
         )
 
@@ -122,7 +122,7 @@ final class CardNotPresentOnDeviceTests: XCTestCase {
     /// matching on email takes it, and an empty form is then what fails.
     func testDTheToggleOffShapeNamesAPayerWithoutANumber() async throws {
         let identity = QAIdentity.current
-        let configured = PaymentCaptureQAView.freshRequestConfiguration(suppliesCustomer: false)
+        let configured = PayInRequests.freshCapture(suppliesCustomer: false)
         let payer = PayabliPayInPaymentFlowCustomerData(
             billingEmail: identity.billingEmail,
             firstName: identity.firstName,

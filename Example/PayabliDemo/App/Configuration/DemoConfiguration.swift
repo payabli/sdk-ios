@@ -1,5 +1,4 @@
 import Foundation
-import PayabliSDKCore
 
 /// Non-secret demo settings, in one place.
 ///
@@ -21,7 +20,7 @@ enum DemoConfiguration {
     ///
     /// Captured by the facades at launch, so the Config screen shows it
     /// read-only.
-    static let environment: PayabliEnvironment = resolvedEnvironment()
+    static let environment: DemoEnvironment = resolvedEnvironment()
 
     /// The paypoint for whichever environment is running, from
     /// `Secrets.entryPoints`.
@@ -52,37 +51,24 @@ enum DemoConfiguration {
 
     private static let environmentDefaultsKey = "PayabliEnvironment"
 
-    private static func resolvedEnvironment() -> PayabliEnvironment {
+    private static func resolvedEnvironment() -> DemoEnvironment {
         if let fromArgument = argumentEnvironment() {
-            UserDefaults.standard.set(nameFor(fromArgument), forKey: environmentDefaultsKey)
+            UserDefaults.standard.set(fromArgument.label, forKey: environmentDefaultsKey)
             return fromArgument
         }
-        return rememberedEnvironment() ?? .sandbox
+        return rememberedEnvironment() ?? .fallback
     }
 
-    private static func argumentEnvironment() -> PayabliEnvironment? {
+    private static func argumentEnvironment() -> DemoEnvironment? {
         let arguments = ProcessInfo.processInfo.arguments
         guard let index = arguments.firstIndex(of: "-PayabliEnvironment"),
               index + 1 < arguments.count else { return nil }
-        return environmentNamed(arguments[index + 1])
+        return DemoEnvironment.named(arguments[index + 1])
     }
 
-    private static func rememberedEnvironment() -> PayabliEnvironment? {
+    private static func rememberedEnvironment() -> DemoEnvironment? {
         UserDefaults.standard.string(forKey: environmentDefaultsKey)
-            .flatMap(environmentNamed)
-    }
-
-    private static func environmentNamed(_ name: String) -> PayabliEnvironment? {
-        switch name.lowercased() {
-        case "qa": return .qa
-        case "sandbox": return .sandbox
-        case "production": return .production
-        default: return nil
-        }
-    }
-
-    static func nameFor(_ environment: PayabliEnvironment) -> String {
-        EntryPointLookup.name(for: environment)
+            .flatMap(DemoEnvironment.named)
     }
 
     /// Resolves the bundled `LocalTokenServer` base URL at runtime.

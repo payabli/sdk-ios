@@ -169,9 +169,8 @@ enum TapToPayPreflight {
     ///
     /// Lives here rather than in a view so the Tap to Pay tab and the
     /// Configuration tab cannot reach different conclusions from the same facts.
-    /// `Check.Status` is deliberately not `Comparable` — the checks are
-    /// independent and there is no meaningful ordering between them — so the
-    /// rollup is stated explicitly instead of derived from a max().
+    /// The checks are independent and have no ordering between them, so the
+    /// rollup is stated case by case rather than derived from a maximum.
     enum Readiness {
         case ready
         case notAvailable

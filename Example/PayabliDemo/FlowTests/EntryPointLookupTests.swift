@@ -7,9 +7,9 @@ import XCTest
 /// as a bad credential, so what this covers is every way the map can fail to
 /// produce one rather than the happy row.
 final class EntryPointLookupTests: XCTestCase {
-    private let map: [PayabliEnvironment: String] = [
-        .qa: "entryONE",
-        .sandbox: "entryTWO"
+    private let map: [String: String] = [
+        "qa": "entryONE",
+        "sandbox": "entryTWO"
     ]
 
     func testEntryPointComesFromTheRunningEnvironment() {
@@ -30,7 +30,7 @@ final class EntryPointLookupTests: XCTestCase {
     /// A row someone left blank while switching paypoints. Reported as missing
     /// rather than handed to the SDK, which would refuse it as a credential.
     func testBlankRowReadsAsMissing() {
-        let blank: [PayabliEnvironment: String] = [.qa: "", .sandbox: "   "]
+        let blank: [String: String] = ["qa": "", "sandbox": "   "]
 
         XCTAssertNil(EntryPointLookup.entryPoint(from: blank, for: .qa))
         XCTAssertNil(EntryPointLookup.entryPoint(from: blank, for: .sandbox))
@@ -40,7 +40,7 @@ final class EntryPointLookupTests: XCTestCase {
     /// The list names environments a run could actually use, so a blank row is
     /// not offered as an alternative.
     func testBlankRowsAreNotListedAsConfigured() {
-        let mixed: [PayabliEnvironment: String] = [.qa: "entryONE", .sandbox: " "]
+        let mixed: [String: String] = ["qa": "entryONE", "sandbox": " "]
 
         let problem = EntryPointLookup.problem(from: mixed, for: .production)
 
@@ -56,7 +56,7 @@ final class EntryPointLookupTests: XCTestCase {
     /// Padding survives a copy and paste and would reach the service as part of
     /// the identifier.
     func testSurroundingWhitespaceIsTrimmed() {
-        let padded: [PayabliEnvironment: String] = [.qa: "  entryONE\n"]
+        let padded = ["qa": "  entryONE\n"]
 
         XCTAssertEqual(EntryPointLookup.entryPoint(from: padded, for: .qa), "entryONE")
         XCTAssertNil(EntryPointLookup.problem(from: padded, for: .qa))

@@ -7,6 +7,33 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		5DC00000000000000000C503 /* PayInOperation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DC00000000000000000C501 /* PayInOperation.swift */; };
+		5DC00000000000000000C502 /* PayInOperation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DC00000000000000000C501 /* PayInOperation.swift */; };
+		5DC00000000000000000C402 /* LoggableError.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F600000000BB51 /* LoggableError.swift */; };
+		5DC00000000000000000C401 /* PayInOutcome.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DC00000000000000000B101 /* PayInOutcome.swift */; };
+		5DC00000000000000000C302 /* PayInFailureTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DC00000000000000000C301 /* PayInFailureTests.swift */; };
+		5DC00000000000000000C203 /* DemoCustomerData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DC00000000000000000B801 /* DemoCustomerData.swift */; };
+		5DC00000000000000000C202 /* PayInRequests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DC00000000000000000B501 /* PayInRequests.swift */; };
+		5DC00000000000000000C201 /* PayInFlowHandle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DC00000000000000000B201 /* PayInFlowHandle.swift */; };
+		5DC00000000000000000C102 /* PayInFlowHandleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DC00000000000000000C101 /* PayInFlowHandleTests.swift */; };
+		5DC00000000000000000BF03 /* PayabliEnvironmentMapping.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DC00000000000000000BF01 /* PayabliEnvironmentMapping.swift */; };
+		5DC00000000000000000C002 /* DemoEnvironmentTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DC00000000000000000C001 /* DemoEnvironmentTests.swift */; };
+		5DC00000000000000000BF02 /* PayabliEnvironmentMapping.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DC00000000000000000BF01 /* PayabliEnvironmentMapping.swift */; };
+		5DC00000000000000000BE03 /* DemoEnvironment.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DC00000000000000000BE01 /* DemoEnvironment.swift */; };
+		5DC00000000000000000BE02 /* DemoEnvironment.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DC00000000000000000BE01 /* DemoEnvironment.swift */; };
+		5DC00000000000000000BC02 /* PayInPrefill.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DC00000000000000000BC01 /* PayInPrefill.swift */; };
+		5DC00000000000000000BB02 /* TapToPaySessions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DC00000000000000000BB01 /* TapToPaySessions.swift */; };
+		5DC00000000000000000BA02 /* TapToPayTerminal.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DC00000000000000000BA01 /* TapToPayTerminal.swift */; };
+		5DC00000000000000000B903 /* TapToPaySessionStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DC00000000000000000B901 /* TapToPaySessionStatus.swift */; };
+		5DC00000000000000000B902 /* TapToPaySessionStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DC00000000000000000B901 /* TapToPaySessionStatus.swift */; };
+		5DC00000000000000000B802 /* DemoCustomerData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DC00000000000000000B801 /* DemoCustomerData.swift */; };
+		5DC00000000000000000B702 /* PayInDiagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DC00000000000000000B701 /* PayInDiagnostics.swift */; };
+		5DC00000000000000000B602 /* PayInSessions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DC00000000000000000B601 /* PayInSessions.swift */; };
+		5DC00000000000000000B502 /* PayInRequests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DC00000000000000000B501 /* PayInRequests.swift */; };
+		5DC00000000000000000B402 /* PayInForms.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DC00000000000000000B401 /* PayInForms.swift */; };
+		5DC00000000000000000B302 /* PaymentFormHost.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DC00000000000000000B301 /* PaymentFormHost.swift */; };
+		5DC00000000000000000B202 /* PayInFlowHandle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DC00000000000000000B201 /* PayInFlowHandle.swift */; };
+		5DC00000000000000000B102 /* PayInOutcome.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DC00000000000000000B101 /* PayInOutcome.swift */; };
 		A1B2C3D4E5F60000000000E2 /* QAContextLine.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60000000000E1 /* QAContextLine.swift */; };
 		A1B2C3D4E5F60000000000D2 /* StepRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60000000000D1 /* StepRow.swift */; };
 		A1B2C3D4E5F60000000000F2 /* TokenProbeResults.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60000000000F1 /* TokenProbeResults.swift */; };
@@ -94,6 +121,24 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		5DC00000000000000000C501 /* PayInOperation.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PayInOperation.swift; sourceTree = "<group>"; };
+		5DC00000000000000000C301 /* PayInFailureTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PayInFailureTests.swift; sourceTree = "<group>"; };
+		5DC00000000000000000C101 /* PayInFlowHandleTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PayInFlowHandleTests.swift; sourceTree = "<group>"; };
+		5DC00000000000000000C001 /* DemoEnvironmentTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DemoEnvironmentTests.swift; sourceTree = "<group>"; };
+		5DC00000000000000000BF01 /* PayabliEnvironmentMapping.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PayabliEnvironmentMapping.swift; sourceTree = "<group>"; };
+		5DC00000000000000000BE01 /* DemoEnvironment.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DemoEnvironment.swift; sourceTree = "<group>"; };
+		5DC00000000000000000BC01 /* PayInPrefill.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PayInPrefill.swift; sourceTree = "<group>"; };
+		5DC00000000000000000BB01 /* TapToPaySessions.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TapToPaySessions.swift; sourceTree = "<group>"; };
+		5DC00000000000000000BA01 /* TapToPayTerminal.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TapToPayTerminal.swift; sourceTree = "<group>"; };
+		5DC00000000000000000B901 /* TapToPaySessionStatus.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TapToPaySessionStatus.swift; sourceTree = "<group>"; };
+		5DC00000000000000000B801 /* DemoCustomerData.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DemoCustomerData.swift; sourceTree = "<group>"; };
+		5DC00000000000000000B701 /* PayInDiagnostics.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PayInDiagnostics.swift; sourceTree = "<group>"; };
+		5DC00000000000000000B601 /* PayInSessions.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PayInSessions.swift; sourceTree = "<group>"; };
+		5DC00000000000000000B501 /* PayInRequests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PayInRequests.swift; sourceTree = "<group>"; };
+		5DC00000000000000000B401 /* PayInForms.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PayInForms.swift; sourceTree = "<group>"; };
+		5DC00000000000000000B301 /* PaymentFormHost.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PaymentFormHost.swift; sourceTree = "<group>"; };
+		5DC00000000000000000B201 /* PayInFlowHandle.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PayInFlowHandle.swift; sourceTree = "<group>"; };
+		5DC00000000000000000B101 /* PayInOutcome.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PayInOutcome.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F60000000000E1 /* QAContextLine.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = QAContextLine.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F60000000000D1 /* StepRow.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = StepRow.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F60000000000F1 /* TokenProbeResults.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TokenProbeResults.swift; sourceTree = "<group>"; };
@@ -216,21 +261,14 @@
 		B5DAA0EB93D1309AB418DD32 /* PayabliDemo */ = {
 			isa = PBXGroup;
 			children = (
+				5DC0000000000000000000A0 /* SDK */,
 				E1000000000000000000000A /* App */,
 				F10000000000000000000010 /* Config */,
 				F10000000000000000000021 /* Scripts */,
-				F20000000000000000000010 /* Flow */,
 				F20000000000000000000020 /* FlowTests */,
 				F30000000000000000000020 /* UITests */,				F40000000000000000000020 /* DeviceTests */,
 
-				E1000000000000000000000B /* Configuration */,
-				E1000000000000000000000C /* TapToPay */,
-				E10000000000000000000020 /* Shared */,
-				E1000000000000000000000D /* PayIn */,
-				E1000000000000000000000E /* Diagnostics */,
-				E1000000000000000000000F /* Debug */,
 				E10000000000000000000010 /* Resources */,
-				D20000000000000000000024 /* Theme */,
 			);
 			name = PayabliDemo;
 			path = .;
@@ -247,17 +285,49 @@
 		E1000000000000000000000A /* App */ = {
 			isa = PBXGroup;
 			children = (
+				D20000000000000000000024 /* Theme */,
+				E1000000000000000000000C /* TapToPay */,
+				E10000000000000000000020 /* Shared */,
+				E1000000000000000000000D /* PayIn */,
+				F20000000000000000000010 /* Flow */,
+				E1000000000000000000000E /* Diagnostics */,
+				E1000000000000000000000F /* Debug */,
+				E1000000000000000000000B /* Configuration */,
 				6EA1E9A0909DDC1A7B827C8D /* PayabliDemoQAApp.swift */,
 			);
 			path = App;
 			sourceTree = "<group>";
 		};
+		5DC0000000000000000000A0 /* SDK */ = {
+			isa = PBXGroup;
+			children = (
+				5DC00000000000000000C501 /* PayInOperation.swift */,
+				5DC00000000000000000BF01 /* PayabliEnvironmentMapping.swift */,
+				5DC00000000000000000BC01 /* PayInPrefill.swift */,
+				5DC00000000000000000BB01 /* TapToPaySessions.swift */,
+				5DC00000000000000000BA01 /* TapToPayTerminal.swift */,
+				5DC00000000000000000B901 /* TapToPaySessionStatus.swift */,
+				5DC00000000000000000B801 /* DemoCustomerData.swift */,
+				5DC00000000000000000B701 /* PayInDiagnostics.swift */,
+				5DC00000000000000000B601 /* PayInSessions.swift */,
+				5DC00000000000000000B501 /* PayInRequests.swift */,
+				5DC00000000000000000B401 /* PayInForms.swift */,
+				5DC00000000000000000B301 /* PaymentFormHost.swift */,
+				5DC00000000000000000B201 /* PayInFlowHandle.swift */,
+				5DC00000000000000000B101 /* PayInOutcome.swift */,
+				D10000000000000000000004 /* PayInSharedConfiguration.swift */,
+				A1B2C3D4E5F600000000BB51 /* LoggableError.swift */,
+			);
+			path = SDK;
+			sourceTree = "<group>";
+		};
 		E1000000000000000000000B /* Configuration */ = {
 			isa = PBXGroup;
 			children = (
+				5DC00000000000000000BE01 /* DemoEnvironment.swift */,
+				A1B2C3D4E5F600000000BB31 /* EntryPointLookup.swift */,
 				D10000000000000000000001 /* DemoConfiguration.swift */,
 				A1B2C3D4E5F600000000BB01 /* TokenServerHealth.swift */,
-				A1B2C3D4E5F600000000BB31 /* EntryPointLookup.swift */,
 				4C921D1F3EE7130C23911757 /* Secrets.swift */,
 				D10000000000000000000007 /* ConfigurationQAView.swift */,
 			);
@@ -280,7 +350,6 @@
 				BB9C96115FF840C6491AED9C /* PaymentMethodQAView.swift */,
 				5B1E0F9A8C7D6E5F4A3B2C1D /* PaymentCaptureQAView.swift */,
 				0F5E8CC6E7A24D19A71B0A1C /* PaymentMethodAddedView.swift */,
-				D10000000000000000000004 /* PayInSharedConfiguration.swift */,
 			);
 			path = PayIn;
 			sourceTree = "<group>";
@@ -343,7 +412,6 @@
 				A1B2C3D4E5F60000000000E1 /* QAContextLine.swift */,
 				A1B2C3D4E5F60000000000F1 /* TokenProbeResults.swift */,
 				A1B2C3D4E5F600000000AA01 /* DemoCustomerSetting.swift */,
-				A1B2C3D4E5F600000000BB51 /* LoggableError.swift */,
 				A1B2C3D4E5F600000000AB11 /* QAAmount.swift */,
 				A1B2C3D4E5F600000000AB01 /* QAIdentity.swift */,
 			);
@@ -384,6 +452,9 @@
 		F20000000000000000000020 /* FlowTests */ = {
 			isa = PBXGroup;
 			children = (
+				5DC00000000000000000C301 /* PayInFailureTests.swift */,
+				5DC00000000000000000C101 /* PayInFlowHandleTests.swift */,
+				5DC00000000000000000C001 /* DemoEnvironmentTests.swift */,
 				F20000000000000000000021 /* StepStatusTests.swift */,
 				F20000000000000000000023 /* TapToPayStepsTests.swift */,
 				F20000000000000000000025 /* PayInStepsTests.swift */,
@@ -612,6 +683,18 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				5DC00000000000000000C503 /* PayInOperation.swift in Sources */,
+				5DC00000000000000000C402 /* LoggableError.swift in Sources */,
+				5DC00000000000000000C401 /* PayInOutcome.swift in Sources */,
+				5DC00000000000000000C302 /* PayInFailureTests.swift in Sources */,
+				5DC00000000000000000C203 /* DemoCustomerData.swift in Sources */,
+				5DC00000000000000000C202 /* PayInRequests.swift in Sources */,
+				5DC00000000000000000C201 /* PayInFlowHandle.swift in Sources */,
+				5DC00000000000000000C102 /* PayInFlowHandleTests.swift in Sources */,
+				5DC00000000000000000BF03 /* PayabliEnvironmentMapping.swift in Sources */,
+				5DC00000000000000000C002 /* DemoEnvironmentTests.swift in Sources */,
+				5DC00000000000000000BE03 /* DemoEnvironment.swift in Sources */,
+				5DC00000000000000000B903 /* TapToPaySessionStatus.swift in Sources */,
 				F20000000000000000000012 /* StepStatus.swift in Sources */,
 				F20000000000000000000013 /* TapToPaySteps.swift in Sources */,
 				F20000000000000000000014 /* PayInSteps.swift in Sources */,
@@ -635,6 +718,21 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				5DC00000000000000000C502 /* PayInOperation.swift in Sources */,
+				5DC00000000000000000BF02 /* PayabliEnvironmentMapping.swift in Sources */,
+				5DC00000000000000000BE02 /* DemoEnvironment.swift in Sources */,
+				5DC00000000000000000BC02 /* PayInPrefill.swift in Sources */,
+				5DC00000000000000000BB02 /* TapToPaySessions.swift in Sources */,
+				5DC00000000000000000BA02 /* TapToPayTerminal.swift in Sources */,
+				5DC00000000000000000B902 /* TapToPaySessionStatus.swift in Sources */,
+				5DC00000000000000000B802 /* DemoCustomerData.swift in Sources */,
+				5DC00000000000000000B702 /* PayInDiagnostics.swift in Sources */,
+				5DC00000000000000000B602 /* PayInSessions.swift in Sources */,
+				5DC00000000000000000B502 /* PayInRequests.swift in Sources */,
+				5DC00000000000000000B402 /* PayInForms.swift in Sources */,
+				5DC00000000000000000B302 /* PaymentFormHost.swift in Sources */,
+				5DC00000000000000000B202 /* PayInFlowHandle.swift in Sources */,
+				5DC00000000000000000B102 /* PayInOutcome.swift in Sources */,
 				AF77F479977FE319B28EB3D7 /* PayabliDemoQAApp.swift in Sources */,
 				D20000000000000000000007 /* ConfigurationQAView.swift in Sources */,
 				D20000000000000000000005 /* QADetailRow.swift in Sources */,

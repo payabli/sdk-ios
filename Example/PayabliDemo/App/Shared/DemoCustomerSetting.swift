@@ -1,6 +1,4 @@
 import Foundation
-import PayabliSDKPayInPaymentFlow
-import PayabliSDKTapToPay
 import SwiftUI
 
 /// Whether the sample supplies a stand-in customer or asks for one.
@@ -10,6 +8,9 @@ import SwiftUI
 /// configured an empty customer is accepted and no customer record is written
 /// at all. Which one a paypoint has is a merchant setting the SDK cannot see,
 /// so the sample offers both and defaults to the one that works on either.
+///
+/// Only the answers live here. What is actually sent on each surface is in the
+/// SDK group, beside the calls that send it.
 ///
 /// Not persisted: it describes the paypoint under test, which changes with the
 /// environment, so a stored answer would outlive the paypoint it was true for.
@@ -30,37 +31,4 @@ final class DemoCustomerSetting: ObservableObject {
     /// billing email are written over whatever this configures, so a capture with
     /// none configured still names a payer.
     @Published var suppliesPayInCustomer = true
-
-    /// This device rather than one constant, because several devices run the
-    /// card-not-present flows at once and a shared number would put every row on
-    /// one record.
-    static let payInCustomer = PayabliPayInPaymentFlowCustomerData(
-        customerNumber: QAIdentity.current.customerNumber
-    )
-
-    /// What the sample describes itself as sending, for the Configuration tab.
-    static var payInCustomerSummary: String {
-        QAIdentity.current.summary
-    }
-
-    /// One fixed customer, not a generated one. The lookup matches on
-    /// `customerNumber` within a paypoint, so a constant reuses a single
-    /// record; a per-sale value would leave one behind for every coffee.
-    static let demoCustomer = PayabliTTPCustomerData(
-        firstName: "Demo",
-        lastName: "Customer",
-        customerNumber: "DEMO-TAPTOPAY",
-        billingEmail: "demo-taptopay@example.com"
-    )
-
-    /// What the sample describes itself as sending, for the Configuration tab.
-    static var demoCustomerSummary: String {
-        [
-            demoCustomer.fullName,
-            demoCustomer.customerNumber,
-            demoCustomer.billingEmail
-        ]
-        .compactMap { $0 }
-        .joined(separator: " · ")
-    }
 }

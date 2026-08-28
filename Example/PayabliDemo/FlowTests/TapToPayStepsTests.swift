@@ -1,4 +1,3 @@
-import PayabliSDKTapToPay
 import XCTest
 
 /// The Tap to Pay sequence, over every combination it can be asked for.
@@ -6,11 +5,11 @@ final class TapToPayStepsTests: XCTestCase {
     /// What the probe said, where the session is, and what activation did.
     private struct Combination: CustomStringConvertible {
         let tokenCheck: TokenCheck
-        let session: PayabliTTPSessionState
+        let session: TapToPaySessionStatus
         let outcome: TapToPayActivationOutcome
 
         var description: String {
-            "token \(tokenCheck), session \(sessionName(session)), activation \(outcome)"
+            "token \(tokenCheck), session \(session.label), activation \(outcome)"
         }
     }
 
@@ -19,7 +18,7 @@ final class TapToPayStepsTests: XCTestCase {
         let outcomes: [TapToPayActivationOutcome] =
             [.none, .activationFailed, .attestationRevoked, .enableFailed, .succeeded]
         return checks.flatMap { check in
-            everyTapToPaySession.flatMap { session in
+            everyTapToPayStatus.flatMap { session in
                 outcomes.map { Combination(tokenCheck: check, session: session, outcome: $0) }
             }
         }
@@ -31,6 +30,20 @@ final class TapToPayStepsTests: XCTestCase {
             session: combination.session,
             activation: combination.outcome
         )
+    }
+
+    /// A state this app does not name leaves the enable step offering its action,
+    /// which is what an unknown reader state means: nothing about whether it came
+    /// up. The nine the SDK has today never map to it, which `StepStatusTests`
+    /// asserts, so this is the only place the case is exercised.
+    func testAnUnnamedStateLeavesTheEnableStepToAct() {
+        let sequence = TapToPaySteps.forCharging(
+            tokenCheck: .reachable,
+            session: .unrecognised(99),
+            activation: .none
+        )
+
+        XCTAssertEqual(sequence.enable.status, .current)
     }
 
     func testTheSpaceIsTheSizeItClaims() {
@@ -219,7 +232,7 @@ final class TapToPayStepsTests: XCTestCase {
         // `.activationFailed` does not establish that `/activate` reached the
         // backend. `generateAssertion` clears the cached key and device on a
         // DeviceCheck error and throws before the request is sent, and that error
-        // is not a `PayabliTTPError`, so it arrives here indistinguishable from a
+        // is not a reader failure, so it arrives here indistinguishable from a
         // decline. Only a 401 from `/activate` is reported as
         // `.attestationRevoked`.
         let sequence = TapToPaySteps.forCharging(
@@ -240,13 +253,13 @@ final class TapToPayStepsTests: XCTestCase {
     }
 
     func testAFailedProbeKeepsTheOnlyActionOnTheProbe() {
-        for session in everyTapToPaySession {
+        for session in everyTapToPayStatus {
             let sequence = TapToPaySteps.forCharging(
                 tokenCheck: .unreachable, session: session, activation: .activationFailed
             )
             XCTAssertEqual(
                 sequence.nextAction, .checkToken,
-                "session \(sessionName(session)) moved past a failed probe"
+                "session \(session.label) moved past a failed probe"
             )
         }
     }
@@ -337,18 +350,18 @@ final class TapToPayStepsTests: XCTestCase {
     }
 
     func testStartingTheTerminalIsTheAppWaitingNotThePerson() {
-        for session in [PayabliTTPSessionState.attestingDevice, .fetchingConfig, .initializingReader, .reinitializing] {
+        for session in [TapToPaySessionStatus.attestingDevice, .fetchingConfig, .initializingReader, .reinitializing] {
             let sequence = TapToPaySteps.forCharging(tokenCheck: .reachable, session: session, activation: .none)
-            XCTAssertEqual(sequence.enable.status, .inProgress, "\(sessionName(session))")
-            XCTAssertFalse(sequence.enable.status.isActionable, "\(sessionName(session))")
+            XCTAssertEqual(sequence.enable.status, .inProgress, "\(session.label)")
+            XCTAssertFalse(sequence.enable.status.isActionable, "\(session.label)")
         }
     }
 
     func testASessionThatStoppedKeepsTheStepThatCanStartItAgain() {
-        for session in [PayabliTTPSessionState.error, .sessionExpired] {
+        for session in [TapToPaySessionStatus.error, .sessionExpired] {
             let sequence = TapToPaySteps.forCharging(tokenCheck: .reachable, session: session, activation: .none)
-            XCTAssertEqual(sequence.enable.status, .failed, "\(sessionName(session))")
-            XCTAssertTrue(sequence.enable.status.showsContent, "\(sessionName(session))")
+            XCTAssertEqual(sequence.enable.status, .failed, "\(session.label)")
+            XCTAssertTrue(sequence.enable.status.showsContent, "\(session.label)")
         }
     }
 
@@ -457,22 +470,5 @@ final class TapToPayStepsTests: XCTestCase {
         let idle = TapToPaySteps.forCharging(tokenCheck: .reachable, session: .idle, activation: .none)
         XCTAssertTrue(pending.activation.detail.contains("Device Management"))
         XCTAssertNotEqual(idle.activation.detail, pending.activation.detail)
-    }
-}
-
-/// `PayabliTTPSessionState` is `@objc`, so `String(describing:)` renders a raw
-/// value rather than the case name, and a failure message has to name the state.
-func sessionName(_ state: PayabliTTPSessionState) -> String {
-    switch state {
-    case .idle: return "idle"
-    case .attestingDevice: return "attestingDevice"
-    case .fetchingConfig: return "fetchingConfig"
-    case .initializingReader: return "initializingReader"
-    case .ready: return "ready"
-    case .sessionExpired: return "sessionExpired"
-    case .reinitializing: return "reinitializing"
-    case .pendingActivation: return "pendingActivation"
-    case .error: return "error"
-    @unknown default: return "state(\(state.rawValue))"
     }
 }

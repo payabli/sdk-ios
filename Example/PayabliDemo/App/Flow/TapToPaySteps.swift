@@ -1,4 +1,3 @@
-import PayabliSDKTapToPay
 
 /// Which half of the activation step happened.
 ///
@@ -62,7 +61,7 @@ enum TapToPayRecovery {
     /// A failed activation is one of them. `.activationFailed` does not
     /// establish that `/activate` reached the backend: `generateAssertion`
     /// clears the cached key and device on a DeviceCheck error and throws before
-    /// the request is sent, and that error is not a `PayabliTTPError`, so it
+    /// the request is sent, and that error is not a reader failure, so it
     /// arrives as a plain `.activationFailed` with the identity already gone.
     /// Only a 401 from `/activate` itself is reported as `.attestationRevoked`.
     case sessionErrored
@@ -91,7 +90,7 @@ enum TapToPaySteps {
     ///   - outcome: what the last activation attempt did.
     static func forCharging(
         tokenCheck: TokenCheck,
-        session: PayabliTTPSessionState,
+        session: TapToPaySessionStatus,
         activation outcome: TapToPayActivationOutcome
     ) -> TapToPayFlowSteps {
         // States the session cannot reach without a successful authenticated
@@ -142,7 +141,9 @@ enum TapToPaySteps {
                 return outcome == .attestationRevoked || outcome == .activationFailed
                     ? .failed
                     : .current
-            @unknown default: return .current
+            // A state this app does not name says nothing about whether the reader
+            // came up, so the step stays the one to act on.
+            case .unrecognised: return .current
             }
         }()
 
