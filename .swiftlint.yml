@@ -135,12 +135,16 @@ custom_rules:
   # and that call never gets a match of its own. Lazy takes the nearest field,
   # which is the one being logged.
   #
+  # `log` is in the list beside the severity methods: `os.Logger` carries
+  # `log(level:_:)` as well, and a rule that names only the convenient spellings
+  # leaves the general one open.
+  #
   # The names are the repository's own, not a generic list: `holderName`,
   # `achHolder`, `achAccount`, `achRouting`, `cardCvv` and `cardExpiration` all
   # appear here, and `cardCvv` is not matched by a lowercase `cvv`.
   sensitive_field_in_log:
     name: "Sensitive field in a log statement"
-    regex: '\.(debug|info|notice|warning|error|fault|critical)\([\s\S]{0,160}?(cardholderName|cardHolder|holderName|achHolder|customerName|firstName|lastName|cardNumber|accountNumber|routingNumber|achAccount|achRouting|cardCvv|cvv|CVV|[Ee]xpiration|expiryMonth|expiryYear|storedMethodId|paymentToken)'
+    regex: '\.(log|debug|info|notice|warning|error|fault|critical)\([\s\S]{0,160}?(cardholderName|cardHolder|holderName|achHolder|customerName|firstName|lastName|cardNumber|accountNumber|routingNumber|achAccount|achRouting|cardCvv|cvv|CVV|[Ee]xpiration|expiryMonth|expiryYear|storedMethodId|paymentToken)'
     message: "Do not log a cardholder name, card value or account identifier. Leave the field out of the payload; `.private` redacts a view of the log and is not sufficient."
     severity: error
     excluded:
