@@ -12,13 +12,12 @@
 # baseline only when a violation has actually been fixed, never to make a new
 # one go away:
 #   swiftlint --write-baseline .swiftlint-baseline.json
-#   python3 Scripts/relativise-lint-baseline.py
 #
-# The second command is not optional. `--write-baseline` records the absolute
-# path of every violation, which is the path on the machine that wrote it, so a
-# baseline left as written matches nothing on a CI runner and every violation in
-# it fires. Matching is by path: a baseline whose paths do not resolve suppresses
-# nothing, which is what makes this silent rather than obvious.
+# The paths it records must stay relative to the repository root. Matching is by
+# path, so a baseline holding one machine's absolute paths suppresses nothing on
+# another and every violation in it fires. SwiftLint wrote absolute paths until
+# 0.65.1, which is why the version this repository pins is the floor rather than
+# a preference.
 
 disabled_rules:
   - trailing_whitespace

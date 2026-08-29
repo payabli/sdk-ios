@@ -51,11 +51,11 @@ Schemes: `PayabliSDK-Package` (everything, the one CI uses), `PayabliSDK`, `Paya
 - **Lint**: `swiftlint --strict --baseline .swiftlint-baseline.json` (config `.swiftlint.yml`). This is
   what the CI lint job runs. The baseline holds the violations that predate the gate, so a new violation
   fails and an existing one does not. Regenerate it only after fixing something, never to clear a fresh
-  violation, and say in the pull request what was fixed. Regenerating is two commands, not one:
-  `swiftlint --write-baseline .swiftlint-baseline.json` then
-  `python3 Scripts/relativise-lint-baseline.py`. The first records absolute paths belonging to the
-  machine that ran it, and a baseline left that way matches nothing on a CI runner, so every violation
-  in it fires.
+  violation, and say in the pull request what was fixed: `swiftlint --write-baseline
+  .swiftlint-baseline.json`. The paths it records must stay relative to the repository root, because
+  matching is by path and a baseline holding one machine's absolute paths suppresses nothing on
+  another. SwiftLint wrote absolute paths until 0.65.1, so that version is a floor rather than a
+  preference.
 - **Format**: `swiftformat .` (config `.swiftformat`). The same job runs `swiftformat --lint .`, which
   the tree satisfies today, so a change that reformats files it did not otherwise touch will show up as
   a repository-wide diff. Keep a change limited to the files it edits.
