@@ -145,17 +145,23 @@ custom_rules:
   # line is legitimate, so the lookahead lets that one through.
   #
   # A bare `token` holds the bearer in the transport and in both bridges, and it is
-  # matched only where it is interpolated. The word itself is ordinary in a log
-  # message — this SDK already writes "Access token refreshed" — so matching the
-  # name would report three of its own lines. `\(eventToken)` is untouched by the
-  # same construction, the interpolation opening on a different character.
+  # matched where it terminates an interpolation. The word itself is ordinary in a
+  # log message — this SDK already writes "Access token refreshed" — so matching the
+  # name would report three of its own lines. Terminating rather than exact text,
+  # because `\(token, privacy: .private)` and `\(response.token)` are both the
+  # value reaching the log, and the second is how the reusable payment-method token
+  # on `PayabliPayInPaymentFlowAPIResponse` would get there. `\(eventToken)` and
+  # `\(tokenProvider)` stay unmatched: neither ends the interpolation at `token`.
+  #
+  # `secretKey` and `apiKey` are the reader's own credentials, off the `/config`
+  # response.
   #
   # The names are the repository's own, not a generic list: `holderName`,
   # `achHolder`, `achAccount`, `achRouting`, `cardCvv` and `cardExpiration` all
   # appear here, and `cardCvv` is not matched by a lowercase `cvv`.
   sensitive_field_in_log:
     name: "Sensitive field in a log statement"
-    regex: '\.(log|debug|info|notice|warning|error|fault|critical)\([\s\S]{0,160}?(cardholderName|cardHolder|holderName|achHolder|customerName|firstName|lastName|cardNumber|accountNumber|routingNumber|achAccount|achRouting|cardCvv|cvv|CVV|[Ee]xpiration|expiryMonth|expiryYear|storedMethodId|paymentToken|accessToken(?!Provider)|currentToken|\\\(token\))'
+    regex: '\.(log|debug|info|notice|warning|error|fault|critical)\([\s\S]{0,160}?(cardholderName|cardHolder|holderName|achHolder|customerName|firstName|lastName|cardNumber|accountNumber|routingNumber|achAccount|achRouting|cardCvv|cvv|CVV|[Ee]xpiration|expiryMonth|expiryYear|storedMethodId|paymentToken|accessToken(?!Provider)|currentToken|secretKey|apiKey|\\\([^)"]*\btoken[,)])'
     message: "Do not log a cardholder name, card value or account identifier. Leave the field out of the payload; `.private` redacts a view of the log and is not sufficient."
     severity: error
     excluded:
