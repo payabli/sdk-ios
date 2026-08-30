@@ -135,6 +135,16 @@ custom_rules:
   # and that call never gets a match of its own. Lazy takes the nearest field,
   # which is the one being logged.
   #
+  # 160 is measured, and widening it backfires. At 400 the tree reports seven log
+  # calls that carry no value: the span runs past the end of its own call into the
+  # next statement, so `logger.error("Access token rejected and no tokenProvider
+  # configured")` matches the `accessToken` four lines below it in a thrown error's
+  # detail. The cost runs the other way too. A window is not the call, so an
+  # argument longer than it puts its tail out of reach, and the two longest calls
+  # here reach 324 and 364 characters. Following the call expression itself needs a
+  # rule compiled into SwiftLint; a `custom_rules` entry is a regex. This one is a
+  # net under the prohibition in CLAUDE.md, not a proof of it.
+  #
   # `log` is in the list beside the severity methods: `os.Logger` carries
   # `log(level:_:)` as well, and a rule that names only the convenient spellings
   # leaves the general one open.
@@ -162,5 +172,5 @@ custom_rules:
   sensitive_field_in_log:
     name: "Sensitive field in a log statement"
     regex: '\.(log|debug|info|notice|warning|error|fault|critical)\([\s\S]{0,160}?(cardholderName|cardHolder|holderName|achHolder|customerName|firstName|lastName|cardNumber|accountNumber|routingNumber|achAccount|achRouting|cardCvv|cvv|CVV|[Ee]xpiration|expiryMonth|expiryYear|storedMethodId|paymentToken|accessToken(?!Provider)|currentToken|secretKey|apiKey|\\\([^)"]*\btoken[,)])'
-    message: "Do not log a cardholder name, card value or account identifier. Leave the field out of the payload; `.private` redacts a view of the log and is not sufficient."
+    message: "Do not log a cardholder name, card value, account identifier, token or credential. Leave the field out of the payload; `.private` redacts a view of the log and is not sufficient."
     severity: error
