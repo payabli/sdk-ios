@@ -95,6 +95,43 @@ final class PayabliServiceTests: XCTestCase {
         }
     }
 
+    /// The v2 MoneyIn 400 verbatim from api-qa, which sends the object form and a
+    /// null `token`. Both endpoint families are live, so neither shape replaces the
+    /// other: this one and the string form above come from the same SDK's calls.
+    func testMaps400FromMoneyInDecodesObjectFormAndNullToken() async throws {
+        let serverMessage = "The token does not have access to entity in scope "
+            + "or the token is not allowed to execute requested action"
+        StubURLProtocol.handler = { request in
+            let json = """
+            {"code":"E9001","detail":"Invalid Authorization Token",
+             "errors":{"entryPoint":[{"message":"\(serverMessage)",
+                                      "suggestion":"Use an authorized API token for the request."}]},
+             "instance":"/api/v2/MoneyIn/getpaid","status":400,"title":"Bad Request",
+             "token":null,
+             "type":"https://docs.payabli.com/developers/references/pay-in-unified-response-codes"}
+            """
+            let response = HTTPURLResponse(url: request.url!, statusCode: 400, httpVersion: nil, headerFields: nil)!
+            return (response, Data(json.utf8))
+        }
+
+        let request = PayabliRequest(method: .post, path: "/api/v2/MoneyIn/getpaid")
+        do {
+            _ = try await service().performV2(request, decoding: FakeData.self)
+            XCTFail("Expected error")
+        } catch let PayabliPaymentError.validation(err) {
+            XCTAssertEqual(err.rawCode, "E9001")
+            XCTAssertEqual(err.detail, "Invalid Authorization Token")
+            XCTAssertNil(err.token)
+            XCTAssertEqual(err.errors?["entryPoint"]?.first?.message, serverMessage)
+            XCTAssertEqual(
+                err.errors?["entryPoint"]?.first?.suggestion,
+                "Use an authorized API token for the request."
+            )
+        } catch {
+            XCTFail("Wrong error: \(error)")
+        }
+    }
+
     func testMaps400WithMissingPropertyErrorsToValidationError() async throws {
         StubURLProtocol.handler = { request in
             let json = """
