@@ -72,6 +72,25 @@ public struct PayabliGenericError: PayabliError {
 public struct PayabliFieldError: Decodable, Sendable {
     public let message: String
     public let suggestion: String?
+
+    /// Reads either shape the platform sends. Model validation returns arrays of
+    /// bare strings, which become `message` with no suggestion. The
+    /// `{message, suggestion}` object this type declares is real on at least one
+    /// endpoint, so both decode and neither replaces the other.
+    public init(from decoder: any Decoder) throws {
+        if let message = try? decoder.singleValueContainer().decode(String.self) {
+            self.message = message
+            suggestion = nil
+            return
+        }
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        message = try container.decode(String.self, forKey: .message)
+        suggestion = try container.decodeIfPresent(String.self, forKey: .suggestion)
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case message, suggestion
+    }
 }
 
 /// HTTP 400 validation error (RFC 7807). See PRD §8.1.1 "Validation Error".
@@ -114,6 +133,39 @@ public struct PayabliValidationError: PayabliError, Decodable {
             }
         }
         return parts.joined(separator: " · ")
+    }
+
+    /// The status fixes the classification; the body only decides how many fields
+    /// get filled. `errors` is the field most likely to arrive in a shape neither
+    /// form covers, and the synthesised decoder throws on a present-but-mismatched
+    /// value, which would take `title`, `detail` and `type` down with it and leave
+    /// a real validation failure reporting `.unknown`. Decoding it separately costs
+    /// the field list instead. One unreadable entry drops the whole map, matching
+    /// what the sibling platform does with the same body.
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        type = try container.decodeIfPresent(String.self, forKey: .type)
+        title = try container.decodeIfPresent(String.self, forKey: .title)
+        status = try container.decodeIfPresent(Int.self, forKey: .status)
+        detail = try container.decodeIfPresent(String.self, forKey: .detail)
+        instance = try container.decodeIfPresent(String.self, forKey: .instance)
+        rawCode = try container.decodeIfPresent(String.self, forKey: .rawCode)
+        token = try container.decodeIfPresent(String.self, forKey: .token)
+        errors = try? container.decodeIfPresent([String: [PayabliFieldError]].self, forKey: .errors)
+    }
+
+    /// The empty error, for a 400 whose body will not decode at all. The status has
+    /// already fixed the classification, so the caller still catches `.validation`
+    /// and gets no fields.
+    init() {
+        type = nil
+        title = nil
+        status = nil
+        detail = nil
+        instance = nil
+        rawCode = nil
+        errors = nil
+        token = nil
     }
 
     enum CodingKeys: String, CodingKey {

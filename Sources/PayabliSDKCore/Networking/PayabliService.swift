@@ -139,7 +139,7 @@ public final class PayabliService: PayabliTransport, Sendable {
 /// standard mapping.
 ///
 /// Standard mappings (PRD §8):
-/// - 400 → `PayabliPaymentError.validation` (or `.generic(.unknown)`)
+/// - 400 → `PayabliPaymentError.validation`, whatever the body says
 /// - 401 → `PayabliGenericError(.tokenExpired)`
 /// - 402 → `PayabliPaymentError.decline` (or `.generic(.unknown)`)
 /// - 403 → `PayabliGenericError(.permissionDenied)`
@@ -161,10 +161,13 @@ public func mapPayabliHTTPError(
 
     switch response.statusCode {
     case 400:
-        if let validation = try? decoder.decode(PayabliValidationError.self, from: response.body) {
-            throw PayabliPaymentError.validation(validation)
-        }
-        throw PayabliGenericError(code: .unknown, reason: "Bad request (400)")
+        // The status fixes the classification; the body only decides how many fields
+        // get filled. A body that will not decode costs the fields, so a caller's
+        // catch on `.validation` cannot miss because a proxy returned HTML. The
+        // sibling platform states the same invariant on its own mapper.
+        let validation = (try? decoder.decode(PayabliValidationError.self, from: response.body))
+            ?? PayabliValidationError()
+        throw PayabliPaymentError.validation(validation)
 
     case 401:
         throw PayabliGenericError(code: .tokenExpired, reason: "Unauthorized (401)")

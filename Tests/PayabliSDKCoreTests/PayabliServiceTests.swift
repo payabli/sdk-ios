@@ -68,6 +68,105 @@ final class PayabliServiceTests: XCTestCase {
         }
     }
 
+    /// The body above is the object form. The platform's model validation sends a
+    /// map of string arrays instead, and both bodies below were captured from api-qa.
+    func testMaps400WithStringFieldErrorsToValidationError() async throws {
+        StubURLProtocol.handler = { request in
+            let json = """
+            {"errors": {"Entry": ["The Entry field is required."]},
+             "status": 400, "title": "One or more validation errors occurred.",
+             "type": "https://tools.ietf.org/html/rfc9110#section-15.5.1"}
+            """
+            let response = HTTPURLResponse(url: request.url!, statusCode: 400, httpVersion: nil, headerFields: nil)!
+            return (response, Data(json.utf8))
+        }
+
+        let request = PayabliRequest(method: .post, path: "/api/v2/MoneyIn/getpaid")
+        do {
+            _ = try await service().performV2(request, decoding: FakeData.self)
+            XCTFail("Expected error")
+        } catch let PayabliPaymentError.validation(err) {
+            XCTAssertEqual(err.title, "One or more validation errors occurred.")
+            XCTAssertEqual(err.type, "https://tools.ietf.org/html/rfc9110#section-15.5.1")
+            XCTAssertEqual(err.errors?["Entry"]?.first?.message, "The Entry field is required.")
+            XCTAssertNil(err.errors?["Entry"]?.first?.suggestion)
+        } catch {
+            XCTFail("Wrong error: \(error)")
+        }
+    }
+
+    func testMaps400WithMissingPropertyErrorsToValidationError() async throws {
+        StubURLProtocol.handler = { request in
+            let json = """
+            {"errors": {"$": ["JSON deserialization for type 'AttestRequest' was missing required properties including: 'platform'."],
+                        "request": ["The request field is required."]},
+             "status": 400, "title": "One or more validation errors occurred.",
+             "type": "https://tools.ietf.org/html/rfc9110#section-15.5.1"}
+            """
+            let response = HTTPURLResponse(url: request.url!, statusCode: 400, httpVersion: nil, headerFields: nil)!
+            return (response, Data(json.utf8))
+        }
+
+        let request = PayabliRequest(method: .post, path: "/api/v2/MoneyIn/getpaid")
+        do {
+            _ = try await service().performV2(request, decoding: FakeData.self)
+            XCTFail("Expected error")
+        } catch let PayabliPaymentError.validation(err) {
+            XCTAssertEqual(
+                err.errors?["$"]?.first?.message,
+                "JSON deserialization for type 'AttestRequest' was missing required properties including: 'platform'."
+            )
+            XCTAssertEqual(err.errors?["request"]?.first?.message, "The request field is required.")
+        } catch {
+            XCTFail("Wrong error: \(error)")
+        }
+    }
+
+    /// The status fixes the classification and the body only decides how many fields
+    /// get filled, so an `errors` map in a shape neither form covers costs the field
+    /// list and nothing else.
+    func testMaps400WithUnreadableFieldErrorsKeepsTheClassification() async throws {
+        StubURLProtocol.handler = { request in
+            let json = """
+            {"errors": {"Entry": [42]},
+             "status": 400, "title": "One or more validation errors occurred."}
+            """
+            let response = HTTPURLResponse(url: request.url!, statusCode: 400, httpVersion: nil, headerFields: nil)!
+            return (response, Data(json.utf8))
+        }
+
+        let request = PayabliRequest(method: .post, path: "/api/v2/MoneyIn/getpaid")
+        do {
+            _ = try await service().performV2(request, decoding: FakeData.self)
+            XCTFail("Expected error")
+        } catch let PayabliPaymentError.validation(err) {
+            XCTAssertEqual(err.title, "One or more validation errors occurred.")
+            XCTAssertTrue(err.errors?.isEmpty ?? true)
+        } catch {
+            XCTFail("Wrong error: \(error)")
+        }
+    }
+
+    /// A proxy that answers with HTML is the case the classification must survive.
+    func testMaps400WithUndecodableBodyStillClassifiesAsValidation() async throws {
+        StubURLProtocol.handler = { request in
+            let response = HTTPURLResponse(url: request.url!, statusCode: 400, httpVersion: nil, headerFields: nil)!
+            return (response, Data("<html><body>Bad Request</body></html>".utf8))
+        }
+
+        let request = PayabliRequest(method: .post, path: "/api/v2/MoneyIn/getpaid")
+        do {
+            _ = try await service().performV2(request, decoding: FakeData.self)
+            XCTFail("Expected error")
+        } catch let PayabliPaymentError.validation(err) {
+            XCTAssertEqual(err.code, .validation)
+            XCTAssertNil(err.title)
+            XCTAssertNil(err.errors)
+        } catch {
+            XCTFail("Wrong error: \(error)")
+        }
+    }
+
     func testMaps401ToTokenExpired() async throws {
         StubURLProtocol.handler = { request in
             let headers = ["Content-Type": "application/json"]
