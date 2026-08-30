@@ -11,9 +11,13 @@ import os
 ///
 /// Privacy rules:
 /// - Tokens, secrets, credentials: redacted (never logged, even as `.private`)
-/// - PAN, CVV, account numbers: NEVER logged, period
+/// - PAN, CVV, expiry, account and routing numbers: NEVER logged, period
+/// - A cardholder or payer name: never logged either, and `.private` is not the
+///   exception. It redacts a view of the log rather than keeping the value out of
+///   it, so it is the tool for something loggable-but-sensitive, which a name on an
+///   instrument is not. Leave it out of the payload.
 /// - Transaction IDs, state names, error codes, durations: `.public`
-/// - Device IDs, emails, names: `.private`
+/// - Device identifiers and email addresses: `.private`
 public struct PayabliLogger: Sendable {
     private let logger: Logger
 

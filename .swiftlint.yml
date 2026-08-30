@@ -6,9 +6,18 @@
 #     relaxes rules that conflict with idiomatic XCTest patterns (force
 #     unwraps on fixtures, large fixture tuples, etc.).
 #
-# CI runs `swiftlint`, which fails on a serious violation and reports the rest.
-# `--strict`, which would treat every warning as an error, exits 2 on the 29
-# warnings currently in the tree.
+# CI runs `swiftlint --strict --baseline .swiftlint-baseline.json`, so every
+# warning is an error and the baseline holds the violations that predate the
+# gate. A new violation fails; an existing one does not. Regenerate the
+# baseline only when a violation has actually been fixed, never to make a new
+# one go away:
+#   swiftlint --write-baseline .swiftlint-baseline.json
+#
+# The paths it records must stay relative to the repository root. Matching is by
+# path, so a baseline holding one machine's absolute paths suppresses nothing on
+# another and every violation in it fires. SwiftLint wrote absolute paths until
+# 0.65.1, which is why the version this repository pins is the floor rather than
+# a preference.
 
 disabled_rules:
   - trailing_whitespace
@@ -27,18 +36,29 @@ opt_in_rules:
   - force_unwrapping
   - implicitly_unwrapped_optional
 
-analyzer_rules:
-  - unused_import
-  - unused_declaration
+# `analyzer_rules` are deliberately absent. They run only under
+# `swiftlint analyze`, which needs a compiler log, and no invocation here
+# produces one — so declaring them read as coverage while enforcing nothing.
 
 included:
   - Sources
   - Tests
+  # The sample app too. The sensitive-field rule below names it as a place a leak
+  # was found, and a rule that does not read the file it cites guarantees nothing.
+  - Example/PayabliDemo
+  # The two bridge wrappers are Swift and take a card number, a CVV, an expiry and
+  # an account, so they are exactly where the rule below has to look. SPM does not
+  # build them, which is why they were outside every scope until now.
+  - Bridges
 
 excluded:
   - .build
   - .swiftpm
   - Example/PayabliDemo/build
+  # Gitignored, and a symlink to the developer's own copy, so it is neither this
+  # repository's code nor at a path inside it. Linting it puts an absolute path
+  # into the baseline that no other machine can resolve.
+  - Example/PayabliDemo/App/Configuration/Secrets.swift
   # Vendored Fiserv/TTPPackage source is carried byte-identical to upstream
   # (see Scripts/refresh_vendored_ttp.sh). Linting it would either force us to
   # fork the style or re-apply diffs on every refresh — neither is worth it.
@@ -98,3 +118,59 @@ identifier_name:
     - x
 
 reporter: "xcode"
+
+custom_rules:
+  # A cardholder name, an account identifier or a card value reaching a log
+  # statement was found in four successive places on one branch, in the SDK, the
+  # sample app and a checked-in example. `.private` is not the fix and is not
+  # accepted here: the field does not go into the payload at all. Names only —
+  # no attempt to match a value, which would be guesswork on a variable name.
+  #
+  # The span between the call and the field is bounded and lazy, and both halves
+  # matter. Unbounded `.*` matched a log call against a field name hundreds of
+  # lines below it. Bounding it to one line missed the multi-line calls this repo
+  # writes, where the argument opens on the line after `logger.info(`. And greedy
+  # `{0,160}` reads as if it works while hiding violations: the span runs forward
+  # to the furthest field it can reach, so one match swallows the next log call
+  # and that call never gets a match of its own. Lazy takes the nearest field,
+  # which is the one being logged.
+  #
+  # 160 is measured, and widening it backfires. At 400 the tree reports seven log
+  # calls that carry no value: the span runs past the end of its own call into the
+  # next statement, so `logger.error("Access token rejected and no tokenProvider
+  # configured")` matches the `accessToken` four lines below it in a thrown error's
+  # detail. The cost runs the other way too. A window is not the call, so an
+  # argument longer than it puts its tail out of reach, and the two longest calls
+  # here reach 324 and 364 characters. Following the call expression itself needs a
+  # rule compiled into SwiftLint; a `custom_rules` entry is a regex. This one is a
+  # net under the prohibition in CLAUDE.md, not a proof of it.
+  #
+  # `log` is in the list beside the severity methods: `os.Logger` carries
+  # `log(level:_:)` as well, and a rule that names only the convenient spellings
+  # leaves the general one open.
+  #
+  # A bearer credential is a value CLAUDE.md forbids logging as plainly as a card
+  # number, so `accessToken` and `currentToken` are here too. `accessTokenProvider`
+  # is not a credential but contains the name of one, and naming a closure in a log
+  # line is legitimate, so the lookahead lets that one through.
+  #
+  # A bare `token` holds the bearer in the transport and in both bridges, and it is
+  # matched where it terminates an interpolation. The word itself is ordinary in a
+  # log message — this SDK already writes "Access token refreshed" — so matching the
+  # name would report three of its own lines. Terminating rather than exact text,
+  # because `\(token, privacy: .private)` and `\(response.token)` are both the
+  # value reaching the log, and the second is how the reusable payment-method token
+  # on `PayabliPayInPaymentFlowAPIResponse` would get there. `\(eventToken)` and
+  # `\(tokenProvider)` stay unmatched: neither ends the interpolation at `token`.
+  #
+  # `secretKey` and `apiKey` are the reader's own credentials, off the `/config`
+  # response.
+  #
+  # The names are the repository's own, not a generic list: `holderName`,
+  # `achHolder`, `achAccount`, `achRouting`, `cardCvv` and `cardExpiration` all
+  # appear here, and `cardCvv` is not matched by a lowercase `cvv`.
+  sensitive_field_in_log:
+    name: "Sensitive field in a log statement"
+    regex: '\.(log|debug|info|notice|warning|error|fault|critical)\([\s\S]{0,160}?(cardholderName|cardHolder|holderName|achHolder|customerName|firstName|lastName|cardNumber|accountNumber|routingNumber|achAccount|achRouting|cardCvv|cvv|CVV|[Ee]xpiration|expiryMonth|expiryYear|storedMethodId|paymentToken|accessToken(?!Provider)|currentToken|secretKey|apiKey|\\\([^)"]*\btoken[,)])'
+    message: "Do not log a cardholder name, card value, account identifier, token or credential. Leave the field out of the payload; `.private` redacts a view of the log and is not sufficient."
+    severity: error

@@ -51,9 +51,14 @@ jobs:
 
       # No `--config`: naming a config file makes SwiftLint ignore nested ones,
       # and Tests/.swiftlint.yml is what relaxes the rules XCTest fixtures break.
+      #
+      # `--strict` makes a warning fail the job, and the baseline holds the ones
+      # that predate the gate, so a new violation is what reddens this and an old
+      # one is not. Regenerating the baseline is a deliberate act after a fix, not
+      # a way to clear a fresh violation; see .swiftlint.yml.
       - name: Lint
         run: |
-          swiftlint
+          swiftlint --strict --baseline .swiftlint-baseline.json
           swiftformat --lint .
 
   # Reports, never judges. A branch that runs `swiftformat .` puts hundreds of
