@@ -164,7 +164,3 @@ custom_rules:
     regex: '\.(log|debug|info|notice|warning|error|fault|critical)\([\s\S]{0,160}?(cardholderName|cardHolder|holderName|achHolder|customerName|firstName|lastName|cardNumber|accountNumber|routingNumber|achAccount|achRouting|cardCvv|cvv|CVV|[Ee]xpiration|expiryMonth|expiryYear|storedMethodId|paymentToken|accessToken(?!Provider)|currentToken|secretKey|apiKey|\\\([^)"]*\btoken[,)])'
     message: "Do not log a cardholder name, card value or account identifier. Leave the field out of the payload; `.private` redacts a view of the log and is not sufficient."
     severity: error
-    excluded:
-      # The logger and the redactor name these fields in order to remove them.
-      - ".*/PayabliLogger\\.swift"
-      - ".*SensitiveDataRedactor\\.swift"
