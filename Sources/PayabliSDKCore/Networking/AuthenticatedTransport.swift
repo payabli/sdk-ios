@@ -22,7 +22,7 @@ struct AuthenticatedTransport: PayabliTransport {
 
         guard firstAttempt.statusCode == 401 else { return firstAttempt }
 
-        let refreshed = try await auth.invalidateAndRefresh()
+        let refreshed = try await auth.invalidateAndRefresh(rejectedToken: token)
         let secondAttempt = try await base.perform(authorize(request, with: refreshed))
         if secondAttempt.statusCode == 401 {
             throw PayabliGenericError(
