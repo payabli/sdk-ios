@@ -113,18 +113,30 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
         }
 
         Task { @MainActor in
-            // Re-create the facade if configure() is called again. Cancel any
-            // previous event subscription so we don't leak.
+            // Re-creates the facade when configure() is called again, cancelling any
+            // previous event subscription so it does not leak.
             self.eventToken?.cancel()
             self.eventToken = nil
 
-            let ttp = PayabliTTP(
-                accessToken: accessToken,
-                tokenProvider: tokenProvider,
-                entryPoint: entryPoint,
-                appId: appId,
-                environment: environment
-            )
+            // The initialiser rejects an access token that cannot be sent as a header
+            // and an empty entry point, both of which arrive from the Dart side.
+            let ttp: PayabliTTP
+            do {
+                ttp = try PayabliTTP(
+                    accessToken: accessToken,
+                    tokenProvider: tokenProvider,
+                    entryPoint: entryPoint,
+                    appId: appId,
+                    environment: environment
+                )
+            } catch {
+                result(FlutterError(
+                    code: "INVALID_CONFIGURATION",
+                    message: error.localizedDescription,
+                    details: nil
+                ))
+                return
+            }
             self.ttp = ttp
             self.subscribeEvents(on: ttp)
             result(nil)

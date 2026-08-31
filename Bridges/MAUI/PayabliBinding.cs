@@ -227,13 +227,18 @@ namespace Payabli.TapToPay
         // the @objc-friendly counterpart of the Swift PayabliTokenRefresh
         // closure. Pass null to disable silent refresh (the SDK will
         // surface tokenExpired errors instead).
-        [Export("initWithAccessToken:tokenRefreshHandler:entryPoint:appId:environment:")]
+        // Carries `error:` because the Swift initialiser throws: it rejects an access
+        // token that cannot be sent as an HTTP header value, and an empty entry point.
+        // The selector must match the generated header exactly or the binding calls
+        // one that does not exist.
+        [Export("initWithAccessToken:tokenRefreshHandler:entryPoint:appId:environment:error:")]
         IntPtr Constructor(
             string accessToken,
             [NullAllowed] TokenRefreshRequest tokenRefreshHandler,
             string entryPoint,
             string appId,
-            PayabliEnvironment environment
+            PayabliEnvironment environment,
+            out NSError error
         );
 
         // Lifecycle (all @MainActor — completion fires on main thread).
