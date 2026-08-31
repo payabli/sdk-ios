@@ -3,8 +3,8 @@ import PayabliSDKTestUtils
 import XCTest
 
 final class PayabliSessionTests: XCTestCase {
-    func testSessionExposesAuthAndService() async {
-        let config = PayabliConfig(
+    func testSessionExposesAuthAndService() async throws {
+        let config = try PayabliConfig(
             accessToken: "abc",
             entryPoint: "demo",
             environment: .sandbox
@@ -32,7 +32,7 @@ final class PayabliSessionTests: XCTestCase {
         defer { StubURLProtocol.handler = nil }
 
         let urlSession = StubURLProtocol.makeSession()
-        let config = PayabliConfig(
+        let config = try PayabliConfig(
             accessToken: "tok",
             entryPoint: "demo",
             environment: .sandbox

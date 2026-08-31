@@ -19,19 +19,34 @@ public actor PayabliAuth {
     }
 
     /// Returns the current access token. Never throws synchronously — token
-    /// refresh only happens after a 401 via `invalidateAndRefresh()`.
+    /// refresh only happens after a 401 via `invalidateAndRefresh(rejectedToken:)`.
     public func currentAccessToken() -> String {
         currentToken
     }
 
-    /// Marks the token as rejected and fetches a new one via `tokenProvider`.
-    /// Callers should invoke this after receiving HTTP 401, then retry once.
+    /// Reports `rejectedToken` as refused and returns the token to use instead.
+    /// Callers invoke this after receiving HTTP 401, then retry once.
+    ///
+    /// Passing the token that was actually rejected is what makes a staggered
+    /// rejection cheap: two requests sent with the same token can have their 401s
+    /// arrive far apart, and the later one must not refresh again on a token that
+    /// has already rotated, which would discard the rotation the first one obtained.
+    ///
+    /// The in-flight join comes before the already-rotated check, because the
+    /// current token may itself be the one under refresh and handing it back would
+    /// return a credential already known to be rejected.
     ///
     /// If no provider is configured, throws `PayabliGenericError(.tokenExpired)`
     /// so the caller can surface a re-authentication prompt.
-    public func invalidateAndRefresh() async throws -> String {
+    public func invalidateAndRefresh(rejectedToken: String) async throws -> String {
         if let existing = inFlightRefresh {
             return try await existing.value
+        }
+
+        guard currentToken == rejectedToken else {
+            let rotated = currentToken
+            logger.info("Access token already rotated; reusing the current one")
+            return rotated
         }
 
         guard let provider = config.tokenProvider else {
@@ -43,29 +58,85 @@ public actor PayabliAuth {
             )
         }
 
+        // The task carries the finished refresh, not the provider call: a joiner at
+        // the top of this method awaits this same value, so validation and redaction
+        // are inside it. Left to the initiating caller, a joiner would return a token
+        // that was never checked and, on a throw, the host's own error text.
         let task = Task<String, Error> { [logger] in
             logger.info("Refreshing access token via partner tokenProvider")
-            return try await provider()
+            let minted: String
+            do {
+                minted = try await provider()
+            } catch {
+                // Every throw from the provider lands here, this SDK's own error type
+                // included: it is host code whatever it chose to throw.
+                logger.error("The token provider failed")
+                throw PayabliGenericError(
+                    code: .tokenExpired,
+                    reason: "Token refresh failed",
+                    underlying: RedactedCause(error)
+                )
+            }
+            do {
+                try Self.validate(minted, against: rejectedToken)
+            } catch {
+                logger.error("The minted token was refused before it was committed")
+                throw error
+            }
+            return minted
         }
         inFlightRefresh = task
 
         do {
             let fresh = try await task.value
-            currentToken = fresh
-            inFlightRefresh = nil
-            logger.info("Access token refreshed")
-            // Notify observers of the rotation.
-            for (_, continuation) in tokenChangeContinuations {
-                continuation.yield(fresh)
-            }
+            commit(fresh)
             return fresh
         } catch {
             inFlightRefresh = nil
-            logger.error("Token refresh failed")
+            throw error
+        }
+    }
+
+    /// Installs the minted token and announces the rotation. Called only once the
+    /// token has passed `validate(_:against:)`, so nothing here can publish a
+    /// rotation that did not happen.
+    private func commit(_ fresh: String) {
+        currentToken = fresh
+        inFlightRefresh = nil
+        logger.info("Access token refreshed")
+        for (_, continuation) in tokenChangeContinuations {
+            continuation.yield(fresh)
+        }
+    }
+
+    /// Throws rather than let a minted token be committed.
+    ///
+    /// A blank one becomes the session's credential and every later request goes out
+    /// unauthenticated. A token equal to the one just refused publishes a rotation
+    /// that did not happen and hands the caller a credential the server has already
+    /// rejected; because `currentToken` would be unchanged, the next rejection starts
+    /// another provider call instead of taking the already-rotated path, so a
+    /// provider that keeps returning it costs one call per 401 with no end.
+    private static func validate(_ fresh: String, against rejectedToken: String) throws {
+        guard !fresh.isBlank else {
             throw PayabliGenericError(
                 code: .tokenExpired,
                 reason: "Token refresh failed",
-                underlying: error
+                detail: "The tokenProvider returned a blank token."
+            )
+        }
+        guard fresh.isHeaderSafe else {
+            throw PayabliGenericError(
+                code: .tokenMalformed,
+                reason: "Token refresh failed",
+                detail: "The tokenProvider returned a token that cannot be an HTTP header value."
+            )
+        }
+        guard fresh != rejectedToken else {
+            throw PayabliGenericError(
+                code: .tokenExpired,
+                reason: "Token refresh failed",
+                detail: "The tokenProvider returned the token the server rejected."
             )
         }
     }
@@ -77,7 +148,7 @@ public actor PayabliAuth {
         inFlightRefresh = nil
     }
 
-    /// AsyncStream that emits whenever `invalidateAndRefresh()` succeeds.
+    /// AsyncStream that emits whenever `invalidateAndRefresh(rejectedToken:)` commits a new token.
     /// Each call returns an independent stream — multiple subscribers each
     /// receive every subsequent token.
     public func tokenChanges() -> AsyncStream<String> {

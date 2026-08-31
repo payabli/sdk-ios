@@ -8,7 +8,7 @@ import Foundation
 ///
 /// ## Why a closure, not a hard-coded endpoint
 ///
-/// The `clientSecret` used to mint a Payabli access token MUST NOT ship in the
+/// The `clientSecret` that mints a Payabli access token MUST NOT ship in the
 /// mobile binary — reverse-engineering a published app would expose it. Each
 /// partner runs their own backend endpoint that holds their `clientSecret`
 /// server-side and exchanges it against Payabli's token endpoint, then returns
@@ -16,7 +16,7 @@ import Foundation
 ///
 /// The host app wires this closure to call its own backend:
 /// ```swift
-/// PayabliConfig(
+/// try PayabliConfig(
 ///     accessToken: initialToken,
 ///     tokenProvider: { try await api.fetchPayabliAccessToken() },
 ///     ...

@@ -43,8 +43,8 @@ final class AttestationTurnsTests: XCTestCase {
         // Two services over one Keychain namespace, which is what a host talking to
         // one paypoint from two places builds.
         let storage = InMemorySecureStorage()
-        let (first, firstAttestor, _) = AttestFixture.makeService(storage: storage)
-        let (second, secondAttestor, _) = AttestFixture.makeService(storage: storage)
+        let (first, firstAttestor, _) = try AttestFixture.makeService(storage: storage)
+        let (second, secondAttestor, _) = try AttestFixture.makeService(storage: storage)
 
         async let a = first.attest(entry: "myEntry", appId: "TEAM.bundle.id")
         async let b = second.attest(entry: "myEntry", appId: "TEAM.bundle.id")
@@ -93,8 +93,8 @@ final class AttestationTurnsTests: XCTestCase {
 
         // Two services over one store, as two facades for one paypoint are.
         let storage = InMemorySecureStorage()
-        let (first, firstAttestor, _) = AttestFixture.makeService(storage: storage)
-        let (second, secondAttestor, _) = AttestFixture.makeService(storage: storage)
+        let (first, firstAttestor, _) = try AttestFixture.makeService(storage: storage)
+        let (second, secondAttestor, _) = try AttestFixture.makeService(storage: storage)
 
         // Sequential, so the second is never inside the gate with the first. Its
         // caller decided to attest before the first had written anything.
@@ -137,7 +137,7 @@ final class AttestationTurnsTests: XCTestCase {
 
         let storage = InMemorySecureStorage()
         try AttestFixture.seedBinding(entry: "myEntry", deviceId: "dev_stale", keyId: "dead_key", in: storage)
-        let (sut, attestor, _) = AttestFixture.makeService(storage: storage)
+        let (sut, attestor, _) = try AttestFixture.makeService(storage: storage)
         attestor.generateAssertionError = NSError(
             domain: AppAttestService.deviceCheckErrorDomain,
             code: 2,
@@ -156,7 +156,7 @@ final class AttestationTurnsTests: XCTestCase {
     /// Bounded, because the failure is a caller that never returns: without the
     /// bound this waits for the holder that the test itself is holding open, and
     /// reports a hang instead of the defect.
-    func testACancelledCallerIsReleasedBeforeTheTurnAheadEnds() async {
+    func testACancelledCallerIsReleasedBeforeTheTurnAheadEnds() async throws {
         StubURLProtocol.handler = { request in
             if request.url!.path == "/api/v2/device/taptopay/register" {
                 return AttestFixture.ok(request, ["deviceId": "dev_\(UUID().uuidString)"])
@@ -165,8 +165,8 @@ final class AttestationTurnsTests: XCTestCase {
         }
 
         let storage = InMemorySecureStorage()
-        let (holder, holdingAttestor, _) = AttestFixture.makeService(storage: storage)
-        let (waiter, _, _) = AttestFixture.makeService(storage: storage)
+        let (holder, holdingAttestor, _) = try AttestFixture.makeService(storage: storage)
+        let (waiter, _, _) = try AttestFixture.makeService(storage: storage)
 
         let held = AsyncGate()
         let reached = AsyncGate()
@@ -200,7 +200,7 @@ final class AttestationTurnsTests: XCTestCase {
         )
     }
 
-    func testACancelledCallerWaitingForATurnRegistersNothing() async {
+    func testACancelledCallerWaitingForATurnRegistersNothing() async throws {
         let paths = PathsBox()
         StubURLProtocol.handler = { request in
             paths.append(request.url!.path)
@@ -211,8 +211,8 @@ final class AttestationTurnsTests: XCTestCase {
         }
 
         let storage = InMemorySecureStorage()
-        let (holder, holdingAttestor, _) = AttestFixture.makeService(storage: storage)
-        let (waiter, waitingAttestor, _) = AttestFixture.makeService(storage: storage)
+        let (holder, holdingAttestor, _) = try AttestFixture.makeService(storage: storage)
+        let (waiter, waitingAttestor, _) = try AttestFixture.makeService(storage: storage)
 
         let held = AsyncGate()
         let reached = AsyncGate()
@@ -275,8 +275,8 @@ final class AttestationTurnsTests: XCTestCase {
         // storage has. The entry point is the same, which is all the queue keys on.
         let firstStorage = InMemorySecureStorage()
         let secondStorage = InMemorySecureStorage()
-        let (first, _, _) = AttestFixture.makeService(storage: firstStorage)
-        let (second, _, _) = AttestFixture.makeService(storage: secondStorage)
+        let (first, _, _) = try AttestFixture.makeService(storage: firstStorage)
+        let (second, _, _) = try AttestFixture.makeService(storage: secondStorage)
 
         async let a = first.attest(entry: "myEntry", appId: "TEAM.bundle.id")
         async let b = second.attest(entry: "myEntry", appId: "TEAM.bundle.id")
@@ -313,8 +313,8 @@ final class AttestationTurnsTests: XCTestCase {
         }
 
         let storage = InMemorySecureStorage()
-        let (holder, holdingAttestor, _) = AttestFixture.makeService(storage: storage)
-        let (other, otherAttestor, _) = AttestFixture.makeService(storage: storage)
+        let (holder, holdingAttestor, _) = try AttestFixture.makeService(storage: storage)
+        let (other, otherAttestor, _) = try AttestFixture.makeService(storage: storage)
 
         let held = AsyncGate()
         let reached = AsyncGate()

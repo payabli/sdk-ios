@@ -15,13 +15,50 @@ import XCTest
 /// authorization did, so a failure part way through leaves nothing standing.
 @MainActor
 final class CardNotPresentOnDeviceTests: XCTestCase {
-    private var named: (environment: PayabliEnvironment, entry: String, name: String)!
+    // Set in setUp, read by every test: the XCTest shape for a fixture that cannot
+    // exist at init. Was accepted through the lint baseline until this line moved.
+    // swiftlint:disable:next implicitly_unwrapped_optional
+    private var named: LiveTarget!
 
     override func setUp() async throws {
         try await super.setUp()
         named = try LiveEnvironment.named()
         LiveEnvironment.announce(named)
         _ = try await LiveEnvironment.requireAToken()
+    }
+
+    /// The rejection path against the real token endpoint: a credential the holder is
+    /// told was refused, replaced through the provider, and the stale rejection that
+    /// follows answered without asking the provider again.
+    ///
+    /// Moves no money. The refresh is what every other test here depends on and
+    /// nothing else proves it ran, because the app launches holding a token that may
+    /// still be valid.
+    func testEARejectedTokenIsReplacedOnceAndReused() async throws {
+        let calls = ProviderCalls()
+        let auth = PayabliAuth(config: try PayabliConfig(
+            accessToken: "refused-by-the-service",
+            tokenProvider: {
+                await calls.increment()
+                return try await Secrets.fetchAccessToken()
+            },
+            entryPoint: named.entry,
+            environment: named.environment
+        ))
+
+        let fresh = try await auth.invalidateAndRefresh(rejectedToken: "refused-by-the-service")
+        XCTAssertFalse(fresh.isEmpty)
+        XCTAssertNotEqual(fresh, "refused-by-the-service")
+        let held = await auth.currentAccessToken()
+        XCTAssertEqual(held, fresh, "the minted token should be the one held")
+
+        // The staggered 401: names a token that has already rotated.
+        let again = try await auth.invalidateAndRefresh(rejectedToken: "refused-by-the-service")
+        XCTAssertEqual(again, fresh)
+        let total = await calls.value
+        XCTAssertEqual(total, 1, "the stale rejection should not have called the provider")
+
+        LiveEnvironment.report("PAYABLI_REFRESH env=\(named.name) providerCalls=\(total)")
     }
 
     /// The test card, from the file the app prefills its form from.
@@ -177,5 +214,15 @@ final class CardNotPresentOnDeviceTests: XCTestCase {
             "PAYABLI_VOID env=\(named.name) transId=\(transId) status=\(status) bytes=\(data.count)"
         )
         return (200 ..< 300).contains(status)
+    }
+}
+
+/// Counts provider calls across the actor boundary, so a test can say the stale
+/// rejection did not reach the host's endpoint again.
+private actor ProviderCalls {
+    private(set) var value = 0
+
+    func increment() {
+        value += 1
     }
 }

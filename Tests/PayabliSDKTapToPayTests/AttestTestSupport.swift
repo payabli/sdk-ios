@@ -15,10 +15,10 @@ enum AttestFixture {
     static func makeService(
         storage: SecureStorage = InMemorySecureStorage(),
         hardwareIdProvider: @Sendable @escaping () throws -> String = { "fixed-hw-id" }
-    ) -> (AppAttestService, MockAppAttestor, PayabliAuth) {
+    ) throws -> (AppAttestService, MockAppAttestor, PayabliAuth) {
         let urlSession = StubURLProtocol.makeSession()
         let service = PayabliService(environment: .sandbox, session: urlSession)
-        let config = PayabliConfig(
+        let config = try PayabliConfig(
             accessToken: "seed",
             entryPoint: "myEntry",
             environment: .sandbox

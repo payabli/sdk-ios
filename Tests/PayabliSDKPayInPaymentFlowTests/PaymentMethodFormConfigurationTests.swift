@@ -310,13 +310,13 @@ final class PaymentMethodFormConfigurationTests: XCTestCase {
     }
 
     @MainActor
-    func testPaymentMethodLegacyConfigureWithThemeRoutesToCurrentConfigure() {
+    func testPaymentMethodLegacyConfigureWithThemeRoutesToCurrentConfigure() throws {
         let component = PayabliPayInPaymentFlow(
             accessToken: "access-token",
             entryPoint: "old-entry",
             environment: .sandbox
         )
-        let config = PayabliConfig(
+        let config = try PayabliConfig(
             accessToken: "access-token",
             entryPoint: "new-entry",
             environment: .qa

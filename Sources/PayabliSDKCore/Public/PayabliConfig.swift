@@ -52,17 +52,58 @@ public struct PayabliConfig: Sendable {
     /// Whether to emit telemetry events. Defaults to `true` (opt-out per NFR-18).
     public let telemetryEnabled: Bool
 
+    /// Throws `PayabliGenericError(.invalidConfiguration)` when the token could not
+    /// be sent or the entry point is empty.
+    ///
+    /// A token arrives from the host's own backend at run time, so a blank or
+    /// unusable one is a run-time condition and not a programmer error: it throws
+    /// rather than trapping, because trapping would crash a payment app over a
+    /// backend hiccup. The refresh path checks the same two things, so no token
+    /// reaches `Authorization` unchecked whether it came from here or from the
+    /// provider.
     public init(
         accessToken: String,
         tokenProvider: PayabliTokenRefresh? = nil,
         entryPoint: String,
         environment: PayabliEnvironment,
         telemetryEnabled: Bool = true
-    ) {
+    ) throws {
+        guard !accessToken.isBlank else {
+            throw PayabliGenericError(
+                code: .invalidConfiguration,
+                reason: "Invalid configuration",
+                detail: "accessToken is blank. Mint one on your backend and pass it here."
+            )
+        }
+        guard accessToken.isHeaderSafe else {
+            throw PayabliGenericError(
+                code: .invalidConfiguration,
+                reason: "Invalid configuration",
+                detail: "accessToken cannot be an HTTP header value."
+            )
+        }
+        guard !entryPoint.isBlank else {
+            throw PayabliGenericError(
+                code: .invalidConfiguration,
+                reason: "Invalid configuration",
+                detail: "entryPoint is blank."
+            )
+        }
         self.accessToken = accessToken
         self.tokenProvider = tokenProvider
         self.entryPoint = entryPoint
         self.environment = environment
         self.telemetryEnabled = telemetryEnabled
+    }
+}
+
+extension PayabliConfig: CustomStringConvertible {
+    /// Withholds the token and the entry point. A synthesised description prints
+    /// every property, and this type reaches assertion failures and crash reports
+    /// without passing the logger. The entry point names one merchant, so it is
+    /// withheld alongside the credential.
+    public var description: String {
+        "PayabliConfig(environment: \(environment), telemetryEnabled: \(telemetryEnabled), "
+            + "tokenProvider: \(tokenProvider == nil ? "absent" : "present"))"
     }
 }

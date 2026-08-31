@@ -16,7 +16,7 @@ provides the checkout user interface.
 ```swift
 import PayabliSDKTapToPay
 
-let ttp = PayabliTTP(
+let ttp = try PayabliTTP(
     accessToken: token,
     tokenProvider: { try await yourBackend.fetchPayabliAccessToken() },
     entryPoint: "your-entrypoint",
@@ -232,7 +232,7 @@ these. Don't link it from production targets.
 `PayabliTTP` is constructed with four parameters:
 
 ```swift
-let ttp = PayabliTTP(
+let ttp = try PayabliTTP(
     accessToken: try await yourBackend.fetchPayabliAccessToken(),
     tokenProvider: { try await yourBackend.fetchPayabliAccessToken() },
     entryPoint: "your-entrypoint",

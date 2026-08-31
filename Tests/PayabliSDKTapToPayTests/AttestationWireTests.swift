@@ -41,7 +41,7 @@ final class AttestationWireTests: XCTestCase {
             return AttestFixture.ok(request, ["challengeId": "c_1", "challenge": "Y2hhbGxlbmdl"])
         }
 
-        let (sut, _, _) = AttestFixture.makeService(storage: storage)
+        let (sut, _, _) = try AttestFixture.makeService(storage: storage)
 
         try await sut.activateDevice(activationCode: "123456", entry: "myEntry")
 
@@ -76,7 +76,7 @@ final class AttestationWireTests: XCTestCase {
             return AttestFixture.ok(request, ["challengeId": "c_1", "challenge": "Y2hhbGxlbmdl"])
         }
 
-        let (sut, _, _) = AttestFixture.makeService(storage: storage)
+        let (sut, _, _) = try AttestFixture.makeService(storage: storage)
 
         do {
             try await sut.activateDevice(activationCode: "123456", entry: "myEntry")
@@ -111,7 +111,7 @@ final class AttestationWireTests: XCTestCase {
 
         // The real provider, so this covers the wiring rather than a stand-in.
         let storage = InMemorySecureStorage()
-        let (sut, _, _) = AttestFixture.makeService(
+        let (sut, _, _) = try AttestFixture.makeService(
             storage: storage,
             hardwareIdProvider: { try InstallIdentifier.hardwareId(storage: storage, bundleIdentifier: "com.acme.checkout") }
         )

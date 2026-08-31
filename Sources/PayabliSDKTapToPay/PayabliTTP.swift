@@ -8,7 +8,7 @@ import PayabliSDKCore
 /// See PRD §19.1.
 ///
 /// ```swift
-/// let ttp = PayabliTTP(
+/// let ttp = try PayabliTTP(
 ///     accessToken: "...", entryPoint: "myEntry",
 ///     appId: "TEAM.bundle.id", environment: .sandbox
 /// )
@@ -140,14 +140,16 @@ public final class PayabliTTP: NSObject, ObservableObject {
         /// iOS 14, so no extra `@available` gate is needed. A platform without
         /// `DeviceCheck` uses the designated init with a custom
         /// `DeviceAttestationService`.
+        /// Throws whatever `PayabliConfig.init` rejects: a token that cannot be sent,
+        /// or an empty entry point.
         public convenience init(
             accessToken: String,
             tokenProvider: PayabliTokenRefresh? = nil,
             entryPoint: String,
             appId: String,
             environment: PayabliEnvironment
-        ) {
-            let config = PayabliConfig(
+        ) throws {
+            let config = try PayabliConfig(
                 accessToken: accessToken,
                 tokenProvider: tokenProvider,
                 entryPoint: entryPoint,
@@ -190,7 +192,7 @@ public final class PayabliTTP: NSObject, ObservableObject {
             entryPoint: String,
             appId: String,
             environment: PayabliEnvironment
-        ) {
+        ) throws {
             let bridged: PayabliTokenRefresh? = tokenRefreshHandler.map { handler in
                 // ObjC blocks are heap-allocated and copy-on-capture, so the
                 // bridged closure can safely be `@Sendable` even though Swift
@@ -226,7 +228,7 @@ public final class PayabliTTP: NSObject, ObservableObject {
                     }
                 }
             }
-            self.init(
+            try self.init(
                 accessToken: accessToken,
                 tokenProvider: bridged,
                 entryPoint: entryPoint,

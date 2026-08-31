@@ -5,8 +5,8 @@ import XCTest
 
 @MainActor
 final class PayabliTTPSessionInitTests: XCTestCase {
-    func testTwoFacadesShareTheSameSession() {
-        let config = PayabliConfig(
+    func testTwoFacadesShareTheSameSession() throws {
+        let config = try PayabliConfig(
             accessToken: "shared-token",
             entryPoint: "demo",
             environment: .sandbox

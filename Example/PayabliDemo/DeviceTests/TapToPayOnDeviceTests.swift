@@ -17,7 +17,10 @@ import XCTest
 /// These register a device against the paypoint the run names, which is a write.
 @MainActor
 final class TapToPayOnDeviceTests: XCTestCase {
-    private var named: (environment: PayabliEnvironment, entry: String, name: String)!
+    // Set in setUp, read by every test: the XCTest shape for a fixture that cannot
+    // exist at init. Was accepted through the lint baseline until this line moved.
+    // swiftlint:disable:next implicitly_unwrapped_optional
+    private var named: LiveTarget!
 
     override func setUp() async throws {
         try await super.setUp()
@@ -26,8 +29,8 @@ final class TapToPayOnDeviceTests: XCTestCase {
         _ = try await LiveEnvironment.requireAToken()
     }
 
-    private func makeTTP() -> PayabliTTP {
-        PayabliTTP(
+    private func makeTTP() throws -> PayabliTTP {
+        try PayabliTTP(
             accessToken: Secrets.placeholderAccessToken,
             tokenProvider: { try await Secrets.fetchAccessToken() },
             entryPoint: named.entry,
@@ -36,9 +39,9 @@ final class TapToPayOnDeviceTests: XCTestCase {
         )
     }
 
-    private func attestation() -> AppAttestService {
+    private func attestation() throws -> AppAttestService {
         AppAttestService(
-            transport: PayabliSession(config: LiveEnvironment.config(for: named)).transport,
+            transport: PayabliSession(config: try LiveEnvironment.config(for: named)).transport,
             attestor: RealAppAttestor(),
             storage: KeychainStorage()
         )
@@ -57,7 +60,7 @@ final class TapToPayOnDeviceTests: XCTestCase {
     /// one to do the same thing.
     @discardableResult
     private func enrolledDevice() async throws -> (session: PayabliTTP, handle: String) {
-        let ttp = makeTTP()
+        let ttp = try makeTTP()
         do {
             try await ttp.initialize()
         } catch PayabliTTPError.devicePendingActivation {
@@ -120,10 +123,10 @@ final class TapToPayOnDeviceTests: XCTestCase {
     /// The cold sequence is what enrolled this device, and re-running it needs a
     /// person with the handle in hand.
     func testTheSessionAfterAnEnrolmentHoldsTheSameHandle() async throws {
-        let store = attestation()
+        let store = try attestation()
         let first = try await enrolledDevice().handle
 
-        let second = makeTTP()
+        let second = try makeTTP()
         try await second.initialize()
 
         XCTAssertEqual(second.sessionState, .ready)
@@ -138,7 +141,7 @@ final class TapToPayOnDeviceTests: XCTestCase {
     /// never registered against, and asking does not disturb the one it did.
     func testAnotherPaypointIsNotThisDevicesEnrolment() async throws {
         let held = try await enrolledDevice().handle
-        let store = attestation()
+        let store = try attestation()
 
         let other = "\(named.entry)_notARealPaypoint"
         let enrolledElsewhere = try await store.isAttested(for: other)
@@ -155,7 +158,7 @@ final class TapToPayOnDeviceTests: XCTestCase {
     /// activation is surfaced, so a device that cannot reach `.ready` still has a
     /// handle to report.
     func testReportTheHandleThisDeviceHolds() async throws {
-        let store = attestation()
+        let store = try attestation()
         if try store.cachedDeviceId(for: named.entry) == nil {
             _ = try? await makeTTP().initialize()
         }
@@ -259,7 +262,7 @@ final class TapToPayOnDeviceTests: XCTestCase {
         let collector = Task {
             for await event in stream {
                 if case .chargeInitiated = event {
-                    seen.record("initiated")
+                    seen.recordInitiated()
                     reachedTheTap.fulfill()
                     return
                 }
@@ -275,7 +278,7 @@ final class TapToPayOnDeviceTests: XCTestCase {
                     orderDescription: "device tests"
                 )
             } catch {
-                seen.record("failed \(error.localizedDescription)")
+                seen.recordTerminal(error.localizedDescription)
             }
         }
 
@@ -291,25 +294,45 @@ final class TapToPayOnDeviceTests: XCTestCase {
         collector.cancel()
         _ = await charging.value
 
-        LiveEnvironment.report("PAYABLI_CHARGE env=\(named.name) customer=\(label) outcome=\(seen.value)")
+        // Names what was asserted, not only what the charge last threw: this test
+        // ends the read itself, so a run that reached the tap still throws.
+        LiveEnvironment.report(
+            "PAYABLI_CHARGE env=\(named.name) customer=\(label) "
+                + "asserted=\(result == .completed ? "reachedTheTap" : "didNotReachTheTap") \(seen.value)"
+        )
         return (result, seen.value)
     }
 }
 
-/// What a charge reported, written from one task and read from another.
+/// What a charge run saw, written from one task and read from another: whether it
+/// reached the tap, and what it last threw.
+///
+/// Two fields rather than one, because this test ends the read itself once the tap
+/// is reached. The charge throws even on a run that got there, and that throw is not
+/// the verdict.
 private final class OutcomeBox: @unchecked Sendable {
     private let lock = NSLock()
-    private var storage = "nothing was reported"
+    private var initiated = false
+    private var terminal: String?
 
+    /// `terminal` is whatever the charge threw, the cancellation this test performs
+    /// itself included.
     var value: String {
         lock.lock()
         defer { lock.unlock() }
-        return storage
+        return "reachedTheTap=\(initiated ? "yes" : "no") terminal=\(terminal ?? "none")"
     }
 
-    func record(_ outcome: String) {
+    /// Called on `chargeInitiated`, the last event before the reader waits for a card.
+    func recordInitiated() {
         lock.lock()
         defer { lock.unlock() }
-        storage = outcome
+        initiated = true
+    }
+
+    func recordTerminal(_ outcome: String) {
+        lock.lock()
+        defer { lock.unlock() }
+        terminal = outcome
     }
 }

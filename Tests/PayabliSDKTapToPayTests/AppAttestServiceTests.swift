@@ -61,7 +61,7 @@ final class AppAttestServiceTests: XCTestCase {
         }
 
         let storage = InMemorySecureStorage()
-        let (sut, attestor, _) = AttestFixture.makeService(storage: storage)
+        let (sut, attestor, _) = try AttestFixture.makeService(storage: storage)
 
         try await assertAttested(sut, "myEntry", false)
         let result = try await sut.attest(entry: "myEntry", appId: "TEAM.bundle.id")
@@ -111,7 +111,7 @@ final class AppAttestServiceTests: XCTestCase {
         }
 
         let storage = InMemorySecureStorage()
-        let (sut, attestor, _) = AttestFixture.makeService(storage: storage)
+        let (sut, attestor, _) = try AttestFixture.makeService(storage: storage)
         do {
             _ = try await sut.attest(entry: "myEntry", appId: "x")
             XCTFail("expected throw")
@@ -158,7 +158,7 @@ final class AppAttestServiceTests: XCTestCase {
         }
 
         let storage = InMemorySecureStorage()
-        let (sut, attestor, _) = AttestFixture.makeService(storage: storage)
+        let (sut, attestor, _) = try AttestFixture.makeService(storage: storage)
         attestor.attestKeyError = NSError(domain: AppAttestService.deviceCheckErrorDomain, code: 2)
 
         do {
@@ -209,7 +209,7 @@ final class AppAttestServiceTests: XCTestCase {
         }
 
         let storage = InMemorySecureStorage()
-        let (sut, attestor, _) = AttestFixture.makeService(storage: storage)
+        let (sut, attestor, _) = try AttestFixture.makeService(storage: storage)
 
         // Attempt 1 fails at /register (after the key was generated + cached).
         do {
@@ -243,7 +243,7 @@ final class AppAttestServiceTests: XCTestCase {
     /// A key can be attested once, so two paypoints must not share one, and
     /// starting one must not take the other's away.
     func testAPendingKeyIsReusedOnlyByTheEntryPointThatMintedIt() throws {
-        let (sut, _, _) = AttestFixture.makeService()
+        let (sut, _, _) = try AttestFixture.makeService()
         try sut.rememberPendingKey("key_for_a", for: "entryA")
         try sut.rememberPendingKey("key_for_b", for: "entryB")
 
@@ -257,7 +257,7 @@ final class AppAttestServiceTests: XCTestCase {
     /// another on every attempt.
     func testTheSameEntryPointReusesItsPendingKey() async throws {
         let storage = InMemorySecureStorage()
-        let (sut, attestor, _) = AttestFixture.makeService(storage: storage)
+        let (sut, attestor, _) = try AttestFixture.makeService(storage: storage)
         try sut.rememberPendingKey("already_minted", for: "myEntry")
 
         StubURLProtocol.handler = { request in
@@ -289,7 +289,7 @@ final class AppAttestServiceTests: XCTestCase {
     /// Clearing one paypoint must leave another's retry alone: taking it away
     /// makes the next attempt mint a key and register another device.
     func testClearingOnePaypointKeepsAnothersPendingKey() throws {
-        let (sut, _, _) = AttestFixture.makeService()
+        let (sut, _, _) = try AttestFixture.makeService()
         try sut.rememberPendingKey("key_for_a", for: "entryA")
         try sut.rememberPendingKey("key_for_b", for: "entryB")
 
@@ -304,7 +304,7 @@ final class AppAttestServiceTests: XCTestCase {
     /// Reading is what makes a binding recent. Ordering by enrolment instead
     /// evicts the binding every session uses in favour of one that enrolled later.
     func testUsingABindingMovesItToTheFront() throws {
-        let (sut, _, _) = AttestFixture.makeService()
+        let (sut, _, _) = try AttestFixture.makeService()
         for name in ["a", "b", "c", "d"] {
             try sut.remember(AttestedDevice(entry: name, deviceId: "dev-\(name)", keyId: "key-\(name)"))
         }
@@ -319,7 +319,7 @@ final class AppAttestServiceTests: XCTestCase {
 
     /// Four, so a device moved between paypoints finds each where it left it.
     func testOnlyFourBindingsAreKept() throws {
-        let (sut, _, _) = AttestFixture.makeService()
+        let (sut, _, _) = try AttestFixture.makeService()
 
         for index in 0 ..< 6 {
             try sut.remember(AttestedDevice(entry: "e\(index)", deviceId: "d\(index)", keyId: "k\(index)"))
@@ -334,8 +334,8 @@ final class AppAttestServiceTests: XCTestCase {
     /// reporting the enrolment as done leaves the service holding a device this
     /// one cannot name: the next request fails for a missing binding, and a device
     /// awaiting activation cannot activate at all.
-    func testAWriteThatFailsIsRaised() {
-        let (sut, _, _) = AttestFixture.makeService(storage: FailingStorage())
+    func testAWriteThatFailsIsRaised() throws {
+        let (sut, _, _) = try AttestFixture.makeService(storage: FailingStorage())
 
         XCTAssertThrowsError(
             try sut.remember(AttestedDevice(entry: "e", deviceId: "d", keyId: "k"))
@@ -355,7 +355,7 @@ final class AppAttestServiceTests: XCTestCase {
         for code in [2, 3] {
             let storage = InMemorySecureStorage()
             try AttestFixture.seedBinding(entry: "myEntry", deviceId: "dev", keyId: "key", in: storage)
-            let (sut, attestor, _) = AttestFixture.makeService(storage: storage)
+            let (sut, attestor, _) = try AttestFixture.makeService(storage: storage)
             attestor.generateAssertionError = NSError(
                 domain: AppAttestService.deviceCheckErrorDomain,
                 code: code
@@ -376,7 +376,7 @@ final class AppAttestServiceTests: XCTestCase {
         for code in [0, 1, 4] {
             let storage = InMemorySecureStorage()
             try AttestFixture.seedBinding(entry: "myEntry", deviceId: "dev", keyId: "key", in: storage)
-            let (sut, attestor, _) = AttestFixture.makeService(storage: storage)
+            let (sut, attestor, _) = try AttestFixture.makeService(storage: storage)
             attestor.generateAssertionError = NSError(
                 domain: AppAttestService.deviceCheckErrorDomain,
                 code: code
@@ -391,7 +391,7 @@ final class AppAttestServiceTests: XCTestCase {
     func testABindingWhoseKeySignsIsAnEnrolment() async throws {
         let storage = InMemorySecureStorage()
         try AttestFixture.seedBinding(entry: "myEntry", deviceId: "dev", keyId: "key", in: storage)
-        let (sut, _, _) = AttestFixture.makeService(storage: storage)
+        let (sut, _, _) = try AttestFixture.makeService(storage: storage)
 
         try await assertAttested(sut, "myEntry", true)
         XCTAssertEqual(try sut.cachedDeviceId(for: "myEntry"), "dev")
@@ -400,7 +400,7 @@ final class AppAttestServiceTests: XCTestCase {
     /// Asking about a paypoint with no binding asks the platform nothing: there is
     /// no key to ask about, and a signature attempt would be wasted.
     func testNoBindingAsksThePlatformNothing() async throws {
-        let (sut, attestor, _) = AttestFixture.makeService()
+        let (sut, attestor, _) = try AttestFixture.makeService()
 
         try await assertAttested(sut, "myEntry", false)
 
@@ -413,7 +413,7 @@ final class AppAttestServiceTests: XCTestCase {
         let storage = InMemorySecureStorage()
         try AttestFixture.seedBinding(entry: "myEntry", deviceId: "cached_deviceId", keyId: "cached_keyId", in: storage)
 
-        let (sut, attestor, _) = AttestFixture.makeService(storage: storage)
+        let (sut, attestor, _) = try AttestFixture.makeService(storage: storage)
         let headers = try await sut.generateAssertion(for: "myEntry")
         XCTAssertEqual(headers.keyId, "cached_keyId")
         XCTAssertEqual(headers.deviceId, "cached_deviceId")
@@ -423,7 +423,7 @@ final class AppAttestServiceTests: XCTestCase {
     }
 
     func testGenerateAssertionFailsWithoutState() async throws {
-        let (sut, _, _) = AttestFixture.makeService()
+        let (sut, _, _) = try AttestFixture.makeService()
         do {
             _ = try await sut.generateAssertion(for: "myEntry")
             XCTFail("expected throw")
@@ -441,7 +441,7 @@ final class AppAttestServiceTests: XCTestCase {
         let storage = InMemorySecureStorage()
         try AttestFixture.seedBinding(entry: "myEntry", deviceId: "cached_deviceId", keyId: "cached_keyId", in: storage)
 
-        let (sut, attestor, _) = AttestFixture.makeService(storage: storage)
+        let (sut, attestor, _) = try AttestFixture.makeService(storage: storage)
         attestor.generateAssertionError = NSError(
             domain: AppAttestService.deviceCheckErrorDomain,
             code: 3
@@ -464,7 +464,7 @@ final class AppAttestServiceTests: XCTestCase {
         for code in [0, 1, 4] {
             let storage = InMemorySecureStorage()
             try AttestFixture.seedBinding(entry: "myEntry", deviceId: "cached_deviceId", keyId: "cached_keyId", in: storage)
-            let (sut, attestor, _) = AttestFixture.makeService(storage: storage)
+            let (sut, attestor, _) = try AttestFixture.makeService(storage: storage)
             attestor.generateAssertionError = NSError(
                 domain: AppAttestService.deviceCheckErrorDomain,
                 code: code
@@ -487,7 +487,7 @@ final class AppAttestServiceTests: XCTestCase {
         let storage = InMemorySecureStorage()
         try AttestFixture.seedBinding(entry: "myEntry", deviceId: "cached_deviceId", keyId: "cached_keyId", in: storage)
 
-        let (sut, attestor, _) = AttestFixture.makeService(storage: storage)
+        let (sut, attestor, _) = try AttestFixture.makeService(storage: storage)
         attestor.generateAssertionError = NSError(domain: "com.example.other", code: 7)
 
         do {
@@ -505,7 +505,7 @@ final class AppAttestServiceTests: XCTestCase {
     func testClearCacheRemovesThisEntryPointsBinding() async throws {
         let storage = InMemorySecureStorage()
         try AttestFixture.seedBinding(entry: "myEntry", deviceId: "b", keyId: "a", in: storage)
-        let (sut, _, _) = AttestFixture.makeService(storage: storage)
+        let (sut, _, _) = try AttestFixture.makeService(storage: storage)
 
         try sut.clearCache(for: "myEntry")
 
@@ -515,7 +515,7 @@ final class AppAttestServiceTests: XCTestCase {
     /// A refusal drops the binding it was about.
     func testForgetRefusedBindingDropsTheBindingItNames() throws {
         let storage = InMemorySecureStorage()
-        let (sut, _, _) = AttestFixture.makeService(storage: storage)
+        let (sut, _, _) = try AttestFixture.makeService(storage: storage)
         try sut.remember(AttestedDevice(entry: "entryA", deviceId: "devA", keyId: "keyA"))
         try sut.remember(AttestedDevice(entry: "entryB", deviceId: "devB", keyId: "keyB"))
 
@@ -530,7 +530,7 @@ final class AppAttestServiceTests: XCTestCase {
     /// enrolment on the strength of an answer about a different device.
     func testForgetRefusedBindingKeepsABindingEnrolledSince() throws {
         let storage = InMemorySecureStorage()
-        let (sut, _, _) = AttestFixture.makeService(storage: storage)
+        let (sut, _, _) = try AttestFixture.makeService(storage: storage)
         try sut.remember(AttestedDevice(entry: "entryA", deviceId: "devNew", keyId: "keyNew"))
 
         XCTAssertFalse(try sut.forgetRefusedBinding(entry: "entryA", deviceId: "devOld", keyId: "keyOld"))
@@ -542,7 +542,7 @@ final class AppAttestServiceTests: XCTestCase {
     /// rotation is not the binding the service answered about.
     func testForgetRefusedBindingKeepsABindingWhoseKeyChanged() throws {
         let storage = InMemorySecureStorage()
-        let (sut, _, _) = AttestFixture.makeService(storage: storage)
+        let (sut, _, _) = try AttestFixture.makeService(storage: storage)
         try sut.remember(AttestedDevice(entry: "entryA", deviceId: "devA", keyId: "keyNew"))
 
         XCTAssertFalse(try sut.forgetRefusedBinding(entry: "entryA", deviceId: "devA", keyId: "keyOld"))
@@ -554,7 +554,7 @@ final class AppAttestServiceTests: XCTestCase {
     /// name keys that work, and each one dropped costs an enrolment.
     func testClearCacheLeavesEveryOtherBindingAlone() async throws {
         let storage = InMemorySecureStorage()
-        let (sut, _, _) = AttestFixture.makeService(storage: storage)
+        let (sut, _, _) = try AttestFixture.makeService(storage: storage)
         try sut.remember(AttestedDevice(entry: "entryA", deviceId: "devA", keyId: "keyA"))
         try sut.remember(AttestedDevice(entry: "entryB", deviceId: "devB", keyId: "keyB"))
 
@@ -569,7 +569,7 @@ final class AppAttestServiceTests: XCTestCase {
     /// the other paypoint's record is left intact.
     func testAHandleFromAnotherPaypointIsNotThisOnesEnrolment() async throws {
         let storage = InMemorySecureStorage()
-        let (sut, _, _) = AttestFixture.makeService(storage: storage)
+        let (sut, _, _) = try AttestFixture.makeService(storage: storage)
         try sut.remember(AttestedDevice(entry: "entryA", deviceId: "devA", keyId: "keyA"))
 
         try await assertAttested(sut, "entryB", false)
@@ -586,7 +586,7 @@ final class AppAttestServiceTests: XCTestCase {
         try storage.set("old_key", forKey: "com.payabli.ttp.keyId")
         try storage.set("old_device", forKey: "com.payabli.ttp.deviceId")
 
-        let (sut, _, _) = AttestFixture.makeService(storage: storage)
+        let (sut, _, _) = try AttestFixture.makeService(storage: storage)
 
         try await assertAttested(sut, "myEntry", false)
         XCTAssertNil(try storage.string(forKey: "com.payabli.ttp.keyId"))
@@ -599,7 +599,7 @@ final class AppAttestServiceTests: XCTestCase {
     /// device that enrolled moments ago holding nothing.
     func testAProbeAnsweringLateDropsOnlyTheBindingItAskedAbout() async throws {
         let storage = InMemorySecureStorage()
-        let (sut, attestor, _) = AttestFixture.makeService(storage: storage)
+        let (sut, attestor, _) = try AttestFixture.makeService(storage: storage)
 
         // What the probe read, before it went away to ask.
         let probed = AttestedDevice(entry: "myEntry", deviceId: "dev_old", keyId: "old_key")
@@ -636,7 +636,7 @@ final class AppAttestServiceTests: XCTestCase {
     func testAnAssertionFailingLateDropsOnlyTheBindingItUsed() async throws {
         let storage = InMemorySecureStorage()
         try AttestFixture.seedBinding(entry: "myEntry", deviceId: "dev_old", keyId: "old_key", in: storage)
-        let (sut, attestor, _) = AttestFixture.makeService(storage: storage)
+        let (sut, attestor, _) = try AttestFixture.makeService(storage: storage)
 
         // Written inside the window the signature attempt suspends for.
         attestor.beforeGenerateAssertion = { [weak sut] in
@@ -666,7 +666,7 @@ final class AppAttestServiceTests: XCTestCase {
     /// again, and a caller told it was cleared cannot tell that apart.
     func testAClearTheStoreRefusedIsRaised() throws {
         let storage = WriteRefusingStorage()
-        let (sut, _, _) = AttestFixture.makeService(storage: storage)
+        let (sut, _, _) = try AttestFixture.makeService(storage: storage)
         try sut.remember(AttestedDevice(entry: "myEntry", deviceId: "dev", keyId: "key"))
 
         storage.refusesWrites = true
@@ -693,7 +693,7 @@ final class AppAttestServiceTests: XCTestCase {
         try AttestFixture.seedBinding(entry: "myEntry", deviceId: "dev", keyId: "key", in: storage)
         storage.readFailure = KeychainStorage.KeychainError.underlying(errSecInteractionNotAllowed)
 
-        let (sut, _, _) = AttestFixture.makeService(storage: storage)
+        let (sut, _, _) = try AttestFixture.makeService(storage: storage)
 
         do {
             _ = try await sut.isAttested(for: "myEntry")
@@ -730,7 +730,7 @@ final class AppAttestServiceTests: XCTestCase {
         }
 
         let storage = WriteRefusingStorage()
-        let (sut, attestor, _) = AttestFixture.makeService(storage: storage)
+        let (sut, attestor, _) = try AttestFixture.makeService(storage: storage)
 
         // The mint's own write is the first refusal, so reach the drop with the key
         // already in the slot.
@@ -756,7 +756,7 @@ final class AppAttestServiceTests: XCTestCase {
             )
         }
 
-        let (sut, _, _) = AttestFixture.makeService(hardwareIdProvider: { () throws -> String in
+        let (sut, _, _) = try AttestFixture.makeService(hardwareIdProvider: { () throws -> String in
             throw KeychainStorage.KeychainError.underlying(errSecInteractionNotAllowed)
         })
 

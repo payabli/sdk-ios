@@ -10,7 +10,7 @@ import UIKit
 
 /// React Native Native Module bridging the bilingual `@objc` surface of
 /// `PayabliSDKTapToPay` and `PayabliSDKPayInPaymentFlow` to JavaScript.
-/// Inherits `RCTEventEmitter` so we can push lifecycle events to JS without
+/// Inherits `RCTEventEmitter`, which pushes lifecycle events to JS without
 /// polling.
 ///
 /// ## Protocol
@@ -111,8 +111,8 @@ public final class PayabliSDKModule: RCTEventEmitter {
                             self.sendEvent(withName: "TTPTokenRefreshRequested", body: nil)
                         }
                     } else {
-                        // Best-effort: chain — but RN doesn't give us
-                        // multi-await semantics, so we error this caller.
+                        // Best effort: RN offers no multi-await semantics, so a
+                        // second caller arriving during a refresh gets an error.
                         continuation.resume(throwing: PayabliGenericError(
                             code: .tokenExpired,
                             reason: "A token refresh is already in flight"
@@ -123,16 +123,27 @@ public final class PayabliSDKModule: RCTEventEmitter {
         }
 
         Task { @MainActor in
+            // Constructed before anything is torn down: the initialiser rejects an
+            // access token that cannot be sent as a header and an empty entry point,
+            // both of which arrive from the JS side. A configure() that fails leaves
+            // the previous facade and its event subscription exactly as they were.
+            let ttp: PayabliTTP
+            do {
+                ttp = try PayabliTTP(
+                    accessToken: accessToken,
+                    tokenProvider: tokenProvider,
+                    entryPoint: entryPoint,
+                    appId: appId,
+                    environment: environment
+                )
+            } catch {
+                reject("INVALID_CONFIGURATION", error.localizedDescription, error)
+                return
+            }
+
+            // Only now is the previous subscription dropped, so it does not leak.
             self.eventToken?.cancel()
             self.eventToken = nil
-
-            let ttp = PayabliTTP(
-                accessToken: accessToken,
-                tokenProvider: tokenProvider,
-                entryPoint: entryPoint,
-                appId: appId,
-                environment: environment
-            )
             self.ttp = ttp
             self.subscribeEvents(on: ttp)
             resolve(nil)

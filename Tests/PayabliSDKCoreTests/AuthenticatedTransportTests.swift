@@ -6,7 +6,7 @@ final class AuthenticatedTransportTests: XCTestCase {
         let mock = MockTransport(scripted: [
             .response(statusCode: 200, body: Data("{}".utf8))
         ])
-        let auth = PayabliAuth(config: PayabliConfig(
+        let auth = PayabliAuth(config: try PayabliConfig(
             accessToken: "tok-1",
             entryPoint: "demo",
             environment: .sandbox
@@ -24,7 +24,7 @@ final class AuthenticatedTransportTests: XCTestCase {
             .response(statusCode: 401, body: Data()),
             .response(statusCode: 200, body: Data("{}".utf8))
         ])
-        let auth = PayabliAuth(config: PayabliConfig(
+        let auth = PayabliAuth(config: try PayabliConfig(
             accessToken: "old",
             tokenProvider: { "new" },
             entryPoint: "demo",
@@ -41,11 +41,11 @@ final class AuthenticatedTransportTests: XCTestCase {
         XCTAssertEqual(captured[1].headers["Authorization"], "Bearer new")
     }
 
-    func testPerformV2MapsNon2xxToTypedError() async {
+    func testPerformV2MapsNon2xxToTypedError() async throws {
         let mock = MockTransport(scripted: [
             .response(statusCode: 500, body: Data("{}".utf8))
         ])
-        let auth = PayabliAuth(config: PayabliConfig(
+        let auth = PayabliAuth(config: try PayabliConfig(
             accessToken: "tok",
             entryPoint: "demo",
             environment: .sandbox
@@ -65,12 +65,12 @@ final class AuthenticatedTransportTests: XCTestCase {
         }
     }
 
-    func testThrowsTokenExpiredAfterDouble401() async {
+    func testThrowsTokenExpiredAfterDouble401() async throws {
         let mock = MockTransport(scripted: [
             .response(statusCode: 401, body: Data()),
             .response(statusCode: 401, body: Data())
         ])
-        let auth = PayabliAuth(config: PayabliConfig(
+        let auth = PayabliAuth(config: try PayabliConfig(
             accessToken: "old",
             tokenProvider: { "new" },
             entryPoint: "demo",

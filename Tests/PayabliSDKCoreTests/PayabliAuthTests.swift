@@ -7,8 +7,8 @@ final class PayabliAuthTests: XCTestCase {
     private func makeConfig(
         accessToken: String = "partner_minted_token",
         tokenProvider: PayabliTokenRefresh? = nil
-    ) -> PayabliConfig {
-        PayabliConfig(
+    ) throws -> PayabliConfig {
+        try PayabliConfig(
             accessToken: accessToken,
             tokenProvider: tokenProvider,
             entryPoint: "test_entry",
@@ -18,8 +18,8 @@ final class PayabliAuthTests: XCTestCase {
 
     // MARK: - Initial token
 
-    func testInitialTokenComesFromConfig() async {
-        let auth = PayabliAuth(config: makeConfig(accessToken: "seed"))
+    func testInitialTokenComesFromConfig() async throws {
+        let auth = PayabliAuth(config: try makeConfig(accessToken: "seed"))
         let token = await auth.currentAccessToken()
         XCTAssertEqual(token, "seed")
     }
@@ -28,7 +28,7 @@ final class PayabliAuthTests: XCTestCase {
 
     func testInvalidateAndRefreshCallsProvider() async throws {
         let counter = Counter()
-        let auth = PayabliAuth(config: makeConfig(
+        let auth = PayabliAuth(config: try makeConfig(
             accessToken: "old",
             tokenProvider: {
                 await counter.increment()
@@ -36,7 +36,7 @@ final class PayabliAuthTests: XCTestCase {
             }
         ))
 
-        let fresh = try await auth.invalidateAndRefresh()
+        let fresh = try await auth.invalidateAndRefresh(rejectedToken: "old")
         XCTAssertEqual(fresh, "fresh_from_partner")
         let calls = await counter.value
         XCTAssertEqual(calls, 1)
@@ -47,9 +47,9 @@ final class PayabliAuthTests: XCTestCase {
     }
 
     func testInvalidateAndRefreshWithoutProviderThrowsTokenExpired() async throws {
-        let auth = PayabliAuth(config: makeConfig(accessToken: "old", tokenProvider: nil))
+        let auth = PayabliAuth(config: try makeConfig(accessToken: "old", tokenProvider: nil))
         do {
-            _ = try await auth.invalidateAndRefresh()
+            _ = try await auth.invalidateAndRefresh(rejectedToken: "old")
             XCTFail("expected throw")
         } catch let err as PayabliGenericError {
             XCTAssertEqual(err.code, .tokenExpired)
@@ -60,7 +60,7 @@ final class PayabliAuthTests: XCTestCase {
 
     func testInvalidateAndRefreshCoalescesConcurrentCallers() async throws {
         let counter = Counter()
-        let auth = PayabliAuth(config: makeConfig(
+        let auth = PayabliAuth(config: try makeConfig(
             accessToken: "old",
             tokenProvider: {
                 await counter.increment()
@@ -69,9 +69,9 @@ final class PayabliAuthTests: XCTestCase {
             }
         ))
 
-        async let a = auth.invalidateAndRefresh()
-        async let b = auth.invalidateAndRefresh()
-        async let c = auth.invalidateAndRefresh()
+        async let a = auth.invalidateAndRefresh(rejectedToken: "old")
+        async let b = auth.invalidateAndRefresh(rejectedToken: "old")
+        async let c = auth.invalidateAndRefresh(rejectedToken: "old")
         let results = try await [a, b, c]
 
         XCTAssertEqual(Set(results), ["fresh"])
@@ -81,12 +81,12 @@ final class PayabliAuthTests: XCTestCase {
 
     func testProviderErrorMapsToTokenExpired() async throws {
         struct ProviderError: Error {}
-        let auth = PayabliAuth(config: makeConfig(
+        let auth = PayabliAuth(config: try makeConfig(
             accessToken: "old",
             tokenProvider: { throw ProviderError() }
         ))
         do {
-            _ = try await auth.invalidateAndRefresh()
+            _ = try await auth.invalidateAndRefresh(rejectedToken: "old")
             XCTFail("expected throw")
         } catch let err as PayabliGenericError {
             XCTAssertEqual(err.code, .tokenExpired)
@@ -95,8 +95,209 @@ final class PayabliAuthTests: XCTestCase {
         }
     }
 
+    // MARK: - The rejected token
+
+    /// Two requests sent with the same token can have their 401s arrive far apart.
+    /// The later one must not spend a provider call replacing a token that has
+    /// already rotated, which would discard the rotation the first one obtained.
+    func testARejectionOnAnAlreadyRotatedTokenDoesNotCallTheProvider() async throws {
+        let counter = Counter()
+        let auth = PayabliAuth(config: try makeConfig(
+            accessToken: "old",
+            tokenProvider: {
+                await counter.increment()
+                return "fresh"
+            }
+        ))
+
+        let first = try await auth.invalidateAndRefresh(rejectedToken: "old")
+        XCTAssertEqual(first, "fresh")
+
+        let second = try await auth.invalidateAndRefresh(rejectedToken: "old")
+        XCTAssertEqual(second, "fresh", "The stale 401 should be answered with the rotated token")
+
+        let calls = await counter.value
+        XCTAssertEqual(calls, 1, "The second rejection names a token that is no longer current")
+    }
+
+    // MARK: - What may be committed
+
+    func testAProviderReturningTheRejectedTokenFailsRatherThanLooping() async throws {
+        let counter = Counter()
+        let auth = PayabliAuth(config: try makeConfig(
+            accessToken: "old",
+            tokenProvider: {
+                await counter.increment()
+                return "old"
+            }
+        ))
+
+        do {
+            _ = try await auth.invalidateAndRefresh(rejectedToken: "old")
+            XCTFail("expected throw")
+        } catch let err as PayabliGenericError {
+            XCTAssertEqual(err.code, .tokenExpired)
+        }
+
+        let calls = await counter.value
+        XCTAssertEqual(calls, 1)
+        let current = await auth.currentAccessToken()
+        XCTAssertEqual(current, "old", "The refused credential must not be committed")
+    }
+
+    /// Whitespace is printable ASCII, so a token of spaces passes the header check
+    /// and would be committed carrying nothing.
+    func testABlankRefreshedTokenIsNotCommitted() async throws {
+        for blank in ["", " ", "   ", "\t\n"] {
+            let auth = PayabliAuth(config: try makeConfig(
+                accessToken: "old",
+                tokenProvider: { blank }
+            ))
+
+            do {
+                _ = try await auth.invalidateAndRefresh(rejectedToken: "old")
+                XCTFail("expected throw for \(blank.debugDescription)")
+            } catch let err as PayabliGenericError {
+                XCTAssertEqual(err.code, .tokenExpired, blank.debugDescription)
+            }
+
+            let current = await auth.currentAccessToken()
+            XCTAssertEqual(current, "old", blank.debugDescription)
+        }
+    }
+
+    // MARK: - What a joining caller receives
+
+    /// A caller that arrives while a refresh is in flight awaits the same task, so
+    /// the checks have to be inside it. Otherwise the joiner returns a token nothing
+    /// validated.
+    func testAJoinerDoesNotReceiveAnUnvalidatedToken() async throws {
+        let auth = PayabliAuth(config: try makeConfig(
+            accessToken: "old",
+            tokenProvider: {
+                try await Task.sleep(nanoseconds: 30_000_000)
+                return "   "
+            }
+        ))
+
+        async let first = auth.invalidateAndRefresh(rejectedToken: "old")
+        async let second = auth.invalidateAndRefresh(rejectedToken: "old")
+
+        for outcome in await [try? first, try? second] {
+            XCTAssertNil(outcome, "a blank token reached a caller")
+        }
+        let current = await auth.currentAccessToken()
+        XCTAssertEqual(current, "old")
+    }
+
+    /// The provider's text must not reach a joiner either, which it does when the
+    /// redaction is applied by the initiating caller rather than inside the task.
+    func testAJoinerDoesNotReceiveTheProvidersOwnMessage() async throws {
+        struct ChattyProviderError: Error {
+            let responseBody: String
+        }
+        let auth = PayabliAuth(config: try makeConfig(
+            accessToken: "old",
+            tokenProvider: {
+                try await Task.sleep(nanoseconds: 30_000_000)
+                throw ChattyProviderError(responseBody: "SHOULD_NOT_LEAVE_THE_PROVIDER")
+            }
+        ))
+
+        async let first = auth.invalidateAndRefresh(rejectedToken: "old")
+        async let second = auth.invalidateAndRefresh(rejectedToken: "old")
+
+        var rendered = ""
+        do {
+            _ = try await first
+            XCTFail("expected the initiating caller to fail")
+        } catch {
+            rendered += " \(error) \(String(describing: (error as? PayabliGenericError)?.underlying))"
+        }
+        do {
+            _ = try await second
+            XCTFail("expected the joining caller to fail")
+        } catch {
+            rendered += " \(error) \(String(describing: (error as? PayabliGenericError)?.underlying))"
+        }
+        XCTAssertFalse(rendered.contains("SHOULD_NOT_LEAVE_THE_PROVIDER"), rendered)
+    }
+
+    /// A CR or LF in a bearer is header injection, and the platform drops the header
+    /// rather than reporting it, so the request goes out unauthenticated.
+    func testATokenThatCannotBeAHeaderValueIsNotCommitted() async throws {
+        let auth = PayabliAuth(config: try makeConfig(
+            accessToken: "old",
+            tokenProvider: { "fresh\r\nX-Injected: true" }
+        ))
+
+        do {
+            _ = try await auth.invalidateAndRefresh(rejectedToken: "old")
+            XCTFail("expected throw")
+        } catch let err as PayabliGenericError {
+            XCTAssertEqual(err.code, .tokenMalformed)
+        }
+
+        let current = await auth.currentAccessToken()
+        XCTAssertEqual(current, "old")
+    }
+
+    func testARefusedTokenPublishesNoRotation() async throws {
+        let auth = PayabliAuth(config: try makeConfig(
+            accessToken: "old",
+            tokenProvider: { "old" }
+        ))
+
+        let stream = await auth.tokenChanges()
+        let collector = Task<String?, Never> {
+            for await token in stream {
+                return token
+            }
+            return nil
+        }
+
+        _ = try? await auth.invalidateAndRefresh(rejectedToken: "old")
+        collector.cancel()
+        let received = await collector.value
+        XCTAssertNil(received, "A rotation that did not happen must not be announced")
+    }
+
+    // MARK: - What the provider's failure may carry
+
+    /// The provider is host code and its error text can name the host's own endpoint
+    /// or quote a response body. An `underlying` error reaches a crash reporter the
+    /// SDK does not scrub.
+    func testTheProvidersOwnMessageDoesNotReachTheErrorChain() async throws {
+        // A stored property, because that is what a rendered error shows. A type
+        // with none renders as its own name whatever `errorDescription` returns,
+        // which would make this assertion unable to fail.
+        struct ChattyProviderError: Error {
+            let responseBody: String
+        }
+        let auth = PayabliAuth(config: try makeConfig(
+            accessToken: "old",
+            tokenProvider: { throw ChattyProviderError(responseBody: "SHOULD_NOT_LEAVE_THE_PROVIDER") }
+        ))
+
+        do {
+            _ = try await auth.invalidateAndRefresh(rejectedToken: "old")
+            XCTFail("expected throw")
+        } catch let err as PayabliGenericError {
+            XCTAssertEqual(err.code, .tokenExpired)
+            let rendered = "\(err) \(err.localizedDescription) \(String(describing: err.underlying))"
+            XCTAssertFalse(
+                rendered.contains("SHOULD_NOT_LEAVE_THE_PROVIDER"),
+                "the provider's own text reached the error chain: \(rendered)"
+            )
+            XCTAssertTrue(
+                rendered.contains("ChattyProviderError"),
+                "the failing type should survive, since it names no subject: \(rendered)"
+            )
+        }
+    }
+
     func testTokenChangesEmitsAfterRefresh() async throws {
-        let config = PayabliConfig(
+        let config = try PayabliConfig(
             accessToken: "old",
             tokenProvider: { "new" },
             entryPoint: "demo",
@@ -112,7 +313,7 @@ final class PayabliAuthTests: XCTestCase {
             return nil
         }
 
-        _ = try await auth.invalidateAndRefresh()
+        _ = try await auth.invalidateAndRefresh(rejectedToken: "old")
         let received = await collector.value
         XCTAssertEqual(received, "new")
     }

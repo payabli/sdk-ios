@@ -170,7 +170,7 @@ final class PayabliTTPReaderSessionRecoveryTests: XCTestCase {
     /// failure would kill the healthy session it just built.
     func testFailureFromASupersededReaderDoesNotExpireTheNewSession() async throws {
         let provider = InterleavingProvider()
-        let ttp = makeTTP(provider: provider)
+        let ttp = try makeTTP(provider: provider)
         try await bounded { try await ttp.initialize() }
         XCTAssertEqual(ttp.sessionState, .ready)
 
@@ -195,7 +195,7 @@ final class PayabliTTPReaderSessionRecoveryTests: XCTestCase {
     func testConcurrentInitializeRunsOnce() async throws {
         let provider = InterleavingProvider()
         provider.suspendDuringPrepare = true
-        let ttp = makeTTP(provider: provider)
+        let ttp = try makeTTP(provider: provider)
 
         // Two independent callers, both in flight. Not a nested call: awaiting
         // an initialization from inside one would wait on the task that is
@@ -219,7 +219,7 @@ final class PayabliTTPReaderSessionRecoveryTests: XCTestCase {
     func testInitializeDoesNotOverlapAReinitialize() async throws {
         let provider = InterleavingProvider()
         provider.suspendDuringPrepare = true
-        let ttp = makeTTP(provider: provider)
+        let ttp = try makeTTP(provider: provider)
         try await bounded { try await ttp.initialize() }
 
         // Put the session where a recovery is what runs.
@@ -274,7 +274,7 @@ final class PayabliTTPReaderSessionRecoveryTests: XCTestCase {
                 reason: "passcodeDisabled: Error that indicates the device doesn't have an active passcode."
             )
         )
-        let ttp = makeTTP(provider: provider)
+        let ttp = try makeTTP(provider: provider)
 
         do {
             try await bounded { try await ttp.initialize() }
@@ -383,9 +383,9 @@ final class PayabliTTPReaderSessionRecoveryTests: XCTestCase {
         }
     }
 
-    private func makeTTP(provider: some TapToPayProvider) -> PayabliTTP {
+    private func makeTTP(provider: some TapToPayProvider) throws -> PayabliTTP {
         PayabliTTP(
-            config: PayabliConfig(accessToken: "seed_token", entryPoint: "e", environment: .sandbox),
+            config: try PayabliConfig(accessToken: "seed_token", entryPoint: "e", environment: .sandbox),
             appId: "appid",
             provider: provider,
             attestation: MockDeviceAttestationService(),
@@ -399,7 +399,7 @@ final class PayabliTTPReaderSessionRecoveryTests: XCTestCase {
     private func makeReadyTTP() async throws -> (PayabliTTP, MockTapToPayProvider, MockDeviceAttestationService) {
         let provider = MockTapToPayProvider()
         let attestation = MockDeviceAttestationService()
-        let config = PayabliConfig(
+        let config = try PayabliConfig(
             accessToken: "seed_token",
             entryPoint: "e",
             environment: .sandbox
