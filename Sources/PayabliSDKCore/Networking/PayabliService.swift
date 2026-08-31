@@ -139,13 +139,15 @@ public final class PayabliService: PayabliTransport, Sendable {
 /// standard mapping.
 ///
 /// Standard mappings (PRD §8):
-/// - 400 → `PayabliPaymentError.validation`, whatever the body says
+/// - 400 → `PayabliPaymentError.validation`
 /// - 401 → `PayabliGenericError(.tokenExpired)`
-/// - 402 → `PayabliPaymentError.decline` (or `.generic(.unknown)`)
+/// - 402 → `PayabliPaymentError.decline`
 /// - 403 → `PayabliGenericError(.permissionDenied)`
 /// - 410 → `PayabliGenericError(.sessionBurned)`
-/// - 500+ → `PayabliPaymentError.server` (or `.generic(.unknown)`)
+/// - 500+ → `PayabliPaymentError.server`
 /// - other non-2xx → `PayabliGenericError(.unknown)`
+///
+/// The status fixes the classification; the body only decides how many fields get filled.
 public func mapPayabliHTTPError(
     response: PayabliResponse,
     override: ((Int) -> (any Error)?)? = nil
@@ -161,10 +163,6 @@ public func mapPayabliHTTPError(
 
     switch response.statusCode {
     case 400:
-        // The status fixes the classification; the body only decides how many fields
-        // get filled. A body that will not decode costs the fields, so a caller's
-        // catch on `.validation` cannot miss because a proxy returned HTML. The
-        // sibling platform states the same invariant on its own mapper.
         let validation = (try? decoder.decode(PayabliValidationError.self, from: response.body))
             ?? PayabliValidationError()
         throw PayabliPaymentError.validation(validation)
@@ -173,10 +171,9 @@ public func mapPayabliHTTPError(
         throw PayabliGenericError(code: .tokenExpired, reason: "Unauthorized (401)")
 
     case 402:
-        if let decline = try? decoder.decode(PayabliDeclineError.self, from: response.body) {
-            throw PayabliPaymentError.decline(decline)
-        }
-        throw PayabliGenericError(code: .unknown, reason: "Payment declined (402)")
+        let decline = (try? decoder.decode(PayabliDeclineError.self, from: response.body))
+            ?? PayabliDeclineError()
+        throw PayabliPaymentError.decline(decline)
 
     case 403:
         throw PayabliGenericError(code: .permissionDenied, reason: "Forbidden (403)")
@@ -185,10 +182,9 @@ public func mapPayabliHTTPError(
         throw PayabliGenericError(code: .sessionBurned, reason: "Session burned (410)")
 
     case 500...:
-        if let server = try? decoder.decode(PayabliServerError.self, from: response.body) {
-            throw PayabliPaymentError.server(server)
-        }
-        throw PayabliGenericError(code: .unknown, reason: "Server error (\(response.statusCode))")
+        let server = (try? decoder.decode(PayabliServerError.self, from: response.body))
+            ?? PayabliServerError()
+        throw PayabliPaymentError.server(server)
 
     default:
         throw PayabliGenericError(

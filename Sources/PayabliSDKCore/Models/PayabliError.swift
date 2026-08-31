@@ -73,10 +73,8 @@ public struct PayabliFieldError: Decodable, Sendable {
     public let message: String
     public let suggestion: String?
 
-    /// Reads either shape the platform sends. Model validation returns arrays of
-    /// bare strings, which become `message` with no suggestion. The
-    /// `{message, suggestion}` object this type declares is real on at least one
-    /// endpoint, so both decode and neither replaces the other.
+    /// Reads both shapes the platform sends: a bare string becomes `message` with
+    /// no suggestion, and the declared object decodes as-is. Both are live.
     public init(from decoder: any Decoder) throws {
         if let message = try? decoder.singleValueContainer().decode(String.self) {
             self.message = message
@@ -135,13 +133,9 @@ public struct PayabliValidationError: PayabliError, Decodable {
         return parts.joined(separator: " · ")
     }
 
-    /// The status fixes the classification; the body only decides how many fields
-    /// get filled. `errors` is the field most likely to arrive in a shape neither
-    /// form covers, and the synthesised decoder throws on a present-but-mismatched
-    /// value, which would take `title`, `detail` and `type` down with it and leave
-    /// a real validation failure reporting `.unknown`. Decoding it separately costs
-    /// the field list instead. One unreadable entry drops the whole map, matching
-    /// what the sibling platform does with the same body.
+    /// `errors` decodes separately because the synthesised decoder throws on a
+    /// present-but-mismatched value, taking `title`, `detail` and `type` with it.
+    /// One unreadable entry drops the whole map.
     public init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         type = try container.decodeIfPresent(String.self, forKey: .type)
@@ -154,9 +148,7 @@ public struct PayabliValidationError: PayabliError, Decodable {
         errors = try? container.decodeIfPresent([String: [PayabliFieldError]].self, forKey: .errors)
     }
 
-    /// The empty error, for a 400 whose body will not decode at all. The status has
-    /// already fixed the classification, so the caller still catches `.validation`
-    /// and gets no fields.
+    /// The empty error, for a 400 whose body will not decode at all.
     init() {
         type = nil
         title = nil
@@ -188,14 +180,25 @@ public struct PayabliServerError: PayabliError, Decodable {
     public var reason: String {
         title ?? "Internal server error"
     }
+
+    /// The empty error, for a 5xx whose body will not decode at all.
+    init() {
+        title = nil
+        status = nil
+        detail = nil
+        instance = nil
+    }
 }
 
 /// HTTP 402 declined payment. See PRD §8.1.1 "Declined Response".
 public struct PayabliDeclineError: PayabliError, Decodable {
-    public let rawCode: String
+    /// The processor decline code, for example `D0329`. `nil` when the body carried none.
+    public let rawCode: String?
     public let reason: String
     public let explanation: String?
     public let action: String?
+
+    static let defaultReason = "Payment declined (402)"
 
     public var code: PayabliErrorCode {
         .unknown
@@ -216,6 +219,23 @@ public struct PayabliDeclineError: PayabliError, Decodable {
             parts.append(action)
         }
         return parts.joined(separator: " · ")
+    }
+
+    /// A missing `code` or `reason` degrades that field and does not fail the decode.
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        rawCode = try container.decodeIfPresent(String.self, forKey: .rawCode)
+        reason = try container.decodeIfPresent(String.self, forKey: .reason) ?? Self.defaultReason
+        explanation = try container.decodeIfPresent(String.self, forKey: .explanation)
+        action = try container.decodeIfPresent(String.self, forKey: .action)
+    }
+
+    /// The empty decline, for a 402 whose body will not decode at all.
+    init() {
+        rawCode = nil
+        reason = Self.defaultReason
+        explanation = nil
+        action = nil
     }
 
     enum CodingKeys: String, CodingKey {

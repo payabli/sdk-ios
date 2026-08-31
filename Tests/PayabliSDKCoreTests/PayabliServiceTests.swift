@@ -248,6 +248,65 @@ final class PayabliServiceTests: XCTestCase {
         }
     }
 
+    func testMaps402WithPartialBodyKeepsTheDecline() async throws {
+        StubURLProtocol.handler = { request in
+            let json = """
+            {"explanation":"Insufficient funds","action":"Try another card"}
+            """
+            let response = HTTPURLResponse(url: request.url!, statusCode: 402, httpVersion: nil, headerFields: nil)!
+            return (response, Data(json.utf8))
+        }
+
+        let request = PayabliRequest(method: .post, path: "/api/v2/MoneyIn/getpaid")
+        do {
+            _ = try await service().performV2(request, decoding: FakeData.self)
+            XCTFail("Expected error")
+        } catch let PayabliPaymentError.decline(err) {
+            XCTAssertNil(err.rawCode)
+            XCTAssertEqual(err.reason, "Payment declined (402)")
+            XCTAssertEqual(err.explanation, "Insufficient funds")
+            XCTAssertEqual(err.action, "Try another card")
+        } catch {
+            XCTFail("Wrong error: \(error)")
+        }
+    }
+
+    func testMaps402WithUndecodableBodyStillClassifiesAsDecline() async throws {
+        StubURLProtocol.handler = { request in
+            let response = HTTPURLResponse(url: request.url!, statusCode: 402, httpVersion: nil, headerFields: nil)!
+            return (response, Data("<html>Payment Required</html>".utf8))
+        }
+
+        let request = PayabliRequest(method: .post, path: "/api/v2/MoneyIn/getpaid")
+        do {
+            _ = try await service().performV2(request, decoding: FakeData.self)
+            XCTFail("Expected error")
+        } catch let PayabliPaymentError.decline(err) {
+            XCTAssertNil(err.rawCode)
+            XCTAssertEqual(err.reason, "Payment declined (402)")
+        } catch {
+            XCTFail("Wrong error: \(error)")
+        }
+    }
+
+    func testMaps500WithUndecodableBodyStillClassifiesAsServer() async throws {
+        StubURLProtocol.handler = { request in
+            let response = HTTPURLResponse(url: request.url!, statusCode: 503, httpVersion: nil, headerFields: nil)!
+            return (response, Data("<html>Service Unavailable</html>".utf8))
+        }
+
+        let request = PayabliRequest(method: .post, path: "/x")
+        do {
+            _ = try await service().performV2(request, decoding: FakeData.self)
+            XCTFail("Expected error")
+        } catch let PayabliPaymentError.server(err) {
+            XCTAssertNil(err.title)
+            XCTAssertEqual(err.reason, "Internal server error")
+        } catch {
+            XCTFail("Wrong error: \(error)")
+        }
+    }
+
     func testMaps500ToServerError() async throws {
         StubURLProtocol.handler = { request in
             let json = """
