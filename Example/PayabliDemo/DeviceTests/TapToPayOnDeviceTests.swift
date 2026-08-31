@@ -160,7 +160,7 @@ final class TapToPayOnDeviceTests: XCTestCase {
     func testReportTheHandleThisDeviceHolds() async throws {
         let store = try attestation()
         if try store.cachedDeviceId(for: named.entry) == nil {
-            _ = try? await try makeTTP().initialize()
+            _ = try? await makeTTP().initialize()
         }
         let held = try XCTUnwrap(
             try store.cachedDeviceId(for: named.entry),

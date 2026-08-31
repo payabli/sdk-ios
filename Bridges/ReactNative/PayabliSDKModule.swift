@@ -123,11 +123,10 @@ public final class PayabliSDKModule: RCTEventEmitter {
         }
 
         Task { @MainActor in
-            self.eventToken?.cancel()
-            self.eventToken = nil
-
-            // The initialiser rejects an access token that cannot be sent as a header
-            // and an empty entry point, both of which arrive from the JS side.
+            // Constructed before anything is torn down: the initialiser rejects an
+            // access token that cannot be sent as a header and an empty entry point,
+            // both of which arrive from the JS side. A configure() that fails leaves
+            // the previous facade and its event subscription exactly as they were.
             let ttp: PayabliTTP
             do {
                 ttp = try PayabliTTP(
@@ -141,6 +140,10 @@ public final class PayabliSDKModule: RCTEventEmitter {
                 reject("INVALID_CONFIGURATION", error.localizedDescription, error)
                 return
             }
+
+            // Only now is the previous subscription dropped, so it does not leak.
+            self.eventToken?.cancel()
+            self.eventToken = nil
             self.ttp = ttp
             self.subscribeEvents(on: ttp)
             resolve(nil)
