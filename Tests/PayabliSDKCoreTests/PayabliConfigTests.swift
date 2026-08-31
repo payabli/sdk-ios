@@ -19,12 +19,16 @@ final class PayabliConfigTests: XCTestCase {
         XCTAssertEqual(config.entryPoint, "test_entry")
     }
 
-    func testAnEmptyAccessTokenIsRefused() throws {
-        do {
-            _ = try makeConfig(accessToken: "")
-            XCTFail("expected throw")
-        } catch let err as PayabliGenericError {
-            XCTAssertEqual(err.code, .invalidConfiguration)
+    /// Whitespace is printable ASCII, so a token of spaces passes the header check
+    /// and would reach the wire carrying nothing.
+    func testABlankAccessTokenIsRefused() throws {
+        for blank in ["", " ", "   ", "\t", "\n", " \t\n "] {
+            do {
+                _ = try makeConfig(accessToken: blank)
+                XCTFail("expected throw for \(blank.debugDescription)")
+            } catch let err as PayabliGenericError {
+                XCTAssertEqual(err.code, .invalidConfiguration, blank.debugDescription)
+            }
         }
     }
 
@@ -42,12 +46,14 @@ final class PayabliConfigTests: XCTestCase {
         }
     }
 
-    func testAnEmptyEntryPointIsRefused() throws {
-        do {
-            _ = try makeConfig(entryPoint: "")
-            XCTFail("expected throw")
-        } catch let err as PayabliGenericError {
-            XCTAssertEqual(err.code, .invalidConfiguration)
+    func testABlankEntryPointIsRefused() throws {
+        for blank in ["", "  ", "\t"] {
+            do {
+                _ = try makeConfig(entryPoint: blank)
+                XCTFail("expected throw for \(blank.debugDescription)")
+            } catch let err as PayabliGenericError {
+                XCTAssertEqual(err.code, .invalidConfiguration, blank.debugDescription)
+            }
         }
     }
 

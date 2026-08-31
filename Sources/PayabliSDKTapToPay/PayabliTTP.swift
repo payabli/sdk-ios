@@ -8,7 +8,7 @@ import PayabliSDKCore
 /// See PRD §19.1.
 ///
 /// ```swift
-/// let ttp = PayabliTTP(
+/// let ttp = try PayabliTTP(
 ///     accessToken: "...", entryPoint: "myEntry",
 ///     appId: "TEAM.bundle.id", environment: .sandbox
 /// )

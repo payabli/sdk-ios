@@ -4,6 +4,15 @@ private let firstPrintableASCII: UInt32 = 0x20
 private let lastPrintableASCII: UInt32 = 0x7E
 
 extension String {
+    /// True when this holds no credential: empty, or nothing but whitespace.
+    ///
+    /// Whitespace passes `isHeaderSafe`, space being printable ASCII, so a token of
+    /// spaces would reach the wire as `Authorization: Bearer` and carry nothing. The
+    /// sibling platform draws the same line with `isBlank`.
+    var isBlank: Bool {
+        allSatisfy(\.isWhitespace)
+    }
+
     /// True when every character can legally sit in an HTTP header value.
     ///
     /// A token reaches the wire as `Authorization: Bearer <token>`. A carriage return

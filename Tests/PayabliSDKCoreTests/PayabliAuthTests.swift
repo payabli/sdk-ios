@@ -145,21 +145,82 @@ final class PayabliAuthTests: XCTestCase {
         XCTAssertEqual(current, "old", "The refused credential must not be committed")
     }
 
+    /// Whitespace is printable ASCII, so a token of spaces passes the header check
+    /// and would be committed carrying nothing.
     func testABlankRefreshedTokenIsNotCommitted() async throws {
+        for blank in ["", " ", "   ", "\t\n"] {
+            let auth = PayabliAuth(config: try makeConfig(
+                accessToken: "old",
+                tokenProvider: { blank }
+            ))
+
+            do {
+                _ = try await auth.invalidateAndRefresh(rejectedToken: "old")
+                XCTFail("expected throw for \(blank.debugDescription)")
+            } catch let err as PayabliGenericError {
+                XCTAssertEqual(err.code, .tokenExpired, blank.debugDescription)
+            }
+
+            let current = await auth.currentAccessToken()
+            XCTAssertEqual(current, "old", blank.debugDescription)
+        }
+    }
+
+    // MARK: - What a joining caller receives
+
+    /// A caller that arrives while a refresh is in flight awaits the same task, so
+    /// the checks have to be inside it. Otherwise the joiner returns a token nothing
+    /// validated.
+    func testAJoinerDoesNotReceiveAnUnvalidatedToken() async throws {
         let auth = PayabliAuth(config: try makeConfig(
             accessToken: "old",
-            tokenProvider: { "" }
+            tokenProvider: {
+                try await Task.sleep(nanoseconds: 30_000_000)
+                return "   "
+            }
         ))
 
-        do {
-            _ = try await auth.invalidateAndRefresh(rejectedToken: "old")
-            XCTFail("expected throw")
-        } catch let err as PayabliGenericError {
-            XCTAssertEqual(err.code, .tokenExpired)
-        }
+        async let first = auth.invalidateAndRefresh(rejectedToken: "old")
+        async let second = auth.invalidateAndRefresh(rejectedToken: "old")
 
+        for outcome in await [try? first, try? second] {
+            XCTAssertNil(outcome, "a blank token reached a caller")
+        }
         let current = await auth.currentAccessToken()
         XCTAssertEqual(current, "old")
+    }
+
+    /// The provider's text must not reach a joiner either, which it does when the
+    /// redaction is applied by the initiating caller rather than inside the task.
+    func testAJoinerDoesNotReceiveTheProvidersOwnMessage() async throws {
+        struct ChattyProviderError: Error {
+            let responseBody: String
+        }
+        let auth = PayabliAuth(config: try makeConfig(
+            accessToken: "old",
+            tokenProvider: {
+                try await Task.sleep(nanoseconds: 30_000_000)
+                throw ChattyProviderError(responseBody: "SHOULD_NOT_LEAVE_THE_PROVIDER")
+            }
+        ))
+
+        async let first = auth.invalidateAndRefresh(rejectedToken: "old")
+        async let second = auth.invalidateAndRefresh(rejectedToken: "old")
+
+        var rendered = ""
+        do {
+            _ = try await first
+            XCTFail("expected the initiating caller to fail")
+        } catch {
+            rendered += " \(error) \(String(describing: (error as? PayabliGenericError)?.underlying))"
+        }
+        do {
+            _ = try await second
+            XCTFail("expected the joining caller to fail")
+        } catch {
+            rendered += " \(error) \(String(describing: (error as? PayabliGenericError)?.underlying))"
+        }
+        XCTAssertFalse(rendered.contains("SHOULD_NOT_LEAVE_THE_PROVIDER"), rendered)
     }
 
     /// A CR or LF in a bearer is header injection, and the platform drops the header

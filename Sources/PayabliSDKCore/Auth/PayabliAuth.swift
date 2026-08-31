@@ -58,37 +58,43 @@ public actor PayabliAuth {
             )
         }
 
+        // The task carries the finished refresh, not the provider call: a joiner at
+        // the top of this method awaits this same value, so validation and redaction
+        // are inside it. Left to the initiating caller, a joiner would return a token
+        // that was never checked and, on a throw, the host's own error text.
         let task = Task<String, Error> { [logger] in
             logger.info("Refreshing access token via partner tokenProvider")
-            return try await provider()
+            let minted: String
+            do {
+                minted = try await provider()
+            } catch {
+                // Every throw from the provider lands here, this SDK's own error type
+                // included: it is host code whatever it chose to throw.
+                logger.error("The token provider failed")
+                throw PayabliGenericError(
+                    code: .tokenExpired,
+                    reason: "Token refresh failed",
+                    underlying: RedactedCause(error)
+                )
+            }
+            do {
+                try Self.validate(minted, against: rejectedToken)
+            } catch {
+                logger.error("The minted token was refused before it was committed")
+                throw error
+            }
+            return minted
         }
         inFlightRefresh = task
 
-        let fresh: String
         do {
-            fresh = try await task.value
-        } catch {
-            // Every throw from the provider lands here, this SDK's own error type
-            // included: it is host code whatever it chose to throw.
-            inFlightRefresh = nil
-            logger.error("Token refresh failed")
-            throw PayabliGenericError(
-                code: .tokenExpired,
-                reason: "Token refresh failed",
-                underlying: RedactedCause(error)
-            )
-        }
-
-        do {
-            try validate(fresh, against: rejectedToken)
+            let fresh = try await task.value
+            commit(fresh)
+            return fresh
         } catch {
             inFlightRefresh = nil
-            logger.error("The minted token was refused before it was committed")
             throw error
         }
-
-        commit(fresh)
-        return fresh
     }
 
     /// Installs the minted token and announces the rotation. Called only once the
@@ -111,8 +117,8 @@ public actor PayabliAuth {
     /// rejected; because `currentToken` would be unchanged, the next rejection starts
     /// another provider call instead of taking the already-rotated path, so a
     /// provider that keeps returning it costs one call per 401 with no end.
-    private func validate(_ fresh: String, against rejectedToken: String) throws {
-        guard !fresh.isEmpty else {
+    private static func validate(_ fresh: String, against rejectedToken: String) throws {
+        guard !fresh.isBlank else {
             throw PayabliGenericError(
                 code: .tokenExpired,
                 reason: "Token refresh failed",

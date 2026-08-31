@@ -68,11 +68,11 @@ public struct PayabliConfig: Sendable {
         environment: PayabliEnvironment,
         telemetryEnabled: Bool = true
     ) throws {
-        guard !accessToken.isEmpty else {
+        guard !accessToken.isBlank else {
             throw PayabliGenericError(
                 code: .invalidConfiguration,
                 reason: "Invalid configuration",
-                detail: "accessToken is empty. Mint one on your backend and pass it here."
+                detail: "accessToken is blank. Mint one on your backend and pass it here."
             )
         }
         guard accessToken.isHeaderSafe else {
@@ -82,11 +82,11 @@ public struct PayabliConfig: Sendable {
                 detail: "accessToken cannot be an HTTP header value."
             )
         }
-        guard !entryPoint.isEmpty else {
+        guard !entryPoint.isBlank else {
             throw PayabliGenericError(
                 code: .invalidConfiguration,
                 reason: "Invalid configuration",
-                detail: "entryPoint is empty."
+                detail: "entryPoint is blank."
             )
         }
         self.accessToken = accessToken
