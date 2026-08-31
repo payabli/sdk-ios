@@ -2,6 +2,14 @@
 import PayabliSDKCore
 import XCTest
 
+/// What one live run writes to. A type rather than a tuple so the three members
+/// keep their names at every call site.
+struct LiveTarget {
+    let environment: PayabliEnvironment
+    let entry: String
+    let name: String
+}
+
 /// Which environment this run is against, and the credentials for it.
 ///
 /// Two things are required, and the environment alone is not enough. `PAYABLI_ENV`
@@ -12,14 +20,6 @@ import XCTest
 /// on the same variable for the same reason.
 ///
 /// Both come from the scheme's environment for an app-hosted bundle: the
-/// What one live run writes to. A type rather than a tuple so the three members
-/// keep their names at every call site.
-struct LiveTarget {
-    let environment: PayabliEnvironment
-    let entry: String
-    let name: String
-}
-
 /// `TEST_RUNNER_` prefix reaches a UI-test runner and not a host application.
 enum LiveEnvironment {
     /// The name the walkthrough already uses, so one flag opts into every live run
