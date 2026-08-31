@@ -33,7 +33,7 @@ enum ErrorSummary {
     static func of(_ error: PayabliPaymentError) -> String {
         switch error {
         case let .decline(decline):
-            return "decline(\(decline.rawCode))"
+            return "decline(\(decline.rawCode ?? "no code"))"
         case let .server(server):
             return "server(\(server.status.map(String.init) ?? "no status"))"
         case let .validation(validation):

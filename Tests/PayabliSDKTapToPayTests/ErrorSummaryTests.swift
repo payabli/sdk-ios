@@ -121,6 +121,18 @@ final class ErrorSummaryTests: XCTestCase {
         XCTAssertFalse(serverSummary.contains("Internal server error"), serverSummary)
     }
 
+    func testADeclineWithoutACodeSaysSo() throws {
+        let decline = try JSONDecoder().decode(
+            PayabliDeclineError.self,
+            from: Data(#"{"reason":"Do not honor","explanation":"Contact issuer"}"#.utf8)
+        )
+
+        let summary = ErrorSummary.of(PayabliPaymentError.decline(decline))
+
+        XCTAssertEqual(summary, "decline(no code)")
+        XCTAssertFalse(summary.contains("Do not honor"), summary)
+    }
+
     func testAServerFailureWithoutAStatusSaysSo() throws {
         let server = try JSONDecoder().decode(
             PayabliServerError.self,
