@@ -17,7 +17,10 @@ import XCTest
 /// These register a device against the paypoint the run names, which is a write.
 @MainActor
 final class TapToPayOnDeviceTests: XCTestCase {
-    private var named: (environment: PayabliEnvironment, entry: String, name: String)!
+    // Set in setUp, read by every test: the XCTest shape for a fixture that cannot
+    // exist at init. Was accepted through the lint baseline until this line moved.
+    // swiftlint:disable:next implicitly_unwrapped_optional
+    private var named: LiveTarget!
 
     override func setUp() async throws {
         try await super.setUp()
@@ -26,8 +29,8 @@ final class TapToPayOnDeviceTests: XCTestCase {
         _ = try await LiveEnvironment.requireAToken()
     }
 
-    private func makeTTP() -> PayabliTTP {
-        PayabliTTP(
+    private func makeTTP() throws -> PayabliTTP {
+        try PayabliTTP(
             accessToken: Secrets.placeholderAccessToken,
             tokenProvider: { try await Secrets.fetchAccessToken() },
             entryPoint: named.entry,
@@ -36,9 +39,9 @@ final class TapToPayOnDeviceTests: XCTestCase {
         )
     }
 
-    private func attestation() -> AppAttestService {
+    private func attestation() throws -> AppAttestService {
         AppAttestService(
-            transport: PayabliSession(config: LiveEnvironment.config(for: named)).transport,
+            transport: PayabliSession(config: try LiveEnvironment.config(for: named)).transport,
             attestor: RealAppAttestor(),
             storage: KeychainStorage()
         )
@@ -57,7 +60,7 @@ final class TapToPayOnDeviceTests: XCTestCase {
     /// one to do the same thing.
     @discardableResult
     private func enrolledDevice() async throws -> (session: PayabliTTP, handle: String) {
-        let ttp = makeTTP()
+        let ttp = try makeTTP()
         do {
             try await ttp.initialize()
         } catch PayabliTTPError.devicePendingActivation {
@@ -120,10 +123,10 @@ final class TapToPayOnDeviceTests: XCTestCase {
     /// The cold sequence is what enrolled this device, and re-running it needs a
     /// person with the handle in hand.
     func testTheSessionAfterAnEnrolmentHoldsTheSameHandle() async throws {
-        let store = attestation()
+        let store = try attestation()
         let first = try await enrolledDevice().handle
 
-        let second = makeTTP()
+        let second = try makeTTP()
         try await second.initialize()
 
         XCTAssertEqual(second.sessionState, .ready)
@@ -138,7 +141,7 @@ final class TapToPayOnDeviceTests: XCTestCase {
     /// never registered against, and asking does not disturb the one it did.
     func testAnotherPaypointIsNotThisDevicesEnrolment() async throws {
         let held = try await enrolledDevice().handle
-        let store = attestation()
+        let store = try attestation()
 
         let other = "\(named.entry)_notARealPaypoint"
         let enrolledElsewhere = try await store.isAttested(for: other)
@@ -155,9 +158,9 @@ final class TapToPayOnDeviceTests: XCTestCase {
     /// activation is surfaced, so a device that cannot reach `.ready` still has a
     /// handle to report.
     func testReportTheHandleThisDeviceHolds() async throws {
-        let store = attestation()
+        let store = try attestation()
         if try store.cachedDeviceId(for: named.entry) == nil {
-            _ = try? await makeTTP().initialize()
+            _ = try? await try makeTTP().initialize()
         }
         let held = try XCTUnwrap(
             try store.cachedDeviceId(for: named.entry),

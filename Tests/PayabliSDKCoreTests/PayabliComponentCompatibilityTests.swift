@@ -3,9 +3,9 @@ import XCTest
 
 @MainActor
 final class PayabliComponentCompatibilityTests: XCTestCase {
-    func testNewConfigureRoutesToLegacyConfigureImplementation() {
+    func testNewConfigureRoutesToLegacyConfigureImplementation() throws {
         let component = LegacyConfigureComponent()
-        let config = testConfig(entryPoint: "legacy-entry")
+        let config = try testConfig(entryPoint: "legacy-entry")
 
         component.configure(config: config)
 
@@ -13,8 +13,8 @@ final class PayabliComponentCompatibilityTests: XCTestCase {
         XCTAssertEqual(component.configuredTheme?.primaryColorHex, PayabliTheme.default.primaryColorHex)
     }
 
-    private func testConfig(entryPoint: String) -> PayabliConfig {
-        PayabliConfig(
+    private func testConfig(entryPoint: String) throws -> PayabliConfig {
+        try PayabliConfig(
             accessToken: "access-token",
             entryPoint: entryPoint,
             environment: .sandbox

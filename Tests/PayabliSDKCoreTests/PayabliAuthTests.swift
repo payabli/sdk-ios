@@ -7,8 +7,8 @@ final class PayabliAuthTests: XCTestCase {
     private func makeConfig(
         accessToken: String = "partner_minted_token",
         tokenProvider: PayabliTokenRefresh? = nil
-    ) -> PayabliConfig {
-        PayabliConfig(
+    ) throws -> PayabliConfig {
+        try PayabliConfig(
             accessToken: accessToken,
             tokenProvider: tokenProvider,
             entryPoint: "test_entry",
@@ -18,8 +18,8 @@ final class PayabliAuthTests: XCTestCase {
 
     // MARK: - Initial token
 
-    func testInitialTokenComesFromConfig() async {
-        let auth = PayabliAuth(config: makeConfig(accessToken: "seed"))
+    func testInitialTokenComesFromConfig() async throws {
+        let auth = PayabliAuth(config: try makeConfig(accessToken: "seed"))
         let token = await auth.currentAccessToken()
         XCTAssertEqual(token, "seed")
     }
@@ -28,7 +28,7 @@ final class PayabliAuthTests: XCTestCase {
 
     func testInvalidateAndRefreshCallsProvider() async throws {
         let counter = Counter()
-        let auth = PayabliAuth(config: makeConfig(
+        let auth = PayabliAuth(config: try makeConfig(
             accessToken: "old",
             tokenProvider: {
                 await counter.increment()
@@ -47,7 +47,7 @@ final class PayabliAuthTests: XCTestCase {
     }
 
     func testInvalidateAndRefreshWithoutProviderThrowsTokenExpired() async throws {
-        let auth = PayabliAuth(config: makeConfig(accessToken: "old", tokenProvider: nil))
+        let auth = PayabliAuth(config: try makeConfig(accessToken: "old", tokenProvider: nil))
         do {
             _ = try await auth.invalidateAndRefresh(rejectedToken: "old")
             XCTFail("expected throw")
@@ -60,7 +60,7 @@ final class PayabliAuthTests: XCTestCase {
 
     func testInvalidateAndRefreshCoalescesConcurrentCallers() async throws {
         let counter = Counter()
-        let auth = PayabliAuth(config: makeConfig(
+        let auth = PayabliAuth(config: try makeConfig(
             accessToken: "old",
             tokenProvider: {
                 await counter.increment()
@@ -81,7 +81,7 @@ final class PayabliAuthTests: XCTestCase {
 
     func testProviderErrorMapsToTokenExpired() async throws {
         struct ProviderError: Error {}
-        let auth = PayabliAuth(config: makeConfig(
+        let auth = PayabliAuth(config: try makeConfig(
             accessToken: "old",
             tokenProvider: { throw ProviderError() }
         ))
@@ -102,7 +102,7 @@ final class PayabliAuthTests: XCTestCase {
     /// already rotated, which would discard the rotation the first one obtained.
     func testARejectionOnAnAlreadyRotatedTokenDoesNotCallTheProvider() async throws {
         let counter = Counter()
-        let auth = PayabliAuth(config: makeConfig(
+        let auth = PayabliAuth(config: try makeConfig(
             accessToken: "old",
             tokenProvider: {
                 await counter.increment()
@@ -124,7 +124,7 @@ final class PayabliAuthTests: XCTestCase {
 
     func testAProviderReturningTheRejectedTokenFailsRatherThanLooping() async throws {
         let counter = Counter()
-        let auth = PayabliAuth(config: makeConfig(
+        let auth = PayabliAuth(config: try makeConfig(
             accessToken: "old",
             tokenProvider: {
                 await counter.increment()
@@ -146,7 +146,7 @@ final class PayabliAuthTests: XCTestCase {
     }
 
     func testABlankRefreshedTokenIsNotCommitted() async throws {
-        let auth = PayabliAuth(config: makeConfig(
+        let auth = PayabliAuth(config: try makeConfig(
             accessToken: "old",
             tokenProvider: { "" }
         ))
@@ -165,7 +165,7 @@ final class PayabliAuthTests: XCTestCase {
     /// A CR or LF in a bearer is header injection, and the platform drops the header
     /// rather than reporting it, so the request goes out unauthenticated.
     func testATokenThatCannotBeAHeaderValueIsNotCommitted() async throws {
-        let auth = PayabliAuth(config: makeConfig(
+        let auth = PayabliAuth(config: try makeConfig(
             accessToken: "old",
             tokenProvider: { "fresh\r\nX-Injected: true" }
         ))
@@ -181,8 +181,8 @@ final class PayabliAuthTests: XCTestCase {
         XCTAssertEqual(current, "old")
     }
 
-    func testARefusedTokenPublishesNoRotation() async {
-        let auth = PayabliAuth(config: makeConfig(
+    func testARefusedTokenPublishesNoRotation() async throws {
+        let auth = PayabliAuth(config: try makeConfig(
             accessToken: "old",
             tokenProvider: { "old" }
         ))
@@ -213,7 +213,7 @@ final class PayabliAuthTests: XCTestCase {
         struct ChattyProviderError: Error {
             let responseBody: String
         }
-        let auth = PayabliAuth(config: makeConfig(
+        let auth = PayabliAuth(config: try makeConfig(
             accessToken: "old",
             tokenProvider: { throw ChattyProviderError(responseBody: "SHOULD_NOT_LEAVE_THE_PROVIDER") }
         ))
@@ -236,7 +236,7 @@ final class PayabliAuthTests: XCTestCase {
     }
 
     func testTokenChangesEmitsAfterRefresh() async throws {
-        let config = PayabliConfig(
+        let config = try PayabliConfig(
             accessToken: "old",
             tokenProvider: { "new" },
             entryPoint: "demo",

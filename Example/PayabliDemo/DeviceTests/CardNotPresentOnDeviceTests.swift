@@ -15,7 +15,10 @@ import XCTest
 /// authorization did, so a failure part way through leaves nothing standing.
 @MainActor
 final class CardNotPresentOnDeviceTests: XCTestCase {
-    private var named: (environment: PayabliEnvironment, entry: String, name: String)!
+    // Set in setUp, read by every test: the XCTest shape for a fixture that cannot
+    // exist at init. Was accepted through the lint baseline until this line moved.
+    // swiftlint:disable:next implicitly_unwrapped_optional
+    private var named: LiveTarget!
 
     override func setUp() async throws {
         try await super.setUp()

@@ -45,8 +45,8 @@ final class PayabliTTPTests: XCTestCase {
         provider: MockTapToPayProvider = MockTapToPayProvider(),
         attestation: MockDeviceAttestationService = MockDeviceAttestationService(),
         retry: RetryPolicy = RetryPolicy(maxAttempts: 1, baseDelay: 0, maxDelay: 0, multiplier: 1, maxJitter: 0)
-    ) -> (PayabliTTP, MockTapToPayProvider, MockDeviceAttestationService) {
-        let config = PayabliConfig(
+    ) throws -> (PayabliTTP, MockTapToPayProvider, MockDeviceAttestationService) {
+        let config = try PayabliConfig(
             accessToken: "seed_token",
             entryPoint: "e",
             environment: .sandbox
@@ -63,7 +63,7 @@ final class PayabliTTPTests: XCTestCase {
     }
 
     func testColdInitializeRunsAttestation() async throws {
-        let (ttp, provider, attestation) = makeTTP()
+        let (ttp, provider, attestation) = try makeTTP()
         attestation.isAlreadyAttested = false
 
         try await ttp.initialize()
@@ -74,7 +74,7 @@ final class PayabliTTPTests: XCTestCase {
     }
 
     func testWarmInitializeSkipsAttestation() async throws {
-        let (ttp, provider, attestation) = makeTTP()
+        let (ttp, provider, attestation) = try makeTTP()
         attestation.isAlreadyAttested = true
 
         try await ttp.initialize()
@@ -84,7 +84,7 @@ final class PayabliTTPTests: XCTestCase {
     }
 
     func testPendingActivationSurfacesError() async throws {
-        let (ttp, _, attestation) = makeTTP()
+        let (ttp, _, attestation) = try makeTTP()
         attestation.attestResult = .failure(PayabliTTPError.devicePendingActivation)
 
         do {
@@ -98,7 +98,7 @@ final class PayabliTTPTests: XCTestCase {
     }
 
     func testEligibilityFailurePreventsInit() async throws {
-        let (ttp, provider, _) = makeTTP()
+        let (ttp, provider, _) = try makeTTP()
         provider.eligibility = .failure(.readerSetupFailed(reason: "no entitlement"))
         do {
             try await ttp.initialize()
@@ -111,7 +111,7 @@ final class PayabliTTPTests: XCTestCase {
     }
 
     func testActivationFromPendingState() async throws {
-        let (ttp, _, attestation) = makeTTP()
+        let (ttp, _, attestation) = try makeTTP()
         attestation.attestResult = .failure(PayabliTTPError.devicePendingActivation)
         _ = try? await ttp.initialize()
         XCTAssertEqual(ttp.sessionState, .pendingActivation)
@@ -122,7 +122,7 @@ final class PayabliTTPTests: XCTestCase {
     }
 
     func testActivationOutsidePendingStateIsInvalid() async throws {
-        let (ttp, _, _) = makeTTP()
+        let (ttp, _, _) = try makeTTP()
         do {
             try await ttp.activateDevice(activationCode: "X")
             XCTFail("expected invalid state")
@@ -134,7 +134,7 @@ final class PayabliTTPTests: XCTestCase {
     }
 
     func testChargeRejectsNonSale() async throws {
-        let (ttp, _, _) = makeTTP()
+        let (ttp, _, _) = try makeTTP()
         do {
             _ = try await ttp.charge(
                 type: PayabliTTPPaymentType(rawValue: 99) ?? .sale,
@@ -185,7 +185,7 @@ final class PayabliTTPTests: XCTestCase {
     /// An `initialize()` that fails in the attestation phase says so on the event
     /// stream, which was silent before, and says it without repeating the reason.
     func testAttestationFailureEmitsAnEventNamingThePhase() async throws {
-        let (ttp, _, attestation) = makeTTP()
+        let (ttp, _, attestation) = try makeTTP()
         attestation.attestResult = .failure(PayabliTTPError.attestationFailed(reason: "key unusable"))
         let stream = ttp.events()
 
@@ -211,7 +211,7 @@ final class PayabliTTPTests: XCTestCase {
     /// `initialize()` while the published state stayed where `reset()` left it, so a
     /// host observing `state` saw an idle session and a caller saw a failure.
     func testAWarmReadFailureMarksTheStateAndEmitsTheEvent() async throws {
-        let (ttp, _, attestation) = makeTTP()
+        let (ttp, _, attestation) = try makeTTP()
         attestation.readFailure = PayabliTTPError.attestationFailed(reason: "unreadable")
         let stream = ttp.events()
 
@@ -232,7 +232,7 @@ final class PayabliTTPTests: XCTestCase {
     /// A refusal whose drop did not land says so, since the binding is still
     /// readable and its key still signs, so the next warm check presents it again.
     func testAConfigRefusalThatCouldNotDropTheBindingSaysSo() async throws {
-        let (ttp, _, attestation) = makeTTP()
+        let (ttp, _, attestation) = try makeTTP()
         attestation.isAlreadyAttested = true
         attestation.clearFailure = PayabliTTPError.attestationFailed(reason: "keychain unavailable")
 
@@ -269,7 +269,7 @@ final class PayabliTTPTests: XCTestCase {
 
     /// A config 401 answering one handle leaves a binding enrolled since.
     func testAConfigRefusalLeavesABindingEnrolledSince() async throws {
-        let (ttp, _, attestation) = makeTTP()
+        let (ttp, _, attestation) = try makeTTP()
         attestation.isAlreadyAttested = true
         attestation.bindings = [MockDeviceAttestationService.anyEntry: "dev_old"]
 
@@ -302,7 +302,7 @@ final class PayabliTTPTests: XCTestCase {
     /// A charge names the binding held when it is sent, not the one held when the
     /// session was built.
     func testAChargeSendsTheBindingHeldWhenItIsSent() async throws {
-        let (ttp, _, attestation) = makeTTP()
+        let (ttp, _, attestation) = try makeTTP()
         attestation.bindings = [MockDeviceAttestationService.anyEntry: "dev_old"]
 
         let sent = BodyBox()
@@ -339,7 +339,7 @@ final class PayabliTTPTests: XCTestCase {
     /// The event, the published state and the thrown error carry one value, so a
     /// reader comparing a screen against a log sees the same failure twice.
     func testConfigFailureEmitsAnEventAndMarksWhatItThrows() async throws {
-        let (ttp, _, _) = makeTTP()
+        let (ttp, _, _) = try makeTTP()
         StubURLProtocol.handler = { request in
             (HTTPURLResponse(
                 url: request.url!,
@@ -382,7 +382,7 @@ final class PayabliTTPTests: XCTestCase {
     /// service's own wording must not ride along in one. The caller still gets it,
     /// through the thrown error.
     func testConfigFailureEventCarriesTheCodeRatherThanTheServersWords() async throws {
-        let (ttp, _, _) = makeTTP()
+        let (ttp, _, _) = try makeTTP()
         let serversWords = "Card number belongs to another merchant"
         StubURLProtocol.handler = { request in
             (HTTPURLResponse(
@@ -423,7 +423,7 @@ final class PayabliTTPTests: XCTestCase {
     /// the attestation cache, marks, emits and throws. A missing clear leaves the
     /// next call re-sending a handle the service has already refused.
     func testConfigRejectionClearsTheAttestationCacheAndReportsItOnce() async throws {
-        let (ttp, _, attestation) = makeTTP()
+        let (ttp, _, attestation) = try makeTTP()
         attestation.isAlreadyAttested = true
         StubURLProtocol.handler = { request in
             (
@@ -476,7 +476,7 @@ final class PayabliTTPTests: XCTestCase {
     /// The rule reaches the events that predate it. An activation failure's reason
     /// can be the service's own, since the decline body is where it comes from.
     func testActivationFailureEventNamesTheCaseWithoutItsReason() async throws {
-        let (ttp, _, attestation) = makeTTP()
+        let (ttp, _, attestation) = try makeTTP()
         let serversWords = "Device belongs to another merchant"
         attestation.attestResult = .failure(PayabliTTPError.devicePendingActivation)
         _ = try? await ttp.initialize()
@@ -500,7 +500,7 @@ final class PayabliTTPTests: XCTestCase {
     }
 
     func testEventsStreamDeliversLifecycle() async throws {
-        let (ttp, _, _) = makeTTP()
+        let (ttp, _, _) = try makeTTP()
         let stream = ttp.events()
 
         let collector = Task {

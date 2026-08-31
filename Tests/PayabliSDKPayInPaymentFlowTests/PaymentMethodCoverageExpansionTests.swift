@@ -453,7 +453,7 @@ final class PaymentMethodCoverageExpansionTests: XCTestCase {
         }
         """)
         let component = PayabliPayInPaymentFlow(
-            config: PayabliConfig(
+            config: try PayabliConfig(
                 accessToken: "unused",
                 entryPoint: "entry",
                 environment: .sandbox

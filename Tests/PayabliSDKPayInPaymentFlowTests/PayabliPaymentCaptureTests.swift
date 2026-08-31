@@ -61,7 +61,7 @@ final class PayabliPayInPaymentFlowTests: XCTestCase {
             transport: transport
         )
 
-        component.configure(config: PayabliConfig(
+        component.configure(config: try PayabliConfig(
             accessToken: "unused",
             entryPoint: "new-entry",
             environment: .qa

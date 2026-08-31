@@ -12,13 +12,21 @@ import XCTest
 /// on the same variable for the same reason.
 ///
 /// Both come from the scheme's environment for an app-hosted bundle: the
+/// What one live run writes to. A type rather than a tuple so the three members
+/// keep their names at every call site.
+struct LiveTarget {
+    let environment: PayabliEnvironment
+    let entry: String
+    let name: String
+}
+
 /// `TEST_RUNNER_` prefix reaches a UI-test runner and not a host application.
 enum LiveEnvironment {
     /// The name the walkthrough already uses, so one flag opts into every live run
     /// rather than one per suite.
     static let liveRunKey = "PAYABLI_QA_LIVE"
 
-    static func named() throws -> (environment: PayabliEnvironment, entry: String, name: String) {
+    static func named() throws -> LiveTarget {
         try XCTSkipUnless(
             ProcessInfo.processInfo.environment[liveRunKey] == "1",
             "set \(liveRunKey)=1 in the scheme to register a device and move money"
@@ -41,7 +49,11 @@ enum LiveEnvironment {
             "no paypoint configured for \(requested)"
         )
         pointAtTheServerFor(demoEnvironment.label)
-        return (demoEnvironment.sdkEnvironment, entry, demoEnvironment.label)
+        return LiveTarget(
+            environment: demoEnvironment.sdkEnvironment,
+            entry: entry,
+            name: demoEnvironment.label
+        )
     }
 
     /// One token server per environment, since a server holds one upstream, so the
@@ -61,8 +73,8 @@ enum LiveEnvironment {
 
     /// A config pointed at the live environment, taking its token from the
     /// partner endpoint the demo app uses.
-    static func config(for named: (environment: PayabliEnvironment, entry: String, name: String)) -> PayabliConfig {
-        PayabliConfig(
+    static func config(for named: LiveTarget) throws -> PayabliConfig {
+        try PayabliConfig(
             accessToken: Secrets.placeholderAccessToken,
             tokenProvider: { try await Secrets.fetchAccessToken() },
             entryPoint: named.entry,
@@ -89,7 +101,7 @@ enum LiveEnvironment {
     }
 
     /// Printed so a run's output names the environment and paypoint it wrote to.
-    static func announce(_ named: (environment: PayabliEnvironment, entry: String, name: String)) {
+    static func announce(_ named: LiveTarget) {
         print("PAYABLI_RUN env=\(named.name) entry=\(named.entry)")
     }
 
