@@ -27,9 +27,9 @@ final class CardNotPresentOnDeviceTests: XCTestCase {
         _ = try await LiveEnvironment.requireAToken()
     }
 
-    /// The rejection path against the real token endpoint: a credential the service
-    /// refuses, replaced through the provider, and the stale rejection that follows
-    /// answered without asking the provider again.
+    /// The rejection path against the real token endpoint: a credential the holder is
+    /// told was refused, replaced through the provider, and the stale rejection that
+    /// follows answered without asking the provider again.
     ///
     /// Moves no money. The refresh is what every other test here depends on and
     /// nothing else proves it ran, because the app launches holding a token that may

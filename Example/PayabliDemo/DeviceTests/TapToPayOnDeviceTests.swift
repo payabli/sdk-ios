@@ -262,7 +262,7 @@ final class TapToPayOnDeviceTests: XCTestCase {
         let collector = Task {
             for await event in stream {
                 if case .chargeInitiated = event {
-                    seen.record("initiated")
+                    seen.recordInitiated()
                     reachedTheTap.fulfill()
                     return
                 }
@@ -278,7 +278,7 @@ final class TapToPayOnDeviceTests: XCTestCase {
                     orderDescription: "device tests"
                 )
             } catch {
-                seen.record("failed \(error.localizedDescription)")
+                seen.recordTerminal(error.localizedDescription)
             }
         }
 
@@ -294,25 +294,45 @@ final class TapToPayOnDeviceTests: XCTestCase {
         collector.cancel()
         _ = await charging.value
 
-        LiveEnvironment.report("PAYABLI_CHARGE env=\(named.name) customer=\(label) outcome=\(seen.value)")
+        // Names what was asserted, not only what the charge last threw: this test
+        // ends the read itself, so a run that reached the tap still throws.
+        LiveEnvironment.report(
+            "PAYABLI_CHARGE env=\(named.name) customer=\(label) "
+                + "asserted=\(result == .completed ? "reachedTheTap" : "didNotReachTheTap") \(seen.value)"
+        )
         return (result, seen.value)
     }
 }
 
-/// What a charge reported, written from one task and read from another.
+/// What a charge run saw, written from one task and read from another: whether it
+/// reached the tap, and what it last threw.
+///
+/// Two fields rather than one, because this test ends the read itself once the tap
+/// is reached. The charge throws even on a run that got there, and that throw is not
+/// the verdict.
 private final class OutcomeBox: @unchecked Sendable {
     private let lock = NSLock()
-    private var storage = "nothing was reported"
+    private var initiated = false
+    private var terminal: String?
 
+    /// `terminal` is whatever the charge threw, the cancellation this test performs
+    /// itself included.
     var value: String {
         lock.lock()
         defer { lock.unlock() }
-        return storage
+        return "reachedTheTap=\(initiated ? "yes" : "no") terminal=\(terminal ?? "none")"
     }
 
-    func record(_ outcome: String) {
+    /// Called on `chargeInitiated`, the last event before the reader waits for a card.
+    func recordInitiated() {
         lock.lock()
         defer { lock.unlock() }
-        storage = outcome
+        initiated = true
+    }
+
+    func recordTerminal(_ outcome: String) {
+        lock.lock()
+        defer { lock.unlock() }
+        terminal = outcome
     }
 }
