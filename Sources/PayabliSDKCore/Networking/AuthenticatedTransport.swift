@@ -8,10 +8,15 @@ import Foundation
 struct AuthenticatedTransport: PayabliTransport {
     private let base: any PayabliTransport
     private let auth: PayabliAuth
+    private let logger: PayabliLogger
 
-    init(base: any PayabliTransport, auth: PayabliAuth) {
+    /// `.network`, not `.auth`: recovering, or giving up on it, is this layer's decision and not the
+    /// holder's. The logger is required rather than defaulted, so no composition can build its own and
+    /// leave a caller's substitution reaching nothing.
+    init(base: any PayabliTransport, auth: PayabliAuth, logger: PayabliLogger) {
         self.base = base
         self.auth = auth
+        self.logger = logger
     }
 
     func perform(_ request: PayabliRequest) async throws -> PayabliResponse {
@@ -22,6 +27,8 @@ struct AuthenticatedTransport: PayabliTransport {
 
         guard firstAttempt.statusCode == 401 else { return firstAttempt }
 
+        logger.info("credential rejected: refreshing and replaying once (\(request.method.rawValue) 401)")
+
         // The token the chain stamped. A fresh read covers a chain that stamped nothing.
         let rejected: String = if let sent = stamped.value {
             sent
@@ -31,11 +38,15 @@ struct AuthenticatedTransport: PayabliTransport {
         _ = try await auth.invalidateAndRefresh(rejectedToken: rejected)
 
         // Re-entering the transport re-runs the chain, which reads the refreshed token.
+        logger.debug("replaying \(request.method.rawValue) under the refreshed credential")
         let replayed = SentToken()
         let secondAttempt = try await SentToken.$current.withValue(replayed) {
             try await base.perform(request)
         }
         if secondAttempt.statusCode == 401 {
+            logger.warning(
+                "recovery exhausted: the replay was refused too (\(request.method.rawValue) 401)"
+            )
             throw PayabliGenericError(
                 code: .tokenExpired,
                 reason: "Refresh token rejected"

@@ -2,7 +2,7 @@ import Foundation
 
 public actor PayabliAuth {
     private let config: PayabliConfig
-    private let logger = PayabliLogger(category: .auth)
+    private let logger: PayabliLogger
 
     private var currentToken: String
     /// Guards against concurrent refresh attempts. If a refresh is in flight,
@@ -14,7 +14,15 @@ public actor PayabliAuth {
     private var tokenChangeContinuations: [UUID: AsyncStream<String>.Continuation] = [:]
 
     public init(config: PayabliConfig) {
+        self.init(config: config, logger: PayabliLogger(category: .auth))
+    }
+
+    /// Internal, so it widens what a test can construct and not what production can. The logger is
+    /// required rather than defaulted: a holder that built its own would leave a caller's substitution
+    /// reaching nothing, and nothing would report it.
+    init(config: PayabliConfig, logger: PayabliLogger) {
         self.config = config
+        self.logger = logger
         self.currentToken = config.accessToken
     }
 

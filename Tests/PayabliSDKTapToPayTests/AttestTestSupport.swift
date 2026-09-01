@@ -30,7 +30,11 @@ enum AttestFixture {
             readToken: { await auth.currentAccessToken() },
             session: urlSession
         )
-        let transport = AuthenticatedTransport(base: service, auth: auth)
+        let transport = AuthenticatedTransport(
+            base: service,
+            auth: auth,
+            logger: PayabliLogger(category: .network)
+        )
         let attestor = MockAppAttestor()
         let sut = AppAttestService(
             transport: transport,

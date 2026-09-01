@@ -36,19 +36,40 @@ public final class PayabliService: PayabliTransport, Sendable {
         self.init(
             environment: environment,
             decorations: RequestDecorationFactory.chain(readToken: readToken),
-            session: session
+            session: session,
+            logger: PayabliLogger(category: .network)
         )
     }
 
     private init(
         environment: PayabliEnvironment,
         decorations: [any PayabliRequestDecoration],
-        session: URLSession?
+        session: URLSession?,
+        logger: PayabliLogger
     ) {
         self.baseURL = environment.baseURL
         self.session = session ?? Self.makeDefaultSession()
-        self.logger = PayabliLogger(category: .network)
+        self.logger = logger
         self.decorations = decorations
+    }
+
+    /// Builds a transport carrying the shipping chain, with the caller's logger.
+    ///
+    /// Internal, so it widens what a test can construct and not what production can. The chain is the
+    /// one the public initializer builds, because a test that reads what this layer logged still has to
+    /// be running the decorations that attach the credential.
+    static func makeWithChain(
+        environment: PayabliEnvironment,
+        readToken: @escaping @Sendable () async throws -> String,
+        session: URLSession? = nil,
+        logger: PayabliLogger
+    ) -> PayabliService {
+        PayabliService(
+            environment: environment,
+            decorations: RequestDecorationFactory.chain(readToken: readToken),
+            session: session,
+            logger: logger
+        )
     }
 
     /// Builds a transport with a caller-supplied chain, for a test that needs a specific one.
@@ -58,9 +79,15 @@ public final class PayabliService: PayabliTransport, Sendable {
     static func makeWithDecorations(
         environment: PayabliEnvironment,
         decorations: [any PayabliRequestDecoration],
-        session: URLSession? = nil
+        session: URLSession? = nil,
+        logger: PayabliLogger
     ) -> PayabliService {
-        PayabliService(environment: environment, decorations: decorations, session: session)
+        PayabliService(
+            environment: environment,
+            decorations: decorations,
+            session: session,
+            logger: logger
+        )
     }
 
     static func makeDefaultSession() -> URLSession {

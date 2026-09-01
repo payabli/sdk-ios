@@ -43,6 +43,10 @@ public final class PayabliSession: @unchecked Sendable {
             readToken: { await auth.currentAccessToken() },
             session: urlSession
         )
-        self.transport = AuthenticatedTransport(base: service, auth: auth)
+        self.transport = AuthenticatedTransport(
+            base: service,
+            auth: auth,
+            logger: PayabliLogger(category: .network)
+        )
     }
 }

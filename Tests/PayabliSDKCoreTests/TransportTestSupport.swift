@@ -9,7 +9,8 @@ let testToken = "test-token"
 /// No provider by default, so a 401 is terminal. Pass one when the refresh path is the subject.
 func makeTestAuth(
     accessToken: String = testToken,
-    tokenProvider: PayabliTokenRefresh? = nil
+    tokenProvider: PayabliTokenRefresh? = nil,
+    sink: RecordingLogSink? = nil
 ) throws -> PayabliAuth {
     let config = try PayabliConfig(
         accessToken: accessToken,
@@ -17,7 +18,10 @@ func makeTestAuth(
         entryPoint: "entry",
         environment: .sandbox
     )
-    return PayabliAuth(config: config)
+    return PayabliAuth(
+        config: config,
+        logger: PayabliLogger(category: .auth, sink: sink ?? RecordingLogSink())
+    )
 }
 
 /// Counts calls from any isolation, so a test can assert how many times a provider ran.
@@ -93,13 +97,18 @@ final class RecordingStub: @unchecked Sendable {
 
 /// A service whose network is stubbed and whose chain reads from `auth`, and the recovery layer above
 /// it. One holder serves both, which is what makes a replay carry the token a refresh minted.
-func makeAuthenticatedStack(auth: PayabliAuth) -> any PayabliTransport {
-    let service = PayabliService(
+func makeAuthenticatedStack(
+    auth: PayabliAuth,
+    sink: RecordingLogSink? = nil
+) -> any PayabliTransport {
+    let logger = PayabliLogger(category: .network, sink: sink ?? RecordingLogSink())
+    let service = PayabliService.makeWithChain(
         environment: .sandbox,
         readToken: { await auth.currentAccessToken() },
-        session: StubURLProtocol.makeSession()
+        session: StubURLProtocol.makeSession(),
+        logger: logger
     )
-    return AuthenticatedTransport(base: service, auth: auth)
+    return AuthenticatedTransport(base: service, auth: auth, logger: logger)
 }
 
 /// A service whose chain is the caller's, so a test can park a request at an exact point relative to
@@ -108,12 +117,14 @@ func makeStackWithChain(
     _ decorations: [any PayabliRequestDecoration],
     auth: PayabliAuth
 ) -> any PayabliTransport {
+    let logger = PayabliLogger(category: .network, sink: RecordingLogSink())
     let service = PayabliService.makeWithDecorations(
         environment: .sandbox,
         decorations: decorations,
-        session: StubURLProtocol.makeSession()
+        session: StubURLProtocol.makeSession(),
+        logger: logger
     )
-    return AuthenticatedTransport(base: service, auth: auth)
+    return AuthenticatedTransport(base: service, auth: auth, logger: logger)
 }
 
 /// Parks every request that reaches it until it is released, so a rotation lands at a chosen point in
