@@ -117,6 +117,29 @@ final class CredentialLoggingTests: XCTestCase {
         assertNeverLogged([testToken], in: sinks.all)
     }
 
+    /// The no-provider path throws from the refresh and never replays, so the record written ahead of it
+    /// must claim neither. Anchors on the attempt and asserts the replay record is absent.
+    func testARejectionWithNoProviderRecordsTheAttemptAndNoReplay() async throws {
+        let stub = RecordingStub(status: Self.unauthorized)
+        stub.install()
+        defer { stub.uninstall() }
+
+        let sinks = LogSinks()
+        let stack = try makeLoggingStack(sinks: sinks)
+
+        do {
+            _ = try await stack.transport.perform(ping())
+            XCTFail("a 401 with no provider is terminal")
+        } catch let error as PayabliGenericError {
+            XCTAssertEqual(error.code, .tokenExpired)
+        }
+
+        XCTAssertEqual(stub.count, 1, "nothing to refresh with, so nothing is replayed")
+        assertLogged("attempting recovery", in: sinks.network, category: .network)
+        assertNotLogged("replaying", in: sinks.network, category: .network)
+        assertNeverLogged([testToken], in: sinks.all)
+    }
+
     // MARK: - Helpers
 
     private func ping() -> PayabliRequest {

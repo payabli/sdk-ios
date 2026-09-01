@@ -27,7 +27,7 @@ struct AuthenticatedTransport: PayabliTransport {
 
         guard firstAttempt.statusCode == 401 else { return firstAttempt }
 
-        logger.info("credential rejected: refreshing and replaying once (\(request.method.rawValue) 401)")
+        logger.info("credential rejected: attempting recovery (\(request.method.rawValue) 401)")
 
         // The token the chain stamped. A fresh read covers a chain that stamped nothing.
         let rejected: String = if let sent = stamped.value {
@@ -38,7 +38,7 @@ struct AuthenticatedTransport: PayabliTransport {
         _ = try await auth.invalidateAndRefresh(rejectedToken: rejected)
 
         // Re-entering the transport re-runs the chain, which reads the refreshed token.
-        logger.debug("replaying \(request.method.rawValue) under the refreshed credential")
+        logger.debug("replaying \(request.method.rawValue) under the current credential")
         let replayed = SentToken()
         let secondAttempt = try await SentToken.$current.withValue(replayed) {
             try await base.perform(request)
