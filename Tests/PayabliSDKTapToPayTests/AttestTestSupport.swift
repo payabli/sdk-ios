@@ -17,13 +17,19 @@ enum AttestFixture {
         hardwareIdProvider: @Sendable @escaping () throws -> String = { "fixed-hw-id" }
     ) throws -> (AppAttestService, MockAppAttestor, PayabliAuth) {
         let urlSession = StubURLProtocol.makeSession()
-        let service = PayabliService(environment: .sandbox, session: urlSession)
         let config = try PayabliConfig(
             accessToken: "seed",
             entryPoint: "myEntry",
             environment: .sandbox
         )
+        // The holder comes first: the service's chain reads the token from it, so the same instance
+        // has to serve the chain and the recovery layer above it.
         let auth = PayabliAuth(config: config)
+        let service = PayabliService(
+            environment: .sandbox,
+            readToken: { await auth.currentAccessToken() },
+            session: urlSession
+        )
         let transport = AuthenticatedTransport(base: service, auth: auth)
         let attestor = MockAppAttestor()
         let sut = AppAttestService(

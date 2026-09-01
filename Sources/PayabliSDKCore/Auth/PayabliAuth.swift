@@ -58,10 +58,11 @@ public actor PayabliAuth {
             )
         }
 
-        // The task carries the finished refresh, not the provider call: a joiner at
-        // the top of this method awaits this same value, so validation and redaction
-        // are inside it. Left to the initiating caller, a joiner would return a token
-        // that was never checked and, on a throw, the host's own error text.
+        // Validation, redaction and the install are all inside the task, because a joiner
+        // at the top of this method awaits this same value. So a joiner receives a checked
+        // token, never the host's own error text, and never resumes before the token is
+        // installed — which matters because the decoration chain reads the holder again on
+        // the replay.
         let task = Task<String, Error> { [logger] in
             logger.info("Refreshing access token via partner tokenProvider")
             let minted: String
@@ -83,14 +84,13 @@ public actor PayabliAuth {
                 logger.error("The minted token was refused before it was committed")
                 throw error
             }
+            self.commit(minted)
             return minted
         }
         inFlightRefresh = task
 
         do {
-            let fresh = try await task.value
-            commit(fresh)
-            return fresh
+            return try await task.value
         } catch {
             inFlightRefresh = nil
             throw error

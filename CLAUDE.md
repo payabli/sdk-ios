@@ -120,10 +120,20 @@ channel, so an app that never accepts card-present never links the certified car
 - `PayabliSession` owns one `PayabliAuth` and one `PayabliService` per `PayabliConfig`. Component
   facades accept a session, so token refresh, telemetry hooks and 401 semantics are shared rather
   than reimplemented per module.
-- **One choke-point for auth.** Every authenticated request goes through `AuthenticatedTransport`,
-  which injects the bearer and handles 401 to refresh to retry-once to `.tokenExpired`. Endpoint
-  clients never construct an `Authorization` header themselves. Concurrent refreshes are deduplicated
-  inside the `PayabliAuth` actor via a stored in-flight `Task`.
+- **One choke-point for auth, and the two halves are separate.** `PayabliService.perform` applies a
+  decoration chain as its first statement, and `BearerDecoration` inside that chain is the only thing
+  that attaches `Authorization`. `AuthenticatedTransport` wraps the service and does the 401 dance
+  alone: refresh, retry once, then `.tokenExpired`. So a client handed the service without the
+  wrapper loses the recovery and still sends its credential. Endpoint clients never set an
+  `Authorization` header; one set anyway is replaced by the chain, case-insensitively. Concurrent
+  refreshes are deduplicated inside the `PayabliAuth` actor via a stored in-flight `Task`.
+- **A transport cannot be built without a token source.** `PayabliService`'s initialiser takes a
+  `readToken` closure and builds its own chain from it; there is no initialiser that takes a chain, so
+  no caller can supply an empty one. `PayabliSession` exposes only the wrapped `transport`, never the
+  service underneath. A test that needs a specific chain uses `PayabliService.makeWithDecorations`,
+  which is internal and named for that purpose.
+- **The chain runs once per attempt**, so anything that must survive a replay unchanged — an
+  idempotency key is the live example — is set by the client and not by a decoration.
 - `mapPayabliHTTPError(response:override:)` is the canonical status-to-typed-error mapper: 400
   validation, 401 tokenExpired (triggers refresh), 402 decline, 403 permissionDenied, 410
   sessionBurned, 500+ server. `override` lets a caller intercept one specific code.

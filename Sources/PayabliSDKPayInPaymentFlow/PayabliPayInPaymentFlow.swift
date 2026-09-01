@@ -53,16 +53,19 @@ public final class PayabliPayInPaymentFlow: NSObject, ObservableObject, PayabliC
         self.accessTokenProvider = accessTokenProvider
         injectedTransport = nil
         self.diagnostics = diagnostics
-        let baseTransport = PayabliService(environment: environment)
+        // The chain attaches the credential, so neither client stamps one. This surface has no
+        // session, so it gets the bearer and not the 401 recovery.
+        let baseTransport = PayabliService(
+            environment: environment,
+            readToken: Self.guardedRead(accessTokenProvider)
+        )
         client = PayInPaymentFlowClient(
             transport: baseTransport,
-            accessTokenProvider: accessTokenProvider,
             baseURL: environment.baseURL,
             diagnostics: diagnostics
         )
         tokenStorageClient = PayInPaymentFlowTokenStorageClient(
             transport: baseTransport,
-            accessTokenProvider: accessTokenProvider,
             baseURL: environment.baseURL,
             diagnostics: diagnostics
         )
@@ -85,16 +88,18 @@ public final class PayabliPayInPaymentFlow: NSObject, ObservableObject, PayabliC
         self.accessTokenProvider = accessTokenProvider
         self.injectedTransport = transport
         self.diagnostics = diagnostics
-        let baseTransport = transport ?? PayabliService(environment: environment)
+        let baseTransport = transport
+            ?? PayabliService(
+                environment: environment,
+                readToken: Self.guardedRead(accessTokenProvider)
+            )
         client = PayInPaymentFlowClient(
             transport: baseTransport,
-            accessTokenProvider: accessTokenProvider,
             baseURL: environment.baseURL,
             diagnostics: diagnostics
         )
         tokenStorageClient = PayInPaymentFlowTokenStorageClient(
             transport: baseTransport,
-            accessTokenProvider: accessTokenProvider,
             baseURL: environment.baseURL,
             diagnostics: diagnostics
         )
@@ -185,16 +190,18 @@ public final class PayabliPayInPaymentFlow: NSObject, ObservableObject, PayabliC
     public func configure(config: PayabliConfig) {
         entryPoint = config.entryPoint
         environment = config.environment
-        let baseTransport = injectedTransport ?? PayabliService(environment: config.environment)
+        let baseTransport = injectedTransport
+            ?? PayabliService(
+                environment: config.environment,
+                readToken: Self.guardedRead(accessTokenProvider)
+            )
         client = PayInPaymentFlowClient(
             transport: baseTransport,
-            accessTokenProvider: accessTokenProvider,
             baseURL: config.environment.baseURL,
             diagnostics: diagnostics
         )
         tokenStorageClient = PayInPaymentFlowTokenStorageClient(
             transport: baseTransport,
-            accessTokenProvider: accessTokenProvider,
             baseURL: config.environment.baseURL,
             diagnostics: diagnostics
         )
@@ -202,6 +209,23 @@ public final class PayabliPayInPaymentFlow: NSObject, ObservableObject, PayabliC
 
     public func configure(config: PayabliConfig, theme _: PayabliTheme) {
         configure(config: config)
+    }
+
+    /// The host's provider, trimmed and refused when empty, in the shape the chain reads.
+    ///
+    /// One read per request. The chain is what sends the credential, and a provider may mint a
+    /// different token per call, so a check elsewhere would either spend a second call or validate a
+    /// token that was not sent.
+    private static func guardedRead(
+        _ provider: @escaping PayabliPayInPaymentFlowAccessTokenProvider
+    ) -> @Sendable () async throws -> String {
+        {
+            let token = try await provider().payabliCaptureTrimmed
+            guard !token.isEmpty else {
+                throw PayabliPayInPaymentFlowError.missingAccessToken
+            }
+            return token
+        }
     }
 
     public func configure(

@@ -2,9 +2,13 @@ import Foundation
 
 /// A pending HTTP request assembled by the SDK.
 ///
-/// Consumed by `PayabliService` which resolves it against the current environment
-/// base URL, attaches auth headers, and performs the call.
+/// Consumed by `PayabliService`, which resolves it against the environment base URL, runs the
+/// decoration chain over it, and performs the call. The chain sets the credential, and overrides an
+/// `Authorization` header set here.
 public struct PayabliRequest: Sendable {
+    public static let contentTypeHeader = "Content-Type"
+    public static let applicationJSON = "application/json"
+
     public let method: HTTPMethod
     public let path: String
     public let query: [URLQueryItem]
@@ -37,7 +41,7 @@ public struct PayabliRequest: Sendable {
         encoder.dateEncodingStrategy = .iso8601
         let body = try encoder.encode(jsonBody)
         var mergedHeaders = headers
-        mergedHeaders["Content-Type"] = "application/json"
+        mergedHeaders[contentTypeHeader] = applicationJSON
         return PayabliRequest(
             method: method,
             path: path,

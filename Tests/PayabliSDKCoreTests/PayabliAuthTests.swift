@@ -31,14 +31,14 @@ final class PayabliAuthTests: XCTestCase {
         let auth = PayabliAuth(config: try makeConfig(
             accessToken: "old",
             tokenProvider: {
-                await counter.increment()
+                _ = await counter.increment()
                 return "fresh_from_partner"
             }
         ))
 
         let fresh = try await auth.invalidateAndRefresh(rejectedToken: "old")
         XCTAssertEqual(fresh, "fresh_from_partner")
-        let calls = await counter.value
+        let calls = await counter.count
         XCTAssertEqual(calls, 1)
 
         // Subsequent currentAccessToken returns the refreshed value.
@@ -63,7 +63,7 @@ final class PayabliAuthTests: XCTestCase {
         let auth = PayabliAuth(config: try makeConfig(
             accessToken: "old",
             tokenProvider: {
-                await counter.increment()
+                _ = await counter.increment()
                 try await Task.sleep(nanoseconds: 20_000_000)
                 return "fresh"
             }
@@ -75,7 +75,7 @@ final class PayabliAuthTests: XCTestCase {
         let results = try await [a, b, c]
 
         XCTAssertEqual(Set(results), ["fresh"])
-        let calls = await counter.value
+        let calls = await counter.count
         XCTAssertEqual(calls, 1, "Concurrent refresh requests should share a single in-flight Task")
     }
 
@@ -105,7 +105,7 @@ final class PayabliAuthTests: XCTestCase {
         let auth = PayabliAuth(config: try makeConfig(
             accessToken: "old",
             tokenProvider: {
-                await counter.increment()
+                _ = await counter.increment()
                 return "fresh"
             }
         ))
@@ -116,7 +116,7 @@ final class PayabliAuthTests: XCTestCase {
         let second = try await auth.invalidateAndRefresh(rejectedToken: "old")
         XCTAssertEqual(second, "fresh", "The stale 401 should be answered with the rotated token")
 
-        let calls = await counter.value
+        let calls = await counter.count
         XCTAssertEqual(calls, 1, "The second rejection names a token that is no longer current")
     }
 
@@ -127,7 +127,7 @@ final class PayabliAuthTests: XCTestCase {
         let auth = PayabliAuth(config: try makeConfig(
             accessToken: "old",
             tokenProvider: {
-                await counter.increment()
+                _ = await counter.increment()
                 return "old"
             }
         ))
@@ -139,7 +139,7 @@ final class PayabliAuthTests: XCTestCase {
             XCTAssertEqual(err.code, .tokenExpired)
         }
 
-        let calls = await counter.value
+        let calls = await counter.count
         XCTAssertEqual(calls, 1)
         let current = await auth.currentAccessToken()
         XCTAssertEqual(current, "old", "The refused credential must not be committed")
@@ -316,13 +316,5 @@ final class PayabliAuthTests: XCTestCase {
         _ = try await auth.invalidateAndRefresh(rejectedToken: "old")
         let received = await collector.value
         XCTAssertEqual(received, "new")
-    }
-}
-
-/// Simple actor counter for tracking concurrent calls in tests.
-private actor Counter {
-    private(set) var value: Int = 0
-    func increment() {
-        value += 1
     }
 }

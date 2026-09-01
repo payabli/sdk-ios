@@ -39,7 +39,7 @@ final class PayabliPayInPaymentFlowTests: XCTestCase {
         XCTAssertEqual(component.lastResult?.code, "A0000")
         XCTAssertEqual(result.transaction?.paymentTransId, "trans-1")
         let request = try await firstFacadeRequest(from: transport)
-        XCTAssertEqual(request.headers["Authorization"], "Bearer access-token")
+        XCTAssertNil(request.headers["Authorization"], "the client contributes no credential")
         XCTAssertNil(request.headers["requestToken"])
     }
 

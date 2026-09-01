@@ -3,23 +3,19 @@ import PayabliSDKCore
 
 /// HTTP client for v2 MoneyIn transaction endpoints.
 ///
-/// This client authenticates with the same one-off bearer-token pattern used by
-/// a Pay In payment flow: host apps fetch a scoped token from their backend
-/// before submission, and the SDK sends it as `Authorization: Bearer <token>`.
+/// It builds requests and reads responses. The credential is attached by the chain inside the
+/// transport, so nothing here holds a token or a token source.
 final class PayInPaymentFlowClient: Sendable {
     private let transport: any PayabliTransport
-    private let accessTokenProvider: PayabliPayInPaymentFlowAccessTokenProvider
     private let baseURL: URL?
     private let diagnostics: PayabliPayInPaymentFlowDiagnostics
 
     init(
         transport: any PayabliTransport,
-        accessTokenProvider: @escaping PayabliPayInPaymentFlowAccessTokenProvider,
         baseURL: URL? = nil,
         diagnostics: PayabliPayInPaymentFlowDiagnostics = .disabled
     ) {
         self.transport = transport
-        self.accessTokenProvider = accessTokenProvider
         self.baseURL = baseURL
         self.diagnostics = diagnostics
     }
@@ -61,7 +57,7 @@ final class PayInPaymentFlowClient: Sendable {
         try request.paymentDetails.validate()
 
         let body = AuthorizedCaptureBody(paymentDetails: request.paymentDetails)
-        let payabliRequest = try await authorizedRequest(
+        let payabliRequest = try buildRequest(
             path: "/api/v2/MoneyIn/capture/\(Self.pathComponent(transId))",
             query: [],
             idempotencyKey: nil,
@@ -96,7 +92,7 @@ final class PayInPaymentFlowClient: Sendable {
             subdomain: request.subdomain?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty,
             subscriptionId: request.subscriptionId
         )
-        let payabliRequest = try await authorizedRequest(
+        let payabliRequest = try buildRequest(
             path: path,
             query: request.queryItems(allowsACHValidation: allowsACHValidation),
             idempotencyKey: request.idempotencyKey,
@@ -105,31 +101,26 @@ final class PayInPaymentFlowClient: Sendable {
         return try await perform(payabliRequest)
     }
 
-    private func authorizedRequest(
+    /// Builds the request. The transport's chain attaches the credential and the content type.
+    ///
+    /// The idempotency key is set here because the chain runs once per attempt, and a key minted
+    /// there would differ on a replay.
+    private func buildRequest(
         path: String,
         query: [URLQueryItem],
         idempotencyKey: String?,
         body: some Encodable
-    ) async throws -> PayabliRequest {
-        let accessToken = try await accessTokenProvider()
-        let trimmedAccessToken = accessToken.payabliCaptureTrimmed
-        guard !trimmedAccessToken.isEmpty else {
-            throw PayabliPayInPaymentFlowError.missingAccessToken
-        }
-
-        var headers = ["Authorization": "Bearer \(trimmedAccessToken)"]
+    ) throws -> PayabliRequest {
+        var headers: [String: String] = [:]
         if let idempotencyKey = idempotencyKey?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty {
             headers["idempotencyKey"] = idempotencyKey
         }
-
-        var mergedHeaders = headers
-        mergedHeaders["Content-Type"] = "application/json"
 
         return try PayabliRequest(
             method: .post,
             path: path,
             query: query,
-            headers: mergedHeaders,
+            headers: headers,
             body: PayInPaymentFlowJSONBody.encode(body)
         )
     }

@@ -6,8 +6,7 @@ final class PayInPaymentFlowClientTests: XCTestCase {
     func testCaptureSerializesCardTransactionWithBearerAuthorization() async throws {
         let transport = MockPaymentCaptureTransport(responseBody: Self.approvedResponse)
         let client = PayInPaymentFlowClient(
-            transport: transport,
-            accessTokenProvider: { "access-token-1" }
+            transport: transport
         )
 
         let result = try await client.capture(
@@ -26,7 +25,7 @@ final class PayInPaymentFlowClientTests: XCTestCase {
         let request = try await firstRequest(from: transport)
         XCTAssertEqual(request.method, .post)
         XCTAssertEqual(request.path, "/api/v2/MoneyIn/getpaid")
-        XCTAssertEqual(request.headers["Authorization"], "Bearer access-token-1")
+        XCTAssertNil(request.headers["Authorization"], "the client contributes no credential")
         XCTAssertNil(request.headers["requestToken"])
         XCTAssertEqual(request.headers["idempotencyKey"], "idem-1")
         XCTAssertEqual(request.query.map(\.name), ["achValidation", "forceCustomerCreation"])
@@ -61,8 +60,7 @@ final class PayInPaymentFlowClientTests: XCTestCase {
     func testAuthorizeUsesAuthorizePathAndOmitsACHValidationQuery() async throws {
         let transport = MockPaymentCaptureTransport(responseBody: Self.authorizedResponse)
         let client = PayInPaymentFlowClient(
-            transport: transport,
-            accessTokenProvider: { "access-token-2" }
+            transport: transport
         )
 
         let result = try await client.authorize(
@@ -74,15 +72,14 @@ final class PayInPaymentFlowClientTests: XCTestCase {
         let request = try await firstRequest(from: transport)
         XCTAssertEqual(request.path, "/api/v2/MoneyIn/authorize")
         XCTAssertTrue(request.query.isEmpty)
-        XCTAssertEqual(request.headers["Authorization"], "Bearer access-token-2")
+        XCTAssertNil(request.headers["Authorization"], "the client contributes no credential")
         XCTAssertNil(request.headers["requestToken"])
     }
 
     func testPaymentDetailsCurrencyAmountsSerializeWithTwoDecimals() async throws {
         let transport = MockPaymentCaptureTransport(responseBody: Self.approvedResponse)
         let client = PayInPaymentFlowClient(
-            transport: transport,
-            accessTokenProvider: { "access-token" }
+            transport: transport
         )
 
         _ = try await client.capture(
@@ -108,8 +105,7 @@ final class PayInPaymentFlowClientTests: XCTestCase {
     func testAuthorizeRejectsACHBeforeTransport() async throws {
         let transport = MockPaymentCaptureTransport(responseBody: Self.approvedResponse)
         let client = PayInPaymentFlowClient(
-            transport: transport,
-            accessTokenProvider: { "access-token" }
+            transport: transport
         )
 
         do {
@@ -138,8 +134,7 @@ final class PayInPaymentFlowClientTests: XCTestCase {
     func testAuthorizeRejectsStoredCardBeforeTransport() async throws {
         let transport = MockPaymentCaptureTransport(responseBody: Self.approvedResponse)
         let client = PayInPaymentFlowClient(
-            transport: transport,
-            accessTokenProvider: { "access-token" }
+            transport: transport
         )
 
         do {
@@ -166,8 +161,7 @@ final class PayInPaymentFlowClientTests: XCTestCase {
     func testCaptureAuthorizedSerializesPathAndPaymentDetailsOnly() async throws {
         let transport = MockPaymentCaptureTransport(responseBody: Self.approvedResponse)
         let client = PayInPaymentFlowClient(
-            transport: transport,
-            accessTokenProvider: { "access-token-3" }
+            transport: transport
         )
 
         _ = try await client.captureAuthorized(PayabliPayInPaymentFlowAuthorizedRequest(
@@ -180,7 +174,7 @@ final class PayInPaymentFlowClientTests: XCTestCase {
 
         let request = try await firstRequest(from: transport)
         XCTAssertEqual(request.path, "/api/v2/MoneyIn/capture/10-7d9cd67d-2d5d-4cd7-a1b7-72b8b201ec13")
-        XCTAssertEqual(request.headers["Authorization"], "Bearer access-token-3")
+        XCTAssertNil(request.headers["Authorization"], "the client contributes no credential")
         XCTAssertNil(request.headers["requestToken"])
         XCTAssertTrue(request.query.isEmpty)
 
@@ -195,8 +189,7 @@ final class PayInPaymentFlowClientTests: XCTestCase {
     func testCaptureAuthorizedEscapesPathSeparatorsInTransactionId() async throws {
         let transport = MockPaymentCaptureTransport(responseBody: Self.approvedResponse)
         let client = PayInPaymentFlowClient(
-            transport: transport,
-            accessTokenProvider: { "access-token-4" }
+            transport: transport
         )
 
         _ = try await client.captureAuthorized(PayabliPayInPaymentFlowAuthorizedRequest(
@@ -223,8 +216,7 @@ final class PayInPaymentFlowClientTests: XCTestCase {
             """
         )
         let client = PayInPaymentFlowClient(
-            transport: transport,
-            accessTokenProvider: { "access-token" }
+            transport: transport
         )
 
         do {
@@ -258,8 +250,7 @@ final class PayInPaymentFlowClientTests: XCTestCase {
             """
         )
         let client = PayInPaymentFlowClient(
-            transport: transport,
-            accessTokenProvider: { "access-token" }
+            transport: transport
         )
 
         do {
@@ -278,19 +269,24 @@ final class PayInPaymentFlowClientTests: XCTestCase {
         }
     }
 
-    func testMissingAccessTokenDoesNotReachTransport() async throws {
-        let transport = MockPaymentCaptureTransport(responseBody: Self.approvedResponse)
-        let client = PayInPaymentFlowClient(
-            transport: transport,
+    /// A blank token is refused where it is read, which is the chain.
+    ///
+    /// Driven through the facade's own transport, because injecting a double replaces the chain and
+    /// with it the guard. Nothing reaches the network: the read runs before the request is built,
+    /// pinned in Core by `testAFailingTokenReadStopsTheRequestBeforeItIsSent`.
+    @MainActor
+    func testMissingAccessTokenIsRefusedBeforeAnythingIsSent() async throws {
+        let component = PayabliPayInPaymentFlow(
+            entryPoint: "entry",
+            environment: .sandbox,
             accessTokenProvider: { "   " }
         )
 
         do {
-            _ = try await client.capture(entryPoint: "entry", request: cardRequest())
+            _ = try await component.capture(cardRequest())
             XCTFail("Expected missing token")
         } catch PayabliPayInPaymentFlowError.missingAccessToken {
-            let requests = await transport.requests
-            XCTAssertTrue(requests.isEmpty)
+            // The guard fired.
         } catch {
             XCTFail("Wrong error: \(error)")
         }
@@ -325,7 +321,6 @@ final class PayInPaymentFlowClientTests: XCTestCase {
         }
         let client = PayInPaymentFlowClient(
             transport: transport,
-            accessTokenProvider: { "secret-token" },
             diagnostics: diagnostics
         )
 
@@ -361,7 +356,6 @@ final class PayInPaymentFlowClientTests: XCTestCase {
         }
         let client = PayInPaymentFlowClient(
             transport: transport,
-            accessTokenProvider: { "secret-token" },
             diagnostics: diagnostics
         )
         let request = cardRequest(additionalData: [
@@ -391,7 +385,6 @@ final class PayInPaymentFlowClientTests: XCTestCase {
         }
         let client = PayInPaymentFlowClient(
             transport: transport,
-            accessTokenProvider: { "secret-token" },
             baseURL: URL(string: "https://api-sandbox.payabli.com"),
             diagnostics: diagnostics
         )
@@ -400,7 +393,10 @@ final class PayInPaymentFlowClientTests: XCTestCase {
 
         await fulfillment(of: [expectation], timeout: 1)
         let entry = try XCTUnwrap(requestEntry.value)
-        XCTAssertEqual(entry.headers["Authorization"], "[REDACTED]")
+        // Stronger than redaction: the credential is attached below this layer, so it never enters the
+        // diagnostic record and there is nothing here to redact. The rule that decides what is
+        // sensitive is the same one the body assertions below exercise.
+        XCTAssertNil(entry.headers["Authorization"])
         XCTAssertTrue(entry.body?.contains(#""cardnumber":"[REDACTED]""#) == true)
         XCTAssertTrue(entry.body?.contains(#""cardcvv":"[REDACTED]""#) == true)
         XCTAssertTrue(entry.body?.contains(#""totalAmount":100.00"#) == true)

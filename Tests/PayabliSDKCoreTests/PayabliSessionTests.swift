@@ -40,7 +40,7 @@ final class PayabliSessionTests: XCTestCase {
         let session = PayabliSession(config: config, urlSession: urlSession)
 
         let request = PayabliRequest(method: .get, path: "/api/v2/test-wiring")
-        let response = try await session.service.perform(request)
+        let response = try await session.transport.perform(request)
 
         XCTAssertEqual(response.statusCode, 200)
         XCTAssertEqual(response.body, expectedBody)
