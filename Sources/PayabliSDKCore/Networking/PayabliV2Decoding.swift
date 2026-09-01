@@ -13,10 +13,11 @@ func decodePayabliV2Envelope<T: Decodable & Sendable>(
     do {
         return try decoder.decode(PayabliV2Envelope<T>.self, from: response.body)
     } catch {
+        // The decoder's own error does not travel. It names a coding path and a column in a body this
+        // SDK does not scrub, and the code and reason are what a caller acts on.
         throw PayabliGenericError(
             code: .decodingError,
-            reason: "Failed to decode v2 envelope",
-            underlying: error
+            reason: "Failed to decode v2 envelope"
         )
     }
 }
