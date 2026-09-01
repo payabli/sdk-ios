@@ -1,9 +1,7 @@
 import Foundation
 
-/// Carries the token the chain stamped to the layer that reports a rejection.
-///
-/// The chain reads the token after that layer does, so the two can disagree under a rotation.
-/// Reporting the earlier read names a credential the service did not refuse.
+/// Carries the token the chain stamped to the layer that reports a rejection, which reads it after
+/// that layer does and so can disagree with it.
 ///
 /// One instance per attempt, bound as a task-local. Concurrent requests each bind their own.
 final class SentToken: @unchecked Sendable {
