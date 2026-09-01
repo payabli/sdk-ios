@@ -23,6 +23,13 @@ HEAD_REF="${2:?usage: $0 <base-ref> <head-ref>}"
 
 cd "$REPO_ROOT"
 
+# The long lists below fold away, so the report reads as a summary and a reviewer
+# opens only the part they are acting on. GitHub needs a blank line after
+# </summary>, or the Markdown inside renders as literal text, and one before
+# </details>, or a trailing table swallows the tag. Each summary carries its own
+# count, since that line is what gets read while the block is shut.
+noun() { if [ "$1" -eq 1 ]; then printf '%s' "$2"; else printf '%ss' "$2"; fi; }
+
 BASE=$(git merge-base "$BASE_REF" "$HEAD_REF" 2>/dev/null) || BASE="$BASE_REF"
 HEAD_SHA=$(git rev-parse "$HEAD_REF")
 
@@ -74,7 +81,17 @@ else
     added=$(printf '%s\n' "$LIFECYCLE" | grep -c '^A' || true)
     deleted=$(printf '%s\n' "$LIFECYCLE" | grep -c '^D' || true)
     renamed=$(printf '%s\n' "$LIFECYCLE" | grep -c '^R' || true)
-    echo "$added added, $deleted deleted, $renamed renamed."
+    # git reports a regular file that became a symlink as `T`, which none of the
+    # three counts covers. The list is folded away, so a summary that did not add
+    # up to it would hide that file behind three zeroes.
+    listed=$(printf '%s\n' "$LIFECYCLE" | grep -c . || true)
+    other=$((listed - added - deleted - renamed))
+    summary="$added added, $deleted deleted, $renamed renamed"
+    if [ "$other" -gt 0 ]; then
+        summary="$summary, $other other"
+    fi
+    echo "<details>"
+    echo "<summary>$summary</summary>"
     echo
     echo '```'
     printf '%s\n' "$LIFECYCLE"
@@ -83,6 +100,8 @@ else
         echo
         echo "A rename shown below \`R100\` was edited as well as moved."
     fi
+    echo
+    echo "</details>"
 fi
 echo
 
@@ -302,7 +321,8 @@ fi
 echo
 
 if [ "$semantic" -gt 0 ]; then
-    echo "#### Files that can change behaviour"
+    echo "<details>"
+    echo "<summary>$semantic $(noun "$semantic" file) that can change behaviour</summary>"
     echo
     echo "\`Code\` counts declarations and executable statements that differ once"
     echo "formatting is normalised, on both sides of the diff, so an altered line"
@@ -314,14 +334,19 @@ if [ "$semantic" -gt 0 ]; then
     echo "| ---: | ---: | --- |"
     printf '%s' "$rows" | sort -rn | awk -F'\t' 'NF == 3 { printf "| %s | %s | `%s` |\n", $1, $2, $3 }'
     echo
+    echo "</details>"
+    echo
 fi
 
 if [ "$doc_only" -gt 0 ]; then
-    echo "#### Documentation-only files"
+    echo "<details>"
+    echo "<summary>$doc_only $(noun "$doc_only" 'documentation-only file')</summary>"
     echo
     echo "| Docs | File |"
     echo "| ---: | --- |"
     printf '%s' "$doc_rows" | sort -rn | awk -F'\t' 'NF == 2 { printf "| %s | `%s` |\n", $1, $2 }'
+    echo
+    echo "</details>"
     echo
 fi
 
@@ -338,19 +363,34 @@ if [ -z "$api_added" ] && [ -z "$api_removed" ]; then
 else
     echo "Declarations a consumer can see were added or removed. The public surface is a"
     echo "contract shared with the SDK for Android, so a change here is a change to both."
+    # A path is a heading in these listings, not a declaration, so it is not
+    # counted as one. Every heading is a path from a diff limited to Sources/,
+    # and no declaration begins with a directory, so the prefix is what tells the
+    # two apart: a suffix alone also drops `let sourceType = FileType.swift`.
+    api_count() { printf '%s' "$1" | grep -vcE '^Sources/.*\.swift( \(file (added|deleted)\))?$' || true; }
     if [ -n "$api_removed" ]; then
+        n=$(api_count "$api_removed")
         echo
-        echo "Removed or altered:"
+        echo "<details>"
+        echo "<summary>Removed or altered: $n $(noun "$n" declaration)</summary>"
+        echo
         echo '```'
         printf '%s' "$api_removed"
         echo '```'
+        echo
+        echo "</details>"
     fi
     if [ -n "$api_added" ]; then
+        n=$(api_count "$api_added")
         echo
-        echo "Added or altered:"
+        echo "<details>"
+        echo "<summary>Added or altered: $n $(noun "$n" declaration)</summary>"
+        echo
         echo '```'
         printf '%s' "$api_added"
         echo '```'
+        echo
+        echo "</details>"
     fi
 fi
 echo
