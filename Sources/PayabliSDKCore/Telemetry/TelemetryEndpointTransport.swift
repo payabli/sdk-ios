@@ -11,12 +11,15 @@ import Foundation
 public actor TelemetryEndpointTransport: TelemetryTransport {
     public static let defaultPath = "/api/v2/telemetry/sdk"
 
-    private let transport: any PayabliTransport
+    private let transport: PayabliService
     private let path: String
     private let logger = PayabliLogger(category: .telemetry)
 
+    /// Takes the service rather than any transport, so the recovery layer cannot be wrapped around it.
+    /// A telemetry 401 would otherwise spend the session's refresh and replay the batch, which is the
+    /// opposite of the contract above.
     public init(
-        transport: any PayabliTransport,
+        transport: PayabliService,
         path: String = TelemetryEndpointTransport.defaultPath
     ) {
         self.transport = transport
