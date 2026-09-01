@@ -3,24 +3,20 @@ import PayabliSDKCore
 
 /// HTTP client for `POST /api/TokenStorage/add`.
 ///
-/// This endpoint authenticates with a server-side bearer token fetched from
-/// the host application's backend. This client intentionally uses a raw
-/// `PayabliTransport` instead of `PayabliSession.transport` because
-/// the PayInPaymentFlow component owns the one-off access-token fetch before submit.
+/// It builds the request and reads the response. The credential is attached by the chain inside the
+/// transport, so nothing here holds a token or a token source. That transport carries no 401
+/// recovery: this surface's credential comes from a per-call provider, not from a session.
 final class PayInPaymentFlowTokenStorageClient: Sendable {
     private let transport: any PayabliTransport
-    private let accessTokenProvider: PayabliPayInPaymentFlowAccessTokenProvider
     private let baseURL: URL?
     private let diagnostics: PayabliPayInPaymentFlowDiagnostics
 
     init(
         transport: any PayabliTransport,
-        accessTokenProvider: @escaping PayabliPayInPaymentFlowAccessTokenProvider,
         baseURL: URL? = nil,
         diagnostics: PayabliPayInPaymentFlowDiagnostics = .disabled
     ) {
         self.transport = transport
-        self.accessTokenProvider = accessTokenProvider
         self.baseURL = baseURL
         self.diagnostics = diagnostics
     }
@@ -36,23 +32,20 @@ final class PayInPaymentFlowTokenStorageClient: Sendable {
         }
         try paymentMethod.validate(options.validation)
 
-        let accessToken = try await accessTokenProvider()
-        let trimmedAccessToken = accessToken.trimmed
-        guard !trimmedAccessToken.isEmpty else {
-            throw PayabliPayInPaymentFlowTokenStorageError.missingAccessToken
-        }
-
         let request = try addMethodRequest(
             entryPoint: entry,
             paymentMethod: paymentMethod,
-            options: options,
-            accessToken: trimmedAccessToken
+            options: options
         )
         diagnostics.logRequest(request, baseURL: baseURL)
         let start = Date()
         let response: PayabliResponse
         do {
             response = try await transport.perform(request)
+        } catch let failure as PayInProviderFailure {
+            // Not recorded: the host's own error can name its backend, and the sink renders a non-SDK
+            // error whole. The host still gets the error it threw.
+            throw failure.underlying
         } catch {
             diagnostics.logFailure(
                 error,
@@ -60,6 +53,11 @@ final class PayInPaymentFlowTokenStorageClient: Sendable {
                 baseURL: baseURL,
                 durationMilliseconds: Date().timeIntervalSince(start) * 1000
             )
+            // The chain refuses an empty credential in the capture surface's error type. Translated,
+            // so this surface answers in its own.
+            if case PayabliPayInPaymentFlowError.missingAccessToken = error {
+                throw PayabliPayInPaymentFlowTokenStorageError.missingAccessToken
+            }
             throw error
         }
         diagnostics.logResponse(
@@ -75,13 +73,16 @@ final class PayInPaymentFlowTokenStorageClient: Sendable {
         return try decodeStoredPaymentMethod(from: response)
     }
 
+    /// Builds the request. The transport's chain attaches the credential.
+    ///
+    /// The idempotency key is set here because the chain runs once per attempt, and a key minted
+    /// there would differ on a replay.
     private func addMethodRequest(
         entryPoint: String,
         paymentMethod: PayabliPayInPaymentFlowMethodInput,
-        options: PayabliPayInPaymentFlowTokenStorageOptions,
-        accessToken: String
+        options: PayabliPayInPaymentFlowTokenStorageOptions
     ) throws -> PayabliRequest {
-        var headers = ["Authorization": "Bearer \(accessToken)"]
+        var headers: [String: String] = [:]
         if let idempotencyKey = options.idempotencyKey?.trimmed.nilIfEmpty {
             headers["idempotencyKey"] = idempotencyKey
         }

@@ -30,25 +30,19 @@ public final class PayabliSession: @unchecked Sendable {
     /// Subscribe to `auth.tokenChanges()` to observe rotations.
     public let auth: PayabliAuth
 
-    /// The shared HTTP transport for this session. Prefer
-    /// `session.transport` (which wraps this in `AuthenticatedTransport`)
-    /// over reaching this directly — endpoint clients should always go
-    /// through the authenticated decorator.
-    public let service: PayabliService
+    /// The transport every endpoint client consumes: its chain attaches the credential, and it adds
+    /// 401 refresh-and-retry over that. The undecorated transport underneath is not exposed.
+    public let transport: any PayabliTransport
 
     public init(config: PayabliConfig, urlSession: URLSession? = nil) {
         self.config = config
-        self.auth = PayabliAuth(config: config)
-        self.service = PayabliService(
+        let auth = PayabliAuth(config: config)
+        self.auth = auth
+        let service = PayabliService(
             environment: config.environment,
+            readToken: { await auth.currentAccessToken() },
             session: urlSession
         )
-    }
-
-    /// Transport that every endpoint client should consume. Wraps the
-    /// session's `PayabliService` with bearer-auth injection and 401
-    /// refresh-and-retry.
-    public var transport: any PayabliTransport {
-        AuthenticatedTransport(base: service, auth: auth)
+        self.transport = AuthenticatedTransport(base: service, auth: auth)
     }
 }

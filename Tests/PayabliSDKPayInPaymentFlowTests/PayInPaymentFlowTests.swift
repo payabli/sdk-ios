@@ -27,7 +27,7 @@ final class PayInPaymentFlowTests: XCTestCase {
 
         let request = try await firstRequest(from: transport)
         XCTAssertEqual(request.path, "/api/TokenStorage/add")
-        XCTAssertEqual(request.headers["Authorization"], "Bearer access-token")
+        XCTAssertNil(request.headers["Authorization"], "the client contributes no credential")
         XCTAssertNil(request.headers["requestToken"])
     }
 

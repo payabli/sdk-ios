@@ -19,8 +19,7 @@ final class TokenStorageClientTests: XCTestCase {
         }
         """)
         let client = PayInPaymentFlowTokenStorageClient(
-            transport: transport,
-            accessTokenProvider: { "access-token-1" }
+            transport: transport
         )
 
         let result = try await client.addMethod(
@@ -50,7 +49,7 @@ final class TokenStorageClientTests: XCTestCase {
         try await assertCardPaymentMethodRequest(firstRequest(from: transport))
     }
 
-    func testAddMethodSerializesAuthorizationHeaderOnly() async throws {
+    func testAddMethodSerializesNoCredentialHeader() async throws {
         let transport = MockTransport(responseBody: """
         {
           "responseText": "Success",
@@ -63,8 +62,7 @@ final class TokenStorageClientTests: XCTestCase {
         }
         """)
         let client = PayInPaymentFlowTokenStorageClient(
-            transport: transport,
-            accessTokenProvider: { "access-token-1" }
+            transport: transport
         )
 
         _ = try await client.addMethod(
@@ -79,8 +77,8 @@ final class TokenStorageClientTests: XCTestCase {
         )
 
         let request = try await firstRequest(from: transport)
-        XCTAssertEqual(request.headers["Authorization"], "Bearer access-token-1")
-        XCTAssertEqual(Set(request.headers.keys), ["Authorization", "Content-Type"])
+        // The client contributes no credential, so the header set is the whole assertion.
+        XCTAssertEqual(Set(request.headers.keys), ["Content-Type"])
     }
 
     func testAddMethodSerializesACHPaymentMethodRequest() async throws {
@@ -98,8 +96,7 @@ final class TokenStorageClientTests: XCTestCase {
         }
         """)
         let client = PayInPaymentFlowTokenStorageClient(
-            transport: transport,
-            accessTokenProvider: { "access-token-2" }
+            transport: transport
         )
 
         _ = try await client.addMethod(
@@ -150,8 +147,7 @@ final class TokenStorageClientTests: XCTestCase {
         }
         """)
         let client = PayInPaymentFlowTokenStorageClient(
-            transport: transport,
-            accessTokenProvider: { "access-token-ach" }
+            transport: transport
         )
 
         _ = try await client.addMethod(
@@ -173,8 +169,7 @@ final class TokenStorageClientTests: XCTestCase {
     func testInvalidCardDoesNotReachTransport() async throws {
         let transport = MockTransport(responseBody: "{}")
         let client = PayInPaymentFlowTokenStorageClient(
-            transport: transport,
-            accessTokenProvider: { "access-token" }
+            transport: transport
         )
 
         do {
@@ -200,8 +195,7 @@ final class TokenStorageClientTests: XCTestCase {
     func testMissingCardZipDoesNotReachTransport() async throws {
         let transport = MockTransport(responseBody: "{}")
         let client = PayInPaymentFlowTokenStorageClient(
-            transport: transport,
-            accessTokenProvider: { "access-token" }
+            transport: transport
         )
 
         do {
@@ -228,8 +222,7 @@ final class TokenStorageClientTests: XCTestCase {
     func testMissingCardCvvDoesNotReachTransport() async throws {
         let transport = MockTransport(responseBody: "{}")
         let client = PayInPaymentFlowTokenStorageClient(
-            transport: transport,
-            accessTokenProvider: { "access-token" }
+            transport: transport
         )
 
         do {
@@ -288,8 +281,7 @@ final class TokenStorageClientTests: XCTestCase {
         for (paymentMethod, expectedMessage) in scenarios {
             let transport = MockTransport(responseBody: "{}")
             let client = PayInPaymentFlowTokenStorageClient(
-                transport: transport,
-                accessTokenProvider: { "access-token" }
+                transport: transport
             )
 
             do {
@@ -311,8 +303,7 @@ final class TokenStorageClientTests: XCTestCase {
     func testSixDigitExpirationDoesNotReachTransport() async throws {
         let transport = MockTransport(responseBody: "{}")
         let client = PayInPaymentFlowTokenStorageClient(
-            transport: transport,
-            accessTokenProvider: { "access-token" }
+            transport: transport
         )
 
         do {
@@ -361,8 +352,7 @@ final class TokenStorageClientTests: XCTestCase {
         for (paymentMethod, expectedMessage) in scenarios {
             let transport = MockTransport(responseBody: "{}")
             let client = PayInPaymentFlowTokenStorageClient(
-                transport: transport,
-                accessTokenProvider: { "access-token" }
+                transport: transport
             )
 
             do {
@@ -398,7 +388,6 @@ final class TokenStorageClientTests: XCTestCase {
         """)
         let client = PayInPaymentFlowTokenStorageClient(
             transport: transport,
-            accessTokenProvider: { "access-token-secret" },
             baseURL: URL(string: "https://api-qa.payabli.com"),
             diagnostics: .enabled { sink.append($0) }
         )
@@ -432,7 +421,8 @@ final class TokenStorageClientTests: XCTestCase {
         XCTAssertTrue(request.url.contains("createAnonymous=false"))
         XCTAssertTrue(request.url.contains("forceCustomerCreation=true"))
         XCTAssertTrue(request.url.contains("temporary=false"))
-        XCTAssertEqual(request.headers["Authorization"], "[REDACTED]")
+        // The credential is attached below this layer, so it never enters the diagnostic record.
+        XCTAssertNil(request.headers["Authorization"])
         XCTAssertEqual(request.headers["Content-Type"], "application/json")
         let requestBody = try XCTUnwrap(request.body)
         XCTAssertTrue(requestBody.contains("\"entryPoint\":\"f743aed24a\""))
@@ -465,8 +455,7 @@ final class TokenStorageClientTests: XCTestCase {
         }
         """)
         let client = PayInPaymentFlowTokenStorageClient(
-            transport: transport,
-            accessTokenProvider: { "access-token" }
+            transport: transport
         )
 
         do {
@@ -503,8 +492,7 @@ final class TokenStorageClientTests: XCTestCase {
         }
         """)
         let client = PayInPaymentFlowTokenStorageClient(
-            transport: transport,
-            accessTokenProvider: { "access-token" }
+            transport: transport
         )
 
         do {
@@ -540,8 +528,7 @@ final class TokenStorageClientTests: XCTestCase {
         }
         """)
         let client = PayInPaymentFlowTokenStorageClient(
-            transport: transport,
-            accessTokenProvider: { "access-token" }
+            transport: transport
         )
 
         do {
@@ -839,10 +826,11 @@ private func assertCardPaymentMethodResult(_ result: PayabliPayInPaymentFlowStor
 private func assertCardPaymentMethodRequest(_ request: PayabliRequest) throws {
     XCTAssertEqual(request.method, .post)
     XCTAssertEqual(request.path, "/api/TokenStorage/add")
-    XCTAssertEqual(request.headers["Authorization"], "Bearer access-token-1")
+    // The idempotency key stays with the client; the credential does not, so the header set names
+    // exactly two. A hand-stamped bearer creeping back in fails here.
     XCTAssertEqual(request.headers["idempotencyKey"], "idem-1")
     XCTAssertEqual(request.headers["Content-Type"], "application/json")
-    XCTAssertEqual(Set(request.headers.keys), ["Authorization", "Content-Type", "idempotencyKey"])
+    XCTAssertEqual(Set(request.headers.keys), ["Content-Type", "idempotencyKey"])
     XCTAssertEqual(
         request.query.map { "\($0.name)=\($0.value ?? "")" }.sorted(),
         ["createAnonymous=true", "forceCustomerCreation=false", "temporary=true"]

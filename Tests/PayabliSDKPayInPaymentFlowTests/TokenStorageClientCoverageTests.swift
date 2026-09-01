@@ -12,7 +12,6 @@ final class TokenStorageClientCoverageTests: XCTestCase {
         ))
         let client = PayInPaymentFlowTokenStorageClient(
             transport: transport,
-            accessTokenProvider: { "access-token-secret" },
             diagnostics: .enabled { sink.append($0) }
         )
 
@@ -46,7 +45,8 @@ final class TokenStorageClientCoverageTests: XCTestCase {
         XCTAssertTrue(failure.url.hasPrefix("/api/TokenStorage/add?"))
         XCTAssertTrue(failure.url.contains("createAnonymous=false"))
         XCTAssertTrue(failure.url.contains("temporary=true"))
-        XCTAssertEqual(failure.headers["Authorization"], "[REDACTED]")
+        // The credential is attached below this layer, so it never enters the diagnostic record.
+        XCTAssertNil(failure.headers["Authorization"])
         XCTAssertNil(failure.body)
         XCTAssertNotNil(failure.durationMilliseconds)
         XCTAssertFalse((failure.errorDescription ?? "").isEmpty)
@@ -61,7 +61,6 @@ final class TokenStorageClientCoverageTests: XCTestCase {
         ))
         let client = PayInPaymentFlowTokenStorageClient(
             transport: transport,
-            accessTokenProvider: { "access-token-secret" },
             diagnostics: .enabled { sink.append($0) }
         )
 
@@ -102,7 +101,6 @@ final class TokenStorageClientCoverageTests: XCTestCase {
         """)
         let arrayClient = PayInPaymentFlowTokenStorageClient(
             transport: arrayTransport,
-            accessTokenProvider: { "access-token" },
             diagnostics: .enabled { arraySink.append($0) }
         )
 
@@ -133,7 +131,6 @@ final class TokenStorageClientCoverageTests: XCTestCase {
         let nonJSONTransport = CoverageMockTransport(responseBody: "gateway text response")
         let nonJSONClient = PayInPaymentFlowTokenStorageClient(
             transport: nonJSONTransport,
-            accessTokenProvider: { "access-token" },
             diagnostics: .enabled { nonJSONSink.append($0) }
         )
 
@@ -173,8 +170,7 @@ final class TokenStorageClientCoverageTests: XCTestCase {
         }
         """)
         let client = PayInPaymentFlowTokenStorageClient(
-            transport: transport,
-            accessTokenProvider: { "access-token" }
+            transport: transport
         )
 
         let result = try await client.addMethod(
@@ -203,8 +199,7 @@ final class TokenStorageClientCoverageTests: XCTestCase {
         }
         """)
         let client = PayInPaymentFlowTokenStorageClient(
-            transport: transport,
-            accessTokenProvider: { "access-token" }
+            transport: transport
         )
 
         do {
@@ -228,11 +223,10 @@ final class TokenStorageClientCoverageTests: XCTestCase {
         }
     }
 
-    func testInvalidEntryPointAndMissingAccessTokenDoNotReachTransport() async throws {
+    func testAnInvalidEntryPointDoesNotReachTransport() async throws {
         let invalidEntryTransport = CoverageMockTransport(responseBody: "{}")
         let invalidEntryClient = PayInPaymentFlowTokenStorageClient(
-            transport: invalidEntryTransport,
-            accessTokenProvider: { "access-token" }
+            transport: invalidEntryTransport
         )
 
         do {
@@ -254,28 +248,32 @@ final class TokenStorageClientCoverageTests: XCTestCase {
         } catch {
             XCTFail("Wrong error: \(error)")
         }
+    }
 
-        let missingTokenTransport = CoverageMockTransport(responseBody: "{}")
-        let missingTokenClient = PayInPaymentFlowTokenStorageClient(
-            transport: missingTokenTransport,
-            accessTokenProvider: { "  " }
+    /// A blank token is refused, and this surface answers in its own error type.
+    ///
+    /// The chain is shared, so the refusal is raised in the capture surface's type and translated
+    /// here. Driven through the facade's own transport, because injecting a double replaces the chain
+    /// and with it the guard.
+    @MainActor
+    func testABlankTokenIsRefusedInThisSurfacesVocabulary() async throws {
+        let component = PayabliPayInPaymentFlow(
+            entryPoint: "entry",
+            environment: .sandbox,
+            accessTokenProvider: { "" }
         )
 
         do {
-            _ = try await missingTokenClient.addMethod(
-                entryPoint: "entry",
-                paymentMethod: .card(PayabliPayInPaymentFlowCardData(
-                    cardNumber: "4111111111111111",
-                    expiration: "02/28",
-                    cardholderName: "Jane Doe",
-                    cvv: "123",
-                    billingZip: "33139"
-                ))
-            )
+            _ = try await component.addCard(PayabliPayInPaymentFlowCardData(
+                cardNumber: "4111111111111111",
+                expiration: "02/28",
+                cardholderName: "Jane Doe",
+                cvv: "123",
+                billingZip: "33139"
+            ))
             XCTFail("Expected missing token error")
         } catch PayabliPayInPaymentFlowTokenStorageError.missingAccessToken {
-            let requests = await missingTokenTransport.requests
-            XCTAssertTrue(requests.isEmpty)
+            // Translated, so the shared chain's own error type does not surface here.
         } catch {
             XCTFail("Wrong error: \(error)")
         }

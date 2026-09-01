@@ -2,9 +2,9 @@ import Foundation
 
 /// HTTP client for Payabli APIs.
 ///
-/// Pure transport layer — no auth state. Callers supply headers (including
-/// `Authorization: Bearer <access token>`), and the service performs the
-/// request, returning the raw response or a decoded envelope.
+/// The decoration chain is built in the initializer and applied as the first statement of `perform`,
+/// so every request through this type is decorated. `AuthenticatedTransport` wraps this and adds 401
+/// recovery; a request that skips that wrapper still carries its credential.
 ///
 /// Error mapping (PRD §8 "Error Codes", §8.1.1):
 /// - 400 → throws `PayabliPaymentError.validation`
@@ -18,14 +18,49 @@ public final class PayabliService: PayabliTransport, Sendable {
     private let baseURL: URL
     private let session: URLSession
     private let logger: PayabliLogger
+    private let decorations: [any PayabliRequestDecoration]
 
     /// Default per-request timeout (PRD NFR-6 — 10 seconds for tokenization calls).
     public static let defaultRequestTimeout: TimeInterval = 10
 
-    public init(environment: PayabliEnvironment, session: URLSession? = nil) {
+    /// The only way to build a transport outside this module.
+    ///
+    /// There is no initializer that takes a chain, so every transport carries the one the factory
+    /// builds. `readToken` reaches the chain and nothing here reads it; it is called once per request,
+    /// so a rotation needs no cache invalidated.
+    public convenience init(
+        environment: PayabliEnvironment,
+        readToken: @escaping @Sendable () async throws -> String,
+        session: URLSession? = nil
+    ) {
+        self.init(
+            environment: environment,
+            decorations: RequestDecorationFactory.chain(readToken: readToken),
+            session: session
+        )
+    }
+
+    private init(
+        environment: PayabliEnvironment,
+        decorations: [any PayabliRequestDecoration],
+        session: URLSession?
+    ) {
         self.baseURL = environment.baseURL
         self.session = session ?? Self.makeDefaultSession()
         self.logger = PayabliLogger(category: .network)
+        self.decorations = decorations
+    }
+
+    /// Builds a transport with a caller-supplied chain, for a test that needs a specific one.
+    ///
+    /// Internal, so it widens what a test can construct and not what production can. Not for a
+    /// shipping code path.
+    static func makeWithDecorations(
+        environment: PayabliEnvironment,
+        decorations: [any PayabliRequestDecoration],
+        session: URLSession? = nil
+    ) -> PayabliService {
+        PayabliService(environment: environment, decorations: decorations, session: session)
     }
 
     static func makeDefaultSession() -> URLSession {
@@ -43,8 +78,10 @@ public final class PayabliService: PayabliTransport, Sendable {
     /// Callers should use `performV2` for envelope decoding, or decode the raw
     /// response body manually for non-v2 endpoints.
     public func perform(_ request: PayabliRequest) async throws -> PayabliResponse {
-        let urlRequest = try buildURLRequest(request)
-        logger.debug("→ \(request.method.rawValue) \(request.path)")
+        // First statement, so no path through this method skips decoration.
+        let decorated = try await decorations.applyTo(request)
+        let urlRequest = try buildURLRequest(decorated)
+        logger.debug("→ \(decorated.method.rawValue) \(decorated.path)")
 
         do {
             let (data, urlResponse) = try await session.data(for: urlRequest)
@@ -56,7 +93,7 @@ public final class PayabliService: PayabliTransport, Sendable {
             }
 
             let headers = (http.allHeaderFields as? [String: String]) ?? [:]
-            logger.debug("← \(request.method.rawValue) \(request.path) [\(http.statusCode)]")
+            logger.debug("← \(decorated.method.rawValue) \(decorated.path) [\(http.statusCode)]")
 
             return PayabliResponse(
                 statusCode: http.statusCode,
@@ -66,7 +103,7 @@ public final class PayabliService: PayabliTransport, Sendable {
         } catch let error as PayabliGenericError {
             throw error
         } catch {
-            logger.error("Network error on \(request.path): \(error.localizedDescription)")
+            logger.error("Network error on \(decorated.path): \(error.localizedDescription)")
             throw PayabliGenericError(
                 code: .networkError,
                 reason: "Network request failed",
@@ -82,18 +119,7 @@ public final class PayabliService: PayabliTransport, Sendable {
     ) async throws -> PayabliV2Envelope<T> {
         let response = try await perform(request)
         try mapHTTPError(response: response)
-
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        do {
-            return try decoder.decode(PayabliV2Envelope<T>.self, from: response.body)
-        } catch {
-            throw PayabliGenericError(
-                code: .decodingError,
-                reason: "Failed to decode v2 envelope",
-                underlying: error
-            )
-        }
+        return try decodePayabliV2Envelope(T.self, from: response)
     }
 
     // MARK: - Internals

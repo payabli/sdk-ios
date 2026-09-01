@@ -13,7 +13,11 @@ final class PayabliServiceTests: XCTestCase {
     }
 
     private func service() -> PayabliService {
-        PayabliService(environment: .sandbox, session: StubURLProtocol.makeSession())
+        PayabliService(
+            environment: .sandbox,
+            readToken: { testToken },
+            session: StubURLProtocol.makeSession()
+        )
     }
 
     // MARK: - V2 envelope decoding
@@ -346,7 +350,7 @@ final class PayabliServiceTests: XCTestCase {
 
     func testAttachesHeaders() async throws {
         StubURLProtocol.handler = { request in
-            XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer abc123")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "X-Caller-Header"), "kept")
             XCTAssertEqual(request.value(forHTTPHeaderField: "Content-Type"), "application/json")
             let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
             return (response, Data("{}".utf8))
@@ -355,8 +359,30 @@ final class PayabliServiceTests: XCTestCase {
         let request = PayabliRequest(
             method: .post,
             path: "/test",
-            headers: ["Authorization": "Bearer abc123", "Content-Type": "application/json"]
+            headers: ["X-Caller-Header": "kept", "Content-Type": "application/json"]
         )
         _ = try await service().perform(request)
+    }
+
+    /// A caller cannot choose the credential.
+    ///
+    /// Only the same-cased spelling is assertable here. `URLRequest.setValue` replaces
+    /// case-insensitively, so with two keys differing only in case the survivor is whichever the
+    /// dictionary yields last, and a test reading the result turns on iteration order. That guarantee
+    /// is asserted on the request itself, by
+    /// `testADifferentlyCasedCallerHeaderIsRemovedNotShadowed`.
+    func testACallerSuppliedBearerIsNotWhatReachesTheWire() async throws {
+        let stub = RecordingStub()
+        stub.install()
+        defer { stub.uninstall() }
+
+        let request = PayabliRequest(
+            method: .post,
+            path: "/test",
+            headers: ["Authorization": "Bearer caller-supplied"]
+        )
+        _ = try await service().perform(request)
+
+        XCTAssertEqual(stub.sentTokens, [testToken])
     }
 }

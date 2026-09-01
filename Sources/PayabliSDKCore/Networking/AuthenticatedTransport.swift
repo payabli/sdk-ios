@@ -1,12 +1,10 @@
 import Foundation
 
-/// Decorator that injects the `Authorization: Bearer <token>` header on
-/// every outgoing request and handles HTTP 401 with a single
-/// refresh-and-retry. After two consecutive 401s, throws
+/// Handles an HTTP 401 with a single refresh-and-retry. After two consecutive 401s, throws
 /// `PayabliGenericError(.tokenExpired)`.
 ///
-/// Endpoint clients that need bearer auth depend on this transport rather
-/// than open-coding the header / retry dance themselves.
+/// The bearer is attached by `base`'s chain, not here, so a request that skips this layer still
+/// carries its credential.
 struct AuthenticatedTransport: PayabliTransport {
     private let base: any PayabliTransport
     private let auth: PayabliAuth
@@ -17,13 +15,26 @@ struct AuthenticatedTransport: PayabliTransport {
     }
 
     func perform(_ request: PayabliRequest) async throws -> PayabliResponse {
-        let token = await auth.currentAccessToken()
-        let firstAttempt = try await base.perform(authorize(request, with: token))
+        let stamped = SentToken()
+        let firstAttempt = try await SentToken.$current.withValue(stamped) {
+            try await base.perform(request)
+        }
 
         guard firstAttempt.statusCode == 401 else { return firstAttempt }
 
-        let refreshed = try await auth.invalidateAndRefresh(rejectedToken: token)
-        let secondAttempt = try await base.perform(authorize(request, with: refreshed))
+        // The token the chain stamped. A fresh read covers a chain that stamped nothing.
+        let rejected: String = if let sent = stamped.value {
+            sent
+        } else {
+            await auth.currentAccessToken()
+        }
+        _ = try await auth.invalidateAndRefresh(rejectedToken: rejected)
+
+        // Re-entering the transport re-runs the chain, which reads the refreshed token.
+        let replayed = SentToken()
+        let secondAttempt = try await SentToken.$current.withValue(replayed) {
+            try await base.perform(request)
+        }
         if secondAttempt.statusCode == 401 {
             throw PayabliGenericError(
                 code: .tokenExpired,
@@ -33,34 +44,13 @@ struct AuthenticatedTransport: PayabliTransport {
         return secondAttempt
     }
 
+    /// `base`'s overload maps a 401 to a typed error, so this decodes after its own `perform`.
     func performV2<T: Decodable & Sendable>(
         _ request: PayabliRequest,
         decoding: T.Type
     ) async throws -> PayabliV2Envelope<T> {
         let response = try await perform(request)
         try mapPayabliHTTPError(response: response)
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        do {
-            return try decoder.decode(PayabliV2Envelope<T>.self, from: response.body)
-        } catch {
-            throw PayabliGenericError(
-                code: .decodingError,
-                reason: "Failed to decode v2 envelope",
-                underlying: error
-            )
-        }
-    }
-
-    private func authorize(_ request: PayabliRequest, with token: String) -> PayabliRequest {
-        var headers = request.headers
-        headers["Authorization"] = "Bearer \(token)"
-        return PayabliRequest(
-            method: request.method,
-            path: request.path,
-            query: request.query,
-            headers: headers,
-            body: request.body
-        )
+        return try decodePayabliV2Envelope(T.self, from: response)
     }
 }
