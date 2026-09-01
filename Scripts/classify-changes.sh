@@ -81,8 +81,17 @@ else
     added=$(printf '%s\n' "$LIFECYCLE" | grep -c '^A' || true)
     deleted=$(printf '%s\n' "$LIFECYCLE" | grep -c '^D' || true)
     renamed=$(printf '%s\n' "$LIFECYCLE" | grep -c '^R' || true)
+    # git reports a regular file that became a symlink as `T`, which none of the
+    # three counts covers. The list is folded away, so a summary that did not add
+    # up to it would hide that file behind three zeroes.
+    listed=$(printf '%s\n' "$LIFECYCLE" | grep -c . || true)
+    other=$((listed - added - deleted - renamed))
+    summary="$added added, $deleted deleted, $renamed renamed"
+    if [ "$other" -gt 0 ]; then
+        summary="$summary, $other other"
+    fi
     echo "<details>"
-    echo "<summary>$added added, $deleted deleted, $renamed renamed</summary>"
+    echo "<summary>$summary</summary>"
     echo
     echo '```'
     printf '%s\n' "$LIFECYCLE"
