@@ -116,6 +116,39 @@ final class PayabliRequestDecorationTests: XCTestCase {
         XCTAssertNil(decorated.headers[PayabliRequest.contentTypeHeader])
     }
 
+    // MARK: - What may reach the wire
+
+    /// The token source is the caller's, so the config and refresh validations do not cover it.
+    func testABlankTokenIsRefusedBeforeItIsStamped() async throws {
+        let box = SentToken()
+
+        do {
+            try await SentToken.$current.withValue(box) {
+                _ = try await BearerDecoration(readToken: { "   " }).decorate(request)
+            }
+            XCTFail("expected a blank token to be refused")
+        } catch let error as PayabliGenericError {
+            XCTAssertEqual(error.code, .tokenExpired)
+        }
+
+        XCTAssertNil(box.value, "a token that was not sent is not recorded as sent")
+    }
+
+    func testATokenThatCannotBeAHeaderValueIsRefused() async throws {
+        let box = SentToken()
+
+        do {
+            try await SentToken.$current.withValue(box) {
+                _ = try await BearerDecoration(readToken: { "tok\r\nX-Injected: 1" }).decorate(request)
+            }
+            XCTFail("expected an unsafe token to be refused")
+        } catch let error as PayabliGenericError {
+            XCTAssertEqual(error.code, .tokenMalformed)
+        }
+
+        XCTAssertNil(box.value)
+    }
+
     // MARK: - The sent-token record
 
     func testTheBearerRecordsWhatItStampedWhenABoxIsBound() async throws {

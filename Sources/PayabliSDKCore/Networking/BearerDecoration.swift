@@ -18,8 +18,28 @@ struct BearerDecoration: PayabliRequestDecoration {
 
     func decorate(_ request: PayabliRequest) async throws -> PayabliRequest {
         let token = try await readToken()
-        // Recorded for the layer that reports which token a rejection refused.
+        try Self.validate(token)
+        // Recorded after validation, so the layer that reports a rejection names a token that was sent.
         SentToken.current?.record(token)
         return request.withHeaders([Self.headerName: Self.scheme + token])
+    }
+
+    /// The only place every token source is seen, so a `readToken` the caller supplied meets the same
+    /// checks as a token from the config or a refresh.
+    private static func validate(_ token: String) throws {
+        guard !token.isBlank else {
+            throw PayabliGenericError(
+                code: .tokenExpired,
+                reason: "Access token unusable",
+                detail: "The token source returned a blank token."
+            )
+        }
+        guard token.isHeaderSafe else {
+            throw PayabliGenericError(
+                code: .tokenMalformed,
+                reason: "Access token unusable",
+                detail: "The token source returned a token that cannot be an HTTP header value."
+            )
+        }
     }
 }
