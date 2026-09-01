@@ -1,29 +1,23 @@
 import Foundation
-import os
 
-/// Structured logger wrapping Apple's `os.Logger` with `.private` redaction
-/// for sensitive metadata.
+/// Structured logger for the SDK's own diagnostics.
 ///
 /// Subsystem: `com.payabli.sdk`
 /// Categories: `auth`, `network`, `tokenization`, `taptopay`, `telemetry`, `core`
 ///
-/// See PRD §24.5 and NFR-23.
-///
 /// Privacy rules:
-/// - Tokens, secrets, credentials: redacted (never logged, even as `.private`)
-/// - PAN, CVV, expiry, account and routing numbers: NEVER logged, period
-/// - A cardholder or payer name: never logged either, and `.private` is not the
-///   exception. It redacts a view of the log rather than keeping the value out of
-///   it, so it is the tool for something loggable-but-sensitive, which a name on an
-///   instrument is not. Leave it out of the payload.
-/// - Transaction IDs, state names, error codes, durations: `.public`
-/// - Device identifiers and email addresses: `.private`
+/// - Tokens, secrets, credentials: never logged
+/// - PAN, CVV, expiry, account and routing numbers: never logged, period
+/// - A cardholder or payer name: never logged either. Leave it out of the payload.
+/// - Transaction IDs, state names, error codes, durations: loggable
+/// - Device identifiers and email addresses: use `redactFully(_:)`
 public struct PayabliLogger: Sendable {
-    private let logger: Logger
+    private let sink: any LogSink
+    private let category: Category
 
     public static let subsystem = "com.payabli.sdk"
 
-    public enum Category: String, Sendable {
+    public enum Category: String, Sendable, CaseIterable {
         case core
         case auth
         case network
@@ -32,38 +26,46 @@ public struct PayabliLogger: Sendable {
         case telemetry
     }
 
+    /// Severity of one record. Internal: what a host may set as a cutoff, and whether there is an off
+    /// value, is not settled, and a public ladder would fix the spelling before that decision.
+    enum Level: Sendable {
+        case debug
+        case info
+        case warning
+        case error
+        case fault
+    }
+
+    /// The logger a shipping path uses. This is the one place the unified log is named, which is what
+    /// makes every layer below take the logger it was given rather than build its own.
     public init(category: Category) {
-        self.logger = Logger(subsystem: Self.subsystem, category: category.rawValue)
+        self.init(category: category, sink: UnifiedLogSink())
+    }
+
+    /// Internal, so it widens what a test can construct and not what production can.
+    init(category: Category, sink: any LogSink) {
+        self.category = category
+        self.sink = sink
     }
 
     public func debug(_ message: String) {
-        logger.debug("\(message, privacy: .public)")
+        sink.write(level: .debug, category: category, message: message)
     }
 
     public func info(_ message: String) {
-        logger.info("\(message, privacy: .public)")
+        sink.write(level: .info, category: category, message: message)
     }
 
     public func warning(_ message: String) {
-        logger.warning("\(message, privacy: .public)")
+        sink.write(level: .warning, category: category, message: message)
     }
 
     public func error(_ message: String) {
-        logger.error("\(message, privacy: .public)")
+        sink.write(level: .error, category: category, message: message)
     }
 
     public func fault(_ message: String) {
-        logger.fault("\(message, privacy: .public)")
-    }
-
-    /// Log a message with a private (redacted) value.
-    public func info(_ message: String, private privateValue: String) {
-        logger.info("\(message, privacy: .public): \(privateValue, privacy: .private)")
-    }
-
-    /// Log a message with a private (redacted) value at error level.
-    public func error(_ message: String, private privateValue: String) {
-        logger.error("\(message, privacy: .public): \(privateValue, privacy: .private)")
+        sink.write(level: .fault, category: category, message: message)
     }
 }
 
