@@ -131,6 +131,10 @@ final class PayInPaymentFlowClient: Sendable {
         let response: PayabliResponse
         do {
             response = try await transport.perform(request)
+        } catch let failure as PayInProviderFailure {
+            // Not recorded: the host's own error can name its backend, and the sink renders a non-SDK
+            // error whole. The host still gets the error it threw.
+            throw failure.underlying
         } catch {
             diagnostics.logFailure(
                 error,

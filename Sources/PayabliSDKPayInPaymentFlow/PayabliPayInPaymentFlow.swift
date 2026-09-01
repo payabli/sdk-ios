@@ -216,11 +216,23 @@ public final class PayabliPayInPaymentFlow: NSObject, ObservableObject, PayabliC
     /// One read per request. The chain is what sends the credential, and a provider may mint a
     /// different token per call, so a check elsewhere would either spend a second call or validate a
     /// token that was not sent.
+    ///
+    /// A provider failure is tagged `PayInProviderFailure` on the way out. The read runs inside
+    /// `transport.perform` now, so anything thrown from it reaches the diagnostics sink, which renders
+    /// a non-SDK error whole and redacts only digit sequences shaped like a card number — and a host's
+    /// provider error can name its own backend. The tag is what lets both clients keep it out of the
+    /// record while still handing the host back its own error, which the Objective-C bridge relies on.
     private static func guardedRead(
         _ provider: @escaping PayabliPayInPaymentFlowAccessTokenProvider
     ) -> @Sendable () async throws -> String {
         {
-            let token = try await provider().payabliCaptureTrimmed
+            let minted: String
+            do {
+                minted = try await provider()
+            } catch {
+                throw PayInProviderFailure(underlying: error)
+            }
+            let token = minted.payabliCaptureTrimmed
             guard !token.isEmpty else {
                 throw PayabliPayInPaymentFlowError.missingAccessToken
             }

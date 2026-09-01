@@ -269,6 +269,40 @@ final class PayInPaymentFlowClientTests: XCTestCase {
         }
     }
 
+    /// A provider that throws does not put its own error into the diagnostics record.
+    ///
+    /// The read runs inside `transport.perform` now, so anything it throws reaches the sink, which
+    /// describes a non-SDK error whole and redacts only digit sequences shaped like a card number. A
+    /// host's provider can name its backend in that error.
+    @MainActor
+    func testAProviderFailureDoesNotReachTheDiagnosticsRecord() async throws {
+        let sentinel = "SENTINEL-BACKEND-https://tokens.internal.example/mint?client=acme"
+        let captured = LockedDiagnosticStrings()
+        let component = PayabliPayInPaymentFlow(
+            entryPoint: "entry",
+            environment: .sandbox,
+            accessTokenProvider: {
+                throw NSError(
+                    domain: sentinel,
+                    code: 1,
+                    userInfo: [NSLocalizedDescriptionKey: sentinel]
+                )
+            },
+            diagnostics: .enabled { captured.append($0) }
+        )
+
+        do {
+            _ = try await component.capture(cardRequest())
+            XCTFail("Expected the provider failure to surface")
+        } catch let error as NSError where error.domain == sentinel {
+            // The host gets its own error back, which the Objective-C bridge relies on.
+        }
+
+        let rendered = captured.all.joined(separator: "\n")
+        XCTAssertFalse(rendered.contains("SENTINEL-BACKEND"), rendered)
+        XCTAssertFalse(rendered.contains("tokens.internal.example"), rendered)
+    }
+
     /// A blank token is refused where it is read, which is the chain.
     ///
     /// Driven through the facade's own transport, because injecting a double replaces the chain and
@@ -530,6 +564,33 @@ private actor MockPaymentCaptureTransport: PayabliTransport {
     ) async throws -> PayabliV2Envelope<T> {
         requests.append(request)
         return try JSONDecoder().decode(PayabliV2Envelope<T>.self, from: Data(responseBody.utf8))
+    }
+}
+
+/// Every diagnostic entry a run produced, rendered, so an assertion can sweep the lot for a value that
+/// must not be in any of them.
+private final class LockedDiagnosticStrings: @unchecked Sendable {
+    private let lock = NSLock()
+    private var entries: [String] = []
+
+    var all: [String] {
+        lock.lock()
+        defer { lock.unlock() }
+        return entries
+    }
+
+    func append(_ entry: PayabliPayInPaymentFlowDiagnosticEntry) {
+        lock.lock()
+        defer { lock.unlock() }
+        entries.append(
+            [
+                entry.url,
+                entry.method,
+                entry.body ?? "",
+                entry.errorDescription ?? "",
+                entry.headers.map { "\($0.key)=\($0.value)" }.sorted().joined(separator: " ")
+            ].joined(separator: " | ")
+        )
     }
 }
 
