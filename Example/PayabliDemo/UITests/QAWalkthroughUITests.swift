@@ -18,11 +18,15 @@ import XCTest
 ///   -only-testing:PayabliDemoUITests -destination 'id=<simulator udid>'
 /// ```
 ///
-/// The token server has to be up on 8787, which a simulator reaches at `127.0.0.1` with nothing configured.
+/// The token server has to be up, and it is per environment: each one mints from its own credentials, so a
+/// walk against one environment holding the other's token is refused. `PAYABLI_QA_TOKEN_HOST` names the one
+/// to use, as a bare host, `host:port`, or a URL. Left unset the app resolves its own, which is loopback on
+/// a simulator and the Mac over the local network on a device, at the port the app defaults to.
 ///
-/// `PAYABLI_QA_ENVIRONMENT` reaches the runner only through the `TEST_RUNNER_` prefix, which `xcodebuild`
-/// strips: `TEST_RUNNER_PAYABLI_QA_ENVIRONMENT=sandbox xcodebuild test ...`. Set plainly it reaches
-/// `xcodebuild` and stops there, which looks exactly like a variable that had no effect.
+/// Both `PAYABLI_QA_ENVIRONMENT` and `PAYABLI_QA_TOKEN_HOST` reach the runner only through the
+/// `TEST_RUNNER_` prefix, which `xcodebuild` strips: `TEST_RUNNER_PAYABLI_QA_ENVIRONMENT=sandbox
+/// xcodebuild test ...`. Set plainly they reach `xcodebuild` and stop there, which looks exactly like a
+/// variable that had no effect.
 final class QAWalkthroughUITests: XCTestCase {
     private var app: XCUIApplication!
 
@@ -41,6 +45,11 @@ final class QAWalkthroughUITests: XCTestCase {
         app = XCUIApplication()
         // The environment is remembered, so it is passed every launch rather than relied on from the last one.
         app.launchArguments = ["-PayabliEnvironment", environment]
+        // Only when named. Unset, the app resolves the host itself, which is what a hand-run against a
+        // device relies on.
+        if let tokenHost {
+            app.launchArguments += ["-PayabliTokenHost", tokenHost]
+        }
         app.launch()
     }
 
@@ -219,6 +228,15 @@ final class QAWalkthroughUITests: XCTestCase {
     /// environment and neither is compiled into the request.
     private var environment: String {
         ProcessInfo.processInfo.environment["PAYABLI_QA_ENVIRONMENT"] ?? "qa"
+    }
+
+    /// The token server to mint from, which follows the environment rather than the build: one runs per
+    /// environment, on its own port, and the app's default names one of them. A walk that takes the default
+    /// while pointed at the other environment mints a credential that environment refuses.
+    private var tokenHost: String? {
+        guard let raw = ProcessInfo.processInfo.environment["PAYABLI_QA_TOKEN_HOST"] else { return nil }
+        let trimmed = raw.trimmingCharacters(in: .whitespaces)
+        return trimmed.isEmpty ? nil : trimmed
     }
 
     private let save = "Add Payment Method"
