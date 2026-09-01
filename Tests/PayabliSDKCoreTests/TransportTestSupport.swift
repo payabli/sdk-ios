@@ -2,7 +2,9 @@
 import PayabliSDKTestUtils
 import XCTest
 
-let testToken = "test-token"
+/// The last four characters are what a sweep for a partial leak matches, so they are distinctive: the
+/// tail of "test-token" is "oken", which is a substring of the messages the auth path writes.
+let testToken = "test-token-QXJZ"
 
 /// An auth holder for transport tests, which need a token source without being about auth.
 ///

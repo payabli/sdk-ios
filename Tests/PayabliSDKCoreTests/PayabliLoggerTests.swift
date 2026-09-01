@@ -106,6 +106,17 @@ final class PayabliLoggerTests: XCTestCase {
         )
     }
 
+    /// `redact` keeps four characters of its input, so a record carrying its output is a partial leak
+    /// that a sweep for whole values reports as absence.
+    func testASweepRejectsARecordCarryingOnlyTheRedactedTail() {
+        let sink = RecordingLogSink()
+        let credential = "SENTINEL-PARTIAL-CREDENTIAL-WXYZ"
+        PayabliLogger(category: .auth, sink: sink).info(PayabliLogger.redact(credential))
+
+        XCTAssertFalse(flattenLog(sink.records).contains(credential), "the whole value is absent")
+        XCTAssertEqual(sweepLog(for: [credential], in: sink.records), .found("WXYZ"))
+    }
+
     func testASweepOverANonEmptyRunCarryingNoneOfThemIsAbsent() {
         let sink = RecordingLogSink()
         PayabliLogger(category: .core, sink: sink).info("nothing of interest")

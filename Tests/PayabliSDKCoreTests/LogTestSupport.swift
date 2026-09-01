@@ -74,13 +74,28 @@ enum LogSweep: Equatable {
     case absent
 }
 
-/// Sweeps every message for each of `secrets`. A pure function, so the case that matters — an empty run
-/// reporting absence — can be driven directly instead of by observing an assertion.
+/// Sweeps every message for each of `secrets` and for the last four characters of each.
+///
+/// `PayabliLogger.redact` keeps a four-character tail, so a record carrying its output holds part of the
+/// credential while the whole value is absent, and a sweep for whole values alone reports that as
+/// absence. A sentinel therefore needs a last four that appears in no message asserted present.
+///
+/// The head is not swept. Nothing here keeps a leading fragment, and the sentinels share their first
+/// characters, so a head sweep would match one sentinel against another rather than against a leak.
+///
+/// A pure function, so the case that matters — an empty run reporting absence — can be driven directly
+/// instead of by observing an assertion.
 func sweepLog(for secrets: [String], in records: [RecordingLogSink.Record]) -> LogSweep {
     guard !records.isEmpty else { return .nothingWasLogged }
     let flattened = flattenLog(records)
-    for secret in secrets where flattened.contains(secret) {
-        return .found(secret)
+    for secret in secrets {
+        if flattened.contains(secret) {
+            return .found(secret)
+        }
+        let tail = String(secret.suffix(4))
+        if secret.count > 4, flattened.contains(tail) {
+            return .found(tail)
+        }
     }
     return .absent
 }
