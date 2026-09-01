@@ -364,8 +364,10 @@ else
     echo "Declarations a consumer can see were added or removed. The public surface is a"
     echo "contract shared with the SDK for Android, so a change here is a change to both."
     # A path is a heading in these listings, not a declaration, so it is not
-    # counted as one.
-    api_count() { printf '%s' "$1" | grep -vcE '\.swift( \(file (added|deleted)\))?$' || true; }
+    # counted as one. Every heading is a path from a diff limited to Sources/,
+    # and no declaration begins with a directory, so the prefix is what tells the
+    # two apart: a suffix alone also drops `let sourceType = FileType.swift`.
+    api_count() { printf '%s' "$1" | grep -vcE '^Sources/.*\.swift( \(file (added|deleted)\))?$' || true; }
     if [ -n "$api_removed" ]; then
         n=$(api_count "$api_removed")
         echo
