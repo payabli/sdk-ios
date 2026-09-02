@@ -8,6 +8,10 @@ import Foundation
 /// This closure may issue its own requests through the SDK. While the refresh runs, those requests
 /// carry the token being replaced, not the one this closure is about to return.
 ///
+/// That covers work this closure awaits, directly or in a child task. A request issued from a
+/// detached task is not covered: it waits on the refresh this closure is running, and neither can
+/// finish.
+///
 /// ## Why a closure, not a hard-coded endpoint
 ///
 /// The `clientSecret` that mints a Payabli access token MUST NOT ship in the
