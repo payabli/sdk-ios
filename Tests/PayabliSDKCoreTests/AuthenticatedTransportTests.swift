@@ -208,12 +208,65 @@ final class AuthenticatedTransportTests: XCTestCase {
         XCTAssertEqual(sent.filter { $0 == "refreshed-token" }.count, 5, "traffic was \(sent)")
     }
 
-    /// A provider that issues its own request through the SDK while its refresh is in flight.
+    /// A provider that issues its own request through the SDK while its own refresh is in flight.
     ///
-    /// Skipped because it wedges: unskipped it hangs the suite. The nested request's own 401 joins the
-    /// refresh task that is waiting on the provider that issued it.
-    func testAProviderThatIssuesItsOwnRequestThroughTheSdkDoesNotDeadlock() throws {
-        throw XCTSkip("Deadlocks: a provider's own request joins the refresh that is awaiting it.")
+    /// The nested request carries the token being replaced, so it is refused; it completes on that
+    /// refusal instead of joining the refresh that is waiting on the provider that issued it.
+    ///
+    /// Bounded, because the failure it covers is a wedge rather than a wrong answer. An unbounded wait
+    /// hangs the suite, which prints no failure and reads exactly like passing.
+    func testAProviderThatIssuesItsOwnRequestThroughTheSdkDoesNotDeadlock() async throws {
+        let stub = RecordingStub { request in
+            bearer(of: request) == "refreshed-token"
+                ? (Self.ok, Data())
+                : (Self.unauthorized, Data())
+        }
+        stub.install()
+        defer { stub.uninstall() }
+
+        let request = ping()
+        let stack = Slot<any PayabliTransport>()
+        let nested = Slot<String>()
+        let providerCalls = Counter()
+
+        let auth = try makeTestAuth(tokenProvider: {
+            _ = await providerCalls.increment()
+            // The host reaching for the SDK-shaped HTTP path it already has.
+            do {
+                let response = try await stack.value!.perform(request)
+                nested.set("\(response.statusCode)")
+            } catch let error as PayabliGenericError {
+                nested.set(error.code.rawValue)
+            }
+            return "refreshed-token"
+        })
+        stack.set(makeAuthenticatedStack(auth: auth))
+
+        let outcome = await outcomeWithinCeiling {
+            do {
+                return "\(try await stack.value!.perform(request).statusCode)"
+            } catch let error as PayabliGenericError {
+                return error.code.rawValue
+            } catch {
+                return "\(error)"
+            }
+        }
+
+        guard let outcome else {
+            return XCTFail(
+                "the request never finished: the provider's own request joined the refresh awaiting it"
+            )
+        }
+        XCTAssertEqual(outcome, "\(Self.ok)", "traffic was \(stub.sentTokens)")
+        // Completing is the guarantee, not succeeding: the nested request could only carry the token
+        // being replaced, so it is refused twice and reports the credential.
+        XCTAssertEqual(
+            nested.value,
+            PayabliErrorCode.tokenExpired.rawValue,
+            "traffic was \(stub.sentTokens)"
+        )
+        let refreshes = await providerCalls.count
+        XCTAssertEqual(refreshes, 1, "the nested request must not start a second refresh")
     }
 
     // MARK: - The decoding overload

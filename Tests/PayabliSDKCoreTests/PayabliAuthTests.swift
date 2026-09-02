@@ -79,6 +79,270 @@ final class PayabliAuthTests: XCTestCase {
         XCTAssertEqual(calls, 1, "Concurrent refresh requests should share a single in-flight Task")
     }
 
+    // MARK: - A provider that calls back into the SDK
+
+    /// A caller already inside this holder's own provider is answered with the token being replaced,
+    /// rather than joining the refresh that is waiting on it.
+    ///
+    /// Bounded: without the reentrancy step this wedges, and an unbounded wait would hang the suite
+    /// rather than report.
+    func testACallFromInsideTheProviderIsAnsweredInsteadOfJoining() async throws {
+        let holder = Slot<PayabliAuth>()
+        let nested = Slot<String>()
+        let auth = PayabliAuth(config: try makeConfig(
+            accessToken: "old",
+            tokenProvider: {
+                let inner = try? await holder.value!.invalidateAndRefresh(rejectedToken: "old")
+                nested.set(inner ?? "threw")
+                return "fresh"
+            }
+        ))
+        holder.set(auth)
+
+        let outcome = await outcomeWithinCeiling {
+            (try? await auth.invalidateAndRefresh(rejectedToken: "old")) ?? "threw"
+        }
+
+        guard let outcome else {
+            return XCTFail("the refresh never finished: the nested call joined the refresh awaiting it")
+        }
+        XCTAssertEqual(outcome, "fresh")
+        XCTAssertEqual(nested.value, "old", "a nested call receives the token being replaced")
+    }
+
+    /// The mark names the holder, so a nested call into a *different* holder is an ordinary caller
+    /// there and refreshes normally. A mark that recorded only that some refresh was running would
+    /// short-circuit this one and hand back its stale token.
+    func testAProviderCallingADifferentHolderStillRefreshesThere() async throws {
+        let other = PayabliAuth(config: try makeConfig(
+            accessToken: "other-old",
+            tokenProvider: { "other-fresh" }
+        ))
+        let nested = Slot<String>()
+        let auth = PayabliAuth(config: try makeConfig(
+            accessToken: "own-old",
+            tokenProvider: {
+                let inner = try? await other.invalidateAndRefresh(rejectedToken: "other-old")
+                nested.set(inner ?? "threw")
+                return "own-fresh"
+            }
+        ))
+
+        let fresh = try await auth.invalidateAndRefresh(rejectedToken: "own-old")
+
+        XCTAssertEqual(fresh, "own-fresh")
+        XCTAssertEqual(nested.value, "other-fresh", "a second holder's refresh is not this one's")
+    }
+
+    /// Two holders whose providers call each other. The second holder is an ordinary caller of the
+    /// first, so it starts its own refresh; the mark has to record both, because the call that comes
+    /// back is a call into the outer one.
+    ///
+    /// Recording only the innermost holder leaves the outer one unmarked, and the callback joins the
+    /// refresh that is waiting on it. Bounded for that reason.
+    func testTwoHoldersWhoseProvidersCallEachOtherBothComplete() async throws {
+        let first = Slot<PayabliAuth>()
+        let backIntoTheFirst = Slot<String>()
+
+        let second = PayabliAuth(config: try makeConfig(
+            accessToken: "second-old",
+            tokenProvider: {
+                let inner = try? await first.value!.invalidateAndRefresh(rejectedToken: "first-old")
+                backIntoTheFirst.set(inner ?? "threw")
+                return "second-fresh"
+            }
+        ))
+        let outer = PayabliAuth(config: try makeConfig(
+            accessToken: "first-old",
+            tokenProvider: {
+                _ = try? await second.invalidateAndRefresh(rejectedToken: "second-old")
+                return "first-fresh"
+            }
+        ))
+        first.set(outer)
+
+        let outcome = await outcomeWithinCeiling {
+            (try? await outer.invalidateAndRefresh(rejectedToken: "first-old")) ?? "threw"
+        }
+
+        guard let outcome else {
+            return XCTFail("the refresh never finished: a callback joined the refresh awaiting it")
+        }
+        XCTAssertEqual(outcome, "first-fresh")
+        XCTAssertEqual(
+            backIntoTheFirst.value,
+            "first-old",
+            "a call back into an enclosing holder is answered, not joined"
+        )
+        let settled = await outer.currentAccessToken()
+        XCTAssertEqual(settled, "first-fresh")
+    }
+
+    /// A task the provider leaves running outlives the refresh that marked it, and an unstructured
+    /// `Task` inherits task-local values, so the mark it captured survives past the refresh it belongs
+    /// to. It must not answer a later rejection on this holder.
+    ///
+    /// Bounded: the escaped task is polled for rather than awaited, since nothing else owns it.
+    func testATaskLeftRunningByTheProviderDoesNotAnswerALaterRejection() async throws {
+        let holder = Slot<PayabliAuth>()
+        let escaped = Slot<String>()
+        let released = Latch()
+        let providerCalls = Counter()
+
+        let auth = PayabliAuth(config: try makeConfig(
+            accessToken: "old",
+            tokenProvider: {
+                let call = await providerCalls.increment()
+                guard call == 1 else { return "second" }
+                Task {
+                    await released.wait()
+                    let later = try? await holder.value!.invalidateAndRefresh(rejectedToken: "first")
+                    escaped.set(later ?? "threw")
+                }
+                return "first"
+            }
+        ))
+        holder.set(auth)
+
+        let first = try await auth.invalidateAndRefresh(rejectedToken: "old")
+        XCTAssertEqual(first, "first")
+
+        released.open()
+
+        guard let later = await valueWithinCeiling(escaped) else {
+            return XCTFail("the task the provider left running never finished")
+        }
+        XCTAssertEqual(later, "second", "a mark left behind must not answer a later rejection")
+        let calls = await providerCalls.count
+        XCTAssertEqual(calls, 2, "the later rejection starts its own refresh")
+    }
+
+    /// The same mark, but a later refresh on this holder is in flight when the escaped task calls.
+    ///
+    /// The mark names the refresh it belongs to, so the call joins the live refresh. Dropping the
+    /// refresh half of the check and keeping the holder half leaves this answered immediately, from a
+    /// mark whose own refresh is long over, with the token that was just rejected.
+    func testAMarkFromAFinishedRefreshJoinsTheLiveOneRatherThanAnsweringIt() async throws {
+        let holder = Slot<PayabliAuth>()
+        let escaped = Slot<String>()
+        let escapedAtTheCall = Slot<String>()
+        let secondProviderEntered = Slot<String>()
+        let releaseEscaped = Latch()
+        let releaseSecondProvider = Latch()
+        let providerCalls = Counter()
+
+        let auth = PayabliAuth(config: try makeConfig(
+            accessToken: "old",
+            tokenProvider: {
+                let call = await providerCalls.increment()
+                guard call > 1 else {
+                    Task {
+                        await releaseEscaped.wait()
+                        escapedAtTheCall.set("at the call")
+                        let seen = try? await holder.value!.invalidateAndRefresh(rejectedToken: "first")
+                        escaped.set(seen ?? "threw")
+                    }
+                    return "first"
+                }
+                secondProviderEntered.set("entered")
+                await releaseSecondProvider.wait()
+                return "second"
+            }
+        ))
+        holder.set(auth)
+
+        let first = try await auth.invalidateAndRefresh(rejectedToken: "old")
+        XCTAssertEqual(first, "first")
+
+        let secondRefresh = Task { try? await auth.invalidateAndRefresh(rejectedToken: "first") }
+        guard await valueWithinCeiling(secondProviderEntered) != nil else {
+            return XCTFail("the second refresh never reached its provider")
+        }
+
+        // The escaped call runs while that refresh is still in flight. Joining it means nothing is set
+        // yet; answering from the stale mark would already have set the rejected token.
+        releaseEscaped.open()
+        guard await valueWithinCeiling(escapedAtTheCall) != nil else {
+            return XCTFail("the task the provider left running never resumed")
+        }
+        let answeredEarly = await valueWithinCeiling(escaped, attempts: 12)
+        releaseSecondProvider.open()
+        _ = await secondRefresh.value
+
+        XCTAssertNil(answeredEarly, "a mark whose own refresh had finished answered instead of joining")
+        let joined = await valueWithinCeiling(escaped)
+        XCTAssertEqual(joined, "second", "the call takes the live refresh's outcome")
+    }
+
+    /// A detached caller the provider does not await, driving the recovery path directly. It inherits
+    /// no mark, so it is an ordinary caller: it joins the refresh in flight rather than being answered
+    /// from inside it, and completes once the provider has returned.
+    ///
+    /// The shape that cannot finish is the provider awaiting such work once it is refused, which is
+    /// what the public documentation rules out. Fire and forget is not that shape.
+    func testADetachedRequestTheProviderDoesNotAwaitCompletes() async throws {
+        let holder = Slot<PayabliAuth>()
+        let detached = Slot<String>()
+        let providerCalls = Counter()
+
+        let auth = PayabliAuth(config: try makeConfig(
+            accessToken: "old",
+            tokenProvider: {
+                _ = await providerCalls.increment()
+                Task.detached {
+                    let seen = try? await holder.value!.invalidateAndRefresh(rejectedToken: "old")
+                    detached.set(seen ?? "threw")
+                }
+                return "fresh"
+            }
+        ))
+        holder.set(auth)
+
+        let fresh = try await auth.invalidateAndRefresh(rejectedToken: "old")
+        XCTAssertEqual(fresh, "fresh")
+
+        guard let seen = await valueWithinCeiling(detached) else {
+            return XCTFail("the detached request never finished")
+        }
+        // The same answer whether it joined the refresh in flight or arrived after it had rotated.
+        XCTAssertEqual(seen, "fresh")
+        let calls = await providerCalls.count
+        XCTAssertEqual(calls, 1, "the detached request must not spend a second provider call")
+    }
+
+    /// A task the provider leaves running keeps its inherited marks for as long as it lives, so a mark
+    /// holding the session would keep the session, and the credential in it, alive after the host had
+    /// released both.
+    func testATaskLeftRunningDoesNotRetainTheSession() async throws {
+        weak var session: PayabliAuth?
+        let released = Latch()
+        let spawned = Slot<String>()
+
+        do {
+            // The closure captures the latch and the slot, never the session.
+            let auth = PayabliAuth(config: try makeConfig(
+                accessToken: "old",
+                tokenProvider: {
+                    Task {
+                        await released.wait()
+                        spawned.set("done")
+                    }
+                    return "fresh"
+                }
+            ))
+            session = auth
+            let fresh = try await auth.invalidateAndRefresh(rejectedToken: "old")
+            XCTAssertEqual(fresh, "fresh")
+        }
+
+        // The spawned task is still parked, so anything it holds is still held.
+        try? await Task.sleep(nanoseconds: 200_000_000)
+        XCTAssertNil(session, "a task left running kept the session alive through its inherited mark")
+
+        released.open()
+        _ = await valueWithinCeiling(spawned)
+    }
+
     func testProviderErrorMapsToTokenExpired() async throws {
         struct ProviderError: Error {}
         let auth = PayabliAuth(config: try makeConfig(

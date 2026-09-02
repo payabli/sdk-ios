@@ -3,8 +3,15 @@ import Foundation
 /// Closure that refreshes the access token by calling the partner's
 /// server-side endpoint. Returns a freshly-minted token.
 ///
-/// The SDK invokes this when its cached token is rejected (HTTP 401) or has
-/// been explicitly invalidated via `PayabliAuth.invalidateToken()`.
+/// The SDK invokes this when its cached token is rejected (HTTP 401).
+///
+/// This closure may issue its own requests through the SDK. While the refresh runs, a request made
+/// on the session this closure refreshes carries the token being replaced, not the one it is about
+/// to return.
+///
+/// What this closure must not do is wait on work that itself needs this refresh to finish. Such work
+/// cannot complete until the refresh does, and the refresh cannot complete until this closure
+/// returns.
 ///
 /// ## Why a closure, not a hard-coded endpoint
 ///

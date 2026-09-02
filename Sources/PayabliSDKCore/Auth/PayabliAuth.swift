@@ -5,9 +5,12 @@ public actor PayabliAuth {
     private let logger: PayabliLogger
 
     private var currentToken: String
-    /// Guards against concurrent refresh attempts. If a refresh is in flight,
-    /// other callers await the same Task result.
+    /// Guards against concurrent refresh attempts. If a refresh is in flight, other callers await
+    /// the same Task result, except one already inside this holder's own provider call.
     private var inFlightRefresh: Task<String, Error>?
+    /// Names the refresh `inFlightRefresh` is running, so a mark that outlived its own refresh
+    /// is ignored rather than answering a later rejection.
+    private var inFlightRefreshID: UUID?
 
     /// Multicasts every successful token rotation. Producers append on every
     /// refresh; consumers iterate as long as they want.
@@ -40,6 +43,12 @@ public actor PayabliAuth {
     /// arrive far apart, and the later one must not refresh again on a token that
     /// has already rotated, which would discard the rotation the first one obtained.
     ///
+    /// A caller already inside this holder's own provider call is answered first, with the token
+    /// currently held: the refresh it would otherwise join is the one waiting on it. That holds at
+    /// any depth, where one provider calls a second session whose provider calls back into this one.
+    /// A mark naming a refresh that has already finished is not one of these and takes the ordinary
+    /// path, so a task a provider left running cannot answer for a refresh that is over.
+    ///
     /// The in-flight join comes before the already-rotated check, because the
     /// current token may itself be the one under refresh and handing it back would
     /// return a credential already known to be rejected.
@@ -47,6 +56,10 @@ public actor PayabliAuth {
     /// If no provider is configured, throws `PayabliGenericError(.tokenExpired)`
     /// so the caller can surface a re-authentication prompt.
     public func invalidateAndRefresh(rejectedToken: String) async throws -> String {
+        if let refreshID = inFlightRefreshID, RefreshInProgress.carries(self, refresh: refreshID) {
+            return currentToken
+        }
+
         if let existing = inFlightRefresh {
             return try await existing.value
         }
@@ -71,11 +84,14 @@ public actor PayabliAuth {
         // token, never the host's own error text, and never resumes before the token is
         // installed — which matters because the decoration chain reads the holder again on
         // the replay.
+        let refreshID = UUID()
         let task = Task<String, Error> { [logger] in
             logger.info("Refreshing access token via partner tokenProvider")
             let minted: String
             do {
-                minted = try await provider()
+                minted = try await RefreshInProgress.withMark(holder: self, refresh: refreshID) {
+                    try await provider()
+                }
             } catch {
                 // Every throw from the provider lands here, this SDK's own error type
                 // included: it is host code whatever it chose to throw.
@@ -96,11 +112,13 @@ public actor PayabliAuth {
             return minted
         }
         inFlightRefresh = task
+        inFlightRefreshID = refreshID
 
         do {
             return try await task.value
         } catch {
             inFlightRefresh = nil
+            inFlightRefreshID = nil
             throw error
         }
     }
@@ -111,6 +129,7 @@ public actor PayabliAuth {
     private func commit(_ fresh: String) {
         currentToken = fresh
         inFlightRefresh = nil
+        inFlightRefreshID = nil
         logger.info("Access token refreshed")
         for (_, continuation) in tokenChangeContinuations {
             continuation.yield(fresh)
@@ -154,6 +173,7 @@ public actor PayabliAuth {
     public func reset() {
         currentToken = config.accessToken
         inFlightRefresh = nil
+        inFlightRefreshID = nil
     }
 
     /// AsyncStream that emits whenever `invalidateAndRefresh(rejectedToken:)` commits a new token.
