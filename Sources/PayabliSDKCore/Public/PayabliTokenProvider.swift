@@ -5,12 +5,13 @@ import Foundation
 ///
 /// The SDK invokes this when its cached token is rejected (HTTP 401).
 ///
-/// This closure may issue its own requests through the SDK. While the refresh runs, those requests
-/// carry the token being replaced, not the one this closure is about to return.
+/// This closure may issue its own requests through the SDK. While the refresh runs, a request made
+/// on the session this closure refreshes carries the token being replaced, not the one it is about
+/// to return.
 ///
 /// The one shape that cannot work is awaiting, from inside this closure, a request issued on a
-/// detached task. If that request is refused it waits for the refresh this closure has yet to
-/// finish, and neither completes.
+/// detached task against that same session. If that request is refused it waits for the refresh this
+/// closure has yet to finish, and neither completes.
 ///
 /// ## Why a closure, not a hard-coded endpoint
 ///
