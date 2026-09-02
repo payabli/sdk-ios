@@ -269,6 +269,39 @@ final class PayabliAuthTests: XCTestCase {
         XCTAssertEqual(joined, "second", "the call takes the live refresh's outcome")
     }
 
+    /// A task the provider leaves running keeps its inherited marks for as long as it lives, so a mark
+    /// holding the session would keep the session, and the credential in it, alive after the host had
+    /// released both.
+    func testATaskLeftRunningDoesNotRetainTheSession() async throws {
+        weak var session: PayabliAuth?
+        let released = Latch()
+        let spawned = Slot<String>()
+
+        do {
+            // The closure captures the latch and the slot, never the session.
+            let auth = PayabliAuth(config: try makeConfig(
+                accessToken: "old",
+                tokenProvider: {
+                    Task {
+                        await released.wait()
+                        spawned.set("done")
+                    }
+                    return "fresh"
+                }
+            ))
+            session = auth
+            let fresh = try await auth.invalidateAndRefresh(rejectedToken: "old")
+            XCTAssertEqual(fresh, "fresh")
+        }
+
+        // The spawned task is still parked, so anything it holds is still held.
+        try? await Task.sleep(nanoseconds: 200_000_000)
+        XCTAssertNil(session, "a task left running kept the session alive through its inherited mark")
+
+        released.open()
+        _ = await valueWithinCeiling(spawned)
+    }
+
     func testProviderErrorMapsToTokenExpired() async throws {
         struct ProviderError: Error {}
         let auth = PayabliAuth(config: try makeConfig(
