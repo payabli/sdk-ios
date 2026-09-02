@@ -1,8 +1,5 @@
 import Foundation
 
-/// One refresh, by identity. A mark naming a refresh that has already finished answers nothing.
-final class RefreshTicket: Sendable {}
-
 /// The refreshes whose provider call this task is inside, outermost first, so a request a provider
 /// issues can be told apart from one merely waiting on a refresh.
 ///
@@ -15,35 +12,35 @@ final class RefreshTicket: Sendable {}
 /// its mark indefinitely and would answer rejections belonging to refreshes that finished long before.
 /// The holder checks that the refresh named here is still the one it has in flight.
 ///
-/// The session is named by `ObjectIdentifier` and not held. A mark inherited by such a task lives as
-/// long as the task does, and holding the session there would keep it, and the credential it holds,
-/// alive after the host had released both. An address can be reused once a session is gone, which is
-/// what the refresh half rules out: a later session at the same address has a different refresh.
+/// Both halves are values and neither is held. A mark inherited by such a task lives as long as the
+/// task does, and holding the session there would keep it, and the credential it holds, alive after the
+/// host had released both. An address can be reused once a session is gone, which is what the refresh
+/// half rules out: a later session's refresh is a value that was never minted before.
 ///
 /// Bound around a provider call and nothing else. A provider that hops to a detached task leaves the
 /// binding behind and is treated as any other caller.
 enum RefreshInProgress {
     struct Mark: Sendable {
         let session: ObjectIdentifier
-        let ticket: RefreshTicket
+        let refresh: UUID
     }
 
     @TaskLocal static var marks: [Mark] = []
 
-    /// Whether this task is inside `auth`'s own provider call for `ticket`, at any depth.
-    static func carries(_ auth: PayabliAuth, ticket: RefreshTicket) -> Bool {
+    /// Whether this task is inside `auth`'s own provider call for `refresh`, at any depth.
+    static func carries(_ auth: PayabliAuth, refresh: UUID) -> Bool {
         let session = ObjectIdentifier(auth)
-        return marks.contains { $0.session == session && $0.ticket === ticket }
+        return marks.contains { $0.session == session && $0.refresh == refresh }
     }
 
     /// Runs `operation` with this refresh appended, so every enclosing one stays marked.
     static func withMark<T>(
         holder: PayabliAuth,
-        ticket: RefreshTicket,
+        refresh: UUID,
         operation: () async throws -> T
     ) async rethrows -> T {
         try await $marks.withValue(
-            marks + [Mark(session: ObjectIdentifier(holder), ticket: ticket)],
+            marks + [Mark(session: ObjectIdentifier(holder), refresh: refresh)],
             operation: operation
         )
     }

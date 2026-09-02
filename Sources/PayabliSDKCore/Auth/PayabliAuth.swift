@@ -10,7 +10,7 @@ public actor PayabliAuth {
     private var inFlightRefresh: Task<String, Error>?
     /// Names the refresh `inFlightRefresh` is running, so a mark that outlived its own refresh
     /// is ignored rather than answering a later rejection.
-    private var inFlightTicket: RefreshTicket?
+    private var inFlightRefreshID: UUID?
 
     /// Multicasts every successful token rotation. Producers append on every
     /// refresh; consumers iterate as long as they want.
@@ -56,7 +56,7 @@ public actor PayabliAuth {
     /// If no provider is configured, throws `PayabliGenericError(.tokenExpired)`
     /// so the caller can surface a re-authentication prompt.
     public func invalidateAndRefresh(rejectedToken: String) async throws -> String {
-        if let ticket = inFlightTicket, RefreshInProgress.carries(self, ticket: ticket) {
+        if let refreshID = inFlightRefreshID, RefreshInProgress.carries(self, refresh: refreshID) {
             return currentToken
         }
 
@@ -84,12 +84,12 @@ public actor PayabliAuth {
         // token, never the host's own error text, and never resumes before the token is
         // installed — which matters because the decoration chain reads the holder again on
         // the replay.
-        let ticket = RefreshTicket()
+        let refreshID = UUID()
         let task = Task<String, Error> { [logger] in
             logger.info("Refreshing access token via partner tokenProvider")
             let minted: String
             do {
-                minted = try await RefreshInProgress.withMark(holder: self, ticket: ticket) {
+                minted = try await RefreshInProgress.withMark(holder: self, refresh: refreshID) {
                     try await provider()
                 }
             } catch {
@@ -112,13 +112,13 @@ public actor PayabliAuth {
             return minted
         }
         inFlightRefresh = task
-        inFlightTicket = ticket
+        inFlightRefreshID = refreshID
 
         do {
             return try await task.value
         } catch {
             inFlightRefresh = nil
-            inFlightTicket = nil
+            inFlightRefreshID = nil
             throw error
         }
     }
@@ -129,7 +129,7 @@ public actor PayabliAuth {
     private func commit(_ fresh: String) {
         currentToken = fresh
         inFlightRefresh = nil
-        inFlightTicket = nil
+        inFlightRefreshID = nil
         logger.info("Access token refreshed")
         for (_, continuation) in tokenChangeContinuations {
             continuation.yield(fresh)
@@ -173,7 +173,7 @@ public actor PayabliAuth {
     public func reset() {
         currentToken = config.accessToken
         inFlightRefresh = nil
-        inFlightTicket = nil
+        inFlightRefreshID = nil
     }
 
     /// AsyncStream that emits whenever `invalidateAndRefresh(rejectedToken:)` commits a new token.
