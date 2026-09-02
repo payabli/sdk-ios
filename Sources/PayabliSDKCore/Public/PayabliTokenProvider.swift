@@ -9,9 +9,9 @@ import Foundation
 /// on the session this closure refreshes carries the token being replaced, not the one it is about
 /// to return.
 ///
-/// What this closure must not do is wait on work that itself needs this refresh to finish. A request
-/// issued on a detached task against this session is one such shape; so is a second session whose own
-/// provider calls back into this one while both are refreshing. Neither can complete.
+/// What this closure must not do is wait on work that itself needs this refresh to finish. Such work
+/// cannot complete until the refresh does, and the refresh cannot complete until this closure
+/// returns.
 ///
 /// ## Why a closure, not a hard-coded endpoint
 ///
