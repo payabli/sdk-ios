@@ -274,12 +274,12 @@ final class PayabliAuthTests: XCTestCase {
         XCTAssertEqual(joined, "second", "the call takes the live refresh's outcome")
     }
 
-    /// A detached request the provider does not await. It inherits no mark, so it is an ordinary
-    /// caller: it waits for the refresh rather than being answered from inside it, and completes once
-    /// the provider has returned.
+    /// A detached caller the provider does not await, driving the recovery path directly. It inherits
+    /// no mark, so it is an ordinary caller: it joins the refresh in flight rather than being answered
+    /// from inside it, and completes once the provider has returned.
     ///
-    /// The deadlocking shape is the provider awaiting such work, which is what the public
-    /// documentation rules out. Fire and forget is not that shape, and must not be described as one.
+    /// The shape that cannot finish is the provider awaiting such work once it is refused, which is
+    /// what the public documentation rules out. Fire and forget is not that shape.
     func testADetachedRequestTheProviderDoesNotAwaitCompletes() async throws {
         let holder = Slot<PayabliAuth>()
         let detached = Slot<String>()

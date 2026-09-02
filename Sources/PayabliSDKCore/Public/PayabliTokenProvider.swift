@@ -8,10 +8,9 @@ import Foundation
 /// This closure may issue its own requests through the SDK. While the refresh runs, those requests
 /// carry the token being replaced, not the one this closure is about to return.
 ///
-/// That covers work this closure awaits, directly or in a child task. A request issued from a
-/// detached task is not covered: it waits for the refresh rather than carrying the token being
-/// replaced, and completes once this closure has returned. Awaiting one here cannot finish, because
-/// the refresh it waits for is this one.
+/// The one shape that cannot work is awaiting, from inside this closure, a request issued on a
+/// detached task. If that request is refused it waits for the refresh this closure has yet to
+/// finish, and neither completes.
 ///
 /// ## Why a closure, not a hard-coded endpoint
 ///
