@@ -274,6 +274,42 @@ final class PayabliAuthTests: XCTestCase {
         XCTAssertEqual(joined, "second", "the call takes the live refresh's outcome")
     }
 
+    /// A detached request the provider does not await. It inherits no mark, so it is an ordinary
+    /// caller: it waits for the refresh rather than being answered from inside it, and completes once
+    /// the provider has returned.
+    ///
+    /// The deadlocking shape is the provider awaiting such work, which is what the public
+    /// documentation rules out. Fire and forget is not that shape, and must not be described as one.
+    func testADetachedRequestTheProviderDoesNotAwaitCompletes() async throws {
+        let holder = Slot<PayabliAuth>()
+        let detached = Slot<String>()
+        let providerCalls = Counter()
+
+        let auth = PayabliAuth(config: try makeConfig(
+            accessToken: "old",
+            tokenProvider: {
+                _ = await providerCalls.increment()
+                Task.detached {
+                    let seen = try? await holder.value!.invalidateAndRefresh(rejectedToken: "old")
+                    detached.set(seen ?? "threw")
+                }
+                return "fresh"
+            }
+        ))
+        holder.set(auth)
+
+        let fresh = try await auth.invalidateAndRefresh(rejectedToken: "old")
+        XCTAssertEqual(fresh, "fresh")
+
+        guard let seen = await valueWithinCeiling(detached) else {
+            return XCTFail("the detached request never finished")
+        }
+        // The same answer whether it joined the refresh in flight or arrived after it had rotated.
+        XCTAssertEqual(seen, "fresh")
+        let calls = await providerCalls.count
+        XCTAssertEqual(calls, 1, "the detached request must not spend a second provider call")
+    }
+
     /// A task the provider leaves running keeps its inherited marks for as long as it lives, so a mark
     /// holding the session would keep the session, and the credential in it, alive after the host had
     /// released both.

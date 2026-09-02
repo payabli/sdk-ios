@@ -9,8 +9,9 @@ import Foundation
 /// carry the token being replaced, not the one this closure is about to return.
 ///
 /// That covers work this closure awaits, directly or in a child task. A request issued from a
-/// detached task is not covered: it waits on the refresh this closure is running, and neither can
-/// finish.
+/// detached task is not covered: it waits for the refresh rather than carrying the token being
+/// replaced, and completes once this closure has returned. Awaiting one here cannot finish, because
+/// the refresh it waits for is this one.
 ///
 /// ## Why a closure, not a hard-coded endpoint
 ///
