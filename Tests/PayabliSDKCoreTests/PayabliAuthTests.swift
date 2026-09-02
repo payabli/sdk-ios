@@ -225,6 +225,7 @@ final class PayabliAuthTests: XCTestCase {
     func testAMarkFromAFinishedRefreshJoinsTheLiveOneRatherThanAnsweringIt() async throws {
         let holder = Slot<PayabliAuth>()
         let escaped = Slot<String>()
+        let escapedAtTheCall = Slot<String>()
         let secondProviderEntered = Slot<String>()
         let releaseEscaped = Latch()
         let releaseSecondProvider = Latch()
@@ -237,6 +238,7 @@ final class PayabliAuthTests: XCTestCase {
                 guard call > 1 else {
                     Task {
                         await releaseEscaped.wait()
+                        escapedAtTheCall.set("at the call")
                         let seen = try? await holder.value!.invalidateAndRefresh(rejectedToken: "first")
                         escaped.set(seen ?? "threw")
                     }
@@ -260,6 +262,9 @@ final class PayabliAuthTests: XCTestCase {
         // The escaped call runs while that refresh is still in flight. Joining it means nothing is set
         // yet; answering from the stale mark would already have set the rejected token.
         releaseEscaped.open()
+        guard await valueWithinCeiling(escapedAtTheCall) != nil else {
+            return XCTFail("the task the provider left running never resumed")
+        }
         let answeredEarly = await valueWithinCeiling(escaped, attempts: 12)
         releaseSecondProvider.open()
         _ = await secondRefresh.value
