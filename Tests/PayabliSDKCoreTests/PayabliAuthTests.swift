@@ -134,6 +134,50 @@ final class PayabliAuthTests: XCTestCase {
         XCTAssertEqual(nested.value, "other-fresh", "a second holder's refresh is not this one's")
     }
 
+    /// Two holders whose providers call each other. The second holder is an ordinary caller of the
+    /// first, so it starts its own refresh; the mark has to record both, because the call that comes
+    /// back is a call into the outer one.
+    ///
+    /// Recording only the innermost holder leaves the outer one unmarked, and the callback joins the
+    /// refresh that is waiting on it. Bounded for that reason.
+    func testTwoHoldersWhoseProvidersCallEachOtherBothComplete() async throws {
+        let first = Slot<PayabliAuth>()
+        let backIntoTheFirst = Slot<String>()
+
+        let second = PayabliAuth(config: try makeConfig(
+            accessToken: "second-old",
+            tokenProvider: {
+                let inner = try? await first.value!.invalidateAndRefresh(rejectedToken: "first-old")
+                backIntoTheFirst.set(inner ?? "threw")
+                return "second-fresh"
+            }
+        ))
+        let outer = PayabliAuth(config: try makeConfig(
+            accessToken: "first-old",
+            tokenProvider: {
+                _ = try? await second.invalidateAndRefresh(rejectedToken: "second-old")
+                return "first-fresh"
+            }
+        ))
+        first.set(outer)
+
+        let outcome = await outcomeWithinCeiling {
+            (try? await outer.invalidateAndRefresh(rejectedToken: "first-old")) ?? "threw"
+        }
+
+        guard let outcome else {
+            return XCTFail("the refresh never finished: a callback joined the refresh awaiting it")
+        }
+        XCTAssertEqual(outcome, "first-fresh")
+        XCTAssertEqual(
+            backIntoTheFirst.value,
+            "first-old",
+            "a call back into an enclosing holder is answered, not joined"
+        )
+        let settled = await outer.currentAccessToken()
+        XCTAssertEqual(settled, "first-fresh")
+    }
+
     func testProviderErrorMapsToTokenExpired() async throws {
         struct ProviderError: Error {}
         let auth = PayabliAuth(config: try makeConfig(

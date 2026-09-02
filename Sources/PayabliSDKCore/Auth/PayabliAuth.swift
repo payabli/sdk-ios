@@ -41,7 +41,8 @@ public actor PayabliAuth {
     /// has already rotated, which would discard the rotation the first one obtained.
     ///
     /// A caller already inside this holder's own provider call is answered first, with the token
-    /// currently held: the refresh it would otherwise join is the one waiting on it.
+    /// currently held: the refresh it would otherwise join is the one waiting on it. That holds at
+    /// any depth, where one provider calls a second session whose provider calls back into this one.
     ///
     /// The in-flight join comes before the already-rotated check, because the
     /// current token may itself be the one under refresh and handing it back would
@@ -50,7 +51,7 @@ public actor PayabliAuth {
     /// If no provider is configured, throws `PayabliGenericError(.tokenExpired)`
     /// so the caller can surface a re-authentication prompt.
     public func invalidateAndRefresh(rejectedToken: String) async throws -> String {
-        if RefreshInProgress.current === self {
+        if RefreshInProgress.contains(self) {
             return currentToken
         }
 
@@ -82,7 +83,7 @@ public actor PayabliAuth {
             logger.info("Refreshing access token via partner tokenProvider")
             let minted: String
             do {
-                minted = try await RefreshInProgress.$current.withValue(self) { try await provider() }
+                minted = try await RefreshInProgress.withHolder(self) { try await provider() }
             } catch {
                 // Every throw from the provider lands here, this SDK's own error type
                 // included: it is host code whatever it chose to throw.
