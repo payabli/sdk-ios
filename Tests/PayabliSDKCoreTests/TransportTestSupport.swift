@@ -259,3 +259,49 @@ func outcomeWithinCeiling(_ work: @escaping @Sendable () async -> String) async 
     }
     return nil
 }
+
+/// Holds every caller until it is opened, so a task a test spawned runs at a chosen point rather than
+/// whenever the scheduler reaches it.
+final class Latch: @unchecked Sendable {
+    private let lock = NSLock()
+    private var waiting: [CheckedContinuation<Void, Never>] = []
+    private var isOpen = false
+
+    func wait() async {
+        await withCheckedContinuation { continuation in
+            lock.lock()
+            if isOpen {
+                lock.unlock()
+                continuation.resume()
+                return
+            }
+            waiting.append(continuation)
+            lock.unlock()
+        }
+    }
+
+    func open() {
+        lock.lock()
+        isOpen = true
+        let released = waiting
+        waiting = []
+        lock.unlock()
+        for continuation in released {
+            continuation.resume()
+        }
+    }
+}
+
+/// The slot's value once something sets it, or nil if nothing did inside the ceiling.
+///
+/// Polled rather than awaited, for a task nothing else owns. Bounded for the same reason as
+/// `outcomeWithinCeiling`.
+func valueWithinCeiling(_ slot: Slot<String>, attempts: Int = 200) async -> String? {
+    for _ in 0 ..< attempts {
+        if let seen = slot.value {
+            return seen
+        }
+        try? await Task.sleep(nanoseconds: 25_000_000)
+    }
+    return nil
+}
