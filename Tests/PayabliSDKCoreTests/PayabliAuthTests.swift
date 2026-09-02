@@ -79,6 +79,61 @@ final class PayabliAuthTests: XCTestCase {
         XCTAssertEqual(calls, 1, "Concurrent refresh requests should share a single in-flight Task")
     }
 
+    // MARK: - A provider that calls back into the SDK
+
+    /// A caller already inside this holder's own provider is answered with the token being replaced,
+    /// rather than joining the refresh that is waiting on it.
+    ///
+    /// Bounded: without the reentrancy step this wedges, and an unbounded wait would hang the suite
+    /// rather than report.
+    func testACallFromInsideTheProviderIsAnsweredInsteadOfJoining() async throws {
+        let holder = Slot<PayabliAuth>()
+        let nested = Slot<String>()
+        let auth = PayabliAuth(config: try makeConfig(
+            accessToken: "old",
+            tokenProvider: {
+                let inner = try? await holder.value!.invalidateAndRefresh(rejectedToken: "old")
+                nested.set(inner ?? "threw")
+                return "fresh"
+            }
+        ))
+        holder.set(auth)
+
+        let outcome = await outcomeWithinCeiling {
+            (try? await auth.invalidateAndRefresh(rejectedToken: "old")) ?? "threw"
+        }
+
+        guard let outcome else {
+            return XCTFail("the refresh never finished: the nested call joined the refresh awaiting it")
+        }
+        XCTAssertEqual(outcome, "fresh")
+        XCTAssertEqual(nested.value, "old", "a nested call receives the token being replaced")
+    }
+
+    /// The mark names the holder, so a nested call into a *different* holder is an ordinary caller
+    /// there and refreshes normally. A mark that recorded only that some refresh was running would
+    /// short-circuit this one and hand back its stale token.
+    func testAProviderCallingADifferentHolderStillRefreshesThere() async throws {
+        let other = PayabliAuth(config: try makeConfig(
+            accessToken: "other-old",
+            tokenProvider: { "other-fresh" }
+        ))
+        let nested = Slot<String>()
+        let auth = PayabliAuth(config: try makeConfig(
+            accessToken: "own-old",
+            tokenProvider: {
+                let inner = try? await other.invalidateAndRefresh(rejectedToken: "other-old")
+                nested.set(inner ?? "threw")
+                return "own-fresh"
+            }
+        ))
+
+        let fresh = try await auth.invalidateAndRefresh(rejectedToken: "own-old")
+
+        XCTAssertEqual(fresh, "own-fresh")
+        XCTAssertEqual(nested.value, "other-fresh", "a second holder's refresh is not this one's")
+    }
+
     func testProviderErrorMapsToTokenExpired() async throws {
         struct ProviderError: Error {}
         let auth = PayabliAuth(config: try makeConfig(

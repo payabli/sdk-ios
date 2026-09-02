@@ -221,3 +221,41 @@ final class RecordingDecoration: PayabliRequestDecoration, @unchecked Sendable {
         return stamp.isEmpty ? request : request.withHeaders(stamp)
     }
 }
+
+/// A one-slot thread-safe holder, for wiring a value into a closure that has to be built before it.
+///
+/// A provider that calls back into the SDK and the stack it calls are mutually dependent, so one of
+/// the two exists first and the other arrives afterwards.
+final class Slot<Value: Sendable>: @unchecked Sendable {
+    private let lock = NSLock()
+    private var stored: Value?
+
+    var value: Value? {
+        lock.lock()
+        defer { lock.unlock() }
+        return stored
+    }
+
+    func set(_ newValue: Value) {
+        lock.lock()
+        stored = newValue
+        lock.unlock()
+    }
+}
+
+/// Runs `work` under a ceiling and returns its outcome, or nil if it never finished.
+///
+/// The run is abandoned rather than awaited when the ceiling expires. Awaiting it instead would hang
+/// the whole suite, and a hung suite prints no failure and reads exactly like a passing one, which is
+/// why the case this exists for was skipped rather than left to run.
+func outcomeWithinCeiling(_ work: @escaping @Sendable () async -> String) async -> String? {
+    let slot = Slot<String>()
+    Task { slot.set(await work()) }
+    for _ in 0 ..< 200 {
+        if let seen = slot.value {
+            return seen
+        }
+        try? await Task.sleep(nanoseconds: 25_000_000)
+    }
+    return nil
+}

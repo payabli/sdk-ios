@@ -5,8 +5,8 @@ public actor PayabliAuth {
     private let logger: PayabliLogger
 
     private var currentToken: String
-    /// Guards against concurrent refresh attempts. If a refresh is in flight,
-    /// other callers await the same Task result.
+    /// Guards against concurrent refresh attempts. If a refresh is in flight, other callers await
+    /// the same Task result, except one already inside this holder's own provider call.
     private var inFlightRefresh: Task<String, Error>?
 
     /// Multicasts every successful token rotation. Producers append on every
@@ -40,6 +40,9 @@ public actor PayabliAuth {
     /// arrive far apart, and the later one must not refresh again on a token that
     /// has already rotated, which would discard the rotation the first one obtained.
     ///
+    /// A caller already inside this holder's own provider call is answered first, with the token
+    /// currently held: the refresh it would otherwise join is the one waiting on it.
+    ///
     /// The in-flight join comes before the already-rotated check, because the
     /// current token may itself be the one under refresh and handing it back would
     /// return a credential already known to be rejected.
@@ -47,6 +50,10 @@ public actor PayabliAuth {
     /// If no provider is configured, throws `PayabliGenericError(.tokenExpired)`
     /// so the caller can surface a re-authentication prompt.
     public func invalidateAndRefresh(rejectedToken: String) async throws -> String {
+        if RefreshInProgress.current === self {
+            return currentToken
+        }
+
         if let existing = inFlightRefresh {
             return try await existing.value
         }
@@ -75,7 +82,7 @@ public actor PayabliAuth {
             logger.info("Refreshing access token via partner tokenProvider")
             let minted: String
             do {
-                minted = try await provider()
+                minted = try await RefreshInProgress.$current.withValue(self) { try await provider() }
             } catch {
                 // Every throw from the provider lands here, this SDK's own error type
                 // included: it is host code whatever it chose to throw.
