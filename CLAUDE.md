@@ -43,8 +43,9 @@ xcodebuild test -scheme PayabliSDK-Package -destination '...' -quiet
 ```
 
 Schemes: `PayabliSDK-Package` (everything, the one CI uses), `PayabliSDK`, `PayabliSDKCore`,
-`PayabliSDKTapToPay`, `PayabliSDKPayInPaymentFlow`, `PayabliSDKTelemetry`, `PayabliSDKTestUtils`,
-`PayabliCardReaderCore`.
+`PayabliSDKTapToPay`, `PayabliSDKPayInPaymentFlow`, `PayabliSDKTelemetry`, `PayabliCardReaderCore`.
+`PayabliSDKTestUtils` has no scheme of its own, being a target rather than a product; it builds as a
+dependency of the test targets.
 
 ## Code Quality
 
@@ -104,8 +105,9 @@ channel, so an app that never accepts card-present never links the certified car
   `PayabliConfig.telemetryEnabled` (depends on Core)
 
 **Test-only:**
-- `PayabliSDKTestUtils` - a real shipped library product carrying every in-memory fixture (depends on
-  Core, TapToPay, Telemetry). **Link from test targets only, never from a production target.**
+- `PayabliSDKTestUtils` - a target rather than a product, carrying every in-memory fixture (depends on
+  Core and TapToPay). Its declarations are `package`, so the test targets reach them and no consumer
+  can link or import the module at all.
 
 **Vendored:**
 - `PayabliCardReaderCore` - MIT-licensed `Fiserv/TTPPackage` source under
@@ -195,7 +197,7 @@ channel, so an app that never accepts card-present never links the certified car
 ### Testing Strategy
 
 - Five XCTest targets, one per module, in `Tests/`.
-- **Fixtures ship in `PayabliSDKTestUtils`**: `StubURLProtocol`, `InMemorySecureStorage`,
+- **Fixtures live in `PayabliSDKTestUtils`**: `StubURLProtocol`, `InMemorySecureStorage`,
   `MockTapToPayProvider`, `MockAppAttestor`, `MockDeviceAttestationService`,
   `InMemoryTelemetryTransport`. Import it; do not redeclare these in a test bundle.
 - `StubURLProtocol` is the HTTP mocking primitive. Install its `handler` closure before the test;
