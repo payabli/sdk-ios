@@ -18,7 +18,12 @@ public enum PayabliPayInPaymentFlowError: PayabliError, Equatable {
     /// answer leaves the outcome open: a network failure, a cancellation, a 5xx, a response that could
     /// not be decoded. A decline, a refused credential and a locally refused request all arrive as
     /// themselves, because there the outcome is known and a retry is a new payment.
-    case submissionInterrupted(retryKey: String, underlying: any Error)
+    ///
+    /// `code` is the classification to branch on. `causeType` names the failing type and carries none
+    /// of its message, because that message can quote a response body or name a host's own endpoint,
+    /// and an error's associated values are rendered wherever the chain is walked, a crash reporter
+    /// included.
+    case submissionInterrupted(retryKey: String, code: PayabliErrorCode, causeType: String)
 
     public var code: PayabliErrorCode {
         switch self {
@@ -26,8 +31,10 @@ public enum PayabliPayInPaymentFlowError: PayabliError, Equatable {
             return .validation
         case .missingAccessToken:
             return .missingToken
-        case .transactionFailed, .submissionInterrupted:
+        case .transactionFailed:
             return .unknown
+        case let .submissionInterrupted(_, code, _):
+            return code
         }
     }
 
@@ -52,32 +59,8 @@ public enum PayabliPayInPaymentFlowError: PayabliError, Equatable {
             return nil
         case let .transactionFailed(failure):
             return failure.detailText
-        case let .submissionInterrupted(_, underlying):
-            // The classification, never the cause's own text: an underlying error can carry wording
-            // from a response body.
-            return (underlying as? any PayabliError)?.code.rawValue
-        }
-    }
-
-    /// Compares what a caller branches on.
-    ///
-    /// `submissionInterrupted` carries the error that interrupted it, and an arbitrary `Error` is not
-    /// `Equatable`, so two interruptions are equal when they carry the same key and the same
-    /// classification. The cause is for a caller to read, not to match on.
-    public static func == (lhs: Self, rhs: Self) -> Bool {
-        switch (lhs, rhs) {
-        case let (.invalidInput(left), .invalidInput(right)):
-            return left == right
-        case (.missingAccessToken, .missingAccessToken),
-             (.submissionInProgress, .submissionInProgress):
-            return true
-        case let (.transactionFailed(left), .transactionFailed(right)):
-            return left == right
-        case let (.submissionInterrupted(leftKey, leftCause), .submissionInterrupted(rightKey, rightCause)):
-            return leftKey == rightKey
-                && (leftCause as? any PayabliError)?.code == (rightCause as? any PayabliError)?.code
-        default:
-            return false
+        case let .submissionInterrupted(_, _, causeType):
+            return causeType
         }
     }
 }

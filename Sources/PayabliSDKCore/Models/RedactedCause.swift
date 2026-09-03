@@ -11,19 +11,19 @@ import Foundation
 /// A type name carries no subject, which is why it is the part kept. Swift errors
 /// carry no capturable stack, so unlike the sibling platform's version this holds
 /// the name alone.
-struct RedactedCause: Error, CustomStringConvertible {
+package struct RedactedCause: Error, CustomStringConvertible, Equatable {
     /// The redacted failure's concrete type, module-qualified.
-    let originalType: String
+    package let originalType: String
 
-    init(_ original: any Error) {
+    package init(_ original: any Error) {
         originalType = String(reflecting: type(of: original))
     }
 
-    var description: String {
+    package var description: String {
         originalType
     }
 
-    var localizedDescription: String {
+    package var localizedDescription: String {
         originalType
     }
 }
