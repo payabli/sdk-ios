@@ -60,12 +60,12 @@ final class PayInIdempotencyTests: XCTestCase {
             accessToken: "token",
             entryPoint: "entry",
             environment: .sandbox,
-            transport: transport,
-            newIdempotencyKey: {
-                minted += 1
-                return "reserved-\(minted)"
-            }
+            transport: transport
         )
+        flow.newIdempotencyKey = {
+            minted += 1
+            return "reserved-\(minted)"
+        }
 
         _ = try await flow.capture(Self.request(idempotencyKey: nil))
         _ = try await flow.capture(Self.request(idempotencyKey: nil))
@@ -109,6 +109,28 @@ final class PayInIdempotencyTests: XCTestCase {
         XCTAssertEqual(transport.count, 0, "nothing is sent")
     }
 
+    /// The key reported is the one the request carried, not the one the caller wrote.
+    ///
+    /// `sendableKey` normalises before the header is set, so a caller value with surrounding space is
+    /// sent trimmed. Reporting the untrimmed value would name a key that never went over the wire.
+    func testTheReportedKeyIsTheKeyThatWentOnTheWire() async {
+        let transport = RecordingIdempotencyTransport(
+            failure: PayabliGenericError(code: .networkError, reason: "Network request failed")
+        )
+        let flow = Self.makeFlow(transport: transport, key: "unused")
+
+        let failure = await Self.failure(from: {
+            _ = try await flow.capture(Self.request(idempotencyKey: "  caller-key  "))
+        })
+
+        XCTAssertEqual(transport.sentKeys, ["caller-key"])
+        guard case let .submissionInterrupted(retryKey, _, _) = failure as? PayabliPayInPaymentFlowError
+        else {
+            return XCTFail("expected submissionInterrupted, got \(failure)")
+        }
+        XCTAssertEqual(retryKey, "caller-key")
+    }
+
     // MARK: - Which failures report the key
 
     func testANetworkFailureReportsTheKeyThatWentOut() async {
@@ -121,21 +143,34 @@ final class PayInIdempotencyTests: XCTestCase {
             _ = try await flow.capture(Self.request(idempotencyKey: nil))
         })
 
-        guard case let .submissionInterrupted(retryKey, _) = failure as? PayabliPayInPaymentFlowError else {
+        guard
+            case let .submissionInterrupted(retryKey, code, causeType) =
+            failure as? PayabliPayInPaymentFlowError
+        else {
             return XCTFail("expected submissionInterrupted, got \(failure)")
         }
         XCTAssertEqual(retryKey, "reserved-9")
+        XCTAssertEqual(code, .networkError)
+        // The failing type and none of its message: that message can name a host or quote a body.
+        XCTAssertEqual(causeType, "PayabliSDKCore.PayabliGenericError")
     }
 
+    /// A 5xx whose body carries a message decodes into a failure rather than reaching the typed server
+    /// error, and that is the path a real 5xx takes. A bodyless `{}` bypasses it, which is what made an
+    /// earlier version of this case pass without exercising the classification at all.
     func testAServerFailureReportsTheKey() async {
-        let transport = RecordingIdempotencyTransport(body: Data("{}".utf8), status: 500)
+        let transport = RecordingIdempotencyTransport(
+            body: Data(#"{"message":"Internal Server Error"}"#.utf8),
+            status: 500
+        )
         let flow = Self.makeFlow(transport: transport, key: "reserved-9")
 
         let failure = await Self.failure(from: {
             _ = try await flow.capture(Self.request(idempotencyKey: nil))
         })
 
-        guard case let .submissionInterrupted(retryKey, _) = failure as? PayabliPayInPaymentFlowError else {
+        guard case let .submissionInterrupted(retryKey, _, _) = failure as? PayabliPayInPaymentFlowError
+        else {
             return XCTFail("expected submissionInterrupted, got \(failure)")
         }
         XCTAssertEqual(retryKey, "reserved-9")
@@ -158,7 +193,10 @@ final class PayInIdempotencyTests: XCTestCase {
     /// A repeat the service recognised is what a key produces at all. Reporting it as unknown would
     /// tell a caller to resend the key that provoked it.
     func testARecognisedRepeatReportsNoKey() async {
-        let transport = RecordingIdempotencyTransport(body: Data("{}".utf8), status: 409)
+        let transport = RecordingIdempotencyTransport(
+            body: Data(#"{"message":"Duplicate request"}"#.utf8),
+            status: 409
+        )
         let flow = Self.makeFlow(transport: transport, key: "reserved-9")
 
         let failure = await Self.failure(from: {
@@ -167,7 +205,7 @@ final class PayInIdempotencyTests: XCTestCase {
 
         XCTAssertNil(
             (failure as? PayabliPayInPaymentFlowError).flatMap { error -> String? in
-                guard case let .submissionInterrupted(key, _) = error else { return nil }
+                guard case let .submissionInterrupted(key, _, _) = error else { return nil }
                 return key
             },
             "a 409 is an answer, not an open outcome"
@@ -207,13 +245,14 @@ final class PayInIdempotencyTests: XCTestCase {
         transport: any PayabliTransport,
         key: String
     ) -> PayabliPayInPaymentFlow {
-        PayabliPayInPaymentFlow(
+        let flow = PayabliPayInPaymentFlow(
             accessToken: "token",
             entryPoint: "entry",
             environment: .sandbox,
-            transport: transport,
-            newIdempotencyKey: { key }
+            transport: transport
         )
+        flow.newIdempotencyKey = { key }
+        return flow
     }
 
     private static func request(

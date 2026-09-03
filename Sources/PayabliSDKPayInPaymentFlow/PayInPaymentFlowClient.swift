@@ -68,7 +68,9 @@ final class PayInPaymentFlowClient: Sendable {
             idempotencyKey: idempotencyKey,
             body: body
         )
-        return try await perform(payabliRequest, retryKey: idempotencyKey)
+        // The key as the request carries it, not as the caller wrote it: `sendableKey` normalises, and
+        // reporting the unnormalised value would name a key that never went over the wire.
+        return try await perform(payabliRequest, retryKey: payabliRequest.headers["idempotencyKey"])
     }
 
     private func performTransaction(
@@ -104,7 +106,9 @@ final class PayInPaymentFlowClient: Sendable {
             idempotencyKey: idempotencyKey,
             body: body
         )
-        return try await perform(payabliRequest, retryKey: idempotencyKey)
+        // The key as the request carries it, not as the caller wrote it: `sendableKey` normalises, and
+        // reporting the unnormalised value would name a key that never went over the wire.
+        return try await perform(payabliRequest, retryKey: payabliRequest.headers["idempotencyKey"])
     }
 
     /// Builds the request. The transport's chain attaches the credential and the content type.
@@ -152,18 +156,28 @@ final class PayInPaymentFlowClient: Sendable {
 
     /// Whether a failure leaves the outcome of a money-moving request open.
     ///
-    /// The sibling platform draws this line and these are its classes: a cancellation, a network
-    /// failure, a 5xx, a response that could not be decoded, and anything unexpected. In each the
-    /// payment may already have been taken.
+    /// Unknown, so a key is reported: a cancellation, a network failure, a 5xx, a response that could
+    /// not be decoded, and anything unexpected. In each the payment may already have been taken, and a
+    /// retry carrying the key is recognised as the repeat it is instead of acting twice.
     ///
-    /// A decline, a validation refusal, a refused or expired credential and a burned session are all
-    /// answers, so the outcome is known and a retry is a new payment. So is a repeat the service
-    /// recognised and refused, which arrives as its own status and is what a key existing at all
-    /// produces: reporting it as unknown would tell a caller to resend the key that provoked it.
+    /// Known, so none is: a decline and a validation refusal are answers, and a refused credential
+    /// never reached the operation. Reporting a key for any of those would suggest a repeat that a
+    /// second attempt is not.
+    ///
+    /// The sibling platform decides this on the error code alone. That is not available here, because
+    /// this platform's code set has no server-error member: a 5xx arrives either as a payment error of
+    /// its own type or, where the body carries a message, as a decoded failure whose only record of
+    /// the status is the failure itself. So the status decides where there is one and the code decides
+    /// otherwise, and completing the code taxonomy is what would collapse this back to one rule.
     private static func leavesOutcomeUnknown(_ failure: any Error) -> Bool {
         switch failure {
-        case is PayabliPayInPaymentFlowError:
-            return false
+        case let flow as PayabliPayInPaymentFlowError:
+            // A decoded failure keeps the status it came from. A 5xx among them is a server failure
+            // that happened to carry a message, not an answer about the payment.
+            guard case let .transactionFailed(decoded) = flow else {
+                return false
+            }
+            return (decoded.httpStatusCode ?? 0) >= 500
         case let payment as PayabliPaymentError:
             if case .server = payment {
                 return true
@@ -171,13 +185,10 @@ final class PayInPaymentFlowClient: Sendable {
             return false
         case let generic as PayabliGenericError:
             switch generic.code {
-            case .networkError, .decodingError, .userCancelled:
+            case .networkError, .decodingError, .userCancelled, .unknown:
                 return true
             case .missingToken, .tokenExpired, .tokenMalformed, .invalidSignature,
                  .permissionDenied, .sessionBurned, .invalidConfiguration, .validation:
-                return false
-            case .unknown:
-                // Every other status, the recognised repeat among them. Known: the service answered.
                 return false
             }
         default:
@@ -199,7 +210,9 @@ final class PayInPaymentFlowClient: Sendable {
             guard let retryKey, Self.leavesOutcomeUnknown(error) else { throw error }
             throw PayabliPayInPaymentFlowError.submissionInterrupted(
                 retryKey: retryKey,
-                underlying: error
+                code: (error as? any PayabliError)?.code ?? .unknown,
+                // One definition of what is kept from a failure, reused rather than restated.
+                causeType: RedactedCause(error).originalType
             )
         }
     }
