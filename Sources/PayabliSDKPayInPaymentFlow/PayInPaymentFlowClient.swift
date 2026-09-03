@@ -22,19 +22,22 @@ final class PayInPaymentFlowClient: Sendable {
 
     func capture(
         entryPoint: String,
-        request: PayabliPayInPaymentFlowRequest
+        request: PayabliPayInPaymentFlowRequest,
+        idempotencyKey: String
     ) async throws -> PayabliPayInPaymentFlowResult {
         try await performTransaction(
             path: "/api/v2/MoneyIn/getpaid",
             entryPoint: entryPoint,
             request: request,
+            idempotencyKey: idempotencyKey,
             allowsACHValidation: true
         )
     }
 
     func authorize(
         entryPoint: String,
-        request: PayabliPayInPaymentFlowRequest
+        request: PayabliPayInPaymentFlowRequest,
+        idempotencyKey: String
     ) async throws -> PayabliPayInPaymentFlowResult {
         guard request.paymentMethod.authorizationMethod != nil else {
             throw PayabliPayInPaymentFlowError.invalidInput("Only card data can be authorized.")
@@ -43,12 +46,14 @@ final class PayInPaymentFlowClient: Sendable {
             path: "/api/v2/MoneyIn/authorize",
             entryPoint: entryPoint,
             request: request,
+            idempotencyKey: idempotencyKey,
             allowsACHValidation: false
         )
     }
 
     func captureAuthorized(
-        _ request: PayabliPayInPaymentFlowAuthorizedRequest
+        _ request: PayabliPayInPaymentFlowAuthorizedRequest,
+        idempotencyKey: String
     ) async throws -> PayabliPayInPaymentFlowResult {
         let transId = request.transId.payabliCaptureTrimmed
         guard !transId.isEmpty else {
@@ -60,16 +65,17 @@ final class PayInPaymentFlowClient: Sendable {
         let payabliRequest = try buildRequest(
             path: "/api/v2/MoneyIn/capture/\(Self.pathComponent(transId))",
             query: [],
-            idempotencyKey: nil,
+            idempotencyKey: idempotencyKey,
             body: body
         )
-        return try await perform(payabliRequest)
+        return try await perform(payabliRequest, retryKey: idempotencyKey)
     }
 
     private func performTransaction(
         path: String,
         entryPoint: String,
         request: PayabliPayInPaymentFlowRequest,
+        idempotencyKey: String,
         allowsACHValidation: Bool
     ) async throws -> PayabliPayInPaymentFlowResult {
         let entry = entryPoint.payabliCaptureTrimmed
@@ -95,10 +101,10 @@ final class PayInPaymentFlowClient: Sendable {
         let payabliRequest = try buildRequest(
             path: path,
             query: request.queryItems(allowsACHValidation: allowsACHValidation),
-            idempotencyKey: request.idempotencyKey,
+            idempotencyKey: idempotencyKey,
             body: body
         )
-        return try await perform(payabliRequest)
+        return try await perform(payabliRequest, retryKey: idempotencyKey)
     }
 
     /// Builds the request. The transport's chain attaches the credential and the content type.
@@ -112,8 +118,8 @@ final class PayInPaymentFlowClient: Sendable {
         body: some Encodable
     ) throws -> PayabliRequest {
         var headers: [String: String] = [:]
-        if let idempotencyKey = idempotencyKey?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty {
-            headers["idempotencyKey"] = idempotencyKey
+        if let idempotencyKey {
+            headers["idempotencyKey"] = try Self.sendableKey(idempotencyKey)
         }
 
         return try PayabliRequest(
@@ -125,7 +131,80 @@ final class PayInPaymentFlowClient: Sendable {
         )
     }
 
-    private func perform(_ request: PayabliRequest) async throws -> PayabliPayInPaymentFlowResult {
+    /// The key as it will be sent, or a refusal.
+    ///
+    /// A value that is blank once trimmed is refused rather than dropped. Dropping it sends a
+    /// money-moving request with no duplicate protection to a caller who set a key and believes it is
+    /// protected. A value that cannot sit in a header is refused for the reason `isHeaderSafe` exists:
+    /// `URLRequest.setValue` mangles a header holding a carriage return rather than reporting it, so the
+    /// request would go out unprotected and the failure would name something else.
+    private static func sendableKey(_ key: String) throws -> String {
+        let trimmed = key.payabliCaptureTrimmed
+        guard !trimmed.isBlank else {
+            throw PayabliPayInPaymentFlowError.invalidInput("The idempotency key cannot be blank.")
+        }
+        guard trimmed.isHeaderSafe else {
+            throw PayabliPayInPaymentFlowError
+                .invalidInput("The idempotency key may contain printable ASCII only.")
+        }
+        return trimmed
+    }
+
+    /// Whether a failure leaves the outcome of a money-moving request open.
+    ///
+    /// The sibling platform draws this line and these are its classes: a cancellation, a network
+    /// failure, a 5xx, a response that could not be decoded, and anything unexpected. In each the
+    /// payment may already have been taken.
+    ///
+    /// A decline, a validation refusal, a refused or expired credential and a burned session are all
+    /// answers, so the outcome is known and a retry is a new payment. So is a repeat the service
+    /// recognised and refused, which arrives as its own status and is what a key existing at all
+    /// produces: reporting it as unknown would tell a caller to resend the key that provoked it.
+    private static func leavesOutcomeUnknown(_ failure: any Error) -> Bool {
+        switch failure {
+        case is PayabliPayInPaymentFlowError:
+            return false
+        case let payment as PayabliPaymentError:
+            if case .server = payment {
+                return true
+            }
+            return false
+        case let generic as PayabliGenericError:
+            switch generic.code {
+            case .networkError, .decodingError, .userCancelled:
+                return true
+            case .missingToken, .tokenExpired, .tokenMalformed, .invalidSignature,
+                 .permissionDenied, .sessionBurned, .invalidConfiguration, .validation:
+                return false
+            case .unknown:
+                // Every other status, the recognised repeat among them. Known: the service answered.
+                return false
+            }
+        default:
+            return true
+        }
+    }
+
+    private func perform(
+        _ request: PayabliRequest,
+        retryKey: String? = nil
+    ) async throws -> PayabliPayInPaymentFlowResult {
+        do {
+            return try await send(request)
+        } catch let failure as PayInProviderFailure {
+            // The credential was never minted, so nothing was sent: the outcome is known and there is
+            // no key to report. The host gets the error it threw, unwrapped and unwrapped only here.
+            throw failure.underlying
+        } catch {
+            guard let retryKey, Self.leavesOutcomeUnknown(error) else { throw error }
+            throw PayabliPayInPaymentFlowError.submissionInterrupted(
+                retryKey: retryKey,
+                underlying: error
+            )
+        }
+    }
+
+    private func send(_ request: PayabliRequest) async throws -> PayabliPayInPaymentFlowResult {
         diagnostics.logRequest(request, baseURL: baseURL)
         let start = Date()
         let response: PayabliResponse
@@ -133,8 +212,8 @@ final class PayInPaymentFlowClient: Sendable {
             response = try await transport.perform(request)
         } catch let failure as PayInProviderFailure {
             // Not recorded: the host's own error can name its backend, and the sink renders a non-SDK
-            // error whole. The host still gets the error it threw.
-            throw failure.underlying
+            // error whole. Rethrown intact so the caller below can tell it apart; it is unwrapped there.
+            throw failure
         } catch {
             diagnostics.logFailure(
                 error,

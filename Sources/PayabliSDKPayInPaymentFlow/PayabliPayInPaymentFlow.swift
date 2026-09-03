@@ -28,6 +28,9 @@ public final class PayabliPayInPaymentFlow: NSObject, ObservableObject, PayabliC
 
     public private(set) var entryPoint: String
     public private(set) var environment: PayabliEnvironment
+    /// Mints the key for an attempt that supplied none. Injected so a test can pin it.
+    private let newIdempotencyKey: @Sendable () -> String
+
     @Published public private(set) var operation: PayabliPayInPaymentFlowOperation
     @Published public private(set) var requestConfiguration: PayabliPayInPaymentFlowRequestConfiguration?
 
@@ -53,6 +56,7 @@ public final class PayabliPayInPaymentFlow: NSObject, ObservableObject, PayabliC
         self.accessTokenProvider = accessTokenProvider
         injectedTransport = nil
         self.diagnostics = diagnostics
+        newIdempotencyKey = { UUID().uuidString }
         // The chain attaches the credential, so neither client stamps one. This surface has no
         // session, so it gets the bearer and not the 401 recovery.
         let baseTransport = PayabliService(
@@ -79,8 +83,10 @@ public final class PayabliPayInPaymentFlow: NSObject, ObservableObject, PayabliC
         transport: (any PayabliTransport)? = nil,
         diagnostics: PayabliPayInPaymentFlowDiagnostics = .disabled,
         operation: PayabliPayInPaymentFlowOperation = .storePaymentMethod,
-        requestConfiguration: PayabliPayInPaymentFlowRequestConfiguration? = nil
+        requestConfiguration: PayabliPayInPaymentFlowRequestConfiguration? = nil,
+        newIdempotencyKey: @escaping @Sendable () -> String = { UUID().uuidString }
     ) {
+        self.newIdempotencyKey = newIdempotencyKey
         self.entryPoint = entryPoint
         self.environment = environment
         self.operation = operation
@@ -173,7 +179,8 @@ public final class PayabliPayInPaymentFlow: NSObject, ObservableObject, PayabliC
         transport: (any PayabliTransport)? = nil,
         diagnostics: PayabliPayInPaymentFlowDiagnostics = .disabled,
         operation: PayabliPayInPaymentFlowOperation = .storePaymentMethod,
-        requestConfiguration: PayabliPayInPaymentFlowRequestConfiguration? = nil
+        requestConfiguration: PayabliPayInPaymentFlowRequestConfiguration? = nil,
+        newIdempotencyKey: @escaping @Sendable () -> String = { UUID().uuidString }
     ) {
         let provider: PayabliPayInPaymentFlowAccessTokenProvider = { accessToken }
         self.init(
@@ -183,7 +190,8 @@ public final class PayabliPayInPaymentFlow: NSObject, ObservableObject, PayabliC
             transport: transport,
             diagnostics: diagnostics,
             operation: operation,
-            requestConfiguration: requestConfiguration
+            requestConfiguration: requestConfiguration,
+            newIdempotencyKey: newIdempotencyKey
         )
     }
 
@@ -316,7 +324,11 @@ public final class PayabliPayInPaymentFlow: NSObject, ObservableObject, PayabliC
         _ request: PayabliPayInPaymentFlowRequest
     ) async throws -> PayabliPayInPaymentFlowResult {
         try await submit {
-            try await client.capture(entryPoint: entryPoint, request: request)
+            try await client.capture(
+                entryPoint: entryPoint,
+                request: request,
+                idempotencyKey: self.reserveKey(request.idempotencyKey)
+            )
         }
     }
 
@@ -331,7 +343,11 @@ public final class PayabliPayInPaymentFlow: NSObject, ObservableObject, PayabliC
         _ request: PayabliPayInPaymentFlowRequest
     ) async throws -> PayabliPayInPaymentFlowResult {
         try await submit {
-            try await client.authorize(entryPoint: entryPoint, request: request)
+            try await client.authorize(
+                entryPoint: entryPoint,
+                request: request,
+                idempotencyKey: self.reserveKey(request.idempotencyKey)
+            )
         }
     }
 
@@ -341,8 +357,24 @@ public final class PayabliPayInPaymentFlow: NSObject, ObservableObject, PayabliC
         _ request: PayabliPayInPaymentFlowAuthorizedRequest
     ) async throws -> PayabliPayInPaymentFlowResult {
         try await submit {
-            try await client.captureAuthorized(request)
+            try await client.captureAuthorized(
+                request,
+                idempotencyKey: self.reserveKey(request.idempotencyKey)
+            )
         }
+    }
+
+    /// The key this attempt sends: the caller's when it set one, otherwise a fresh one.
+    ///
+    /// A money-moving request always carries one. Left absent, the service recognises no repeat, so a
+    /// caller whose attempt was cancelled or timed out cannot retry without risking a second payment.
+    /// One key per attempt, so a retry the caller chooses to make is the same request and a second
+    /// payment is a second key.
+    ///
+    /// A key the caller supplied is refused rather than replaced when it cannot be sent, which is the
+    /// client's to decide, since substituting one would send a key the caller does not hold.
+    private func reserveKey(_ supplied: String?) -> String {
+        supplied ?? newIdempotencyKey()
     }
 
     private func submit(

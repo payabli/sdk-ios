@@ -3,7 +3,7 @@ import Foundation
 private let firstPrintableASCII: UInt32 = 0x20
 private let lastPrintableASCII: UInt32 = 0x7E
 
-extension String {
+package extension String {
     /// True when this holds no credential: empty, or nothing but whitespace.
     ///
     /// Whitespace passes `isHeaderSafe`, space being printable ASCII, so a token of

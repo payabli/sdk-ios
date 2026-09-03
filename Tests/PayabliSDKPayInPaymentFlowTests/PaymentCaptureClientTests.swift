@@ -621,3 +621,43 @@ private func parseBody(_ request: PayabliRequest) throws -> [String: Any] {
     let object = try JSONSerialization.jsonObject(with: body)
     return try XCTUnwrap(object as? [String: Any])
 }
+
+/// Reserves the key the way the facade does, so these cases can exercise the client alone.
+///
+/// The client takes the key as a parameter rather than reading it off the request, because the facade
+/// has to know which key went out in order to report it on a failure whose outcome is unknown. That
+/// makes the parameter mandatory, which is the point: it cannot be forgotten at a call site. These
+/// overloads apply the same rule the facade applies, so a case that supplies a key still asserts on
+/// its own key.
+private extension PayInPaymentFlowClient {
+    func capture(
+        entryPoint: String,
+        request: PayabliPayInPaymentFlowRequest
+    ) async throws -> PayabliPayInPaymentFlowResult {
+        try await capture(
+            entryPoint: entryPoint,
+            request: request,
+            idempotencyKey: request.idempotencyKey ?? "reserved-by-test"
+        )
+    }
+
+    func authorize(
+        entryPoint: String,
+        request: PayabliPayInPaymentFlowRequest
+    ) async throws -> PayabliPayInPaymentFlowResult {
+        try await authorize(
+            entryPoint: entryPoint,
+            request: request,
+            idempotencyKey: request.idempotencyKey ?? "reserved-by-test"
+        )
+    }
+
+    func captureAuthorized(
+        _ request: PayabliPayInPaymentFlowAuthorizedRequest
+    ) async throws -> PayabliPayInPaymentFlowResult {
+        try await captureAuthorized(
+            request,
+            idempotencyKey: request.idempotencyKey ?? "reserved-by-test"
+        )
+    }
+}
