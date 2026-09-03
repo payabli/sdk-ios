@@ -28,8 +28,11 @@ public final class PayabliPayInPaymentFlow: NSObject, ObservableObject, PayabliC
 
     public private(set) var entryPoint: String
     public private(set) var environment: PayabliEnvironment
-    /// Mints the key for an attempt that supplied none. Injected so a test can pin it.
-    private let newIdempotencyKey: @Sendable () -> String
+    /// Mints the key for an attempt that supplied none.
+    ///
+    /// Settable rather than an initialiser parameter: every initialiser here already carries seven, and
+    /// a test only needs this pinned before it submits. Not public, so a host cannot supply one.
+    var newIdempotencyKey: @Sendable () -> String = { UUID().uuidString }
 
     @Published public private(set) var operation: PayabliPayInPaymentFlowOperation
     @Published public private(set) var requestConfiguration: PayabliPayInPaymentFlowRequestConfiguration?
@@ -56,7 +59,6 @@ public final class PayabliPayInPaymentFlow: NSObject, ObservableObject, PayabliC
         self.accessTokenProvider = accessTokenProvider
         injectedTransport = nil
         self.diagnostics = diagnostics
-        newIdempotencyKey = { UUID().uuidString }
         // The chain attaches the credential, so neither client stamps one. This surface has no
         // session, so it gets the bearer and not the 401 recovery.
         let baseTransport = PayabliService(
@@ -83,10 +85,8 @@ public final class PayabliPayInPaymentFlow: NSObject, ObservableObject, PayabliC
         transport: (any PayabliTransport)? = nil,
         diagnostics: PayabliPayInPaymentFlowDiagnostics = .disabled,
         operation: PayabliPayInPaymentFlowOperation = .storePaymentMethod,
-        requestConfiguration: PayabliPayInPaymentFlowRequestConfiguration? = nil,
-        newIdempotencyKey: @escaping @Sendable () -> String = { UUID().uuidString }
+        requestConfiguration: PayabliPayInPaymentFlowRequestConfiguration? = nil
     ) {
-        self.newIdempotencyKey = newIdempotencyKey
         self.entryPoint = entryPoint
         self.environment = environment
         self.operation = operation
@@ -179,8 +179,7 @@ public final class PayabliPayInPaymentFlow: NSObject, ObservableObject, PayabliC
         transport: (any PayabliTransport)? = nil,
         diagnostics: PayabliPayInPaymentFlowDiagnostics = .disabled,
         operation: PayabliPayInPaymentFlowOperation = .storePaymentMethod,
-        requestConfiguration: PayabliPayInPaymentFlowRequestConfiguration? = nil,
-        newIdempotencyKey: @escaping @Sendable () -> String = { UUID().uuidString }
+        requestConfiguration: PayabliPayInPaymentFlowRequestConfiguration? = nil
     ) {
         let provider: PayabliPayInPaymentFlowAccessTokenProvider = { accessToken }
         self.init(
@@ -190,8 +189,7 @@ public final class PayabliPayInPaymentFlow: NSObject, ObservableObject, PayabliC
             transport: transport,
             diagnostics: diagnostics,
             operation: operation,
-            requestConfiguration: requestConfiguration,
-            newIdempotencyKey: newIdempotencyKey
+            requestConfiguration: requestConfiguration
         )
     }
 
