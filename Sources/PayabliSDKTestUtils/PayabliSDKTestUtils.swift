@@ -9,8 +9,8 @@ import Foundation
 ///
 /// Mirrors the pattern used by `apple/swift-nio`'s `NIOTestUtils` and
 /// `apple/swift-log`'s `InMemoryLogging` libraries.
-public enum PayabliSDKTestUtils {
-    public static var version: String {
+package enum PayabliSDKTestUtils {
+    package static var version: String {
         Bundle(for: VersionMarker.self)
             .infoDictionary?["CFBundleShortVersionString"] as? String
             ?? "0.0.0"

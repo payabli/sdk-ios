@@ -9,21 +9,21 @@ import PayabliSDKCore
 /// ```swift
 /// let transport = InMemoryTelemetryTransport()
 /// let client = TelemetryClient(configuration: ..., transport: transport)
-/// await client.emit("my.event")
+/// await client.emit("payin.capture.completed")
 /// let batches = await transport.batches
-/// XCTAssertEqual(batches.first?.first?.event, "my.event")
+/// XCTAssertEqual(batches.first?.first?.event, "payin.capture.completed")
 /// ```
-public actor InMemoryTelemetryTransport: TelemetryTransport {
-    public private(set) var batches: [[TelemetryEvent]] = []
+package actor InMemoryTelemetryTransport: TelemetryTransport {
+    package private(set) var batches: [[TelemetryEvent]] = []
 
-    public init() {}
+    package init() {}
 
-    public func send(_ batch: [TelemetryEvent]) async {
+    package func send(_ batch: [TelemetryEvent]) async {
         batches.append(batch)
     }
 
     /// Returns all recorded batches and clears the internal buffer.
-    public func drainBatches() -> [[TelemetryEvent]] {
+    package func drainBatches() -> [[TelemetryEvent]] {
         let snapshot = batches
         batches.removeAll()
         return snapshot

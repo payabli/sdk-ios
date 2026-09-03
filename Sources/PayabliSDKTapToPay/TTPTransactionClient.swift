@@ -7,11 +7,11 @@ import PayabliSDKCore
 /// `PayabliTransport` passed at init — callers should supply
 /// `session.transport` (an `AuthenticatedTransport`).
 ///
-public final class TTPTransactionClient: Sendable {
+package final class TTPTransactionClient: Sendable {
     private let transport: any PayabliTransport
     private let logger = PayabliLogger(category: .taptopay)
 
-    public init(transport: any PayabliTransport) {
+    package init(transport: any PayabliTransport) {
         self.transport = transport
     }
 
@@ -22,7 +22,7 @@ public final class TTPTransactionClient: Sendable {
     /// (`firstName`, `lastName`, `customerNumber`) are sent as empty strings
     /// rather than `null` for backward compatibility. All other customer
     /// fields are omitted from the JSON when nil.
-    public func initiate(
+    package func initiate(
         entryPoint: String,
         deviceId: String,
         paymentDetails: PayabliTTPPaymentDetails,

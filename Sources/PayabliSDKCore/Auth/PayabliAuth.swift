@@ -1,6 +1,6 @@
 import Foundation
 
-public actor PayabliAuth {
+actor PayabliAuth {
     private let config: PayabliConfig
     private let logger: PayabliLogger
 
@@ -12,17 +12,12 @@ public actor PayabliAuth {
     /// is ignored rather than answering a later rejection.
     private var inFlightRefreshID: UUID?
 
-    /// Multicasts every successful token rotation. Producers append on every
-    /// refresh; consumers iterate as long as they want.
-    private var tokenChangeContinuations: [UUID: AsyncStream<String>.Continuation] = [:]
-
-    public init(config: PayabliConfig) {
+    init(config: PayabliConfig) {
         self.init(config: config, logger: PayabliLogger(category: .auth))
     }
 
-    /// Internal, so it widens what a test can construct and not what production can. The logger is
-    /// required rather than defaulted: a holder that built its own would leave a caller's substitution
-    /// reaching nothing, and nothing would report it.
+    /// The logger is required rather than defaulted: a holder that built its own would leave a
+    /// caller's substitution reaching nothing, and nothing would report it.
     init(config: PayabliConfig, logger: PayabliLogger) {
         self.config = config
         self.logger = logger
@@ -31,7 +26,7 @@ public actor PayabliAuth {
 
     /// Returns the current access token. Never throws synchronously — token
     /// refresh only happens after a 401 via `invalidateAndRefresh(rejectedToken:)`.
-    public func currentAccessToken() -> String {
+    func currentAccessToken() -> String {
         currentToken
     }
 
@@ -55,7 +50,7 @@ public actor PayabliAuth {
     ///
     /// If no provider is configured, throws `PayabliGenericError(.tokenExpired)`
     /// so the caller can surface a re-authentication prompt.
-    public func invalidateAndRefresh(rejectedToken: String) async throws -> String {
+    func invalidateAndRefresh(rejectedToken: String) async throws -> String {
         if let refreshID = inFlightRefreshID, RefreshInProgress.carries(self, refresh: refreshID) {
             return currentToken
         }
@@ -123,17 +118,13 @@ public actor PayabliAuth {
         }
     }
 
-    /// Installs the minted token and announces the rotation. Called only once the
-    /// token has passed `validate(_:against:)`, so nothing here can publish a
-    /// rotation that did not happen.
+    /// Installs the minted token. Called only once the token has passed
+    /// `validate(_:against:)`, so nothing here can install one that was refused.
     private func commit(_ fresh: String) {
         currentToken = fresh
         inFlightRefresh = nil
         inFlightRefreshID = nil
         logger.info("Access token refreshed")
-        for (_, continuation) in tokenChangeContinuations {
-            continuation.yield(fresh)
-        }
     }
 
     /// Throws rather than let a minted token be committed.
@@ -168,28 +159,11 @@ public actor PayabliAuth {
         }
     }
 
-    /// Test/dev convenience — resets the cached token to the initial value from
-    /// `PayabliConfig`. Not part of the public API contract.
-    public func reset() {
+    /// Resets the cached token to the initial value from `PayabliConfig`, dropping any
+    /// refresh in flight.
+    func reset() {
         currentToken = config.accessToken
         inFlightRefresh = nil
         inFlightRefreshID = nil
-    }
-
-    /// AsyncStream that emits whenever `invalidateAndRefresh(rejectedToken:)` commits a new token.
-    /// Each call returns an independent stream — multiple subscribers each
-    /// receive every subsequent token.
-    public func tokenChanges() -> AsyncStream<String> {
-        let id = UUID()
-        return AsyncStream { continuation in
-            tokenChangeContinuations[id] = continuation
-            continuation.onTermination = { [weak self] _ in
-                Task { await self?.removeTokenChangeContinuation(id: id) }
-            }
-        }
-    }
-
-    private func removeTokenChangeContinuation(id: UUID) {
-        tokenChangeContinuations.removeValue(forKey: id)
     }
 }

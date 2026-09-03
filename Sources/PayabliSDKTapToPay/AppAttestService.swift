@@ -29,7 +29,7 @@ import PayabliSDKCore
 ///   - `AppAttestService+Requests.swift`   — shared envelope plumbing
 ///   - `AppAttestService+Defaults.swift`   — hardware-identifier providers
 ///   - `AppAttestWireFormat.swift`         — request/response DTOs
-public final class AppAttestService: DeviceAttestationService, @unchecked Sendable {
+package final class AppAttestService: DeviceAttestationService, @unchecked Sendable {
     let transport: any PayabliTransport
     let attestor: AppAttestor
     let storage: SecureStorage
@@ -42,7 +42,7 @@ public final class AppAttestService: DeviceAttestationService, @unchecked Sendab
     let modelProvider: @Sendable () -> String
     let osVersionProvider: @Sendable () -> String
 
-    public convenience init(
+    package convenience init(
         transport: any PayabliTransport,
         attestor: AppAttestor,
         storage: SecureStorage
@@ -84,7 +84,7 @@ public final class AppAttestService: DeviceAttestationService, @unchecked Sendab
     /// Raises when the store could not be read, which is not the same answer as
     /// `false`: `false` runs the cold sequence and registers a second device for a
     /// paypoint that is already enrolled.
-    public func isAttested(for entry: String) async throws -> Bool {
+    package func isAttested(for entry: String) async throws -> Bool {
         guard let binding = try binding(for: entry) else {
             return false
         }
@@ -147,7 +147,7 @@ public final class AppAttestService: DeviceAttestationService, @unchecked Sendab
     /// its content is immaterial.
     static let keyProbeHash = ClientDataHash(Data(SHA256.hash(data: Data("payabli.keyProbe".utf8))))
 
-    public func cachedDeviceId(for entry: String) throws -> String? {
+    package func cachedDeviceId(for entry: String) throws -> String? {
         try binding(for: entry)?.deviceId
     }
 
@@ -161,14 +161,14 @@ public final class AppAttestService: DeviceAttestationService, @unchecked Sendab
     ///
     /// A caller acting on a refused key uses `forgetIfUnchanged` instead: it holds
     /// the record its answer is about, and the entry point may hold a newer one.
-    public func clearCache(for entry: String) throws {
+    package func clearCache(for entry: String) throws {
         try reportingStorageFailure {
             try bindingStore.forgetEverything(for: entry)
         }
     }
 
     @discardableResult
-    public func forgetRefusedBinding(entry: String, deviceId: String, keyId: String) throws -> Bool {
+    package func forgetRefusedBinding(entry: String, deviceId: String, keyId: String) throws -> Bool {
         try forgetRefused(AttestedDevice(entry: entry, deviceId: deviceId, keyId: keyId))
     }
 

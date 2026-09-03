@@ -5,7 +5,7 @@ import Foundation
 /// Production uses `KeychainStorage` (iOS Keychain). Tests inject
 /// `InMemorySecureStorage` from `PayabliSDKTestUtils`. The SDK depends only
 /// on this protocol so it remains unit-testable without Keychain access.
-public protocol SecureStorage: Sendable {
+package protocol SecureStorage: Sendable {
     /// The value stored under `key`, or `nil` when nothing is stored under it now.
     ///
     /// `nil` is the current state and never a failure: a store that could not be

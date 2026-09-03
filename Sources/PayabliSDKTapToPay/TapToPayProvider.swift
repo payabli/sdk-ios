@@ -17,7 +17,7 @@ import Foundation
 ///
 /// `CardReadRequest` and `CardReadResult` are defined in
 /// `Models/TapToPayCardRead.swift` (PRD §7.2).
-public protocol TapToPayProvider: AnyObject, Sendable {
+package protocol TapToPayProvider: AnyObject, Sendable {
     /// Identifier sent in the API payload `provider` field so the backend
     /// routes decryption correctly (PRD FR-11J.3).
     static var providerId: String { get }

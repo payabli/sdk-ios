@@ -5,17 +5,17 @@ import Foundation
 /// Consumed by `PayabliService`, which resolves it against the environment base URL, runs the
 /// decoration chain over it, and performs the call. The chain sets the credential, and overrides an
 /// `Authorization` header set here.
-public struct PayabliRequest: Sendable {
-    public static let contentTypeHeader = "Content-Type"
-    public static let applicationJSON = "application/json"
+package struct PayabliRequest: Sendable {
+    package static let contentTypeHeader = "Content-Type"
+    package static let applicationJSON = "application/json"
 
-    public let method: HTTPMethod
-    public let path: String
-    public let query: [URLQueryItem]
-    public let headers: [String: String]
-    public let body: Data?
+    package let method: HTTPMethod
+    package let path: String
+    package let query: [URLQueryItem]
+    package let headers: [String: String]
+    package let body: Data?
 
-    public init(
+    package init(
         method: HTTPMethod,
         path: String,
         query: [URLQueryItem] = [],
@@ -30,7 +30,7 @@ public struct PayabliRequest: Sendable {
     }
 
     /// Convenience for JSON POSTs with a `Content-Type: application/json` header.
-    public static func json(
+    package static func json(
         method: HTTPMethod,
         path: String,
         query: [URLQueryItem] = [],
@@ -53,12 +53,12 @@ public struct PayabliRequest: Sendable {
 }
 
 /// The raw result of a `PayabliService` call.
-public struct PayabliResponse: Sendable {
-    public let statusCode: Int
-    public let headers: [String: String]
-    public let body: Data
+package struct PayabliResponse: Sendable {
+    package let statusCode: Int
+    package let headers: [String: String]
+    package let body: Data
 
-    public init(
+    package init(
         statusCode: Int,
         headers: [String: String],
         body: Data

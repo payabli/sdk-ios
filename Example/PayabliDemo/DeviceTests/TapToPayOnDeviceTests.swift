@@ -1,5 +1,5 @@
 @testable import PayabliDemo
-import PayabliSDKCore
+@testable import PayabliSDKCore
 @testable import PayabliSDKTapToPay
 import XCTest
 

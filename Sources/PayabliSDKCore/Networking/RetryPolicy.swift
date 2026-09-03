@@ -13,14 +13,14 @@ import Foundation
 /// - Jitter 0–0.5s
 /// - Retryable: 5xx + timeouts
 /// - Non-retryable: 4xx (fail immediately)
-public struct RetryPolicy: Sendable {
-    public let maxAttempts: Int
-    public let baseDelay: TimeInterval
-    public let maxDelay: TimeInterval
-    public let multiplier: Double
-    public let maxJitter: TimeInterval
+package struct RetryPolicy: Sendable {
+    package let maxAttempts: Int
+    package let baseDelay: TimeInterval
+    package let maxDelay: TimeInterval
+    package let multiplier: Double
+    package let maxJitter: TimeInterval
 
-    public static let `default` = RetryPolicy(
+    package static let `default` = RetryPolicy(
         maxAttempts: 3,
         baseDelay: 1.0,
         maxDelay: 8.0,
@@ -28,7 +28,7 @@ public struct RetryPolicy: Sendable {
         maxJitter: 0.5
     )
 
-    public init(
+    package init(
         maxAttempts: Int,
         baseDelay: TimeInterval,
         maxDelay: TimeInterval,
@@ -44,7 +44,7 @@ public struct RetryPolicy: Sendable {
     }
 
     /// Delay before the given attempt (1-indexed). Attempt 1 returns 0 (no wait).
-    public func delay(forAttempt attempt: Int) -> TimeInterval {
+    package func delay(forAttempt attempt: Int) -> TimeInterval {
         guard attempt > 1 else { return 0 }
         let exponent = Double(attempt - 2)
         let backoff = min(baseDelay * pow(multiplier, exponent), maxDelay)
@@ -53,7 +53,7 @@ public struct RetryPolicy: Sendable {
     }
 
     /// Whether the given HTTP status code is retryable.
-    public func isRetryable(statusCode: Int) -> Bool {
+    package func isRetryable(statusCode: Int) -> Bool {
         // Retryable: 500, 502, 503, 504, generic 5xx, timeouts.
         // Non-retryable: 400, 401, 403, 404.
         switch statusCode {
@@ -69,15 +69,15 @@ public struct RetryPolicy: Sendable {
 /// The operation receives the current attempt number (1-indexed). If it throws
 /// a `RetryableError`, the policy applies backoff and retries up to
 /// `policy.maxAttempts`. Other errors propagate immediately.
-public struct RetryableError: Error {
-    public let underlying: Error
-    public init(_ underlying: Error) {
+package struct RetryableError: Error {
+    package let underlying: Error
+    package init(_ underlying: Error) {
         self.underlying = underlying
     }
 }
 
-public enum Retry {
-    public static func run<T: Sendable>(
+package enum Retry {
+    package static func run<T: Sendable>(
         policy: RetryPolicy = .default,
         _ operation: @Sendable (_ attempt: Int) async throws -> T
     ) async throws -> T {
