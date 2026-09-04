@@ -113,48 +113,26 @@ package struct RetryPolicy: Sendable {
         totalTimeout: TimeInterval?,
         maxRetryAfter: TimeInterval
     ) -> String? {
-        if maxAttempts < 1 {
-            return "requires at least 1 attempt"
-        }
-        if !(baseDelay >= 0) {
-            return "requires a non-negative base delay"
-        }
-        // Checked for every duration, not only the multiplier: infinity satisfies both `>= 0` and
-        // `maxDelay >= baseDelay`, so an unbounded wait would reach the clock as a valid policy.
-        if !baseDelay.isFinite {
-            return "requires a finite base delay"
-        }
-        if !(maxDelay >= baseDelay) {
-            return "requires a max delay at or above the base delay"
-        }
-        if !maxDelay.isFinite {
-            return "requires a finite max delay"
-        }
-        if !(multiplier >= 1) {
-            return "requires a multiplier of at least 1"
-        }
-        if !multiplier.isFinite {
-            return "requires a finite multiplier"
-        }
-        if !(maxJitter >= 0) {
-            return "requires a non-negative jitter bound"
-        }
-        if !maxJitter.isFinite {
-            return "requires a finite jitter bound"
-        }
-        if let totalTimeout, !(totalTimeout > 0) {
-            return "requires a positive total timeout"
-        }
-        if let totalTimeout, !totalTimeout.isFinite {
-            return "requires a finite total timeout"
-        }
-        if !(maxRetryAfter >= 0) {
-            return "requires a non-negative retry-after ceiling"
-        }
-        if !maxRetryAfter.isFinite {
-            return "requires a finite retry-after ceiling"
-        }
-        return nil
+        // A table rather than a ladder: every duration needs both a range check and a finiteness one,
+        // because infinity satisfies `>= 0` and `maxDelay >= baseDelay` and would otherwise reach the
+        // clock as an unbounded wait. A NaN fails the range check first, since every comparison to one
+        // is false.
+        let rules: [(holds: Bool, complaint: String)] = [
+            (maxAttempts >= 1, "requires at least 1 attempt"),
+            (baseDelay >= 0, "requires a non-negative base delay"),
+            (baseDelay.isFinite, "requires a finite base delay"),
+            (maxDelay >= baseDelay, "requires a max delay at or above the base delay"),
+            (maxDelay.isFinite, "requires a finite max delay"),
+            (multiplier >= 1, "requires a multiplier of at least 1"),
+            (multiplier.isFinite, "requires a finite multiplier"),
+            (maxJitter >= 0, "requires a non-negative jitter bound"),
+            (maxJitter.isFinite, "requires a finite jitter bound"),
+            (totalTimeout.map { $0 > 0 } ?? true, "requires a positive total timeout"),
+            (totalTimeout.map(\.isFinite) ?? true, "requires a finite total timeout"),
+            (maxRetryAfter >= 0, "requires a non-negative retry-after ceiling"),
+            (maxRetryAfter.isFinite, "requires a finite retry-after ceiling")
+        ]
+        return rules.first { !$0.holds }?.complaint
     }
 
     /// The wait before `attempt`, 1-indexed. Attempt 1 does not wait.
