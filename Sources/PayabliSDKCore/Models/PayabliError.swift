@@ -23,15 +23,15 @@ public enum PayabliErrorCode: String, Sendable {
     /// not be.
     case rateLimited = "RATE_LIMITED"
 
-    /// HTTP 409, a request the service recognised as one it already has.
+    /// HTTP 409. The request conflicts with the state the service holds.
     ///
-    /// The outcome is settled rather than open: the service already holds the request and
-    /// refuses the repeat instead of executing it. A caller reconciles rather than resending, so this
-    /// must not be reported as a failure whose outcome is unknown.
+    /// Says no more than the status does, because the status mapping serves every route. What a
+    /// conflict means is the route's to say: on a money-moving one it is the repeat an idempotency key
+    /// caused the service to recognise, and there the outcome is settled rather than open. Reading that
+    /// meaning in here would give a conflict on any other route a sense it has not earned.
     ///
-    /// The sibling platform has no counterpart. It carries no idempotency-conflict code because nothing
-    /// there classifies one yet.
-    case duplicateRequest = "DUPLICATE_REQUEST"
+    /// The sibling platform carries no counterpart yet.
+    case conflict = "CONFLICT"
 
     // Client-side error codes (not from the API).
     case invalidConfiguration = "INVALID_CONFIGURATION"

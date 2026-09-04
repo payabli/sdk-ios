@@ -174,10 +174,10 @@ extension PayInFailure {
         {
             return true
         }
-        // An empty body carries no code of its own, so the status mapping supplies one. This used
-        // to be a comparison against the reason text the transport built for an unmapped status,
-        // which only worked while 409 had no code.
-        if let payabliError = error as? any PayabliError, payabliError.code == .duplicateRequest {
+        // An empty body carries no code of its own, so the status mapping supplies one. The code says
+        // a conflict and no more; that a conflict here is a repeat is what the operation above adds,
+        // since a capture is the only one of the two that sends a key.
+        if let payabliError = error as? any PayabliError, payabliError.code == .conflict {
             return true
         }
         return false

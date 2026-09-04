@@ -222,7 +222,7 @@ final class PayInIdempotencyTests: XCTestCase {
             _ = try await flow.capture(Self.request(idempotencyKey: nil))
         })
 
-        XCTAssertEqual((failure as? any PayabliError)?.code, .duplicateRequest)
+        XCTAssertEqual((failure as? any PayabliError)?.code, .conflict)
         XCTAssertNil(
             (failure as? PayabliPayInPaymentFlowError).flatMap { error -> String? in
                 guard case let .submissionInterrupted(key, _, _) = error else { return nil }

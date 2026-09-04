@@ -232,10 +232,7 @@ public func mapPayabliHTTPError(
         throw PayabliGenericError(code: .permissionDenied, reason: "Forbidden (403)")
 
     case 409:
-        throw PayabliGenericError(
-            code: .duplicateRequest,
-            reason: "Duplicate request (409)"
-        )
+        throw PayabliGenericError(code: .conflict, reason: "Conflict (409)")
 
     case 410:
         throw PayabliGenericError(code: .sessionBurned, reason: "Session burned (410)")

@@ -180,7 +180,7 @@ final class PayInPaymentFlowClient: Sendable {
         switch code {
         case .networkError, .decodingError, .userCancelled, .serverError, .unknown:
             return true
-        case .paymentDeclined, .rateLimited, .duplicateRequest, .missingToken, .tokenExpired,
+        case .paymentDeclined, .rateLimited, .conflict, .missingToken, .tokenExpired,
              .tokenMalformed, .invalidSignature, .permissionDenied, .sessionBurned,
              .invalidConfiguration, .validation:
             return false
