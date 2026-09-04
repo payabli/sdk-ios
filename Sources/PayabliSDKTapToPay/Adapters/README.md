@@ -145,8 +145,13 @@ convenience initializer; a second adapter would follow the same pattern
 
 ## 7. Checklist for a new adapter
 
-1. `XxxCardReader.swift` in this folder, `public final class XxxCardReader: TapToPayProvider, @unchecked Sendable`.
-2. Nested `public struct Credentials: Sendable` + `configure(credentials: [String:String])` that maps the `/config` dict to it.
+1. `XxxCardReader.swift` in this folder, `package final class XxxCardReader: TapToPayProvider, @unchecked Sendable`.
+   `package` and not `public`: an adapter is reached by `PayabliTTP` inside this package, and a host app
+   neither names one nor supplies one.
+2. Nested `struct Credentials: Sendable` + `configure(credentials: [String:String])` that maps the `/config`
+   dict to it. No access modifier on the type and `private` on the stored property, as
+   `FiservCardReader.swift:26,64` has them, so nothing outside the module names the credential shape and
+   nothing outside the file reads the held value.
 3. `requiredCredentialKeys` / `optionalCredentialKeys` static arrays; log a warning for missing optionals.
 4. `checkEligibility()` never reads credentials.
 5. `prepareReader()` drops `self.credentials = nil` right after the processor SDK has its own copy.
