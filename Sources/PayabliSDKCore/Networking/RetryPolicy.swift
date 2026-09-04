@@ -26,6 +26,10 @@ package struct RetryPolicy: Sendable {
 
     /// One deadline covering every attempt and every wait between them. `nil` installs no deadline at
     /// all, which is not the same as a very large one.
+    ///
+    /// An attempt is bounded by cancelling it, so the deadline is as tight as the operation is
+    /// cancellable. It is honoured exactly for transport work and late for anything that ignores
+    /// cancellation.
     package let totalTimeout: TimeInterval?
 
     /// The longest server-supplied wait worth honouring. A `Retry-After` above this ends the retry rather

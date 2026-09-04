@@ -29,12 +29,17 @@ package enum Retry {
                 throw budgetExhausted(logger: logger, phase: "before-attempt")
             }
 
+            // Copied before the closure captures it: the loop reassigns `attempt`, and a `var` crossing
+            // into concurrently-executing code is an error under the Swift 6 language mode.
+            let thisAttempt = attempt
             let outcome: T?
             do {
                 if let remaining {
-                    outcome = try await withBudget(remaining, clock: clock) { try await operation(attempt) }
+                    outcome = try await withBudget(remaining, clock: clock) {
+                        try await operation(thisAttempt)
+                    }
                 } else {
-                    outcome = try await operation(attempt)
+                    outcome = try await operation(thisAttempt)
                 }
             } catch let failure as any PayabliError {
                 attempt = try await nextAttempt(
@@ -110,6 +115,13 @@ package enum Retry {
     ///
     /// The optional is what separates an expiry from the operation legitimately answering, which a bare
     /// throw could not.
+    ///
+    /// **The bound is only as tight as `operation` is cancellable.** A task group cannot leave its scope
+    /// until every child has finished, so reaching the deadline cancels the operation and then waits for
+    /// it to notice. An operation that ignores cancellation runs to completion and the budget expires
+    /// late rather than on time; it never returns while that work is still in flight, which is what would
+    /// make a write unsafe. Every caller is transport work over `URLSession`, which ends promptly on
+    /// cancellation. An operation that blocks without checking does not belong under a budget.
     private static func withBudget<T: Sendable>(
         _ seconds: TimeInterval,
         clock: any RetryClock,

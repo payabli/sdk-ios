@@ -289,13 +289,11 @@ final class RetryTests: XCTestCase {
             _ = try await task.value
             XCTFail("expected cancellation")
         } catch is CancellationError {
-            // expected
-        } catch let error as PayabliGenericError {
-            XCTFail("cancellation was reported as \(error.reason)")
+            // The only acceptable outcome. The operation here is `Task.sleep`, which raises exactly this
+            // on cancellation, so accepting anything else would let an unrelated failure satisfy a case
+            // named for cancellation propagating.
         } catch {
-            // A cancelled `Task.sleep` may surface as a URLError-shaped cancellation on some paths;
-            // what must not happen is a budget error.
-            XCTAssertFalse("\(error)".contains("total timeout"))
+            XCTFail("cancellation surfaced as \(type(of: error)): \(error)")
         }
     }
 }
