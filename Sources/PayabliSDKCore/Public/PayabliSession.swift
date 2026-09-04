@@ -1,18 +1,20 @@
 import Foundation
 
-/// A shared session backbone used by every PayabliSDK component instance
-/// that targets the same `PayabliConfig`.
+/// The session backbone a component facade runs on.
 ///
 /// Owns one credential holder and one transport for the lifetime of the host app's
 /// interaction with Payabli on a given config, so token refreshes, rate limits and
-/// telemetry hooks live in one place rather than per-facade.
+/// telemetry hooks live in one place rather than per-request.
 ///
-/// One session serves every capability, never two. The initializers that take a session
-/// rather than building one are `package`, so sharing a session across two facades is
-/// reachable from a capability target and not from a host app.
+/// The initializers that take a session rather than building one are `package`, so a
+/// shared session is reachable from a capability target and not from a host app. A host
+/// builds a facade from an access token and an entry point, and the facade builds the
+/// session.
 ///
-/// A host app builds a facade from an access token and an entry point, and the facade
-/// builds the session.
+/// Two facades do not share one today. The card-present facade's public initializers
+/// build a fresh session, and the card-not-present facade takes its own token provider and
+/// builds its own transport, so an app using both holds two sets of credential state.
+/// Converging them changes what an integrator supplies and is tracked separately.
 public final class PayabliSession: @unchecked Sendable {
     /// The configuration this session was constructed with.
     public let config: PayabliConfig
