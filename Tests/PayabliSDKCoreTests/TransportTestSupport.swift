@@ -101,6 +101,7 @@ final class RecordingStub: @unchecked Sendable {
 /// it. One holder serves both, which is what makes a replay carry the token a refresh minted.
 func makeAuthenticatedStack(
     auth: PayabliAuth,
+    recovery: any AuthRecoveryPolicy = DefaultAuthRecoveryPolicy(),
     sink: RecordingLogSink? = nil
 ) -> any PayabliTransport {
     let logger = PayabliLogger(category: .network, sink: sink ?? RecordingLogSink())
@@ -110,7 +111,24 @@ func makeAuthenticatedStack(
         session: StubURLProtocol.makeSession(),
         logger: logger
     )
-    return AuthenticatedTransport(base: service, auth: auth, logger: logger)
+    return AuthenticatedTransport(base: service, auth: auth, recovery: recovery, logger: logger)
+}
+
+/// Treats a 419 as a credential rejection as well as a 401, standing in for a capability whose own
+/// routes refuse a stale credential with something else.
+struct WidenedRecoveryPolicy: AuthRecoveryPolicy {
+    static let widenedStatus = 419
+
+    func isCredentialRejection(_ response: PayabliResponse) -> Bool {
+        response.statusCode == 401 || response.statusCode == Self.widenedStatus
+    }
+}
+
+/// Never treats anything as a credential rejection, so a 401 passes through untouched.
+struct RefusingRecoveryPolicy: AuthRecoveryPolicy {
+    func isCredentialRejection(_ response: PayabliResponse) -> Bool {
+        false
+    }
 }
 
 /// A service whose chain is the caller's, so a test can park a request at an exact point relative to

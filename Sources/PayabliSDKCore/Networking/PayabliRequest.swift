@@ -51,20 +51,3 @@ public struct PayabliRequest: Sendable {
         )
     }
 }
-
-/// The raw result of a `PayabliService` call.
-public struct PayabliResponse: Sendable {
-    public let statusCode: Int
-    public let headers: [String: String]
-    public let body: Data
-
-    public init(
-        statusCode: Int,
-        headers: [String: String],
-        body: Data
-    ) {
-        self.statusCode = statusCode
-        self.headers = headers
-        self.body = body
-    }
-}

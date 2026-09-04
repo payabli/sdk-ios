@@ -197,6 +197,7 @@ public final class PayabliService: PayabliTransport, Sendable {
 /// - 402 → `PayabliPaymentError.decline`
 /// - 403 → `PayabliGenericError(.permissionDenied)`
 /// - 410 → `PayabliGenericError(.sessionBurned)`
+/// - 429 → `PayabliRateLimitError`
 /// - 500+ → `PayabliPaymentError.server`
 /// - other non-2xx → `PayabliGenericError(.unknown)`
 ///
@@ -205,7 +206,7 @@ public func mapPayabliHTTPError(
     response: PayabliResponse,
     override: ((Int) -> (any Error)?)? = nil
 ) throws {
-    guard !(200 ..< 300).contains(response.statusCode) else { return }
+    guard !response.isSuccessful else { return }
 
     // Component-specific override takes priority.
     if let customError = override?(response.statusCode) {
@@ -234,10 +235,18 @@ public func mapPayabliHTTPError(
     case 410:
         throw PayabliGenericError(code: .sessionBurned, reason: "Session burned (410)")
 
+    case 429:
+        throw PayabliRateLimitError(retryAfter: RetryAfterHeader.value(from: response))
+
     case 500...:
         let server = (try? decoder.decode(PayabliServerError.self, from: response.body))
             ?? PayabliServerError()
-        throw PayabliPaymentError.server(server)
+        throw PayabliPaymentError.server(
+            server.carrying(
+                httpStatus: response.statusCode,
+                retryAfter: RetryAfterHeader.value(from: response)
+            )
+        )
 
     default:
         throw PayabliGenericError(

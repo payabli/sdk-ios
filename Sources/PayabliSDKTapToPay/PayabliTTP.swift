@@ -1,5 +1,5 @@
 import Foundation
-import PayabliSDKCore
+@_spi(PayabliInternal) import PayabliSDKCore
 
 /// Tap to Pay on iPhone facade.
 ///
@@ -81,14 +81,34 @@ public final class PayabliTTP: NSObject, ObservableObject {
 
     // MARK: - Init
 
-    /// Designated init. Shares a single `PayabliAuth` + `PayabliService`
-    /// across every component facade constructed with the same `PayabliSession`.
-    public init(
+    /// Shares a single `PayabliAuth` + `PayabliService` across every component facade constructed with
+    /// the same `PayabliSession`.
+    ///
+    /// How the SDK retries is not a knob a host sets: the numbers only mean anything together, and a
+    /// wrong combination fails as a slow call rather than as a compile error.
+    public convenience init(
+        session: PayabliSession,
+        appId: String,
+        provider: TapToPayProvider,
+        attestation: DeviceAttestationService
+    ) {
+        self.init(
+            session: session,
+            appId: appId,
+            provider: provider,
+            attestation: attestation,
+            retryPolicy: .default
+        )
+    }
+
+    /// Designated init. Internal, so it widens what a test can construct and not what production can:
+    /// a test that had to wait out the shipping backoff would be answering a question about the clock.
+    init(
         session: PayabliSession,
         appId: String,
         provider: TapToPayProvider,
         attestation: DeviceAttestationService,
-        retryPolicy: RetryPolicy = .default
+        retryPolicy: RetryPolicy
     ) {
         self.entryPoint = session.config.entryPoint
         self.appId = appId
@@ -114,7 +134,25 @@ public final class PayabliTTP: NSObject, ObservableObject {
         appId: String,
         provider: TapToPayProvider,
         attestation: DeviceAttestationService,
-        retryPolicy: RetryPolicy = .default,
+        session: URLSession? = nil
+    ) {
+        self.init(
+            config: config,
+            appId: appId,
+            provider: provider,
+            attestation: attestation,
+            retryPolicy: .default,
+            session: session
+        )
+    }
+
+    /// Internal, for the same reason the designated init is.
+    convenience init(
+        config: PayabliConfig,
+        appId: String,
+        provider: TapToPayProvider,
+        attestation: DeviceAttestationService,
+        retryPolicy: RetryPolicy,
         session: URLSession? = nil
     ) {
         let payabliSession = PayabliSession(config: config, urlSession: session)

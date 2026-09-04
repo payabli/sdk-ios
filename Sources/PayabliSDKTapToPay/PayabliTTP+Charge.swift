@@ -1,5 +1,5 @@
 import Foundation
-import PayabliSDKCore
+@_spi(PayabliInternal) import PayabliSDKCore
 
 // MARK: - Charge pipeline (PRD §19.1, FR-11D)
 
@@ -219,25 +219,23 @@ extension PayabliTTP {
         }
 
         do {
-            try await Retry.run(policy: retryPolicy) { [retryPolicy] attempt in
+            // Raise a non-2xx as its mapped error and let the policy classify it. Deciding here would
+            // make retryability this call site's opinion, which the next call site is free to differ on.
+            try await Retry.run(policy: retryPolicy, logger: logger) { attempt in
                 let response = try await performOnce(attempt: String(attempt))
-
-                if (200 ..< 300).contains(response.statusCode) {
-                    return
-                }
-                if retryPolicy.isRetryable(statusCode: response.statusCode) {
-                    throw RetryableError(PayabliTTPError.updateFailed(
-                        reason: "HTTP \(response.statusCode)"
-                    ))
-                }
-                throw PayabliTTPError.updateFailed(reason: "HTTP \(response.statusCode)")
+                try mapPayabliHTTPError(response: response)
             }
             return .succeeded
         } catch {
+            // Back into this surface's own vocabulary, so the event and the outcome read the same
+            // whatever layer underneath produced the failure.
+            let failure = PayabliTTPError.updateFailed(reason: error.localizedDescription)
             // The event carries a summary and the caller the description: one goes
             // wherever a host app forwards its telemetry, the other to a person.
-            multicaster.emit(.updateFailed(paymentTransId: paymentTransId, error: ErrorSummary.of(error)))
-            return .failed(reason: error.localizedDescription)
+            multicaster.emit(
+                .updateFailed(paymentTransId: paymentTransId, error: ErrorSummary.of(failure))
+            )
+            return .failed(reason: failure.localizedDescription)
         }
     }
 
