@@ -212,6 +212,26 @@ final class PayInIdempotencyTests: XCTestCase {
         )
     }
 
+    /// The same repeat with no body at all, which is the shape the status mapping answers rather than
+    /// the decoder. Reporting it as open tells a caller to resend the key the service refuses.
+    func testABodylessRecognisedRepeatReportsNoKey() async {
+        let transport = RecordingIdempotencyTransport(body: Data(), status: 409)
+        let flow = Self.makeFlow(transport: transport, key: "reserved-9")
+
+        let failure = await Self.failure(from: {
+            _ = try await flow.capture(Self.request(idempotencyKey: nil))
+        })
+
+        XCTAssertEqual((failure as? any PayabliError)?.code, .duplicateRequest)
+        XCTAssertNil(
+            (failure as? PayabliPayInPaymentFlowError).flatMap { error -> String? in
+                guard case let .submissionInterrupted(key, _, _) = error else { return nil }
+                return key
+            },
+            "the service already holds the request, so the outcome is settled"
+        )
+    }
+
     /// The store route carries no key, so no failure on it can report one.
     func testAStoreFailureReportsNoKey() async {
         let transport = RecordingIdempotencyTransport(

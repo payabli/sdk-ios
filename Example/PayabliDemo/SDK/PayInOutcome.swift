@@ -145,12 +145,6 @@ extension PayInOutcome {
 }
 
 extension PayInFailure {
-    /// `mapPayabliHTTPError` has no 409 case, so a duplicate arrives through the
-    /// default branch as the bare reason `HTTP 409`, which names a status and no
-    /// cause. The typed failure carries the code where the API answered with a
-    /// body; the generic error is what an empty one becomes.
-    private static let bareConflictReason = "HTTP 409"
-
     private static let duplicateMessage =
         "Duplicate submission (409): this attempt's idempotency key has already "
             + "been used, so the service answered from the earlier one rather than taking "
@@ -180,10 +174,10 @@ extension PayInFailure {
         {
             return true
         }
-        // The exact string the transport builds for a status it does not map, not
-        // a substring: a validation failure's reason is the server's own title,
-        // which can carry those three digits for its own reasons.
-        if let payabliError = error as? any PayabliError, payabliError.reason == Self.bareConflictReason {
+        // An empty body carries no code of its own, so the status mapping supplies one. This used
+        // to be a comparison against the reason text the transport built for an unmapped status,
+        // which only worked while 409 had no code.
+        if let payabliError = error as? any PayabliError, payabliError.code == .duplicateRequest {
             return true
         }
         return false

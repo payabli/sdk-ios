@@ -156,43 +156,34 @@ final class PayInPaymentFlowClient: Sendable {
 
     /// Whether a failure leaves the outcome of a money-moving request open.
     ///
-    /// Unknown, so a key is reported: a cancellation, a network failure, a 5xx, a response that could
-    /// not be decoded, and anything unexpected. In each the payment may already have been taken, and a
+    /// Open, so a key is reported: a cancellation, a network failure, a 5xx, a response that could not
+    /// be decoded, and anything unclassified. In each the payment may already have been taken, and a
     /// retry carrying the key is recognised as the repeat it is instead of acting twice.
     ///
-    /// Known, so none is: a decline and a validation refusal are answers, and a refused credential
-    /// never reached the operation. Reporting a key for any of those would suggest a repeat that a
-    /// second attempt is not.
+    /// Settled, so none is: a decline and a validation refusal are answers, a rate limit is a refusal
+    /// to act, a refused credential never reached the operation, and a repeat the service recognised
+    /// means the service already holds that request. Reporting a key for any of those would
+    /// suggest a retry that is either a new payment or one the service refuses again.
     ///
-    /// The sibling platform decides this on the error code alone. That is not available here, because
-    /// this platform's code set has no server-error member: a 5xx arrives either as a payment error of
-    /// its own type or, where the body carries a message, as a decoded failure whose only record of
-    /// the status is the failure itself. So the status decides where there is one and the code decides
-    /// otherwise, and completing the code taxonomy is what would collapse this back to one rule.
+    /// Decided on the code, member for member with the sibling's own predicate. A decoded failure is
+    /// the one thing it cannot answer, because that type reports no code of its own, so the status it
+    /// was decoded from decides instead: a 5xx that happened to carry a message is a server failure
+    /// rather than an answer about the payment.
     private static func leavesOutcomeUnknown(_ failure: any Error) -> Bool {
-        switch failure {
-        case let flow as PayabliPayInPaymentFlowError:
-            // A decoded failure keeps the status it came from. A 5xx among them is a server failure
-            // that happened to carry a message, not an answer about the payment.
-            guard case let .transactionFailed(decoded) = flow else {
-                return false
-            }
+        if case let .transactionFailed(decoded) = failure as? PayabliPayInPaymentFlowError {
             return (decoded.httpStatusCode ?? 0) >= 500
-        case let payment as PayabliPaymentError:
-            if case .server = payment {
-                return true
-            }
-            return false
-        case let generic as PayabliGenericError:
-            switch generic.code {
-            case .networkError, .decodingError, .userCancelled, .unknown:
-                return true
-            case .missingToken, .tokenExpired, .tokenMalformed, .invalidSignature,
-                 .permissionDenied, .sessionBurned, .invalidConfiguration, .validation:
-                return false
-            }
-        default:
+        }
+        guard let code = (failure as? any PayabliError)?.code else {
+            // Not this SDK's error at all, so nothing classified it and nothing can say it settled.
             return true
+        }
+        switch code {
+        case .networkError, .decodingError, .userCancelled, .serverError, .unknown:
+            return true
+        case .paymentDeclined, .rateLimited, .duplicateRequest, .missingToken, .tokenExpired,
+             .tokenMalformed, .invalidSignature, .permissionDenied, .sessionBurned,
+             .invalidConfiguration, .validation:
+            return false
         }
     }
 
