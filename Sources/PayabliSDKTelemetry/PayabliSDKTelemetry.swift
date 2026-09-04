@@ -4,8 +4,6 @@ import PayabliSDKCore
 /// Optional telemetry module (PRD §24.4, §24.6, NFR-26).
 ///
 /// Provides production-grade transports for `TelemetryClient`:
-/// - `TelemetryEndpointTransport` — posts batches to `/api/v2/telemetry/sdk` through the SDK's own
-///   request path, in Core.
 /// - `SentryTelemetryTransport` — mirrors batched events to a **separate**
 ///   Sentry hub so it doesn't clash with the host app's own Sentry integration.
 /// - `PostHogTelemetryTransport` — product analytics; session recording is
