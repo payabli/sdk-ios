@@ -92,6 +92,16 @@ final class RetryPolicyTests: XCTestCase {
         XCTAssertNotNil(rejection(maxJitter: .infinity))
     }
 
+    /// Infinity satisfies `>= 0` and `maxDelay >= baseDelay`, so without an explicit check an unbounded
+    /// wait reaches the clock as a valid policy.
+    func testANonFiniteDurationIsRejectedWhicheverOneItIs() {
+        XCTAssertNotNil(rejection(baseDelay: .infinity, maxDelay: .infinity), "base delay")
+        XCTAssertNotNil(rejection(maxDelay: .infinity), "max delay")
+        XCTAssertNotNil(rejection(totalTimeout: .infinity), "total timeout")
+        XCTAssertNotNil(rejection(maxRetryAfter: .infinity), "retry-after ceiling")
+        XCTAssertNotNil(rejection(baseDelay: .nan), "a NaN base delay fails every comparison")
+    }
+
     func testANonPositiveTotalTimeoutIsRejected() {
         XCTAssertNotNil(rejection(totalTimeout: 0))
         XCTAssertNotNil(rejection(totalTimeout: -1))

@@ -115,8 +115,16 @@ package struct RetryPolicy: Sendable {
         if !(baseDelay >= 0) {
             return "requires a non-negative base delay"
         }
+        // Checked for every duration, not only the multiplier: infinity satisfies both `>= 0` and
+        // `maxDelay >= baseDelay`, so an unbounded wait would reach the clock as a valid policy.
+        if !baseDelay.isFinite {
+            return "requires a finite base delay"
+        }
         if !(maxDelay >= baseDelay) {
             return "requires a max delay at or above the base delay"
+        }
+        if !maxDelay.isFinite {
+            return "requires a finite max delay"
         }
         if !(multiplier >= 1) {
             return "requires a multiplier of at least 1"
@@ -133,8 +141,14 @@ package struct RetryPolicy: Sendable {
         if let totalTimeout, !(totalTimeout > 0) {
             return "requires a positive total timeout"
         }
+        if let totalTimeout, !totalTimeout.isFinite {
+            return "requires a finite total timeout"
+        }
         if !(maxRetryAfter >= 0) {
             return "requires a non-negative retry-after ceiling"
+        }
+        if !maxRetryAfter.isFinite {
+            return "requires a finite retry-after ceiling"
         }
         return nil
     }
