@@ -169,11 +169,64 @@ final class PayInIdempotencyTests: XCTestCase {
             _ = try await flow.capture(Self.request(idempotencyKey: nil))
         })
 
-        guard case let .submissionInterrupted(retryKey, _, _) = failure as? PayabliPayInPaymentFlowError
-        else {
+        guard let interrupted = Self.interruption(failure) else {
             return XCTFail("expected submissionInterrupted, got \(failure)")
         }
-        XCTAssertEqual(retryKey, "reserved-9")
+        XCTAssertEqual(interrupted.retryKey, "reserved-9")
+        XCTAssertEqual(interrupted.code, .serverError)
+    }
+
+    /// The same status with an empty body, which the status mapping answers rather than the decoder.
+    /// Both shapes have to publish the same classification: a caller branching on the code would
+    /// otherwise see a server failure only when the service happened to send a message with it.
+    func testABodylessServerFailureReportsTheSameCode() async {
+        let transport = RecordingIdempotencyTransport(body: Data(), status: 500)
+        let flow = Self.makeFlow(transport: transport, key: "reserved-9")
+
+        let failure = await Self.failure(from: {
+            _ = try await flow.capture(Self.request(idempotencyKey: nil))
+        })
+
+        guard let interrupted = Self.interruption(failure) else {
+            return XCTFail("expected submissionInterrupted, got \(failure)")
+        }
+        XCTAssertEqual(interrupted.retryKey, "reserved-9")
+        XCTAssertEqual(interrupted.code, .serverError)
+    }
+
+    /// Cancelled while in flight, so whether the service acted on it is exactly what nobody knows.
+    func testACancellationReportsTheKey() async {
+        let transport = RecordingIdempotencyTransport(
+            failure: PayabliGenericError(code: .userCancelled, reason: "Cancelled")
+        )
+        let flow = Self.makeFlow(transport: transport, key: "reserved-9")
+
+        let failure = await Self.failure(from: {
+            _ = try await flow.capture(Self.request(idempotencyKey: nil))
+        })
+
+        guard let interrupted = Self.interruption(failure) else {
+            return XCTFail("expected submissionInterrupted, got \(failure)")
+        }
+        XCTAssertEqual(interrupted.retryKey, "reserved-9")
+        XCTAssertEqual(interrupted.code, .userCancelled)
+    }
+
+    /// An answer the SDK cannot read is the case the key exists for: the payment may well have been
+    /// taken, and the only record of it is on the service.
+    func testAnUnreadableAnswerReportsTheKey() async {
+        let transport = RecordingIdempotencyTransport(body: Data("not json".utf8))
+        let flow = Self.makeFlow(transport: transport, key: "reserved-9")
+
+        let failure = await Self.failure(from: {
+            _ = try await flow.capture(Self.request(idempotencyKey: nil))
+        })
+
+        guard let interrupted = Self.interruption(failure) else {
+            return XCTFail("expected submissionInterrupted, got \(failure)")
+        }
+        XCTAssertEqual(interrupted.retryKey, "reserved-9")
+        XCTAssertEqual(interrupted.code, .decodingError)
     }
 
     /// A decline is an answer, so the outcome is known and a retry is a new payment.
@@ -232,6 +285,33 @@ final class PayInIdempotencyTests: XCTestCase {
         )
     }
 
+    /// A decline with no body, which the status mapping answers. Still an answer, so still no key.
+    func testABodylessDeclineReportsNoKey() async {
+        let transport = RecordingIdempotencyTransport(body: Data(), status: 402)
+        let flow = Self.makeFlow(transport: transport, key: "reserved-9")
+
+        let failure = await Self.failure(from: {
+            _ = try await flow.capture(Self.request(idempotencyKey: nil))
+        })
+
+        XCTAssertEqual((failure as? any PayabliError)?.code, .paymentDeclined)
+        XCTAssertNil(Self.interruption(failure), "a decline is an answer, whatever its body")
+    }
+
+    /// Refused before the service acted on it, so nothing was taken and the next submit is a fresh
+    /// attempt rather than a repeat of this one.
+    func testARefusalForTooManyRequestsReportsNoKey() async {
+        let transport = RecordingIdempotencyTransport(body: Data(), status: 429)
+        let flow = Self.makeFlow(transport: transport, key: "reserved-9")
+
+        let failure = await Self.failure(from: {
+            _ = try await flow.capture(Self.request(idempotencyKey: nil))
+        })
+
+        XCTAssertEqual((failure as? any PayabliError)?.code, .rateLimited)
+        XCTAssertNil(Self.interruption(failure), "the request was refused, not attempted")
+    }
+
     /// The store route carries no key, so no failure on it can report one.
     func testAStoreFailureReportsNoKey() async {
         let transport = RecordingIdempotencyTransport(
@@ -260,6 +340,19 @@ final class PayInIdempotencyTests: XCTestCase {
     }
 
     // MARK: - Support
+
+    /// The parts of an interruption, or nil when the failure was classified as an answer.
+    private static func interruption(
+        _ failure: any Error
+    ) -> (retryKey: String, code: PayabliErrorCode, causeType: String)? {
+        guard
+            case let .submissionInterrupted(retryKey, code, causeType) =
+            failure as? PayabliPayInPaymentFlowError
+        else {
+            return nil
+        }
+        return (retryKey, code, causeType)
+    }
 
     private static func makeFlow(
         transport: any PayabliTransport,

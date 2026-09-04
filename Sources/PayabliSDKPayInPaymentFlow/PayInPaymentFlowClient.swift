@@ -187,6 +187,20 @@ final class PayInPaymentFlowClient: Sendable {
         }
     }
 
+    /// The classification an interruption publishes.
+    ///
+    /// A decoded failure reports ``PayabliErrorCode/unknown`` whatever its status, so without this a
+    /// 5xx that happened to carry a message would publish something different from the same status
+    /// with an empty body. Same rule as ``leavesOutcomeUnknown``, which is why both read the status.
+    private static func interruptionCode(_ failure: any Error) -> PayabliErrorCode {
+        if case let .transactionFailed(decoded) = failure as? PayabliPayInPaymentFlowError,
+           (decoded.httpStatusCode ?? 0) >= 500
+        {
+            return .serverError
+        }
+        return (failure as? any PayabliError)?.code ?? .unknown
+    }
+
     private func perform(
         _ request: PayabliRequest,
         retryKey: String? = nil
@@ -201,7 +215,7 @@ final class PayInPaymentFlowClient: Sendable {
             guard let retryKey, Self.leavesOutcomeUnknown(error) else { throw error }
             throw PayabliPayInPaymentFlowError.submissionInterrupted(
                 retryKey: retryKey,
-                code: (error as? any PayabliError)?.code ?? .unknown,
+                code: Self.interruptionCode(error),
                 // One definition of what is kept from a failure, reused rather than restated.
                 causeType: RedactedCause(error).originalType
             )
