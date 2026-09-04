@@ -165,14 +165,8 @@ final class PayInPaymentFlowClient: Sendable {
     /// means the service already holds that request. Reporting a key for any of those would
     /// suggest a retry that is either a new payment or one the service refuses again.
     ///
-    /// Decided on the code, member for member with the sibling's own predicate. A decoded failure is
-    /// the one thing it cannot answer, because that type reports no code of its own, so the status it
-    /// was decoded from decides instead: a 5xx that happened to carry a message is a server failure
-    /// rather than an answer about the payment.
+    /// Decided on the code alone, member for member with the sibling's own predicate.
     private static func leavesOutcomeUnknown(_ failure: any Error) -> Bool {
-        if case let .transactionFailed(decoded) = failure as? PayabliPayInPaymentFlowError {
-            return (decoded.httpStatusCode ?? 0) >= 500
-        }
         guard let code = (failure as? any PayabliError)?.code else {
             // Not this SDK's error at all, so nothing classified it and nothing can say it settled.
             return true
@@ -185,20 +179,6 @@ final class PayInPaymentFlowClient: Sendable {
              .invalidConfiguration, .validation:
             return false
         }
-    }
-
-    /// The classification an interruption publishes.
-    ///
-    /// A decoded failure reports ``PayabliErrorCode/unknown`` whatever its status, so without this a
-    /// 5xx that happened to carry a message would publish something different from the same status
-    /// with an empty body. Same rule as ``leavesOutcomeUnknown``, which is why both read the status.
-    private static func interruptionCode(_ failure: any Error) -> PayabliErrorCode {
-        if case let .transactionFailed(decoded) = failure as? PayabliPayInPaymentFlowError,
-           (decoded.httpStatusCode ?? 0) >= 500
-        {
-            return .serverError
-        }
-        return (failure as? any PayabliError)?.code ?? .unknown
     }
 
     private func perform(
@@ -215,7 +195,7 @@ final class PayInPaymentFlowClient: Sendable {
             guard let retryKey, Self.leavesOutcomeUnknown(error) else { throw error }
             throw PayabliPayInPaymentFlowError.submissionInterrupted(
                 retryKey: retryKey,
-                code: Self.interruptionCode(error),
+                code: (error as? any PayabliError)?.code ?? .unknown,
                 // One definition of what is kept from a failure, reused rather than restated.
                 causeType: RedactedCause(error).originalType
             )

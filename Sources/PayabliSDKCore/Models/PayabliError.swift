@@ -15,7 +15,9 @@ public enum PayabliErrorCode: String, Sendable {
     /// without matching on prose.
     case paymentDeclined = "PAYMENT_DECLINED"
 
-    /// HTTP 5xx. Retryable, which is why it is not folded into ``unknown``.
+    /// The service could not process the request: an HTTP 5xx, or an answer whose own response code
+    /// reports a problem rather than a refusal. Retryable, which is why it is not folded into
+    /// ``unknown``.
     case serverError = "SERVER_ERROR"
 
     /// HTTP 429. Retryable, and the one status whose correct handling is unreachable without a code of

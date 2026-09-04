@@ -229,7 +229,9 @@ final class PayInIdempotencyTests: XCTestCase {
         XCTAssertEqual(interrupted.code, .decodingError)
     }
 
-    /// A decline is an answer, so the outcome is known and a retry is a new payment.
+    /// A decline is an answer, so the outcome is known and a retry is a new payment. It arrives on a
+    /// successful status with the refusal in the body, which is why the response code decides and not
+    /// the status.
     func testADeclineReportsNoKey() async {
         let transport = RecordingIdempotencyTransport(body: Self.declined)
         let flow = Self.makeFlow(transport: transport, key: "reserved-9")
@@ -241,6 +243,28 @@ final class PayInIdempotencyTests: XCTestCase {
         guard case .transactionFailed = failure as? PayabliPayInPaymentFlowError else {
             return XCTFail("expected transactionFailed, got \(failure)")
         }
+        XCTAssertEqual((failure as? any PayabliError)?.code, .paymentDeclined)
+        XCTAssertNil(Self.interruption(failure), "a refusal settles the outcome")
+    }
+
+    /// The same successful status carrying a code that is not a refusal: the service could not process
+    /// the request rather than declining it, so whether the payment was taken is exactly what is not
+    /// known. The sibling separates these two the same way.
+    func testAServiceFailureOnASuccessfulStatusReportsTheKey() async {
+        let transport = RecordingIdempotencyTransport(
+            body: Data(#"{"code":"E0001","reason":"Unable to process","explanation":"Try again."}"#.utf8)
+        )
+        let flow = Self.makeFlow(transport: transport, key: "reserved-9")
+
+        let failure = await Self.failure(from: {
+            _ = try await flow.capture(Self.request(idempotencyKey: nil))
+        })
+
+        guard let interrupted = Self.interruption(failure) else {
+            return XCTFail("expected submissionInterrupted, got \(failure)")
+        }
+        XCTAssertEqual(interrupted.retryKey, "reserved-9")
+        XCTAssertEqual(interrupted.code, .serverError)
     }
 
     /// A repeat the service recognised is what a key produces at all. Reporting it as unknown would
