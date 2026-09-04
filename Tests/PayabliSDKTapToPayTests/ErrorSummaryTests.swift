@@ -142,6 +142,38 @@ final class ErrorSummaryTests: XCTestCase {
         XCTAssertEqual(ErrorSummary.of(PayabliPaymentError.server(server)), "server(no status)")
     }
 
+    /// The response is the authority on what was answered. A 5xx whose body will not decode carries no
+    /// `status` of its own, and reading the body alone reported it as having no status at all.
+    func testAServerFailureNamesTheStatusTheResponseCarriedRatherThanTheBodys() throws {
+        let undecodable = try XCTUnwrap(
+            mappedServerError(status: 503, body: "<html>gateway</html>"),
+            "a 503 has to map to a server error"
+        )
+        XCTAssertEqual(ErrorSummary.of(PayabliPaymentError.server(undecodable)), "server(503)")
+
+        let disagreeing = try XCTUnwrap(
+            mappedServerError(status: 503, body: #"{"status":500}"#),
+            "a 503 has to map to a server error"
+        )
+        XCTAssertEqual(
+            ErrorSummary.of(PayabliPaymentError.server(disagreeing)),
+            "server(503)",
+            "the body does not get to rename the status"
+        )
+    }
+
+    private func mappedServerError(status: Int, body: String) -> PayabliServerError? {
+        let response = PayabliResponse(statusCode: status, headers: [:], body: Data(body.utf8))
+        do {
+            try mapPayabliHTTPError(response: response)
+            return nil
+        } catch let PayabliPaymentError.server(server) {
+            return server
+        } catch {
+            return nil
+        }
+    }
+
     /// The umbrella bridges to a domain and an ordinal on its own, which is the
     /// `error 1` shape this SDK stopped showing anyone.
     func testTheUmbrellaIsUnwrappedBeforeItsCodeIsRead() throws {
