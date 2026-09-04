@@ -2,10 +2,9 @@ import Foundation
 
 /// How a retried operation waits, how long it may take in total, and which failures it retries at all.
 ///
-/// Reachable only through `@_spi(PayabliInternal)`, so the SDK's own modules can name it and an app
-/// embedding the SDK cannot. The mechanism it configures is not part of the integration surface, and
-/// publishing these knobs would ask an integrator to reason about attempt counts, a budget and a jitter
-/// shape to reach behaviour the SDK owns.
+/// `package`, so the SDK's own modules can name it and an app embedding the SDK cannot. The mechanism it
+/// configures is not part of the integration surface, and publishing these knobs would ask an integrator
+/// to reason about attempt counts, a budget and a jitter shape to reach behaviour the SDK owns.
 ///
 /// Two bounds exist and they are not the same control. The bound on one HTTP call belongs to the
 /// transport, which is where `URLSessionConfiguration`'s timeouts are set. `totalTimeout` here is the
