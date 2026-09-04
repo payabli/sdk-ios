@@ -68,6 +68,17 @@ public enum PayabliPayInPaymentFlowError: PayabliError, Equatable {
     /// code of its own. The envelope's own status is read before the transport's, because the older
     /// shape answers `200` and states the real one in the body, and taking the transport's there would
     /// read a refusal the service had already made as an outcome nobody knows.
+    ///
+    /// The status is put to ``mapPayabliHTTPError`` rather than classified again here. That mapping is
+    /// the one place a status becomes a classification, and a second copy of it drifts: it is answering
+    /// the same question, so it has to give the same answer, including for a status added to it later.
+    /// The body passed is empty because only the code is wanted, and every branch of that mapping falls
+    /// back to a value whose code is fixed.
+    ///
+    /// The sibling needs no equivalent. Its money-in client puts the response to the shared mapper
+    /// before it reads the body, so a non-2xx never reaches an in-body classification there. Here the
+    /// body is preferred for the merchant-facing text it carries, and that preference is what leaves a
+    /// status to classify at all.
     private static func classification(
         of failure: PayabliPayInPaymentFlowFailure
     ) -> PayabliErrorCode {
@@ -77,21 +88,15 @@ public enum PayabliPayInPaymentFlowError: PayabliError, Equatable {
         guard let status = failure.status ?? failure.httpStatusCode else {
             return .unknown
         }
-        switch status {
-        case 200 ..< 300:
+        do {
+            try mapPayabliHTTPError(
+                response: PayabliResponse(statusCode: status, headers: [:], body: Data())
+            )
+            // A status that mapping reads as success, so the service answered and what it answered was
+            // neither an approval nor a refusal.
             return .serverError
-        case 400:
-            return .validation
-        case 402:
-            return .paymentDeclined
-        case 409:
-            return .conflict
-        case 429:
-            return .rateLimited
-        case 500...:
-            return .serverError
-        default:
-            return .unknown
+        } catch {
+            return (error as? any PayabliError)?.code ?? .unknown
         }
     }
 

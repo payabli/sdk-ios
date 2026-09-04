@@ -336,6 +336,39 @@ final class PayInIdempotencyTests: XCTestCase {
         XCTAssertNil(Self.interruption(failure), "the request was refused, not attempted")
     }
 
+    /// A refused credential never reached the operation, so no payment was attempted and no key is
+    /// reported. Each of these arrives carrying a message, which is the shape that reaches the body
+    /// decoder rather than the status mapping, and the classification has to be the same either way.
+    func testARefusedCredentialReportsNoKeyWhateverItsBody() async {
+        let expected: [Int: PayabliErrorCode] = [
+            401: .tokenExpired,
+            403: .permissionDenied,
+            410: .sessionBurned
+        ]
+
+        for (status, code) in expected {
+            let transport = RecordingIdempotencyTransport(
+                body: Data(#"{"message":"Refused"}"#.utf8),
+                status: status
+            )
+            let flow = Self.makeFlow(transport: transport, key: "reserved-9")
+
+            let failure = await Self.failure(from: {
+                _ = try await flow.capture(Self.request(idempotencyKey: nil))
+            })
+
+            XCTAssertEqual(
+                (failure as? any PayabliError)?.code,
+                code,
+                "a \(status) carrying a message must classify as it does with none"
+            )
+            XCTAssertNil(
+                Self.interruption(failure),
+                "a \(status) never reached the operation, so there is nothing to retry"
+            )
+        }
+    }
+
     /// The store route carries no key, so no failure on it can report one.
     func testAStoreFailureReportsNoKey() async {
         let transport = RecordingIdempotencyTransport(
