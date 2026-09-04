@@ -3,8 +3,8 @@ import Foundation
 /// Provider-agnostic abstraction over the contactless NFC card reader.
 ///
 /// Implementations (the vendored `PayabliCardReaderCore` adapter, future
-/// Apple ProximityReader direct, etc.) are registered with
-/// `TapToPayProviderFactory`. The TTP facade depends only on this protocol
+/// Apple ProximityReader direct, etc.) are built by a `PayabliTTP` convenience
+/// initializer and held by the facade, which depends only on this protocol
 /// (PRD FR-11A.1..7).
 ///
 /// v1.0 only ships the `PayabliCardReaderCore` adapter. Because that
