@@ -9,6 +9,30 @@ public enum PayabliErrorCode: String, Sendable {
     case permissionDenied = "PERMISSION_DENIED"
     case sessionBurned = "SESSION_BURNED"
 
+    /// HTTP 402, an issuer decline.
+    ///
+    /// Telling this apart from ``unknown`` is what lets a retry policy say "never retry a decline"
+    /// without matching on prose.
+    case paymentDeclined = "PAYMENT_DECLINED"
+
+    /// HTTP 5xx. Retryable, which is why it is not folded into ``unknown``.
+    case serverError = "SERVER_ERROR"
+
+    /// HTTP 429. Retryable, and the one status whose correct handling is unreachable without a code of
+    /// its own: folded into ``unknown`` it could never be retried, because an unclassified status must
+    /// not be.
+    case rateLimited = "RATE_LIMITED"
+
+    /// HTTP 409, a request the service recognised as one it already has.
+    ///
+    /// The outcome is settled rather than open: the service already holds the request and
+    /// refuses the repeat instead of executing it. A caller reconciles rather than resending, so this
+    /// must not be reported as a failure whose outcome is unknown.
+    ///
+    /// The sibling platform has no counterpart. It carries no idempotency-conflict code because nothing
+    /// there classifies one yet.
+    case duplicateRequest = "DUPLICATE_REQUEST"
+
     // Client-side error codes (not from the API).
     case invalidConfiguration = "INVALID_CONFIGURATION"
     case networkError = "NETWORK_ERROR"
@@ -174,7 +198,7 @@ public struct PayabliServerError: PayabliError, Decodable {
     public let instance: String?
 
     public var code: PayabliErrorCode {
-        .unknown
+        .serverError
     }
 
     public var reason: String {
@@ -201,7 +225,7 @@ public struct PayabliDeclineError: PayabliError, Decodable {
     static let defaultReason = "Payment declined (402)"
 
     public var code: PayabliErrorCode {
-        .unknown
+        .paymentDeclined
     }
 
     public var detail: String? {

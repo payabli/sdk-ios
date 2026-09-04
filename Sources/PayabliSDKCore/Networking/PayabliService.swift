@@ -231,8 +231,17 @@ public func mapPayabliHTTPError(
     case 403:
         throw PayabliGenericError(code: .permissionDenied, reason: "Forbidden (403)")
 
+    case 409:
+        throw PayabliGenericError(
+            code: .duplicateRequest,
+            reason: "Duplicate request (409)"
+        )
+
     case 410:
         throw PayabliGenericError(code: .sessionBurned, reason: "Session burned (410)")
+
+    case 429:
+        throw PayabliGenericError(code: .rateLimited, reason: "Too many requests (429)")
 
     case 500...:
         let server = (try? decoder.decode(PayabliServerError.self, from: response.body))
