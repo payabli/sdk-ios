@@ -109,8 +109,8 @@ concern. The convenience init on `PayabliTTP` is only available where
 `DeviceCheck` can be imported. Package floor is already iOS 16.7 (from
 `PayabliCardReaderCore` / `ProximityReader`) and macOS 12 — both well above
 `DCAppAttestService`'s own minimums — so no inline `@available` gates are
-required. Platforms without `DeviceCheck` must use the designated init
-with a custom `DeviceAttestationService`.
+required. Where `DeviceCheck` cannot be imported, no public initializer builds a
+session: the initializers taking a `DeviceAttestationService` are `package`.
 
 ### Networking — `TTPConfigClient*`, `TTPTransactionClient*`
 
@@ -154,7 +154,6 @@ in-flight transaction bodies: RAM only (NFR-5D).
 | File | Role |
 |---|---|
 | `TapToPayProvider.swift` | The protocol every adapter implements |
-| `TapToPayProviderFactory.swift` | Registry — `providerId` → builder lookup (FR-11A.5..7) |
 | `Adapters/` | Concrete implementations. See `Adapters/README.md` for the full contract, credentials policy, error-mapping rules, and onboarding checklist |
 
 ---

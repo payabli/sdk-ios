@@ -10,9 +10,9 @@ import PayabliSDKCore
 /// CVV, bank account, or routing values after submission.
 @MainActor
 public final class PayabliPayInPaymentFlow: NSObject, ObservableObject, PayabliComponent {
-    public nonisolated static let componentId = "payInPaymentFlow"
-    public nonisolated static let sessionTier: PayabliSessionTier = .tier1Transactional
-    public nonisolated static let requiredPermissions = [
+    package nonisolated static let componentId = "payInPaymentFlow"
+    package nonisolated static let sessionTier: PayabliSessionTier = .tier1Transactional
+    package nonisolated static let requiredPermissions = [
         "tokenstorage:add",
         "moneyin:getpaid",
         "moneyin:authorize",

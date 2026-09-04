@@ -69,7 +69,6 @@ need `PayabliSDKTapToPay`.
 | `PayabliSDKPayInPaymentFlow` | Opt-in card/ACH stored-method, capture, and authorize component.      |
 | `PayabliCardReaderCore` | Tap to Phone engine. Pulled in transitively; no explicit link required.      |
 | `PayabliSDKTelemetry`   | Optional Sentry and PostHog plumbing; bring your own instance.               |
-| `PayabliSDKTestUtils`   | Test fixtures (`StubURLProtocol`, `InMemorySecureStorage`, mocks). Link in test targets only. |
 
 ---
 
@@ -205,23 +204,6 @@ for SwiftUI integration examples.
 
 Example apps live under `Example/`, including native iOS, Flutter, .NET MAUI,
 and React Native/Expo scaffolds.
-
-For host-app integration tests, also link `PayabliSDKTestUtils`:
-
-```swift
-.testTarget(
-    name: "MyAppTests",
-    dependencies: [
-        "MyApp",
-        .product(name: "PayabliSDKTestUtils", package: "sdk-ios")
-    ]
-)
-```
-
-It ships `StubURLProtocol`, `InMemorySecureStorage`, `MockTapToPayProvider`,
-`MockAppAttestor`, `MockDeviceAttestationService`, and
-`InMemoryTelemetryTransport` so test bundles don't need to re-implement
-these. Don't link it from production targets.
 
 ---
 

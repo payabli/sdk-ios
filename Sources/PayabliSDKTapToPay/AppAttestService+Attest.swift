@@ -19,7 +19,7 @@ extension AppAttestService {
     /// already being attested waits for that attempt to end and then runs its own,
     /// which reads the store first. Different entry points never wait for each
     /// other.
-    public func attest(entry: String, appId: String) async throws -> AttestationResult {
+    package func attest(entry: String, appId: String) async throws -> AttestationResult {
         try await Self.attestations.takingTurns(entry) {
             try await self.runAttest(entry: entry, appId: appId)
         }
@@ -117,7 +117,7 @@ extension AppAttestService {
         return AttestationResult(keyId: keyId.rawValue, deviceId: register.deviceId)
     }
 
-    public func generateAssertion(for entry: String) async throws -> AssertionHeaders {
+    package func generateAssertion(for entry: String) async throws -> AssertionHeaders {
         guard let binding = try binding(for: entry) else {
             throw PayabliTTPError.attestationFailed(reason: "Missing attestation state")
         }

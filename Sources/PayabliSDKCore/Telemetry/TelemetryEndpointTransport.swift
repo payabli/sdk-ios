@@ -8,8 +8,8 @@ import Foundation
 ///
 /// Failures are swallowed — telemetry never blocks or degrades a payment. It does not retry; the next
 /// batch is attempted on the next flush tick (§24.2).
-public actor TelemetryEndpointTransport: TelemetryTransport {
-    public static let defaultPath = "/api/v2/telemetry/sdk"
+package actor TelemetryEndpointTransport: TelemetryTransport {
+    package static let defaultPath = "/api/v2/telemetry/sdk"
 
     private let transport: PayabliService
     private let path: String
@@ -18,7 +18,7 @@ public actor TelemetryEndpointTransport: TelemetryTransport {
     /// Takes the service rather than any transport, so the recovery layer cannot be wrapped around it.
     /// A telemetry 401 would otherwise spend the session's refresh and replay the batch, which is the
     /// opposite of the contract above.
-    public init(
+    package init(
         transport: PayabliService,
         path: String = TelemetryEndpointTransport.defaultPath
     ) {
@@ -26,7 +26,7 @@ public actor TelemetryEndpointTransport: TelemetryTransport {
         self.path = path
     }
 
-    public func send(_ batch: [TelemetryEvent]) async {
+    package func send(_ batch: [TelemetryEvent]) async {
         guard !batch.isEmpty else { return }
         do {
             // The status is not read: the next tick carries the next batch either way.

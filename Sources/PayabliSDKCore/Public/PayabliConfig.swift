@@ -35,12 +35,18 @@ public struct PayabliConfig: Sendable {
     /// Pre-minted access token obtained by the host app from its own backend,
     /// which performed the client-credentials exchange server-side against
     /// `POST /api/v2/token/serverside`.
-    public let accessToken: String
+    ///
+    /// Supplied through `init` and readable only inside the SDK. There is no accessor
+    /// that returns it to a host app.
+    let accessToken: String
 
     /// Optional refresh callback. When the SDK detects an expired or rejected
     /// token (HTTP 401), it calls this closure to fetch a new one from the
     /// partner's backend. If `nil`, the SDK surfaces a `.tokenExpired` error.
-    public let tokenProvider: PayabliTokenRefresh?
+    ///
+    /// Readable only inside the SDK, so a holder of this config cannot re-invoke
+    /// the host's own provider.
+    let tokenProvider: PayabliTokenRefresh?
 
     /// Partner integration point — the platform's `entryName` concept.
     /// See PRD §5.3 FR-6A.7.

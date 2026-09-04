@@ -9,7 +9,7 @@ import Foundation
 /// `ObservableObject` state. The static requirements are `nonisolated` since
 /// they are compile-time constants.
 @MainActor
-public protocol PayabliComponent: AnyObject {
+package protocol PayabliComponent: AnyObject {
     /// Unique identifier for this component (e.g. `"payin"`, `"payout"`).
     nonisolated static var componentId: String { get }
 
@@ -28,7 +28,7 @@ public protocol PayabliComponent: AnyObject {
     func configure(config: PayabliConfig, theme: PayabliTheme)
 }
 
-public extension PayabliComponent {
+package extension PayabliComponent {
     func configure(config: PayabliConfig) {
         configure(config: config, theme: .default)
     }

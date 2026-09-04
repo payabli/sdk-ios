@@ -6,7 +6,7 @@ import Foundation
 /// In v1.0 the SDK only implements the client-credentials flow, which maps to
 /// `tier1Transactional` semantics. Tier 2 is reserved for future components
 /// (Reporting, Onboarding).
-@objc public enum PayabliSessionTier: Int, Sendable {
+@objc package enum PayabliSessionTier: Int, Sendable {
     /// Short-lived, single-transaction. Token burns on successful submission.
     /// Used by PayIn and Payout.
     case tier1Transactional = 1
