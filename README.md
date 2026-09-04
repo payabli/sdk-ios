@@ -69,7 +69,6 @@ need `PayabliSDKTapToPay`.
 | `PayabliSDKPayInPaymentFlow` | Opt-in card/ACH stored-method, capture, and authorize component.      |
 | `PayabliCardReaderCore` | Tap to Phone engine. Pulled in transitively; no explicit link required.      |
 | `PayabliSDKTelemetry`   | Optional Sentry and PostHog plumbing; bring your own instance.               |
-| `PayabliSDKTestUtils`   | Test fixtures (`StubURLProtocol`, `InMemorySecureStorage`, mocks). Link in test targets only. |
 
 ---
 
