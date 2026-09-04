@@ -1,4 +1,4 @@
-import PayabliSDKTapToPay
+@testable import PayabliSDKTapToPay
 import Security
 import XCTest
 

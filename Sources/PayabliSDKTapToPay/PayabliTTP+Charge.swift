@@ -1,5 +1,5 @@
 import Foundation
-@_spi(PayabliInternal) import PayabliSDKCore
+import PayabliSDKCore
 
 // MARK: - Charge pipeline (PRD §19.1, FR-11D)
 

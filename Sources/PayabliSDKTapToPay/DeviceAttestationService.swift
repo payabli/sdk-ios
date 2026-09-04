@@ -1,31 +1,31 @@
 import Foundation
 
 /// The result of a device attestation flow.
-public struct AttestationResult: Sendable {
-    public let keyId: String
-    public let deviceId: String
+package struct AttestationResult: Sendable {
+    package let keyId: String
+    package let deviceId: String
 
-    public init(keyId: String, deviceId: String) {
+    package init(keyId: String, deviceId: String) {
         self.keyId = keyId
         self.deviceId = deviceId
     }
 }
 
 /// A per-request integrity assertion (PRD §18.2).
-public struct AssertionHeaders: Sendable {
-    public let assertion: String
-    public let keyId: String
-    public let deviceId: String
-    public let timestamp: String
+package struct AssertionHeaders: Sendable {
+    package let assertion: String
+    package let keyId: String
+    package let deviceId: String
+    package let timestamp: String
 
-    public init(assertion: String, keyId: String, deviceId: String, timestamp: String) {
+    package init(assertion: String, keyId: String, deviceId: String, timestamp: String) {
         self.assertion = assertion
         self.keyId = keyId
         self.deviceId = deviceId
         self.timestamp = timestamp
     }
 
-    public var asDictionary: [String: String] {
+    package var asDictionary: [String: String] {
         [
             "X-App-Assertion": assertion,
             "X-App-KeyId": keyId,
@@ -44,7 +44,7 @@ public struct AssertionHeaders: Sendable {
 /// The real `DCAppAttestService` integration lives in Phase 6 / production —
 /// this protocol isolates it so the rest of the TTP flow is unit-testable
 /// without iOS entitlements or network access.
-public protocol DeviceAttestationService: AnyObject, Sendable {
+package protocol DeviceAttestationService: AnyObject, Sendable {
     /// Whether this device holds a binding for this entry point, which picks the
     /// warm or cold path during `initialize()` (PRD §18.3). A handle issued under
     /// another entry point is not this device's enrolment here.

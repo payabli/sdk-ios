@@ -16,52 +16,52 @@ import Foundation
 /// A 401 is not retryable and must not become so. Recovering from one belongs to `AuthenticatedTransport`,
 /// which sits below this layer; treating `.tokenExpired` as transient here would loop refresh-and-replay
 /// cycles around a credential that is not going to be accepted.
-@_spi(PayabliInternal) public struct RetryPolicy: Sendable {
+package struct RetryPolicy: Sendable {
     /// Total attempts, not retries. `1` disables retrying without disabling the caller.
-    public let maxAttempts: Int
-    public let baseDelay: TimeInterval
-    public let maxDelay: TimeInterval
-    public let multiplier: Double
-    public let maxJitter: TimeInterval
+    package let maxAttempts: Int
+    package let baseDelay: TimeInterval
+    package let maxDelay: TimeInterval
+    package let multiplier: Double
+    package let maxJitter: TimeInterval
 
     /// One deadline covering every attempt and every wait between them. `nil` installs no deadline at
     /// all, which is not the same as a very large one.
-    public let totalTimeout: TimeInterval?
+    package let totalTimeout: TimeInterval?
 
     /// The longest server-supplied wait worth honouring. A `Retry-After` above this ends the retry rather
     /// than being shortened, because shortening it would ignore the limit the server just stated.
-    public let maxRetryAfter: TimeInterval
+    package let maxRetryAfter: TimeInterval
 
-    public let jitter: Jitter
+    package let jitter: Jitter
 
     /// Whether a failure is worth another attempt. Takes the whole error rather than its code, so a
     /// caller can discriminate on a subtype's fields without this signature changing.
-    public let isRetryable: @Sendable (any PayabliError) -> Bool
+    package let isRetryable: @Sendable (any PayabliError) -> Bool
 
-    public static let defaultMaxAttempts = 3
-    public static let defaultBaseDelay: TimeInterval = 1
-    public static let defaultMaxDelay: TimeInterval = 8
-    public static let defaultMultiplier = 2.0
-    public static let defaultMaxJitter: TimeInterval = 0.5
-    public static let defaultMaxRetryAfter: TimeInterval = 30
+    package static let defaultMaxAttempts = 3
+    package static let defaultBaseDelay: TimeInterval = 1
+    package static let defaultMaxDelay: TimeInterval = 8
+    package static let defaultMultiplier = 2.0
+    package static let defaultMaxJitter: TimeInterval = 0.5
+    package static let defaultMaxRetryAfter: TimeInterval = 30
 
     /// The three transient conditions, and nothing else. A code absent from this set is not retried, so a
     /// code added later is un-retryable until someone decides otherwise.
-    public static let retryableCodes: Set<PayabliErrorCode> = [
+    package static let retryableCodes: Set<PayabliErrorCode> = [
         .networkError,
         .serverError,
         .rateLimited
     ]
 
-    public static let retryableByCode: @Sendable (any PayabliError) -> Bool = { error in
+    package static let retryableByCode: @Sendable (any PayabliError) -> Bool = { error in
         retryableCodes.contains(error.code)
     }
 
-    public static let `default` = RetryPolicy()
+    package static let `default` = RetryPolicy()
 
     /// Every timing input is checked. A negative delay reaches the sleep and masks the failure it was
     /// retrying, and a multiplier below one shrinks the wait on each attempt instead of growing it.
-    public init(
+    package init(
         maxAttempts: Int = defaultMaxAttempts,
         baseDelay: TimeInterval = defaultBaseDelay,
         maxDelay: TimeInterval = defaultMaxDelay,
@@ -100,7 +100,7 @@ import Foundation
     /// Separate from the initializer so the rules can be read back. Only SDK code constructs a policy, so
     /// a bad combination is a programmer error and traps rather than throwing; a trap cannot be caught,
     /// and rules nothing can exercise stop matching the ones the initializer applies.
-    public static func rejection(
+    package static func rejection(
         maxAttempts: Int,
         baseDelay: TimeInterval,
         maxDelay: TimeInterval,
@@ -142,7 +142,7 @@ import Foundation
     /// The wait before `attempt`, 1-indexed. Attempt 1 does not wait.
     ///
     /// Jitter is added after the cap, so the longest possible wait is `maxDelay + maxJitter`.
-    public func delay(forAttempt attempt: Int) -> TimeInterval {
+    package func delay(forAttempt attempt: Int) -> TimeInterval {
         guard attempt > 1 else { return 0 }
         let exponent = Double(attempt - 2)
         let backoff = min(baseDelay * pow(multiplier, exponent), maxDelay)
@@ -150,23 +150,23 @@ import Foundation
     }
 
     /// How much of the jitter bound a given wait takes.
-    public struct Jitter: Sendable {
+    package struct Jitter: Sendable {
         private let compute: @Sendable (TimeInterval) -> TimeInterval
 
-        public init(_ compute: @escaping @Sendable (TimeInterval) -> TimeInterval) {
+        package init(_ compute: @escaping @Sendable (TimeInterval) -> TimeInterval) {
             self.compute = compute
         }
 
-        public func value(upTo bound: TimeInterval) -> TimeInterval {
+        package func value(upTo bound: TimeInterval) -> TimeInterval {
             compute(bound)
         }
 
         /// Uniform across the whole bound, which is what keeps a fleet of clients from retrying together.
-        public static let random = Jitter { bound in
+        package static let random = Jitter { bound in
             bound <= 0 ? 0 : TimeInterval.random(in: 0 ... bound)
         }
 
         /// None, for a test asserting an exact schedule.
-        public static let none = Jitter { _ in 0 }
+        package static let none = Jitter { _ in 0 }
     }
 }

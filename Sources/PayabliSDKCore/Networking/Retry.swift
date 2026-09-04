@@ -8,12 +8,12 @@ import Foundation
 ///
 /// The operation is expected to raise a non-2xx rather than return it. Classification is the policy's:
 /// this type never inspects a status.
-@_spi(PayabliInternal) public enum Retry {
+package enum Retry {
     /// Runs `operation`, retrying while `policy` says the failure is worth another attempt.
     ///
     /// Only a `PayabliError` is considered. Anything else propagates on the first throw, because a
     /// failure this layer cannot classify is not one it may repeat.
-    public static func run<T: Sendable>(
+    package static func run<T: Sendable>(
         policy: RetryPolicy = .default,
         logger: PayabliLogger,
         clock: any RetryClock = SystemRetryClock(),

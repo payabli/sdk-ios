@@ -11,13 +11,13 @@ import Foundation
 /// - A cardholder or payer name: never logged either. Leave it out of the payload.
 /// - Transaction IDs, state names, error codes, durations: loggable
 /// - Device identifiers and email addresses: use `redactFully(_:)`
-public struct PayabliLogger: Sendable {
+package struct PayabliLogger: Sendable {
     private let sink: any LogSink
     private let category: Category
 
-    public static let subsystem = "com.payabli.sdk"
+    package static let subsystem = "com.payabli.sdk"
 
-    public enum Category: String, Sendable, CaseIterable {
+    package enum Category: String, Sendable, CaseIterable {
         case core
         case auth
         case network
@@ -38,7 +38,7 @@ public struct PayabliLogger: Sendable {
 
     /// The logger a shipping path uses. This is the one place the unified log is named, which is what
     /// makes every layer below take the logger it was given rather than build its own.
-    public init(category: Category) {
+    package init(category: Category) {
         self.init(category: category, sink: UnifiedLogSink())
     }
 
@@ -48,30 +48,30 @@ public struct PayabliLogger: Sendable {
         self.sink = sink
     }
 
-    public func debug(_ message: String) {
+    package func debug(_ message: String) {
         sink.write(level: .debug, category: category, message: message)
     }
 
-    public func info(_ message: String) {
+    package func info(_ message: String) {
         sink.write(level: .info, category: category, message: message)
     }
 
-    public func warning(_ message: String) {
+    package func warning(_ message: String) {
         sink.write(level: .warning, category: category, message: message)
     }
 
-    public func error(_ message: String) {
+    package func error(_ message: String) {
         sink.write(level: .error, category: category, message: message)
     }
 
-    public func fault(_ message: String) {
+    package func fault(_ message: String) {
         sink.write(level: .fault, category: category, message: message)
     }
 }
 
 // MARK: - Redaction helpers
 
-public extension PayabliLogger {
+package extension PayabliLogger {
     /// Returns a redacted form of a sensitive string, showing only the last 4
     /// characters. Use for transaction debugging where the full value must never
     /// be logged (e.g. never use this for PAN/CVV — those must be dropped entirely).

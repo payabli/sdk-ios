@@ -69,11 +69,10 @@ let package = Package(
             type: .dynamic,
             targets: ["PayabliSDKTelemetry"]
         ),
-        .library(
-            name: "PayabliSDKTestUtils",
-            type: .dynamic,
-            targets: ["PayabliSDKTestUtils"]
-        ),
+        // `PayabliSDKTestUtils` is a target and not a product. Its doubles conform to the
+        // attestation, provider and storage protocols, so a linkable library of them requires
+        // those protocols to be `public`.
+        //
         // Private, like `PayabliCardReaderCore` above: absent from the public
         // Package.swift template, so no consumer can link it and the
         // three-artifact split is unaffected.
@@ -86,7 +85,7 @@ let package = Package(
         // with the same-named `PayabliSDKCore` *product*. One aggregate product
         // is one dylib, so there is nothing to hoist.
         //
-        // Measured, so nobody re-runs these:
+        // Two alternatives that do not work:
         //   - Dropping `type: .dynamic` from the three products makes the demo
         //     link all three individually with no aggregate at all. It is not an
         //     option, because `xcodebuild archive` then emits a bare

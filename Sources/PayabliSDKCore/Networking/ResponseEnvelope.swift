@@ -25,36 +25,36 @@ import Foundation
 ///     ...
 /// }
 /// ```
-public enum PayabliEnvelope {
+package enum PayabliEnvelope {
     /// Thin "peek" of the response body: only `isSuccess` and the top-level
     /// `responseText`. Used to decide between the success and decline decodes
     /// without committing to the full payload shape.
-    public struct Status: Decodable, Sendable {
-        public let isSuccess: Bool?
-        public let responseText: String?
+    package struct Status: Decodable, Sendable {
+        package let isSuccess: Bool?
+        package let responseText: String?
     }
 
     /// `responseData.resultCode` / `responseData.resultText` on decline.
-    public struct DeclinePayload: Decodable, Sendable {
-        public let resultCode: Int?
-        public let resultText: String?
+    package struct DeclinePayload: Decodable, Sendable {
+        package let resultCode: Int?
+        package let resultText: String?
     }
 
     /// Wrapper that pulls the `DeclinePayload` out of `responseData` on
     /// `isSuccess == false`.
-    public struct DeclineEnvelope: Decodable, Sendable {
-        public let responseData: DeclinePayload?
+    package struct DeclineEnvelope: Decodable, Sendable {
+        package let responseData: DeclinePayload?
     }
 
     /// Wrapper that pulls the endpoint-specific payload out of `responseData`
     /// on `isSuccess == true`.
-    public struct Success<Payload: Decodable>: Decodable {
-        public let responseData: Payload?
+    package struct Success<Payload: Decodable>: Decodable {
+        package let responseData: Payload?
     }
 
     /// Placeholder payload for endpoints that return no success body (e.g.
     /// `/attest` just returns `isSuccess: true`).
-    public struct EmptyPayload: Decodable, Sendable {}
+    package struct EmptyPayload: Decodable, Sendable {}
 
     /// Returns `(code, reason)` when `data` is a decline body
     /// (HTTP 200 + `isSuccess == false`), or `nil` when it looks like a
@@ -65,7 +65,7 @@ public enum PayabliEnvelope {
     /// Uses `try?` decodes so a malformed body simply returns `nil`; the
     /// caller's subsequent `Success<Payload>` decode will produce the
     /// canonical "failed to decode response" error.
-    public static func declineOutcome(
+    package static func declineOutcome(
         from data: Data,
         decoder: JSONDecoder = JSONDecoder()
     ) -> (code: Int?, reason: String)? {
@@ -99,22 +99,22 @@ public enum PayabliEnvelope {
 ///
 /// See PRD §8.2 "v2 envelope". Success: `code.hasPrefix("A")`.
 ///
-/// The SDK intentionally ignores any envelope-level `token` field — every
-/// authenticated request reuses the access token held by `PayabliAuth`.
-public struct PayabliV2Envelope<Data: Decodable>: Decodable {
-    public let code: String
-    public let reason: String?
-    public let explanation: String?
-    public let action: String?
-    public let data: Data?
+/// An envelope-level `token` field is not read: every authenticated request reuses the
+/// access token held by `PayabliAuth`.
+package struct PayabliV2Envelope<Data: Decodable>: Decodable {
+    package let code: String
+    package let reason: String?
+    package let explanation: String?
+    package let action: String?
+    package let data: Data?
 
     /// `true` if `code` starts with `"A"` (Approved family).
-    public var isApproved: Bool {
+    package var isApproved: Bool {
         code.hasPrefix("A")
     }
 
     /// `true` if `code` starts with `"D"` (Declined family).
-    public var isDeclined: Bool {
+    package var isDeclined: Bool {
         code.hasPrefix("D")
     }
 }

@@ -7,9 +7,8 @@ import PayabliSDKCore
 /// The PRD leaves the exact shape flexible because it contains processor-specific
 /// credentials (Fiserv in v1.0), so it arrives as a loose dictionary that the
 /// concrete provider adapter interprets. See FR-11B.3, NFR-5D.
-public struct TTPConfig: Sendable {
-    public let paymentToken: String?
-    public let providerCredentials: [String: String]
+struct TTPConfig: Sendable {
+    let providerCredentials: [String: String]
 }
 
 /// Client for the attestation-protected config endpoint (PRD §8.2).
@@ -18,12 +17,12 @@ public struct TTPConfig: Sendable {
 /// Bearer-auth injection and HTTP 401 refresh-and-retry are delegated to the
 /// `PayabliTransport` passed at init — callers should supply `session.transport`.
 /// Attestation headers are component-specific and are added inline.
-public final class TTPConfigClient: Sendable {
+final class TTPConfigClient: Sendable {
     private let transport: any PayabliTransport
     private let attestation: DeviceAttestationService
     private let logger = PayabliLogger(category: .taptopay)
 
-    public init(
+    init(
         transport: any PayabliTransport,
         attestation: DeviceAttestationService
     ) {
@@ -48,7 +47,7 @@ public final class TTPConfigClient: Sendable {
     ///
     /// The SDK flattens `credentials` into `TTPConfig.providerCredentials`
     /// for the TapToPayProvider to consume.
-    public func fetchConfig(entry: String) async throws -> TTPConfig {
+    func fetchConfig(entry: String) async throws -> TTPConfig {
         let headers = try await assertionHeaders(entry: entry)
 
         // Attestation headers are component-specific; bearer is added by the transport.
@@ -107,10 +106,7 @@ public final class TTPConfigClient: Sendable {
             throw PayabliTTPError.configFailed(reason: "Invalid config envelope")
         }
 
-        return TTPConfig(
-            paymentToken: nil,
-            providerCredentials: credentials
-        )
+        return TTPConfig(providerCredentials: credentials)
     }
 
     private func assertionHeaders(entry: String) async throws -> AssertionHeaders {

@@ -1,5 +1,5 @@
 import Foundation
-@_spi(PayabliInternal) @testable import PayabliSDKCore
+@testable import PayabliSDKCore
 
 /// A clock a test drives, so a schedule is asserted rather than waited out.
 ///

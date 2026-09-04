@@ -11,13 +11,13 @@ import Security
 /// Items are stored as `kSecClassGenericPassword` with the SDK's bundle-level
 /// service identifier so they're namespaced away from the host app's own
 /// Keychain entries.
-public struct KeychainStorage: SecureStorage, Sendable {
-    public static let service = "com.payabli.sdk"
+package struct KeychainStorage: SecureStorage, Sendable {
+    package static let service = "com.payabli.sdk"
 
     /// Errors surfaced by Keychain operations. Tests may receive `.underlying`
     /// wrapping an `errSecXxx` OSStatus; on-device failures are typically
     /// transient (user locked device, etc.).
-    public enum KeychainError: Swift.Error, Sendable {
+    package enum KeychainError: Swift.Error, Sendable {
         case underlying(OSStatus)
         case decoding
     }
@@ -26,14 +26,14 @@ public struct KeychainStorage: SecureStorage, Sendable {
 
     /// Opening the store corrects what an older version of the SDK wrote, since
     /// nothing else will: see `migrateAccessibility(forKeys:)`.
-    public init(service: String = KeychainStorage.service) {
+    package init(service: String = KeychainStorage.service) {
         self.service = service
         migrateAccessibility(forKeys: PayabliKeychainKey.all)
     }
 
     // MARK: - Read
 
-    public func string(forKey key: String) throws -> String? {
+    package func string(forKey key: String) throws -> String? {
         guard let data = try data(forKey: key) else { return nil }
         return String(data: data, encoding: .utf8)
     }
@@ -70,7 +70,7 @@ public struct KeychainStorage: SecureStorage, Sendable {
 
     // MARK: - Write
 
-    public func set(_ value: String, forKey key: String) throws {
+    package func set(_ value: String, forKey key: String) throws {
         guard let data = value.data(using: .utf8) else {
             throw KeychainError.decoding
         }
@@ -140,7 +140,7 @@ public struct KeychainStorage: SecureStorage, Sendable {
 
     /// Deleting what is not there is a success, so `errSecItemNotFound` passes: the
     /// caller asked for the item to be gone and it is.
-    public func remove(forKey key: String) throws {
+    package func remove(forKey key: String) throws {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
@@ -165,22 +165,22 @@ public struct KeychainStorage: SecureStorage, Sendable {
 
 // MARK: - Storage keys used by the SDK (§22.1)
 
-public enum PayabliKeychainKey {
+package enum PayabliKeychainKey {
     /// Holds a freshly generated App Attest key that has not yet completed
     /// attestation. Kept separate from the binding so a pre-attest retry can
     /// reuse the same Secure Enclave key without the warm path reading it as an
     /// enrolled device.
-    public static let pendingKeyId = Stored.pendingKeyId.rawValue
+    package static let pendingKeyId = Stored.pendingKeyId.rawValue
 
     /// Every binding this device holds, as one item. Replaces `keyId` and
     /// `deviceId`, which recorded no paypoint and were two writes with a window
     /// between them.
-    public static let deviceBindings = Stored.deviceBindings.rawValue
+    package static let deviceBindings = Stored.deviceBindings.rawValue
 
     /// The UUID this install was first seen with, which the value `/register`
     /// receives is derived from. It outlives every binding: an install that lost it
     /// registers as a new device. See `InstallIdentifier`.
-    public static let installId = Stored.installId.rawValue
+    package static let installId = Stored.installId.rawValue
 
     /// The keys themselves. The constants above are the names callers use, and a
     /// key added here joins `all` by being a case, so a sweep cannot miss one.

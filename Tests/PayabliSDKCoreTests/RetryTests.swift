@@ -1,4 +1,4 @@
-@_spi(PayabliInternal) @testable import PayabliSDKCore
+@testable import PayabliSDKCore
 import XCTest
 
 /// Ported from the sibling SDK's retry suite. Every timing assertion runs on `FakeRetryClock`, so an

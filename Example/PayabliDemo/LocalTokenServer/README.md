@@ -280,10 +280,11 @@ Serial number is the app's `identifierForVendor`, and several device records can
 share one serial: one handset on this entrypoint has ten records with the same
 serial, eight of them pending.
 
-The app reads its own `deviceId` from the attestation service. Build
-`PayabliTTP` with the designated initializer, keep the `AppAttestService` you
-pass in, and read `cachedDeviceId` after `initialize()` reports pending
-activation.
+A host app has no `deviceId` to pass. The attestation service holding it is internal
+to the SDK, and activating does not need it: once the session reports
+`.pendingActivation`, `PayabliTTP.activateDevice(activationCode:)` resolves the binding
+the SDK is holding. The on-device tests reach the service through `@testable` and are
+where a specific binding can be named.
 
 With no `deviceId`, the server uses the newest pending device. `resolvedFrom`
 reports which path was used: `request`, `onlyPendingDevice`, or

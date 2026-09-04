@@ -1,4 +1,4 @@
-@_spi(PayabliInternal) import PayabliSDKCore
+import PayabliSDKCore
 @testable import PayabliSDKTapToPay
 import PayabliSDKTestUtils
 import XCTest

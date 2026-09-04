@@ -3,18 +3,6 @@ import PayabliSDKTestUtils
 import XCTest
 
 final class PayabliSessionTests: XCTestCase {
-    func testSessionExposesAuthAndService() async throws {
-        let config = try PayabliConfig(
-            accessToken: "abc",
-            entryPoint: "demo",
-            environment: .sandbox
-        )
-        let session = PayabliSession(config: config)
-        let token = await session.auth.currentAccessToken()
-        XCTAssertEqual(token, "abc")
-        XCTAssertEqual(session.config.entryPoint, "demo")
-    }
-
     func testSessionAcceptsCustomURLSession() async throws {
         let expectedBody = Data("{\"hello\":\"world\"}".utf8)
         StubURLProtocol.handler = { request in

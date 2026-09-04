@@ -1,4 +1,4 @@
-@_spi(PayabliInternal) @testable import PayabliSDKCore
+@testable import PayabliSDKCore
 import XCTest
 
 final class RetryPolicyTests: XCTestCase {
