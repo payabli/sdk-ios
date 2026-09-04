@@ -196,6 +196,7 @@ package final class PayabliService: PayabliTransport, Sendable {
 /// - 401 → `PayabliGenericError(.tokenExpired)`
 /// - 402 → `PayabliPaymentError.decline`
 /// - 403 → `PayabliGenericError(.permissionDenied)`
+/// - 408 → `PayabliGenericError(.networkError)`
 /// - 410 → `PayabliGenericError(.sessionBurned)`
 /// - 429 → `PayabliRateLimitError`
 /// - 500+ → `PayabliPaymentError.server`
@@ -234,6 +235,12 @@ package func mapPayabliHTTPError(
 
     case 410:
         throw PayabliGenericError(code: .sessionBurned, reason: "Session burned (410)")
+
+    case 408:
+        // RFC 9110 Section 15.5.9: the server did not receive a complete request in time and "the client
+        // MAY repeat the request without modifications at any later time". Retryable, and classified as a
+        // network failure because that is what it is: the request did not arrive, so nothing ran.
+        throw PayabliGenericError(code: .networkError, reason: "Request timeout (408)")
 
     case 429:
         throw PayabliRateLimitError(retryAfter: RetryAfterHeader.value(from: response))

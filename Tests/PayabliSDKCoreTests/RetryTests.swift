@@ -143,6 +143,19 @@ final class RetryTests: XCTestCase {
         XCTAssertEqual(RetryPolicy.retryableCodes, [.networkError, .serverError, .rateLimited])
     }
 
+    /// A 408 says the request never arrived, so repeating it is safe and the policy has to agree. It was
+    /// retryable under the status-based classification this replaced, and would otherwise have been lost.
+    func testARequestTimeoutIsRetryable() throws {
+        let response = PayabliResponse(statusCode: 408, headers: [:], body: Data())
+        do {
+            try mapPayabliHTTPError(response: response)
+            XCTFail("expected a 408 to map to an error")
+        } catch let error as PayabliGenericError {
+            XCTAssertEqual(error.code, .networkError)
+            XCTAssertTrue(RetryPolicy.retryableByCode(error))
+        }
+    }
+
     func testATokenExpiryIsNotRetryableSoTheTwoLayersDoNotOverlap() {
         // Recovering from a refused credential belongs to the transport below. Retrying it here would
         // spend the policy on refresh-and-replay cycles around a credential that is settled.
