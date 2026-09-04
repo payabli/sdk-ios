@@ -78,6 +78,61 @@ final class RetryAfterHeaderTests: XCTestCase {
         }
     }
 
+    // MARK: - Through the mapper
+
+    // The parser and the retry engine are covered apart, and both stay green if the mapper drops the
+    // parsed value on the floor: the engine's own cases construct their hints directly. These two run a
+    // real response through `mapPayabliHTTPError` and read the hint off what it threw.
+
+    func testA429CarriesItsParsedHintIntoTheThrownError() throws {
+        let response = PayabliResponse(
+            statusCode: 429,
+            headers: [RetryAfterHeader.name: "90"],
+            body: Data()
+        )
+
+        do {
+            try mapPayabliHTTPError(response: response)
+            XCTFail("a 429 has to map to an error")
+        } catch let error as PayabliRateLimitError {
+            XCTAssertEqual(error.retryAfter, 90)
+        }
+    }
+
+    func testA5xxCarriesItsParsedHintAndItsStatusIntoTheThrownError() throws {
+        let response = PayabliResponse(
+            statusCode: 503,
+            headers: [RetryAfterHeader.name: "30"],
+            body: Data(#"{"title":"Service Unavailable"}"#.utf8)
+        )
+
+        do {
+            try mapPayabliHTTPError(response: response)
+            XCTFail("a 503 has to map to an error")
+        } catch let PayabliPaymentError.server(server) {
+            XCTAssertEqual(server.retryAfter, 30, "the hint has to survive decoding and the copy")
+            XCTAssertEqual(server.httpStatus, 503)
+        }
+    }
+
+    func testAStatusThatCarriesNoHintReportsNone() throws {
+        // Only 429 and 5xx are given one, so a 403 with the field set still reports nothing: reading it
+        // there would invent a wait the retry layer would then honour.
+        let response = PayabliResponse(
+            statusCode: 403,
+            headers: [RetryAfterHeader.name: "90"],
+            body: Data()
+        )
+
+        do {
+            try mapPayabliHTTPError(response: response)
+            XCTFail("a 403 has to map to an error")
+        } catch let error as PayabliGenericError {
+            XCTAssertEqual(error.code, .permissionDenied)
+            XCTAssertNil(error as? any PayabliRetryAfter, "a 403 carries no hint")
+        }
+    }
+
     // MARK: - Case
 
     func testALowercasedFieldNameIsFoundToo() {
