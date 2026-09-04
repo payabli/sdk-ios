@@ -191,12 +191,14 @@ public final class PayabliService: PayabliTransport, Sendable {
 /// for a 403 on the config endpoint). Return `nil` to fall through to the
 /// standard mapping.
 ///
-/// Standard mappings (PRD §8):
+/// Standard mappings:
 /// - 400 → `PayabliPaymentError.validation`
 /// - 401 → `PayabliGenericError(.tokenExpired)`
 /// - 402 → `PayabliPaymentError.decline`
 /// - 403 → `PayabliGenericError(.permissionDenied)`
+/// - 409 → `PayabliGenericError(.conflict)`
 /// - 410 → `PayabliGenericError(.sessionBurned)`
+/// - 429 → `PayabliGenericError(.rateLimited)`
 /// - 500+ → `PayabliPaymentError.server`
 /// - other non-2xx → `PayabliGenericError(.unknown)`
 ///
