@@ -186,7 +186,8 @@ channel, so an app that never accepts card-present never links the certified car
 
 ### Testing Strategy
 
-- Five XCTest targets, one per module, in `Tests/`.
+- Five XCTest targets, one per module, in `Tests/`, plus three in the sample app's project:
+  `PayabliDemoFlowTests`, `PayabliDemoUITests` and `PayabliDemoDeviceTests`.
 - **Fixtures ship in `PayabliSDKTestUtils`**: `StubURLProtocol`, `InMemorySecureStorage`,
   `MockTapToPayProvider`, `MockAppAttestor`, `MockDeviceAttestationService`,
   `InMemoryTelemetryTransport`. Import it; do not redeclare these in a test bundle.
@@ -197,3 +198,62 @@ channel, so an app that never accepts card-present never links the certified car
   `AppAttestService`'s internal init).
 - Tap to Pay and Apple Pay tests need a physical device, or substitute mocks for `DCAppAttestService`.
   A simulator cannot produce a real App Attest assertion.
+
+### The tier that needs hardware
+
+Some tests cannot run unattended: they need a card reader, a device with a Keychain that answers, or a
+reachable token server. **They are excluded from the automated tiers, never skipped**, and the difference
+is the point. The reporter derives passed from total minus failed minus skipped, so a test parked with
+`XCTSkip` reports a standing skip every night, and a permanent skip is indistinguishable from a regression
+that started skipping. An excluded test is absent from the result bundle and the counts stay honest.
+
+Two forms, and the first is the one to reach for:
+
+- **A suite that needs hardware is its own test target.** That is `PayabliDemoDeviceTests` and
+  `PayabliDemoUITests`, both hosted by the sample app. `Example/PayabliDemo/Config/DeviceTests.xcconfig`
+  records why the device bundle is a target rather than a setting: a tool-hosted bundle has no entitlement,
+  so every Keychain call returns `errSecMissingEntitlement`. Automated runs simply never name those
+  schemes.
+- **A single class or method inside a target that otherwise runs** takes an `OnDevice`, `Live` or
+  `IfAvailable` name suffix and goes in the `HARDWARE_ONLY_TESTS` list in `.github/workflows/nightly.yml`,
+  which becomes `-skip-testing:` arguments. Identifiers are `Target/Class` or `Target/Class/method`,
+  without parentheses.
+
+  Five methods in `SecureStorageTests` are the list today. They need a Keychain that answers, the SPM test
+  host has no entitlement, and they returned `errSecMissingEntitlement` and skipped on every simulator run
+  before the list existed. `KeychainOnDeviceTests` covers their assertions on a device and skips nothing.
+  The other ten tests in that class run normally, which is why the exclusion names methods rather than the
+  class.
+
+**The bar is that the test would fail or answer wrongly unattended, not that nobody has taught the
+automation to run it.** The second is a provisioning gap, fixed by changing the workflow rather than by
+owning a phone, and a test parked here for that reason is borrowing time.
+
+Run the live tier by hand, against a running token server:
+
+```bash
+TEST_RUNNER_PAYABLI_QA_LIVE=1 \
+xcodebuild test -project Example/PayabliDemo/PayabliDemo.xcodeproj -scheme 'PayabliDemo qa' \
+  -only-testing:PayabliDemoUITests -destination 'id=<simulator udid>'
+```
+
+`PAYABLI_QA_LIVE` and `PAYABLI_ENV` reach the runner only through the `TEST_RUNNER_` prefix, which
+`xcodebuild` strips. Set plainly they reach `xcodebuild` and stop there, which looks exactly like a
+variable that had no effect.
+
+### CI
+
+- **`ci.yml`** gates every pull request: lint, the SDK suite, `PayabliDemoFlowTests`, and a change report.
+  `pr-reports.yml` holds anything needing a token and is read from the default branch, so a pull request
+  cannot edit the jobs that hold one.
+- **`nightly.yml`** runs on a schedule and reports to Slack. It adds what the gate cannot reach: the sample
+  app itself, which no pull request can build because `Secrets.swift` is gitignored and is a member of the
+  app target; a device-slice compile; both live test bundles compiled but not run; and the release
+  XCFrameworks. It is not a required check.
+- **The nightly's reporter is covered by its own tests**, `.github/scripts/tests/`, run by `scripts.yml` on
+  any pull request that touches them. Change either script and run both halves:
+
+  ```bash
+  python3 .github/scripts/tests/verify.py
+  python3 .github/scripts/tests/sabotage.py
+  ```
