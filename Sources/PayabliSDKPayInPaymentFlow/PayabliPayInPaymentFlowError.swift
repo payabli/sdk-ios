@@ -17,10 +17,14 @@ public enum PayabliPayInPaymentFlowError: PayabliError, Equatable {
     /// refused rather than executed. The original response is not replayed, so a caller that needs the
     /// outcome still reads the transaction back.
     ///
-    /// Raised only where a key was sent, which is the money-moving routes, and only where the service's
-    /// answer leaves the outcome open: a network failure, a cancellation, a 5xx, a response that could
-    /// not be decoded. A decline, a refused credential and a locally refused request all arrive as
-    /// themselves, because there the outcome is known and a retry is a new payment.
+    /// Raised only where a key was sent, which is the money-moving routes, and only where the answer
+    /// leaves the outcome open: a network failure, a cancellation, a 5xx, a response that could not be
+    /// decoded, a failure the service declared on a successful status without calling it a refusal, and
+    /// anything this SDK could not classify at all.
+    ///
+    /// Everything else arrives as itself, because the outcome is known and a retry there is a new
+    /// payment: a refusal, a validation failure, a refused credential, a locally refused request, a
+    /// refusal for too many requests, and a repeat the service recognised.
     ///
     /// `code` is the classification to branch on. `causeType` names the failing type and carries none
     /// of its message, because that message can quote a response body or name a host's own endpoint,
