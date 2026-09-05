@@ -6,12 +6,14 @@ import Foundation
 /// so every request through this type is decorated. `AuthenticatedTransport` wraps this and adds 401
 /// recovery; a request that skips that wrapper still carries its credential.
 ///
-/// Error mapping (PRD §8 "Error Codes", §8.1.1):
+/// Error mapping, which ``mapPayabliHTTPError`` performs and states in full:
 /// - 400 → throws `PayabliPaymentError.validation`
 /// - 401 → throws `PayabliGenericError(code: .tokenExpired)` (callers re-auth)
 /// - 402 → throws `PayabliPaymentError.decline`
 /// - 403 → throws `PayabliGenericError(code: .permissionDenied)`
+/// - 409 → throws `PayabliGenericError(code: .conflict)`
 /// - 410 → throws `PayabliGenericError(code: .sessionBurned)`
+/// - 429 → throws `PayabliGenericError(code: .rateLimited)`
 /// - 500 → throws `PayabliPaymentError.server`
 /// - Other non-2xx → throws `PayabliGenericError(code: .unknown)`
 package final class PayabliService: PayabliTransport, Sendable {
@@ -191,12 +193,14 @@ package final class PayabliService: PayabliTransport, Sendable {
 /// for a 403 on the config endpoint). Return `nil` to fall through to the
 /// standard mapping.
 ///
-/// Standard mappings (PRD §8):
+/// Standard mappings:
 /// - 400 → `PayabliPaymentError.validation`
 /// - 401 → `PayabliGenericError(.tokenExpired)`
 /// - 402 → `PayabliPaymentError.decline`
 /// - 403 → `PayabliGenericError(.permissionDenied)`
+/// - 409 → `PayabliGenericError(.conflict)`
 /// - 410 → `PayabliGenericError(.sessionBurned)`
+/// - 429 → `PayabliGenericError(.rateLimited)`
 /// - 500+ → `PayabliPaymentError.server`
 /// - other non-2xx → `PayabliGenericError(.unknown)`
 ///
@@ -231,8 +235,14 @@ package func mapPayabliHTTPError(
     case 403:
         throw PayabliGenericError(code: .permissionDenied, reason: "Forbidden (403)")
 
+    case 409:
+        throw PayabliGenericError(code: .conflict, reason: "Conflict (409)")
+
     case 410:
         throw PayabliGenericError(code: .sessionBurned, reason: "Session burned (410)")
+
+    case 429:
+        throw PayabliGenericError(code: .rateLimited, reason: "Too many requests (429)")
 
     case 500...:
         let server = (try? decoder.decode(PayabliServerError.self, from: response.body))

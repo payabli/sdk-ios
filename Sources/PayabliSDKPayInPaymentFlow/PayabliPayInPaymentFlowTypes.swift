@@ -330,52 +330,21 @@ public struct PayabliPayInPaymentFlowAuthorizedRequest: Sendable {
     public let transId: String
     public let paymentDetails: PayabliPayInPaymentFlowPaymentDetails
 
+    /// The key this capture sends, or nil to have one minted for the attempt.
+    ///
+    /// This call moves money, so a response lost on the way back leaves the outcome open. Supplying a
+    /// key lets a caller resend the same capture rather than risk a second partial one; a repeat inside
+    /// the service's window is refused rather than executed, and the first response is not replayed.
+    public let idempotencyKey: String?
+
     public init(
         transId: String,
-        paymentDetails: PayabliPayInPaymentFlowPaymentDetails
+        paymentDetails: PayabliPayInPaymentFlowPaymentDetails,
+        idempotencyKey: String? = nil
     ) {
         self.transId = transId
         self.paymentDetails = paymentDetails
-    }
-}
-
-public enum PayabliPayInPaymentFlowError: PayabliError, Equatable {
-    case invalidInput(String)
-    case missingAccessToken
-    case submissionInProgress
-    case transactionFailed(PayabliPayInPaymentFlowFailure)
-
-    public var code: PayabliErrorCode {
-        switch self {
-        case .invalidInput, .submissionInProgress:
-            return .validation
-        case .missingAccessToken:
-            return .missingToken
-        case .transactionFailed:
-            return .unknown
-        }
-    }
-
-    public var reason: String {
-        switch self {
-        case let .invalidInput(message):
-            return message
-        case .missingAccessToken:
-            return "Missing access token"
-        case .submissionInProgress:
-            return "A payment submission is already in progress."
-        case let .transactionFailed(failure):
-            return failure.reasonText
-        }
-    }
-
-    public var detail: String? {
-        switch self {
-        case .invalidInput, .missingAccessToken, .submissionInProgress:
-            return nil
-        case let .transactionFailed(failure):
-            return failure.detailText
-        }
+        self.idempotencyKey = idempotencyKey
     }
 }
 

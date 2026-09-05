@@ -9,6 +9,32 @@ public enum PayabliErrorCode: String, Sendable {
     case permissionDenied = "PERMISSION_DENIED"
     case sessionBurned = "SESSION_BURNED"
 
+    /// HTTP 402, an issuer decline.
+    ///
+    /// Telling this apart from ``unknown`` is what lets a retry policy say "never retry a decline"
+    /// without matching on prose.
+    case paymentDeclined = "PAYMENT_DECLINED"
+
+    /// The service could not process the request: an HTTP 5xx, or an answer whose own response code
+    /// reports a problem rather than a refusal. Retryable, which is why it is not folded into
+    /// ``unknown``.
+    case serverError = "SERVER_ERROR"
+
+    /// HTTP 429. Retryable, and the one status whose correct handling is unreachable without a code of
+    /// its own: folded into ``unknown`` it could never be retried, because an unclassified status must
+    /// not be.
+    case rateLimited = "RATE_LIMITED"
+
+    /// HTTP 409. The request conflicts with the state the service holds.
+    ///
+    /// Says no more than the status does, because the status mapping serves every route. What a
+    /// conflict means is the route's to say: on a money-moving one it is the repeat an idempotency key
+    /// caused the service to recognise, and there the outcome is settled rather than open. Reading that
+    /// meaning in here would give a conflict on any other route a sense it has not earned.
+    ///
+    /// The sibling platform carries no counterpart yet.
+    case conflict = "CONFLICT"
+
     // Client-side error codes (not from the API).
     case invalidConfiguration = "INVALID_CONFIGURATION"
     case networkError = "NETWORK_ERROR"
@@ -174,7 +200,7 @@ public struct PayabliServerError: PayabliError, Decodable {
     public let instance: String?
 
     public var code: PayabliErrorCode {
-        .unknown
+        .serverError
     }
 
     public var reason: String {
@@ -201,7 +227,7 @@ public struct PayabliDeclineError: PayabliError, Decodable {
     static let defaultReason = "Payment declined (402)"
 
     public var code: PayabliErrorCode {
-        .unknown
+        .paymentDeclined
     }
 
     public var detail: String? {

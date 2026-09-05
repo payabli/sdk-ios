@@ -35,7 +35,6 @@ final class TokenStorageClientTests: XCTestCase {
                 createAnonymous: true,
                 forceCustomerCreation: false,
                 temporary: true,
-                idempotencyKey: "idem-1",
                 customerData: PayabliPayInPaymentFlowCustomerData(customerId: 4440),
                 fallbackAuth: true,
                 fallbackAuthAmount: 100,
@@ -826,11 +825,12 @@ private func assertCardPaymentMethodResult(_ result: PayabliPayInPaymentFlowStor
 private func assertCardPaymentMethodRequest(_ request: PayabliRequest) throws {
     XCTAssertEqual(request.method, .post)
     XCTAssertEqual(request.path, "/api/TokenStorage/add")
-    // The idempotency key stays with the client; the credential does not, so the header set names
-    // exactly two. A hand-stamped bearer creeping back in fails here.
-    XCTAssertEqual(request.headers["idempotencyKey"], "idem-1")
+    // The credential is the chain's, and this route carries no idempotency key: a repeat is not
+    // recognizable here, so a key sent would be read by nothing. The header set names exactly one, so
+    // both a hand-stamped bearer and a reinstated key fail here.
+    XCTAssertNil(request.headers["idempotencyKey"])
     XCTAssertEqual(request.headers["Content-Type"], "application/json")
-    XCTAssertEqual(Set(request.headers.keys), ["Content-Type", "idempotencyKey"])
+    XCTAssertEqual(Set(request.headers.keys), ["Content-Type"])
     XCTAssertEqual(
         request.query.map { "\($0.name)=\($0.value ?? "")" }.sorted(),
         ["createAnonymous=true", "forceCustomerCreation=false", "temporary=true"]

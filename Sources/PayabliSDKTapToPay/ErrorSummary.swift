@@ -24,12 +24,12 @@ enum ErrorSummary {
         }
     }
 
-    /// A decline and a server failure both answer `.unknown` for their `code`,
-    /// there being no case for either in `PayabliErrorCode`, so reading the code
-    /// alone tells a reader that a charge failed and nothing more.
+    /// A decline answers `.paymentDeclined` and a server failure `.serverError`, so
+    /// the code says which of the two a charge met. What it does not say is which
+    /// decline, or which server failure.
     ///
-    /// Both carry a structured value that says which: the decline's wire code and
-    /// the server's status. Neither is free text.
+    /// Both carry a structured value that does: the decline's wire code and the
+    /// server's status. Neither is free text.
     static func of(_ error: PayabliPaymentError) -> String {
         switch error {
         case let .decline(decline):

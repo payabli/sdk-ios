@@ -281,7 +281,8 @@ let storedACH = try await paymentFlow.addACH(
 | `device` | Optional device identifier for ACH request payloads. |
 
 `PayabliPayInPaymentFlowOptions` is a typealias for
-`PayabliPayInPaymentFlowTokenStorageOptions`:
+`PayabliPayInPaymentFlowTokenStorageOptions`. It carries no idempotency key: a repeat is not
+recognizable on the store route, so a key sent there is read by nothing.
 
 | Field | Meaning |
 | --- | --- |
@@ -289,7 +290,6 @@ let storedACH = try await paymentFlow.addACH(
 | `createAnonymous` | Whether to create an anonymous stored method. |
 | `forceCustomerCreation` | Whether to force customer creation. |
 | `temporary` | Whether the stored method is temporary. |
-| `idempotencyKey` | Caller-supplied idempotency key. |
 | `customerData` | `PayabliPayInPaymentFlowCustomerData` merged into storage request. |
 | `vendorData` | Optional `PayabliPayInPaymentFlowVendorData`. |
 | `fallbackAuth` | Optional fallback authorization flag. |
@@ -325,7 +325,7 @@ authorize forms:
 | `source` | Optional integration source string. |
 | `subdomain` | Optional subdomain query value. |
 | `subscriptionId` | Optional subscription ID. |
-| `idempotencyKey` | Optional idempotency key. |
+| `idempotencyKey` | Optional. Left unset, the SDK reserves one for the attempt, so a money-in request always carries a key. Set it to resend the same attempt. Blank or unsendable is refused rather than dropped. |
 | `achValidation` | Optional ACH validation flag for capture. |
 | `forceCustomerCreation` | Optional customer-creation flag. |
 | `validation` | Client validation toggles. |

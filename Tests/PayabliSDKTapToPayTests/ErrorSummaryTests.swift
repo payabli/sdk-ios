@@ -100,8 +100,8 @@ final class ErrorSummaryTests: XCTestCase {
         XCTAssertFalse(summary.contains("signature key"), summary)
     }
 
-    /// A decline and a server failure both answer `.unknown` for their code, so
-    /// reading the code alone cannot tell a refused card from a broken service.
+    /// The code tells a refused card from a broken service. The summary carries what
+    /// it does not: which decline, and which status.
     func testADeclineIsNotTheSameSummaryAsAServerFailure() throws {
         let decline = try JSONDecoder().decode(
             PayabliDeclineError.self,
