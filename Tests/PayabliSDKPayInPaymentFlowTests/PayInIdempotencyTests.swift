@@ -75,6 +75,89 @@ final class PayInIdempotencyTests: XCTestCase {
         XCTAssertEqual(transport.sentKeys, ["reserved-1", "reserved-2"])
     }
 
+    // MARK: - An attempt nobody knows the outcome of keeps its key
+
+    /// The case the key exists for. An attempt that was interrupted may already have taken the money,
+    /// so the submit after it has to be the same request rather than a new one: the service refuses a
+    /// repeat, where a fresh key takes the money again. A payer pressing Submit a second time is the
+    /// ordinary way this happens.
+    func testARetryAfterAnUnknownOutcomeSendsTheSameKey() async {
+        let transport = SequencedIdempotencyTransport(
+            outcomes: [
+                .failure(PayabliGenericError(code: .networkError, reason: "Network request failed")),
+                .success(Self.approved)
+            ]
+        )
+        let flow = Self.makeFlow(transport: transport, keys: ["reserved-1", "reserved-2"])
+
+        _ = await Self.failure(from: {
+            _ = try await flow.capture(Self.request(idempotencyKey: nil))
+        })
+        _ = try? await flow.capture(Self.request(idempotencyKey: nil))
+
+        XCTAssertEqual(
+            transport.sentKeys,
+            ["reserved-1", "reserved-1"],
+            "the retry has to be the same request, or the payer is charged twice"
+        )
+    }
+
+    /// A different payment is not that retry. Reusing the key there would have the service refuse a
+    /// payment the payer meant to make.
+    func testADifferentAmountAfterAnUnknownOutcomeSendsANewKey() async {
+        let transport = SequencedIdempotencyTransport(
+            outcomes: [
+                .failure(PayabliGenericError(code: .networkError, reason: "Network request failed")),
+                .success(Self.approved)
+            ]
+        )
+        let flow = Self.makeFlow(transport: transport, keys: ["reserved-1", "reserved-2"])
+
+        _ = await Self.failure(from: {
+            _ = try await flow.capture(Self.request(idempotencyKey: nil))
+        })
+        _ = try? await flow.capture(Self.request(idempotencyKey: nil, totalAmount: 99.99))
+
+        XCTAssertEqual(transport.sentKeys, ["reserved-1", "reserved-2"])
+    }
+
+    /// An answer settles the attempt, so the next submit is a new payment and carries a new key.
+    func testASubmitAfterAKnownOutcomeSendsANewKey() async {
+        let transport = SequencedIdempotencyTransport(
+            outcomes: [.success(Self.declined), .success(Self.approved)]
+        )
+        let flow = Self.makeFlow(transport: transport, keys: ["reserved-1", "reserved-2"])
+
+        _ = await Self.failure(from: {
+            _ = try await flow.capture(Self.request(idempotencyKey: nil))
+        })
+        _ = try? await flow.capture(Self.request(idempotencyKey: nil))
+
+        XCTAssertEqual(
+            transport.sentKeys,
+            ["reserved-1", "reserved-2"],
+            "a refusal is an answer, so the next submit is a second payment"
+        )
+    }
+
+    /// A caller that supplies its own key is never given the held one.
+    func testACallersKeyIsSentEvenAfterAnUnknownOutcome() async {
+        let transport = SequencedIdempotencyTransport(
+            outcomes: [
+                .failure(PayabliGenericError(code: .networkError, reason: "Network request failed")),
+                .success(Self.approved)
+            ]
+        )
+        let flow = Self.makeFlow(transport: transport, keys: ["reserved-1", "reserved-2"])
+
+        _ = await Self.failure(from: {
+            _ = try await flow.capture(Self.request(idempotencyKey: nil))
+        })
+        _ = try? await flow.capture(Self.request(idempotencyKey: "caller-key"))
+
+        XCTAssertEqual(transport.sentKeys, ["reserved-1", "caller-key"])
+    }
+
     // MARK: - A key that cannot be sent is refused, not dropped
 
     func testABlankKeyIsRefusedAndNothingIsSent() async {
@@ -413,6 +496,21 @@ final class PayInIdempotencyTests: XCTestCase {
 
     private static func makeFlow(
         transport: any PayabliTransport,
+        keys: [String]
+    ) -> PayabliPayInPaymentFlow {
+        let flow = PayabliPayInPaymentFlow(
+            accessToken: "token",
+            entryPoint: "entry",
+            environment: .sandbox,
+            transport: transport
+        )
+        let remaining = MintedKeys(keys)
+        flow.newIdempotencyKey = { remaining.next() }
+        return flow
+    }
+
+    private static func makeFlow(
+        transport: any PayabliTransport,
         key: String
     ) -> PayabliPayInPaymentFlow {
         let flow = PayabliPayInPaymentFlow(
@@ -427,10 +525,11 @@ final class PayInIdempotencyTests: XCTestCase {
 
     private static func request(
         idempotencyKey: String?,
-        cardOnly: Bool = false
+        cardOnly: Bool = false,
+        totalAmount: Double = 12.34
     ) -> PayabliPayInPaymentFlowRequest {
         PayabliPayInPaymentFlowRequest(
-            paymentDetails: PayabliPayInPaymentFlowPaymentDetails(totalAmount: 12.34),
+            paymentDetails: PayabliPayInPaymentFlowPaymentDetails(totalAmount: totalAmount),
             paymentMethod: cardOnly
                 ? .card(PayabliPayInPaymentFlowCardMethod(
                     data: PayabliPayInPaymentFlowCardData(
@@ -512,6 +611,67 @@ private final class RecordingIdempotencyTransport: PayabliTransport, @unchecked 
             throw failure
         }
         return PayabliResponse(statusCode: status, headers: [:], body: body ?? Data())
+    }
+
+    func performV2<T: Decodable & Sendable>(
+        _ request: PayabliRequest,
+        decoding: T.Type
+    ) async throws -> PayabliV2Envelope<T> {
+        let response = try await perform(request)
+        try mapPayabliHTTPError(response: response)
+        return try decodePayabliV2Envelope(T.self, from: response)
+    }
+}
+
+/// Hands out the keys a test named, in order, so a second attempt is distinguishable from the first.
+private final class MintedKeys: @unchecked Sendable {
+    private let lock = NSLock()
+    private var remaining: [String]
+
+    init(_ keys: [String]) {
+        remaining = keys
+    }
+
+    func next() -> String {
+        lock.lock()
+        defer { lock.unlock() }
+        return remaining.isEmpty ? "exhausted" : remaining.removeFirst()
+    }
+}
+
+/// One outcome per call, so a test can fail an attempt and then answer the retry.
+private final class SequencedIdempotencyTransport: PayabliTransport, @unchecked Sendable {
+    enum Outcome {
+        case success(Data)
+        case failure(any Error)
+    }
+
+    private let lock = NSLock()
+    private var recorded: [String?] = []
+    private var outcomes: [Outcome]
+
+    init(outcomes: [Outcome]) {
+        self.outcomes = outcomes
+    }
+
+    var sentKeys: [String] {
+        lock.lock()
+        defer { lock.unlock() }
+        return recorded.compactMap { $0 }
+    }
+
+    func perform(_ request: PayabliRequest) async throws -> PayabliResponse {
+        lock.lock()
+        recorded.append(request.headers["idempotencyKey"])
+        let outcome = outcomes.isEmpty ? Outcome.success(Data()) : outcomes.removeFirst()
+        lock.unlock()
+
+        switch outcome {
+        case let .success(body):
+            return PayabliResponse(statusCode: 200, headers: [:], body: body)
+        case let .failure(error):
+            throw error
+        }
     }
 
     func performV2<T: Decodable & Sendable>(

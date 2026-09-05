@@ -44,6 +44,37 @@ public final class PayabliPayInPaymentFlow: NSObject, ObservableObject, PayabliC
     private var tokenStorageClient: PayInPaymentFlowTokenStorageClient
     private var activeSubmissionCount = 0
 
+    /// The attempt in flight, and the payment it is for.
+    private var attemptInFlight: (key: String, scope: AttemptScope)?
+
+    /// The attempt that ended without an answer, whose key the next submit of the same payment sends.
+    ///
+    /// Nothing here identifies a payer or an instrument: what a repeat has to match is the payment, and
+    /// this holds only what says which one that is.
+    private var unresolvedAttempt: (key: String, scope: AttemptScope)?
+
+    /// Which payment an attempt was for, so a held key is reused for that one and no other.
+    ///
+    /// The route is part of it because authorizing and capturing the same amount are different
+    /// requests, and the transaction is, because two authorizations of equal value are as well.
+    struct AttemptScope: Equatable {
+        let route: String
+        let amount: Double
+        let currency: String?
+        let transactionId: String?
+
+        init(
+            route: String,
+            _ details: PayabliPayInPaymentFlowPaymentDetails,
+            transactionId: String? = nil
+        ) {
+            self.route = route
+            amount = details.totalAmount
+            currency = details.currency
+            self.transactionId = transactionId
+        }
+    }
+
     public init(
         entryPoint: String,
         environment: PayabliEnvironment,
@@ -325,7 +356,10 @@ public final class PayabliPayInPaymentFlow: NSObject, ObservableObject, PayabliC
             try await client.capture(
                 entryPoint: entryPoint,
                 request: request,
-                idempotencyKey: self.reserveKey(request.idempotencyKey)
+                idempotencyKey: self.reserveKey(
+                    request.idempotencyKey,
+                    for: AttemptScope(route: "capture", request.paymentDetails)
+                )
             )
         }
     }
@@ -344,7 +378,10 @@ public final class PayabliPayInPaymentFlow: NSObject, ObservableObject, PayabliC
             try await client.authorize(
                 entryPoint: entryPoint,
                 request: request,
-                idempotencyKey: self.reserveKey(request.idempotencyKey)
+                idempotencyKey: self.reserveKey(
+                    request.idempotencyKey,
+                    for: AttemptScope(route: "authorize", request.paymentDetails)
+                )
             )
         }
     }
@@ -357,22 +394,58 @@ public final class PayabliPayInPaymentFlow: NSObject, ObservableObject, PayabliC
         try await submit {
             try await client.captureAuthorized(
                 request,
-                idempotencyKey: self.reserveKey(request.idempotencyKey)
+                idempotencyKey: self.reserveKey(
+                    request.idempotencyKey,
+                    for: AttemptScope(
+                        route: "captureAuthorized",
+                        request.paymentDetails,
+                        transactionId: request.transId
+                    )
+                )
             )
         }
     }
 
-    /// The key this attempt sends: the caller's when it set one, otherwise a fresh one.
+    /// The key this attempt sends: the caller's when it set one, the held key when the last attempt at
+    /// this same payment ended without an answer, otherwise a fresh one.
     ///
-    /// A money-moving request always carries one. Left absent, the service recognises no repeat, so a
-    /// caller whose attempt was cancelled or timed out cannot retry without risking a second payment.
-    /// One key per attempt, so a retry the caller chooses to make is the same request and a second
-    /// payment is a second key.
+    /// A money-moving request always carries one. Left absent, the service recognises no repeat, so an
+    /// attempt that was cancelled or timed out cannot be made again without risking a second payment.
+    ///
+    /// Reusing the held key is what makes the next submit a repeat rather than a second payment, and it
+    /// is the safe direction of the two: the service refuses a repeat inside its window, where a fresh
+    /// key would take the money again. It is held only for an outcome nobody knows and only for the
+    /// same payment, so a different one is never refused as a duplicate.
     ///
     /// A key the caller supplied is refused rather than replaced when it cannot be sent, which is the
     /// client's to decide, since substituting one would send a key the caller does not hold.
-    private func reserveKey(_ supplied: String?) -> String {
-        supplied ?? newIdempotencyKey()
+    private func reserveKey(_ supplied: String?, for scope: AttemptScope) -> String {
+        if let supplied {
+            attemptInFlight = (supplied, scope)
+            return supplied
+        }
+        if let unresolvedAttempt, unresolvedAttempt.scope == scope {
+            attemptInFlight = unresolvedAttempt
+            return unresolvedAttempt.key
+        }
+        let minted = newIdempotencyKey()
+        attemptInFlight = (minted, scope)
+        return minted
+    }
+
+    /// Records how the attempt in flight ended.
+    ///
+    /// An outcome nobody knows holds the key for the next submit of the same payment; anything else
+    /// drops it, an answer being an answer. A submission that reserved no key leaves a held one alone,
+    /// so storing a method between an interrupted payment and its retry does not lose the key.
+    private func settleAttempt(_ failure: (any Error)?) {
+        guard let attempt = attemptInFlight else { return }
+        attemptInFlight = nil
+        if case .submissionInterrupted = failure as? PayabliPayInPaymentFlowError {
+            unresolvedAttempt = attempt
+        } else {
+            unresolvedAttempt = nil
+        }
     }
 
     private func submit(
@@ -381,9 +454,15 @@ public final class PayabliPayInPaymentFlow: NSObject, ObservableObject, PayabliC
         try beginSubmission()
         defer { endSubmission() }
 
-        let result = try await operation()
-        lastResult = result
-        return result
+        do {
+            let result = try await operation()
+            settleAttempt(nil)
+            lastResult = result
+            return result
+        } catch {
+            settleAttempt(error)
+            throw error
+        }
     }
 
     private func beginSubmission() throws {
