@@ -100,8 +100,8 @@ final class ErrorSummaryTests: XCTestCase {
         XCTAssertFalse(summary.contains("signature key"), summary)
     }
 
-    /// A decline and a server failure both answer `.unknown` for their code, so
-    /// reading the code alone cannot tell a refused card from a broken service.
+    /// Each carries a structured value beyond its code, so a refused card and a broken service are told
+    /// apart by the processor's decline code and the server's status rather than by prose.
     func testADeclineIsNotTheSameSummaryAsAServerFailure() throws {
         let decline = try JSONDecoder().decode(
             PayabliDeclineError.self,
@@ -144,7 +144,7 @@ final class ErrorSummaryTests: XCTestCase {
 
     /// The response is the authority on what was answered. A 5xx whose body will not decode carries no
     /// `status` of its own, and reading the body alone reported it as having no status at all.
-    func testAServerFailureNamesTheStatusTheResponseCarriedRatherThanTheBodys() throws {
+    func testAServerFailureNamesTheResponseStatusRatherThanTheOneInTheBody() throws {
         let undecodable = try XCTUnwrap(
             mappedServerError(status: 503, body: "<html>gateway</html>"),
             "a 503 has to map to a server error"
