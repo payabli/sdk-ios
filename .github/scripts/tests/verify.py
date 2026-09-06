@@ -43,6 +43,8 @@ COLLECTOR = SCRIPTS / "nightly_report.py"
 POSTER = SCRIPTS / "nightly_slack.py"
 NIGHTLY_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "nightly.yml"
 SCRIPTS_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "scripts.yml"
+CI_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "ci.yml"
+HARDWARE_LIST = REPO_ROOT / ".github" / "hardware-only-tests.txt"
 
 HALVES = ("collector", "poster", "workflows", "both")
 ONLY = os.environ.get("NIGHTLY_ONLY", "both")
@@ -980,8 +982,39 @@ def test_workflows() -> None:
         check(f"W11 the harness runs on {event} for every file it makes claims about",
               guarded <= watched, sorted(watched))
 
-    check("W12 the hardware-only exclusion is wired on both test steps",
-          nightly_text.count("HARDWARE_ONLY_TESTS") >= 4, nightly_text.count("HARDWARE_ONLY_TESTS"))
+    # Every automated tier that runs the package scheme applies the same exclusions, from one file. A tier
+    # that does not is where a hardware-only test stops being excluded and starts being a standing skip,
+    # and it is silent: the tier stays green and reports a skip nobody reads.
+    ci_text = CI_WORKFLOW.read_text()
+    helper = "hardware-only-skips.sh"
+    # Both halves, because reading the list and passing it to xcodebuild are separate acts and only the
+    # second one excludes anything. Asserting the first alone stayed green with the expansion deleted.
+    expansion = '${skips[@]+"${skips[@]}"}'
+    for name, text in (("nightly.yml", nightly_text), ("ci.yml", ci_text)):
+        runs_package = "-scheme PayabliSDK-Package" in text and "xcodebuild test" in text
+        check(f"W12 {name} applies the shared hardware-only list where it tests the package scheme",
+              runs_package and helper in text and expansion in text,
+              (runs_package, helper in text, expansion in text))
+
+    check("W12c the list is one file, not a copy in a workflow",
+          "SecureStorageTests" not in nightly_text and "SecureStorageTests" not in ci_text,
+          "an identifier is written into a workflow rather than the shared list")
+
+    listed = [
+        line.split("#", 1)[0].strip()
+        for line in HARDWARE_LIST.read_text().splitlines()
+        if line.split("#", 1)[0].strip()
+    ]
+    check("W12d the shared list is not empty, and every entry is a test identifier",
+          listed and all("/" in entry and " " not in entry for entry in listed), listed)
+    bundles = next((s for s in steps if s.get("id") == "bundles"), None)
+    bundles_run = (bundles or {}).get("run", "")
+    # `set -e` in a loop over two builds abandons the second the moment the first fails, which hides
+    # whatever it was going to say. Every other step here continues on error for the same reason.
+    check("W12e both live bundles are attempted whichever of them fails",
+          "set -euo pipefail" not in bundles_run and "if ! xcodebuild" in bundles_run,
+          bundles_run[:200])
+
     check("W13 the platform is named at workflow level, where the no-report path can read it",
           (nightly.get("env") or {}).get("PLATFORM") == "iOS", nightly.get("env"))
 

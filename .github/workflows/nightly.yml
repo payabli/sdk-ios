@@ -71,30 +71,14 @@ jobs:
         id: sdk
         continue-on-error: true
         timeout-minutes: 45
-        env:
-          # The hardware-only tier, excluded rather than skipped, because a standing skip every night is
-          # indistinguishable from a regression that started skipping.
-          #
-          # These five need a Keychain that answers, and the SPM test host has no entitlement, so every one
-          # of them skipped on every simulator run before this list existed. Their assertions are covered on
-          # a device by `KeychainOnDeviceTests` in the sample app's DeviceTests bundle, which skips nothing.
-          # The rest of `SecureStorageTests` runs here, which is why this excludes methods rather than the
-          # class.
-          #
-          # Entries are `Target/Class` or `Target/Class/method`, without parentheses. A whole suite that
-          # needs hardware belongs in its own test target instead, which is what the sample app's DeviceTests
-          # and UITests bundles are; this is for a single class or method inside a target the nightly
-          # otherwise runs.
-          HARDWARE_ONLY_TESTS: >-
-            PayabliSDKTapToPayTests/SecureStorageTests/testKeychainRoundTripIfAvailable
-            PayabliSDKTapToPayTests/SecureStorageTests/testKeychainItemsAreWrittenForThisDeviceOnlyIfAvailable
-            PayabliSDKTapToPayTests/SecureStorageTests/testRewritingALegacyItemStopsItTravellingIfAvailable
-            PayabliSDKTapToPayTests/SecureStorageTests/testTheSweepRewritesAStoredItemAndKeepsItsValueIfAvailable
-            PayabliSDKTapToPayTests/SecureStorageTests/testTheSweepStoresNothingForAKeyThatHasNoItemIfAvailable
+        # The hardware-only exclusions come from `.github/hardware-only-tests.txt`, which `ci.yml` reads
+        # for the same scheme. One list: a test excluded here and skipping there would report a standing
+        # skip on every pull request, which is the thing the tier exists to remove.
         run: |
           set -euo pipefail
-          skips=()
-          for test in $HARDWARE_ONLY_TESTS; do skips+=("-skip-testing:$test"); done
+          # Into an array rather than expanded unquoted, so the arguments split exactly where the list
+          # says and nowhere else. An empty list leaves an empty array, which expands to nothing.
+          read -r -a skips <<< "$(.github/scripts/hardware-only-skips.sh)"
           xcodebuild test \
             -scheme PayabliSDK-Package \
             -destination "platform=iOS Simulator,id=$SIMULATOR_ID" \
@@ -109,13 +93,11 @@ jobs:
         id: flow
         continue-on-error: true
         timeout-minutes: 30
-        env:
-          # The same list, for this bundle. See the SDK step for what belongs in it.
-          HARDWARE_ONLY_TESTS: ''
+        # No exclusion list here. Every entry in the shared one names a target in the package scheme, and
+        # this bundle has no hardware-only test: a demo suite that needed one would get its own list, and
+        # a suite that needs hardware outright belongs in the DeviceTests or UITests target instead.
         run: |
           set -euo pipefail
-          skips=()
-          for test in $HARDWARE_ONLY_TESTS; do skips+=("-skip-testing:$test"); done
           xcodebuild test \
             -project Example/PayabliDemo/PayabliDemo.xcodeproj \
             -scheme PayabliDemoFlowTests \
@@ -123,7 +105,6 @@ jobs:
             -clonedSourcePackagesDirPath .build/checkouts \
             -enableCodeCoverage YES \
             -resultBundlePath DemoFlowTests.xcresult \
-            ${skips[@]+"${skips[@]}"} \
             -quiet \
             CODE_SIGNING_ALLOWED=NO
 
@@ -173,17 +154,29 @@ jobs:
         id: bundles
         continue-on-error: true
         timeout-minutes: 25
+        #
+        # Both are attempted whichever fails. `set -e` would abandon the loop on the first, so a broken
+        # UITests bundle would hide whatever the DeviceTests bundle was going to say, which is the
+        # failure-hides-later-checks shape every other step here avoids by continuing on error.
         run: |
-          set -euo pipefail
+          set -uo pipefail
+          failed=""
           for scheme in PayabliDemoUITests PayabliDemoDeviceTests; do
-            xcodebuild build-for-testing \
+            if ! xcodebuild build-for-testing \
               -project Example/PayabliDemo/PayabliDemo.xcodeproj \
               -scheme "$scheme" \
               -destination "platform=iOS Simulator,id=$SIMULATOR_ID" \
               -clonedSourcePackagesDirPath .build/checkouts \
               -quiet \
-              CODE_SIGNING_ALLOWED=NO
+              CODE_SIGNING_ALLOWED=NO; then
+              echo "::error::$scheme did not build"
+              failed="$failed $scheme"
+            fi
           done
+          if [ -n "$failed" ]; then
+            echo "these bundles did not build:$failed"
+            exit 1
+          fi
 
       # The shipped artifact. `release.yml` runs on workflow_dispatch only, so without this a change that
       # breaks the distribution build is invisible until someone cuts a release and finds out.

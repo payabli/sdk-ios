@@ -39,8 +39,12 @@ COPIED = (
     ".github/scripts/tests/verify.py",
     ".github/workflows/nightly.yml",
     ".github/workflows/scripts.yml",
+    ".github/workflows/ci.yml",
+    ".github/hardware-only-tests.txt",
 )
 
+CI_YML = ".github/workflows/ci.yml"
+HARDWARE_LIST = ".github/hardware-only-tests.txt"
 REPORT = ".github/scripts/nightly_report.py"
 SLACK = ".github/scripts/nightly_slack.py"
 NIGHTLY = ".github/workflows/nightly.yml"
@@ -296,11 +300,43 @@ MUTATIONS = [
         "the job may run longer than the liveness window allows for",
         NIGHTLY, "    timeout-minutes: 220", "    timeout-minutes: 400", "W14", "workflows",
     ),
+    Mutation(
+        "the pull-request gate stops applying the hardware-only exclusions",
+        CI_YML,
+        '            ${skips[@]+"${skips[@]}"} \\\n',
+        "",
+        "W12", "workflows",
+    ),
+    Mutation(
+        "an exclusion is written into a workflow instead of the shared list",
+        NIGHTLY,
+        "          read -r -a skips <<< \"$(.github/scripts/hardware-only-skips.sh)\"",
+        "          skips=(-skip-testing:PayabliSDKTapToPayTests/SecureStorageTests)",
+        "W12c", "workflows",
+    ),
+    Mutation(
+        "a failing first bundle abandons the second",
+        NIGHTLY, "          set -uo pipefail\n          failed=\"\"", "          set -euo pipefail",
+        "W12e", "workflows",
+    ),
+    Mutation(
+        "the shared list is emptied",
+        HARDWARE_LIST,
+        "PayabliSDKTapToPayTests/SecureStorageTests/testKeychainRoundTripIfAvailable\n"
+        "PayabliSDKTapToPayTests/SecureStorageTests/testKeychainItemsAreWrittenForThisDeviceOnlyIfAvailable\n"
+        "PayabliSDKTapToPayTests/SecureStorageTests/testRewritingALegacyItemStopsItTravellingIfAvailable\n"
+        "PayabliSDKTapToPayTests/SecureStorageTests/testTheSweepRewritesAStoredItemAndKeepsItsValueIfAvailable\n"
+        "PayabliSDKTapToPayTests/SecureStorageTests/testTheSweepStoresNothingForAKeyThatHasNoItemIfAvailable\n",
+        "",
+        "W12d", "workflows",
+    ),
 ]
 
 
 def stage(scratch: Path) -> None:
-    for relative in COPIED:
+    # The helper is copied but never mutated: the workflows invoke it, so a scratch tree without it would
+    # fail for a reason unrelated to the mutation under test.
+    for relative in (*COPIED, ".github/scripts/hardware-only-skips.sh"):
         target = scratch / relative
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy(REPO_ROOT / relative, target)
