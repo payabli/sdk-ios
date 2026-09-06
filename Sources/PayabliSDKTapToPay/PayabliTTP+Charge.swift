@@ -113,9 +113,15 @@ extension PayabliTTP {
                 ?? PayabliTTPError.nfcFailed(reason: String(describing: error))
         }
 
-        // Step 3 — success update. No offline fallback: on failure the
-        // transaction stays authorized on the processor and the host must
-        // reconcile manually.
+        return try await runSuccessUpdate(paymentTransId: paymentTransId, readResult: readResult)
+    }
+
+    /// Step 3 — success update. No offline fallback: on failure the transaction
+    /// stays authorized on the processor and the host must reconcile manually.
+    private func runSuccessUpdate(
+        paymentTransId: String,
+        readResult: CardReadResult
+    ) async throws -> TransactionResult {
         switch await tryUpdate(paymentTransId: paymentTransId, payload: .success(readResult)) {
         case .succeeded:
             multicaster.emit(.updateCompleted(paymentTransId: paymentTransId))
