@@ -209,6 +209,51 @@ MUTATIONS = [
         "P14c", "poster",
     ),
 
+    # ---- the poster's last-green lookup -----------------------------------------------------------
+    Mutation(
+        "a re-run of the green commit is reported as unknown rather than empty",
+        SLACK,
+        '        return {**facts, "count": 0, "shas": [], "empty": True}\n\n    compared',
+        "        return None\n\n    compared",
+        "P19", "poster",
+    ),
+    Mutation(
+        "a checkout behind the baseline is reported as unknown",
+        SLACK,
+        '    if status in ("behind", "identical"):',
+        "    if False:",
+        "P21", "poster",
+    ),
+    Mutation(
+        "rewritten history is treated as a real range",
+        SLACK,
+        '    if status != "ahead":\n        return None',
+        '    if status not in ("ahead", "diverged"):\n        return None',
+        "P22", "poster",
+    ),
+    Mutation(
+        "a truncated compare is read as the whole range",
+        SLACK,
+        "    return shas if len(shas) == total else None",
+        "    return shas",
+        "P23", "poster",
+    ),
+    Mutation(
+        "a branch with no previous success is treated as green from nothing",
+        SLACK,
+        "    if not baseline:\n        return None",
+        "    if not baseline:\n        return {**{'base': '', 'head': '', 'url': '', 'when': ''},\n"
+        "                                     'count': 0, 'shas': [], 'empty': True}",
+        "P24", "poster",
+    ),
+    Mutation(
+        "the lookup runs without a token and reaches the network anyway",
+        SLACK,
+        "    if not (token and repo and run_id and sha):\n        return None",
+        "    if not (repo and run_id and sha):\n        return None",
+        "P25", "poster",
+    ),
+
     # ---- the workflows -------------------------------------------------------------------------
     Mutation(
         "the nightly starts running on pull requests",

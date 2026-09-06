@@ -465,7 +465,9 @@ class FakeHandler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:  # noqa: N802
         path = self.path.split("?", 1)[0]
-        method = path.rsplit("/", 1)[-1]
+        # The compare endpoint carries both shas in the path, so it is keyed by name rather than by its
+        # last segment the way the others are.
+        method = "compare" if "/compare/" in path else path.rsplit("/", 1)[-1]
         server = self.server
         server.calls.append((method, {"query": self.path}, dict(self.headers)))
         if method in server.responses:
@@ -772,6 +774,75 @@ def test_poster() -> None:
               poster.landed_before_last_green(old, {"shas": []}) is True
               and poster.landed_before_last_green(old, {"shas": None}) is False,
               "")
+
+        # P19 -------------------------------------------------------------------------------------
+        # The last-green lookup, driven through the fake Actions API rather than hand-built. Every branch
+        # below decides whether a commit is named as a culprit, and each was previously reachable only in
+        # production: nothing set GITHUB_TOKEN, so the function returned at its first guard and the fake's
+        # responses were never consumed.
+        head = "0123456789abcdef"
+
+        def lookup(responses: dict, token: str = "gh-harness") -> dict | None:
+            server.responses = {"999": {"workflow_id": 77}, **responses}
+            saved = dict(os.environ)
+            os.environ.update({
+                "GITHUB_TOKEN": token,
+                "GITHUB_REPOSITORY": "payabli/sdk-ios",
+                "GITHUB_RUN_ID": "999",
+                "GITHUB_SHA": head,
+                "GITHUB_REF_NAME": "main",
+                "GITHUB_SERVER_URL": "https://github.test",
+                "GITHUB_API_URL": server.base,
+            })
+            if not token:
+                os.environ.pop("GITHUB_TOKEN", None)
+            server.calls.clear()
+            try:
+                return poster.commits_since_last_green()
+            finally:
+                os.environ.clear()
+                os.environ.update(saved)
+
+        got = lookup({"runs": {"workflow_runs": [{"id": 1, "head_sha": head}]}})
+        check("P19 a re-run of the commit that went green is an empty range, not an unknown one",
+              got is not None and got.get("empty") is True and got.get("shas") == [], got)
+
+        got = lookup({
+            "runs": {"workflow_runs": [{"id": 1, "head_sha": "f" * 40}]},
+            "compare": {"status": "ahead", "total_commits": 2,
+                        "commits": [{"sha": "9" * 40}, {"sha": "8" * 40}]},
+        })
+        check("P20 an ahead range carries its count and every sha in it",
+              got is not None and got.get("count") == 2 and len(got.get("shas") or []) == 2, got)
+
+        got = lookup({
+            "runs": {"workflow_runs": [{"id": 1, "head_sha": "f" * 40}]},
+            "compare": {"status": "behind", "total_commits": 0, "commits": []},
+        })
+        check("P21 a checkout behind the baseline is an empty range",
+              got is not None and got.get("empty") is True, got)
+
+        got = lookup({
+            "runs": {"workflow_runs": [{"id": 1, "head_sha": "f" * 40}]},
+            "compare": {"status": "diverged", "total_commits": 5, "commits": []},
+        })
+        check("P22 rewritten history is unknown rather than empty, so nobody is cleared", got is None, got)
+
+        got = lookup({
+            "runs": {"workflow_runs": [{"id": 1, "head_sha": "f" * 40}]},
+            # total_commits counts the whole range while the array pages at 250, so a short list is a
+            # truncated one and every absence from it means nothing.
+            "compare": {"status": "ahead", "total_commits": 300, "commits": [{"sha": "9" * 40}]},
+        })
+        check("P23 a truncated compare yields no sha list rather than a partial one",
+              got is not None and got.get("shas") is None, got)
+
+        got = lookup({"runs": {"workflow_runs": []}})
+        check("P24 no previous success on this branch is unknown rather than empty", got is None, got)
+
+        got = lookup({"runs": {"workflow_runs": [{"id": 1, "head_sha": "f" * 40}]}}, token="")
+        check("P25 without a token the range is unknown and nothing is looked up",
+              got is None and not server.calls, (got, len(server.calls)))
 
         # P15 -------------------------------------------------------------------------------------
         # Long through the parts that are still rendered. The failure message is no longer one of them,

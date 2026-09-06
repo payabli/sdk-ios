@@ -29,8 +29,11 @@ the harness produces a bundle that cannot be read.
 
 **Poster checks (`P*`)** run `nightly_slack.py` in-process against a fake Slack on loopback. It posts twice
 and the second call depends on the first one's `ts`, so a stub returning canned values without being a
-server would not exercise the contract that matters. The same server answers the GitHub compare endpoints,
-which is how the last-green range is driven.
+server would not exercise the contract that matters. The same server answers the GitHub Actions endpoints,
+and `commits_since_last_green()` is driven through it for each answer it has to tell apart: a re-run of the
+commit that went green, a checkout behind the baseline, a real range, rewritten history, a compare truncated
+at its page limit, a branch with no previous success, and no token at all. Those decide whether a commit is
+named as a probable cause, so getting one wrong blames somebody for work that was already green.
 
 **Workflow checks (`W*`)** parse `nightly.yml` and `scripts.yml` and assert what the files have to be:
 which triggers the nightly may carry, that exactly one job names the Slack token, how the liveness owner is
