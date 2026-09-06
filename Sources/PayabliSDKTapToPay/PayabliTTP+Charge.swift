@@ -8,6 +8,10 @@ import PayabliSDKCore
 private enum TTPUpdateOutcome {
     case succeeded
     case failed(reason: String)
+
+    /// The caller cancelled. Separate from `failed`, because a caller who cancelled is not told the
+    /// update failed, and the best-effort notify after a reader failure ignores it either way.
+    case cancelled
 }
 
 @MainActor
@@ -109,15 +113,23 @@ extension PayabliTTP {
                 ?? PayabliTTPError.nfcFailed(reason: String(describing: error))
         }
 
-        // Step 3 — success update. No offline fallback: on failure the
-        // transaction stays authorized on the processor and the host must
-        // reconcile manually.
+        return try await runSuccessUpdate(paymentTransId: paymentTransId, readResult: readResult)
+    }
+
+    /// Step 3 — success update. No offline fallback: on failure the transaction
+    /// stays authorized on the processor and the host must reconcile manually.
+    private func runSuccessUpdate(
+        paymentTransId: String,
+        readResult: CardReadResult
+    ) async throws -> TransactionResult {
         switch await tryUpdate(paymentTransId: paymentTransId, payload: .success(readResult)) {
         case .succeeded:
             multicaster.emit(.updateCompleted(paymentTransId: paymentTransId))
             return TransactionResult(paymentTransId: paymentTransId)
         case let .failed(reason):
             throw PayabliTTPError.updateFailed(reason: reason)
+        case .cancelled:
+            throw CancellationError()
         }
     }
 
@@ -219,25 +231,27 @@ extension PayabliTTP {
         }
 
         do {
-            try await Retry.run(policy: retryPolicy) { [retryPolicy] attempt in
+            // Raise a non-2xx as its mapped error and let the policy classify it. Deciding here would
+            // make retryability this call site's opinion, which the next call site is free to differ on.
+            try await Retry.run(policy: retryPolicy, logger: logger) { attempt in
                 let response = try await performOnce(attempt: String(attempt))
-
-                if (200 ..< 300).contains(response.statusCode) {
-                    return
-                }
-                if retryPolicy.isRetryable(statusCode: response.statusCode) {
-                    throw RetryableError(PayabliTTPError.updateFailed(
-                        reason: "HTTP \(response.statusCode)"
-                    ))
-                }
-                throw PayabliTTPError.updateFailed(reason: "HTTP \(response.statusCode)")
+                try mapPayabliHTTPError(response: response)
             }
             return .succeeded
+        } catch is CancellationError {
+            // Nothing below retries a cancelled request any more, and reporting it as a failed update
+            // here would put the same misreport back one layer up.
+            return .cancelled
         } catch {
+            // Back into this surface's own vocabulary, so the event and the outcome read the same
+            // whatever layer underneath produced the failure.
+            let failure = PayabliTTPError.updateFailed(reason: error.localizedDescription)
             // The event carries a summary and the caller the description: one goes
             // wherever a host app forwards its telemetry, the other to a person.
-            multicaster.emit(.updateFailed(paymentTransId: paymentTransId, error: ErrorSummary.of(error)))
-            return .failed(reason: error.localizedDescription)
+            multicaster.emit(
+                .updateFailed(paymentTransId: paymentTransId, error: ErrorSummary.of(failure))
+            )
+            return .failed(reason: failure.localizedDescription)
         }
     }
 
