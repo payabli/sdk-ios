@@ -662,6 +662,22 @@ def test_poster() -> None:
               "<!channel>" not in rendered and "&lt;!channel&gt;" in rendered, rendered[:400])
         check("P5b nor in a failure message", "<!here>" not in rendered, rendered[:400])
 
+        # P5c -------------------------------------------------------------------------------------
+        # The failure message is never rendered, whatever it says. XCTest quotes both operands of a
+        # mismatch, and the suites here assert over card numbers, CVVs, expiries, cardholder names and
+        # ACH account numbers, so a rendered message would copy those into Slack storage.
+        leaky = failure_fixture(
+            detail='XCTAssertEqual failed: ("4111111111111111") is not equal to ("4242424242424242")',
+        )
+        run_poster(poster, server, facts_fixture("red", [leaky]), {"LIVENESS_OWNER": "true"}, root)
+        rendered = json.dumps(posted(server, "chat.postMessage"))
+        check("P5c a failed payment assertion cannot copy its operands into Slack",
+              "4111111111111111" not in rendered and "XCTAssertEqual" not in rendered, rendered[:400])
+        # The label is escaped on the way in, so `>` reaches the block as `&gt;`. Asserting the raw form
+        # would fail against correct output, which is the shape of check that gets "fixed" by weakening it.
+        check("P5d the test that failed is still named, with a link to the message",
+              "WidgetTests &gt; testTwo()" in rendered and "failure message" in rendered, rendered[:400])
+
         # P6 --------------------------------------------------------------------------------------
         tampered = facts_fixture("red", [failure_fixture()])
         tampered["run"] = {"url": "https://evil.test|x><!channel>"}
@@ -758,7 +774,18 @@ def test_poster() -> None:
               "")
 
         # P15 -------------------------------------------------------------------------------------
-        many = [failure_fixture(label=f"Suite{i} > test{i}()", detail="x" * 280) for i in range(20)]
+        # Long through the parts that are still rendered. The failure message is no longer one of them,
+        # so padding `detail` would leave the trim loop with nothing to trim and the check would pass
+        # without reaching the behaviour it names.
+        many = [
+            failure_fixture(
+                label=f"Suite{i}WithAVeryLongNameThatFillsTheBlock > test{i}()",
+                culprits=[{"sha": f"abc{i:04}", "author": "Someone", "email": "s@example.invalid",
+                           "subject": "a commit subject long enough to fill the block " * 3,
+                           "what": "test"}],
+            )
+            for i in range(20)
+        ]
         blocks = poster.thread_blocks(facts_fixture("red", many), None)
         text = blocks[0]["text"]["text"]
         check("P15 an over-long failure list is trimmed to whole entries",

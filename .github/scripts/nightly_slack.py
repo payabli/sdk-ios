@@ -24,8 +24,9 @@ be all or nothing, which on a red night means no message at all.
 Nothing here can fail the run. A Slack outage must not turn a green nightly red, and the suite gate in the
 test job owns the run result, so every path below warns and exits zero.
 
-Never prints the token, and never handles a failure message body beyond escaping it: traces stay in the job
-summary and this links them.
+Never prints the token, and never renders a failure message. Those quote the operands of a failed
+assertion, and the suites here assert over card numbers, CVVs, expiries, cardholder names and ACH account
+numbers, so the message stays in the job summary inside GitHub and this links to it.
 """
 
 from __future__ import annotations
@@ -362,9 +363,11 @@ def landed_before_last_green(commit: dict, since_green: dict | None) -> bool:
 def thread_blocks(facts: dict, since_green: dict | None = None) -> list[dict]:
     """The thread reply: one entry per failed test, with its trace linked and its commit attributed.
 
-    The failure text is a link rather than the text itself. It lives in the job summary, which renders
-    without a download and outlives log retention, and a full message would blow the 3000-character block
-    limit on the first failure.
+    The failure text is a link rather than the text itself, and that is a disclosure boundary rather than
+    a length one. XCTest writes a mismatch as both operands quoted, and the suites here assert over card
+    numbers, CVVs, expiries, cardholder names and ACH account numbers, so the first line of a failing
+    payment assertion carries exactly the fields that must never be logged. Nothing renders it here: the
+    job summary holds it, inside GitHub, and this links there.
     """
     failures = facts["failures"]
     run_url = trusted_run_links()["url"]
@@ -374,7 +377,12 @@ def thread_blocks(facts: dict, since_green: dict | None = None) -> list[dict]:
     for failure in failures[:MAX_LISTED_FAILURES]:
         # Every field here originates in a test result or in git output, which carries commit subjects and
         # author names, so all of it is escaped.
-        entry = f"\n• `{mrkdwn(failure['label'])}` · <{run_url}|failure detail>\n  {mrkdwn(failure['detail'])}"
+        # The label and the link, never the failure message itself. An XCTest mismatch quotes both
+        # operands, and this repository's suites assert over card numbers, CVVs, expiries, cardholder
+        # names and ACH account numbers, so a failing payment assertion would copy those fields into
+        # Slack storage, in a channel, permanently. The message is in the job summary, which is inside
+        # GitHub with the same audience as the logs, and that is what the link goes to.
+        entry = f"\n• `{mrkdwn(failure['label'])}` · <{run_url}|failure message>"
         for commit, whats in merge_by_commit(failure["culprits"]):
             # One line per commit, not per lookup. The two lookups usually land on the same commit, because
             # a change to a type and to its test normally ships together, and printing that commit twice

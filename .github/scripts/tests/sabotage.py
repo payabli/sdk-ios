@@ -138,6 +138,13 @@ MUTATIONS = [
         '"url": f"https://evil.test/{repo}/actions/runs/{run_id}" if repo and run_id',
         "P6", "poster",
     ),
+    Mutation(
+        "the failure message is rendered into the Slack thread again",
+        SLACK,
+        'entry = f"\\n• `{mrkdwn(failure[\'label\'])}` · <{run_url}|failure message>"',
+        'entry = f"\\n• `{mrkdwn(failure[\'label\'])}` · <{run_url}|failure message>\\n  {mrkdwn(failure[\'detail\'])}"',
+        "P5c", "poster",
+    ),
     # ---- the poster's green path ----------------------------------------------------------------
     Mutation(
         "a green run posts into the channel anyway",
