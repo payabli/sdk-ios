@@ -247,6 +247,10 @@ MUTATIONS = [
         "the checkout goes shallow, so every failure names the same commit",
         NIGHTLY, "          fetch-depth: 0", "          fetch-depth: 1", "W10", "workflows",
     ),
+    Mutation(
+        "the job may run longer than the liveness window allows for",
+        NIGHTLY, "    timeout-minutes: 220", "    timeout-minutes: 400", "W14", "workflows",
+    ),
 ]
 
 

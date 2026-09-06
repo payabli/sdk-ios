@@ -78,9 +78,20 @@ SUPPORTED_SCHEMA = 4
 # and leaves the alarm untouched, because the switch answers "is the schedule alive" and those runs are not
 # evidence of a schedule. A non-owner going quiet is the design, not a broken path.
 #
-# 26 hours rather than 25, because a scheduled run fires some tens of minutes after the cron under the
-# documented load delay, and a tighter window would cry wolf nightly.
-SWITCH_HOURS = 26
+# Sized from this workflow's own ceiling rather than from the cadence alone, which is what makes 26 hours
+# wrong here even though it is right for a nightly that finishes in minutes. The alarm is armed when a run
+# reports and cancelled when the next one does, so the gap between two arms is the 24-hour cadence plus the
+# difference in runtime plus the difference in scheduling delay. The test job may run to 220 minutes and a
+# fast night finishes well inside an hour, so that difference alone reaches three hours; a scheduled run
+# also fires some tens of minutes after the cron under the documented load delay, which adds about one more.
+# 24 + 3 + 1 is 28, and 30 leaves margin over it.
+#
+# The cost is stated rather than hidden: a nightly that genuinely stops is reported up to 30 hours later
+# instead of 26. Detecting it a few hours sooner is not worth an alarm that fires on a slow-but-healthy
+# night, because an alarm that cries wolf is one nobody believes.
+#
+# `verify.py` ties this to the job's `timeout-minutes`, so raising that bound without re-sizing this fails.
+SWITCH_HOURS = 30
 
 # The stale sweep pages through the pending list, because an alarm it never sees is an alarm it cannot
 # cancel, and that one fires as a false alarm. Bounded so a repeating or malformed cursor cannot spin: ten

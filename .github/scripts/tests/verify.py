@@ -914,6 +914,22 @@ def test_workflows() -> None:
     check("W13 the platform is named at workflow level, where the no-report path can read it",
           (nightly.get("env") or {}).get("PLATFORM") == "iOS", nightly.get("env"))
 
+    # The liveness window and the job's own ceiling are one decision in two files. The alarm is armed when
+    # a run reports and cancelled when the next one does, so a run that takes hours longer than the one
+    # before it widens that gap; sized only from the 24-hour cadence, a slow-but-healthy night fires the
+    # previous alarm. Tied here so raising the job bound without re-sizing the window fails rather than
+    # producing a false alarm months later.
+    sys.path.insert(0, str(SCRIPTS))
+    import nightly_slack as poster_module  # noqa: PLC0415 - needs the path set above
+
+    cadence_hours = 24
+    delay_margin_hours = 1
+    needed = cadence_hours + (job_bound or 0) / 60 + delay_margin_hours
+    check("W14 the liveness window covers the cadence plus the longest healthy run",
+          poster_module.SWITCH_HOURS >= needed,
+          f"SWITCH_HOURS={poster_module.SWITCH_HOURS} needs >= {needed:.1f} "
+          f"(24h cadence + {job_bound}min job bound + {delay_margin_hours}h delay)")
+
 
 def main() -> int:
     if ONLY not in HALVES:
