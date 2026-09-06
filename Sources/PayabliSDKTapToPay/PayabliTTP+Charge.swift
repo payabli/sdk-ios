@@ -8,6 +8,10 @@ import PayabliSDKCore
 private enum TTPUpdateOutcome {
     case succeeded
     case failed(reason: String)
+
+    /// The caller cancelled. Separate from `failed`, because a caller who cancelled is not told the
+    /// update failed, and the best-effort notify after a reader failure ignores it either way.
+    case cancelled
 }
 
 @MainActor
@@ -118,6 +122,8 @@ extension PayabliTTP {
             return TransactionResult(paymentTransId: paymentTransId)
         case let .failed(reason):
             throw PayabliTTPError.updateFailed(reason: reason)
+        case .cancelled:
+            throw CancellationError()
         }
     }
 
@@ -226,6 +232,10 @@ extension PayabliTTP {
                 try mapPayabliHTTPError(response: response)
             }
             return .succeeded
+        } catch is CancellationError {
+            // Nothing below retries a cancelled request any more, and reporting it as a failed update
+            // here would put the same misreport back one layer up.
+            return .cancelled
         } catch {
             // Back into this surface's own vocabulary, so the event and the outcome read the same
             // whatever layer underneath produced the failure.
