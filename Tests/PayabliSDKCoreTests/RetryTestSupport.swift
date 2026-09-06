@@ -47,6 +47,28 @@ final class FakeRetryClock: RetryClock, @unchecked Sendable {
     }
 }
 
+/// A clock whose wait neither suspends nor observes cancellation.
+///
+/// `FakeRetryClock` waits on `Task.sleep`, which raises on a cancelled task, so a case about cancellation
+/// run against it stops in the backoff and reports cancellation whatever the code under test did. This one
+/// lets a retry proceed, so a guard that should have stopped it is the only thing that can.
+final class ImmediateRetryClock: RetryClock, @unchecked Sendable {
+    private let lock = NSLock()
+    private var seconds: TimeInterval = 0
+
+    func elapsed() -> TimeInterval {
+        lock.lock()
+        defer { lock.unlock() }
+        return seconds
+    }
+
+    func sleep(for seconds: TimeInterval) async throws {
+        lock.lock()
+        self.seconds += seconds
+        lock.unlock()
+    }
+}
+
 /// Counts attempts across a retried operation.
 actor AttemptCounter {
     private(set) var count = 0

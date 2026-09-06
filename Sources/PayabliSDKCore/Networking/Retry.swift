@@ -42,6 +42,10 @@ package enum Retry {
                     outcome = try await operation(thisAttempt)
                 }
             } catch let failure as any PayabliError {
+                // A layer below may have classified a cancelled call as a transient failure, which is
+                // retryable, so the caller who cancelled would have the request sent again. Asked before
+                // the failure is classified, so no policy can make cancellation worth repeating.
+                try Task.checkCancellation()
                 attempt = try await nextAttempt(
                     after: failure,
                     attempt: attempt,

@@ -129,6 +129,13 @@ package final class PayabliService: PayabliTransport, Sendable {
             )
         } catch let error as PayabliGenericError {
             throw error
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch let error as URLError where error.code == .cancelled {
+            // `URLSession` reports a cancelled task this way. Wrapping it as a network failure would make
+            // it retryable, so a caller who cancelled a charge would have it sent again and be told the
+            // network failed. Cancellation is not a failure of the request.
+            throw CancellationError()
         } catch {
             logger.error("Network error on \(decorated.path): \(error.localizedDescription)")
             throw PayabliGenericError(

@@ -270,6 +270,48 @@ final class RetryTests: XCTestCase {
 
     // MARK: - Cancellation
 
+    /// The path the case below cannot reach. `PayabliService.perform` wraps what `URLSession` throws, and
+    /// a cancelled request arriving as a transient failure would be retried: the caller who cancelled
+    /// gets the request sent again and is told the network failed.
+    ///
+    /// Driven through a real service over a stub that never answers, so the cancellation is the one
+    /// `URLSession` raises rather than one this case constructed.
+    func testCancellingAServiceBackedAttemptIsNotRetried() async throws {
+        let stub = RecordingStub { _ in (200, Data()) }
+        stub.installNeverAnswering()
+        defer { stub.uninstall() }
+
+        let auth = try makeTestAuth()
+        let transport = makeAuthenticatedStack(auth: auth)
+
+        // A clock that neither suspends nor observes cancellation, so a retry that should not happen is
+        // free to happen. Waiting on `Task.sleep` here would raise on the cancelled task and report
+        // cancellation whatever the code under test did.
+        let task = Task {
+            try await Retry.run(
+                policy: .test(maxAttempts: 3),
+                logger: logger(RecordingLogSink()),
+                clock: ImmediateRetryClock()
+            ) { _ in
+                try await transport.perform(PayabliRequest(method: .get, path: "/api/v2/ping"))
+            }
+        }
+        // Long enough for the request to be in flight, short enough not to be the reason a run is slow.
+        try await Task.sleep(nanoseconds: 200_000_000)
+        task.cancel()
+
+        do {
+            _ = try await task.value
+            XCTFail("expected cancellation")
+        } catch is CancellationError {
+            // The only acceptable outcome.
+        } catch let error as PayabliGenericError {
+            XCTFail("cancellation was reported as \(error.code.rawValue): \(error.reason)")
+        }
+
+        XCTAssertLessThanOrEqual(stub.count, 1, "a cancelled request is not sent again")
+    }
+
     func testCancellingTheCallerStaysCancellationRatherThanBecomingABudgetFailure() async {
         let clock = FakeRetryClock()
 
