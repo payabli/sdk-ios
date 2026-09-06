@@ -225,9 +225,13 @@ Two forms, and the first is the one to reach for:
   so every Keychain call returns `errSecMissingEntitlement`. Automated runs simply never name those
   schemes.
 - **A single class or method inside a target that otherwise runs** takes an `OnDevice`, `Live` or
-  `IfAvailable` name suffix and goes in the `HARDWARE_ONLY_TESTS` list in `.github/workflows/nightly.yml`,
-  which becomes `-skip-testing:` arguments. Identifiers are `Target/Class` or `Target/Class/method`,
-  without parentheses.
+  `IfAvailable` name suffix and goes in `.github/hardware-only-tests.txt`. Identifiers are `Target/Class`
+  or `Target/Class/method`, without parentheses.
+
+  **That file is the only copy, and every automated tier reads it.** The nightly and the pull-request gate
+  both run the `PayabliSDK-Package` scheme and both apply it through
+  `.github/scripts/hardware-only-skips.sh`. A tier that does not is where an excluded test quietly becomes
+  a skipping one: that tier stays green and reports a standing skip nobody reads.
 
   Five methods in `SecureStorageTests` are the list today. They need a Keychain that answers, the SPM test
   host has no entitlement, and they returned `errSecMissingEntitlement` and skipped on every simulator run
