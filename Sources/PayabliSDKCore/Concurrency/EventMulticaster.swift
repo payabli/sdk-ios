@@ -2,7 +2,7 @@ import Foundation
 
 /// Multicast emitter for any `Sendable` event type. Every concurrent caller
 /// of `stream()` receives all subsequent events.
-public final class EventMulticaster<Event: Sendable>: @unchecked Sendable {
+package final class EventMulticaster<Event: Sendable>: @unchecked Sendable {
     private final class Subscription: @unchecked Sendable {
         let id = UUID()
         let continuation: AsyncStream<Event>.Continuation
@@ -15,14 +15,14 @@ public final class EventMulticaster<Event: Sendable>: @unchecked Sendable {
     private let lock = NSLock()
     private var subscribers: [Subscription] = []
 
-    public init() {}
+    package init() {}
 
     /// Returns an independent `AsyncStream` for an event subscriber. Every
     /// concurrent caller of `stream()` receives all subsequent events emitted
     /// by `emit(_:)`. Subscriptions are cleaned up automatically when the
     /// returned stream's iterator is released or the consuming task is
     /// cancelled.
-    public func stream() -> AsyncStream<Event> {
+    package func stream() -> AsyncStream<Event> {
         AsyncStream { continuation in
             let sub = Subscription(continuation: continuation)
             lock.lock()
@@ -36,7 +36,7 @@ public final class EventMulticaster<Event: Sendable>: @unchecked Sendable {
 
     /// Broadcasts an event to every currently-active subscriber. Subscribers
     /// added after this call do not receive the event.
-    public func emit(_ event: Event) {
+    package func emit(_ event: Event) {
         lock.lock()
         let snapshot = subscribers
         lock.unlock()
@@ -48,7 +48,7 @@ public final class EventMulticaster<Event: Sendable>: @unchecked Sendable {
     /// Terminates every active stream. Typical use is during SDK teardown so
     /// consumer `for await` loops exit cleanly. Idempotent; new subscribers
     /// added after `finishAll()` start a fresh stream.
-    public func finishAll() {
+    package func finishAll() {
         lock.lock()
         let snapshot = subscribers
         subscribers.removeAll()

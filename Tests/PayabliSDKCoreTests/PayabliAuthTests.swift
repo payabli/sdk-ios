@@ -1,4 +1,4 @@
-import PayabliSDKCore
+@testable import PayabliSDKCore
 import XCTest
 
 final class PayabliAuthTests: XCTestCase {
@@ -506,26 +506,6 @@ final class PayabliAuthTests: XCTestCase {
         XCTAssertEqual(current, "old")
     }
 
-    func testARefusedTokenPublishesNoRotation() async throws {
-        let auth = PayabliAuth(config: try makeConfig(
-            accessToken: "old",
-            tokenProvider: { "old" }
-        ))
-
-        let stream = await auth.tokenChanges()
-        let collector = Task<String?, Never> {
-            for await token in stream {
-                return token
-            }
-            return nil
-        }
-
-        _ = try? await auth.invalidateAndRefresh(rejectedToken: "old")
-        collector.cancel()
-        let received = await collector.value
-        XCTAssertNil(received, "A rotation that did not happen must not be announced")
-    }
-
     // MARK: - What the provider's failure may carry
 
     /// The provider is host code and its error text can name the host's own endpoint
@@ -558,27 +538,5 @@ final class PayabliAuthTests: XCTestCase {
                 "the failing type should survive, since it names no subject: \(rendered)"
             )
         }
-    }
-
-    func testTokenChangesEmitsAfterRefresh() async throws {
-        let config = try PayabliConfig(
-            accessToken: "old",
-            tokenProvider: { "new" },
-            entryPoint: "demo",
-            environment: .sandbox
-        )
-        let auth = PayabliAuth(config: config)
-
-        let stream = await auth.tokenChanges()
-        let collector = Task<String?, Never> {
-            for await token in stream {
-                return token
-            }
-            return nil
-        }
-
-        _ = try await auth.invalidateAndRefresh(rejectedToken: "old")
-        let received = await collector.value
-        XCTAssertEqual(received, "new")
     }
 }

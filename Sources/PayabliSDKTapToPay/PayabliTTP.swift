@@ -81,9 +81,12 @@ public final class PayabliTTP: NSObject, ObservableObject {
 
     // MARK: - Init
 
-    /// Designated init. Shares a single `PayabliAuth` + `PayabliService`
-    /// across every component facade constructed with the same `PayabliSession`.
-    public init(
+    /// Designated init. Shares one credential holder and one transport across every
+    /// component facade constructed with the same `PayabliSession`.
+    ///
+    /// `package`: it takes the provider and the attestation service, so a host reaching
+    /// it could substitute either. A host uses the `accessToken:` init below instead.
+    package init(
         session: PayabliSession,
         appId: String,
         provider: TapToPayProvider,
@@ -109,7 +112,7 @@ public final class PayabliTTP: NSObject, ObservableObject {
     /// Convenience init that wraps a `PayabliConfig` in a fresh
     /// `PayabliSession`. Use the `session:` init when you need to share auth
     /// across multiple component facades on the same config.
-    public convenience init(
+    package convenience init(
         config: PayabliConfig,
         appId: String,
         provider: TapToPayProvider,
@@ -137,9 +140,7 @@ public final class PayabliTTP: NSObject, ObservableObject {
         /// Only available where Apple's `DeviceCheck` framework is importable.
         /// The package minimum of iOS 16.7, set by PayabliCardReaderCore and
         /// ProximityReader, is well above `DCAppAttestService`'s own floor of
-        /// iOS 14, so no extra `@available` gate is needed. A platform without
-        /// `DeviceCheck` uses the designated init with a custom
-        /// `DeviceAttestationService`.
+        /// iOS 14, so no extra `@available` gate is needed.
         /// Throws whatever `PayabliConfig.init` rejects: a token that cannot be sent,
         /// or an empty entry point.
         public convenience init(

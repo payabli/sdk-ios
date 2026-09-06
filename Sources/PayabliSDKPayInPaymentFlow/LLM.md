@@ -103,8 +103,8 @@ Direct async APIs:
 - Use only when the host app is prepared to handle clear card or bank data.
 - Do not describe direct APIs as PAN-isolating.
 
-Do not generate public sample code with a custom `PayabliTransport`.
-Transport injection exists for internal tests only.
+`PayabliTransport` is `package`, so a host app cannot supply one and sample code
+cannot show it being supplied.
 
 ## Operations
 

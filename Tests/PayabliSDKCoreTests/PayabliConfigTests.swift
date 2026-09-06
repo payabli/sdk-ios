@@ -1,4 +1,4 @@
-import PayabliSDKCore
+@testable import PayabliSDKCore
 import XCTest
 
 final class PayabliConfigTests: XCTestCase {

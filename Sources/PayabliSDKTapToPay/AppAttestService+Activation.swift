@@ -3,7 +3,7 @@ import PayabliSDKCore
 
 // MARK: - Device activation (PRD §9.7)
 
-public extension AppAttestService {
+package extension AppAttestService {
     func activateDevice(activationCode: String, entry: String) async throws {
         // Read only to refuse a paypoint that holds no binding. The handle sent is
         // the assertion's, below.

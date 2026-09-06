@@ -17,8 +17,8 @@ import PayabliSDKCore
 /// card-reader SDK. Retries require a fresh `/config` fetch.
 ///
 /// Error mapping: see `FiservCardReader+Errors.swift`.
-public final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
-    public static var providerId: String {
+package final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
+    package static var providerId: String {
         "fiserv"
     }
 
@@ -68,7 +68,7 @@ public final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
         private var reader: FiservTTPCardReader?
     #endif
 
-    public init() {}
+    package init() {}
 
     /// Injects `Credentials` directly. Facade path uses `configure(credentials:)`.
     func setCredentials(_ credentials: Credentials) {
@@ -93,7 +93,7 @@ public final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
 
     /// Validates the `/config` `providerCredentials` dict and stores it as
     /// `Credentials`. Throws on any missing required key.
-    public func configure(credentials raw: [String: String]) throws {
+    package func configure(credentials raw: [String: String]) throws {
         let missing = Self.requiredCredentialKeys.filter { raw[$0]?.isEmpty != false }
         guard missing.isEmpty else {
             throw PayabliTTPError.readerSetupFailed(
@@ -126,7 +126,7 @@ public final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
 
     /// Platform + `PaymentCardReader` hardware check. Runs before `/config`
     /// is fetched, so must not require credentials.
-    public func checkEligibility() async -> Result<Void, PayabliTTPError> {
+    package func checkEligibility() async -> Result<Void, PayabliTTPError> {
         #if canImport(PayabliCardReaderCore)
             if #available(iOS 16.7, *) {
                 guard PaymentCardReader.isSupported else {
@@ -142,12 +142,12 @@ public final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
         #endif
     }
 
-    public func prepareReader() async throws {
+    package func prepareReader() async throws {
         #if canImport(PayabliCardReaderCore)
             let creds = try requireCredentials()
             let newReader = try buildReader(credentials: creds)
 
-            // Drop our copy; credentials now live inside `newReader` (NFR-5D).
+            // Credentials now live inside `newReader`, so this copy is dropped (NFR-5D).
             lock.lock()
             credentials = nil
             lock.unlock()
@@ -172,7 +172,7 @@ public final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
         #endif
     }
 
-    public func startReading(_ request: CardReadRequest) async throws -> CardReadResult {
+    package func startReading(_ request: CardReadRequest) async throws -> CardReadResult {
         #if canImport(PayabliCardReaderCore)
             lock.lock()
             let activeReader = reader
@@ -232,12 +232,12 @@ public final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
         #endif
     }
 
-    public func cancelReading() async {
+    package func cancelReading() async {
         logger.info("[fiserv.cancel] clearing reader state")
         clearAllState()
     }
 
-    public func cleanUp() async {
+    package func cleanUp() async {
         logger.info("[fiserv.cleanup] clearing reader state")
         clearAllState()
     }

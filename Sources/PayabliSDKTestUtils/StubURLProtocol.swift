@@ -13,10 +13,10 @@ import Foundation
 ///
 /// POST bodies streamed via `httpBodyStream` are drained into `httpBody`
 /// automatically, so test handlers can inspect the request payload.
-public final class StubURLProtocol: URLProtocol {
-    public typealias Handler = (URLRequest) throws -> (HTTPURLResponse, Data)
+package final class StubURLProtocol: URLProtocol {
+    package typealias Handler = (URLRequest) throws -> (HTTPURLResponse, Data)
 
-    public nonisolated(unsafe) static var handler: Handler?
+    package nonisolated(unsafe) static var handler: Handler?
 
     override public class func canInit(with request: URLRequest) -> Bool {
         true
@@ -53,7 +53,7 @@ public final class StubURLProtocol: URLProtocol {
 
     /// Returns a `URLSession` pre-configured to intercept all requests with
     /// this protocol. Register a `handler` before making requests.
-    public static func makeSession() -> URLSession {
+    package static func makeSession() -> URLSession {
         let config = URLSessionConfiguration.ephemeral
         config.protocolClasses = [StubURLProtocol.self]
         return URLSession(configuration: config)

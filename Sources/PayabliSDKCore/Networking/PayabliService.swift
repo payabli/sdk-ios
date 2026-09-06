@@ -14,21 +14,21 @@ import Foundation
 /// - 410 → throws `PayabliGenericError(code: .sessionBurned)`
 /// - 500 → throws `PayabliPaymentError.server`
 /// - Other non-2xx → throws `PayabliGenericError(code: .unknown)`
-public final class PayabliService: PayabliTransport, Sendable {
+package final class PayabliService: PayabliTransport, Sendable {
     private let baseURL: URL
     private let session: URLSession
     private let logger: PayabliLogger
     private let decorations: [any PayabliRequestDecoration]
 
     /// Default per-request timeout (PRD NFR-6 — 10 seconds for tokenization calls).
-    public static let defaultRequestTimeout: TimeInterval = 10
+    package static let defaultRequestTimeout: TimeInterval = 10
 
     /// The only way to build a transport outside this module.
     ///
     /// There is no initializer that takes a chain, so every transport carries the one the factory
     /// builds. `readToken` reaches the chain and nothing here reads it; it is called once per request,
     /// so a rotation needs no cache invalidated.
-    public convenience init(
+    package convenience init(
         environment: PayabliEnvironment,
         readToken: @escaping @Sendable () async throws -> String,
         session: URLSession? = nil
@@ -104,7 +104,7 @@ public final class PayabliService: PayabliTransport, Sendable {
     ///
     /// Callers should use `performV2` for envelope decoding, or decode the raw
     /// response body manually for non-v2 endpoints.
-    public func perform(_ request: PayabliRequest) async throws -> PayabliResponse {
+    package func perform(_ request: PayabliRequest) async throws -> PayabliResponse {
         // First statement, so no path through this method skips decoration.
         let decorated = try await decorations.applyTo(request)
         let urlRequest = try buildURLRequest(decorated)
@@ -140,7 +140,7 @@ public final class PayabliService: PayabliTransport, Sendable {
     }
 
     /// Performs a request and decodes a v2 (MoneyIn) envelope.
-    public func performV2<T: Decodable & Sendable>(
+    package func performV2<T: Decodable & Sendable>(
         _ request: PayabliRequest,
         decoding: T.Type
     ) async throws -> PayabliV2Envelope<T> {
@@ -177,7 +177,7 @@ public final class PayabliService: PayabliTransport, Sendable {
     /// Maps a non-2xx `PayabliResponse` to a typed error. No-op for 2xx.
     /// Callers that decode responses manually (e.g. attestation endpoints
     /// that return a non-v2 envelope) should invoke this before decoding.
-    public func mapHTTPError(response: PayabliResponse) throws {
+    package func mapHTTPError(response: PayabliResponse) throws {
         try mapPayabliHTTPError(response: response)
     }
 }
@@ -201,7 +201,7 @@ public final class PayabliService: PayabliTransport, Sendable {
 /// - other non-2xx → `PayabliGenericError(.unknown)`
 ///
 /// The status fixes the classification; the body only decides how many fields get filled.
-public func mapPayabliHTTPError(
+package func mapPayabliHTTPError(
     response: PayabliResponse,
     override: ((Int) -> (any Error)?)? = nil
 ) throws {

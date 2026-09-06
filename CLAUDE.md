@@ -43,8 +43,9 @@ xcodebuild test -scheme PayabliSDK-Package -destination '...' -quiet
 ```
 
 Schemes: `PayabliSDK-Package` (everything, the one CI uses), `PayabliSDK`, `PayabliSDKCore`,
-`PayabliSDKTapToPay`, `PayabliSDKPayInPaymentFlow`, `PayabliSDKTelemetry`, `PayabliSDKTestUtils`,
-`PayabliCardReaderCore`.
+`PayabliSDKTapToPay`, `PayabliSDKPayInPaymentFlow`, `PayabliSDKTelemetry`, `PayabliCardReaderCore`.
+`PayabliSDKTestUtils` has no scheme of its own, being a target rather than a product; it builds as a
+dependency of the test targets.
 
 ## Code Quality
 
@@ -104,8 +105,9 @@ channel, so an app that never accepts card-present never links the certified car
   `PayabliConfig.telemetryEnabled` (depends on Core)
 
 **Test-only:**
-- `PayabliSDKTestUtils` - a real shipped library product carrying every in-memory fixture (depends on
-  Core, TapToPay, Telemetry). **Link from test targets only, never from a production target.**
+- `PayabliSDKTestUtils` - a target rather than a product, carrying every in-memory fixture (depends on
+  Core and TapToPay). Its declarations are `package`, so the test targets reach them and no consumer
+  can link or import the module at all.
 
 **Vendored:**
 - `PayabliCardReaderCore` - MIT-licensed `Fiserv/TTPPackage` source under
@@ -119,7 +121,15 @@ channel, so an app that never accepts card-present never links the certified car
 
 - `PayabliSession` owns one `PayabliAuth` and one `PayabliService` per `PayabliConfig`. Component
   facades accept a session, so token refresh, telemetry hooks and 401 semantics are shared rather
-  than reimplemented per module.
+  than reimplemented per module. Those session-taking initialisers are `package`; a host app reaches
+  the facade initialisers that take an access token and an entry point.
+- **`package` is the level for anything a capability target needs and a consumer must not have**:
+  the transport seam, the request and envelope types, the attestation and storage protocols, the
+  logger, and the retry primitive. `internal` is for what only its own module needs, and the
+  credential holder is one of those. Nothing at any level returns a token, a processor credential or
+  a key to a host app, and no `public` declaration offers an arbitrary authenticated request.
+  Adding `public` to a declaration in `Sources/` is a change to the shared contract described at the
+  top of this file.
 - **One choke-point for auth, and the two halves are separate.** `PayabliService.perform` applies a
   decoration chain as its first statement, and `BearerDecoration` inside that chain is the only thing
   that attaches `Authorization`. `AuthenticatedTransport` wraps the service and does the 401 dance
@@ -129,9 +139,9 @@ channel, so an app that never accepts card-present never links the certified car
   refreshes are deduplicated inside the `PayabliAuth` actor via a stored in-flight `Task`.
 - **A transport cannot be built without a token source.** `PayabliService`'s initialiser takes a
   `readToken` closure and builds its own chain from it; there is no initialiser that takes a chain, so
-  no caller can supply an empty one. `PayabliSession` exposes only the wrapped `transport`, never the
-  service underneath. A test that needs a specific chain uses `PayabliService.makeWithDecorations`,
-  which is internal and named for that purpose.
+  no caller can supply an empty one. `PayabliSession` exposes the wrapped `transport` at `package`
+  and never the service underneath. A test that needs a specific chain uses
+  `PayabliService.makeWithDecorations`, which is internal and named for that purpose.
 - **The chain runs once per attempt**, so anything that must survive a replay unchanged — an
   idempotency key is the live example — is set by the client and not by a decoration.
 - `mapPayabliHTTPError(response:override:)` is the canonical status-to-typed-error mapper: 400
@@ -188,7 +198,7 @@ channel, so an app that never accepts card-present never links the certified car
 
 - Five XCTest targets, one per module, in `Tests/`, plus three in the sample app's project:
   `PayabliDemoFlowTests`, `PayabliDemoUITests` and `PayabliDemoDeviceTests`.
-- **Fixtures ship in `PayabliSDKTestUtils`**: `StubURLProtocol`, `InMemorySecureStorage`,
+- **Fixtures live in `PayabliSDKTestUtils`**: `StubURLProtocol`, `InMemorySecureStorage`,
   `MockTapToPayProvider`, `MockAppAttestor`, `MockDeviceAttestationService`,
   `InMemoryTelemetryTransport`. Import it; do not redeclare these in a test bundle.
 - `StubURLProtocol` is the HTTP mocking primitive. Install its `handler` closure before the test;
