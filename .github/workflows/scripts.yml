@@ -1,0 +1,76 @@
+name: Nightly reporter tests
+
+# `nightly_report.py` decides the nightly verdict and gates the run, and `nightly_slack.py` is the only
+# thing that reports a failure. They are covered here rather than trusted.
+#
+# The harness also asserts what `nightly.yml` itself has to be: which triggers it may carry, that exactly one
+# job names the Slack token, and how the liveness owner is decided. Each of those was true of how the file was
+# written, which is not the same as being enforced. The checks themselves are the list, under
+# `test_workflows` in `verify.py`; naming them here as well would be a second copy that goes stale.
+#
+# This is also the only place a change to those scripts can be checked before it merges. A scheduled run
+# never fires from a feature branch, and `workflow_dispatch` needs the workflow to be on the default branch,
+# so nothing on a pull request can start the nightly itself. These run on the pull request, in about a
+# minute, and post nothing.
+#
+# Path-filtered, so an ordinary pull request pays nothing for it. That also means it must not be made a
+# required check: a required check that never runs blocks a merge rather than passing it. Neither may
+# `nightly.yml`.
+#
+# No `setup-python` and no install step. The runner's `python3` is what `nightly.yml` already invokes these
+# scripts with, and the harness is standard library only, so there is nothing to fetch. `git` is needed and
+# present, because the collector half builds a synthetic repository to run against.
+
+on:
+  pull_request:
+    paths:
+      # The workflow file is in the filter so a change to it tests itself.
+      - '.github/scripts/**'
+      - '.github/workflows/scripts.yml'
+      # The harness reads the nightly, so it has to be here or its assertions would not run on the change
+      # that broke them. A guard that does not run on the file it protects is not a guard.
+      - '.github/workflows/nightly.yml'
+  push:
+    branches: [main]
+    paths:
+      - '.github/scripts/**'
+      - '.github/workflows/scripts.yml'
+      - '.github/workflows/nightly.yml'
+
+concurrency:
+  group: scripts-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  harness:
+    name: Harness
+    runs-on: ubuntu-latest
+    # The sabotage half runs deliberately corrupted copies of the reporter, and neither it nor the collector
+    # subprocesses impose a timeout of their own, so a mutation that produces a loop would otherwise sit on
+    # the six-hour default.
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      # The workflow checks parse YAML, so the module has to be there. This fails the job if the runner image
+      # ever stops carrying it, which is the difference between a missing parser and checks that quietly
+      # examine nothing.
+      - name: A YAML parser is present
+        run: python3 -c "import yaml; print('yaml', yaml.__version__)"
+
+      # The collector runs as a subprocess in a synthetic git repository; the poster runs in-process against
+      # a fake Slack on loopback.
+      - name: Verify
+        run: python3 .github/scripts/tests/verify.py
+
+      # Each break is confirmed to turn a check red. Rewrites copies in a scratch directory and never the
+      # files in the tree, so an interrupted run leaves nothing behind. An edit that moves a mutation anchor
+      # reports INVALID and fails here; re-point the anchor in the same change.
+      - name: Sabotage
+        run: python3 .github/scripts/tests/sabotage.py

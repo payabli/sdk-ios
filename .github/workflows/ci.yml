@@ -121,14 +121,22 @@ jobs:
 
       - uses: ./.github/actions/ios-toolchain
 
+      # The same hardware-only exclusions the nightly applies, from the same file. Without them these
+      # tests do not fail here, they skip, and a standing skip on every pull request is indistinguishable
+      # from a regression that started skipping. `.github/hardware-only-tests.txt` says what belongs in it.
       - name: Test the SDK
         run: |
+          set -euo pipefail
+          # Into an array rather than expanded unquoted, so the arguments split exactly where the list
+          # says and nowhere else. An empty list leaves an empty array, which expands to nothing.
+          read -r -a skips <<< "$(.github/scripts/hardware-only-skips.sh)"
           xcodebuild test \
             -scheme PayabliSDK-Package \
             -destination "platform=iOS Simulator,id=$SIMULATOR_ID" \
             -clonedSourcePackagesDirPath .build/checkouts \
             -enableCodeCoverage YES \
             -resultBundlePath SDKTests.xcresult \
+            ${skips[@]+"${skips[@]}"} \
             -quiet \
             CODE_SIGNING_ALLOWED=NO
 

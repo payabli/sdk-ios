@@ -1,0 +1,300 @@
+name: Nightly
+
+# The slower half of CI, on a schedule, reporting to Slack.
+#
+# `ci.yml` gates every pull request and stays fast. This runs everything that gate cannot: the four builds
+# below produce no test results and none of them is reachable from a pull request, because the sample app
+# cannot compile on a clean checkout. It is deliberately not a required check, and it never runs on `push`
+# or `pull_request`.
+#
+# Two jobs, and the split is not organisation. Three things follow from it:
+#
+#   1. A test job that hits its own timeout dies before any step inside it can run, `if: always()` included.
+#      Only a separate job can announce that, and a nightly that goes silent on exactly the nights something
+#      is badly wrong is worse than no nightly.
+#   2. A slow Slack cannot hold a macOS runner.
+#   3. The bot token never shares a job with the code under test.
+#
+# The third is the weakest of the three here and is stated last on purpose: this test job runs no
+# third-party action, so unlike the Android counterpart there is nothing in it the token needs isolating
+# from today. The first two are sufficient on their own, and the third stops being free the moment a
+# third-party action is added.
+
+on:
+  workflow_dispatch:
+  schedule:
+    # 10:00 UTC, matching the Android nightly so both platforms land in the channel together. GitHub cron is
+    # UTC only, so this drifts an hour against local time twice a year. Scheduled runs also fire some tens of
+    # minutes after the hour under load, which is what the reporter's liveness window allows for.
+    - cron: '0 10 * * *'
+
+concurrency:
+  group: nightly-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  # Workflow level, never job level. Both platform SDKs report into one channel, and the report job reads
+  # this even when no facts file reached it, which is the one message that cannot name the platform any
+  # other way.
+  PLATFORM: iOS
+
+jobs:
+  nightly:
+    name: Suites and builds
+    runs-on: macos-15
+    # A backstop above the sum of the step bounds below, not a bound on the expected run. If it sits near
+    # that sum, steps running near their own limits let the job time out first, which takes the collect step
+    # and the suite gate with it. Raise it whenever a step bound goes up.
+    timeout-minutes: 220
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # Load-bearing rather than cautious. The failure attribution runs `git log -1 -- <file>`, and on a
+          # shallow clone git attributes the single grafted commit to every path, so every failure would name
+          # whatever landed last. A confidently wrong culprit is worse than none.
+          fetch-depth: 0
+          # Nothing here pushes, so the token is not left in `.git/config` for the branch's own scripts.
+          persist-credentials: false
+
+      - uses: ./.github/actions/ios-toolchain
+
+      # Every suite and build below carries `continue-on-error: true` and an id. One red step must not hide
+      # the rest, and the gate at the end reads all of them. `continue-on-error` is what makes that work:
+      # without it the first failure ends the job and the report describes a run that stopped early.
+
+      - name: Test the SDK
+        id: sdk
+        continue-on-error: true
+        timeout-minutes: 45
+        # The hardware-only exclusions come from `.github/hardware-only-tests.txt`, which `ci.yml` reads
+        # for the same scheme. One list: a test excluded here and skipping there would report a standing
+        # skip on every pull request, which is the thing the tier exists to remove.
+        run: |
+          set -euo pipefail
+          # Into an array rather than expanded unquoted, so the arguments split exactly where the list
+          # says and nowhere else. An empty list leaves an empty array, which expands to nothing.
+          read -r -a skips <<< "$(.github/scripts/hardware-only-skips.sh)"
+          xcodebuild test \
+            -scheme PayabliSDK-Package \
+            -destination "platform=iOS Simulator,id=$SIMULATOR_ID" \
+            -clonedSourcePackagesDirPath .build/checkouts \
+            -enableCodeCoverage YES \
+            -resultBundlePath SDKTests.xcresult \
+            ${skips[@]+"${skips[@]}"} \
+            -quiet \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Test the sample app's step sequences
+        id: flow
+        continue-on-error: true
+        timeout-minutes: 30
+        # No exclusion list here. Every entry in the shared one names a target in the package scheme, and
+        # this bundle has no hardware-only test: a demo suite that needed one would get its own list, and
+        # a suite that needs hardware outright belongs in the DeviceTests or UITests target instead.
+        run: |
+          set -euo pipefail
+          xcodebuild test \
+            -project Example/PayabliDemo/PayabliDemo.xcodeproj \
+            -scheme PayabliDemoFlowTests \
+            -destination "platform=iOS Simulator,id=$SIMULATOR_ID" \
+            -clonedSourcePackagesDirPath .build/checkouts \
+            -enableCodeCoverage YES \
+            -resultBundlePath DemoFlowTests.xcresult \
+            -quiet \
+            CODE_SIGNING_ALLOWED=NO
+
+      # The app target, which no pull request can build. `Secrets.swift` is gitignored and is a member of
+      # the app's Sources phase, so a clean checkout has no app to compile and `ci.yml` runs the flow tests
+      # through a host-free scheme for that reason. The tracked sample declares every member the app reads,
+      # so a placeholder copy compiles; nothing here runs the app or reaches a network.
+      #
+      # This step is also what makes the next one possible: both live test bundles are hosted by this app.
+      - name: Build the sample app
+        id: app
+        continue-on-error: true
+        timeout-minutes: 25
+        run: |
+          set -euo pipefail
+          cp Example/PayabliDemo/App/Configuration/Secrets.swift.sample \
+             Example/PayabliDemo/App/Configuration/Secrets.swift
+          xcodebuild build \
+            -project Example/PayabliDemo/PayabliDemo.xcodeproj \
+            -scheme PayabliDemo \
+            -destination "platform=iOS Simulator,id=$SIMULATOR_ID" \
+            -clonedSourcePackagesDirPath .build/checkouts \
+            -quiet \
+            CODE_SIGNING_ALLOWED=NO
+
+      # A device slice, which the simulator slice does not prove. The card-present paths compile against
+      # ProximityReader and App Attest, and code behind an availability or platform condition can be absent
+      # from a simulator build entirely, so a break there reaches a release rather than a run.
+      - name: Compile for a device
+        id: device_compile
+        continue-on-error: true
+        timeout-minutes: 25
+        run: |
+          set -euo pipefail
+          xcodebuild build \
+            -scheme PayabliSDK-Package \
+            -destination 'generic/platform=iOS' \
+            -clonedSourcePackagesDirPath .build/checkouts \
+            -quiet \
+            CODE_SIGNING_ALLOWED=NO
+
+      # Compiled, not run. Both bundles are the hardware tier: every test in them skips without a reachable
+      # token server and a live paypoint, so running them here would report a standing skip every night,
+      # which is the thing the tier convention exists to avoid. Compiling them is what keeps them from
+      # rotting silently between the hand runs that do exercise them.
+      - name: Build the live test bundles
+        id: bundles
+        continue-on-error: true
+        timeout-minutes: 25
+        #
+        # Both are attempted whichever fails. `set -e` would abandon the loop on the first, so a broken
+        # UITests bundle would hide whatever the DeviceTests bundle was going to say, which is the
+        # failure-hides-later-checks shape every other step here avoids by continuing on error.
+        run: |
+          set -uo pipefail
+          failed=""
+          for scheme in PayabliDemoUITests PayabliDemoDeviceTests; do
+            if ! xcodebuild build-for-testing \
+              -project Example/PayabliDemo/PayabliDemo.xcodeproj \
+              -scheme "$scheme" \
+              -destination "platform=iOS Simulator,id=$SIMULATOR_ID" \
+              -clonedSourcePackagesDirPath .build/checkouts \
+              -quiet \
+              CODE_SIGNING_ALLOWED=NO; then
+              echo "::error::$scheme did not build"
+              failed="$failed $scheme"
+            fi
+          done
+          if [ -n "$failed" ]; then
+            echo "these bundles did not build:$failed"
+            exit 1
+          fi
+
+      # The shipped artifact. `release.yml` runs on workflow_dispatch only, so without this a change that
+      # breaks the distribution build is invisible until someone cuts a release and finds out.
+      - name: Build the release XCFrameworks
+        id: xcframework
+        continue-on-error: true
+        timeout-minutes: 45
+        env:
+          # Never published, and named so it cannot be mistaken for one that is.
+          VERSION: nightly-${{ github.sha }}
+        run: ./Scripts/build_release_frameworks.sh
+
+      # Holds no credential, and must stay in this job: the result bundles are here and so is the git
+      # history the attribution reads. `!cancelled()` rather than `always()`, because a cancelled run has
+      # nothing worth reporting and a superseded one is about to be replaced by its successor.
+      - name: Collect the report
+        id: collect
+        if: ${{ !cancelled() }}
+        timeout-minutes: 5
+        env:
+          SDK_OUTCOME: ${{ steps.sdk.outcome }}
+          FLOW_OUTCOME: ${{ steps.flow.outcome }}
+          APP_BUILD_OUTCOME: ${{ steps.app.outcome }}
+          DEVICE_COMPILE_OUTCOME: ${{ steps.device_compile.outcome }}
+          LIVE_BUNDLES_OUTCOME: ${{ steps.bundles.outcome }}
+          XCFRAMEWORK_OUTCOME: ${{ steps.xcframework.outcome }}
+        run: python3 .github/scripts/nightly_report.py "$RUNNER_TEMP/nightly-facts/nightly-facts.json"
+
+      # One named directory rather than a glob. upload-artifact roots the archive at the common ancestor of
+      # everything it matched, so a glob that happens to match one extra path on a bad night shifts every
+      # internal path and the download step in the other job finds nothing where it looked.
+      - name: Upload the report facts
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-facts
+          path: ${{ runner.temp }}/nightly-facts
+          retention-days: 7
+
+      - name: Upload the result bundles
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-results
+          path: |
+            *.xcresult
+          retention-days: 7
+
+      # The gate. Reads step outcomes *and* the collector's verdict, because neither sees what the other
+      # does: a step outcome cannot see a suite that succeeded while discovering no tests, and the collector
+      # cannot see a step that died after writing its results.
+      #
+      # The verdict is a step output rather than something read back from the artifact, so the gate never
+      # has to wait on or trust the job that talks to Slack.
+      - name: Fail if any suite or build failed
+        if: always()
+        run: |
+          failed=0
+          for outcome in "${{ steps.sdk.outcome }}" "${{ steps.flow.outcome }}" \
+                         "${{ steps.app.outcome }}" "${{ steps.device_compile.outcome }}" \
+                         "${{ steps.bundles.outcome }}" "${{ steps.xcframework.outcome }}"; do
+            case "$outcome" in failure|cancelled|timed_out) failed=1 ;; esac
+          done
+          if [ "${{ steps.collect.outputs.verdict }}" = "red" ]; then
+            failed=1
+          fi
+          if [ "$failed" -eq 1 ]; then
+            echo "::error::A suite or build failed, or reported no results. See the Slack report and the logs."
+            exit 1
+          fi
+          echo "Everything passed."
+
+  report:
+    name: Report to Slack
+    needs: nightly
+    # `!cancelled()` rather than `always()`, and the three cases are why. A test job that timed out or
+    # failed reports, which is the case a step inside that job cannot cover. A run superseded by
+    # cancel-in-progress stays silent, because its successor is already running. A manual cancel stays
+    # silent, and is indistinguishable from supersession anyway.
+    if: ${{ !cancelled() }}
+    # What makes "the reporter cannot redden a green run" true. The poster's own exit-zero discipline covers
+    # a Slack outage; it does not cover a failed checkout or an uncaught exception, and neither of those is a
+    # test result.
+    continue-on-error: true
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # Shallow is fine: the history the attribution needed was read in the test job. This job holds a
+          # Slack token and has nothing to push.
+          persist-credentials: false
+
+      - name: Download the report facts
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: nightly-facts
+          path: ${{ runner.temp }}/nightly-facts
+
+      - name: Post the nightly report
+        timeout-minutes: 5
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+          SLACK_CHANNEL_ID: ${{ vars.SLACK_CHANNEL_ID }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Only the scheduled run on the default branch vouches for the schedule being alive. A dispatch or
+          # a probe branch reports normally and leaves the liveness alarm alone, because those runs are not
+          # evidence that the schedule still fires.
+          LIVENESS_OWNER: ${{ github.event_name == 'schedule' && github.ref_name == github.event.repository.default_branch }}
+          # What actually became of the test job, which the facts file cannot know: it is written and
+          # uploaded before the gate runs.
+          NIGHTLY_JOB_RESULT: ${{ needs.nightly.result }}
+        run: python3 .github/scripts/nightly_slack.py "$RUNNER_TEMP/nightly-facts/nightly-facts.json"

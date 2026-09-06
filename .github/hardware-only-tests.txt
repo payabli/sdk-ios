@@ -1,0 +1,30 @@
+# Tests that cannot run unattended, excluded from every automated tier rather than skipped.
+#
+# One list, read by `.github/scripts/hardware-only-skips.sh` and applied wherever the
+# `PayabliSDK-Package` scheme is tested: the nightly and the pull-request gate. Two copies would be two
+# lists the moment one of them is edited, and the failure mode is silent — a test excluded in one tier and
+# skipping in the other reports a standing skip nobody reads.
+#
+# Why excluded rather than skipped: the reporter derives passed from total minus failed minus skipped, so a
+# test parked with `XCTSkip` reports a skip every night, and a permanent skip cannot be told apart from a
+# regression that started skipping. An excluded test is absent from the result bundle and the counts stay
+# honest.
+#
+# The bar is that the test would fail or answer wrongly unattended, not that nobody has taught the
+# automation to run it. The second is a provisioning gap, fixed by changing a workflow rather than by owning
+# a device, and a test parked here for that reason is borrowing time.
+#
+# A whole suite that needs hardware belongs in its own test target instead, which is what the sample app's
+# DeviceTests and UITests bundles are. This file is for a class or a method inside a target that otherwise
+# runs. Entries are `Target/Class` or `Target/Class/method`, without parentheses. Blank lines and anything
+# after a `#` are ignored.
+
+# Need a Keychain that answers. The Swift package test host carries no entitlement, so these return
+# errSecMissingEntitlement and skipped on every simulator run before this list existed. Their assertions
+# are covered on a device by PayabliDemoDeviceTests/KeychainOnDeviceTests, which skips nothing. The other
+# ten tests in SecureStorageTests run normally, which is why these are named per method.
+PayabliSDKTapToPayTests/SecureStorageTests/testKeychainRoundTripIfAvailable
+PayabliSDKTapToPayTests/SecureStorageTests/testKeychainItemsAreWrittenForThisDeviceOnlyIfAvailable
+PayabliSDKTapToPayTests/SecureStorageTests/testRewritingALegacyItemStopsItTravellingIfAvailable
+PayabliSDKTapToPayTests/SecureStorageTests/testTheSweepRewritesAStoredItemAndKeepsItsValueIfAvailable
+PayabliSDKTapToPayTests/SecureStorageTests/testTheSweepStoresNothingForAKeyThatHasNoItemIfAvailable
