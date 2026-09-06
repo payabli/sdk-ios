@@ -5,10 +5,9 @@ import XCTest
 /// How a failure reads on each of the two flows.
 ///
 /// One adapter builds both screens' failures, and a 409 means different things on
-/// them. A capture sends an idempotency key, so a conflict says the service
-/// answered from an attempt that already reached it and the next submit repeats it.
-/// A stored method sends no key and offers no new attempt, so the same status is
-/// just what the service said.
+/// them. A capture sends an idempotency key, so a conflict says the service already
+/// holds this attempt and refused the repeat. A stored method sends no key and
+/// offers no new attempt, so the same status is just what the service said.
 ///
 /// Both shapes a conflict arrives in are covered: the typed failure carries the
 /// status where the API answered with a body, and an empty one carries the code

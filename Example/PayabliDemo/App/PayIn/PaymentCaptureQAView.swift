@@ -221,8 +221,9 @@ struct PaymentCaptureQAView: View {
         submitFailed = true
         // The request keeps its idempotency key. A failure does not say whether
         // the service accepted the payment: a lost response and a refused card
-        // arrive the same way, and a submit carrying the same key is answered
-        // from the attempt that already reached it.
+        // arrive the same way, and a submit carrying the same key is refused
+        // rather than taken a second time. What the first attempt did is read
+        // back rather than answered here.
         //
         // Drawing a fresh attempt is the button beside this message, and it is
         // the only place a key is minted.

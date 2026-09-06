@@ -6,8 +6,8 @@ enum PayInRequests {
     /// A capture's request configuration, with a key minted per attempt.
     ///
     /// One attempt is one payment, however many times it is submitted: a retry
-    /// carries the same key, so the service answers from the attempt that already
-    /// reached it. A payment of its own is a new configuration, which is what this
+    /// carries the same key, so the service refuses it rather than taking a second
+    /// payment. A payment of its own is a new configuration, which is what this
     /// builds, and the app builds the first at launch.
     ///
     /// The amount is drawn per attempt and the identifiers name this device and the

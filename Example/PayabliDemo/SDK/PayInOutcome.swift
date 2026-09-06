@@ -65,8 +65,8 @@ struct PayInFailure {
     /// the part safe to record.
     let logLabel: String
 
-    /// Whether the service answered from an attempt that already reached it, in
-    /// which case submitting again does the same thing and only a new attempt
+    /// Whether the service refused this as a repeat of an attempt it already holds,
+    /// in which case submitting again is refused the same way and only a new attempt
     /// sends a payment of its own.
     let isDuplicateSubmission: Bool
 }
@@ -147,9 +147,10 @@ extension PayInOutcome {
 extension PayInFailure {
     private static let duplicateMessage =
         "Duplicate submission (409): this attempt's idempotency key has already "
-            + "been used, so the service answered from the earlier one rather than taking "
-            + "a payment. Submitting again does the same. Start a new attempt to send a "
-            + "payment of its own."
+            + "been used, so the service refused the repeat rather than taking a payment. "
+            + "It does not answer with the earlier attempt's result, so read that attempt "
+            + "back to see whether it went through. Start a new attempt to send a payment "
+            + "of its own."
 
     /// Every failure reads as `localizedDescription`, which each SDK error type
     /// writes for a merchant: a validation failure appends the rejected fields, a
