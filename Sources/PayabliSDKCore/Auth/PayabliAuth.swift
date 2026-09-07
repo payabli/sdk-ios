@@ -56,7 +56,7 @@ actor PayabliAuth {
         }
 
         if let existing = inFlightRefresh {
-            return try await existing.value
+            return try await join(existing)
         }
 
         guard currentToken == rejectedToken else {
@@ -110,12 +110,27 @@ actor PayabliAuth {
         inFlightRefreshID = refreshID
 
         do {
-            return try await task.value
+            return try await join(task)
         } catch {
             inFlightRefresh = nil
             inFlightRefreshID = nil
             throw error
         }
+    }
+
+    /// Waits for a refresh already under way and answers with what it minted, unless this caller was
+    /// cancelled while waiting.
+    ///
+    /// The refresh itself runs on: it is shared, so one joiner going away must not take the credential
+    /// from the others. Only this caller stops.
+    ///
+    /// Cancellation is raised rather than returned because a caller who is cancelled and handed a token
+    /// carries on with it, which on the recovery path means sending the request again. `Task.value`
+    /// does not observe the awaiting task's cancellation, so nothing else here would notice.
+    private func join(_ refresh: Task<String, Error>) async throws -> String {
+        let minted = try await refresh.value
+        try Task.checkCancellation()
+        return minted
     }
 
     /// Installs the minted token. Called only once the token has passed
