@@ -882,7 +882,7 @@ def main() -> int:
     parent = slack_post("chat.postMessage", token, {"channel": channel, "text": fallback, "blocks": blocks})
     if parent is None or not parent.get("ok"):
         # Deliberately not reset here. The switch asserts that the channel heard from the nightly, and it did
-        # not: resetting would push the alarm out another 26 hours while the report was lost. Leaving the
+        # not: resetting would push the alarm out another SWITCH_HOURS while the report was lost. Leaving the
         # existing alarm armed is what makes that visible.
         return 0
     if owns_liveness_switch() and not green:
