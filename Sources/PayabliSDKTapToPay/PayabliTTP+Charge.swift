@@ -243,14 +243,15 @@ extension PayabliTTP {
             // here would put the same misreport back one layer up.
             return .cancelled
         } catch {
-            // Back into this surface's own vocabulary, so the event and the outcome read the same
-            // whatever layer underneath produced the failure.
-            let failure = PayabliTTPError.updateFailed(reason: error.localizedDescription)
-            // The event carries a summary and the caller the description: one goes
-            // wherever a host app forwards its telemetry, the other to a person.
+            // The event summarizes what actually failed, not this surface's wrapper for it: a rate limit,
+            // a server fault, a decline and a transport failure all reduce to `updateFailed` once wrapped,
+            // and a host forwarding this to telemetry cannot then tell an outage from a refused card.
             multicaster.emit(
-                .updateFailed(paymentTransId: paymentTransId, error: ErrorSummary.of(failure))
+                .updateFailed(paymentTransId: paymentTransId, error: ErrorSummary.of(error))
             )
+            // The caller still gets this surface's vocabulary, so the outcome reads the same whatever
+            // layer underneath produced the failure.
+            let failure = PayabliTTPError.updateFailed(reason: error.localizedDescription)
             return .failed(reason: failure.localizedDescription)
         }
     }

@@ -85,6 +85,36 @@ final class TTPUpdateRetryTests: XCTestCase {
         }
     }
 
+    /// The event names what failed, not the wrapper. Once wrapped, a rate limit, a server fault, a
+    /// decline and a transport failure all reduce to `updateFailed`, and a host forwarding this to
+    /// telemetry cannot tell an outage from a refused card.
+    func testTheUpdateFailedEventNamesTheUnderlyingFailure() async throws {
+        Self.updateResponses.script([402])
+        let ttp = try await makeReadyTTP()
+
+        var summaries: [String] = []
+        let stream = ttp.events()
+        let collector = Task {
+            for await event in stream {
+                if case let .updateFailed(_, error) = event {
+                    return error
+                }
+            }
+            return ""
+        }
+
+        _ = try? await charge(ttp)
+        summaries.append(await collector.value)
+
+        // The processor's own code as well as the kind: the stub's body carries `A01`, and it survives
+        // the decode into the event. Wrapping first reduced all of this to `updateFailed`.
+        XCTAssertEqual(
+            summaries.first,
+            "decline(A01)",
+            "a decline reaches telemetry as a decline, not as updateFailed"
+        )
+    }
+
     // MARK: - Fixture
 
     /// Statuses to answer `/MoneyIn/update/` with, in order, and how many arrived. The last entry
