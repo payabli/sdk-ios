@@ -40,10 +40,12 @@ COPIED = (
     ".github/workflows/nightly.yml",
     ".github/workflows/scripts.yml",
     ".github/workflows/ci.yml",
+    ".github/workflows/release.yml",
     ".github/hardware-only-tests.txt",
 )
 
 CI_YML = ".github/workflows/ci.yml"
+RELEASE_YML = ".github/workflows/release.yml"
 HARDWARE_LIST = ".github/hardware-only-tests.txt"
 HELPER = ".github/scripts/hardware-only-skips.sh"
 REPORT = ".github/scripts/nightly_report.py"
@@ -309,8 +311,8 @@ MUTATIONS = [
     Mutation(
         "the harness stops running on the workflow it makes claims about",
         SCRIPTS_YML,
-        "      - '.github/workflows/nightly.yml'\n  push:",
-        "  push:",
+        "      # list itself is what those exclusions are.\n      - '.github/workflows/nightly.yml'\n",
+        "      # list itself is what those exclusions are.\n",
         "W11", "workflows",
     ),
     Mutation(
@@ -327,6 +329,20 @@ MUTATIONS = [
     Mutation(
         "the job may run longer than the liveness window allows for",
         NIGHTLY, "    timeout-minutes: 220", "    timeout-minutes: 400", "W14", "workflows",
+    ),
+    Mutation(
+        "the release build stops applying the hardware-only exclusions",
+        RELEASE_YML,
+        '            ${skips[@]+"${skips[@]}"} \\\n',
+        "",
+        "W12", "workflows",
+    ),
+    Mutation(
+        "the harness stops running on the file holding the exclusions",
+        SCRIPTS_YML,
+        "      - '.github/hardware-only-tests.txt'\n  push:",
+        "  push:",
+        "W11", "workflows",
     ),
     Mutation(
         "the pull-request gate stops applying the hardware-only exclusions",

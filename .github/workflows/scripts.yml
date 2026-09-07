@@ -27,15 +27,23 @@ on:
       # The workflow file is in the filter so a change to it tests itself.
       - '.github/scripts/**'
       - '.github/workflows/scripts.yml'
-      # The harness reads the nightly, so it has to be here or its assertions would not run on the change
-      # that broke them. A guard that does not run on the file it protects is not a guard.
+      # Every file the harness makes claims about, or its assertions would not run on the change that
+      # broke them. A guard that does not run on the file it protects is not a guard. `ci.yml` and
+      # `release.yml` both test the package scheme and both have to apply the shared exclusions, and the
+      # list itself is what those exclusions are.
       - '.github/workflows/nightly.yml'
+      - '.github/workflows/ci.yml'
+      - '.github/workflows/release.yml'
+      - '.github/hardware-only-tests.txt'
   push:
     branches: [main]
     paths:
       - '.github/scripts/**'
       - '.github/workflows/scripts.yml'
       - '.github/workflows/nightly.yml'
+      - '.github/workflows/ci.yml'
+      - '.github/workflows/release.yml'
+      - '.github/hardware-only-tests.txt'
 
 concurrency:
   group: scripts-${{ github.ref }}

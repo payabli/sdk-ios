@@ -75,10 +75,15 @@ jobs:
           print(sorted(iphones, key=lambda x: x['name'])[-1]['udid'])
           ")
           echo "Using simulator: $SIMULATOR_ID"
+          # The same hardware-only exclusions the nightly and the pull-request gate apply, from the same
+          # file. This job tests and then tags, so without them a release is cut off a run that reported
+          # five standing skips.
+          read -r -a skips <<< "$(.github/scripts/hardware-only-skips.sh)"
           xcodebuild test \
             -scheme PayabliSDK-Package \
             -destination "platform=iOS Simulator,id=$SIMULATOR_ID" \
             -clonedSourcePackagesDirPath .build/checkouts \
+            ${skips[@]+"${skips[@]}"} \
             CODE_SIGNING_ALLOWED=NO \
             | xcpretty && exit ${PIPESTATUS[0]}
 

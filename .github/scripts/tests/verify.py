@@ -44,6 +44,7 @@ POSTER = SCRIPTS / "nightly_slack.py"
 NIGHTLY_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "nightly.yml"
 SCRIPTS_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "scripts.yml"
 CI_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "ci.yml"
+RELEASE_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "release.yml"
 HARDWARE_LIST = REPO_ROOT / ".github" / "hardware-only-tests.txt"
 
 HALVES = ("collector", "poster", "workflows", "helper", "both")
@@ -908,6 +909,19 @@ def test_workflows() -> None:
     scripts = yaml.safe_load(SCRIPTS_WORKFLOW.read_text())
     nightly_text = NIGHTLY_WORKFLOW.read_text()
 
+    # Every workflow in the directory, discovered rather than listed here. A named list would have to be
+    # extended by whoever adds the next workflow that tests this scheme, and the one that was missed was
+    # release.yml, which tests and then tags.
+    workflow_dir = REPO_ROOT / ".github" / "workflows"
+    tiers = []
+    for path in sorted(workflow_dir.glob("*.yml")):
+        text = path.read_text()
+        if "-scheme PayabliSDK-Package" in text and "xcodebuild test" in text:
+            tiers.append((path.name, text))
+    check("W12a every automated tier that tests the package scheme is accounted for",
+          {name for name, _ in tiers} >= {"nightly.yml", "ci.yml", "release.yml"},
+          sorted(name for name, _ in tiers))
+
     # PyYAML resolves the bare key `on` to the boolean True, which is the one YAML 1.1 quirk this file hits.
     triggers = nightly.get("on", nightly.get(True)) or {}
     check("W1 the nightly never runs on a push or a pull request",
@@ -977,7 +991,12 @@ def test_workflows() -> None:
           any((s.get("with") or {}).get("fetch-depth") == 0 for s in steps), "")
 
     scripts_triggers = scripts.get("on", scripts.get(True)) or {}
-    guarded = {".github/scripts/**", ".github/workflows/scripts.yml", ".github/workflows/nightly.yml"}
+    guarded = {
+        ".github/scripts/**",
+        ".github/workflows/scripts.yml",
+        ".github/hardware-only-tests.txt",
+        *(f".github/workflows/{name}" for name, _ in tiers),
+    }
     # Per event, not across both. A file listed only under `push` leaves the guard not running on the
     # pull request that changes it, which is the whole case it exists for, and a union would call that
     # covered.
@@ -994,14 +1013,12 @@ def test_workflows() -> None:
     # Both halves, because reading the list and passing it to xcodebuild are separate acts and only the
     # second one excludes anything. Asserting the first alone stayed green with the expansion deleted.
     expansion = '${skips[@]+"${skips[@]}"}'
-    for name, text in (("nightly.yml", nightly_text), ("ci.yml", ci_text)):
-        runs_package = "-scheme PayabliSDK-Package" in text and "xcodebuild test" in text
+    for name, text in tiers:
         check(f"W12 {name} applies the shared hardware-only list where it tests the package scheme",
-              runs_package and helper in text and expansion in text,
-              (runs_package, helper in text, expansion in text))
+              helper in text and expansion in text, (helper in text, expansion in text))
 
     check("W12c the list is one file, not a copy in a workflow",
-          "SecureStorageTests" not in nightly_text and "SecureStorageTests" not in ci_text,
+          not any("SecureStorageTests" in text for _, text in tiers),
           "an identifier is written into a workflow rather than the shared list")
 
     listed = [
