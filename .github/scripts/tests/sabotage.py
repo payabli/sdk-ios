@@ -318,6 +318,13 @@ MUTATIONS = [
         NIGHTLY, "          fetch-depth: 0", "          fetch-depth: 1", "W10", "workflows",
     ),
     Mutation(
+        "the report job runs only when the run was cancelled, which is the inverse",
+        NIGHTLY,
+        "    if: ${{ !cancelled() }}\n    # What makes",
+        "    if: ${{ cancelled() }}\n    # What makes",
+        "W4b", "workflows",
+    ),
+    Mutation(
         "the job may run longer than the liveness window allows for",
         NIGHTLY, "    timeout-minutes: 220", "    timeout-minutes: 400", "W14", "workflows",
     ),

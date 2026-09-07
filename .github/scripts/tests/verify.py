@@ -926,8 +926,12 @@ def test_workflows() -> None:
     report = jobs.get("report") or {}
     check("W4 the report job cannot redden a green run",
           report.get("continue-on-error") is True, report.get("continue-on-error"))
+    # The exact condition, not the substring. `cancelled()` and `!cancelled()` both contain it, and they
+    # are opposites: under the first the report job runs only when the run was cancelled, so no failure and
+    # no timeout would ever be announced, which is the one thing this job exists to do.
+    report_if = str(report.get("if", "")).replace("${{", "").replace("}}", "").strip()
     check("W4b and runs even when the test job did not finish",
-          "cancelled()" in str(report.get("if", "")), report.get("if"))
+          report_if == "!cancelled()", report.get("if"))
     check("W4c and waits for the test job", report.get("needs") == "nightly", report.get("needs"))
 
     owner = ""
