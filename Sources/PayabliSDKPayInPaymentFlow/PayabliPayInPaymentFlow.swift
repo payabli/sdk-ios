@@ -34,6 +34,10 @@ public final class PayabliPayInPaymentFlow: NSObject, ObservableObject, PayabliC
     /// a test only needs this pinned before it submits. Not public, so a host cannot supply one.
     var newIdempotencyKey: @Sendable () -> String = { UUID().uuidString }
 
+    /// Reads a clock that keeps running while the device sleeps, so a key held across a locked phone
+    /// expires on the wall rather than on processor time.
+    var monotonicNow: @Sendable () -> ContinuousClock.Instant = { ContinuousClock().now }
+
     @Published public private(set) var operation: PayabliPayInPaymentFlowOperation
     @Published public private(set) var requestConfiguration: PayabliPayInPaymentFlowRequestConfiguration?
 
@@ -44,33 +48,83 @@ public final class PayabliPayInPaymentFlow: NSObject, ObservableObject, PayabliC
     private var tokenStorageClient: PayInPaymentFlowTokenStorageClient
     private var activeSubmissionCount = 0
 
-    /// The attempt in flight, and the payment it is for.
-    private var attemptInFlight: (key: String, scope: AttemptScope)?
+    /// The attempt in flight.
+    private var attemptInFlight: HeldAttempt?
 
     /// The attempt that ended without an answer, whose key the next submit of the same payment sends.
     ///
-    /// Nothing here identifies a payer or an instrument: what a repeat has to match is the payment, and
-    /// this holds only what says which one that is.
-    private var unresolvedAttempt: (key: String, scope: AttemptScope)?
+    /// Nothing here identifies a payer or an instrument. What a repeat has to match is the payment, and
+    /// the instrument is not part of that: a payer reaching for a second card is retrying the same
+    /// purchase, and the card before it may already have been charged for that purchase.
+    private var unresolvedAttempt: HeldAttempt?
+
+    /// A key this SDK is holding, and what it was reserved for.
+    private struct HeldAttempt {
+        let key: String
+        let scope: AttemptScope
+        let reservedAt: ContinuousClock.Instant
+
+        /// True when this SDK minted the key or reused one it was already holding.
+        ///
+        /// A key the caller supplied is never held: it is theirs to resend, and holding one would mean
+        /// sending a value the caller did not choose for a submission they did not make.
+        let ours: Bool
+
+        /// True when the key was already being held rather than minted for this attempt, which is what
+        /// makes a conflict on this submission something the key's own handling caused.
+        let reused: Bool
+    }
 
     /// Which payment an attempt was for, so a held key is reused for that one and no other.
     ///
-    /// The route is part of it because authorizing and capturing the same amount are different
-    /// requests, and the transaction is, because two authorizations of equal value are as well.
+    /// Every field is an identifier or an amount the caller set. None of them names a payer or an
+    /// instrument, so holding this costs no exposure: a merchant that distinguishes two payments of
+    /// equal value distinguishes them here too, by the order, the customer, the account or the
+    /// subscription the request already carries.
     struct AttemptScope: Equatable {
         let route: String
         let amount: Double
         let currency: String?
+        let orderId: String?
+        let accountId: String?
+        let subscriptionId: Int64?
+        let customerId: Int64?
+        let customerNumber: String?
         let transactionId: String?
 
         init(
             route: String,
+            _ request: PayabliPayInPaymentFlowRequest,
+            transactionId: String? = nil
+        ) {
+            self.init(
+                route: route,
+                request.paymentDetails,
+                orderId: request.orderId,
+                accountId: request.accountId,
+                subscriptionId: request.subscriptionId,
+                customerData: request.customerData,
+                transactionId: transactionId
+            )
+        }
+
+        init(
+            route: String,
             _ details: PayabliPayInPaymentFlowPaymentDetails,
+            orderId: String? = nil,
+            accountId: String? = nil,
+            subscriptionId: Int64? = nil,
+            customerData: PayabliPayInPaymentFlowCustomerData? = nil,
             transactionId: String? = nil
         ) {
             self.route = route
             amount = details.totalAmount
             currency = details.currency
+            self.orderId = orderId
+            self.accountId = accountId
+            self.subscriptionId = subscriptionId
+            customerId = customerData?.customerId
+            customerNumber = customerData?.customerNumber
             self.transactionId = transactionId
         }
     }
@@ -358,7 +412,7 @@ public final class PayabliPayInPaymentFlow: NSObject, ObservableObject, PayabliC
                 request: request,
                 idempotencyKey: self.reserveKey(
                     request.idempotencyKey,
-                    for: AttemptScope(route: "capture", request.paymentDetails)
+                    for: AttemptScope(route: "capture", request)
                 )
             )
         }
@@ -380,7 +434,7 @@ public final class PayabliPayInPaymentFlow: NSObject, ObservableObject, PayabliC
                 request: request,
                 idempotencyKey: self.reserveKey(
                     request.idempotencyKey,
-                    for: AttemptScope(route: "authorize", request.paymentDetails)
+                    for: AttemptScope(route: "authorize", request)
                 )
             )
         }
@@ -420,18 +474,42 @@ public final class PayabliPayInPaymentFlow: NSObject, ObservableObject, PayabliC
     /// A key the caller supplied is refused rather than replaced when it cannot be sent, which is the
     /// client's to decide, since substituting one would send a key the caller does not hold.
     private func reserveKey(_ supplied: String?, for scope: AttemptScope) -> String {
+        let now = monotonicNow()
         if let supplied {
-            attemptInFlight = (supplied, scope)
+            attemptInFlight = HeldAttempt(
+                key: supplied, scope: scope, reservedAt: now, ours: false, reused: false
+            )
             return supplied
         }
-        if let unresolvedAttempt, unresolvedAttempt.scope == scope {
-            attemptInFlight = unresolvedAttempt
-            return unresolvedAttempt.key
+        if let held = unresolvedAttempt {
+            let expired = held.reservedAt.duration(to: now) >= Self.heldKeyWindow
+            if expired {
+                // Sending it now would read as protection and be a second payment: the service no
+                // longer holds the key, so it executes the request rather than refusing it.
+                unresolvedAttempt = nil
+            } else if held.scope == scope {
+                attemptInFlight = HeldAttempt(
+                    key: held.key, scope: scope, reservedAt: held.reservedAt, ours: true, reused: true
+                )
+                return held.key
+            }
         }
         let minted = newIdempotencyKey()
-        attemptInFlight = (minted, scope)
+        attemptInFlight = HeldAttempt(
+            key: minted, scope: scope, reservedAt: now, ours: true, reused: false
+        )
         return minted
     }
+
+    /// How long a key this SDK holds is still worth sending.
+    ///
+    /// The service keeps a key for two minutes from the moment it reads the request. This clock starts
+    /// when the key is reserved, which is before the request leaves the device, so the window that can
+    /// be relied on is shorter than the service's by however long the attempt took. Short by a margin
+    /// rather than exact, because the two directions cost different things: stopping early mints a key
+    /// where a repeat would have been refused, and stopping late sends a key the service has forgotten,
+    /// which it executes.
+    private static let heldKeyWindow: Duration = .seconds(90)
 
     /// Records how the attempt in flight ended.
     ///
@@ -441,10 +519,38 @@ public final class PayabliPayInPaymentFlow: NSObject, ObservableObject, PayabliC
     private func settleAttempt(_ failure: (any Error)?) {
         guard let attempt = attemptInFlight else { return }
         attemptInFlight = nil
-        if case .submissionInterrupted = failure as? PayabliPayInPaymentFlowError {
+        guard attempt.ours else {
+            // A key the caller chose is not this SDK's to hold, whatever happened to it.
+            return
+        }
+        if let failure, !Self.answersTheRequest(failure) {
             unresolvedAttempt = attempt
         } else {
             unresolvedAttempt = nil
+        }
+    }
+
+    /// Whether a failure says anything about the request the key went out for.
+    ///
+    /// A refusal, a conflict and a validation failure the service made all answer it, so the key has
+    /// nothing left to protect. Nothing else does. A credential the service rejected, a refusal to act
+    /// at all, and anything that never left the device leave the earlier attempt exactly as unknown as
+    /// it was, so its key is still the one the next submission has to send. Discarding it there is what
+    /// turns a corrected retry into a second payment.
+    private static func answersTheRequest(_ failure: any Error) -> Bool {
+        if let flow = failure as? PayabliPayInPaymentFlowError {
+            switch flow {
+            case .invalidInput, .missingAccessToken, .submissionInProgress, .submissionInterrupted:
+                return false
+            case .transactionFailed, .repeatRefused:
+                return true
+            }
+        }
+        switch (failure as? any PayabliError)?.code {
+        case .paymentDeclined, .conflict, .validation:
+            return true
+        default:
+            return false
         }
     }
 
@@ -460,7 +566,13 @@ public final class PayabliPayInPaymentFlow: NSObject, ObservableObject, PayabliC
             lastResult = result
             return result
         } catch {
+            let repeated = attemptInFlight?.reused ?? false
             settleAttempt(error)
+            if repeated, (error as? any PayabliError)?.code == .conflict {
+                // The key this SDK chose to send is why this failed, which is the one thing about its
+                // handling a caller has to be told.
+                throw PayabliPayInPaymentFlowError.repeatRefused
+            }
             throw error
         }
     }

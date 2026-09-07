@@ -70,7 +70,7 @@ final class PayInPaymentFlowClient: Sendable {
         )
         // The key as the request carries it, not as the caller wrote it: `sendableKey` normalises, and
         // reporting the unnormalised value would name a key that never went over the wire.
-        return try await perform(payabliRequest, retryKey: payabliRequest.headers["idempotencyKey"])
+        return try await perform(payabliRequest, carriesKey: payabliRequest.headers["idempotencyKey"] != nil)
     }
 
     private func performTransaction(
@@ -108,7 +108,7 @@ final class PayInPaymentFlowClient: Sendable {
         )
         // The key as the request carries it, not as the caller wrote it: `sendableKey` normalises, and
         // reporting the unnormalised value would name a key that never went over the wire.
-        return try await perform(payabliRequest, retryKey: payabliRequest.headers["idempotencyKey"])
+        return try await perform(payabliRequest, carriesKey: payabliRequest.headers["idempotencyKey"] != nil)
     }
 
     /// Builds the request. The transport's chain attaches the credential and the content type.
@@ -183,7 +183,7 @@ final class PayInPaymentFlowClient: Sendable {
 
     private func perform(
         _ request: PayabliRequest,
-        retryKey: String? = nil
+        carriesKey: Bool = false
     ) async throws -> PayabliPayInPaymentFlowResult {
         do {
             return try await send(request)
@@ -192,9 +192,8 @@ final class PayInPaymentFlowClient: Sendable {
             // no key to report. The host gets the error it threw, unwrapped and unwrapped only here.
             throw failure.underlying
         } catch {
-            guard let retryKey, Self.leavesOutcomeUnknown(error) else { throw error }
+            guard carriesKey, Self.leavesOutcomeUnknown(error) else { throw error }
             throw PayabliPayInPaymentFlowError.submissionInterrupted(
-                retryKey: retryKey,
                 code: (error as? any PayabliError)?.code ?? .unknown,
                 // One definition of what is kept from a failure, reused rather than restated.
                 causeType: RedactedCause(error).originalType

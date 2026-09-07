@@ -12,10 +12,10 @@ public enum PayabliPayInPaymentFlowError: PayabliError, Equatable {
 
     /// The request may have moved money and the outcome is not known.
     ///
-    /// `retryKey` is the idempotency key the attempt sent. A retry carrying it is recognised as the
-    /// repeat it is rather than acting a second time, and a repeat inside the service's window is
-    /// refused rather than executed. The original response is not replayed, so a caller that needs the
-    /// outcome still reads the transaction back.
+    /// No key is reported. This SDK mints it, holds it and sends it again itself when the next submit is
+    /// the same payment, so there is nothing here for a caller to carry and no value it could act on.
+    /// The original response is not replayed, so a caller that needs the outcome reads the transaction
+    /// back rather than repeating the submission.
     ///
     /// Raised only where a key was sent, which is the money-moving routes, and only where the answer
     /// leaves the outcome open: a network failure, a cancellation, a 5xx, a response that could not be
@@ -30,7 +30,18 @@ public enum PayabliPayInPaymentFlowError: PayabliError, Equatable {
     /// of its message, because that message can quote a response body or name a host's own endpoint,
     /// and an error's associated values are rendered wherever the chain is walked, a crash reporter
     /// included.
-    case submissionInterrupted(retryKey: String, code: PayabliErrorCode, causeType: String)
+    case submissionInterrupted(code: PayabliErrorCode, causeType: String)
+
+    /// A repeat this SDK sent, which the service refused.
+    ///
+    /// Raised where the key's own handling caused the failure: the previous submission of this payment
+    /// ended without an answer, this one repeated it under the same key, and the service recognised the
+    /// key and declined to act. So the earlier submission reached the service and this one took no
+    /// money.
+    ///
+    /// The outcome of that earlier submission is still what a caller needs, and a repeat cannot supply
+    /// it: the service answers the conflict rather than replaying what it did. Read the transaction back.
+    case repeatRefused
 
     public var code: PayabliErrorCode {
         switch self {
@@ -40,8 +51,10 @@ public enum PayabliPayInPaymentFlowError: PayabliError, Equatable {
             return .missingToken
         case let .transactionFailed(failure):
             return Self.classification(of: failure)
-        case let .submissionInterrupted(_, code, _):
+        case let .submissionInterrupted(code, _):
             return code
+        case .repeatRefused:
+            return .conflict
         }
     }
 
@@ -57,6 +70,8 @@ public enum PayabliPayInPaymentFlowError: PayabliError, Equatable {
             return failure.reasonText
         case .submissionInterrupted:
             return "The payment may have been taken and the outcome is unknown."
+        case .repeatRefused:
+            return "This payment already reached the service, so the repeat was refused rather than taken."
         }
     }
 
@@ -110,8 +125,10 @@ public enum PayabliPayInPaymentFlowError: PayabliError, Equatable {
             return nil
         case let .transactionFailed(failure):
             return failure.detailText
-        case let .submissionInterrupted(_, _, causeType):
+        case let .submissionInterrupted(_, causeType):
             return causeType
+        case .repeatRefused:
+            return nil
         }
     }
 }
