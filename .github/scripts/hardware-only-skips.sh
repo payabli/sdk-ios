@@ -5,9 +5,9 @@
 #
 #   xcodebuild test -scheme PayabliSDK-Package $(.github/scripts/hardware-only-skips.sh) ...
 #
-# Unquoted on purpose at the call site: the output is a list of arguments and has to split into several.
-# A test identifier carries no whitespace, which is what makes that safe, and the list is checked below
-# rather than assumed. An empty list expands to nothing, which is the state this is meant to survive.
+# The output is a list of arguments and has to split into several, which is safe because a test identifier
+# carries no whitespace. That is checked below rather than assumed. An empty list produces no output, which
+# is the state this is meant to survive.
 #
 # Its reason for existing is that the same exclusions must apply in the nightly and in the pull-request
 # gate. Two copies of the list would be two lists the moment one of them is edited, and the failure is
@@ -25,11 +25,19 @@ fi
 # `|| [ -n "$line" ]` so a final line with no trailing newline is still read.
 while IFS= read -r line || [ -n "$line" ]; do
     line="${line%%#*}"
-    # Trims in both directions, and rejects rather than repairs anything with whitespace inside it: an
-    # identifier that splits would become two arguments and silently exclude nothing.
-    line="$(printf '%s' "$line" | tr -d '[:space:]')"
+    # The edges only. Deleting interior whitespace would join two identifiers into a third that names no
+    # test: xcodebuild would then exclude nothing, and this would exit 0 having reported success. Measured
+    # before this changed, `Target/Class/methodA<tab>methodB` came out as `Target/Class/methodAmethodB`.
+    line="${line#"${line%%[![:space:]]*}"}"
+    line="${line%"${line##*[![:space:]]}"}"
     if [ -z "$line" ]; then
         continue
     fi
+    case "$line" in
+        *[[:space:]]*)
+            echo "error: hardware-only entry '$line' contains whitespace; a test identifier has none" >&2
+            exit 1
+            ;;
+    esac
     printf ' -skip-testing:%s' "$line"
 done < "$list"

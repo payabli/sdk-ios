@@ -45,6 +45,7 @@ COPIED = (
 
 CI_YML = ".github/workflows/ci.yml"
 HARDWARE_LIST = ".github/hardware-only-tests.txt"
+HELPER = ".github/scripts/hardware-only-skips.sh"
 REPORT = ".github/scripts/nightly_report.py"
 SLACK = ".github/scripts/nightly_slack.py"
 NIGHTLY = ".github/workflows/nightly.yml"
@@ -258,6 +259,26 @@ MUTATIONS = [
         "P25", "poster",
     ),
 
+    # ---- the exclusion helper ---------------------------------------------------------------------
+    Mutation(
+        "whitespace inside an entry is deleted rather than refused",
+        HELPER,
+        '    case "$line" in\n        *[[:space:]]*)\n            echo "error: hardware-only entry \'$line\' contains whitespace; a test identifier has none" >&2\n            exit 1\n            ;;\n    esac\n',
+        '    line="$(printf \'%s\' "$line" | tr -d \'[:space:]\')"\n',
+        "H3", "helper",
+    ),
+    Mutation(
+        "a comment on an entry's line is taken as part of the identifier",
+        HELPER, '    line="${line%%#*}"', "", "H2", "helper",
+    ),
+    Mutation(
+        "a missing list is treated as an empty one",
+        HELPER,
+        'if [ ! -f "$list" ]; then\n    echo "error: no hardware-only test list at $list" >&2\n    exit 1\nfi',
+        'if [ ! -f "$list" ]; then\n    exit 0\nfi',
+        "H5", "helper",
+    ),
+
     # ---- the workflows -------------------------------------------------------------------------
     Mutation(
         "the nightly starts running on pull requests",
@@ -360,12 +381,25 @@ def failed_labels(output: str) -> list[str]:
 
 
 def parses(path: Path) -> bool:
+    """Whether the mutated file still loads, checked by whatever can actually read that kind of file.
+
+    Per suffix, rather than Python-or-YAML. Treating everything else as YAML rejected a shell script that
+    was perfectly valid and reported three sound mutations as INVALID, which reads as a stale anchor and
+    sends the next reader to re-point one that was already right. A plain list has no parser and needs
+    none.
+    """
     text = path.read_text(encoding="utf-8")
     if path.suffix == ".py":
         try:
             ast.parse(text)
         except SyntaxError:
             return False
+        return True
+    if path.suffix == ".sh":
+        result = subprocess.run(["bash", "-n", str(path)], capture_output=True, text=True,
+                                timeout=30, check=False)
+        return result.returncode == 0
+    if path.suffix not in (".yml", ".yaml"):
         return True
     try:
         import yaml

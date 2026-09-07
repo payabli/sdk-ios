@@ -46,7 +46,7 @@ SCRIPTS_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "scripts.yml"
 CI_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "ci.yml"
 HARDWARE_LIST = REPO_ROOT / ".github" / "hardware-only-tests.txt"
 
-HALVES = ("collector", "poster", "workflows", "both")
+HALVES = ("collector", "poster", "workflows", "helper", "both")
 ONLY = os.environ.get("NIGHTLY_ONLY", "both")
 
 PASS: list[str] = []
@@ -1035,6 +1035,66 @@ def test_workflows() -> None:
           f"(24h cadence + {job_bound}min job bound + {delay_margin_hours}h delay)")
 
 
+# --------------------------------------------------------------------------------------------------
+# The exclusion helper.
+#
+# Two workflows pass its output straight to xcodebuild, so a wrong answer here excludes the wrong tests or
+# none at all, and nothing downstream notices: the suite still passes, and a test that should have been
+# excluded reports a standing skip instead. It had no checks at all until an entry with an embedded tab was
+# found being joined into a name that matches no test, with the helper exiting 0.
+# --------------------------------------------------------------------------------------------------
+
+def run_helper(entries: str, tmp: Path, *, write_list: bool = True) -> tuple[int, str, str]:
+    """Run the real helper against a synthetic list, in a tree shaped the way it resolves paths."""
+    root = tmp / "helper"
+    if root.exists():
+        shutil.rmtree(root)
+    (root / "scripts").mkdir(parents=True)
+    shutil.copy(REPO_ROOT / ".github/scripts/hardware-only-skips.sh", root / "scripts")
+    if write_list:
+        (root / "hardware-only-tests.txt").write_text(entries, encoding="utf-8")
+    result = subprocess.run(
+        [str(root / "scripts" / "hardware-only-skips.sh")],
+        capture_output=True, text=True, timeout=60, check=False,
+    )
+    return result.returncode, result.stdout, result.stderr
+
+
+def test_helper() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+
+        code, out, _ = run_helper("A/B/c\nD/E/f\n", root)
+        check("H1 every entry becomes one exclusion argument",
+              code == 0 and out.split() == ["-skip-testing:A/B/c", "-skip-testing:D/E/f"], (code, out))
+
+        code, out, _ = run_helper(
+            "# a comment\n\n   \nA/B/c   # trailing note\n   D/E/f\n", root
+        )
+        check("H2 comments, blank lines and surrounding space are ignored",
+              code == 0 and out.split() == ["-skip-testing:A/B/c", "-skip-testing:D/E/f"], (code, out))
+
+        # The one that shipped wrong. Deleting the tab produced `Target/Class/methodAmethodB`, which names
+        # no test, so xcodebuild excluded nothing and the helper reported success.
+        code, out, err = run_helper("Target/Class/methodA\tmethodB\n", root)
+        check("H3 an identifier with whitespace inside it is refused rather than joined",
+              code != 0 and not out.strip(), (code, out))
+        check("H3b and the refusal says which entry it was",
+              "whitespace" in err and "methodA" in err, err[:200])
+
+        code, out, _ = run_helper("# nothing but a comment\n", root)
+        check("H4 an empty list produces no arguments and still succeeds",
+              code == 0 and out.strip() == "", (code, out))
+
+        code, _, err = run_helper("", root, write_list=False)
+        check("H5 a missing list fails rather than silently excluding nothing",
+              code != 0 and "no hardware-only test list" in err, (code, err[:200]))
+
+        code, out, _ = run_helper("A/B/c", root)
+        check("H6 a final entry with no trailing newline is still read",
+              code == 0 and out.split() == ["-skip-testing:A/B/c"], (code, out))
+
+
 def main() -> int:
     if ONLY not in HALVES:
         print(f"NIGHTLY_ONLY={ONLY!r} is not one of {', '.join(HALVES)}")
@@ -1047,6 +1107,8 @@ def main() -> int:
         test_poster()
     if ONLY in ("workflows", "both"):
         test_workflows()
+    if ONLY in ("helper", "both"):
+        test_helper()
 
     for label in PASS:
         print(f"  ok   {label}")
