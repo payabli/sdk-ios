@@ -18,8 +18,13 @@ public enum PayabliPayInPaymentFlowError: PayabliError, Equatable {
     ///
     /// **So resubmitting after this can take the payment a second time.** What settles the outcome is
     /// reading the transaction back, not repeating the submission: the service answers a repeat rather
-    /// than replaying what it did. A caller that supplied its own key may send that same key again, which
-    /// the service recognises as the repeat it is.
+    /// than replaying what it did.
+    ///
+    /// A caller that supplied its own key may send that same key again, and the service recognises the
+    /// repeat **for two minutes only**. That clock starts when the service reads the first request, not
+    /// when a caller sends it, so the window a caller can rely on is shorter than two minutes by however
+    /// long the attempt took. Past it the service has forgotten the key and executes the request, taking
+    /// the payment again. Past it, read the transaction back instead.
     ///
     /// Raised only where a key was sent, which is the money-moving routes, and only where the answer
     /// leaves the outcome open: a network failure, a cancellation, a 5xx, a response that could not be

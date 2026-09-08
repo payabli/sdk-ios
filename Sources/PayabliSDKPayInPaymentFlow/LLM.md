@@ -325,7 +325,7 @@ authorize forms:
 | `source` | Optional integration source string. |
 | `subdomain` | Optional subdomain query value. |
 | `subscriptionId` | Optional subscription ID. |
-| `idempotencyKey` | Optional. Left unset, the SDK reserves one for the attempt, so a money-in request always carries a key. Set it to resend the same attempt. Blank or unsendable is refused rather than dropped. |
+| `idempotencyKey` | Optional. Left unset, the SDK reserves one for the attempt, so a money-in request always carries a key. Set it to resend the same attempt: the service recognises a repeat under one key for two minutes and refuses it, counting from when it read the first request rather than from when you sent it. Past that it has forgotten the key and executes the request, so an outcome you never saw is settled by reading the transaction back rather than by resending. Blank or unsendable is refused rather than dropped. |
 | `achValidation` | Optional ACH validation flag for capture. |
 | `forceCustomerCreation` | Optional customer-creation flag. |
 | `validation` | Client validation toggles. |

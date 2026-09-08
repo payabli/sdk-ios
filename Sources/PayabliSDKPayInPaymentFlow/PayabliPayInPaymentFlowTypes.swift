@@ -333,8 +333,11 @@ public struct PayabliPayInPaymentFlowAuthorizedRequest: Sendable {
     /// The key this capture sends, or nil to have one minted for the attempt.
     ///
     /// This call moves money, so a response lost on the way back leaves the outcome open. Supplying a
-    /// key lets a caller resend the same capture rather than risk a second partial one; a repeat inside
-    /// the service's window is refused rather than executed, and the first response is not replayed.
+    /// key lets a caller resend the same capture rather than risk a second partial one, for two minutes
+    /// counted from when the service read the first request: inside that a repeat is refused rather than
+    /// executed, and past it the service has forgotten the key and executes the request. The first
+    /// response is never replayed either way, so an outcome nobody saw is settled by reading the
+    /// transaction back.
     public let idempotencyKey: String?
 
     public init(
