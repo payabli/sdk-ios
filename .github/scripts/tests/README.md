@@ -5,8 +5,13 @@ that reports a failure. Neither is covered by the SDK's own suites, and both are
 defects are invisible: a reporter that stops noticing something looks exactly like a repository where that
 thing stopped happening.
 
-Two entry points, both standard library only, both run by `.github/workflows/scripts.yml` on any pull
-request that touches the scripts or the nightly.
+Two entry points, both run by `.github/workflows/scripts.yml` on any pull request that touches the
+scripts, the workflows that test the package scheme, or the exclusion list.
+
+**PyYAML is a prerequisite.** The workflow checks parse the workflows, so `verify.py` imports `yaml`
+and fails without it, and `sabotage.py` loses its parse safeguard for workflow mutations. The CI
+runner's own `python3` carries it, and the job asserts that rather than assuming it. Everything else is
+standard library. Locally: `python3 -c "import yaml"`, and `pip install pyyaml` if that fails.
 
 ```bash
 python3 .github/scripts/tests/verify.py     # do the scripts behave

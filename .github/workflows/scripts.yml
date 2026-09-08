@@ -18,8 +18,9 @@ name: Nightly reporter tests
 # `nightly.yml`.
 #
 # No `setup-python` and no install step. The runner's `python3` is what `nightly.yml` already invokes these
-# scripts with, and the harness is standard library only, so there is nothing to fetch. `git` is needed and
-# present, because the collector half builds a synthetic repository to run against.
+# scripts with, and the only module the harness needs beyond the standard library is PyYAML, which the
+# runner image carries and the first step asserts rather than assumes. `git` is needed and present,
+# because the collector half builds a synthetic repository to run against.
 
 on:
   pull_request:
