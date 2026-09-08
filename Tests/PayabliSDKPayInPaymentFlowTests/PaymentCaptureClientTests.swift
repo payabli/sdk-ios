@@ -649,9 +649,9 @@ private func parseBody(_ request: PayabliRequest) throws -> [String: Any] {
 
 /// Reserves the key the way the facade does, so these cases can exercise the client alone.
 ///
-/// The client takes the key as a parameter rather than reading it off the request, because the facade
-/// has to know which key went out in order to report it on a failure whose outcome is unknown. That
-/// makes the parameter mandatory, which is the point: it cannot be forgotten at a call site. These
+/// The client takes the key as a parameter rather than reading it off the request, and the parameter is
+/// mandatory, which is the whole of the point: a money-moving call cannot be written that omits it.
+/// Nothing reports the key. These
 /// overloads apply the same rule the facade applies, so a case that supplies a key still asserts on
 /// its own key.
 private extension PayInPaymentFlowClient {

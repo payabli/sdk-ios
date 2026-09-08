@@ -68,8 +68,8 @@ final class PayInPaymentFlowClient: Sendable {
             idempotencyKey: idempotencyKey,
             body: body
         )
-        // The key as the request carries it, not as the caller wrote it: `sendableKey` normalises, and
-        // reporting the unnormalised value would name a key that never went over the wire.
+        // Whether a key went out, not which one: nothing reports a key, and `perform` needs only to
+        // know that this route carries one so a failure that leaves the outcome open says so.
         return try await perform(payabliRequest, carriesKey: payabliRequest.headers["idempotencyKey"] != nil)
     }
 
@@ -106,8 +106,8 @@ final class PayInPaymentFlowClient: Sendable {
             idempotencyKey: idempotencyKey,
             body: body
         )
-        // The key as the request carries it, not as the caller wrote it: `sendableKey` normalises, and
-        // reporting the unnormalised value would name a key that never went over the wire.
+        // Whether a key went out, not which one: nothing reports a key, and `perform` needs only to
+        // know that this route carries one so a failure that leaves the outcome open says so.
         return try await perform(payabliRequest, carriesKey: payabliRequest.headers["idempotencyKey"] != nil)
     }
 
