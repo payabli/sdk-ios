@@ -51,13 +51,14 @@ ships a placeholder partner backend, so copy it and switch both endpoints to the
 resolver:
 
 ```swift
-static var partnerTokenEndpoint: URL { DemoConfiguration.TokenServer.exchangeTokenURL }
-static var partnerPaymentMethodAccessTokenEndpoint: URL { DemoConfiguration.TokenServer.exchangeTokenURL }
+static var partnerTokenEndpoint: URL { DemoConfiguration.TokenServer.accessTokenURL }
+static var partnerPaymentMethodAccessTokenEndpoint: URL { DemoConfiguration.TokenServer.accessTokenURL }
 ```
 
-`exchangeTokenURL` mints a token per call. `accessTokenURL` answers with the one the server was started
-with when it has one, so a refresh returns the credential that was just refused and the SDK's recovery
-from a rejected token cannot be exercised from the app at all.
+This is the endpoint for the direct-token setup above, and it answers with the token in `.env` every
+time. One thing that costs: the SDK asks its token provider again when a token is refused, and the same
+token comes back, so nothing the SDK does about a rejected credential can be exercised this way. See
+**Credential Exchange Mode** for the endpoint that mints per call.
 
 Both are listed because they are separate settings; a build pointing them at
 different backends is supported and honoured.
@@ -93,6 +94,18 @@ For another environment, change this and pick the matching scheme in the app.
 **Match this to the app.** A token minted for one Payabli environment is
 rejected by another, and the rejection reads as a credential problem rather than
 a configuration one.
+
+**Point the app at the minting endpoint too**, or it keeps asking the one that answers from `.env`:
+
+```swift
+static var partnerTokenEndpoint: URL { DemoConfiguration.TokenServer.exchangeTokenURL }
+static var partnerPaymentMethodAccessTokenEndpoint: URL { DemoConfiguration.TokenServer.exchangeTokenURL }
+```
+
+`/payabli/exchange-token` reads the client pair on every call and answers with a different token each
+time, so a refused token is followed by a new one and the SDK's recovery from a rejected credential runs
+end to end. It needs the two variables above: with only `PAYABLI_ACCESS_TOKEN` set it refuses the
+request rather than falling back.
 
 The app ships `.sandbox`, which is what an integrator can reach, so
 `.env.example` defaults to `api-sandbox`. Change them together. On the app side
