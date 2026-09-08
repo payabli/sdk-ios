@@ -188,6 +188,57 @@ extension PayabliPayInPaymentFlowDiagnostics {
         return value
     }
 
+    /// Names whose value is a verification outcome rather than a submitted one, checked before the
+    /// rules below because the substring `cvv` catches them.
+    private static let verificationResultKeys: Set<String> = [
+        "cvvresponse",
+        "cvvresponsetext"
+    ]
+
+    /// Names redacted on their own rather than by a substring rule.
+    private static let sensitiveExactKeys: Set<String> = [
+        "authorization",
+        // Generated here, held here and resent from here, so nothing outside this SDK is meant to
+        // hold it. A diagnostics entry a host can read is a surface like any other.
+        "idempotencykey",
+        "requesttoken",
+        "accesstoken",
+        "clientsecret",
+        "cardnumber",
+        "cardcvv",
+        "cvv",
+        "cardexp",
+        "cardzip",
+        "cardholder",
+        "achaccount",
+        "achrouting",
+        "achholder",
+        "accountnumber",
+        "referenceid",
+        "methodreferenceid",
+        "routingnumber",
+        "storedmethodid",
+        "customerid",
+        "customernumber",
+        "billingemail",
+        "billingphone",
+        "billingaddress1",
+        "billingaddress2",
+        "billingcity",
+        "billingstate",
+        "billingzip",
+        "shippingaddress1",
+        "shippingaddress2",
+        "shippingcity",
+        "shippingstate",
+        "shippingzip",
+        "firstname",
+        "lastname",
+        "name",
+        "email",
+        "phone"
+    ]
+
     private static func isSensitiveKey(
         _ key: String,
         phase: PayabliPayInPaymentFlowDiagnosticEntry.Phase
@@ -206,54 +257,11 @@ extension PayabliPayInPaymentFlowDiagnostics {
         // A response only, because they are the gateway's answer. `additionalData`
         // takes any key a caller puts in it, so on a request these names are a
         // submitted value wearing the answer's name.
-        let verificationResultKeys: Set = [
-            "cvvresponse",
-            "cvvresponsetext"
-        ]
         if phase == .response, verificationResultKeys.contains(normalized) {
             return false
         }
 
-        let exactKeys: Set = [
-            "authorization",
-            "requesttoken",
-            "accesstoken",
-            "clientsecret",
-            "cardnumber",
-            "cardcvv",
-            "cvv",
-            "cardexp",
-            "cardzip",
-            "cardholder",
-            "achaccount",
-            "achrouting",
-            "achholder",
-            "accountnumber",
-            "referenceid",
-            "methodreferenceid",
-            "routingnumber",
-            "storedmethodid",
-            "customerid",
-            "customernumber",
-            "billingemail",
-            "billingphone",
-            "billingaddress1",
-            "billingaddress2",
-            "billingcity",
-            "billingstate",
-            "billingzip",
-            "shippingaddress1",
-            "shippingaddress2",
-            "shippingcity",
-            "shippingstate",
-            "shippingzip",
-            "firstname",
-            "lastname",
-            "name",
-            "email",
-            "phone"
-        ]
-        if exactKeys.contains(normalized) {
+        if sensitiveExactKeys.contains(normalized) {
             return true
         }
 

@@ -303,6 +303,30 @@ final class PayInPaymentFlowClientTests: XCTestCase {
         XCTAssertFalse(rendered.contains("tokens.internal.example"), rendered)
     }
 
+    /// The key this SDK generates reaches no surface a host reads, diagnostics included.
+    ///
+    /// The record copies request headers, so a key left out of the error type still arrived here. What
+    /// the SDK holds and resends is not something a caller is asked to carry, and a diagnostics entry a
+    /// host can read is a surface like any other.
+    @MainActor
+    func testAGeneratedKeyDoesNotReachTheDiagnosticsRecord() async {
+        let sentinel = "SENTINEL-GENERATED-KEY"
+        let captured = LockedDiagnosticStrings()
+        let component = PayabliPayInPaymentFlow(
+            entryPoint: "entry",
+            environment: .sandbox,
+            accessTokenProvider: { "token" },
+            diagnostics: .enabled { captured.append($0) }
+        )
+        component.newIdempotencyKey = { sentinel }
+
+        _ = try? await component.capture(cardRequest())
+
+        let rendered = captured.all.joined(separator: "\n")
+        XCTAssertFalse(rendered.isEmpty, "the record should have entries to check")
+        XCTAssertFalse(rendered.contains(sentinel), rendered)
+    }
+
     /// A blank token is refused where it is read, which is the chain.
     ///
     /// Driven through the facade's own transport, because injecting a double replaces the chain and
