@@ -352,6 +352,13 @@ MUTATIONS = [
         "W12f", "workflows",
     ),
     Mutation(
+        "workflow discovery stops seeing one of the two extensions GitHub accepts",
+        ".github/scripts/tests/verify.py",
+        'if not path.is_file() or path.suffix not in (".yml", ".yaml"):',
+        'if not path.is_file() or path.suffix != ".yml":',
+        "W12g", "workflows",
+    ),
+    Mutation(
         "the release build stops applying the hardware-only exclusions",
         RELEASE_YML,
         '            ${skips[@]+"${skips[@]}"} \\\n',

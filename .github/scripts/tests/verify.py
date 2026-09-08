@@ -949,6 +949,24 @@ def _bad_args(poster) -> int:
 # The workflows themselves.
 # --------------------------------------------------------------------------------------------------
 
+def discover_tiers(workflow_dir: Path) -> list[tuple[str, str]]:
+    """Every workflow in a directory that tests the package scheme, found by content rather than by name.
+
+    Both extensions GitHub accepts, quoting its own documentation: "You can give the workflow file any
+    name you like, but you must use `.yml` or `.yaml` as the file name extension." Scanning one of them
+    would let a tier added under the other bypass every check that reads this list, and silently: the new
+    workflow would run its tests with no exclusions while the checks reported the invariant holding.
+    """
+    tiers = []
+    for path in sorted(workflow_dir.iterdir()):
+        if not path.is_file() or path.suffix not in (".yml", ".yaml"):
+            continue
+        text = path.read_text()
+        if "-scheme PayabliSDK-Package" in text and "xcodebuild test" in text:
+            tiers.append((path.name, text))
+    return tiers
+
+
 def test_workflows() -> None:
     import yaml  # noqa: PLC0415 - only this half needs it, and the job asserts it is present
 
@@ -959,15 +977,23 @@ def test_workflows() -> None:
     # Every workflow in the directory, discovered rather than listed here. A named list would have to be
     # extended by whoever adds the next workflow that tests this scheme, and the one that was missed was
     # release.yml, which tests and then tags.
-    workflow_dir = REPO_ROOT / ".github" / "workflows"
-    tiers = []
-    for path in sorted(workflow_dir.glob("*.yml")):
-        text = path.read_text()
-        if "-scheme PayabliSDK-Package" in text and "xcodebuild test" in text:
-            tiers.append((path.name, text))
+    tiers = discover_tiers(REPO_ROOT / ".github" / "workflows")
     check("W12a every automated tier that tests the package scheme is accounted for",
           {name for name, _ in tiers} >= {"nightly.yml", "ci.yml", "release.yml"},
           sorted(name for name, _ in tiers))
+
+    # Driven against a synthetic directory, because this repository has no `.yaml` workflow and the check
+    # would otherwise pass whatever the discovery matched.
+    with tempfile.TemporaryDirectory() as probe_dir:
+        probe = Path(probe_dir)
+        tests_package = "        run: xcodebuild test -scheme PayabliSDK-Package\n"
+        (probe / "named-yml.yml").write_text(tests_package, encoding="utf-8")
+        (probe / "named-yaml.yaml").write_text(tests_package, encoding="utf-8")
+        (probe / "not-a-tier.yml").write_text("        run: echo nothing\n", encoding="utf-8")
+        (probe / "notes.md").write_text(tests_package, encoding="utf-8")
+        found = {name for name, _ in discover_tiers(probe)}
+        check("W12g a tier is discovered under either extension GitHub accepts",
+              found == {"named-yml.yml", "named-yaml.yaml"}, sorted(found))
 
     # PyYAML resolves the bare key `on` to the boolean True, which is the one YAML 1.1 quirk this file hits.
     triggers = nightly.get("on", nightly.get(True)) or {}
