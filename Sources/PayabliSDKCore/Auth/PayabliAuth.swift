@@ -128,9 +128,12 @@ actor PayabliAuth {
     /// carries on with it, which on the recovery path means sending the request again. `Task.value`
     /// does not observe the awaiting task's cancellation, so nothing else here would notice.
     private func join(_ refresh: Task<String, Error>) async throws -> String {
-        let minted = try await refresh.value
+        // The result rather than the value, so a refresh that fails does not throw past the check. A
+        // caller cancelled while a provider was failing is cancelled, not told what the provider said:
+        // the failure belongs to whoever is still waiting for it.
+        let outcome = await refresh.result
         try Task.checkCancellation()
-        return minted
+        return try outcome.get()
     }
 
     /// Installs the minted token. Called only once the token has passed

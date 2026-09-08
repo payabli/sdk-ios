@@ -330,6 +330,57 @@ final class RetryTests: XCTestCase {
         XCTAssertEqual(attempts, 1, "a cancellation during the wait leaves the next attempt unsent")
     }
 
+    /// A caller cancelled while the refresh is failing is cancelled, not told what the provider said.
+    ///
+    /// The check after the join only guards the success path unless the result is awaited: a refresh that
+    /// throws would otherwise throw straight past it, and a direct transport caller outside `Retry.run`
+    /// would read a provider failure where its own cancellation is the answer.
+    func testCancellingWhileJoiningAFailingRefreshReportsCancellation() async throws {
+        struct ProviderFailure: Error {}
+
+        let released = Latch()
+        let providerCalls = Counter()
+        let stub = RecordingStub { _ in (401, Data()) }
+        stub.install()
+        defer { stub.uninstall() }
+
+        let auth = try makeTestAuth(tokenProvider: {
+            _ = await providerCalls.increment()
+            await released.wait()
+            throw ProviderFailure()
+        })
+        let transport = makeAuthenticatedStack(auth: auth)
+
+        let task = Task {
+            try await transport.perform(PayabliRequest(method: .get, path: "/api/v2/ping"))
+        }
+
+        // Cancelling before the refresh is under way would take the ordinary path and prove nothing.
+        var started = false
+        for _ in 0 ..< 300 where !started {
+            if await providerCalls.count == 1 {
+                started = true
+                break
+            }
+            try await Task.sleep(nanoseconds: 10_000_000)
+        }
+        XCTAssertTrue(started, "the refresh never started, so nothing was joined")
+
+        task.cancel()
+        released.open()
+
+        do {
+            _ = try await task.value
+            XCTFail("expected cancellation")
+        } catch is CancellationError {
+            // The only acceptable outcome.
+        } catch is ProviderFailure {
+            XCTFail("the provider's failure was reported to a caller that had been cancelled")
+        } catch {
+            XCTFail("cancellation surfaced as \(type(of: error)): \(error)")
+        }
+    }
+
     /// Cancelling while waiting on a shared refresh stops the recovery instead of replaying.
     ///
     /// The other cancellation cases cancel an HTTP request in flight and never reach this: the join goes
@@ -407,8 +458,9 @@ final class RetryTests: XCTestCase {
                 try await transport.perform(PayabliRequest(method: .get, path: "/api/v2/ping"))
             }
         }
-        // Long enough for the request to be in flight, short enough not to be the reason a run is slow.
-        try await Task.sleep(nanoseconds: 200_000_000)
+        // Cancelling before the request reaches the transport would satisfy every assertion below without
+        // the URLSession cancellation ever being translated, which is what this case is about.
+        await stub.waitUntilRequestArrives()
         task.cancel()
 
         do {
