@@ -331,6 +331,16 @@ MUTATIONS = [
         NIGHTLY, "    timeout-minutes: 220", "    timeout-minutes: 400", "W14", "workflows",
     ),
     Mutation(
+        "a tier runs on with no exclusions when the list cannot be read",
+        NIGHTLY,
+        '          if ! exclusions="$(.github/scripts/hardware-only-skips.sh)"; then\n'
+        '              echo "::error::the hardware-only exclusion list could not be read"\n'
+        "              exit 1\n"
+        "          fi\n",
+        '          exclusions="$(.github/scripts/hardware-only-skips.sh)"\n',
+        "W12f", "workflows",
+    ),
+    Mutation(
         "the release build stops applying the hardware-only exclusions",
         RELEASE_YML,
         '            ${skips[@]+"${skips[@]}"} \\\n',
@@ -354,7 +364,7 @@ MUTATIONS = [
     Mutation(
         "an exclusion is written into a workflow instead of the shared list",
         NIGHTLY,
-        "          read -r -a skips <<< \"$(.github/scripts/hardware-only-skips.sh)\"",
+        '          read -r -a skips <<< "$exclusions"',
         "          skips=(-skip-testing:PayabliSDKTapToPayTests/SecureStorageTests)",
         "W12c", "workflows",
     ),
@@ -444,13 +454,17 @@ def main() -> int:
     with tempfile.TemporaryDirectory() as tmp:
         baseline = Path(tmp) / "baseline"
         stage(baseline)
-        for half in ("collector", "poster", "workflows"):
+        # Every half a mutation can name, taken from the mutations themselves rather than listed here.
+        # The helper half was added and this list was not, so a pre-existing helper failure could have
+        # been credited to a helper mutation, which is the one thing the baseline exists to rule out.
+        halves = sorted({mutation.half for mutation in MUTATIONS})
+        for half in halves:
             code, output = run_verify(baseline, half)
             if code != 0:
                 print(f"INVALID: the unmutated copy is already failing the {half} half")
                 print(output[-2000:])
                 return 2
-        print(f"baseline green for all three halves ({len(MUTATIONS)} mutations to apply)\n")
+        print(f"baseline green for {', '.join(halves)} ({len(MUTATIONS)} mutations to apply)\n")
 
         for mutation in MUTATIONS:
             scratch = Path(tmp) / "scratch"

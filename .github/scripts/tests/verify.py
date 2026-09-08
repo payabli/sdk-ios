@@ -21,7 +21,7 @@ nothing looks exactly like one that passes.
     python3 .github/scripts/tests/verify.py
 
 Environment:
-    NIGHTLY_ONLY        collector | poster | workflows | both   (default: both, meaning all three)
+    NIGHTLY_ONLY        one of HALVES, or `both` for every family (the default)
 """
 
 from __future__ import annotations
@@ -1016,6 +1016,15 @@ def test_workflows() -> None:
     for name, text in tiers:
         check(f"W12 {name} applies the shared hardware-only list where it tests the package scheme",
               helper in text and expansion in text, (helper in text, expansion in text))
+        # And fails closed when the list cannot be read. `read` succeeds on a here-string whatever the
+        # command substitution inside it returned, so `read -r -a skips <<< "$(helper)"` drops the failure
+        # and leaves the array empty: the tier then runs the hardware-only tests with no exclusions and
+        # passes, which is the silent skip the list exists to prevent.
+        checks_status = f"if ! exclusions=\"$({helper}" in text.replace(".github/scripts/", "")
+        substituted_into_read = f'read -r -a skips <<< "$(' in text
+        check(f"W12f {name} refuses to run when the exclusion list cannot be read",
+              checks_status and not substituted_into_read,
+              (checks_status, substituted_into_read))
 
     check("W12c the list is one file, not a copy in a workflow",
           not any("SecureStorageTests" in text for _, text in tiers),

@@ -78,7 +78,17 @@ jobs:
           # The same hardware-only exclusions the nightly and the pull-request gate apply, from the same
           # file. This job tests and then tags, so without them a release is cut off a run that reported
           # five standing skips.
-          read -r -a skips <<< "$(.github/scripts/hardware-only-skips.sh)"
+          # The status is checked before the output is parsed. `read` succeeds on a here-string
+          # whatever the command substitution inside it returned, so the failure would be dropped and
+          # the array left empty: the step would then run the hardware-only tests with no exclusions
+          # and pass, which is the silent skip this whole list exists to prevent. Fail closed.
+          if ! exclusions="$(.github/scripts/hardware-only-skips.sh)"; then
+              echo "::error::the hardware-only exclusion list could not be read"
+              exit 1
+          fi
+          # Into an array rather than expanded unquoted, so the arguments split exactly where the list
+          # says and nowhere else. An empty list leaves an empty array, which expands to nothing.
+          read -r -a skips <<< "$exclusions"
           xcodebuild test \
             -scheme PayabliSDK-Package \
             -destination "platform=iOS Simulator,id=$SIMULATOR_ID" \
