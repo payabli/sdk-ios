@@ -127,6 +127,25 @@ final class RecordingStub: @unchecked Sendable {
         requests.count
     }
 
+    /// Resumes once `count` requests have arrived, so a case acts on a state it established rather than
+    /// on elapsed time.
+    ///
+    /// Bounded, and fails rather than returning: a request that never arrives means the case is about to
+    /// assert against something that did not happen.
+    func waitUntilRequestArrives(
+        count wanted: Int = 1,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) async {
+        for _ in 0 ..< 300 {
+            if count >= wanted {
+                return
+            }
+            try? await Task.sleep(nanoseconds: 10_000_000)
+        }
+        XCTFail("only \(count) of \(wanted) requests reached the stub", file: file, line: line)
+    }
+
     /// The bearer each request carried, in order, with the scheme stripped.
     var sentTokens: [String?] {
         requests.map {

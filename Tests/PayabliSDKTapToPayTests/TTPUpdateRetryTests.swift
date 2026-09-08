@@ -71,8 +71,9 @@ final class TTPUpdateRetryTests: XCTestCase {
         let ttp = try await makeReadyTTP()
 
         let task = Task { try await charge(ttp) }
-        // Long enough for the update to be in flight, short enough not to be why a run is slow.
-        try await Task.sleep(nanoseconds: 300_000_000)
+        // Cancelling during initiate or the card read would raise cancellation without the update ever
+        // being reached, which is the branch this case is about.
+        await Self.updateResponses.waitUntilEntered()
         task.cancel()
 
         do {
@@ -125,6 +126,7 @@ final class TTPUpdateRetryTests: XCTestCase {
         private var count = 0
 
         private var holdSeconds: TimeInterval = 0
+        private var hasEntered = false
 
         func script(_ statuses: [Int]) {
             lock.lock()
@@ -132,6 +134,7 @@ final class TTPUpdateRetryTests: XCTestCase {
             self.statuses = statuses
             count = 0
             holdSeconds = 0
+            hasEntered = false
         }
 
         /// Leaves the update in flight, so a test can cancel one that is genuinely under way. Bounded, so
@@ -142,6 +145,7 @@ final class TTPUpdateRetryTests: XCTestCase {
             statuses = [200]
             count = 0
             holdSeconds = seconds
+            hasEntered = false
         }
 
         var hold: TimeInterval {
@@ -166,6 +170,36 @@ final class TTPUpdateRetryTests: XCTestCase {
             lock.lock()
             defer { lock.unlock() }
             return count
+        }
+
+        /// Resumes once the update handler has been entered, so a case acts on a state it established
+        /// rather than on elapsed time.
+        ///
+        /// Bounded, and fails rather than returning: an update that never arrives means the case is about
+        /// to cancel something else and call it a cancelled update.
+        func waitUntilEntered(
+            file: StaticString = #filePath,
+            line: UInt = #line
+        ) async {
+            for _ in 0 ..< 300 {
+                if entered {
+                    return
+                }
+                try? await Task.sleep(nanoseconds: 10_000_000)
+            }
+            XCTFail("the update handler was never entered", file: file, line: line)
+        }
+
+        func markEntered() {
+            lock.lock()
+            defer { lock.unlock() }
+            hasEntered = true
+        }
+
+        var entered: Bool {
+            lock.lock()
+            defer { lock.unlock() }
+            return hasEntered
         }
     }
 
@@ -215,6 +249,7 @@ final class TTPUpdateRetryTests: XCTestCase {
         if path.contains("/MoneyIn/initiate") {
             body = ["code": "A01", "data": ["paymentTransId": TTPUpdateRetryTests.paymentTransId]]
         } else if path.contains("/MoneyIn/update/") {
+            TTPUpdateRetryTests.updateResponses.markEntered()
             let hold = TTPUpdateRetryTests.updateResponses.hold
             if hold > 0 {
                 Thread.sleep(forTimeInterval: hold)
