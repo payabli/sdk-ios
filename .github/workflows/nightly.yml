@@ -7,18 +7,19 @@ name: Nightly
 # cannot compile on a clean checkout. It is deliberately not a required check, and it never runs on `push`
 # or `pull_request`.
 #
-# Two jobs, and the split is not organisation. Three things follow from it:
+# This file holds no credential, and cannot. `workflow_dispatch` selects a ref, and GitHub runs that ref's
+# copy of the workflow and of every script it invokes, so any secret named here would be handed to whatever
+# a branch had written. Splitting it into a second job in this file does not close that: the job's steps
+# are still written in the branch's copy.
 #
-#   1. A test job that hits its own timeout dies before any step inside it can run, `if: always()` included.
-#      Only a separate job can announce that, and a nightly that goes silent on exactly the nights something
-#      is badly wrong is worse than no nightly.
+# So the Slack report lives in `nightly-report.yml`, triggered by `workflow_run`, which GitHub reads from
+# the default branch. Two more things follow from reporting out of a separate run rather than a step here,
+# and both are why it would be split even without the credential:
+#
+#   1. A job that hits its own timeout dies before any step inside it can run, `if: always()` included.
+#      Only something outside the run can announce that, and a nightly that goes silent on exactly the
+#      nights something is badly wrong is worse than no nightly.
 #   2. A slow Slack cannot hold a macOS runner.
-#   3. The bot token never shares a job with the code under test.
-#
-# The third is the weakest of the three here and is stated last on purpose: this test job runs no
-# third-party action, so unlike the Android counterpart there is nothing in it the token needs isolating
-# from today. The first two are sufficient on their own, and the third stops being free the moment a
-# third-party action is added.
 
 on:
   workflow_dispatch:
@@ -259,50 +260,3 @@ jobs:
           fi
           echo "Everything passed."
 
-  report:
-    name: Report to Slack
-    needs: nightly
-    # `!cancelled()` rather than `always()`, and the three cases are why. A test job that timed out or
-    # failed reports, which is the case a step inside that job cannot cover. A run superseded by
-    # cancel-in-progress stays silent, because its successor is already running. A manual cancel stays
-    # silent, and is indistinguishable from supersession anyway.
-    if: ${{ !cancelled() }}
-    # What makes "the reporter cannot redden a green run" true. The poster's own exit-zero discipline covers
-    # a Slack outage; it does not cover a failed checkout or an uncaught exception, and neither of those is a
-    # test result.
-    continue-on-error: true
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      contents: read
-      actions: read
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          # Shallow is fine: the history the attribution needed was read in the test job. This job holds a
-          # Slack token and has nothing to push.
-          persist-credentials: false
-
-      - name: Download the report facts
-        continue-on-error: true
-        uses: actions/download-artifact@v4
-        with:
-          name: nightly-facts
-          path: ${{ runner.temp }}/nightly-facts
-
-      - name: Post the nightly report
-        timeout-minutes: 5
-        env:
-          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
-          SLACK_CHANNEL_ID: ${{ vars.SLACK_CHANNEL_ID }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Only the scheduled run on the default branch vouches for the schedule being alive. A dispatch or
-          # a probe branch reports normally and leaves the liveness alarm alone, because those runs are not
-          # evidence that the schedule still fires.
-          LIVENESS_OWNER: ${{ github.event_name == 'schedule' && github.ref_name == github.event.repository.default_branch }}
-          # What actually became of the test job, which the facts file cannot know: it is written and
-          # uploaded before the gate runs.
-          NIGHTLY_JOB_RESULT: ${{ needs.nightly.result }}
-        run: python3 .github/scripts/nightly_slack.py "$RUNNER_TEMP/nightly-facts/nightly-facts.json"

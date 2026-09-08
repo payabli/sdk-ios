@@ -41,11 +41,13 @@ COPIED = (
     ".github/workflows/scripts.yml",
     ".github/workflows/ci.yml",
     ".github/workflows/release.yml",
+    ".github/workflows/nightly-report.yml",
     ".github/hardware-only-tests.txt",
 )
 
 CI_YML = ".github/workflows/ci.yml"
 RELEASE_YML = ".github/workflows/release.yml"
+REPORT_YML = ".github/workflows/nightly-report.yml"
 HARDWARE_LIST = ".github/hardware-only-tests.txt"
 HELPER = ".github/scripts/hardware-only-skips.sh"
 REPORT = ".github/scripts/nightly_report.py"
@@ -300,9 +302,11 @@ MUTATIONS = [
     ),
     Mutation(
         "either condition is enough to own the liveness switch",
-        NIGHTLY,
-        "github.event_name == 'schedule' && github.ref_name == github.event.repository.default_branch",
-        "github.event_name == 'schedule' || github.ref_name == github.event.repository.default_branch",
+        REPORT_YML,
+        "${{ github.event.workflow_run.event == 'schedule'\n"
+        "              && github.event.workflow_run.head_branch == github.event.repository.default_branch }}",
+        "${{ github.event.workflow_run.event == 'schedule'\n"
+        "              || github.event.workflow_run.head_branch == github.event.repository.default_branch }}",
         "W5", "workflows",
     ),
     Mutation(
@@ -322,8 +326,8 @@ MUTATIONS = [
     Mutation(
         "the harness stops running on the workflow it makes claims about",
         SCRIPTS_YML,
-        "      # list itself is what those exclusions are.\n      - '.github/workflows/nightly.yml'\n",
-        "      # list itself is what those exclusions are.\n",
+        "      - '.github/workflows/**'\n      - '.github/workflows/nightly.yml'\n",
+        "      - '.github/workflows/**'\n",
         "W11", "workflows",
     ),
     Mutation(
@@ -331,10 +335,35 @@ MUTATIONS = [
         NIGHTLY, "          fetch-depth: 0", "          fetch-depth: 1", "W10", "workflows",
     ),
     Mutation(
-        "the report job runs only when the run was cancelled, which is the inverse",
+        "the Slack token moves back into the branch-dispatchable workflow",
         NIGHTLY,
-        "    if: ${{ !cancelled() }}\n    # What makes",
-        "    if: ${{ cancelled() }}\n    # What makes",
+        "      - name: Checkout\n        uses: actions/checkout@v4\n",
+        "      - name: Checkout\n        env:\n"
+        "          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}\n"
+        "        uses: actions/checkout@v4\n",
+        "W3", "workflows",
+    ),
+    Mutation(
+        "the reporting workflow becomes dispatchable, so a branch chooses its definition",
+        REPORT_YML,
+        "on:\n  workflow_run:",
+        "on:\n  workflow_dispatch:\n  workflow_run:",
+        "W3c", "workflows",
+    ),
+    Mutation(
+        "the liveness owner reads this run instead of the nightly it reports on",
+        REPORT_YML,
+        "${{ github.event.workflow_run.event == 'schedule'\n"
+        "              && github.event.workflow_run.head_branch == github.event.repository.default_branch }}",
+        "${{ github.event_name == 'schedule'\n"
+        "              && github.ref_name == github.event.repository.default_branch }}",
+        "W5b", "workflows",
+    ),
+    Mutation(
+        "the report job runs only when the run was cancelled, which is the inverse",
+        REPORT_YML,
+        "    if: github.event.workflow_run.conclusion != 'cancelled'",
+        "    if: github.event.workflow_run.conclusion == 'cancelled'",
         "W4b", "workflows",
     ),
     Mutation(
@@ -354,8 +383,8 @@ MUTATIONS = [
     Mutation(
         "workflow discovery stops seeing one of the two extensions GitHub accepts",
         ".github/scripts/tests/verify.py",
-        'if not path.is_file() or path.suffix not in (".yml", ".yaml"):',
-        'if not path.is_file() or path.suffix != ".yml":',
+        'WORKFLOW_SUFFIXES = (".yml", ".yaml")',
+        'WORKFLOW_SUFFIXES = (".yml",)',
         "W12g", "workflows",
     ),
     Mutation(

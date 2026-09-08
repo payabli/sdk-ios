@@ -45,9 +45,15 @@ NIGHTLY_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "nightly.yml"
 SCRIPTS_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "scripts.yml"
 CI_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "ci.yml"
 RELEASE_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "release.yml"
+REPORT_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "nightly-report.yml"
 HARDWARE_LIST = REPO_ROOT / ".github" / "hardware-only-tests.txt"
 
 HALVES = ("collector", "poster", "workflows", "helper", "both")
+
+# What GitHub accepts as a workflow file, quoting its own documentation: "You can give the workflow
+# file any name you like, but you must use `.yml` or `.yaml` as the file name extension." One copy,
+# because a second one is how a scan comes to see a different set of files from its neighbour.
+WORKFLOW_SUFFIXES = (".yml", ".yaml")
 ONLY = os.environ.get("NIGHTLY_ONLY", "both")
 
 PASS: list[str] = []
@@ -959,7 +965,7 @@ def discover_tiers(workflow_dir: Path) -> list[tuple[str, str]]:
     """
     tiers = []
     for path in sorted(workflow_dir.iterdir()):
-        if not path.is_file() or path.suffix not in (".yml", ".yaml"):
+        if not path.is_file() or path.suffix not in WORKFLOW_SUFFIXES:
             continue
         text = path.read_text()
         if "-scheme PayabliSDK-Package" in text and "xcodebuild test" in text:
@@ -1003,23 +1009,51 @@ def test_workflows() -> None:
           "schedule" in triggers and "workflow_dispatch" in triggers, sorted(triggers))
 
     jobs = nightly.get("jobs") or {}
-    holders = [
-        name for name, job in jobs.items()
-        if "SLACK_BOT_TOKEN" in yaml.safe_dump(job)
-    ]
-    check("W3 exactly one job names the Slack token", holders == ["report"], holders)
-    check("W3b and it is not the job that runs the tests", "nightly" not in holders, holders)
 
-    report = jobs.get("report") or {}
+    # Which workflows name the Slack token, across the whole directory rather than inside one file. The
+    # question is not which job holds it but which *definitions* GitHub reads from a caller-selected ref:
+    # `workflow_dispatch` picks one, and the run then executes that ref's copy of the workflow and of
+    # every script it invokes, so a branch could rewrite the poster and be handed the credential. Putting
+    # the reporting in a second job of the same file does not close that, because the job's steps are
+    # still written in the branch's copy.
+    workflow_dir = REPO_ROOT / ".github" / "workflows"
+    token_holders = {}
+    for path in sorted(workflow_dir.iterdir()):
+        if not path.is_file() or path.suffix not in WORKFLOW_SUFFIXES:
+            continue
+        text = path.read_text()
+        if "SLACK_BOT_TOKEN" in text:
+            token_holders[path.name] = yaml.safe_load(text)
+
+    check("W3 exactly one workflow names the Slack token",
+          sorted(token_holders) == ["nightly-report.yml"], sorted(token_holders))
+    check("W3b and it is not the workflow that runs the tests",
+          "SLACK_BOT_TOKEN" not in nightly_text, "nightly.yml names the Slack token")
+
+    for name, holder in token_holders.items():
+        # PyYAML resolves the bare key `on` to True, the one YAML 1.1 quirk these files hit.
+        holder_on = holder.get("on", holder.get(True)) or {}
+        check(f"W3c {name} is triggered only by events whose definition comes from the default branch",
+              "workflow_dispatch" not in holder_on and "pull_request" not in holder_on
+              and "pull_request_target" not in holder_on,
+              sorted(holder_on))
+        check(f"W3d {name} reports on the nightly rather than repeating it",
+              "workflow_run" in holder_on
+              and "Nightly" in ((holder_on.get("workflow_run") or {}).get("workflows") or []),
+              holder_on.get("workflow_run"))
+
+    report_workflow = token_holders.get("nightly-report.yml") or {}
+    report = (report_workflow.get("jobs") or {}).get("report") or {}
     check("W4 the report job cannot redden a green run",
           report.get("continue-on-error") is True, report.get("continue-on-error"))
-    # The exact condition, not the substring. `cancelled()` and `!cancelled()` both contain it, and they
-    # are opposites: under the first the report job runs only when the run was cancelled, so no failure and
-    # no timeout would ever be announced, which is the one thing this job exists to do.
+    # The exact condition, not a substring of it. A report that ran only on a cancelled nightly would
+    # announce no failure and no timeout, which is the one thing it exists to do.
     report_if = str(report.get("if", "")).replace("${{", "").replace("}}", "").strip()
-    check("W4b and runs even when the test job did not finish",
-          report_if == "!cancelled()", report.get("if"))
-    check("W4c and waits for the test job", report.get("needs") == "nightly", report.get("needs"))
+    check("W4b and runs whatever became of the nightly, except when it was cancelled",
+          report_if == "github.event.workflow_run.conclusion != 'cancelled'", report.get("if"))
+    check("W4c and reads what became of it from the triggering run",
+          "github.event.workflow_run.conclusion" in yaml.safe_dump(report),
+          "the nightly's conclusion never reaches the poster")
 
     owner = ""
     for step in report.get("steps") or []:
@@ -1027,11 +1061,13 @@ def test_workflows() -> None:
     operands = [part.strip() for part in owner.split("&&")]
     check("W5 the liveness owner requires both conditions rather than either",
           "||" not in owner and len(operands) == 2, owner)
-    check("W5b one of them is that this run came from the schedule",
-          any("event_name == 'schedule'" in part for part in operands), owner)
-    check("W5c the other compares the ref to the default branch, and not by inequality",
-          any("ref_name" in part and "default_branch" in part for part in operands)
+    check("W5b one of them is that the nightly came from the schedule",
+          any("workflow_run.event == 'schedule'" in part for part in operands), owner)
+    check("W5c the other compares the nightly's branch to the default branch, and not by inequality",
+          any("workflow_run.head_branch" in part and "default_branch" in part for part in operands)
           and "!=" not in owner, owner)
+    check("W5d and both are read from the triggering run, not from this one",
+          "github.event_name" not in owner and "github.ref_name" not in owner, owner)
 
     test_job = jobs.get("nightly") or {}
     steps = test_job.get("steps") or []
@@ -1069,6 +1105,7 @@ def test_workflows() -> None:
         ".github/workflows/scripts.yml",
         ".github/hardware-only-tests.txt",
         *(f".github/workflows/{name}" for name, _ in tiers),
+        *(f".github/workflows/{name}" for name in token_holders),
     }
     # Per event, not across both. A file listed only under `push` leaves the guard not running on the
     # pull request that changes it, which is the whole case it exists for, and a union would call that
