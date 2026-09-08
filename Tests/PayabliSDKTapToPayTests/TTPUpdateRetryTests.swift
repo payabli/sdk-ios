@@ -13,6 +13,9 @@ final class TTPUpdateRetryTests: XCTestCase {
     private static let paymentTransId = "TXN-RETRY"
 
     override func tearDown() {
+        // Released before the handler is dropped: a held-open handler is on a URLProtocol thread and
+        // outlives this case otherwise.
+        Self.updateResponses.release()
         StubURLProtocol.handler = nil
         Self.updateResponses.reset()
         super.tearDown()
@@ -93,24 +96,31 @@ final class TTPUpdateRetryTests: XCTestCase {
         Self.updateResponses.script([402])
         let ttp = try await makeReadyTTP()
 
-        var summaries: [String] = []
         let stream = ttp.events()
-        let collector = Task {
+        let collector = Task<String?, Never> {
             for await event in stream {
                 if case let .updateFailed(_, error) = event {
                     return error
                 }
             }
-            return ""
+            return nil
         }
 
         _ = try? await charge(ttp)
-        summaries.append(await collector.value)
+
+        // Bounded, because the regression this case exists to catch is the event not being emitted, and an
+        // unbounded read of the stream would hang the suite rather than report it.
+        let deadline = Task {
+            guard (try? await Task.sleep(nanoseconds: 2_000_000_000)) != nil else { return }
+            collector.cancel()
+        }
+        let summary = await collector.value
+        deadline.cancel()
 
         // The processor's own code as well as the kind: the stub's body carries `A01`, and it survives
         // the decode into the event. Wrapping first reduced all of this to `updateFailed`.
         XCTAssertEqual(
-            summaries.first,
+            try XCTUnwrap(summary, "no updateFailed event arrived"),
             "decline(A01)",
             "a decline reaches telemetry as a decline, not as updateFailed"
         )
@@ -148,10 +158,34 @@ final class TTPUpdateRetryTests: XCTestCase {
             hasEntered = false
         }
 
-        var hold: TimeInterval {
+        /// Blocks while the case is holding the update open, and answers whether it was.
+        ///
+        /// Polls so teardown can end it: this runs on a URLProtocol thread, and one still sleeping when
+        /// the next case starts serves that case's request and consumes a status from its script.
+        func waitWhileHeld() -> Bool {
+            lock.lock()
+            let held = holdSeconds > 0
+            lock.unlock()
+            guard held else { return false }
+
+            let deadline = Date().addingTimeInterval(holdSeconds)
+            while Date() < deadline {
+                lock.lock()
+                let stillHeld = holdSeconds > 0
+                lock.unlock()
+                if !stillHeld {
+                    break
+                }
+                Thread.sleep(forTimeInterval: 0.02)
+            }
+            return true
+        }
+
+        /// Ends any hold, so teardown releases a handler rather than waiting out its bound.
+        func release() {
             lock.lock()
             defer { lock.unlock() }
-            return holdSeconds
+            holdSeconds = 0
         }
 
         func reset() {
@@ -249,12 +283,20 @@ final class TTPUpdateRetryTests: XCTestCase {
         if path.contains("/MoneyIn/initiate") {
             body = ["code": "A01", "data": ["paymentTransId": TTPUpdateRetryTests.paymentTransId]]
         } else if path.contains("/MoneyIn/update/") {
-            TTPUpdateRetryTests.updateResponses.markEntered()
-            let hold = TTPUpdateRetryTests.updateResponses.hold
-            if hold > 0 {
-                Thread.sleep(forTimeInterval: hold)
+            let script = TTPUpdateRetryTests.updateResponses
+            script.markEntered()
+            if script.waitWhileHeld() {
+                // Released by teardown rather than by its own bound, so the case that follows is not
+                // served by a handler still sleeping for this one. A released handler answers without
+                // consuming a status: the next script belongs to the next case.
+                return (
+                    HTTPURLResponse(
+                        url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: [:]
+                    )!,
+                    Data()
+                )
             }
-            status = TTPUpdateRetryTests.updateResponses.next()
+            status = script.next()
             body = ["code": "A01", "data": ["paymentTransId": TTPUpdateRetryTests.paymentTransId]]
         } else {
             body = [
