@@ -317,6 +317,31 @@ def test_collector() -> None:
         check("C6 every recorded message reaches the job summary",
               "a second recorded failure" in summary, summary[:400])
 
+        # C6b -------------------------------------------------------------------------------------
+        # A skip is red on its own. Green posts nothing, so a run whose only anomaly is a newly skipping
+        # test would say nothing at all, which is the regression the tier convention exists to expose.
+        skipped_only = write_bundle(
+            repo, "SkippedOnly.xcresult",
+            summary=summary_json(4, 3, 0, 1),
+            tests=tests_tree("PayabliSDKCoreTests", {
+                "WidgetTests": [
+                    case("testOne()", "Passed"),
+                    case("testTwo()", "Skipped", ["Test skipped - needs a device"]),
+                ],
+            }),
+            xccov=healthy_cov,
+        )
+        _, _, facts, output, _ = run_collector(
+            repo, bin_dir, {**ALL_GREEN_STEPS, **base, "SDK_RESULTS": str(skipped_only)}
+        )
+        check("C6b a run whose only anomaly is a skip is red",
+              facts and facts["verdict"] == "red", facts and facts["suites"])
+        check("C6c and the suite line says how many skipped",
+              "1 skipped" in at((facts or {}).get("suites") or [], 0).get("label", ""),
+              at((facts or {}).get("suites") or [], 0))
+        check("C6d while the skip is not listed as a failure",
+              facts and facts["failures"] == [], facts and facts["failures"])
+
         # C7 --------------------------------------------------------------------------------------
         silent = write_bundle(repo, "Silent.xcresult", summary=summary_json(0, 0, 0, 0),
                               tests=tests_tree("PayabliSDKCoreTests", {}), xccov=healthy_cov)
@@ -531,9 +556,18 @@ def failure_fixture(label: str = "WidgetTests > testTwo()", detail: str = "boom"
 
 
 def run_poster(poster, server: FakeSlack, facts: dict | None, env_extra: dict[str, str],
-               tmp: Path) -> int:
+               tmp: Path, raw: str | None = None) -> int:
+    """Run the poster's main() with the environment a real report job has.
+
+    `raw` writes the facts file verbatim, which is how a payload that is not valid facts gets driven
+    through the same path. It cannot be done by writing the file and calling main() directly: the
+    environment is restored below on the way out, so a later direct call has no credentials and returns
+    at that guard before reading the file.
+    """
     facts_path = tmp / "facts.json"
-    if facts is None:
+    if raw is not None:
+        facts_path.write_text(raw, encoding="utf-8")
+    elif facts is None:
         if facts_path.exists():
             facts_path.unlink()
     else:
@@ -717,9 +751,22 @@ def test_poster() -> None:
         check("P10 an unrecognised schema falls back rather than half-rendering",
               "Nightly · no report" in text, text[:200])
 
-        (root / "facts.json").write_text("[]", encoding="utf-8")
-        code = _call_main(poster, root / "facts.json")
-        check("P11 a facts file that is not an object never raises", code == 0, code)
+        # Through run_poster, so the credentials are set. Called directly it returned at the credential
+        # guard without ever reading the file, so the root-object check it names was never reached:
+        # measured, zero Slack calls. Asserting the fallback was posted is what makes it load-bearing.
+        # Caught rather than allowed to propagate, because "never raises" is the assertion. Letting it
+        # escape kills the harness before it prints anything, which reads like a pass and takes every
+        # later check with it. The broad except is the check, not a swallowed defect.
+        raised: Exception | None = None
+        code = None
+        try:
+            code = run_poster(poster, server, None, {"NIGHTLY_JOB_RESULT": "failure"}, root, raw="[]")
+        except Exception as error:  # noqa: BLE001 - see above
+            raised = error
+        check("P11 a facts file that is not an object never raises",
+              raised is None and code == 0, raised if raised else code)
+        check("P11b and falls back to the no-report message rather than saying nothing",
+              "Nightly · no report" in headline(server), headline(server)[:200])
 
         # P12 -------------------------------------------------------------------------------------
         server.responses = {

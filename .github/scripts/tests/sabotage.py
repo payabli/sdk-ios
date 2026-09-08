@@ -98,6 +98,10 @@ MUTATIONS = [
         "pass",
         "C1b", "collector",
     ),
+    Mutation(
+        "a skipped test no longer reddens the run",
+        REPORT, "        or skips_bad\n", "", "C6b", "collector",
+    ),
     # ---- the collector's counting ---------------------------------------------------------------
     Mutation(
         "passed is read rather than derived, so a skip reads as a pass",
@@ -190,6 +194,13 @@ MUTATIONS = [
     Mutation(
         "the collected verdict is believed over the job result",
         SLACK, 'unfinished = job_result != "success"', "unfinished = False", "P7", "poster",
+    ),
+    Mutation(
+        "a facts file that is not an object is rendered anyway",
+        SLACK,
+        "    if not isinstance(raw, dict):",
+        "    if False:",
+        "P11", "poster",
     ),
     Mutation(
         "an unrecognised facts schema is rendered anyway",

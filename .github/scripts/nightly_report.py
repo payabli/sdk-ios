@@ -35,7 +35,11 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
-# The first line of a failure message, which is what the Slack thread shows. The rest is in the job summary.
+# The first line of a failure message. It is not rendered anywhere the report reaches: the Slack
+# thread carries the test label and a link, because an XCTest mismatch quotes both operands and these
+# suites assert over card numbers, CVVs, expiries, cardholder names and ACH account numbers. It stays
+# in the facts because that file is a GitHub artifact with the same audience as the job summary, and a
+# reader opening it wants a line per failure without unpacking a result bundle. Bounded for that reader.
 MAX_DETAIL_CHARS = 300
 MAX_TRACE_CHARS = 4000
 # GitHub caps a job summary at 1 MiB. Spent in bytes rather than characters because that cap is a byte
@@ -482,12 +486,25 @@ def main() -> int:
     sdk_missing = sdk_step == "success" and sdk_total == 0
     flow_missing = flow_step == "success" and flow_total == 0
 
+    # A skip is red, and this is the whole point of the tier convention rather than a strict reading of it.
+    # A test that needs hardware is excluded, so it is absent from the bundle and the skip count stays 0;
+    # anything that does skip is therefore either a test that newly started skipping, which is a
+    # regression, or an `XCTSkip` added instead of an exclusion, which is the policy being bypassed. Both
+    # need a person.
+    #
+    # Green posts nothing, which is what makes ignoring this worse than it looks: a run whose only anomaly
+    # is a new skip would be silent, and the regression the convention exists to expose is exactly the one
+    # nobody would hear about. The skip count already renders in the suite line, so a red run with no
+    # failures says why on its face.
+    skips_bad = bool(sdk_skipped or flow_skipped)
+
     red = (
         bool(sdk_failed or flow_failed)
         or steps_bad
         or builds_bad
         or sdk_missing
         or flow_missing
+        or skips_bad
     )
 
     # Named by the workflow rather than inferred from the repo. Both platform SDKs report into the same
