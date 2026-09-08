@@ -50,6 +50,12 @@ struct AuthenticatedTransport: PayabliTransport {
         }
         _ = try await auth.invalidateAndRefresh(rejectedToken: rejected)
 
+        // Asked here rather than inside the holder, because a refresh answers from several places: a
+        // caller inside its own provider gets the current token, a token another request already rotated
+        // comes back without waiting, and only the joining path passes a check. Sending the request again
+        // is this layer's decision, so this is where the caller's cancellation has to stop it.
+        try Task.checkCancellation()
+
         // Refreshing first and deciding after: a refused credential is worth replacing whether or not
         // this particular request may be sent again, so the next one starts from a clean one.
         guard mayReplay(request, rejectedBy: firstAttempt) else {
