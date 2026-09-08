@@ -225,6 +225,34 @@ final class RetryTests: XCTestCase {
         XCTAssertEqual(clock.elapsed(), 1)
     }
 
+    /// A wait that fits when planned can still overrun: the clock keeps counting while the device is
+    /// suspended. The failure that caused the wait is what reaches the caller, not a synthetic timeout.
+    func testABackoffThatOverrunsTheBudgetStillReportsTheFailureThatCausedIt() async {
+        let clock = FakeRetryClock()
+
+        do {
+            _ = try await Retry.run(
+                policy: .test(maxAttempts: 5, totalTimeout: 1.2),
+                logger: logger(RecordingLogSink()),
+                clock: clock
+            ) { attempt in
+                if attempt == 1 {
+                    // Lands the clock past the deadline during the wait that follows, which the planned
+                    // 1s wait would not have done on its own.
+                    clock.advance(by: 0.4)
+                }
+                throw TestFailure(.serverError, reason: "the one that caused the wait")
+            }
+            XCTFail("expected the retry to stop")
+        } catch let error as TestFailure {
+            XCTAssertEqual(error.reason, "the one that caused the wait")
+        } catch let error as PayabliGenericError {
+            XCTFail("the real failure was discarded for: \(error.reason)")
+        } catch {
+            XCTFail("unexpected \(error)")
+        }
+    }
+
     func testAnUnboundedPolicyImposesNoDeadlineOfItsOwn() async throws {
         let clock = FakeRetryClock()
 
@@ -243,6 +271,9 @@ final class RetryTests: XCTestCase {
 
     func testTheTotalBudgetCutsOffAnInFlightAttemptAndDoesNotRetry() async {
         let clock = FakeRetryClock()
+        // This is the one case about the deadline winning, so it is the one that opens it. Everywhere
+        // else the operation wins by decision rather than by out-running a timer.
+        clock.openTheDeadline()
         let counter = AttemptCounter()
 
         do {
@@ -269,6 +300,86 @@ final class RetryTests: XCTestCase {
     }
 
     // MARK: - Cancellation
+
+    /// A cancellation landing during the wait stops the next attempt.
+    ///
+    /// The loop checks cancellation where it catches a failure, so one arriving before that is already
+    /// seen. This is the window after it: a wait of zero seconds observes nothing, and `Retry-After: 0`
+    /// is a value a server may send, so without a check at the top of the loop the attempt goes out.
+    func testACancellationDuringTheWaitStopsTheNextAttempt() async {
+        let clock = SleepHookClock()
+        let counter = AttemptCounter()
+        let holder = TaskHolder()
+
+        let task = Task {
+            try await Retry.run(
+                policy: .test(maxAttempts: 5, baseDelay: 0, maxDelay: 0),
+                logger: logger(RecordingLogSink()),
+                clock: clock
+            ) { _ in
+                _ = await counter.next()
+                throw TestHintedFailure(code: .rateLimited, retryAfter: 0)
+            }
+        }
+        holder.hold(task)
+        clock.onSleep { holder.cancel() }
+
+        _ = try? await task.value
+
+        let attempts = await counter.count
+        XCTAssertEqual(attempts, 1, "a cancellation during the wait leaves the next attempt unsent")
+    }
+
+    /// Cancelling while waiting on a shared refresh stops the recovery instead of replaying.
+    ///
+    /// The other cancellation cases cancel an HTTP request in flight and never reach this: the join goes
+    /// through `Task.value`, which does not observe the awaiting task's cancellation, so the refresh
+    /// would complete, hand back its token, and the recovery would send the request again.
+    func testCancellingWhileJoiningARefreshDoesNotReplay() async throws {
+        let released = Latch()
+        let providerCalls = Counter()
+        let stub = RecordingStub { _ in (401, Data()) }
+        stub.install()
+        defer { stub.uninstall() }
+
+        let auth = try makeTestAuth(tokenProvider: {
+            _ = await providerCalls.increment()
+            // Held open so the cancellation lands while the refresh is still running.
+            await released.wait()
+            return "refreshed-token"
+        })
+        let transport = makeAuthenticatedStack(auth: auth)
+
+        let task = Task {
+            try await transport.perform(PayabliRequest(method: .get, path: "/api/v2/ping"))
+        }
+
+        // The first send has to have been refused and the refresh started before cancelling, or this
+        // would be testing a cancellation that arrived before the join. Bounded, so a refresh that never
+        // starts fails here rather than hanging the suite.
+        var started = false
+        for _ in 0 ..< 200 where !started {
+            if await providerCalls.count == 1 {
+                started = true
+                break
+            }
+            try await Task.sleep(nanoseconds: 10_000_000)
+        }
+        XCTAssertTrue(started, "the refresh never started, so nothing was joined")
+        task.cancel()
+        released.open()
+
+        do {
+            _ = try await task.value
+            XCTFail("expected cancellation")
+        } catch is CancellationError {
+            // The only acceptable outcome.
+        } catch {
+            XCTFail("cancellation surfaced as \(type(of: error)): \(error)")
+        }
+
+        XCTAssertEqual(stub.count, 1, "the request is not sent again after a cancelled join")
+    }
 
     /// The path the case below cannot reach. `PayabliService.perform` wraps what `URLSession` throws, and
     /// a cancelled request arriving as a transient failure would be retried: the caller who cancelled

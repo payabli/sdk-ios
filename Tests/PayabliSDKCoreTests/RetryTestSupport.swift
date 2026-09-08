@@ -3,13 +3,18 @@ import Foundation
 
 /// A clock a test drives, so a schedule is asserted rather than waited out.
 ///
-/// `sleep` advances the clock and returns; nothing suspends on a real timer. That is what lets a case
-/// assert the exact elapsed total, which a policy with its delays set to zero cannot: zeroed delays make
-/// every schedule look identical and pass whatever the arithmetic did.
+/// Nothing here suspends on a real timer, which is what lets a case assert an exact elapsed total. A
+/// policy with its delays zeroed cannot: zeroed delays make every schedule look identical and pass
+/// whatever the arithmetic did.
 final class FakeRetryClock: RetryClock, @unchecked Sendable {
     private let lock = NSLock()
     private var seconds: TimeInterval = 0
     private var slept: [TimeInterval] = []
+    private var parked: [CheckedContinuation<Void, Never>] = []
+
+    /// Whether a bounded attempt is allowed to reach its deadline. Off by default, so the operation wins
+    /// unless a case says otherwise.
+    private var deadlineIsOpen = false
 
     func elapsed() -> TimeInterval {
         lock.lock()
@@ -17,19 +22,65 @@ final class FakeRetryClock: RetryClock, @unchecked Sendable {
         return seconds
     }
 
-    /// Advances the clock by `seconds` after a short real pause.
-    ///
-    /// `Retry` races the attempt against this sleep to bound it, so a sleep that returned at once would
-    /// report every attempt as an expiry, the ones that failed on their own included. The pause settles
-    /// that race the way a real deadline does: an operation that completes without blocking always wins
-    /// it, and only one that is genuinely blocked loses. It is ordering and not measurement — what a case
-    /// asserts is the virtual total, which moves by `seconds` and not by the pause.
+    /// Advances the clock by `seconds` and returns. A backoff wait is a decision already taken, so
+    /// nothing here delays it.
     func sleep(for seconds: TimeInterval) async throws {
-        try await Task.sleep(nanoseconds: 30_000_000)
+        try Task.checkCancellation()
         lock.lock()
         self.seconds += seconds
         slept.append(seconds)
         lock.unlock()
+    }
+
+    /// Holds until a case opens the deadline, so what wins the race against an attempt is a decision
+    /// rather than elapsed time. A loaded executor cannot make a deadline fire that a case did not ask
+    /// for, and cannot delay one it did.
+    func expire(after seconds: TimeInterval) async throws {
+        lock.lock()
+        let open = deadlineIsOpen
+        if open {
+            self.seconds += seconds
+        }
+        lock.unlock()
+
+        if !open {
+            await withTaskCancellationHandler {
+                await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+                    lock.lock()
+                    // Read under the lock, and per call rather than from state on the clock: `onCancel`
+                    // can run before this closure does, and a continuation stored after that would never
+                    // be resumed. A flag on the clock would stay set for every later attempt.
+                    if Task.isCancelled {
+                        lock.unlock()
+                        continuation.resume()
+                        return
+                    }
+                    parked.append(continuation)
+                    lock.unlock()
+                }
+            } onCancel: {
+                self.releaseParked()
+            }
+        }
+        try Task.checkCancellation()
+    }
+
+    /// Lets a bounded attempt reach its deadline, for the cases that are about the budget expiring.
+    func openTheDeadline() {
+        lock.lock()
+        deadlineIsOpen = true
+        lock.unlock()
+        releaseParked()
+    }
+
+    private func releaseParked() {
+        lock.lock()
+        let waiting = parked
+        parked = []
+        lock.unlock()
+        for continuation in waiting {
+            continuation.resume()
+        }
     }
 
     /// Every wait asked for, in order.
@@ -47,14 +98,15 @@ final class FakeRetryClock: RetryClock, @unchecked Sendable {
     }
 }
 
-/// A clock whose wait neither suspends nor observes cancellation.
+/// A clock that observes no cancellation at all.
 ///
-/// `FakeRetryClock` waits on `Task.sleep`, which raises on a cancelled task, so a case about cancellation
-/// run against it stops in the backoff and reports cancellation whatever the code under test did. This one
-/// lets a retry proceed, so a guard that should have stopped it is the only thing that can.
+/// `FakeRetryClock` raises on a cancelled task, so a case about cancellation run against it stops in the
+/// backoff and reports cancellation whatever the code under test did. This one lets a retry proceed, so a
+/// guard that should have stopped it is the only thing that can.
 final class ImmediateRetryClock: RetryClock, @unchecked Sendable {
     private let lock = NSLock()
     private var seconds: TimeInterval = 0
+    private var parked: CheckedContinuation<Void, Never>?
 
     func elapsed() -> TimeInterval {
         lock.lock()
@@ -66,6 +118,69 @@ final class ImmediateRetryClock: RetryClock, @unchecked Sendable {
         lock.lock()
         self.seconds += seconds
         lock.unlock()
+    }
+
+    /// Never fires. A case using this clock is about what happens without a deadline.
+    func expire(after seconds: TimeInterval) async throws {
+        await withTaskCancellationHandler {
+            await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+                lock.lock()
+                if Task.isCancelled {
+                    lock.unlock()
+                    continuation.resume()
+                    return
+                }
+                parked = continuation
+                lock.unlock()
+            }
+        } onCancel: {
+            self.lock.lock()
+            let waiting = self.parked
+            self.parked = nil
+            self.lock.unlock()
+            waiting?.resume()
+        }
+    }
+}
+
+/// Runs a hook during the wait between attempts, so a case can land an event in the window between the
+/// retry decision and the attempt it leads to.
+///
+/// That window is not otherwise reachable: the loop checks cancellation when it catches a failure, so a
+/// cancellation arriving before that is seen there and never reaches the next attempt.
+final class SleepHookClock: RetryClock, @unchecked Sendable {
+    private let lock = NSLock()
+    private var hook: (@Sendable () -> Void)?
+    private var seconds: TimeInterval = 0
+
+    func onSleep(_ hook: @escaping @Sendable () -> Void) {
+        lock.lock()
+        defer { lock.unlock() }
+        self.hook = hook
+    }
+
+    func elapsed() -> TimeInterval {
+        lock.lock()
+        defer { lock.unlock() }
+        return seconds
+    }
+
+    func sleep(for seconds: TimeInterval) async throws {
+        lock.lock()
+        self.seconds += seconds
+        let fire = hook
+        lock.unlock()
+        fire?()
+    }
+
+    /// Never fires. A case using this clock is about the wait, not the deadline.
+    func expire(after seconds: TimeInterval) async throws {
+        await withTaskCancellationHandler {
+            await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+                continuation.resume()
+            }
+        } onCancel: {}
+        try await Task.sleep(nanoseconds: .max)
     }
 }
 
@@ -119,5 +234,24 @@ extension RetryPolicy {
             maxRetryAfter: maxRetryAfter,
             jitter: .none
         )
+    }
+}
+
+/// Holds a task so a hook set after its creation can cancel it.
+final class TaskHolder: @unchecked Sendable {
+    private let lock = NSLock()
+    private var cancelHeld: (@Sendable () -> Void)?
+
+    func hold(_ task: Task<some Sendable, Error>) {
+        lock.lock()
+        defer { lock.unlock() }
+        cancelHeld = { task.cancel() }
+    }
+
+    func cancel() {
+        lock.lock()
+        let cancelIt = cancelHeld
+        lock.unlock()
+        cancelIt?()
     }
 }

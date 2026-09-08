@@ -9,7 +9,16 @@ package protocol RetryClock: Sendable {
     /// Seconds since an arbitrary origin fixed at creation. Monotonic.
     func elapsed() -> TimeInterval
 
+    /// Waits before the next attempt.
     func sleep(for seconds: TimeInterval) async throws
+
+    /// Returns once `seconds` have passed, to bound an attempt already running.
+    ///
+    /// Separate from `sleep(for:)` because the two are different operations on the same clock: one is a
+    /// wait the caller has decided to take, the other a deadline racing work in flight. They coincide on
+    /// the shipping clock and must not on a test one, which has to settle that race by decision rather
+    /// than by elapsed time.
+    func expire(after seconds: TimeInterval) async throws
 }
 
 /// The shipping clock.
@@ -33,5 +42,9 @@ package struct SystemRetryClock: RetryClock {
     package func sleep(for seconds: TimeInterval) async throws {
         guard seconds > 0 else { return }
         try await clock.sleep(for: .seconds(seconds))
+    }
+
+    package func expire(after seconds: TimeInterval) async throws {
+        try await sleep(for: seconds)
     }
 }

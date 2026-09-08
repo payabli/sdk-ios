@@ -23,9 +23,14 @@ package enum Retry {
         var attempt = 1
 
         while true {
+            // Every iteration, before anything reaches the wire. The wait between attempts is where
+            // cancellation is usually noticed, and a wait of zero seconds notices nothing: the shipping
+            // clock returns without suspending, and `Retry-After: 0` is a value a server may send. Without
+            // this, a cancelled caller gets one more attempt.
+            try Task.checkCancellation()
+
             let remaining = remainingBudget(policy, clock: clock, startedAt: startedAt)
             if let remaining, remaining <= 0 {
-                try Task.checkCancellation()
                 throw budgetExhausted(logger: logger, phase: "before-attempt")
             }
 
@@ -95,6 +100,15 @@ package enum Retry {
 
         logger.debug("attempt \(attempt) failed with \(failure.code.rawValue); retrying in \(wait)s")
         try await clock.sleep(for: wait)
+
+        // Checked again on the far side. A wait that fits when it is planned can still overrun: a
+        // monotonic clock keeps counting while the device is suspended, so the sleep can resume past the
+        // deadline. Reporting the synthetic timeout then would discard the 429 or 5xx that caused the
+        // wait, where the branch above keeps it.
+        if let remaining = remainingBudget(policy, clock: clock, startedAt: startedAt), remaining <= 0 {
+            logger.warning("total budget exhausted while waiting; not retrying (\(failure.code.rawValue))")
+            throw failure
+        }
         return attempt + 1
     }
 
@@ -134,7 +148,7 @@ package enum Retry {
         try await withThrowingTaskGroup(of: T?.self) { group in
             group.addTask { try await operation() }
             group.addTask {
-                try await clock.sleep(for: seconds)
+                try await clock.expire(after: seconds)
                 return nil
             }
             defer { group.cancelAll() }
