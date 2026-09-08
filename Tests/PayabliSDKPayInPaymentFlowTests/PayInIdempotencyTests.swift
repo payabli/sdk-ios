@@ -129,8 +129,8 @@ final class PayInIdempotencyTests: XCTestCase {
 
     // MARK: - Which failures leave the outcome open
 
-    /// The classification and the failing type reach the caller. The key does not: this SDK holds it and
-    /// sends it again itself, so there is nothing for a caller to carry.
+    /// The classification and the failing type reach the caller. The key does not, this SDK minting one
+    /// per submission and never handing it out, so there is nothing for a caller to carry.
     func testANetworkFailureLeavesTheOutcomeOpen() async {
         let transport = RecordingIdempotencyTransport(
             failure: PayabliGenericError(code: .networkError, reason: "Network request failed")
@@ -189,7 +189,14 @@ final class PayInIdempotencyTests: XCTestCase {
         XCTAssertEqual(interrupted.code, .serverError)
     }
 
-    /// Cancelled while in flight, so whether the service acted on it is exactly what nobody knows.
+    /// A cancellation is classified as leaving the outcome open, which is what this pins.
+    ///
+    /// It reaches the classification through an injected error rather than through a cancelled task,
+    /// because no production path produces that code: `PayabliService.perform` wraps anything that is
+    /// not already a Payabli error, cancellation included, into `networkError`. So this covers the
+    /// table's handling of the code and not a route a caller can take to it. Whether a cancelled
+    /// request should report cancellation instead is Core's behaviour for every module and is asked
+    /// rather than decided here.
     func testACancellationReportsTheKey() async {
         let transport = RecordingIdempotencyTransport(
             failure: PayabliGenericError(code: .userCancelled, reason: "Cancelled")

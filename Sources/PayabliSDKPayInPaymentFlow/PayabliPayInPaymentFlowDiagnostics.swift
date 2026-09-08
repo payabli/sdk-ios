@@ -198,8 +198,8 @@ extension PayabliPayInPaymentFlowDiagnostics {
     /// Names redacted on their own rather than by a substring rule.
     private static let sensitiveExactKeys: Set<String> = [
         "authorization",
-        // Generated here, held here and resent from here, so nothing outside this SDK is meant to
-        // hold it. A diagnostics entry a host can read is a surface like any other.
+        // Generated here and sent from here, so nothing outside this SDK is meant to hold it, and a
+        // diagnostics entry a host can read is a surface like any other.
         "idempotencykey",
         "requesttoken",
         "accesstoken",

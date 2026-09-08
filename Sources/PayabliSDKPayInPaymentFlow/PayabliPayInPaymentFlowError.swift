@@ -12,10 +12,14 @@ public enum PayabliPayInPaymentFlowError: PayabliError, Equatable {
 
     /// The request may have moved money and the outcome is not known.
     ///
-    /// No key is reported. This SDK mints it, holds it and sends it again itself when the next submit is
-    /// the same payment, so there is nothing here for a caller to carry and no value it could act on.
-    /// The original response is not replayed, so a caller that needs the outcome reads the transaction
-    /// back rather than repeating the submission.
+    /// No key is reported, and none is reused. This SDK mints one per submission and never hands it out,
+    /// so there is nothing here for a caller to carry; it also does not decide that a later submission
+    /// retries this one, because two submissions described identically are indistinguishable to it.
+    ///
+    /// **So resubmitting after this can take the payment a second time.** What settles the outcome is
+    /// reading the transaction back, not repeating the submission: the service answers a repeat rather
+    /// than replaying what it did. A caller that supplied its own key may send that same key again, which
+    /// the service recognises as the repeat it is.
     ///
     /// Raised only where a key was sent, which is the money-moving routes, and only where the answer
     /// leaves the outcome open: a network failure, a cancellation, a 5xx, a response that could not be

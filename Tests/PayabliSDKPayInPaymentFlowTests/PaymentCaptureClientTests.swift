@@ -305,8 +305,8 @@ final class PayInPaymentFlowClientTests: XCTestCase {
 
     /// The key this SDK generates reaches no surface a host reads, diagnostics included.
     ///
-    /// The record copies request headers, so a key left out of the error type still arrived here. What
-    /// the SDK holds and resends is not something a caller is asked to carry, and a diagnostics entry a
+    /// The record copies request headers, so a key left out of the error type still arrived here. A key
+    /// this SDK mints and sends is not something a caller is asked to carry, and a diagnostics entry a
     /// host can read is a surface like any other.
     @MainActor
     func testAGeneratedKeyDoesNotReachTheDiagnosticsRecord() async {

@@ -398,11 +398,9 @@ public struct PayabliPayInPaymentFlowVendorData: Codable, Sendable {
     }
 }
 
-/// The options a stored-method request carries.
-///
-/// No idempotency key. A repeat is not recognisable on the store route, so a key sent there is read by
-/// nothing and offering one implies a protection the route does not give. A store whose outcome is
-/// unknown is settled by reading the entry point's stored methods back before sending it again.
+/// The options a stored-method request carries, and no idempotency key: a repeat is not recognisable on
+/// the store route, so one sent there is read by nothing and offering it implies a protection the route
+/// does not give. A store whose outcome is unknown is settled by reading the stored methods back.
 public struct PayabliPayInPaymentFlowTokenStorageOptions: Sendable {
     public var achValidation: Bool?
     public var createAnonymous: Bool?
