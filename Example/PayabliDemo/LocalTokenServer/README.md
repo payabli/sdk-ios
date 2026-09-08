@@ -51,9 +51,13 @@ ships a placeholder partner backend, so copy it and switch both endpoints to the
 resolver:
 
 ```swift
-static var partnerTokenEndpoint: URL { DemoConfiguration.TokenServer.accessTokenURL }
-static var partnerPaymentMethodAccessTokenEndpoint: URL { DemoConfiguration.TokenServer.accessTokenURL }
+static var partnerTokenEndpoint: URL { DemoConfiguration.TokenServer.exchangeTokenURL }
+static var partnerPaymentMethodAccessTokenEndpoint: URL { DemoConfiguration.TokenServer.exchangeTokenURL }
 ```
+
+`exchangeTokenURL` mints a token per call. `accessTokenURL` answers with the one the server was started
+with when it has one, so a refresh returns the credential that was just refused and the SDK's recovery
+from a rejected token cannot be exercised from the app at all.
 
 Both are listed because they are separate settings; a build pointing them at
 different backends is supported and honoured.
