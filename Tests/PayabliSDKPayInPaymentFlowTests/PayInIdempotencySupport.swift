@@ -27,25 +27,6 @@ enum PayInFixture {
 
     static func makeFlow(
         transport: any PayabliTransport,
-        keys: [String],
-        clock: TestClock? = nil
-    ) -> PayabliPayInPaymentFlow {
-        let flow = PayabliPayInPaymentFlow(
-            accessToken: "token",
-            entryPoint: "entry",
-            environment: .sandbox,
-            transport: transport
-        )
-        let remaining = MintedKeys(keys)
-        flow.newIdempotencyKey = { remaining.next() }
-        if let clock {
-            flow.monotonicNow = { clock.now }
-        }
-        return flow
-    }
-
-    static func makeFlow(
-        transport: any PayabliTransport,
         key: String
     ) -> PayabliPayInPaymentFlow {
         let flow = PayabliPayInPaymentFlow(
@@ -156,91 +137,5 @@ final class RecordingIdempotencyTransport: PayabliTransport, @unchecked Sendable
         let response = try await perform(request)
         try mapPayabliHTTPError(response: response)
         return try decodePayabliV2Envelope(T.self, from: response)
-    }
-}
-
-/// Hands out the keys a test named, in order, so a second attempt is distinguishable from the first.
-final class MintedKeys: @unchecked Sendable {
-    private let lock = NSLock()
-    private var remaining: [String]
-
-    init(_ keys: [String]) {
-        remaining = keys
-    }
-
-    func next() -> String {
-        lock.lock()
-        defer { lock.unlock() }
-        return remaining.isEmpty ? "exhausted" : remaining.removeFirst()
-    }
-}
-
-/// One outcome per call, so a test can fail an attempt and then answer the retry.
-final class SequencedIdempotencyTransport: PayabliTransport, @unchecked Sendable {
-    enum Outcome {
-        case success(Data)
-        case status(Int)
-        case response(Int, Data)
-        case failure(any Error)
-    }
-
-    private let lock = NSLock()
-    private var recorded: [String?] = []
-    private var outcomes: [Outcome]
-
-    init(outcomes: [Outcome]) {
-        self.outcomes = outcomes
-    }
-
-    var sentKeys: [String] {
-        lock.lock()
-        defer { lock.unlock() }
-        return recorded.compactMap { $0 }
-    }
-
-    func perform(_ request: PayabliRequest) async throws -> PayabliResponse {
-        lock.lock()
-        recorded.append(request.headers["idempotencyKey"])
-        let outcome = outcomes.isEmpty ? Outcome.success(Data()) : outcomes.removeFirst()
-        lock.unlock()
-
-        switch outcome {
-        case let .success(body):
-            return PayabliResponse(statusCode: 200, headers: [:], body: body)
-        case let .status(code):
-            return PayabliResponse(statusCode: code, headers: [:], body: Data())
-        case let .response(code, body):
-            return PayabliResponse(statusCode: code, headers: [:], body: body)
-        case let .failure(error):
-            throw error
-        }
-    }
-
-    func performV2<T: Decodable & Sendable>(
-        _ request: PayabliRequest,
-        decoding: T.Type
-    ) async throws -> PayabliV2Envelope<T> {
-        let response = try await perform(request)
-        try mapPayabliHTTPError(response: response)
-        return try decodePayabliV2Envelope(T.self, from: response)
-    }
-}
-
-/// A clock a test moves by hand, so a window can be crossed without waiting for it.
-final class TestClock: @unchecked Sendable {
-    private let lock = NSLock()
-    private let base = ContinuousClock().now
-    private var offset: Duration = .zero
-
-    var now: ContinuousClock.Instant {
-        lock.lock()
-        defer { lock.unlock() }
-        return base.advanced(by: offset)
-    }
-
-    func advance(by amount: Duration) {
-        lock.lock()
-        defer { lock.unlock() }
-        offset += amount
     }
 }

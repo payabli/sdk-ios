@@ -32,17 +32,6 @@ public enum PayabliPayInPaymentFlowError: PayabliError, Equatable {
     /// included.
     case submissionInterrupted(code: PayabliErrorCode, causeType: String)
 
-    /// A repeat this SDK sent, which the service refused.
-    ///
-    /// Raised where the key's own handling caused the failure: the previous submission of this payment
-    /// ended without an answer, this one repeated it under the same key, and the service recognised the
-    /// key and declined to act. So the earlier submission reached the service and this one took no
-    /// money.
-    ///
-    /// The outcome of that earlier submission is still what a caller needs, and a repeat cannot supply
-    /// it: the service answers the conflict rather than replaying what it did. Read the transaction back.
-    case repeatRefused
-
     public var code: PayabliErrorCode {
         switch self {
         case .invalidInput, .submissionInProgress:
@@ -53,8 +42,6 @@ public enum PayabliPayInPaymentFlowError: PayabliError, Equatable {
             return Self.classification(of: failure)
         case let .submissionInterrupted(code, _):
             return code
-        case .repeatRefused:
-            return .conflict
         }
     }
 
@@ -70,8 +57,6 @@ public enum PayabliPayInPaymentFlowError: PayabliError, Equatable {
             return failure.reasonText
         case .submissionInterrupted:
             return "The payment may have been taken and the outcome is unknown."
-        case .repeatRefused:
-            return "This payment already reached the service, so the repeat was refused rather than taken."
         }
     }
 
@@ -127,8 +112,6 @@ public enum PayabliPayInPaymentFlowError: PayabliError, Equatable {
             return failure.detailText
         case let .submissionInterrupted(_, causeType):
             return causeType
-        case .repeatRefused:
-            return nil
         }
     }
 }
