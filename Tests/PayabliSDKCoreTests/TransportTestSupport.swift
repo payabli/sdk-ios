@@ -47,6 +47,7 @@ final class RecordingStub: @unchecked Sendable {
 
     private let lock = NSLock()
     private var recorded: [URLRequest] = []
+    private var uninstalled = false
     private let respond: @Sendable (URLRequest) -> Reply
 
     init(respond: @escaping @Sendable (URLRequest) -> Reply) {
@@ -56,6 +57,35 @@ final class RecordingStub: @unchecked Sendable {
     /// Answers every request alike.
     convenience init(status: Int = 200, body: Data = Data()) {
         self.init { _ in (status, body) }
+    }
+
+    /// Installs a handler that leaves the request in flight, so a test can cancel one that is genuinely
+    /// under way and read what `URLSession` raises rather than an error it constructed itself.
+    ///
+    /// Blocks the loading thread rather than suspending, because the handler is synchronous. Bounded, so
+    /// a test that never cancels fails on its own assertion instead of hanging the suite.
+    func installNeverAnswering(forAtMost seconds: TimeInterval = 3) {
+        StubURLProtocol.handler = { [self] request in
+            lock.lock()
+            recorded.append(request)
+            lock.unlock()
+            // Released as soon as the case uninstalls, not slept to the bound: this blocks a URLProtocol
+            // thread, and one still sleeping when the next case runs holds that case's request behind it.
+            // The bound is the backstop for a case that never uninstalls.
+            let deadline = Date().addingTimeInterval(seconds)
+            while Date() < deadline, !self.isUninstalled {
+                Thread.sleep(forTimeInterval: 0.02)
+            }
+            return (
+                HTTPURLResponse(
+                    url: request.url!,
+                    statusCode: 200,
+                    httpVersion: "HTTP/1.1",
+                    headerFields: [:]
+                )!,
+                Data()
+            )
+        }
     }
 
     func install() {
@@ -75,7 +105,16 @@ final class RecordingStub: @unchecked Sendable {
     }
 
     func uninstall() {
+        lock.lock()
+        uninstalled = true
+        lock.unlock()
         StubURLProtocol.handler = nil
+    }
+
+    private var isUninstalled: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return uninstalled
     }
 
     var requests: [URLRequest] {
