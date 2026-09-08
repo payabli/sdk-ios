@@ -26,13 +26,17 @@ final class RetryPolicyTests: XCTestCase {
         XCTAssertEqual(policy.delay(forAttempt: 9), 3)
     }
 
+    /// Asserted against a jitter that always returns its whole bound, so the sum is exact. Bounds alone
+    /// would be satisfied by an implementation that returned the capped backoff and added nothing.
     func testJitterIsAddedAfterTheCapSoTheCeilingIsTheSumOfBoth() {
-        let policy = RetryPolicy(maxDelay: 2, maxJitter: 0.5)
-        for _ in 0 ..< 50 {
-            let delay = policy.delay(forAttempt: 9)
-            XCTAssertGreaterThanOrEqual(delay, 2)
-            XCTAssertLessThanOrEqual(delay, 2.5)
-        }
+        let policy = RetryPolicy(
+            maxDelay: 2,
+            maxJitter: 0.5,
+            jitter: RetryPolicy.Jitter { $0 }
+        )
+
+        XCTAssertEqual(policy.delay(forAttempt: 9), 2.5, "the cap plus the whole bound")
+        XCTAssertEqual(policy.delay(forAttempt: 2), policy.baseDelay + 0.5, "and before the cap is reached")
     }
 
     func testJitterNoneProducesAnExactSchedule() {
