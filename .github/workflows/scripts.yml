@@ -28,11 +28,18 @@ on:
       # The workflow file is in the filter so a change to it tests itself.
       - '.github/scripts/**'
       - '.github/workflows/scripts.yml'
-      # Every file the harness makes claims about, or its assertions would not run on the change that
-      # broke them. A guard that does not run on the file it protects is not a guard. `ci.yml` and
-      # `release.yml` both test the package scheme and both have to apply the shared exclusions, and the
-      # list itself is what those exclusions are.
+      # Every workflow, not only the ones that exist today. The harness discovers which of them test the
+      # package scheme and asserts each applies the shared exclusions, and a pull request adding a new one
+      # would not have matched a filter of filenames: the harness would not run, the discovery would not
+      # see it, and the tier could ship without the exclusions while every check reported the invariant
+      # holding. A guard that does not run on the file it protects is not a guard, and that includes a
+      # file that does not exist yet.
+      #
+      # The named entries stay because the harness asserts on them literally, so the two would otherwise
+      # disagree about what is guarded.
+      - '.github/workflows/**'
       - '.github/workflows/nightly.yml'
+      - '.github/workflows/nightly-report.yml'
       - '.github/workflows/ci.yml'
       - '.github/workflows/release.yml'
       - '.github/hardware-only-tests.txt'
@@ -40,8 +47,10 @@ on:
     branches: [main]
     paths:
       - '.github/scripts/**'
+      - '.github/workflows/**'
       - '.github/workflows/scripts.yml'
       - '.github/workflows/nightly.yml'
+      - '.github/workflows/nightly-report.yml'
       - '.github/workflows/ci.yml'
       - '.github/workflows/release.yml'
       - '.github/hardware-only-tests.txt'
