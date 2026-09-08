@@ -25,6 +25,16 @@ final class RetryAfterHeaderTests: XCTestCase {
         XCTAssertEqual(RetryAfterHeader.value(from: response("  30  ")), 30)
     }
 
+    /// `delay-seconds` is digits and nothing else, and `Int64` is looser than that. A signed value read as
+    /// a valid hint is worse than one read as absent: above the ceiling it ends the retry, so it stops a
+    /// request the computed backoff would have repeated.
+    func testASignedDelayReadsAsNoInstruction() {
+        XCTAssertNil(RetryAfterHeader.value(from: response("+3600")), "a leading plus is not delay-seconds")
+        XCTAssertNil(RetryAfterHeader.value(from: response("-0")))
+        XCTAssertNil(RetryAfterHeader.value(from: response("3600.5")))
+        XCTAssertNil(RetryAfterHeader.value(from: response("3 600")))
+    }
+
     func testANegativeDelayReadsAsNoInstruction() {
         // Not zero: a value the field cannot carry says nothing, and falling back to the computed
         // backoff is the honest answer.

@@ -30,16 +30,15 @@ enum RetryAfterHeader {
             return nil
         }
 
-        if let seconds = Int64(raw) {
-            guard seconds >= 0 else { return nil }
-            return TimeInterval(seconds)
-        }
-
-        // A run of digits too long to hold is still an instruction to wait, and an extreme one. Saturating
-        // keeps it above any ceiling it is compared against; reporting no hint would fall back to the
-        // computed backoff and retry in about a second.
-        if raw.allSatisfy({ $0.isASCII && $0.isNumber }) {
-            return .greatestFiniteMagnitude
+        // `delay-seconds` is one or more DIGIT and nothing else (RFC 9110 Section 10.2.3). The grammar is
+        // checked before converting because `Int64` is looser than it: `+3600` and `-0` both convert, and
+        // a malformed value read as a valid hint is worse than one read as absent. Above the ceiling it
+        // ends the retry, so the wrong reading stops a request the computed backoff would have repeated.
+        if !raw.isEmpty, raw.allSatisfy({ $0.isASCII && $0.isNumber }) {
+            // A run too long to hold is still an instruction to wait, and an extreme one. Saturating keeps
+            // it above any ceiling it is compared against; reporting no hint would fall back to the
+            // computed backoff and retry in about a second.
+            return Int64(raw).map(TimeInterval.init) ?? .greatestFiniteMagnitude
         }
 
         for format in dateFormats {
