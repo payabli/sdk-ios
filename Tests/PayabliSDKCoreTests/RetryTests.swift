@@ -163,6 +163,56 @@ final class RetryTests: XCTestCase {
         XCTAssertFalse(RetryPolicy.retryableByCode(TestFailure(.tokenExpired)))
     }
 
+    /// The runner asks the policy rather than classifying for itself.
+    ///
+    /// Every other case here uses the default predicate, so a runner that hard-coded it would pass all of
+    /// them. These two supply a predicate that disagrees with the default in both directions.
+    func testTheRunnerAsksThePolicyRatherThanClassifyingForItself() async {
+        let retriedAnyway = AttemptCounter()
+        _ = try? await Retry.run(
+            policy: RetryPolicy(
+                maxAttempts: 2,
+                baseDelay: 0,
+                maxDelay: 0,
+                multiplier: 1,
+                maxJitter: 0,
+                jitter: .none,
+                isRetryable: { $0.code == .paymentDeclined }
+            ),
+            logger: logger(RecordingLogSink()),
+            clock: FakeRetryClock()
+        ) { _ in
+            _ = await retriedAnyway.next()
+            throw TestFailure(.paymentDeclined)
+        }
+        await assertEqualAwaiting(
+            await retriedAnyway.count, 2,
+            "a decline is retried when the policy says so"
+        )
+
+        let stoppedAnyway = AttemptCounter()
+        _ = try? await Retry.run(
+            policy: RetryPolicy(
+                maxAttempts: 3,
+                baseDelay: 0,
+                maxDelay: 0,
+                multiplier: 1,
+                maxJitter: 0,
+                jitter: .none,
+                isRetryable: { _ in false }
+            ),
+            logger: logger(RecordingLogSink()),
+            clock: FakeRetryClock()
+        ) { _ in
+            _ = await stoppedAnyway.next()
+            throw TestFailure(.serverError)
+        }
+        await assertEqualAwaiting(
+            await stoppedAnyway.count, 1,
+            "a server fault stops when the policy says so"
+        )
+    }
+
     func testANonPayabliFailurePropagatesUntouchedAndUnretried() async {
         struct Foreign: Error {}
         let counter = AttemptCounter()
@@ -311,8 +361,12 @@ final class RetryTests: XCTestCase {
         let counter = AttemptCounter()
         let holder = TaskHolder()
 
+        // The run waits on this, so the hook and the holder are in place before the first wait. Without
+        // it the task can reach that wait while the hook is still nil, and the case asserts nothing.
+        let ready = Latch()
         let task = Task {
-            try await Retry.run(
+            await ready.wait()
+            return try await Retry.run(
                 policy: .test(maxAttempts: 5, baseDelay: 0, maxDelay: 0),
                 logger: logger(RecordingLogSink()),
                 clock: clock
@@ -323,6 +377,7 @@ final class RetryTests: XCTestCase {
         }
         holder.hold(task)
         clock.onSleep { holder.cancel() }
+        ready.open()
 
         _ = try? await task.value
 
