@@ -39,6 +39,23 @@ final class TTPUpdateRetryTests: XCTestCase {
         XCTAssertEqual(Self.updateResponses.sends, 2)
     }
 
+    /// A server hint on the wire reaches the policy and ends the retry.
+    ///
+    /// The parser and the engine are covered apart, and both construct a `PayabliResponse` directly, so
+    /// dropping the header while converting the real `HTTPURLResponse` would leave them green while the
+    /// shipping client ignored what the server asked for.
+    func testARateLimitCarryingAHintAboveTheCeilingIsNotRetried() async throws {
+        Self.updateResponses.scriptWithHint([429, 200], retryAfter: "3600")
+        let ttp = try await makeReadyTTP()
+
+        _ = try? await charge(ttp)
+
+        XCTAssertEqual(
+            Self.updateResponses.sends, 1,
+            "a hint past the ceiling ends the retry rather than being shortened"
+        )
+    }
+
     /// A decline is authoritative, so repeating it only spends the merchant's time. It reaches the caller
     /// as a failed update, and the reason is the mapped one rather than a bare status.
     func testADeclinedUpdateIsNotRetriedAndReportsWhy() async throws {
@@ -137,6 +154,25 @@ final class TTPUpdateRetryTests: XCTestCase {
 
         private var holdSeconds: TimeInterval = 0
         private var hasEntered = false
+        private var hint: String?
+
+        /// A `Retry-After` to send with every scripted status, so the wire-to-policy path is exercised
+        /// rather than the parser and the engine separately.
+        func scriptWithHint(_ statuses: [Int], retryAfter: String) {
+            lock.lock()
+            defer { lock.unlock() }
+            self.statuses = statuses
+            count = 0
+            holdSeconds = 0
+            hasEntered = false
+            hint = retryAfter
+        }
+
+        var retryAfterHint: String? {
+            lock.lock()
+            defer { lock.unlock() }
+            return hint
+        }
 
         func script(_ statuses: [Int]) {
             lock.lock()
@@ -145,6 +181,7 @@ final class TTPUpdateRetryTests: XCTestCase {
             count = 0
             holdSeconds = 0
             hasEntered = false
+            hint = nil
         }
 
         /// Leaves the update in flight, so a test can cancel one that is genuinely under way. Bounded, so
@@ -315,12 +352,16 @@ final class TTPUpdateRetryTests: XCTestCase {
         }
 
         let data = try JSONSerialization.data(withJSONObject: body)
+        var headers = ["Content-Type": "application/json"]
+        if let hint = TTPUpdateRetryTests.updateResponses.retryAfterHint {
+            headers["Retry-After"] = hint
+        }
         return (
             HTTPURLResponse(
                 url: request.url!,
                 statusCode: status,
                 httpVersion: "HTTP/1.1",
-                headerFields: ["Content-Type": "application/json"]
+                headerFields: headers
             )!,
             data
         )
