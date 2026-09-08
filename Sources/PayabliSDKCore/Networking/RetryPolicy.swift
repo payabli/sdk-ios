@@ -152,8 +152,18 @@ package struct RetryPolicy: Sendable {
             self.compute = compute
         }
 
+        /// The jitter for a wait, clamped to the bound it was given.
+        ///
+        /// The closure is supplied rather than chosen here, so its answer is treated the way every other
+        /// timing input is. An unclamped one defeats the initializer's validation from outside: a negative
+        /// value shortens a wait the policy already sized, a value past the bound lengthens it past the
+        /// ceiling those numbers were checked against, and a non-finite one reaches the clock as an
+        /// unbounded sleep.
         package func value(upTo bound: TimeInterval) -> TimeInterval {
-            compute(bound)
+            guard bound > 0 else { return 0 }
+            let computed = compute(bound)
+            guard computed.isFinite else { return 0 }
+            return min(max(computed, 0), bound)
         }
 
         /// Uniform across the whole bound, which is what keeps a fleet of clients from retrying together.

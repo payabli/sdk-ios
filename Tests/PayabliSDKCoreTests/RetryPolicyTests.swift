@@ -55,6 +55,15 @@ final class RetryPolicyTests: XCTestCase {
         XCTAssertEqual(RetryPolicy.Jitter.random.value(upTo: 0), 0)
     }
 
+    /// The closure is supplied, so its answer is checked the way every other timing input is. Left
+    /// unclamped it defeats the initializer's validation from outside the policy.
+    func testAJitterAnsweringOutsideItsBoundIsClamped() {
+        XCTAssertEqual(RetryPolicy.Jitter { _ in -5 }.value(upTo: 0.5), 0, "never shortens the wait")
+        XCTAssertEqual(RetryPolicy.Jitter { _ in 9 }.value(upTo: 0.5), 0.5, "never passes the bound")
+        XCTAssertEqual(RetryPolicy.Jitter { _ in .infinity }.value(upTo: 0.5), 0, "never reaches the clock")
+        XCTAssertEqual(RetryPolicy.Jitter { _ in .nan }.value(upTo: 0.5), 0)
+    }
+
     // MARK: - What a policy refuses to be
 
     /// Read back through `rejection` rather than by constructing one: only SDK code builds a policy, so a
