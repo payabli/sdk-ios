@@ -316,6 +316,7 @@ final class PayInPaymentFlowClientTests: XCTestCase {
             entryPoint: "entry",
             environment: .sandbox,
             accessTokenProvider: { "token" },
+            transport: MockPaymentCaptureTransport(responseBody: Self.approvedResponse),
             diagnostics: .enabled { captured.append($0) }
         )
         component.newIdempotencyKey = { sentinel }
