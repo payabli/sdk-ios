@@ -34,11 +34,6 @@ package struct PayabliResponse: Sendable {
         let lowered = name.lowercased()
         return headers.first { $0.key.lowercased() == lowered }?.value
     }
-
-    /// The body decoded as UTF-8, or an empty string if it is not valid UTF-8.
-    package func bodyAsText() -> String {
-        String(data: body, encoding: .utf8) ?? ""
-    }
 }
 
 extension PayabliResponse: CustomStringConvertible {

@@ -34,20 +34,6 @@ final class PayabliResponseTests: XCTestCase {
         }
     }
 
-    func testBodyAsTextDecodesUTF8() {
-        let response = PayabliResponse(
-            statusCode: 200,
-            headers: [:],
-            body: Data("hello".utf8)
-        )
-        XCTAssertEqual(response.bodyAsText(), "hello")
-    }
-
-    func testBodyAsTextAnswersEmptyForBytesThatAreNotUTF8() {
-        let response = PayabliResponse(statusCode: 200, headers: [:], body: Data([0xFF, 0xFE]))
-        XCTAssertEqual(response.bodyAsText(), "")
-    }
-
     /// The description reaches an assertion failure and a crash report without passing the logger, so it
     /// carries neither the body nor the headers. A synthesized one would print both.
     func testTheDescriptionCarriesNeitherTheBodyNorTheHeaders() {
