@@ -51,12 +51,17 @@ public final class PayabliPayInPaymentFlow: NSObject, ObservableObject, PayabliC
     /// The attempt in flight.
     private var attemptInFlight: HeldAttempt?
 
-    /// The attempt that ended without an answer, whose key the next submit of the same payment sends.
+    /// The attempts that ended without an answer, one per payment, whose key the next submit of that
+    /// payment sends.
+    ///
+    /// Keyed rather than a single slot: two payments can each end without an answer, and a slot lets the
+    /// second erase the first's key, so retrying the first mints a fresh one and can charge it twice.
+    /// The sibling holds them the same way, `PayInSubmission.unresolved` mapping a payment to its key.
     ///
     /// Nothing here identifies a payer or an instrument. What a repeat has to match is the payment, and
     /// the instrument is not part of that: a payer reaching for a second card is retrying the same
     /// purchase, and the card before it may already have been charged for that purchase.
-    private var unresolvedAttempt: HeldAttempt?
+    private var unresolvedAttempts: [AttemptScope: HeldAttempt] = [:]
 
     /// A key this SDK is holding, and what it was reserved for.
     private struct HeldAttempt {
@@ -81,7 +86,13 @@ public final class PayabliPayInPaymentFlow: NSObject, ObservableObject, PayabliC
     /// instrument, so holding this costs no exposure: a merchant that distinguishes two payments of
     /// equal value distinguishes them here too, by the order, the customer, the account or the
     /// subscription the request already carries.
-    struct AttemptScope: Equatable {
+    ///
+    /// The order and the account are normalised the way the request body normalises them, at
+    /// `PayInPaymentFlowClient.swift:91` and `:96`. Comparing them as the caller wrote them would read
+    /// one payment as two whenever a retry differed only in surrounding space. Nothing else here is
+    /// normalised because nothing else is: the customer, the currency and the subscription reach the
+    /// wire as given, so a difference in them is a real one.
+    struct AttemptScope: Hashable {
         let route: String
         let amount: Double
         let currency: String?
@@ -120,8 +131,8 @@ public final class PayabliPayInPaymentFlow: NSObject, ObservableObject, PayabliC
             self.route = route
             amount = details.totalAmount
             currency = details.currency
-            self.orderId = orderId
-            self.accountId = accountId
+            self.orderId = orderId?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty
+            self.accountId = accountId?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty
             self.subscriptionId = subscriptionId
             customerId = customerData?.customerId
             customerNumber = customerData?.customerNumber
@@ -481,13 +492,12 @@ public final class PayabliPayInPaymentFlow: NSObject, ObservableObject, PayabliC
             )
             return supplied
         }
-        if let held = unresolvedAttempt {
-            let expired = held.reservedAt.duration(to: now) >= Self.heldKeyWindow
-            if expired {
+        if let held = unresolvedAttempts[scope] {
+            if held.reservedAt.duration(to: now) >= Self.heldKeyWindow {
                 // Sending it now would read as protection and be a second payment: the service no
                 // longer holds the key, so it executes the request rather than refusing it.
-                unresolvedAttempt = nil
-            } else if held.scope == scope {
+                unresolvedAttempts[scope] = nil
+            } else {
                 attemptInFlight = HeldAttempt(
                     key: held.key, scope: scope, reservedAt: held.reservedAt, ours: true, reused: true
                 )
@@ -519,15 +529,20 @@ public final class PayabliPayInPaymentFlow: NSObject, ObservableObject, PayabliC
     private func settleAttempt(_ failure: (any Error)?) {
         guard let attempt = attemptInFlight else { return }
         attemptInFlight = nil
-        guard attempt.ours else {
-            // A key the caller chose is not this SDK's to hold, whatever happened to it.
+
+        // An answer answers for the payment, not for the key that carried it. A caller's own key
+        // succeeding on a payment this SDK is holding a key for means that payment happened, so the
+        // held key has nothing left to protect and sending it again would charge a second time.
+        guard let failure, !Self.answersTheRequest(failure) else {
+            unresolvedAttempts[attempt.scope] = nil
             return
         }
-        if let failure, !Self.answersTheRequest(failure) {
-            unresolvedAttempt = attempt
-        } else {
-            unresolvedAttempt = nil
+        guard attempt.ours else {
+            // A key the caller chose is not this SDK's to hold, and an unanswered attempt under one
+            // says nothing about a key this SDK may already be holding for that payment.
+            return
         }
+        unresolvedAttempts[attempt.scope] = attempt
     }
 
     /// Whether a failure says anything about the request the key went out for.
@@ -542,8 +557,13 @@ public final class PayabliPayInPaymentFlow: NSObject, ObservableObject, PayabliC
             switch flow {
             case .invalidInput, .missingAccessToken, .submissionInProgress, .submissionInterrupted:
                 return false
-            case .transactionFailed, .repeatRefused:
+            case .repeatRefused:
                 return true
+            case .transactionFailed:
+                // Decided on the classification below, as every other failure is. A decoded refusal of
+                // the credential or of the request itself says nothing about the payment, and treating
+                // every decoded failure as an answer dropped a key those had not resolved.
+                break
             }
         }
         switch (failure as? any PayabliError)?.code {

@@ -156,9 +156,10 @@ final class PayInPaymentFlowClient: Sendable {
 
     /// Whether a failure leaves the outcome of a money-moving request open.
     ///
-    /// Open, so a key is reported: a cancellation, a network failure, a 5xx, a response that could not
-    /// be decoded, and anything unclassified. In each the payment may already have been taken, and a
-    /// retry carrying the key is recognised as the repeat it is instead of acting twice.
+    /// Open, so the failure is wrapped and the facade keeps the key: a cancellation, a network failure,
+    /// a 5xx, a response that could not be decoded, and anything unclassified. In each the payment may
+    /// already have been taken, and the next submission of that payment carries the same key so the
+    /// service recognises the repeat instead of acting twice. No key is reported to a caller.
     ///
     /// Settled, so none is: a decline and a validation refusal are answers, a rate limit is a refusal
     /// to act, a refused credential never reached the operation, and a repeat the service recognised

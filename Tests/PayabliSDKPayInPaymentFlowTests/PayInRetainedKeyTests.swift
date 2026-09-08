@@ -216,4 +216,99 @@ final class PayInRetainedKeyTests: XCTestCase {
 
         XCTAssertEqual(transport.sentKeys, ["reserved-1", "reserved-2"])
     }
+
+    /// The request body trims an order before sending it, so two submissions differing only in space
+    /// around it are one payment on the wire. Comparing them as the caller wrote them read that as two
+    /// and minted a second key, which is the protection removing itself.
+    func testAnOrderDifferingOnlyInSpaceIsTheSamePayment() async {
+        let transport = SequencedIdempotencyTransport(
+            outcomes: [
+                .failure(PayabliGenericError(code: .networkError, reason: "Network request failed")),
+                .success(PayInFixture.approved)
+            ]
+        )
+        let flow = PayInFixture.makeFlow(transport: transport, keys: ["reserved-1", "reserved-2"])
+
+        _ = await PayInFixture.failure(from: {
+            _ = try await flow.capture(PayInFixture.request(idempotencyKey: nil, orderId: "order-1"))
+        })
+        _ = try? await flow.capture(PayInFixture.request(idempotencyKey: nil, orderId: "  order-1  "))
+
+        XCTAssertEqual(transport.sentKeys, ["reserved-1", "reserved-1"])
+    }
+
+    /// Two payments can each end without an answer. A single slot let the second erase the first's key,
+    /// so retrying the first minted a fresh one and could charge it twice.
+    func testTwoPaymentsWithUnknownOutcomesEachKeepTheirOwnKey() async {
+        let transport = SequencedIdempotencyTransport(
+            outcomes: [
+                .failure(PayabliGenericError(code: .networkError, reason: "Network request failed")),
+                .failure(PayabliGenericError(code: .networkError, reason: "Network request failed")),
+                .success(PayInFixture.approved)
+            ]
+        )
+        let flow = PayInFixture.makeFlow(transport: transport, keys: ["reserved-1", "reserved-2", "reserved-3"])
+
+        _ = await PayInFixture.failure(from: {
+            _ = try await flow.capture(PayInFixture.request(idempotencyKey: nil, orderId: "order-a"))
+        })
+        _ = await PayInFixture.failure(from: {
+            _ = try await flow.capture(PayInFixture.request(idempotencyKey: nil, orderId: "order-b"))
+        })
+        _ = try? await flow.capture(PayInFixture.request(idempotencyKey: nil, orderId: "order-a"))
+
+        XCTAssertEqual(
+            transport.sentKeys,
+            ["reserved-1", "reserved-2", "reserved-1"],
+            "the first payment's key survives the second payment's unknown outcome"
+        )
+    }
+
+    /// An answer answers for the payment, not for the key that carried it. A caller's own key
+    /// succeeding means that payment happened, so a key still held for it would charge a second time.
+    func testACallersKeySucceedingOnAHeldPaymentDropsTheHeldKey() async {
+        let transport = SequencedIdempotencyTransport(
+            outcomes: [
+                .failure(PayabliGenericError(code: .networkError, reason: "Network request failed")),
+                .success(PayInFixture.approved),
+                .success(PayInFixture.approved)
+            ]
+        )
+        let flow = PayInFixture.makeFlow(transport: transport, keys: ["reserved-1", "reserved-2"])
+
+        _ = await PayInFixture.failure(from: {
+            _ = try await flow.capture(PayInFixture.request(idempotencyKey: nil))
+        })
+        _ = try? await flow.capture(PayInFixture.request(idempotencyKey: "caller-key"))
+        _ = try? await flow.capture(PayInFixture.request(idempotencyKey: nil))
+
+        XCTAssertEqual(transport.sentKeys, ["reserved-1", "caller-key", "reserved-2"])
+    }
+
+    /// A refusal of the credential says nothing about the payment, so it does not resolve the attempt
+    /// whose outcome nobody knows. Reading every decoded failure as an answer dropped the key those had
+    /// not resolved, and the next corrected submission charged again.
+    func testARefusedCredentialOnARetryKeepsTheHeldKey() async {
+        let transport = SequencedIdempotencyTransport(
+            outcomes: [
+                .failure(PayabliGenericError(code: .networkError, reason: "Network request failed")),
+                .response(401, Data(#"{"message":"Unauthorized"}"#.utf8)),
+                .success(PayInFixture.approved)
+            ]
+        )
+        let flow = PayInFixture.makeFlow(transport: transport, keys: ["reserved-1", "reserved-2"])
+
+        for _ in 0 ..< 2 {
+            _ = await PayInFixture.failure(from: {
+                _ = try await flow.capture(PayInFixture.request(idempotencyKey: nil))
+            })
+        }
+        _ = try? await flow.capture(PayInFixture.request(idempotencyKey: nil))
+
+        XCTAssertEqual(
+            transport.sentKeys,
+            ["reserved-1", "reserved-1", "reserved-1"],
+            "a refused credential resolves nothing, so the key is still the one to send"
+        )
+    }
 }

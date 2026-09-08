@@ -180,6 +180,7 @@ final class SequencedIdempotencyTransport: PayabliTransport, @unchecked Sendable
     enum Outcome {
         case success(Data)
         case status(Int)
+        case response(Int, Data)
         case failure(any Error)
     }
 
@@ -208,6 +209,8 @@ final class SequencedIdempotencyTransport: PayabliTransport, @unchecked Sendable
             return PayabliResponse(statusCode: 200, headers: [:], body: body)
         case let .status(code):
             return PayabliResponse(statusCode: code, headers: [:], body: Data())
+        case let .response(code, body):
+            return PayabliResponse(statusCode: code, headers: [:], body: body)
         case let .failure(error):
             throw error
         }
