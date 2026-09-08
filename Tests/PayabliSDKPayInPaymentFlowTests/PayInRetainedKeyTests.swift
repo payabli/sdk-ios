@@ -311,4 +311,80 @@ final class PayInRetainedKeyTests: XCTestCase {
             "a refused credential resolves nothing, so the key is still the one to send"
         )
     }
+
+    /// The path trims the transaction before sending it, so two captures of the same authorization
+    /// differing only in space around it are one payment. Comparing it as the caller wrote it minted a
+    /// second key and could capture the authorization twice.
+    func testATransactionDifferingOnlyInSpaceIsTheSameCapture() async {
+        let transport = SequencedIdempotencyTransport(
+            outcomes: [
+                .failure(PayabliGenericError(code: .networkError, reason: "Network request failed")),
+                .success(PayInFixture.approved)
+            ]
+        )
+        let flow = PayInFixture.makeFlow(transport: transport, keys: ["reserved-1", "reserved-2"])
+
+        _ = await PayInFixture.failure(from: {
+            _ = try await flow.captureAuthorizedTransaction(
+                PayabliPayInPaymentFlowAuthorizedRequest(
+                    transId: "trans-1",
+                    paymentDetails: PayabliPayInPaymentFlowPaymentDetails(totalAmount: 10)
+                )
+            )
+        })
+        _ = try? await flow.captureAuthorizedTransaction(
+            PayabliPayInPaymentFlowAuthorizedRequest(
+                transId: "  trans-1  ",
+                paymentDetails: PayabliPayInPaymentFlowPaymentDetails(totalAmount: 10)
+            )
+        )
+
+        XCTAssertEqual(transport.sentKeys, ["reserved-1", "reserved-1"])
+    }
+
+    /// The body writes an amount to two places, so two values differing below that are one amount to
+    /// the service. Comparing them unrounded read one payment as two.
+    func testAnAmountDifferingBelowTwoPlacesIsTheSamePayment() async {
+        let transport = SequencedIdempotencyTransport(
+            outcomes: [
+                .failure(PayabliGenericError(code: .networkError, reason: "Network request failed")),
+                .success(PayInFixture.approved)
+            ]
+        )
+        let flow = PayInFixture.makeFlow(transport: transport, keys: ["reserved-1", "reserved-2"])
+
+        _ = await PayInFixture.failure(from: {
+            _ = try await flow.capture(PayInFixture.request(idempotencyKey: nil, totalAmount: 10.001))
+        })
+        _ = try? await flow.capture(PayInFixture.request(idempotencyKey: nil, totalAmount: 10.00))
+
+        XCTAssertEqual(transport.sentKeys, ["reserved-1", "reserved-1"])
+    }
+
+    /// A recognised repeat answers the repeat, not the payment. The service says it already holds the
+    /// key, which is not the same as saying what the attempt under it did: the marker is written before
+    /// the request runs, and a failed original still burns it. So the key stays until it expires and a
+    /// third submission is refused too, rather than being handed a fresh key that would execute.
+    func testARecognisedRepeatKeepsTheKeyRatherThanSettlingIt() async {
+        let transport = SequencedIdempotencyTransport(
+            outcomes: [
+                .failure(PayabliGenericError(code: .networkError, reason: "Network request failed")),
+                .status(409),
+                .status(409)
+            ]
+        )
+        let flow = PayInFixture.makeFlow(transport: transport, keys: ["reserved-1", "reserved-2"])
+
+        for _ in 0 ..< 3 {
+            _ = await PayInFixture.failure(from: {
+                _ = try await flow.capture(PayInFixture.request(idempotencyKey: nil))
+            })
+        }
+
+        XCTAssertEqual(
+            transport.sentKeys,
+            ["reserved-1", "reserved-1", "reserved-1"],
+            "a conflict on a reused key leaves the payment's outcome exactly as unknown as it was"
+        )
+    }
 }

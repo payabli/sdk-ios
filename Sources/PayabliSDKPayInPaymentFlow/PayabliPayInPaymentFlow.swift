@@ -87,14 +87,19 @@ public final class PayabliPayInPaymentFlow: NSObject, ObservableObject, PayabliC
     /// equal value distinguishes them here too, by the order, the customer, the account or the
     /// subscription the request already carries.
     ///
-    /// The order and the account are normalised the way the request body normalises them, at
-    /// `PayInPaymentFlowClient.swift:91` and `:96`. Comparing them as the caller wrote them would read
-    /// one payment as two whenever a retry differed only in surrounding space. Nothing else here is
-    /// normalised because nothing else is: the customer, the currency and the subscription reach the
-    /// wire as given, so a difference in them is a real one.
+    /// Every field is compared as the request sends it. The order and the account are trimmed the way
+    /// the body trims them at `PayInPaymentFlowClient.swift:91` and `:96`, the transaction the way the
+    /// path trims it at `:58`, and the amount is written by the body's own formatter rather than
+    /// rounded a second time here. Comparing any of them as the caller wrote it read one payment as
+    /// two and minted a key the service would have refused. The customer, the currency and the
+    /// subscription reach the wire as given, so a difference in those is a real one.
     struct AttemptScope: Hashable {
         let route: String
-        let amount: Double
+
+        /// The amount as the request body writes it, not as the caller passed it. The body rounds to
+        /// two places, so comparing the unrounded value read one amount as two and minted a key the
+        /// service would have refused.
+        let amount: String
         let currency: String?
         let orderId: String?
         let accountId: String?
@@ -129,7 +134,7 @@ public final class PayabliPayInPaymentFlow: NSObject, ObservableObject, PayabliC
             transactionId: String? = nil
         ) {
             self.route = route
-            amount = details.totalAmount
+            amount = PayInPaymentFlowJSONBody.formattedCurrencyAmount(details.totalAmount)
             currency = details.currency
             self.orderId = orderId?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty
             self.accountId = accountId?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty
@@ -464,7 +469,7 @@ public final class PayabliPayInPaymentFlow: NSObject, ObservableObject, PayabliC
                     for: AttemptScope(
                         route: "captureAuthorized",
                         request.paymentDetails,
-                        transactionId: request.transId
+                        transactionId: request.transId.payabliCaptureTrimmed
                     )
                 )
             )
@@ -486,6 +491,12 @@ public final class PayabliPayInPaymentFlow: NSObject, ObservableObject, PayabliC
     /// client's to decide, since substituting one would send a key the caller does not hold.
     private func reserveKey(_ supplied: String?, for scope: AttemptScope) -> String {
         let now = monotonicNow()
+        // Every expired entry, not only this payment's. A key the service has forgotten protects
+        // nothing, and one left here keeps an order and a customer identifier on an object that lives
+        // as long as the screen does.
+        unresolvedAttempts = unresolvedAttempts.filter {
+            $0.value.reservedAt.duration(to: now) < Self.heldKeyWindow
+        }
         if let supplied {
             attemptInFlight = HeldAttempt(
                 key: supplied, scope: scope, reservedAt: now, ours: false, reused: false
@@ -493,16 +504,10 @@ public final class PayabliPayInPaymentFlow: NSObject, ObservableObject, PayabliC
             return supplied
         }
         if let held = unresolvedAttempts[scope] {
-            if held.reservedAt.duration(to: now) >= Self.heldKeyWindow {
-                // Sending it now would read as protection and be a second payment: the service no
-                // longer holds the key, so it executes the request rather than refusing it.
-                unresolvedAttempts[scope] = nil
-            } else {
-                attemptInFlight = HeldAttempt(
-                    key: held.key, scope: scope, reservedAt: held.reservedAt, ours: true, reused: true
-                )
-                return held.key
-            }
+            attemptInFlight = HeldAttempt(
+                key: held.key, scope: scope, reservedAt: held.reservedAt, ours: true, reused: true
+            )
+            return held.key
         }
         let minted = newIdempotencyKey()
         attemptInFlight = HeldAttempt(
@@ -533,7 +538,7 @@ public final class PayabliPayInPaymentFlow: NSObject, ObservableObject, PayabliC
         // An answer answers for the payment, not for the key that carried it. A caller's own key
         // succeeding on a payment this SDK is holding a key for means that payment happened, so the
         // held key has nothing left to protect and sending it again would charge a second time.
-        guard let failure, !Self.answersTheRequest(failure) else {
+        guard let failure, !Self.answersTheRequest(failure, reused: attempt.reused) else {
             unresolvedAttempts[attempt.scope] = nil
             return
         }
@@ -552,13 +557,19 @@ public final class PayabliPayInPaymentFlow: NSObject, ObservableObject, PayabliC
     /// at all, and anything that never left the device leave the earlier attempt exactly as unknown as
     /// it was, so its key is still the one the next submission has to send. Discarding it there is what
     /// turns a corrected retry into a second payment.
-    private static func answersTheRequest(_ failure: any Error) -> Bool {
+    ///
+    /// A conflict is the exception, and only on a submission that reused a held key. There the service
+    /// is saying it already holds that key, which is not the same as saying what the attempt under it
+    /// did: the marker is written before the request runs and a failed original still burns it. So the
+    /// payment's outcome is as unknown as it was, the key stays until it expires, and further
+    /// submissions keep being refused rather than being handed a fresh key that would execute.
+    private static func answersTheRequest(_ failure: any Error, reused: Bool) -> Bool {
         if let flow = failure as? PayabliPayInPaymentFlowError {
             switch flow {
             case .invalidInput, .missingAccessToken, .submissionInProgress, .submissionInterrupted:
                 return false
             case .repeatRefused:
-                return true
+                return false
             case .transactionFailed:
                 // Decided on the classification below, as every other failure is. A decoded refusal of
                 // the credential or of the request itself says nothing about the payment, and treating
@@ -567,7 +578,9 @@ public final class PayabliPayInPaymentFlow: NSObject, ObservableObject, PayabliC
             }
         }
         switch (failure as? any PayabliError)?.code {
-        case .paymentDeclined, .conflict, .validation:
+        case .conflict:
+            return !reused
+        case .paymentDeclined, .validation:
             return true
         default:
             return false

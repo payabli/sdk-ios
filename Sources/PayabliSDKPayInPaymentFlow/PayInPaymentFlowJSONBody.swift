@@ -91,7 +91,9 @@ enum PayInPaymentFlowJSONBody {
         return nil
     }
 
-    private static func formattedCurrencyAmount(_ value: Double) -> String {
+    /// The amount as the body writes it, which is what a comparison of two amounts has to use: the
+    /// wire rounds to two places, so two values that differ below that are one amount to the service.
+    static func formattedCurrencyAmount(_ value: Double) -> String {
         var decimal = Decimal(value)
         var rounded = Decimal()
         NSDecimalRound(&rounded, &decimal, 2, .plain)
