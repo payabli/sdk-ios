@@ -321,21 +321,28 @@ final class RetryTests: XCTestCase {
 
     func testTheTotalBudgetCutsOffAnInFlightAttemptAndDoesNotRetry() async {
         let clock = FakeRetryClock()
-        // This is the one case about the deadline winning, so it is the one that opens it. Everywhere
-        // else the operation wins by decision rather than by out-running a timer.
-        clock.openTheDeadline()
         let counter = AttemptCounter()
+        let entered = Latch()
 
-        do {
-            _ = try await Retry.run(
+        // Opened only once the attempt is under way. Opening it first lets the deadline finish before the
+        // operation has run at all, and the attempt count then holds for the wrong reason.
+        let run = Task {
+            try await Retry.run(
                 policy: .test(maxAttempts: 5, totalTimeout: 0.5),
                 logger: logger(RecordingLogSink()),
                 clock: clock
             ) { _ in
                 _ = await counter.next()
+                entered.open()
                 try await Task.sleep(nanoseconds: 5_000_000_000)
                 return "never"
             }
+        }
+        await entered.wait()
+        clock.openTheDeadline()
+
+        do {
+            _ = try await run.value
             XCTFail("expected the budget to cut the attempt off")
         } catch let error as PayabliGenericError {
             XCTAssertEqual(error.code, .networkError)
@@ -533,16 +540,21 @@ final class RetryTests: XCTestCase {
     func testCancellingTheCallerStaysCancellationRatherThanBecomingABudgetFailure() async {
         let clock = FakeRetryClock()
 
+        let entered = Latch()
         let task = Task {
             try await Retry.run(
                 policy: .test(maxAttempts: 5, totalTimeout: 30),
                 logger: logger(RecordingLogSink()),
                 clock: clock
             ) { _ in
+                entered.open()
                 try await Task.sleep(nanoseconds: 5_000_000_000)
                 return "never"
             }
         }
+        // Cancelling first is answered by the check at the top of the loop, which is a different guard
+        // from the one this case is about: cancellation inside a budgeted attempt staying cancellation.
+        await entered.wait()
         task.cancel()
 
         do {

@@ -10,7 +10,7 @@ final class FakeRetryClock: RetryClock, @unchecked Sendable {
     private let lock = NSLock()
     private var seconds: TimeInterval = 0
     private var slept: [TimeInterval] = []
-    private var parked: [CheckedContinuation<Void, Never>] = []
+    private var parked: [(continuation: CheckedContinuation<Void, Never>, seconds: TimeInterval)] = []
 
     /// Whether a bounded attempt is allowed to reach its deadline. Off by default, so the operation wins
     /// unless a case says otherwise.
@@ -36,31 +36,30 @@ final class FakeRetryClock: RetryClock, @unchecked Sendable {
     /// rather than elapsed time. A loaded executor cannot make a deadline fire that a case did not ask
     /// for, and cannot delay one it did.
     func expire(after seconds: TimeInterval) async throws {
-        lock.lock()
-        let open = deadlineIsOpen
-        if open {
-            self.seconds += seconds
-        }
-        lock.unlock()
-
-        if !open {
-            await withTaskCancellationHandler {
-                await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-                    lock.lock()
-                    // Read under the lock, and per call rather than from state on the clock: `onCancel`
-                    // can run before this closure does, and a continuation stored after that would never
-                    // be resumed. A flag on the clock would stay set for every later attempt.
-                    if Task.isCancelled {
-                        lock.unlock()
-                        continuation.resume()
-                        return
-                    }
-                    parked.append(continuation)
+        await withTaskCancellationHandler {
+            await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+                lock.lock()
+                // Both reads happen here, under the same lock the append takes. Reading the gate first and
+                // appending afterwards leaves a window: an open, or a cancel, landing between the two
+                // releases a list this continuation is not in yet, and it then parks for good.
+                if deadlineIsOpen {
+                    self.seconds += seconds
                     lock.unlock()
+                    continuation.resume()
+                    return
                 }
-            } onCancel: {
-                self.releaseParked()
+                if Task.isCancelled {
+                    lock.unlock()
+                    continuation.resume()
+                    return
+                }
+                parked.append((continuation, seconds))
+                lock.unlock()
             }
+        } onCancel: {
+            // Without advancing: a deadline the attempt beat did not elapse, and moving the clock for it
+            // would spend budget on a wait that never happened.
+            self.releaseParked(advancingClock: false)
         }
         try Task.checkCancellation()
     }
@@ -70,16 +69,23 @@ final class FakeRetryClock: RetryClock, @unchecked Sendable {
         lock.lock()
         deadlineIsOpen = true
         lock.unlock()
-        releaseParked()
+        releaseParked(advancingClock: true)
     }
 
-    private func releaseParked() {
+    /// Resumes everything parked. A deadline that fires advances the clock by the wait it was holding, so
+    /// one opened after the fact lands where one opened before it would have.
+    private func releaseParked(advancingClock: Bool) {
         lock.lock()
         let waiting = parked
         parked = []
+        if advancingClock {
+            for entry in waiting {
+                seconds += entry.seconds
+            }
+        }
         lock.unlock()
-        for continuation in waiting {
-            continuation.resume()
+        for entry in waiting {
+            entry.continuation.resume()
         }
     }
 
