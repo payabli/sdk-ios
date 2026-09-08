@@ -15,7 +15,8 @@ python3 .github/scripts/tests/sabotage.py   # would the checks notice if they st
 
 ## verify.py
 
-83-odd named checks in three families, printed one per line.
+Named checks in four families, printed one per line. No count here: it was written as "83-odd" and
+was stale within two rounds, and the number the run prints is the only one that cannot be.
 
 **Collector checks (`C*`)** run `nightly_report.py` as a subprocess inside a synthetic git repository. It
 globs for source files, resolves paths against its own repository root and shells out to `xcrun`, none of
@@ -35,13 +36,19 @@ commit that went green, a checkout behind the baseline, a real range, rewritten 
 at its page limit, a branch with no previous success, and no token at all. Those decide whether a commit is
 named as a probable cause, so getting one wrong blames somebody for work that was already green.
 
-**Workflow checks (`W*`)** parse `nightly.yml` and `scripts.yml` and assert what the files have to be:
+**Helper checks (`H*`)** run `hardware-only-skips.sh` against synthetic lists. Two workflows pass its
+output straight to `xcodebuild`, so a wrong answer there excludes the wrong tests or none at all, and
+nothing downstream notices: the suite still passes and a test that should have been excluded reports a
+standing skip instead.
+
+**Workflow checks (`W*`)** parse the workflows and assert what the files have to be:
 which triggers the nightly may carry, that exactly one job names the Slack token, how the liveness owner is
 decided, that every suite continues on error and is bounded, that the gate reads every outcome, and that
 this harness runs on every file it makes claims about. Each of those was true of how the files were
 written, which is not the same as being enforced.
 
-Set `NIGHTLY_ONLY` to `collector`, `poster` or `workflows` to run one family. The default is all three.
+Set `NIGHTLY_ONLY` to `collector`, `poster`, `workflows` or `helper` to run one family. The default,
+`both`, runs all of them.
 
 ## sabotage.py
 
@@ -75,6 +82,12 @@ Worth recording, because each was live in a harness whose own run was fully gree
   running on the pull request that changes it.
 - **Dead code in the collector.** A flag distinguishing an unreadable bundle from an absent one could never
   change the verdict, because both produce a zero total. It was removed rather than given a check.
+- **A parse check that could not read the file it guarded.** Every non-Python file was handed to a YAML
+  parser, so a mutated shell script came back unparseable and three sound mutations reported `INVALID`.
+  That reads as a stale anchor, and the next reader would have re-pointed one that was already right.
+- **A baseline narrower than the mutations.** It ran three halves while mutations named four, so a
+  pre-existing failure in the fourth could have been credited to a mutation. It now derives the halves
+  from the mutations themselves.
 
 ## Adding to either
 
