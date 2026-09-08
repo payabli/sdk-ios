@@ -109,10 +109,8 @@ final class PayInIdempotencyTests: XCTestCase {
         XCTAssertEqual(transport.count, 0, "nothing is sent")
     }
 
-    /// The key reported is the one the request carried, not the one the caller wrote.
-    ///
-    /// `sendableKey` normalises before the header is set, so a caller value with surrounding space is
-    /// sent trimmed rather than as it was given.
+    /// `sendableKey` normalises before the header is set, so a caller value with surrounding space
+    /// reaches the wire trimmed rather than as it was given.
     func testACallersKeyIsSentTrimmedRatherThanAsGiven() async {
         let transport = RecordingIdempotencyTransport(
             failure: PayabliGenericError(code: .networkError, reason: "Network request failed")
@@ -365,8 +363,11 @@ final class PayInIdempotencyTests: XCTestCase {
         }
     }
 
-    /// The store route carries no key, so no failure on it can report one.
-    func testAStoreFailureReportsNoKey() async {
+    /// A store failure is never wrapped as an attempt whose outcome is open.
+    ///
+    /// The route sends no key, so a repeat on it is not recognisable and there is nothing for the
+    /// wrapping to mean. An unknown store is settled by reading the entry point's stored methods back.
+    func testAStoreFailureIsNotWrappedAsAnOpenOutcome() async {
         let transport = RecordingIdempotencyTransport(
             failure: PayabliGenericError(code: .networkError, reason: "Network request failed")
         )
@@ -389,6 +390,6 @@ final class PayInIdempotencyTests: XCTestCase {
             XCTAssertEqual(transport.sentKeys, [], "the store route sends no key")
             return
         }
-        XCTFail("a store failure must not report a retry key")
+        XCTFail("a store failure must not be wrapped as an open outcome")
     }
 }
