@@ -514,12 +514,14 @@ have `*ObjC` companion classes, events expose stable integer codes,
 and errors bridge to `NSError` with domain `"com.payabli.ttp"`.
 
 ```objc
+NSError *error = nil;
 PayabliTTP *ttp = [[PayabliTTP alloc]
     initWithTokenHandler:^(void (^done)(NSString *, NSError *)) { /* ... */ }
               entryPoint:@"your-entrypoint"
                    appId:@"TEAM123456.com.yourcompany.app"
              environment:PayabliEnvironmentSandbox
                    error:&error];
+if (!ttp) { /* the configuration was rejected; read error */ return; }
 
 [ttp initializeWithCompletion:^(NSError *err) {
     if (err) { /* handle */ return; }
