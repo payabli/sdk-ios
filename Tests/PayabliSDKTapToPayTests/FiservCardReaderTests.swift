@@ -132,11 +132,11 @@ final class FiservCardReaderTests: XCTestCase {
     /// answering `false`. A caller cannot otherwise tell a merchant who has not
     /// accepted from a reader that was never prepared.
     ///
-    /// This is the only half of `areTermsAccepted()` a unit test reaches. The
-    /// answering path needs a prepared reader, and `prepareReader()` cannot get
-    /// past `requestSessionToken()` without reader hardware, so whether an
-    /// unaccepted merchant leaves the reader able to answer is proved on the
-    /// manual device tier and nowhere else.
+    /// The answering branches are covered below, through `setLinkStateSource`.
+    /// What no test here reaches is a real reader: `prepareReader()` cannot get
+    /// past `requestSessionToken()` without hardware, so whether an unaccepted
+    /// merchant leaves the reader able to answer at all is proved on the manual
+    /// device tier and nowhere else.
     func testTermsCannotBeAnsweredWithoutAPreparedReader() async {
         let reader = FiservCardReader()
         do {
