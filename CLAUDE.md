@@ -196,7 +196,8 @@ channel, so an app that never accepts card-present never links the certified car
 
 ### Testing Strategy
 
-- Five XCTest targets, one per module, in `Tests/`.
+- Five XCTest targets, one per module, in `Tests/`, plus three in the sample app's project:
+  `PayabliDemoFlowTests`, `PayabliDemoUITests` and `PayabliDemoDeviceTests`.
 - **Fixtures live in `PayabliSDKTestUtils`**: `StubURLProtocol`, `InMemorySecureStorage`,
   `MockTapToPayProvider`, `MockAppAttestor`, `MockDeviceAttestationService`,
   `InMemoryTelemetryTransport`. Import it; do not redeclare these in a test bundle.
@@ -207,3 +208,83 @@ channel, so an app that never accepts card-present never links the certified car
   `AppAttestService`'s internal init).
 - Tap to Pay and Apple Pay tests need a physical device, or substitute mocks for `DCAppAttestService`.
   A simulator cannot produce a real App Attest assertion.
+
+### The tier that needs hardware
+
+Some tests cannot run unattended: they need a card reader, a device with a Keychain that answers, or a
+reachable token server. **They are excluded from the automated tiers, never skipped**, and the difference
+is the point. The reporter derives passed from total minus failed minus skipped, so a test parked with
+`XCTSkip` reports a standing skip every night, and a permanent skip is indistinguishable from a regression
+that started skipping. An excluded test is absent from the result bundle and the counts stay honest.
+
+Two forms, and the first is the one to reach for:
+
+- **A suite that needs hardware is its own test target.** That is `PayabliDemoDeviceTests` and
+  `PayabliDemoUITests`, both hosted by the sample app. `Example/PayabliDemo/Config/DeviceTests.xcconfig`
+  records why the device bundle is a target rather than a setting: a tool-hosted bundle has no entitlement,
+  so every Keychain call returns `errSecMissingEntitlement`. Automated runs simply never name those
+  schemes.
+- **A single class or method inside a target that otherwise runs** takes an `OnDevice`, `Live` or
+  `IfAvailable` name suffix and goes in `.github/hardware-only-tests.txt`. Identifiers are `Target/Class`
+  or `Target/Class/method`, without parentheses.
+
+  **That file is the only copy, and every automated tier reads it.** Every workflow that runs the
+  `PayabliSDK-Package` scheme applies it through `.github/scripts/hardware-only-skips.sh`, the release
+  build included, and the checks find those workflows by reading the directory rather than from a list
+  anyone has to maintain. A tier that does not apply it is where an excluded test quietly becomes a
+  skipping one: that tier stays green and reports a standing skip nobody reads.
+
+  Five methods in `SecureStorageTests` are the list today. They need a Keychain that answers, the SPM test
+  host has no entitlement, and they returned `errSecMissingEntitlement` and skipped on every simulator run
+  before the list existed. The other ten tests in that class run normally, which is why the exclusion names
+  methods rather than the class.
+
+  **Excluding a test means moving its assertion, not dropping it.** Each of those five has a counterpart in
+  `KeychainOnDeviceTests`, which skips nothing. Two of them had to be written when the list was reviewed:
+  the device suite covered the add path of `set` and the sweep's correction, while the excluded tests
+  covered the update path of `set` on an existing item and the sweep creating no item for any key it knows.
+  Those are different branches, so the exclusion would have dropped the only test of each. Read the
+  counterpart before excluding anything: "covered on a device" is a claim about a file, and it was made
+  twice here without one.
+
+**The bar is that the test would fail or answer wrongly unattended, not that nobody has taught the
+automation to run it.** The second is a provisioning gap, fixed by changing the workflow rather than by
+owning a phone, and a test parked here for that reason is borrowing time.
+
+Run the live tier by hand, against a running token server:
+
+```bash
+TEST_RUNNER_PAYABLI_QA_LIVE=1 TEST_RUNNER_PAYABLI_QA_ENVIRONMENT=qa \
+xcodebuild test -project Example/PayabliDemo/PayabliDemo.xcodeproj -scheme PayabliDemoUITests \
+  -destination 'id=<simulator udid>'
+```
+
+The test scheme, not an app scheme. `PayabliDemo qa` and its siblings carry no test action, so
+`xcodebuild` refuses the whole invocation with "Scheme PayabliDemo qa is not currently configured for the
+test action" rather than running anything. The environment the app would have taken from that scheme is
+passed in instead.
+
+`PAYABLI_QA_LIVE` and `PAYABLI_QA_ENVIRONMENT` reach the runner only through the `TEST_RUNNER_` prefix,
+which `xcodebuild` strips. Set plainly they reach `xcodebuild` and stop there, which looks exactly like a
+variable that had no effect.
+
+Those two are the UI walkthrough's. The device bundle reads `PAYABLI_QA_LIVE` and `PAYABLI_ENV`, and
+takes them from the scheme rather than the `TEST_RUNNER_` prefix, so the two tiers do not share the
+environment variable that names where they run.
+
+### CI
+
+- **`ci.yml`** gates every pull request: lint, the SDK suite, `PayabliDemoFlowTests`, and a change report.
+  `pr-reports.yml` holds anything needing a token and is read from the default branch, so a pull request
+  cannot edit the jobs that hold one.
+- **`nightly.yml`** runs on a schedule and reports to Slack. It adds what the gate cannot reach: the sample
+  app itself, which no pull request can build because `Secrets.swift` is gitignored and is a member of the
+  app target; a device-slice compile; both live test bundles compiled but not run; and the release
+  XCFrameworks. It is not a required check.
+- **The nightly's reporter is covered by its own tests**, `.github/scripts/tests/`, run by `scripts.yml` on
+  any pull request that touches them. Change either script and run both halves:
+
+  ```bash
+  python3 .github/scripts/tests/verify.py
+  python3 .github/scripts/tests/sabotage.py
+  ```
