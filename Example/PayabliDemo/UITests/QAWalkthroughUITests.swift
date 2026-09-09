@@ -13,10 +13,13 @@ import XCTest
 /// Every test skips unless `PAYABLI_QA_LIVE` is `1`, so opening the scheme and pressing run charges nothing.
 ///
 /// ```
-/// TEST_RUNNER_PAYABLI_QA_LIVE=1 \
-/// xcodebuild test -project Example/PayabliDemo/PayabliDemo.xcodeproj -scheme 'PayabliDemo qa' \
-///   -only-testing:PayabliDemoUITests -destination 'id=<simulator udid>'
+/// TEST_RUNNER_PAYABLI_QA_LIVE=1 TEST_RUNNER_PAYABLI_QA_ENVIRONMENT=qa \
+/// xcodebuild test -project Example/PayabliDemo/PayabliDemo.xcodeproj -scheme PayabliDemoUITests \
+///   -destination 'id=<simulator udid>'
 /// ```
+///
+/// The test scheme rather than an app scheme: `PayabliDemo qa` carries no test action, so `xcodebuild`
+/// refuses the invocation instead of running this bundle.
 ///
 /// The token server has to be up, and it is per environment: each one mints from its own credentials, so a
 /// walk against one environment holding the other's token is refused. `PAYABLI_QA_TOKEN_HOST` names the one
