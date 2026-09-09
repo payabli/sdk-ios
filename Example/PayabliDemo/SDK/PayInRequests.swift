@@ -5,10 +5,13 @@ import PayabliSDKPayInPaymentFlow
 enum PayInRequests {
     /// A capture's request configuration, with a key minted per attempt.
     ///
-    /// One attempt is one payment, however many times it is submitted: a retry
-    /// carries the same key, so the service answers from the attempt that already
-    /// reached it. A payment of its own is a new configuration, which is what this
-    /// builds, and the app builds the first at launch.
+    /// One attempt is one payment for as long as the service remembers its key: a
+    /// retry carries the same key, and a repeat inside two minutes of the first
+    /// request is refused rather than taken. After that the service has forgotten
+    /// the key and a retry is a second payment, so an outcome nobody saw is settled
+    /// by reading the transaction back. A payment of its own is a new
+    /// configuration, which is what this builds, and the app builds the first at
+    /// launch.
     ///
     /// The amount is drawn per attempt and the identifiers name this device and the
     /// moment, so a run over several devices at once produces rows a dashboard can

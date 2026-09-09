@@ -5,14 +5,13 @@ import XCTest
 /// How a failure reads on each of the two flows.
 ///
 /// One adapter builds both screens' failures, and a 409 means different things on
-/// them. A capture sends an idempotency key, so a conflict says the service
-/// answered from an attempt that already reached it and the next submit repeats it.
-/// A stored method sends no key and offers no new attempt, so the same status is
-/// just what the service said.
+/// them. A capture sends an idempotency key, so a conflict says the service already
+/// holds this attempt and refused the repeat. A stored method sends no key and
+/// offers no new attempt, so the same status is just what the service said.
 ///
 /// Both shapes a conflict arrives in are covered: the typed failure carries the
-/// status where the API answered with a body, and an empty one reaches the mapper
-/// with no 409 case and comes back as the bare reason.
+/// status where the API answered with a body, and an empty one carries the code
+/// the status mapping supplies.
 final class PayInFailureTests: XCTestCase {
     func testATypedConflictOnACaptureNamesTheKey() {
         let failure = PayInFailure(typedConflict, operation: .capture)
@@ -22,7 +21,10 @@ final class PayInFailureTests: XCTestCase {
     }
 
     func testABareConflictOnACaptureNamesTheKey() {
-        let failure = PayInFailure(BareReason(reason: "HTTP 409"), operation: .capture)
+        let failure = PayInFailure(
+            BareReason(reason: "Conflict (409)", code: .conflict),
+            operation: .capture
+        )
 
         XCTAssertTrue(failure.isDuplicateSubmission)
         XCTAssertTrue(failure.message.contains("idempotency key"), failure.message)
@@ -36,14 +38,18 @@ final class PayInFailureTests: XCTestCase {
     }
 
     func testABareConflictOnAStoredMethodSaysWhatTheServiceSaid() {
-        let failure = PayInFailure(BareReason(reason: "HTTP 409"), operation: .storedMethod)
+        let failure = PayInFailure(
+            BareReason(reason: "Conflict (409)", code: .conflict),
+            operation: .storedMethod
+        )
 
         XCTAssertFalse(failure.isDuplicateSubmission)
-        XCTAssertEqual(failure.message, "HTTP 409")
+        XCTAssertEqual(failure.message, "Conflict (409)")
     }
 
     /// A validation failure's reason is the server's own title, which can carry
-    /// those three digits for its own reasons, so the match is the exact string.
+    /// those three digits for its own reasons. The code decides, so the text is not
+    /// read and cannot be mistaken for one.
     func testAReasonThatMerelyMentions409IsNotAConflict() {
         let failure = PayInFailure(
             BareReason(reason: "Rejected: field 409 is not a valid account"),
@@ -125,9 +131,7 @@ private struct ActionableDecline: PayabliError {
 /// which is what an empty body becomes.
 private struct BareReason: PayabliError {
     let reason: String
-    var code: PayabliErrorCode {
-        .unknown
-    }
+    var code: PayabliErrorCode = .unknown
 
     var detail: String? {
         nil
