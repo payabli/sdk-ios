@@ -200,12 +200,15 @@ final class TTPUpdateRetryTests: XCTestCase {
         /// Polls so teardown can end it: this runs on a URLProtocol thread, and one still sleeping when
         /// the next case starts serves that case's request and consumes a status from its script.
         func waitWhileHeld() -> Bool {
+            // Taken once, under the lock, and used for the deadline. Reading it again outside would race
+            // `release()`, which teardown calls from another thread while this one is holding a request
+            // open, and the bound is meant to be the one that was in force when the hold began.
             lock.lock()
-            let held = holdSeconds > 0
+            let seconds = holdSeconds
             lock.unlock()
-            guard held else { return false }
+            guard seconds > 0 else { return false }
 
-            let deadline = Date().addingTimeInterval(holdSeconds)
+            let deadline = Date().addingTimeInterval(seconds)
             while Date() < deadline {
                 lock.lock()
                 let stillHeld = holdSeconds > 0
