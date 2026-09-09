@@ -17,7 +17,6 @@ provides the checkout user interface.
 import PayabliSDKTapToPay
 
 let ttp = try PayabliTTP(
-    accessToken: token,
     tokenProvider: { try await yourBackend.fetchPayabliAccessToken() },
     entryPoint: "your-entrypoint",
     appId: "TEAM123456.com.yourcompany.app",
@@ -215,7 +214,6 @@ and React Native/Expo scaffolds.
 
 ```swift
 let ttp = try PayabliTTP(
-    accessToken: try await yourBackend.fetchPayabliAccessToken(),
     tokenProvider: { try await yourBackend.fetchPayabliAccessToken() },
     entryPoint: "your-entrypoint",
     appId: "TEAM123456.com.yourcompany.app",
@@ -225,8 +223,7 @@ let ttp = try PayabliTTP(
 
 | Parameter        | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `accessToken`    | A valid short-lived bearer token issued by the host backend.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| `tokenProvider`  | An `async throws -> String` closure. The SDK invokes it to obtain a fresh token after a `401 Unauthorized` response. Concurrent refresh attempts are deduplicated.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `tokenProvider`  | An `async throws -> String` closure that returns a short-lived bearer token from the host backend. The SDK calls it before its first request and again after a `401 Unauthorized`, and holds the result in memory in between. Concurrent callers share one call. The SDK never asks the host to store or hand over a token any other way.                                                                                                                                                                                                                                                                                                                |
 | `entryPoint`     | The entrypoint slug provisioned by Payabli (see [Payabli entrypoint](#payabli-entrypoint)).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | `appId`          | The application's identity in the form `<TEAM_ID>.<BUNDLE_ID>`. The `TEAM_ID` is the 10-character team identifier from the [Apple Developer account](https://developer.apple.com/account); the `BUNDLE_ID` is the application's bundle identifier (e.g., `TEAM123456.com.acme.checkout`). The same `appId` must be authorized on the paypoint allowlist (see [Authorized application on the paypoint allowlist](#authorized-application-on-the-paypoint-allowlist)). App Attest uses `appId` to verify that the binary on the device matches the registered application; a mismatch surfaces as `PayabliTTPError.attestationFailed`. |
 | `environment`    | Selects the target Payabli API (see the values table below). The value must match the `appattest-environment` entitlement: `development` for `.sandbox`, `production` for `.production`.                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
@@ -518,11 +515,11 @@ and errors bridge to `NSError` with domain `"com.payabli.ttp"`.
 
 ```objc
 PayabliTTP *ttp = [[PayabliTTP alloc]
-    initWithAccessToken:token
-    tokenRefreshHandler:^(void (^done)(NSString *, NSError *)) { /* ... */ }
+    initWithTokenHandler:^(void (^done)(NSString *, NSError *)) { /* ... */ }
               entryPoint:@"your-entrypoint"
                    appId:@"TEAM123456.com.yourcompany.app"
-             environment:PayabliEnvironmentSandbox];
+             environment:PayabliEnvironmentSandbox
+                   error:&error];
 
 [ttp initializeWithCompletion:^(NSError *err) {
     if (err) { /* handle */ return; }

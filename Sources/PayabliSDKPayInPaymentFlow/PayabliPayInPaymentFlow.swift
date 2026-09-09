@@ -31,52 +31,51 @@ public final class PayabliPayInPaymentFlow: NSObject, ObservableObject, PayabliC
     @Published public private(set) var operation: PayabliPayInPaymentFlowOperation
     @Published public private(set) var requestConfiguration: PayabliPayInPaymentFlowRequestConfiguration?
 
-    private let accessTokenProvider: PayabliPayInPaymentFlowAccessTokenProvider
+    private var session: PayabliSession?
     private let injectedTransport: (any PayabliTransport)?
     private let diagnostics: PayabliPayInPaymentFlowDiagnostics
     private var client: PayInPaymentFlowClient
     private var tokenStorageClient: PayInPaymentFlowTokenStorageClient
     private var activeSubmissionCount = 0
 
+    /// Builds the flow on a session, which carries the credential and the transport that sends it.
+    ///
+    /// The entry point and the environment come from the session's configuration, so a flow and the
+    /// session it runs on cannot disagree about which merchant or which host they are for.
     public init(
-        entryPoint: String,
-        environment: PayabliEnvironment,
-        accessTokenProvider: @escaping PayabliPayInPaymentFlowAccessTokenProvider,
+        session: PayabliSession,
         diagnostics: PayabliPayInPaymentFlowDiagnostics = .disabled,
         operation: PayabliPayInPaymentFlowOperation = .storePaymentMethod,
         requestConfiguration: PayabliPayInPaymentFlowRequestConfiguration? = nil
     ) {
-        self.entryPoint = entryPoint
-        self.environment = environment
+        self.entryPoint = session.config.entryPoint
+        self.environment = session.config.environment
         self.operation = operation
         self.requestConfiguration = requestConfiguration
-        self.accessTokenProvider = accessTokenProvider
+        self.session = session
         injectedTransport = nil
         self.diagnostics = diagnostics
-        // The chain attaches the credential, so neither client stamps one. This surface has no
-        // session, so it gets the bearer and not the 401 recovery.
-        let baseTransport = PayabliService(
-            environment: environment,
-            readToken: Self.guardedRead(accessTokenProvider)
-        )
         client = PayInPaymentFlowClient(
-            transport: baseTransport,
-            baseURL: environment.baseURL,
+            transport: session.transport,
+            baseURL: session.config.environment.baseURL,
             diagnostics: diagnostics
         )
         tokenStorageClient = PayInPaymentFlowTokenStorageClient(
-            transport: baseTransport,
-            baseURL: environment.baseURL,
+            transport: session.transport,
+            baseURL: session.config.environment.baseURL,
             diagnostics: diagnostics
         )
         super.init()
     }
 
+    /// A flow on a transport supplied whole, for tests that answer requests themselves.
+    ///
+    /// There is no token source here because there is nothing to authenticate: the transport given
+    /// is the one used, and a fake one never reads a credential.
     init(
         entryPoint: String,
         environment: PayabliEnvironment,
-        accessTokenProvider: @escaping PayabliPayInPaymentFlowAccessTokenProvider,
-        transport: (any PayabliTransport)? = nil,
+        transport: any PayabliTransport,
         diagnostics: PayabliPayInPaymentFlowDiagnostics = .disabled,
         operation: PayabliPayInPaymentFlowOperation = .storePaymentMethod,
         requestConfiguration: PayabliPayInPaymentFlowRequestConfiguration? = nil
@@ -85,123 +84,44 @@ public final class PayabliPayInPaymentFlow: NSObject, ObservableObject, PayabliC
         self.environment = environment
         self.operation = operation
         self.requestConfiguration = requestConfiguration
-        self.accessTokenProvider = accessTokenProvider
-        self.injectedTransport = transport
+        session = nil
+        injectedTransport = transport
         self.diagnostics = diagnostics
-        let baseTransport = transport
-            ?? PayabliService(
-                environment: environment,
-                readToken: Self.guardedRead(accessTokenProvider)
-            )
         client = PayInPaymentFlowClient(
-            transport: baseTransport,
+            transport: transport,
             baseURL: environment.baseURL,
             diagnostics: diagnostics
         )
         tokenStorageClient = PayInPaymentFlowTokenStorageClient(
-            transport: baseTransport,
+            transport: transport,
             baseURL: environment.baseURL,
             diagnostics: diagnostics
         )
         super.init()
     }
 
-    public convenience init(
-        config: PayabliConfig,
-        accessTokenProvider: @escaping PayabliPayInPaymentFlowAccessTokenProvider,
-        diagnostics: PayabliPayInPaymentFlowDiagnostics = .disabled,
-        operation: PayabliPayInPaymentFlowOperation = .storePaymentMethod,
-        requestConfiguration: PayabliPayInPaymentFlowRequestConfiguration? = nil
-    ) {
-        self.init(
-            entryPoint: config.entryPoint,
-            environment: config.environment,
-            accessTokenProvider: accessTokenProvider,
-            diagnostics: diagnostics,
-            operation: operation,
-            requestConfiguration: requestConfiguration
-        )
-    }
-
-    convenience init(
-        config: PayabliConfig,
-        accessTokenProvider: @escaping PayabliPayInPaymentFlowAccessTokenProvider,
-        transport: (any PayabliTransport)? = nil,
-        diagnostics: PayabliPayInPaymentFlowDiagnostics = .disabled,
-        operation: PayabliPayInPaymentFlowOperation = .storePaymentMethod,
-        requestConfiguration: PayabliPayInPaymentFlowRequestConfiguration? = nil
-    ) {
-        self.init(
-            entryPoint: config.entryPoint,
-            environment: config.environment,
-            accessTokenProvider: accessTokenProvider,
-            transport: transport,
-            diagnostics: diagnostics,
-            operation: operation,
-            requestConfiguration: requestConfiguration
-        )
-    }
-
-    /// Convenience for tests or ephemeral access tokens.
+    /// Points the flow at a different merchant or host.
     ///
-    /// Do not pass a long-lived private API token from production app code.
-    /// Prefer the `accessTokenProvider` initializer and fetch a scoped token
-    /// from the host application's backend just before submission.
-    public convenience init(
-        accessToken: String,
-        entryPoint: String,
-        environment: PayabliEnvironment,
-        diagnostics: PayabliPayInPaymentFlowDiagnostics = .disabled,
-        operation: PayabliPayInPaymentFlowOperation = .storePaymentMethod,
-        requestConfiguration: PayabliPayInPaymentFlowRequestConfiguration? = nil
-    ) {
-        let provider: PayabliPayInPaymentFlowAccessTokenProvider = { accessToken }
-        self.init(
-            entryPoint: entryPoint,
-            environment: environment,
-            accessTokenProvider: provider,
-            diagnostics: diagnostics,
-            operation: operation,
-            requestConfiguration: requestConfiguration
-        )
-    }
-
-    convenience init(
-        accessToken: String,
-        entryPoint: String,
-        environment: PayabliEnvironment,
-        transport: (any PayabliTransport)? = nil,
-        diagnostics: PayabliPayInPaymentFlowDiagnostics = .disabled,
-        operation: PayabliPayInPaymentFlowOperation = .storePaymentMethod,
-        requestConfiguration: PayabliPayInPaymentFlowRequestConfiguration? = nil
-    ) {
-        let provider: PayabliPayInPaymentFlowAccessTokenProvider = { accessToken }
-        self.init(
-            entryPoint: entryPoint,
-            environment: environment,
-            accessTokenProvider: provider,
-            transport: transport,
-            diagnostics: diagnostics,
-            operation: operation,
-            requestConfiguration: requestConfiguration
-        )
-    }
-
+    /// A configuration carries a token provider, so this builds the session it describes rather than
+    /// reusing the one the flow was made with, which was for a different entry point.
     public func configure(config: PayabliConfig) {
         entryPoint = config.entryPoint
         environment = config.environment
-        let baseTransport = injectedTransport
-            ?? PayabliService(
-                environment: config.environment,
-                readToken: Self.guardedRead(accessTokenProvider)
-            )
+        let transport: any PayabliTransport
+        if let injectedTransport {
+            transport = injectedTransport
+        } else {
+            let rebuilt = PayabliSession(config: config)
+            session = rebuilt
+            transport = rebuilt.transport
+        }
         client = PayInPaymentFlowClient(
-            transport: baseTransport,
+            transport: transport,
             baseURL: config.environment.baseURL,
             diagnostics: diagnostics
         )
         tokenStorageClient = PayInPaymentFlowTokenStorageClient(
-            transport: baseTransport,
+            transport: transport,
             baseURL: config.environment.baseURL,
             diagnostics: diagnostics
         )
@@ -209,35 +129,6 @@ public final class PayabliPayInPaymentFlow: NSObject, ObservableObject, PayabliC
 
     public func configure(config: PayabliConfig, theme _: PayabliTheme) {
         configure(config: config)
-    }
-
-    /// The host's provider, trimmed and refused when empty, in the shape the chain reads.
-    ///
-    /// One read per request. The chain is what sends the credential, and a provider may mint a
-    /// different token per call, so a check elsewhere would either spend a second call or validate a
-    /// token that was not sent.
-    ///
-    /// A provider failure is tagged `PayInProviderFailure` on the way out. The read runs inside
-    /// `transport.perform` now, so anything thrown from it reaches the diagnostics sink, which renders
-    /// a non-SDK error whole and redacts only digit sequences shaped like a card number — and a host's
-    /// provider error can name its own backend. The tag is what lets both clients keep it out of the
-    /// record while still handing the host back its own error, which the Objective-C bridge relies on.
-    private static func guardedRead(
-        _ provider: @escaping PayabliPayInPaymentFlowAccessTokenProvider
-    ) -> @Sendable () async throws -> String {
-        {
-            let minted: String
-            do {
-                minted = try await provider()
-            } catch {
-                throw PayInProviderFailure(underlying: error)
-            }
-            let token = minted.payabliCaptureTrimmed
-            guard !token.isEmpty else {
-                throw PayabliPayInPaymentFlowError.missingAccessToken
-            }
-            return token
-        }
     }
 
     public func configure(

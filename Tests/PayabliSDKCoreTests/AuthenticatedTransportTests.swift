@@ -132,9 +132,11 @@ final class AuthenticatedTransportTests: XCTestCase {
             let call = await provider.increment()
             return call == 1 ? "rotated-by-other" : "minted-for-us"
         })
+        // The rotation below names the token in effect, so one has to be in effect first.
+        _ = try await auth.currentAccessToken()
         let gate = GateDecoration()
         let transport = makeStackWithChain(
-            [gate, BearerDecoration(readToken: { await auth.currentAccessToken() })],
+            [gate, BearerDecoration(readToken: { try await auth.currentAccessToken() })],
             auth: auth
         )
 
@@ -176,7 +178,7 @@ final class AuthenticatedTransportTests: XCTestCase {
         // refused. Without it the count below depends on which caller the scheduler runs first.
         let gate = GateDecoration()
         let transport = makeStackWithChain(
-            [BearerDecoration(readToken: { await auth.currentAccessToken() }), gate],
+            [BearerDecoration(readToken: { try await auth.currentAccessToken() }), gate],
             auth: auth
         )
 

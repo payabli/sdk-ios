@@ -63,25 +63,23 @@ Core public types are prefixed with `PayabliPayInPaymentFlow`.
 
 ## Authentication Rules
 
-All operations use the same mobile access-token provider model:
+Every operation runs on a session, which holds the credential and the transport that sends it:
 
 ```swift
 let component = PayabliPayInPaymentFlow(
-    entryPoint: entryPoint,
-    environment: .sandbox,
-    accessTokenProvider: {
-        try await backend.fetchPayInAccessToken()
-    }
+    session: PayabliSession(config: try PayabliConfig(
+        tokenProvider: { try await backend.fetchPayInAccessToken() },
+        entryPoint: entryPoint,
+        environment: .sandbox
+    ))
 )
 ```
 
 Never generate capture or authorize code that manually adds a `requestToken`
-header. The component obtains a bearer access token from
-`PayabliPayInPaymentFlowAccessTokenProvider`.
+header, or that passes a token to the component. The session's holder calls
+`PayabliConfig.tokenProvider` when it needs one and attaches the bearer itself.
 
-The convenience initializer that accepts `accessToken: String` is for tests or
-short-lived ephemeral tokens. Production examples should use
-`accessTokenProvider`.
+There is no initializer that accepts a token. Generate the session form above.
 
 ## Security Model
 
@@ -129,30 +127,11 @@ Authorize guidance:
 
 ## Component Initializers And State
 
-Public initializers:
+The public initializer:
 
 ```swift
 PayabliPayInPaymentFlow(
-    entryPoint: String,
-    environment: PayabliEnvironment,
-    accessTokenProvider: @escaping PayabliPayInPaymentFlowAccessTokenProvider,
-    diagnostics: PayabliPayInPaymentFlowDiagnostics = .disabled,
-    operation: PayabliPayInPaymentFlowOperation = .storePaymentMethod,
-    requestConfiguration: PayabliPayInPaymentFlowRequestConfiguration? = nil
-)
-
-PayabliPayInPaymentFlow(
-    config: PayabliConfig,
-    accessTokenProvider: @escaping PayabliPayInPaymentFlowAccessTokenProvider,
-    diagnostics: PayabliPayInPaymentFlowDiagnostics = .disabled,
-    operation: PayabliPayInPaymentFlowOperation = .storePaymentMethod,
-    requestConfiguration: PayabliPayInPaymentFlowRequestConfiguration? = nil
-)
-
-PayabliPayInPaymentFlow(
-    accessToken: String,
-    entryPoint: String,
-    environment: PayabliEnvironment,
+    session: PayabliSession,
     diagnostics: PayabliPayInPaymentFlowDiagnostics = .disabled,
     operation: PayabliPayInPaymentFlowOperation = .storePaymentMethod,
     requestConfiguration: PayabliPayInPaymentFlowRequestConfiguration? = nil

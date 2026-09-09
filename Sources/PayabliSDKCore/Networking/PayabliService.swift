@@ -28,7 +28,7 @@ package final class PayabliService: PayabliTransport, Sendable {
     /// There is no initializer that takes a chain, so every transport carries the one the factory
     /// builds. `readToken` reaches the chain and nothing here reads it; it is called once per request,
     /// so a rotation needs no cache invalidated.
-    package convenience init(
+    convenience init(
         environment: PayabliEnvironment,
         readToken: @escaping @Sendable () async throws -> String,
         session: URLSession? = nil

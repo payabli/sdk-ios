@@ -37,19 +37,19 @@ final class CardNotPresentOnDeviceTests: XCTestCase {
     func testEARejectedTokenIsReplacedOnceAndReused() async throws {
         let calls = ProviderCalls()
         let auth = PayabliAuth(config: try PayabliConfig(
-            accessToken: "refused-by-the-service",
+            entryPoint: named.entry,
+            environment: named.environment,
+
             tokenProvider: {
                 await calls.increment()
                 return try await Secrets.fetchAccessToken()
-            },
-            entryPoint: named.entry,
-            environment: named.environment
+            }
         ))
 
         let fresh = try await auth.invalidateAndRefresh(rejectedToken: "refused-by-the-service")
         XCTAssertFalse(fresh.isEmpty)
         XCTAssertNotEqual(fresh, "refused-by-the-service")
-        let held = await auth.currentAccessToken()
+        let held = try await auth.currentAccessToken()
         XCTAssertEqual(held, fresh, "the minted token should be the one held")
 
         // The staggered 401: names a token that has already rotated.
@@ -73,11 +73,14 @@ final class CardNotPresentOnDeviceTests: XCTestCase {
         )
     }
 
-    private func makeFlow() -> PayabliPayInPaymentFlow {
+    private func makeFlow() throws -> PayabliPayInPaymentFlow {
         PayabliPayInPaymentFlow(
-            entryPoint: named.entry,
-            environment: named.environment,
-            accessTokenProvider: { try await Secrets.fetchPaymentMethodAccessToken() }
+            session: PayabliSession(config: try PayabliConfig(
+                entryPoint: named.entry,
+                environment: named.environment,
+
+                tokenProvider: { try await Secrets.fetchPaymentMethodAccessToken() }
+            ))
         )
     }
 

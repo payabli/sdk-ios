@@ -16,7 +16,7 @@ import UIKit
 /// ## Protocol
 ///
 /// Methods (resolver/rejecter pattern, all `@objc`):
-///   - `configure(config, resolver, rejecter)` — accessToken, entryPoint,
+///   - `configure(config, resolver, rejecter)` — entryPoint,
 ///     appId, environment.
 ///   - `initialize(resolver, rejecter)`
 ///   - `charge(params, resolver, rejecter)` — amount, type, serviceFee,
@@ -82,13 +82,12 @@ public final class PayabliSDKModule: RCTEventEmitter {
         resolver resolve: @escaping RCTPromiseResolveBlock,
         rejecter reject: @escaping RCTPromiseRejectBlock
     ) {
-        guard let accessToken = config["accessToken"] as? String,
-              let entryPoint = config["entryPoint"] as? String,
+        guard let entryPoint = config["entryPoint"] as? String,
               let appId = config["appId"] as? String,
               let envRaw = config["environment"] as? Int,
               let environment = PayabliEnvironment(rawValue: envRaw)
         else {
-            reject("INVALID_ARGS", "Missing accessToken/entryPoint/appId/environment", nil)
+            reject("INVALID_ARGS", "Missing entryPoint/appId/environment", nil)
             return
         }
 
@@ -130,7 +129,6 @@ public final class PayabliSDKModule: RCTEventEmitter {
             let ttp: PayabliTTP
             do {
                 ttp = try PayabliTTP(
-                    accessToken: accessToken,
                     tokenProvider: tokenProvider,
                     entryPoint: entryPoint,
                     appId: appId,
@@ -287,7 +285,7 @@ public final class PayabliSDKModule: RCTEventEmitter {
             return
         }
 
-        let accessTokenProvider: PayabliPayInPaymentFlowAccessTokenProvider = { @Sendable [weak self] in
+        let tokenProvider: PayabliTokenRefresh = { @Sendable [weak self] in
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<String, Error>) in
                 guard let self else {
                     continuation.resume(throwing: PayabliGenericError(
@@ -313,12 +311,20 @@ public final class PayabliSDKModule: RCTEventEmitter {
         }
 
         Task { @MainActor in
-            self.payInPaymentFlow = PayabliPayInPaymentFlow(
-                entryPoint: entryPoint,
-                environment: environment,
-                accessTokenProvider: accessTokenProvider
-            )
-            resolve(nil)
+            do {
+                let config = try PayabliConfig(
+                    entryPoint: entryPoint,
+                    environment: environment,
+
+                    tokenProvider: tokenProvider
+                )
+                self.payInPaymentFlow = PayabliPayInPaymentFlow(
+                    session: PayabliSession(config: config)
+                )
+                resolve(nil)
+            } catch {
+                reject("INVALID_CONFIGURATION", error.localizedDescription, error)
+            }
         }
     }
 

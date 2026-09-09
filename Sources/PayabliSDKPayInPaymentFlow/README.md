@@ -17,11 +17,11 @@ import PayabliSDKCore
 import PayabliSDKPayInPaymentFlow
 
 @StateObject private var paymentFlow = PayabliPayInPaymentFlow(
-    entryPoint: "merchant-entry",
-    environment: .sandbox,
-    accessTokenProvider: {
-        try await Backend.shared.fetchMobilePayInToken()
-    },
+    session: PayabliSession(config: try PayabliConfig(
+        tokenProvider: { try await Backend.shared.fetchMobilePayInToken() },
+        entryPoint: "merchant-entry",
+        environment: .sandbox
+    )),
     operation: .storePaymentMethod
 )
 ```

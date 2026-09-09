@@ -75,10 +75,10 @@ enum LiveEnvironment {
     /// partner endpoint the demo app uses.
     static func config(for named: LiveTarget) throws -> PayabliConfig {
         try PayabliConfig(
-            accessToken: Secrets.placeholderAccessToken,
-            tokenProvider: { try await Secrets.fetchAccessToken() },
             entryPoint: named.entry,
-            environment: named.environment
+            environment: named.environment,
+
+            tokenProvider: { try await Secrets.fetchAccessToken() }
         )
     }
 

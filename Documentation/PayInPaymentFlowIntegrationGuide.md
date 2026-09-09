@@ -24,19 +24,22 @@ import PayabliSDKPayInPaymentFlow
 
 ## 2. Provide A Mobile Access Token
 
-The component expects an async token provider:
+The session expects an async token provider:
 
 ```swift
-let accessTokenProvider: PayabliPayInPaymentFlowAccessTokenProvider = {
-    try await backend.fetchPayInAccessToken()
-}
+let config = try PayabliConfig(
+    tokenProvider: { try await backend.fetchPayInAccessToken() },
+    entryPoint: entryPoint,
+    environment: .sandbox
+)
 ```
 
 Recommended production pattern:
 
 1. The iOS app asks your backend for a short-lived Payabli mobile access token.
 2. Your backend holds the private Payabli credentials.
-3. The component calls `accessTokenProvider` just before network operations.
+3. The session calls `tokenProvider` before its first request and again whenever a token is
+   rejected, and holds the result in memory in between.
 
 Do not embed Payabli `clientSecret` values in the app. Do not manually attach a
 `requestToken` header for capture or authorize; these operations use the same
@@ -91,11 +94,11 @@ final class StorePaymentMethodViewModel: ObservableObject {
 
     init(backend: Backend) {
         paymentFlow = PayabliPayInPaymentFlow(
-            entryPoint: backend.entryPoint,
-            environment: .sandbox,
-            accessTokenProvider: {
-                try await backend.fetchPayInAccessToken()
-            },
+            session: PayabliSession(config: try PayabliConfig(
+                tokenProvider: { try await backend.fetchPayInAccessToken() },
+                entryPoint: backend.entryPoint,
+                environment: .sandbox
+            )),
             operation: .storePaymentMethod
         )
     }
@@ -189,11 +192,11 @@ Create a component in capture mode with request configuration:
 
 ```swift
 let paymentFlow = PayabliPayInPaymentFlow(
-    entryPoint: entryPoint,
-    environment: .sandbox,
-    accessTokenProvider: {
-        try await backend.fetchPayInAccessToken()
-    },
+    session: PayabliSession(config: try PayabliConfig(
+        tokenProvider: { try await backend.fetchPayInAccessToken() },
+        entryPoint: entryPoint,
+        environment: .sandbox
+    )),
     operation: .capture,
     requestConfiguration: PayabliPayInPaymentFlowRequestConfiguration(
         paymentDetails: PayabliPayInPaymentFlowPaymentDetails(
@@ -277,11 +280,11 @@ Create a component in authorize mode:
 
 ```swift
 let paymentFlow = PayabliPayInPaymentFlow(
-    entryPoint: entryPoint,
-    environment: .sandbox,
-    accessTokenProvider: {
-        try await backend.fetchPayInAccessToken()
-    },
+    session: PayabliSession(config: try PayabliConfig(
+        tokenProvider: { try await backend.fetchPayInAccessToken() },
+        entryPoint: entryPoint,
+        environment: .sandbox
+    )),
     operation: .authorize,
     requestConfiguration: PayabliPayInPaymentFlowRequestConfiguration(
         paymentDetails: PayabliPayInPaymentFlowPaymentDetails(
@@ -855,9 +858,11 @@ Diagnostics are disabled by default:
 
 ```swift
 let paymentFlow = PayabliPayInPaymentFlow(
-    entryPoint: entryPoint,
-    environment: .sandbox,
-    accessTokenProvider: accessTokenProvider,
+    session: PayabliSession(config: try PayabliConfig(
+        tokenProvider: { try await backend.fetchPayInAccessToken() },
+        entryPoint: entryPoint,
+        environment: .sandbox
+    )),
     diagnostics: .disabled
 )
 ```

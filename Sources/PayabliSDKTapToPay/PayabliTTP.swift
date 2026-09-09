@@ -9,7 +9,8 @@ import PayabliSDKCore
 ///
 /// ```swift
 /// let ttp = try PayabliTTP(
-///     accessToken: "...", entryPoint: "myEntry",
+///     tokenProvider: { try await myBackend.payabliToken() },
+///     entryPoint: "myEntry",
 ///     appId: "TEAM.bundle.id", environment: .sandbox
 /// )
 /// try await ttp.initialize()
@@ -85,7 +86,7 @@ public final class PayabliTTP: NSObject, ObservableObject {
     /// component facade constructed with the same `PayabliSession`.
     ///
     /// `package`: it takes the provider and the attestation service, so a host reaching
-    /// it could substitute either. A host uses the `accessToken:` init below instead.
+    /// it could substitute either. A host uses the `tokenProvider:` init below instead.
     package init(
         session: PayabliSession,
         appId: String,
@@ -134,27 +135,25 @@ public final class PayabliTTP: NSObject, ObservableObject {
         /// PRD §19.1 convenience init. Wires the default `FiservCardReader`
         /// provider and a real `AppAttestService` with Keychain-backed storage.
         ///
-        /// The host supplies the server-minted `accessToken` and an optional
-        /// `tokenProvider` callback for refreshes (see `PayabliConfig`).
+        /// The host supplies a `tokenProvider` that asks its own backend for a token. The SDK
+        /// calls it before the first request and again after a rejection (see `PayabliConfig`).
         ///
         /// Only available where Apple's `DeviceCheck` framework is importable.
         /// The package minimum of iOS 16.7, set by PayabliCardReaderCore and
         /// ProximityReader, is well above `DCAppAttestService`'s own floor of
         /// iOS 14, so no extra `@available` gate is needed.
-        /// Throws whatever `PayabliConfig.init` rejects: a token that cannot be sent,
-        /// or an empty entry point.
+        /// Throws whatever `PayabliConfig.init` rejects, which is an empty entry point.
         public convenience init(
-            accessToken: String,
-            tokenProvider: PayabliTokenRefresh? = nil,
+            tokenProvider: @escaping PayabliTokenRefresh,
             entryPoint: String,
             appId: String,
             environment: PayabliEnvironment
         ) throws {
             let config = try PayabliConfig(
-                accessToken: accessToken,
-                tokenProvider: tokenProvider,
                 entryPoint: entryPoint,
-                environment: environment
+                environment: environment,
+
+                tokenProvider: tokenProvider
             )
             let payabliSession = PayabliSession(config: config)
             let storage: SecureStorage = KeychainStorage()
@@ -177,28 +176,26 @@ public final class PayabliTTP: NSObject, ObservableObject {
         /// that can't represent the Swift `PayabliTokenRefresh` (`@Sendable ()
         /// async throws -> String`) closure.
         ///
-        /// Token refresh is exposed here as a completion-style block:
-        /// `tokenRefreshHandler` receives a `(token, error) -> Void` callback
-        /// that the host invokes exactly once with either a fresh access token
-        /// or an `NSError` — the SDK bridges that to the underlying async
-        /// closure internally. Pass `nil` to disable silent refresh; the SDK
-        /// surfaces `tokenExpired` instead.
+        /// The token source is exposed here as a completion-style block:
+        /// `tokenHandler` receives a `(token, error) -> Void` callback that the host invokes
+        /// exactly once with either an access token or an `NSError` — the SDK bridges that to the
+        /// underlying async closure internally. It is called before the first request and again
+        /// after a rejection.
         ///
         /// All other parameters mirror the Swift convenience init exactly. A
         /// Swift caller that needs an `async throws` token provider uses the
         /// Swift-only convenience init above.
         @objc public convenience init(
-            accessToken: String,
-            tokenRefreshHandler: ((@escaping (String?, NSError?) -> Void) -> Void)?,
+            tokenHandler: @escaping (@escaping (String?, NSError?) -> Void) -> Void,
             entryPoint: String,
             appId: String,
             environment: PayabliEnvironment
         ) throws {
-            let bridged: PayabliTokenRefresh? = tokenRefreshHandler.map { handler in
+            let bridged: PayabliTokenRefresh = {
                 // ObjC blocks are heap-allocated and copy-on-capture, so the
                 // bridged closure can safely be `@Sendable` even though Swift
                 // does not infer `@Sendable` for the input handler type.
-                let sendable = UncheckedSendableBox(handler)
+                let sendable = UncheckedSendableBox(tokenHandler)
                 return { @Sendable in
                     try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<String, Error>) in
                         // An ObjC host that invokes the completion block more
@@ -222,15 +219,14 @@ public final class PayabliTTP: NSObject, ObservableObject {
                                     domain: "com.payabli.ttp",
                                     code: -1,
                                     userInfo: [NSLocalizedDescriptionKey:
-                                        "tokenRefreshHandler returned nil token and nil error"]
+                                        "tokenHandler returned nil token and nil error"]
                                 ))
                             }
                         }
                     }
                 }
-            }
+            }()
             try self.init(
-                accessToken: accessToken,
                 tokenProvider: bridged,
                 entryPoint: entryPoint,
                 appId: appId,

@@ -1,3 +1,4 @@
+import PayabliSDKCore
 import PayabliSDKPayInPaymentFlow
 import XCTest
 
@@ -14,8 +15,8 @@ import XCTest
 /// without a live request. What is covered is every part reachable while idle.
 @MainActor
 final class PayInFlowHandleTests: XCTestCase {
-    func testDrawingAnAttemptMintsAKeyThatWasNotThereBefore() {
-        let handle = makeHandle()
+    func testDrawingAnAttemptMintsAKeyThatWasNotThereBefore() throws {
+        let handle = try makeHandle()
         XCTAssertTrue(handle.startNewAttempt(suppliesCustomer: true))
         let first = try? XCTUnwrap(handle.requestKey)
 
@@ -28,8 +29,8 @@ final class PayInFlowHandleTests: XCTestCase {
     /// The key is the only field a new attempt is guaranteed to change. The order
     /// identifier names the device and the second, so two attempts inside one second
     /// share it, and the amount is drawn at random and can repeat.
-    func testDrawingAnAttemptCarriesTheAttemptsOwnFields() {
-        let handle = makeHandle()
+    func testDrawingAnAttemptCarriesTheAttemptsOwnFields() throws {
+        let handle = try makeHandle()
 
         XCTAssertTrue(handle.startNewAttempt(suppliesCustomer: true))
 
@@ -41,8 +42,8 @@ final class PayInFlowHandleTests: XCTestCase {
     /// Moving the customer switch answers a different question, so it leaves the
     /// attempt's identity alone. Without this the retry of the payment on screen
     /// would become a payment of its own.
-    func testChangingTheCustomerKeepsTheAttemptItIsOn() {
-        let handle = makeHandle()
+    func testChangingTheCustomerKeepsTheAttemptItIsOn() throws {
+        let handle = try makeHandle()
         XCTAssertTrue(handle.startNewAttempt(suppliesCustomer: true))
         let key = handle.requestKey
         let order = handle.requestOrderId
@@ -56,8 +57,8 @@ final class PayInFlowHandleTests: XCTestCase {
         XCTAssertNil(handle.requestCustomerNumber, "the customer was still sent")
     }
 
-    func testChangingTheCustomerBackNamesThePayerAgain() {
-        let handle = makeHandle()
+    func testChangingTheCustomerBackNamesThePayerAgain() throws {
+        let handle = try makeHandle()
         XCTAssertTrue(handle.startNewAttempt(suppliesCustomer: false))
         XCTAssertNil(handle.requestCustomerNumber)
 
@@ -68,12 +69,15 @@ final class PayInFlowHandleTests: XCTestCase {
 
     // MARK: -
 
-    private func makeHandle() -> PayInFlowHandle {
+    private func makeHandle() throws -> PayInFlowHandle {
         PayInFlowHandle(
             PayabliPayInPaymentFlow(
-                accessToken: "test-token",
-                entryPoint: "test-entry",
-                environment: DemoEnvironment.sandbox.sdkEnvironment,
+                session: PayabliSession(config: try PayabliConfig(
+                    entryPoint: "test-entry",
+                    environment: DemoEnvironment.sandbox.sdkEnvironment,
+
+                    tokenProvider: { "test-token" }
+                )),
                 operation: .capture
             )
         )

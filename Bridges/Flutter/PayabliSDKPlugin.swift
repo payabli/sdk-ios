@@ -80,7 +80,6 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
 
     private func handleConfigure(_ arguments: Any?, result: @escaping FlutterResult) {
         guard let args = arguments as? [String: Any],
-              let accessToken = args["accessToken"] as? String,
               let entryPoint = args["entryPoint"] as? String,
               let appId = args["appId"] as? String,
               let envRaw = args["environment"] as? Int,
@@ -88,7 +87,7 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
         else {
             result(FlutterError(
                 code: "INVALID_ARGS",
-                message: "Missing accessToken/entryPoint/appId/environment",
+                message: "Missing entryPoint/appId/environment",
                 details: nil
             ))
             return
@@ -120,7 +119,6 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
             let ttp: PayabliTTP
             do {
                 ttp = try PayabliTTP(
-                    accessToken: accessToken,
                     tokenProvider: tokenProvider,
                     entryPoint: entryPoint,
                     appId: appId,
@@ -285,7 +283,7 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
         }
 
         let methodChannel = self.methodChannel
-        let accessTokenProvider: PayabliPayInPaymentFlowAccessTokenProvider = { @Sendable [methodChannel] in
+        let tokenProvider: PayabliTokenRefresh = { @Sendable [methodChannel] in
             try await withCheckedThrowingContinuation { continuation in
                 Task { @MainActor in
                     methodChannel.invokeMethod("accessToken", arguments: nil) { value in
@@ -303,12 +301,24 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
         }
 
         Task { @MainActor in
-            self.payInPaymentFlow = PayabliPayInPaymentFlow(
-                entryPoint: entryPoint,
-                environment: environment,
-                accessTokenProvider: accessTokenProvider
-            )
-            result(nil)
+            do {
+                let config = try PayabliConfig(
+                    entryPoint: entryPoint,
+                    environment: environment,
+
+                    tokenProvider: tokenProvider
+                )
+                self.payInPaymentFlow = PayabliPayInPaymentFlow(
+                    session: PayabliSession(config: config)
+                )
+                result(nil)
+            } catch {
+                result(FlutterError(
+                    code: "INVALID_CONFIGURATION",
+                    message: error.localizedDescription,
+                    details: nil
+                ))
+            }
         }
     }
 

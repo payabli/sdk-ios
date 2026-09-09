@@ -278,24 +278,30 @@ final class PayInPaymentFlowClientTests: XCTestCase {
     func testAProviderFailureDoesNotReachTheDiagnosticsRecord() async throws {
         let sentinel = "SENTINEL-BACKEND-https://tokens.internal.example/mint?client=acme"
         let captured = LockedDiagnosticStrings()
-        let component = PayabliPayInPaymentFlow(
+        let config = try PayabliConfig(
             entryPoint: "entry",
             environment: .sandbox,
-            accessTokenProvider: {
+
+            tokenProvider: {
                 throw NSError(
                     domain: sentinel,
                     code: 1,
                     userInfo: [NSLocalizedDescriptionKey: sentinel]
                 )
-            },
+            }
+        )
+        let component = PayabliPayInPaymentFlow(
+            session: PayabliSession(config: config),
             diagnostics: .enabled { captured.append($0) }
         )
 
         do {
             _ = try await component.capture(cardRequest())
             XCTFail("Expected the provider failure to surface")
-        } catch let error as NSError where error.domain == sentinel {
-            // The host gets its own error back, which the Objective-C bridge relies on.
+        } catch let error as PayabliGenericError {
+            // The holder owns the provider now, so a host failure arrives as this SDK's own
+            // `.tokenExpired` with the cause redacted, rather than as the host's error verbatim.
+            XCTAssertEqual(error.code, .tokenExpired)
         }
 
         let rendered = captured.all.joined(separator: "\n")
@@ -303,24 +309,20 @@ final class PayInPaymentFlowClientTests: XCTestCase {
         XCTAssertFalse(rendered.contains("tokens.internal.example"), rendered)
     }
 
-    /// A blank token is refused where it is read, which is the chain.
+    /// A blank token is refused where it is installed, which is the session's holder.
     ///
-    /// Driven through the facade's own transport, because injecting a double replaces the chain and
-    /// with it the guard. Nothing reaches the network: the read runs before the request is built,
-    /// pinned in Core by `testAFailingTokenReadStopsTheRequestBeforeItIsSent`.
+    /// Driven through the facade's own transport, because injecting a double never reads a
+    /// credential. Nothing reaches the network: the read runs before the request is built, pinned in
+    /// Core by `testAFailingTokenReadStopsTheRequestBeforeItIsSent`.
     @MainActor
     func testMissingAccessTokenIsRefusedBeforeAnythingIsSent() async throws {
-        let component = PayabliPayInPaymentFlow(
-            entryPoint: "entry",
-            environment: .sandbox,
-            accessTokenProvider: { "   " }
-        )
+        let component = flowOnSession(token: "   ")
 
         do {
             _ = try await component.capture(cardRequest())
             XCTFail("Expected missing token")
-        } catch PayabliPayInPaymentFlowError.missingAccessToken {
-            // The guard fired.
+        } catch let error as PayabliGenericError {
+            XCTAssertEqual(error.code, .tokenExpired)
         } catch {
             XCTFail("Wrong error: \(error)")
         }

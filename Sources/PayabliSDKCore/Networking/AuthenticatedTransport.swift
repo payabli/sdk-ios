@@ -29,11 +29,17 @@ struct AuthenticatedTransport: PayabliTransport {
 
         logger.info("credential rejected: attempting recovery (\(request.method.rawValue) 401)")
 
-        // The token the chain stamped. A fresh read covers a chain that stamped nothing.
-        let rejected: String = if let sent = stamped.value {
+        // The token the chain stamped, falling back to the one held for a chain that stamped
+        // nothing. Held rather than minted: a token obtained here would name a credential that no
+        // request carried, and holding none means there is nothing to replace.
+        let sentOrHeld: String? = if let sent = stamped.value {
             sent
         } else {
-            await auth.currentAccessToken()
+            await auth.heldToken()
+        }
+        guard let rejected = sentOrHeld else {
+            logger.warning("credential rejected, and none was sent: nothing to recover")
+            return firstAttempt
         }
         _ = try await auth.invalidateAndRefresh(rejectedToken: rejected)
 

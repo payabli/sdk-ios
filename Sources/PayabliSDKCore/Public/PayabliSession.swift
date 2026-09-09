@@ -17,7 +17,10 @@ import Foundation
 /// Converging them changes what an integrator supplies and is tracked separately.
 public final class PayabliSession: @unchecked Sendable {
     /// The configuration this session was constructed with.
-    public let config: PayabliConfig
+    ///
+    /// `package`, so a capability target can read the entry point and the environment it is running
+    /// against and a host app cannot read the configuration back out of the session.
+    package let config: PayabliConfig
 
     /// Holds the current access token and deduplicates concurrent refreshes. Nothing outside
     /// this module reaches it, and nothing at any visibility hands the token to a host app.
@@ -35,7 +38,7 @@ public final class PayabliSession: @unchecked Sendable {
         self.auth = auth
         let service = PayabliService(
             environment: config.environment,
-            readToken: { await auth.currentAccessToken() },
+            readToken: { try await auth.currentAccessToken() },
             session: urlSession
         )
         self.transport = AuthenticatedTransport(
