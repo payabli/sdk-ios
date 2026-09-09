@@ -201,7 +201,7 @@ package final class PayabliService: PayabliTransport, Sendable {
 /// - 409 → `PayabliGenericError(.conflict)`
 /// - 410 → `PayabliGenericError(.sessionBurned)`
 /// - 429 → `PayabliRateLimitError`
-/// - 500 to 599 → `PayabliPaymentError.server`
+/// - 500 and above → `PayabliPaymentError.server`
 /// - other non-2xx → `PayabliGenericError(.unknown)`
 ///
 /// The status fixes the classification; the body only decides how many fields get filled.
@@ -250,10 +250,10 @@ package func mapPayabliHTTPError(
     case 429:
         throw PayabliRateLimitError(retryAfter: RetryAfterHeader.value(from: response))
 
-    // A status code is three digits and the highest class is 5 (RFC 9110 Section 15). Anything above
-    // that is not a status this client can read, and reading it as a server fault would put it in the
-    // set a retry reconsiders, on no more evidence than its size.
-    case 500 ... 599:
+    // Everything at or above 500, including the 6xx and up a proxy or a library may invent. RFC 9110
+    // Section 15: "A client that receives a response with an invalid status code SHOULD process the
+    // response as if it had a 5xx (Server Error) status code." Do not narrow this to 500...599.
+    case 500...:
         let server = (try? decoder.decode(PayabliServerError.self, from: response.body))
             ?? PayabliServerError()
         throw PayabliPaymentError.server(

@@ -333,33 +333,25 @@ final class PayabliServiceTests: XCTestCase {
 
     // MARK: - Request building
 
-    /// A status the HTTP grammar has no room for is not read as a server fault.
+    /// A status the HTTP grammar has no room for is read as a server fault, which is what RFC 9110
+    /// Section 15 asks of a client: it "SHOULD process the response as if it had a 5xx (Server Error)
+    /// status code".
     ///
-    /// Classification decides retrying now that the policy reads the code, so a status above the highest
-    /// class would be repeated on nothing but its size. It answers `unknown`, which is not retried.
-    func testAStatusAboveTheServerRangeIsNotAServerError() throws {
-        for status in [600, 700, 999] {
-            let response = PayabliResponse(statusCode: status, headers: [:], body: Data())
+    /// The classification decides retrying now that the policy reads the code, so narrowing the branch
+    /// to the valid range would make one of these terminal here and repeatable on the sibling. The
+    /// status is carried through, so what arrived is still readable.
+    func testAStatusAboveTheValidRangeIsStillAServerFault() throws {
+        for status in [599, 600, 999] {
             do {
-                try mapPayabliHTTPError(response: response)
+                try mapPayabliHTTPError(
+                    response: PayabliResponse(statusCode: status, headers: [:], body: Data())
+                )
                 XCTFail("\(status) has to map to an error")
-            } catch let error as PayabliGenericError {
-                XCTAssertEqual(error.code, .unknown, "\(status)")
+            } catch let PayabliPaymentError.server(server) {
+                XCTAssertEqual(server.httpStatus, status)
             } catch {
                 XCTFail("\(status) mapped to \(error)")
             }
-        }
-    }
-
-    /// The top of the range is still a server fault, so narrowing it did not take 599 with it.
-    func testTheTopOfTheServerRangeIsStillAServerError() throws {
-        do {
-            try mapPayabliHTTPError(
-                response: PayabliResponse(statusCode: 599, headers: [:], body: Data())
-            )
-            XCTFail("599 has to map to an error")
-        } catch let PayabliPaymentError.server(server) {
-            XCTAssertEqual(server.httpStatus, 599)
         }
     }
 
