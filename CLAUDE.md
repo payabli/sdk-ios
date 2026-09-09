@@ -247,10 +247,15 @@ owning a phone, and a test parked here for that reason is borrowing time.
 Run the live tier by hand, against a running token server:
 
 ```bash
-TEST_RUNNER_PAYABLI_QA_LIVE=1 \
-xcodebuild test -project Example/PayabliDemo/PayabliDemo.xcodeproj -scheme 'PayabliDemo qa' \
-  -only-testing:PayabliDemoUITests -destination 'id=<simulator udid>'
+TEST_RUNNER_PAYABLI_QA_LIVE=1 TEST_RUNNER_PAYABLI_QA_ENVIRONMENT=qa \
+xcodebuild test -project Example/PayabliDemo/PayabliDemo.xcodeproj -scheme PayabliDemoUITests \
+  -destination 'id=<simulator udid>'
 ```
+
+The test scheme, not an app scheme. `PayabliDemo qa` and its siblings carry no test action, so
+`xcodebuild` refuses the whole invocation with "Scheme PayabliDemo qa is not currently configured for the
+test action" rather than running anything. The environment the app would have taken from that scheme is
+passed in instead.
 
 `PAYABLI_QA_LIVE` and `PAYABLI_ENV` reach the runner only through the `TEST_RUNNER_` prefix, which
 `xcodebuild` strips. Set plainly they reach `xcodebuild` and stop there, which looks exactly like a
