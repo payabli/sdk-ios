@@ -83,7 +83,15 @@ package enum Retry {
     ) async throws -> Int {
         guard attempt < policy.maxAttempts, policy.isRetryable(failure) else { throw failure }
 
+        // `PayabliRetryAfter` is public, so this value comes from outside everything the initializer
+        // checked. A negative wait is not an instruction, and a NaN passes both tests below because every
+        // comparison against one is false, then reaches the clock as no wait at all. Neither reads as a
+        // hint, so the computed backoff answers instead. The parser's saturation is finite and survives.
         let serverHint = (failure as? any PayabliRetryAfter)?.retryAfter
+            .flatMap { hint -> TimeInterval? in
+                guard hint.isFinite, hint >= 0 else { return nil }
+                return hint
+            }
         if let serverHint, serverHint > policy.maxRetryAfter {
             // Shortening it would ignore the limit the server just stated, and waiting it out is not
             // something to do on a caller's behalf. Stop, and report what the server actually said.

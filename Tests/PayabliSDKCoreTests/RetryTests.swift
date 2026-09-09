@@ -84,6 +84,28 @@ final class RetryTests: XCTestCase {
         XCTAssertEqual(clock.waits, [5], "the server's 5s wins over the policy's 1s")
     }
 
+    /// A hint that is not a wait reads as no hint rather than as a wait of none.
+    ///
+    /// `PayabliRetryAfter` is public, so a conformer outside the SDK supplies this value and nothing the
+    /// policy validated covers it. A NaN passes the ceiling test and the budget test alike, because every
+    /// comparison against one is false, and then reaches the clock as no wait at all: the attempts run
+    /// back to back. A negative one is not an instruction either.
+    func testAHintThatIsNotAWaitFallsBackToTheComputedBackoff() async {
+        for hint: TimeInterval in [.nan, -1, -.infinity] {
+            let clock = FakeRetryClock()
+
+            _ = try? await Retry.run(
+                policy: .test(maxAttempts: 2),
+                logger: logger(RecordingLogSink()),
+                clock: clock
+            ) { _ in
+                throw TestHintedFailure(code: .rateLimited, retryAfter: hint)
+            }
+
+            XCTAssertEqual(clock.waits, [1], "a hint of \(hint) leaves the computed backoff in place")
+        }
+    }
+
     func testARetryAfterBeyondTheCeilingStopsRatherThanUnderSleeping() async {
         let clock = FakeRetryClock()
         let counter = AttemptCounter()
