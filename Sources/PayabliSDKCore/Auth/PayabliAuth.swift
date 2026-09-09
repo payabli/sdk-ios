@@ -139,7 +139,7 @@ actor PayabliAuth {
                 logger.error("The minted token was refused before it was committed")
                 throw error
             }
-            self.commit(minted)
+            self.commit(minted, mintID: mintID)
             return minted
         }
         inFlightMint = task
@@ -148,18 +148,26 @@ actor PayabliAuth {
         do {
             return try await task.value
         } catch {
-            inFlightMint = nil
-            inFlightMintID = nil
+            releaseMint(mintID)
             throw error
         }
     }
 
-    /// Installs the minted token. Called only once the token has passed `check(_:replacing:)`, so
-    /// nothing here can install one that was refused.
-    private func commit(_ fresh: String) {
-        currentToken = fresh
+    /// Drops the in-flight mark, and only for the call that owns it.
+    ///
+    /// A call whose mark has already been replaced clears nothing, so a finished mint cannot
+    /// discard a later one's task and leave its joiners waiting on a task no mark names.
+    private func releaseMint(_ mintID: UUID) {
+        guard inFlightMintID == mintID else { return }
         inFlightMint = nil
         inFlightMintID = nil
+    }
+
+    /// Installs the minted token. Called only once the token has passed `check(_:replacing:)`, so
+    /// nothing here can install one that was refused.
+    private func commit(_ fresh: String, mintID: UUID) {
+        currentToken = fresh
+        releaseMint(mintID)
         logger.info("Access token installed")
     }
 
