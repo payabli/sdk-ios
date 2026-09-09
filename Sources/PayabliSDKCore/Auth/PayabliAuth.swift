@@ -47,7 +47,7 @@ actor PayabliAuth {
         }
 
         if let existing = inFlightMint {
-            return try await existing.value
+            return try await join(existing)
         }
 
         return try await mint(replacing: nil)
@@ -92,7 +92,7 @@ actor PayabliAuth {
         }
 
         if let existing = inFlightMint {
-            return try await existing.value
+            return try await join(existing)
         }
 
         if let held = currentToken, held != rejectedToken {
@@ -146,11 +146,29 @@ actor PayabliAuth {
         inFlightMintID = mintID
 
         do {
-            return try await task.value
+            return try await join(task)
         } catch {
             releaseMint(mintID)
             throw error
         }
+    }
+
+    /// Waits for a mint already under way and answers with what it produced, unless this caller was
+    /// cancelled while waiting.
+    ///
+    /// The mint itself runs on: it is shared, so one waiter going away must not take the credential from
+    /// the others. Only this caller stops.
+    ///
+    /// Cancellation is raised rather than returned because a caller who is cancelled and handed a token
+    /// carries on with it, which on the recovery path means sending the request again. `Task.value` does
+    /// not observe the awaiting task's cancellation, so nothing else here would notice.
+    private func join(_ mint: Task<String, Error>) async throws -> String {
+        // The result rather than the value, so a mint that fails does not throw past the check. A caller
+        // cancelled while a provider was failing is cancelled, not told what the provider said: the
+        // failure belongs to whoever is still waiting for it.
+        let outcome = await mint.result
+        try Task.checkCancellation()
+        return try outcome.get()
     }
 
     /// Drops the in-flight mark, and only for the call that owns it.

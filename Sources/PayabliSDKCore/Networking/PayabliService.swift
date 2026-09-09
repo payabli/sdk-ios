@@ -6,16 +6,8 @@ import Foundation
 /// so every request through this type is decorated. `AuthenticatedTransport` wraps this and adds 401
 /// recovery; a request that skips that wrapper still carries its credential.
 ///
-/// Error mapping, which ``mapPayabliHTTPError`` performs and states in full:
-/// - 400 → throws `PayabliPaymentError.validation`
-/// - 401 → throws `PayabliGenericError(code: .tokenExpired)` (callers re-auth)
-/// - 402 → throws `PayabliPaymentError.decline`
-/// - 403 → throws `PayabliGenericError(code: .permissionDenied)`
-/// - 409 → throws `PayabliGenericError(code: .conflict)`
-/// - 410 → throws `PayabliGenericError(code: .sessionBurned)`
-/// - 429 → throws `PayabliGenericError(code: .rateLimited)`
-/// - 500 → throws `PayabliPaymentError.server`
-/// - Other non-2xx → throws `PayabliGenericError(code: .unknown)`
+/// A non-2xx answer is mapped by ``mapPayabliHTTPError``, which states the statuses it reads and what
+/// each one becomes.
 package final class PayabliService: PayabliTransport, Sendable {
     private let baseURL: URL
     private let session: URLSession
@@ -131,6 +123,13 @@ package final class PayabliService: PayabliTransport, Sendable {
             )
         } catch let error as PayabliGenericError {
             throw error
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch let error as URLError where error.code == .cancelled {
+            // `URLSession` reports a cancelled task this way. Wrapping it as a network failure would make
+            // it retryable, so a caller who cancelled a charge would have it sent again and be told the
+            // network failed. Cancellation is not a failure of the request.
+            throw CancellationError()
         } catch {
             logger.error("Network error on \(decorated.path): \(error.localizedDescription)")
             throw PayabliGenericError(
@@ -204,10 +203,11 @@ package final class PayabliService: PayabliTransport, Sendable {
 /// - 401 → `PayabliGenericError(.tokenExpired)`
 /// - 402 → `PayabliPaymentError.decline`
 /// - 403 → `PayabliGenericError(.permissionDenied)`
+/// - 408 → `PayabliGenericError(.networkError)`
 /// - 409 → `PayabliGenericError(.conflict)`
 /// - 410 → `PayabliGenericError(.sessionBurned)`
-/// - 429 → `PayabliGenericError(.rateLimited)`
-/// - 500+ → `PayabliPaymentError.server`
+/// - 429 → `PayabliRateLimitError`
+/// - 500 and above → `PayabliPaymentError.server`
 /// - other non-2xx → `PayabliGenericError(.unknown)`
 ///
 /// The status fixes the classification; the body only decides how many fields get filled.
@@ -215,7 +215,7 @@ package func mapPayabliHTTPError(
     response: PayabliResponse,
     override: ((Int) -> (any Error)?)? = nil
 ) throws {
-    guard !(200 ..< 300).contains(response.statusCode) else { return }
+    guard !response.isSuccessful else { return }
 
     // Component-specific override takes priority.
     if let customError = override?(response.statusCode) {
@@ -241,6 +241,12 @@ package func mapPayabliHTTPError(
     case 403:
         throw PayabliGenericError(code: .permissionDenied, reason: "Forbidden (403)")
 
+    case 408:
+        // RFC 9110 Section 15.5.9: the server did not receive a complete request in time and "the client
+        // MAY repeat the request without modifications at any later time". Retryable, and classified as a
+        // network failure because that is what it is: the request did not arrive, so nothing ran.
+        throw PayabliGenericError(code: .networkError, reason: "Request timeout (408)")
+
     case 409:
         throw PayabliGenericError(code: .conflict, reason: "Conflict (409)")
 
@@ -248,12 +254,20 @@ package func mapPayabliHTTPError(
         throw PayabliGenericError(code: .sessionBurned, reason: "Session burned (410)")
 
     case 429:
-        throw PayabliGenericError(code: .rateLimited, reason: "Too many requests (429)")
+        throw PayabliRateLimitError(retryAfter: RetryAfterHeader.value(from: response))
 
+    // Everything at or above 500, including the 6xx and up a proxy or a library may invent. RFC 9110
+    // Section 15: "A client that receives a response with an invalid status code SHOULD process the
+    // response as if it had a 5xx (Server Error) status code." Do not narrow this to 500...599.
     case 500...:
         let server = (try? decoder.decode(PayabliServerError.self, from: response.body))
             ?? PayabliServerError()
-        throw PayabliPaymentError.server(server)
+        throw PayabliPaymentError.server(
+            server.carrying(
+                httpStatus: response.statusCode,
+                retryAfter: RetryAfterHeader.value(from: response)
+            )
+        )
 
     default:
         throw PayabliGenericError(

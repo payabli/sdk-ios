@@ -57,6 +57,7 @@ final class RecordingStub: @unchecked Sendable {
 
     private let lock = NSLock()
     private var recorded: [URLRequest] = []
+    private var uninstalled = false
     private let respond: @Sendable (URLRequest) -> Reply
 
     init(respond: @escaping @Sendable (URLRequest) -> Reply) {
@@ -66,6 +67,35 @@ final class RecordingStub: @unchecked Sendable {
     /// Answers every request alike.
     convenience init(status: Int = 200, body: Data = Data()) {
         self.init { _ in (status, body) }
+    }
+
+    /// Installs a handler that leaves the request in flight, so a test can cancel one that is genuinely
+    /// under way and read what `URLSession` raises rather than an error it constructed itself.
+    ///
+    /// Blocks the loading thread rather than suspending, because the handler is synchronous. Bounded, so
+    /// a test that never cancels fails on its own assertion instead of hanging the suite.
+    func installNeverAnswering(forAtMost seconds: TimeInterval = 3) {
+        StubURLProtocol.handler = { [self] request in
+            lock.lock()
+            recorded.append(request)
+            lock.unlock()
+            // Released as soon as the case uninstalls, not slept to the bound: this blocks a URLProtocol
+            // thread, and one still sleeping when the next case runs holds that case's request behind it.
+            // The bound is the backstop for a case that never uninstalls.
+            let deadline = Date().addingTimeInterval(seconds)
+            while Date() < deadline, !self.isUninstalled {
+                Thread.sleep(forTimeInterval: 0.02)
+            }
+            return (
+                HTTPURLResponse(
+                    url: request.url!,
+                    statusCode: 200,
+                    httpVersion: "HTTP/1.1",
+                    headerFields: [:]
+                )!,
+                Data()
+            )
+        }
     }
 
     func install() {
@@ -85,7 +115,16 @@ final class RecordingStub: @unchecked Sendable {
     }
 
     func uninstall() {
+        lock.lock()
+        uninstalled = true
+        lock.unlock()
         StubURLProtocol.handler = nil
+    }
+
+    private var isUninstalled: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return uninstalled
     }
 
     var requests: [URLRequest] {
@@ -96,6 +135,25 @@ final class RecordingStub: @unchecked Sendable {
 
     var count: Int {
         requests.count
+    }
+
+    /// Resumes once `count` requests have arrived, so a case acts on a state it established rather than
+    /// on elapsed time.
+    ///
+    /// Bounded, and fails rather than returning: a request that never arrives means the case is about to
+    /// assert against something that did not happen.
+    func waitUntilRequestArrives(
+        count wanted: Int = 1,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) async {
+        for _ in 0 ..< 300 {
+            if count >= wanted {
+                return
+            }
+            try? await Task.sleep(nanoseconds: 10_000_000)
+        }
+        XCTFail("only \(count) of \(wanted) requests reached the stub", file: file, line: line)
     }
 
     /// The bearer each request carried, in order, with the scheme stripped.
@@ -111,6 +169,7 @@ final class RecordingStub: @unchecked Sendable {
 /// it. One holder serves both, which is what makes a replay carry the token a refresh minted.
 func makeAuthenticatedStack(
     auth: PayabliAuth,
+    recovery: any AuthRecoveryPolicy = DefaultAuthRecoveryPolicy(),
     sink: RecordingLogSink? = nil
 ) -> any PayabliTransport {
     let logger = PayabliLogger(category: .network, sink: sink ?? RecordingLogSink())
@@ -120,7 +179,24 @@ func makeAuthenticatedStack(
         session: StubURLProtocol.makeSession(),
         logger: logger
     )
-    return AuthenticatedTransport(base: service, auth: auth, logger: logger)
+    return AuthenticatedTransport(base: service, auth: auth, recovery: recovery, logger: logger)
+}
+
+/// Treats a 419 as a credential rejection as well as a 401, standing in for a capability whose own
+/// routes refuse a stale credential with something else.
+struct WidenedRecoveryPolicy: AuthRecoveryPolicy {
+    static let widenedStatus = 419
+
+    func isCredentialRejection(_ response: PayabliResponse) -> Bool {
+        response.statusCode == 401 || response.statusCode == Self.widenedStatus
+    }
+}
+
+/// Never treats anything as a credential rejection, so a 401 passes through untouched.
+struct RefusingRecoveryPolicy: AuthRecoveryPolicy {
+    func isCredentialRejection(_ response: PayabliResponse) -> Bool {
+        false
+    }
 }
 
 /// A service whose chain is the caller's, so a test can park a request at an exact point relative to

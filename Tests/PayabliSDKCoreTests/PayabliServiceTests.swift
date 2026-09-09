@@ -333,6 +333,28 @@ final class PayabliServiceTests: XCTestCase {
 
     // MARK: - Request building
 
+    /// A status the HTTP grammar has no room for is read as a server fault, which is what RFC 9110
+    /// Section 15 asks of a client: it "SHOULD process the response as if it had a 5xx (Server Error)
+    /// status code".
+    ///
+    /// The classification decides retrying now that the policy reads the code, so narrowing the branch
+    /// to the valid range would make one of these terminal here and repeatable on the sibling. The
+    /// status is carried through, so what arrived is still readable.
+    func testAStatusAboveTheValidRangeIsStillAServerFault() throws {
+        for status in [599, 600, 999] {
+            do {
+                try mapPayabliHTTPError(
+                    response: PayabliResponse(statusCode: status, headers: [:], body: Data())
+                )
+                XCTFail("\(status) has to map to an error")
+            } catch let PayabliPaymentError.server(server) {
+                XCTAssertEqual(server.httpStatus, status)
+            } catch {
+                XCTFail("\(status) mapped to \(error)")
+            }
+        }
+    }
+
     /// An escape a caller put in the path reaches the wire as that escape.
     ///
     /// The path arrives percent-encoded, so encoding it again is a different resource: `%2F` becomes

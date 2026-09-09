@@ -1,3 +1,4 @@
+import Foundation
 @testable import PayabliSDKCore
 import XCTest
 
@@ -163,5 +164,50 @@ func assertNeverLogged(
         XCTFail("\"\(secret)\" reached the log: \(flattenLog(records))", file: file, line: line)
     case .absent:
         break
+    }
+}
+
+/// A sink that holds the caller on one chosen occurrence of one chosen line.
+///
+/// The only synchronous hook inside the holder: it keeps the turn that installs a token, so another task
+/// can be enqueued behind it and run before the caller waiting on that mint resumes. A case about what
+/// one caller's cleanup may reach needs that order, and the holder gives no other way to build it.
+///
+/// `occurrence` is 1-based and exists because a holder installs its first token by acquiring one, so a
+/// case about a later mint has to let the acquisition past.
+///
+/// That occurrence only. Every other line is let through, because the hold blocks a thread rather than
+/// suspending a task: a line arriving after the release has nothing to wake it, and it would take the
+/// thread with it into whatever runs next.
+///
+/// The hold is bounded for the same reason, so a test that never releases it fails rather than hanging.
+final class HoldingLogSink: LogSink, @unchecked Sendable {
+    private let held: String
+    private let occurrence: Int
+    private let entered: Slot<String>
+    private let release = DispatchSemaphore(value: 0)
+    private let lock = NSLock()
+    private var seen = 0
+
+    init(holdingOn held: String, occurrence: Int = 1, entered: Slot<String>) {
+        self.held = held
+        self.occurrence = occurrence
+        self.entered = entered
+    }
+
+    func write(level: PayabliLogger.Level, category: PayabliLogger.Category, message: String) {
+        guard message == held else { return }
+        lock.lock()
+        seen += 1
+        let isTheOne = seen == occurrence
+        lock.unlock()
+        guard isTheOne else { return }
+
+        entered.set(message)
+        _ = release.wait(timeout: .now() + 5)
+    }
+
+    func open() {
+        release.signal()
     }
 }

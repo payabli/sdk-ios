@@ -88,6 +88,14 @@ enum DemoConfiguration {
         static let defaultPort = 8787
         static let accessTokenPath = "/payabli/access-token"
 
+        /// Mints a token on every call.
+        ///
+        /// `accessTokenPath` honours a static token the server may have been started with, so a refresh
+        /// there hands back the credential that was just refused and the SDK's recovery path is a no-op
+        /// from the app's side. Point a `tokenProvider` here instead: a rejection then leads to a
+        /// genuinely different token, which is the only way the app exercises recovery at all.
+        static let exchangeTokenPath = "/payabli/exchange-token"
+
         /// Launch argument / `UserDefaults` key for the override.
         static let overrideKey = "PayabliTokenHost"
 
@@ -123,6 +131,12 @@ enum DemoConfiguration {
         static var accessTokenURL: URL {
             baseURL.appendingPathComponent(
                 accessTokenPath.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+            )
+        }
+
+        static var exchangeTokenURL: URL {
+            baseURL.appendingPathComponent(
+                exchangeTokenPath.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
             )
         }
 

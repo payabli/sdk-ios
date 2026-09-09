@@ -2,46 +2,6 @@
 import XCTest
 
 final class PayabliAuthTests: XCTestCase {
-    // MARK: - Helpers
-
-    /// `accessToken`, when given, is what the provider answers on its first call; `tokenProvider`
-    /// serves every call after it. The holder carries no seed, so a test that starts on one token
-    /// and rotates to another says so here.
-    private func makeConfig(
-        accessToken: String? = nil,
-        tokenProvider: PayabliTokenRefresh? = nil
-    ) throws -> PayabliConfig {
-        let calls = Counter()
-        return try PayabliConfig(
-            entryPoint: "test_entry",
-            environment: .sandbox,
-
-            tokenProvider: {
-                let call = await calls.increment()
-                if let accessToken, call == 1 {
-                    return accessToken
-                }
-                if let tokenProvider {
-                    return try await tokenProvider()
-                }
-                return accessToken ?? "partner_minted_token"
-            }
-        )
-    }
-
-    /// A holder with `accessToken` already installed, for the tests whose subject is what happens
-    /// to a token that is already held rather than how the first one arrives.
-    private func makeWarmAuth(
-        accessToken: String,
-        tokenProvider: PayabliTokenRefresh? = nil
-    ) async throws -> PayabliAuth {
-        let auth = PayabliAuth(
-            config: try makeConfig(accessToken: accessToken, tokenProvider: tokenProvider)
-        )
-        _ = try await auth.currentAccessToken()
-        return auth
-    }
-
     // MARK: - Initial token
 
     func testTheFirstReadMintsFromTheProvider() async throws {
