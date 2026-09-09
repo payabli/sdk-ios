@@ -1,3 +1,4 @@
+import Foundation
 @testable import PayabliSDKCore
 import XCTest
 
@@ -163,5 +164,45 @@ func assertNeverLogged(
         XCTFail("\"\(secret)\" reached the log: \(flattenLog(records))", file: file, line: line)
     case .absent:
         break
+    }
+}
+
+/// A sink that holds the caller the first time one chosen line is written.
+///
+/// The only synchronous hook inside the holder: it keeps the turn that commits a token, so another task
+/// can be enqueued behind it and run before the caller waiting on that refresh resumes. A case about
+/// what one caller's cleanup may reach needs that order, and the holder gives no other way to build it.
+///
+/// The first occurrence only. A later one is let through, because the hold blocks a thread rather than
+/// suspending a task: a second line arriving after the release has nothing to wake it, and it would take
+/// the thread with it into whatever runs next.
+///
+/// The hold is bounded for the same reason, so a test that never releases it fails rather than hanging.
+final class HoldingLogSink: LogSink, @unchecked Sendable {
+    private let held: String
+    private let entered: Slot<String>
+    private let release = DispatchSemaphore(value: 0)
+    private let lock = NSLock()
+    private var hasHeld = false
+
+    init(holdingOn held: String, entered: Slot<String>) {
+        self.held = held
+        self.entered = entered
+    }
+
+    func write(level: PayabliLogger.Level, category: PayabliLogger.Category, message: String) {
+        guard message == held else { return }
+        lock.lock()
+        let isFirst = !hasHeld
+        hasHeld = true
+        lock.unlock()
+        guard isFirst else { return }
+
+        entered.set(message)
+        _ = release.wait(timeout: .now() + 5)
+    }
+
+    func open() {
+        release.signal()
     }
 }

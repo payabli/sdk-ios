@@ -91,6 +91,7 @@ actor PayabliAuth {
                 // Every throw from the provider lands here, this SDK's own error type
                 // included: it is host code whatever it chose to throw.
                 logger.error("The token provider failed")
+                self.finish(refreshID)
                 throw PayabliGenericError(
                     code: .tokenExpired,
                     reason: "Token refresh failed",
@@ -101,21 +102,16 @@ actor PayabliAuth {
                 try Self.validate(minted, against: rejectedToken)
             } catch {
                 logger.error("The minted token was refused before it was committed")
+                self.finish(refreshID)
                 throw error
             }
-            self.commit(minted)
+            self.commit(minted, refreshID: refreshID)
             return minted
         }
         inFlightRefresh = task
         inFlightRefreshID = refreshID
 
-        do {
-            return try await join(task)
-        } catch {
-            inFlightRefresh = nil
-            inFlightRefreshID = nil
-            throw error
-        }
+        return try await join(task)
     }
 
     /// Waits for a refresh already under way and answers with what it minted, unless this caller was
@@ -138,11 +134,23 @@ actor PayabliAuth {
 
     /// Installs the minted token. Called only once the token has passed
     /// `validate(_:against:)`, so nothing here can install one that was refused.
-    private func commit(_ fresh: String) {
+    private func commit(_ fresh: String, refreshID: UUID) {
         currentToken = fresh
+        finish(refreshID)
+        logger.info("Access token refreshed")
+    }
+
+    /// Ends `refreshID`, unless a later refresh already holds the marker.
+    ///
+    /// Both of a refresh's endings come through here, so the clear belongs to the refresh rather than to
+    /// whoever started it. A caller waiting on one resumes after it has finished and cleared, and the
+    /// holder is free in between, so a rejection arriving there installs a refresh of its own. A clear
+    /// naming no refresh took that one's marker with it, and the next rejection then found nothing in
+    /// flight and called the provider alongside it.
+    private func finish(_ refreshID: UUID) {
+        guard inFlightRefreshID == refreshID else { return }
         inFlightRefresh = nil
         inFlightRefreshID = nil
-        logger.info("Access token refreshed")
     }
 
     /// Throws rather than let a minted token be committed.

@@ -359,6 +359,109 @@ final class PayabliAuthTests: XCTestCase {
         }
     }
 
+    /// A refresh that failed leaves nothing installed, so the next rejection reaches the provider.
+    ///
+    /// Both of a refresh's endings clear the marker, and a failure that skipped it would leave a
+    /// finished task in flight: every later rejection joins that task and is handed the failure it
+    /// already produced, for the life of the session.
+    func testAFailedRefreshDoesNotStandInForTheNextOne() async throws {
+        struct ProviderError: Error {}
+        let calls = Counter()
+        let auth = PayabliAuth(config: try makeConfig(
+            accessToken: "old",
+            tokenProvider: {
+                let call = await calls.increment()
+                guard call > 1 else { throw ProviderError() }
+                return "fresh"
+            }
+        ))
+
+        do {
+            _ = try await auth.invalidateAndRefresh(rejectedToken: "old")
+            XCTFail("the first refresh has to fail")
+        } catch {
+            // The mapped failure is `testProviderErrorMapsToTokenExpired`'s subject, not this one's.
+        }
+
+        let second = try await auth.invalidateAndRefresh(rejectedToken: "old")
+
+        XCTAssertEqual(second, "fresh")
+        let count = await calls.count
+        XCTAssertEqual(count, 2, "the second rejection reaches the provider, not a task that has ended")
+    }
+
+    /// A caller cancelled while waiting does not clear the refresh that started after its own.
+    ///
+    /// Cancellation is reported once the refresh being waited on has committed and cleared, and the
+    /// holder is free between those two points. A rejection arriving there installs a refresh of its
+    /// own, and a clear naming no refresh took that one's marker with it: the next rejection found
+    /// nothing in flight and called the provider alongside it.
+    ///
+    /// The holder is serial, so the order is built rather than waited for. The commit holds its turn
+    /// inside the log sink, the second caller is enqueued behind it, and the cancelled caller resumes
+    /// only once that turn ends, which puts its cleanup after that install.
+    func testACancelledCallerDoesNotClearTheRefreshThatFollowedIt() async throws {
+        let firstProvider = Slot<String>(), committing = Slot<String>()
+        let secondProvider = Slot<String>()
+        let releaseFirst = Latch(), releaseSecond = Latch()
+        let calls = Counter()
+        let sink = HoldingLogSink(holdingOn: "Access token refreshed", entered: committing)
+
+        let auth = PayabliAuth(
+            config: try makeConfig(
+                accessToken: "first",
+                tokenProvider: {
+                    switch await calls.increment() {
+                    case 1:
+                        firstProvider.set("entered")
+                        await releaseFirst.wait()
+                        return "second"
+                    case 2:
+                        secondProvider.set("entered")
+                        await releaseSecond.wait()
+                        return "third"
+                    default:
+                        return "fourth"
+                    }
+                }
+            ),
+            logger: PayabliLogger(category: .auth, sink: sink)
+        )
+
+        let cancelled = Task { try await auth.invalidateAndRefresh(rejectedToken: "first") }
+        guard await valueWithinCeiling(firstProvider) != nil else {
+            return XCTFail("the first refresh never reached its provider")
+        }
+        cancelled.cancel()
+        releaseFirst.open()
+
+        guard await valueWithinCeiling(committing) != nil else {
+            return XCTFail("the first refresh never committed")
+        }
+        let follower = Task { try? await auth.invalidateAndRefresh(rejectedToken: "second") }
+        try? await Task.sleep(nanoseconds: 100_000_000) // long enough for that call to be enqueued
+        sink.open()
+
+        guard await valueWithinCeiling(secondProvider) != nil else {
+            return XCTFail("the second refresh never reached its provider")
+        }
+        let joiner = Task { try? await auth.invalidateAndRefresh(rejectedToken: "second") }
+        try? await Task.sleep(nanoseconds: 100_000_000)
+        releaseSecond.open()
+
+        _ = await follower.value
+        _ = await joiner.value
+        do {
+            _ = try await cancelled.value
+            XCTFail("the cancelled caller has to report cancellation")
+        } catch is CancellationError {
+            // What puts it on the path this case is about.
+        }
+
+        let count = await calls.count
+        XCTAssertEqual(count, 2, "the last rejection joined the refresh in flight rather than starting one")
+    }
+
     // MARK: - The rejected token
 
     /// Two requests sent with the same token can have their 401s arrive far apart.
