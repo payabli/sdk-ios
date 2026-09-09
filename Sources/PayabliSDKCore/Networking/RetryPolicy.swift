@@ -61,7 +61,22 @@ package struct RetryPolicy: Sendable {
     ]
 
     package static let retryableByCode: @Sendable (any PayabliError) -> Bool = { error in
-        retryableCodes.contains(error.code)
+        guard retryableCodes.contains(error.code) else { return false }
+
+        // A status the HTTP grammar has no room for is read as a server fault, which is what RFC 9110
+        // Section 15 asks of a client. Reading it that way is not licence to send the request again:
+        // Section 9.2.2 says a client "SHOULD NOT automatically retry a request with a non-idempotent
+        // method unless it has some means to know that the request semantics are actually idempotent
+        // [...] or some means to detect that the original request was never applied." An unreadable
+        // status is no such means, so it is the unclassified case and stops here.
+        guard let status = RetryPolicy.httpStatus(of: error) else { return true }
+        return status <= 599
+    }
+
+    /// The status the response itself carried, where the error kept it.
+    private static func httpStatus(of error: any PayabliError) -> Int? {
+        guard case let .server(server)? = error as? PayabliPaymentError else { return nil }
+        return server.httpStatus
     }
 
     package static let `default` = RetryPolicy()

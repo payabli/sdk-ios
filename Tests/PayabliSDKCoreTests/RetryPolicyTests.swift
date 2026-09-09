@@ -123,6 +123,40 @@ final class RetryPolicyTests: XCTestCase {
         )
     }
 
+    /// A status outside the valid range is a server fault to the caller and not a repeat.
+    ///
+    /// The two halves answer different questions. RFC 9110 Section 15 asks a client to read an invalid
+    /// status as a 5xx, so the mapper classifies it as one and a host is told what it is. Section 9.2.2
+    /// puts repeat safety on the request instead, and a status the grammar has no room for says nothing
+    /// about whether the service acted, so it is the unclassified case.
+    func testAnInvalidStatusIsAServerFaultThatIsNotRepeated() throws {
+        for status in [600, 999] {
+            do {
+                try mapPayabliHTTPError(
+                    response: PayabliResponse(statusCode: status, headers: [:], body: Data())
+                )
+                XCTFail("\(status) has to map to an error")
+            } catch let error as any PayabliError {
+                XCTAssertEqual(error.code, .serverError, "\(status) is still a server fault")
+                XCTAssertFalse(RetryPolicy.retryableByCode(error), "\(status) is not repeated")
+            }
+        }
+    }
+
+    /// The narrowing is on the status and not on the code, so a real 5xx is untouched.
+    func testAStatusInsideTheValidRangeIsStillRepeated() throws {
+        for status in [500, 503, 599] {
+            do {
+                try mapPayabliHTTPError(
+                    response: PayabliResponse(statusCode: status, headers: [:], body: Data())
+                )
+                XCTFail("\(status) has to map to an error")
+            } catch let error as any PayabliError {
+                XCTAssertTrue(RetryPolicy.retryableByCode(error), "\(status) is repeated")
+            }
+        }
+    }
+
     func testANonPositiveTotalTimeoutIsRejected() {
         XCTAssertNotNil(rejection(totalTimeout: 0))
         XCTAssertNotNil(rejection(totalTimeout: -1))
