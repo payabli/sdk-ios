@@ -197,18 +197,22 @@ package final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
     }
 
     package func areTermsAccepted() async throws -> Bool {
-        // Scoped rather than `lock()`/`unlock()`, which the neighbours use and
-        // which is an error under the Swift 6 language mode from an async context.
-        let source = lock.withLock { linkStateSource }
-        guard let source else {
-            throw PayabliTTPError.readerSetupFailed(reason: "Reader not prepared")
-        }
+        #if canImport(PayabliCardReaderCore)
+            // Scoped rather than `lock()`/`unlock()`, which the neighbours use and
+            // which is an error under the Swift 6 language mode from an async context.
+            let source = lock.withLock { linkStateSource }
+            guard let source else {
+                throw PayabliTTPError.readerSetupFailed(reason: "Reader not prepared")
+            }
 
-        do {
-            return try await source.isAccountLinked()
-        } catch {
-            throw Self.mapError(error) { .readerSetupFailed(reason: $0) }
-        }
+            do {
+                return try await source.isAccountLinked()
+            } catch {
+                throw Self.mapError(error) { .readerSetupFailed(reason: $0) }
+            }
+        #else
+            throw PayabliTTPError.readerSetupFailed(reason: "Tap to Pay is iOS-only")
+        #endif
     }
 
     package func startReading(_ request: CardReadRequest) async throws -> CardReadResult {
