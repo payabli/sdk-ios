@@ -43,7 +43,6 @@ class PayabliTTP {
   /// Configures the underlying `PayabliTTP` instance. Call once per app
   /// launch, before [initialize].
   static Future<void> configure({
-    required String accessToken,
     required Future<String> Function() tokenProvider,
     required String entryPoint,
     required String appId,
@@ -53,7 +52,6 @@ class PayabliTTP {
     _payabliMethodChannel.setMethodCallHandler(_handleNativeCallback);
 
     await _payabliMethodChannel.invokeMethod<void>('configure', {
-      'accessToken': accessToken,
       'entryPoint': entryPoint,
       'appId': appId,
       'environment': environment.index,
