@@ -73,15 +73,3 @@ package protocol TapToPayProvider: AnyObject, Sendable {
     /// Cleans up reader resources.
     func cleanUp() async
 }
-
-package extension TapToPayProvider {
-    /// Answers for a provider that does not consult its reader for this.
-    ///
-    /// Throwing rather than returning `true` keeps the contract's own
-    /// distinction intact: `false` means the merchant has not accepted, and a
-    /// throw means nothing was in a position to say. A default that answered
-    /// `true` would tell a host the merchant had accepted when nothing asked.
-    func areTermsAccepted() async throws -> Bool {
-        throw PayabliTTPError.readerSetupFailed(reason: "Reader not prepared")
-    }
-}
