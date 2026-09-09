@@ -45,9 +45,9 @@ final class PayabliTTPTermsTests: XCTestCase {
         attestation: MockDeviceAttestationService = MockDeviceAttestationService()
     ) throws -> (PayabliTTP, MockTapToPayProvider) {
         let config = try PayabliConfig(
-            accessToken: "seed_token",
             entryPoint: "e",
-            environment: .sandbox
+            environment: .sandbox,
+            tokenProvider: { "seed_token" }
         )
         let ttp = PayabliTTP(
             config: config,
