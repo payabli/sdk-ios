@@ -481,19 +481,19 @@ Before a device reads a card, the merchant has to accept Apple's Tap to Pay term
 Apple holds that acceptance and is the only authority on it, so ask rather than
 track it yourself.
 
-The reader is built during `initialize()`, so there is nothing to ask before then.
-Ask from the failure instead: `termsNotAccepted` is the one failure that leaves
-the reader alive for exactly this.
+The reader is built during `initialize()`, so ask once initialization has run:
 
 ```swift
-do {
-    try await ttp.initialize()
-} catch PayabliTTPError.termsNotAccepted {
-    if try await ttp.areTermsAccepted() == false {
-        // Show your own screen explaining what the merchant is about to accept.
-    }
-}
+try await ttp.initialize()
+let accepted = try await ttp.areTermsAccepted()
 ```
+
+`initialize()` currently presents Apple's sheet itself when the merchant has not
+accepted. A host-triggered way to present it, so the sheet appears on a screen you
+control rather than to whoever opens the app, is coming in a later release.
+
+Acceptance is once per merchant, not once per device: a merchant who has accepted
+on one device does not accept again on another using the same merchant identifier.
 
 Ask each time rather than caching the answer. Acceptance can be granted or
 withdrawn outside your app, and a remembered `true` goes stale without anything
@@ -516,8 +516,6 @@ do {
     )
 } catch PayabliTTPError.devicePendingActivation {
     // First-time device — prompt for activation code.
-} catch PayabliTTPError.termsNotAccepted {
-    // The merchant has not accepted Apple's Tap to Pay terms. See above.
 } catch let PayabliTTPError.invalidState(current, attempted) {
     // Session isn't in the required state for this call.
 } catch let PayabliTTPError.attestationFailed(reason) {
@@ -555,20 +553,12 @@ PayabliTTP *ttp = [[PayabliTTP alloc]
              environment:PayabliEnvironmentSandbox];
 
 [ttp initializeWithCompletion:^(NSError *err) {
-    if (err) {
-        // The reader is only built during initialization, so ask about terms
-        // from here rather than before it. This failure keeps the reader alive
-        // so the question can still be answered.
-        if (err.code == 14 /* termsNotAccepted */) {
-            [ttp areTermsAcceptedWithCompletion:^(BOOL accepted, NSError *termsErr) {
-                // Read termsErr first: accepted is NO on the failure path as a
-                // bridging default, and that is not the merchant declining.
-                if (termsErr) { /* handle */ return; }
-                if (!accepted) { /* show your own terms screen */ }
-            }];
-        }
-        return;
-    }
+    if (err) { /* handle */ return; }
+    [ttp areTermsAcceptedWithCompletion:^(BOOL accepted, NSError *termsErr) {
+        // Read termsErr first: accepted is NO on the failure path as a bridging
+        // default, and that is not the same as the merchant not having accepted.
+        if (termsErr) { /* handle */ }
+    }];
     PayabliTTPPaymentDetailsObjC *details =
         [[PayabliTTPPaymentDetailsObjC alloc]
             initWithAmount:[NSDecimalNumber decimalNumberWithString:@"9.99"]

@@ -156,19 +156,13 @@ package final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
             do {
                 try await newReader.requestSessionToken()
 
-                guard try await newReader.isAccountLinked() else {
-                    logger.info("[fiserv.prepare] ← terms not accepted")
-                    throw PayabliTTPError.termsNotAccepted
+                let linked = try await newReader.isAccountLinked()
+                if !linked {
+                    try await newReader.linkAccount()
                 }
 
                 try await newReader.initializeSession()
-                logger.info("[fiserv.prepare] ← reader ready")
-            } catch PayabliTTPError.termsNotAccepted {
-                // The one failure that does not tear the reader down. Accepting is
-                // the merchant's own act on their own screen, and the reader is what
-                // answers `areTermsAccepted()` afterwards — clearing here would leave
-                // a host unable to confirm the reason it was just given.
-                throw PayabliTTPError.termsNotAccepted
+                logger.info("[fiserv.prepare] ← reader ready (linked=\(linked))")
             } catch {
                 clearAllState()
                 throw Self.mapError(error) { .readerSetupFailed(reason: $0) }
