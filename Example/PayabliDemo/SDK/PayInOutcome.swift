@@ -65,9 +65,11 @@ struct PayInFailure {
     /// the part safe to record.
     let logLabel: String
 
-    /// Whether the service refused this as a repeat of an attempt it already holds,
-    /// in which case submitting again is refused the same way and only a new attempt
-    /// sends a payment of its own.
+    /// Whether the service refused this as a repeat of an attempt it already holds.
+    ///
+    /// It holds one for two minutes from the first request, so submitting again is
+    /// refused the same way only inside that. Past it the same key is executed, and
+    /// a new attempt is what sends a payment of its own.
     let isDuplicateSubmission: Bool
 }
 
