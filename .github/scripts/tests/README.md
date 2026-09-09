@@ -41,10 +41,11 @@ commit that went green, a checkout behind the baseline, a real range, rewritten 
 at its page limit, a branch with no previous success, and no token at all. Those decide whether a commit is
 named as a probable cause, so getting one wrong blames somebody for work that was already green.
 
-**Helper checks (`H*`)** run `hardware-only-skips.sh` against synthetic lists. Two workflows pass its
-output straight to `xcodebuild`, so a wrong answer there excludes the wrong tests or none at all, and
-nothing downstream notices: the suite still passes and a test that should have been excluded reports a
-standing skip instead.
+**Helper checks (`H*`)** run `hardware-only-skips.sh` against synthetic lists. Every workflow that tests
+the package scheme passes its output straight to `xcodebuild`, so a wrong answer there excludes the wrong
+tests or none at all, and nothing downstream notices: the suite still passes and a test that should have
+been excluded reports a standing skip instead. No count, for the same reason the check count above is
+gone: the set changes, and a number written here is wrong by the next round.
 
 **Workflow checks (`W*`)** parse the workflows and assert what the files have to be:
 which triggers the nightly may carry, that exactly one job names the Slack token, how the liveness owner is

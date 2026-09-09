@@ -1,9 +1,12 @@
 # Tests that cannot run unattended, excluded from every automated tier rather than skipped.
 #
-# One list, read by `.github/scripts/hardware-only-skips.sh` and applied wherever the
-# `PayabliSDK-Package` scheme is tested: the nightly and the pull-request gate. Two copies would be two
-# lists the moment one of them is edited, and the failure mode is silent — a test excluded in one tier and
-# skipping in the other reports a standing skip nobody reads.
+# One list, read by `.github/scripts/hardware-only-skips.sh` and applied by every workflow that tests the
+# `PayabliSDK-Package` scheme. This file does not name them, because a roster written here goes stale the
+# first time one is added and it did: `verify.py` finds them by reading the workflow directory instead,
+# and asserts each one applies this list. The release build is among them and it tags, so an exclusion
+# missing there ships. Two copies of the list would be two lists the moment one of them is edited, and the
+# failure mode is silent — a test excluded in one tier and skipping in the other reports a standing skip
+# nobody reads.
 #
 # Why excluded rather than skipped: the reporter derives passed from total minus failed minus skipped, so a
 # test parked with `XCTSkip` reports a skip every night, and a permanent skip cannot be told apart from a

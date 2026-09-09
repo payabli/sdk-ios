@@ -8,8 +8,13 @@ here, because a divergence in the message shape is a divergence in what the chan
 mentions that file supports are not ported: the culprit is a labelled heuristic, and the version of this
 that pings people at 3am needs a team decision rather than a flag.
 
-Runs in a job of its own that `needs` the test job. It reads the facts file `nightly_report.py` wrote and
-posts twice.
+Runs from `nightly-report.yml`, which `workflow_run` starts when the nightly finishes. That is a
+credential boundary rather than a layout: the nightly is dispatchable, a dispatch selects a ref, and
+GitHub would run that ref's copy of this file. `workflow_run` is read from the default branch, so a
+branch cannot supply the code that is handed the Slack token.
+
+It reads the facts file `nightly_report.py` wrote, which does cross from the branch and is treated as
+untrusted throughout, and posts twice.
 
 Why a bot token rather than an incoming webhook. Threading needs the parent message's `ts` as `thread_ts`,
 and a webhook's response body is the literal string `ok` with no `ts` and no channel, so a webhook cannot
