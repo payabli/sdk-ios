@@ -44,6 +44,8 @@ enum ErrorSummary {
         }
     }
 
+    // swiftlint:disable cyclomatic_complexity
+
     /// The case, and details that are not free text. No `reason` reaches this
     /// string.
     ///
@@ -56,7 +58,9 @@ enum ErrorSummary {
     ///
     /// Written out case by case rather than reflected over, because this string
     /// reaches host apps and a reflected one is whatever the compiler renders
-    /// today.
+    /// today. Its complexity is therefore one branch per error case, and the
+    /// compiler requires every one of them, which is why the rule is suppressed
+    /// around it rather than the switch being split across two functions.
     static func of(_ error: PayabliTTPError) -> String {
         switch error {
         case .notInitialized:
@@ -87,8 +91,12 @@ enum ErrorSummary {
             return "initiateFailed"
         case .updateFailed:
             return "updateFailed"
+        case .termsNotAccepted:
+            return "termsNotAccepted"
         }
     }
+
+    // swiftlint:enable cyclomatic_complexity
 
     /// The state is an `@objc` enum, so interpolating one renders
     /// `PayabliTTPSessionState(rawValue: 4)`. A log read at speed wants the name.
