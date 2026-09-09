@@ -238,8 +238,10 @@ serial steps. The result of each step feeds the next:
                                           └──────────────────────────────┘    └─────────────────────────┘
                                                                                       │
                                                                                       ▼
-                                                       RetryPolicy.default (5xx only) — on final failure
-                                                       the charge throws `PayabliTTPError.updateFailed`.
+                                                       Retried on a transport failure, a server fault
+                                                       or a rate limit, honouring `Retry-After`. On
+                                                       final failure the charge throws
+                                                       `PayabliTTPError.updateFailed`.
                                                        There is no offline / pending-update fallback.
 ```
 
