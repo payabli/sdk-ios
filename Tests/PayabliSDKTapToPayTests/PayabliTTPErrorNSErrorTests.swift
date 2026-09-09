@@ -7,7 +7,7 @@ import XCTest
 ///
 /// The integer codes are part of the public API. Inserting a new error case
 /// in the middle of `PayabliTTPError` would silently renumber the rest, so
-/// these tests fail loudly to remind us to append-only.
+/// these tests fail loudly when a case arrives anywhere but the end.
 final class PayabliTTPErrorNSErrorTests: XCTestCase {
     // MARK: - Domain
 
@@ -111,6 +111,7 @@ final class PayabliTTPErrorNSErrorTests: XCTestCase {
         ErrorSample(error: .updateFailed(reason: "x"), expectedCode: 10),
         ErrorSample(error: .tokenExpired, expectedCode: 11),
         ErrorSample(error: .activationFailed(reason: "x"), expectedCode: 12),
-        ErrorSample(error: .networkError(reason: "x"), expectedCode: 13)
+        ErrorSample(error: .networkError(reason: "x"), expectedCode: 13),
+        ErrorSample(error: .termsNotAccepted, expectedCode: 14)
     ]
 }
