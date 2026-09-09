@@ -34,6 +34,7 @@ The public entry point that host apps consume. Split across companion files
 | `PayabliTTP+Initialize.swift` | `initialize()` (cold/warm path) and `reinitializeIfNeeded()` (fresh `/config` after 401) |
 | `PayabliTTP+Activation.swift` | `activateDevice()` for pending-device flows. Emits `activationStarted` / `activationCompleted` / `activationFailed`. The partner provisions the activation code out-of-band (PRD §9.7) |
 | `PayabliTTP+Charge.swift` | 3-step sale pipeline: `/initiate` → `startReading` → `/update` (PRD §19.1) |
+| `PayabliTTP+Terms.swift` | `areTermsAccepted()`, asked of the platform on every call rather than cached. A provider that cannot be asked throws, so a caller can tell that from "not accepted" |
 | `PayabliTTPEvent.swift` | `PayabliTTPEvent` (lifecycle cases) + `PayabliTTPError` (PRD §20) + `PayabliTTPEventCode` (`@objc`) + per-case `payload` schema + `CustomNSError` bridging |
 | `PayabliTTPTypes.swift` | `PayabliTTPSessionState`, `PayabliTTPPaymentType`, `TransactionResult` |
 | `PayabliTTPTransactionData.swift` | `PayabliTTPCustomerData`, `PayabliTTPPaymentDetails`, `PayabliTTPInvoiceData`, internal `TTPTransactionContext` |
