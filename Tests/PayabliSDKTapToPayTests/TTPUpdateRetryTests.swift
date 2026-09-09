@@ -39,6 +39,27 @@ final class TTPUpdateRetryTests: XCTestCase {
         XCTAssertEqual(Self.updateResponses.sends, 2)
     }
 
+    /// An update that fails at the transport is retried, which no scripted status can reach.
+    ///
+    /// This call site decided retrying from the status until this branch moved it onto the code, and a
+    /// connection that never returned a status is exactly what a status could not classify. A regression
+    /// that stopped mapping a `URLError`, or dropped `networkError` from the retryable set, would leave
+    /// every scripted-status case here green.
+    ///
+    /// Success is the charge not throwing: the second attempt answers 200 and the outcome is the update
+    /// having landed.
+    func testAnUpdateThatFailsAtTheTransportIsRetried() async throws {
+        Self.updateResponses.scriptTransportFailureThen([200])
+        let ttp = try await makeReadyTTP()
+
+        _ = try await charge(ttp)
+
+        XCTAssertEqual(
+            Self.updateResponses.sends, 2,
+            "the attempt that never arrived, and the one that did"
+        )
+    }
+
     /// A server hint on the wire reaches the policy and ends the retry.
     ///
     /// The parser and the engine are covered apart, and both construct a `PayabliResponse` directly, so
@@ -155,6 +176,7 @@ final class TTPUpdateRetryTests: XCTestCase {
         private var holdSeconds: TimeInterval = 0
         private var hasEntered = false
         private var hint: String?
+        private var transportFailures = 0
 
         /// A `Retry-After` to send with every scripted status, so the wire-to-policy path is exercised
         /// rather than the parser and the engine separately.
@@ -166,6 +188,7 @@ final class TTPUpdateRetryTests: XCTestCase {
             holdSeconds = 0
             hasEntered = false
             hint = retryAfter
+            transportFailures = 0
         }
 
         var retryAfterHint: String? {
@@ -182,6 +205,32 @@ final class TTPUpdateRetryTests: XCTestCase {
             holdSeconds = 0
             hasEntered = false
             hint = nil
+            transportFailures = 0
+        }
+
+        /// Fails one attempt at the transport before answering `statuses`.
+        ///
+        /// A handler that throws reaches `URLSession` as a connection that failed rather than as a
+        /// status, which is the one path a status script cannot produce.
+        func scriptTransportFailureThen(_ statuses: [Int]) {
+            lock.lock()
+            defer { lock.unlock() }
+            self.statuses = statuses
+            count = 0
+            holdSeconds = 0
+            hasEntered = false
+            hint = nil
+            transportFailures = 1
+        }
+
+        /// Whether this attempt is one the transport fails, counted as a send because it was one.
+        func takeTransportFailure() -> Bool {
+            lock.lock()
+            defer { lock.unlock() }
+            guard transportFailures > 0 else { return false }
+            transportFailures -= 1
+            count += 1
+            return true
         }
 
         /// Leaves the update in flight, so a test can cancel one that is genuinely under way. Bounded, so
@@ -193,6 +242,7 @@ final class TTPUpdateRetryTests: XCTestCase {
             count = 0
             holdSeconds = seconds
             hasEntered = false
+            transportFailures = 0
         }
 
         /// Blocks while the case is holding the update open, and answers whether it was.
@@ -335,6 +385,9 @@ final class TTPUpdateRetryTests: XCTestCase {
                     )!,
                     Data()
                 )
+            }
+            if script.takeTransportFailure() {
+                throw URLError(.timedOut)
             }
             status = script.next()
             body = ["code": "A01", "data": ["paymentTransId": TTPUpdateRetryTests.paymentTransId]]
