@@ -401,32 +401,13 @@ final class PayabliAuthTests: XCTestCase {
     /// inside the log sink, the second caller is enqueued behind it, and the cancelled caller resumes
     /// only once that turn ends, which puts its cleanup after that install.
     func testACancelledCallerDoesNotClearTheRefreshThatFollowedIt() async throws {
-        let firstProvider = Slot<String>(), committing = Slot<String>()
-        let secondProvider = Slot<String>()
-        let releaseFirst = Latch(), releaseSecond = Latch()
-        let calls = Counter()
-        let sink = HoldingLogSink(holdingOn: "Access token refreshed", entered: committing)
-
-        let auth = PayabliAuth(
-            config: try makeConfig(
-                accessToken: "first",
-                tokenProvider: {
-                    switch await calls.increment() {
-                    case 1:
-                        firstProvider.set("entered")
-                        await releaseFirst.wait()
-                        return "second"
-                    case 2:
-                        secondProvider.set("entered")
-                        await releaseSecond.wait()
-                        return "third"
-                    default:
-                        return "fourth"
-                    }
-                }
-            ),
-            logger: PayabliLogger(category: .auth, sink: sink)
-        )
+        let race = RefreshRace()
+        let auth = try makeRacingAuth(race)
+        let (firstProvider, committing) = (race.firstProvider, race.committing)
+        let (secondProvider, thirdProvider) = (race.secondProvider, race.thirdProvider)
+        let (followerCalling, joinerCalling) = (race.followerCalling, race.joinerCalling)
+        let (releaseFirst, releaseSecond) = (race.releaseFirst, race.releaseSecond)
+        let (calls, sink) = (race.calls, race.sink)
 
         let cancelled = Task { try await auth.invalidateAndRefresh(rejectedToken: "first") }
         guard await valueWithinCeiling(firstProvider) != nil else {
@@ -435,22 +416,38 @@ final class PayabliAuthTests: XCTestCase {
         cancelled.cancel()
         releaseFirst.open()
 
+        // The commit holds the holder from inside the sink. A call made now is enqueued behind that turn
+        // and runs before the cancelled caller, which is resumed only when the turn ends.
         guard await valueWithinCeiling(committing) != nil else {
             return XCTFail("the first refresh never committed")
         }
-        let follower = Task { try? await auth.invalidateAndRefresh(rejectedToken: "second") }
-        try? await Task.sleep(nanoseconds: 100_000_000) // long enough for that call to be enqueued
+        let follower = Task {
+            followerCalling.set("calling")
+            return try? await auth.invalidateAndRefresh(rejectedToken: "second")
+        }
+        guard await valueWithinCeiling(followerCalling) != nil else {
+            return XCTFail("the second caller never ran")
+        }
         sink.open()
 
         guard await valueWithinCeiling(secondProvider) != nil else {
             return XCTFail("the second refresh never reached its provider")
         }
-        let joiner = Task { try? await auth.invalidateAndRefresh(rejectedToken: "second") }
-        try? await Task.sleep(nanoseconds: 100_000_000)
+
+        // That refresh stays in its provider until this case releases it, so the last caller cannot
+        // arrive after it finished and take the already-rotated path instead of joining it.
+        let joiner = Task {
+            joinerCalling.set("calling")
+            return try? await auth.invalidateAndRefresh(rejectedToken: "second")
+        }
+        guard await valueWithinCeiling(joinerCalling) != nil else {
+            return XCTFail("the last caller never ran")
+        }
+        let startedItsOwn = await valueWithinCeiling(thirdProvider, attempts: 12)
         releaseSecond.open()
 
+        let joined = await joiner.value
         _ = await follower.value
-        _ = await joiner.value
         do {
             _ = try await cancelled.value
             XCTFail("the cancelled caller has to report cancellation")
@@ -458,6 +455,8 @@ final class PayabliAuthTests: XCTestCase {
             // What puts it on the path this case is about.
         }
 
+        XCTAssertNil(startedItsOwn, "the marker was cleared, so the last rejection called the provider")
+        XCTAssertEqual(joined, "third", "it took the refresh in flight's own answer")
         let count = await calls.count
         XCTAssertEqual(count, 2, "the last rejection joined the refresh in flight rather than starting one")
     }
