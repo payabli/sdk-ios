@@ -85,11 +85,12 @@ jobs:
           # What became of the nightly, which the facts file cannot know: it is written and uploaded two
           # steps before the gate that decides the run.
           NIGHTLY_JOB_RESULT: ${{ github.event.workflow_run.conclusion }}
-          # The triggering run, not this one. `trusted_run_links()` builds the report's links from these,
-          # and without the override they would point at this reporting run rather than at the nightly
-          # whose failures the reader wants. Still trusted: GitHub fills the event payload, and a branch
-          # cannot write to it.
-          GITHUB_RUN_ID: ${{ github.event.workflow_run.id }}
-          GITHUB_SHA: ${{ github.event.workflow_run.head_sha }}
-          GITHUB_REF_NAME: ${{ github.event.workflow_run.head_branch }}
+          # The triggering run, under names of our own. GitHub documents that "You can't overwrite the
+          # value of the default environment variables named `GITHUB_*` and `RUNNER_*`", so assigning
+          # GITHUB_RUN_ID here would be ignored and the report would link to itself, while the last-green
+          # lookup would query this workflow rather than the nightly. Still trusted: these come from the
+          # event payload, which GitHub fills and a branch cannot write to.
+          NIGHTLY_RUN_ID: ${{ github.event.workflow_run.id }}
+          NIGHTLY_SHA: ${{ github.event.workflow_run.head_sha }}
+          NIGHTLY_REF_NAME: ${{ github.event.workflow_run.head_branch }}
         run: python3 .github/scripts/nightly_slack.py "$RUNNER_TEMP/nightly-facts/nightly-facts.json"

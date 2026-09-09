@@ -206,24 +206,44 @@ def merge_by_commit(culprits: list[dict]) -> list[tuple[dict, list[str]]]:
     return list(merged.values())
 
 
+def reported_run() -> dict[str, str]:
+    """The run this is reporting on, which is not necessarily the run this is executing in.
+
+    The report runs from `workflow_run`, so GITHUB_RUN_ID, GITHUB_SHA and GITHUB_REF_NAME describe the
+    reporting run rather than the nightly it describes. They cannot be corrected by an `env` block:
+    GitHub documents that "You can't overwrite the value of the default environment variables named
+    `GITHUB_*` and `RUNNER_*`", and an assignment that tries is ignored, silently. So the workflow passes
+    the triggering run's values under names of its own.
+
+    Falling back to the GITHUB_ ones keeps a hand run working, and keeps this correct for a reporter
+    invoked inside the run it describes, which is the shape the Android counterpart has.
+
+    Trusted either way, and that is the point of reading them here rather than from the facts: GitHub
+    fills both sets, the workflow_run values come from the event payload, and a branch can write to
+    neither. A URL is the worst place for untrusted input, since it is interpolated inside Slack's
+    `<url|label>` syntax where a single `>` closes the link and whatever follows is parsed as mrkdwn.
+    """
+    return {
+        "run_id": os.environ.get("NIGHTLY_RUN_ID") or os.environ.get("GITHUB_RUN_ID", ""),
+        "sha": os.environ.get("NIGHTLY_SHA") or os.environ.get("GITHUB_SHA", ""),
+        "ref": os.environ.get("NIGHTLY_REF_NAME") or os.environ.get("GITHUB_REF_NAME", ""),
+    }
+
+
 def trusted_run_links() -> dict[str, str]:
-    """The run and commit URLs, rebuilt from this job's own environment rather than read from the facts.
+    """The run and commit URLs for the run being reported on, never read from the facts.
 
-    The facts file crosses a job boundary, so every value in it is untrusted input. A URL is the worst place
-    for that: it is interpolated inside Slack's `<url|label>` syntax, where a single `>` closes the link and
-    whatever follows is parsed as mrkdwn, so `<!channel>` in a tampered `run.url` would broadcast from the
-    job that holds the bot token.
-
-    Escaping would not be the right answer even though it would work. GitHub injects GITHUB_SERVER_URL,
-    GITHUB_REPOSITORY, GITHUB_RUN_ID and GITHUB_SHA into this job directly, they describe the same run, and
-    a value that never crossed the boundary cannot have been tampered with. So the dependency is removed
-    rather than sanitised.
+    The facts file crosses a workflow boundary, so every value in it is untrusted input, and a link built
+    from one would let a tampered artifact put `<!channel>` inside Slack link syntax from the job that
+    holds the bot token. These come from the environment instead, so the dependency is removed rather
+    than sanitised.
     """
     server = os.environ.get("GITHUB_SERVER_URL", "https://github.com")
     repo = os.environ.get("GITHUB_REPOSITORY", "")
-    run_id = os.environ.get("GITHUB_RUN_ID", "")
-    sha = os.environ.get("GITHUB_SHA", "")[:7]
-    ref = os.environ.get("GITHUB_REF_NAME", "")
+    run = reported_run()
+    run_id = run["run_id"]
+    sha = run["sha"][:7]
+    ref = run["ref"]
     return {
         "url": f"{server}/{repo}/actions/runs/{run_id}" if repo and run_id else f"{server}/{repo}/actions",
         "commit_url": f"{server}/{repo}/commit/{sha}" if repo and sha else "",
@@ -507,9 +527,13 @@ def commits_since_last_green() -> dict | None:
     """
     token = os.environ.get("GITHUB_TOKEN", "").strip()
     repo = os.environ.get("GITHUB_REPOSITORY", "")
-    run_id = os.environ.get("GITHUB_RUN_ID", "")
-    sha = os.environ.get("GITHUB_SHA", "")
-    branch = os.environ.get("GITHUB_REF_NAME", "")
+    # The nightly, not this report. Reading GITHUB_RUN_ID here would resolve to the reporting workflow,
+    # whose runs are `continue-on-error` and so almost always succeed: the baseline would be a run that
+    # says nothing about whether the suite was green, and every culprit would be measured against it.
+    run = reported_run()
+    run_id = run["run_id"]
+    sha = run["sha"]
+    branch = run["ref"]
     server = os.environ.get("GITHUB_SERVER_URL", "https://github.com")
     api = os.environ.get("GITHUB_API_URL", "https://api.github.com")
     if not (token and repo and run_id and sha):

@@ -136,6 +136,37 @@ MUTATIONS = [
         "C14b", "collector",
     ),
 
+    # ---- the run the report describes -------------------------------------------------------------
+    Mutation(
+        "the report links to the run it is executing in rather than the one it describes",
+        SLACK,
+        '        "run_id": os.environ.get("NIGHTLY_RUN_ID") or os.environ.get("GITHUB_RUN_ID", ""),',
+        '        "run_id": os.environ.get("GITHUB_RUN_ID", ""),',
+        "P5e", "poster",
+    ),
+    Mutation(
+        "the commit link names the reporting checkout rather than the tested revision",
+        SLACK,
+        '        "sha": os.environ.get("NIGHTLY_SHA") or os.environ.get("GITHUB_SHA", ""),',
+        '        "sha": os.environ.get("GITHUB_SHA", ""),',
+        "P5f", "poster",
+    ),
+    Mutation(
+        "the reporting workflow tries to overwrite a reserved default variable",
+        REPORT_YML,
+        "          NIGHTLY_RUN_ID: ${{ github.event.workflow_run.id }}",
+        "          GITHUB_RUN_ID: ${{ github.event.workflow_run.id }}",
+        "W6a", "workflows",
+    ),
+    Mutation(
+        "the fail-closed guard reports the problem and carries on anyway",
+        NIGHTLY,
+        '              echo "::error::the hardware-only exclusion list could not be read"\n'
+        "              exit 1\n",
+        '              echo "::error::the hardware-only exclusion list could not be read"\n',
+        "W12f", "workflows",
+    ),
+
     # ---- the poster's escaping and links --------------------------------------------------------
     Mutation(
         "test data reaches Slack unescaped",

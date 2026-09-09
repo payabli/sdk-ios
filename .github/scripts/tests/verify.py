@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -723,6 +724,19 @@ def test_poster() -> None:
         check("P5d the test that failed is still named, with a link to the message",
               "WidgetTests &gt; testTwo()" in rendered and "failure message" in rendered, rendered[:400])
 
+        # P5e -------------------------------------------------------------------------------------
+        # The report runs from `workflow_run`, so GITHUB_RUN_ID is this report rather than the nightly.
+        # It cannot be corrected by an env block, because GitHub refuses to overwrite a GITHUB_ default,
+        # so the values arrive under their own names and these assert they are the ones used.
+        run_poster(poster, server, facts_fixture("red", [failure_fixture()]),
+                   {"LIVENESS_OWNER": "true", "NIGHTLY_RUN_ID": "4242",
+                    "NIGHTLY_SHA": "abcdef1234567890", "NIGHTLY_REF_NAME": "main"}, root)
+        rendered = json.dumps(posted(server, "chat.postMessage"))
+        check("P5e the report links to the run it describes, not to the run it is executing in",
+              "/actions/runs/4242" in rendered and "/actions/runs/999" not in rendered, rendered[:400])
+        check("P5f and to the commit that was tested",
+              "/commit/abcdef1" in rendered, rendered[:400])
+
         # P6 --------------------------------------------------------------------------------------
         tampered = facts_fixture("red", [failure_fixture()])
         tampered["run"] = {"url": "https://evil.test|x><!channel>"}
@@ -862,6 +876,27 @@ def test_poster() -> None:
         got = lookup({"runs": {"workflow_runs": [{"id": 1, "head_sha": head}]}})
         check("P19 a re-run of the commit that went green is an empty range, not an unknown one",
               got is not None and got.get("empty") is True and got.get("shas") == [], got)
+
+        # The lookup starts from a run id to find the workflow whose history it should read. Started from
+        # the reporting run it would read that workflow instead, whose runs are `continue-on-error` and so
+        # almost always succeed: every culprit would be measured against a baseline that says nothing
+        # about whether the suite was green.
+        saved_env = dict(os.environ)
+        os.environ.update({"NIGHTLY_RUN_ID": "4242", "NIGHTLY_SHA": head, "NIGHTLY_REF_NAME": "main"})
+        server.responses = {"4242": {"workflow_id": 77},
+                            "runs": {"workflow_runs": [{"id": 1, "head_sha": head}]}}
+        os.environ.update({
+            "GITHUB_TOKEN": "gh-harness", "GITHUB_REPOSITORY": "payabli/sdk-ios",
+            "GITHUB_RUN_ID": "999", "GITHUB_SHA": "f" * 40, "GITHUB_REF_NAME": "other",
+            "GITHUB_API_URL": server.base, "GITHUB_SERVER_URL": "https://github.test",
+        })
+        server.calls.clear()
+        got = poster.commits_since_last_green()
+        asked = [payload.get("query", "") for name, payload, _ in server.calls if name == "4242"]
+        os.environ.clear()
+        os.environ.update(saved_env)
+        check("P19b the last-green lookup starts from the run being reported on",
+              got is not None and asked, (got, [name for name, _, _ in server.calls]))
 
         got = lookup({
             "runs": {"workflow_runs": [{"id": 1, "head_sha": "f" * 40}]},
@@ -1069,6 +1104,22 @@ def test_workflows() -> None:
     check("W5d and both are read from the triggering run, not from this one",
           "github.event_name" not in owner and "github.ref_name" not in owner, owner)
 
+    # GitHub refuses to overwrite a GITHUB_ default: "You can't overwrite the value of the default
+    # environment variables named GITHUB_* and RUNNER_*". An env block that tries is ignored silently, so
+    # the report would link to itself and the last-green lookup would read the wrong workflow's history.
+    report_env = {}
+    for step in report.get("steps") or []:
+        report_env.update(step.get("env") or {})
+    overwritten = sorted(
+        key for key in report_env
+        if key.startswith(("GITHUB_", "RUNNER_")) and key not in ("GITHUB_TOKEN",)
+    )
+    check("W6a the reporting workflow does not try to overwrite a reserved default variable",
+          not overwritten, overwritten)
+    check("W6b and passes the run it reports on under its own names",
+          {"NIGHTLY_RUN_ID", "NIGHTLY_SHA", "NIGHTLY_REF_NAME"} <= set(report_env),
+          sorted(report_env))
+
     test_job = jobs.get("nightly") or {}
     steps = test_job.get("steps") or []
     suites = [s for s in steps if s.get("id") in
@@ -1130,11 +1181,14 @@ def test_workflows() -> None:
         # command substitution inside it returned, so `read -r -a skips <<< "$(helper)"` drops the failure
         # and leaves the array empty: the tier then runs the hardware-only tests with no exclusions and
         # passes, which is the silent skip the list exists to prevent.
-        checks_status = f"if ! exclusions=\"$({helper}" in text.replace(".github/scripts/", "")
+        # The guard has to leave, not merely exist. Asserting the `if !` line alone stayed green with the
+        # `exit` deleted, and the step then carried on with an empty array and ran the hardware-only
+        # tests: the fail-open case this check names.
+        guard = re.search(r"if ! exclusions=.*?\n(.*?)\n\s*fi\n", text, re.S)
+        exits = bool(guard) and re.search(r"\bexit [1-9]", guard.group(1)) is not None
         substituted_into_read = f'read -r -a skips <<< "$(' in text
         check(f"W12f {name} refuses to run when the exclusion list cannot be read",
-              checks_status and not substituted_into_read,
-              (checks_status, substituted_into_read))
+              exits and not substituted_into_read, (bool(guard), exits, substituted_into_read))
 
     check("W12c the list is one file, not a copy in a workflow",
           not any("SecureStorageTests" in text for _, text in tiers),
