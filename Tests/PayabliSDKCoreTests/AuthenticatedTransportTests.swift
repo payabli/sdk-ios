@@ -132,9 +132,11 @@ final class AuthenticatedTransportTests: XCTestCase {
             let call = await provider.increment()
             return call == 1 ? "rotated-by-other" : "minted-for-us"
         })
+        // The rotation below names the token in effect, so one has to be in effect first.
+        _ = try await auth.currentAccessToken()
         let gate = GateDecoration()
         let transport = makeStackWithChain(
-            [gate, BearerDecoration(readToken: { await auth.currentAccessToken() })],
+            [gate, BearerDecoration(readToken: { try await auth.currentAccessToken() })],
             auth: auth
         )
 
@@ -176,7 +178,7 @@ final class AuthenticatedTransportTests: XCTestCase {
         // refused. Without it the count below depends on which caller the scheduler runs first.
         let gate = GateDecoration()
         let transport = makeStackWithChain(
-            [BearerDecoration(readToken: { await auth.currentAccessToken() }), gate],
+            [BearerDecoration(readToken: { try await auth.currentAccessToken() }), gate],
             auth: auth
         )
 
@@ -362,6 +364,43 @@ final class AuthenticatedTransportTests: XCTestCase {
         let refreshes = await provider.count
         XCTAssertEqual(refreshes, 0)
         XCTAssertEqual(stub.count, 1)
+    }
+
+    /// A 401 on a request that carried no credential is returned as it arrived.
+    ///
+    /// Nothing was sent, so there is nothing a refresh would replace, and minting here would name a
+    /// credential no request carried. The provider is asserted untouched: calling it would turn a
+    /// route that needs no token into one that obtains one.
+    func testA401OnARequestThatSentNoCredentialIsReturnedAndMintsNothing() async throws {
+        let provider = Counter()
+        let stub = RecordingStub(status: Self.unauthorized)
+        stub.install()
+        defer { stub.uninstall() }
+
+        let config = try PayabliConfig(
+            entryPoint: "entry",
+            environment: .sandbox,
+            tokenProvider: {
+                _ = await provider.increment()
+                return "minted-token"
+            }
+        )
+        let auth = PayabliAuth(
+            config: config,
+            logger: PayabliLogger(category: .auth, sink: RecordingLogSink())
+        )
+        // An empty chain, so no decoration stamps the sent token and none reads the holder. The
+        // holder is cold for the same reason: this case is the one where neither source has a token.
+        let transport = makeStackWithChain([], auth: auth)
+
+        let response = try await transport.perform(ping())
+
+        XCTAssertEqual(response.statusCode, Self.unauthorized)
+        XCTAssertEqual(stub.count, 1, "nothing was sent, so nothing is replayed")
+        let mints = await provider.count
+        XCTAssertEqual(mints, 0)
+        let held = await auth.heldToken()
+        XCTAssertNil(held, "the recovery path installs no token of its own")
     }
 
     // MARK: - Helpers

@@ -25,19 +25,17 @@ public partial class MainPage : ContentPage
     }
 
     /// <summary>
-    /// Bootstraps a single PayabliTTP instance with credentials from the
-    /// partner backend. The token-refresh callback fires whenever the SDK
-    /// needs a new access token — wire it to your own /payabli/token
-    /// endpoint. Never embed the clientSecret in the mobile binary.
+    /// Bootstraps a single PayabliTTP instance. The token handler is the only source of a
+    /// credential: the SDK asks it for the first token as well as for a replacement, so the app
+    /// holds none. Wire it to your own /payabli/token endpoint, and never embed the clientSecret
+    /// in the mobile binary.
     /// </summary>
-    private async void ConfigurePayabli()
+    private void ConfigurePayabli()
     {
         try
         {
-            var initialToken = await FetchAccessTokenFromPartnerBackend();
             _ttp = new PayabliTTP(
-                accessToken: initialToken,
-                tokenRefreshHandler: (completion) =>
+                tokenHandler: (completion) =>
                 {
                     Task.Run(async () =>
                     {
@@ -62,10 +60,15 @@ public partial class MainPage : ContentPage
                 },
                 entryPoint: Secrets.EntryPoint,
                 appId: Secrets.AppId,
-                environment: PayabliEnvironment.Sandbox
+                environment: PayabliEnvironment.Sandbox,
+                error: out var ttpError
             );
+            if (ttpError is not null)
+            {
+                throw new System.Exception(ttpError.LocalizedDescription);
+            }
             _payInPaymentFlow = new PayabliPayInPaymentFlowObjC(
-                accessTokenHandler: (completion) =>
+                tokenHandler: (completion) =>
                 {
                     Task.Run(async () =>
                     {
@@ -81,8 +84,13 @@ public partial class MainPage : ContentPage
                     });
                 },
                 entryPoint: Secrets.EntryPoint,
-                environment: PayabliEnvironment.Sandbox
+                environment: PayabliEnvironment.Sandbox,
+                error: out var payInError
             );
+            if (payInError is not null)
+            {
+                throw new System.Exception(payInError.LocalizedDescription);
+            }
 
             _eventToken = _ttp.AddEventListener((code, payload) =>
             {

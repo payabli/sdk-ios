@@ -125,8 +125,8 @@ final class PaymentMethodReseedTests: XCTestCase {
     // MARK: -
 
     private func makeComponent(entryPoint: String = "entry") -> PayabliPayInPaymentFlow {
-        PayabliPayInPaymentFlow(
-            accessToken: "access-token",
+        flowOnSession(
+            token: "access-token",
             entryPoint: entryPoint,
             environment: .sandbox
         )

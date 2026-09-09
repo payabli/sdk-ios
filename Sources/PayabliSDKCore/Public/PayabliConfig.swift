@@ -14,15 +14,13 @@ import Foundation
 /// the mobile app binary (which would expose it to anyone who downloads the
 /// app and reverse-engineers it).
 ///
-/// The host app is responsible for:
-/// 1. Calling its own backend to obtain an initial `accessToken` and passing
-///    it to the SDK via `PayabliConfig.accessToken`.
-/// 2. Providing an optional `tokenProvider` closure that the SDK calls when
-///    the token expires or is rejected (HTTP 401). The closure asks the
-///    partner backend for a fresh token.
+/// The host app supplies one thing: a `tokenProvider` closure that asks its own backend for a
+/// token. The SDK calls it when it needs one, which is before the first request and again
+/// whenever a token is rejected, and holds the result in memory until then.
 ///
-/// If no `tokenProvider` is supplied, the SDK will return a `.tokenExpired`
-/// error on expiry rather than attempting to refresh silently.
+/// There is no initial token to hand over. A provider that can mint on a rejection can mint on
+/// the first request, so a second way to supply the same value would only be a second thing to
+/// keep correct.
 ///
 /// ## Security notes (PRD NFR-5A..C)
 ///
@@ -32,21 +30,12 @@ import Foundation
 /// - The `clientSecret` is not part of this config — by design, it lives on
 ///   the partner's server.
 public struct PayabliConfig: Sendable {
-    /// Pre-minted access token obtained by the host app from its own backend,
-    /// which performed the client-credentials exchange server-side against
-    /// `POST /api/v2/token/serverside`.
+    /// Asks the host's backend for an access token, which it minted against
+    /// `POST /api/v2/token/serverside` with a `clientSecret` that stays on that backend.
     ///
-    /// Supplied through `init` and readable only inside the SDK. There is no accessor
-    /// that returns it to a host app.
-    let accessToken: String
-
-    /// Optional refresh callback. When the SDK detects an expired or rejected
-    /// token (HTTP 401), it calls this closure to fetch a new one from the
-    /// partner's backend. If `nil`, the SDK surfaces a `.tokenExpired` error.
-    ///
-    /// Readable only inside the SDK, so a holder of this config cannot re-invoke
-    /// the host's own provider.
-    let tokenProvider: PayabliTokenRefresh?
+    /// Called before the first request and again after a rejection. Readable only inside the
+    /// SDK, so a holder of this config cannot re-invoke the host's own provider.
+    let tokenProvider: PayabliTokenRefresh
 
     /// Partner integration point — the platform's `entryName` concept.
     /// See PRD §5.3 FR-6A.7.
@@ -58,36 +47,20 @@ public struct PayabliConfig: Sendable {
     /// Whether to emit telemetry events. Defaults to `true` (opt-out per NFR-18).
     public let telemetryEnabled: Bool
 
-    /// Throws `PayabliGenericError(.invalidConfiguration)` when the token could not
-    /// be sent or the entry point is empty.
+    /// Throws `PayabliGenericError(.invalidConfiguration)` when the entry point is empty.
     ///
-    /// A token arrives from the host's own backend at run time, so a blank or
-    /// unusable one is a run-time condition and not a programmer error: it throws
-    /// rather than trapping, because trapping would crash a payment app over a
-    /// backend hiccup. The refresh path checks the same two things, so no token
-    /// reaches `Authorization` unchecked whether it came from here or from the
-    /// provider.
+    /// It throws rather than trapping because an entry point can arrive from a remote
+    /// configuration at run time, and trapping would crash a payment app over one.
+    ///
+    /// Nothing about the token is checked here, because no token is supplied here. What the
+    /// provider returns is checked where it is installed, on the first call and on every one
+    /// after, so no token reaches `Authorization` unchecked.
     public init(
-        accessToken: String,
-        tokenProvider: PayabliTokenRefresh? = nil,
         entryPoint: String,
         environment: PayabliEnvironment,
+        tokenProvider: @escaping PayabliTokenRefresh,
         telemetryEnabled: Bool = true
     ) throws {
-        guard !accessToken.isBlank else {
-            throw PayabliGenericError(
-                code: .invalidConfiguration,
-                reason: "Invalid configuration",
-                detail: "accessToken is blank. Mint one on your backend and pass it here."
-            )
-        }
-        guard accessToken.isHeaderSafe else {
-            throw PayabliGenericError(
-                code: .invalidConfiguration,
-                reason: "Invalid configuration",
-                detail: "accessToken cannot be an HTTP header value."
-            )
-        }
         guard !entryPoint.isBlank else {
             throw PayabliGenericError(
                 code: .invalidConfiguration,
@@ -95,7 +68,6 @@ public struct PayabliConfig: Sendable {
                 detail: "entryPoint is blank."
             )
         }
-        self.accessToken = accessToken
         self.tokenProvider = tokenProvider
         self.entryPoint = entryPoint
         self.environment = environment
@@ -104,12 +76,10 @@ public struct PayabliConfig: Sendable {
 }
 
 extension PayabliConfig: CustomStringConvertible {
-    /// Withholds the token and the entry point. A synthesised description prints
-    /// every property, and this type reaches assertion failures and crash reports
-    /// without passing the logger. The entry point names one merchant, so it is
-    /// withheld alongside the credential.
+    /// Withholds the entry point, which names one merchant. A synthesised description prints
+    /// every property, and this type reaches assertion failures and crash reports without
+    /// passing the logger.
     public var description: String {
-        "PayabliConfig(environment: \(environment), telemetryEnabled: \(telemetryEnabled), "
-            + "tokenProvider: \(tokenProvider == nil ? "absent" : "present"))"
+        "PayabliConfig(environment: \(environment), telemetryEnabled: \(telemetryEnabled))"
     }
 }

@@ -15,9 +15,10 @@ final class PayabliComponentCompatibilityTests: XCTestCase {
 
     private func testConfig(entryPoint: String) throws -> PayabliConfig {
         try PayabliConfig(
-            accessToken: "access-token",
             entryPoint: entryPoint,
-            environment: .sandbox
+            environment: .sandbox,
+
+            tokenProvider: { "access-token" }
         )
     }
 }

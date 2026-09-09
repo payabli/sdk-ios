@@ -30,7 +30,6 @@ enum PayInFixture {
         key: String
     ) -> PayabliPayInPaymentFlow {
         let flow = PayabliPayInPaymentFlow(
-            accessToken: "token",
             entryPoint: "entry",
             environment: .sandbox,
             transport: transport

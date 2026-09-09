@@ -66,8 +66,9 @@ the form requires a valid Bearer access token from your backend for
 
 - `PayabliTTP.configure()` sets up the underlying Swift `PayabliTTP`
   instance and wires the Dart-side `tokenProvider` callback to the
-  native `refreshToken` MethodChannel callback. Token refresh stays
-  end-to-end in your code.
+  native `refreshToken` MethodChannel callback. It takes no token: the
+  SDK asks the callback for the first one as well as for a replacement,
+  so minting stays end-to-end in your code.
 - `PayabliPayInPaymentFlow.configure()` sets up the native
   `PayabliPayInPaymentFlow` component and wires the Dart-side
   `accessTokenProvider` callback to the native `accessToken`

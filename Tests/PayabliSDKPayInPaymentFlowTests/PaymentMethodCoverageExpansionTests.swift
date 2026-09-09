@@ -175,8 +175,8 @@ final class PaymentMethodCoverageExpansionTests: XCTestCase {
 
     @MainActor
     func testPaymentMethodSheetModifierPresents() {
-        let component = PayabliPayInPaymentFlow(
-            accessToken: "access-token",
+        let component = flowOnSession(
+            token: "access-token",
             entryPoint: "entry",
             environment: .sandbox
         )
@@ -210,8 +210,8 @@ final class PaymentMethodCoverageExpansionTests: XCTestCase {
     @MainActor
     func testPaymentMethodSheetContentRendersFormFields() {
         var isPresented = true
-        let component = PayabliPayInPaymentFlow(
-            accessToken: "access-token",
+        let component = flowOnSession(
+            token: "access-token",
             entryPoint: "entry",
             environment: .sandbox
         )
@@ -249,8 +249,8 @@ final class PaymentMethodCoverageExpansionTests: XCTestCase {
     @MainActor
     func testPaymentMethodSheetContentRendersInlineHeaderWhenSheetHeaderIsHidden() {
         var isPresented = true
-        let component = PayabliPayInPaymentFlow(
-            accessToken: "access-token",
+        let component = flowOnSession(
+            token: "access-token",
             entryPoint: "entry",
             environment: .sandbox
         )
@@ -288,8 +288,8 @@ final class PaymentMethodCoverageExpansionTests: XCTestCase {
 
     @MainActor
     func testHostedACHFormRendersAccountPickerAndCustomerFields() {
-        let component = PayabliPayInPaymentFlow(
-            accessToken: "access-token",
+        let component = flowOnSession(
+            token: "access-token",
             entryPoint: "entry",
             environment: .sandbox
         )
@@ -326,8 +326,8 @@ final class PaymentMethodCoverageExpansionTests: XCTestCase {
 
     @MainActor
     func testHostedACHFormRendersPlaceholderSectionsAndUnmaskedAccount() throws {
-        let component = PayabliPayInPaymentFlow(
-            accessToken: "access-token",
+        let component = flowOnSession(
+            token: "access-token",
             entryPoint: "entry",
             environment: .sandbox
         )
@@ -373,8 +373,8 @@ final class PaymentMethodCoverageExpansionTests: XCTestCase {
 
     @MainActor
     func testHostedCombinedFormRendersMethodSelectorAndCardValidationError() throws {
-        let component = PayabliPayInPaymentFlow(
-            accessToken: "access-token",
+        let component = flowOnSession(
+            token: "access-token",
             entryPoint: "entry",
             environment: .sandbox
         )
@@ -407,8 +407,8 @@ final class PaymentMethodCoverageExpansionTests: XCTestCase {
 
     @MainActor
     func testHostedCardEntryMasksPANFromHostVisibleTextAndAccessibility() throws {
-        let component = PayabliPayInPaymentFlow(
-            accessToken: "access-token",
+        let component = flowOnSession(
+            token: "access-token",
             entryPoint: "entry",
             environment: .sandbox
         )
@@ -453,12 +453,8 @@ final class PaymentMethodCoverageExpansionTests: XCTestCase {
         }
         """)
         let component = PayabliPayInPaymentFlow(
-            config: try PayabliConfig(
-                accessToken: "unused",
-                entryPoint: "entry",
-                environment: .sandbox
-            ),
-            accessTokenProvider: { "access-token" },
+            entryPoint: "entry",
+            environment: .sandbox,
             transport: transport
         )
 
@@ -670,9 +666,9 @@ final class PaymentMethodCoverageExpansionTests: XCTestCase {
     }
 
     @MainActor
-    func testObjCAddACHRejectsInvalidArgumentsSynchronously() {
-        let component = PayabliPayInPaymentFlowObjC(
-            accessTokenHandler: { completion in completion("unused", nil) },
+    func testObjCAddACHRejectsInvalidArgumentsSynchronously() throws {
+        let component = try PayabliPayInPaymentFlowObjC(
+            tokenHandler: { completion in completion("unused", nil) },
             entryPoint: "entry",
             environment: .sandbox
         )
@@ -723,10 +719,10 @@ final class PaymentMethodCoverageExpansionTests: XCTestCase {
     }
 
     @MainActor
-    func testObjCAddCardReturnsValidationErrorWithoutCallingTokenHandler() async {
+    func testObjCAddCardReturnsValidationErrorWithoutCallingTokenHandler() async throws {
         let completionExpectation = expectation(description: "ObjC card completion")
-        let component = PayabliPayInPaymentFlowObjC(
-            accessTokenHandler: { _ in XCTFail("Token handler should not be called before local validation fails") },
+        let component = try PayabliPayInPaymentFlowObjC(
+            tokenHandler: { _ in XCTFail("Token handler should not be called before local validation fails") },
             entryPoint: "entry",
             environment: .sandbox
         )
@@ -753,15 +749,15 @@ final class PaymentMethodCoverageExpansionTests: XCTestCase {
     }
 
     @MainActor
-    func testObjCAccessTokenHandlerErrorIsReturnedAndDoubleCallbacksAreIgnored() async {
+    func testObjCAccessTokenHandlerErrorIsReturnedAndDoubleCallbacksAreIgnored() async throws {
         let completionExpectation = expectation(description: "ObjC token error completion")
         let tokenError = NSError(
             domain: "TokenProvider",
             code: 42,
             userInfo: [NSLocalizedDescriptionKey: "Token unavailable"]
         )
-        let component = PayabliPayInPaymentFlowObjC(
-            accessTokenHandler: { completion in
+        let component = try PayabliPayInPaymentFlowObjC(
+            tokenHandler: { completion in
                 completion(nil, tokenError)
                 completion("late-token", nil)
             },
@@ -781,8 +777,10 @@ final class PaymentMethodCoverageExpansionTests: XCTestCase {
             source: nil
         ) { result, error in
             XCTAssertNil(result)
-            XCTAssertEqual(error?.domain, "TokenProvider")
-            XCTAssertEqual(error?.code, 42)
+            // The session's holder owns the provider, so the host's own NSError is wrapped in this
+            // SDK's `.tokenExpired` and reaches the bridge as a PayabliError rather than verbatim.
+            XCTAssertEqual(error?.domain, "com.payabli.payInPaymentFlow")
+            XCTAssertEqual(error?.code, -3)
             completionExpectation.fulfill()
         }
 
@@ -790,10 +788,10 @@ final class PaymentMethodCoverageExpansionTests: XCTestCase {
     }
 
     @MainActor
-    func testObjCNilTokenAndNilErrorProducesInvalidTokenProviderError() async {
+    func testObjCNilTokenAndNilErrorProducesInvalidTokenProviderError() async throws {
         let completionExpectation = expectation(description: "ObjC nil token completion")
-        let component = PayabliPayInPaymentFlowObjC(
-            accessTokenHandler: { completion in completion(nil, nil) },
+        let component = try PayabliPayInPaymentFlowObjC(
+            tokenHandler: { completion in completion(nil, nil) },
             entryPoint: "entry",
             environment: .sandbox
         )
@@ -813,7 +811,7 @@ final class PaymentMethodCoverageExpansionTests: XCTestCase {
         ) { result, error in
             XCTAssertNil(result)
             XCTAssertEqual(error?.domain, "com.payabli.payInPaymentFlow")
-            XCTAssertEqual(error?.code, -1)
+            XCTAssertEqual(error?.code, -3)
             completionExpectation.fulfill()
         }
 

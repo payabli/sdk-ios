@@ -47,9 +47,10 @@ final class PayabliTTPTests: XCTestCase {
         retry: RetryPolicy = RetryPolicy(maxAttempts: 1, baseDelay: 0, maxDelay: 0, multiplier: 1, maxJitter: 0)
     ) throws -> (PayabliTTP, MockTapToPayProvider, MockDeviceAttestationService) {
         let config = try PayabliConfig(
-            accessToken: "seed_token",
             entryPoint: "e",
-            environment: .sandbox
+            environment: .sandbox,
+
+            tokenProvider: { "seed_token" }
         )
         let ttp = PayabliTTP(
             config: config,

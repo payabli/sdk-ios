@@ -31,7 +31,6 @@ final class TapToPayOnDeviceTests: XCTestCase {
 
     private func makeTTP() throws -> PayabliTTP {
         try PayabliTTP(
-            accessToken: Secrets.placeholderAccessToken,
             tokenProvider: { try await Secrets.fetchAccessToken() },
             entryPoint: named.entry,
             appId: Secrets.appId,

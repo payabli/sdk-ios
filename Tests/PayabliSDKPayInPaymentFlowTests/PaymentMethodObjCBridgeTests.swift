@@ -4,9 +4,9 @@ import XCTest
 
 @MainActor
 final class PaymentMethodObjCBridgeTests: XCTestCase {
-    func testAddACHRejectsInvalidHolderType() {
-        let component = PayabliPayInPaymentFlowObjC(
-            accessTokenHandler: { completion in
+    func testAddACHRejectsInvalidHolderType() throws {
+        let component = try PayabliPayInPaymentFlowObjC(
+            tokenHandler: { completion in
                 completion("token", nil)
             },
             entryPoint: "entry",

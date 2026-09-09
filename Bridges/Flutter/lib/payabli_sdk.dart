@@ -20,11 +20,11 @@ const EventChannel _payabliEventChannel = EventChannel(
 ///
 /// ## Authentication
 ///
-/// Your Flutter app must obtain the access token from your **own backend**
-/// (which holds the Payabli `clientSecret` server-side) and pass it in via
-/// [configure]. The native SDK calls back via the `refreshToken` channel
-/// method when the token expires — supply a [tokenProvider] callback that
-/// hits your backend and returns a fresh token.
+/// Supply a [tokenProvider] callback to [configure] that fetches a token from your
+/// **own backend** (which holds the Payabli `clientSecret` server-side). It is the
+/// only way a token reaches the SDK: [configure] takes none, and the native side
+/// calls back over the `refreshToken` channel method for the first token as well as
+/// for a replacement once one is rejected.
 ///
 /// ## Tap to Pay requirements
 ///
@@ -43,7 +43,6 @@ class PayabliTTP {
   /// Configures the underlying `PayabliTTP` instance. Call once per app
   /// launch, before [initialize].
   static Future<void> configure({
-    required String accessToken,
     required Future<String> Function() tokenProvider,
     required String entryPoint,
     required String appId,
@@ -53,7 +52,6 @@ class PayabliTTP {
     _payabliMethodChannel.setMethodCallHandler(_handleNativeCallback);
 
     await _payabliMethodChannel.invokeMethod<void>('configure', {
-      'accessToken': accessToken,
       'entryPoint': entryPoint,
       'appId': appId,
       'environment': environment.index,

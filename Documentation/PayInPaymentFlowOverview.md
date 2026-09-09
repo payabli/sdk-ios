@@ -69,15 +69,15 @@ The default is `.storePaymentMethod`.
 
 ## Authentication Model
 
-Every operation uses a mobile access-token provider:
+Every operation runs on a session, which holds the credential and asks for one when it needs it:
 
 ```swift
 let paymentFlow = PayabliPayInPaymentFlow(
-    entryPoint: entryPoint,
-    environment: .sandbox,
-    accessTokenProvider: {
-        try await backend.fetchPayInAccessToken()
-    }
+    session: PayabliSession(config: try PayabliConfig(
+        entryPoint: entryPoint,
+        environment: .sandbox,
+        tokenProvider: { try await backend.fetchPayInAccessToken() }
+    ))
 )
 ```
 
