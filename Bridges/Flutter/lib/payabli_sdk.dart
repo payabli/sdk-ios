@@ -125,8 +125,9 @@ class PayabliTTP {
   /// it will take a contactless payment. On iOS these are Apple's Tap to Pay
   /// terms, which the platform holds and the merchant accepts in a sheet.
   ///
-  /// Throws a [PayabliTTPException] rather than returning `false` when there is
-  /// no reader to ask, so do not treat a throw as a decline.
+  /// Throws a [PayabliTTPException] rather than returning `false` when the
+  /// reader cannot answer, whether none is prepared or the platform raised, so
+  /// do not treat a throw as a decline.
   static Future<bool> areTermsAccepted() async {
     try {
       final accepted = await _payabliMethodChannel.invokeMethod<bool>(

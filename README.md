@@ -500,8 +500,9 @@ withdrawn outside your app, and a remembered `true` goes stale without anything
 failing.
 
 A thrown error is not the same as `false`: `false` means the merchant has not
-accepted, while `PayabliTTPError.readerSetupFailed` means there was no reader to
-ask. Show a terms screen for the first and not for the second.
+accepted, while `PayabliTTPError.readerSetupFailed` means the reader could not
+answer, either because none was prepared or because the platform raised while
+being asked. Show a terms screen for the first and not for the second.
 
 ### Handling errors
 

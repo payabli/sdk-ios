@@ -23,7 +23,8 @@ import UIKit
 ///     customer, order. Resolves with `{paymentTransId}`.
 ///   - `activateDevice(activationCode, resolver, rejecter)`
 ///   - `areTermsAccepted(resolver, rejecter)` — resolves a bool. Rejects
-///     rather than resolving `false` when there is no reader to ask.
+///     rather than resolving `false` when the reader cannot answer, whether
+///     none is prepared or the platform raised.
 ///   - `getSessionState(resolver, rejecter)` — resolves the int raw value
 ///     of the current `PayabliTTPSessionState`.
 ///   - `resolveTokenRefresh(token)` / `rejectTokenRefresh(reason)` —
