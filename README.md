@@ -557,21 +557,25 @@ PayabliTTP *ttp = [[PayabliTTP alloc]
     [ttp areTermsAcceptedWithCompletion:^(BOOL accepted, NSError *termsErr) {
         // Read termsErr first: accepted is NO on the failure path as a bridging
         // default, and that is not the same as the merchant not having accepted.
-        if (termsErr) { /* handle */ }
-    }];
-    PayabliTTPPaymentDetailsObjC *details =
-        [[PayabliTTPPaymentDetailsObjC alloc]
-            initWithAmount:[NSDecimalNumber decimalNumberWithString:@"9.99"]
-                serviceFee:NSDecimalNumber.zero
-                  currency:@"USD"
-        paymentDescription:nil];
-    [ttp chargeWithType:PayabliTTPPaymentTypeSale
-        paymentDetails:details
-              customer:nil
-               invoice:nil
-      orderDescription:nil
-            completion:^(PayabliTTPTransactionResultObjC *result, NSError *e) {
-        NSLog(@"Transaction captured. ID: %@", result.paymentTransId);
+        if (termsErr) { /* handle */ return; }
+        if (!accepted) { /* the merchant has not accepted; do not charge */ return; }
+
+        // Charging goes inside this block. Starting it alongside the check would
+        // race past both answers.
+        PayabliTTPPaymentDetailsObjC *details =
+            [[PayabliTTPPaymentDetailsObjC alloc]
+                initWithAmount:[NSDecimalNumber decimalNumberWithString:@"9.99"]
+                    serviceFee:NSDecimalNumber.zero
+                      currency:@"USD"
+            paymentDescription:nil];
+        [ttp chargeWithType:PayabliTTPPaymentTypeSale
+            paymentDetails:details
+                  customer:nil
+                   invoice:nil
+          orderDescription:nil
+                completion:^(PayabliTTPTransactionResultObjC *result, NSError *e) {
+            NSLog(@"Transaction captured. ID: %@", result.paymentTransId);
+        }];
     }];
 }];
 ```
