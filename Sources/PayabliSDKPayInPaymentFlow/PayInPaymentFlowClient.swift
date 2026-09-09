@@ -58,7 +58,7 @@ final class PayInPaymentFlowClient: Sendable {
 
         let body = AuthorizedCaptureBody(paymentDetails: request.paymentDetails)
         let payabliRequest = try buildRequest(
-            path: "/api/v2/MoneyIn/capture/\(Self.pathComponent(transId))",
+            path: "/api/v2/MoneyIn/capture/\(PercentEncoding.segment(transId))",
             query: [],
             idempotencyKey: nil,
             body: body
@@ -131,10 +131,6 @@ final class PayInPaymentFlowClient: Sendable {
         let response: PayabliResponse
         do {
             response = try await transport.perform(request)
-        } catch let failure as PayInProviderFailure {
-            // Not recorded: the host's own error can name its backend, and the sink renders a non-SDK
-            // error whole. The host still gets the error it threw.
-            throw failure.underlying
         } catch {
             diagnostics.logFailure(
                 error,
@@ -185,12 +181,6 @@ final class PayInPaymentFlowClient: Sendable {
         }
 
         return envelope.failure(httpStatusCode: response.statusCode)
-    }
-
-    private static func pathComponent(_ value: String) -> String {
-        var allowed = CharacterSet.urlPathAllowed
-        allowed.remove(charactersIn: "/")
-        return value.addingPercentEncoding(withAllowedCharacters: allowed) ?? value
     }
 }
 
