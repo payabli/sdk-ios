@@ -132,7 +132,16 @@ class PayabliTTP {
       final accepted = await _payabliMethodChannel.invokeMethod<bool>(
         'areTermsAccepted',
       );
-      return accepted ?? false;
+      if (accepted == null) {
+        // Defaulting to false here would report a missing or malformed native
+        // response as a merchant who has not accepted, which is the one
+        // distinction this method exists to keep.
+        throw const PayabliTTPException(
+          code: 'TERMS_CHECK_FAILED',
+          message: 'Native terms check returned no answer',
+        );
+      }
+      return accepted;
     } on PlatformException catch (e) {
       throw PayabliTTPException._fromPlatform(e);
     }
