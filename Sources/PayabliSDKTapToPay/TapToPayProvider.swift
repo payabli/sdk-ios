@@ -48,6 +48,20 @@ package protocol TapToPayProvider: AnyObject, Sendable {
     /// `configure(credentials:)` must have succeeded before this call.
     func prepareReader() async throws
 
+    /// Whether the merchant has accepted the terms their platform requires
+    /// before it will take a contactless payment.
+    ///
+    /// Called by the facade on demand rather than during a phase, so it may
+    /// arrive at any point. Implementations answer from the platform each time
+    /// instead of caching, since acceptance can be granted or withdrawn outside
+    /// this process.
+    ///
+    /// A platform that requires no acceptance returns `true`.
+    ///
+    /// Must throw `PayabliTTPError.readerSetupFailed(reason:)` when there is no
+    /// reader to ask, so a caller can tell "not accepted" from "cannot answer".
+    func areTermsAccepted() async throws -> Bool
+
     /// Runs the NFC interaction and (for atomic providers like Fiserv) the
     /// actual charge. Providers that only collect card data should ignore the
     /// merchant correlation IDs and populate `encryptedPayload` in the result.
@@ -58,4 +72,16 @@ package protocol TapToPayProvider: AnyObject, Sendable {
 
     /// Cleans up reader resources.
     func cleanUp() async
+}
+
+package extension TapToPayProvider {
+    /// Answers for a provider that does not consult its reader for this.
+    ///
+    /// Throwing rather than returning `true` keeps the contract's own
+    /// distinction intact: `false` means the merchant has not accepted, and a
+    /// throw means nothing was in a position to say. A default that answered
+    /// `true` would tell a host the merchant had accepted when nothing asked.
+    func areTermsAccepted() async throws -> Bool {
+        throw PayabliTTPError.readerSetupFailed(reason: "Reader not prepared")
+    }
 }
