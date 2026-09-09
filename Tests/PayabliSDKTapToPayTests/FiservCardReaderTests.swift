@@ -148,4 +148,53 @@ final class FiservCardReaderTests: XCTestCase {
             XCTFail("wrong error: \(error)")
         }
     }
+
+    func testTermsAreReportedAcceptedWhenTheReaderSaysSo() async throws {
+        let reader = FiservCardReader()
+        reader.setLinkStateSource(StubLinkState(.success(true)))
+
+        let accepted = try await reader.areTermsAccepted()
+
+        XCTAssertTrue(accepted)
+    }
+
+    func testTermsAreReportedUnacceptedWhenTheReaderSaysSo() async throws {
+        let reader = FiservCardReader()
+        reader.setLinkStateSource(StubLinkState(.success(false)))
+
+        let accepted = try await reader.areTermsAccepted()
+
+        XCTAssertFalse(accepted)
+    }
+
+    /// A reader that raises is not a merchant who declined, so the failure keeps
+    /// its own shape instead of collapsing into `false`.
+    func testAReaderThatRaisesIsMappedRatherThanReportedAsUnaccepted() async {
+        let reader = FiservCardReader()
+        struct PlatformFailure: Error {}
+        reader.setLinkStateSource(StubLinkState(.failure(PlatformFailure())))
+
+        do {
+            _ = try await reader.areTermsAccepted()
+            XCTFail("expected the reader's failure to surface")
+        } catch PayabliTTPError.readerSetupFailed {
+            // expected
+        } catch {
+            XCTFail("wrong error: \(error)")
+        }
+    }
+}
+
+/// Answers the linked state in place of a reader, which cannot be built without
+/// hardware.
+private final class StubLinkState: AccountLinkReading {
+    private let result: Result<Bool, Error>
+
+    init(_ result: Result<Bool, Error>) {
+        self.result = result
+    }
+
+    func isAccountLinked() async throws -> Bool {
+        try result.get()
+    }
 }

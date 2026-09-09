@@ -68,6 +68,30 @@ package final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
         private var reader: FiservTTPCardReader?
     #endif
 
+    /// Set only by a test, so the linked, unlinked and platform-error answers are
+    /// reachable without reader hardware. `prepareReader()` never assigns it, so
+    /// the shipped path always asks the reader it built.
+    private var injectedLinkStateSource: AccountLinkReading?
+
+    /// Whatever `areTermsAccepted()` asks. Read under the lock by its caller.
+    private var linkStateSource: AccountLinkReading? {
+        if let injectedLinkStateSource {
+            return injectedLinkStateSource
+        }
+        #if canImport(PayabliCardReaderCore)
+            return reader
+        #else
+            return nil
+        #endif
+    }
+
+    /// Injects the answer `areTermsAccepted()` reads. Tests only.
+    func setLinkStateSource(_ source: AccountLinkReading?) {
+        lock.lock()
+        injectedLinkStateSource = source
+        lock.unlock()
+    }
+
     package init() {}
 
     /// Injects `Credentials` directly. Facade path uses `configure(credentials:)`.
@@ -173,22 +197,18 @@ package final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
     }
 
     package func areTermsAccepted() async throws -> Bool {
-        #if canImport(PayabliCardReaderCore)
-            // Scoped rather than `lock()`/`unlock()`, which the neighbours use and
-            // which is an error under the Swift 6 language mode from an async context.
-            let activeReader = lock.withLock { reader }
-            guard let reader = activeReader else {
-                throw PayabliTTPError.readerSetupFailed(reason: "Reader not prepared")
-            }
+        // Scoped rather than `lock()`/`unlock()`, which the neighbours use and
+        // which is an error under the Swift 6 language mode from an async context.
+        let source = lock.withLock { linkStateSource }
+        guard let source else {
+            throw PayabliTTPError.readerSetupFailed(reason: "Reader not prepared")
+        }
 
-            do {
-                return try await reader.isAccountLinked()
-            } catch {
-                throw Self.mapError(error) { .readerSetupFailed(reason: $0) }
-            }
-        #else
-            throw PayabliTTPError.readerSetupFailed(reason: "Tap to Pay is iOS-only")
-        #endif
+        do {
+            return try await source.isAccountLinked()
+        } catch {
+            throw Self.mapError(error) { .readerSetupFailed(reason: $0) }
+        }
     }
 
     package func startReading(_ request: CardReadRequest) async throws -> CardReadResult {
