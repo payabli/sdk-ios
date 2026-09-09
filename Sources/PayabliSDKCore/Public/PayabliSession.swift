@@ -6,15 +6,13 @@ import Foundation
 /// interaction with Payabli on a given config, so token refreshes, rate limits and
 /// telemetry hooks live in one place rather than per-request.
 ///
-/// The initializers that take a session rather than building one are `package`, so a
-/// shared session is reachable from a capability target and not from a host app. A host
-/// builds a facade from an access token and an entry point, and the facade builds the
-/// session.
+/// A host builds one from a `PayabliConfig` and hands it to the card-not-present facade,
+/// whose initializer takes it. The card-present facade takes a provider and an entry point
+/// and builds its own.
 ///
-/// Two facades do not share one today. The card-present facade's public initializers
-/// build a fresh session, and the card-not-present facade takes its own token provider and
-/// builds its own transport, so an app using both holds two sets of credential state.
-/// Converging them changes what an integrator supplies and is tracked separately.
+/// So two facades do not share one today: an app using both holds two sessions and two sets
+/// of credential state. Giving the card-present facade the same session-taking shape changes
+/// what an integrator supplies and is tracked separately.
 public final class PayabliSession: @unchecked Sendable {
     /// The configuration this session was constructed with.
     ///
