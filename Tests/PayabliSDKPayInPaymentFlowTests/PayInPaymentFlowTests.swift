@@ -9,7 +9,6 @@ final class PayInPaymentFlowTests: XCTestCase {
         let component = PayabliPayInPaymentFlow(
             entryPoint: "entry",
             environment: .sandbox,
-            accessTokenProvider: { "access-token" },
             transport: transport,
             operation: .storePaymentMethod
         )
@@ -36,7 +35,6 @@ final class PayInPaymentFlowTests: XCTestCase {
         let component = PayabliPayInPaymentFlow(
             entryPoint: "entry",
             environment: .sandbox,
-            accessTokenProvider: { "access-token" },
             transport: transport,
             operation: .capture
         )

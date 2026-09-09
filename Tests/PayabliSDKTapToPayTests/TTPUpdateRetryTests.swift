@@ -282,9 +282,9 @@ final class TTPUpdateRetryTests: XCTestCase {
     private func makeReadyTTP() async throws -> PayabliTTP {
         StubURLProtocol.handler = Self.stubHandler
         let config = try PayabliConfig(
-            accessToken: "seed_token",
             entryPoint: "e",
-            environment: .sandbox
+            environment: .sandbox,
+            tokenProvider: { "seed_token" }
         )
         let ttp = PayabliTTP(
             config: config,

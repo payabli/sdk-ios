@@ -212,7 +212,7 @@ extension PayabliTTP {
     ) async -> TTPUpdateOutcome {
         let body = TTPTransactionClient.updateBody(for: payload)
         let logger = self.logger
-        let path = "/api/v2/MoneyIn/update/\(paymentTransId)"
+        let path = "/api/v2/MoneyIn/update/\(PercentEncoding.segment(paymentTransId))"
         let transport = self.session.transport
 
         @Sendable func performOnce(attempt: String) async throws -> PayabliResponse {

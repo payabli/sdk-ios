@@ -311,15 +311,16 @@ final class PaymentMethodFormConfigurationTests: XCTestCase {
 
     @MainActor
     func testPaymentMethodLegacyConfigureWithThemeRoutesToCurrentConfigure() throws {
-        let component = PayabliPayInPaymentFlow(
-            accessToken: "access-token",
+        let component = flowOnSession(
+            token: "access-token",
             entryPoint: "old-entry",
             environment: .sandbox
         )
         let config = try PayabliConfig(
-            accessToken: "access-token",
             entryPoint: "new-entry",
-            environment: .qa
+            environment: .qa,
+
+            tokenProvider: { "access-token" }
         )
 
         component.configure(config: config, theme: .default)
@@ -438,7 +439,6 @@ final class PaymentMethodFormConfigurationTests: XCTestCase {
     func testViewModelUsesStringDescriptionForNonPayabliErrors() async {
         let viewModel = PayabliPayInPaymentFlowViewModel(
             component: PayabliPayInPaymentFlow(
-                accessToken: "access-token",
                 entryPoint: "entry",
                 environment: .sandbox,
                 transport: ThrowingPaymentMethodTransport(error: PaymentMethodTestError.transportBoom)
@@ -565,8 +565,8 @@ final class PaymentMethodFormConfigurationTests: XCTestCase {
 
     @MainActor
     private func component() -> PayabliPayInPaymentFlow {
-        PayabliPayInPaymentFlow(
-            accessToken: "access-token",
+        flowOnSession(
+            token: "access-token",
             entryPoint: "entry",
             environment: .sandbox
         )

@@ -8,17 +8,27 @@ let testToken = "test-token-QXJZ"
 
 /// An auth holder for transport tests, which need a token source without being about auth.
 ///
-/// No provider by default, so a 401 is terminal. Pass one when the refresh path is the subject.
+/// The holder carries no seed, so `accessToken` is what the provider answers on its first call and
+/// `tokenProvider` serves every call after it. That is how a test says "start on this token, then
+/// rotate to that one", which one closure returning one value cannot express.
+///
+/// With no `tokenProvider` the first token is also the only one, so a 401 stays terminal: the holder
+/// refuses a replacement equal to the token that was rejected.
 func makeTestAuth(
     accessToken: String = testToken,
     tokenProvider: PayabliTokenRefresh? = nil,
     sink: RecordingLogSink? = nil
 ) throws -> PayabliAuth {
+    let calls = Counter()
     let config = try PayabliConfig(
-        accessToken: accessToken,
-        tokenProvider: tokenProvider,
         entryPoint: "entry",
-        environment: .sandbox
+        environment: .sandbox,
+
+        tokenProvider: {
+            let call = await calls.increment()
+            guard call > 1, let tokenProvider else { return accessToken }
+            return try await tokenProvider()
+        }
     )
     return PayabliAuth(
         config: config,
@@ -165,7 +175,7 @@ func makeAuthenticatedStack(
     let logger = PayabliLogger(category: .network, sink: sink ?? RecordingLogSink())
     let service = PayabliService.makeWithChain(
         environment: .sandbox,
-        readToken: { await auth.currentAccessToken() },
+        readToken: { try await auth.currentAccessToken() },
         session: StubURLProtocol.makeSession(),
         logger: logger
     )

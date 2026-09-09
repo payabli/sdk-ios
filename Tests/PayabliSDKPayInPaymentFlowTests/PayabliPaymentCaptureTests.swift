@@ -21,7 +21,6 @@ final class PayabliPayInPaymentFlowTests: XCTestCase {
         }
         """)
         let component = PayabliPayInPaymentFlow(
-            accessToken: "access-token",
             entryPoint: "entry",
             environment: .sandbox,
             transport: transport
@@ -55,16 +54,16 @@ final class PayabliPayInPaymentFlowTests: XCTestCase {
         }
         """)
         let component = PayabliPayInPaymentFlow(
-            accessToken: "access-token",
             entryPoint: "old-entry",
             environment: .sandbox,
             transport: transport
         )
 
         component.configure(config: try PayabliConfig(
-            accessToken: "unused",
             entryPoint: "new-entry",
-            environment: .qa
+            environment: .qa,
+
+            tokenProvider: { "unused" }
         ))
 
         _ = try await component.capture(PayabliPayInPaymentFlowRequest(
@@ -95,7 +94,6 @@ final class PayabliPayInPaymentFlowTests: XCTestCase {
         }
         """)
         let component = PayabliPayInPaymentFlow(
-            accessToken: "access-token",
             entryPoint: "entry",
             environment: .sandbox,
             transport: transport,
@@ -133,8 +131,8 @@ final class PayabliPayInPaymentFlowTests: XCTestCase {
     }
 
     func testAuthorizeFormLimitsAvailableMethodsToCardData() {
-        let component = PayabliPayInPaymentFlow(
-            accessToken: "access-token",
+        let component = flowOnSession(
+            token: "access-token",
             entryPoint: "entry",
             environment: .sandbox,
             operation: .authorize,
@@ -159,8 +157,8 @@ final class PayabliPayInPaymentFlowTests: XCTestCase {
     }
 
     func testViewModelUpdateReconcilesChangedComponentOperationAndConfiguration() {
-        let component = PayabliPayInPaymentFlow(
-            accessToken: "access-token",
+        let component = flowOnSession(
+            token: "access-token",
             entryPoint: "entry",
             environment: .sandbox,
             operation: .storePaymentMethod
@@ -203,7 +201,6 @@ final class PayabliPayInPaymentFlowTests: XCTestCase {
     func testFacadeRejectsConcurrentSubmissionsBeforeSecondTransportCall() async throws {
         let transport = BlockingFacadeTransport(responseBody: Self.formCaptureResponse)
         let component = PayabliPayInPaymentFlow(
-            accessToken: "access-token",
             entryPoint: "entry",
             environment: .sandbox,
             transport: transport
@@ -237,7 +234,6 @@ final class PayabliPayInPaymentFlowTests: XCTestCase {
     func testFormViewModelSubmitsConfiguredCaptureRequest() async throws {
         let transport = FacadeTransport(responseBody: Self.formCaptureResponse)
         let component = PayabliPayInPaymentFlow(
-            accessToken: "access-token",
             entryPoint: "entry",
             environment: .sandbox,
             transport: transport,

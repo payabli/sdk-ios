@@ -119,10 +119,18 @@ channel, so an app that never accepts card-present never links the certified car
 
 ### Key Patterns
 
-- `PayabliSession` owns one `PayabliAuth` and one `PayabliService` per `PayabliConfig`. Component
-  facades accept a session, so token refresh, telemetry hooks and 401 semantics are shared rather
-  than reimplemented per module. Those session-taking initialisers are `package`; a host app reaches
-  the facade initialisers that take an access token and an entry point.
+- `PayabliSession` owns one `PayabliAuth` and one `PayabliService` per `PayabliConfig`. Every
+  facade runs on a session, so token minting, refresh, telemetry hooks and 401 semantics live in one
+  place rather than per module. The card-not-present facade's public initialiser takes the session
+  itself; the card-present one takes a provider and an entry point and builds the session.
+- **No token crosses the boundary in either direction.** `PayabliConfig` takes a `tokenProvider` and
+  nothing else about credentials: no seed token, and no accessor that returns one. `PayabliAuth`
+  holds `String?`, calls the provider on the first read and again after a rejection, and shares one
+  call between concurrent callers. It checks every token it installs, which is why
+  `BearerDecoration` checks none.
+- **Two facades do not share one session today.** The card-present facade's public initialisers
+  build a fresh one, and the card-not-present facade is handed one. Converging them changes what an
+  integrator supplies and is tracked separately.
 - **`package` is the level for anything a capability target needs and a consumer must not have**:
   the transport seam, the request and envelope types, the attestation and storage protocols, the
   logger, and the retry primitive. `internal` is for what only its own module needs, and the
@@ -136,12 +144,18 @@ channel, so an app that never accepts card-present never links the certified car
   alone: refresh, retry once, then `.tokenExpired`. So a client handed the service without the
   wrapper loses the recovery and still sends its credential. Endpoint clients never set an
   `Authorization` header; one set anyway is replaced by the chain, case-insensitively. Concurrent
-  refreshes are deduplicated inside the `PayabliAuth` actor via a stored in-flight `Task`.
-- **A transport cannot be built without a token source.** `PayabliService`'s initialiser takes a
-  `readToken` closure and builds its own chain from it; there is no initialiser that takes a chain, so
-  no caller can supply an empty one. `PayabliSession` exposes the wrapped `transport` at `package`
-  and never the service underneath. A test that needs a specific chain uses
+  provider calls, cold or after a rejection, are deduplicated inside the `PayabliAuth` actor via a
+  stored in-flight `Task`.
+- **A transport cannot be built without a token source, and only the session builds one.**
+  `PayabliService`'s initialiser is `internal`, takes a `readToken` closure and builds its own chain
+  from it; there is no initialiser that takes a chain, so no caller can supply an empty one.
+  `PayabliSession` exposes the wrapped `transport` at `package` and never the service underneath. A test that needs a specific chain uses
   `PayabliService.makeWithDecorations`, which is internal and named for that purpose.
+- **One percent-encoder, and every interpolated path segment goes through it.**
+  `PercentEncoding.segment` keeps RFC 3986's unreserved set and encodes every other UTF-8 byte, so a
+  `/`, `?` or `#` in an identifier stays part of the identifier. It matches the sibling platform byte
+  for byte, and is stricter than `urlPathAllowed`, which admits the sub-delimiters. A route built by
+  interpolating a value without it is a defect.
 - **The chain runs once per attempt**, so anything that must survive a replay unchanged — an
   idempotency key is the live example — is set by the client and not by a decoration.
 - `mapPayabliHTTPError(response:override:)` is the canonical status-to-typed-error mapper: 400

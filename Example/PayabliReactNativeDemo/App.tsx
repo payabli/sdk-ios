@@ -63,7 +63,6 @@ export default function App() {
   const configure = async () => {
     await run("Configure", async () => {
       await PayabliTTP.configure({
-        accessToken: await Secrets.fetchAccessToken(),
         tokenProvider: Secrets.fetchAccessToken,
         entryPoint: Secrets.entryPoint,
         appId: Secrets.appId,
