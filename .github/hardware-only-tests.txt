@@ -23,9 +23,15 @@
 # after a `#` are ignored.
 
 # Need a Keychain that answers. The Swift package test host carries no entitlement, so these return
-# errSecMissingEntitlement and skipped on every simulator run before this list existed. Their assertions
-# are covered on a device by PayabliDemoDeviceTests/KeychainOnDeviceTests, which skips nothing. The other
-# ten tests in SecureStorageTests run normally, which is why these are named per method.
+# errSecMissingEntitlement and skipped on every simulator run before this list existed. The other ten
+# tests in SecureStorageTests run normally, which is why these are named per method.
+#
+# Every assertion here has a counterpart in PayabliDemoDeviceTests/KeychainOnDeviceTests, which skips
+# nothing. Two of them did not until this list was reviewed: the update path of `set` on an item that
+# already exists, and the sweep creating no item for any key it knows. The device suite covered the add
+# path and the sweep's correction, which are different branches, so excluding those two would have
+# dropped the only test of each. Check the counterpart exists before adding a line here; "it is covered
+# on a device" is a claim about a file, and it was wrong twice.
 PayabliSDKTapToPayTests/SecureStorageTests/testKeychainRoundTripIfAvailable
 PayabliSDKTapToPayTests/SecureStorageTests/testKeychainItemsAreWrittenForThisDeviceOnlyIfAvailable
 PayabliSDKTapToPayTests/SecureStorageTests/testRewritingALegacyItemStopsItTravellingIfAvailable

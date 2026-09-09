@@ -82,6 +82,38 @@ final class KeychainOnDeviceTests: XCTestCase {
         )
     }
 
+    /// Writing over an item that already exists has to set the attribute too. The store is opened before
+    /// the legacy item is written, so the sweep cannot have corrected it and this is `set` alone: it takes
+    /// the update path rather than the add path the test above covers, and an update that names only the
+    /// value leaves the old attribute in place for as long as the install lasts.
+    func testRewritingAnExistingItemStopsItTravelling() throws {
+        try writeDirectly(
+            "before",
+            forKey: PayabliKeychainKey.installId,
+            accessible: kSecAttrAccessibleAfterFirstUnlock
+        )
+
+        try storage.set("after", forKey: PayabliKeychainKey.installId)
+
+        XCTAssertEqual(
+            try accessibility(ofKey: PayabliKeychainKey.installId),
+            kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly as String
+        )
+        XCTAssertEqual(try storage.string(forKey: PayabliKeychainKey.installId), "after")
+    }
+
+    /// Opening the store reads every key it knows about. Reading must not create one: an item written
+    /// empty here would be a stored credential that nothing ever set, and every later read would find it.
+    /// Asserted over every key rather than one, since a key absent from that list would not be swept and
+    /// so would not show the regression.
+    func testOpeningTheStoreWritesNothingForAKeyThatHasNoItem() throws {
+        _ = KeychainStorage(service: service)
+
+        for key in PayabliKeychainKey.all {
+            XCTAssertNil(try storage.string(forKey: key), key)
+        }
+    }
+
     /// Correcting the attribute must not read the value and write it back: an item
     /// deleted in between would be put back from the copy in hand.
     func testCorrectingTheAttributeKeepsTheStoredValue() throws {

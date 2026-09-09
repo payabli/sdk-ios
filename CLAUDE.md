@@ -236,9 +236,16 @@ Two forms, and the first is the one to reach for:
 
   Five methods in `SecureStorageTests` are the list today. They need a Keychain that answers, the SPM test
   host has no entitlement, and they returned `errSecMissingEntitlement` and skipped on every simulator run
-  before the list existed. `KeychainOnDeviceTests` covers their assertions on a device and skips nothing.
-  The other ten tests in that class run normally, which is why the exclusion names methods rather than the
-  class.
+  before the list existed. The other ten tests in that class run normally, which is why the exclusion names
+  methods rather than the class.
+
+  **Excluding a test means moving its assertion, not dropping it.** Each of those five has a counterpart in
+  `KeychainOnDeviceTests`, which skips nothing. Two of them had to be written when the list was reviewed:
+  the device suite covered the add path of `set` and the sweep's correction, while the excluded tests
+  covered the update path of `set` on an existing item and the sweep creating no item for any key it knows.
+  Those are different branches, so the exclusion would have dropped the only test of each. Read the
+  counterpart before excluding anything: "covered on a device" is a claim about a file, and it was made
+  twice here without one.
 
 **The bar is that the test would fail or answer wrongly unattended, not that nobody has taught the
 automation to run it.** The second is a provisioning gap, fixed by changing the workflow rather than by
@@ -257,9 +264,13 @@ The test scheme, not an app scheme. `PayabliDemo qa` and its siblings carry no t
 test action" rather than running anything. The environment the app would have taken from that scheme is
 passed in instead.
 
-`PAYABLI_QA_LIVE` and `PAYABLI_ENV` reach the runner only through the `TEST_RUNNER_` prefix, which
-`xcodebuild` strips. Set plainly they reach `xcodebuild` and stop there, which looks exactly like a
+`PAYABLI_QA_LIVE` and `PAYABLI_QA_ENVIRONMENT` reach the runner only through the `TEST_RUNNER_` prefix,
+which `xcodebuild` strips. Set plainly they reach `xcodebuild` and stop there, which looks exactly like a
 variable that had no effect.
+
+Those two are the UI walkthrough's. The device bundle reads `PAYABLI_QA_LIVE` and `PAYABLI_ENV`, and
+takes them from the scheme rather than the `TEST_RUNNER_` prefix, so the two tiers do not share the
+environment variable that names where they run.
 
 ### CI
 
