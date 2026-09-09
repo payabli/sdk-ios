@@ -990,6 +990,25 @@ def _bad_args(poster) -> int:
 # The workflows themselves.
 # --------------------------------------------------------------------------------------------------
 
+# A workflow tests the package scheme if it invokes `xcodebuild test` against it. Both halves are matched
+# on a normalised copy of the file rather than as literal substrings, because a run step is shell and the
+# same command has several correct spellings: `xcodebuild test` split across a line continuation,
+# `-scheme PayabliSDK-Package`, `-scheme 'PayabliSDK-Package'` or `-scheme=PayabliSDK-Package`. Matching
+# only the spelling the current files happen to use is what makes "every automated tier" quietly untrue,
+# since a new workflow written any other legal way is simply not seen.
+TESTS_PACKAGE_SCHEME = re.compile(
+    r"xcodebuild\s+(?:[-\w=:.,/\"']+\s+)*?test\b", re.S
+)
+NAMES_PACKAGE_SCHEME = re.compile(
+    r"-scheme[\s=]+['\"]?PayabliSDK-Package['\"]?"
+)
+
+
+def normalise_shell(text: str) -> str:
+    """Join shell line continuations so a command split over several lines reads as one."""
+    return re.sub(r"\\\s*\n\s*", " ", text)
+
+
 def discover_tiers(workflow_dir: Path) -> list[tuple[str, str]]:
     """Every workflow in a directory that tests the package scheme, found by content rather than by name.
 
@@ -997,13 +1016,17 @@ def discover_tiers(workflow_dir: Path) -> list[tuple[str, str]]:
     name you like, but you must use `.yml` or `.yaml` as the file name extension." Scanning one of them
     would let a tier added under the other bypass every check that reads this list, and silently: the new
     workflow would run its tests with no exclusions while the checks reported the invariant holding.
+
+    The returned text is the file as written, not the normalised copy, because the checks that read it
+    assert on what a person would see in the file.
     """
     tiers = []
     for path in sorted(workflow_dir.iterdir()):
         if not path.is_file() or path.suffix not in WORKFLOW_SUFFIXES:
             continue
         text = path.read_text()
-        if "-scheme PayabliSDK-Package" in text and "xcodebuild test" in text:
+        joined = normalise_shell(text)
+        if TESTS_PACKAGE_SCHEME.search(joined) and NAMES_PACKAGE_SCHEME.search(joined):
             tiers.append((path.name, text))
     return tiers
 
@@ -1023,18 +1046,38 @@ def test_workflows() -> None:
           {name for name, _ in tiers} >= {"nightly.yml", "ci.yml", "release.yml"},
           sorted(name for name, _ in tiers))
 
-    # Driven against a synthetic directory, because this repository has no `.yaml` workflow and the check
-    # would otherwise pass whatever the discovery matched.
+    # Driven against a synthetic directory, because this repository has no `.yaml` workflow and writes the
+    # command one way, so the check would otherwise pass whatever the discovery matched.
     with tempfile.TemporaryDirectory() as probe_dir:
         probe = Path(probe_dir)
         tests_package = "        run: xcodebuild test -scheme PayabliSDK-Package\n"
         (probe / "named-yml.yml").write_text(tests_package, encoding="utf-8")
         (probe / "named-yaml.yaml").write_text(tests_package, encoding="utf-8")
+        # The spellings a person could reasonably write, each of which runs the same tests.
+        (probe / "quoted.yml").write_text(
+            "        run: xcodebuild test -scheme 'PayabliSDK-Package'\n", encoding="utf-8")
+        (probe / "equals.yml").write_text(
+            "        run: xcodebuild test -scheme=PayabliSDK-Package\n", encoding="utf-8")
+        (probe / "multiline.yml").write_text(
+            "        run: |\n"
+            "          xcodebuild \\\n"
+            "            test \\\n"
+            '            -scheme "PayabliSDK-Package" \\\n'
+            "            -quiet\n",
+            encoding="utf-8")
         (probe / "not-a-tier.yml").write_text("        run: echo nothing\n", encoding="utf-8")
+        # Builds it, does not test it. `release.yml` builds frameworks from the same scheme elsewhere.
+        (probe / "builds-only.yml").write_text(
+            "        run: xcodebuild build -scheme PayabliSDK-Package\n", encoding="utf-8")
         (probe / "notes.md").write_text(tests_package, encoding="utf-8")
         found = {name for name, _ in discover_tiers(probe)}
         check("W12g a tier is discovered under either extension GitHub accepts",
-              found == {"named-yml.yml", "named-yaml.yaml"}, sorted(found))
+              {"named-yml.yml", "named-yaml.yaml"} <= found, sorted(found))
+        check("W12h and however the command is legally spelled",
+              {"quoted.yml", "equals.yml", "multiline.yml"} <= found, sorted(found))
+        check("W12i while a workflow that only builds the scheme is not a test tier",
+              "builds-only.yml" not in found and "not-a-tier.yml" not in found
+              and "notes.md" not in found, sorted(found))
 
     # PyYAML resolves the bare key `on` to the boolean True, which is the one YAML 1.1 quirk this file hits.
     triggers = nightly.get("on", nightly.get(True)) or {}

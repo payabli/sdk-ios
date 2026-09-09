@@ -412,6 +412,27 @@ MUTATIONS = [
         "W12f", "workflows",
     ),
     Mutation(
+        "discovery matches only the spelling the current workflows happen to use",
+        ".github/scripts/tests/verify.py",
+        'NAMES_PACKAGE_SCHEME = re.compile(\n    r"-scheme[\\s=]+[\'\\"]?PayabliSDK-Package[\'\\"]?"\n)',
+        'NAMES_PACKAGE_SCHEME = re.compile(\n    r"-scheme PayabliSDK-Package"\n)',
+        "W12h", "workflows",
+    ),
+    Mutation(
+        "a command split over several lines is not recognised as a test tier",
+        ".github/scripts/tests/verify.py",
+        '    return re.sub(r"\\\\\\s*\\n\\s*", " ", text)',
+        "    return text",
+        "W12h", "workflows",
+    ),
+    Mutation(
+        "a workflow that only builds the scheme is counted as a test tier",
+        ".github/scripts/tests/verify.py",
+        'TESTS_PACKAGE_SCHEME = re.compile(\n    r"xcodebuild\\s+(?:[-\\w=:.,/\\"\']+\\s+)*?test\\b", re.S\n)',
+        'TESTS_PACKAGE_SCHEME = re.compile(\n    r"xcodebuild", re.S\n)',
+        "W12i", "workflows",
+    ),
+    Mutation(
         "workflow discovery stops seeing one of the two extensions GitHub accepts",
         ".github/scripts/tests/verify.py",
         'WORKFLOW_SUFFIXES = (".yml", ".yaml")',
