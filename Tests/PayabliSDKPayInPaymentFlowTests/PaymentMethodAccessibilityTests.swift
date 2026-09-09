@@ -103,8 +103,8 @@ final class PaymentMethodAccessibilityTests: XCTestCase {
 
     @MainActor
     func testHostedPlaceholderOnlyFieldsExposeLabelsWithoutPlaceholderValues() {
-        let component = PayabliPayInPaymentFlow(
-            accessToken: "test-token",
+        let component = flowOnSession(
+            token: "test-token",
             entryPoint: "entry",
             environment: .sandbox
         )

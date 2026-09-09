@@ -53,7 +53,7 @@ final class TTPConfigClient: Sendable {
         // Attestation headers are component-specific; bearer is added by the transport.
         let request = PayabliRequest(
             method: .get,
-            path: "/api/v2/device/taptopay/config/\(entry)",
+            path: "/api/v2/device/taptopay/config/\(PercentEncoding.segment(entry))",
             headers: headers.asDictionary
         )
 

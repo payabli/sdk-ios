@@ -57,7 +57,6 @@ final class PayInIdempotencyTests: XCTestCase {
         let transport = RecordingIdempotencyTransport(body: PayInFixture.approved)
         var minted = 0
         let flow = PayabliPayInPaymentFlow(
-            accessToken: "token",
             entryPoint: "entry",
             environment: .sandbox,
             transport: transport

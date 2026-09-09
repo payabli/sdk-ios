@@ -567,7 +567,6 @@ final class TokenStorageClientTests: XCTestCase {
         }
         """)
         let component = PayabliPayInPaymentFlow(
-            accessToken: "access-token-hidden",
             entryPoint: "entry-hidden",
             environment: .sandbox,
             transport: transport
@@ -630,7 +629,6 @@ final class TokenStorageClientTests: XCTestCase {
         }
         """)
         let component = PayabliPayInPaymentFlow(
-            accessToken: "access-token-required",
             entryPoint: "entry-required",
             environment: .sandbox,
             transport: transport
@@ -684,7 +682,6 @@ final class TokenStorageClientTests: XCTestCase {
         }
         """)
         let component = PayabliPayInPaymentFlow(
-            accessToken: "access-token-ach-hidden",
             entryPoint: "entry-ach-hidden",
             environment: .sandbox,
             transport: transport
@@ -734,7 +731,6 @@ final class TokenStorageClientTests: XCTestCase {
         """)
         let viewModel = PayabliPayInPaymentFlowViewModel(
             component: PayabliPayInPaymentFlow(
-                accessToken: "access-token",
                 entryPoint: "entry",
                 environment: .sandbox,
                 transport: transport
@@ -773,7 +769,6 @@ final class TokenStorageClientTests: XCTestCase {
         """)
         let viewModel = PayabliPayInPaymentFlowViewModel(
             component: PayabliPayInPaymentFlow(
-                accessToken: "access-token",
                 entryPoint: "entry",
                 environment: .sandbox,
                 transport: transport

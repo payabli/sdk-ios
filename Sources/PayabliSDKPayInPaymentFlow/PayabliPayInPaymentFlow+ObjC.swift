@@ -37,13 +37,15 @@ public final class PayabliPayInPaymentFlowStoredPaymentMethodObjC: NSObject {
 public final class PayabliPayInPaymentFlowObjC: NSObject {
     private let component: PayabliPayInPaymentFlow
 
+    /// Builds the session internally, because an Objective-C caller cannot hold a Swift-only
+    /// `PayabliSession`. Throws whatever `PayabliConfig.init` rejects, which is an empty entry point.
     @objc public init(
-        accessTokenHandler: @escaping (@escaping (String?, NSError?) -> Void) -> Void,
+        tokenHandler: @escaping (@escaping (String?, NSError?) -> Void) -> Void,
         entryPoint: String,
         environment: PayabliEnvironment
-    ) {
-        let sendable = UncheckedSendableBox(accessTokenHandler)
-        let accessTokenProvider: PayabliPayInPaymentFlowAccessTokenProvider = {
+    ) throws {
+        let sendable = UncheckedSendableBox(tokenHandler)
+        let tokenProvider: PayabliTokenRefresh = {
             try await withCheckedThrowingContinuation { continuation in
                 let resumed = Locked(false)
                 sendable.value { token, error in
@@ -62,17 +64,19 @@ public final class PayabliPayInPaymentFlowObjC: NSObject {
                             domain: "com.payabli.payInPaymentFlow",
                             code: -1,
                             userInfo: [NSLocalizedDescriptionKey:
-                                "accessTokenHandler returned nil token and nil error"]
+                                "tokenHandler returned nil token and nil error"]
                         ))
                     }
                 }
             }
         }
-        component = PayabliPayInPaymentFlow(
+        let config = try PayabliConfig(
             entryPoint: entryPoint,
             environment: environment,
-            accessTokenProvider: accessTokenProvider
+
+            tokenProvider: tokenProvider
         )
+        component = PayabliPayInPaymentFlow(session: PayabliSession(config: config))
         super.init()
     }
 

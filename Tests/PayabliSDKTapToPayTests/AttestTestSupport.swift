@@ -18,16 +18,17 @@ enum AttestFixture {
     ) throws -> (AppAttestService, MockAppAttestor, PayabliAuth) {
         let urlSession = StubURLProtocol.makeSession()
         let config = try PayabliConfig(
-            accessToken: "seed",
             entryPoint: "myEntry",
-            environment: .sandbox
+            environment: .sandbox,
+
+            tokenProvider: { "seed" }
         )
         // The holder comes first: the service's chain reads the token from it, so the same instance
         // has to serve the chain and the recovery layer above it.
         let auth = PayabliAuth(config: config)
         let service = PayabliService(
             environment: .sandbox,
-            readToken: { await auth.currentAccessToken() },
+            readToken: { try await auth.currentAccessToken() },
             session: urlSession
         )
         let transport = AuthenticatedTransport(

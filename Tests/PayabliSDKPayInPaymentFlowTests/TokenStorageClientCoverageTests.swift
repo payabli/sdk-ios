@@ -252,16 +252,12 @@ final class TokenStorageClientCoverageTests: XCTestCase {
 
     /// A blank token is refused, and this surface answers in its own error type.
     ///
-    /// The chain is shared, so the refusal is raised in the capture surface's type and translated
-    /// here. Driven through the facade's own transport, because injecting a double replaces the chain
-    /// and with it the guard.
+    /// The token is checked where it is installed, which is the session's holder, so the refusal
+    /// carries the holder's vocabulary rather than this surface's. Driven through the facade's own
+    /// transport, because injecting a double replaces the chain and never reads a credential.
     @MainActor
-    func testABlankTokenIsRefusedInThisSurfacesVocabulary() async throws {
-        let component = PayabliPayInPaymentFlow(
-            entryPoint: "entry",
-            environment: .sandbox,
-            accessTokenProvider: { "" }
-        )
+    func testABlankTokenIsRefusedByTheHolder() async throws {
+        let component = flowOnSession(token: "")
 
         do {
             _ = try await component.addCard(PayabliPayInPaymentFlowCardData(
@@ -272,8 +268,8 @@ final class TokenStorageClientCoverageTests: XCTestCase {
                 billingZip: "33139"
             ))
             XCTFail("Expected missing token error")
-        } catch PayabliPayInPaymentFlowTokenStorageError.missingAccessToken {
-            // Translated, so the shared chain's own error type does not surface here.
+        } catch let error as PayabliGenericError {
+            XCTAssertEqual(error.code, .tokenExpired)
         } catch {
             XCTFail("Wrong error: \(error)")
         }
@@ -295,7 +291,6 @@ final class TokenStorageClientCoverageTests: XCTestCase {
         """)
         let viewModel = PayabliPayInPaymentFlowViewModel(
             component: PayabliPayInPaymentFlow(
-                accessToken: "access-token-ach-hidden",
                 entryPoint: "entry-ach-hidden",
                 environment: .sandbox,
                 transport: transport

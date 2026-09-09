@@ -385,7 +385,7 @@ final class PayabliTTPReaderSessionRecoveryTests: XCTestCase {
 
     private func makeTTP(provider: some TapToPayProvider) throws -> PayabliTTP {
         PayabliTTP(
-            config: try PayabliConfig(accessToken: "seed_token", entryPoint: "e", environment: .sandbox),
+            config: try PayabliConfig(entryPoint: "e", environment: .sandbox, tokenProvider: { "seed_token" }),
             appId: "appid",
             provider: provider,
             attestation: MockDeviceAttestationService(),
@@ -400,9 +400,10 @@ final class PayabliTTPReaderSessionRecoveryTests: XCTestCase {
         let provider = MockTapToPayProvider()
         let attestation = MockDeviceAttestationService()
         let config = try PayabliConfig(
-            accessToken: "seed_token",
             entryPoint: "e",
-            environment: .sandbox
+            environment: .sandbox,
+
+            tokenProvider: { "seed_token" }
         )
         let ttp = PayabliTTP(
             config: config,

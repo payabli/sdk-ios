@@ -21,9 +21,10 @@ final class PayabliSessionTests: XCTestCase {
 
         let urlSession = StubURLProtocol.makeSession()
         let config = try PayabliConfig(
-            accessToken: "tok",
             entryPoint: "demo",
-            environment: .sandbox
+            environment: .sandbox,
+
+            tokenProvider: { "tok" }
         )
         let session = PayabliSession(config: config, urlSession: urlSession)
 

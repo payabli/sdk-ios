@@ -234,16 +234,14 @@ namespace Payabli.TapToPay
     {
         // Convenience init that takes the completion-style token refresh —
         // the @objc-friendly counterpart of the Swift PayabliTokenRefresh
-        // closure. Pass null to disable silent refresh (the SDK will
-        // surface tokenExpired errors instead).
-        // Carries `error:` because the Swift initialiser throws: it rejects an access
-        // token that cannot be sent as an HTTP header value, and an empty entry point.
+        // closure. It is required: the SDK asks it for the first token as well as for a
+        // replacement, so there is no token at all without it.
+        // Carries `error:` because the Swift initialiser throws: it rejects an empty entry point.
         // The selector must match the generated header exactly or the binding calls
         // one that does not exist.
-        [Export("initWithAccessToken:tokenRefreshHandler:entryPoint:appId:environment:error:")]
+        [Export("initWithTokenHandler:entryPoint:appId:environment:error:")]
         IntPtr Constructor(
-            string accessToken,
-            [NullAllowed] TokenRefreshRequest tokenRefreshHandler,
+            TokenRefreshRequest tokenHandler,
             string entryPoint,
             string appId,
             PayabliEnvironment environment,
@@ -306,11 +304,14 @@ namespace Payabli.TapToPay
     [DisableDefaultCtor]
     public interface PayabliPayInPaymentFlowObjC
     {
-        [Export("initWithAccessTokenHandler:entryPoint:environment:")]
+        // Carries `error:` because the Swift initialiser throws: it builds the configuration and
+        // the session itself, an Objective-C caller being unable to hold a Swift-only session.
+        [Export("initWithTokenHandler:entryPoint:environment:error:")]
         IntPtr Constructor(
-            AccessTokenRequest accessTokenHandler,
+            AccessTokenRequest tokenHandler,
             string entryPoint,
-            PayabliEnvironment environment
+            PayabliEnvironment environment,
+            out NSError error
         );
 
         [Export("addCardWithCardNumber:expiration:cardholderName:cvv:billingZip:createAnonymous:forceCustomerCreation:temporary:source:completion:")]

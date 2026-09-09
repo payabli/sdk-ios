@@ -5,20 +5,17 @@ import PayabliSDKTapToPay
 enum TapToPaySessions {
     /// The terminal the app runs on a device.
     ///
-    /// `placeholderAccessToken` only has to survive the initialiser — the SDK
-    /// replaces it through the token provider on the first 401, so no synchronous
-    /// network call is needed at launch.
+    /// No token is handed over at launch: the SDK asks the provider for one when it makes its
+    /// first request, so nothing here waits on the network.
     ///
-    /// The initialiser rejects a token it could not send and an empty entry point.
-    /// Both are constants here, so this app treats a rejection as a build it should
-    /// not ship. A host reading either from its own backend catches instead, and
-    /// shows the payer something.
+    /// The initialiser rejects an empty entry point, which is a constant here, so this app
+    /// treats a rejection as a build it should not ship. A host reading one from its own
+    /// backend catches instead, and shows the payer something.
     @MainActor
     static func terminal() -> TapToPayTerminal {
         do {
             return TapToPayTerminal(
                 try PayabliTTP(
-                    accessToken: Secrets.placeholderAccessToken,
                     tokenProvider: { try await Secrets.fetchAccessToken() },
                     entryPoint: DemoConfiguration.entryPoint,
                     appId: Secrets.appId,
@@ -37,7 +34,6 @@ enum TapToPaySessions {
         do {
             return TapToPayTerminal(
                 try PayabliTTP(
-                    accessToken: "preview-token",
                     tokenProvider: { "preview-token" },
                     entryPoint: "preview-entry",
                     appId: "PREVIEW0000.\(Bundle.main.bundleIdentifier ?? "preview")",

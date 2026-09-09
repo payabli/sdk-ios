@@ -1,0 +1,224 @@
+@testable import PayabliSDKCore
+import XCTest
+
+/// The sibling SDK has this parser and no test for it, so these are written rather than ported.
+final class RetryAfterHeaderTests: XCTestCase {
+    private func response(_ value: String?, status: Int = 429) -> PayabliResponse {
+        PayabliResponse(
+            statusCode: status,
+            headers: value.map { [RetryAfterHeader.name: $0] } ?? [:],
+            body: Data()
+        )
+    }
+
+    // MARK: - Delay in seconds
+
+    func testDeltaSecondsIsRead() {
+        XCTAssertEqual(RetryAfterHeader.value(from: response("120")), 120)
+    }
+
+    func testZeroSecondsIsAWaitOfNoneRatherThanNoInstruction() {
+        XCTAssertEqual(RetryAfterHeader.value(from: response("0")), 0)
+    }
+
+    func testSurroundingWhitespaceIsIgnored() {
+        XCTAssertEqual(RetryAfterHeader.value(from: response("  30  ")), 30)
+    }
+
+    /// `delay-seconds` is digits and nothing else, and `Int64` is looser than that. A signed value read as
+    /// a valid hint is worse than one read as absent: above the ceiling it ends the retry, so it stops a
+    /// request the computed backoff would have repeated.
+    func testASignedDelayReadsAsNoInstruction() {
+        XCTAssertNil(RetryAfterHeader.value(from: response("+3600")), "a leading plus is not delay-seconds")
+        XCTAssertNil(RetryAfterHeader.value(from: response("-0")))
+        XCTAssertNil(RetryAfterHeader.value(from: response("3600.5")))
+        XCTAssertNil(RetryAfterHeader.value(from: response("3 600")))
+    }
+
+    func testANegativeDelayReadsAsNoInstruction() {
+        // Not zero: a value the field cannot carry says nothing, and falling back to the computed
+        // backoff is the honest answer.
+        XCTAssertNil(RetryAfterHeader.value(from: response("-5")))
+    }
+
+    func testADigitRunTooLargeToHoldSaturatesRatherThanReadingAsAbsent() throws {
+        // It is still an instruction to wait, and an extreme one, so it has to stay above any ceiling it
+        // is compared against. Reading it as absent would retry in about a second.
+        let raw = String(repeating: "9", count: 40)
+        let value = try XCTUnwrap(RetryAfterHeader.value(from: response(raw)))
+        XCTAssertEqual(value, .greatestFiniteMagnitude)
+    }
+
+    // MARK: - HTTP-date
+
+    func testAnImfFixdateIsRead() throws {
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        let later = "Tue, 14 Nov 2023 22:14:20 GMT" // now + 60s
+        let parsed = try XCTUnwrap(RetryAfterHeader.value(from: response(later), now: now))
+        XCTAssertEqual(parsed, 60, accuracy: 1)
+    }
+
+    func testTheTwoObsoleteDateFormatsAreAcceptedToo() throws {
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        for raw in ["Tuesday, 14-Nov-23 22:14:20 GMT", "Tue Nov 14 22:14:20 2023"] {
+            let parsed = try XCTUnwrap(RetryAfterHeader.value(from: response(raw), now: now))
+            XCTAssertEqual(parsed, 60, accuracy: 1, "\(raw) must parse")
+        }
+    }
+
+    func testADateAlreadyPastReadsAsNoWaitRatherThanANegativeOne() {
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        let earlier = "Tue, 14 Nov 2023 22:00:00 GMT"
+        XCTAssertEqual(RetryAfterHeader.value(from: response(earlier), now: now), 0)
+    }
+
+    /// A zone other than GMT is not an HTTP-date, whatever else it looks like.
+    ///
+    /// `GMT = %s"GMT"` and both zoned forms end in that literal (RFC 9110 Section 5.6.7), so a pattern
+    /// that reads the zone instead takes the sender at its word and moves the instant by that zone's
+    /// distance. It fails in the direction that costs the most: `PST` reads as a wait of just over
+    /// eight hours, which is above the ceiling, and a wait above the ceiling ends the retry rather than
+    /// being shortened. A numeric offset reads as a date already past and asks for no wait at all.
+    func testAZoneThatIsNotGMTReadsAsNoInstruction() {
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        for raw in [
+            "Tue, 14 Nov 2023 22:14:20 PST",
+            "Tue, 14 Nov 2023 22:14:20 +0530",
+            "Tue, 14 Nov 2023 22:14:20 UTC",
+            "Tuesday, 14-Nov-23 22:14:20 EST"
+        ] {
+            XCTAssertNil(
+                RetryAfterHeader.value(from: response(raw), now: now),
+                "\(raw) is not an HTTP-date"
+            )
+        }
+    }
+
+    /// A two-digit year is read by the rule, not by the formatter's window.
+    ///
+    /// RFC 9110 Section 5.6.7 asks a recipient to read a timestamp "that appears to be more than 50 years
+    /// in the future as representing the most recent year in the past that had the same last two digits".
+    /// `DateFormatter` answers from a window fixed at 1950 instead, so without the rule `09-Sep-50` read
+    /// in 2026 is 1950: a date already past, which is no wait, so a long wait the server asked for becomes
+    /// an immediate repeat.
+    ///
+    /// The boundary is what the case is for. Fifty years ahead stays, because the rule turns on *more*
+    /// than fifty, and one year past that rolls back a century.
+    func testATwoDigitYearIsReadByTheFiftyYearRule() throws {
+        let now = Date(timeIntervalSince1970: 1_789_000_000) // 2026-09-10 00:26:40 GMT
+
+        // Ahead of now once the rule has placed them, so the wait names the year it picked.
+        for (twoDigit, year) in [("50", 2050), ("76", 2076)] {
+            let raw = "Thursday, 09-Sep-\(twoDigit) 12:00:00 GMT"
+            let wait = try XCTUnwrap(RetryAfterHeader.value(from: response(raw), now: now), raw)
+            XCTAssertEqual(yearOf(now.addingTimeInterval(wait)), year, raw)
+        }
+
+        // Past once the rule has placed them, and a date already past is a wait of none.
+        for twoDigit in ["77", "99"] {
+            let raw = "Thursday, 09-Sep-\(twoDigit) 12:00:00 GMT"
+            XCTAssertEqual(RetryAfterHeader.value(from: response(raw), now: now), 0, raw)
+        }
+    }
+
+    /// A four-digit year names its own century, so the rule that repairs a two-digit one must not reach it.
+    ///
+    /// Both remaining forms carry the year in full. Rolling one forward would turn a date decades past
+    /// into a wait decades long, which is above any ceiling and therefore ends the retry.
+    func testAFourDigitYearIsLeftInTheCenturyItNames() {
+        let now = Date(timeIntervalSince1970: 1_789_000_000) // 2026-09-10 00:26:40 GMT
+
+        for raw in ["Tue, 14 Nov 1975 22:14:20 GMT", "Tue Nov 14 22:14:20 1975"] {
+            XCTAssertEqual(
+                RetryAfterHeader.value(from: response(raw), now: now), 0,
+                "\(raw) is a date decades past, which is a wait of none"
+            )
+        }
+    }
+
+    private func yearOf(_ date: Date) -> Int {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "GMT") ?? calendar.timeZone
+        return calendar.component(.year, from: date)
+    }
+
+    // MARK: - Absent and unreadable
+
+    func testAnAbsentHeaderReadsAsNoInstruction() {
+        XCTAssertNil(RetryAfterHeader.value(from: response(nil)))
+    }
+
+    func testAnEmptyHeaderReadsAsNoInstruction() {
+        XCTAssertNil(RetryAfterHeader.value(from: response("   ")))
+    }
+
+    func testAnUnreadableValueReadsAsNoInstructionRatherThanFailing() {
+        for raw in ["soon", "12 seconds", "Tue, 32 Nov 2023 22:00:00 GMT"] {
+            XCTAssertNil(RetryAfterHeader.value(from: response(raw)), "\(raw) must not be read as a wait")
+        }
+    }
+
+    // MARK: - Through the mapper
+
+    // The parser and the retry engine are covered apart, and both stay green if the mapper drops the
+    // parsed value on the floor: the engine's own cases construct their hints directly. These two run a
+    // real response through `mapPayabliHTTPError` and read the hint off what it threw.
+
+    func testA429CarriesItsParsedHintIntoTheThrownError() throws {
+        let response = PayabliResponse(
+            statusCode: 429,
+            headers: [RetryAfterHeader.name: "90"],
+            body: Data()
+        )
+
+        do {
+            try mapPayabliHTTPError(response: response)
+            XCTFail("a 429 has to map to an error")
+        } catch let error as PayabliRateLimitError {
+            XCTAssertEqual(error.retryAfter, 90)
+        }
+    }
+
+    func testA5xxCarriesItsParsedHintAndItsStatusIntoTheThrownError() throws {
+        let response = PayabliResponse(
+            statusCode: 503,
+            headers: [RetryAfterHeader.name: "30"],
+            body: Data(#"{"title":"Service Unavailable"}"#.utf8)
+        )
+
+        do {
+            try mapPayabliHTTPError(response: response)
+            XCTFail("a 503 has to map to an error")
+        } catch let PayabliPaymentError.server(server) {
+            XCTAssertEqual(server.retryAfter, 30, "the hint has to survive decoding and the copy")
+            XCTAssertEqual(server.httpStatus, 503)
+        }
+    }
+
+    func testAStatusThatCarriesNoHintReportsNone() throws {
+        // Only 429 and 5xx are given one, so a 403 with the field set still reports nothing: reading it
+        // there would invent a wait the retry layer would then honour.
+        let response = PayabliResponse(
+            statusCode: 403,
+            headers: [RetryAfterHeader.name: "90"],
+            body: Data()
+        )
+
+        do {
+            try mapPayabliHTTPError(response: response)
+            XCTFail("a 403 has to map to an error")
+        } catch let error as PayabliGenericError {
+            XCTAssertEqual(error.code, .permissionDenied)
+            XCTAssertNil(error as? any PayabliRetryAfter, "a 403 carries no hint")
+        }
+    }
+
+    // MARK: - Case
+
+    func testALowercasedFieldNameIsFoundToo() {
+        // HTTP/2 lower-cases every field name on the wire, so this is the ordinary case rather than an
+        // edge one. Subscripting the dictionary would miss it.
+        let lowercased = PayabliResponse(statusCode: 429, headers: ["retry-after": "45"], body: Data())
+        XCTAssertEqual(RetryAfterHeader.value(from: lowercased), 45)
+    }
+}

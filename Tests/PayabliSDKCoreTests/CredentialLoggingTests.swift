@@ -36,7 +36,7 @@ final class CredentialLoggingTests: XCTestCase {
         XCTAssertEqual(response.statusCode, Self.ok)
         XCTAssertEqual(stub.sentTokens, [testToken, Self.refreshed])
 
-        assertLogged("Access token refreshed", in: sinks.auth, category: .auth)
+        assertLogged("Access token installed", in: sinks.auth, category: .auth)
         assertLogged("credential rejected", in: sinks.network, category: .network)
 
         assertNeverLogged([testToken, Self.refreshed], in: sinks.all)
@@ -57,8 +57,8 @@ final class CredentialLoggingTests: XCTestCase {
 
         _ = try await stack.transport.perform(ping())
 
-        assertLogged("Access token refreshed", in: sinks.auth, category: .auth)
-        assertNotLogged("Access token refreshed", in: sinks.network, category: .network)
+        assertLogged("Access token installed", in: sinks.auth, category: .auth)
+        assertNotLogged("Access token installed", in: sinks.network, category: .network)
     }
 
     func testTheReplayIsRecordedSoARecoveryIsNotSilent() async throws {

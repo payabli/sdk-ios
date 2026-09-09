@@ -1,4 +1,4 @@
-import PayabliSDKCore
+@testable import PayabliSDKCore
 import PayabliSDKTestUtils
 import XCTest
 
@@ -332,6 +332,73 @@ final class PayabliServiceTests: XCTestCase {
     }
 
     // MARK: - Request building
+
+    /// A status the HTTP grammar has no room for is read as a server fault, which is what RFC 9110
+    /// Section 15 asks of a client: it "SHOULD process the response as if it had a 5xx (Server Error)
+    /// status code".
+    ///
+    /// The classification decides retrying now that the policy reads the code, so narrowing the branch
+    /// to the valid range would make one of these terminal here and repeatable on the sibling. The
+    /// status is carried through, so what arrived is still readable.
+    func testAStatusAboveTheValidRangeIsStillAServerFault() throws {
+        for status in [599, 600, 999] {
+            do {
+                try mapPayabliHTTPError(
+                    response: PayabliResponse(statusCode: status, headers: [:], body: Data())
+                )
+                XCTFail("\(status) has to map to an error")
+            } catch let PayabliPaymentError.server(server) {
+                XCTAssertEqual(server.httpStatus, status)
+            } catch {
+                XCTFail("\(status) mapped to \(error)")
+            }
+        }
+    }
+
+    /// An escape a caller put in the path reaches the wire as that escape.
+    ///
+    /// The path arrives percent-encoded, so encoding it again is a different resource: `%2F` becomes
+    /// `%252F`, which the service reads as the literal three characters rather than as a separator
+    /// inside one segment. Asserted on `URLRequest.url`, since a claim about the string handed in
+    /// says nothing about what was sent.
+    func testAnEncodedPathSegmentReachesTheWireUnchanged() async throws {
+        let sent = Slot<String>()
+        StubURLProtocol.handler = { request in
+            sent.set(request.url?.absoluteString ?? "")
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            return (response, Data("{}".utf8))
+        }
+
+        let encoded = PercentEncoding.segment("a/b c")
+        _ = try await service().perform(
+            PayabliRequest(method: .get, path: "/api/v2/MoneyIn/capture/\(encoded)")
+        )
+
+        let url = try XCTUnwrap(sent.value)
+        XCTAssertTrue(url.hasSuffix("/api/v2/MoneyIn/capture/a%2Fb%20c"), url)
+        XCTAssertFalse(url.contains("%25"), "an escape encoded twice names a different resource: \(url)")
+    }
+
+    /// A path carrying no escapes is joined exactly as before, so the fix above changed no route.
+    func testAPlainPathIsUnaffectedByTheEncodedJoin() async throws {
+        let sent = Slot<String>()
+        StubURLProtocol.handler = { request in
+            sent.set(request.url?.absoluteString ?? "")
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            return (response, Data("{}".utf8))
+        }
+
+        _ = try await service().perform(
+            PayabliRequest(method: .get, path: "/api/v2/MoneyIn/details/1234")
+        )
+
+        let url = try XCTUnwrap(sent.value)
+        var base = PayabliEnvironment.sandbox.baseURL.absoluteString
+        while base.hasSuffix("/") {
+            base.removeLast()
+        }
+        XCTAssertEqual(url, base + "/api/v2/MoneyIn/details/1234")
+    }
 
     func testAppendsQueryItems() async throws {
         StubURLProtocol.handler = { request in

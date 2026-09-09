@@ -92,7 +92,6 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _configurePayabli() async {
     try {
       await PayabliTTP.configure(
-        accessToken: await Secrets.fetchAccessToken(),
         tokenProvider: Secrets.fetchAccessToken,
         entryPoint: Secrets.entryPoint,
         appId: Secrets.appId,

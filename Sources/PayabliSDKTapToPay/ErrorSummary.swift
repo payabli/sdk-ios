@@ -24,18 +24,19 @@ enum ErrorSummary {
         }
     }
 
-    /// A decline answers `.paymentDeclined` and a server failure `.serverError`, so
-    /// the code says which of the two a charge met. What it does not say is which
-    /// decline, or which server failure.
+    /// A decline and a server failure both name their kind, and each carries a structured value that
+    /// says which one it was: the decline's wire code and the server's status. Neither is free text.
     ///
-    /// Both carry a structured value that does: the decline's wire code and the
-    /// server's status. Neither is free text.
+    /// The server's status is read from the response before the body. A body that will not decode
+    /// leaves the body's own `status` empty, and a body that disagrees with the response is not the
+    /// authority on what was answered.
     static func of(_ error: PayabliPaymentError) -> String {
         switch error {
         case let .decline(decline):
             return "decline(\(decline.rawCode ?? "no code"))"
         case let .server(server):
-            return "server(\(server.status.map(String.init) ?? "no status"))"
+            let status = server.httpStatus ?? server.status
+            return "server(\(status.map(String.init) ?? "no status"))"
         case let .validation(validation):
             return validation.code.rawValue
         case let .generic(generic):

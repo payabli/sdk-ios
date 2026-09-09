@@ -7,9 +7,10 @@ import XCTest
 final class PayabliTTPSessionInitTests: XCTestCase {
     func testTwoFacadesShareTheSameSession() throws {
         let config = try PayabliConfig(
-            accessToken: "shared-token",
             entryPoint: "demo",
-            environment: .sandbox
+            environment: .sandbox,
+
+            tokenProvider: { "shared-token" }
         )
         let session = PayabliSession(config: config)
 

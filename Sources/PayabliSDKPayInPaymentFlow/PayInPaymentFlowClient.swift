@@ -63,7 +63,7 @@ final class PayInPaymentFlowClient: Sendable {
 
         let body = AuthorizedCaptureBody(paymentDetails: request.paymentDetails)
         let payabliRequest = try buildRequest(
-            path: "/api/v2/MoneyIn/capture/\(Self.pathComponent(transId))",
+            path: "/api/v2/MoneyIn/capture/\(PercentEncoding.segment(transId))",
             query: [],
             idempotencyKey: idempotencyKey,
             body: body
@@ -188,11 +188,10 @@ final class PayInPaymentFlowClient: Sendable {
     ) async throws -> PayabliPayInPaymentFlowResult {
         do {
             return try await send(request)
-        } catch let failure as PayInProviderFailure {
-            // The credential was never minted, so nothing was sent: the outcome is known and there is
-            // no key to report. The host gets the error it threw, unwrapped and unwrapped only here.
-            throw failure.underlying
         } catch {
+            // A credential that was never obtained arrives as `.tokenExpired`, which
+            // `leavesOutcomeUnknown` already answers false for: nothing was sent, so the outcome is
+            // known and there is no key to report.
             guard carriesKey, Self.leavesOutcomeUnknown(error) else { throw error }
             throw PayabliPayInPaymentFlowError.submissionInterrupted(
                 code: (error as? any PayabliError)?.code ?? .unknown,
@@ -208,10 +207,6 @@ final class PayInPaymentFlowClient: Sendable {
         let response: PayabliResponse
         do {
             response = try await transport.perform(request)
-        } catch let failure as PayInProviderFailure {
-            // Not recorded: the host's own error can name its backend, and the sink renders a non-SDK
-            // error whole. Rethrown intact so the caller below can tell it apart; it is unwrapped there.
-            throw failure
         } catch {
             diagnostics.logFailure(
                 error,
@@ -262,12 +257,6 @@ final class PayInPaymentFlowClient: Sendable {
         }
 
         return envelope.failure(httpStatusCode: response.statusCode)
-    }
-
-    private static func pathComponent(_ value: String) -> String {
-        var allowed = CharacterSet.urlPathAllowed
-        allowed.remove(charactersIn: "/")
-        return value.addingPercentEncoding(withAllowedCharacters: allowed) ?? value
     }
 }
 
