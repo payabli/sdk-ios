@@ -154,10 +154,16 @@ package final class PayabliService: PayabliTransport, Sendable {
     // MARK: - Internals
 
     private func buildURLRequest(_ request: PayabliRequest) throws -> URLRequest {
-        guard var components = URLComponents(
-            url: baseURL.appendingPathComponent(request.path),
-            resolvingAgainstBaseURL: false
-        ) else {
+        // The path arrives percent-encoded, so it is joined as text and parsed as encoded. Both
+        // `appendingPathComponent` and `URLComponents.path` encode its `%` a second time, which
+        // turns an encoded separator inside a value from `%2F` into `%252F` and names a different
+        // resource than the caller asked for.
+        var base = baseURL.absoluteString
+        while base.hasSuffix("/") {
+            base.removeLast()
+        }
+        let tail = request.path.hasPrefix("/") ? request.path : "/" + request.path
+        guard var components = URLComponents(string: base + tail) else {
             throw PayabliGenericError(code: .invalidConfiguration, reason: "Invalid URL")
         }
         if !request.query.isEmpty {
