@@ -6,9 +6,14 @@ import Foundation
 /// It is the SDK's only source of a credential, so it is called for the first request as well as
 /// after one is rejected (HTTP 401), and a host hands over no token of its own.
 ///
-/// This closure may issue its own requests through the SDK. While the refresh runs, a request made
-/// on the session this closure refreshes carries the token being replaced, not the one it is about
-/// to return.
+/// This closure may issue its own requests through the SDK, but not before it has returned its first
+/// token. Until it does the SDK holds no credential, so such a request needs the token this closure
+/// was asked to supply and is refused rather than joined, which makes a provider written that way fail
+/// on first use every time.
+///
+/// Once a token is held, a request made on the session this closure refreshes carries the token being
+/// replaced, not the one it is about to return, and that holds through a chain of sessions whose
+/// providers call one another.
 ///
 /// What this closure must not do is wait on work that itself needs this refresh to finish. Such work
 /// cannot complete until the refresh does, and the refresh cannot complete until this closure
