@@ -74,9 +74,9 @@ Every operation runs on a session, which holds the credential and asks for one w
 ```swift
 let paymentFlow = PayabliPayInPaymentFlow(
     session: PayabliSession(config: try PayabliConfig(
-        tokenProvider: { try await backend.fetchPayInAccessToken() },
         entryPoint: entryPoint,
-        environment: .sandbox
+        environment: .sandbox,
+        tokenProvider: { try await backend.fetchPayInAccessToken() }
     ))
 )
 ```

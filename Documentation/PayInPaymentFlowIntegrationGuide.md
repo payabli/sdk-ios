@@ -28,9 +28,9 @@ The session expects an async token provider:
 
 ```swift
 let config = try PayabliConfig(
-    tokenProvider: { try await backend.fetchPayInAccessToken() },
     entryPoint: entryPoint,
-    environment: .sandbox
+    environment: .sandbox,
+    tokenProvider: { try await backend.fetchPayInAccessToken() }
 )
 ```
 
@@ -92,13 +92,10 @@ final class StorePaymentMethodViewModel: ObservableObject {
 
     let paymentFlow: PayabliPayInPaymentFlow
 
-    init(backend: Backend) {
+    // The session is built by the caller, which is where a rejected configuration can be handled.
+    init(session: PayabliSession) {
         paymentFlow = PayabliPayInPaymentFlow(
-            session: PayabliSession(config: try PayabliConfig(
-                tokenProvider: { try await backend.fetchPayInAccessToken() },
-                entryPoint: backend.entryPoint,
-                environment: .sandbox
-            )),
+            session: session,
             operation: .storePaymentMethod
         )
     }
@@ -193,9 +190,9 @@ Create a component in capture mode with request configuration:
 ```swift
 let paymentFlow = PayabliPayInPaymentFlow(
     session: PayabliSession(config: try PayabliConfig(
-        tokenProvider: { try await backend.fetchPayInAccessToken() },
         entryPoint: entryPoint,
-        environment: .sandbox
+        environment: .sandbox,
+        tokenProvider: { try await backend.fetchPayInAccessToken() }
     )),
     operation: .capture,
     requestConfiguration: PayabliPayInPaymentFlowRequestConfiguration(
@@ -281,9 +278,9 @@ Create a component in authorize mode:
 ```swift
 let paymentFlow = PayabliPayInPaymentFlow(
     session: PayabliSession(config: try PayabliConfig(
-        tokenProvider: { try await backend.fetchPayInAccessToken() },
         entryPoint: entryPoint,
-        environment: .sandbox
+        environment: .sandbox,
+        tokenProvider: { try await backend.fetchPayInAccessToken() }
     )),
     operation: .authorize,
     requestConfiguration: PayabliPayInPaymentFlowRequestConfiguration(
@@ -859,9 +856,9 @@ Diagnostics are disabled by default:
 ```swift
 let paymentFlow = PayabliPayInPaymentFlow(
     session: PayabliSession(config: try PayabliConfig(
-        tokenProvider: { try await backend.fetchPayInAccessToken() },
         entryPoint: entryPoint,
-        environment: .sandbox
+        environment: .sandbox,
+        tokenProvider: { try await backend.fetchPayInAccessToken() }
     )),
     diagnostics: .disabled
 )

@@ -16,14 +16,25 @@ Use it to:
 import PayabliSDKCore
 import PayabliSDKPayInPaymentFlow
 
-@StateObject private var paymentFlow = PayabliPayInPaymentFlow(
-    session: PayabliSession(config: try PayabliConfig(
-        tokenProvider: { try await Backend.shared.fetchMobilePayInToken() },
-        entryPoint: "merchant-entry",
-        environment: .sandbox
-    )),
-    operation: .storePaymentMethod
+// Once, where a rejected configuration can be handled.
+let config = try PayabliConfig(
+    entryPoint: "merchant-entry",
+    environment: .sandbox,
+    tokenProvider: { try await Backend.shared.fetchMobilePayInToken() }
 )
+let session = PayabliSession(config: config)
+
+// Then the view takes the session.
+struct StoreMethodView: View {
+    @StateObject private var paymentFlow: PayabliPayInPaymentFlow
+
+    init(session: PayabliSession) {
+        _paymentFlow = StateObject(wrappedValue: PayabliPayInPaymentFlow(
+            session: session,
+            operation: .storePaymentMethod
+        ))
+    }
+}
 ```
 
 Set `operation` to `.storePaymentMethod`, `.capture`, or `.authorize`. Capture and authorize require `PayabliPayInPaymentFlowRequestConfiguration` during initialization or direct API calls.
