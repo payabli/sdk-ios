@@ -63,6 +63,8 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
             handleCharge(call.arguments, result: result)
         case "activateDevice":
             handleActivateDevice(call.arguments, result: result)
+        case "areTermsAccepted":
+            handleAreTermsAccepted(result: result)
         case "getSessionState":
             handleGetSessionState(result: result)
         case "configurePayInPaymentFlow":
@@ -255,6 +257,29 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
                 result(error.toFlutterError(defaultCode: "ACTIVATION_FAILED"))
             } else {
                 result(nil)
+            }
+        }
+    }
+
+    // MARK: - areTermsAccepted
+
+    /// Reports a `FlutterError` rather than `false` when the answer is
+    /// unavailable, so a Dart caller cannot read "the reader could not be asked"
+    /// as "the merchant declined".
+    private func handleAreTermsAccepted(result: @escaping FlutterResult) {
+        guard let ttp else {
+            result(FlutterError(
+                code: "NOT_CONFIGURED",
+                message: "Call configure() before areTermsAccepted()",
+                details: nil
+            ))
+            return
+        }
+        ttp.areTermsAccepted { accepted, error in
+            if let error {
+                result(error.toFlutterError(defaultCode: "TERMS_CHECK_FAILED"))
+            } else {
+                result(accepted)
             }
         }
     }

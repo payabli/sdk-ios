@@ -156,15 +156,40 @@ package final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
             do {
                 try await newReader.requestSessionToken()
 
-                let linked = try await newReader.isAccountLinked()
-                if !linked {
-                    try await newReader.linkAccount()
+                guard try await newReader.isAccountLinked() else {
+                    logger.info("[fiserv.prepare] ← terms not accepted")
+                    throw PayabliTTPError.termsNotAccepted
                 }
 
                 try await newReader.initializeSession()
-                logger.info("[fiserv.prepare] ← reader ready (linked=\(linked))")
+                logger.info("[fiserv.prepare] ← reader ready")
+            } catch PayabliTTPError.termsNotAccepted {
+                // The one failure that does not tear the reader down. Accepting is
+                // the merchant's own act on their own screen, and the reader is what
+                // answers `areTermsAccepted()` afterwards — clearing here would leave
+                // a host unable to confirm the reason it was just given.
+                throw PayabliTTPError.termsNotAccepted
             } catch {
                 clearAllState()
+                throw Self.mapError(error) { .readerSetupFailed(reason: $0) }
+            }
+        #else
+            throw PayabliTTPError.readerSetupFailed(reason: "Tap to Pay is iOS-only")
+        #endif
+    }
+
+    package func areTermsAccepted() async throws -> Bool {
+        #if canImport(PayabliCardReaderCore)
+            // Scoped rather than `lock()`/`unlock()`, which the neighbours use and
+            // which is an error under the Swift 6 language mode from an async context.
+            let activeReader = lock.withLock { reader }
+            guard let reader = activeReader else {
+                throw PayabliTTPError.readerSetupFailed(reason: "Reader not prepared")
+            }
+
+            do {
+                return try await reader.isAccountLinked()
+            } catch {
                 throw Self.mapError(error) { .readerSetupFailed(reason: $0) }
             }
         #else

@@ -12,15 +12,16 @@ live here; no sub-folders.
 
 ## 1. Contract — `TapToPayProvider`
 
-Defined in `../TapToPayProvider.swift`. The facade calls these six methods in
-the order shown below.
+Defined in `../TapToPayProvider.swift`. The facade calls these methods in the
+order shown below, except `areTermsAccepted()`, which a host asks for on demand.
 
 | Method | When the facade calls it | Adapter must do |
 |---|---|---|
 | `static var providerId: String` | `CardReadResult.provider` | Return a stable identifier (`"fiserv"`, `"visa"`, ...). Goes into the API payload `provider` field so the backend routes decryption correctly (FR-11J.3). |
 | `checkEligibility() async` | Before any UI, before `/config` is fetched | Validate platform, OS version, hardware (e.g. `PaymentCardReader.isSupported`). **Must not require credentials.** |
 | `configure(credentials: [String:String]) throws` | After `/config` returns `providerCredentials` | Validate required keys, map to a typed struct, stash it in `self`. Throw `PayabliTTPError.readerSetupFailed(reason:)` on missing / malformed input. |
-| `prepareReader() async throws` | Right after `configure(...)` | Build the processor SDK's reader, request session token, link account if needed, initialize session. **Drop `self.credentials` as soon as the SDK has its own copy.** |
+| `prepareReader() async throws` | Right after `configure(...)` | Build the processor SDK's reader, request session token, initialize session. **Drop `self.credentials` as soon as the SDK has its own copy.** **Never accept the merchant's terms on their behalf** — throw `PayabliTTPError.termsNotAccepted` and leave the reader able to answer `areTermsAccepted()`, so a host can confirm the reason without preparing again. |
+| `areTermsAccepted() async throws -> Bool` | Whenever a host asks | Ask the platform each time rather than caching, since acceptance is granted and withdrawn outside this process. Return `true` where the platform requires no acceptance. Throw `PayabliTTPError.readerSetupFailed(reason:)` when there is no reader to ask, so a caller can tell that from "not accepted". |
 | `startReading(_ request: CardReadRequest) async throws -> CardReadResult` | `PayabliTTP.charge(...)` | Run the NFC interaction. Atomic providers (Fiserv) also charge here and return the full processor response. Payload-only providers populate `encryptedPayload` instead. |
 | `cancelReading() async` | User cancelled the tap | Tear down the active reader and clear `self.credentials`. |
 | `cleanUp() async` | End of session | Same as cancel — full teardown. |

@@ -22,6 +22,8 @@ import UIKit
 ///   - `charge(params, resolver, rejecter)` — amount, type, serviceFee,
 ///     customer, order. Resolves with `{paymentTransId}`.
 ///   - `activateDevice(activationCode, resolver, rejecter)`
+///   - `areTermsAccepted(resolver, rejecter)` — resolves a bool. Rejects
+///     rather than resolving `false` when there is no reader to ask.
 ///   - `getSessionState(resolver, rejecter)` — resolves the int raw value
 ///     of the current `PayabliTTPSessionState`.
 ///   - `resolveTokenRefresh(token)` / `rejectTokenRefresh(reason)` —
@@ -237,6 +239,29 @@ public final class PayabliSDKModule: RCTEventEmitter {
                 reject(error.rnCode(default: "ACTIVATION_FAILED"), error.rnMessage, error)
             } else {
                 resolve(nil)
+            }
+        }
+    }
+
+    // MARK: - areTermsAccepted
+
+    /// Rejects rather than resolving `false` when the answer is unavailable.
+    /// A JS caller branching on the resolved value would otherwise show a terms
+    /// screen to a merchant who has already accepted, because the reader could
+    /// not be asked.
+    @objc public func areTermsAccepted(
+        _ resolve: @escaping RCTPromiseResolveBlock,
+        rejecter reject: @escaping RCTPromiseRejectBlock
+    ) {
+        guard let ttp else {
+            reject("NOT_CONFIGURED", "Call configure() before areTermsAccepted()", nil)
+            return
+        }
+        ttp.areTermsAccepted { accepted, error in
+            if let error {
+                reject(error.rnCode(default: "TERMS_CHECK_FAILED"), error.rnMessage, error)
+            } else {
+                resolve(accepted)
             }
         }
     }

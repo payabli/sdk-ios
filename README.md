@@ -475,6 +475,30 @@ The activation code is issued by the partner backend (typically via an
 administrator dashboard); the SDK doesn't generate it. Delivery of
 the code to the user is the host application's responsibility.
 
+### Accepting Apple's Tap to Pay terms
+
+Before a device reads a card, the merchant has to accept Apple's Tap to Pay terms.
+Apple holds that acceptance and is the only authority on it, so ask rather than
+track it yourself:
+
+```swift
+if try await ttp.areTermsAccepted() == false {
+    // Show your own screen explaining what the merchant is about to accept.
+}
+```
+
+Until they accept, `initialize()` throws `PayabliTTPError.termsNotAccepted`. The
+SDK never accepts on the merchant's behalf, so whoever taps the button is the
+person with the authority to agree.
+
+Ask each time rather than caching the answer. Acceptance can be granted or
+withdrawn outside your app, and a remembered `true` goes stale without anything
+failing.
+
+A thrown error is not the same as `false`: `false` means the merchant has not
+accepted, while `PayabliTTPError.readerSetupFailed` means there was no reader to
+ask. Show a terms screen for the first and not for the second.
+
 ### Handling errors
 
 `PayabliTTPError` covers the entire session and charge lifecycle:
@@ -488,6 +512,8 @@ do {
     )
 } catch PayabliTTPError.devicePendingActivation {
     // First-time device — prompt for activation code.
+} catch PayabliTTPError.termsNotAccepted {
+    // The merchant has not accepted Apple's Tap to Pay terms. See above.
 } catch let PayabliTTPError.invalidState(current, attempted) {
     // Session isn't in the required state for this call.
 } catch let PayabliTTPError.attestationFailed(reason) {
@@ -523,6 +549,13 @@ PayabliTTP *ttp = [[PayabliTTP alloc]
               entryPoint:@"your-entrypoint"
                    appId:@"TEAM123456.com.yourcompany.app"
              environment:PayabliEnvironmentSandbox];
+
+[ttp areTermsAcceptedWithCompletion:^(BOOL accepted, NSError *termsErr) {
+    // Read termsErr first: accepted is NO on the failure path as a bridging
+    // default, and that is not the same as the merchant having declined.
+    if (termsErr) { /* handle */ return; }
+    if (!accepted) { /* show your own terms screen */ return; }
+}];
 
 [ttp initializeWithCompletion:^(NSError *err) {
     if (err) { /* handle */ return; }

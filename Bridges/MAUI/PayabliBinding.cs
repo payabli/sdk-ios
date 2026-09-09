@@ -103,6 +103,14 @@ namespace Payabli.TapToPay
         [NullAllowed] NSError error
     );
 
+    // `accepted` is false on the failure path as a bridging default and is not an
+    // answer. Read `error` first: it separates "the merchant has not accepted"
+    // from "there was no reader to ask".
+    public delegate void PayabliTTPTermsCompletion(
+        bool accepted,
+        [NullAllowed] NSError error
+    );
+
     public delegate void PayabliTTPEventHandler(
         PayabliTTPEventCode code,
         NSDictionary payload
@@ -261,6 +269,9 @@ namespace Payabli.TapToPay
 
         [Export("activateDeviceWithActivationCode:completion:")]
         void ActivateDevice(string activationCode, PayabliTTPCompletion completion);
+
+        [Export("areTermsAcceptedWithCompletion:")]
+        void AreTermsAccepted(PayabliTTPTermsCompletion completion);
 
         // Session state (read-only @Published properties).
 

@@ -15,8 +15,8 @@ final class FiservCardReaderTests: XCTestCase {
         #if os(iOS)
             if #available(iOS 16.7, *) {
                 // On a real iPhone `success`; on an incompatible device
-                // `readerSetupFailed` — both are acceptable. We just assert the
-                // error (if any) is not about missing credentials.
+                // `readerSetupFailed`. Both are acceptable, so the assertion is
+                // only that the error, if any, is not about missing credentials.
                 if case let .failure(err) = result, case let .readerSetupFailed(reason) = err {
                     XCTAssertFalse(
                         reason.lowercased().contains("credentials"),
@@ -121,6 +121,27 @@ final class FiservCardReaderTests: XCTestCase {
         do {
             try await reader.prepareReader()
             XCTFail("expected failure after cleanUp")
+        } catch PayabliTTPError.readerSetupFailed {
+            // expected
+        } catch {
+            XCTFail("wrong error: \(error)")
+        }
+    }
+
+    /// With no reader there is nothing to ask, and the adapter says so rather than
+    /// answering `false`. A caller cannot otherwise tell a merchant who has not
+    /// accepted from a reader that was never prepared.
+    ///
+    /// This is the only half of `areTermsAccepted()` a unit test reaches. The
+    /// answering path needs a prepared reader, and `prepareReader()` cannot get
+    /// past `requestSessionToken()` without reader hardware, so whether an
+    /// unaccepted merchant leaves the reader able to answer is proved on the
+    /// manual device tier and nowhere else.
+    func testTermsCannotBeAnsweredWithoutAPreparedReader() async {
+        let reader = FiservCardReader()
+        do {
+            _ = try await reader.areTermsAccepted()
+            XCTFail("expected failure with no prepared reader")
         } catch PayabliTTPError.readerSetupFailed {
             // expected
         } catch {
