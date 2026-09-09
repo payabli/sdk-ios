@@ -45,6 +45,12 @@ public enum PayabliTTPError: Error, Sendable {
     case tokenExpired
     case activationFailed(reason: String)
     case networkError(reason: String)
+    /// The merchant has not accepted the terms their platform requires before it
+    /// will take a contactless payment. The SDK does not accept on their behalf.
+    ///
+    /// Appended after `networkError` to keep the `errorCode` table below
+    /// append-only; those codes are public API.
+    case termsNotAccepted
 }
 
 // MARK: - ObjC event-code mapping
@@ -186,6 +192,7 @@ extension PayabliTTPError: CustomNSError, LocalizedError {
         case .tokenExpired: return 11
         case .activationFailed: return 12
         case .networkError: return 13
+        case .termsNotAccepted: return 14
         }
     }
 
@@ -201,6 +208,8 @@ extension PayabliTTPError: CustomNSError, LocalizedError {
             return [NSLocalizedDescriptionKey: "Device is pending activation"]
         case .tokenExpired:
             return [NSLocalizedDescriptionKey: "Access token expired"]
+        case .termsNotAccepted:
+            return [NSLocalizedDescriptionKey: "Contactless payment terms have not been accepted"]
         case let .attestationRevoked(reason),
              let .attestationFailed(reason),
              let .configFailed(reason),
