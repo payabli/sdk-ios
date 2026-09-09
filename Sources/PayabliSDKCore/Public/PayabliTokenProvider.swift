@@ -1,9 +1,10 @@
 import Foundation
 
-/// Closure that refreshes the access token by calling the partner's
-/// server-side endpoint. Returns a freshly-minted token.
+/// Closure that supplies an access token by calling the partner's server-side endpoint. Returns a
+/// freshly-minted token.
 ///
-/// The SDK invokes this when its cached token is rejected (HTTP 401).
+/// It is the SDK's only source of a credential, so it is called for the first request as well as
+/// after one is rejected (HTTP 401), and a host hands over no token of its own.
 ///
 /// This closure may issue its own requests through the SDK. While the refresh runs, a request made
 /// on the session this closure refreshes carries the token being replaced, not the one it is about
@@ -24,9 +25,9 @@ import Foundation
 /// The host app wires this closure to call its own backend:
 /// ```swift
 /// try PayabliConfig(
-///     accessToken: initialToken,
-///     tokenProvider: { try await api.fetchPayabliAccessToken() },
-///     ...
+///     entryPoint: "partner-entry-point",
+///     environment: .sandbox,
+///     tokenProvider: { try await api.fetchPayabliAccessToken() }
 /// )
 /// ```
 public typealias PayabliTokenRefresh = @Sendable () async throws -> String
