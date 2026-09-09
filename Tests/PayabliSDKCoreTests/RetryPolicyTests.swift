@@ -120,6 +120,42 @@ final class RetryPolicyTests: XCTestCase {
         XCTAssertNotNil(rejection(totalTimeout: -1))
     }
 
+    /// A base of zero with a growth that overflows still waits a number.
+    ///
+    /// `0 * .infinity` is NaN, and every comparison against one is false, so a NaN wait passes the budget
+    /// checks that exist to catch a wait too long and then reaches the clock as no wait at all. Both
+    /// values are ones the initializer accepts.
+    func testAZeroBaseAndAGrowthThatOverflowsStillWaitANumber() {
+        let policy = RetryPolicy(
+            maxAttempts: 5,
+            baseDelay: 0,
+            maxDelay: 8,
+            multiplier: 1e300,
+            maxJitter: 0,
+            jitter: .none
+        )
+
+        for attempt in 1 ... 5 {
+            let wait = policy.delay(forAttempt: attempt)
+            XCTAssertTrue(wait.isFinite, "attempt \(attempt) waits \(wait)")
+            XCTAssertEqual(wait, 0, "a base of zero is a policy with no computed backoff")
+        }
+    }
+
+    /// The jitter a zero base is configured with is still the wait, since jitter is added after the cap.
+    func testAZeroBaseStillTakesTheJitterItWasGiven() {
+        let policy = RetryPolicy(
+            maxAttempts: 3,
+            baseDelay: 0,
+            maxDelay: 8,
+            multiplier: 1e300,
+            maxJitter: 0.5,
+            jitter: RetryPolicy.Jitter { $0 }
+        )
+
+        XCTAssertEqual(policy.delay(forAttempt: 2), 0.5)
+    }
+
     func testANegativeRetryAfterCeilingIsRejected() {
         XCTAssertNotNil(rejection(maxRetryAfter: -1))
     }

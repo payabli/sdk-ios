@@ -143,6 +143,14 @@ package struct RetryPolicy: Sendable {
     /// Jitter is added after the cap, so the longest possible wait is `maxDelay + maxJitter`.
     package func delay(forAttempt attempt: Int) -> TimeInterval {
         guard attempt > 1 else { return 0 }
+
+        // A base of zero is a policy with no computed backoff, and zero times any finite growth is zero.
+        // Multiplying anyway reaches `0 * .infinity` as soon as the growth overflows, which a large
+        // multiplier does in two attempts. The NaN that produces passes every budget comparison, because
+        // each is false against one, and reaches the clock as no wait at all. Jitter guards its own
+        // closure the same way.
+        guard baseDelay > 0 else { return jitter.value(upTo: maxJitter) }
+
         let exponent = Double(attempt - 2)
         let backoff = min(baseDelay * pow(multiplier, exponent), maxDelay)
         return backoff + jitter.value(upTo: maxJitter)
