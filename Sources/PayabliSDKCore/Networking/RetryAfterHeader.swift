@@ -21,10 +21,10 @@ enum RetryAfterHeader {
     /// The locale is fixed because the month and day names are part of the format, and a device set to a
     /// locale that spells them differently would otherwise fail to parse a correct header. The time zone
     /// is fixed because the third form carries none.
-    private static let dateFormats = [
-        "EEE, dd MMM yyyy HH:mm:ss 'GMT'",
-        "EEEE, dd-MMM-yy HH:mm:ss 'GMT'",
-        "EEE MMM d HH:mm:ss yyyy"
+    private static let dateFormats: [(pattern: String, twoDigitYear: Bool)] = [
+        ("EEE, dd MMM yyyy HH:mm:ss 'GMT'", false),
+        ("EEEE, dd-MMM-yy HH:mm:ss 'GMT'", true),
+        ("EEE MMM d HH:mm:ss yyyy", false)
     ]
 
     /// The wait `response` asked for, or `nil` when it named none, named one that cannot be read, or named
@@ -53,12 +53,45 @@ enum RetryAfterHeader {
             let formatter = DateFormatter()
             formatter.locale = Locale(identifier: "en_US_POSIX")
             formatter.timeZone = TimeZone(identifier: "GMT")
-            formatter.dateFormat = format
+            formatter.dateFormat = format.pattern
             if let parsed = formatter.date(from: raw) {
-                return max(0, parsed.timeIntervalSince(now))
+                let instant = format.twoDigitYear ? century(of: parsed, near: now) : parsed
+                return max(0, instant.timeIntervalSince(now))
             }
         }
 
         return nil
+    }
+
+    /// The instant a two-digit year names, by the rule rather than by the formatter's window.
+    ///
+    /// RFC 9110 Section 5.6.7 requires a recipient to read a timestamp "that appears to be more than 50
+    /// years in the future as representing the most recent year in the past that had the same last two
+    /// digits". `DateFormatter` answers from a window fixed at 1950 instead, which is not that rule and
+    /// does not move: read in 2026, `09-Sep-50` is 1950.
+    ///
+    /// Getting it wrong here is the one reading that makes a client louder rather than quieter. A date in
+    /// the past is no wait at all, so a long wait the server asked for becomes an immediate repeat,
+    /// against a service that has just said it is under too much load.
+    private static func century(of parsed: Date, near now: Date) -> Date {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "GMT") ?? calendar.timeZone
+        guard let ceiling = calendar.date(byAdding: .year, value: 50, to: now) else { return parsed }
+
+        // A century keeps the last two digits, so each step names the same header. The most recent year at
+        // or below the ceiling is the one the rule asks for, and exactly 50 years ahead stays, since it is
+        // "more than 50" that rolls back.
+        //
+        // Bounded rather than run to exhaustion: two steps already cover the formatter's whole window, and
+        // a date arithmetic that stopped advancing would otherwise spin here.
+        var instant = parsed
+        for _ in 0 ..< 3 {
+            guard let next = calendar.date(byAdding: .year, value: 100, to: instant), next <= ceiling
+            else {
+                break
+            }
+            instant = next
+        }
+        return instant
     }
 }

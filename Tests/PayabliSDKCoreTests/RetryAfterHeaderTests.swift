@@ -94,6 +94,54 @@ final class RetryAfterHeaderTests: XCTestCase {
         }
     }
 
+    /// A two-digit year is read by the rule, not by the formatter's window.
+    ///
+    /// RFC 9110 Section 5.6.7 asks a recipient to read a timestamp "that appears to be more than 50 years
+    /// in the future as representing the most recent year in the past that had the same last two digits".
+    /// `DateFormatter` answers from a window fixed at 1950 instead, so without the rule `09-Sep-50` read
+    /// in 2026 is 1950: a date already past, which is no wait, so a long wait the server asked for becomes
+    /// an immediate repeat.
+    ///
+    /// The boundary is what the case is for. Fifty years ahead stays, because the rule turns on *more*
+    /// than fifty, and one year past that rolls back a century.
+    func testATwoDigitYearIsReadByTheFiftyYearRule() throws {
+        let now = Date(timeIntervalSince1970: 1_789_000_000) // 2026-09-10 00:26:40 GMT
+
+        // Ahead of now once the rule has placed them, so the wait names the year it picked.
+        for (twoDigit, year) in [("50", 2050), ("76", 2076)] {
+            let raw = "Thursday, 09-Sep-\(twoDigit) 12:00:00 GMT"
+            let wait = try XCTUnwrap(RetryAfterHeader.value(from: response(raw), now: now), raw)
+            XCTAssertEqual(yearOf(now.addingTimeInterval(wait)), year, raw)
+        }
+
+        // Past once the rule has placed them, and a date already past is a wait of none.
+        for twoDigit in ["77", "99"] {
+            let raw = "Thursday, 09-Sep-\(twoDigit) 12:00:00 GMT"
+            XCTAssertEqual(RetryAfterHeader.value(from: response(raw), now: now), 0, raw)
+        }
+    }
+
+    /// A four-digit year names its own century, so the rule that repairs a two-digit one must not reach it.
+    ///
+    /// Both remaining forms carry the year in full. Rolling one forward would turn a date decades past
+    /// into a wait decades long, which is above any ceiling and therefore ends the retry.
+    func testAFourDigitYearIsLeftInTheCenturyItNames() {
+        let now = Date(timeIntervalSince1970: 1_789_000_000) // 2026-09-10 00:26:40 GMT
+
+        for raw in ["Tue, 14 Nov 1975 22:14:20 GMT", "Tue Nov 14 22:14:20 1975"] {
+            XCTAssertEqual(
+                RetryAfterHeader.value(from: response(raw), now: now), 0,
+                "\(raw) is a date decades past, which is a wait of none"
+            )
+        }
+    }
+
+    private func yearOf(_ date: Date) -> Int {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "GMT") ?? calendar.timeZone
+        return calendar.component(.year, from: date)
+    }
+
     // MARK: - Absent and unreadable
 
     func testAnAbsentHeaderReadsAsNoInstruction() {
