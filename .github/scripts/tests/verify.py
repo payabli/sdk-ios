@@ -1009,6 +1009,25 @@ def normalise_shell(text: str) -> str:
     return re.sub(r"\\\s*\n\s*", " ", text)
 
 
+def package_test_steps(workflow: dict) -> list[tuple[str, str]]:
+    """Every `run` step in a parsed workflow that invokes the package scheme, as (job, script).
+
+    Per step rather than per file, because a workflow's steps are separate commands and the exclusions
+    have to be on the one that runs the tests. Reading the file as one string let a single guarded step
+    vouch for every other package-test invocation beside it.
+    """
+    steps = []
+    for job_name, job in (workflow.get("jobs") or {}).items():
+        for step in (job or {}).get("steps") or []:
+            script = step.get("run")
+            if not isinstance(script, str):
+                continue
+            joined = normalise_shell(script)
+            if TESTS_PACKAGE_SCHEME.search(joined) and NAMES_PACKAGE_SCHEME.search(joined):
+                steps.append((job_name, script))
+    return steps
+
+
 def discover_tiers(workflow_dir: Path) -> list[tuple[str, str]]:
     """Every workflow in a directory that tests the package scheme, found by content rather than by name.
 
@@ -1218,20 +1237,30 @@ def test_workflows() -> None:
     # second one excludes anything. Asserting the first alone stayed green with the expansion deleted.
     expansion = '${skips[@]+"${skips[@]}"}'
     for name, text in tiers:
-        check(f"W12 {name} applies the shared hardware-only list where it tests the package scheme",
-              helper in text and expansion in text, (helper in text, expansion in text))
-        # And fails closed when the list cannot be read. `read` succeeds on a here-string whatever the
-        # command substitution inside it returned, so `read -r -a skips <<< "$(helper)"` drops the failure
-        # and leaves the array empty: the tier then runs the hardware-only tests with no exclusions and
-        # passes, which is the silent skip the list exists to prevent.
-        # The guard has to leave, not merely exist. Asserting the `if !` line alone stayed green with the
-        # `exit` deleted, and the step then carried on with an empty array and ran the hardware-only
-        # tests: the fail-open case this check names.
-        guard = re.search(r"if ! exclusions=.*?\n(.*?)\n\s*fi\n", text, re.S)
-        exits = bool(guard) and re.search(r"\bexit [1-9]", guard.group(1)) is not None
-        substituted_into_read = f'read -r -a skips <<< "$(' in text
-        check(f"W12f {name} refuses to run when the exclusion list cannot be read",
-              exits and not substituted_into_read, (bool(guard), exits, substituted_into_read))
+        # Per step, not per file. A workflow's steps are separate commands, so asserting on the file as
+        # one string lets a single guarded step vouch for every other package-test invocation beside it.
+        # Named apart from the nightly job's own `steps` below, which is a list of step dicts. Reusing
+        # that name here rebound it to a list of tuples and the later checks read the wrong thing.
+        test_steps = package_test_steps(yaml.safe_load(text))
+        check(f"W12 {name} has a package-test step the checks can read",
+              bool(test_steps), "the scheme is named in the file but no run step was parsed")
+        for job_name, script in test_steps:
+            where = f"{name} ({job_name})"
+            check(f"W12 {where} applies the shared hardware-only list in the step that tests",
+                  helper in script and expansion in script,
+                  (helper in script, expansion in script))
+            # And fails closed when the list cannot be read. `read` succeeds on a here-string whatever
+            # the command substitution inside it returned, so `read -r -a skips <<< "$(helper)"` drops
+            # the failure and leaves the array empty: the step then runs the hardware-only tests with no
+            # exclusions and passes, which is the silent skip the list exists to prevent.
+            #
+            # The guard has to leave, not merely exist. Asserting the `if !` line alone stayed green with
+            # the `exit` deleted, and the step carried on with an empty array.
+            guard = re.search(r"if ! exclusions=.*?\n(.*?)\n\s*fi\n", script, re.S)
+            exits = bool(guard) and re.search(r"\bexit [1-9]", guard.group(1)) is not None
+            substituted_into_read = 'read -r -a skips <<< "$(' in script
+            check(f"W12f {where} refuses to run when the exclusion list cannot be read",
+                  exits and not substituted_into_read, (bool(guard), exits, substituted_into_read))
 
     check("W12c the list is one file, not a copy in a workflow",
           not any("SecureStorageTests" in text for _, text in tiers),

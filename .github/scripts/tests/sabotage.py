@@ -412,6 +412,15 @@ MUTATIONS = [
         "W12f", "workflows",
     ),
     Mutation(
+        "the exclusions are checked across the file instead of in the step that tests",
+        ".github/scripts/tests/verify.py",
+        "            if TESTS_PACKAGE_SCHEME.search(joined) and NAMES_PACKAGE_SCHEME.search(joined):\n"
+        "                steps.append((job_name, script))",
+        "            if TESTS_PACKAGE_SCHEME.search(joined) or NAMES_PACKAGE_SCHEME.search(joined):\n"
+        "                steps.append((job_name, script))",
+        "W12", "workflows",
+    ),
+    Mutation(
         "discovery matches only the spelling the current workflows happen to use",
         ".github/scripts/tests/verify.py",
         'NAMES_PACKAGE_SCHEME = re.compile(\n    r"-scheme[\\s=]+[\'\\"]?PayabliSDK-Package[\'\\"]?"\n)',
