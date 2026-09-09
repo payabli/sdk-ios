@@ -121,7 +121,9 @@ final class PayabliTTPTermsTests: XCTestCase {
     /// outside `.ready`, which is the one moment a host needs the answer; a guard
     /// on `sessionState == .ready` would refuse exactly then.
     ///
-    /// Driven through the mock. No shipped provider reports this yet.
+    /// Driven through the mock because the shipped provider reaches this only on
+    /// a device: preparation cannot get past the session-token call without reader
+    /// hardware, so the branch that reports unaccepted terms is unreachable here.
     func testTheQuestionIsAnswerableWhenTheSessionIsNotReady() async throws {
         let (ttp, provider) = try makeTTP()
         provider.prepareReaderResult = .failure(PayabliTTPError.termsNotAccepted)
