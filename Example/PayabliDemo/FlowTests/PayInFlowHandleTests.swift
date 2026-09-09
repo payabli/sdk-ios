@@ -4,10 +4,13 @@ import XCTest
 
 /// What drawing a new capture attempt does to the request the next submit carries.
 ///
-/// One attempt is one payment however many times it is submitted: a resubmission
-/// carries the same idempotency key, so the service answers from the attempt that
-/// already reached it. Drawing a new attempt is the one action here that mints a
-/// key, and therefore the one that can turn the next submit into a second payment.
+/// One attempt is one payment for as long as the service remembers its key: a
+/// resubmission carries the same idempotency key, and a repeat inside two minutes of
+/// the first request is refused rather than taken. Drawing a new attempt is the one
+/// action here that mints a key, and therefore the one that turns the next submit
+/// into a second payment. The other route to a second payment is a resubmission
+/// after the window, which these cases do not cover: they hold no clock, and the
+/// service's own is not reachable from here.
 ///
 /// The refusal during a submission is not covered, and cannot be from this target:
 /// `isSubmitting` is `public private(set)`, and the initialiser that accepts a

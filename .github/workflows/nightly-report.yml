@@ -1,0 +1,96 @@
+name: Nightly report
+
+# The Slack half of the nightly, kept out of reach of the code it reports on.
+#
+# `nightly.yml` carries `workflow_dispatch`, and a dispatch selects a ref. GitHub runs that ref's copy of
+# the workflow file and of every script it invokes, so a reporting job living there would hand
+# `SLACK_BOT_TOKEN` to whatever a branch had written into `nightly_slack.py`. Splitting it into a separate
+# job in the same file does not close that: the job's steps are still written in the branch's copy.
+#
+# GitHub triggers `workflow_run` only for a workflow file that exists on the default branch, and runs that
+# copy. So this file and the poster it invokes cannot be edited by the branch whose run it is reporting on.
+# `pr-reports.yml` holds the same boundary for the pull-request gate, and states the same reasoning.
+#
+# The consequence to know: a change here does not take effect until it is on the default branch, and cannot
+# be exercised from a pull request or a dispatch.
+#
+# What still crosses from the branch is the facts file, and it is treated as untrusted for that reason: the
+# poster escapes every field before it reaches a Slack block, and rebuilds the run links from the event
+# rather than reading them out of the artifact.
+
+on:
+  workflow_run:
+    workflows: [Nightly]
+    types: [completed]
+
+# Granted per job, never here.
+permissions: {}
+
+env:
+  # Both platform SDKs report into one channel, and the no-report path cannot read the platform from a
+  # facts file that never arrived.
+  PLATFORM: iOS
+
+jobs:
+  report:
+    name: Report to Slack
+    # Silent on a cancelled nightly, and the three cases are why. A run that timed out or failed reports,
+    # which is the case a step inside the test job cannot cover: a job timeout kills the job and takes
+    # `if: always()` with it. A run superseded by `cancel-in-progress` stays silent, because its successor
+    # is already running. A manual cancel stays silent, and is indistinguishable from supersession anyway.
+    if: github.event.workflow_run.conclusion != 'cancelled'
+    # What makes "the reporter cannot redden a green run" true. The poster's own exit-zero discipline covers
+    # a Slack outage; it does not cover a failed checkout or an uncaught exception, and neither of those is a
+    # test result. It cannot change the nightly's own conclusion either way, since that run has finished.
+    continue-on-error: true
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # The default branch, which is what `workflow_run` checks out and the whole point of this file.
+          # Nothing here pushes, so the token is not left in `.git/config`.
+          persist-credentials: false
+
+      # From the run that triggered this one, which is not the run this job is part of, so the id and a
+      # token are both required.
+      - name: Download the report facts
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: nightly-facts
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ${{ runner.temp }}/nightly-facts
+
+      - name: Post the nightly report
+        timeout-minutes: 5
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+          SLACK_CHANNEL_ID: ${{ vars.SLACK_CHANNEL_ID }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Only the scheduled run on the default branch vouches for the schedule being alive. A dispatch,
+          # or a run on any other branch, reports normally and leaves the liveness alarm alone, because
+          # neither is evidence that the schedule still fires. Read from the triggering run rather than
+          # from this one, which is always a `workflow_run` on the default branch and would vouch for
+          # everything.
+          LIVENESS_OWNER: >-
+            ${{ github.event.workflow_run.event == 'schedule'
+              && github.event.workflow_run.head_branch == github.event.repository.default_branch }}
+          # What became of the nightly, which the facts file cannot know: it is written and uploaded two
+          # steps before the gate that decides the run.
+          NIGHTLY_JOB_RESULT: ${{ github.event.workflow_run.conclusion }}
+          # The triggering run, under names of our own. GitHub documents that "You can't overwrite the
+          # value of the default environment variables named `GITHUB_*` and `RUNNER_*`", so assigning
+          # GITHUB_RUN_ID here would be ignored and the report would link to itself, while the last-green
+          # lookup would query this workflow rather than the nightly. Still trusted: these come from the
+          # event payload, which GitHub fills and a branch cannot write to.
+          NIGHTLY_RUN_ID: ${{ github.event.workflow_run.id }}
+          NIGHTLY_SHA: ${{ github.event.workflow_run.head_sha }}
+          NIGHTLY_REF_NAME: ${{ github.event.workflow_run.head_branch }}
+        run: python3 .github/scripts/nightly_slack.py "$RUNNER_TEMP/nightly-facts/nightly-facts.json"

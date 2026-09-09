@@ -7,8 +7,8 @@ import PayabliSDKPayInPaymentFlow
 /// neither type.
 ///
 /// It also carries what the form is for, because a failure reads differently on
-/// each: only a capture sends an idempotency key, so only a capture can be
-/// answered from an attempt that already reached the service.
+/// each: only a capture sends an idempotency key, so only a capture can be refused
+/// as a repeat of an attempt the service already holds.
 struct PayInFormSetup {
     let operation: PayInOperation
     let configuration: PayabliPayInPaymentFlowFormConfiguration

@@ -219,10 +219,13 @@ struct PaymentCaptureQAView: View {
 
     private func handleError(_ failure: PayInFailure) {
         submitFailed = true
-        // The request keeps its idempotency key. A failure does not say whether
-        // the service accepted the payment: a lost response and a refused card
-        // arrive the same way, and a submit carrying the same key is answered
-        // from the attempt that already reached it.
+        // A refused card and a lost response no longer read alike: the first
+        // arrives as a transaction the service declined, the second as an
+        // interruption saying the payment may already have been taken. Only the
+        // second needs reconciling, and reconciling means reading the earlier
+        // submission back. Submitting again sends this attempt's own key, which
+        // the service refuses for two minutes from the first request and executes
+        // after that, so a late resubmission is a second payment.
         //
         // Drawing a fresh attempt is the button beside this message, and it is
         // the only place a key is minted.

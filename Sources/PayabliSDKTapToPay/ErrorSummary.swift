@@ -24,12 +24,12 @@ enum ErrorSummary {
         }
     }
 
-    /// A decline and a server failure both answer `.unknown` for their `code`,
-    /// there being no case for either in `PayabliErrorCode`, so reading the code
-    /// alone tells a reader that a charge failed and nothing more.
+    /// A decline answers `.paymentDeclined` and a server failure `.serverError`, so
+    /// the code says which of the two a charge met. What it does not say is which
+    /// decline, or which server failure.
     ///
-    /// Both carry a structured value that says which: the decline's wire code and
-    /// the server's status. Neither is free text.
+    /// Both carry a structured value that does: the decline's wire code and the
+    /// server's status. Neither is free text.
     static func of(_ error: PayabliPaymentError) -> String {
         switch error {
         case let .decline(decline):
@@ -43,6 +43,8 @@ enum ErrorSummary {
         }
     }
 
+    // swiftlint:disable cyclomatic_complexity
+
     /// The case, and details that are not free text. No `reason` reaches this
     /// string.
     ///
@@ -55,7 +57,9 @@ enum ErrorSummary {
     ///
     /// Written out case by case rather than reflected over, because this string
     /// reaches host apps and a reflected one is whatever the compiler renders
-    /// today.
+    /// today. Its complexity is therefore one branch per error case, and the
+    /// compiler requires every one of them, which is why the rule is suppressed
+    /// around it rather than the switch being split across two functions.
     static func of(_ error: PayabliTTPError) -> String {
         switch error {
         case .notInitialized:
@@ -86,8 +90,12 @@ enum ErrorSummary {
             return "initiateFailed"
         case .updateFailed:
             return "updateFailed"
+        case .termsNotAccepted:
+            return "termsNotAccepted"
         }
     }
+
+    // swiftlint:enable cyclomatic_complexity
 
     /// The state is an `@objc` enum, so interpolating one renders
     /// `PayabliTTPSessionState(rawValue: 4)`. A log read at speed wants the name.

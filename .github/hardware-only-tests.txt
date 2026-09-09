@@ -1,0 +1,39 @@
+# Tests that cannot run unattended, excluded from every automated tier rather than skipped.
+#
+# One list, read by `.github/scripts/hardware-only-skips.sh` and applied by every workflow that tests the
+# `PayabliSDK-Package` scheme. This file does not name them, because a roster written here goes stale the
+# first time one is added and it did: `verify.py` finds them by reading the workflow directory instead,
+# and asserts each one applies this list. The release build is among them and it tags, so an exclusion
+# missing there ships. Two copies of the list would be two lists the moment one of them is edited, and the
+# failure mode is silent — a test excluded in one tier and skipping in the other reports a standing skip
+# nobody reads.
+#
+# Why excluded rather than skipped: the reporter derives passed from total minus failed minus skipped, so a
+# test parked with `XCTSkip` reports a skip every night, and a permanent skip cannot be told apart from a
+# regression that started skipping. An excluded test is absent from the result bundle and the counts stay
+# honest.
+#
+# The bar is that the test would fail or answer wrongly unattended, not that nobody has taught the
+# automation to run it. The second is a provisioning gap, fixed by changing a workflow rather than by owning
+# a device, and a test parked here for that reason is borrowing time.
+#
+# A whole suite that needs hardware belongs in its own test target instead, which is what the sample app's
+# DeviceTests and UITests bundles are. This file is for a class or a method inside a target that otherwise
+# runs. Entries are `Target/Class` or `Target/Class/method`, without parentheses. Blank lines and anything
+# after a `#` are ignored.
+
+# Need a Keychain that answers. The Swift package test host carries no entitlement, so these return
+# errSecMissingEntitlement and skipped on every simulator run before this list existed. The other ten
+# tests in SecureStorageTests run normally, which is why these are named per method.
+#
+# Every assertion here has a counterpart in PayabliDemoDeviceTests/KeychainOnDeviceTests, which skips
+# nothing. Two of them did not until this list was reviewed: the update path of `set` on an item that
+# already exists, and the sweep creating no item for any key it knows. The device suite covered the add
+# path and the sweep's correction, which are different branches, so excluding those two would have
+# dropped the only test of each. Check the counterpart exists before adding a line here; "it is covered
+# on a device" is a claim about a file, and it was wrong twice.
+PayabliSDKTapToPayTests/SecureStorageTests/testKeychainRoundTripIfAvailable
+PayabliSDKTapToPayTests/SecureStorageTests/testKeychainItemsAreWrittenForThisDeviceOnlyIfAvailable
+PayabliSDKTapToPayTests/SecureStorageTests/testRewritingALegacyItemStopsItTravellingIfAvailable
+PayabliSDKTapToPayTests/SecureStorageTests/testTheSweepRewritesAStoredItemAndKeepsItsValueIfAvailable
+PayabliSDKTapToPayTests/SecureStorageTests/testTheSweepStoresNothingForAKeyThatHasNoItemIfAvailable

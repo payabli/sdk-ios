@@ -28,6 +28,12 @@ public final class PayabliPayInPaymentFlow: NSObject, ObservableObject, PayabliC
 
     public private(set) var entryPoint: String
     public private(set) var environment: PayabliEnvironment
+    /// Mints the key for an attempt that supplied none.
+    ///
+    /// Settable rather than an initialiser parameter: every initialiser here already carries seven, and
+    /// a test only needs this pinned before it submits. Not public, so a host cannot supply one.
+    var newIdempotencyKey: @Sendable () -> String = { UUID().uuidString }
+
     @Published public private(set) var operation: PayabliPayInPaymentFlowOperation
     @Published public private(set) var requestConfiguration: PayabliPayInPaymentFlowRequestConfiguration?
 
@@ -207,7 +213,11 @@ public final class PayabliPayInPaymentFlow: NSObject, ObservableObject, PayabliC
         _ request: PayabliPayInPaymentFlowRequest
     ) async throws -> PayabliPayInPaymentFlowResult {
         try await submit {
-            try await client.capture(entryPoint: entryPoint, request: request)
+            try await client.capture(
+                entryPoint: entryPoint,
+                request: request,
+                idempotencyKey: self.reserveKey(request.idempotencyKey)
+            )
         }
     }
 
@@ -222,7 +232,11 @@ public final class PayabliPayInPaymentFlow: NSObject, ObservableObject, PayabliC
         _ request: PayabliPayInPaymentFlowRequest
     ) async throws -> PayabliPayInPaymentFlowResult {
         try await submit {
-            try await client.authorize(entryPoint: entryPoint, request: request)
+            try await client.authorize(
+                entryPoint: entryPoint,
+                request: request,
+                idempotencyKey: self.reserveKey(request.idempotencyKey)
+            )
         }
     }
 
@@ -232,8 +246,28 @@ public final class PayabliPayInPaymentFlow: NSObject, ObservableObject, PayabliC
         _ request: PayabliPayInPaymentFlowAuthorizedRequest
     ) async throws -> PayabliPayInPaymentFlowResult {
         try await submit {
-            try await client.captureAuthorized(request)
+            try await client.captureAuthorized(
+                request,
+                idempotencyKey: self.reserveKey(request.idempotencyKey)
+            )
         }
+    }
+
+    /// The key this attempt sends: the caller's when it set one, otherwise a fresh one.
+    ///
+    /// A money-moving request always carries one. Left absent, the service recognises no repeat, so a
+    /// double submit or a resend takes the money twice rather than being refused.
+    ///
+    /// One per submission, and no submission reuses another's. Whether a later submission retries this
+    /// payment or is a payment of its own is the host's to say rather than this SDK's to infer: two
+    /// submissions a host has described identically are one payment to anything readable here, so
+    /// inferring would refuse a legitimate second payment of equal value. The host declares a retry and
+    /// the SDK supplies the key, and until that member exists nothing here reuses one.
+    ///
+    /// A key the caller supplied is refused rather than replaced when it cannot be sent, which is the
+    /// client's to decide, since substituting one would send a key the caller does not hold.
+    private func reserveKey(_ supplied: String?) -> String {
+        supplied ?? newIdempotencyKey()
     }
 
     private func submit(

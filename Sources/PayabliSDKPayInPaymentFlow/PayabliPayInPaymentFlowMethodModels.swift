@@ -398,12 +398,14 @@ public struct PayabliPayInPaymentFlowVendorData: Codable, Sendable {
     }
 }
 
+/// The options a stored-method request carries, and no idempotency key: a repeat is not recognisable on
+/// the store route, so one sent there is read by nothing and offering it implies a protection the route
+/// does not give. A store whose outcome is unknown is settled by reading the stored methods back.
 public struct PayabliPayInPaymentFlowTokenStorageOptions: Sendable {
     public var achValidation: Bool?
     public var createAnonymous: Bool?
     public var forceCustomerCreation: Bool?
     public var temporary: Bool?
-    public var idempotencyKey: String?
     public var customerData: PayabliPayInPaymentFlowCustomerData?
     public var vendorData: PayabliPayInPaymentFlowVendorData?
     public var fallbackAuth: Bool?
@@ -418,7 +420,6 @@ public struct PayabliPayInPaymentFlowTokenStorageOptions: Sendable {
         createAnonymous: Bool? = nil,
         forceCustomerCreation: Bool? = nil,
         temporary: Bool? = nil,
-        idempotencyKey: String? = nil,
         customerData: PayabliPayInPaymentFlowCustomerData? = nil,
         vendorData: PayabliPayInPaymentFlowVendorData? = nil,
         fallbackAuth: Bool? = nil,
@@ -432,7 +433,6 @@ public struct PayabliPayInPaymentFlowTokenStorageOptions: Sendable {
         self.createAnonymous = createAnonymous
         self.forceCustomerCreation = forceCustomerCreation
         self.temporary = temporary
-        self.idempotencyKey = idempotencyKey
         self.customerData = customerData
         self.vendorData = vendorData
         self.fallbackAuth = fallbackAuth
@@ -451,7 +451,6 @@ extension PayabliPayInPaymentFlowTokenStorageOptions {
             "createAnonymous:\(createAnonymous.map { "\($0)" } ?? "")",
             "forceCustomerCreation:\(forceCustomerCreation.map { "\($0)" } ?? "")",
             "temporary:\(temporary.map { "\($0)" } ?? "")",
-            "idempotencyKey:\(idempotencyKey ?? "")",
             "customerData:\(customerData.payabliJSONSignature)",
             "vendorData:\(payabliEncodedJSONSignature(vendorData))",
             "fallbackAuth:\(fallbackAuth.map { "\($0)" } ?? "")",

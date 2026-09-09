@@ -309,6 +309,30 @@ final class PayInPaymentFlowClientTests: XCTestCase {
         XCTAssertFalse(rendered.contains("tokens.internal.example"), rendered)
     }
 
+    /// The key this SDK generates reaches no surface a host reads, diagnostics included.
+    ///
+    /// The record copies request headers, so a key left out of the error type still arrived here. A key
+    /// this SDK mints and sends is not something a caller is asked to carry, and a diagnostics entry a
+    /// host can read is a surface like any other.
+    @MainActor
+    func testAGeneratedKeyDoesNotReachTheDiagnosticsRecord() async {
+        let sentinel = "SENTINEL-GENERATED-KEY"
+        let captured = LockedDiagnosticStrings()
+        let component = PayabliPayInPaymentFlow(
+            entryPoint: "entry",
+            environment: .sandbox,
+            transport: MockPaymentCaptureTransport(responseBody: Self.approvedResponse),
+            diagnostics: .enabled { captured.append($0) }
+        )
+        component.newIdempotencyKey = { sentinel }
+
+        _ = try? await component.capture(cardRequest())
+
+        let rendered = captured.all.joined(separator: "\n")
+        XCTAssertFalse(rendered.isEmpty, "the record should have entries to check")
+        XCTAssertFalse(rendered.contains(sentinel), rendered)
+    }
+
     /// A blank token is refused where it is installed, which is the session's holder.
     ///
     /// Driven through the facade's own transport, because injecting a double never reads a
@@ -622,4 +646,44 @@ private func parseBody(_ request: PayabliRequest) throws -> [String: Any] {
     let body = try XCTUnwrap(request.body)
     let object = try JSONSerialization.jsonObject(with: body)
     return try XCTUnwrap(object as? [String: Any])
+}
+
+/// Reserves the key the way the facade does, so these cases can exercise the client alone.
+///
+/// The client takes the key as a parameter rather than reading it off the request, and the parameter is
+/// mandatory, which is the whole of the point: a money-moving call cannot be written that omits it.
+/// Nothing reports the key. These
+/// overloads apply the same rule the facade applies, so a case that supplies a key still asserts on
+/// its own key.
+private extension PayInPaymentFlowClient {
+    func capture(
+        entryPoint: String,
+        request: PayabliPayInPaymentFlowRequest
+    ) async throws -> PayabliPayInPaymentFlowResult {
+        try await capture(
+            entryPoint: entryPoint,
+            request: request,
+            idempotencyKey: request.idempotencyKey ?? "reserved-by-test"
+        )
+    }
+
+    func authorize(
+        entryPoint: String,
+        request: PayabliPayInPaymentFlowRequest
+    ) async throws -> PayabliPayInPaymentFlowResult {
+        try await authorize(
+            entryPoint: entryPoint,
+            request: request,
+            idempotencyKey: request.idempotencyKey ?? "reserved-by-test"
+        )
+    }
+
+    func captureAuthorized(
+        _ request: PayabliPayInPaymentFlowAuthorizedRequest
+    ) async throws -> PayabliPayInPaymentFlowResult {
+        try await captureAuthorized(
+            request,
+            idempotencyKey: request.idempotencyKey ?? "reserved-by-test"
+        )
+    }
 }
