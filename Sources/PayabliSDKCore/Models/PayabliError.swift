@@ -9,16 +9,31 @@ public enum PayabliErrorCode: String, Sendable, CaseIterable {
     case permissionDenied = "PERMISSION_DENIED"
     case sessionBurned = "SESSION_BURNED"
 
-    /// A payment the processor refused. Authoritative, so it is never retried, and telling it apart from
-    /// `unknown` is what lets a retry policy say so without matching on prose.
+    /// HTTP 402, an issuer decline.
+    ///
+    /// Telling this apart from ``unknown`` is what lets a retry policy say "never retry a decline"
+    /// without matching on prose.
     case paymentDeclined = "PAYMENT_DECLINED"
 
-    /// A server-side fault. Transient, so it is retried, which is why it is not folded into `unknown`.
+    /// The service could not process the request: an HTTP 5xx, or an answer whose own response code
+    /// reports a problem rather than a refusal. Retryable, which is why it is not folded into
+    /// ``unknown``.
     case serverError = "SERVER_ERROR"
 
-    /// Too many requests. The one code whose correct handling is unreachable without it: folded into
-    /// `unknown` it becomes un-retryable, because an unclassified failure must never be retried.
+    /// HTTP 429. Retryable, and the one status whose correct handling is unreachable without a code of
+    /// its own: folded into ``unknown`` it could never be retried, because an unclassified status must
+    /// not be.
     case rateLimited = "RATE_LIMITED"
+
+    /// HTTP 409. The request conflicts with the state the service holds.
+    ///
+    /// Says no more than the status does, because the status mapping serves every route. What a
+    /// conflict means is the route's to say: on a money-moving one it is the repeat an idempotency key
+    /// caused the service to recognise, and there the outcome is settled rather than open. Reading that
+    /// meaning in here would give a conflict on any other route a sense it has not earned.
+    ///
+    /// The sibling platform carries no counterpart yet.
+    case conflict = "CONFLICT"
 
     // Client-side error codes (not from the API).
     case invalidConfiguration = "INVALID_CONFIGURATION"

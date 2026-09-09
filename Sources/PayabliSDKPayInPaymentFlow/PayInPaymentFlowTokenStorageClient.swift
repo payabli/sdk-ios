@@ -75,23 +75,18 @@ final class PayInPaymentFlowTokenStorageClient: Sendable {
 
     /// Builds the request. The transport's chain attaches the credential.
     ///
-    /// The idempotency key is set here because the chain runs once per attempt, and a key minted
-    /// there would differ on a replay.
+    /// No idempotency key: a repeat is not recognisable on this route, so a key sent here is read by
+    /// nothing.
     private func addMethodRequest(
         entryPoint: String,
         paymentMethod: PayabliPayInPaymentFlowMethodInput,
         options: PayabliPayInPaymentFlowTokenStorageOptions
     ) throws -> PayabliRequest {
-        var headers: [String: String] = [:]
-        if let idempotencyKey = options.idempotencyKey?.trimmed.nilIfEmpty {
-            headers["idempotencyKey"] = idempotencyKey
-        }
-
         return try PayabliRequest.json(
             method: .post,
             path: "/api/TokenStorage/add",
             query: options.queryItems,
-            headers: headers,
+            headers: [:],
             jsonBody: TokenStorageAddMethodBody(
                 customerData: options.customerData,
                 entryPoint: entryPoint,

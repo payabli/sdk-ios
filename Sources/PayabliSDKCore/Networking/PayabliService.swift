@@ -6,14 +6,8 @@ import Foundation
 /// so every request through this type is decorated. `AuthenticatedTransport` wraps this and adds 401
 /// recovery; a request that skips that wrapper still carries its credential.
 ///
-/// Error mapping (PRD §8 "Error Codes", §8.1.1):
-/// - 400 → throws `PayabliPaymentError.validation`
-/// - 401 → throws `PayabliGenericError(code: .tokenExpired)` (callers re-auth)
-/// - 402 → throws `PayabliPaymentError.decline`
-/// - 403 → throws `PayabliGenericError(code: .permissionDenied)`
-/// - 410 → throws `PayabliGenericError(code: .sessionBurned)`
-/// - 500 → throws `PayabliPaymentError.server`
-/// - Other non-2xx → throws `PayabliGenericError(code: .unknown)`
+/// A non-2xx answer is mapped by ``mapPayabliHTTPError``, which states the statuses it reads and what
+/// each one becomes.
 package final class PayabliService: PayabliTransport, Sendable {
     private let baseURL: URL
     private let session: URLSession
@@ -198,12 +192,13 @@ package final class PayabliService: PayabliTransport, Sendable {
 /// for a 403 on the config endpoint). Return `nil` to fall through to the
 /// standard mapping.
 ///
-/// Standard mappings (PRD §8):
+/// Standard mappings:
 /// - 400 → `PayabliPaymentError.validation`
 /// - 401 → `PayabliGenericError(.tokenExpired)`
 /// - 402 → `PayabliPaymentError.decline`
 /// - 403 → `PayabliGenericError(.permissionDenied)`
 /// - 408 → `PayabliGenericError(.networkError)`
+/// - 409 → `PayabliGenericError(.conflict)`
 /// - 410 → `PayabliGenericError(.sessionBurned)`
 /// - 429 → `PayabliRateLimitError`
 /// - 500+ → `PayabliPaymentError.server`
@@ -240,14 +235,17 @@ package func mapPayabliHTTPError(
     case 403:
         throw PayabliGenericError(code: .permissionDenied, reason: "Forbidden (403)")
 
-    case 410:
-        throw PayabliGenericError(code: .sessionBurned, reason: "Session burned (410)")
-
     case 408:
         // RFC 9110 Section 15.5.9: the server did not receive a complete request in time and "the client
         // MAY repeat the request without modifications at any later time". Retryable, and classified as a
         // network failure because that is what it is: the request did not arrive, so nothing ran.
         throw PayabliGenericError(code: .networkError, reason: "Request timeout (408)")
+
+    case 409:
+        throw PayabliGenericError(code: .conflict, reason: "Conflict (409)")
+
+    case 410:
+        throw PayabliGenericError(code: .sessionBurned, reason: "Session burned (410)")
 
     case 429:
         throw PayabliRateLimitError(retryAfter: RetryAfterHeader.value(from: response))
