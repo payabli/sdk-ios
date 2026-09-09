@@ -130,6 +130,9 @@ package struct RetryPolicy: Sendable {
             (multiplier.isFinite, "requires a finite multiplier"),
             (maxJitter >= 0, "requires a non-negative jitter bound"),
             (maxJitter.isFinite, "requires a finite jitter bound"),
+            // Jitter is added after the cap, so this sum is the longest wait the policy can produce and
+            // both halves can be finite while it is not.
+            ((maxDelay + maxJitter).isFinite, "requires a finite longest wait"),
             (totalTimeout.map { $0 > 0 } ?? true, "requires a positive total timeout"),
             (totalTimeout.map(\.isFinite) ?? true, "requires a finite total timeout"),
             (maxRetryAfter >= 0, "requires a non-negative retry-after ceiling"),

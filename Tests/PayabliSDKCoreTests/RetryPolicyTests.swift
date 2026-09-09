@@ -115,6 +115,14 @@ final class RetryPolicyTests: XCTestCase {
         XCTAssertNotNil(rejection(baseDelay: .nan), "a NaN base delay fails every comparison")
     }
 
+    /// Jitter is added after the cap, so the two together are the longest wait the policy can produce.
+    /// Each is finite at `greatestFiniteMagnitude` and the sum of two of them is not.
+    func testANonFiniteLongestWaitIsRejected() {
+        XCTAssertNotNil(
+            rejection(maxDelay: .greatestFiniteMagnitude, maxJitter: .greatestFiniteMagnitude)
+        )
+    }
+
     func testANonPositiveTotalTimeoutIsRejected() {
         XCTAssertNotNil(rejection(totalTimeout: 0))
         XCTAssertNotNil(rejection(totalTimeout: -1))
