@@ -10,12 +10,20 @@ enum RetryAfterHeader {
 
     /// Formats in the order Section 5.6.7 lists them: IMF-fixdate, then the two obsolete forms.
     ///
+    /// The zone is the literal `GMT` in the two that carry one, because the grammar admits nothing else:
+    /// `GMT = %s"GMT"`, and both `IMF-fixdate` and `rfc850-date` end in it. A pattern reading the zone
+    /// would accept any abbreviation or offset and take the sender at its word, which moves the instant
+    /// by that zone's distance from GMT: `Tue, 14 Nov 2023 22:14:20 PST` reads as a wait of just over
+    /// eight hours. That is above any sane ceiling, and a wait above the ceiling ends the retry, so a
+    /// header that is not an HTTP-date would stop a request the computed backoff repeats in about a
+    /// second.
+    ///
     /// The locale is fixed because the month and day names are part of the format, and a device set to a
     /// locale that spells them differently would otherwise fail to parse a correct header. The time zone
-    /// is fixed because the obsolete forms carry no offset.
+    /// is fixed because the third form carries none.
     private static let dateFormats = [
-        "EEE, dd MMM yyyy HH:mm:ss zzz",
-        "EEEE, dd-MMM-yy HH:mm:ss zzz",
+        "EEE, dd MMM yyyy HH:mm:ss 'GMT'",
+        "EEEE, dd-MMM-yy HH:mm:ss 'GMT'",
         "EEE MMM d HH:mm:ss yyyy"
     ]
 

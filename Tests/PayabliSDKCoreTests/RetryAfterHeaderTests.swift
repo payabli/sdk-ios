@@ -72,6 +72,28 @@ final class RetryAfterHeaderTests: XCTestCase {
         XCTAssertEqual(RetryAfterHeader.value(from: response(earlier), now: now), 0)
     }
 
+    /// A zone other than GMT is not an HTTP-date, whatever else it looks like.
+    ///
+    /// `GMT = %s"GMT"` and both zoned forms end in that literal (RFC 9110 Section 5.6.7), so a pattern
+    /// that reads the zone instead takes the sender at its word and moves the instant by that zone's
+    /// distance. It fails in the direction that costs the most: `PST` reads as a wait of just over
+    /// eight hours, which is above the ceiling, and a wait above the ceiling ends the retry rather than
+    /// being shortened. A numeric offset reads as a date already past and asks for no wait at all.
+    func testAZoneThatIsNotGMTReadsAsNoInstruction() {
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        for raw in [
+            "Tue, 14 Nov 2023 22:14:20 PST",
+            "Tue, 14 Nov 2023 22:14:20 +0530",
+            "Tue, 14 Nov 2023 22:14:20 UTC",
+            "Tuesday, 14-Nov-23 22:14:20 EST"
+        ] {
+            XCTAssertNil(
+                RetryAfterHeader.value(from: response(raw), now: now),
+                "\(raw) is not an HTTP-date"
+            )
+        }
+    }
+
     // MARK: - Absent and unreadable
 
     func testAnAbsentHeaderReadsAsNoInstruction() {
