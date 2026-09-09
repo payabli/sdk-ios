@@ -48,8 +48,12 @@ package struct RetryPolicy: Sendable {
     package static let defaultMaxJitter: TimeInterval = 0.5
     package static let defaultMaxRetryAfter: TimeInterval = 30
 
-    /// The three transient conditions, and nothing else. A code absent from this set is not retried, so a
-    /// code added later is un-retryable until someone decides otherwise.
+    /// The three codes a failure may be reconsidered under, and nothing else. A code absent from this set
+    /// is not retried, so a code added later is un-retryable until someone decides otherwise.
+    ///
+    /// Membership says the failure could be worth another attempt, never that the call may be repeated.
+    /// A server error is reached by a request that may already have been executed, so whether a repeat is
+    /// safe belongs to the operation, and the call site is what decides to run under this at all.
     package static let retryableCodes: Set<PayabliErrorCode> = [
         .networkError,
         .serverError,

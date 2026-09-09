@@ -16,13 +16,18 @@ public enum PayabliErrorCode: String, Sendable, CaseIterable {
     case paymentDeclined = "PAYMENT_DECLINED"
 
     /// The service could not process the request: an HTTP 5xx, or an answer whose own response code
-    /// reports a problem rather than a refusal. Retryable, which is why it is not folded into
-    /// ``unknown``.
+    /// reports a problem rather than a refusal.
+    ///
+    /// A classification and not a licence to repeat: on a money-moving call the request may already have
+    /// been executed, so a repeat without the original key can take the payment again. Whether an
+    /// operation is safe to repeat is the operation's to say.
     case serverError = "SERVER_ERROR"
 
-    /// HTTP 429. Retryable, and the one status whose correct handling is unreachable without a code of
-    /// its own: folded into ``unknown`` it could never be retried, because an unclassified status must
-    /// not be.
+    /// HTTP 429, and the one status whose correct handling is unreachable without a code of its own:
+    /// folded into ``unknown`` it could never be retried, because an unclassified status must not be.
+    ///
+    /// Safe to repeat, unlike a server error: the service refused to act rather than failing while
+    /// acting, so nothing was executed.
     case rateLimited = "RATE_LIMITED"
 
     /// HTTP 409. The request conflicts with the state the service holds.
