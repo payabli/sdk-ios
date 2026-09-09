@@ -5,9 +5,10 @@ import XCTest
 /// the documented domain `"com.payabli.ttp"`, the documented stable per-case
 /// integer code, and a non-empty `NSLocalizedDescriptionKey`.
 ///
-/// The integer codes are part of the public API. Inserting a new error case
-/// in the middle of `PayabliTTPError` would silently renumber the rest, so
-/// these tests fail loudly when a case arrives anywhere but the end.
+/// The integer codes are part of the public API. `errorCode` assigns each one
+/// explicitly, so what these tests hold is that every sampled case keeps the code
+/// it publishes. Declaration order is not checked and cannot be: a case inserted
+/// mid-enum, given a fresh code and added to the table below, passes.
 final class PayabliTTPErrorNSErrorTests: XCTestCase {
     // MARK: - Domain
 
