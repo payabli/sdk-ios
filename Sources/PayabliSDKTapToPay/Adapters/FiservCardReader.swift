@@ -73,22 +73,34 @@ package final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
     /// the shipped path always asks the reader it built.
     private var injectedLinkStateSource: AccountLinking?
 
+    /// Whatever `prepareReader()` last built, which in a shipped build is the vendored reader and
+    /// in a test is the injected one. Held apart from `reader` because that stays the vendored
+    /// type the charge path needs.
+    private var preparedReader: ReaderSetup?
+
+    /// Builds the reader `prepareReader()` drives. Set only by a test; `nil` in every shipped
+    /// build, where the vendored reader is constructed instead.
+    private var injectedReaderFactory: ((Credentials) throws -> ReaderSetup)?
+
     /// Whatever the terms surface asks. Read under the lock by its caller.
     private var linkStateSource: AccountLinking? {
         if let injectedLinkStateSource {
             return injectedLinkStateSource
         }
-        #if canImport(PayabliCardReaderCore)
-            return reader
-        #else
-            return nil
-        #endif
+        return preparedReader
     }
 
     /// Injects what the terms surface reads and presents. Tests only.
     func setLinkStateSource(_ source: AccountLinking?) {
         lock.lock()
         injectedLinkStateSource = source
+        lock.unlock()
+    }
+
+    /// Injects the reader `prepareReader()` drives. Tests only.
+    func setReaderFactory(_ make: ((Credentials) throws -> ReaderSetup)?) {
+        lock.lock()
+        injectedReaderFactory = make
         lock.unlock()
     }
 
@@ -169,12 +181,15 @@ package final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
     package func prepareReader() async throws {
         #if canImport(PayabliCardReaderCore)
             let creds = try requireCredentials()
-            let newReader = try buildReader(credentials: creds)
+            let injected = lock.withLock { injectedReaderFactory }
+            let newReader: ReaderSetup = try injected.map { try $0(creds) }
+                ?? buildReader(credentials: creds)
 
             // Credentials now live inside `newReader`, so this copy is dropped (NFR-5D).
-            lock.lock()
-            credentials = nil
-            lock.unlock()
+            lock.withLock {
+                preparedReader = newReader
+                credentials = nil
+            }
 
             logger.info("[fiserv.prepare] → requesting session")
             do {
@@ -348,6 +363,7 @@ package final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
             reader?.finalize()
             reader = nil
         #endif
+        preparedReader = nil
         credentials = nil
         lock.unlock()
     }

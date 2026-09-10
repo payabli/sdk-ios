@@ -26,7 +26,21 @@ protocol AccountLinking: AnyObject {
     func linkAccount() async throws
 }
 
+/// The rest of what `prepareReader()` drives, on the same reader instance.
+///
+/// Separate from `AccountLinking` because the terms surface asks only the two questions above,
+/// and widening that seam would make every terms test answer setup calls it never makes.
+///
+/// A test supplies its own, because `isAccountLinked()` reaches `PaymentCardReader` and a
+/// simulator has none. The session token is not the wall: `requestSessionToken()` is an ordinary
+/// `URLSession` call and answers a stub.
+protocol ReaderSetup: AccountLinking {
+    func requestSessionToken() async throws
+    func initializeSession() async throws
+}
+
 #if canImport(PayabliCardReaderCore)
-    /// The vendored reader already answers both, so the conformance is empty.
+    /// The vendored reader already answers all four, so both conformances are empty.
     extension FiservTTPCardReader: AccountLinking {}
+    extension FiservTTPCardReader: ReaderSetup {}
 #endif
