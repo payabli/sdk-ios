@@ -413,6 +413,7 @@ struct PaymentTapToPayQAView: View {
     /// sit under a step that is ready to run again.
     private func clearOutcomesForNewSession() {
         enableMessage = ""
+        termsMessage = ""
         chargeMessage = ""
         activationMessage = ""
         activationOutcome = .none
