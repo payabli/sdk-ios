@@ -116,36 +116,7 @@ enum TapToPaySteps {
             }
         }()
 
-        let enable: StepStatus = {
-            guard token.isFinished else { return .blocked }
-            switch session {
-            case .ready: return .done
-            case .attestingDevice, .fetchingConfig, .initializingReader, .reinitializing: return .inProgress
-            // Activation is a separate step, so reaching it means this one
-            // finished — unless the enable that follows a successful activation
-            // is what failed. `/config` answering 403 again puts the session back
-            // to `.pendingActivation`, and the reason for that failure is written
-            // to this step.
-            case .pendingActivation: return outcome == .enableFailed ? .failed : .done
-            // `activateDevice` calls markError when it is refused, so the session
-            // reads `.error` for a failure that belongs to the step after this
-            // one. Taking it here would block activation, which is where the
-            // reason and the retry are rendered. Expiry is not activation's
-            // doing, so a stale outcome does not move it.
-            case .error: return outcome == .activationFailed ? .done : .failed
-            case .sessionExpired: return .failed
-            // A recorded activation failure at `.idle` is a revoked attestation:
-            // it is the one failure `activateDevice` resets rather than marks,
-            // and re-attesting from scratch is this step's own action.
-            case .idle:
-                return outcome == .attestationRevoked || outcome == .activationFailed
-                    ? .failed
-                    : .current
-            // A state this app does not name says nothing about whether the reader
-            // came up, so the step stays the one to act on.
-            case .unrecognised: return .current
-            }
-        }()
+        let enable = enableStatus(token: token, session: session, outcome: outcome)
 
         let activation: StepStatus = {
             // Ordered. The outcome outlives the session it belongs to, so reading
@@ -177,47 +148,12 @@ enum TapToPaySteps {
         // down cannot answer.
         // Derived before `nextAction`, which reads it, so the control and the
         // sentence beside it cannot disagree about what went wrong.
-        let recovery: TapToPayRecovery? = {
-            guard !token.isActionable, token.isFinished else { return nil }
-            if session == .sessionExpired {
-                return .sessionExpired
-            }
-            if session == .error {
-                return .sessionErrored
-            }
-            return nil
-        }()
+        let recovery = recoveryReason(token: token, session: session)
 
-        let nextAction: TapToPayAction? = {
-            if token.isActionable {
-                return .checkToken
-            }
-            guard token.isFinished else { return nil }
-            // A session that expired still holds its attested identity, so
-            // re-running config and the reader is enough, and so does a refused
-            // activation, whose request reached the backend. `.error` otherwise
-            // is where a config 401 lands, and that path clears the attestation
-            // cache, so skipping attestation would fail on the assertion every
-            // time and offer the same control again.
-            if let recovery {
-                return recovery == .sessionErrored ? .reattest : .reinitialize
-            }
-            // `.failed` as well as `.current`: an enable that failed is retried
-            // from its own row, and this is the state a broken session does not
-            // cover.
-            if enable.isActionable {
-                return .enableTerminal
-            }
-            guard enable.isFinished else { return nil }
-            // `.failed` as well as `.current`, as with the enable step above: a
-            // refused code leaves the session `.pendingActivation`, which is the
-            // one state `activateDevice` accepts, so another code is the way on.
-            if activation.isActionable {
-                return .enterActivationCode
-            }
-            guard activation.isFinished else { return nil }
-            return charge == .current ? .charge : nil
-        }()
+        let nextAction = nextControl(
+            token: token, enable: enable, activation: activation,
+            charge: charge, recovery: recovery
+        )
 
         return TapToPayFlowSteps(
             token: FlowStep(
@@ -245,5 +181,103 @@ enum TapToPaySteps {
             nextAction: nextAction,
             recovery: recovery
         )
+    }
+
+    /// What the screen is recovering from, derived before the control that reads
+    /// it so the two cannot disagree about what went wrong.
+    private static func recoveryReason(
+        token: StepStatus,
+        session: TapToPaySessionStatus
+    ) -> TapToPayRecovery? {
+        guard !token.isActionable, token.isFinished else { return nil }
+        if session == .sessionExpired {
+            return .sessionExpired
+        }
+        if session == .error {
+            return .sessionErrored
+        }
+        return nil
+    }
+
+    /// The one control the screen offers, ordered like the steps: the first thing
+    /// wanting attention is the only thing shown.
+    private static func nextControl(
+        token: StepStatus,
+        enable: StepStatus,
+        activation: StepStatus,
+        charge: StepStatus,
+        recovery: TapToPayRecovery?
+    ) -> TapToPayAction? {
+        if token.isActionable {
+            return .checkToken
+        }
+        guard token.isFinished else { return nil }
+        // A session that expired still holds its attested identity, so
+        // re-running config and the reader is enough, and so does a refused
+        // activation, whose request reached the backend. `.error` otherwise
+        // is where a config 401 lands, and that path clears the attestation
+        // cache, so skipping attestation would fail on the assertion every
+        // time and offer the same control again.
+        if let recovery {
+            return recovery == .sessionErrored ? .reattest : .reinitialize
+        }
+        // `.failed` as well as `.current`: an enable that failed is retried
+        // from its own row, and this is the state a broken session does not
+        // cover.
+        if enable.isActionable {
+            return .enableTerminal
+        }
+        guard enable.isFinished else { return nil }
+        // `.failed` as well as `.current`, as with the enable step above: a
+        // refused code leaves the session `.pendingActivation`, which is the
+        // one state `activateDevice` accepts, so another code is the way on.
+        if activation.isActionable {
+            return .enterActivationCode
+        }
+        guard activation.isFinished else { return nil }
+        return charge == .current ? .charge : nil
+    }
+
+    /// What the enable step offers, which is the one step that reads the session
+    /// state directly. Its own function because the state model is what grows:
+    /// every state the SDK adds lands here, and folding it into the sequence
+    /// builder makes that growth everyone else's problem.
+    private static func enableStatus(
+        token: StepStatus,
+        session: TapToPaySessionStatus,
+        outcome: TapToPayActivationOutcome
+    ) -> StepStatus {
+        guard token.isFinished else { return .blocked }
+        switch session {
+        case .ready: return .done
+        case .attestingDevice, .fetchingConfig, .initializingReader, .reinitializing: return .inProgress
+        // Activation is a separate step, so reaching it means this one
+        // finished — unless the enable that follows a successful activation
+        // is what failed. `/config` answering 403 again puts the session back
+        // to `.pendingActivation`, and the reason for that failure is written
+        // to this step.
+        case .pendingActivation: return outcome == .enableFailed ? .failed : .done
+        // `activateDevice` calls markError when it is refused, so the session
+        // reads `.error` for a failure that belongs to the step after this
+        // one. Taking it here would block activation, which is where the
+        // reason and the retry are rendered. Expiry is not activation's
+        // doing, so a stale outcome does not move it.
+        case .error: return outcome == .activationFailed ? .done : .failed
+        case .sessionExpired: return .failed
+        // A recorded activation failure at `.idle` is a revoked attestation:
+        // it is the one failure `activateDevice` resets rather than marks,
+        // and re-attesting from scratch is this step's own action.
+        case .idle:
+            return outcome == .attestationRevoked || outcome == .activationFailed
+                ? .failed
+                : .current
+        // The reader is up and holding the token the sheet needs; what is
+        // missing is a person accepting. That is this step's to resolve, the
+        // way an activation code is the next step's.
+        case .pendingTerms: return .current
+        // A state this app does not name says nothing about whether the reader
+        // came up, so the step stays the one to act on.
+        case .unrecognised: return .current
+        }
     }
 }

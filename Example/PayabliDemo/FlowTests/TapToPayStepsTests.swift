@@ -34,7 +34,7 @@ final class TapToPayStepsTests: XCTestCase {
 
     /// A state this app does not name leaves the enable step offering its action,
     /// which is what an unknown reader state means: nothing about whether it came
-    /// up. The nine the SDK has today never map to it, which `StepStatusTests`
+    /// up. Every state the SDK has today is named, which `StepStatusTests`
     /// asserts, so this is the only place the case is exercised.
     func testAnUnnamedStateLeavesTheEnableStepToAct() {
         let sequence = TapToPaySteps.forCharging(
@@ -47,7 +47,9 @@ final class TapToPayStepsTests: XCTestCase {
     }
 
     func testTheSpaceIsTheSizeItClaims() {
-        XCTAssertEqual(everyCombination.count, 4 * 9 * 5)
+        // Derived from the same list the space is built over rather than written out, so a state
+        // added to the SDK moves this with it instead of failing here for the wrong reason.
+        XCTAssertEqual(everyCombination.count, 4 * everyTapToPayStatus.count * 5)
     }
 
     // MARK: - Invariants, over the whole space
