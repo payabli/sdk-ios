@@ -449,12 +449,20 @@ struct PaymentTapToPayQAView: View {
             defer { isWorking = false }
             do {
                 try await terminal.presentTerms()
+            } catch {
+                termsMessage = "✗ Presenting failed: \(error.localizedDescription)"
+                return
+            }
+            // Asked in its own scope: presenting has already returned by here, so a failure to
+            // ask afterwards must not be reported as the presentation having failed.
+            do {
                 let accepted = try await terminal.termsAccepted()
                 termsMessage = accepted
                     ? "returned; now ✓ Accepted"
                     : "returned; still ✗ Not accepted"
             } catch {
-                termsMessage = "✗ Presenting failed: \(error.localizedDescription)"
+                termsMessage = "returned; could not ask whether accepted: "
+                    + error.localizedDescription
             }
         }
     }
