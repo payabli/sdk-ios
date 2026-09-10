@@ -169,8 +169,9 @@ final class PayabliTTPTermsTests: XCTestCase {
         let (ttp, provider) = try makeTTP()
         provider.prepareReaderResult = .failure(PayabliTTPError.termsNotAccepted)
 
-        let seen = Task { () -> Bool in
-            for await event in ttp.events() where event.code == .termsRequired {
+        let stream = ttp.events()
+        let collector = Task { () -> Bool in
+            for await event in stream where event.code == .termsRequired {
                 return true
             }
             return false
@@ -178,7 +179,15 @@ final class PayabliTTPTermsTests: XCTestCase {
 
         _ = try? await ttp.initialize()
 
-        let emitted = await seen.value
+        // Bounded, because the regression this case exists to catch is the event not being emitted, and
+        // an unbounded read of the stream would hang the suite rather than report it.
+        let deadline = Task {
+            guard (try? await Task.sleep(nanoseconds: 2_000_000_000)) != nil else { return }
+            collector.cancel()
+        }
+        let emitted = await collector.value
+        deadline.cancel()
+
         XCTAssertTrue(emitted, "a host watching events is told what the session is waiting on")
     }
 
