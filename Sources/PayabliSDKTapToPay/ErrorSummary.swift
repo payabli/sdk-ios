@@ -110,6 +110,7 @@ enum ErrorSummary {
         case .sessionExpired: return "sessionExpired"
         case .reinitializing: return "reinitializing"
         case .pendingActivation: return "pendingActivation"
+        case .pendingTerms: return "pendingTerms"
         case .error: return "error"
         @unknown default: return "state(\(state.rawValue))"
         }

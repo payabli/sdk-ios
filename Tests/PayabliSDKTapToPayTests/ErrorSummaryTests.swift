@@ -84,6 +84,7 @@ final class ErrorSummaryTests: XCTestCase {
             (.sessionExpired, "sessionExpired"),
             (.reinitializing, "reinitializing"),
             (.pendingActivation, "pendingActivation"),
+            (.pendingTerms, "pendingTerms"),
             (.error, "error")
         ]
 

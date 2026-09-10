@@ -281,6 +281,38 @@ final class PayabliTTPTermsTests: XCTestCase {
         await fulfillment(of: [done], timeout: 1)
     }
 
+    /// The bridge every wrapper calls: three of them reach the sheet through this
+    /// selector rather than the Swift member, so its success path is theirs.
+    func testObjCCompanionPresentsAndReportsNoError() async throws {
+        let (ttp, provider) = try makeTTP()
+
+        let done = expectation(description: "completion")
+        ttp.presentTerms { error in
+            XCTAssertNil(error)
+            done.fulfill()
+        }
+        await fulfillment(of: [done], timeout: 1)
+
+        XCTAssertEqual(provider.presentTermsCalls, 1)
+    }
+
+    /// A failure crosses the bridge as an `NSError` in the SDK's own domain, so a
+    /// wrapper can tell a reader that could not present from a merchant who
+    /// declined. Its code is the taxonomy's, not a bridging invention.
+    func testObjCCompanionReportsAFailureAsAnNSError() async throws {
+        let (ttp, provider) = try makeTTP()
+        provider.presentTermsResult = .failure(
+            PayabliTTPError.readerSetupFailed(reason: "Reader not prepared")
+        )
+
+        let done = expectation(description: "completion")
+        ttp.presentTerms { error in
+            XCTAssertEqual(error?.domain, "com.payabli.ttp")
+            done.fulfill()
+        }
+        await fulfillment(of: [done], timeout: 1)
+    }
+
     /// `false` on the failure path is the bridging default, not an answer. An ObjC
     /// caller reading the flag without the error would treat a broken reader as an
     /// unaccepted merchant.

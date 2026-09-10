@@ -68,7 +68,8 @@ final class PayabliTTPEventCodeMappingTests: XCTestCase {
             .attestationStarted, .attestationCompleted, .configReceived,
             .readerInitializing, .readerReady, .nfcStarted, .nfcCompleted,
             .sessionExpired, .reinitializeStarted, .reinitializeCompleted,
-            .devicePendingActivation, .activationStarted, .activationCompleted
+            .devicePendingActivation, .activationStarted, .activationCompleted,
+            .termsRequired
         ]
         for event in emptyCases {
             XCTAssertTrue(
