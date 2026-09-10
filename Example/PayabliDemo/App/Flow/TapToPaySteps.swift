@@ -100,7 +100,7 @@ enum TapToPaySteps {
         // request. `.attestingDevice` is set before that request, and `.error` is
         // where a failing token provider lands.
         let sessionProvesBackend = switch session {
-        case .fetchingConfig, .initializingReader, .ready, .pendingActivation, .reinitializing:
+        case .fetchingConfig, .initializingReader, .ready, .pendingActivation, .pendingTerms, .reinitializing:
             true
         default:
             false

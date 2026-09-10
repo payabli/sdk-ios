@@ -61,6 +61,23 @@ final class TapToPayStepsTests: XCTestCase {
         XCTAssertEqual(sequence.enable.status, .current)
     }
 
+    /// A session waiting on terms proves the backend answered, so an unrun probe does not send the
+    /// sequence back to the token step.
+    ///
+    /// Reaching `.pendingTerms` takes an attestation and a config request, exactly as
+    /// `.pendingActivation` does. Left out of that set, the token step claims `.current` whenever the
+    /// probe has not run and the screen offers the probe instead of the terms.
+    func testWaitingOnTermsProvesTheBackendAnsweredEvenWithNoProbe() {
+        let sequence = TapToPaySteps.forCharging(
+            tokenCheck: .notRun,
+            session: .pendingTerms,
+            activation: .none
+        )
+
+        XCTAssertEqual(sequence.token.status, .done)
+        XCTAssertEqual(sequence.nextAction, .presentTerms)
+    }
+
     func testTheSpaceIsTheSizeItClaims() {
         // Derived from the same list the space is built over rather than written out, so a state
         // added to the SDK moves this with it instead of failing here for the wrong reason.
