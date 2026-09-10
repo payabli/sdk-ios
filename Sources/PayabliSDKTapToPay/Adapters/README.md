@@ -157,7 +157,12 @@ source tree, and the facade holds its provider directly.
 3. `requiredCredentialKeys` / `optionalCredentialKeys` static arrays; log a warning for missing optionals.
 4. `checkEligibility()` never reads credentials.
 5. `prepareReader()` drops `self.credentials = nil` right after the processor SDK has its own copy.
-6. Any failure inside `prepareReader()` calls `clearAllState()` before throwing.
+6. Any failure inside `prepareReader()` calls `clearAllState()` before throwing, with one
+   exception: a failure that means the merchant has not accepted the platform's terms keeps the
+   reader. That reader holds what `presentTerms()` needs and is what answers
+   `areTermsAccepted()` afterwards, so clearing it leaves a host unable to act on the one failure
+   it can resolve. Read that condition from the platform rather than from the error's text, and
+   only where the platform can actually report it.
 7. `cancelReading()` and `cleanUp()` both call `clearAllState()`.
 8. `XxxCardReader+Errors.swift` with `mapError(_:fallback:)` and `cancellationReasonPrefix`.
 9. Unit tests: `XxxCardReaderTests.swift` under `Tests/PayabliSDKTapToPayTests/` covering eligibility, `configure` validation, and the `cleanUp → prepareReader` failure path.

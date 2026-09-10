@@ -185,18 +185,27 @@ package final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
                     try await newReader.linkAccount()
                 }
 
-                try await newReader.initializeSession()
-                logger.info("[fiserv.prepare] ← reader ready (linked=\(linked))")
-            } catch {
-                // Unaccepted terms is the one setup failure that leaves the reader in use, and it has
-                // to: the reader holds the session token presenting the sheet needs, and it is what
-                // answers whether the merchant has accepted afterwards. Clearing it here would leave a
-                // host holding a failure it has no way to act on.
-                if try await isNotLinked(newReader) {
+                do {
+                    try await newReader.initializeSession()
+                } catch {
+                    // Opening the session is the only step the platform refuses over terms, so it is
+                    // the only failure read that way. The steps before it leave the merchant unlinked
+                    // whenever they fail at all — a dropped connection while presenting the sheet is
+                    // still an unlinked merchant — and calling those unaccepted terms would hide an
+                    // operational failure behind a state the host cannot resolve by asking again.
+                    guard try await isNotLinked(newReader) else { throw error }
                     logger.info("[fiserv.prepare] ← terms not accepted; reader kept")
                     throw PayabliTTPError.termsNotAccepted
                 }
 
+                logger.info("[fiserv.prepare] ← reader ready (linked=\(linked))")
+            } catch PayabliTTPError.termsNotAccepted {
+                // The one setup failure that leaves the reader in use, and it has to: the reader holds
+                // the session token presenting the sheet needs, and it is what answers whether the
+                // merchant has accepted afterwards. Clearing it would leave a host holding a failure it
+                // has no way to act on.
+                throw PayabliTTPError.termsNotAccepted
+            } catch {
                 clearAllState()
                 throw Self.mapError(error) { .readerSetupFailed(reason: $0) }
             }
