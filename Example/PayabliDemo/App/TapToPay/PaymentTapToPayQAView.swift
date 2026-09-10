@@ -103,12 +103,9 @@ struct PaymentTapToPayQAView: View {
             StepRow(index: 2, step: steps.enable) {
                 VStack(alignment: .leading, spacing: 6) {
                     if steps.nextAction == .enableTerminal {
-                        Button { runEnableTerminal() } label: {
-                            Label("Enable Terminal", systemImage: "wave.3.right")
-                                .frame(maxWidth: .infinity)
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .disabled(isWorking)
+                        Button { runEnableTerminal() } label: { enableTerminalLabel }
+                            .buttonStyle(.borderedProminent)
+                            .disabled(isWorking)
                     }
                     if steps.nextAction == .presentTerms {
                         Button { runPresentTerms() } label: {
@@ -117,6 +114,13 @@ struct PaymentTapToPayQAView: View {
                         }
                         .buttonStyle(.borderedProminent)
                         .disabled(isWorking)
+                        // Accepting does not move the session on its own. Presenting the sheet and
+                        // running the setup again are two calls a host makes, and only the second
+                        // reaches `.ready`, so both belong here: offering the first alone leaves
+                        // this screen with nothing to press once the merchant has accepted.
+                        Button { runEnableTerminal() } label: { enableTerminalLabel }
+                            .buttonStyle(.bordered)
+                            .disabled(isWorking)
                     }
                     // Never gated on a state: the SDK answers this whenever a host asks, and hiding it
                     // until some state would show the opposite of what the member promises.
@@ -179,6 +183,11 @@ struct PaymentTapToPayQAView: View {
 
     /// Recovery is not part of the sequence, so it only appears when the session
     /// is in a state it can actually repair.
+    private var enableTerminalLabel: some View {
+        Label("Enable Terminal", systemImage: "wave.3.right")
+            .frame(maxWidth: .infinity)
+    }
+
     @ViewBuilder
     private var recoverySection: some View {
         if let recovery = steps.recovery {
