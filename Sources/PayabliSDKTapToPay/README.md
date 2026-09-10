@@ -164,8 +164,13 @@ in-flight transaction bodies: RAM only (NFR-5D).
 ## 2. Session lifecycle (PRD §17)
 
 The state machine in `PayabliTTPSessionState` is the single source of truth
-for what the facade can do next. Every public facade method first asserts
+for what the facade can do next. A facade method that acts on the session asserts
 `sessionState ∈ {allowed}` before acting.
+
+The terms members are the exception and it is deliberate: `areTermsAccepted()` and
+`presentTerms()` carry no state guard, because what they need is a prepared reader
+rather than a state. Guarding them would refuse at `.pendingTerms`, which is the
+one moment a host asks.
 
 ```
              ┌──────────────────────────────────────────────┐
@@ -185,9 +190,24 @@ SDK: the host resolves what the session is waiting for, then initializes again.
 ```
 
 The transition matrix lives in `SessionManager.isValidTransition(from:to:)`.
-Adding a new state or edge means updating that matrix, the switch in
-`PayabliTTPSessionState`, and the relevant facade extension — no other file
-needs to change.
+An **edge** is that matrix and nothing else.
+
+A **state** is not, and this list is written from what adding `.pendingTerms`
+actually touched. The raw values are public API and are mirrored by hand in three
+bridges, so a state that stops at the matrix ships a number the wrappers cannot
+name:
+
+- `PayabliTTPSessionState`, appended, never renumbered
+- `SessionManager.isValidTransition(from:to:)`, and its cases
+- the facade extension that enters or leaves it
+- `ErrorSummary.name(of:)`, or a diagnostic prints the raw number
+- `Bridges/ReactNative/PayabliSDK.ts`, `Bridges/Flutter/lib/payabli_sdk.dart`,
+  `Bridges/MAUI/PayabliEnums.cs` and `PayabliBinding.cs`
+- the sample app's `TapToPaySessionStatus` and the step sequence that switches on
+  it, which build from their own scheme and so stay green in the package suite
+- the exhaustive tables in `ErrorSummaryTests`, `StepStatusTests` and
+  `TapToPayStepsTests`
+- this diagram
 
 ---
 

@@ -17,7 +17,7 @@ end to end against sandbox.
 - **Live event log** — every `PayabliTTPEvent` from the multicaster
   rendered into a list, including the per-case payload.
 - **Session badge** — the navigation bar shows where the reader has got to,
-  color-coded, as `TapToPaySessionStatus`: the SDK's nine states in this app's
+  color-coded, as `TapToPaySessionStatus`: the SDK's states in this app's
   own words.
 - **PayIn payment flow** — SwiftUI `PayabliPayInPaymentFlowView` tabs that can
   render stored-method and capture forms, hide optional values, apply a custom
@@ -114,7 +114,7 @@ PayabliDemo/
                   PayInDiagnostics.swift        the redacted request log
                   TapToPaySessions.swift        builds the card reader
                   TapToPayTerminal.swift        owns the reader, hands screens answers
-                  TapToPaySessionStatus.swift   the nine states, in this app's words
+                  TapToPaySessionStatus.swift   the SDK's states, in this app's words
                   PayabliEnvironmentMapping.swift  the demo's environment, in the SDK's terms
                   DemoCustomerData.swift        the stand-in customer each surface sends
                   PayInSharedConfiguration.swift  what both forms share

@@ -2,9 +2,8 @@ import PayabliSDKTapToPay
 
 /// Where the card reader has got to, in this app's own words.
 ///
-/// The SDK publishes nine states. These are the same nine plus a case for one it
-/// adds later, so a screen switches over this and not over a type that can grow
-/// under it.
+/// These mirror the SDK's states, plus a case for one it adds later, so a screen
+/// switches over this and not over a type that can grow under it.
 enum TapToPaySessionStatus {
     case idle
     case attestingDevice
