@@ -16,7 +16,9 @@ protocol AccountLinking: AnyObject {
     /// Whether the merchant has accepted the terms the platform requires.
     func isAccountLinked() async throws -> Bool
 
-    /// Presents the platform's own terms sheet. Returns once the merchant has finished with it.
+    /// Asks the platform to present its own terms. Returns once the request is done, which is not
+    /// the same as a sheet having been shown: a merchant who has already accepted needs none, and
+    /// the request then completes without presenting anything.
     ///
     /// The reader holds the session token this needs, which is why it is asked of the reader rather
     /// than performed anywhere above it. Nothing here accepts on the merchant's behalf: the sheet is

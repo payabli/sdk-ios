@@ -306,12 +306,13 @@ export function areTermsAccepted(): Promise<boolean> {
 }
 
 /**
- * Presents the terms the merchant has to accept before this device will take a
- * contactless payment, and resolves once they have finished with the sheet.
+ * Asks the platform to present the terms the merchant has to accept before this
+ * device will take a contactless payment, and resolves once the request is done.
  *
- * This does not accept anything on their behalf: the sheet belongs to the
- * platform and the merchant taps it, so resolving means it was shown and
- * dismissed. Call `areTermsAccepted()` afterwards to find out what they chose.
+ * This does not accept anything on their behalf, and resolving is not proof that
+ * a sheet appeared: a merchant who has already accepted needs none, and the
+ * request then resolves without showing one. Call `areTermsAccepted()` afterwards
+ * to find out where they stand.
  *
  * `initialize()` reports `PayabliTTPSessionState.PendingTerms` when acceptance is
  * what it is waiting for. Present them from a screen you chose, then initialize

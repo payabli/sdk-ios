@@ -62,10 +62,10 @@ final class TapToPayTerminal: ObservableObject {
         try await run { try await terminal.activateDevice(activationCode: code) }
     }
 
-    /// Presents the platform's terms so the merchant can accept them.
+    /// Asks the platform to present its terms so the merchant can accept them.
     ///
-    /// Returning means the sheet was shown and dismissed, so the walk asks again
-    /// afterwards rather than assuming the merchant accepted.
+    /// Returning means the request completed, not that a sheet appeared, so the walk
+    /// asks again afterwards rather than assuming either.
     func presentTerms() async throws {
         try await run { try await terminal.presentTerms() }
     }

@@ -230,8 +230,8 @@ final class PayabliTTPTermsTests: XCTestCase {
         XCTAssertEqual(provider.presentTermsCalls, 1)
     }
 
-    /// Returning says the sheet was shown and dismissed, never that acceptance was given. The platform
-    /// is the only authority on that, so a host reads it by asking afterwards.
+    /// Returning says the request completed, never that acceptance was given and never that a sheet
+    /// appeared. The platform is the only authority on that, so a host reads it by asking afterwards.
     func testPresentingDoesNotItselfMeanAccepted() async throws {
         let (ttp, provider) = try makeTTP()
         provider.areTermsAcceptedResult = .success(false)

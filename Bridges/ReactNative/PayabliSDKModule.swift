@@ -267,9 +267,9 @@ public final class PayabliSDKModule: RCTEventEmitter {
 
     // MARK: - presentTerms
 
-    /// Resolves once the sheet has been shown and dismissed, which is not the same
-    /// as the merchant having accepted. Call `areTermsAccepted()` after this to
-    /// find out.
+    /// Resolves once the platform request is done, which is neither proof that a
+    /// sheet appeared nor that the merchant accepted. Call `areTermsAccepted()`
+    /// after this to find out where the merchant stands.
     @objc public func presentTerms(
         _ resolve: @escaping RCTPromiseResolveBlock,
         rejecter reject: @escaping RCTPromiseRejectBlock

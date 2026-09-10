@@ -51,13 +51,14 @@ public extension PayabliTTP {
         }
     }
 
-    /// Presents the terms the merchant has to accept before this device will take
-    /// a contactless payment, and returns once they have finished with the sheet.
+    /// Asks the platform to present the terms the merchant has to accept before this
+    /// device will take a contactless payment, and returns once the request is done.
     ///
-    /// **This does not accept anything on the merchant's behalf.** The sheet is
-    /// the platform's, the merchant reads and taps it, and returning without an
-    /// error means it was shown and dismissed — not that acceptance was given.
-    /// Call `areTermsAccepted()` afterwards to find out.
+    /// **This accepts nothing on the merchant's behalf, and returning is not proof
+    /// that a sheet appeared.** The sheet is the platform's and the merchant reads
+    /// and taps it, but a merchant who has already accepted needs no sheet, and the
+    /// request then completes without showing one. Call `areTermsAccepted()`
+    /// afterwards to find out where the merchant stands.
     ///
     /// Call it from a screen you chose, at a moment a merchant with the authority
     /// to accept is present. `initialize()` reports

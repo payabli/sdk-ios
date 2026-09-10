@@ -286,8 +286,9 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
 
     // MARK: - presentTerms
 
-    /// Completes once the sheet has been shown and dismissed, which is not the
-    /// same as the merchant having accepted. `areTermsAccepted` answers that.
+    /// Completes once the platform request is done, which is neither proof that a
+    /// sheet appeared nor that the merchant accepted. `areTermsAccepted` answers
+    /// where the merchant stands.
     private func handlePresentTerms(result: @escaping FlutterResult) {
         guard let ttp else {
             result(FlutterError(

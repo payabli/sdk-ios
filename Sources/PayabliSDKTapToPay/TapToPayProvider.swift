@@ -62,13 +62,14 @@ package protocol TapToPayProvider: AnyObject, Sendable {
     /// reader to ask, so a caller can tell "not accepted" from "cannot answer".
     func areTermsAccepted() async throws -> Bool
 
-    /// Presents the platform's own terms sheet so the merchant can accept, and
-    /// returns once they have finished with it.
+    /// Asks the platform to present its own terms so the merchant can accept, and
+    /// returns once the request is done.
     ///
     /// Nothing here accepts on the merchant's behalf. The sheet belongs to the
     /// platform and the merchant taps it, so returning without error means the
-    /// sheet was shown and dismissed rather than that acceptance was given.
-    /// `areTermsAccepted()` is what answers that afterwards.
+    /// request completed, not that a sheet was shown: a platform that requires no
+    /// acceptance returns without presenting anything. `areTermsAccepted()` is what
+    /// answers where the merchant stands afterwards.
     ///
     /// Called by the facade on demand, from a screen the host chose. A platform
     /// that requires no acceptance returns without doing anything.
