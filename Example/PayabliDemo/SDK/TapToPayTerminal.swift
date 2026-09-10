@@ -62,6 +62,19 @@ final class TapToPayTerminal: ObservableObject {
         try await run { try await terminal.activateDevice(activationCode: code) }
     }
 
+    /// Presents the platform's terms so the merchant can accept them.
+    ///
+    /// Returning means the sheet was shown and dismissed, so the walk asks again
+    /// afterwards rather than assuming the merchant accepted.
+    func presentTerms() async throws {
+        try await run { try await terminal.presentTerms() }
+    }
+
+    /// Whether the merchant has accepted, asked of the platform.
+    func termsAccepted() async throws -> Bool {
+        try await run { try await terminal.areTermsAccepted() }
+    }
+
     /// Listens for the reader's own events, already named and flattened.
     func addEventListener(
         _ onEvent: @escaping (TapToPayEvent) -> Void

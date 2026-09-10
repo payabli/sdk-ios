@@ -14,6 +14,7 @@ enum TapToPaySessionStatus {
     case sessionExpired
     case reinitializing
     case pendingActivation
+    case pendingTerms
     case error
     case unrecognised(Int)
 
@@ -28,6 +29,7 @@ enum TapToPaySessionStatus {
         case .sessionExpired: return "expired"
         case .reinitializing: return "reinit"
         case .pendingActivation: return "pending"
+        case .pendingTerms: return "terms"
         case .error: return "error"
         case let .unrecognised(raw): return "state(\(raw))"
         }
@@ -39,7 +41,7 @@ enum TapToPaySessionStatus {
         switch self {
         case .ready: return .ready
         case .error, .sessionExpired: return .failed
-        case .pendingActivation: return .waiting
+        case .pendingActivation, .pendingTerms: return .waiting
         default: return .working
         }
     }
@@ -71,6 +73,7 @@ extension TapToPaySessionStatus {
         case .sessionExpired: self = .sessionExpired
         case .reinitializing: self = .reinitializing
         case .pendingActivation: self = .pendingActivation
+        case .pendingTerms: self = .pendingTerms
         case .error: self = .error
         @unknown default: self = .unrecognised(state.rawValue)
         }

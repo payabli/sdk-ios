@@ -146,6 +146,26 @@ class PayabliTTP {
     }
   }
 
+  // MARK: - presentTerms
+
+  /// Presents the terms the merchant has to accept before this device will take
+  /// a contactless payment, completing once they have finished with the sheet.
+  ///
+  /// This does not accept anything on their behalf: the sheet belongs to the
+  /// platform and the merchant taps it, so completing means it was shown and
+  /// dismissed. Call [areTermsAccepted] afterwards to find out what they chose.
+  ///
+  /// [initialize] reports [PayabliTTPSessionState.pendingTerms] when acceptance
+  /// is what it is waiting for. Present them from a screen you chose, then
+  /// initialize again.
+  static Future<void> presentTerms() async {
+    try {
+      await _payabliMethodChannel.invokeMethod<void>('presentTerms');
+    } on PlatformException catch (e) {
+      throw PayabliTTPException._fromPlatform(e);
+    }
+  }
+
   // MARK: - getSessionState
 
   /// Polls the current `PayabliTTPSessionState`.
@@ -354,6 +374,7 @@ enum PayabliTTPSessionState {
   reinitializing,
   pendingActivation,
   error,
+  pendingTerms,
 }
 
 /// Mirrors `PayabliTTPEventCode` (raw indices match the @objc Int enum).
@@ -378,6 +399,7 @@ enum PayabliTTPEventCode {
   activationFailed,
   attestationFailed,
   configFailed,
+  termsRequired,
 
   /// A code this mirror has not been taught yet. The SDK appends cases, and a
   /// bridge that indexes blindly turns a newer SDK into a crash.

@@ -32,6 +32,7 @@ final class PayabliTTPEventCodeMappingTests: XCTestCase {
         XCTAssertEqual(PayabliTTPEventCode.activationFailed.rawValue, 17)
         XCTAssertEqual(PayabliTTPEventCode.attestationFailed.rawValue, 18)
         XCTAssertEqual(PayabliTTPEventCode.configFailed.rawValue, 19)
+        XCTAssertEqual(PayabliTTPEventCode.termsRequired.rawValue, 20)
     }
 
     // MARK: - .code mapping
@@ -57,6 +58,7 @@ final class PayabliTTPEventCodeMappingTests: XCTestCase {
         XCTAssertEqual(PayabliTTPEvent.activationFailed(error: "x").code, .activationFailed)
         XCTAssertEqual(PayabliTTPEvent.attestationFailed(error: "x").code, .attestationFailed)
         XCTAssertEqual(PayabliTTPEvent.configFailed(error: "x").code, .configFailed)
+        XCTAssertEqual(PayabliTTPEvent.termsRequired.code, .termsRequired)
     }
 
     // MARK: - .payload schema

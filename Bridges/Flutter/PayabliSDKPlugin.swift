@@ -65,6 +65,8 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
             handleActivateDevice(call.arguments, result: result)
         case "areTermsAccepted":
             handleAreTermsAccepted(result: result)
+        case "presentTerms":
+            handlePresentTerms(result: result)
         case "getSessionState":
             handleGetSessionState(result: result)
         case "configurePayInPaymentFlow":
@@ -278,6 +280,28 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
                 result(error.toFlutterError(defaultCode: "TERMS_CHECK_FAILED"))
             } else {
                 result(accepted)
+            }
+        }
+    }
+
+    // MARK: - presentTerms
+
+    /// Completes once the sheet has been shown and dismissed, which is not the
+    /// same as the merchant having accepted. `areTermsAccepted` answers that.
+    private func handlePresentTerms(result: @escaping FlutterResult) {
+        guard let ttp else {
+            result(FlutterError(
+                code: "NOT_CONFIGURED",
+                message: "Call configure() before presentTerms()",
+                details: nil
+            ))
+            return
+        }
+        ttp.presentTerms { error in
+            if let error {
+                result(error.toFlutterError(defaultCode: "TERMS_PRESENT_FAILED"))
+            } else {
+                result(nil)
             }
         }
     }

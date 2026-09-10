@@ -279,6 +279,12 @@ extension PayabliTTP {
         do {
             try await provider.prepareReader()
             readerSessionGeneration += 1
+        } catch PayabliTTPError.termsNotAccepted {
+            // Not an error state: the session is waiting on a person, the way it waits on one in
+            // `pendingActivation`. The host presents the terms and initializes again, and the reader
+            // stays up meanwhile because it is what presents them.
+            markPendingTerms()
+            throw PayabliTTPError.termsNotAccepted
         } catch {
             sessionManager.markError(error)
             syncPublished()
@@ -293,5 +299,11 @@ extension PayabliTTP {
         _ = sessionManager.transition(to: .pendingActivation)
         syncPublished()
         multicaster.emit(.devicePendingActivation)
+    }
+
+    private func markPendingTerms() {
+        _ = sessionManager.transition(to: .pendingTerms)
+        syncPublished()
+        multicaster.emit(.termsRequired)
     }
 }

@@ -56,6 +56,7 @@ export enum PayabliTTPSessionState {
     Reinitializing = 6,
     PendingActivation = 7,
     Error = 8,
+    PendingTerms = 9,
 }
 
 export enum PayabliTTPEventCode {
@@ -79,6 +80,7 @@ export enum PayabliTTPEventCode {
     ActivationFailed = 17,
     AttestationFailed = 18,
     ConfigFailed = 19,
+    TermsRequired = 20,
 }
 
 export type PayabliPayInPaymentFlowACHAccountType = "Checking" | "Savings";
@@ -216,6 +218,7 @@ interface NativePayabliSDKModule {
     activateDevice(activationCode: string): Promise<void>;
 
     areTermsAccepted(): Promise<boolean>;
+    presentTerms(): Promise<void>;
 
     getSessionState(): Promise<number>;
 
@@ -302,6 +305,22 @@ export function areTermsAccepted(): Promise<boolean> {
     return requireNativeModule().areTermsAccepted();
 }
 
+/**
+ * Presents the terms the merchant has to accept before this device will take a
+ * contactless payment, and resolves once they have finished with the sheet.
+ *
+ * This does not accept anything on their behalf: the sheet belongs to the
+ * platform and the merchant taps it, so resolving means it was shown and
+ * dismissed. Call `areTermsAccepted()` afterwards to find out what they chose.
+ *
+ * `initialize()` reports `PayabliTTPSessionState.PendingTerms` when acceptance is
+ * what it is waiting for. Present them from a screen you chose, then initialize
+ * again.
+ */
+export function presentTerms(): Promise<void> {
+    return requireNativeModule().presentTerms();
+}
+
 export async function getSessionState(): Promise<PayabliTTPSessionState> {
     const raw = await requireNativeModule().getSessionState();
     return raw as PayabliTTPSessionState;
@@ -324,6 +343,7 @@ export const PayabliTTP = {
     charge,
     activateDevice,
     areTermsAccepted,
+    presentTerms,
     getSessionState,
     addEventListener,
 };

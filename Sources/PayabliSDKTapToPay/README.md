@@ -34,7 +34,7 @@ The public entry point that host apps consume. Split across companion files
 | `PayabliTTP+Initialize.swift` | `initialize()` (cold/warm path) and `reinitializeIfNeeded()` (fresh `/config` after 401) |
 | `PayabliTTP+Activation.swift` | `activateDevice()` for pending-device flows. Emits `activationStarted` / `activationCompleted` / `activationFailed`. The partner provisions the activation code out-of-band (PRD §9.7) |
 | `PayabliTTP+Charge.swift` | 3-step sale pipeline: `/initiate` → `startReading` → `/update` (PRD §19.1) |
-| `PayabliTTP+Terms.swift` | `areTermsAccepted()`, asked of the platform on every call rather than cached. A provider that cannot be asked throws, so a caller can tell that from "not accepted" |
+| `PayabliTTP+Terms.swift` | `areTermsAccepted()`, asked of the platform on every call rather than cached. A provider that cannot be asked throws, so a caller can tell that from "not accepted". `presentTerms()` shows the platform's sheet from a screen the host chose; returning means it was shown, not that the merchant accepted |
 | `PayabliTTPEvent.swift` | `PayabliTTPEvent` (lifecycle cases) + `PayabliTTPError` (PRD §20) + `PayabliTTPEventCode` (`@objc`) + per-case `payload` schema + `CustomNSError` bridging |
 | `PayabliTTPTypes.swift` | `PayabliTTPSessionState`, `PayabliTTPPaymentType`, `TransactionResult` |
 | `PayabliTTPTransactionData.swift` | `PayabliTTPCustomerData`, `PayabliTTPPaymentDetails`, `PayabliTTPInvoiceData`, internal `TTPTransactionContext` |
@@ -64,6 +64,7 @@ or value-typed `enum`s with associated values.
 | `try await ttp.charge(type:paymentDetails:customer:invoice:orderDescription:)` | `[ttp chargeWithType:paymentDetails:customer:invoice:orderDescription:completion:]` returning `PayabliTTPTransactionResultObjC*` + `NSError*` |
 | `try await ttp.activateDevice(activationCode:)` | `[ttp activateDeviceWithActivationCode:completion:]` |
 | `try await ttp.areTermsAccepted()` | `[ttp areTermsAcceptedWithCompletion:^(BOOL accepted, NSError *err){...}]` — `accepted` is `NO` on the failure path as a bridging default and never an answer, so read `err` first |
+| `try await ttp.presentTerms()` | `[ttp presentTermsWithCompletion:^(NSError *err){...}]` — `err` is `nil` once the sheet has been shown and dismissed, which is not the same as accepted |
 | `for await event in ttp.events()` | `[ttp addEventListenerWithHandler:^(PayabliTTPEventCode code, NSDictionary *payload){...}]` returning a `PayabliTTPEventToken` (call `[token cancel]` to stop) |
 | `PayabliTTPCustomerData(...)` (struct) | `[[PayabliTTPCustomerDataObjC alloc] initWithFirstName:lastName:customerNumber:email:phone:customerId:company:billingAddress1:billingAddress2:billingCity:billingState:billingZip:billingCountry:billingPhone:billingEmail:shippingAddress1:shippingAddress2:shippingCity:shippingState:shippingZip:shippingCountry:]` |
 | `PayabliTTPPaymentDetails(...)` (struct) | `[[PayabliTTPPaymentDetailsObjC alloc] initWithAmount:serviceFee:currency:paymentDescription:]` |

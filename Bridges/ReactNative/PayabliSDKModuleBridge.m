@@ -21,6 +21,9 @@ RCT_EXTERN_METHOD(activateDevice:(NSString *)activationCode
 RCT_EXTERN_METHOD(areTermsAccepted:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject)
 
+RCT_EXTERN_METHOD(presentTerms:(RCTPromiseResolveBlock)resolve
+                  rejecter:(RCTPromiseRejectBlock)reject)
+
 RCT_EXTERN_METHOD(getSessionState:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject)
 

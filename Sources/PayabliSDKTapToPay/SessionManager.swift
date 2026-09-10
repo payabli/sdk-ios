@@ -90,6 +90,7 @@ final class SessionManager: ObservableObject {
             return true
 
         case (.initializingReader, .ready),
+             (.initializingReader, .pendingTerms),
              (.initializingReader, .error):
             return true
 
@@ -104,7 +105,10 @@ final class SessionManager: ObservableObject {
              (.reinitializing, .error):
             return true
 
-        case (.pendingActivation, .attestingDevice):
+        // Both wait on a person rather than on the SDK, and both leave the same way: the host resolves
+        // what the session is waiting on, then initializes again, which starts at attestation.
+        case (.pendingActivation, .attestingDevice),
+             (.pendingTerms, .attestingDevice):
             return true
 
         case (.error, .attestingDevice),

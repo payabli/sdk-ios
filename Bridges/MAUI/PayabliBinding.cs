@@ -51,6 +51,7 @@ namespace Payabli.TapToPay
         Reinitializing = 6,
         PendingActivation = 7,
         Error = 8,
+        PendingTerms = 9,
     }
 
     // MARK: - PayabliTTPEventCode
@@ -78,6 +79,7 @@ namespace Payabli.TapToPay
         ActivationFailed = 17,
         AttestationFailed = 18,
         ConfigFailed = 19,
+        TermsRequired = 20,
     }
 
     // MARK: - Completion delegates
@@ -271,6 +273,9 @@ namespace Payabli.TapToPay
 
         [Export("areTermsAcceptedWithCompletion:")]
         void AreTermsAccepted(PayabliTTPTermsCompletion completion);
+
+        [Export("presentTermsWithCompletion:")]
+        void PresentTerms(PayabliTTPCompletion completion);
 
         // Session state (read-only @Published properties).
 

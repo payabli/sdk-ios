@@ -167,6 +167,48 @@ final class FiservCardReaderTests: XCTestCase {
         XCTAssertFalse(accepted)
     }
 
+    func testPresentingReachesTheReader() async throws {
+        let reader = FiservCardReader()
+        let source = StubLinkState(.success(false))
+        reader.setLinkStateSource(source)
+
+        try await reader.presentTerms()
+
+        XCTAssertEqual(source.linkAccountCalls, 1)
+    }
+
+    /// The sheet needs the session token the reader obtained, so there is nothing to present from
+    /// before one is prepared. That is a different answer from the merchant declining, and a caller
+    /// showing a terms screen has to tell them apart.
+    func testPresentingWithoutAReaderSaysSoRatherThanFailingQuietly() async {
+        let reader = FiservCardReader()
+
+        do {
+            try await reader.presentTerms()
+            XCTFail("expected the missing reader to surface")
+        } catch PayabliTTPError.readerSetupFailed {
+            // expected
+        } catch {
+            XCTFail("wrong error: \(error)")
+        }
+    }
+
+    /// A platform failure while presenting keeps its shape rather than reading as a dismissal.
+    func testAReaderThatRaisesWhilePresentingIsMapped() async {
+        let reader = FiservCardReader()
+        struct PlatformFailure: Error {}
+        reader.setLinkStateSource(StubLinkState(.success(false), linkResult: .failure(PlatformFailure())))
+
+        do {
+            try await reader.presentTerms()
+            XCTFail("expected the reader's failure to surface")
+        } catch PayabliTTPError.readerSetupFailed {
+            // expected
+        } catch {
+            XCTFail("wrong error: \(error)")
+        }
+    }
+
     /// A reader that raises is not a merchant who declined, so the failure keeps
     /// its own shape instead of collapsing into `false`.
     func testAReaderThatRaisesIsMappedRatherThanReportedAsUnaccepted() async {
@@ -186,15 +228,38 @@ final class FiservCardReaderTests: XCTestCase {
 }
 
 /// Answers the linked state in place of a reader, which cannot be built without
-/// hardware.
-private final class StubLinkState: AccountLinkReading {
-    private let result: Result<Bool, Error>
+/// hardware, and stands in for the sheet the reader would present.
+private final class StubLinkState: AccountLinking {
+    private let lock = NSLock()
+    private var result: Result<Bool, Error>
+    private let linkResult: Result<Void, Error>
+    private let acceptsOnPresent: Bool
 
-    init(_ result: Result<Bool, Error>) {
+    private(set) var linkAccountCalls = 0
+
+    /// `acceptsOnPresent` makes the stub answer `true` after the sheet has been presented, which is
+    /// what a real reader does once the merchant accepts. Left off, presenting changes no answer.
+    init(
+        _ result: Result<Bool, Error>,
+        linkResult: Result<Void, Error> = .success(()),
+        acceptsOnPresent: Bool = false
+    ) {
         self.result = result
+        self.linkResult = linkResult
+        self.acceptsOnPresent = acceptsOnPresent
     }
 
     func isAccountLinked() async throws -> Bool {
-        try result.get()
+        try lock.withLock { result }.get()
+    }
+
+    func linkAccount() async throws {
+        lock.withLock { linkAccountCalls += 1 }
+        if case let .failure(err) = linkResult {
+            throw err
+        }
+        if acceptsOnPresent {
+            lock.withLock { result = .success(true) }
+        }
     }
 }

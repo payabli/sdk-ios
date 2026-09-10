@@ -143,6 +143,129 @@ final class PayabliTTPTermsTests: XCTestCase {
         XCTAssertFalse(accepted)
     }
 
+    // MARK: - What initialize reports
+
+    /// Unaccepted terms is a session waiting on a person, not a session that failed. `error` would tell
+    /// a host to give up on something one tap resolves, and `pendingActivation` is the precedent for
+    /// saying so.
+    func testInitializeReportsPendingTermsRatherThanAnError() async throws {
+        let (ttp, provider) = try makeTTP()
+        provider.prepareReaderResult = .failure(PayabliTTPError.termsNotAccepted)
+
+        do {
+            try await ttp.initialize()
+            XCTFail("expected initialize to report unaccepted terms")
+        } catch let error as PayabliTTPError {
+            guard case .termsNotAccepted = error else {
+                return XCTFail("expected termsNotAccepted, got \(error)")
+            }
+        }
+
+        XCTAssertEqual(ttp.sessionState, .pendingTerms)
+    }
+
+    /// A host that watches events rather than state is told the same thing.
+    func testInitializeEmitsTermsRequired() async throws {
+        let (ttp, provider) = try makeTTP()
+        provider.prepareReaderResult = .failure(PayabliTTPError.termsNotAccepted)
+
+        let seen = Task { () -> Bool in
+            for await event in ttp.events() where event.code == .termsRequired {
+                return true
+            }
+            return false
+        }
+
+        _ = try? await ttp.initialize()
+
+        let emitted = await seen.value
+        XCTAssertTrue(emitted, "a host watching events is told what the session is waiting on")
+    }
+
+    /// Any other setup failure is still an error, so the terms path did not widen what it catches.
+    func testAnOrdinarySetupFailureIsStillAnError() async throws {
+        let (ttp, provider) = try makeTTP()
+        provider.prepareReaderResult = .failure(
+            PayabliTTPError.readerSetupFailed(reason: "no reader")
+        )
+
+        _ = try? await ttp.initialize()
+
+        XCTAssertEqual(ttp.sessionState, .error)
+    }
+
+    // MARK: - Presenting them
+
+    /// The member reaches the provider, which is the whole of what the facade owes: the sheet belongs
+    /// to the platform and the reader is what presents it.
+    func testPresentingReachesTheProvider() async throws {
+        let (ttp, provider) = try makeTTP()
+
+        try await ttp.presentTerms()
+
+        XCTAssertEqual(provider.presentTermsCalls, 1)
+    }
+
+    /// Presenting is answerable outside `.ready` for the same reason asking is, and this is the moment
+    /// that matters: a session stopped on unaccepted terms is exactly when a host presents them. A
+    /// state guard would refuse the one call that resolves the state.
+    func testPresentingIsReachableWhileTheSessionWaitsOnTerms() async throws {
+        let (ttp, provider) = try makeTTP()
+        provider.prepareReaderResult = .failure(PayabliTTPError.termsNotAccepted)
+
+        _ = try? await ttp.initialize()
+        XCTAssertNotEqual(ttp.sessionState, .ready)
+
+        try await ttp.presentTerms()
+
+        XCTAssertEqual(provider.presentTermsCalls, 1)
+    }
+
+    /// Returning says the sheet was shown and dismissed, never that acceptance was given. The platform
+    /// is the only authority on that, so a host reads it by asking afterwards.
+    func testPresentingDoesNotItselfMeanAccepted() async throws {
+        let (ttp, provider) = try makeTTP()
+        provider.areTermsAcceptedResult = .success(false)
+
+        try await ttp.presentTerms()
+
+        let accepted = try await ttp.areTermsAccepted()
+        XCTAssertFalse(accepted, "presenting the sheet is not the merchant accepting it")
+    }
+
+    /// A failure from the platform reaches the caller rather than being reported as a dismissal.
+    func testAFailureToPresentIsRaised() async throws {
+        let (ttp, provider) = try makeTTP()
+        provider.presentTermsResult = .failure(
+            PayabliTTPError.readerSetupFailed(reason: "Reader not prepared")
+        )
+
+        do {
+            try await ttp.presentTerms()
+            XCTFail("expected the failure to reach the caller")
+        } catch let error as PayabliTTPError {
+            guard case .readerSetupFailed = error else {
+                return XCTFail("expected readerSetupFailed, got \(error)")
+            }
+        }
+    }
+
+    /// The loop the feature is: stopped on terms, present, initialize again, ready.
+    func testTheSessionReachesReadyOnceTermsAreAccepted() async throws {
+        let (ttp, provider) = try makeTTP()
+        provider.prepareReaderResult = .failure(PayabliTTPError.termsNotAccepted)
+
+        _ = try? await ttp.initialize()
+        XCTAssertNotEqual(ttp.sessionState, .ready)
+
+        try await ttp.presentTerms()
+        provider.prepareReaderResult = .success(())
+
+        try await ttp.initialize()
+
+        XCTAssertEqual(ttp.sessionState, .ready)
+    }
+
     // MARK: - ObjC companion
 
     func testObjCCompanionDeliversTheAnswer() async throws {
