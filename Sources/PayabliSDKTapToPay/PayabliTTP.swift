@@ -3,7 +3,7 @@ import PayabliSDKCore
 
 /// Tap to Pay on iPhone facade.
 ///
-/// Exposes the 9-state session lifecycle, one-call `initialize()` / `charge()`,
+/// Exposes the session lifecycle, one-call `initialize()` / `charge()`,
 /// device activation, pending-update sync, and event stream multicasting.
 /// See PRD §19.1.
 ///

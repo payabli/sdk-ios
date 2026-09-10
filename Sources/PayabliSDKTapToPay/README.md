@@ -1,7 +1,7 @@
 # PayabliSDKTapToPay
 
 Everything the SDK needs to run a Tap-to-Pay-on-iPhone charge lives in this
-module: the public facade, the 9-state session lifecycle, device
+module: the public facade, the session lifecycle, device
 attestation, the backend clients, and the processor-agnostic adapter
 contract.
 
@@ -89,7 +89,7 @@ contract.
 
 ### Session — `SessionManager`
 
-`SessionManager.swift` owns the 9-state transition matrix (PRD §17). The
+`SessionManager.swift` owns the transition matrix (PRD §17). The
 facade calls `transition(to:)` before each phase and `syncPublished()` to
 re-publish into its own `@Published` properties. Invalid transitions are
 rejected, keeping the machine honest.
@@ -163,7 +163,7 @@ in-flight transaction bodies: RAM only (NFR-5D).
 
 ## 2. Session lifecycle (PRD §17)
 
-The 9-state machine in `PayabliTTPSessionState` is the single source of truth
+The state machine in `PayabliTTPSessionState` is the single source of truth
 for what the facade can do next. Every public facade method first asserts
 `sessionState ∈ {allowed}` before acting.
 
@@ -171,12 +171,15 @@ for what the facade can do next. Every public facade method first asserts
              ┌──────────────────────────────────────────────┐
              ▼                                              │
 .idle ─▶ .attestingDevice ─▶ .fetchingConfig ─▶ .initializingReader ─▶ .ready
-  │              │                   │                                  │
-  │              └──────┐            └─▶ .pendingActivation ─▶ (back to .idle / .attestingDevice)
-  │                     ▼
+  │              │                   │                     │
+  │              └──────┐            │                     └─▶ .pendingTerms ─▶ (back to .attestingDevice)
+  │                     ▼            └─▶ .pendingActivation ─▶ (back to .idle / .attestingDevice)
   │              .pendingActivation
   ▼
 .error ◀── (from anywhere on unrecoverable failure)
+
+Both `.pendingTerms` and `.pendingActivation` wait on a person rather than on the
+SDK: the host resolves what the session is waiting for, then initializes again.
 
 .ready ─▶ .sessionExpired ─▶ .reinitializing ─▶ .fetchingConfig ─▶ .initializingReader ─▶ .ready
 ```
@@ -319,7 +322,7 @@ For adding a new card-reader implementation, see `Adapters/README.md`.
 ## References
 
 - PRD `§7.2` — directory layout
-- PRD `§17` — 9-state session machine
+- PRD `§17` — the session state machine
 - PRD `§18` — App Attest integration
 - PRD `§19.1` — charge pipeline
 - PRD `§20` — events + errors

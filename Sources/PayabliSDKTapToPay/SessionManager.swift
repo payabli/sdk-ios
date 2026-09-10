@@ -1,7 +1,7 @@
 import Combine
 import Foundation
 
-/// Manages the 9-state TTP session lifecycle (PRD §17).
+/// Manages the TTP session lifecycle (PRD §17).
 ///
 /// State transitions are enforced internally. Host apps observe state via
 /// `@Published sessionState`. All transitions occur on `@MainActor` for safe

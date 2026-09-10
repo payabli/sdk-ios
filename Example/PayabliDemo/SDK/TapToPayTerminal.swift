@@ -136,31 +136,42 @@ struct TapToPayEvent {
 
     /// `PayabliTTPEventCode` is an `@objc Int` enum, so `String(describing:)`
     /// renders `PayabliTTPEventCode(rawValue: 0)` rather than the case name.
+    ///
+    /// A table rather than a switch. The switch it replaced ended in
+    /// `@unknown default`, which reports a new event as a warning the build does
+    /// not fail on, and that is how one reached review here unnamed.
+    ///
+    /// Nothing guards the table yet. The flow-test target compiles a curated list
+    /// of these files and this one is not on it, so the check belongs with a
+    /// change to that target rather than with this line.
     static func name(for code: PayabliTTPEventCode) -> String {
-        switch code {
-        case .attestationStarted: return "attestationStarted"
-        case .attestationCompleted: return "attestationCompleted"
-        case .configReceived: return "configReceived"
-        case .readerInitializing: return "readerInitializing"
-        case .readerReady: return "readerReady"
-        case .chargeInitiated: return "chargeInitiated"
-        case .nfcStarted: return "nfcStarted"
-        case .nfcCompleted: return "nfcCompleted"
-        case .nfcFailed: return "nfcFailed"
-        case .updateCompleted: return "updateCompleted"
-        case .updateFailed: return "updateFailed"
-        case .sessionExpired: return "sessionExpired"
-        case .reinitializeStarted: return "reinitializeStarted"
-        case .reinitializeCompleted: return "reinitializeCompleted"
-        case .devicePendingActivation: return "devicePendingActivation"
-        case .activationStarted: return "activationStarted"
-        case .activationCompleted: return "activationCompleted"
-        case .activationFailed: return "activationFailed"
-        case .attestationFailed: return "attestationFailed"
-        case .configFailed: return "configFailed"
-        @unknown default: return "event(\(code.rawValue))"
-        }
+        names[code] ?? "event(\(code.rawValue))"
     }
+
+    /// Every event the SDK publishes, by its code.
+    static let names: [PayabliTTPEventCode: String] = [
+        .attestationStarted: "attestationStarted",
+        .attestationCompleted: "attestationCompleted",
+        .configReceived: "configReceived",
+        .readerInitializing: "readerInitializing",
+        .readerReady: "readerReady",
+        .chargeInitiated: "chargeInitiated",
+        .nfcStarted: "nfcStarted",
+        .nfcCompleted: "nfcCompleted",
+        .nfcFailed: "nfcFailed",
+        .updateCompleted: "updateCompleted",
+        .updateFailed: "updateFailed",
+        .sessionExpired: "sessionExpired",
+        .reinitializeStarted: "reinitializeStarted",
+        .reinitializeCompleted: "reinitializeCompleted",
+        .devicePendingActivation: "devicePendingActivation",
+        .activationStarted: "activationStarted",
+        .activationCompleted: "activationCompleted",
+        .activationFailed: "activationFailed",
+        .attestationFailed: "attestationFailed",
+        .configFailed: "configFailed",
+        .termsRequired: "termsRequired"
+    ]
 }
 
 /// A listener's own tear-down.
