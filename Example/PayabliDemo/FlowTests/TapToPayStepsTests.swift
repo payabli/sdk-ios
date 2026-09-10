@@ -46,6 +46,21 @@ final class TapToPayStepsTests: XCTestCase {
         XCTAssertEqual(sequence.enable.status, .current)
     }
 
+    /// A session waiting on terms offers to present them, not to run the setup again.
+    ///
+    /// The enable step is the one to act on for both waits, so the step alone does not say which
+    /// control belongs there; the state does.
+    func testASessionWaitingOnTermsOffersToPresentThem() {
+        let sequence = TapToPaySteps.forCharging(
+            tokenCheck: .reachable,
+            session: .pendingTerms,
+            activation: .none
+        )
+
+        XCTAssertEqual(sequence.nextAction, .presentTerms)
+        XCTAssertEqual(sequence.enable.status, .current)
+    }
+
     func testTheSpaceIsTheSizeItClaims() {
         // Derived from the same list the space is built over rather than written out, so a state
         // added to the SDK moves this with it instead of failing here for the wrong reason.

@@ -19,6 +19,7 @@ struct PaymentTapToPayQAView: View {
     @State private var amountText = "1.00"
     @State private var activationCode = ""
     @State private var enableMessage = ""
+    @State private var termsMessage = ""
     @State private var activationMessage = ""
     @State private var chargeMessage = ""
     @State private var eventLog: [TapToPayQAEventEntry] = []
@@ -109,6 +110,23 @@ struct PaymentTapToPayQAView: View {
                         .buttonStyle(.borderedProminent)
                         .disabled(isWorking)
                     }
+                    if steps.nextAction == .presentTerms {
+                        Button { runPresentTerms() } label: {
+                            Label("Present terms", systemImage: "hand.tap")
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(isWorking)
+                    }
+                    // Never gated on a state: the SDK answers this whenever a host asks, and hiding it
+                    // until some state would show the opposite of what the member promises.
+                    Button { runTermsCheck() } label: {
+                        Label("Ask about terms", systemImage: "doc.text.magnifyingglass")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(isWorking)
+                    stepOutcome(termsMessage)
                     stepOutcome(enableMessage)
                 }
             }
@@ -389,6 +407,46 @@ struct PaymentTapToPayQAView: View {
         chargeMessage = ""
         activationMessage = ""
         activationOutcome = .none
+    }
+
+    /// Asks the platform whether this merchant has accepted.
+    ///
+    /// A failure shows the SDK's own words rather than a category of this screen's invention. The two
+    /// worth telling apart already read differently: a reader that does not exist yet says so, and a
+    /// platform that refused carries what it said.
+    private func runTermsCheck() {
+        isWorking = true
+        Task { @MainActor in
+            defer { isWorking = false }
+            do {
+                let accepted = try await terminal.termsAccepted()
+                termsMessage = accepted ? "✓ Accepted" : "✗ Not accepted"
+            } catch {
+                termsMessage = "? Could not ask: \(error.localizedDescription)"
+            }
+        }
+    }
+
+    /// Asks the SDK to present the terms, then asks again what the answer is now.
+    ///
+    /// **It does not say a sheet appeared, because nothing here can know that.** The call returns on a
+    /// merchant who has already accepted without presenting anything, and that is the documented
+    /// contract rather than a fault. So this reports what it observed — the call returned — and lets
+    /// the answer beside it carry the meaning.
+    private func runPresentTerms() {
+        isWorking = true
+        Task { @MainActor in
+            defer { isWorking = false }
+            do {
+                try await terminal.presentTerms()
+                let accepted = try await terminal.termsAccepted()
+                termsMessage = accepted
+                    ? "returned; now ✓ Accepted"
+                    : "returned; still ✗ Not accepted"
+            } catch {
+                termsMessage = "✗ Presenting failed: \(error.localizedDescription)"
+            }
+        }
     }
 
     private func runEnableTerminal() {

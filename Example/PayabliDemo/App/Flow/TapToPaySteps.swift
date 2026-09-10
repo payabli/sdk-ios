@@ -72,6 +72,9 @@ enum TapToPayAction {
     case checkToken
     case enableTerminal
     case enterActivationCode
+    /// Presents the platform's terms. Offered only at `.pendingTerms`, because that
+    /// is the only state where presenting them changes anything.
+    case presentTerms
     case charge
     /// `reinitializeIfNeeded`, which re-runs config and the reader and skips
     /// attestation. Only sound where the attested identity is still held.
@@ -151,7 +154,7 @@ enum TapToPaySteps {
         let recovery = recoveryReason(token: token, session: session)
 
         let nextAction = nextControl(
-            token: token, enable: enable, activation: activation,
+            token: token, enable: enable, session: session, activation: activation,
             charge: charge, recovery: recovery
         )
 
@@ -204,6 +207,7 @@ enum TapToPaySteps {
     private static func nextControl(
         token: StepStatus,
         enable: StepStatus,
+        session: TapToPaySessionStatus,
         activation: StepStatus,
         charge: StepStatus,
         recovery: TapToPayRecovery?
@@ -225,7 +229,9 @@ enum TapToPaySteps {
         // from its own row, and this is the state a broken session does not
         // cover.
         if enable.isActionable {
-            return .enableTerminal
+            // The enable step is the one to act on for both waits, and what it offers differs: a
+            // session waiting on terms wants them presented, not the setup run again.
+            return session == .pendingTerms ? .presentTerms : .enableTerminal
         }
         guard enable.isFinished else { return nil }
         // `.failed` as well as `.current`, as with the enable step above: a
