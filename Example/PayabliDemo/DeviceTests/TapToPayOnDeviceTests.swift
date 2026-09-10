@@ -301,39 +301,6 @@ final class TapToPayOnDeviceTests: XCTestCase {
         )
         return (result, seen.value)
     }
-}
-
-/// What a charge run saw, written from one task and read from another: whether it
-/// reached the tap, and what it last threw.
-///
-/// Two fields rather than one, because this test ends the read itself once the tap
-/// is reached. The charge throws even on a run that got there, and that throw is not
-/// the verdict.
-private final class OutcomeBox: @unchecked Sendable {
-    private let lock = NSLock()
-    private var initiated = false
-    private var terminal: String?
-
-    /// `terminal` is whatever the charge threw, the cancellation this test performs
-    /// itself included.
-    var value: String {
-        lock.lock()
-        defer { lock.unlock() }
-        return "reachedTheTap=\(initiated ? "yes" : "no") terminal=\(terminal ?? "none")"
-    }
-
-    /// Called on `chargeInitiated`, the last event before the reader waits for a card.
-    func recordInitiated() {
-        lock.lock()
-        defer { lock.unlock() }
-        initiated = true
-    }
-
-    func recordTerminal(_ outcome: String) {
-        lock.lock()
-        defer { lock.unlock() }
-        terminal = outcome
-    }
 
     // MARK: - Contactless payment terms
 
@@ -390,5 +357,38 @@ private final class OutcomeBox: @unchecked Sendable {
                 return XCTFail("expected readerSetupFailed, got \(error)")
             }
         }
+    }
+}
+
+/// What a charge run saw, written from one task and read from another: whether it
+/// reached the tap, and what it last threw.
+///
+/// Two fields rather than one, because this test ends the read itself once the tap
+/// is reached. The charge throws even on a run that got there, and that throw is not
+/// the verdict.
+private final class OutcomeBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var initiated = false
+    private var terminal: String?
+
+    /// `terminal` is whatever the charge threw, the cancellation this test performs
+    /// itself included.
+    var value: String {
+        lock.lock()
+        defer { lock.unlock() }
+        return "reachedTheTap=\(initiated ? "yes" : "no") terminal=\(terminal ?? "none")"
+    }
+
+    /// Called on `chargeInitiated`, the last event before the reader waits for a card.
+    func recordInitiated() {
+        lock.lock()
+        defer { lock.unlock() }
+        initiated = true
+    }
+
+    func recordTerminal(_ outcome: String) {
+        lock.lock()
+        defer { lock.unlock() }
+        terminal = outcome
     }
 }
