@@ -472,6 +472,35 @@ The activation code is issued by the partner backend (typically via an
 administrator dashboard); the SDK doesn't generate it. Delivery of
 the code to the user is the host application's responsibility.
 
+### Accepting Apple's Tap to Pay terms
+
+Before a device reads a card, the merchant has to accept Apple's Tap to Pay terms.
+Apple holds that acceptance and is the only authority on it, so ask rather than
+track it yourself.
+
+The reader is built during `initialize()`, so ask once initialization has run:
+
+```swift
+try await ttp.initialize()
+let accepted = try await ttp.areTermsAccepted()
+```
+
+`initialize()` currently presents Apple's sheet itself when the merchant has not
+accepted. A host-triggered way to present it, so the sheet appears on a screen you
+control rather than to whoever opens the app, is coming in a later release.
+
+Acceptance is once per merchant, not once per device: a merchant who has accepted
+on one device does not accept again on another using the same merchant identifier.
+
+Ask each time rather than caching the answer. Acceptance can be granted or
+withdrawn outside your app, and a remembered `true` goes stale without anything
+failing.
+
+A thrown error is not the same as `false`: `false` means the merchant has not
+accepted, while `PayabliTTPError.readerSetupFailed` means the reader could not
+answer, either because none was prepared or because the platform raised while
+being asked. Show a terms screen for the first and not for the second.
+
 ### Handling errors
 
 `PayabliTTPError` covers the entire session and charge lifecycle:
@@ -525,19 +554,28 @@ if (!ttp) { /* the configuration was rejected; read error */ return; }
 
 [ttp initializeWithCompletion:^(NSError *err) {
     if (err) { /* handle */ return; }
-    PayabliTTPPaymentDetailsObjC *details =
-        [[PayabliTTPPaymentDetailsObjC alloc]
-            initWithAmount:[NSDecimalNumber decimalNumberWithString:@"9.99"]
-                serviceFee:NSDecimalNumber.zero
-                  currency:@"USD"
-        paymentDescription:nil];
-    [ttp chargeWithType:PayabliTTPPaymentTypeSale
-        paymentDetails:details
-              customer:nil
-               invoice:nil
-      orderDescription:nil
-            completion:^(PayabliTTPTransactionResultObjC *result, NSError *e) {
-        NSLog(@"Transaction captured. ID: %@", result.paymentTransId);
+    [ttp areTermsAcceptedWithCompletion:^(BOOL accepted, NSError *termsErr) {
+        // Read termsErr first: accepted is NO on the failure path as a bridging
+        // default, and that is not the same as the merchant not having accepted.
+        if (termsErr) { /* handle */ return; }
+        if (!accepted) { /* the merchant has not accepted; do not charge */ return; }
+
+        // Charging goes inside this block. Starting it alongside the check would
+        // race past both answers.
+        PayabliTTPPaymentDetailsObjC *details =
+            [[PayabliTTPPaymentDetailsObjC alloc]
+                initWithAmount:[NSDecimalNumber decimalNumberWithString:@"9.99"]
+                    serviceFee:NSDecimalNumber.zero
+                      currency:@"USD"
+            paymentDescription:nil];
+        [ttp chargeWithType:PayabliTTPPaymentTypeSale
+            paymentDetails:details
+                  customer:nil
+                   invoice:nil
+          orderDescription:nil
+                completion:^(PayabliTTPTransactionResultObjC *result, NSError *e) {
+            NSLog(@"Transaction captured. ID: %@", result.paymentTransId);
+        }];
     }];
 }];
 ```

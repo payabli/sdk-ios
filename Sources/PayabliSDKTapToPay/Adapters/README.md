@@ -12,8 +12,8 @@ live here; no sub-folders.
 
 ## 1. Contract — `TapToPayProvider`
 
-Defined in `../TapToPayProvider.swift`. The facade calls these six methods in
-the order shown below.
+Defined in `../TapToPayProvider.swift`. The facade calls these methods in the
+order shown below, except `areTermsAccepted()`, which a host asks for on demand.
 
 | Method | When the facade calls it | Adapter must do |
 |---|---|---|
@@ -21,6 +21,7 @@ the order shown below.
 | `checkEligibility() async` | Before any UI, before `/config` is fetched | Validate platform, OS version, hardware (e.g. `PaymentCardReader.isSupported`). **Must not require credentials.** |
 | `configure(credentials: [String:String]) throws` | After `/config` returns `providerCredentials` | Validate required keys, map to a typed struct, stash it in `self`. Throw `PayabliTTPError.readerSetupFailed(reason:)` on missing / malformed input. |
 | `prepareReader() async throws` | Right after `configure(...)` | Build the processor SDK's reader, request session token, link account if needed, initialize session. **Drop `self.credentials` as soon as the SDK has its own copy.** |
+| `areTermsAccepted() async throws -> Bool` | Whenever a host asks, at any point | Ask the platform each time rather than caching, since acceptance is granted and withdrawn outside this process. **Return `true` where the platform requires no acceptance.** The contract carries no default, so an adapter answers this or does not compile. Throw `PayabliTTPError.readerSetupFailed(reason:)` whenever the reader cannot answer, whether none is prepared or the platform raised, so a caller can tell either from "not accepted". |
 | `startReading(_ request: CardReadRequest) async throws -> CardReadResult` | `PayabliTTP.charge(...)` | Run the NFC interaction. Atomic providers (Fiserv) also charge here and return the full processor response. Payload-only providers populate `encryptedPayload` instead. |
 | `cancelReading() async` | User cancelled the tap | Tear down the active reader and clear `self.credentials`. |
 | `cleanUp() async` | End of session | Same as cancel — full teardown. |

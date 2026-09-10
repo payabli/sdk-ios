@@ -117,6 +117,35 @@ class PayabliTTP {
     }
   }
 
+  // MARK: - areTermsAccepted
+
+  /// Whether the merchant has accepted the terms their platform requires before
+  /// it will take a contactless payment. On iOS these are Apple's Tap to Pay
+  /// terms, which the platform holds and the merchant accepts in a sheet.
+  ///
+  /// Throws a [PayabliTTPException] rather than returning `false` when the
+  /// reader cannot answer, whether none is prepared or the platform raised, so
+  /// do not treat a throw as a decline.
+  static Future<bool> areTermsAccepted() async {
+    try {
+      final accepted = await _payabliMethodChannel.invokeMethod<bool>(
+        'areTermsAccepted',
+      );
+      if (accepted == null) {
+        // Defaulting to false here would report a missing or malformed native
+        // response as a merchant who has not accepted, which is the one
+        // distinction this method exists to keep.
+        throw const PayabliTTPException(
+          code: 'TERMS_CHECK_FAILED',
+          message: 'Native terms check returned no answer',
+        );
+      }
+      return accepted;
+    } on PlatformException catch (e) {
+      throw PayabliTTPException._fromPlatform(e);
+    }
+  }
+
   // MARK: - getSessionState
 
   /// Polls the current `PayabliTTPSessionState`.

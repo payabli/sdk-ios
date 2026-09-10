@@ -600,6 +600,12 @@ private final class InterleavingProvider: TapToPayProvider, @unchecked Sendable 
         }
     }
 
+    /// Nothing in this file turns on acceptance, so it answers accepted and stays
+    /// out of the way of the interleaving these tests assert.
+    func areTermsAccepted() async throws -> Bool {
+        true
+    }
+
     func cancelReading() async {}
     func cleanUp() async {}
 

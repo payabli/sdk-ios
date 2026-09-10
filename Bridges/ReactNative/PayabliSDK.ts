@@ -215,6 +215,8 @@ interface NativePayabliSDKModule {
 
     activateDevice(activationCode: string): Promise<void>;
 
+    areTermsAccepted(): Promise<boolean>;
+
     getSessionState(): Promise<number>;
 
     resolveTokenRefresh(token: string): void;
@@ -287,6 +289,19 @@ export function activateDevice(activationCode: string): Promise<void> {
     return requireNativeModule().activateDevice(activationCode);
 }
 
+/**
+ * Whether the merchant has accepted the terms their platform requires before it
+ * will take a contactless payment. On iOS these are Apple's Tap to Pay terms,
+ * which the platform holds and the merchant accepts in a sheet.
+ *
+ * Rejects rather than resolving `false` when the reader cannot answer, whether
+ * none is prepared or the platform raised, so do not treat a rejection as a
+ * decline.
+ */
+export function areTermsAccepted(): Promise<boolean> {
+    return requireNativeModule().areTermsAccepted();
+}
+
 export async function getSessionState(): Promise<PayabliTTPSessionState> {
     const raw = await requireNativeModule().getSessionState();
     return raw as PayabliTTPSessionState;
@@ -308,6 +323,7 @@ export const PayabliTTP = {
     initialize,
     charge,
     activateDevice,
+    areTermsAccepted,
     getSessionState,
     addEventListener,
 };

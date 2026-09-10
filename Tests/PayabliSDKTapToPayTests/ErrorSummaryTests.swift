@@ -60,7 +60,8 @@ final class ErrorSummaryTests: XCTestCase {
             (.activationFailed(reason: reason), "activationFailed"),
             (.networkError(reason: reason), "networkError"),
             (.initiateFailed(reason: reason), "initiateFailed"),
-            (.updateFailed(reason: reason), "updateFailed")
+            (.updateFailed(reason: reason), "updateFailed"),
+            (.termsNotAccepted, "termsNotAccepted")
         ]
 
         for (error, published) in expected {

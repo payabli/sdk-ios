@@ -35,9 +35,20 @@ package final class MockTapToPayProvider: TapToPayProvider, @unchecked Sendable 
         set { lock.withLock { _readingResult = newValue } }
     }
 
+    private var _areTermsAcceptedResult: Result<Bool, Error> = .success(true)
+    package var areTermsAcceptedResult: Result<Bool, Error> {
+        get { lock.withLock { _areTermsAcceptedResult } }
+        set { lock.withLock { _areTermsAcceptedResult = newValue } }
+    }
+
     private var _prepareReaderCalls = 0
     package var prepareReaderCalls: Int {
         lock.withLock { _prepareReaderCalls }
+    }
+
+    private var _areTermsAcceptedCalls = 0
+    package var areTermsAcceptedCalls: Int {
+        lock.withLock { _areTermsAcceptedCalls }
     }
 
     private var _configureCalls = 0
@@ -96,6 +107,17 @@ package final class MockTapToPayProvider: TapToPayProvider, @unchecked Sendable 
         }
         if case let .failure(err) = result {
             throw err
+        }
+    }
+
+    package func areTermsAccepted() async throws -> Bool {
+        let result: Result<Bool, Error> = lock.withLock {
+            _areTermsAcceptedCalls += 1
+            return _areTermsAcceptedResult
+        }
+        switch result {
+        case let .success(value): return value
+        case let .failure(err): throw err
         }
     }
 
