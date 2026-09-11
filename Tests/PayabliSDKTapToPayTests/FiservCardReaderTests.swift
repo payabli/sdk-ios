@@ -209,6 +209,29 @@ final class FiservCardReaderTests: XCTestCase {
         }
     }
 
+    /// Dismissing the terms sheet is a failed presentation, not a failed card read. The charge mapper
+    /// used to hard-code cancel as `.nfcFailed`, so this call borrowed that label with no NFC underway.
+    func testDismissingTheTermsSheetIsASetupFailureNotAnNfcOne() async {
+        let reader = FiservCardReader()
+        let cancel = NSError(domain: NSCocoaErrorDomain, code: NSUserCancelledError)
+        reader.setLinkStateSource(StubLinkState(.success(false), linkResult: .failure(cancel)))
+
+        do {
+            try await reader.presentTerms()
+            XCTFail("expected dismissal to surface")
+        } catch let error as PayabliTTPError {
+            guard case let .readerSetupFailed(reason) = error else {
+                return XCTFail("expected readerSetupFailed, got \(error)")
+            }
+            XCTAssertTrue(
+                reason.hasPrefix(FiservCardReader.cancellationReasonPrefix),
+                "cancel keeps the prefix a host already matches: \(reason)"
+            )
+        } catch {
+            XCTFail("wrong error: \(error)")
+        }
+    }
+
     /// A reader that raises is not a merchant who declined, so the failure keeps
     /// its own shape instead of collapsing into `false`.
     func testAReaderThatRaisesIsMappedRatherThanReportedAsUnaccepted() async {

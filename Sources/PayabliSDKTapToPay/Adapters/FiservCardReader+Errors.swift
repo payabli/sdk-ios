@@ -15,7 +15,8 @@ extension FiservCardReader {
     #if canImport(PayabliCardReaderCore)
 
         /// Translates a card-reader / ProximityReader error into `PayabliTTPError`.
-        /// `fallback` picks the case (setup vs. NFC) for non-cancel errors.
+        /// `fallback` picks the case (setup vs. NFC), including for a user cancel: dismissing
+        /// the terms sheet is a setup failure, dismissing the tap sheet is an NFC one.
         static func mapError(
             _ error: Error,
             fallback: (String) -> PayabliTTPError
@@ -25,8 +26,8 @@ extension FiservCardReader {
             }
 
             if (error as NSError).code == NSUserCancelledError {
-                return .nfcFailed(
-                    reason: "\(cancellationReasonPrefix) user dismissed Tap to Pay sheet"
+                return fallback(
+                    "\(cancellationReasonPrefix) user dismissed Tap to Pay sheet"
                 )
             }
 
