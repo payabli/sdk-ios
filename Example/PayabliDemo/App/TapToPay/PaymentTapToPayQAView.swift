@@ -122,18 +122,19 @@ struct PaymentTapToPayQAView: View {
                             .buttonStyle(.bordered)
                             .disabled(isWorking)
                     }
-                    // Never gated on a state: the SDK answers this whenever a host asks, and hiding it
-                    // until some state would show the opposite of what the member promises.
-                    Button { runTermsCheck() } label: {
-                        Label("Ask about terms", systemImage: "doc.text.magnifyingglass")
-                            .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.bordered)
-                    .disabled(isWorking)
-                    stepOutcome(termsMessage)
                     stepOutcome(enableMessage)
                 }
             }
+
+            // Outside `StepRow`: that view only renders content while the step is current, failed or
+            // in progress, so a ready session would hide a question that is never gated on a state.
+            Button { runTermsCheck() } label: {
+                Label("Ask about terms", systemImage: "doc.text.magnifyingglass")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+            .disabled(isWorking)
+            stepOutcome(termsMessage)
 
             StepRow(index: 3, step: steps.activation) {
                 VStack(alignment: .leading, spacing: 6) {
