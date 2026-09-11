@@ -209,8 +209,8 @@ final class FiservCardReaderTests: XCTestCase {
         }
     }
 
-    /// Dismissing the terms sheet is a failed presentation, not a failed card read. The charge mapper
-    /// used to hard-code cancel as `.nfcFailed`, so this call borrowed that label with no NFC underway.
+    /// Dismissing the terms sheet fails as `.readerSetupFailed` with the cancel prefix. The same
+    /// `NSUserCancelledError` during a charge maps to `.nfcFailed`; presenting is not a card read.
     func testDismissingTheTermsSheetIsASetupFailureNotAnNfcOne() async {
         let reader = FiservCardReader()
         let cancel = NSError(domain: NSCocoaErrorDomain, code: NSUserCancelledError)
