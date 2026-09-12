@@ -265,6 +265,28 @@ public final class PayabliSDKModule: RCTEventEmitter {
         }
     }
 
+    // MARK: - presentTerms
+
+    /// Resolves once the platform request is done, which is neither proof that a
+    /// sheet appeared nor that the merchant accepted. Call `areTermsAccepted()`
+    /// after this to find out where the merchant stands.
+    @objc public func presentTerms(
+        _ resolve: @escaping RCTPromiseResolveBlock,
+        rejecter reject: @escaping RCTPromiseRejectBlock
+    ) {
+        guard let ttp else {
+            reject("NOT_CONFIGURED", "Call configure() before presentTerms()", nil)
+            return
+        }
+        ttp.presentTerms { error in
+            if let error {
+                reject(error.rnCode(default: "TERMS_PRESENT_FAILED"), error.rnMessage, error)
+            } else {
+                resolve(nil)
+            }
+        }
+    }
+
     // MARK: - getSessionState
 
     @objc public func getSessionState(

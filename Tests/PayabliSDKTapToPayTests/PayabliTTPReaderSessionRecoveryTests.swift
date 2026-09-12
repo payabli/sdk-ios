@@ -606,6 +606,8 @@ private final class InterleavingProvider: TapToPayProvider, @unchecked Sendable 
         true
     }
 
+    func presentTerms() async throws {}
+
     func cancelReading() async {}
     func cleanUp() async {}
 

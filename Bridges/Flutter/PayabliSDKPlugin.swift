@@ -65,6 +65,8 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
             handleActivateDevice(call.arguments, result: result)
         case "areTermsAccepted":
             handleAreTermsAccepted(result: result)
+        case "presentTerms":
+            handlePresentTerms(result: result)
         case "getSessionState":
             handleGetSessionState(result: result)
         case "configurePayInPaymentFlow":
@@ -278,6 +280,29 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
                 result(error.toFlutterError(defaultCode: "TERMS_CHECK_FAILED"))
             } else {
                 result(accepted)
+            }
+        }
+    }
+
+    // MARK: - presentTerms
+
+    /// Completes once the platform request is done, which is neither proof that a
+    /// sheet appeared nor that the merchant accepted. `areTermsAccepted` answers
+    /// where the merchant stands.
+    private func handlePresentTerms(result: @escaping FlutterResult) {
+        guard let ttp else {
+            result(FlutterError(
+                code: "NOT_CONFIGURED",
+                message: "Call configure() before presentTerms()",
+                details: nil
+            ))
+            return
+        }
+        ttp.presentTerms { error in
+            if let error {
+                result(error.toFlutterError(defaultCode: "TERMS_PRESENT_FAILED"))
+            } else {
+                result(nil)
             }
         }
     }

@@ -50,4 +50,57 @@ public extension PayabliTTP {
             }
         }
     }
+
+    /// Asks the platform to present the terms the merchant has to accept before this
+    /// device will take a contactless payment, and returns once the request is done.
+    ///
+    /// **This accepts nothing on the merchant's behalf, and returning is not proof
+    /// that a sheet appeared.** The sheet is the platform's and the merchant reads
+    /// and taps it, but a merchant who has already accepted needs no sheet, and the
+    /// request then completes without showing one. Call `areTermsAccepted()`
+    /// afterwards to find out where the merchant stands.
+    ///
+    /// Call it from a screen you chose, at a moment a merchant with the authority
+    /// to accept is present. `initialize()` reports
+    /// `PayabliTTPSessionState.pendingTerms` when acceptance is what it is waiting
+    /// for; present them, then call `initialize()` again:
+    ///
+    /// ```swift
+    /// try await ttp.presentTerms()
+    /// try await ttp.initialize()
+    /// ```
+    ///
+    /// Acceptance is recorded against the merchant rather than the device, so a
+    /// merchant who has accepted on one device is not asked again on the next one
+    /// using the same merchant identifier. It is an onboarding step, not a cost
+    /// per install.
+    ///
+    /// There is no separate call for re-presenting them after acceptance lapses.
+    /// This is that call too.
+    ///
+    /// - Throws: `PayabliTTPError.readerSetupFailed(reason:)` when there is no
+    ///   reader to present from. `initialize()` is what builds one.
+    func presentTerms() async throws {
+        try await provider.presentTerms()
+    }
+
+    /// `@objc` companion to `presentTerms()` for ObjC / MAUI / Flutter / RN
+    /// consumers. Bridges the `async throws` Swift method to a callback-based
+    /// signature: `completion(nil)` on success, `completion(NSError)` on failure
+    /// (domain `"com.payabli.ttp"` for typed `PayabliTTPError`s).
+    ///
+    /// The completion handler is always invoked on the main thread because the
+    /// entire `PayabliTTP` surface is `@MainActor`.
+    @objc func presentTerms(
+        completion: @escaping (NSError?) -> Void
+    ) {
+        Task { @MainActor in
+            do {
+                try await self.presentTerms()
+                completion(nil)
+            } catch {
+                completion(error.toPayabliNSError())
+            }
+        }
+    }
 }

@@ -1,7 +1,7 @@
 # PayabliSDKTapToPay
 
 Everything the SDK needs to run a Tap-to-Pay-on-iPhone charge lives in this
-module: the public facade, the 9-state session lifecycle, device
+module: the public facade, the session lifecycle, device
 attestation, the backend clients, and the processor-agnostic adapter
 contract.
 
@@ -34,7 +34,7 @@ The public entry point that host apps consume. Split across companion files
 | `PayabliTTP+Initialize.swift` | `initialize()` (cold/warm path) and `reinitializeIfNeeded()` (fresh `/config` after 401) |
 | `PayabliTTP+Activation.swift` | `activateDevice()` for pending-device flows. Emits `activationStarted` / `activationCompleted` / `activationFailed`. The partner provisions the activation code out-of-band (PRD §9.7) |
 | `PayabliTTP+Charge.swift` | 3-step sale pipeline: `/initiate` → `startReading` → `/update` (PRD §19.1) |
-| `PayabliTTP+Terms.swift` | `areTermsAccepted()`, asked of the platform on every call rather than cached. A provider that cannot be asked throws, so a caller can tell that from "not accepted" |
+| `PayabliTTP+Terms.swift` | `areTermsAccepted()`, asked of the platform on every call rather than cached. A provider that cannot be asked throws, so a caller can tell that from "not accepted". `presentTerms()` asks the platform to present its sheet from a screen the host chose; returning means the request completed, which is neither proof that a sheet appeared nor that the merchant accepted |
 | `PayabliTTPEvent.swift` | `PayabliTTPEvent` (lifecycle cases) + `PayabliTTPError` (PRD §20) + `PayabliTTPEventCode` (`@objc`) + per-case `payload` schema + `CustomNSError` bridging |
 | `PayabliTTPTypes.swift` | `PayabliTTPSessionState`, `PayabliTTPPaymentType`, `TransactionResult` |
 | `PayabliTTPTransactionData.swift` | `PayabliTTPCustomerData`, `PayabliTTPPaymentDetails`, `PayabliTTPInvoiceData`, internal `TTPTransactionContext` |
@@ -64,6 +64,7 @@ or value-typed `enum`s with associated values.
 | `try await ttp.charge(type:paymentDetails:customer:invoice:orderDescription:)` | `[ttp chargeWithType:paymentDetails:customer:invoice:orderDescription:completion:]` returning `PayabliTTPTransactionResultObjC*` + `NSError*` |
 | `try await ttp.activateDevice(activationCode:)` | `[ttp activateDeviceWithActivationCode:completion:]` |
 | `try await ttp.areTermsAccepted()` | `[ttp areTermsAcceptedWithCompletion:^(BOOL accepted, NSError *err){...}]` — `accepted` is `NO` on the failure path as a bridging default and never an answer, so read `err` first |
+| `try await ttp.presentTerms()` | `[ttp presentTermsWithCompletion:^(NSError *err){...}]` — `err` is `nil` once the request completes, which is neither proof that a sheet appeared nor that the merchant accepted; ask `areTermsAccepted()` |
 | `for await event in ttp.events()` | `[ttp addEventListenerWithHandler:^(PayabliTTPEventCode code, NSDictionary *payload){...}]` returning a `PayabliTTPEventToken` (call `[token cancel]` to stop) |
 | `PayabliTTPCustomerData(...)` (struct) | `[[PayabliTTPCustomerDataObjC alloc] initWithFirstName:lastName:customerNumber:email:phone:customerId:company:billingAddress1:billingAddress2:billingCity:billingState:billingZip:billingCountry:billingPhone:billingEmail:shippingAddress1:shippingAddress2:shippingCity:shippingState:shippingZip:shippingCountry:]` |
 | `PayabliTTPPaymentDetails(...)` (struct) | `[[PayabliTTPPaymentDetailsObjC alloc] initWithAmount:serviceFee:currency:paymentDescription:]` |
@@ -88,7 +89,7 @@ contract.
 
 ### Session — `SessionManager`
 
-`SessionManager.swift` owns the 9-state transition matrix (PRD §17). The
+`SessionManager.swift` owns the transition matrix (PRD §17). The
 facade calls `transition(to:)` before each phase and `syncPublished()` to
 re-publish into its own `@Published` properties. Invalid transitions are
 rejected, keeping the machine honest.
@@ -162,28 +163,51 @@ in-flight transaction bodies: RAM only (NFR-5D).
 
 ## 2. Session lifecycle (PRD §17)
 
-The 9-state machine in `PayabliTTPSessionState` is the single source of truth
-for what the facade can do next. Every public facade method first asserts
+The state machine in `PayabliTTPSessionState` is the single source of truth
+for what the facade can do next. A facade method that acts on the session asserts
 `sessionState ∈ {allowed}` before acting.
+
+The terms members are the exception and it is deliberate: `areTermsAccepted()` and
+`presentTerms()` carry no state guard, because what they need is a prepared reader
+rather than a state. Guarding them would refuse at `.pendingTerms`, which is the
+one moment a host asks.
 
 ```
              ┌──────────────────────────────────────────────┐
              ▼                                              │
 .idle ─▶ .attestingDevice ─▶ .fetchingConfig ─▶ .initializingReader ─▶ .ready
-  │              │                   │                                  │
-  │              └──────┐            └─▶ .pendingActivation ─▶ (back to .idle / .attestingDevice)
-  │                     ▼
+  │              │                   │                     │
+  │              └──────┐            │                     └─▶ .pendingTerms ─▶ (back to .attestingDevice)
+  │                     ▼            └─▶ .pendingActivation ─▶ (back to .idle / .attestingDevice)
   │              .pendingActivation
   ▼
 .error ◀── (from anywhere on unrecoverable failure)
+
+Both `.pendingTerms` and `.pendingActivation` wait on a person rather than on the
+SDK: the host resolves what the session is waiting for, then initializes again.
 
 .ready ─▶ .sessionExpired ─▶ .reinitializing ─▶ .fetchingConfig ─▶ .initializingReader ─▶ .ready
 ```
 
 The transition matrix lives in `SessionManager.isValidTransition(from:to:)`.
-Adding a new state or edge means updating that matrix, the switch in
-`PayabliTTPSessionState`, and the relevant facade extension — no other file
-needs to change.
+An **edge** is that matrix and nothing else.
+
+A **state** is not, and this list is written from what adding `.pendingTerms`
+actually touched. The raw values are public API and are mirrored by hand in three
+bridges, so a state that stops at the matrix ships a number the wrappers cannot
+name:
+
+- `PayabliTTPSessionState`, appended, never renumbered
+- `SessionManager.isValidTransition(from:to:)`, and its cases
+- the facade extension that enters or leaves it
+- `ErrorSummary.name(of:)`, or a diagnostic prints the raw number
+- `Bridges/ReactNative/PayabliSDK.ts`, `Bridges/Flutter/lib/payabli_sdk.dart`,
+  `Bridges/MAUI/PayabliEnums.cs` and `PayabliBinding.cs`
+- the sample app's `TapToPaySessionStatus` and the step sequence that switches on
+  it, which build from their own scheme and so stay green in the package suite
+- the exhaustive tables in `ErrorSummaryTests`, `StepStatusTests` and
+  `TapToPayStepsTests`
+- this diagram
 
 ---
 
@@ -318,7 +342,7 @@ For adding a new card-reader implementation, see `Adapters/README.md`.
 ## References
 
 - PRD `§7.2` — directory layout
-- PRD `§17` — 9-state session machine
+- PRD `§17` — the session state machine
 - PRD `§18` — App Attest integration
 - PRD `§19.1` — charge pipeline
 - PRD `§20` — events + errors

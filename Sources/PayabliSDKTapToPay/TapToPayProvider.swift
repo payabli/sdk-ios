@@ -62,6 +62,22 @@ package protocol TapToPayProvider: AnyObject, Sendable {
     /// reader to ask, so a caller can tell "not accepted" from "cannot answer".
     func areTermsAccepted() async throws -> Bool
 
+    /// Asks the platform to present its own terms so the merchant can accept, and
+    /// returns once the request is done.
+    ///
+    /// Nothing here accepts on the merchant's behalf. The sheet belongs to the
+    /// platform and the merchant taps it, so returning without error means the
+    /// request completed, not that a sheet was shown: a platform that requires no
+    /// acceptance returns without presenting anything. `areTermsAccepted()` is what
+    /// answers where the merchant stands afterwards.
+    ///
+    /// Called by the facade on demand, from a screen the host chose. A platform
+    /// that requires no acceptance returns without doing anything.
+    ///
+    /// Must throw `PayabliTTPError.readerSetupFailed(reason:)` when there is no
+    /// reader to present from, for the same reason `areTermsAccepted()` does.
+    func presentTerms() async throws
+
     /// Runs the NFC interaction and (for atomic providers like Fiserv) the
     /// actual charge. Providers that only collect card data should ignore the
     /// merchant correlation IDs and populate `encryptedPayload` in the result.

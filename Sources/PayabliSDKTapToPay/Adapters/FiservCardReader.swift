@@ -71,24 +71,36 @@ package final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
     /// Set only by a test, so the linked, unlinked and platform-error answers are
     /// reachable without reader hardware. `prepareReader()` never assigns it, so
     /// the shipped path always asks the reader it built.
-    private var injectedLinkStateSource: AccountLinkReading?
+    private var injectedLinkStateSource: AccountLinking?
 
-    /// Whatever `areTermsAccepted()` asks. Read under the lock by its caller.
-    private var linkStateSource: AccountLinkReading? {
+    /// Whatever `prepareReader()` last built, which in a shipped build is the vendored reader and
+    /// in a test is the injected one. Held apart from `reader` because that stays the vendored
+    /// type the charge path needs.
+    private var preparedReader: ReaderSetup?
+
+    /// Builds the reader `prepareReader()` drives. Set only by a test; `nil` in every shipped
+    /// build, where the vendored reader is constructed instead.
+    private var injectedReaderFactory: ((Credentials) throws -> ReaderSetup)?
+
+    /// Whatever the terms surface asks. Read under the lock by its caller.
+    private var linkStateSource: AccountLinking? {
         if let injectedLinkStateSource {
             return injectedLinkStateSource
         }
-        #if canImport(PayabliCardReaderCore)
-            return reader
-        #else
-            return nil
-        #endif
+        return preparedReader
     }
 
-    /// Injects the answer `areTermsAccepted()` reads. Tests only.
-    func setLinkStateSource(_ source: AccountLinkReading?) {
+    /// Injects what the terms surface reads and presents. Tests only.
+    func setLinkStateSource(_ source: AccountLinking?) {
         lock.lock()
         injectedLinkStateSource = source
+        lock.unlock()
+    }
+
+    /// Injects the reader `prepareReader()` drives. Tests only.
+    func setReaderFactory(_ make: ((Credentials) throws -> ReaderSetup)?) {
+        lock.lock()
+        injectedReaderFactory = make
         lock.unlock()
     }
 
@@ -169,12 +181,15 @@ package final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
     package func prepareReader() async throws {
         #if canImport(PayabliCardReaderCore)
             let creds = try requireCredentials()
-            let newReader = try buildReader(credentials: creds)
+            let injected = lock.withLock { injectedReaderFactory }
+            let newReader: ReaderSetup = try injected.map { try $0(creds) }
+                ?? buildReader(credentials: creds)
 
             // Credentials now live inside `newReader`, so this copy is dropped (NFR-5D).
-            lock.lock()
-            credentials = nil
-            lock.unlock()
+            lock.withLock {
+                preparedReader = newReader
+                credentials = nil
+            }
 
             logger.info("[fiserv.prepare] → requesting session")
             do {
@@ -185,8 +200,26 @@ package final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
                     try await newReader.linkAccount()
                 }
 
-                try await newReader.initializeSession()
+                do {
+                    try await newReader.initializeSession()
+                } catch {
+                    // Opening the session is the only step the platform refuses over terms, so it is
+                    // the only failure read that way. The steps before it leave the merchant unlinked
+                    // whenever they fail at all — a dropped connection while presenting the sheet is
+                    // still an unlinked merchant — and calling those unaccepted terms would hide an
+                    // operational failure behind a state the host cannot resolve by asking again.
+                    guard try await isNotLinked(newReader) else { throw error }
+                    logger.info("[fiserv.prepare] ← terms not accepted; reader kept")
+                    throw PayabliTTPError.termsNotAccepted
+                }
+
                 logger.info("[fiserv.prepare] ← reader ready (linked=\(linked))")
+            } catch PayabliTTPError.termsNotAccepted {
+                // The one setup failure that leaves the reader in use, and it has to: the reader holds
+                // the session token presenting the sheet needs, and it is what answers whether the
+                // merchant has accepted afterwards. Clearing it would leave a host holding a failure it
+                // has no way to act on.
+                throw PayabliTTPError.termsNotAccepted
             } catch {
                 clearAllState()
                 throw Self.mapError(error) { .readerSetupFailed(reason: $0) }
@@ -207,6 +240,40 @@ package final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
 
             do {
                 return try await source.isAccountLinked()
+            } catch {
+                throw Self.mapError(error) { .readerSetupFailed(reason: $0) }
+            }
+        #else
+            throw PayabliTTPError.readerSetupFailed(reason: "Tap to Pay is iOS-only")
+        #endif
+    }
+
+    #if canImport(PayabliCardReaderCore)
+        /// Whether setup failed because the merchant has not accepted, asked of the reader rather than
+        /// read off the error.
+        ///
+        /// The platform refuses this with a typed case, and the vendored reader rewraps it as its own
+        /// error carrying only the platform's prose. Matching that text would bind this decision to
+        /// wording nobody in this repository controls, where the reader answers the question directly
+        /// and authoritatively.
+        ///
+        /// A reader that cannot answer at all is not the terms case: `false` here sends the original
+        /// failure on unchanged.
+        private func isNotLinked(_ reader: AccountLinking) async throws -> Bool {
+            (try? await reader.isAccountLinked()) == false
+        }
+    #endif
+
+    package func presentTerms() async throws {
+        #if canImport(PayabliCardReaderCore)
+            // Same reader the answer comes from, and the same reason for the scoped read as above.
+            let source = lock.withLock { linkStateSource }
+            guard let source else {
+                throw PayabliTTPError.readerSetupFailed(reason: "Reader not prepared")
+            }
+
+            do {
+                try await source.linkAccount()
             } catch {
                 throw Self.mapError(error) { .readerSetupFailed(reason: $0) }
             }
@@ -296,6 +363,7 @@ package final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
             reader?.finalize()
             reader = nil
         #endif
+        preparedReader = nil
         credentials = nil
         lock.unlock()
     }

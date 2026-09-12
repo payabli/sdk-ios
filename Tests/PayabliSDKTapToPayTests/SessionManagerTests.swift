@@ -116,4 +116,18 @@ final class SessionManagerTests: XCTestCase {
         XCTAssertFalse(sm.isReady)
         XCTAssertNotNil(sm.lastError)
     }
+
+    /// The terms state is reached from the reader phase and leaves the way `pendingActivation` does:
+    /// the host resolves what the session waits on, then initializes again from attestation.
+    func testPendingTermsIsEnteredFromTheReaderPhaseAndLeavesToAttestation() {
+        XCTAssertTrue(SessionManager.isValidTransition(from: .initializingReader, to: .pendingTerms))
+        XCTAssertTrue(SessionManager.isValidTransition(from: .pendingTerms, to: .attestingDevice))
+        XCTAssertTrue(SessionManager.isValidTransition(from: .pendingTerms, to: .idle))
+    }
+
+    /// It is not a way into the reader being usable: only a fresh run gets there.
+    func testPendingTermsDoesNotReachReadyDirectly() {
+        XCTAssertFalse(SessionManager.isValidTransition(from: .pendingTerms, to: .ready))
+        XCTAssertFalse(SessionManager.isValidTransition(from: .ready, to: .pendingTerms))
+    }
 }

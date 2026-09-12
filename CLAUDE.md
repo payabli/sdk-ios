@@ -166,10 +166,10 @@ channel, so an app that never accepts card-present never links the certified car
   Do not consolidate them.
 - `SecureStorage` abstracts Keychain access; inject a stub in tests rather than touching the real
   Keychain. Items are `...ThisDeviceOnly` so nothing rides an iCloud backup or a device transfer.
-- Tap to Pay is a **nine-state machine** (`PayabliTTPSessionState`: `idle`, `attestingDevice`,
+- Tap to Pay session states (`PayabliTTPSessionState`: `idle`, `attestingDevice`,
   `fetchingConfig`, `initializingReader`, `ready`, `sessionExpired`, `reinitializing`,
-  `pendingActivation`, `error`) enforced by the internal `SessionManager` and published via
-  `@Published sessionState`.
+  `pendingActivation`, `pendingTerms`, `error`) enforced by the internal `SessionManager` and
+  published via `@Published sessionState`.
 - Guard new TapToPay code with `#if canImport(PayabliCardReaderCore)` or `#if os(iOS)` even though the
   package is iOS-only today.
 - Platform-native only: `URLSession`, CryptoKit and the Secure Enclave, `Codable`. No third-party HTTP

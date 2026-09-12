@@ -27,6 +27,7 @@ public enum PayabliTTPEvent: Sendable {
     // keeps the warning that says a new case arrived, which is the point of it.
     case attestationFailed(error: String)
     case configFailed(error: String)
+    case termsRequired
 }
 
 /// TTP-specific errors (PRD §20.2).
@@ -85,6 +86,7 @@ public enum PayabliTTPError: Error, Sendable {
     case activationFailed = 17
     case attestationFailed = 18
     case configFailed = 19
+    case termsRequired = 20
 }
 
 public extension PayabliTTPEvent {
@@ -112,6 +114,7 @@ public extension PayabliTTPEvent {
         case .activationFailed: return .activationFailed
         case .attestationFailed: return .attestationFailed
         case .configFailed: return .configFailed
+        case .termsRequired: return .termsRequired
         }
     }
 
@@ -158,7 +161,8 @@ public extension PayabliTTPEvent {
              .reinitializeCompleted,
              .devicePendingActivation,
              .activationStarted,
-             .activationCompleted:
+             .activationCompleted,
+             .termsRequired:
             return [:]
         }
     }

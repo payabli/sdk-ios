@@ -31,6 +31,7 @@ namespace Payabli.TapToPay
         Reinitializing = 6,
         PendingActivation = 7,
         Error = 8,
+        PendingTerms = 9,
     }
 
     [Native]
@@ -56,5 +57,6 @@ namespace Payabli.TapToPay
         ActivationFailed = 17,
         AttestationFailed = 18,
         ConfigFailed = 19,
+        TermsRequired = 20,
     }
 }

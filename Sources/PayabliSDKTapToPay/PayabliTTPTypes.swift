@@ -1,6 +1,6 @@
 import Foundation
 
-/// The 9-state session lifecycle for Tap to Pay (PRD §17).
+/// The session lifecycle for Tap to Pay (PRD §17).
 @objc public enum PayabliTTPSessionState: Int, Sendable {
     case idle = 0
     case attestingDevice = 1
@@ -11,6 +11,14 @@ import Foundation
     case reinitializing = 6
     case pendingActivation = 7
     case error = 8
+
+    /// The merchant has not accepted the terms their platform requires, so the session stops here and
+    /// the host presents them. Resolved the way `pendingActivation` is: the host acts, then initializes
+    /// again.
+    ///
+    /// Appended rather than placed beside `pendingActivation`, because the raw values are public API and
+    /// are mirrored by each bridge. A case arrives at the end with a new value; none is renumbered.
+    case pendingTerms = 9
 }
 
 /// TTP transaction type. v1.0 supports `.sale` only (PRD FR-11D.1).

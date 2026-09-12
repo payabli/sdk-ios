@@ -34,9 +34,9 @@ final class StepStatusTests: XCTestCase {
 
     func testTheDemoKnowsEverySessionStateTheSDKHas() {
         // `PayabliTTPSessionState` is `@objc`, so it cannot be `CaseIterable` and
-        // the list below is written out. A tenth state fails here first.
-        XCTAssertEqual(everyTapToPaySession.count, 9)
-        XCTAssertNil(PayabliTTPSessionState(rawValue: 9))
+        // the list below is written out. A state added to the SDK fails here first.
+        XCTAssertEqual(everyTapToPaySession.count, highestSessionStateRawValue + 1)
+        XCTAssertNil(PayabliTTPSessionState(rawValue: highestSessionStateRawValue + 1))
         for status in everyTapToPayStatus {
             if case let .unrecognised(raw) = status {
                 XCTFail("the app does not name the SDK state with raw value \(raw)")
@@ -45,11 +45,15 @@ final class StepStatusTests: XCTestCase {
     }
 }
 
-/// The nine session states, by raw value, since the enum is `@objc`.
-let everyTapToPaySession: [PayabliTTPSessionState] =
-    (0 ... 8).compactMap(PayabliTTPSessionState.init(rawValue:))
+/// The last raw value the SDK's state enum defines. One number to move when it grows, and the case
+/// beside it is what proves the move was needed.
+let highestSessionStateRawValue = 9
 
-/// The same nine as this app names them.
+/// Every session state, by raw value, since the enum is `@objc`.
+let everyTapToPaySession: [PayabliTTPSessionState] =
+    (0 ... highestSessionStateRawValue).compactMap(PayabliTTPSessionState.init(rawValue:))
+
+/// The same states as this app names them.
 ///
 /// Derived rather than written out, so a state the app has not mapped arrives here
 /// as `unrecognised` and fails the assertion beside it rather than reaching a

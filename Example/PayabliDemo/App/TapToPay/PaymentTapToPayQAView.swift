@@ -19,6 +19,7 @@ struct PaymentTapToPayQAView: View {
     @State private var amountText = "1.00"
     @State private var activationCode = ""
     @State private var enableMessage = ""
+    @State private var termsMessage = ""
     @State private var activationMessage = ""
     @State private var chargeMessage = ""
     @State private var eventLog: [TapToPayQAEventEntry] = []
@@ -102,16 +103,38 @@ struct PaymentTapToPayQAView: View {
             StepRow(index: 2, step: steps.enable) {
                 VStack(alignment: .leading, spacing: 6) {
                     if steps.nextAction == .enableTerminal {
-                        Button { runEnableTerminal() } label: {
-                            Label("Enable Terminal", systemImage: "wave.3.right")
+                        Button { runEnableTerminal() } label: { enableTerminalLabel }
+                            .buttonStyle(.borderedProminent)
+                            .disabled(isWorking)
+                    }
+                    if steps.nextAction == .presentTerms {
+                        Button { runPresentTerms() } label: {
+                            Label("Present terms", systemImage: "hand.tap")
                                 .frame(maxWidth: .infinity)
                         }
                         .buttonStyle(.borderedProminent)
                         .disabled(isWorking)
+                        // Accepting does not move the session on its own. Presenting the sheet and
+                        // running the setup again are two calls a host makes, and only the second
+                        // reaches `.ready`, so both belong here: offering the first alone leaves
+                        // this screen with nothing to press once the merchant has accepted.
+                        Button { runEnableTerminal() } label: { enableTerminalLabel }
+                            .buttonStyle(.bordered)
+                            .disabled(isWorking)
                     }
                     stepOutcome(enableMessage)
                 }
             }
+
+            // Outside `StepRow`: that view only renders content while the step is current, failed or
+            // in progress, so a ready session would hide a question that is never gated on a state.
+            Button { runTermsCheck() } label: {
+                Label("Ask about terms", systemImage: "doc.text.magnifyingglass")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+            .disabled(isWorking)
+            stepOutcome(termsMessage)
 
             StepRow(index: 3, step: steps.activation) {
                 VStack(alignment: .leading, spacing: 6) {
@@ -161,6 +184,11 @@ struct PaymentTapToPayQAView: View {
 
     /// Recovery is not part of the sequence, so it only appears when the session
     /// is in a state it can actually repair.
+    private var enableTerminalLabel: some View {
+        Label("Enable Terminal", systemImage: "wave.3.right")
+            .frame(maxWidth: .infinity)
+    }
+
     @ViewBuilder
     private var recoverySection: some View {
         if let recovery = steps.recovery {
@@ -386,9 +414,58 @@ struct PaymentTapToPayQAView: View {
     /// sit under a step that is ready to run again.
     private func clearOutcomesForNewSession() {
         enableMessage = ""
+        termsMessage = ""
         chargeMessage = ""
         activationMessage = ""
         activationOutcome = .none
+    }
+
+    /// Asks the platform whether this merchant has accepted.
+    ///
+    /// A failure shows the SDK's own words rather than a category of this screen's invention. The two
+    /// worth telling apart already read differently: a reader that does not exist yet says so, and a
+    /// platform that refused carries what it said.
+    private func runTermsCheck() {
+        isWorking = true
+        Task { @MainActor in
+            defer { isWorking = false }
+            do {
+                let accepted = try await terminal.termsAccepted()
+                termsMessage = accepted ? "✓ Accepted" : "✗ Not accepted"
+            } catch {
+                termsMessage = "? Could not ask: \(error.localizedDescription)"
+            }
+        }
+    }
+
+    /// Asks the SDK to present the terms, then asks again what the answer is now.
+    ///
+    /// **It does not say a sheet appeared, because nothing here can know that.** The call returns on a
+    /// merchant who has already accepted without presenting anything, and that is the documented
+    /// contract rather than a fault. So this reports what it observed — the call returned — and lets
+    /// the answer beside it carry the meaning.
+    private func runPresentTerms() {
+        isWorking = true
+        Task { @MainActor in
+            defer { isWorking = false }
+            do {
+                try await terminal.presentTerms()
+            } catch {
+                termsMessage = "✗ Presenting failed: \(error.localizedDescription)"
+                return
+            }
+            // Asked in its own scope: presenting has already returned by here, so a failure to
+            // ask afterwards must not be reported as the presentation having failed.
+            do {
+                let accepted = try await terminal.termsAccepted()
+                termsMessage = accepted
+                    ? "returned; now ✓ Accepted"
+                    : "returned; still ✗ Not accepted"
+            } catch {
+                termsMessage = "returned; could not ask whether accepted: "
+                    + error.localizedDescription
+            }
+        }
     }
 
     private func runEnableTerminal() {

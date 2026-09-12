@@ -301,6 +301,63 @@ final class TapToPayOnDeviceTests: XCTestCase {
         )
         return (result, seen.value)
     }
+
+    // MARK: - Contactless payment terms
+
+    /// The platform answers for this merchant, against a reader that exists.
+    ///
+    /// The simulator suite drives this through a mock provider, so nothing there reaches the platform
+    /// at all. What this adds is that the question survives the whole chain: facade, adapter, vendored
+    /// reader, Apple.
+    func testTheTermsQuestionIsAnsweredByTheLiveReader() async throws {
+        let ttp = try await enrolledDevice().session
+
+        let accepted = try await ttp.areTermsAccepted()
+
+        XCTAssertTrue(
+            accepted,
+            "this paypoint's Apple merchant identifier has not accepted; the walk below needs one that has"
+        )
+        LiveEnvironment.reportIdentifier("TERMS_ACCEPTED", String(accepted), env: named.name)
+    }
+
+    /// Presenting completes against a live session.
+    ///
+    /// **What this does not prove, and cannot here.** Acceptance is keyed to the Apple merchant
+    /// identifier the paypoint carries, and every paypoint reachable from this bench has already
+    /// accepted. Apple refuses a second acceptance with `accountAlreadyLinked`, which the vendored
+    /// reader swallows, so on an accepted merchant this call returns without presenting anything.
+    /// That is the documented contract rather than a defect: a platform needing no acceptance returns
+    /// without doing anything.
+    ///
+    /// So this covers the path reaching the platform and coming back. The sheet appearing needs a
+    /// paypoint whose Apple merchant identifier has never accepted, which is a provisioning ask and is
+    /// filed as one.
+    func testPresentingTermsCompletesAgainstALiveReader() async throws {
+        let ttp = try await enrolledDevice().session
+
+        try await ttp.presentTerms()
+
+        XCTAssertEqual(ttp.sessionState, .ready, "presenting must not disturb a session that was ready")
+    }
+
+    /// Presenting before a reader exists says so rather than failing quietly.
+    ///
+    /// The one guard on this member, and the one a host meets first: the sheet needs the session token
+    /// the reader holds, so there is nothing to present from until `initialize()` has built one. It is
+    /// provable here because it needs no acceptance state at all.
+    func testPresentingWithoutASessionSaysThereIsNoReader() async throws {
+        let ttp = try makeTTP()
+
+        do {
+            try await ttp.presentTerms()
+            XCTFail("presenting without a prepared reader has to say so")
+        } catch let error as PayabliTTPError {
+            guard case .readerSetupFailed = error else {
+                return XCTFail("expected readerSetupFailed, got \(error)")
+            }
+        }
+    }
 }
 
 /// What a charge run saw, written from one task and read from another: whether it

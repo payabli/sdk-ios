@@ -1,7 +1,7 @@
 import Combine
 import Foundation
 
-/// Manages the 9-state TTP session lifecycle (PRD §17).
+/// Manages the TTP session lifecycle (PRD §17).
 ///
 /// State transitions are enforced internally. Host apps observe state via
 /// `@Published sessionState`. All transitions occur on `@MainActor` for safe
@@ -90,6 +90,7 @@ final class SessionManager: ObservableObject {
             return true
 
         case (.initializingReader, .ready),
+             (.initializingReader, .pendingTerms),
              (.initializingReader, .error):
             return true
 
@@ -104,7 +105,10 @@ final class SessionManager: ObservableObject {
              (.reinitializing, .error):
             return true
 
-        case (.pendingActivation, .attestingDevice):
+        // Both wait on a person rather than on the SDK, and both leave the same way: the host resolves
+        // what the session is waiting on, then initializes again, which starts at attestation.
+        case (.pendingActivation, .attestingDevice),
+             (.pendingTerms, .attestingDevice):
             return true
 
         case (.error, .attestingDevice),

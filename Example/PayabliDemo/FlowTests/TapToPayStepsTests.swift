@@ -34,7 +34,7 @@ final class TapToPayStepsTests: XCTestCase {
 
     /// A state this app does not name leaves the enable step offering its action,
     /// which is what an unknown reader state means: nothing about whether it came
-    /// up. The nine the SDK has today never map to it, which `StepStatusTests`
+    /// up. Every state the SDK has today is named, which `StepStatusTests`
     /// asserts, so this is the only place the case is exercised.
     func testAnUnnamedStateLeavesTheEnableStepToAct() {
         let sequence = TapToPaySteps.forCharging(
@@ -46,8 +46,42 @@ final class TapToPayStepsTests: XCTestCase {
         XCTAssertEqual(sequence.enable.status, .current)
     }
 
+    /// A session waiting on terms offers to present them, not to run the setup again.
+    ///
+    /// The enable step is the one to act on for both waits, so the step alone does not say which
+    /// control belongs there; the state does.
+    func testASessionWaitingOnTermsOffersToPresentThem() {
+        let sequence = TapToPaySteps.forCharging(
+            tokenCheck: .reachable,
+            session: .pendingTerms,
+            activation: .none
+        )
+
+        XCTAssertEqual(sequence.nextAction, .presentTerms)
+        XCTAssertEqual(sequence.enable.status, .current)
+    }
+
+    /// A session waiting on terms proves the backend answered, so an unrun probe does not send the
+    /// sequence back to the token step.
+    ///
+    /// Reaching `.pendingTerms` takes an attestation and a config request, exactly as
+    /// `.pendingActivation` does. Left out of that set, the token step claims `.current` whenever the
+    /// probe has not run and the screen offers the probe instead of the terms.
+    func testWaitingOnTermsProvesTheBackendAnsweredEvenWithNoProbe() {
+        let sequence = TapToPaySteps.forCharging(
+            tokenCheck: .notRun,
+            session: .pendingTerms,
+            activation: .none
+        )
+
+        XCTAssertEqual(sequence.token.status, .done)
+        XCTAssertEqual(sequence.nextAction, .presentTerms)
+    }
+
     func testTheSpaceIsTheSizeItClaims() {
-        XCTAssertEqual(everyCombination.count, 4 * 9 * 5)
+        // Derived from the same list the space is built over rather than written out, so a state
+        // added to the SDK moves this with it instead of failing here for the wrong reason.
+        XCTAssertEqual(everyCombination.count, 4 * everyTapToPayStatus.count * 5)
     }
 
     // MARK: - Invariants, over the whole space
