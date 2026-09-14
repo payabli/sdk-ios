@@ -96,6 +96,54 @@ final class TapToPayOnDeviceTests: XCTestCase {
         return (ttp, handle)
     }
 
+    /// The reader reports its configuration progress, and it reaches a host.
+    ///
+    /// Only a real reader raises this. A simulator answers `isSupported` false and
+    /// never arms, so nothing below the device tier can tell a working stream from
+    /// one nobody subscribed to.
+    ///
+    /// A device that has already armed configures in seconds and may report once or
+    /// not at all, so an absent report is not a failure here. What is asserted is
+    /// that whatever arrives is a usable percentage, that the announcement and the
+    /// readable value agree, and that a card state is never mistaken for progress.
+    func testTheReaderReportsItsConfigurationProgress() async throws {
+        let ttp = try makeTTP()
+
+        // Subscribed before `initialize()`, because progress is raised during it.
+        let stream = ttp.events()
+        let collector = Task { () -> [Int] in
+            var seen: [Int] = []
+            for await event in stream {
+                if case let .readerConfigurationProgressChanged(percent) = event {
+                    seen.append(percent)
+                }
+                if case .readerReady = event {
+                    return seen
+                }
+            }
+            return seen
+        }
+
+        do {
+            try await ttp.initialize()
+        } catch PayabliTTPError.devicePendingActivation {
+            collector.cancel()
+            throw XCTSkip("this device is pending activation on \(named.entry)")
+        }
+
+        let reported = await collector.value
+        for percent in reported {
+            XCTAssertTrue((0 ... 100).contains(percent), "reported \(percent), which is not a percentage")
+        }
+        if let last = reported.last {
+            XCTAssertEqual(
+                ttp.readerConfigurationProgress, last,
+                "the last announcement and the readable value disagree"
+            )
+        }
+        print("[device] reader reported \(reported.count) progress values: \(reported)")
+    }
+
     /// Reaching `.ready` stores a binding that names this paypoint.
     func testReachingReadyStoresABindingForThisPaypoint() async throws {
         let held = try await enrolledDevice().handle

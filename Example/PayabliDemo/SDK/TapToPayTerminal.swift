@@ -14,19 +14,35 @@ final class TapToPayTerminal: ObservableObject {
     /// on the way out.
     @Published private(set) var status: TapToPaySessionStatus
 
+    /// How far the reader has got configuring, from 0 to 100, or `nil` when it
+    /// has not reported.
+    ///
+    /// Republished rather than read through the SDK, so a screen watching this
+    /// object redraws. Configuring takes minutes the first time a device arms.
+    @Published private(set) var configurationProgress: Int?
+
     private let terminal: PayabliTTP
-    private var forwarding: AnyCancellable?
+    private var forwarding: Set<AnyCancellable> = []
 
     init(_ terminal: PayabliTTP) {
         self.terminal = terminal
         status = TapToPaySessionStatus(terminal.sessionState)
-        // This object holds the subscription, so the subscription holds it weakly.
-        forwarding = terminal.$sessionState
+        configurationProgress = terminal.readerConfigurationProgress
+        // This object holds the subscriptions, so they hold it weakly.
+        terminal.$sessionState
             .map(TapToPaySessionStatus.init)
             .removeDuplicates()
             .sink { [weak self] status in
                 self?.status = status
             }
+            .store(in: &forwarding)
+
+        terminal.$readerConfigurationProgress
+            .removeDuplicates()
+            .sink { [weak self] percent in
+                self?.configurationProgress = percent
+            }
+            .store(in: &forwarding)
     }
 
     /// Attests the device, fetches its configuration and brings the reader up.

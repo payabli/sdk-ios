@@ -104,7 +104,116 @@ final class PayabliTTPReaderEventTests: XCTestCase {
         XCTAssertEqual(ttp.readerConfigurationProgress, 40, "an event arrived after cleanUp")
     }
 
+    // MARK: - Announced to a host
+
+    /// A subscriber is told progress moved, and the payload carries where it
+    /// got to for a bridge host that has no property to read.
+    func testProgressIsAnnouncedWithItsPercentage() async throws {
+        let (ttp, provider) = try makeTTP()
+        try await ttp.initialize()
+
+        let collector = collectFirst(from: ttp.events()) { event -> Int? in
+            guard case let .readerConfigurationProgressChanged(percent) = event else { return nil }
+            return percent
+        }
+        provider.emitReaderEvent(.configurationProgress(percent: 73))
+
+        let percent = try await firstValue(of: collector, named: "readerConfigurationProgressChanged")
+        XCTAssertEqual(percent, 73)
+    }
+
+    /// The property is written before the announcement, so a subscriber reading
+    /// it on being told it moved does not read the previous value.
+    func testTheProgressIsReadableWhenTheAnnouncementArrives() async throws {
+        let (ttp, provider) = try makeTTP()
+        try await ttp.initialize()
+
+        let collector = collectFirst(from: ttp.events()) { event -> Int? in
+            guard case let .readerConfigurationProgressChanged(percent) = event else { return nil }
+            return percent
+        }
+        provider.emitReaderEvent(.configurationProgress(percent: 61))
+
+        _ = try await firstValue(of: collector, named: "readerConfigurationProgressChanged")
+        XCTAssertEqual(
+            ttp.readerConfigurationProgress, 61,
+            "the announcement arrived before the value it is about was readable"
+        )
+    }
+
+    /// Every card state a host acts on reaches it, in the order the reader
+    /// raised them.
+    func testTheCardStatesReachAHostInOrder() async throws {
+        let (ttp, provider) = try makeTTP()
+        try await ttp.initialize()
+
+        let wanted: [PayabliTTPEventCode] = [
+            .cardDetected, .pinEntryRequested, .pinEntryCompleted,
+            .cardRemovalRequested, .cardReadRetryRequested,
+            .readerNotReady, .readerPromptDismissed
+        ]
+        // Subscribed before anything is raised: a stream taken inside the task
+        // would not exist yet when the events below are emitted.
+        let stream = ttp.events()
+        let collector = Task { () -> [PayabliTTPEventCode] in
+            var seen: [PayabliTTPEventCode] = []
+            for await event in stream {
+                seen.append(event.code)
+                if seen.count == wanted.count {
+                    return seen
+                }
+            }
+            return seen
+        }
+
+        for event in [
+            TapToPayReaderEvent.cardDetected, .pinEntryRequested, .pinEntryCompleted,
+            .cardRemovalRequested, .cardReadRetryRequested, .notReady, .promptDismissed
+        ] {
+            provider.emitReaderEvent(event)
+        }
+
+        let deadline = Task {
+            guard (try? await Task.sleep(nanoseconds: Self.eventWait)) != nil else { return }
+            collector.cancel()
+        }
+        let seen = await collector.value
+        deadline.cancel()
+        XCTAssertEqual(seen, wanted)
+    }
+
     // MARK: - Fixtures
+
+    /// How long an event has to arrive before the test says it never did.
+    private static let eventWait: UInt64 = 2_000_000_000
+
+    /// Reads the stream for the first event `match` accepts. Bounded by
+    /// `firstValue`, so a missing event fails a test rather than hanging it.
+    private func collectFirst<T: Sendable>(
+        from stream: AsyncStream<PayabliTTPEvent>,
+        match: @escaping @Sendable (PayabliTTPEvent) -> T?
+    ) -> Task<T?, Never> {
+        Task {
+            for await event in stream {
+                if let found = match(event) {
+                    return found
+                }
+            }
+            return nil
+        }
+    }
+
+    private func firstValue<T: Sendable>(of collector: Task<T?, Never>, named name: String) async throws -> T {
+        let deadline = Task {
+            // A cancelled sleep throws, and swallowing that would cancel the
+            // collector after it had already answered.
+            guard (try? await Task.sleep(nanoseconds: Self.eventWait)) != nil else { return }
+            collector.cancel()
+        }
+        let found = await collector.value
+        deadline.cancel()
+        return try XCTUnwrap(found, "no \(name) event arrived")
+    }
 
     private func makeTTP() throws -> (PayabliTTP, MockTapToPayProvider) {
         let provider = MockTapToPayProvider()
