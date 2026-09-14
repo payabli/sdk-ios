@@ -165,7 +165,7 @@ extension PayInFailure {
     ///   not the duplicate this message describes, and it reads as the service's own
     ///   answer.
     init(_ error: Error, operation: PayInOperation) {
-        let duplicate = operation == .capture && Self.isDuplicateSubmission(error)
+        let duplicate = operation.sendsIdempotencyKey && Self.isDuplicateSubmission(error)
         isDuplicateSubmission = duplicate
         logLabel = LoggableError.label(for: error)
         message = duplicate ? Self.duplicateMessage : error.localizedDescription
@@ -179,7 +179,7 @@ extension PayInFailure {
         }
         // An empty body carries no code of its own, so the status mapping supplies one. The code says
         // a conflict and no more; that a conflict here is a repeat is what the operation above adds,
-        // since a capture is the only one of the two that sends a key.
+        // since only an operation that sends a key can have one refused.
         if let payabliError = error as? any PayabliError, payabliError.code == .conflict {
             return true
         }

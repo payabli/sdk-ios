@@ -129,28 +129,30 @@ final class CardNotPresentOnDeviceTests: XCTestCase {
 
     /// An authorization is taken and then voided, so nothing settles.
     func testBAuthorizeThenVoid() async throws {
-        let authorized = try await makeFlow().authorize(request(with: try card()))
+        let flow = try makeFlow()
+        let authorized = try await flow.authorize(request(with: try card()))
         let transId = try XCTUnwrap(
             authorized.transaction?.paymentTransId,
             "authorize returned no paymentTransId: code=\(authorized.code) reason=\(authorized.reason ?? "<nil>")"
         )
         LiveEnvironment.report("PAYABLI_AUTHORIZED env=\(named.name) transId=\(transId) code=\(authorized.code)")
 
-        let voided = try await void(transId)
+        let voided = try await void(transId, on: flow)
         XCTAssertTrue(voided, "the authorization was left open and needs voiding by hand: \(transId)")
     }
 
     /// Authorize and capture in one call, so the combined endpoint is exercised as
     /// well as the split one. Voided the same way.
     func testCCaptureThenVoid() async throws {
-        let captured = try await makeFlow().capture(request(with: try card()))
+        let flow = try makeFlow()
+        let captured = try await flow.capture(request(with: try card()))
         let transId = try XCTUnwrap(
             captured.transaction?.paymentTransId,
             "capture returned no paymentTransId: code=\(captured.code) reason=\(captured.reason ?? "<nil>")"
         )
         LiveEnvironment.report("PAYABLI_CAPTURED env=\(named.name) transId=\(transId) code=\(captured.code)")
 
-        let voided = try await void(transId)
+        let voided = try await void(transId, on: flow)
         XCTAssertTrue(voided, "the transaction was left standing and needs voiding by hand: \(transId)")
     }
 
@@ -180,43 +182,70 @@ final class CardNotPresentOnDeviceTests: XCTestCase {
             validation: configured.validation
         )
 
-        let authorized = try await makeFlow().authorize(request)
+        let flow = try makeFlow()
+        let authorized = try await flow.authorize(request)
         let transId = try XCTUnwrap(
             authorized.transaction?.paymentTransId,
             "the toggle-off shape was refused: code=\(authorized.code) reason=\(authorized.reason ?? "<nil>")"
         )
         LiveEnvironment.report("PAYABLI_TOGGLE_OFF env=\(named.name) transId=\(transId) code=\(authorized.code)")
 
-        let voided = try await void(transId)
+        let voided = try await void(transId, on: flow)
         XCTAssertTrue(voided, "left open and needs voiding by hand: \(transId)")
+    }
+
+    /// The seam the capture screen's reversal button calls, in the app's own process.
+    ///
+    /// The button records which payment to reverse and the screen drives the call; this
+    /// covers the half that reaches the service, so a screen that stops calling it is the
+    /// only way the button can break without this failing.
+    @MainActor
+    func testEReversingThroughTheScreensOwnSeam() async throws {
+        let flow = try makeFlow()
+        let captured = try await flow.capture(request(with: try card()))
+        let transId = try XCTUnwrap(
+            captured.transaction?.paymentTransId,
+            "capture returned no paymentTransId: code=\(captured.code)"
+        )
+
+        // The reversal button is disabled while a submission is in flight, so a flow that
+        // never reports the capture finished would leave it permanently untappable.
+        XCTAssertFalse(flow.isSubmitting, "the capture never reported itself finished")
+
+        let outcome = try await PayInFlowHandle(flow).voidTransaction(transId)
+
+        LiveEnvironment.report(
+            "PAYABLI_VOID_SEAM env=\(named.name) transId=\(transId) code=\(outcome.code)"
+        )
+        XCTAssertTrue(
+            outcome.code.hasPrefix("A"),
+            "the screen's seam did not reverse it, and it needs voiding by hand: \(transId)"
+        )
     }
 
     // MARK: - Void
 
-    /// `POST /api/v2/MoneyIn/void/{transId}`, direct because the SDK exposes no
-    /// void. The transaction id is printed either way, so one left standing can be
-    /// found.
+    /// Reverses a transaction through the SDK's own member, which is what gives this
+    /// path product coverage rather than coverage of a request the test wrote itself.
     ///
-    /// `PayabliEnvironment.baseURL` is the host alone, so the `api` segment belongs
-    /// here; without it a void answers 404 and reads as a route that is not there.
-    private func void(_ transId: String) async throws -> Bool {
-        let token = try await Secrets.fetchPaymentMethodAccessToken()
-        var request = URLRequest(
-            url: named.environment.baseURL
-                .appendingPathComponent("api/v2/MoneyIn/void")
-                .appendingPathComponent(transId)
-        )
-        request.httpMethod = "POST"
-        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-
-        let (data, response) = try await URLSession.shared.data(for: request)
-        let status = (response as? HTTPURLResponse)?.statusCode ?? 0
-        // The status and the size, not the body: a money-in response carries the
-        // processor's whole answer, `paymentTokens.tokenData` among it.
-        LiveEnvironment.report(
-            "PAYABLI_VOID env=\(named.name) transId=\(transId) status=\(status) bytes=\(data.count)"
-        )
-        return (200 ..< 300).contains(status)
+    /// The transaction id is printed either way, so one left standing can be found.
+    private func void(_ transId: String, on flow: PayabliPayInPaymentFlow) async throws -> Bool {
+        do {
+            let reversed = try await flow.voidTransaction(transId)
+            LiveEnvironment.report(
+                "PAYABLI_VOID env=\(named.name) transId=\(transId) code=\(reversed.code)"
+            )
+            // A reversal answers its own approval code rather than a capture's, so the family
+            // is what decides. The reason is the service's text and is not reported.
+            return reversed.code.hasPrefix("A")
+        } catch {
+            // The classification and none of its message: that message carries the service's
+            // own wording, which can quote what was submitted.
+            LiveEnvironment.report(
+                "PAYABLI_VOID env=\(named.name) transId=\(transId) failed=\(LoggableError.label(for: error))"
+            )
+            return false
+        }
     }
 }
 

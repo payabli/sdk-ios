@@ -13,6 +13,9 @@ struct PaymentCaptureQAView: View {
     @State private var capturedResult: PayInOutcome?
     @State private var isPaymentCaptureSheetPresented = false
     @State private var isPaymentCaptureResultViewPresented = false
+    @State private var voidedTransId: String?
+    @State private var reversing: String?
+    @State private var voidText = ""
 
     var body: some View {
         NavigationStack {
@@ -101,6 +104,31 @@ struct PaymentCaptureQAView: View {
                                     .frame(maxWidth: .infinity)
                             }
                             .buttonStyle(.bordered)
+
+                            // Only a payment that reported an identifier can be reversed, and
+                            // only once: the service refuses the second attempt, and offering a
+                            // button for a refusal teaches the wrong thing.
+                            if let transId = capturedResult?.transaction?.paymentTransId {
+                                Button { reverse(transId) } label: {
+                                    Label(
+                                        voidedTransId == transId ? "Reversed" : "Reverse this payment",
+                                        systemImage: "arrow.uturn.backward"
+                                    )
+                                    .frame(maxWidth: .infinity)
+                                }
+                                .buttonStyle(.bordered)
+                                .disabled(reversing != nil || voidedTransId == transId || paymentFlow.isSubmitting)
+
+                                if !voidText.isEmpty {
+                                    Text(voidText)
+                                        .font(.caption)
+                                        .foregroundColor(
+                                            voidedTransId == transId ? .payabliOnSurfaceVariant : .payabliError
+                                        )
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                        .textSelection(.enabled)
+                                }
+                            }
                         }
                     }
 
@@ -184,6 +212,37 @@ struct PaymentCaptureQAView: View {
         resultAcknowledged = true
         submitFailed = false
         resultText = ""
+        voidText = ""
+    }
+
+    /// Reverses the payment on screen.
+    ///
+    /// The identifier comes from the result the flow reported, so nothing here builds a
+    /// request or holds a key. A refusal is shown as the service worded it.
+    /// Reverses the payment on screen.
+    ///
+    /// The identifier comes from the result the flow reported, so nothing here builds a
+    /// request or holds a key. A refusal is shown as the service worded it.
+    ///
+    /// The button records which payment to reverse and the work runs under `.task(id:)`
+    /// rather than in the action itself, so it is tied to the view's own lifecycle.
+    private func reverse(_ transId: String) {
+        reversing = transId
+        voidText = ""
+        Task {
+            do {
+                let outcome = try await paymentFlow.voidTransaction(transId)
+                Logger(
+                    subsystem: "com.payabli.example.app",
+                    category: "PaymentCaptureDiagnostics"
+                ).info("Payment reversed: \(outcome.code, privacy: .public)")
+                voidedTransId = transId
+                voidText = "Reversed. Code: \(outcome.code) Reason: \(outcome.reason ?? "-")"
+            } catch {
+                voidText = PayInFailure(error, operation: .void).message
+            }
+            reversing = nil
+        }
     }
 
     private func runTokenCheck() {

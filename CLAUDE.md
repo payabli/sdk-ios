@@ -292,8 +292,20 @@ which `xcodebuild` strips. Set plainly they reach `xcodebuild` and stop there, w
 variable that had no effect.
 
 Those two are the UI walkthrough's. The device bundle reads `PAYABLI_QA_LIVE` and `PAYABLI_ENV`, and
-takes them from the scheme rather than the `TEST_RUNNER_` prefix, so the two tiers do not share the
-environment variable that names where they run.
+takes them through the **same** `TEST_RUNNER_` prefix, which `xcodebuild` strips before handing them to
+the test host:
+
+```bash
+TEST_RUNNER_PAYABLI_QA_LIVE=1 TEST_RUNNER_PAYABLI_ENV=sandbox \
+xcodebuild test -project Example/PayabliDemo/PayabliDemo.xcodeproj -scheme PayabliDemoDeviceTests \
+  -destination 'id=<simulator udid>' -only-testing:PayabliDemoDeviceTests/CardNotPresentOnDeviceTests
+```
+
+The scheme declares `PAYABLI_ENV` as `$(PAYABLI_ENV)`, which reads like the way in and is not one:
+that substitution resolves against build settings, and it expands to nothing whether the value is
+passed as a build setting on the command line or exported into the shell. Both were measured on
+2026-09-14 against sandbox, and both skipped every live case while exiting 0 — which is what a
+successful run of an opted-out tier looks like, so read the skip count rather than the status.
 
 ### CI
 
