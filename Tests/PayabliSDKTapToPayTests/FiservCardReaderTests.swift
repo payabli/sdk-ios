@@ -38,7 +38,7 @@ final class FiservCardReaderTests: XCTestCase {
     func testPrepareReaderRequiresCredentials() async {
         let reader = FiservCardReader()
         do {
-            try await reader.prepareReader()
+            try await reader.prepareReader { _ in }
             XCTFail("expected readerSetupFailed")
         } catch let PayabliTTPError.readerSetupFailed(reason) {
             XCTAssertTrue(
@@ -119,7 +119,7 @@ final class FiservCardReaderTests: XCTestCase {
         await reader.cleanUp()
         // After cleanUp, prepareReader should fail because credentials are gone.
         do {
-            try await reader.prepareReader()
+            try await reader.prepareReader { _ in }
             XCTFail("expected failure after cleanUp")
         } catch PayabliTTPError.readerSetupFailed {
             // expected
@@ -277,7 +277,7 @@ final class FiservCardReaderTests: XCTestCase {
         let reader = preparedReader(stub)
 
         do {
-            try await reader.prepareReader()
+            try await reader.prepareReader { _ in }
             XCTFail("expected the refusal to surface")
         } catch PayabliTTPError.termsNotAccepted {
             // expected
@@ -303,7 +303,7 @@ final class FiservCardReaderTests: XCTestCase {
         let reader = preparedReader(stub)
 
         do {
-            try await reader.prepareReader()
+            try await reader.prepareReader { _ in }
             XCTFail("expected the failure to surface")
         } catch PayabliTTPError.termsNotAccepted {
             XCTFail("a linked merchant's failure is not a terms refusal")
@@ -326,7 +326,7 @@ final class FiservCardReaderTests: XCTestCase {
         let reader = preparedReader(stub)
 
         do {
-            try await reader.prepareReader()
+            try await reader.prepareReader { _ in }
             XCTFail("expected the token failure to surface")
         } catch PayabliTTPError.termsNotAccepted {
             XCTFail("a token failure is not a terms refusal")
@@ -360,7 +360,7 @@ final class FiservCardReaderTests: XCTestCase {
         let reader = preparedReader(stub)
 
         do {
-            try await reader.prepareReader()
+            try await reader.prepareReader { _ in }
             XCTFail("expected a failure")
         } catch PayabliTTPError.termsNotAccepted {
             // The documented limit, not the ideal answer.
@@ -375,7 +375,7 @@ final class FiservCardReaderTests: XCTestCase {
         let stub = StubReaderSetup(linked: false)
         let reader = preparedReader(stub)
 
-        try await reader.prepareReader()
+        try await reader.prepareReader { _ in }
 
         XCTAssertEqual(stub.linkAccountCalls, 1)
         XCTAssertEqual(stub.initializeSessionCalls, 1)
@@ -396,6 +396,10 @@ private final class StubReaderSetup: ReaderSetup {
 
     private(set) var initializeSessionCalls = 0
     private(set) var linkAccountCalls = 0
+
+    /// Raised while the session is being opened, which is when a real reader
+    /// reports its configuration progress.
+    var eventsWhileOpening: [TapToPayReaderEvent] = []
 
     /// `linkTakes: false` is the lapse the vendor documents: the request returns and the merchant
     /// is still not linked. On this branch that is the only route to the terms state, because the
@@ -429,8 +433,11 @@ private final class StubReaderSetup: ReaderSetup {
         }
     }
 
-    func initializeSession() async throws {
+    func initializeSession(onReaderEvent: @escaping (TapToPayReaderEvent) -> Void) async throws {
         lock.withLock { initializeSessionCalls += 1 }
+        for event in eventsWhileOpening {
+            onReaderEvent(event)
+        }
         try sessionResult.get()
     }
 }

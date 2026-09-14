@@ -63,6 +63,10 @@ public final class PayabliTTP: NSObject, ObservableObject {
     /// attributed to the replacement.
     var readerSessionGeneration = 0
 
+    /// How far the reader has got configuring, as a percentage, or `nil` when
+    /// it has not reported.
+    var readerConfigurationPercent: Int?
+
     /// The session setup in progress, if any, and which entry point started it.
     /// A caller of the same kind joins it, the way `PayabliAuth` deduplicates a
     /// token refresh; a caller of the other kind waits for it to finish.

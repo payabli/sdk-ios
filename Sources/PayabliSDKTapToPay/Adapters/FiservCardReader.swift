@@ -178,7 +178,7 @@ package final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
         #endif
     }
 
-    package func prepareReader() async throws {
+    package func prepareReader(onReaderEvent: @escaping @Sendable (TapToPayReaderEvent) -> Void) async throws {
         #if canImport(PayabliCardReaderCore)
             let creds = try requireCredentials()
             let injected = lock.withLock { injectedReaderFactory }
@@ -201,7 +201,7 @@ package final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
                 }
 
                 do {
-                    try await newReader.initializeSession()
+                    try await newReader.initializeSession(onReaderEvent: onReaderEvent)
                 } catch {
                     // Opening the session is the only step the platform refuses over terms, so it is
                     // the only failure read that way. The steps before it leave the merchant unlinked

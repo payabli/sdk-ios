@@ -277,7 +277,9 @@ extension PayabliTTP {
         syncPublished()
         multicaster.emit(.readerInitializing)
         do {
-            try await provider.prepareReader()
+            try await provider.prepareReader { [weak self] event in
+                Task { @MainActor in self?.handleReaderEvent(event) }
+            }
             readerSessionGeneration += 1
         } catch PayabliTTPError.termsNotAccepted {
             // Not an error state: the session is waiting on a person, the way it waits on one in

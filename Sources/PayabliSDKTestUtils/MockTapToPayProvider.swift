@@ -111,14 +111,35 @@ package final class MockTapToPayProvider: TapToPayProvider, @unchecked Sendable 
         }
     }
 
-    package func prepareReader() async throws {
+    package func prepareReader(onReaderEvent: @escaping @Sendable (TapToPayReaderEvent) -> Void) async throws {
         let result: Result<Void, Error> = lock.withLock {
             _prepareReaderCalls += 1
+            _onReaderEvent = onReaderEvent
             return _prepareReaderResult
+        }
+        for event in readerEventsDuringPrepare {
+            onReaderEvent(event)
         }
         if case let .failure(err) = result {
             throw err
         }
+    }
+
+    /// Events raised while `prepareReader` is still running, which is when a
+    /// real reader reports its configuration progress.
+    private var _readerEventsDuringPrepare: [TapToPayReaderEvent] = []
+    package var readerEventsDuringPrepare: [TapToPayReaderEvent] {
+        get { lock.withLock { _readerEventsDuringPrepare } }
+        set { lock.withLock { _readerEventsDuringPrepare = newValue } }
+    }
+
+    private var _onReaderEvent: (@Sendable (TapToPayReaderEvent) -> Void)?
+
+    /// Raises an event the way a prepared reader does, after `prepareReader`
+    /// returned. Does nothing when the reader was never prepared.
+    package func emitReaderEvent(_ event: TapToPayReaderEvent) {
+        let handler = lock.withLock { _onReaderEvent }
+        handler?(event)
     }
 
     package func areTermsAccepted() async throws -> Bool {

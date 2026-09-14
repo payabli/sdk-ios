@@ -570,7 +570,7 @@ private final class InterleavingProvider: TapToPayProvider, @unchecked Sendable 
         lock.withLock { storedConfigureCalls += 1 }
     }
 
-    func prepareReader() async throws {
+    func prepareReader(onReaderEvent: @escaping @Sendable (TapToPayReaderEvent) -> Void) async throws {
         let held: Bool = lock.withLock {
             storedPrepareReaderCalls += 1
             if inProvider {

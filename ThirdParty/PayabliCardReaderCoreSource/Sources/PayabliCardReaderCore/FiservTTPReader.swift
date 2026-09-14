@@ -30,6 +30,13 @@ internal class FiservTTPReader {
     private var cardReaderSession: PaymentCardReaderSession?
     
     private let config: FiservTTPConfig
+
+    /// The subscription to the reader's event stream.
+    ///
+    /// Held so `finalize()` can end it. Apple's `events` is one `AsyncStream`
+    /// per reader and a second iteration of it would take events away from the
+    /// first, so an abandoned task is not merely idle.
+    private var eventTask: Task<Void, Never>?
     
     internal init(config: FiservTTPConfig) {
         
@@ -39,6 +46,8 @@ internal class FiservTTPReader {
     }
     
     internal func finalize() {
+        eventTask?.cancel()
+        eventTask = nil
         paymentCardReader = nil
         cardReaderSession = nil
     }
@@ -87,7 +96,8 @@ internal class FiservTTPReader {
             if let err = error as? PaymentCardReaderError {
                 
                 throw FiservTTPCardReaderError(title: err.errorName,
-                                               localizedDescription: NSLocalizedString(err.errorDescription, comment: ""))
+                                               localizedDescription: NSLocalizedString(err.errorDescription, comment: ""),
+                                               underlying: err)
                 
             } else {
                 throw FiservTTPCardReaderError(title: title,
@@ -123,7 +133,8 @@ internal class FiservTTPReader {
             if let err = error as? PaymentCardReaderError {
             
                 throw FiservTTPCardReaderError(title: err.errorName,
-                                               localizedDescription: NSLocalizedString(err.errorDescription, comment: ""))
+                                               localizedDescription: NSLocalizedString(err.errorDescription, comment: ""),
+                                               underlying: err)
                 
             } else {
                 throw FiservTTPCardReaderError(title: title,
@@ -137,7 +148,7 @@ internal class FiservTTPReader {
     // for the first time. The initial configuration of a device can take up to two minutes.
     // Any subsequent configuration updates typically take just a few seconds.
     
-    internal func initializeSession(token: String, eventHandler: @escaping (String) -> Void) async throws {
+    internal func initializeSession(token: String, eventHandler: @escaping (PaymentCardReader.Event) -> Void) async throws {
         
         let title = "Initialize Session"
         
@@ -153,12 +164,14 @@ internal class FiservTTPReader {
         
         do {
             
-            Task {
+            eventTask?.cancel()
+
+            eventTask = Task {
                 
                 for await event in events {
                     
                     await MainActor.run {
-                        eventHandler(event.name)
+                        eventHandler(event)
                     }
                 }
             }
@@ -170,7 +183,8 @@ internal class FiservTTPReader {
             if let err = error as? PaymentCardReaderError {
             
                 throw FiservTTPCardReaderError(title: err.errorName,
-                                               localizedDescription: NSLocalizedString(err.errorDescription, comment: ""))
+                                               localizedDescription: NSLocalizedString(err.errorDescription, comment: ""),
+                                               underlying: err)
                 
             } else {
                 
@@ -203,12 +217,14 @@ internal class FiservTTPReader {
             if let err = error as? PaymentCardReaderError {
             
                 throw FiservTTPCardReaderError(title: err.errorName,
-                                               localizedDescription: NSLocalizedString(err.errorDescription, comment: ""))
+                                               localizedDescription: NSLocalizedString(err.errorDescription, comment: ""),
+                                               underlying: err)
                 
             } else if let err = error as? PaymentCardReaderSession.ReadError {
                 
                 throw FiservTTPCardReaderError(title: err.errorName,
-                                               localizedDescription: NSLocalizedString(err.errorDescription, comment: ""))
+                                               localizedDescription: NSLocalizedString(err.errorDescription, comment: ""),
+                                               underlying: err)
                 
             } else {
                 
@@ -220,8 +236,7 @@ internal class FiservTTPReader {
     
     internal func readCard(for amount: Decimal,
                            currencyCode: String,
-                           transactionType: PaymentCardTransactionRequest.TransactionType,
-                           eventHandler: @escaping (String) -> Void) async throws -> Result<PaymentCardReadResult, Error> {
+                           transactionType: PaymentCardTransactionRequest.TransactionType) async throws -> Result<PaymentCardReadResult, Error> {
         
         guard let session = cardReaderSession else {
          
@@ -249,12 +264,14 @@ internal class FiservTTPReader {
             if let err = error as? PaymentCardReaderError {
             
                 throw FiservTTPCardReaderError(title: err.errorName,
-                                               localizedDescription: NSLocalizedString(err.errorDescription, comment: ""))
+                                               localizedDescription: NSLocalizedString(err.errorDescription, comment: ""),
+                                               underlying: err)
                 
             } else if let err = error as? PaymentCardReaderSession.ReadError {
                 
                 throw FiservTTPCardReaderError(title: err.errorName,
-                                               localizedDescription: NSLocalizedString(err.errorDescription, comment: ""))
+                                               localizedDescription: NSLocalizedString(err.errorDescription, comment: ""),
+                                               underlying: err)
                 
             } else {
                 

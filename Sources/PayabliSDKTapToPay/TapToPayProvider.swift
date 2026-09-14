@@ -46,7 +46,13 @@ package protocol TapToPayProvider: AnyObject, Sendable {
 
     /// Prepares the reader (connect, link account, open session).
     /// `configure(credentials:)` must have succeeded before this call.
-    func prepareReader() async throws
+    ///
+    /// - Parameter onReaderEvent: Called for each `TapToPayReaderEvent` the
+    ///   reader raises, until `cleanUp()`. It is a parameter here rather than a
+    ///   property set separately because configuration progress arrives during
+    ///   this call: a handler installed afterwards would miss the one thing it
+    ///   exists to report.
+    func prepareReader(onReaderEvent: @escaping @Sendable (TapToPayReaderEvent) -> Void) async throws
 
     /// Whether the merchant has accepted the terms their platform requires
     /// before it will take a contactless payment.

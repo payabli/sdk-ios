@@ -99,10 +99,34 @@ matches where in the pipeline the failure happened:
 (`"cancelled:"`) so hosts can distinguish it by substring. If you add a new
 adapter, expose the same prefix constant for consistency.
 
+**Decide from the platform's type, not from its description.** A description is
+localized and the platform does not promise its wording, so a substring test on
+one answers differently on a device set to another language. Where the component
+under the adapter rebuilds the platform error, recover the original — the Fiserv
+one keeps it on `FiservTTPCardReaderError.underlying` — and match the case.
+
 Don't re-wrap errors that are already `PayabliTTPError` — forward them.
 
 Put the mapping logic in a companion file named `XxxCardReader+Errors.swift`,
 matching the Fiserv layout.
+
+---
+
+## 4.5 Reader events
+
+An adapter converts its platform's reader events into `TapToPayReaderEvent` and
+hands each one to the closure `prepareReader(onReaderEvent:)` was given. Two
+rules:
+
+- **The handler arrives with the call that starts the reader**, because
+  configuration progress is raised during it. An adapter that stored a handler
+  set separately would report everything except the one thing progress exists
+  for.
+- **A platform case with no counterpart is dropped, not invented.** The facade
+  already announces a read starting, completing and failing, so forwarding the
+  platform's equivalents would tell a host the same thing twice. Return `nil`.
+
+Put the mapping in `XxxCardReader+Events.swift`.
 
 ---
 
@@ -113,8 +137,10 @@ Adapters/
 ├── README.md                          ← this file
 ├── FiservCardReader.swift             ← main implementation
 ├── FiservCardReader+Errors.swift      ← error mapping
+├── FiservCardReader+Events.swift      ← reader event mapping
 └── VisaCardReader.swift               ← hypothetical next adapter
     VisaCardReader+Errors.swift
+    VisaCardReader+Events.swift
 ```
 
 Rules:

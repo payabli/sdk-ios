@@ -113,6 +113,15 @@ channel, so an app that never accepts card-present never links the certified car
 - `PayabliCardReaderCore` - MIT-licensed `Fiserv/TTPPackage` source under
   `ThirdParty/PayabliCardReaderCoreSource/`, **byte-identical to upstream**, renamed at the SPM target
   level only. Do not edit the vendored source or strip its copyright headers.
+  **The exception, and it is narrow**: an edit is allowed where the upstream
+  boundary destroys something the SDK needs and no code above it can recover —
+  the reader's event stream flattened to a case name, and the platform's typed
+  error rebuilt as two strings, are the two. Both are boundary signatures rather
+  than behaviour, so the change widens what crosses and alters nothing the
+  component does. Anything else belongs above the boundary. Read
+  `ThirdParty/PayabliCardReaderCoreSource/README.md` first: a refresh from
+  upstream is a merge, never an overwrite, and treating it as one drops these
+  silently.
 
 **Umbrella:**
 - `PayabliSDK` - aggregates Core + TapToPay.

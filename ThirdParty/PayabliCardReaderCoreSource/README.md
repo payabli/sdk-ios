@@ -33,6 +33,8 @@ Byte-identical copies of the 5 Swift source files from
 Each file keeps its original Fiserv copyright/MIT header verbatim — do not
 remove or edit those headers.
 
+These files carry implementation improvements. See `git log` for this directory.
+
 ## What's **not** vendored
 
 `FiservTTP.h` (the Objective-C umbrella header). The only symbols it exports
@@ -55,22 +57,20 @@ GitHub metadata — not needed for our use case.
 
 ## Refreshing from upstream
 
-When Fiserv publishes a newer MIT version of `TTPPackage`, re-sync with:
+**A refresh is a merge, never an overwrite.** These copies carry changes of our
+own, so replacing a file with the upstream version silently drops them. Resolve
+the upstream checkout at the new tag, diff each of the 5 files against it, and
+take the upstream changes into ours rather than the other way round.
 
-```bash
-./Scripts/refresh_vendored_ttp.sh <upstream-tag>
-```
+`Scripts/refresh_vendored_ttp.sh`, which earlier versions of this file
+described, does not exist. It was specified as an `rsync` of the 5 files, which
+is the overwrite the paragraph above rules out. Whoever writes it makes it apply
+the upstream diff instead, and until then the merge is done by hand.
 
-The script:
-
-1. `swift package resolve` to fetch the upstream checkout at the requested tag.
-2. `rsync` the 5 `.swift` files into this directory (mode + time preserved).
-3. Updates this README's "Upstream version pinned" block.
-4. Runs `swift build` + `swift test` to verify nothing regressed.
-
-After running, inspect the diff, commit under `chore(vendor): refresh
-PayabliCardReaderCore from Fiserv/TTPPackage <tag>`, and re-cut a patch
-SDK release if the upstream changes are substantive.
+Either way: read the diff before committing, commit under `chore(vendor):
+refresh PayabliCardReaderCore from Fiserv/TTPPackage <tag>`, update the
+"Upstream version pinned" block, run the test suite on a simulator destination,
+and re-cut a patch SDK release if the upstream changes are substantive.
 
 ## Module renaming
 
