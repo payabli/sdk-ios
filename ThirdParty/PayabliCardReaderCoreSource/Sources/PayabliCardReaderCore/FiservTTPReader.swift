@@ -45,6 +45,14 @@ internal class FiservTTPReader {
         self.paymentCardReader = PaymentCardReader()
     }
     
+    deinit {
+        // Releasing a task does not cancel it. Without this the subscription
+        // outlives the reader, holding the platform's stream open and calling a
+        // handler for a session that is gone. `finalize()` is not called on
+        // every path that drops a reader.
+        eventTask?.cancel()
+    }
+
     internal func finalize() {
         eventTask?.cancel()
         eventTask = nil
