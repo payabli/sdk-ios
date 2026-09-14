@@ -37,6 +37,17 @@ internal class FiservTTPReader {
     /// per reader and a second iteration of it would take events away from the
     /// first, so an abandoned task is not merely idle.
     private var eventTask: Task<Void, Never>?
+
+    /// Marks which subscription is the current one.
+    ///
+    /// Cancelling a task is not enough on its own: an event already taken from
+    /// the stream is delivered after a hop to the main actor, and a cancellation
+    /// landing during that hop still lets it through. A retired subscription
+    /// would then report the previous session's state — a stale `notReady`
+    /// answers the readiness subject `false`, and a stale card state reaches the
+    /// host — so the check has to happen where the handler is called rather than
+    /// before the hop.
+    private var activeSubscription: SubscriptionToken?
     
     internal init(config: FiservTTPConfig) {
         
@@ -50,10 +61,13 @@ internal class FiservTTPReader {
         // outlives the reader, holding the platform's stream open and calling a
         // handler for a session that is gone. `finalize()` is not called on
         // every path that drops a reader.
+        activeSubscription?.retire()
         eventTask?.cancel()
     }
 
     internal func finalize() {
+        activeSubscription?.retire()
+        activeSubscription = nil
         eventTask?.cancel()
         eventTask = nil
         paymentCardReader = nil
@@ -172,18 +186,24 @@ internal class FiservTTPReader {
         
         do {
             
+            activeSubscription?.retire()
             eventTask?.cancel()
+
+            let subscription = SubscriptionToken()
+            activeSubscription = subscription
 
             eventTask = Task {
                 
                 for await event in events {
                     
-                    // A cancelled subscription has been replaced by a newer one,
-                    // and its last in-flight event would report the old session's
-                    // progress over the new session's.
-                    if Task.isCancelled { break }
+                    if Task.isCancelled || !subscription.isActive { break }
                     
                     await MainActor.run {
+                        
+                        // Re-read after the hop: this is the only point at which
+                        // a subscription retired mid-hop can still be caught.
+                        guard subscription.isActive else { return }
+                        
                         eventHandler(event)
                     }
                 }
@@ -295,3 +315,20 @@ internal class FiservTTPReader {
     }
 }
 
+
+/// Which subscription to the reader's event stream is the live one.
+///
+/// A reference type, so the task that captured it sees a retirement made by
+/// whoever replaced it.
+private final class SubscriptionToken: @unchecked Sendable {
+    private let lock = NSLock()
+    private var active = true
+
+    var isActive: Bool {
+        lock.withLock { active }
+    }
+
+    func retire() {
+        lock.withLock { active = false }
+    }
+}
