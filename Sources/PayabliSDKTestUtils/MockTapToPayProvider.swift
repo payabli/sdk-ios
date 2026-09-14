@@ -186,6 +186,11 @@ package final class MockTapToPayProvider: TapToPayProvider, @unchecked Sendable 
     }
 
     package func cleanUp() async {
-        lock.withLock { _cleanUpCalls += 1 }
+        lock.withLock {
+            _cleanUpCalls += 1
+            // The contract ends callbacks here, so a mock that kept delivering
+            // would let a stale subscription pass a test.
+            _onReaderEvent = nil
+        }
     }
 }

@@ -89,6 +89,21 @@ final class PayabliTTPReaderEventTests: XCTestCase {
         XCTAssertEqual(ttp.readerConfigurationProgress, 100)
     }
 
+    /// The provider contract ends callbacks at `cleanUp()`, so a reader that
+    /// reports afterwards is a stale subscription rather than a late event.
+    func testNothingIsKeptFromAReaderThatHasBeenCleanedUp() async throws {
+        let (ttp, provider) = try makeTTP()
+        provider.readerEventsDuringPrepare = [.configurationProgress(percent: 40)]
+        try await ttp.initialize()
+        XCTAssertEqual(ttp.readerConfigurationProgress, 40)
+
+        await provider.cleanUp()
+        provider.emitReaderEvent(.configurationProgress(percent: 90))
+        await Task.yield()
+
+        XCTAssertEqual(ttp.readerConfigurationProgress, 40, "an event arrived after cleanUp")
+    }
+
     // MARK: - Fixtures
 
     private func makeTTP() throws -> (PayabliTTP, MockTapToPayProvider) {
