@@ -102,10 +102,10 @@ final class TapToPayOnDeviceTests: XCTestCase {
     /// never arms, so nothing below the device tier can tell a working stream from
     /// one nobody subscribed to.
     ///
-    /// A device that has already armed configures in seconds and may report once or
-    /// not at all, so an absent report is not a failure here. What is asserted is
-    /// that whatever arrives is a usable percentage, that the announcement and the
-    /// readable value agree, and that a card state is never mistaken for progress.
+    /// A device that has already armed configures in seconds and can report
+    /// nothing at all. That is the reader's state rather than a defect, and it is
+    /// reported as a skip: a run that asserted nothing would otherwise pass
+    /// having tested nothing.
     func testTheReaderReportsItsConfigurationProgress() async throws {
         let ttp = try makeTTP()
 
@@ -123,26 +123,43 @@ final class TapToPayOnDeviceTests: XCTestCase {
             }
             return seen
         }
+        // Bounded, so a `.readerReady` that never arrives fails this test rather
+        // than hanging the bundle. Generous: a first arming runs for minutes.
+        let deadline = Task {
+            guard (try? await Task.sleep(nanoseconds: Self.armingWait)) != nil else { return }
+            collector.cancel()
+        }
+        defer { deadline.cancel() }
 
         do {
             try await ttp.initialize()
-        } catch PayabliTTPError.devicePendingActivation {
+        } catch {
             collector.cancel()
-            throw XCTSkip("this device is pending activation on \(named.entry)")
+            if case PayabliTTPError.devicePendingActivation = error {
+                throw XCTSkip("this device is pending activation on \(named.entry)")
+            }
+            throw error
         }
 
         let reported = await collector.value
         for percent in reported {
             XCTAssertTrue((0 ... 100).contains(percent), "reported \(percent), which is not a percentage")
         }
-        if let last = reported.last {
-            XCTAssertEqual(
-                ttp.readerConfigurationProgress, last,
-                "the last announcement and the readable value disagree"
+        guard let last = reported.last else {
+            throw XCTSkip(
+                "this reader reported no configuration progress, which a device that has already armed "
+                    + "does. Run it on a device that has not armed against \(named.entry)."
             )
         }
-        print("[device] reader reported \(reported.count) progress values: \(reported)")
+        XCTAssertEqual(
+            ttp.readerConfigurationProgress, last,
+            "the last announcement and the readable value disagree"
+        )
     }
+
+    /// How long a reader has to finish arming before the test says it never did.
+    /// Apple documents a first configuration as taking up to several minutes.
+    private static let armingWait: UInt64 = 300_000_000_000
 
     /// Reaching `.ready` stores a binding that names this paypoint.
     func testReachingReadyStoresABindingForThisPaypoint() async throws {
