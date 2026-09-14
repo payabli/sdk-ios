@@ -178,7 +178,7 @@ package final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
         #endif
     }
 
-    package func prepareReader(onReaderEvent: @escaping @Sendable (TapToPayReaderEvent) -> Void) async throws {
+    package func prepareReader(onReaderEvent: @escaping @MainActor @Sendable (TapToPayReaderEvent) -> Void) async throws {
         #if canImport(PayabliCardReaderCore)
             let creds = try requireCredentials()
             let injected = lock.withLock { injectedReaderFactory }

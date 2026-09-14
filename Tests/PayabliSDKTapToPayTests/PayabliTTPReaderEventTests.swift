@@ -44,6 +44,24 @@ final class PayabliTTPReaderEventTests: XCTestCase {
         XCTAssertNil(ttp.readerConfigurationProgress)
     }
 
+    /// A new configuration starts from nothing rather than from where the last
+    /// one finished, or a host draws a full bar over a reader that has just
+    /// begun.
+    func testANewConfigurationStartsUnreported() async throws {
+        let (ttp, provider) = try makeTTP()
+        provider.readerEventsDuringPrepare = [.configurationProgress(percent: 100)]
+        try await ttp.initialize()
+        XCTAssertEqual(ttp.readerConfigurationProgress, 100)
+
+        // A reader that reports nothing this time, so the only thing that can
+        // clear the previous value is the new configuration starting.
+        provider.readerEventsDuringPrepare = []
+        try await ttp.initialize()
+
+        XCTAssertEqual(provider.prepareReaderCalls, 2, "the fixture is broken if the reader was not prepared again")
+        XCTAssertNil(ttp.readerConfigurationProgress)
+    }
+
     // MARK: - After the session is up
 
     /// The subscription lives for the session, so a later configuration

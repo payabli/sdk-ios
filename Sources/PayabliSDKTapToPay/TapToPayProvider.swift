@@ -52,7 +52,7 @@ package protocol TapToPayProvider: AnyObject, Sendable {
     ///   property set separately because configuration progress arrives during
     ///   this call: a handler installed afterwards would miss the one thing it
     ///   exists to report.
-    func prepareReader(onReaderEvent: @escaping @Sendable (TapToPayReaderEvent) -> Void) async throws
+    func prepareReader(onReaderEvent: @escaping @MainActor @Sendable (TapToPayReaderEvent) -> Void) async throws
 
     /// Whether the merchant has accepted the terms their platform requires
     /// before it will take a contactless payment.

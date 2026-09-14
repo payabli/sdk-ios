@@ -277,8 +277,9 @@ extension PayabliTTP {
         syncPublished()
         multicaster.emit(.readerInitializing)
         do {
+            readerConfigurationProgress = nil
             try await provider.prepareReader { [weak self] event in
-                Task { @MainActor in self?.handleReaderEvent(event) }
+                self?.handleReaderEvent(event)
             }
             readerSessionGeneration += 1
         } catch PayabliTTPError.termsNotAccepted {

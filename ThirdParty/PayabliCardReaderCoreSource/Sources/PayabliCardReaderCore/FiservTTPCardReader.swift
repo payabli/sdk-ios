@@ -230,7 +230,7 @@ public class FiservTTPCardReader {
     ///   reader raises, for the life of the session. Apple's stream carries the
     ///   configuration percentage as well as the card-read states, and it is one
     ///   stream per reader, so this is the only place either can be read.
-    public func initializeSession(eventHandler: @escaping (PaymentCardReader.Event) -> Void = { _ in }) async throws {
+    public func initializeSession(eventHandler: @escaping @MainActor (PaymentCardReader.Event) -> Void = { _ in }) async throws {
             
         if self.token != nil {
             

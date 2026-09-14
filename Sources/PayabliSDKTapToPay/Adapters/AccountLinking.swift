@@ -42,7 +42,7 @@ protocol ReaderSetup: AccountLinking {
     /// - Parameter onReaderEvent: Called for each event until the session ends.
     ///   Configuration progress is raised during this call, so the handler
     ///   arrives with it rather than being set afterwards.
-    func initializeSession(onReaderEvent: @escaping (TapToPayReaderEvent) -> Void) async throws
+    func initializeSession(onReaderEvent: @escaping @MainActor (TapToPayReaderEvent) -> Void) async throws
 }
 
 #if canImport(PayabliCardReaderCore)
@@ -52,7 +52,7 @@ protocol ReaderSetup: AccountLinking {
     extension FiservTTPCardReader: ReaderSetup {
         /// The fourth speaks the platform's event vocabulary, so it is converted
         /// here. This is the boundary the rest of the SDK is kept behind.
-        func initializeSession(onReaderEvent: @escaping (TapToPayReaderEvent) -> Void) async throws {
+        func initializeSession(onReaderEvent: @escaping @MainActor (TapToPayReaderEvent) -> Void) async throws {
             try await initializeSession(eventHandler: { event in
                 guard let mapped = FiservCardReader.mapReaderEvent(event) else { return }
                 onReaderEvent(mapped)

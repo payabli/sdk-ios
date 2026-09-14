@@ -433,10 +433,13 @@ private final class StubReaderSetup: ReaderSetup {
         }
     }
 
-    func initializeSession(onReaderEvent: @escaping (TapToPayReaderEvent) -> Void) async throws {
+    func initializeSession(onReaderEvent: @escaping @MainActor (TapToPayReaderEvent) -> Void) async throws {
         lock.withLock { initializeSessionCalls += 1 }
-        for event in eventsWhileOpening {
-            onReaderEvent(event)
+        let scripted = eventsWhileOpening
+        await MainActor.run {
+            for event in scripted {
+                onReaderEvent(event)
+            }
         }
         try sessionResult.get()
     }

@@ -111,14 +111,17 @@ package final class MockTapToPayProvider: TapToPayProvider, @unchecked Sendable 
         }
     }
 
-    package func prepareReader(onReaderEvent: @escaping @Sendable (TapToPayReaderEvent) -> Void) async throws {
+    package func prepareReader(onReaderEvent: @escaping @MainActor @Sendable (TapToPayReaderEvent) -> Void) async throws {
         let result: Result<Void, Error> = lock.withLock {
             _prepareReaderCalls += 1
             _onReaderEvent = onReaderEvent
             return _prepareReaderResult
         }
-        for event in readerEventsDuringPrepare {
-            onReaderEvent(event)
+        let scripted = readerEventsDuringPrepare
+        await MainActor.run {
+            for event in scripted {
+                onReaderEvent(event)
+            }
         }
         if case let .failure(err) = result {
             throw err
@@ -133,10 +136,14 @@ package final class MockTapToPayProvider: TapToPayProvider, @unchecked Sendable 
         set { lock.withLock { _readerEventsDuringPrepare = newValue } }
     }
 
-    private var _onReaderEvent: (@Sendable (TapToPayReaderEvent) -> Void)?
+    private var _onReaderEvent: (@MainActor @Sendable (TapToPayReaderEvent) -> Void)?
 
     /// Raises an event the way a prepared reader does, after `prepareReader`
     /// returned. Does nothing when the reader was never prepared.
+    ///
+    /// `@MainActor` because a reader delivers on the main actor, and a test that
+    /// could deliver from anywhere would not be reproducing one.
+    @MainActor
     package func emitReaderEvent(_ event: TapToPayReaderEvent) {
         let handler = lock.withLock { _onReaderEvent }
         handler?(event)

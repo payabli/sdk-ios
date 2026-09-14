@@ -170,7 +170,7 @@ internal class FiservTTPReader {
     // for the first time. The initial configuration of a device can take up to two minutes.
     // Any subsequent configuration updates typically take just a few seconds.
     
-    internal func initializeSession(token: String, eventHandler: @escaping (PaymentCardReader.Event) -> Void) async throws {
+    internal func initializeSession(token: String, eventHandler: @escaping @MainActor (PaymentCardReader.Event) -> Void) async throws {
         
         let title = "Initialize Session"
         
