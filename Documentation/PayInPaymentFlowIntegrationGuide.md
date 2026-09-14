@@ -343,7 +343,24 @@ let result = try await paymentFlow.captureAuthorizedTransaction(
 `captureAuthorizedTransaction(_:)` is a direct API. It is not a hosted form
 mode.
 
-## 8. Complete Form Configuration Example
+## 8. Reverse A Transaction
+
+Release an authorization's hold, or undo a capture that has not settled:
+
+```swift
+let result = try await paymentFlow.voidTransaction("authorized-transaction-id")
+```
+
+`voidTransaction(_:)` is a direct API. It takes the transaction and nothing else,
+because the route carries the identifier in its path and there is no partial void.
+
+Which transactions can still be reversed is the service's to decide, and the SDK
+mirrors no rule of its own. A state it will not reverse arrives as
+`PayabliPayInPaymentFlowError.transactionFailed`, carrying the service's own
+reason. A reversal answers `A0003` and calls itself canceled, where a capture
+answers `A0000`, so read the code rather than comparing against one literal.
+
+## 9. Complete Form Configuration Example
 
 This configuration creates:
 
@@ -459,7 +476,7 @@ let configuration = PayabliPayInPaymentFlowFormConfiguration(
 )
 ```
 
-## 9. Configuration Field Reference
+## 10. Configuration Field Reference
 
 ### `PayabliPayInPaymentFlowFormConfiguration`
 
@@ -577,7 +594,7 @@ Default field labels:
 | `valueStyle` | semibold subheadline primary | Value font/color. |
 | `rowSpacing` | 8 | Vertical spacing between rows. |
 
-## 10. Styling Reference
+## 11. Styling Reference
 
 ```swift
 let payabliStyle = PayabliPayInPaymentFlowStyle(
@@ -698,7 +715,7 @@ let style = PayabliPayInPaymentFlowStyle(
 If `UIFont(name:size:)` returns nil, verify the font's PostScript name and
 `UIAppFonts` entry.
 
-## 11. Sheet Configuration Reference
+## 12. Sheet Configuration Reference
 
 ```swift
 let sheetConfiguration = PayabliPayInPaymentFlowSheetConfiguration(
@@ -728,7 +745,7 @@ let sheetConfiguration = PayabliPayInPaymentFlowSheetConfiguration(
 | `sizesToContentWhenPossible` | Uses content-sized sheet behavior when possible. |
 | `expandsToLargeWhenContentDoesNotFit` | Expands when smaller detents cannot fit content. |
 
-## 12. Request Configuration Reference
+## 13. Request Configuration Reference
 
 ### `PayabliPayInPaymentFlowPaymentDetails`
 
@@ -791,7 +808,7 @@ Fields:
 | `requiresLuhnCheck` | true | Runs client-side Luhn validation for cards. |
 | `validatesACHRoutingChecksum` | true | Runs client-side ACH routing checksum validation. |
 
-## 13. Result Handling
+## 14. Result Handling
 
 ```swift
 func handle(_ result: PayabliPayInPaymentFlowResult) {
@@ -849,7 +866,7 @@ Transaction fields include:
 - `ipAddress`
 - `walletType`
 
-## 14. Diagnostics
+## 15. Diagnostics
 
 Diagnostics are disabled by default:
 
@@ -891,7 +908,7 @@ The SDK redacts sensitive fields, including authorization headers, request
 tokens, access tokens, client secrets, card number, CVV, ACH account, ACH
 routing, stored method IDs, customer IDs, names, emails, phones, and addresses.
 
-## 15. Accessibility Checklist
+## 16. Accessibility Checklist
 
 When customizing:
 
@@ -903,17 +920,21 @@ When customizing:
 - Test Dynamic Type, especially accessibility sizes.
 - Ensure custom colors have sufficient contrast.
 
-## 16. Bridge Scope
+## 17. Bridge Scope
 
 Flutter, React Native, and .NET MAUI bridges currently expose stored card/ACH
 payment-method creation. Native Swift integrations should call
-`PayabliSDKPayInPaymentFlow` directly for capture, authorize, and
-capture-authorized transaction flows until those request models are added to the
-bridge APIs.
+`PayabliSDKPayInPaymentFlow` directly for capture, authorize, capture-authorized
+and void transaction flows until those request models are added to the bridge
+APIs.
+
+The `@objc` bridge covers `addCard` and `addACH` only. `voidTransaction(_:)` is
+not bridged, which matches capture, authorize and `captureAuthorizedTransaction`
+rather than being an omission.
 
 The React Native Expo QA app is under `Example/PayabliReactNativeDemo`.
 
-## 17. Testing
+## 18. Testing
 
 Run component tests:
 

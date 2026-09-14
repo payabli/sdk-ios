@@ -7,6 +7,7 @@ Use it to:
 - store card or ACH payment methods with `/api/TokenStorage/add`
 - capture or authorize MoneyIn v2 transactions
 - capture a prior authorization by transaction ID
+- reverse a transaction by transaction ID
 - render the same SwiftUI form inline or in the SDK bottom sheet
 - configure labels, placeholders, sections, per-section spacing, per-field spacing, fonts, colors, card-brand icons, diagnostics, and accessibility metadata
 
@@ -44,6 +45,8 @@ Authorize is intentionally narrower than capture: it accepts card data only toda
 The component uses the same mobile access-token approach as the stored-method flow. Do not pass a `requestToken` header directly.
 
 Use `captureAuthorizedTransaction(_:)` for `/api/v2/MoneyIn/capture/{transId}`. That operation is a direct API; the hosted form supports stored-method, capture, and authorize submissions.
+
+Use `voidTransaction(_:)` for `/api/v2/MoneyIn/void/{transId}`, which releases an authorization's hold or undoes a capture that has not settled. Also a direct API. Which transactions can still be reversed is the service's to decide, so the SDK mirrors no rule of its own: a state it will not reverse arrives as the refusal it sent, carrying its own reason.
 
 ## Security Model
 

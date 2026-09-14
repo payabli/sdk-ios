@@ -16,7 +16,8 @@ public final class PayabliPayInPaymentFlow: NSObject, ObservableObject, PayabliC
         "tokenstorage:add",
         "moneyin:getpaid",
         "moneyin:authorize",
-        "moneyin:capture"
+        "moneyin:capture",
+        "moneyin:void"
     ]
 
     @Published public private(set) var isSubmitting: Bool = false
@@ -249,6 +250,25 @@ public final class PayabliPayInPaymentFlow: NSObject, ObservableObject, PayabliC
             try await client.captureAuthorized(
                 request,
                 idempotencyKey: self.reserveKey(request.idempotencyKey)
+            )
+        }
+    }
+
+    /// Reverses a transaction using `POST /api/v2/MoneyIn/void/{transId}`, releasing an
+    /// authorization's hold or undoing a capture that has not settled.
+    ///
+    /// Which transactions can still be reversed is the service's to decide, and is not mirrored here:
+    /// a state it will not reverse comes back as the refusal it sent, carrying its own reason.
+    ///
+    /// - Parameter transId: the transaction to reverse, as
+    ///   ``PayabliPayInPaymentFlowTransaction/paymentTransId`` reported it.
+    public func voidTransaction(
+        _ transId: String
+    ) async throws -> PayabliPayInPaymentFlowResult {
+        try await submit {
+            try await client.void(
+                transId: transId,
+                idempotencyKey: self.reserveKey(nil)
             )
         }
     }

@@ -53,6 +53,34 @@ final class PayInIdempotencyTests: XCTestCase {
         XCTAssertEqual(transport.sentKeys, ["reserved-3"])
     }
 
+    /// Reversing is money-moving, so it carries a key like the calls it reverses. The caller supplies
+    /// none and sees none: the member takes the transaction and nothing else.
+    func testAVoidCarriesAKey() async throws {
+        let transport = RecordingIdempotencyTransport(body: PayInFixture.approved)
+        let flow = PayInFixture.makeFlow(transport: transport, key: "reserved-4")
+
+        _ = try await flow.voidTransaction("trans-1")
+
+        XCTAssertEqual(transport.sentKeys, ["reserved-4"])
+    }
+
+    func testAnInterruptedVoidLeavesTheOutcomeOpen() async {
+        let transport = RecordingIdempotencyTransport(
+            failure: PayabliGenericError(code: .networkError, reason: "Network request failed")
+        )
+        let flow = PayInFixture.makeFlow(transport: transport, key: "reserved-5")
+
+        let failure = await PayInFixture.failure(from: {
+            _ = try await flow.voidTransaction("trans-1")
+        })
+
+        guard let interrupted = PayInFixture.interruption(failure) else {
+            return XCTFail("expected submissionInterrupted, got \(failure)")
+        }
+        XCTAssertEqual(interrupted.code, .networkError)
+        XCTAssertEqual(transport.sentKeys, ["reserved-5"], "the key still went out")
+    }
+
     func testTwoAttemptsReserveTwoKeys() async throws {
         let transport = RecordingIdempotencyTransport(body: PayInFixture.approved)
         var minted = 0

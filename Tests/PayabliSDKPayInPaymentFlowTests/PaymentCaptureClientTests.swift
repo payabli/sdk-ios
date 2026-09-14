@@ -565,7 +565,7 @@ final class PayInPaymentFlowClientTests: XCTestCase {
     """
 }
 
-private actor MockPaymentCaptureTransport: PayabliTransport {
+actor MockPaymentCaptureTransport: PayabliTransport {
     private(set) var requests: [PayabliRequest] = []
     private let statusCode: Int
     private let responseBody: String
@@ -637,7 +637,7 @@ private final class LockedDiagnosticEntry: @unchecked Sendable {
     }
 }
 
-private func firstRequest(from transport: MockPaymentCaptureTransport) async throws -> PayabliRequest {
+func firstRequest(from transport: MockPaymentCaptureTransport) async throws -> PayabliRequest {
     let requests = await transport.requests
     return try XCTUnwrap(requests.first)
 }
