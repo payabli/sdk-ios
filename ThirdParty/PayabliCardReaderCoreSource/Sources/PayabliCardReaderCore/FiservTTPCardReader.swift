@@ -252,10 +252,14 @@ public class FiservTTPCardReader {
         
         if let token = self.token {
             
-            try await self.fiservTTPReader.initializeSession(token: token, eventHandler: { event in
+            // `[weak self]`: the reader holds the task that holds this closure, and
+            // the reader is held by `self`. Captured strongly, dropping the reader
+            // would not end the subscription, and the platform's stream is one per
+            // reader.
+            try await self.fiservTTPReader.initializeSession(token: token, eventHandler: { [weak self] event in
                 
                 if case .notReady = event {
-                    self.sessionReadySubject.send(false)
+                    self?.sessionReadySubject.send(false)
                 }
 
                 eventHandler(event)

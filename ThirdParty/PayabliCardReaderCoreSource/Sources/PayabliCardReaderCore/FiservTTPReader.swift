@@ -170,6 +170,11 @@ internal class FiservTTPReader {
                 
                 for await event in events {
                     
+                    // A cancelled subscription has been replaced by a newer one,
+                    // and its last in-flight event would report the old session's
+                    // progress over the new session's.
+                    if Task.isCancelled { break }
+                    
                     await MainActor.run {
                         eventHandler(event)
                     }
