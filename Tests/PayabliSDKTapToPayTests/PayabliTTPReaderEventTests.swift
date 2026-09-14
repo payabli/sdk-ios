@@ -33,7 +33,7 @@ final class PayabliTTPReaderEventTests: XCTestCase {
 
         try await ttp.initialize()
 
-        XCTAssertEqual(ttp.readerConfigurationPercent, 90)
+        XCTAssertEqual(ttp.readerConfigurationProgress, 90)
     }
 
     func testNothingIsKeptUntilTheReaderReports() async throws {
@@ -41,7 +41,7 @@ final class PayabliTTPReaderEventTests: XCTestCase {
 
         try await ttp.initialize()
 
-        XCTAssertNil(ttp.readerConfigurationPercent)
+        XCTAssertNil(ttp.readerConfigurationProgress)
     }
 
     // MARK: - After the session is up
@@ -55,7 +55,7 @@ final class PayabliTTPReaderEventTests: XCTestCase {
         provider.emitReaderEvent(.configurationProgress(percent: 55))
         await Task.yield()
 
-        XCTAssertEqual(ttp.readerConfigurationPercent, 55)
+        XCTAssertEqual(ttp.readerConfigurationProgress, 55)
     }
 
     /// A card-read state is not progress, and must not be read as any.
@@ -68,7 +68,7 @@ final class PayabliTTPReaderEventTests: XCTestCase {
         provider.emitReaderEvent(.cardRemovalRequested)
         await Task.yield()
 
-        XCTAssertEqual(ttp.readerConfigurationPercent, 100)
+        XCTAssertEqual(ttp.readerConfigurationProgress, 100)
     }
 
     // MARK: - Fixtures

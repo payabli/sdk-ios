@@ -9,7 +9,7 @@ extension PayabliTTP {
     /// after `prepareReader` returned and on every tap.
     func handleReaderEvent(_ event: TapToPayReaderEvent) {
         if case let .configurationProgress(percent) = event {
-            readerConfigurationPercent = percent
+            readerConfigurationProgress = percent
         }
     }
 }

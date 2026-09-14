@@ -25,15 +25,16 @@ import XCTest
 
         // MARK: - Recognised from the type
 
-        func testAnUnsupportedOSVersionIsNamedAsOne() {
+        /// A host shows this differently from a transient failure, so it is its
+        /// own case rather than a reason string the host has to read.
+        func testAnUnsupportedOSVersionIsItsOwnCase() {
             let mapped = FiservCardReader.mapError(Self.rebuilt(.osVersionNotSupported)) {
                 .readerSetupFailed(reason: $0)
             }
 
-            guard case let .readerSetupFailed(reason) = mapped else {
-                return XCTFail("expected .readerSetupFailed, got \(mapped)")
+            guard case .readerOSVersionNotSupported = mapped else {
+                return XCTFail("expected .readerOSVersionNotSupported, got \(mapped)")
             }
-            XCTAssertTrue(reason.hasPrefix("OS version not supported:"), reason)
         }
 
         /// The description is localized and the platform does not promise its
@@ -42,10 +43,9 @@ import XCTest
         func testAnotherFailureIsNotMistakenForAVersionProblem() {
             let mapped = FiservCardReader.mapError(Self.rebuilt(.notReady)) { .readerSetupFailed(reason: $0) }
 
-            guard case let .readerSetupFailed(reason) = mapped else {
+            guard case .readerSetupFailed = mapped else {
                 return XCTFail("expected .readerSetupFailed, got \(mapped)")
             }
-            XCTAssertFalse(reason.hasPrefix("OS version not supported:"), reason)
         }
 
         func testACancelledReadCarriesTheCancellationPrefix() {

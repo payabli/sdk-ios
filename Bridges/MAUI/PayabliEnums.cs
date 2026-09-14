@@ -58,5 +58,13 @@ namespace Payabli.TapToPay
         AttestationFailed = 18,
         ConfigFailed = 19,
         TermsRequired = 20,
+        ReaderConfigurationProgressChanged = 21,
+        ReaderNotReady = 22,
+        CardDetected = 23,
+        CardRemovalRequested = 24,
+        CardReadRetryRequested = 25,
+        PinEntryRequested = 26,
+        PinEntryCompleted = 27,
+        ReaderPromptDismissed = 28,
     }
 }

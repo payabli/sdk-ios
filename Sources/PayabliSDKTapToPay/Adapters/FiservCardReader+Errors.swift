@@ -36,7 +36,7 @@ extension FiservCardReader {
             if let readerError = platform as? PaymentCardReaderError,
                readerError.isUnsupportedOSVersion
             {
-                return .readerSetupFailed(reason: "OS version not supported: \(readerError.errorDescription)")
+                return .readerOSVersionNotSupported
             }
 
             let detail = readerDetail(error)

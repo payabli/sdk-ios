@@ -113,6 +113,7 @@ final class PayabliTTPErrorNSErrorTests: XCTestCase {
         ErrorSample(error: .tokenExpired, expectedCode: 11),
         ErrorSample(error: .activationFailed(reason: "x"), expectedCode: 12),
         ErrorSample(error: .networkError(reason: "x"), expectedCode: 13),
-        ErrorSample(error: .termsNotAccepted, expectedCode: 14)
+        ErrorSample(error: .termsNotAccepted, expectedCode: 14),
+        ErrorSample(error: .readerOSVersionNotSupported, expectedCode: 15)
     ]
 }

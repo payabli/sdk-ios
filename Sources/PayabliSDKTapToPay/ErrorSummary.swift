@@ -93,6 +93,8 @@ enum ErrorSummary {
             return "updateFailed"
         case .termsNotAccepted:
             return "termsNotAccepted"
+        case .readerOSVersionNotSupported:
+            return "readerOSVersionNotSupported"
         }
     }
 
