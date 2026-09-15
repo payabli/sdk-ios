@@ -41,6 +41,9 @@ final class StepStatusTests: XCTestCase {
             everyTapToPaySession.count,
             "two states share a code"
         )
+        // The list below is a literal, so an appended state leaves both sides of
+        // that count unchanged. The next raw value is what forces it to move.
+        XCTAssertNil(PayabliTTPSessionStateCode(rawValue: 10))
         for status in everyTapToPayStatus {
             if case let .unrecognised(raw) = status {
                 XCTFail("the app does not name the SDK state with raw value \(raw)")
