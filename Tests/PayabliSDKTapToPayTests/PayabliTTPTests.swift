@@ -337,9 +337,9 @@ final class PayabliTTPTests: XCTestCase {
         XCTAssertFalse(text.contains("dev_old"), "a handle captured during initialize() was sent")
     }
 
-    /// The event, the published state and the thrown error carry one value, so a
-    /// reader comparing a screen against a log sees the same failure twice.
-    func testConfigFailureEmitsAnEventAndMarksWhatItThrows() async throws {
+    /// The event and the thrown error carry the wrapper; the state carries the
+    /// remedy for the failure underneath it.
+    func testConfigFailureThrowsTheWrapperAndLandsTheRemedyOfWhatFailed() async throws {
         let (ttp, _, _) = try makeTTP()
         StubURLProtocol.handler = { request in
             (HTTPURLResponse(
@@ -368,21 +368,42 @@ final class PayabliTTPTests: XCTestCase {
         let reported = try await value(of: collector, named: "configFailed")
 
         // The whole state rather than its code, which is what pins the remedy a
-        // host is actually given. It is `configurationRejected` because the
-        // config phase wraps every transport failure before the state is set,
-        // so a 500 reaches a host as an account someone must change rather than
-        // a service that may answer later. Asserted as it behaves, and the
-        // wrapper is with the product owner.
-        XCTAssertEqual(ttp.sessionState, .failed(reason: .configurationRejected))
+        // host is actually given. A 500 is a service that may answer later.
+        XCTAssertEqual(ttp.sessionState, .failed(reason: .serviceUnavailable))
         let raised = try XCTUnwrap(thrown, "initialize() returned instead of failing")
         let marked = try XCTUnwrap(ttp.sessionManager.lastError, "the session recorded no error")
 
         XCTAssertEqual(reported, ErrorSummary.of(raised), "the event must summarise what was thrown")
-        XCTAssertEqual(
-            String(describing: marked),
-            String(describing: raised),
-            "the published state must hold what was thrown"
+        XCTAssertTrue(raised is PayabliTTPError, "the bridges read the domain of this type")
+        XCTAssertFalse(
+            marked is PayabliTTPError,
+            "the state is classified from the failure as it arrived, not from the wrapper"
         )
+    }
+
+    /// Two config failures under one wrapper land on different remedies, which is
+    /// what the wrapper hid.
+    func testConfigFailuresLandOnTheRemedyOfWhatFailedRatherThanOnOne() async throws {
+        let (ttp, _, _) = try makeTTP()
+        StubURLProtocol.handler = { request in
+            (HTTPURLResponse(
+                url: request.url!,
+                statusCode: 400,
+                httpVersion: "HTTP/1.1",
+                headerFields: ["Content-Type": "application/json"]
+            )!, Data(#"{"title":"Bad request","status":400}"#.utf8))
+        }
+
+        do {
+            try await ttp.initialize()
+            XCTFail("expected the config phase to fail")
+        } catch {
+            XCTAssertTrue(error is PayabliTTPError, "the bridges read the domain of this type")
+        }
+
+        // The same bytes get the same answer, so a retry is not the remedy. A 500
+        // on the same route lands on `serviceUnavailable`.
+        XCTAssertEqual(ttp.sessionState, .failed(reason: .sdkInternalError))
     }
 
     /// An event payload is forwarded to whatever logging a host app has, so the
@@ -467,7 +488,9 @@ final class PayabliTTPTests: XCTestCase {
         let marked = try XCTUnwrap(ttp.sessionManager.lastError)
 
         XCTAssertFalse(attestation.isAlreadyAttested, "a refused handle must not be sent again")
-        XCTAssertEqual(ttp.sessionState.code, .failed)
+        // A refused binding and a refused bearer are both worth another call,
+        // which is the remedy the 401 underneath the wrapper carries.
+        XCTAssertEqual(ttp.sessionState, .failed(reason: .serviceUnavailable))
         XCTAssertEqual(reported, "configFailed")
         XCTAssertTrue(raised.localizedDescription.contains("401"), raised.localizedDescription)
         // The drop is the config call's to make, so the reason claims nothing about
@@ -477,7 +500,7 @@ final class PayabliTTPTests: XCTestCase {
             raised.localizedDescription.contains("cleared"),
             "the reason claims an outcome this layer does not decide"
         )
-        XCTAssertEqual(String(describing: marked), String(describing: raised))
+        XCTAssertFalse(marked is PayabliTTPError, "the state is classified from the 401 itself")
     }
 
     /// The rule reaches the events that predate it. An activation failure's reason
