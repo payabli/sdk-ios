@@ -14,6 +14,7 @@ struct PaymentCaptureQAView: View {
     @State private var isPaymentCaptureSheetPresented = false
     @State private var isPaymentCaptureResultViewPresented = false
     @State private var voidedTransId: String?
+    @State private var startedAReversal = false
     @State private var unreconciled: [String] = []
     @State private var voidText = ""
 
@@ -218,7 +219,11 @@ struct PaymentCaptureQAView: View {
                 tokenCheck: tokenProbes.check(.capture),
                 hasResult: paymentFlow.hasResult,
                 resultAcknowledged: resultAcknowledged,
-                isSubmitting: paymentFlow.isSubmitting,
+                // A capture in flight, not a submission in flight. The flow's flag answers
+                // whether the next call would be refused, which is true of the reversal this
+                // screen started too, and the capture steps would then hide the payment being
+                // reversed and offer the form again underneath it.
+                isSubmitting: paymentFlow.isSubmitting && !startedAReversal,
                 submitFailed: submitFailed
             )
         )
@@ -251,7 +256,9 @@ struct PaymentCaptureQAView: View {
         // becoming a call whose refusal would read as this reversal's answer.
         guard !paymentFlow.isSubmitting else { return }
         voidText = ""
+        startedAReversal = true
         Task {
+            defer { startedAReversal = false }
             do {
                 let outcome = try await paymentFlow.voidTransaction(transId)
                 Logger(
