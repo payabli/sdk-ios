@@ -109,7 +109,7 @@ struct PaymentCaptureQAView: View {
                             // Only a payment that reported an identifier can be reversed, and
                             // only once: the service refuses the second attempt, and offering a
                             // button for a refusal teaches the wrong thing.
-                            if let transId = capturedResult?.reversableTransId {
+                            if let transId = capturedResult?.reversibleTransId {
                                 Button { reverse(transId) } label: {
                                     Label(
                                         voidedTransId == transId ? "Reversed" : "Reverse this payment",

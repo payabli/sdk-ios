@@ -31,12 +31,15 @@ struct PayInOutcome {
 
     /// The identifier a reversal can be sent for, or nothing.
     ///
-    /// Present is not the same as usable: the SDK trims the value and refuses a blank one, so an
-    /// approved response carrying spaces would otherwise offer a button that can only ever answer
-    /// with an invalid input.
-    var reversableTransId: String? {
+    /// Present is not the same as usable. The SDK trims the value and refuses a blank one, and
+    /// refuses `.` and `..` besides, because either would name a route rather than a transaction.
+    /// Offering the button for one of those gives an operator an action that can only ever come
+    /// back as invalid input.
+    var reversibleTransId: String? {
         guard let transId = transaction?.paymentTransId?.trimmingCharacters(in: .whitespacesAndNewlines),
-              !transId.isEmpty
+              !transId.isEmpty,
+              transId != ".",
+              transId != ".."
         else {
             return nil
         }
