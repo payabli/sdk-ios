@@ -212,8 +212,6 @@ struct PaymentCaptureQAView: View {
         resultAcknowledged = true
         submitFailed = false
         resultText = ""
-        // The payment goes with its result. Left standing, the reversal stays bound to the payment
-        // that is no longer on screen, and offers itself under a row that says nothing was captured.
         capturedResult = nil
         voidedTransId = nil
         voidText = ""
@@ -223,13 +221,6 @@ struct PaymentCaptureQAView: View {
     ///
     /// The identifier comes from the result the flow reported, so nothing here builds a
     /// request or holds a key. A refusal is shown as the service worded it.
-    /// Reverses the payment on screen.
-    ///
-    /// The identifier comes from the result the flow reported, so nothing here builds a
-    /// request or holds a key. A refusal is shown as the service worded it.
-    ///
-    /// The button records which payment to reverse and the work runs under `.task(id:)`
-    /// rather than in the action itself, so it is tied to the view's own lifecycle.
     private func reverse(_ transId: String) {
         reversing = transId
         voidText = ""
