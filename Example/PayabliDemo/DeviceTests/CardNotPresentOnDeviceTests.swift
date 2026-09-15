@@ -216,8 +216,11 @@ final class CardNotPresentOnDeviceTests: XCTestCase {
             LiveEnvironment.report(
                 "PAYABLI_VOID_SEAM env=\(named.name) transId=\(transId) code=\(outcome.code)"
             )
-            XCTAssertTrue(
-                outcome.code.hasPrefix("A"),
+            // The reversal's own code, not the approval family: a capture's `A0000` would pass
+            // that, and reaching the wrong route is what it would mean.
+            XCTAssertEqual(
+                outcome.code,
+                "A0003",
                 "the screen's seam did not reverse it, and it needs voiding by hand: \(transId)"
             )
         } catch {
@@ -255,9 +258,9 @@ final class CardNotPresentOnDeviceTests: XCTestCase {
             LiveEnvironment.report(
                 "PAYABLI_VOID env=\(named.name) transId=\(transId) code=\(reversed.code)"
             )
-            // A reversal answers its own approval code rather than a capture's, so the family
-            // is what decides. The reason is the service's text and is not reported.
-            if !reversed.code.hasPrefix("A") {
+            // The reversal's own code rather than the approval family, which a capture's `A0000`
+            // also satisfies. The reason is the service's text and is not reported.
+            if reversed.code != "A0003" {
                 XCTFail("\(standing), and it needs voiding by hand: \(transId)")
             }
         } catch {

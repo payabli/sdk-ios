@@ -139,21 +139,22 @@ struct PaymentCaptureQAView: View {
                                         .textSelection(.enabled)
                                 }
                             }
-
-                            // Outside the payment's own row, because it outlives it. Drawing a new
-                            // attempt takes the payment off screen, and a reversal nobody can
-                            // account for still has to name the transaction to account for.
-                            if !unreconciled.isEmpty {
-                                Text(
-                                    "A reversal of \(unreconciled.joined(separator: ", ")) may have "
-                                        + "been applied. Read back before reversing again."
-                                )
-                                .font(.caption)
-                                .foregroundColor(.payabliError)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .textSelection(.enabled)
-                            }
                         }
+                    }
+
+                    // Outside the steps, not merely outside the payment's row. A step hides its
+                    // own content once it is blocked, so a later capture failure would take this
+                    // down with it, and what it names is the one thing needed to reconcile money
+                    // that may already have moved.
+                    if !unreconciled.isEmpty {
+                        Text(
+                            "A reversal of \(unreconciled.joined(separator: ", ")) may have been "
+                                + "applied. Read back before reversing again."
+                        )
+                        .font(.caption)
+                        .foregroundColor(.payabliError)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .textSelection(.enabled)
                     }
 
                     DiagnosticsSection(store: diagnosticsStore, isEnabled: Secrets.paymentCaptureDiagnosticsEnabled)
