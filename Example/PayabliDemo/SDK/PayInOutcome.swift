@@ -28,6 +28,23 @@ struct PayInOutcome {
     var headline: String {
         reason ?? explanation ?? code
     }
+
+    /// The identifier a reversal can be sent for, or nothing.
+    ///
+    /// Present is not the same as usable. The SDK trims the value and refuses a blank one, and
+    /// refuses `.` and `..` besides, because either would name a route rather than a transaction.
+    /// Offering the button for one of those gives an operator an action that can only ever come
+    /// back as invalid input.
+    var reversibleTransId: String? {
+        guard let transId = transaction?.paymentTransId?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !transId.isEmpty,
+              transId != ".",
+              transId != ".."
+        else {
+            return nil
+        }
+        return transId
+    }
 }
 
 /// One line of a result screen.
@@ -64,6 +81,19 @@ struct PayInFailure {
     /// The failure's own classification, carrying nothing from the wire, so it is
     /// the part safe to record.
     let logLabel: String
+
+    /// Whether the flow refused this because another submission was already running.
+    ///
+    /// It says nothing about the request that was made, because the request was never made. A
+    /// screen that reads it as this request's answer reports a failure for something it did not do,
+    /// and hides whatever the running one goes on to say.
+    let refusedForAnotherSubmission: Bool
+
+    /// Whether the request may have reached the service, leaving nobody able to say what it did.
+    ///
+    /// A screen offering to send it again after this offers a second one, not a retry: the SDK mints
+    /// a key per call, so the service has nothing to recognise the repeat by.
+    let outcomeIsUnresolved: Bool
 
     /// Whether the service refused this as a repeat of an attempt it already holds.
     ///
@@ -154,6 +184,15 @@ extension PayInFailure {
             + "back to see whether it went through. Start a new attempt to send a payment "
             + "of its own."
 
+    /// What an outcome nobody knows means for a reversal.
+    ///
+    /// The SDK words this one for a payment, which is what every other call here is. After a reversal
+    /// it is the reversal whose fate is open, and reading it as the payment's sends an operator to
+    /// the wrong question.
+    private static let unknownReversalMessage =
+        "The reversal may have been applied and the outcome is unknown. Read the "
+            + "transaction back rather than reversing it again."
+
     /// Every failure reads as `localizedDescription`, which each SDK error type
     /// writes for a merchant: a validation failure appends the rejected fields, a
     /// decline appends the action the payer can take, and the rest fall back to the
@@ -165,10 +204,42 @@ extension PayInFailure {
     ///   not the duplicate this message describes, and it reads as the service's own
     ///   answer.
     init(_ error: Error, operation: PayInOperation) {
-        let duplicate = operation == .capture && Self.isDuplicateSubmission(error)
+        let duplicate = operation.canRepeatUnderOneKey && Self.isDuplicateSubmission(error)
         isDuplicateSubmission = duplicate
+        outcomeIsUnresolved = Self.leavesOutcomeUnknown(error)
+        refusedForAnotherSubmission = Self.refusedForAnotherSubmission(error)
         logLabel = LoggableError.label(for: error)
-        message = duplicate ? Self.duplicateMessage : error.localizedDescription
+        message = Self.message(for: error, operation: operation, duplicate: duplicate)
+    }
+
+    private static func message(
+        for error: Error,
+        operation: PayInOperation,
+        duplicate: Bool
+    ) -> String {
+        if duplicate {
+            return duplicateMessage
+        }
+        // The SDK words an open outcome as the payment's, because every other call here is one.
+        if operation == .void, leavesOutcomeUnknown(error) {
+            return unknownReversalMessage
+        }
+        return error.localizedDescription
+    }
+
+    private static func refusedForAnotherSubmission(_ error: Error) -> Bool {
+        if case .submissionInProgress = error as? PayabliPayInPaymentFlowError {
+            return true
+        }
+        return false
+    }
+
+    /// Whether the request may have reached the service, so sending it again is not safe to offer.
+    private static func leavesOutcomeUnknown(_ error: Error) -> Bool {
+        if case .submissionInterrupted = error as? PayabliPayInPaymentFlowError {
+            return true
+        }
+        return false
     }
 
     private static func isDuplicateSubmission(_ error: Error) -> Bool {
@@ -179,7 +250,7 @@ extension PayInFailure {
         }
         // An empty body carries no code of its own, so the status mapping supplies one. The code says
         // a conflict and no more; that a conflict here is a repeat is what the operation above adds,
-        // since a capture is the only one of the two that sends a key.
+        // since only an operation that sends a key can have one refused.
         if let payabliError = error as? any PayabliError, payabliError.code == .conflict {
             return true
         }

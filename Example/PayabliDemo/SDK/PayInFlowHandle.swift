@@ -64,6 +64,19 @@ final class PayInFlowHandle: ObservableObject {
         return true
     }
 
+    /// Reverses a payment already taken, releasing an authorization's hold or undoing a
+    /// capture that has not settled.
+    ///
+    /// Takes the transaction and nothing else. The key the request carries is the SDK's to
+    /// mint and to keep, so no screen holds one and none is reported back.
+    ///
+    /// Which transactions can still be reversed is the service's to decide, so a state it
+    /// will not reverse arrives here as the refusal it sent rather than being guessed at
+    /// before the call.
+    func voidTransaction(_ transId: String) async throws -> PayInOutcome {
+        PayInOutcome(try await flow.voidTransaction(transId))
+    }
+
     /// Puts the customer the switch now names onto the attempt already on screen,
     /// leaving the amount, the order identifier and the key as they were.
     ///

@@ -100,6 +100,69 @@ final class QAWalkthroughUITests: XCTestCase {
         expectOutcome("Payment submitted", failurePrefix: captureFailure)
     }
 
+    /// Takes a payment and then reverses it from the screen that reported it, which is the
+    /// path an integrator copies.
+    ///
+    /// The reversal is offered only for a payment that came back with an identifier, and only
+    /// once: the service refuses the second, and a button that produces a refusal teaches the
+    /// wrong thing.
+    func testReversingAPaymentItJustTook() {
+        openTheForm(tab: "Capture", submit: capture)
+
+        prefill()
+        chooseAnExpiry()
+        submit(capture)
+        expectOutcome("Payment submitted", failurePrefix: captureFailure)
+
+        // A capture pushes the result view, and the reversal is offered on the screen that
+        // took the payment, so the walk comes back the way an operator would.
+        tap(app.navigationBars.buttons.firstMatch, named: "the back button")
+
+        let reverse = app.buttons["Reverse this payment"]
+        XCTAssertTrue(
+            reverse.waitForExistence(timeout: composes),
+            "a payment that reported an identifier is offered no reversal"
+        )
+        tapWhenStill(reverse, named: "the reverse button")
+
+        // The service's own approval for a reversal, which is not a capture's.
+        let reversed = app.staticTexts.matching(
+            NSPredicate(format: "label BEGINSWITH %@", "Reversed. Code: A0003")
+        ).firstMatch
+        XCTAssertTrue(
+            reversed.waitForExistence(timeout: answers),
+            "the reversal never reported the service's answer. On screen: "
+                + app.staticTexts.allElementsBoundByIndex.map(\.label).joined(separator: " | ")
+        )
+        // Relabelled and refused, not merely relabelled: a reversed payment that still accepts a
+        // press sends a second reversal, and the label alone would not catch that.
+        let reversedButton = app.buttons["Reversed"]
+        XCTAssertTrue(
+            reversedButton.waitForExistence(timeout: composes),
+            "the button never reported it reversed"
+        )
+        XCTAssertFalse(
+            reversedButton.isEnabled,
+            "a payment already reversed still accepts a second reversal"
+        )
+        XCTAssertFalse(
+            app.buttons["Reverse this payment"].exists,
+            "a payment already reversed still offers to reverse it again"
+        )
+
+        // A new attempt takes the payment off screen, and the reversal goes with it. Left standing it
+        // stays bound to a payment the screen no longer shows.
+        tapWhenStill(app.buttons["Capture another payment"], named: "the new attempt button")
+        XCTAssertFalse(
+            app.buttons["Reversed"].exists,
+            "a new attempt still offers the previous payment's reversal"
+        )
+        XCTAssertFalse(
+            app.buttons["Reverse this payment"].exists,
+            "a new attempt still offers a reversal for the payment it replaced"
+        )
+    }
+
     // MARK: - The walk
 
     /// Up to the form, which is the second step and stays blocked until the token endpoint has answered.
@@ -126,6 +189,72 @@ final class QAWalkthroughUITests: XCTestCase {
             app.buttons[submit].waitForExistence(timeout: composes),
             "the form has no \(submit) button"
         )
+    }
+
+    /// Taps an element once it has come to rest in the clear band between the navigation bar and
+    /// the tab bar.
+    ///
+    /// Hittable is not the same as tappable here. Both bars float over the list, and a control
+    /// scrolled under either still reports itself hittable while the bar takes the touch, so the tap
+    /// is delivered and the button never fires. Measured on this screen: `swipeUp` left the reversal
+    /// button at y=37 under a navigation bar about 100 points tall, and every tap on it was
+    /// swallowed.
+    ///
+    /// Resting and clear are checked together rather than one after the other. Coming to rest can
+    /// carry the control back under a bar, and since it still reports itself hittable there, a check
+    /// that stops at resting admits the very state this exists to avoid.
+    private func tapWhenStill(_ element: XCUIElement, named name: String) {
+        XCTAssertTrue(element.waitForExistence(timeout: composes), "\(name) never appeared")
+
+        var swipes = 0
+        while !element.isHittable, swipes < scrolls {
+            app.swipeUp()
+            swipes += 1
+        }
+
+        let window = app.windows.firstMatch.frame
+        let tabBar = app.tabBars.firstMatch
+        let ceiling = window.minY + 140
+        let floor = (tabBar.exists ? tabBar.frame.minY : window.maxY) - 40
+
+        var attempts = 0
+        while true {
+            settle(element)
+            let resting = element.frame
+            if resting.midY >= ceiling, resting.midY <= floor, element.isHittable {
+                break
+            }
+            guard attempts < scrolls else {
+                return XCTFail("\(name) never came to rest clear of the bars: \(resting)")
+            }
+            // Small drags rather than a swipe: a swipe carries momentum and overshoots, which is how
+            // the control ended up under a bar in the first place.
+            let towards: CGFloat = resting.midY < ceiling ? 0.12 : -0.12
+            app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+                .press(
+                    forDuration: 0.05,
+                    thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5 + towards))
+                )
+            attempts += 1
+        }
+
+        element.tap()
+    }
+
+    /// Waits for an element to stop moving.
+    ///
+    /// Its own frame twice over, not a fixed pause: a slow animation outlasts any pause short enough
+    /// to be worth writing.
+    private func settle(_ element: XCUIElement) {
+        var previous = element.frame
+        for _ in 0 ..< 20 {
+            Thread.sleep(forTimeInterval: 0.25)
+            let current = element.frame
+            if current == previous {
+                return
+            }
+            previous = current
+        }
     }
 
     /// Waits for an element to be there and to accept a tap, and says which one

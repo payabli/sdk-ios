@@ -14,13 +14,15 @@ struct LiveTarget {
 ///
 /// Two things are required, and the environment alone is not enough. `PAYABLI_ENV`
 /// names which paypoint, and `PAYABLI_QA_LIVE` opts the run in. Everything reached
-/// from here registers a device and moves money, and the scheme carries the
-/// environment, so without the second one an operator opening the scheme and
-/// pressing Test charges a paypoint. `QAWalkthroughUITests` gates its walkthrough
-/// on the same variable for the same reason.
+/// from here registers a device and moves money, so without the second one an
+/// operator pressing Test charges a paypoint. `QAWalkthroughUITests` gates its
+/// walkthrough on the same variable for the same reason.
 ///
-/// Both come from the scheme's environment for an app-hosted bundle: the
-/// `TEST_RUNNER_` prefix reaches a UI-test runner and not a host application.
+/// Both reach this bundle through the `TEST_RUNNER_` prefix, which `xcodebuild` strips
+/// before handing them to the test host, the same way the UI walkthrough takes its own.
+/// Passing them as build settings or exporting them into the shell reaches `xcodebuild`
+/// and stops there, which looks exactly like a variable that had no effect: every live
+/// case skips and the run still exits 0.
 enum LiveEnvironment {
     /// The name the walkthrough already uses, so one flag opts into every live run
     /// rather than one per suite.
@@ -29,12 +31,12 @@ enum LiveEnvironment {
     static func named() throws -> LiveTarget {
         try XCTSkipUnless(
             ProcessInfo.processInfo.environment[liveRunKey] == "1",
-            "set \(liveRunKey)=1 in the scheme to register a device and move money"
+            "set TEST_RUNNER_\(liveRunKey)=1 to register a device and move money"
         )
 
         let requested = ProcessInfo.processInfo.environment["PAYABLI_ENV"]
         guard let requested, !requested.isEmpty else {
-            throw XCTSkip("no PAYABLI_ENV; set it in the scheme to qa or sandbox")
+            throw XCTSkip("no PAYABLI_ENV; set TEST_RUNNER_PAYABLI_ENV to qa or sandbox")
         }
         // The demo's own environment, which is what the lookup and the app are
         // keyed on. Production is refused: these tests move money.

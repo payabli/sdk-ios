@@ -30,6 +30,54 @@ final class PayInFailureTests: XCTestCase {
         XCTAssertTrue(failure.message.contains("idempotency key"), failure.message)
     }
 
+    /// A reversal takes no key from the caller and the SDK mints a fresh one per call, so the same
+    /// key never reaches the service twice. A conflict there is the service answering about the
+    /// transaction, and reading it as a repeat tells an operator to send a payment instead.
+    func testAConflictOnAReversalIsNotReadAsARepeat() {
+        let failure = PayInFailure(typedConflict, operation: .void)
+
+        XCTAssertFalse(failure.isDuplicateSubmission)
+        XCTAssertFalse(failure.message.contains("idempotency key"), failure.message)
+        XCTAssertFalse(failure.message.contains("Start a new attempt"), failure.message)
+    }
+
+    func testABareConflictOnAReversalSaysWhatTheServiceSaid() {
+        let failure = PayInFailure(
+            BareReason(reason: "Conflict (409)", code: .conflict),
+            operation: .void
+        )
+
+        XCTAssertFalse(failure.isDuplicateSubmission)
+        XCTAssertEqual(failure.message, "Conflict (409)")
+    }
+
+    /// The SDK words an open outcome as the payment's, which is what every other call here is.
+    func testAnInterruptedReversalNamesTheReversalRatherThanThePayment() {
+        let failure = PayInFailure(Self.interruptedReversal, operation: .void)
+
+        XCTAssertTrue(failure.message.contains("reversal may have been applied"), failure.message)
+        XCTAssertFalse(
+            failure.message.contains("payment may have been taken"),
+            "an open reversal must not read as an open payment: \(failure.message)"
+        )
+    }
+
+    /// The classification the screen reads to stop offering a second reversal. What the screen does
+    /// with it is asserted by the walkthrough, not here: this case would stay green if the button
+    /// ignored it entirely.
+    func testAnInterruptedReversalLeavesTheOutcomeUnresolved() {
+        XCTAssertTrue(PayInFailure(Self.interruptedReversal, operation: .void).outcomeIsUnresolved)
+    }
+
+    func testARefusedReversalIsSettledRatherThanUnresolved() {
+        XCTAssertFalse(PayInFailure(typedConflict, operation: .void).outcomeIsUnresolved)
+    }
+
+    private static let interruptedReversal = PayabliPayInPaymentFlowError.submissionInterrupted(
+        code: .networkError,
+        causeType: "PayabliSDKCore.PayabliGenericError"
+    )
+
     func testATypedConflictOnAStoredMethodSaysWhatTheServiceSaid() {
         let failure = PayInFailure(typedConflict, operation: .storedMethod)
 
