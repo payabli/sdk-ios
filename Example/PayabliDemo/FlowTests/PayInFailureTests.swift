@@ -62,8 +62,9 @@ final class PayInFailureTests: XCTestCase {
         )
     }
 
-    /// What stops the screen offering a second reversal: the first may already have applied, and a
-    /// fresh key means the service takes the next one rather than refusing it.
+    /// The classification the screen reads to stop offering a second reversal. What the screen does
+    /// with it is asserted by the walkthrough, not here: this case would stay green if the button
+    /// ignored it entirely.
     func testAnInterruptedReversalLeavesTheOutcomeUnresolved() {
         XCTAssertTrue(PayInFailure(Self.interruptedReversal, operation: .void).outcomeIsUnresolved)
     }

@@ -82,6 +82,13 @@ struct PayInFailure {
     /// the part safe to record.
     let logLabel: String
 
+    /// Whether the flow refused this because another submission was already running.
+    ///
+    /// It says nothing about the request that was made, because the request was never made. A
+    /// screen that reads it as this request's answer reports a failure for something it did not do,
+    /// and hides whatever the running one goes on to say.
+    let refusedForAnotherSubmission: Bool
+
     /// Whether the request may have reached the service, leaving nobody able to say what it did.
     ///
     /// A screen offering to send it again after this offers a second one, not a retry: the SDK mints
@@ -200,6 +207,7 @@ extension PayInFailure {
         let duplicate = operation.canRepeatUnderOneKey && Self.isDuplicateSubmission(error)
         isDuplicateSubmission = duplicate
         outcomeIsUnresolved = Self.leavesOutcomeUnknown(error)
+        refusedForAnotherSubmission = Self.refusedForAnotherSubmission(error)
         logLabel = LoggableError.label(for: error)
         message = Self.message(for: error, operation: operation, duplicate: duplicate)
     }
@@ -217,6 +225,13 @@ extension PayInFailure {
             return unknownReversalMessage
         }
         return error.localizedDescription
+    }
+
+    private static func refusedForAnotherSubmission(_ error: Error) -> Bool {
+        if case .submissionInProgress = error as? PayabliPayInPaymentFlowError {
+            return true
+        }
+        return false
     }
 
     /// Whether the request may have reached the service, so sending it again is not safe to offer.

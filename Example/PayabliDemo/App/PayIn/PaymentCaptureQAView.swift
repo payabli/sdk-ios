@@ -272,6 +272,7 @@ struct PaymentCaptureQAView: View {
                 } else {
                     unreconciled.removeAll { $0 == transId }
                 }
+                guard !failure.refusedForAnotherSubmission else { return }
                 show(failure.message, for: transId)
             }
         }
@@ -319,6 +320,10 @@ struct PaymentCaptureQAView: View {
     }
 
     private func handleError(_ failure: PayInFailure) {
+        // Nothing was submitted, so nothing about this capture failed. Recording it would replace
+        // the payment on screen with an error and leave the result blocked behind it, and the way
+        // back from that clears what a reversal had already reported.
+        guard !failure.refusedForAnotherSubmission else { return }
         submitFailed = true
         // A refused card and a lost response no longer read alike: the first
         // arrives as a transaction the service declined, the second as an
