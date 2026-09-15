@@ -15,7 +15,7 @@ struct PaymentCaptureQAView: View {
     @State private var isPaymentCaptureResultViewPresented = false
     @State private var voidedTransId: String?
     @State private var reversing: String?
-    @State private var unreconciledTransId: String?
+    @State private var unreconciled: [String] = []
     @State private var voidText = ""
 
     var body: some View {
@@ -105,6 +105,10 @@ struct PaymentCaptureQAView: View {
                                     .frame(maxWidth: .infinity)
                             }
                             .buttonStyle(.bordered)
+                            // Only while one is on its way. It clears what the reversal's completion
+                            // checks itself against, so the request would land for a payment the
+                            // screen had already replaced.
+                            .disabled(reversing != nil)
 
                             // Only a payment that reported an identifier can be reversed, and
                             // only once: the service refuses the second attempt, and offering a
@@ -121,7 +125,7 @@ struct PaymentCaptureQAView: View {
                                 .disabled(
                                     reversing != nil
                                         || voidedTransId == transId
-                                        || unreconciledTransId == transId
+                                        || unreconciled.contains(transId)
                                         || paymentFlow.isSubmitting
                                 )
 
@@ -139,10 +143,10 @@ struct PaymentCaptureQAView: View {
                             // Outside the payment's own row, because it outlives it. Drawing a new
                             // attempt takes the payment off screen, and a reversal nobody can
                             // account for still has to name the transaction to account for.
-                            if let unreconciledTransId {
+                            if !unreconciled.isEmpty {
                                 Text(
-                                    "A reversal of \(unreconciledTransId) may have been applied. "
-                                        + "Read that transaction back before reversing it again."
+                                    "A reversal of \(unreconciled.joined(separator: ", ")) may have "
+                                        + "been applied. Read back before reversing again."
                                 )
                                 .font(.caption)
                                 .foregroundColor(.payabliError)
@@ -226,6 +230,7 @@ struct PaymentCaptureQAView: View {
         // The flow refuses while a submission is in flight, and this row keeps
         // offering the button through one. Clearing first would report an attempt
         // that was never drawn, over a request still holding the earlier key.
+        guard reversing == nil else { return }
         guard paymentFlow.startNewAttempt(suppliesCustomer: demoCustomer.suppliesPayInCustomer) else {
             return
         }
@@ -254,12 +259,21 @@ struct PaymentCaptureQAView: View {
                     category: "PaymentCaptureDiagnostics"
                 ).info("Payment reversed: \(outcome.code, privacy: .public)")
                 voidedTransId = transId
+                unreconciled.removeAll { $0 == transId }
                 voidText = "Reversed. Code: \(outcome.code) Reason: \(outcome.reason ?? "-")"
             } catch {
                 guard reversing == transId else { return }
                 let failure = PayInFailure(error, operation: .void)
                 voidText = failure.message
-                unreconciledTransId = failure.outcomeIsUnresolved ? transId : nil
+                // Only this transaction's question is answered here. A settled failure for one
+                // reversal says nothing about another that is still open.
+                if failure.outcomeIsUnresolved {
+                    if !unreconciled.contains(transId) {
+                        unreconciled.append(transId)
+                    }
+                } else {
+                    unreconciled.removeAll { $0 == transId }
+                }
             }
             reversing = nil
         }

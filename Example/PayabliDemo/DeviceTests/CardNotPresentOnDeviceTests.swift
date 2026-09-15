@@ -137,8 +137,7 @@ final class CardNotPresentOnDeviceTests: XCTestCase {
         )
         LiveEnvironment.report("PAYABLI_AUTHORIZED env=\(named.name) transId=\(transId) code=\(authorized.code)")
 
-        let voided = try await void(transId, on: flow)
-        XCTAssertTrue(voided, "the authorization was left open and needs voiding by hand: \(transId)")
+        await reverse(transId, on: flow, whenLeftStanding: "the authorization was left open")
     }
 
     /// Authorize and capture in one call, so the combined endpoint is exercised as
@@ -152,8 +151,7 @@ final class CardNotPresentOnDeviceTests: XCTestCase {
         )
         LiveEnvironment.report("PAYABLI_CAPTURED env=\(named.name) transId=\(transId) code=\(captured.code)")
 
-        let voided = try await void(transId, on: flow)
-        XCTAssertTrue(voided, "the transaction was left standing and needs voiding by hand: \(transId)")
+        await reverse(transId, on: flow, whenLeftStanding: "the transaction was left standing")
     }
 
     /// The shape the capture screen sends with "Send a customer number" off: no
@@ -190,8 +188,7 @@ final class CardNotPresentOnDeviceTests: XCTestCase {
         )
         LiveEnvironment.report("PAYABLI_TOGGLE_OFF env=\(named.name) transId=\(transId) code=\(authorized.code)")
 
-        let voided = try await void(transId, on: flow)
-        XCTAssertTrue(voided, "left open and needs voiding by hand: \(transId)")
+        await reverse(transId, on: flow, whenLeftStanding: "the toggle-off shape was left open")
     }
 
     /// The seam the capture screen's reversal button calls, in the app's own process.
@@ -228,7 +225,14 @@ final class CardNotPresentOnDeviceTests: XCTestCase {
                 "PAYABLI_VOID_SEAM env=\(named.name) transId=\(transId) "
                     + "failed=\(LoggableError.label(for: error))"
             )
-            XCTFail("the screen's seam threw, and it needs voiding by hand: \(transId)")
+            if PayInFailure(error, operation: .void).outcomeIsUnresolved {
+                XCTFail(
+                    "the screen's seam left the outcome open: read \(transId) back before "
+                        + "reversing it again"
+                )
+            } else {
+                XCTFail("the screen's seam threw, and it needs voiding by hand: \(transId)")
+            }
         }
     }
 
@@ -237,8 +241,15 @@ final class CardNotPresentOnDeviceTests: XCTestCase {
     /// Reverses a transaction through the SDK's own member, which is what gives this
     /// path product coverage rather than coverage of a request the test wrote itself.
     ///
-    /// The transaction id is printed either way, so one left standing can be found.
-    private func void(_ transId: String, on flow: PayabliPayInPaymentFlow) async throws -> Bool {
+    /// The transaction id is reported either way, so one left standing can be found, and what to
+    /// do about it is decided here rather than at each call site. A reversal that never answered
+    /// is not one that did not happen: sending another would be a second reversal, because the
+    /// SDK mints a key per call and the service has nothing to recognise the repeat by.
+    private func reverse(
+        _ transId: String,
+        on flow: PayabliPayInPaymentFlow,
+        whenLeftStanding standing: String
+    ) async {
         do {
             let reversed = try await flow.voidTransaction(transId)
             LiveEnvironment.report(
@@ -246,14 +257,23 @@ final class CardNotPresentOnDeviceTests: XCTestCase {
             )
             // A reversal answers its own approval code rather than a capture's, so the family
             // is what decides. The reason is the service's text and is not reported.
-            return reversed.code.hasPrefix("A")
+            if !reversed.code.hasPrefix("A") {
+                XCTFail("\(standing), and it needs voiding by hand: \(transId)")
+            }
         } catch {
             // The classification and none of its message: that message carries the service's
             // own wording, which can quote what was submitted.
             LiveEnvironment.report(
                 "PAYABLI_VOID env=\(named.name) transId=\(transId) failed=\(LoggableError.label(for: error))"
             )
-            return false
+            if PayInFailure(error, operation: .void).outcomeIsUnresolved {
+                XCTFail(
+                    "\(standing), and the reversal may already have applied: read \(transId) "
+                        + "back before reversing it again"
+                )
+            } else {
+                XCTFail("\(standing), and it needs voiding by hand: \(transId)")
+            }
         }
     }
 }
