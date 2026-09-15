@@ -138,6 +138,24 @@ export interface PayabliTTPTransactionResult {
     paymentTransId: string;
 }
 
+/// The session state and what its case carries. The native enum carries
+/// payloads and no bridge can express one, so the code and the payloads arrive
+/// side by side.
+export interface PayabliTTPSessionSnapshot {
+    code: PayabliTTPSessionState;
+    readerConfigurationPercent?: number;
+    failureReason?: PayabliTTPFailureReason;
+}
+
+/// Mirrors `PayabliTTPFailureReason`.
+export enum PayabliTTPFailureReason {
+    AttestationRequired = 0,
+    ConfigurationRejected = 1,
+    ServiceUnavailable = 2,
+    DeviceIneligible = 3,
+    SdkInternalError = 4,
+}
+
 export interface PayabliTTPEvent {
     code: PayabliTTPEventCode;
     payload: { paymentTransId?: string; error?: string };
@@ -230,7 +248,7 @@ interface NativePayabliSDKModule {
     areTermsAccepted(): Promise<boolean>;
     presentTerms(): Promise<void>;
 
-    getSessionState(): Promise<number>;
+    getSessionState(): Promise<PayabliTTPSessionSnapshot>;
 
     resolveTokenRefresh(token: string): void;
 
@@ -332,9 +350,8 @@ export function presentTerms(): Promise<void> {
     return requireNativeModule().presentTerms();
 }
 
-export async function getSessionState(): Promise<PayabliTTPSessionState> {
-    const raw = await requireNativeModule().getSessionState();
-    return raw as PayabliTTPSessionState;
+export async function getSessionState(): Promise<PayabliTTPSessionSnapshot> {
+    return requireNativeModule().getSessionState();
 }
 
 export function addEventListener(

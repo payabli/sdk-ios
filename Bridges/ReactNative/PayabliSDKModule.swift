@@ -294,8 +294,12 @@ public final class PayabliSDKModule: RCTEventEmitter {
         rejecter reject: @escaping RCTPromiseRejectBlock
     ) {
         Task { @MainActor in
-            let raw = (self.ttp?.sessionState ?? .idle).code.rawValue
-            resolve(raw)
+            let state = self.ttp?.sessionState ?? .idle
+            resolve([
+                "code": state.code.rawValue,
+                "readerConfigurationPercent": state.readerConfigurationPercent as Any,
+                "failureReason": state.failureReason?.rawValue as Any
+            ])
         }
     }
 

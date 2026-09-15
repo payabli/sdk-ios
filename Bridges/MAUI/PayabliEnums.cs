@@ -5,6 +5,16 @@ namespace Payabli.TapToPay
     // ApiDefinition files drive binding generation but are not compiled into
     // the final assembly, so generated C# needs these enum declarations here.
     [Native]
+    public enum PayabliTTPFailureReason : long
+    {
+        AttestationRequired = 0,
+        ConfigurationRejected = 1,
+        ServiceUnavailable = 2,
+        DeviceIneligible = 3,
+        SdkInternalError = 4,
+    }
+
+    [Native]
     public enum PayabliEnvironment : long
     {
         Local = 0,

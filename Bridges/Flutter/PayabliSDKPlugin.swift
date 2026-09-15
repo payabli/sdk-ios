@@ -311,8 +311,12 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
 
     private func handleGetSessionState(result: @escaping FlutterResult) {
         Task { @MainActor in
-            let raw = (self.ttp?.sessionState ?? .idle).code.rawValue
-            result(raw)
+            let state = self.ttp?.sessionState ?? .idle
+            result([
+                "code": state.code.rawValue,
+                "readerConfigurationPercent": state.readerConfigurationPercent as Any,
+                "failureReason": state.failureReason?.rawValue as Any
+            ])
         }
     }
 

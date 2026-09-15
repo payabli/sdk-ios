@@ -92,6 +92,25 @@ public final class PayabliTTP: NSObject, ObservableObject {
     @Published public internal(set) var sessionState: PayabliTTPSessionState = .idle
     @Published public internal(set) var isReady: Bool = false
 
+    // MARK: - ObjC projection
+
+    /// ``sessionState`` without its payload, for a host that cannot express an
+    /// enum carrying one.
+    @objc public var sessionStateCode: PayabliTTPSessionStateCode {
+        sessionState.code
+    }
+
+    /// How far the reader has got configuring, or `nil` when no configuration
+    /// is running. `NSNumber` because ObjC has no optional `Int`.
+    @objc public var readerConfigurationPercent: NSNumber? {
+        sessionState.readerConfigurationPercent.map(NSNumber.init(value:))
+    }
+
+    /// Why the session failed, or `nil` when it has not.
+    @objc public var failureReason: NSNumber? {
+        sessionState.failureReason.map { NSNumber(value: $0.rawValue) }
+    }
+
     // MARK: - Init
 
     /// Designated init. Shares one credential holder and one transport across every
