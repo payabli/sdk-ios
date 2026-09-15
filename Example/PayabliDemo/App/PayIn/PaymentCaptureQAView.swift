@@ -15,6 +15,7 @@ struct PaymentCaptureQAView: View {
     @State private var isPaymentCaptureResultViewPresented = false
     @State private var voidedTransId: String?
     @State private var reversing: String?
+    @State private var reversalUnresolved = false
     @State private var voidText = ""
 
     var body: some View {
@@ -108,7 +109,7 @@ struct PaymentCaptureQAView: View {
                             // Only a payment that reported an identifier can be reversed, and
                             // only once: the service refuses the second attempt, and offering a
                             // button for a refusal teaches the wrong thing.
-                            if let transId = capturedResult?.transaction?.paymentTransId {
+                            if let transId = capturedResult?.reversableTransId {
                                 Button { reverse(transId) } label: {
                                     Label(
                                         voidedTransId == transId ? "Reversed" : "Reverse this payment",
@@ -117,7 +118,12 @@ struct PaymentCaptureQAView: View {
                                     .frame(maxWidth: .infinity)
                                 }
                                 .buttonStyle(.bordered)
-                                .disabled(reversing != nil || voidedTransId == transId || paymentFlow.isSubmitting)
+                                .disabled(
+                                    reversing != nil
+                                        || voidedTransId == transId
+                                        || reversalUnresolved
+                                        || paymentFlow.isSubmitting
+                                )
 
                                 if !voidText.isEmpty {
                                     Text(voidText)
@@ -214,6 +220,8 @@ struct PaymentCaptureQAView: View {
         resultText = ""
         capturedResult = nil
         voidedTransId = nil
+        reversing = nil
+        reversalUnresolved = false
         voidText = ""
     }
 
@@ -227,6 +235,7 @@ struct PaymentCaptureQAView: View {
         Task {
             do {
                 let outcome = try await paymentFlow.voidTransaction(transId)
+                guard reversing == transId else { return }
                 Logger(
                     subsystem: "com.payabli.example.app",
                     category: "PaymentCaptureDiagnostics"
@@ -234,7 +243,10 @@ struct PaymentCaptureQAView: View {
                 voidedTransId = transId
                 voidText = "Reversed. Code: \(outcome.code) Reason: \(outcome.reason ?? "-")"
             } catch {
-                voidText = PayInFailure(error, operation: .void).message
+                guard reversing == transId else { return }
+                let failure = PayInFailure(error, operation: .void)
+                voidText = failure.message
+                reversalUnresolved = failure.outcomeIsUnresolved
             }
             reversing = nil
         }

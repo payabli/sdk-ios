@@ -30,37 +30,30 @@ final class PayInFailureTests: XCTestCase {
         XCTAssertTrue(failure.message.contains("idempotency key"), failure.message)
     }
 
-    /// A reversal sends a key, so a repeat is refused the same way. What it means is not the same:
-    /// there is no new attempt to draw, and no payment to send.
-    func testATypedConflictOnAReversalDoesNotAskForANewPayment() {
+    /// A reversal takes no key from the caller and the SDK mints a fresh one per call, so the same
+    /// key never reaches the service twice. A conflict there is the service answering about the
+    /// transaction, and reading it as a repeat tells an operator to send a payment instead.
+    func testAConflictOnAReversalIsNotReadAsARepeat() {
         let failure = PayInFailure(typedConflict, operation: .void)
 
-        XCTAssertTrue(failure.isDuplicateSubmission)
-        XCTAssertTrue(failure.message.contains("reversal of this transaction"), failure.message)
-        XCTAssertFalse(
-            failure.message.contains("Start a new attempt"),
-            "a failed reversal must not tell an operator to send a payment: \(failure.message)"
-        )
+        XCTAssertFalse(failure.isDuplicateSubmission)
+        XCTAssertFalse(failure.message.contains("idempotency key"), failure.message)
+        XCTAssertFalse(failure.message.contains("Start a new attempt"), failure.message)
     }
 
-    func testABareConflictOnAReversalDoesNotAskForANewPayment() {
+    func testABareConflictOnAReversalSaysWhatTheServiceSaid() {
         let failure = PayInFailure(
             BareReason(reason: "Conflict (409)", code: .conflict),
             operation: .void
         )
 
-        XCTAssertTrue(failure.isDuplicateSubmission)
-        XCTAssertFalse(failure.message.contains("Start a new attempt"), failure.message)
+        XCTAssertFalse(failure.isDuplicateSubmission)
+        XCTAssertEqual(failure.message, "Conflict (409)")
     }
 
     /// The SDK words an open outcome as the payment's, which is what every other call here is.
     func testAnInterruptedReversalNamesTheReversalRatherThanThePayment() {
-        let interrupted = PayabliPayInPaymentFlowError.submissionInterrupted(
-            code: .networkError,
-            causeType: "PayabliSDKCore.PayabliGenericError"
-        )
-
-        let failure = PayInFailure(interrupted, operation: .void)
+        let failure = PayInFailure(Self.interruptedReversal, operation: .void)
 
         XCTAssertTrue(failure.message.contains("reversal may have been applied"), failure.message)
         XCTAssertFalse(
@@ -68,6 +61,21 @@ final class PayInFailureTests: XCTestCase {
             "an open reversal must not read as an open payment: \(failure.message)"
         )
     }
+
+    /// What stops the screen offering a second reversal: the first may already have applied, and a
+    /// fresh key means the service takes the next one rather than refusing it.
+    func testAnInterruptedReversalLeavesTheOutcomeUnresolved() {
+        XCTAssertTrue(PayInFailure(Self.interruptedReversal, operation: .void).outcomeIsUnresolved)
+    }
+
+    func testARefusedReversalIsSettledRatherThanUnresolved() {
+        XCTAssertFalse(PayInFailure(typedConflict, operation: .void).outcomeIsUnresolved)
+    }
+
+    private static let interruptedReversal = PayabliPayInPaymentFlowError.submissionInterrupted(
+        code: .networkError,
+        causeType: "PayabliSDKCore.PayabliGenericError"
+    )
 
     func testATypedConflictOnAStoredMethodSaysWhatTheServiceSaid() {
         let failure = PayInFailure(typedConflict, operation: .storedMethod)
