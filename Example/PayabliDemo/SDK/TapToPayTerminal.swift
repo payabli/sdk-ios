@@ -17,32 +17,41 @@ final class TapToPayTerminal: ObservableObject {
     /// How far the reader has got configuring, from 0 to 100, or `nil` when it
     /// has not reported.
     ///
-    /// Republished rather than read through the SDK, so a screen watching this
-    /// object redraws. Configuring takes minutes the first time a device arms.
+    /// The SDK announces each percentage and retains none, so a screen that
+    /// wants a bar keeps the last one here. This is a host's own view state and
+    /// is dropped when the session stops configuring.
     @Published private(set) var configurationProgress: Int?
 
     private let terminal: PayabliTTP
     private var forwarding: Set<AnyCancellable> = []
+    private var progressListener: Task<Void, Never>?
 
     init(_ terminal: PayabliTTP) {
         self.terminal = terminal
         status = TapToPaySessionStatus(terminal.sessionState)
-        configurationProgress = terminal.readerConfigurationProgress
         // This object holds the subscriptions, so they hold it weakly.
         terminal.$sessionState
             .map(TapToPaySessionStatus.init)
             .removeDuplicates()
             .sink { [weak self] status in
                 self?.status = status
+                if status != .initializingReader {
+                    self?.configurationProgress = nil
+                }
             }
             .store(in: &forwarding)
 
-        terminal.$readerConfigurationProgress
-            .removeDuplicates()
-            .sink { [weak self] percent in
+        let events = terminal.events()
+        progressListener = Task { [weak self] in
+            for await event in events {
+                guard case let .readerConfigurationProgressChanged(percent) = event else { continue }
                 self?.configurationProgress = percent
             }
-            .store(in: &forwarding)
+        }
+    }
+
+    deinit {
+        progressListener?.cancel()
     }
 
     /// Attests the device, fetches its configuration and brings the reader up.

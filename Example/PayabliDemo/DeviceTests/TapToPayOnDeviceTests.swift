@@ -167,10 +167,6 @@ final class TapToPayOnDeviceTests: XCTestCase {
             )
         }
         XCTAssertTrue((0 ... 100).contains(last))
-        XCTAssertNil(
-            ttp.readerConfigurationProgress,
-            "the configuration ended and the percentage was left behind"
-        )
     }
 
     /// How long a reader has to finish arming before the test says it never did.

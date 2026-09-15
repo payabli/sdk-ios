@@ -22,12 +22,22 @@ final class PayabliTTPReaderEventTests: XCTestCase {
 
     // MARK: - During configuration
 
-    /// The percentage is readable while `prepareReader` is still running, which
-    /// is the case a handler installed afterwards would miss.
-    func testProgressIsReadableWhileTheReaderConfigures() async throws {
+    /// Every percentage the configuration raises is announced, in order.
+    func testEveryPercentageIsAnnouncedInOrder() async throws {
         let (ttp, provider) = try makeTTP()
-        var seenDuringPrepare: [Int?] = []
-        provider.onPrepare = { seenDuringPrepare.append(ttp.readerConfigurationProgress) }
+        let stream = ttp.events()
+        let collector = Task { () -> [Int] in
+            var seen: [Int] = []
+            for await event in stream {
+                if case let .readerConfigurationProgressChanged(percent) = event {
+                    seen.append(percent)
+                }
+                if case .readerReady = event {
+                    return seen
+                }
+            }
+            return seen
+        }
         provider.readerEventsDuringPrepare = [
             .configurationProgress(percent: 10),
             .configurationProgress(percent: 90)
@@ -35,38 +45,8 @@ final class PayabliTTPReaderEventTests: XCTestCase {
 
         try await ttp.initialize()
 
-        XCTAssertEqual(seenDuringPrepare, [10, 90])
-    }
-
-    /// A configuration that ends leaves nothing behind, or a host told to draw
-    /// progress while this is not `nil` draws a finished bar for ever.
-    func testTheProgressIsClearedWhenTheConfigurationEnds() async throws {
-        let (ttp, provider) = try makeTTP()
-        provider.readerEventsDuringPrepare = [.configurationProgress(percent: 100)]
-
-        try await ttp.initialize()
-
-        XCTAssertEqual(ttp.sessionState, .ready)
-        XCTAssertNil(ttp.readerConfigurationProgress)
-    }
-
-    /// A configuration that fails leaves nothing behind either.
-    func testTheProgressIsClearedWhenTheConfigurationFails() async throws {
-        let (ttp, provider) = try makeTTP()
-        provider.readerEventsDuringPrepare = [.configurationProgress(percent: 40)]
-        provider.prepareReaderResult = .failure(PayabliTTPError.readerSetupFailed(reason: "no reader"))
-
-        _ = try? await ttp.initialize()
-
-        XCTAssertNil(ttp.readerConfigurationProgress)
-    }
-
-    func testNothingIsKeptUntilTheReaderReports() async throws {
-        let (ttp, _) = try makeTTP()
-
-        try await ttp.initialize()
-
-        XCTAssertNil(ttp.readerConfigurationProgress)
+        let announced = await collector.value
+        XCTAssertEqual(announced, [10, 90])
     }
 
     // MARK: - After the session is up
@@ -115,17 +95,29 @@ final class PayabliTTPReaderEventTests: XCTestCase {
 
         let wasAnnounced = await announced.value
         XCTAssertFalse(wasAnnounced, "a configuration that has ended announced progress")
-        XCTAssertNil(ttp.readerConfigurationProgress)
     }
 
-    /// A card-read state is not progress, and must not be read as any.
-    func testACardStateIsNeverReadAsProgress() async throws {
+    /// A card-read state is not progress, and is never announced as any.
+    func testACardStateIsNeverAnnouncedAsProgress() async throws {
         let (ttp, provider) = try makeTTP()
+        let stream = ttp.events()
+        let collector = Task { () -> Bool in
+            for await event in stream {
+                if case .readerConfigurationProgressChanged = event {
+                    return true
+                }
+                if case .readerReady = event {
+                    return false
+                }
+            }
+            return false
+        }
         provider.readerEventsDuringPrepare = [.cardDetected, .cardRemovalRequested]
 
         try await ttp.initialize()
 
-        XCTAssertNil(ttp.readerConfigurationProgress)
+        let sawProgress = await collector.value
+        XCTAssertFalse(sawProgress)
     }
 
     // MARK: - Announced to a host

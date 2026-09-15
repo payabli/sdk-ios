@@ -3,12 +3,11 @@ import Foundation
 // MARK: - Reader events
 
 extension PayabliTTP {
-    /// Publishes progress only for the configuration that installed this
-    /// handler, and records it before announcing it.
+    /// Announces progress only for the configuration that installed this
+    /// handler. Every other reader event is announced whenever it arrives.
     func handleReaderEvent(_ event: TapToPayReaderEvent, from configuration: Int) {
-        if case let .configurationProgress(percent) = event {
-            guard configuration == activeConfiguration else { return }
-            readerConfigurationProgress = percent
+        if case .configurationProgress = event, configuration != activeConfiguration {
+            return
         }
         multicaster.emit(published(event))
     }

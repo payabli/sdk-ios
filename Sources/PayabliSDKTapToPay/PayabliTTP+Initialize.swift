@@ -275,8 +275,7 @@ extension PayabliTTP {
     private func runPrepareReaderPhase() async throws {
         // Progress belongs to one configuration. The handler below carries which
         // one it is, and this releases the claim when the configuration ends, so
-        // a percentage raised afterwards has nothing to write to rather than a
-        // clear-up to outrun.
+        // a percentage raised afterwards is dropped rather than announced.
         nextConfigurationID += 1
         let configuration = nextConfigurationID
         activeConfiguration = configuration
@@ -284,7 +283,6 @@ extension PayabliTTP {
             if activeConfiguration == configuration {
                 activeConfiguration = nil
             }
-            readerConfigurationProgress = nil
         }
 
         _ = sessionManager.transition(to: .initializingReader)

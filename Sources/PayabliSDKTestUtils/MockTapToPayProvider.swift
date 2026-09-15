@@ -118,22 +118,15 @@ package final class MockTapToPayProvider: TapToPayProvider, @unchecked Sendable 
             return _prepareReaderResult
         }
         let scripted = readerEventsDuringPrepare
-        let observe = onPrepare
         await MainActor.run {
             for event in scripted {
                 onReaderEvent(event)
-                observe?()
             }
         }
         if case let .failure(err) = result {
             throw err
         }
     }
-
-    /// Called on the main actor after each scripted event, so a test can read
-    /// what a host would see part-way through a configuration rather than only
-    /// after it.
-    package var onPrepare: (@MainActor () -> Void)?
 
     /// Events raised while `prepareReader` is still running, which is when a
     /// real reader reports its configuration progress.

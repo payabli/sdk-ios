@@ -65,7 +65,11 @@ public final class PayabliTTP: NSObject, ObservableObject {
 
     /// The configuration currently running, or `nil` when none is. A reader's
     /// event handler outlives the configuration that installed it, so progress
-    /// is published only while its own configuration is still this one.
+    /// is announced only while its own configuration is still this one.
+    ///
+    /// Separate from `readerSessionGeneration`, which bumps only when a reader
+    /// comes up: a percentage raised after a configuration failed would still
+    /// match that.
     var activeConfiguration: Int?
 
     /// Names each configuration, so an ended one can be told from a new one.
@@ -87,12 +91,6 @@ public final class PayabliTTP: NSObject, ObservableObject {
     // public read-only contract.
     @Published public internal(set) var sessionState: PayabliTTPSessionState = .idle
     @Published public internal(set) var isReady: Bool = false
-
-    /// How far the reader has got configuring, from 0 to 100, and `nil` whenever
-    /// no configuration is running.
-    ///
-    /// `readerConfigurationProgressChanged` says it moved; this says where it is.
-    @Published public internal(set) var readerConfigurationProgress: Int?
 
     // MARK: - Init
 

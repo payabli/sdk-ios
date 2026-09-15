@@ -34,13 +34,8 @@ public enum PayabliTTPEvent: Sendable {
     // because `nfcStarted`, `nfcCompleted` and `nfcFailed` above already say so
     // and a host would otherwise be told the same thing twice.
 
-    /// The reader's configuration has got further. Read
-    /// `PayabliTTP.readerConfigurationProgress` for where it is now.
-    ///
-    /// Configuration runs for minutes on a device arming for the first time, so
-    /// this is what a progress indicator follows. The percentage is also in
-    /// `payload` under `percent`, for a host that reaches events through
-    /// `addEventListener` and has no property to read.
+    /// How far the reader's configuration has got, raised only while one is
+    /// running. The percentage is in `payload` under `percent`.
     case readerConfigurationProgressChanged(percent: Int)
 
     /// The reader cannot take a card yet.
