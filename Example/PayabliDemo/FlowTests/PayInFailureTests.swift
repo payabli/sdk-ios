@@ -30,6 +30,45 @@ final class PayInFailureTests: XCTestCase {
         XCTAssertTrue(failure.message.contains("idempotency key"), failure.message)
     }
 
+    /// A reversal sends a key, so a repeat is refused the same way. What it means is not the same:
+    /// there is no new attempt to draw, and no payment to send.
+    func testATypedConflictOnAReversalDoesNotAskForANewPayment() {
+        let failure = PayInFailure(typedConflict, operation: .void)
+
+        XCTAssertTrue(failure.isDuplicateSubmission)
+        XCTAssertTrue(failure.message.contains("reversal of this transaction"), failure.message)
+        XCTAssertFalse(
+            failure.message.contains("Start a new attempt"),
+            "a failed reversal must not tell an operator to send a payment: \(failure.message)"
+        )
+    }
+
+    func testABareConflictOnAReversalDoesNotAskForANewPayment() {
+        let failure = PayInFailure(
+            BareReason(reason: "Conflict (409)", code: .conflict),
+            operation: .void
+        )
+
+        XCTAssertTrue(failure.isDuplicateSubmission)
+        XCTAssertFalse(failure.message.contains("Start a new attempt"), failure.message)
+    }
+
+    /// The SDK words an open outcome as the payment's, which is what every other call here is.
+    func testAnInterruptedReversalNamesTheReversalRatherThanThePayment() {
+        let interrupted = PayabliPayInPaymentFlowError.submissionInterrupted(
+            code: .networkError,
+            causeType: "PayabliSDKCore.PayabliGenericError"
+        )
+
+        let failure = PayInFailure(interrupted, operation: .void)
+
+        XCTAssertTrue(failure.message.contains("reversal may have been applied"), failure.message)
+        XCTAssertFalse(
+            failure.message.contains("payment may have been taken"),
+            "an open reversal must not read as an open payment: \(failure.message)"
+        )
+    }
+
     func testATypedConflictOnAStoredMethodSaysWhatTheServiceSaid() {
         let failure = PayInFailure(typedConflict, operation: .storedMethod)
 

@@ -147,12 +147,30 @@ extension PayInOutcome {
 }
 
 extension PayInFailure {
-    private static let duplicateMessage =
+    private static let duplicatePaymentMessage =
         "Duplicate submission (409): this attempt's idempotency key has already "
             + "been used, so the service refused the repeat rather than taking a payment. "
             + "It does not answer with the earlier attempt's result, so read that attempt "
             + "back to see whether it went through. Start a new attempt to send a payment "
             + "of its own."
+
+    /// A refused repeat means something different when the request was a reversal, and so does what
+    /// to do next: there is no new attempt to draw, and telling an operator to send a payment after a
+    /// reversal they were trying to make is the opposite of the right move.
+    private static let duplicateReversalMessage =
+        "Duplicate submission (409): a reversal of this transaction already reached the "
+            + "service under this key, so the repeat was refused rather than reversing it twice. "
+            + "It does not answer with the earlier attempt's result, so read the transaction back "
+            + "to see whether it was reversed."
+
+    /// What an outcome nobody knows means for a reversal.
+    ///
+    /// The SDK words this one for a payment, which is what every other call here is. After a reversal
+    /// it is the reversal whose fate is open, and reading it as the payment's sends an operator to
+    /// the wrong question.
+    private static let unknownReversalMessage =
+        "The reversal may have been applied and the outcome is unknown. Read the "
+            + "transaction back rather than reversing it again."
 
     /// Every failure reads as `localizedDescription`, which each SDK error type
     /// writes for a merchant: a validation failure appends the rejected fields, a
@@ -168,7 +186,25 @@ extension PayInFailure {
         let duplicate = operation.sendsIdempotencyKey && Self.isDuplicateSubmission(error)
         isDuplicateSubmission = duplicate
         logLabel = LoggableError.label(for: error)
-        message = duplicate ? Self.duplicateMessage : error.localizedDescription
+        message = Self.message(for: error, operation: operation, duplicate: duplicate)
+    }
+
+    private static func message(
+        for error: Error,
+        operation: PayInOperation,
+        duplicate: Bool
+    ) -> String {
+        guard operation == .void else {
+            return duplicate ? duplicatePaymentMessage : error.localizedDescription
+        }
+        if duplicate {
+            return duplicateReversalMessage
+        }
+        // The only one the SDK words as the payment's rather than the request's.
+        if case .submissionInterrupted = error as? PayabliPayInPaymentFlowError {
+            return unknownReversalMessage
+        }
+        return error.localizedDescription
     }
 
     private static func isDuplicateSubmission(_ error: Error) -> Bool {
