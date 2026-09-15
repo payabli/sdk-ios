@@ -179,8 +179,7 @@ final class PayabliTTPFailureReasonTests: XCTestCase {
         XCTAssertNil(PayabliTTPFailureReason(rawValue: 5))
     }
 
-    /// A transport refusal lands by its code, and this arm was asserted by
-    /// nothing.
+    /// A transport refusal lands by its code.
     func testATransportPermissionRefusalAsksForAnActivation() {
         XCTAssertEqual(
             PayabliTTPSessionState.landing(
