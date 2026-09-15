@@ -78,6 +78,33 @@ final class PayabliTTPFailureReasonTests: XCTestCase {
         }
     }
 
+    /// A refused body is the two sides disagreeing about the contract, not a
+    /// service that might answer differently in a minute: the same bytes get
+    /// the same 400.
+    func testARefusedBodyIsNotWorthRetrying() throws {
+        // Decoded rather than constructed: the type carries no public
+        // memberwise initializer, which is its own ticket.
+        let refused = PayabliPaymentError.validation(
+            try JSONDecoder().decode(PayabliValidationError.self, from: Data("{}".utf8))
+        )
+
+        XCTAssertEqual(
+            PayabliTTPSessionState.landing(for: refused),
+            .failed(reason: .sdkInternalError)
+        )
+    }
+
+    /// A status nothing has been seen producing has no agreed meaning, so it
+    /// lands where being wrong costs a retry rather than a bug report.
+    func testAStatusNoRouteHasProducedIsTreatedAsTransient() {
+        let burned = PayabliGenericError(code: .sessionBurned, reason: "Gone (410)")
+
+        XCTAssertEqual(
+            PayabliTTPSessionState.landing(for: burned),
+            .failed(reason: .serviceUnavailable)
+        )
+    }
+
     /// Every case lands somewhere, including on nothing. A case added without a
     /// landing would reach a host as a remedy it cannot act on.
     func testEveryErrorCaseHasALanding() {

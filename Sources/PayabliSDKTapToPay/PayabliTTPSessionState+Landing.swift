@@ -72,10 +72,16 @@ extension PayabliTTPSessionState {
         case .invalidConfiguration:
             return .failed(reason: .configurationRejected)
 
-        case .decodingError:
+        case .decodingError, .validation:
+            // Both are the two sides disagreeing about the contract. A 400 is
+            // the service reading the request and refusing the body, so the
+            // same bytes get the same answer and a retry is not the remedy.
             return .failed(reason: .sdkInternalError)
 
         default:
+            // Including a burned session: 410 is specified and no route has
+            // been seen producing one, so its meaning is a guess until one
+            // does.
             return .failed(reason: .serviceUnavailable)
         }
     }
