@@ -14,19 +14,44 @@ final class TapToPayTerminal: ObservableObject {
     /// on the way out.
     @Published private(set) var status: TapToPaySessionStatus
 
+    /// How far the reader has got configuring, from 0 to 100, or `nil` when it
+    /// has not reported.
+    ///
+    /// The SDK announces each percentage and retains none, so a screen that
+    /// wants a bar keeps the last one here. This is a host's own view state and
+    /// is dropped when the session stops configuring.
+    @Published private(set) var configurationProgress: Int?
+
     private let terminal: PayabliTTP
-    private var forwarding: AnyCancellable?
+    private var forwarding: Set<AnyCancellable> = []
+    private var progressListener: Task<Void, Never>?
 
     init(_ terminal: PayabliTTP) {
         self.terminal = terminal
         status = TapToPaySessionStatus(terminal.sessionState)
-        // This object holds the subscription, so the subscription holds it weakly.
-        forwarding = terminal.$sessionState
+        // This object holds the subscriptions, so they hold it weakly.
+        terminal.$sessionState
             .map(TapToPaySessionStatus.init)
             .removeDuplicates()
             .sink { [weak self] status in
                 self?.status = status
+                if status != .initializingReader {
+                    self?.configurationProgress = nil
+                }
             }
+            .store(in: &forwarding)
+
+        let events = terminal.events()
+        progressListener = Task { [weak self] in
+            for await event in events {
+                guard case let .readerConfigurationProgressChanged(percent) = event else { continue }
+                self?.configurationProgress = percent
+            }
+        }
+    }
+
+    deinit {
+        progressListener?.cancel()
     }
 
     /// Attests the device, fetches its configuration and brings the reader up.

@@ -44,6 +44,7 @@ struct PaymentTapToPayQAView: View {
                 VStack(alignment: .leading, spacing: 20) {
                     QAContextLine()
                     TerminalReadinessView(configuredAppId: Secrets.appId)
+                    configurationProgressSection
                     stepsSection
                     recoverySection
                     eventLogSection
@@ -392,6 +393,31 @@ struct PaymentTapToPayQAView: View {
             }
             .padding(.horizontal, 16)
             .background(.bar)
+        }
+    }
+
+    /// Shown only while the reader is reporting, which is what a host does with
+    /// it: arming a device for the first time runs for minutes, and every later
+    /// one is over in seconds.
+    @ViewBuilder
+    private var configurationProgressSection: some View {
+        if let percent = terminal.configurationProgress {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    Text("Configuring the reader")
+                        .font(.subheadline.bold())
+                    Spacer()
+                    Text("\(percent)%")
+                        .font(.subheadline.monospacedDigit())
+                        .foregroundColor(.payabliOnSurfaceVariant)
+                }
+                ProgressView(value: Double(percent), total: 100)
+                    .accessibilityLabel("Reader configuration progress")
+                    .accessibilityValue("\(percent) percent")
+            }
+            .padding(12)
+            .background(Color.payabliSurfaceContainer)
+            .clipShape(RoundedRectangle(cornerRadius: 8))
         }
     }
 

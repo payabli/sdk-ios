@@ -96,6 +96,83 @@ final class TapToPayOnDeviceTests: XCTestCase {
         return (ttp, handle)
     }
 
+    /// The reader reports its configuration progress, and it reaches a host.
+    ///
+    /// Only a real reader raises this. A simulator answers `isSupported` false and
+    /// never arms, so nothing below the device tier can tell a working stream from
+    /// one nobody subscribed to.
+    ///
+    /// A device that has already armed configures in seconds and can report
+    /// nothing at all. That is the reader's state rather than a defect, and it is
+    /// reported as a skip: a run that asserted nothing would otherwise pass
+    /// having tested nothing.
+    func testTheReaderReportsItsConfigurationProgress() async throws {
+        let ttp = try makeTTP()
+
+        // Subscribed before `initialize()`, because progress is raised during it.
+        let stream = ttp.events()
+        // `nil` means the stream ended without the reader becoming ready, which
+        // is what cancellation by the deadline below produces. Returning the
+        // values collected so far instead would report a timeout as a pass.
+        let collector = Task { () -> [Int]? in
+            var seen: [Int] = []
+            for await event in stream {
+                if case let .readerConfigurationProgressChanged(percent) = event {
+                    seen.append(percent)
+                }
+                if case .readerReady = event {
+                    return seen
+                }
+            }
+            return nil
+        }
+        // Initialization is what stalls when a reader cannot arm, so it is
+        // bounded along with the collector. Bounding only the collector left the
+        // test suspended in `initialize()` for exactly the failure the bound was
+        // added for. Generous: a first arming runs for minutes.
+        let setup = Task { try await ttp.initialize() }
+        let deadline = Task {
+            guard (try? await Task.sleep(nanoseconds: Self.armingWait)) != nil else { return }
+            setup.cancel()
+            collector.cancel()
+        }
+        defer { deadline.cancel() }
+
+        do {
+            try await setup.value
+        } catch {
+            collector.cancel()
+            if error is CancellationError {
+                XCTFail("the reader did not finish arming within the time allowed")
+                return
+            }
+            if case PayabliTTPError.devicePendingActivation = error {
+                throw XCTSkip("this device is pending activation on \(named.entry)")
+            }
+            throw error
+        }
+
+        let collected = await collector.value
+        let reported = try XCTUnwrap(
+            collected,
+            "the reader never became ready, and the event stream ended without saying so"
+        )
+        for percent in reported {
+            XCTAssertTrue((0 ... 100).contains(percent), "reported \(percent), which is not a percentage")
+        }
+        guard let last = reported.last else {
+            throw XCTSkip(
+                "this reader reported no configuration progress, which a device that has already armed "
+                    + "does. Run it on a device that has not armed against \(named.entry)."
+            )
+        }
+        XCTAssertTrue((0 ... 100).contains(last))
+    }
+
+    /// How long a reader has to finish arming before the test says it never did.
+    /// Apple documents a first configuration as taking up to several minutes.
+    private static let armingWait: UInt64 = 300_000_000_000
+
     /// Reaching `.ready` stores a binding that names this paypoint.
     func testReachingReadyStoresABindingForThisPaypoint() async throws {
         let held = try await enrolledDevice().handle

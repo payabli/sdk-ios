@@ -273,13 +273,24 @@ extension PayabliTTP {
     // MARK: - Phase 4 — prepare reader
 
     private func runPrepareReaderPhase() async throws {
+        // Progress belongs to one configuration. The handler below carries which
+        // one it is, and this releases the claim when the configuration ends, so
+        // a percentage raised afterwards is dropped rather than announced.
+        nextConfigurationID += 1
+        let configuration = nextConfigurationID
+        activeConfiguration = configuration
+        defer {
+            if activeConfiguration == configuration {
+                activeConfiguration = nil
+            }
+        }
+
         _ = sessionManager.transition(to: .initializingReader)
         syncPublished()
         multicaster.emit(.readerInitializing)
         do {
-            readerConfigurationProgress = nil
             try await provider.prepareReader { [weak self] event in
-                self?.handleReaderEvent(event)
+                self?.handleReaderEvent(event, from: configuration)
             }
             readerSessionGeneration += 1
         } catch PayabliTTPError.termsNotAccepted {
