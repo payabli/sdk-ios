@@ -117,6 +117,14 @@ cannot show it being supplied.
 `captureAuthorizedTransaction(_:)` is a separate direct API for a prior
 authorization. It does not render as a hosted form mode.
 
+`voidTransaction(_:)` is a separate direct API that reverses a transaction,
+releasing an authorization's hold or undoing a capture that has not settled. It
+does not render as a hosted form mode, and it takes the transaction and nothing
+else: the route carries the identifier in its path, so there is no partial void.
+Which transactions can still be reversed is the service's to decide; a state it
+will not reverse arrives as the refusal it sent, carrying its own reason. A void
+answers `A0003` and calls itself canceled, where a capture answers `A0000`.
+
 Authorize guidance:
 
 - Card is the only current authorizable method.
@@ -141,7 +149,9 @@ PayabliPayInPaymentFlow(
 Public state:
 
 - `isSubmitting`: true while one submission is active.
-- `lastResult`: last stored-method or transaction result.
+- `lastResult`: last stored-method or transaction result. A reversal is not
+  published here: `voidTransaction(_:)` returns its result to its caller and
+  leaves this as the last submission left it.
 - `lastStoredPaymentMethod`: convenience accessor for stored-method results.
 - `operation`: current operation.
 - `requestConfiguration`: transaction configuration used by hosted capture and

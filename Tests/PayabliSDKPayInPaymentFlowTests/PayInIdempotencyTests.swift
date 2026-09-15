@@ -1,3 +1,4 @@
+import Combine
 @testable import PayabliSDKCore
 @testable import PayabliSDKPayInPaymentFlow
 import XCTest
@@ -51,6 +52,79 @@ final class PayInIdempotencyTests: XCTestCase {
         )
 
         XCTAssertEqual(transport.sentKeys, ["reserved-3"])
+    }
+
+    /// Reversing is money-moving, so it carries a key like the calls it reverses. The caller supplies
+    /// none and sees none: the member takes the transaction and nothing else.
+    func testAVoidCarriesAKey() async throws {
+        let transport = RecordingIdempotencyTransport(body: PayInFixture.approved)
+        let flow = PayInFixture.makeFlow(transport: transport, key: "reserved-4")
+
+        _ = try await flow.voidTransaction("trans-1")
+
+        XCTAssertEqual(transport.sentKeys, ["reserved-4"])
+    }
+
+    /// One channel per caller: a reversal answers the caller that asked for it and leaves the flow's
+    /// published result alone, so a screen showing what a payment did does not start showing what was
+    /// done to it afterwards.
+    func testAVoidDoesNotReplaceThePublishedResult() async throws {
+        // The two answers differ, so the assertion can tell which operation the published result
+        // came from. Answered alike it would hold whether or not the reversal published.
+        let transport = RecordingIdempotencyTransport(
+            bodies: [PayInFixture.approved, PayInFixture.canceled]
+        )
+        let flow = PayInFixture.makeFlow(transport: transport, key: "reserved-6")
+
+        let captured = try await flow.capture(PayInFixture.request(idempotencyKey: nil))
+        let reversed = try await flow.voidTransaction("trans-1")
+
+        XCTAssertEqual(reversed.code, "A0003", "the reversal did not get its own answer")
+        XCTAssertEqual(flow.lastResult, captured, "the reversal published itself over the payment")
+    }
+
+    /// The result is published before the submission reports itself finished.
+    ///
+    /// An observer woken by `isSubmitting` going false reads `lastResult` in the same breath, so the
+    /// other order hands it the submission before this one.
+    func testThePublishedResultIsSetBeforeTheSubmissionReportsItFinished() async throws {
+        let transport = RecordingIdempotencyTransport(body: PayInFixture.approved)
+        let flow = PayInFixture.makeFlow(transport: transport, key: "reserved-7")
+
+        // Every time it reports itself finished, what it was holding at that moment. The first is the
+        // publisher's own current value on subscribing, before anything has been submitted.
+        var heldWhenFinished: [PayabliPayInPaymentFlowResult?] = []
+        let watching = flow.$isSubmitting.sink { submitting in
+            if !submitting {
+                heldWhenFinished.append(flow.lastResult)
+            }
+        }
+        defer { watching.cancel() }
+
+        _ = try await flow.capture(PayInFixture.request(idempotencyKey: nil))
+
+        XCTAssertEqual(heldWhenFinished.count, 2, "the submission did not report itself finished")
+        XCTAssertNotNil(
+            heldWhenFinished.last ?? nil,
+            "it reported itself finished while still holding the previous result"
+        )
+    }
+
+    func testAnInterruptedVoidLeavesTheOutcomeOpen() async {
+        let transport = RecordingIdempotencyTransport(
+            failure: PayabliGenericError(code: .networkError, reason: "Network request failed")
+        )
+        let flow = PayInFixture.makeFlow(transport: transport, key: "reserved-5")
+
+        let failure = await PayInFixture.failure(from: {
+            _ = try await flow.voidTransaction("trans-1")
+        })
+
+        guard let interrupted = PayInFixture.interruption(failure) else {
+            return XCTFail("expected submissionInterrupted, got \(failure)")
+        }
+        XCTAssertEqual(interrupted.code, .networkError)
+        XCTAssertEqual(transport.sentKeys, ["reserved-5"], "the key still went out")
     }
 
     func testTwoAttemptsReserveTwoKeys() async throws {

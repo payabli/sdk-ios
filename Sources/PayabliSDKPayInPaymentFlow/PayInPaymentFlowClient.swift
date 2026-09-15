@@ -73,6 +73,37 @@ final class PayInPaymentFlowClient: Sendable {
         return try await perform(payabliRequest, carriesKey: payabliRequest.headers["idempotencyKey"] != nil)
     }
 
+    /// Reverses a transaction, releasing an authorization's hold or undoing a capture that has not
+    /// settled.
+    ///
+    /// No body: the route carries the identifier in its path and takes nothing else, so there is no
+    /// partial void. Which states can still be reversed is the service's to decide and is not mirrored
+    /// here; a state it refuses arrives as the refusal it sent, carrying its own reason.
+    func void(
+        transId: String,
+        idempotencyKey: String
+    ) async throws -> PayabliPayInPaymentFlowResult {
+        let transId = transId.payabliCaptureTrimmed
+        guard !transId.isEmpty else {
+            throw PayabliPayInPaymentFlowError.invalidInput("Transaction ID is required.")
+        }
+        // `.` and `..` are unreserved, so the encoder passes them through as themselves and the
+        // identifier names a route rather than a transaction. Refused here because whether a value is
+        // usable is the caller's question rather than the encoder's, and this matches the sibling.
+        guard transId != ".", transId != ".." else {
+            throw PayabliPayInPaymentFlowError.invalidInput("Transaction ID is required.")
+        }
+
+        let payabliRequest = try buildRequest(
+            path: "/api/v2/MoneyIn/void/\(PercentEncoding.segment(transId))",
+            query: [],
+            idempotencyKey: idempotencyKey
+        )
+        // Whether a key went out, not which one: nothing reports a key, and `perform` needs only to
+        // know that this route carries one so a failure that leaves the outcome open says so.
+        return try await perform(payabliRequest, carriesKey: payabliRequest.headers["idempotencyKey"] != nil)
+    }
+
     private func performTransaction(
         path: String,
         entryPoint: String,
@@ -121,18 +152,35 @@ final class PayInPaymentFlowClient: Sendable {
         idempotencyKey: String?,
         body: some Encodable
     ) throws -> PayabliRequest {
-        var headers: [String: String] = [:]
-        if let idempotencyKey {
-            headers["idempotencyKey"] = try Self.sendableKey(idempotencyKey)
-        }
-
-        return try PayabliRequest(
+        try PayabliRequest(
             method: .post,
             path: path,
             query: query,
-            headers: headers,
+            headers: Self.headers(idempotencyKey: idempotencyKey),
             body: PayInPaymentFlowJSONBody.encode(body)
         )
+    }
+
+    /// Builds a request for a route that carries everything it needs in its path.
+    ///
+    /// The body stays absent rather than being an empty object: the two are different requests, and
+    /// only the first is what the route was measured against.
+    private func buildRequest(
+        path: String,
+        query: [URLQueryItem],
+        idempotencyKey: String?
+    ) throws -> PayabliRequest {
+        try PayabliRequest(
+            method: .post,
+            path: path,
+            query: query,
+            headers: Self.headers(idempotencyKey: idempotencyKey)
+        )
+    }
+
+    private static func headers(idempotencyKey: String?) throws -> [String: String] {
+        guard let idempotencyKey else { return [:] }
+        return ["idempotencyKey": try sendableKey(idempotencyKey)]
     }
 
     /// The key as it will be sent, or a refusal.

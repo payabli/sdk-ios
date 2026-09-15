@@ -16,10 +16,18 @@ public final class PayabliPayInPaymentFlow: NSObject, ObservableObject, PayabliC
         "tokenstorage:add",
         "moneyin:getpaid",
         "moneyin:authorize",
-        "moneyin:capture"
+        "moneyin:capture",
+        "moneyin:void"
     ]
 
     @Published public private(set) var isSubmitting: Bool = false
+
+    /// What the last submission the flow published ended as.
+    ///
+    /// **``voidTransaction(_:)`` does not appear here.** One channel per caller: a reversal answers the
+    /// caller that asked for it and leaves this alone, so a screen showing what a payment did does not
+    /// start showing what was done to it afterwards. Read that member's return value instead, and do
+    /// not wait on this for it.
     @Published public private(set) var lastResult: PayabliPayInPaymentFlowResult?
 
     public var lastStoredPaymentMethod: PayabliPayInPaymentFlowStoredPaymentMethod? {
@@ -253,6 +261,28 @@ public final class PayabliPayInPaymentFlow: NSObject, ObservableObject, PayabliC
         }
     }
 
+    /// Reverses a transaction using `POST /api/v2/MoneyIn/void/{transId}`, releasing an
+    /// authorization's hold or undoing a capture that has not settled.
+    ///
+    /// Which transactions can still be reversed is the service's to decide, and is not mirrored here:
+    /// a state it will not reverse comes back as the refusal it sent, carrying its own reason.
+    ///
+    /// The result is returned and not published: ``lastResult`` keeps whatever the last submission
+    /// left there, so a caller reads the outcome here rather than waiting on that.
+    ///
+    /// - Parameter transId: the transaction to reverse, as
+    ///   ``PayabliPayInPaymentFlowTransaction/paymentTransId`` reported it.
+    public func voidTransaction(
+        _ transId: String
+    ) async throws -> PayabliPayInPaymentFlowResult {
+        try await exclusively {
+            try await client.void(
+                transId: transId,
+                idempotencyKey: self.reserveKey(nil)
+            )
+        }
+    }
+
     /// The key this attempt sends: the caller's when it set one, otherwise a fresh one.
     ///
     /// A money-moving request always carries one. Left absent, the service recognises no repeat, so a
@@ -270,15 +300,38 @@ public final class PayabliPayInPaymentFlow: NSObject, ObservableObject, PayabliC
         supplied ?? newIdempotencyKey()
     }
 
-    private func submit(
+    /// Runs one operation at a time and answers its caller, publishing nothing.
+    ///
+    /// One channel per caller: a host that called a member learns the outcome from that member's
+    /// return value, so the operation does not also replace ``lastResult``. A screen showing what a
+    /// payment did must not change because an unrelated operation happened to it afterwards.
+    ///
+    /// The exclusion is separate from the publishing and is kept either way: two submissions in
+    /// flight at once is a second payment, not a display question.
+    private func exclusively(
         _ operation: () async throws -> PayabliPayInPaymentFlowResult
     ) async throws -> PayabliPayInPaymentFlowResult {
         try beginSubmission()
         defer { endSubmission() }
 
-        let result = try await operation()
-        lastResult = result
-        return result
+        return try await operation()
+    }
+
+    /// Runs one operation at a time and publishes its result as the flow's last.
+    ///
+    /// For the operations a rendered form drives, where the screen observes the flow rather than
+    /// holding a return value.
+    private func submit(
+        _ operation: () async throws -> PayabliPayInPaymentFlowResult
+    ) async throws -> PayabliPayInPaymentFlowResult {
+        // Inside the exclusion rather than after it, so the result is published before the
+        // submission reports itself finished. The other way round, an observer woken by
+        // `isSubmitting` going false reads the result of the submission before this one.
+        try await exclusively {
+            let result = try await operation()
+            lastResult = result
+            return result
+        }
     }
 
     private func beginSubmission() throws {
