@@ -191,13 +191,18 @@ final class QAWalkthroughUITests: XCTestCase {
         )
     }
 
-    /// Taps an element once it is in the clear band between the navigation bar and the tab bar.
+    /// Taps an element once it has come to rest in the clear band between the navigation bar and
+    /// the tab bar.
     ///
     /// Hittable is not the same as tappable here. Both bars float over the list, and a control
-    /// scrolled under either still reports itself hittable while the bar takes the touch, so the
-    /// tap is delivered and the button never fires. Measured on this screen: `swipeUp` left the
-    /// reversal button at y=37 under a navigation bar about 100 points tall, and every tap on it
-    /// was swallowed.
+    /// scrolled under either still reports itself hittable while the bar takes the touch, so the tap
+    /// is delivered and the button never fires. Measured on this screen: `swipeUp` left the reversal
+    /// button at y=37 under a navigation bar about 100 points tall, and every tap on it was
+    /// swallowed.
+    ///
+    /// Resting and clear are checked together rather than one after the other. Coming to rest can
+    /// carry the control back under a bar, and since it still reports itself hittable there, a check
+    /// that stops at resting admits the very state this exists to avoid.
     private func tapWhenStill(_ element: XCUIElement, named name: String) {
         XCTAssertTrue(element.waitForExistence(timeout: composes), "\(name) never appeared")
 
@@ -212,36 +217,44 @@ final class QAWalkthroughUITests: XCTestCase {
         let ceiling = window.minY + 140
         let floor = (tabBar.exists ? tabBar.frame.minY : window.maxY) - 40
 
-        // Small drags rather than a swipe: a swipe carries momentum and overshoots, which is how
-        // the control ended up under a bar in the first place.
-        var nudges = 0
-        while element.frame.midY < ceiling || element.frame.midY > floor {
-            guard nudges < scrolls else {
-                return XCTFail("\(name) could not be brought clear of the bars: \(element.frame)")
+        var attempts = 0
+        while true {
+            settle(element)
+            let resting = element.frame
+            if resting.midY >= ceiling, resting.midY <= floor, element.isHittable {
+                break
             }
-            let towards: CGFloat = element.frame.midY < ceiling ? 0.12 : -0.12
+            guard attempts < scrolls else {
+                return XCTFail("\(name) never came to rest clear of the bars: \(resting)")
+            }
+            // Small drags rather than a swipe: a swipe carries momentum and overshoots, which is how
+            // the control ended up under a bar in the first place.
+            let towards: CGFloat = resting.midY < ceiling ? 0.12 : -0.12
             app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
                 .press(
                     forDuration: 0.05,
                     thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5 + towards))
                 )
-            nudges += 1
+            attempts += 1
         }
 
-        // Its own frame twice over, not a fixed pause: a slow animation outlasts any pause short
-        // enough to be worth writing.
+        element.tap()
+    }
+
+    /// Waits for an element to stop moving.
+    ///
+    /// Its own frame twice over, not a fixed pause: a slow animation outlasts any pause short enough
+    /// to be worth writing.
+    private func settle(_ element: XCUIElement) {
         var previous = element.frame
         for _ in 0 ..< 20 {
             Thread.sleep(forTimeInterval: 0.25)
             let current = element.frame
-            if current == previous, element.isHittable {
-                break
+            if current == previous {
+                return
             }
             previous = current
         }
-
-        XCTAssertTrue(element.isHittable, "\(name) never came to rest where it could be tapped")
-        element.tap()
     }
 
     /// Waits for an element to be there and to accept a tap, and says which one
