@@ -5,8 +5,8 @@ import XCTest
 /// The transitions that decide whether a payment can be reversed twice.
 ///
 /// The live walkthrough reaches the approved reversal and nothing else. Everything below is a branch
-/// it never takes, and each one either keeps money from moving again or keeps the operator able to
-/// find out whether it did.
+/// it never takes, and each one keeps an operator either from meeting a refusal they did nothing to
+/// earn, or from losing the transaction they were told to read back.
 final class PayInReversalStateTests: XCTestCase {
     private let payment = "32-abc"
     private let other = "32-def"
@@ -32,6 +32,15 @@ final class PayInReversalStateTests: XCTestCase {
         XCTAssertFalse(state.offersReversal(of: payment), "and it still happened")
     }
 
+    /// The property both guards lean on. The flow cannot report a submission until the call reaches
+    /// it, which is a scheduled task later, so this is what refuses a second tap in between.
+    func testAReversalIsInFlightFromTheMomentItIsDecidedOn() {
+        var state = PayInReversalState()
+        state.began()
+
+        XCTAssertTrue(state.isReversing)
+    }
+
     // MARK: - A reversal that never answered
 
     func testAnUnresolvedReversalIsNotOfferedAgain() {
@@ -41,7 +50,7 @@ final class PayInReversalStateTests: XCTestCase {
 
         XCTAssertFalse(
             state.offersReversal(of: payment),
-            "a reversal that may have applied was offered again, and the next send is a second one"
+            "a reversal that may have applied was offered again, and the service refuses the repeat"
         )
         XCTAssertEqual(state.unreconciled, [payment])
     }
