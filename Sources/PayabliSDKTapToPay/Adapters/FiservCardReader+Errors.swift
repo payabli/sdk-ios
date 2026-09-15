@@ -25,39 +25,67 @@ extension FiservCardReader {
                 return pte
             }
 
-            if (error as NSError).code == NSUserCancelledError {
+            let platform = platformError(behind: error)
+
+            if isCancellation(platform) || (error as NSError).code == NSUserCancelledError {
                 return fallback(
                     "\(cancellationReasonPrefix) user dismissed Tap to Pay sheet"
                 )
             }
 
-            if #available(iOS 16.4, *), error is PaymentCardReaderError {
-                let desc = error.localizedDescription
-                if desc.lowercased().contains("version") {
-                    return .readerSetupFailed(reason: "OS version not supported: \(desc)")
-                }
+            if let readerError = platform as? PaymentCardReaderError,
+               readerError.isUnsupportedOSVersion
+            {
+                return .readerOSVersionNotSupported
             }
 
-            let detail = extractReaderDetail(error)
+            let detail = readerDetail(error)
             return fallback(detail.isEmpty ? error.localizedDescription : detail)
         }
 
-        /// `FiservTTPCardReaderError.localizedDescription` is a stored property
-        /// that shadows (doesn't override) `Error.localizedDescription`, so the
-        /// usual accessor returns a generic NSError message. Read the real
-        /// `title` + `localizedDescription` via reflection.
-        static func extractReaderDetail(_ error: Error) -> String {
-            let mirror = Mirror(reflecting: error)
-            let title = mirror.children.first(where: { $0.label == "title" })?.value as? String
-            let desc = mirror.children.first(where: { $0.label == "localizedDescription" })?.value as? String
-            if let title, let desc {
-                return "\(title): \(desc)"
+        /// The platform error the card-reader component was built from, where it
+        /// kept one.
+        ///
+        /// That component's throwing methods only ever throw their own type, so
+        /// this is the only way to tell one refusal from another without
+        /// matching prose.
+        static func platformError(behind error: Error) -> Error? {
+            (error as? FiservTTPCardReaderError)?.underlying ?? error
+        }
+
+        /// Whether the payer or the platform ended the read.
+        static func isCancellation(_ error: Error?) -> Bool {
+            if let readError = error as? PaymentCardReaderSession.ReadError, case .readCancelled = readError {
+                return true
             }
-            if let desc {
-                return desc
+            return false
+        }
+
+        /// `title` and `localizedDescription` together, which is what a host is
+        /// shown when nothing more specific was recognised.
+        static func readerDetail(_ error: Error) -> String {
+            guard let readerError = error as? FiservTTPCardReaderError else {
+                return ""
             }
-            return ""
+            return "\(readerError.title): \(readerError.localizedDescription)"
         }
 
     #endif
 }
+
+#if canImport(PayabliCardReaderCore)
+
+    private extension PaymentCardReaderError {
+        /// The reader will never work on this OS build, whatever the caller does.
+        ///
+        /// Matched on the case rather than on the description, which is
+        /// localized and which the platform does not promise the wording of.
+        var isUnsupportedOSVersion: Bool {
+            if case .osVersionNotSupported = self {
+                return true
+            }
+            return false
+        }
+    }
+
+#endif

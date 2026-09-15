@@ -20,7 +20,7 @@ order shown below, except `areTermsAccepted()` and `presentTerms()`, which a hos
 | `static var providerId: String` | `CardReadResult.provider` | Return a stable identifier (`"fiserv"`, `"visa"`, ...). Goes into the API payload `provider` field so the backend routes decryption correctly (FR-11J.3). |
 | `checkEligibility() async` | Before any UI, before `/config` is fetched | Validate platform, OS version, hardware (e.g. `PaymentCardReader.isSupported`). **Must not require credentials.** |
 | `configure(credentials: [String:String]) throws` | After `/config` returns `providerCredentials` | Validate required keys, map to a typed struct, stash it in `self`. Throw `PayabliTTPError.readerSetupFailed(reason:)` on missing / malformed input. |
-| `prepareReader() async throws` | Right after `configure(...)` | Build the processor SDK's reader, request session token, link account if needed, initialize session. **Drop `self.credentials` as soon as the SDK has its own copy.** |
+| `prepareReader(onReaderEvent:) async throws` | Right after `configure(...)` | Build the processor SDK's reader, request session token, link account if needed, initialize session. **Drop `self.credentials` as soon as the SDK has its own copy.** Hand every reader event to `onReaderEvent`; section 4.5 carries the rules. |
 | `areTermsAccepted() async throws -> Bool` | Whenever a host asks, at any point | Ask the platform each time rather than caching, since acceptance is granted and withdrawn outside this process. **Return `true` where the platform requires no acceptance.** The contract carries no default, so an adapter answers this or does not compile. Throw `PayabliTTPError.readerSetupFailed(reason:)` whenever the reader cannot answer, whether none is prepared or the platform raised, so a caller can tell either from "not accepted". |
 | `presentTerms() async throws` | Whenever a host asks, at any point | Present the platform's own sheet and return once the merchant has finished with it. **Returning is not acceptance**: the sheet belongs to the platform and the merchant taps it, so `areTermsAccepted()` is what answers afterwards. Return without doing anything where the platform requires no acceptance. Throw `PayabliTTPError.readerSetupFailed(reason:)` when there is no reader to present from, for the same reason the question above does. |
 | `startReading(_ request: CardReadRequest) async throws -> CardReadResult` | `PayabliTTP.charge(...)` | Run the NFC interaction. Atomic providers (Fiserv) also charge here and return the full processor response. Payload-only providers populate `encryptedPayload` instead. |
@@ -67,7 +67,7 @@ The adapter contract is stricter than "RAM only" — the target ventana for
 ```
 configure(credentials:)            ← stored in self.credentials
         ↓
-prepareReader()
+prepareReader(onReaderEvent:)
   └─ buildReader(credentials:)     ← passed into the processor SDK
   └─ self.credentials = nil        ← drop immediately
   └─ requestSessionToken / etc.    ← no longer need them
@@ -99,10 +99,34 @@ matches where in the pipeline the failure happened:
 (`"cancelled:"`) so hosts can distinguish it by substring. If you add a new
 adapter, expose the same prefix constant for consistency.
 
+**Decide from the platform's type, not from its description.** A description is
+localized and the platform does not promise its wording, so a substring test on
+one answers differently on a device set to another language. Where the component
+under the adapter rebuilds the platform error, recover the original — the Fiserv
+one keeps it on `FiservTTPCardReaderError.underlying` — and match the case.
+
 Don't re-wrap errors that are already `PayabliTTPError` — forward them.
 
 Put the mapping logic in a companion file named `XxxCardReader+Errors.swift`,
 matching the Fiserv layout.
+
+---
+
+## 4.5 Reader events
+
+An adapter converts its platform's reader events into `TapToPayReaderEvent` and
+hands each one to the closure `prepareReader(onReaderEvent:)` was given. Two
+rules:
+
+- **The handler arrives with the call that starts the reader**, because
+  configuration progress is raised during it. An adapter that stored a handler
+  set separately would report everything except the one thing progress exists
+  for.
+- **A platform case with no counterpart is dropped, not invented.** The facade
+  already announces a read starting, completing and failing, so forwarding the
+  platform's equivalents would tell a host the same thing twice. Return `nil`.
+
+Put the mapping in `XxxCardReader+Events.swift`.
 
 ---
 
@@ -113,8 +137,10 @@ Adapters/
 ├── README.md                          ← this file
 ├── FiservCardReader.swift             ← main implementation
 ├── FiservCardReader+Errors.swift      ← error mapping
+├── FiservCardReader+Events.swift      ← reader event mapping
 └── VisaCardReader.swift               ← hypothetical next adapter
     VisaCardReader+Errors.swift
+    VisaCardReader+Events.swift
 ```
 
 Rules:
@@ -156,8 +182,8 @@ source tree, and the facade holds its provider directly.
    nothing outside the file reads the held value.
 3. `requiredCredentialKeys` / `optionalCredentialKeys` static arrays; log a warning for missing optionals.
 4. `checkEligibility()` never reads credentials.
-5. `prepareReader()` drops `self.credentials = nil` right after the processor SDK has its own copy.
-6. Any failure inside `prepareReader()` calls `clearAllState()` before throwing, with one
+5. `prepareReader(onReaderEvent:)` drops `self.credentials = nil` right after the processor SDK has its own copy.
+6. Any failure inside `prepareReader(onReaderEvent:)` calls `clearAllState()` before throwing, with one
    exception: a failure that means the merchant has not accepted the platform's terms keeps the
    reader. That reader holds what `presentTerms()` needs and is what answers
    `areTermsAccepted()` afterwards, so clearing it leaves a host unable to act on the one failure

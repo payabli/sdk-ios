@@ -170,7 +170,15 @@ struct TapToPayEvent {
         .activationFailed: "activationFailed",
         .attestationFailed: "attestationFailed",
         .configFailed: "configFailed",
-        .termsRequired: "termsRequired"
+        .termsRequired: "termsRequired",
+        .readerConfigurationProgressChanged: "readerConfigurationProgressChanged",
+        .readerNotReady: "readerNotReady",
+        .cardDetected: "cardDetected",
+        .cardRemovalRequested: "cardRemovalRequested",
+        .cardReadRetryRequested: "cardReadRetryRequested",
+        .pinEntryRequested: "pinEntryRequested",
+        .pinEntryCompleted: "pinEntryCompleted",
+        .readerPromptDismissed: "readerPromptDismissed"
     ]
 }
 

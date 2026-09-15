@@ -81,6 +81,14 @@ export enum PayabliTTPEventCode {
     AttestationFailed = 18,
     ConfigFailed = 19,
     TermsRequired = 20,
+    ReaderConfigurationProgressChanged = 21,
+    ReaderNotReady = 22,
+    CardDetected = 23,
+    CardRemovalRequested = 24,
+    CardReadRetryRequested = 25,
+    PinEntryRequested = 26,
+    PinEntryCompleted = 27,
+    ReaderPromptDismissed = 28,
 }
 
 export type PayabliPayInPaymentFlowACHAccountType = "Checking" | "Savings";
@@ -130,7 +138,7 @@ export interface PayabliTTPTransactionResult {
 
 export interface PayabliTTPEvent {
     code: PayabliTTPEventCode;
-    payload: { paymentTransId?: string; error?: string };
+    payload: { paymentTransId?: string; error?: string; percent?: number };
 }
 
 export interface PayabliTTPConfig {

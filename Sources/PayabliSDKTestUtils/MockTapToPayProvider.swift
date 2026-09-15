@@ -111,14 +111,42 @@ package final class MockTapToPayProvider: TapToPayProvider, @unchecked Sendable 
         }
     }
 
-    package func prepareReader() async throws {
+    package func prepareReader(onReaderEvent: @escaping @MainActor @Sendable (TapToPayReaderEvent) -> Void) async throws {
         let result: Result<Void, Error> = lock.withLock {
             _prepareReaderCalls += 1
+            _onReaderEvent = onReaderEvent
             return _prepareReaderResult
+        }
+        let scripted = readerEventsDuringPrepare
+        await MainActor.run {
+            for event in scripted {
+                onReaderEvent(event)
+            }
         }
         if case let .failure(err) = result {
             throw err
         }
+    }
+
+    /// Events raised while `prepareReader` is still running, which is when a
+    /// real reader reports its configuration progress.
+    private var _readerEventsDuringPrepare: [TapToPayReaderEvent] = []
+    package var readerEventsDuringPrepare: [TapToPayReaderEvent] {
+        get { lock.withLock { _readerEventsDuringPrepare } }
+        set { lock.withLock { _readerEventsDuringPrepare = newValue } }
+    }
+
+    private var _onReaderEvent: (@MainActor @Sendable (TapToPayReaderEvent) -> Void)?
+
+    /// Raises an event the way a prepared reader does, after `prepareReader`
+    /// returned. Does nothing when the reader was never prepared.
+    ///
+    /// `@MainActor` because a reader delivers on the main actor, and a test that
+    /// could deliver from anywhere would not be reproducing one.
+    @MainActor
+    package func emitReaderEvent(_ event: TapToPayReaderEvent) {
+        let handler = lock.withLock { _onReaderEvent }
+        handler?(event)
     }
 
     package func areTermsAccepted() async throws -> Bool {
@@ -158,6 +186,11 @@ package final class MockTapToPayProvider: TapToPayProvider, @unchecked Sendable 
     }
 
     package func cleanUp() async {
-        lock.withLock { _cleanUpCalls += 1 }
+        lock.withLock {
+            _cleanUpCalls += 1
+            // The contract ends callbacks here, so a mock that kept delivering
+            // would let a stale subscription pass a test.
+            _onReaderEvent = nil
+        }
     }
 }

@@ -72,11 +72,19 @@ public struct FiservTTPCardReaderError: Error {
     public let title: String
     public let localizedDescription: String
     public let failureReason: String?
-    
-    public init(title: String, localizedDescription: String, failureReason: String? = nil) {
+
+    /// The error this was rebuilt from, where there was one.
+    ///
+    /// `title` and `localizedDescription` are strings, so a caller that has to
+    /// tell one refusal from another can only match prose. Keeping the original
+    /// lets it match on the type instead.
+    public let underlying: Error?
+
+    public init(title: String, localizedDescription: String, failureReason: String? = nil, underlying: Error? = nil) {
         self.title = title
         self.localizedDescription = localizedDescription
         self.failureReason = failureReason
+        self.underlying = underlying
     }
 }
 
@@ -218,7 +226,11 @@ public class FiservTTPCardReader {
     ///
     /// - Throws: An error of type FiservTTPCardReaderError
     ///
-    public func initializeSession() async throws {
+    /// - Parameter eventHandler: Called on the main actor for each event the
+    ///   reader raises, for the life of the session. Apple's stream carries the
+    ///   configuration percentage as well as the card-read states, and it is one
+    ///   stream per reader, so this is the only place either can be read.
+    public func initializeSession(eventHandler: @escaping @MainActor (PaymentCardReader.Event) -> Void = { _ in }) async throws {
             
         if self.token != nil {
             
@@ -240,11 +252,17 @@ public class FiservTTPCardReader {
         
         if let token = self.token {
             
-            try await self.fiservTTPReader.initializeSession(token: token, eventHandler: { event in
+            // `[weak self]`: the reader holds the task that holds this closure, and
+            // the reader is held by `self`. Captured strongly, dropping the reader
+            // would not end the subscription, and the platform's stream is one per
+            // reader.
+            try await self.fiservTTPReader.initializeSession(token: token, eventHandler: { [weak self] event in
                 
-                if event == "notReady" {
-                    self.sessionReadySubject.send(false)
+                if case .notReady = event {
+                    self?.sessionReadySubject.send(false)
                 }
+
+                eventHandler(event)
             })
             
             self.sessionReadySubject.send(true)
@@ -564,9 +582,7 @@ public class FiservTTPCardReader {
             // 2) READ CARD
             let result = try await self.fiservTTPReader.readCard(for: amount,
                                                                  currencyCode: self.configuration.currencyCode,
-                                                                 transactionType: .purchase,
-                                                                 eventHandler: { _ in
-            })
+                                                                 transactionType: .purchase)
             
             // 3) GET READ RESULT
             do {
@@ -736,9 +752,7 @@ public class FiservTTPCardReader {
             // 2) READ CARD
             let result = try await self.fiservTTPReader.readCard(for: amount,
                                                                  currencyCode: self.configuration.currencyCode,
-                                                                 transactionType: .purchase,
-                                                                 eventHandler: { _ in
-            })
+                                                                 transactionType: .purchase)
             
             // 3) GET READ RESULT
             do {
@@ -827,9 +841,7 @@ public class FiservTTPCardReader {
         
         let result = try await self.fiservTTPReader.readCard(for: amount,
                                                              currencyCode: self.configuration.currencyCode,
-                                                             transactionType: .purchase,
-                                                             eventHandler: { _ in
-        })
+                                                             transactionType: .purchase)
         
         switch result {
             
@@ -1034,9 +1046,7 @@ public class FiservTTPCardReader {
         
         let result = try await self.fiservTTPReader.readCard(for: amount,
                                                              currencyCode: self.configuration.currencyCode,
-                                                             transactionType: .refund,
-                                                             eventHandler: { _ in
-        })
+                                                             transactionType: .refund)
         
         switch result {
             

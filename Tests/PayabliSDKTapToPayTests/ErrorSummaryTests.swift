@@ -61,7 +61,8 @@ final class ErrorSummaryTests: XCTestCase {
             (.networkError(reason: reason), "networkError"),
             (.initiateFailed(reason: reason), "initiateFailed"),
             (.updateFailed(reason: reason), "updateFailed"),
-            (.termsNotAccepted, "termsNotAccepted")
+            (.termsNotAccepted, "termsNotAccepted"),
+            (.readerOSVersionNotSupported, "readerOSVersionNotSupported")
         ]
 
         for (error, published) in expected {

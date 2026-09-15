@@ -30,6 +30,24 @@ internal class FiservTTPReader {
     private var cardReaderSession: PaymentCardReaderSession?
     
     private let config: FiservTTPConfig
+
+    /// The subscription to the reader's event stream.
+    ///
+    /// Held so `finalize()` can end it. Apple's `events` is one `AsyncStream`
+    /// per reader and a second iteration of it would take events away from the
+    /// first, so an abandoned task is not merely idle.
+    private var eventTask: Task<Void, Never>?
+
+    /// Marks which subscription is the current one.
+    ///
+    /// Cancelling a task is not enough on its own: an event already taken from
+    /// the stream is delivered after a hop to the main actor, and a cancellation
+    /// landing during that hop still lets it through. A retired subscription
+    /// would then report the previous session's state — a stale `notReady`
+    /// answers the readiness subject `false`, and a stale card state reaches the
+    /// host — so the check has to happen where the handler is called rather than
+    /// before the hop.
+    private var activeSubscription: SubscriptionToken?
     
     internal init(config: FiservTTPConfig) {
         
@@ -38,7 +56,20 @@ internal class FiservTTPReader {
         self.paymentCardReader = PaymentCardReader()
     }
     
+    deinit {
+        // Releasing a task does not cancel it. Without this the subscription
+        // outlives the reader, holding the platform's stream open and calling a
+        // handler for a session that is gone. `finalize()` is not called on
+        // every path that drops a reader.
+        activeSubscription?.retire()
+        eventTask?.cancel()
+    }
+
     internal func finalize() {
+        activeSubscription?.retire()
+        activeSubscription = nil
+        eventTask?.cancel()
+        eventTask = nil
         paymentCardReader = nil
         cardReaderSession = nil
     }
@@ -87,7 +118,8 @@ internal class FiservTTPReader {
             if let err = error as? PaymentCardReaderError {
                 
                 throw FiservTTPCardReaderError(title: err.errorName,
-                                               localizedDescription: NSLocalizedString(err.errorDescription, comment: ""))
+                                               localizedDescription: NSLocalizedString(err.errorDescription, comment: ""),
+                                               underlying: err)
                 
             } else {
                 throw FiservTTPCardReaderError(title: title,
@@ -123,7 +155,8 @@ internal class FiservTTPReader {
             if let err = error as? PaymentCardReaderError {
             
                 throw FiservTTPCardReaderError(title: err.errorName,
-                                               localizedDescription: NSLocalizedString(err.errorDescription, comment: ""))
+                                               localizedDescription: NSLocalizedString(err.errorDescription, comment: ""),
+                                               underlying: err)
                 
             } else {
                 throw FiservTTPCardReaderError(title: title,
@@ -137,7 +170,7 @@ internal class FiservTTPReader {
     // for the first time. The initial configuration of a device can take up to two minutes.
     // Any subsequent configuration updates typically take just a few seconds.
     
-    internal func initializeSession(token: String, eventHandler: @escaping (String) -> Void) async throws {
+    internal func initializeSession(token: String, eventHandler: @escaping @MainActor (PaymentCardReader.Event) -> Void) async throws {
         
         let title = "Initialize Session"
         
@@ -153,12 +186,25 @@ internal class FiservTTPReader {
         
         do {
             
-            Task {
+            activeSubscription?.retire()
+            eventTask?.cancel()
+
+            let subscription = SubscriptionToken()
+            activeSubscription = subscription
+
+            eventTask = Task {
                 
                 for await event in events {
                     
+                    if Task.isCancelled || !subscription.isActive { break }
+                    
                     await MainActor.run {
-                        eventHandler(event.name)
+                        
+                        // Re-read after the hop: this is the only point at which
+                        // a subscription retired mid-hop can still be caught.
+                        guard subscription.isActive else { return }
+                        
+                        eventHandler(event)
                     }
                 }
             }
@@ -170,7 +216,8 @@ internal class FiservTTPReader {
             if let err = error as? PaymentCardReaderError {
             
                 throw FiservTTPCardReaderError(title: err.errorName,
-                                               localizedDescription: NSLocalizedString(err.errorDescription, comment: ""))
+                                               localizedDescription: NSLocalizedString(err.errorDescription, comment: ""),
+                                               underlying: err)
                 
             } else {
                 
@@ -203,12 +250,14 @@ internal class FiservTTPReader {
             if let err = error as? PaymentCardReaderError {
             
                 throw FiservTTPCardReaderError(title: err.errorName,
-                                               localizedDescription: NSLocalizedString(err.errorDescription, comment: ""))
+                                               localizedDescription: NSLocalizedString(err.errorDescription, comment: ""),
+                                               underlying: err)
                 
             } else if let err = error as? PaymentCardReaderSession.ReadError {
                 
                 throw FiservTTPCardReaderError(title: err.errorName,
-                                               localizedDescription: NSLocalizedString(err.errorDescription, comment: ""))
+                                               localizedDescription: NSLocalizedString(err.errorDescription, comment: ""),
+                                               underlying: err)
                 
             } else {
                 
@@ -220,8 +269,7 @@ internal class FiservTTPReader {
     
     internal func readCard(for amount: Decimal,
                            currencyCode: String,
-                           transactionType: PaymentCardTransactionRequest.TransactionType,
-                           eventHandler: @escaping (String) -> Void) async throws -> Result<PaymentCardReadResult, Error> {
+                           transactionType: PaymentCardTransactionRequest.TransactionType) async throws -> Result<PaymentCardReadResult, Error> {
         
         guard let session = cardReaderSession else {
          
@@ -249,12 +297,14 @@ internal class FiservTTPReader {
             if let err = error as? PaymentCardReaderError {
             
                 throw FiservTTPCardReaderError(title: err.errorName,
-                                               localizedDescription: NSLocalizedString(err.errorDescription, comment: ""))
+                                               localizedDescription: NSLocalizedString(err.errorDescription, comment: ""),
+                                               underlying: err)
                 
             } else if let err = error as? PaymentCardReaderSession.ReadError {
                 
                 throw FiservTTPCardReaderError(title: err.errorName,
-                                               localizedDescription: NSLocalizedString(err.errorDescription, comment: ""))
+                                               localizedDescription: NSLocalizedString(err.errorDescription, comment: ""),
+                                               underlying: err)
                 
             } else {
                 
@@ -265,3 +315,20 @@ internal class FiservTTPReader {
     }
 }
 
+
+/// Which subscription to the reader's event stream is the live one.
+///
+/// A reference type, so the task that captured it sees a retirement made by
+/// whoever replaced it.
+private final class SubscriptionToken: @unchecked Sendable {
+    private let lock = NSLock()
+    private var active = true
+
+    var isActive: Bool {
+        lock.withLock { active }
+    }
+
+    func retire() {
+        lock.withLock { active = false }
+    }
+}

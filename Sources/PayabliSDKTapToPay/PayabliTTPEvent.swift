@@ -28,6 +28,41 @@ public enum PayabliTTPEvent: Sendable {
     case attestationFailed(error: String)
     case configFailed(error: String)
     case termsRequired
+
+    // What the reader is doing. The platform raises more states than these; the
+    // ones it raises for a read starting, completing or failing are left out,
+    // because `nfcStarted`, `nfcCompleted` and `nfcFailed` above already say so
+    // and a host would otherwise be told the same thing twice.
+
+    /// The reader's configuration has got further. Read
+    /// `PayabliTTP.readerConfigurationProgress` for where it is now.
+    ///
+    /// Configuration runs for minutes on a device arming for the first time, so
+    /// this is what a progress indicator follows. The percentage is also in
+    /// `payload` under `percent`, for a host that reaches events through
+    /// `addEventListener` and has no property to read.
+    case readerConfigurationProgressChanged(percent: Int)
+
+    /// The reader cannot take a card yet.
+    case readerNotReady
+
+    /// A card is in the field.
+    case cardDetected
+
+    /// The card has been read and should be taken away.
+    case cardRemovalRequested
+
+    /// The read did not succeed and the card should be presented again.
+    case cardReadRetryRequested
+
+    /// The payer is being asked for a PIN.
+    case pinEntryRequested
+
+    /// The payer has finished entering a PIN.
+    case pinEntryCompleted
+
+    /// The prompt the platform drew is gone. The read may still resolve.
+    case readerPromptDismissed
 }
 
 /// TTP-specific errors (PRD §20.2).
@@ -52,6 +87,15 @@ public enum PayabliTTPError: Error, Sendable {
     /// Appended after `networkError` to keep the `errorCode` table below
     /// append-only; those codes are public API.
     case termsNotAccepted
+
+    /// This OS build cannot take contactless payments, and nothing the app or
+    /// the merchant does reaches that. The remedy is a different device or an
+    /// OS upgrade, where every other reader failure is transient or
+    /// environmental.
+    ///
+    /// Appended after `termsNotAccepted` to keep the `errorCode` table below
+    /// append-only; those codes are public API.
+    case readerOSVersionNotSupported
 }
 
 // MARK: - ObjC event-code mapping
@@ -87,6 +131,14 @@ public enum PayabliTTPError: Error, Sendable {
     case attestationFailed = 18
     case configFailed = 19
     case termsRequired = 20
+    case readerConfigurationProgressChanged = 21
+    case readerNotReady = 22
+    case cardDetected = 23
+    case cardRemovalRequested = 24
+    case cardReadRetryRequested = 25
+    case pinEntryRequested = 26
+    case pinEntryCompleted = 27
+    case readerPromptDismissed = 28
 }
 
 public extension PayabliTTPEvent {
@@ -115,6 +167,14 @@ public extension PayabliTTPEvent {
         case .attestationFailed: return .attestationFailed
         case .configFailed: return .configFailed
         case .termsRequired: return .termsRequired
+        case .readerConfigurationProgressChanged: return .readerConfigurationProgressChanged
+        case .readerNotReady: return .readerNotReady
+        case .cardDetected: return .cardDetected
+        case .cardRemovalRequested: return .cardRemovalRequested
+        case .cardReadRetryRequested: return .cardReadRetryRequested
+        case .pinEntryRequested: return .pinEntryRequested
+        case .pinEntryCompleted: return .pinEntryCompleted
+        case .readerPromptDismissed: return .readerPromptDismissed
         }
     }
 
@@ -126,6 +186,7 @@ public extension PayabliTTPEvent {
     ///   - `.nfcFailed`, `.activationFailed`, `.attestationFailed`,
     ///     `.configFailed` → `["error": String]`
     ///   - `.updateFailed` → `["paymentTransId": String, "error": String]`
+    ///   - `.readerConfigurationProgressChanged` → `["percent": Int]`
     ///   - all other cases → empty `[:]`
     ///
     /// Every `error` string here names the failure and nothing else: the case, or a
@@ -149,6 +210,8 @@ public extension PayabliTTPEvent {
             return ["error": error]
         case let .updateFailed(paymentTransId, error):
             return ["paymentTransId": paymentTransId, "error": error]
+        case let .readerConfigurationProgressChanged(percent):
+            return ["percent": percent]
         case .attestationStarted,
              .attestationCompleted,
              .configReceived,
@@ -162,7 +225,14 @@ public extension PayabliTTPEvent {
              .devicePendingActivation,
              .activationStarted,
              .activationCompleted,
-             .termsRequired:
+             .termsRequired,
+             .readerNotReady,
+             .cardDetected,
+             .cardRemovalRequested,
+             .cardReadRetryRequested,
+             .pinEntryRequested,
+             .pinEntryCompleted,
+             .readerPromptDismissed:
             return [:]
         }
     }
@@ -197,6 +267,7 @@ extension PayabliTTPError: CustomNSError, LocalizedError {
         case .activationFailed: return 12
         case .networkError: return 13
         case .termsNotAccepted: return 14
+        case .readerOSVersionNotSupported: return 15
         }
     }
 
@@ -214,6 +285,8 @@ extension PayabliTTPError: CustomNSError, LocalizedError {
             return [NSLocalizedDescriptionKey: "Access token expired"]
         case .termsNotAccepted:
             return [NSLocalizedDescriptionKey: "Contactless payment terms have not been accepted"]
+        case .readerOSVersionNotSupported:
+            return [NSLocalizedDescriptionKey: "This OS version does not support contactless payments"]
         case let .attestationRevoked(reason),
              let .attestationFailed(reason),
              let .configFailed(reason),

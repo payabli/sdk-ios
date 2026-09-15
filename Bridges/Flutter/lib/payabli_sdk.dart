@@ -401,6 +401,14 @@ enum PayabliTTPEventCode {
   attestationFailed,
   configFailed,
   termsRequired,
+  readerConfigurationProgressChanged,
+  readerNotReady,
+  cardDetected,
+  cardRemovalRequested,
+  cardReadRetryRequested,
+  pinEntryRequested,
+  pinEntryCompleted,
+  readerPromptDismissed,
 
   /// A code this mirror has not been taught yet. The SDK appends cases, and a
   /// bridge that indexes blindly turns a newer SDK into a crash.
