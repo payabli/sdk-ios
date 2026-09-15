@@ -14,7 +14,6 @@ struct PaymentCaptureQAView: View {
     @State private var isPaymentCaptureSheetPresented = false
     @State private var isPaymentCaptureResultViewPresented = false
     @State private var voidedTransId: String?
-    @State private var reversing: String?
     @State private var unreconciled: [String] = []
     @State private var voidText = ""
 
@@ -105,10 +104,9 @@ struct PaymentCaptureQAView: View {
                                     .frame(maxWidth: .infinity)
                             }
                             .buttonStyle(.bordered)
-                            // Only while one is on its way. It clears what the reversal's completion
-                            // checks itself against, so the request would land for a payment the
-                            // screen had already replaced.
-                            .disabled(reversing != nil)
+                            // The flow refuses a new attempt while a reversal is on its way, and
+                            // this says so rather than letting the press do nothing.
+                            .disabled(paymentFlow.isSubmitting)
 
                             // Only a payment that reported an identifier can be reversed, and
                             // only once: the service refuses the second attempt, and offering a
@@ -122,9 +120,11 @@ struct PaymentCaptureQAView: View {
                                     .frame(maxWidth: .infinity)
                                 }
                                 .buttonStyle(.bordered)
+                                // The flow's own flag rather than a copy of it: it is the
+                                // exclusion the flow enforces made observable, so a control cannot
+                                // disagree with the thing doing the refusing.
                                 .disabled(
-                                    reversing != nil
-                                        || voidedTransId == transId
+                                    voidedTransId == transId
                                         || unreconciled.contains(transId)
                                         || paymentFlow.isSubmitting
                                 )
@@ -231,7 +231,6 @@ struct PaymentCaptureQAView: View {
         // The flow refuses while a submission is in flight, and this row keeps
         // offering the button through one. Clearing first would report an attempt
         // that was never drawn, over a request still holding the earlier key.
-        guard reversing == nil else { return }
         guard paymentFlow.startNewAttempt(suppliesCustomer: demoCustomer.suppliesPayInCustomer) else {
             return
         }
@@ -240,7 +239,6 @@ struct PaymentCaptureQAView: View {
         resultText = ""
         capturedResult = nil
         voidedTransId = nil
-        reversing = nil
         voidText = ""
     }
 
@@ -249,23 +247,22 @@ struct PaymentCaptureQAView: View {
     /// The identifier comes from the result the flow reported, so nothing here builds a
     /// request or holds a key. A refusal is shown as the service worded it.
     private func reverse(_ transId: String) {
-        reversing = transId
+        // The flow refuses a second submission itself. Asking first keeps a queued tap from
+        // becoming a call whose refusal would read as this reversal's answer.
+        guard !paymentFlow.isSubmitting else { return }
         voidText = ""
         Task {
             do {
                 let outcome = try await paymentFlow.voidTransaction(transId)
-                guard reversing == transId else { return }
                 Logger(
                     subsystem: "com.payabli.example.app",
                     category: "PaymentCaptureDiagnostics"
                 ).info("Payment reversed: \(outcome.code, privacy: .public)")
                 voidedTransId = transId
                 unreconciled.removeAll { $0 == transId }
-                voidText = "Reversed. Code: \(outcome.code) Reason: \(outcome.reason ?? "-")"
+                show("Reversed. Code: \(outcome.code) Reason: \(outcome.reason ?? "-")", for: transId)
             } catch {
-                guard reversing == transId else { return }
                 let failure = PayInFailure(error, operation: .void)
-                voidText = failure.message
                 // Only this transaction's question is answered here. A settled failure for one
                 // reversal says nothing about another that is still open.
                 if failure.outcomeIsUnresolved {
@@ -275,9 +272,19 @@ struct PaymentCaptureQAView: View {
                 } else {
                     unreconciled.removeAll { $0 == transId }
                 }
+                show(failure.message, for: transId)
             }
-            reversing = nil
         }
+    }
+
+    /// Shows what a reversal answered, if the payment it answers about is still on screen.
+    ///
+    /// The transaction comes from the call's own scope rather than from anything stored, so an
+    /// answer cannot be matched to the wrong request or dropped because an unrelated one finished
+    /// first.
+    private func show(_ text: String, for transId: String) {
+        guard capturedResult?.reversibleTransId == transId else { return }
+        voidText = text
     }
 
     private func runTokenCheck() {
