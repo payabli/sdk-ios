@@ -65,8 +65,8 @@ extension PayabliTTPSessionState {
         }
         switch payabliError.code {
         case .permissionDenied:
-            // A device owing activation and an application this paypoint does
-            // not permit arrive alike, and the host's next move is the same.
+            // The remedy offered is an activation code. A refusal that code does
+            // not repair needs a classification this map is not given.
             return .pendingActivation
 
         case .invalidConfiguration:
