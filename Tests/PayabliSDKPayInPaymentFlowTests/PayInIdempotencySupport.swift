@@ -82,6 +82,10 @@ enum PayInFixture {
     {"code":"A0000","reason":"Approved","responseData":{"authCode":"1","referenceId":"trans-1"}}
     """.utf8)
 
+    static let canceled = Data("""
+    {"code": "A0003", "reason": "Canceled"}
+    """.utf8)
+
     static let declined = Data("""
     {"code":"D0001","reason":"Declined","explanation":"Declined by the issuer."}
     """.utf8)
@@ -90,18 +94,28 @@ enum PayInFixture {
 final class RecordingIdempotencyTransport: PayabliTransport, @unchecked Sendable {
     private let lock = NSLock()
     private var recorded: [String?] = []
-    private let body: Data?
+    private let bodies: [Data]
     private let status: Int
     private let failure: (any Error)?
 
     init(body: Data, status: Int = 200) {
-        self.body = body
+        bodies = [body]
+        self.status = status
+        failure = nil
+    }
+
+    /// Answers each call with the next body, the last one repeating.
+    ///
+    /// A case that drives two operations needs their answers to differ, or it cannot tell which one
+    /// a result came from and passes whether or not the subject works.
+    init(bodies: [Data], status: Int = 200) {
+        self.bodies = bodies
         self.status = status
         failure = nil
     }
 
     init(failure: any Error) {
-        body = nil
+        bodies = []
         status = 200
         self.failure = failure
     }
@@ -121,12 +135,14 @@ final class RecordingIdempotencyTransport: PayabliTransport, @unchecked Sendable
     func perform(_ request: PayabliRequest) async throws -> PayabliResponse {
         lock.lock()
         recorded.append(request.headers["idempotencyKey"])
+        let nth = recorded.count - 1
         lock.unlock()
 
         if let failure {
             throw failure
         }
-        return PayabliResponse(statusCode: status, headers: [:], body: body ?? Data())
+        let body = bodies.isEmpty ? Data() : bodies[min(nth, bodies.count - 1)]
+        return PayabliResponse(statusCode: status, headers: [:], body: body)
     }
 
     func performV2<T: Decodable & Sendable>(

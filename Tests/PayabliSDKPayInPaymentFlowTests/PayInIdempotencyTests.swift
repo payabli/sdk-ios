@@ -64,6 +64,24 @@ final class PayInIdempotencyTests: XCTestCase {
         XCTAssertEqual(transport.sentKeys, ["reserved-4"])
     }
 
+    /// One channel per caller: a reversal answers the caller that asked for it and leaves the flow's
+    /// published result alone, so a screen showing what a payment did does not start showing what was
+    /// done to it afterwards.
+    func testAVoidDoesNotReplaceThePublishedResult() async throws {
+        // The two answers differ, so the assertion can tell which operation the published result
+        // came from. Answered alike it would hold whether or not the reversal published.
+        let transport = RecordingIdempotencyTransport(
+            bodies: [PayInFixture.approved, PayInFixture.canceled]
+        )
+        let flow = PayInFixture.makeFlow(transport: transport, key: "reserved-6")
+
+        let captured = try await flow.capture(PayInFixture.request(idempotencyKey: nil))
+        let reversed = try await flow.voidTransaction("trans-1")
+
+        XCTAssertEqual(reversed.code, "A0003", "the reversal did not get its own answer")
+        XCTAssertEqual(flow.lastResult, captured, "the reversal published itself over the payment")
+    }
+
     func testAnInterruptedVoidLeavesTheOutcomeOpen() async {
         let transport = RecordingIdempotencyTransport(
             failure: PayabliGenericError(code: .networkError, reason: "Network request failed")

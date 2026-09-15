@@ -265,7 +265,7 @@ public final class PayabliPayInPaymentFlow: NSObject, ObservableObject, PayabliC
     public func voidTransaction(
         _ transId: String
     ) async throws -> PayabliPayInPaymentFlowResult {
-        try await submit {
+        try await exclusively {
             try await client.void(
                 transId: transId,
                 idempotencyKey: self.reserveKey(nil)
@@ -290,13 +290,31 @@ public final class PayabliPayInPaymentFlow: NSObject, ObservableObject, PayabliC
         supplied ?? newIdempotencyKey()
     }
 
-    private func submit(
+    /// Runs one operation at a time and answers its caller, publishing nothing.
+    ///
+    /// One channel per caller: a host that called a member learns the outcome from that member's
+    /// return value, so the operation does not also replace ``lastResult``. A screen showing what a
+    /// payment did must not change because an unrelated operation happened to it afterwards.
+    ///
+    /// The exclusion is separate from the publishing and is kept either way: two submissions in
+    /// flight at once is a second payment, not a display question.
+    private func exclusively(
         _ operation: () async throws -> PayabliPayInPaymentFlowResult
     ) async throws -> PayabliPayInPaymentFlowResult {
         try beginSubmission()
         defer { endSubmission() }
 
-        let result = try await operation()
+        return try await operation()
+    }
+
+    /// Runs one operation at a time and publishes its result as the flow's last.
+    ///
+    /// For the operations a rendered form drives, where the screen observes the flow rather than
+    /// holding a return value.
+    private func submit(
+        _ operation: () async throws -> PayabliPayInPaymentFlowResult
+    ) async throws -> PayabliPayInPaymentFlowResult {
+        let result = try await exclusively(operation)
         lastResult = result
         return result
     }
