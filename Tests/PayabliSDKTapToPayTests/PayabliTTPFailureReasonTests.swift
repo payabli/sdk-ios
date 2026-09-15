@@ -105,29 +105,36 @@ final class PayabliTTPFailureReasonTests: XCTestCase {
         )
     }
 
-    /// Every case lands somewhere, including on nothing. A case added without a
-    /// landing would reach a host as a remedy it cannot act on.
-    func testEveryErrorCaseHasALanding() {
-        let everyCase: [PayabliTTPError] = [
-            .notInitialized,
-            .invalidState(current: .ready, attempted: "x"),
-            .notReady(current: .idle),
-            .devicePendingActivation,
-            .attestationRevoked(reason: "x"),
-            .attestationFailed(reason: "x"),
-            .configFailed(reason: "x"),
-            .readerSetupFailed(reason: "x"),
-            .nfcFailed(reason: "x"),
-            .initiateFailed(reason: "x"),
-            .updateFailed(reason: "x"),
-            .tokenExpired,
-            .activationFailed(reason: "x"),
-            .networkError(reason: "x"),
-            .termsNotAccepted,
-            .readerOSVersionNotSupported
+    /// Every case lands where the map says, and the whole map is here rather
+    /// than a count of it.
+    ///
+    /// The production switch is exhaustive, so a case added to `PayabliTTPError`
+    /// fails to compile until it has an arm. What this catches is the arm being
+    /// changed: each pair is the remedy a host is sent to, and moving one moves
+    /// a merchant.
+    func testTheWholeMapLandsWhereItSays() {
+        let map: [(PayabliTTPError, PayabliTTPSessionState?)] = [
+            (.notInitialized, .failed(reason: .sdkInternalError)),
+            (.invalidState(current: .ready, attempted: "x"), .failed(reason: .sdkInternalError)),
+            (.notReady(current: .idle), .failed(reason: .sdkInternalError)),
+            (.devicePendingActivation, .pendingActivation),
+            (.attestationRevoked(reason: "x"), .failed(reason: .attestationRequired)),
+            (.attestationFailed(reason: "x"), .failed(reason: .attestationRequired)),
+            (.configFailed(reason: "x"), .failed(reason: .configurationRejected)),
+            (.readerSetupFailed(reason: "x"), .failed(reason: .serviceUnavailable)),
+            (.nfcFailed(reason: "x"), nil),
+            (.initiateFailed(reason: "x"), nil),
+            (.updateFailed(reason: "x"), nil),
+            (.tokenExpired, .failed(reason: .serviceUnavailable)),
+            (.activationFailed(reason: "x"), nil),
+            (.networkError(reason: "x"), .failed(reason: .serviceUnavailable)),
+            (.termsNotAccepted, .pendingTerms),
+            (.readerOSVersionNotSupported, .failed(reason: .deviceIneligible))
         ]
 
-        XCTAssertEqual(everyCase.count, 16, "a case was added to PayabliTTPError without a landing")
+        for (error, expected) in map {
+            XCTAssertEqual(PayabliTTPSessionState.landing(for: error), expected, "\(error)")
+        }
     }
 
     // MARK: - What the state carries
