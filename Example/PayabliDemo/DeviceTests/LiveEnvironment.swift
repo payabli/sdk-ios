@@ -19,8 +19,11 @@ struct LiveTarget {
 /// pressing Test charges a paypoint. `QAWalkthroughUITests` gates its walkthrough
 /// on the same variable for the same reason.
 ///
-/// Both come from the scheme's environment for an app-hosted bundle: the
-/// `TEST_RUNNER_` prefix reaches a UI-test runner and not a host application.
+/// Both reach this bundle through the `TEST_RUNNER_` prefix, which `xcodebuild` strips
+/// before handing them to the test host, the same way the UI walkthrough takes its own.
+/// Passing them as build settings or exporting them into the shell reaches `xcodebuild`
+/// and stops there, which looks exactly like a variable that had no effect: every live
+/// case skips and the run still exits 0.
 enum LiveEnvironment {
     /// The name the walkthrough already uses, so one flag opts into every live run
     /// rather than one per suite.

@@ -134,6 +134,17 @@ final class QAWalkthroughUITests: XCTestCase {
             "the reversal never reported the service's answer. On screen: "
                 + app.staticTexts.allElementsBoundByIndex.map(\.label).joined(separator: " | ")
         )
+        // Relabelled and refused, not merely relabelled: a reversed payment that still accepts a
+        // press sends a second reversal, and the label alone would not catch that.
+        let reversedButton = app.buttons["Reversed"]
+        XCTAssertTrue(
+            reversedButton.waitForExistence(timeout: composes),
+            "the button never reported it reversed"
+        )
+        XCTAssertFalse(
+            reversedButton.isEnabled,
+            "a payment already reversed still accepts a second reversal"
+        )
         XCTAssertFalse(
             app.buttons["Reverse this payment"].exists,
             "a payment already reversed still offers to reverse it again"

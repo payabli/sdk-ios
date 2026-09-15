@@ -212,15 +212,24 @@ final class CardNotPresentOnDeviceTests: XCTestCase {
         // never reports the capture finished would leave it permanently untappable.
         XCTAssertFalse(flow.isSubmitting, "the capture never reported itself finished")
 
-        let outcome = try await PayInFlowHandle(flow).voidTransaction(transId)
-
-        LiveEnvironment.report(
-            "PAYABLI_VOID_SEAM env=\(named.name) transId=\(transId) code=\(outcome.code)"
-        )
-        XCTAssertTrue(
-            outcome.code.hasPrefix("A"),
-            "the screen's seam did not reverse it, and it needs voiding by hand: \(transId)"
-        )
+        // Reported either way. Letting this throw would end the test on a captured payment whose
+        // identifier never reached the output, leaving nothing to reconcile it by.
+        do {
+            let outcome = try await PayInFlowHandle(flow).voidTransaction(transId)
+            LiveEnvironment.report(
+                "PAYABLI_VOID_SEAM env=\(named.name) transId=\(transId) code=\(outcome.code)"
+            )
+            XCTAssertTrue(
+                outcome.code.hasPrefix("A"),
+                "the screen's seam did not reverse it, and it needs voiding by hand: \(transId)"
+            )
+        } catch {
+            LiveEnvironment.report(
+                "PAYABLI_VOID_SEAM env=\(named.name) transId=\(transId) "
+                    + "failed=\(LoggableError.label(for: error))"
+            )
+            XCTFail("the screen's seam threw, and it needs voiding by hand: \(transId)")
+        }
     }
 
     // MARK: - Void
