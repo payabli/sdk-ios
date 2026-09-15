@@ -46,8 +46,16 @@ final class SessionManager: ObservableObject {
 
     func markError(_ error: Error) {
         lastError = error
-        sessionState = .error
+        sessionState = .failed(reason: PayabliTTPFailureReason.landing(for: error))
         isReady = false
+    }
+
+    /// Records how far the reader has got, without leaving the state it belongs
+    /// to. Does nothing unless a configuration is running, so a percentage
+    /// cannot exist outside one.
+    func recordConfigurationProgress(_ percent: Int) {
+        guard case .initializingReader = sessionState else { return }
+        sessionState = .initializingReader(percent: percent)
     }
 
     /// Returns the session to its starting point. Internal: a host reaches this
@@ -81,28 +89,28 @@ final class SessionManager: ObservableObject {
 
         case (.attestingDevice, .fetchingConfig),
              (.attestingDevice, .pendingActivation),
-             (.attestingDevice, .error):
+             (.attestingDevice, .failed):
             return true
 
         case (.fetchingConfig, .initializingReader),
              (.fetchingConfig, .pendingActivation),
-             (.fetchingConfig, .error):
+             (.fetchingConfig, .failed):
             return true
 
         case (.initializingReader, .ready),
              (.initializingReader, .pendingTerms),
-             (.initializingReader, .error):
+             (.initializingReader, .failed):
             return true
 
         case (.ready, .sessionExpired),
-             (.ready, .error):
+             (.ready, .failed):
             return true
 
         case (.sessionExpired, .reinitializing):
             return true
 
         case (.reinitializing, .fetchingConfig),
-             (.reinitializing, .error):
+             (.reinitializing, .failed):
             return true
 
         // Both wait on a person rather than on the SDK, and both leave the same way: the host resolves
@@ -111,8 +119,8 @@ final class SessionManager: ObservableObject {
              (.pendingTerms, .attestingDevice):
             return true
 
-        case (.error, .attestingDevice),
-             (.error, .fetchingConfig):
+        case (.failed, .attestingDevice),
+             (.failed, .fetchingConfig):
             return true
 
         default:

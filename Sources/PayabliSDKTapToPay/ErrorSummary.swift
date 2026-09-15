@@ -100,8 +100,7 @@ enum ErrorSummary {
 
     // swiftlint:enable cyclomatic_complexity
 
-    /// The state is an `@objc` enum, so interpolating one renders
-    /// `PayabliTTPSessionState(rawValue: 4)`. A log read at speed wants the name.
+    /// A log read at speed wants the name rather than the case's description.
     private static func name(of state: PayabliTTPSessionState) -> String {
         switch state {
         case .idle: return "idle"
@@ -113,8 +112,7 @@ enum ErrorSummary {
         case .reinitializing: return "reinitializing"
         case .pendingActivation: return "pendingActivation"
         case .pendingTerms: return "pendingTerms"
-        case .error: return "error"
-        @unknown default: return "state(\(state.rawValue))"
+        case .failed: return "failed"
         }
     }
 }

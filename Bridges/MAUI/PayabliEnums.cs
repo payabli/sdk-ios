@@ -30,7 +30,7 @@ namespace Payabli.TapToPay
         SessionExpired = 5,
         Reinitializing = 6,
         PendingActivation = 7,
-        Error = 8,
+        Failed = 8,
         PendingTerms = 9,
     }
 
@@ -58,7 +58,7 @@ namespace Payabli.TapToPay
         AttestationFailed = 18,
         ConfigFailed = 19,
         TermsRequired = 20,
-        ReaderConfigurationProgressChanged = 21,
+        // 21 retired: progress is a payload on the session state.
         ReaderNotReady = 22,
         CardDetected = 23,
         CardRemovalRequested = 24,

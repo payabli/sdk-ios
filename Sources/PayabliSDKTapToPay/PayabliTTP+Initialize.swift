@@ -118,7 +118,7 @@ extension PayabliTTP {
         switch sessionState {
         case .ready:
             return
-        case .sessionExpired, .idle, .error:
+        case .sessionExpired, .idle, .failed:
             break
         default:
             throw PayabliTTPError.notReady(current: sessionState)
@@ -285,7 +285,7 @@ extension PayabliTTP {
             }
         }
 
-        _ = sessionManager.transition(to: .initializingReader)
+        _ = sessionManager.transition(to: .initializingReader(percent: nil))
         syncPublished()
         multicaster.emit(.readerInitializing)
         do {

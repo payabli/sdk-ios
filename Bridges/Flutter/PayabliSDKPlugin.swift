@@ -311,7 +311,7 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
 
     private func handleGetSessionState(result: @escaping FlutterResult) {
         Task { @MainActor in
-            let raw = self.ttp?.sessionState.rawValue ?? PayabliTTPSessionState.idle.rawValue
+            let raw = (self.ttp?.sessionState ?? .idle).code.rawValue
             result(raw)
         }
     }

@@ -105,7 +105,7 @@ final class PayabliTTPTests: XCTestCase {
             try await ttp.initialize()
             XCTFail("expected eligibility failure")
         } catch PayabliTTPError.readerSetupFailed {
-            XCTAssertEqual(ttp.sessionState, .error)
+            XCTAssertEqual(ttp.sessionState.code, .failed)
         } catch {
             XCTFail("wrong error: \(error)")
         }
@@ -204,7 +204,7 @@ final class PayabliTTPTests: XCTestCase {
         // one path and the service's on another, so none of them travel.
         XCTAssertEqual(reported, "attestationFailed")
         XCTAssertFalse(reported.contains("key unusable"), reported)
-        XCTAssertEqual(ttp.sessionState, .error)
+        XCTAssertEqual(ttp.sessionState.code, .failed)
     }
 
     /// A warm-path read that fails is reported through all three channels, not just
@@ -227,7 +227,7 @@ final class PayabliTTPTests: XCTestCase {
         let reported = try await value(of: collector, named: "attestationFailed")
 
         XCTAssertEqual(reported, "attestationFailed")
-        XCTAssertEqual(ttp.sessionState, .error, "the caller saw a failure and the published state did not")
+        XCTAssertEqual(ttp.sessionState.code, .failed, "the caller saw a failure and the published state did not")
     }
 
     /// A refusal whose drop did not land says so, since the binding is still
@@ -367,7 +367,7 @@ final class PayabliTTPTests: XCTestCase {
         }
         let reported = try await value(of: collector, named: "configFailed")
 
-        XCTAssertEqual(ttp.sessionState, .error)
+        XCTAssertEqual(ttp.sessionState.code, .failed)
         let raised = try XCTUnwrap(thrown, "initialize() returned instead of failing")
         let marked = try XCTUnwrap(ttp.sessionManager.lastError, "the session recorded no error")
 
@@ -461,7 +461,7 @@ final class PayabliTTPTests: XCTestCase {
         let marked = try XCTUnwrap(ttp.sessionManager.lastError)
 
         XCTAssertFalse(attestation.isAlreadyAttested, "a refused handle must not be sent again")
-        XCTAssertEqual(ttp.sessionState, .error)
+        XCTAssertEqual(ttp.sessionState.code, .failed)
         XCTAssertEqual(reported, "configFailed")
         XCTAssertTrue(raised.localizedDescription.contains("401"), raised.localizedDescription)
         // The drop is the config call's to make, so the reason claims nothing about

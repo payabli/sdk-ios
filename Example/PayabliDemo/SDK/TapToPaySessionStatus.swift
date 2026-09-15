@@ -73,8 +73,7 @@ extension TapToPaySessionStatus {
         case .reinitializing: self = .reinitializing
         case .pendingActivation: self = .pendingActivation
         case .pendingTerms: self = .pendingTerms
-        case .error: self = .error
-        @unknown default: self = .unrecognised(state.rawValue)
+        case .failed: self = .error
         }
     }
 }

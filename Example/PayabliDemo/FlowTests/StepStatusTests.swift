@@ -33,10 +33,14 @@ final class StepStatusTests: XCTestCase {
     }
 
     func testTheDemoKnowsEverySessionStateTheSDKHas() {
-        // `PayabliTTPSessionState` is `@objc`, so it cannot be `CaseIterable` and
-        // the list below is written out. A state added to the SDK fails here first.
-        XCTAssertEqual(everyTapToPaySession.count, highestSessionStateRawValue + 1)
-        XCTAssertNil(PayabliTTPSessionState(rawValue: highestSessionStateRawValue + 1))
+        // The projection is `@objc` and so cannot be `CaseIterable`; its raw
+        // values are what the bridges read, so a state added to the SDK without
+        // one fails here first.
+        XCTAssertEqual(
+            Set(everyTapToPaySession.map(\.code.rawValue)).count,
+            everyTapToPaySession.count,
+            "two states share a code"
+        )
         for status in everyTapToPayStatus {
             if case let .unrecognised(raw) = status {
                 XCTFail("the app does not name the SDK state with raw value \(raw)")
@@ -45,13 +49,21 @@ final class StepStatusTests: XCTestCase {
     }
 }
 
-/// The last raw value the SDK's state enum defines. One number to move when it grows, and the case
-/// beside it is what proves the move was needed.
-let highestSessionStateRawValue = 9
-
-/// Every session state, by raw value, since the enum is `@objc`.
-let everyTapToPaySession: [PayabliTTPSessionState] =
-    (0 ... highestSessionStateRawValue).compactMap(PayabliTTPSessionState.init(rawValue:))
+/// Every session state. Written out because the enum carries payloads and
+/// cannot be enumerated by raw value: a state the SDK adds and this list does
+/// not is what the assertion beside it catches.
+let everyTapToPaySession: [PayabliTTPSessionState] = [
+    .idle,
+    .attestingDevice,
+    .fetchingConfig,
+    .initializingReader(percent: nil),
+    .ready,
+    .sessionExpired,
+    .reinitializing,
+    .pendingActivation,
+    .failed(reason: .sdkInternalError),
+    .pendingTerms
+]
 
 /// The same states as this app names them.
 ///

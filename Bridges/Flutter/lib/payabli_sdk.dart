@@ -374,7 +374,7 @@ enum PayabliTTPSessionState {
   sessionExpired,
   reinitializing,
   pendingActivation,
-  error,
+  failed,
   pendingTerms,
 }
 
@@ -401,7 +401,9 @@ enum PayabliTTPEventCode {
   attestationFailed,
   configFailed,
   termsRequired,
-  readerConfigurationProgressChanged,
+  // 21 was readerConfigurationProgressChanged. Progress is a payload on the
+  // session state now, and this list is read by index, so the gap stays.
+  readerConfigurationProgressRetired,
   readerNotReady,
   cardDetected,
   cardRemovalRequested,

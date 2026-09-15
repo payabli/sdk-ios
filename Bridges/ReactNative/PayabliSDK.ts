@@ -55,7 +55,7 @@ export enum PayabliTTPSessionState {
     SessionExpired = 5,
     Reinitializing = 6,
     PendingActivation = 7,
-    Error = 8,
+    Failed = 8,
     PendingTerms = 9,
 }
 
@@ -81,7 +81,8 @@ export enum PayabliTTPEventCode {
     AttestationFailed = 18,
     ConfigFailed = 19,
     TermsRequired = 20,
-    ReaderConfigurationProgressChanged = 21,
+    // 21 was ReaderConfigurationProgressChanged. Progress is a payload on the
+    // session state now, and a retired raw value is never reused.
     ReaderNotReady = 22,
     CardDetected = 23,
     CardRemovalRequested = 24,
@@ -138,7 +139,7 @@ export interface PayabliTTPTransactionResult {
 
 export interface PayabliTTPEvent {
     code: PayabliTTPEventCode;
-    payload: { paymentTransId?: string; error?: string; percent?: number };
+    payload: { paymentTransId?: string; error?: string };
 }
 
 export interface PayabliTTPConfig {

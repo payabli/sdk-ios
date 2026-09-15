@@ -294,7 +294,7 @@ public final class PayabliSDKModule: RCTEventEmitter {
         rejecter reject: @escaping RCTPromiseRejectBlock
     ) {
         Task { @MainActor in
-            let raw = self.ttp?.sessionState.rawValue ?? PayabliTTPSessionState.idle.rawValue
+            let raw = (self.ttp?.sessionState ?? .idle).code.rawValue
             resolve(raw)
         }
     }
