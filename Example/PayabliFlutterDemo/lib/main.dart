@@ -167,7 +167,7 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() => _isWorking = true);
     try {
       await PayabliTTP.initialize();
-      _state = await PayabliTTP.getSessionState();
+      _state = (await PayabliTTP.getSessionState()).code;
       setState(() => _lastResult = '✓ Initialized');
     } on PayabliTTPException catch (e) {
       setState(() => _lastResult = '✗ ${e.code}: ${e.message}');
@@ -191,7 +191,7 @@ class _HomeScreenState extends State<HomeScreen> {
     } on PayabliTTPException catch (e) {
       setState(() => _lastResult = '✗ ${e.code}: ${e.message}');
     } finally {
-      _state = await PayabliTTP.getSessionState();
+      _state = (await PayabliTTP.getSessionState()).code;
       setState(() => _isWorking = false);
     }
   }

@@ -292,9 +292,9 @@ namespace Payabli.TapToPay
         // so a host reads the code and then asks for what it carries.
         [Export("sessionStateCode")] PayabliTTPSessionState SessionState { get; }
 
-        [Export("readerConfigurationPercent")] NSNumber ReaderConfigurationPercent { get; }
+        [NullAllowed, Export("readerConfigurationPercent")] NSNumber ReaderConfigurationPercent { get; }
 
-        [Export("failureReason")] NSNumber FailureReason { get; }
+        [NullAllowed, Export("failureReason")] NSNumber FailureReason { get; }
         [Export("isReady")] bool IsReady { get; }
 
         // Event subscription. The returned token's Cancel() tears down the

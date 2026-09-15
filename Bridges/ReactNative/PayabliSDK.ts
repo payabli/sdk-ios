@@ -143,8 +143,12 @@ export interface PayabliTTPTransactionResult {
 /// side by side.
 export interface PayabliTTPSessionSnapshot {
     code: PayabliTTPSessionState;
-    readerConfigurationPercent?: number;
-    failureReason?: PayabliTTPFailureReason;
+    /// `null` outside a configuration. The key is always present: the native
+    /// side sends every field and an absent Swift optional arrives as `null`,
+    /// so narrowing on the property being there answers `true` for both.
+    readerConfigurationPercent: number | null;
+    /// `null` unless the session failed, for the same reason.
+    failureReason: PayabliTTPFailureReason | null;
 }
 
 /// Mirrors `PayabliTTPFailureReason`.
