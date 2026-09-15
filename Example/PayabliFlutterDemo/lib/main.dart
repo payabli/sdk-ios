@@ -478,7 +478,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _stateBadge(PayabliTTPSessionState s) {
     final color = switch (s) {
       PayabliTTPSessionState.ready => Colors.green,
-      PayabliTTPSessionState.error ||
+      PayabliTTPSessionState.failed ||
       PayabliTTPSessionState.sessionExpired =>
         Colors.red,
       PayabliTTPSessionState.pendingActivation => Colors.orange,

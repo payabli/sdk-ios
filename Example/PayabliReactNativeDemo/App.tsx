@@ -300,8 +300,8 @@ function sessionStateLabel(state: PayabliTTPSessionState): string {
       return "reinit";
     case PayabliTTPSessionState.PendingActivation:
       return "pending";
-    case PayabliTTPSessionState.Error:
-      return "error";
+    case PayabliTTPSessionState.Failed:
+      return "failed";
     case PayabliTTPSessionState.Idle:
     default:
       return "idle";
