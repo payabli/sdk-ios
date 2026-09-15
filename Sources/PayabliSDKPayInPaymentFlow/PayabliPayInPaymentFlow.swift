@@ -314,9 +314,14 @@ public final class PayabliPayInPaymentFlow: NSObject, ObservableObject, PayabliC
     private func submit(
         _ operation: () async throws -> PayabliPayInPaymentFlowResult
     ) async throws -> PayabliPayInPaymentFlowResult {
-        let result = try await exclusively(operation)
-        lastResult = result
-        return result
+        // Inside the exclusion rather than after it, so the result is published before the
+        // submission reports itself finished. The other way round, an observer woken by
+        // `isSubmitting` going false reads the result of the submission before this one.
+        try await exclusively {
+            let result = try await operation()
+            lastResult = result
+            return result
+        }
     }
 
     private func beginSubmission() throws {

@@ -1,3 +1,4 @@
+import Combine
 @testable import PayabliSDKCore
 @testable import PayabliSDKPayInPaymentFlow
 import XCTest
@@ -80,6 +81,33 @@ final class PayInIdempotencyTests: XCTestCase {
 
         XCTAssertEqual(reversed.code, "A0003", "the reversal did not get its own answer")
         XCTAssertEqual(flow.lastResult, captured, "the reversal published itself over the payment")
+    }
+
+    /// The result is published before the submission reports itself finished.
+    ///
+    /// An observer woken by `isSubmitting` going false reads `lastResult` in the same breath, so the
+    /// other order hands it the submission before this one.
+    func testThePublishedResultIsSetBeforeTheSubmissionReportsItFinished() async throws {
+        let transport = RecordingIdempotencyTransport(body: PayInFixture.approved)
+        let flow = PayInFixture.makeFlow(transport: transport, key: "reserved-7")
+
+        // Every time it reports itself finished, what it was holding at that moment. The first is the
+        // publisher's own current value on subscribing, before anything has been submitted.
+        var heldWhenFinished: [PayabliPayInPaymentFlowResult?] = []
+        let watching = flow.$isSubmitting.sink { submitting in
+            if !submitting {
+                heldWhenFinished.append(flow.lastResult)
+            }
+        }
+        defer { watching.cancel() }
+
+        _ = try await flow.capture(PayInFixture.request(idempotencyKey: nil))
+
+        XCTAssertEqual(heldWhenFinished.count, 2, "the submission did not report itself finished")
+        XCTAssertNotNil(
+            heldWhenFinished.last ?? nil,
+            "it reported itself finished while still holding the previous result"
+        )
     }
 
     func testAnInterruptedVoidLeavesTheOutcomeOpen() async {
