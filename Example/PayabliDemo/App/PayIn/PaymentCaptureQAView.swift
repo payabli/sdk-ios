@@ -212,6 +212,10 @@ struct PaymentCaptureQAView: View {
         resultAcknowledged = true
         submitFailed = false
         resultText = ""
+        // The payment goes with its result. Left standing, the reversal stays bound to the payment
+        // that is no longer on screen, and offers itself under a row that says nothing was captured.
+        capturedResult = nil
+        voidedTransId = nil
         voidText = ""
     }
 

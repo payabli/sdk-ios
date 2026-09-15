@@ -138,6 +138,18 @@ final class QAWalkthroughUITests: XCTestCase {
             app.buttons["Reverse this payment"].exists,
             "a payment already reversed still offers to reverse it again"
         )
+
+        // A new attempt takes the payment off screen, and the reversal goes with it. Left standing it
+        // stays bound to a payment the screen no longer shows.
+        tapWhenStill(app.buttons["Capture another payment"], named: "the new attempt button")
+        XCTAssertFalse(
+            app.buttons["Reversed"].exists,
+            "a new attempt still offers the previous payment's reversal"
+        )
+        XCTAssertFalse(
+            app.buttons["Reverse this payment"].exists,
+            "a new attempt still offers a reversal for the payment it replaced"
+        )
     }
 
     // MARK: - The walk
