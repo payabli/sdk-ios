@@ -15,7 +15,7 @@ struct PaymentCaptureQAView: View {
     @State private var isPaymentCaptureResultViewPresented = false
     @State private var voidedTransId: String?
     @State private var reversing: String?
-    @State private var reversalUnresolved = false
+    @State private var unreconciledTransId: String?
     @State private var voidText = ""
 
     var body: some View {
@@ -121,7 +121,7 @@ struct PaymentCaptureQAView: View {
                                 .disabled(
                                     reversing != nil
                                         || voidedTransId == transId
-                                        || reversalUnresolved
+                                        || unreconciledTransId == transId
                                         || paymentFlow.isSubmitting
                                 )
 
@@ -134,6 +134,20 @@ struct PaymentCaptureQAView: View {
                                         .frame(maxWidth: .infinity, alignment: .leading)
                                         .textSelection(.enabled)
                                 }
+                            }
+
+                            // Outside the payment's own row, because it outlives it. Drawing a new
+                            // attempt takes the payment off screen, and a reversal nobody can
+                            // account for still has to name the transaction to account for.
+                            if let unreconciledTransId {
+                                Text(
+                                    "A reversal of \(unreconciledTransId) may have been applied. "
+                                        + "Read that transaction back before reversing it again."
+                                )
+                                .font(.caption)
+                                .foregroundColor(.payabliError)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .textSelection(.enabled)
                             }
                         }
                     }
@@ -221,7 +235,6 @@ struct PaymentCaptureQAView: View {
         capturedResult = nil
         voidedTransId = nil
         reversing = nil
-        reversalUnresolved = false
         voidText = ""
     }
 
@@ -246,7 +259,7 @@ struct PaymentCaptureQAView: View {
                 guard reversing == transId else { return }
                 let failure = PayInFailure(error, operation: .void)
                 voidText = failure.message
-                reversalUnresolved = failure.outcomeIsUnresolved
+                unreconciledTransId = failure.outcomeIsUnresolved ? transId : nil
             }
             reversing = nil
         }
