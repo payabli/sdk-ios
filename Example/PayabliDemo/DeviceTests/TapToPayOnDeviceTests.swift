@@ -111,7 +111,10 @@ final class TapToPayOnDeviceTests: XCTestCase {
 
         // Subscribed before `initialize()`, because progress is raised during it.
         let stream = ttp.events()
-        let collector = Task { () -> [Int] in
+        // `nil` means the stream ended without the reader becoming ready, which
+        // is what cancellation by the deadline below produces. Returning the
+        // values collected so far instead would report a timeout as a pass.
+        let collector = Task { () -> [Int]? in
             var seen: [Int] = []
             for await event in stream {
                 if case let .readerConfigurationProgressChanged(percent) = event {
@@ -121,7 +124,7 @@ final class TapToPayOnDeviceTests: XCTestCase {
                     return seen
                 }
             }
-            return seen
+            return nil
         }
         // Bounded, so a `.readerReady` that never arrives fails this test rather
         // than hanging the bundle. Generous: a first arming runs for minutes.
@@ -141,7 +144,11 @@ final class TapToPayOnDeviceTests: XCTestCase {
             throw error
         }
 
-        let reported = await collector.value
+        let collected = await collector.value
+        let reported = try XCTUnwrap(
+            collected,
+            "the reader never became ready, and the event stream ended without saying so"
+        )
         for percent in reported {
             XCTAssertTrue((0 ... 100).contains(percent), "reported \(percent), which is not a percentage")
         }
@@ -151,9 +158,10 @@ final class TapToPayOnDeviceTests: XCTestCase {
                     + "does. Run it on a device that has not armed against \(named.entry)."
             )
         }
-        XCTAssertEqual(
-            ttp.readerConfigurationProgress, last,
-            "the last announcement and the readable value disagree"
+        XCTAssertTrue((0 ... 100).contains(last))
+        XCTAssertNil(
+            ttp.readerConfigurationProgress,
+            "the configuration ended and the percentage was left behind"
         )
     }
 
