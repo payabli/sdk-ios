@@ -402,7 +402,8 @@ enum PayabliTTPEventCode {
   configFailed,
   termsRequired,
   // 21 was readerConfigurationProgressChanged. Progress is a payload on the
-  // session state now, and this list is read by index, so the gap stays.
+  // session state now. This list is read by index, and the value is retired
+  // rather than reused: consumers resolve from source against main.
   readerConfigurationProgressRetired,
   readerNotReady,
   cardDetected,

@@ -9,54 +9,76 @@ import XCTest
 final class PayabliTTPFailureReasonTests: XCTestCase {
     // MARK: - The landings
 
-    func testAStaleIdentityAsksForAttestation() {
+    /// Both name the attestation, which is the positive match discarding the
+    /// device's identity needs.
+    func testAFailureThatNamesTheAttestationAsksForOne() {
         for error in [
             PayabliTTPError.attestationRevoked(reason: "x"),
-            .attestationFailed(reason: "x"),
-            .tokenExpired
+            .attestationFailed(reason: "x")
         ] {
-            XCTAssertEqual(PayabliTTPFailureReason.landing(for: error), .attestationRequired, "\(error)")
+            XCTAssertEqual(
+                PayabliTTPSessionState.landing(for: error),
+                .failed(reason: .attestationRequired),
+                "\(error)"
+            )
         }
+    }
+
+    /// An expired token names no attestation, so it does not discard the
+    /// identity. The device is as it was and the same call may work later.
+    func testAnExpiredTokenDoesNotDiscardTheIdentity() {
+        XCTAssertEqual(
+            PayabliTTPSessionState.landing(for: PayabliTTPError.tokenExpired),
+            .failed(reason: .serviceUnavailable)
+        )
     }
 
     func testAnAccountThatIsNotSetUpAsksSomeoneToChangeIt() {
         XCTAssertEqual(
-            PayabliTTPFailureReason.landing(for: PayabliTTPError.configFailed(reason: "x")),
-            .configurationRejected
+            PayabliTTPSessionState.landing(for: PayabliTTPError.configFailed(reason: "x")),
+            .failed(reason: .configurationRejected)
         )
     }
 
-    /// The hardware, the OS build and a vendor refusal arrive alike, and a host
-    /// offers the same thing for all three.
-    func testAReaderThatWillNotComeUpIsTheDevice() {
+    /// An OS build the reader will never run on is the device. A reader that
+    /// merely would not arm is not: it leaves the device as it was.
+    func testOnlyAnUnusableDeviceIsCalledIneligible() {
+        XCTAssertEqual(
+            PayabliTTPSessionState.landing(for: PayabliTTPError.readerOSVersionNotSupported),
+            .failed(reason: .deviceIneligible)
+        )
+        XCTAssertEqual(
+            PayabliTTPSessionState.landing(for: PayabliTTPError.readerSetupFailed(reason: "x")),
+            .failed(reason: .serviceUnavailable)
+        )
+    }
+
+    /// A device owing activation is not a failure, and neither is a merchant who
+    /// has not accepted terms. Each has a state of its own.
+    func testWhatIsNotAFailureDoesNotLandAsOne() {
+        XCTAssertEqual(
+            PayabliTTPSessionState.landing(for: PayabliTTPError.devicePendingActivation),
+            .pendingActivation
+        )
+        XCTAssertEqual(
+            PayabliTTPSessionState.landing(for: PayabliTTPError.termsNotAccepted),
+            .pendingTerms
+        )
+    }
+
+    /// A tap or an activation failing leaves the session where it was.
+    func testAFailureThatIsNotTheSessionsMovesNothing() {
         for error in [
-            PayabliTTPError.readerSetupFailed(reason: "x"),
-            .readerOSVersionNotSupported
+            PayabliTTPError.nfcFailed(reason: "x"),
+            .initiateFailed(reason: "x"),
+            .updateFailed(reason: "x"),
+            .activationFailed(reason: "x")
         ] {
-            XCTAssertEqual(PayabliTTPFailureReason.landing(for: error), .deviceIneligible, "\(error)")
+            XCTAssertNil(PayabliTTPSessionState.landing(for: error), "\(error)")
         }
     }
 
-    func testAServiceThatCouldNotBeReachedMayWorkLater() {
-        XCTAssertEqual(
-            PayabliTTPFailureReason.landing(for: PayabliTTPError.networkError(reason: "x")),
-            .serviceUnavailable
-        )
-    }
-
-    /// A guess sends a host down a repair that cannot work, so anything whose
-    /// remedy is unknown lands where being wrong costs nothing.
-    func testAnUnrecognisedFailureAsksForADefectReport() {
-        struct Opaque: Error {}
-
-        XCTAssertEqual(PayabliTTPFailureReason.landing(for: Opaque()), .sdkInternalError)
-        XCTAssertEqual(
-            PayabliTTPFailureReason.landing(for: PayabliTTPError.notInitialized),
-            .sdkInternalError
-        )
-    }
-
-    /// Every case lands somewhere. A new one added to `PayabliTTPError` without a
+    /// Every case lands somewhere, including on nothing. A case added without a
     /// landing would reach a host as a remedy it cannot act on.
     func testEveryErrorCaseHasALanding() {
         let everyCase: [PayabliTTPError] = [
@@ -78,9 +100,6 @@ final class PayabliTTPFailureReasonTests: XCTestCase {
             .readerOSVersionNotSupported
         ]
 
-        for error in everyCase {
-            XCTAssertNotNil(PayabliTTPFailureReason.landing(for: error), "\(error)")
-        }
         XCTAssertEqual(everyCase.count, 16, "a case was added to PayabliTTPError without a landing")
     }
 

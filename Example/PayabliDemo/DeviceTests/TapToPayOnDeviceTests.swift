@@ -1,3 +1,4 @@
+import Combine
 @testable import PayabliDemo
 @testable import PayabliSDKCore
 @testable import PayabliSDKTapToPay
@@ -109,23 +110,15 @@ final class TapToPayOnDeviceTests: XCTestCase {
     func testTheReaderReportsItsConfigurationProgress() async throws {
         let ttp = try makeTTP()
 
-        // Subscribed before `initialize()`, because progress is raised during it.
-        let stream = ttp.events()
-        // `nil` means the stream ended without the reader becoming ready, which
-        // is what cancellation by the deadline below produces. Returning the
-        // values collected so far instead would report a timeout as a pass.
-        let collector = Task { () -> [Int]? in
-            var seen: [Int] = []
-            for await event in stream {
-                if case let .readerConfigurationProgressChanged(percent) = event {
-                    seen.append(percent)
-                }
-                if case .readerReady = event {
-                    return seen
-                }
+        // Watched before `initialize()`, because the percentage lands on the
+        // state while the configuration is running and is gone once it ends.
+        var reported: [Int] = []
+        let watcher = ttp.$sessionState.sink { state in
+            if let percent = state.readerConfigurationPercent {
+                reported.append(percent)
             }
-            return nil
         }
+        defer { watcher.cancel() }
         // Initialization is what stalls when a reader cannot arm, so it is
         // bounded along with the collector. Bounding only the collector left the
         // test suspended in `initialize()` for exactly the failure the bound was
@@ -134,14 +127,12 @@ final class TapToPayOnDeviceTests: XCTestCase {
         let deadline = Task {
             guard (try? await Task.sleep(nanoseconds: Self.armingWait)) != nil else { return }
             setup.cancel()
-            collector.cancel()
         }
         defer { deadline.cancel() }
 
         do {
             try await setup.value
         } catch {
-            collector.cancel()
             if error is CancellationError {
                 XCTFail("the reader did not finish arming within the time allowed")
                 return
@@ -152,21 +143,20 @@ final class TapToPayOnDeviceTests: XCTestCase {
             throw error
         }
 
-        let collected = await collector.value
-        let reported = try XCTUnwrap(
-            collected,
-            "the reader never became ready, and the event stream ended without saying so"
-        )
+        XCTAssertEqual(ttp.sessionState, .ready, "the reader never became ready")
         for percent in reported {
             XCTAssertTrue((0 ... 100).contains(percent), "reported \(percent), which is not a percentage")
         }
-        guard let last = reported.last else {
+        XCTAssertNil(
+            ttp.sessionState.readerConfigurationPercent,
+            "the configuration ended and its percentage outlived it"
+        )
+        guard !reported.isEmpty else {
             throw XCTSkip(
                 "this reader reported no configuration progress, which a device that has already armed "
                     + "does. Run it on a device that has not armed against \(named.entry)."
             )
         }
-        XCTAssertTrue((0 ... 100).contains(last))
     }
 
     /// How long a reader has to finish arming before the test says it never did.

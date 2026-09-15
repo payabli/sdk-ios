@@ -82,7 +82,8 @@ export enum PayabliTTPEventCode {
     ConfigFailed = 19,
     TermsRequired = 20,
     // 21 was ReaderConfigurationProgressChanged. Progress is a payload on the
-    // session state now, and a retired raw value is never reused.
+    // session state now. Retired rather than reused: consumers resolve this
+    // package from source against main and have had 21 since it merged.
     ReaderNotReady = 22,
     CardDetected = 23,
     CardRemovalRequested = 24,

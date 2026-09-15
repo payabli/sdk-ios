@@ -58,7 +58,8 @@ namespace Payabli.TapToPay
         AttestationFailed = 18,
         ConfigFailed = 19,
         TermsRequired = 20,
-        // 21 retired: progress is a payload on the session state.
+        // 21 retired: progress is a payload on the session state. Not reused,
+        // because consumers resolve this package from source against main.
         ReaderNotReady = 22,
         CardDetected = 23,
         CardRemovalRequested = 24,

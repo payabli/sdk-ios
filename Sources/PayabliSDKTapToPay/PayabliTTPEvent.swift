@@ -123,7 +123,9 @@ public enum PayabliTTPError: Error, Sendable {
     case configFailed = 19
     case termsRequired = 20
     // 21 was `readerConfigurationProgressChanged`. Progress is a payload on the
-    // session state now, and a retired raw value is never reused.
+    // session state now. The value is retired rather than reused: this package
+    // has no tagged release, so every consumer resolves from source against
+    // `main` and has had 21 since it merged there.
     case readerNotReady = 22
     case cardDetected = 23
     case cardRemovalRequested = 24
