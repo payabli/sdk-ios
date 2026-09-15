@@ -21,6 +21,13 @@ public final class PayabliPayInPaymentFlow: NSObject, ObservableObject, PayabliC
     ]
 
     @Published public private(set) var isSubmitting: Bool = false
+
+    /// What the last submission the flow published ended as.
+    ///
+    /// **``voidTransaction(_:)`` does not appear here.** One channel per caller: a reversal answers the
+    /// caller that asked for it and leaves this alone, so a screen showing what a payment did does not
+    /// start showing what was done to it afterwards. Read that member's return value instead, and do
+    /// not wait on this for it.
     @Published public private(set) var lastResult: PayabliPayInPaymentFlowResult?
 
     public var lastStoredPaymentMethod: PayabliPayInPaymentFlowStoredPaymentMethod? {
@@ -259,6 +266,9 @@ public final class PayabliPayInPaymentFlow: NSObject, ObservableObject, PayabliC
     ///
     /// Which transactions can still be reversed is the service's to decide, and is not mirrored here:
     /// a state it will not reverse comes back as the refusal it sent, carrying its own reason.
+    ///
+    /// The result is returned and not published: ``lastResult`` keeps whatever the last submission
+    /// left there, so a caller reads the outcome here rather than waiting on that.
     ///
     /// - Parameter transId: the transaction to reverse, as
     ///   ``PayabliPayInPaymentFlowTransaction/paymentTransId`` reported it.

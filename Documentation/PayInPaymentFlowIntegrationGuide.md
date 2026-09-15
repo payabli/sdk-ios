@@ -354,6 +354,11 @@ let result = try await paymentFlow.voidTransaction("authorized-transaction-id")
 `voidTransaction(_:)` is a direct API. It takes the transaction and nothing else,
 because the route carries the identifier in its path and there is no partial void.
 
+The result is returned and not published. `lastResult` keeps whatever the last
+submission left there, so read the returned value rather than waiting on the
+published one: a screen showing what a payment did does not start showing what was
+done to it afterwards.
+
 Which transactions can still be reversed is the service's to decide, and the SDK
 mirrors no rule of its own. A state it will not reverse arrives as
 `PayabliPayInPaymentFlowError.transactionFailed`, carrying the service's own

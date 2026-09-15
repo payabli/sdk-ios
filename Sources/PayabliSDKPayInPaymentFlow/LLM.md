@@ -149,7 +149,9 @@ PayabliPayInPaymentFlow(
 Public state:
 
 - `isSubmitting`: true while one submission is active.
-- `lastResult`: last stored-method or transaction result.
+- `lastResult`: last stored-method or transaction result. A reversal is not
+  published here: `voidTransaction(_:)` returns its result to its caller and
+  leaves this as the last submission left it.
 - `lastStoredPaymentMethod`: convenience accessor for stored-method results.
 - `operation`: current operation.
 - `requestConfiguration`: transaction configuration used by hosted capture and
