@@ -118,7 +118,7 @@ extension PayabliTTP {
         switch sessionState {
         case .ready:
             return
-        case .sessionExpired, .idle, .error:
+        case .sessionExpired, .idle, .failed:
             break
         default:
             throw PayabliTTPError.notReady(current: sessionState)
@@ -214,8 +214,11 @@ extension PayabliTTP {
     ///   - 401, either a refused binding or a refused bearer → rewrap as
     ///     `.configFailed`, relaying the reason. Dropping a binding is the config
     ///     call's, which knows which of the two it is holding
-    ///   - anything else → `.error`, rewrapped as `.configFailed` so the domain and
-    ///     code stay what the bridges read, keeping the parsed reason
+    ///   - anything else → rewrapped as `.configFailed` so the domain and code
+    ///     stay what the bridges read, keeping the parsed reason
+    ///
+    /// The state is classified from the failure as it arrived, not from the
+    /// wrapper: the error names which phase failed, the state names the remedy.
     private func runFetchConfigPhase() async throws -> TTPConfig {
         do {
             return try await configClient.fetchConfig(entry: entryPoint)
@@ -230,10 +233,7 @@ extension PayabliTTP {
             // nothing. The reason is relayed either way, so it names which happened
             // instead of this layer claiming an outcome for both.
             let failure = PayabliTTPError.configFailed(reason: "Config rejected (401): \(err.reason)")
-            // One value through all three channels. Marking the raw 401 while
-            // throwing the rewrapped failure left the published state and the
-            // caller describing the same failure differently.
-            sessionManager.markError(failure)
+            sessionManager.markError(err)
             syncPublished()
             multicaster.emit(.configFailed(error: ErrorSummary.of(failure)))
             throw failure
@@ -248,7 +248,10 @@ extension PayabliTTP {
             // every stored property instead, the page token among them.
             let failure = error as? PayabliTTPError
                 ?? PayabliTTPError.configFailed(reason: error.localizedDescription)
-            sessionManager.markError(failure)
+            // Marked as it arrived, so a permission this paypoint has not
+            // granted still reaches `.pendingActivation` and a service that was
+            // briefly away still reads as one to try again.
+            sessionManager.markError(error)
             syncPublished()
             multicaster.emit(.configFailed(error: ErrorSummary.of(failure)))
             throw failure
@@ -285,7 +288,7 @@ extension PayabliTTP {
             }
         }
 
-        _ = sessionManager.transition(to: .initializingReader)
+        _ = sessionManager.transition(to: .initializingReader(percent: nil))
         syncPublished()
         multicaster.emit(.readerInitializing)
         do {

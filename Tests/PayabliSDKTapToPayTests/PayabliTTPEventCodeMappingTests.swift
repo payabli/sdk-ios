@@ -33,7 +33,6 @@ final class PayabliTTPEventCodeMappingTests: XCTestCase {
         XCTAssertEqual(PayabliTTPEventCode.attestationFailed.rawValue, 18)
         XCTAssertEqual(PayabliTTPEventCode.configFailed.rawValue, 19)
         XCTAssertEqual(PayabliTTPEventCode.termsRequired.rawValue, 20)
-        XCTAssertEqual(PayabliTTPEventCode.readerConfigurationProgressChanged.rawValue, 21)
         XCTAssertEqual(PayabliTTPEventCode.readerNotReady.rawValue, 22)
         XCTAssertEqual(PayabliTTPEventCode.cardDetected.rawValue, 23)
         XCTAssertEqual(PayabliTTPEventCode.cardRemovalRequested.rawValue, 24)
@@ -67,7 +66,6 @@ final class PayabliTTPEventCodeMappingTests: XCTestCase {
         XCTAssertEqual(PayabliTTPEvent.attestationFailed(error: "x").code, .attestationFailed)
         XCTAssertEqual(PayabliTTPEvent.configFailed(error: "x").code, .configFailed)
         XCTAssertEqual(PayabliTTPEvent.termsRequired.code, .termsRequired)
-        XCTAssertEqual(PayabliTTPEvent.readerConfigurationProgressChanged(percent: 1).code, .readerConfigurationProgressChanged)
         XCTAssertEqual(PayabliTTPEvent.readerNotReady.code, .readerNotReady)
         XCTAssertEqual(PayabliTTPEvent.cardDetected.code, .cardDetected)
         XCTAssertEqual(PayabliTTPEvent.cardRemovalRequested.code, .cardRemovalRequested)
@@ -95,16 +93,6 @@ final class PayabliTTPEventCodeMappingTests: XCTestCase {
                 "Expected empty payload for \(event.code)"
             )
         }
-    }
-
-    /// The percentage travels in the payload as well as on the property,
-    /// because a host reaching events through `addEventListener` has no
-    /// property to read. It is an `Int`, not a string like every other value
-    /// here, so a bridge that assumes strings is caught.
-    func testReaderProgressPayloadCarriesThePercentAsANumber() {
-        let payload = PayabliTTPEvent.readerConfigurationProgressChanged(percent: 42).payload
-        XCTAssertEqual(payload.count, 1)
-        XCTAssertEqual(payload["percent"] as? Int, 42)
     }
 
     func testChargeInitiatedPayloadCarriesPaymentTransId() {

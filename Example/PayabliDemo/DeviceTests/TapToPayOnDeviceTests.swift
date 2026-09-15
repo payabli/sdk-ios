@@ -1,3 +1,4 @@
+import Combine
 @testable import PayabliDemo
 @testable import PayabliSDKCore
 @testable import PayabliSDKTapToPay
@@ -109,69 +110,81 @@ final class TapToPayOnDeviceTests: XCTestCase {
     func testTheReaderReportsItsConfigurationProgress() async throws {
         let ttp = try makeTTP()
 
-        // Subscribed before `initialize()`, because progress is raised during it.
-        let stream = ttp.events()
-        // `nil` means the stream ended without the reader becoming ready, which
-        // is what cancellation by the deadline below produces. Returning the
-        // values collected so far instead would report a timeout as a pass.
-        let collector = Task { () -> [Int]? in
-            var seen: [Int] = []
-            for await event in stream {
-                if case let .readerConfigurationProgressChanged(percent) = event {
-                    seen.append(percent)
-                }
-                if case .readerReady = event {
-                    return seen
-                }
+        // Watched before `initialize()`, because the percentage lands on the
+        // state while the configuration is running and is gone once it ends.
+        var reported: [Int] = []
+        let watcher = ttp.$sessionState.sink { state in
+            if let percent = state.readerConfigurationPercent {
+                reported.append(percent)
             }
-            return nil
         }
-        // Initialization is what stalls when a reader cannot arm, so it is
-        // bounded along with the collector. Bounding only the collector left the
-        // test suspended in `initialize()` for exactly the failure the bound was
-        // added for. Generous: a first arming runs for minutes.
-        let setup = Task { try await ttp.initialize() }
-        let deadline = Task {
-            guard (try? await Task.sleep(nanoseconds: Self.armingWait)) != nil else { return }
-            setup.cancel()
-            collector.cancel()
-        }
-        defer { deadline.cancel() }
-
+        defer { watcher.cancel() }
         do {
-            try await setup.value
-        } catch {
-            collector.cancel()
-            if error is CancellationError {
-                XCTFail("the reader did not finish arming within the time allowed")
-                return
-            }
-            if case PayabliTTPError.devicePendingActivation = error {
-                throw XCTSkip("this device is pending activation on \(named.entry)")
-            }
-            throw error
+            try await bounded { try await ttp.initialize() }
+        } catch is ArmingTimedOut {
+            XCTFail("the reader did not finish arming within the time allowed")
+            return
+        } catch PayabliTTPError.devicePendingActivation {
+            throw XCTSkip("this device is pending activation on \(named.entry)")
         }
 
-        let collected = await collector.value
-        let reported = try XCTUnwrap(
-            collected,
-            "the reader never became ready, and the event stream ended without saying so"
-        )
+        XCTAssertEqual(ttp.sessionState, .ready, "the reader never became ready")
         for percent in reported {
             XCTAssertTrue((0 ... 100).contains(percent), "reported \(percent), which is not a percentage")
         }
-        guard let last = reported.last else {
+        XCTAssertNil(
+            ttp.sessionState.readerConfigurationPercent,
+            "the configuration ended and its percentage outlived it"
+        )
+        guard !reported.isEmpty else {
             throw XCTSkip(
                 "this reader reported no configuration progress, which a device that has already armed "
                     + "does. Run it on a device that has not armed against \(named.entry)."
             )
         }
-        XCTAssertTrue((0 ... 100).contains(last))
     }
 
     /// How long a reader has to finish arming before the test says it never did.
     /// Apple documents a first configuration as taking up to several minutes.
     private static let armingWait: UInt64 = 300_000_000_000
+
+    /// Runs `work` and gives up on it rather than waiting for it.
+    ///
+    /// Cancelling the task that awaits `initialize()` does not reach the task
+    /// `initialize()` is itself awaiting, so a reader wedged in preparation
+    /// keeps that await suspended however early the timer fires. The deadline
+    /// therefore has to resume this caller on its own, which means racing two
+    /// unstructured tasks and taking whichever finishes first.
+    private func bounded<T: Sendable>(
+        _ work: @escaping @MainActor () async throws -> T
+    ) async throws -> T {
+        let once = ResumeOnce()
+
+        return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<T, Error>) in
+            let workTask = Task { @MainActor in
+                do {
+                    let value = try await work()
+                    if !once.done {
+                        once.done = true
+                        continuation.resume(returning: value)
+                    }
+                } catch {
+                    if !once.done {
+                        once.done = true
+                        continuation.resume(throwing: error)
+                    }
+                }
+            }
+            Task { @MainActor in
+                try? await Task.sleep(nanoseconds: Self.armingWait)
+                if !once.done {
+                    once.done = true
+                    continuation.resume(throwing: ArmingTimedOut())
+                }
+                workTask.cancel()
+            }
+        }
+    }
 
     /// Reaching `.ready` stores a binding that names this paypoint.
     func testReachingReadyStoresABindingForThisPaypoint() async throws {
@@ -468,4 +481,14 @@ private final class OutcomeBox: @unchecked Sendable {
         defer { lock.unlock() }
         terminal = outcome
     }
+}
+
+/// Tells a reader that never armed from one that failed while arming.
+private struct ArmingTimedOut: Error {}
+
+/// Guards a continuation so the deadline and the work cannot both resume it.
+/// Only touched from the main actor, which is where both racers run.
+@MainActor
+private final class ResumeOnce {
+    var done = false
 }

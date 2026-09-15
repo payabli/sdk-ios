@@ -119,8 +119,8 @@ export default function App() {
   };
 
   const refreshState = async () => {
-    const state = await PayabliTTP.getSessionState();
-    setSessionState(state);
+    const snapshot = await PayabliTTP.getSessionState();
+    setSessionState(snapshot.code);
   };
 
   const addCard = async () => {
@@ -300,8 +300,8 @@ function sessionStateLabel(state: PayabliTTPSessionState): string {
       return "reinit";
     case PayabliTTPSessionState.PendingActivation:
       return "pending";
-    case PayabliTTPSessionState.Error:
-      return "error";
+    case PayabliTTPSessionState.Failed:
+      return "failed";
     case PayabliTTPSessionState.Idle:
     default:
       return "idle";

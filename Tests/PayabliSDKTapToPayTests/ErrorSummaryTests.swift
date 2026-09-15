@@ -80,13 +80,13 @@ final class ErrorSummaryTests: XCTestCase {
             (.idle, "idle"),
             (.attestingDevice, "attestingDevice"),
             (.fetchingConfig, "fetchingConfig"),
-            (.initializingReader, "initializingReader"),
+            (.initializingReader(percent: nil), "initializingReader"),
             (.ready, "ready"),
             (.sessionExpired, "sessionExpired"),
             (.reinitializing, "reinitializing"),
             (.pendingActivation, "pendingActivation"),
             (.pendingTerms, "pendingTerms"),
-            (.error, "error")
+            (.failed(reason: .sdkInternalError), "failed")
         ]
 
         for (state, name) in expected {

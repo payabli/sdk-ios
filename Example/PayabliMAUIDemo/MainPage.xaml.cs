@@ -258,7 +258,7 @@ public partial class MainPage : ContentPage
             PayabliTTPSessionState.SessionExpired => "expired",
             PayabliTTPSessionState.Reinitializing => "reinit",
             PayabliTTPSessionState.PendingActivation => "pending",
-            PayabliTTPSessionState.Error => "error",
+            PayabliTTPSessionState.Failed => "failed",
             _ => "?",
         };
     }

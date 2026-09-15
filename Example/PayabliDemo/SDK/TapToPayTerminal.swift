@@ -17,14 +17,11 @@ final class TapToPayTerminal: ObservableObject {
     /// How far the reader has got configuring, from 0 to 100, or `nil` when it
     /// has not reported.
     ///
-    /// The SDK announces each percentage and retains none, so a screen that
-    /// wants a bar keeps the last one here. This is a host's own view state and
-    /// is dropped when the session stops configuring.
+    /// How far the reader has got configuring, read off the session state.
     @Published private(set) var configurationProgress: Int?
 
     private let terminal: PayabliTTP
     private var forwarding: Set<AnyCancellable> = []
-    private var progressListener: Task<Void, Never>?
 
     init(_ terminal: PayabliTTP) {
         self.terminal = terminal
@@ -35,23 +32,16 @@ final class TapToPayTerminal: ObservableObject {
             .removeDuplicates()
             .sink { [weak self] status in
                 self?.status = status
-                if status != .initializingReader {
-                    self?.configurationProgress = nil
-                }
             }
             .store(in: &forwarding)
 
-        let events = terminal.events()
-        progressListener = Task { [weak self] in
-            for await event in events {
-                guard case let .readerConfigurationProgressChanged(percent) = event else { continue }
+        terminal.$sessionState
+            .map(\.readerConfigurationPercent)
+            .removeDuplicates()
+            .sink { [weak self] percent in
                 self?.configurationProgress = percent
             }
-        }
-    }
-
-    deinit {
-        progressListener?.cancel()
+            .store(in: &forwarding)
     }
 
     /// Attests the device, fetches its configuration and brings the reader up.
@@ -64,10 +54,8 @@ final class TapToPayTerminal: ObservableObject {
         try await run { try await terminal.reinitializeIfNeeded() }
     }
 
-    /// Takes a sale. The returned string is the payment's transaction identifier.
-    ///
-    /// - Parameter suppliesCustomer: whether the sale names this app's stand-in
-    ///   customer, which the app's switch decides.
+    /// Takes a sale. The returned string is the payment's transaction identifier,
+    /// and `suppliesCustomer` names this app's stand-in customer on it.
     func charge(amount: Decimal, suppliesCustomer: Bool) async throws -> String {
         try await run {
             let result = try await terminal.charge(
@@ -196,7 +184,6 @@ struct TapToPayEvent {
         .attestationFailed: "attestationFailed",
         .configFailed: "configFailed",
         .termsRequired: "termsRequired",
-        .readerConfigurationProgressChanged: "readerConfigurationProgressChanged",
         .readerNotReady: "readerNotReady",
         .cardDetected: "cardDetected",
         .cardRemovalRequested: "cardRemovalRequested",

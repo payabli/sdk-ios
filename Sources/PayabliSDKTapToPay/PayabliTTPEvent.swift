@@ -34,10 +34,6 @@ public enum PayabliTTPEvent: Sendable {
     // because `nfcStarted`, `nfcCompleted` and `nfcFailed` above already say so
     // and a host would otherwise be told the same thing twice.
 
-    /// How far the reader's configuration has got, raised only while one is
-    /// running. The percentage is in `payload` under `percent`.
-    case readerConfigurationProgressChanged(percent: Int)
-
     /// The reader cannot take a card yet.
     case readerNotReady
 
@@ -126,7 +122,10 @@ public enum PayabliTTPError: Error, Sendable {
     case attestationFailed = 18
     case configFailed = 19
     case termsRequired = 20
-    case readerConfigurationProgressChanged = 21
+    // 21 was `readerConfigurationProgressChanged`. Progress is a payload on the
+    // session state now. The value is retired rather than reused: this package
+    // has no tagged release, so every consumer resolves from source against
+    // `main` and has had 21 since it merged there.
     case readerNotReady = 22
     case cardDetected = 23
     case cardRemovalRequested = 24
@@ -162,7 +161,6 @@ public extension PayabliTTPEvent {
         case .attestationFailed: return .attestationFailed
         case .configFailed: return .configFailed
         case .termsRequired: return .termsRequired
-        case .readerConfigurationProgressChanged: return .readerConfigurationProgressChanged
         case .readerNotReady: return .readerNotReady
         case .cardDetected: return .cardDetected
         case .cardRemovalRequested: return .cardRemovalRequested
@@ -181,7 +179,6 @@ public extension PayabliTTPEvent {
     ///   - `.nfcFailed`, `.activationFailed`, `.attestationFailed`,
     ///     `.configFailed` → `["error": String]`
     ///   - `.updateFailed` → `["paymentTransId": String, "error": String]`
-    ///   - `.readerConfigurationProgressChanged` → `["percent": Int]`
     ///   - all other cases → empty `[:]`
     ///
     /// Every `error` string here names the failure and nothing else: the case, or a
@@ -205,8 +202,6 @@ public extension PayabliTTPEvent {
             return ["error": error]
         case let .updateFailed(paymentTransId, error):
             return ["paymentTransId": paymentTransId, "error": error]
-        case let .readerConfigurationProgressChanged(percent):
-            return ["percent": percent]
         case .attestationStarted,
              .attestationCompleted,
              .configReceived,

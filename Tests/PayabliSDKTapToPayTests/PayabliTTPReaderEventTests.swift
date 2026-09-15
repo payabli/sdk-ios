@@ -1,3 +1,4 @@
+import Combine
 import PayabliSDKCore
 @testable import PayabliSDKTapToPay
 import PayabliSDKTestUtils
@@ -22,34 +23,61 @@ final class PayabliTTPReaderEventTests: XCTestCase {
 
     // MARK: - During configuration
 
-    /// Every percentage the configuration raises is announced, in order.
-    func testEveryPercentageIsAnnouncedInOrder() async throws {
+    /// Every percentage reaches the state the configuration is in, so a host
+    /// reading `sessionState` sees how far the reader has got.
+    func testEveryPercentageReachesTheStateInOrder() async throws {
         let (ttp, provider) = try makeTTP()
-        let stream = ttp.events()
-        let collector = Task { () -> [Int] in
-            var seen: [Int] = []
-            for await event in stream {
-                if case let .readerConfigurationProgressChanged(percent) = event {
-                    seen.append(percent)
-                }
-                if case .readerReady = event {
-                    return seen
-                }
-            }
-            return seen
-        }
+        var seen: [Int?] = []
         provider.readerEventsDuringPrepare = [
             .configurationProgress(percent: 10),
             .configurationProgress(percent: 90)
         ]
+        let watcher = ttp.$sessionState.sink { state in
+            if case let .initializingReader(percent) = state, percent != nil {
+                seen.append(percent)
+            }
+        }
+        defer { watcher.cancel() }
 
         try await ttp.initialize()
 
-        let announced = await collector.value
-        XCTAssertEqual(announced, [10, 90])
+        XCTAssertEqual(seen, [10, 90])
     }
 
-    // MARK: - After the session is up
+    /// A configuration that ends takes its percentage with it, because the
+    /// percentage is part of the state rather than a value beside it.
+    func testTheStateThatEndsTakesThePercentageWithIt() async throws {
+        let (ttp, provider) = try makeTTP()
+        provider.readerEventsDuringPrepare = [.configurationProgress(percent: 100)]
+
+        try await ttp.initialize()
+
+        XCTAssertEqual(ttp.sessionState, .ready)
+        XCTAssertNil(ttp.sessionState.readerConfigurationPercent)
+    }
+
+    /// Progress raised once its configuration has ended reaches nothing: the
+    /// state has moved on and the percentage has nowhere to land.
+    func testProgressFromAnEndedConfigurationIsDropped() async throws {
+        let (ttp, provider) = try makeTTP()
+        try await ttp.initialize()
+
+        provider.emitReaderEvent(.configurationProgress(percent: 90))
+        await Task.yield()
+
+        XCTAssertEqual(ttp.sessionState, .ready)
+        XCTAssertNil(ttp.sessionState.readerConfigurationPercent)
+    }
+
+    /// A card-read state is not progress, and never lands as any.
+    func testACardStateIsNeverRecordedAsProgress() async throws {
+        let (ttp, provider) = try makeTTP()
+        provider.readerEventsDuringPrepare = [.cardDetected, .cardRemovalRequested]
+
+        try await ttp.initialize()
+
+        XCTAssertNil(ttp.sessionState.readerConfigurationPercent)
+    }
 
     /// The subscription lives for the session, so card states still reach a host
     /// after `initialize()` has returned.
@@ -66,76 +94,6 @@ final class PayabliTTPReaderEventTests: XCTestCase {
 
         let code = try await firstValue(of: collector, named: "cardDetected")
         XCTAssertEqual(code, .cardDetected)
-    }
-
-    /// Progress belongs to one configuration, so a percentage raised once that
-    /// configuration has ended is dropped rather than published. Publishing it
-    /// would leave a value nothing clears and a bar a host cannot dismiss.
-    func testProgressFromAnEndedConfigurationIsDropped() async throws {
-        let (ttp, provider) = try makeTTP()
-        try await ttp.initialize()
-
-        let stream = ttp.events()
-        let announced = Task { () -> Bool in
-            for await event in stream {
-                if case .readerConfigurationProgressChanged = event {
-                    return true
-                }
-                if case .cardDetected = event {
-                    return false
-                }
-            }
-            return false
-        }
-
-        provider.emitReaderEvent(.configurationProgress(percent: 90))
-        // A card state behind it, so the collector answers rather than waiting
-        // for an event that is never coming.
-        provider.emitReaderEvent(.cardDetected)
-
-        let wasAnnounced = await announced.value
-        XCTAssertFalse(wasAnnounced, "a configuration that has ended announced progress")
-    }
-
-    /// A card-read state is not progress, and is never announced as any.
-    func testACardStateIsNeverAnnouncedAsProgress() async throws {
-        let (ttp, provider) = try makeTTP()
-        let stream = ttp.events()
-        let collector = Task { () -> Bool in
-            for await event in stream {
-                if case .readerConfigurationProgressChanged = event {
-                    return true
-                }
-                if case .readerReady = event {
-                    return false
-                }
-            }
-            return false
-        }
-        provider.readerEventsDuringPrepare = [.cardDetected, .cardRemovalRequested]
-
-        try await ttp.initialize()
-
-        let sawProgress = await collector.value
-        XCTAssertFalse(sawProgress)
-    }
-
-    // MARK: - Announced to a host
-
-    /// A subscriber is told progress moved, and the payload carries where it
-    /// got to for a bridge host that has no property to read.
-    func testProgressIsAnnouncedWithItsPercentage() async throws {
-        let (ttp, provider) = try makeTTP()
-        let collector = collectFirst(from: ttp.events()) { event -> Int? in
-            guard case let .readerConfigurationProgressChanged(percent) = event else { return nil }
-            return percent
-        }
-        provider.readerEventsDuringPrepare = [.configurationProgress(percent: 73)]
-
-        try await ttp.initialize()
-
-        let percent = try await firstValue(of: collector, named: "readerConfigurationProgressChanged")
-        XCTAssertEqual(percent, 73)
     }
 
     /// Every card state a host acts on reaches it, in the order the reader

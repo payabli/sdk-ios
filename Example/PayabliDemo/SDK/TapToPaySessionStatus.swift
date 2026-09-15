@@ -73,8 +73,10 @@ extension TapToPaySessionStatus {
         case .reinitializing: self = .reinitializing
         case .pendingActivation: self = .pendingActivation
         case .pendingTerms: self = .pendingTerms
-        case .error: self = .error
-        @unknown default: self = .unrecognised(state.rawValue)
+        case .failed: self = .error
+        // The SDK ships as a resilient binary framework, so a host built against
+        // this version can be handed a case added by a later one.
+        @unknown default: self = .unrecognised(state.code.rawValue)
         }
     }
 }

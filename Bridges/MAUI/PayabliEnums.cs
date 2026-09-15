@@ -5,6 +5,16 @@ namespace Payabli.TapToPay
     // ApiDefinition files drive binding generation but are not compiled into
     // the final assembly, so generated C# needs these enum declarations here.
     [Native]
+    public enum PayabliTTPFailureReason : long
+    {
+        AttestationRequired = 0,
+        ConfigurationRejected = 1,
+        ServiceUnavailable = 2,
+        DeviceIneligible = 3,
+        SdkInternalError = 4,
+    }
+
+    [Native]
     public enum PayabliEnvironment : long
     {
         Local = 0,
@@ -30,7 +40,7 @@ namespace Payabli.TapToPay
         SessionExpired = 5,
         Reinitializing = 6,
         PendingActivation = 7,
-        Error = 8,
+        Failed = 8,
         PendingTerms = 9,
     }
 
@@ -58,7 +68,8 @@ namespace Payabli.TapToPay
         AttestationFailed = 18,
         ConfigFailed = 19,
         TermsRequired = 20,
-        ReaderConfigurationProgressChanged = 21,
+        // 21 retired: progress is a payload on the session state. Not reused,
+        // because consumers resolve this package from source against main.
         ReaderNotReady = 22,
         CardDetected = 23,
         CardRemovalRequested = 24,

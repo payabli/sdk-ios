@@ -105,7 +105,7 @@ final class PayabliTTPTests: XCTestCase {
             try await ttp.initialize()
             XCTFail("expected eligibility failure")
         } catch PayabliTTPError.readerSetupFailed {
-            XCTAssertEqual(ttp.sessionState, .error)
+            XCTAssertEqual(ttp.sessionState.code, .failed)
         } catch {
             XCTFail("wrong error: \(error)")
         }
@@ -204,7 +204,7 @@ final class PayabliTTPTests: XCTestCase {
         // one path and the service's on another, so none of them travel.
         XCTAssertEqual(reported, "attestationFailed")
         XCTAssertFalse(reported.contains("key unusable"), reported)
-        XCTAssertEqual(ttp.sessionState, .error)
+        XCTAssertEqual(ttp.sessionState.code, .failed)
     }
 
     /// A warm-path read that fails is reported through all three channels, not just
@@ -227,7 +227,7 @@ final class PayabliTTPTests: XCTestCase {
         let reported = try await value(of: collector, named: "attestationFailed")
 
         XCTAssertEqual(reported, "attestationFailed")
-        XCTAssertEqual(ttp.sessionState, .error, "the caller saw a failure and the published state did not")
+        XCTAssertEqual(ttp.sessionState.code, .failed, "the caller saw a failure and the published state did not")
     }
 
     /// A refusal whose drop did not land says so, since the binding is still
@@ -337,9 +337,9 @@ final class PayabliTTPTests: XCTestCase {
         XCTAssertFalse(text.contains("dev_old"), "a handle captured during initialize() was sent")
     }
 
-    /// The event, the published state and the thrown error carry one value, so a
-    /// reader comparing a screen against a log sees the same failure twice.
-    func testConfigFailureEmitsAnEventAndMarksWhatItThrows() async throws {
+    /// The event and the thrown error carry the wrapper; the state carries the
+    /// remedy for the failure underneath it.
+    func testConfigFailureThrowsTheWrapperAndLandsTheRemedyOfWhatFailed() async throws {
         let (ttp, _, _) = try makeTTP()
         StubURLProtocol.handler = { request in
             (HTTPURLResponse(
@@ -367,16 +367,43 @@ final class PayabliTTPTests: XCTestCase {
         }
         let reported = try await value(of: collector, named: "configFailed")
 
-        XCTAssertEqual(ttp.sessionState, .error)
+        // The whole state rather than its code, which is what pins the remedy a
+        // host is actually given. A 500 is a service that may answer later.
+        XCTAssertEqual(ttp.sessionState, .failed(reason: .serviceUnavailable))
         let raised = try XCTUnwrap(thrown, "initialize() returned instead of failing")
         let marked = try XCTUnwrap(ttp.sessionManager.lastError, "the session recorded no error")
 
         XCTAssertEqual(reported, ErrorSummary.of(raised), "the event must summarise what was thrown")
-        XCTAssertEqual(
-            String(describing: marked),
-            String(describing: raised),
-            "the published state must hold what was thrown"
+        XCTAssertTrue(raised is PayabliTTPError, "the bridges read the domain of this type")
+        XCTAssertFalse(
+            marked is PayabliTTPError,
+            "the state is classified from the failure as it arrived, not from the wrapper"
         )
+    }
+
+    /// Two config failures under one wrapper land on different remedies, which is
+    /// what the wrapper hid.
+    func testConfigFailuresLandOnTheRemedyOfWhatFailedRatherThanOnOne() async throws {
+        let (ttp, _, _) = try makeTTP()
+        StubURLProtocol.handler = { request in
+            (HTTPURLResponse(
+                url: request.url!,
+                statusCode: 400,
+                httpVersion: "HTTP/1.1",
+                headerFields: ["Content-Type": "application/json"]
+            )!, Data(#"{"title":"Bad request","status":400}"#.utf8))
+        }
+
+        do {
+            try await ttp.initialize()
+            XCTFail("expected the config phase to fail")
+        } catch {
+            XCTAssertTrue(error is PayabliTTPError, "the bridges read the domain of this type")
+        }
+
+        // The same bytes get the same answer, so a retry is not the remedy. A 500
+        // on the same route lands on `serviceUnavailable`.
+        XCTAssertEqual(ttp.sessionState, .failed(reason: .sdkInternalError))
     }
 
     /// An event payload is forwarded to whatever logging a host app has, so the
@@ -461,7 +488,9 @@ final class PayabliTTPTests: XCTestCase {
         let marked = try XCTUnwrap(ttp.sessionManager.lastError)
 
         XCTAssertFalse(attestation.isAlreadyAttested, "a refused handle must not be sent again")
-        XCTAssertEqual(ttp.sessionState, .error)
+        // A refused binding and a refused bearer are both worth another call,
+        // which is the remedy the 401 underneath the wrapper carries.
+        XCTAssertEqual(ttp.sessionState, .failed(reason: .serviceUnavailable))
         XCTAssertEqual(reported, "configFailed")
         XCTAssertTrue(raised.localizedDescription.contains("401"), raised.localizedDescription)
         // The drop is the config call's to make, so the reason claims nothing about
@@ -471,7 +500,7 @@ final class PayabliTTPTests: XCTestCase {
             raised.localizedDescription.contains("cleared"),
             "the reason claims an outcome this layer does not decide"
         )
-        XCTAssertEqual(String(describing: marked), String(describing: raised))
+        XCTAssertFalse(marked is PayabliTTPError, "the state is classified from the 401 itself")
     }
 
     /// The rule reaches the events that predate it. An activation failure's reason

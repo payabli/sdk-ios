@@ -15,7 +15,7 @@ final class SessionManagerTests: XCTestCase {
         let sm = SessionManager()
         XCTAssertTrue(sm.transition(to: .attestingDevice))
         XCTAssertTrue(sm.transition(to: .fetchingConfig))
-        XCTAssertTrue(sm.transition(to: .initializingReader))
+        XCTAssertTrue(sm.transition(to: .initializingReader(percent: nil)))
         XCTAssertTrue(sm.transition(to: .ready))
         XCTAssertTrue(sm.isReady)
     }
@@ -23,21 +23,21 @@ final class SessionManagerTests: XCTestCase {
     func testWarmPathSkipsAttestation() {
         let sm = SessionManager()
         XCTAssertTrue(sm.transition(to: .fetchingConfig))
-        XCTAssertTrue(sm.transition(to: .initializingReader))
+        XCTAssertTrue(sm.transition(to: .initializingReader(percent: nil)))
         XCTAssertTrue(sm.transition(to: .ready))
     }
 
     func testSessionExpiredAndReinitialize() {
         let sm = SessionManager()
         _ = sm.transition(to: .fetchingConfig)
-        _ = sm.transition(to: .initializingReader)
+        _ = sm.transition(to: .initializingReader(percent: nil))
         _ = sm.transition(to: .ready)
 
         XCTAssertTrue(sm.transition(to: .sessionExpired))
         XCTAssertFalse(sm.isReady)
         XCTAssertTrue(sm.transition(to: .reinitializing))
         XCTAssertTrue(sm.transition(to: .fetchingConfig))
-        XCTAssertTrue(sm.transition(to: .initializingReader))
+        XCTAssertTrue(sm.transition(to: .initializingReader(percent: nil)))
         XCTAssertTrue(sm.transition(to: .ready))
     }
 
@@ -53,14 +53,14 @@ final class SessionManagerTests: XCTestCase {
     func testRejectsSkippingStates() {
         let sm = SessionManager()
         XCTAssertFalse(sm.transition(to: .ready))
-        XCTAssertFalse(sm.transition(to: .initializingReader))
+        XCTAssertFalse(sm.transition(to: .initializingReader(percent: nil)))
         XCTAssertFalse(sm.transition(to: .sessionExpired))
     }
 
     func testRejectsReadyToFetching() {
         let sm = SessionManager()
         _ = sm.transition(to: .fetchingConfig)
-        _ = sm.transition(to: .initializingReader)
+        _ = sm.transition(to: .initializingReader(percent: nil))
         _ = sm.transition(to: .ready)
         // ready → fetchingConfig must go through sessionExpired + reinitializing.
         XCTAssertFalse(sm.transition(to: .fetchingConfig))
@@ -73,7 +73,7 @@ final class SessionManagerTests: XCTestCase {
     func testReadyToSessionExpiredIsPermitted() {
         let sm = SessionManager()
         _ = sm.transition(to: .fetchingConfig)
-        _ = sm.transition(to: .initializingReader)
+        _ = sm.transition(to: .initializingReader(percent: nil))
         _ = sm.transition(to: .ready)
         XCTAssertTrue(sm.transition(to: .sessionExpired))
         XCTAssertEqual(sm.sessionState, .sessionExpired)
@@ -86,8 +86,9 @@ final class SessionManagerTests: XCTestCase {
     /// and `reset()` assigned the state directly to get around it.
     func testEveryStateCanStartOver() {
         let states: [PayabliTTPSessionState] = [
-            .idle, .attestingDevice, .fetchingConfig, .initializingReader,
-            .ready, .sessionExpired, .reinitializing, .pendingActivation, .error
+            .idle, .attestingDevice, .fetchingConfig, .initializingReader(percent: nil),
+            .ready, .sessionExpired, .reinitializing, .pendingActivation,
+            .failed(reason: .sdkInternalError)
         ]
         for state in states {
             XCTAssertTrue(
@@ -112,7 +113,7 @@ final class SessionManagerTests: XCTestCase {
         let sm = SessionManager()
         _ = sm.transition(to: .attestingDevice)
         sm.markError(DummyError())
-        XCTAssertEqual(sm.sessionState, .error)
+        XCTAssertEqual(sm.sessionState, .failed(reason: .sdkInternalError))
         XCTAssertFalse(sm.isReady)
         XCTAssertNotNil(sm.lastError)
     }
@@ -120,7 +121,7 @@ final class SessionManagerTests: XCTestCase {
     /// The terms state is reached from the reader phase and leaves the way `pendingActivation` does:
     /// the host resolves what the session waits on, then initializes again from attestation.
     func testPendingTermsIsEnteredFromTheReaderPhaseAndLeavesToAttestation() {
-        XCTAssertTrue(SessionManager.isValidTransition(from: .initializingReader, to: .pendingTerms))
+        XCTAssertTrue(SessionManager.isValidTransition(from: .initializingReader(percent: nil), to: .pendingTerms))
         XCTAssertTrue(SessionManager.isValidTransition(from: .pendingTerms, to: .attestingDevice))
         XCTAssertTrue(SessionManager.isValidTransition(from: .pendingTerms, to: .idle))
     }

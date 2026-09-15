@@ -55,7 +55,7 @@ export enum PayabliTTPSessionState {
     SessionExpired = 5,
     Reinitializing = 6,
     PendingActivation = 7,
-    Error = 8,
+    Failed = 8,
     PendingTerms = 9,
 }
 
@@ -81,7 +81,9 @@ export enum PayabliTTPEventCode {
     AttestationFailed = 18,
     ConfigFailed = 19,
     TermsRequired = 20,
-    ReaderConfigurationProgressChanged = 21,
+    // 21 was ReaderConfigurationProgressChanged. Progress is a payload on the
+    // session state now. Retired rather than reused: consumers resolve this
+    // package from source against main and have had 21 since it merged.
     ReaderNotReady = 22,
     CardDetected = 23,
     CardRemovalRequested = 24,
@@ -136,9 +138,31 @@ export interface PayabliTTPTransactionResult {
     paymentTransId: string;
 }
 
+/// The session state and what its case carries. The native enum carries
+/// payloads and no bridge can express one, so the code and the payloads arrive
+/// side by side.
+export interface PayabliTTPSessionSnapshot {
+    code: PayabliTTPSessionState;
+    /// `null` outside a configuration. The key is always present: the native
+    /// side sends every field and an absent Swift optional arrives as `null`,
+    /// so narrowing on the property being there answers `true` for both.
+    readerConfigurationPercent: number | null;
+    /// `null` unless the session failed, for the same reason.
+    failureReason: PayabliTTPFailureReason | null;
+}
+
+/// Mirrors `PayabliTTPFailureReason`.
+export enum PayabliTTPFailureReason {
+    AttestationRequired = 0,
+    ConfigurationRejected = 1,
+    ServiceUnavailable = 2,
+    DeviceIneligible = 3,
+    SdkInternalError = 4,
+}
+
 export interface PayabliTTPEvent {
     code: PayabliTTPEventCode;
-    payload: { paymentTransId?: string; error?: string; percent?: number };
+    payload: { paymentTransId?: string; error?: string };
 }
 
 export interface PayabliTTPConfig {
@@ -228,7 +252,7 @@ interface NativePayabliSDKModule {
     areTermsAccepted(): Promise<boolean>;
     presentTerms(): Promise<void>;
 
-    getSessionState(): Promise<number>;
+    getSessionState(): Promise<PayabliTTPSessionSnapshot>;
 
     resolveTokenRefresh(token: string): void;
 
@@ -330,9 +354,8 @@ export function presentTerms(): Promise<void> {
     return requireNativeModule().presentTerms();
 }
 
-export async function getSessionState(): Promise<PayabliTTPSessionState> {
-    const raw = await requireNativeModule().getSessionState();
-    return raw as PayabliTTPSessionState;
+export async function getSessionState(): Promise<PayabliTTPSessionSnapshot> {
+    return requireNativeModule().getSessionState();
 }
 
 export function addEventListener(

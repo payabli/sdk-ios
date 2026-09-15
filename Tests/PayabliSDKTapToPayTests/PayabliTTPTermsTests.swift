@@ -200,7 +200,7 @@ final class PayabliTTPTermsTests: XCTestCase {
 
         _ = try? await ttp.initialize()
 
-        XCTAssertEqual(ttp.sessionState, .error)
+        XCTAssertEqual(ttp.sessionState.code, .failed)
     }
 
     // MARK: - Presenting them

@@ -50,7 +50,7 @@ namespace Payabli.TapToPay
         SessionExpired = 5,
         Reinitializing = 6,
         PendingActivation = 7,
-        Error = 8,
+        Failed = 8,
         PendingTerms = 9,
     }
 
@@ -80,7 +80,8 @@ namespace Payabli.TapToPay
         AttestationFailed = 18,
         ConfigFailed = 19,
         TermsRequired = 20,
-        ReaderConfigurationProgressChanged = 21,
+        // 21 retired: progress is a payload on the session state. Not reused,
+        // because consumers resolve this package from source against main.
         ReaderNotReady = 22,
         CardDetected = 23,
         CardRemovalRequested = 24,
@@ -287,7 +288,13 @@ namespace Payabli.TapToPay
 
         // Session state (read-only @Published properties).
 
-        [Export("sessionState")] PayabliTTPSessionState SessionState { get; }
+        // The Swift state carries payloads and is not Objective-C representable,
+        // so a host reads the code and then asks for what it carries.
+        [Export("sessionStateCode")] PayabliTTPSessionState SessionState { get; }
+
+        [NullAllowed, Export("readerConfigurationPercent")] NSNumber ReaderConfigurationPercent { get; }
+
+        [NullAllowed, Export("failureReason")] NSNumber FailureReason { get; }
         [Export("isReady")] bool IsReady { get; }
 
         // Event subscription. The returned token's Cancel() tears down the

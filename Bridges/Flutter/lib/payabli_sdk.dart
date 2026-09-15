@@ -169,12 +169,22 @@ class PayabliTTP {
 
   // MARK: - getSessionState
 
-  /// Polls the current `PayabliTTPSessionState`.
-  static Future<PayabliTTPSessionState> getSessionState() async {
-    final raw = await _payabliMethodChannel.invokeMethod<int>(
+  /// Polls the session state and what its case carries.
+  static Future<PayabliTTPSessionSnapshot> getSessionState() async {
+    final raw = await _payabliMethodChannel.invokeMethod<Map<dynamic, dynamic>>(
       'getSessionState',
     );
-    return PayabliTTPSessionState.values[raw ?? 0];
+    final code = (raw?['code'] as int?) ?? 0;
+    final reason = raw?['failureReason'] as int?;
+    return PayabliTTPSessionSnapshot(
+      code: code < PayabliTTPSessionState.values.length
+          ? PayabliTTPSessionState.values[code]
+          : PayabliTTPSessionState.idle,
+      readerConfigurationPercent: raw?['readerConfigurationPercent'] as int?,
+      failureReason: reason == null
+          ? null
+          : PayabliTTPFailureReason.values[reason],
+    );
   }
 
   // MARK: - events
@@ -365,6 +375,30 @@ class PayabliPayInPaymentFlowStoredPaymentMethod {
 enum PayabliTTPPaymentType { sale }
 
 /// Mirrors `PayabliTTPSessionState` (raw indices match the @objc Int enum).
+/// The session state and what its case carries. The native enum carries
+/// payloads and no bridge can express one, so the code and the payloads arrive
+/// side by side.
+class PayabliTTPSessionSnapshot {
+  const PayabliTTPSessionSnapshot({
+    required this.code,
+    this.readerConfigurationPercent,
+    this.failureReason,
+  });
+
+  final PayabliTTPSessionState code;
+  final int? readerConfigurationPercent;
+  final PayabliTTPFailureReason? failureReason;
+}
+
+/// Mirrors `PayabliTTPFailureReason`.
+enum PayabliTTPFailureReason {
+  attestationRequired,
+  configurationRejected,
+  serviceUnavailable,
+  deviceIneligible,
+  sdkInternalError,
+}
+
 enum PayabliTTPSessionState {
   idle,
   attestingDevice,
@@ -374,7 +408,7 @@ enum PayabliTTPSessionState {
   sessionExpired,
   reinitializing,
   pendingActivation,
-  error,
+  failed,
   pendingTerms,
 }
 
@@ -401,7 +435,10 @@ enum PayabliTTPEventCode {
   attestationFailed,
   configFailed,
   termsRequired,
-  readerConfigurationProgressChanged,
+  // 21 was readerConfigurationProgressChanged. Progress is a payload on the
+  // session state now. This list is read by index, and the value is retired
+  // rather than reused: consumers resolve from source against main.
+  readerConfigurationProgressRetired,
   readerNotReady,
   cardDetected,
   cardRemovalRequested,

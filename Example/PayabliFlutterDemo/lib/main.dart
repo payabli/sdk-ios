@@ -167,7 +167,7 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() => _isWorking = true);
     try {
       await PayabliTTP.initialize();
-      _state = await PayabliTTP.getSessionState();
+      _state = (await PayabliTTP.getSessionState()).code;
       setState(() => _lastResult = '✓ Initialized');
     } on PayabliTTPException catch (e) {
       setState(() => _lastResult = '✗ ${e.code}: ${e.message}');
@@ -191,7 +191,7 @@ class _HomeScreenState extends State<HomeScreen> {
     } on PayabliTTPException catch (e) {
       setState(() => _lastResult = '✗ ${e.code}: ${e.message}');
     } finally {
-      _state = await PayabliTTP.getSessionState();
+      _state = (await PayabliTTP.getSessionState()).code;
       setState(() => _isWorking = false);
     }
   }
@@ -478,7 +478,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _stateBadge(PayabliTTPSessionState s) {
     final color = switch (s) {
       PayabliTTPSessionState.ready => Colors.green,
-      PayabliTTPSessionState.error ||
+      PayabliTTPSessionState.failed ||
       PayabliTTPSessionState.sessionExpired =>
         Colors.red,
       PayabliTTPSessionState.pendingActivation => Colors.orange,
