@@ -119,28 +119,13 @@ final class TapToPayOnDeviceTests: XCTestCase {
             }
         }
         defer { watcher.cancel() }
-        // Initialization is what stalls when a reader cannot arm, so it is
-        // bounded along with the collector. Bounding only the collector left the
-        // test suspended in `initialize()` for exactly the failure the bound was
-        // added for. Generous: a first arming runs for minutes.
-        let setup = Task { try await ttp.initialize() }
-        let deadline = Task {
-            guard (try? await Task.sleep(nanoseconds: Self.armingWait)) != nil else { return }
-            setup.cancel()
-        }
-        defer { deadline.cancel() }
-
         do {
-            try await setup.value
-        } catch {
-            if error is CancellationError {
-                XCTFail("the reader did not finish arming within the time allowed")
-                return
-            }
-            if case PayabliTTPError.devicePendingActivation = error {
-                throw XCTSkip("this device is pending activation on \(named.entry)")
-            }
-            throw error
+            try await bounded { try await ttp.initialize() }
+        } catch is ArmingTimedOut {
+            XCTFail("the reader did not finish arming within the time allowed")
+            return
+        } catch PayabliTTPError.devicePendingActivation {
+            throw XCTSkip("this device is pending activation on \(named.entry)")
         }
 
         XCTAssertEqual(ttp.sessionState, .ready, "the reader never became ready")
@@ -162,6 +147,44 @@ final class TapToPayOnDeviceTests: XCTestCase {
     /// How long a reader has to finish arming before the test says it never did.
     /// Apple documents a first configuration as taking up to several minutes.
     private static let armingWait: UInt64 = 300_000_000_000
+
+    /// Runs `work` and gives up on it rather than waiting for it.
+    ///
+    /// Cancelling the task that awaits `initialize()` does not reach the task
+    /// `initialize()` is itself awaiting, so a reader wedged in preparation
+    /// keeps that await suspended however early the timer fires. The deadline
+    /// therefore has to resume this caller on its own, which means racing two
+    /// unstructured tasks and taking whichever finishes first.
+    private func bounded<T: Sendable>(
+        _ work: @escaping @MainActor () async throws -> T
+    ) async throws -> T {
+        let once = ResumeOnce()
+
+        return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<T, Error>) in
+            let workTask = Task { @MainActor in
+                do {
+                    let value = try await work()
+                    if !once.done {
+                        once.done = true
+                        continuation.resume(returning: value)
+                    }
+                } catch {
+                    if !once.done {
+                        once.done = true
+                        continuation.resume(throwing: error)
+                    }
+                }
+            }
+            Task { @MainActor in
+                try? await Task.sleep(nanoseconds: Self.armingWait)
+                if !once.done {
+                    once.done = true
+                    continuation.resume(throwing: ArmingTimedOut())
+                }
+                workTask.cancel()
+            }
+        }
+    }
 
     /// Reaching `.ready` stores a binding that names this paypoint.
     func testReachingReadyStoresABindingForThisPaypoint() async throws {
@@ -458,4 +481,14 @@ private final class OutcomeBox: @unchecked Sendable {
         defer { lock.unlock() }
         terminal = outcome
     }
+}
+
+/// Tells a reader that never armed from one that failed while arming.
+private struct ArmingTimedOut: Error {}
+
+/// Guards a continuation so the deadline and the work cannot both resume it.
+/// Only touched from the main actor, which is where both racers run.
+@MainActor
+private final class ResumeOnce {
+    var done = false
 }
