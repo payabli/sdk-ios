@@ -169,5 +169,14 @@ final class PayabliTTPFailureReasonTests: XCTestCase {
     /// host branching on one branches on the same set on both.
     func testTheVocabularyMirrorsTheSibling() {
         XCTAssertEqual(PayabliTTPFailureReason.allCases.count, 5)
+        XCTAssertEqual(PayabliTTPFailureReason.attestationRequired.rawValue, 0)
+        XCTAssertEqual(PayabliTTPFailureReason.configurationRejected.rawValue, 1)
+        XCTAssertEqual(PayabliTTPFailureReason.serviceUnavailable.rawValue, 2)
+        XCTAssertEqual(PayabliTTPFailureReason.deviceIneligible.rawValue, 3)
+        XCTAssertEqual(PayabliTTPFailureReason.sdkInternalError.rawValue, 4)
+        // The bridges read these integers, so a member is appended and never
+        // renumbered. This is what makes an append visible here first.
+        XCTAssertNil(PayabliTTPFailureReason(rawValue: 5))
     }
+
 }
