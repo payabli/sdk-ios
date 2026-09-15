@@ -126,18 +126,26 @@ final class TapToPayOnDeviceTests: XCTestCase {
             }
             return nil
         }
-        // Bounded, so a `.readerReady` that never arrives fails this test rather
-        // than hanging the bundle. Generous: a first arming runs for minutes.
+        // Initialization is what stalls when a reader cannot arm, so it is
+        // bounded along with the collector. Bounding only the collector left the
+        // test suspended in `initialize()` for exactly the failure the bound was
+        // added for. Generous: a first arming runs for minutes.
+        let setup = Task { try await ttp.initialize() }
         let deadline = Task {
             guard (try? await Task.sleep(nanoseconds: Self.armingWait)) != nil else { return }
+            setup.cancel()
             collector.cancel()
         }
         defer { deadline.cancel() }
 
         do {
-            try await ttp.initialize()
+            try await setup.value
         } catch {
             collector.cancel()
+            if error is CancellationError {
+                XCTFail("the reader did not finish arming within the time allowed")
+                return
+            }
             if case PayabliTTPError.devicePendingActivation = error {
                 throw XCTSkip("this device is pending activation on \(named.entry)")
             }
