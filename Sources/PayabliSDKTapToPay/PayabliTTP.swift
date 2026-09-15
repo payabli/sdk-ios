@@ -63,6 +63,14 @@ public final class PayabliTTP: NSObject, ObservableObject {
     /// attributed to the replacement.
     var readerSessionGeneration = 0
 
+    /// The configuration currently running, or `nil` when none is. A reader's
+    /// event handler outlives the configuration that installed it, so progress
+    /// is published only while its own configuration is still this one.
+    var activeConfiguration: Int?
+
+    /// Names each configuration, so an ended one can be told from a new one.
+    var nextConfigurationID = 0
+
     /// The session setup in progress, if any, and which entry point started it.
     /// A caller of the same kind joins it, the way `PayabliAuth` deduplicates a
     /// token refresh; a caller of the other kind waits for it to finish.
