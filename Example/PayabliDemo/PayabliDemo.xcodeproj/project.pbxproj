@@ -12,10 +12,12 @@
 		5DC00000000000000000C402 /* LoggableError.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F600000000BB51 /* LoggableError.swift */; };
 		5DC00000000000000000C401 /* PayInOutcome.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DC00000000000000000B101 /* PayInOutcome.swift */; };
 		5DC00000000000000000C302 /* PayInFailureTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DC00000000000000000C301 /* PayInFailureTests.swift */; };
+		5DC00000000000000000C3B4 /* PayInReversalStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DC00000000000000000C3B3 /* PayInReversalStateTests.swift */; };
 		5DC00000000000000000C3A2 /* PayInReversibleTransIdTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DC00000000000000000C3A1 /* PayInReversibleTransIdTests.swift */; };
 		5DC00000000000000000C203 /* DemoCustomerData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DC00000000000000000B801 /* DemoCustomerData.swift */; };
 		5DC00000000000000000C202 /* PayInRequests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DC00000000000000000B501 /* PayInRequests.swift */; };
 		5DC00000000000000000C201 /* PayInFlowHandle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DC00000000000000000B201 /* PayInFlowHandle.swift */; };
+		5DC00000000000000000C3B2 /* PayInReversalState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DC00000000000000000C3B1 /* PayInReversalState.swift */; };
 		5DC00000000000000000C102 /* PayInFlowHandleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DC00000000000000000C101 /* PayInFlowHandleTests.swift */; };
 		5DC00000000000000000BF03 /* PayabliEnvironmentMapping.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DC00000000000000000BF01 /* PayabliEnvironmentMapping.swift */; };
 		5DC00000000000000000C002 /* DemoEnvironmentTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DC00000000000000000C001 /* DemoEnvironmentTests.swift */; };
@@ -34,6 +36,7 @@
 		5DC00000000000000000B402 /* PayInForms.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DC00000000000000000B401 /* PayInForms.swift */; };
 		5DC00000000000000000B302 /* PaymentFormHost.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DC00000000000000000B301 /* PaymentFormHost.swift */; };
 		5DC00000000000000000B202 /* PayInFlowHandle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DC00000000000000000B201 /* PayInFlowHandle.swift */; };
+		5DC00000000000000000C3B5 /* PayInReversalState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DC00000000000000000C3B1 /* PayInReversalState.swift */; };
 		5DC00000000000000000B102 /* PayInOutcome.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DC00000000000000000B101 /* PayInOutcome.swift */; };
 		A1B2C3D4E5F60000000000E2 /* QAContextLine.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60000000000E1 /* QAContextLine.swift */; };
 		A1B2C3D4E5F60000000000D2 /* StepRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60000000000D1 /* StepRow.swift */; };
@@ -124,6 +127,7 @@
 /* Begin PBXFileReference section */
 		5DC00000000000000000C501 /* PayInOperation.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PayInOperation.swift; sourceTree = "<group>"; };
 		5DC00000000000000000C301 /* PayInFailureTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PayInFailureTests.swift; sourceTree = "<group>"; };
+		5DC00000000000000000C3B3 /* PayInReversalStateTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PayInReversalStateTests.swift; sourceTree = "<group>"; };
 		5DC00000000000000000C3A1 /* PayInReversibleTransIdTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PayInReversibleTransIdTests.swift; sourceTree = "<group>"; };
 		5DC00000000000000000C101 /* PayInFlowHandleTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PayInFlowHandleTests.swift; sourceTree = "<group>"; };
 		5DC00000000000000000C001 /* DemoEnvironmentTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DemoEnvironmentTests.swift; sourceTree = "<group>"; };
@@ -140,6 +144,7 @@
 		5DC00000000000000000B401 /* PayInForms.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PayInForms.swift; sourceTree = "<group>"; };
 		5DC00000000000000000B301 /* PaymentFormHost.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PaymentFormHost.swift; sourceTree = "<group>"; };
 		5DC00000000000000000B201 /* PayInFlowHandle.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PayInFlowHandle.swift; sourceTree = "<group>"; };
+		5DC00000000000000000C3B1 /* PayInReversalState.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PayInReversalState.swift; sourceTree = "<group>"; };
 		5DC00000000000000000B101 /* PayInOutcome.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PayInOutcome.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F60000000000E1 /* QAContextLine.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = QAContextLine.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F60000000000D1 /* StepRow.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = StepRow.swift; sourceTree = "<group>"; };
@@ -316,6 +321,7 @@
 				5DC00000000000000000B401 /* PayInForms.swift */,
 				5DC00000000000000000B301 /* PaymentFormHost.swift */,
 				5DC00000000000000000B201 /* PayInFlowHandle.swift */,
+				5DC00000000000000000C3B1 /* PayInReversalState.swift */,
 				5DC00000000000000000B101 /* PayInOutcome.swift */,
 				D10000000000000000000004 /* PayInSharedConfiguration.swift */,
 				A1B2C3D4E5F600000000BB51 /* LoggableError.swift */,
@@ -455,6 +461,7 @@
 			isa = PBXGroup;
 			children = (
 				5DC00000000000000000C301 /* PayInFailureTests.swift */,
+				5DC00000000000000000C3B3 /* PayInReversalStateTests.swift */,
 				5DC00000000000000000C3A1 /* PayInReversibleTransIdTests.swift */,
 				5DC00000000000000000C101 /* PayInFlowHandleTests.swift */,
 				5DC00000000000000000C001 /* DemoEnvironmentTests.swift */,
@@ -690,10 +697,12 @@
 				5DC00000000000000000C402 /* LoggableError.swift in Sources */,
 				5DC00000000000000000C401 /* PayInOutcome.swift in Sources */,
 				5DC00000000000000000C302 /* PayInFailureTests.swift in Sources */,
+				5DC00000000000000000C3B4 /* PayInReversalStateTests.swift in Sources */,
 				5DC00000000000000000C3A2 /* PayInReversibleTransIdTests.swift in Sources */,
 				5DC00000000000000000C203 /* DemoCustomerData.swift in Sources */,
 				5DC00000000000000000C202 /* PayInRequests.swift in Sources */,
 				5DC00000000000000000C201 /* PayInFlowHandle.swift in Sources */,
+				5DC00000000000000000C3B2 /* PayInReversalState.swift in Sources */,
 				5DC00000000000000000C102 /* PayInFlowHandleTests.swift in Sources */,
 				5DC00000000000000000BF03 /* PayabliEnvironmentMapping.swift in Sources */,
 				5DC00000000000000000C002 /* DemoEnvironmentTests.swift in Sources */,
@@ -736,6 +745,7 @@
 				5DC00000000000000000B402 /* PayInForms.swift in Sources */,
 				5DC00000000000000000B302 /* PaymentFormHost.swift in Sources */,
 				5DC00000000000000000B202 /* PayInFlowHandle.swift in Sources */,
+				5DC00000000000000000C3B5 /* PayInReversalState.swift in Sources */,
 				5DC00000000000000000B102 /* PayInOutcome.swift in Sources */,
 				AF77F479977FE319B28EB3D7 /* PayabliDemoQAApp.swift in Sources */,
 				D20000000000000000000007 /* ConfigurationQAView.swift in Sources */,

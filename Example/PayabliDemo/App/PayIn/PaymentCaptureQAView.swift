@@ -13,10 +13,7 @@ struct PaymentCaptureQAView: View {
     @State private var capturedResult: PayInOutcome?
     @State private var isPaymentCaptureSheetPresented = false
     @State private var isPaymentCaptureResultViewPresented = false
-    @State private var voidedTransId: String?
-    @State private var startedAReversal = false
-    @State private var unreconciled: [String] = []
-    @State private var voidText = ""
+    @State private var reversal = PayInReversalState()
 
     var body: some View {
         NavigationStack {
@@ -115,7 +112,7 @@ struct PaymentCaptureQAView: View {
                             if let transId = capturedResult?.reversibleTransId {
                                 Button { reverse(transId) } label: {
                                     Label(
-                                        voidedTransId == transId ? "Reversed" : "Reverse this payment",
+                                        reversal.reversed == transId ? "Reversed" : "Reverse this payment",
                                         systemImage: "arrow.uturn.backward"
                                     )
                                     .frame(maxWidth: .infinity)
@@ -125,16 +122,16 @@ struct PaymentCaptureQAView: View {
                                 // exclusion the flow enforces made observable, so a control cannot
                                 // disagree with the thing doing the refusing.
                                 .disabled(
-                                    voidedTransId == transId
-                                        || unreconciled.contains(transId)
-                                        || paymentFlow.isSubmitting
+                                    !reversal.offersReversal(of: transId) || paymentFlow.isSubmitting
                                 )
 
-                                if !voidText.isEmpty {
-                                    Text(voidText)
+                                if !reversal.message.isEmpty {
+                                    Text(reversal.message)
                                         .font(.caption)
                                         .foregroundColor(
-                                            voidedTransId == transId ? .payabliOnSurfaceVariant : .payabliError
+                                            reversal.reversed == transId
+                                                ? .payabliOnSurfaceVariant
+                                                : .payabliError
                                         )
                                         .frame(maxWidth: .infinity, alignment: .leading)
                                         .textSelection(.enabled)
@@ -147,10 +144,10 @@ struct PaymentCaptureQAView: View {
                     // own content once it is blocked, so a later capture failure would take this
                     // down with it, and what it names is the one thing needed to reconcile money
                     // that may already have moved.
-                    if !unreconciled.isEmpty {
+                    if !reversal.unreconciled.isEmpty {
                         Text(
-                            "A reversal of \(unreconciled.joined(separator: ", ")) may have been "
-                                + "applied. Read back before reversing again."
+                            "A reversal of \(reversal.unreconciled.joined(separator: ", ")) may have "
+                                + "been applied. Read back before reversing again."
                         )
                         .font(.caption)
                         .foregroundColor(.payabliError)
@@ -223,7 +220,7 @@ struct PaymentCaptureQAView: View {
                 // whether the next call would be refused, which is true of the reversal this
                 // screen started too, and the capture steps would then hide the payment being
                 // reversed and offer the form again underneath it.
-                isSubmitting: paymentFlow.isSubmitting && !startedAReversal,
+                isSubmitting: paymentFlow.isSubmitting && !reversal.isReversing,
                 submitFailed: submitFailed
             )
         )
@@ -243,8 +240,7 @@ struct PaymentCaptureQAView: View {
         submitFailed = false
         resultText = ""
         capturedResult = nil
-        voidedTransId = nil
-        voidText = ""
+        reversal.paymentReplaced()
     }
 
     /// Reverses the payment on screen.
@@ -255,44 +251,28 @@ struct PaymentCaptureQAView: View {
         // The flow refuses a second submission itself. Asking first keeps a queued tap from
         // becoming a call whose refusal would read as this reversal's answer.
         guard !paymentFlow.isSubmitting else { return }
-        voidText = ""
-        startedAReversal = true
+        reversal.began()
         Task {
-            defer { startedAReversal = false }
+            let onScreen = capturedResult?.reversibleTransId
             do {
                 let outcome = try await paymentFlow.voidTransaction(transId)
                 Logger(
                     subsystem: "com.payabli.example.app",
                     category: "PaymentCaptureDiagnostics"
                 ).info("Payment reversed: \(outcome.code, privacy: .public)")
-                voidedTransId = transId
-                unreconciled.removeAll { $0 == transId }
-                show("Reversed. Code: \(outcome.code) Reason: \(outcome.reason ?? "-")", for: transId)
+                reversal.reversed(
+                    transId,
+                    saying: "Reversed. Code: \(outcome.code) Reason: \(outcome.reason ?? "-")",
+                    onScreen: onScreen
+                )
             } catch {
-                let failure = PayInFailure(error, operation: .void)
-                // Only this transaction's question is answered here. A settled failure for one
-                // reversal says nothing about another that is still open.
-                if failure.outcomeIsUnresolved {
-                    if !unreconciled.contains(transId) {
-                        unreconciled.append(transId)
-                    }
-                } else {
-                    unreconciled.removeAll { $0 == transId }
-                }
-                guard !failure.refusedForAnotherSubmission else { return }
-                show(failure.message, for: transId)
+                reversal.failed(
+                    PayInFailure(error, operation: .void),
+                    for: transId,
+                    onScreen: onScreen
+                )
             }
         }
-    }
-
-    /// Shows what a reversal answered, if the payment it answers about is still on screen.
-    ///
-    /// The transaction comes from the call's own scope rather than from anything stored, so an
-    /// answer cannot be matched to the wrong request or dropped because an unrelated one finished
-    /// first.
-    private func show(_ text: String, for transId: String) {
-        guard capturedResult?.reversibleTransId == transId else { return }
-        voidText = text
     }
 
     private func runTokenCheck() {
