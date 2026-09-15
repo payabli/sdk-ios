@@ -367,7 +367,13 @@ final class PayabliTTPTests: XCTestCase {
         }
         let reported = try await value(of: collector, named: "configFailed")
 
-        XCTAssertEqual(ttp.sessionState.code, .failed)
+        // The whole state rather than its code, which is what pins the remedy a
+        // host is actually given. It is `configurationRejected` because the
+        // config phase wraps every transport failure before the state is set,
+        // so a 500 reaches a host as an account someone must change rather than
+        // a service that may answer later. Asserted as it behaves, and the
+        // wrapper is with the product owner.
+        XCTAssertEqual(ttp.sessionState, .failed(reason: .configurationRejected))
         let raised = try XCTUnwrap(thrown, "initialize() returned instead of failing")
         let marked = try XCTUnwrap(ttp.sessionManager.lastError, "the session recorded no error")
 
