@@ -54,10 +54,8 @@ final class TapToPayTerminal: ObservableObject {
         try await run { try await terminal.reinitializeIfNeeded() }
     }
 
-    /// Takes a sale. The returned string is the payment's transaction identifier.
-    ///
-    /// - Parameter suppliesCustomer: whether the sale names this app's stand-in
-    ///   customer, which the app's switch decides.
+    /// Takes a sale. The returned string is the payment's transaction identifier,
+    /// and `suppliesCustomer` names this app's stand-in customer on it.
     func charge(amount: Decimal, suppliesCustomer: Bool) async throws -> String {
         try await run {
             let result = try await terminal.charge(
