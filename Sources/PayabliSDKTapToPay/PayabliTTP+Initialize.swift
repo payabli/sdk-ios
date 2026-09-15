@@ -273,11 +273,15 @@ extension PayabliTTP {
     // MARK: - Phase 4 — prepare reader
 
     private func runPrepareReaderPhase() async throws {
+        // The percentage belongs to this phase. A host is told to draw progress
+        // while it is not `nil`, so leaving the last one behind would leave a
+        // finished bar on screen until the next configuration started.
+        defer { readerConfigurationProgress = nil }
+
         _ = sessionManager.transition(to: .initializingReader)
         syncPublished()
         multicaster.emit(.readerInitializing)
         do {
-            readerConfigurationProgress = nil
             try await provider.prepareReader { [weak self] event in
                 self?.handleReaderEvent(event)
             }

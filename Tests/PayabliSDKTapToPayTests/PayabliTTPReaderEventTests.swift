@@ -22,10 +22,12 @@ final class PayabliTTPReaderEventTests: XCTestCase {
 
     // MARK: - During configuration
 
-    /// The percentage arrives while `prepareReader` is still running, which is
-    /// the case a handler installed afterwards would miss.
-    func testProgressRaisedWhileTheReaderConfiguresIsKept() async throws {
+    /// The percentage is readable while `prepareReader` is still running, which
+    /// is the case a handler installed afterwards would miss.
+    func testProgressIsReadableWhileTheReaderConfigures() async throws {
         let (ttp, provider) = try makeTTP()
+        var seenDuringPrepare: [Int?] = []
+        provider.onPrepare = { seenDuringPrepare.append(ttp.readerConfigurationProgress) }
         provider.readerEventsDuringPrepare = [
             .configurationProgress(percent: 10),
             .configurationProgress(percent: 90)
@@ -33,7 +35,30 @@ final class PayabliTTPReaderEventTests: XCTestCase {
 
         try await ttp.initialize()
 
-        XCTAssertEqual(ttp.readerConfigurationProgress, 90)
+        XCTAssertEqual(seenDuringPrepare, [10, 90])
+    }
+
+    /// A configuration that ends leaves nothing behind, or a host told to draw
+    /// progress while this is not `nil` draws a finished bar for ever.
+    func testTheProgressIsClearedWhenTheConfigurationEnds() async throws {
+        let (ttp, provider) = try makeTTP()
+        provider.readerEventsDuringPrepare = [.configurationProgress(percent: 100)]
+
+        try await ttp.initialize()
+
+        XCTAssertEqual(ttp.sessionState, .ready)
+        XCTAssertNil(ttp.readerConfigurationProgress)
+    }
+
+    /// A configuration that fails leaves nothing behind either.
+    func testTheProgressIsClearedWhenTheConfigurationFails() async throws {
+        let (ttp, provider) = try makeTTP()
+        provider.readerEventsDuringPrepare = [.configurationProgress(percent: 40)]
+        provider.prepareReaderResult = .failure(PayabliTTPError.readerSetupFailed(reason: "no reader"))
+
+        _ = try? await ttp.initialize()
+
+        XCTAssertNil(ttp.readerConfigurationProgress)
     }
 
     func testNothingIsKeptUntilTheReaderReports() async throws {
@@ -44,29 +69,11 @@ final class PayabliTTPReaderEventTests: XCTestCase {
         XCTAssertNil(ttp.readerConfigurationProgress)
     }
 
-    /// A new configuration starts from nothing rather than from where the last
-    /// one finished, or a host draws a full bar over a reader that has just
-    /// begun.
-    func testANewConfigurationStartsUnreported() async throws {
-        let (ttp, provider) = try makeTTP()
-        provider.readerEventsDuringPrepare = [.configurationProgress(percent: 100)]
-        try await ttp.initialize()
-        XCTAssertEqual(ttp.readerConfigurationProgress, 100)
-
-        // A reader that reports nothing this time, so the only thing that can
-        // clear the previous value is the new configuration starting.
-        provider.readerEventsDuringPrepare = []
-        try await ttp.initialize()
-
-        XCTAssertEqual(provider.prepareReaderCalls, 2, "the fixture is broken if the reader was not prepared again")
-        XCTAssertNil(ttp.readerConfigurationProgress)
-    }
-
     // MARK: - After the session is up
 
-    /// The subscription lives for the session, so a later configuration
-    /// reports through the same seam.
-    func testProgressRaisedAfterTheSessionIsUpIsKept() async throws {
+    /// The subscription lives for the session, so the seam still delivers after
+    /// `initialize()` has returned.
+    func testTheSeamStillDeliversAfterTheSessionIsUp() async throws {
         let (ttp, provider) = try makeTTP()
         try await ttp.initialize()
 
@@ -79,22 +86,24 @@ final class PayabliTTPReaderEventTests: XCTestCase {
     /// A card-read state is not progress, and must not be read as any.
     func testACardStateLeavesTheProgressAlone() async throws {
         let (ttp, provider) = try makeTTP()
-        provider.readerEventsDuringPrepare = [.configurationProgress(percent: 100)]
         try await ttp.initialize()
+        provider.emitReaderEvent(.configurationProgress(percent: 70))
+        await Task.yield()
 
         provider.emitReaderEvent(.cardDetected)
         provider.emitReaderEvent(.cardRemovalRequested)
         await Task.yield()
 
-        XCTAssertEqual(ttp.readerConfigurationProgress, 100)
+        XCTAssertEqual(ttp.readerConfigurationProgress, 70)
     }
 
     /// The provider contract ends callbacks at `cleanUp()`, so a reader that
     /// reports afterwards is a stale subscription rather than a late event.
     func testNothingIsKeptFromAReaderThatHasBeenCleanedUp() async throws {
         let (ttp, provider) = try makeTTP()
-        provider.readerEventsDuringPrepare = [.configurationProgress(percent: 40)]
         try await ttp.initialize()
+        provider.emitReaderEvent(.configurationProgress(percent: 40))
+        await Task.yield()
         XCTAssertEqual(ttp.readerConfigurationProgress, 40)
 
         await provider.cleanUp()
