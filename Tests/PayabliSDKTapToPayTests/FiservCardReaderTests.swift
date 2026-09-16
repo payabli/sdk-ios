@@ -271,7 +271,6 @@ final class FiservCardReaderTests: XCTestCase {
     func testAnUnlinkedMerchantRefusedASessionIsTermsAndKeepsTheReader() async throws {
         let stub = StubReaderSetup(
             linked: false,
-            linkTakes: false,
             sessionResult: .failure(PayabliTTPError.readerSetupFailed(reason: "refused"))
         )
         let reader = preparedReader(stub)
@@ -354,7 +353,6 @@ final class FiservCardReaderTests: XCTestCase {
     func testAnUnlinkedMerchantsOperationalFailureIsReportedAsTerms() async {
         let stub = StubReaderSetup(
             linked: false,
-            linkTakes: false,
             sessionResult: .failure(PayabliTTPError.readerSetupFailed(reason: "connection lost"))
         )
         let reader = preparedReader(stub)
@@ -369,15 +367,38 @@ final class FiservCardReaderTests: XCTestCase {
         }
     }
 
-    /// The implicit link still runs on this branch, which is what keeps the terms state the narrow
-    /// case until the second pull request removes it.
-    func testAnUnlinkedMerchantIsStillLinkedImplicitly() async throws {
-        let stub = StubReaderSetup(linked: false)
+    /// Setup never presents the sheet, which is the whole of this change.
+    ///
+    /// A merchant who has not accepted now reaches the terms state by the ordinary route: the
+    /// platform refuses to open a session, and the host is told to ask. Nothing in setup asks on
+    /// the merchant's behalf, so nobody meets the sheet by opening the application.
+    func testPreparingNeverPresentsTheSheet() async {
+        let stub = StubReaderSetup(
+            linked: false,
+            sessionResult: .failure(PayabliTTPError.readerSetupFailed(reason: "refused"))
+        )
+        let reader = preparedReader(stub)
+
+        do {
+            try await reader.prepareReader { _ in }
+            XCTFail("expected the refusal to surface")
+        } catch PayabliTTPError.termsNotAccepted {
+            // expected
+        } catch {
+            XCTFail("wrong error: \(error)")
+        }
+
+        XCTAssertEqual(stub.linkAccountCalls, 0, "setup must never present the sheet")
+    }
+
+    /// A merchant who has accepted gets a prepared reader and is asked for nothing.
+    func testPreparingAnAcceptedMerchantAsksForNothing() async throws {
+        let stub = StubReaderSetup(linked: true)
         let reader = preparedReader(stub)
 
         try await reader.prepareReader { _ in }
 
-        XCTAssertEqual(stub.linkAccountCalls, 1)
+        XCTAssertEqual(stub.linkAccountCalls, 0)
         XCTAssertEqual(stub.initializeSessionCalls, 1)
     }
 }
@@ -390,7 +411,6 @@ final class FiservCardReaderTests: XCTestCase {
 private final class StubReaderSetup: ReaderSetup {
     private let lock = NSLock()
     private var linked: Bool
-    private let linkTakes: Bool
     private let tokenResult: Result<Void, Error>
     private let sessionResult: Result<Void, Error>
 
@@ -401,17 +421,12 @@ private final class StubReaderSetup: ReaderSetup {
     /// reports its configuration progress.
     var eventsWhileOpening: [TapToPayReaderEvent] = []
 
-    /// `linkTakes: false` is the lapse the vendor documents: the request returns and the merchant
-    /// is still not linked. On this branch that is the only route to the terms state, because the
-    /// implicit call otherwise links them before the session is opened.
     init(
         linked: Bool,
-        linkTakes: Bool = true,
         tokenResult: Result<Void, Error> = .success(()),
         sessionResult: Result<Void, Error> = .success(())
     ) {
         self.linked = linked
-        self.linkTakes = linkTakes
         self.tokenResult = tokenResult
         self.sessionResult = sessionResult
     }
@@ -427,9 +442,7 @@ private final class StubReaderSetup: ReaderSetup {
     func linkAccount() async throws {
         lock.withLock {
             linkAccountCalls += 1
-            if linkTakes {
-                linked = true
-            }
+            linked = true
         }
     }
 

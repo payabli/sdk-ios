@@ -195,25 +195,19 @@ package final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
             do {
                 try await newReader.requestSessionToken()
 
-                let linked = try await newReader.isAccountLinked()
-                if !linked {
-                    try await newReader.linkAccount()
-                }
-
                 do {
                     try await newReader.initializeSession(onReaderEvent: onReaderEvent)
                 } catch {
-                    // Opening the session is the only step the platform refuses over terms, so it is
-                    // the only failure read that way. The steps before it leave the merchant unlinked
-                    // whenever they fail at all — a dropped connection while presenting the sheet is
-                    // still an unlinked merchant — and calling those unaccepted terms would hide an
-                    // operational failure behind a state the host cannot resolve by asking again.
+                    // Opening the session is the step the platform refuses over terms, so it is the
+                    // only failure read that way. A token request that fails leaves the merchant
+                    // unlinked too, and reading that as unaccepted terms would hide an operational
+                    // failure behind a state a host resolves by putting a person in front of a sheet.
                     guard try await isNotLinked(newReader) else { throw error }
                     logger.info("[fiserv.prepare] ← terms not accepted; reader kept")
                     throw PayabliTTPError.termsNotAccepted
                 }
 
-                logger.info("[fiserv.prepare] ← reader ready (linked=\(linked))")
+                logger.info("[fiserv.prepare] ← reader ready")
             } catch PayabliTTPError.termsNotAccepted {
                 // The one setup failure that leaves the reader in use, and it has to: the reader holds
                 // the session token presenting the sheet needs, and it is what answers whether the
