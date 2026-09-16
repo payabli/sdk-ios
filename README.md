@@ -478,26 +478,28 @@ Before a device reads a card, the merchant has to accept Apple's Tap to Pay term
 Apple holds that acceptance and is the only authority on it, so ask rather than
 track it yourself.
 
-The reader is built during `initialize()`, so ask once initialization has run:
-
-```swift
-try await ttp.initialize()
-let accepted = try await ttp.areTermsAccepted()
-```
-
-When the merchant has not accepted, `initialize()` stops at
+The question needs a reader, and `initialize()` builds one, so ask once
+initialization has run. When the merchant has not accepted it stops at
 `PayabliTTPSessionState.pendingTerms`, emits `PayabliTTPEvent.termsRequired` and
-throws `PayabliTTPError.termsNotAccepted`. Present the sheet from a screen you
-control, then initialize again:
+throws `PayabliTTPError.termsNotAccepted`, keeping the reader so the sheet can be
+presented from it. Present from a screen you control, then initialize again:
 
 ```swift
 do {
     try await ttp.initialize()
 } catch PayabliTTPError.termsNotAccepted {
-    try await ttp.presentTerms()                       // host UI
-    try await ttp.initialize()                         // retry
+    try await ttp.presentTerms()                        // host UI
+    guard try await ttp.areTermsAccepted() else {
+        return                                          // declined, or the sheet was dismissed
+    }
+    try await ttp.initialize()                          // retry
 }
 ```
+
+The ask sits after presenting because that is the one point where the answer is
+not already known: `presentTerms()` returning says the request completed, not
+what the merchant chose. Asking carries no state guard, so a host may ask
+whenever a reader exists.
 
 `presentTerms()` asks the platform to present its sheet and returns once the
 request is done. Returning is neither acceptance nor proof that a sheet appeared:
@@ -535,6 +537,8 @@ do {
     )
 } catch PayabliTTPError.devicePendingActivation {
     // First-time device — prompt for activation code.
+} catch PayabliTTPError.termsNotAccepted {
+    // The merchant has not accepted Apple's terms. Present them, then initialize again.
 } catch let PayabliTTPError.invalidState(current, attempted) {
     // Session isn't in the required state for this call.
 } catch let PayabliTTPError.attestationFailed(reason) {
