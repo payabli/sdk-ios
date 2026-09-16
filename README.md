@@ -485,9 +485,30 @@ try await ttp.initialize()
 let accepted = try await ttp.areTermsAccepted()
 ```
 
-`initialize()` currently presents Apple's sheet itself when the merchant has not
-accepted. A host-triggered way to present it, so the sheet appears on a screen you
-control rather than to whoever opens the app, is coming in a later release.
+When the merchant has not accepted, `initialize()` stops at
+`PayabliTTPSessionState.pendingTerms`, emits `PayabliTTPEvent.termsRequired` and
+throws `PayabliTTPError.termsNotAccepted`. Present the sheet from a screen you
+control, then initialize again:
+
+```swift
+do {
+    try await ttp.initialize()
+} catch PayabliTTPError.termsNotAccepted {
+    try await ttp.presentTerms()                       // host UI
+    try await ttp.initialize()                         // retry
+}
+```
+
+`presentTerms()` asks the platform to present its sheet and returns once the
+request is done. Returning is neither acceptance nor proof that a sheet appeared:
+a merchant who has already accepted needs none, and the request then completes
+without showing one. `areTermsAccepted()` answers where the merchant stands.
+
+**Upgrading.** `initialize()` used to present the sheet itself, to whoever opened
+the application first. An integration that relied on that now reaches `ready` only
+after a host presents the terms and calls `initialize()` again, as above. Add both,
+on a screen where a merchant with the authority to accept is present. No flag restores the previous behaviour: it is the
+arrangement Apple's publishing-entitlement review refuses.
 
 Acceptance is once per merchant, not once per device: a merchant who has accepted
 on one device does not accept again on another using the same merchant identifier.

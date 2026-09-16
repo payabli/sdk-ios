@@ -121,9 +121,8 @@ final class PayabliTTPTermsTests: XCTestCase {
     /// outside `.ready`, which is the one moment a host needs the answer; a guard
     /// on `sessionState == .ready` would refuse exactly then.
     ///
-    /// Driven through the mock. The contract lets a provider report unaccepted
-    /// terms; no shipped provider does yet, because `prepareReader()` still
-    /// presents the sheet itself rather than reporting.
+    /// Driven through the mock rather than the Fiserv adapter, which needs a
+    /// reader. The shipped adapter reports the same way.
     func testTheQuestionIsAnswerableWhenTheSessionIsNotReady() async throws {
         let (ttp, provider) = try makeTTP()
         provider.prepareReaderResult = .failure(PayabliTTPError.termsNotAccepted)

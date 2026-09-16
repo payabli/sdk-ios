@@ -44,8 +44,12 @@ package protocol TapToPayProvider: AnyObject, Sendable {
     /// them in `cleanUp()`.
     func configure(credentials: [String: String]) throws
 
-    /// Prepares the reader (connect, link account, open session).
+    /// Prepares the reader: connect, request a session token, open the session.
     /// `configure(credentials:)` must have succeeded before this call.
+    ///
+    /// Never present the platform's terms here. A merchant who has not accepted is reported by
+    /// throwing `PayabliTTPError.termsNotAccepted` without clearing reader state, and presenting
+    /// is `presentTerms()`'s job when a host asks.
     ///
     /// - Parameter onReaderEvent: Called for each `TapToPayReaderEvent` the
     ///   reader raises, until `cleanUp()`. It is a parameter here rather than a
