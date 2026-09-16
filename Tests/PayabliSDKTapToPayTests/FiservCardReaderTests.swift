@@ -1,6 +1,11 @@
 @testable import PayabliSDKTapToPay
 import XCTest
 
+#if canImport(PayabliCardReaderCore) && canImport(ProximityReader)
+    import PayabliCardReaderCore
+    import ProximityReader
+#endif
+
 final class FiservCardReaderTests: XCTestCase {
     func testProviderId() {
         XCTAssertEqual(FiservCardReader.providerId, "fiserv")
@@ -251,6 +256,16 @@ final class FiservCardReaderTests: XCTestCase {
 
     // MARK: - Classifying a setup failure
 
+    /// The refusal the platform raises over terms, rebuilt the way `FiservTTPReader` rebuilds it:
+    /// its own error carrying the platform's.
+    private var termsRefusal: Error {
+        FiservTTPCardReaderError(
+            title: PaymentCardReaderError.accountNotLinked.errorName,
+            localizedDescription: PaymentCardReaderError.accountNotLinked.errorDescription,
+            underlying: PaymentCardReaderError.accountNotLinked
+        )
+    }
+
     /// Drives `prepareReader()` against a stub reader, so nothing here reaches `PaymentCardReader`.
     private func preparedReader(_ stub: StubReaderSetup) -> FiservCardReader {
         let reader = FiservCardReader()
@@ -269,10 +284,7 @@ final class FiservCardReaderTests: XCTestCase {
     /// clearing it would leave the host with a failure it cannot act on, which is the whole reason
     /// this failure is classified apart from the others.
     func testAnUnlinkedMerchantRefusedASessionIsTermsAndKeepsTheReader() async throws {
-        let stub = StubReaderSetup(
-            linked: false,
-            sessionResult: .failure(PayabliTTPError.readerSetupFailed(reason: "refused"))
-        )
+        let stub = StubReaderSetup(linked: false, sessionResult: .failure(termsRefusal))
         let reader = preparedReader(stub)
 
         do {
@@ -338,19 +350,12 @@ final class FiservCardReaderTests: XCTestCase {
         XCTAssertEqual(stub.initializeSessionCalls, 0, "the session must not be opened after this")
     }
 
-    /// **What this classification cannot do, recorded rather than implied.**
+    /// An operational failure is reported as itself even for a merchant who has not accepted.
     ///
-    /// `initializeSession()` is itself compound: it re-requests an expiring token and then prepares
-    /// the reader. So an operational failure inside it, for a merchant who has also not accepted,
-    /// is reported as unaccepted terms. The platform's typed refusal does not survive the vendored
-    /// wrapper, which rewraps every case as its own error carrying prose, so the reader is asked
-    /// instead and answers the same either way.
-    ///
-    /// Bounded rather than harmless: the merchant genuinely has not accepted, so presenting the
-    /// terms is still the host's next step, and the operational failure surfaces again on the
-    /// initialize that follows. This case exists so the limit is on the record and fails here if it
-    /// ever changes.
-    func testAnUnlinkedMerchantsOperationalFailureIsReportedAsTerms() async {
+    /// `initializeSession()` re-requests an expiring token before it prepares the reader, so a
+    /// failure inside it need not be about terms. Acceptance state does not decide the answer;
+    /// the platform's own error does.
+    func testAnUnlinkedMerchantsOperationalFailureIsNotTerms() async {
         let stub = StubReaderSetup(
             linked: false,
             sessionResult: .failure(PayabliTTPError.readerSetupFailed(reason: "connection lost"))
@@ -361,7 +366,9 @@ final class FiservCardReaderTests: XCTestCase {
             try await reader.prepareReader { _ in }
             XCTFail("expected a failure")
         } catch PayabliTTPError.termsNotAccepted {
-            // The documented limit, not the ideal answer.
+            XCTFail("an operational failure is not a terms refusal")
+        } catch PayabliTTPError.readerSetupFailed {
+            // expected
         } catch {
             XCTFail("wrong error: \(error)")
         }
@@ -373,10 +380,7 @@ final class FiservCardReaderTests: XCTestCase {
     /// platform refuses to open a session, and the host is told to ask. Nothing in setup asks on
     /// the merchant's behalf, so nobody meets the sheet by opening the application.
     func testPreparingNeverPresentsTheSheet() async {
-        let stub = StubReaderSetup(
-            linked: false,
-            sessionResult: .failure(PayabliTTPError.readerSetupFailed(reason: "refused"))
-        )
+        let stub = StubReaderSetup(linked: false, sessionResult: .failure(termsRefusal))
         let reader = preparedReader(stub)
 
         do {

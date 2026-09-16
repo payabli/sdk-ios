@@ -198,11 +198,11 @@ package final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
                 do {
                     try await newReader.initializeSession(onReaderEvent: onReaderEvent)
                 } catch {
-                    // Opening the session is the step the platform refuses over terms, so it is the
-                    // only failure read that way. A token request that fails leaves the merchant
-                    // unlinked too, and reading that as unaccepted terms would hide an operational
-                    // failure behind a state a host resolves by putting a person in front of a sheet.
-                    guard try await isNotLinked(newReader) else { throw error }
+                    // The platform names this refusal, and the card-reader component keeps its
+                    // error, so every other failure passes through as itself.
+                    guard case .accountNotLinked? =
+                        Self.platformError(behind: error) as? PaymentCardReaderError
+                    else { throw error }
                     logger.info("[fiserv.prepare] ← terms not accepted; reader kept")
                     throw PayabliTTPError.termsNotAccepted
                 }
@@ -241,22 +241,6 @@ package final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
             throw PayabliTTPError.readerSetupFailed(reason: "Tap to Pay is iOS-only")
         #endif
     }
-
-    #if canImport(PayabliCardReaderCore)
-        /// Whether setup failed because the merchant has not accepted, asked of the reader rather than
-        /// read off the error.
-        ///
-        /// The platform refuses this with a typed case, and the vendored reader rewraps it as its own
-        /// error carrying only the platform's prose. Matching that text would bind this decision to
-        /// wording nobody in this repository controls, where the reader answers the question directly
-        /// and authoritatively.
-        ///
-        /// A reader that cannot answer at all is not the terms case: `false` here sends the original
-        /// failure on unchanged.
-        private func isNotLinked(_ reader: AccountLinking) async throws -> Bool {
-            (try? await reader.isAccountLinked()) == false
-        }
-    #endif
 
     package func presentTerms() async throws {
         #if canImport(PayabliCardReaderCore)
