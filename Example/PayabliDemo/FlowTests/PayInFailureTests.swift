@@ -73,8 +73,7 @@ final class PayInFailureTests: XCTestCase {
 
     /// The text a screen shows must not answer an open outcome by telling an operator to send another
     /// payment: the earlier attempt may have taken one, and past the service's window the next attempt
-    /// is executed rather than refused. This pins the wording only. Whether a screen still renders a
-    /// button that does it is that screen's own case, and `PaymentCaptureQAView` does.
+    /// is executed rather than refused. The wording is what this pins; what a screen offers is its own.
     func testARecognisedRepeatOnACaptureIsNotWordedAsAnInvitationToRetry() {
         let failure = PayInFailure(Self.interruptedConflict, operation: .capture)
 
