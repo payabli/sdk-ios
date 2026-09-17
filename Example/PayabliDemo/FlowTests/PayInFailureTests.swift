@@ -5,9 +5,10 @@ import XCTest
 /// How a failure reads on each of the two flows.
 ///
 /// One adapter builds both screens' failures, and a 409 means different things on
-/// them. A capture sends an idempotency key, so a conflict says the service already
-/// holds this attempt and refused the repeat. A stored method sends no key and
-/// offers no new attempt, so the same status is just what the service said.
+/// them. A capture sends an idempotency key, so a conflict is the service refusing
+/// a repeat of it, and says nothing about what the attempt that key names did. A
+/// stored method sends no key and offers no new attempt, so the same status is just
+/// what the service said.
 ///
 /// Three shapes a conflict arrives in are covered. On a route that carries a key the SDK now wraps it,
 /// so what reaches here is the interrupted case. On one that carries none the raw shapes still arrive:
@@ -70,17 +71,6 @@ final class PayInFailureTests: XCTestCase {
         XCTAssertTrue(PayInFailure(Self.interruptedReversal, operation: .void).outcomeIsUnresolved)
     }
 
-    /// A reversal carries a key, so a `409` on one arrives wrapped like any other open outcome. It is
-    /// still not read as a repeat — the SDK mints a fresh key per reversal — and the screen words the
-    /// open outcome as the reversal's rather than the payment's.
-    func testAConflictOnAReversalIsWordedAsTheReversals() {
-        let failure = PayInFailure(Self.interruptedConflict, operation: .void)
-
-        XCTAssertFalse(failure.isDuplicateSubmission)
-        XCTAssertTrue(failure.outcomeIsUnresolved)
-        XCTAssertTrue(failure.message.contains("reversal may have been applied"), failure.message)
-    }
-
     /// The text a screen shows must not answer an open outcome by telling an operator to send another
     /// payment: the earlier attempt may have taken one, and past the service's window the next attempt
     /// is executed rather than refused. This pins the wording only. Whether a screen still renders a
@@ -98,10 +88,11 @@ final class PayInFailureTests: XCTestCase {
         causeType: "PayabliSDKCore.PayabliGenericError"
     )
 
-    /// What the SDK hands over for a `409` on a route that carried a key. The `causeType` is the one the
-    /// bodyless route produces; a `409` answered with a body names the flow's own error type instead.
-    /// Nothing here reads it — the adapter branches on the code — and both values are pinned where they
-    /// are derived, in the SDK's own idempotency cases.
+    /// What the SDK hands over for a `409` on a money-in route. Reversals carry a key too but mint a fresh
+    /// one per call, so the service can never recognise a repeat of one and this shape does not reach the
+    /// reversal path. The `causeType` is the one the bodyless route produces; a `409` answered with a body
+    /// names the flow's own error type instead. Nothing here reads it — the adapter branches on the code —
+    /// and both values are pinned where they are derived, in the SDK's own idempotency cases.
     private static let interruptedConflict = PayabliPayInPaymentFlowError.submissionInterrupted(
         code: .conflict,
         causeType: "PayabliSDKCore.PayabliGenericError"
