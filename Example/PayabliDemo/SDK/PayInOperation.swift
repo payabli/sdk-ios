@@ -16,8 +16,7 @@ enum PayInOperation {
     ///
     /// Only the form-driven capture can: its key rides on the request configuration and stays put
     /// until a new attempt is drawn, so submitting again sends the one the service already holds. A
-    /// reversal takes no key and the SDK mints a fresh one per call, so it can never send a repeat,
-    /// and a conflict there is the service answering about the transaction rather than about a key.
+    /// reversal takes no key and the SDK mints a fresh one per call, so it can never send a repeat.
     var canRepeatUnderOneKey: Bool {
         switch self {
         case .storedMethod, .void:
