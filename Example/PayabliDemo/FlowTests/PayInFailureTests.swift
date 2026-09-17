@@ -87,11 +87,11 @@ final class PayInFailureTests: XCTestCase {
         causeType: "PayabliSDKCore.PayabliGenericError"
     )
 
-    /// What the SDK hands over for a `409` on a money-in route. Reversals carry a key too but mint a fresh
-    /// one per call, so the service can never recognise a repeat of one and this shape does not reach the
-    /// reversal path. The `causeType` is the one the bodyless route produces; a `409` answered with a body
-    /// names the flow's own error type instead. Nothing here reads it — the adapter branches on the code —
-    /// and both values are pinned where they are derived, in the SDK's own idempotency cases.
+    /// What the SDK hands over for a `409` on a money-in route. A reversal carries a key too, but mints a
+    /// fresh one per call, so no repeat of one can be recognised and the case this fixture stands for does
+    /// not arise there. The `causeType` is the one the bodyless route produces; a `409` answered with a
+    /// body names the flow's own error type instead. Nothing here reads it — the adapter branches on the
+    /// code — and both values are pinned where they are derived, in the SDK's own idempotency cases.
     private static let interruptedConflict = PayabliPayInPaymentFlowError.submissionInterrupted(
         code: .conflict,
         causeType: "PayabliSDKCore.PayabliGenericError"
