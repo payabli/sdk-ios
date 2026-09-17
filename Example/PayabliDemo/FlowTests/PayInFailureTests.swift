@@ -33,8 +33,8 @@ final class PayInFailureTests: XCTestCase {
     }
 
     /// A reversal takes no key from the caller and the SDK mints a fresh one per call, so the same
-    /// key never reaches the service twice. A conflict there is the service answering about the
-    /// transaction, and reading it as a repeat tells an operator to send a payment instead.
+    /// key never reaches the service twice and no conflict there can be a repeat of one. Reading one
+    /// as a repeat would tell an operator to send a payment instead.
     func testAConflictOnAReversalIsNotReadAsARepeat() {
         let failure = PayInFailure(typedConflict, operation: .void)
 
