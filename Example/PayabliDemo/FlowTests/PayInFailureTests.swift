@@ -9,9 +9,10 @@ import XCTest
 /// holds this attempt and refused the repeat. A stored method sends no key and
 /// offers no new attempt, so the same status is just what the service said.
 ///
-/// Both shapes a conflict arrives in are covered: the typed failure carries the
-/// status where the API answered with a body, and an empty one carries the code
-/// the status mapping supplies.
+/// Three shapes a conflict arrives in are covered. On a route that carries a key the SDK now wraps it,
+/// so what reaches here is the interrupted case. On one that carries none the raw shapes still arrive:
+/// a typed failure where the API answered with a body, and an empty one carrying the code the status
+/// mapping supplies.
 final class PayInFailureTests: XCTestCase {
     func testATypedConflictOnACaptureNamesTheKey() {
         let failure = PayInFailure(typedConflict, operation: .capture)
@@ -80,9 +81,11 @@ final class PayInFailureTests: XCTestCase {
         XCTAssertTrue(failure.message.contains("reversal may have been applied"), failure.message)
     }
 
-    /// The screen must not answer an open outcome with an offer to send another payment: the earlier
-    /// attempt may have taken one, and past the service's window the next attempt is not deduplicated.
-    func testARecognisedRepeatOnACaptureDoesNotOfferASecondPayment() {
+    /// The text a screen shows must not answer an open outcome by telling an operator to send another
+    /// payment: the earlier attempt may have taken one, and past the service's window the next attempt
+    /// is executed rather than refused. This pins the wording only. Whether a screen still renders a
+    /// button that does it is that screen's own case, and `PaymentCaptureQAView` does.
+    func testARecognisedRepeatOnACaptureIsNotWordedAsAnInvitationToRetry() {
         let failure = PayInFailure(Self.interruptedConflict, operation: .capture)
 
         XCTAssertTrue(failure.outcomeIsUnresolved)
@@ -95,7 +98,10 @@ final class PayInFailureTests: XCTestCase {
         causeType: "PayabliSDKCore.PayabliGenericError"
     )
 
-    /// What the SDK now hands over for a `409` on a route that carried a key.
+    /// What the SDK hands over for a `409` on a route that carried a key. The `causeType` is the one the
+    /// bodyless route produces; a `409` answered with a body names the flow's own error type instead.
+    /// Nothing here reads it — the adapter branches on the code — and both values are pinned where they
+    /// are derived, in the SDK's own idempotency cases.
     private static let interruptedConflict = PayabliPayInPaymentFlowError.submissionInterrupted(
         code: .conflict,
         causeType: "PayabliSDKCore.PayabliGenericError"

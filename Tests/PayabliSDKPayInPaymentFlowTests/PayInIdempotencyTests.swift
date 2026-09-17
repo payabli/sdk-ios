@@ -358,10 +358,12 @@ final class PayInIdempotencyTests: XCTestCase {
             return XCTFail("expected submissionInterrupted, got \(failure)")
         }
         XCTAssertEqual(interrupted.code, .conflict)
+        // A decoded body reaches the wrap as the flow's own error, so that is the type named here.
+        XCTAssertEqual(interrupted.causeType, "PayabliSDKPayInPaymentFlow.PayabliPayInPaymentFlowError")
     }
 
     /// The same repeat with no body at all, which is the shape the status mapping answers rather than
-    /// the decoder. The two routes to a 409 report it the same way.
+    /// the decoder. The two routes to a 409 report it the same way, and name different types doing it.
     func testABodylessRecognisedRepeatLeavesTheOutcomeOpen() async {
         let transport = RecordingIdempotencyTransport(body: Data(), status: 409)
         let flow = PayInFixture.makeFlow(transport: transport, key: "reserved-9")
@@ -374,6 +376,7 @@ final class PayInIdempotencyTests: XCTestCase {
             return XCTFail("expected submissionInterrupted, got \(failure)")
         }
         XCTAssertEqual(interrupted.code, .conflict)
+        XCTAssertEqual(interrupted.causeType, "PayabliSDKCore.PayabliGenericError")
     }
 
     /// A decline with no body, which the status mapping answers. Still an answer, so still no key.

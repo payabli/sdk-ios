@@ -28,12 +28,16 @@ public enum PayabliPayInPaymentFlowError: PayabliError, Equatable {
     ///
     /// Raised only where a key was sent, which is the money-moving routes, and only where the answer
     /// leaves the outcome open: a network failure, a cancellation, a 5xx, a response that could not be
-    /// decoded, a failure the service declared on a successful status without calling it a refusal, and
-    /// anything this SDK could not classify at all.
+    /// decoded, a failure the service declared on a successful status without calling it a refusal, a
+    /// repeat the service recognised, and anything this SDK could not classify at all.
+    ///
+    /// A recognised repeat belongs to that list even though the service answered. What it answered is
+    /// that it has seen the key, and the marker behind that is written before the request is handled and
+    /// is never rolled back, so the attempt the key named may have taken the payment.
     ///
     /// Everything else arrives as itself, because the outcome is known and a retry there is a new
-    /// payment: a refusal, a validation failure, a refused credential, a locally refused request, a
-    /// refusal for too many requests, and a repeat the service recognised.
+    /// payment: a refusal, a validation failure, a refused credential, a locally refused request, and a
+    /// refusal for too many requests.
     ///
     /// `code` is the classification to branch on. `causeType` names the failing type and carries none
     /// of its message, because that message can quote a response body or name a host's own endpoint,
