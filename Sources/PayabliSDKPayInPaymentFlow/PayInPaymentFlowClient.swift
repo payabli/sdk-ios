@@ -224,8 +224,8 @@ final class PayInPaymentFlowClient: Sendable {
         case .networkError, .decodingError, .userCancelled, .serverError, .unknown:
             return true
         case .paymentDeclined, .rateLimited, .conflict, .missingToken, .tokenExpired,
-             .tokenMalformed, .invalidSignature, .permissionDenied, .sessionBurned,
-             .invalidConfiguration, .validation:
+             .tokenMalformed, .tokenProviderFailed, .invalidSignature, .permissionDenied,
+             .sessionBurned, .invalidConfiguration, .validation:
             return false
         }
     }
@@ -237,9 +237,9 @@ final class PayInPaymentFlowClient: Sendable {
         do {
             return try await send(request)
         } catch {
-            // A credential that was never obtained arrives as `.tokenExpired`, which
-            // `leavesOutcomeUnknown` already answers false for: nothing was sent, so the outcome is
-            // known and there is no key to report.
+            // A credential that was never obtained arrives as `.tokenExpired` or
+            // `.tokenProviderFailed`, both of which `leavesOutcomeUnknown` answers false for: nothing
+            // was sent, so the outcome is known and there is no key to report.
             guard carriesKey, Self.leavesOutcomeUnknown(error) else { throw error }
             throw PayabliPayInPaymentFlowError.submissionInterrupted(
                 code: (error as? any PayabliError)?.code ?? .unknown,

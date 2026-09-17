@@ -5,6 +5,22 @@ public enum PayabliErrorCode: String, Sendable, CaseIterable {
     case missingToken = "MISSING_TOKEN"
     case tokenExpired = "TOKEN_EXPIRED"
     case tokenMalformed = "TOKEN_MALFORMED"
+
+    /// The host's `tokenProvider` did not do its job: it hung past the bound, threw, returned a blank or
+    /// unusable token, returned the token the server had just rejected, or read the token it was called to
+    /// mint. Every one of those means the same thing to a caller — fix the callback — so they share this
+    /// code and are distinguished by reason rather than by a code each.
+    ///
+    /// Not ``tokenExpired``: that is the service refusing a credential, which is a different answer
+    /// about a different thing. Neither this SDK's own retry logic nor `AuthRecoveryPolicy` treats
+    /// ``tokenExpired`` as worth repeating — both leave it terminal — so the hazard this code exists
+    /// to avoid is a *host's* retry or UI logic reading the code: one written for "the service
+    /// refused this" would call a deadlocked or misbehaving callback again on exactly that read.
+    ///
+    /// Ruled 2026-09-15, maintainer. Recorded in `documentation/features/public-interface.md`, "A
+    /// misbehaving `tokenProvider` gets its own code". Android carries the same agreement; whether
+    /// `TOKEN_PROVIDER_FAILED` has shipped there yet is that platform's own history to check.
+    case tokenProviderFailed = "TOKEN_PROVIDER_FAILED"
     case invalidSignature = "INVALID_SIGNATURE"
     case permissionDenied = "PERMISSION_DENIED"
     case sessionBurned = "SESSION_BURNED"
