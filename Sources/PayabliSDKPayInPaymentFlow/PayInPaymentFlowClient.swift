@@ -209,21 +209,27 @@ final class PayInPaymentFlowClient: Sendable {
     /// is what the wrapping says and all it says. No key is reported to a caller and none is held for a
     /// later submission, so what resolves an open outcome is reading the transaction back.
     ///
-    /// Settled, so none is: a decline and a validation refusal are answers, a rate limit is a refusal
-    /// to act, a refused credential never reached the operation, and a repeat the service recognised
-    /// means the service already holds that request. Reporting a key for any of those would
-    /// suggest a retry that is either a new payment or one the service refuses again.
+    /// A recognised repeat is open for a different reason than the rest. The service answered, and what
+    /// it answered is that it has seen this key inside the window. The marker is written before the
+    /// handler runs and is never rolled back afterwards, so the attempt that key named may have taken
+    /// the payment and may have failed while taking it. A `409` settles what happens to the key and
+    /// says nothing about the payment.
     ///
-    /// Decided on the code alone, member for member with the sibling's own predicate.
+    /// Settled, so none is: a decline and a validation refusal are answers, a rate limit is a refusal
+    /// to act, and a refused credential never reached the operation. Reporting a key for any of those
+    /// would suggest a retry that is either a new payment or one the service refuses again.
+    ///
+    /// Decided on the code alone: this client publishes no key on any route, so a rule that never asks
+    /// whose key was sent is one it can state exactly.
     private static func leavesOutcomeUnknown(_ failure: any Error) -> Bool {
         guard let code = (failure as? any PayabliError)?.code else {
             // Not this SDK's error at all, so nothing classified it and nothing can say it settled.
             return true
         }
         switch code {
-        case .networkError, .decodingError, .userCancelled, .serverError, .unknown:
+        case .networkError, .decodingError, .userCancelled, .serverError, .unknown, .conflict:
             return true
-        case .paymentDeclined, .rateLimited, .conflict, .missingToken, .tokenExpired,
+        case .paymentDeclined, .rateLimited, .missingToken, .tokenExpired,
              .tokenMalformed, .invalidSignature, .permissionDenied, .sessionBurned,
              .invalidConfiguration, .validation:
             return false
