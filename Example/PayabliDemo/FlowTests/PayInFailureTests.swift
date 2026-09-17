@@ -69,12 +69,35 @@ final class PayInFailureTests: XCTestCase {
         XCTAssertTrue(PayInFailure(Self.interruptedReversal, operation: .void).outcomeIsUnresolved)
     }
 
-    func testARefusedReversalIsSettledRatherThanUnresolved() {
-        XCTAssertFalse(PayInFailure(typedConflict, operation: .void).outcomeIsUnresolved)
+    /// A reversal carries a key, so a `409` on one arrives wrapped like any other open outcome. It is
+    /// still not read as a repeat — the SDK mints a fresh key per reversal — and the screen words the
+    /// open outcome as the reversal's rather than the payment's.
+    func testAConflictOnAReversalIsWordedAsTheReversals() {
+        let failure = PayInFailure(Self.interruptedConflict, operation: .void)
+
+        XCTAssertFalse(failure.isDuplicateSubmission)
+        XCTAssertTrue(failure.outcomeIsUnresolved)
+        XCTAssertTrue(failure.message.contains("reversal may have been applied"), failure.message)
+    }
+
+    /// The screen must not answer an open outcome with an offer to send another payment: the earlier
+    /// attempt may have taken one, and past the service's window the next attempt is not deduplicated.
+    func testARecognisedRepeatOnACaptureDoesNotOfferASecondPayment() {
+        let failure = PayInFailure(Self.interruptedConflict, operation: .capture)
+
+        XCTAssertTrue(failure.outcomeIsUnresolved)
+        XCTAssertTrue(failure.message.contains("idempotency key"), failure.message)
+        XCTAssertFalse(failure.message.contains("Start a new attempt"), failure.message)
     }
 
     private static let interruptedReversal = PayabliPayInPaymentFlowError.submissionInterrupted(
         code: .networkError,
+        causeType: "PayabliSDKCore.PayabliGenericError"
+    )
+
+    /// What the SDK now hands over for a `409` on a route that carried a key.
+    private static let interruptedConflict = PayabliPayInPaymentFlowError.submissionInterrupted(
+        code: .conflict,
         causeType: "PayabliSDKCore.PayabliGenericError"
     )
 
