@@ -131,7 +131,7 @@ final class CredentialLoggingTests: XCTestCase {
             _ = try await stack.transport.perform(ping())
             XCTFail("a 401 with no provider is terminal")
         } catch let error as PayabliGenericError {
-            XCTAssertEqual(error.code, .tokenExpired)
+            XCTAssertEqual(error.code, .tokenProviderFailed)
         }
 
         XCTAssertEqual(stub.count, 1, "nothing to refresh with, so nothing is replayed")

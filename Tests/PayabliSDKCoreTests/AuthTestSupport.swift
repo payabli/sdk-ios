@@ -95,3 +95,29 @@ func makeWarmAuth(
     _ = try await auth.currentAccessToken()
     return auth
 }
+
+/// Fires its first deadline and parks on every one after, so a provider-bound case can race exactly
+/// one mint against the bound and then prove the next mint is unraced — a clock that kept firing
+/// would also time out the recovery the case is checking, rather than let the provider that answers
+/// it win.
+final class FiresOnceRetryClock: RetryClock, @unchecked Sendable {
+    private let lock = NSLock()
+    private var fired = false
+
+    func elapsed() -> TimeInterval {
+        0
+    }
+
+    func sleep(for seconds: TimeInterval) async throws {}
+
+    func expire(after seconds: TimeInterval) async throws {
+        lock.lock()
+        let isFirst = !fired
+        fired = true
+        lock.unlock()
+        guard isFirst else {
+            try await Task.sleep(nanoseconds: .max)
+            return
+        }
+    }
+}
