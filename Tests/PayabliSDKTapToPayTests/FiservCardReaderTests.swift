@@ -1,6 +1,11 @@
 @testable import PayabliSDKTapToPay
 import XCTest
 
+#if canImport(PayabliCardReaderCore) && canImport(ProximityReader)
+    import PayabliCardReaderCore
+    import ProximityReader
+#endif
+
 final class FiservCardReaderTests: XCTestCase {
     func testProviderId() {
         XCTAssertEqual(FiservCardReader.providerId, "fiserv")
@@ -251,6 +256,16 @@ final class FiservCardReaderTests: XCTestCase {
 
     // MARK: - Classifying a setup failure
 
+    /// The refusal the platform raises over terms, rebuilt the way `FiservTTPReader` rebuilds it:
+    /// its own error carrying the platform's.
+    private var termsRefusal: Error {
+        FiservTTPCardReaderError(
+            title: PaymentCardReaderError.accountNotLinked.errorName,
+            localizedDescription: PaymentCardReaderError.accountNotLinked.errorDescription,
+            underlying: PaymentCardReaderError.accountNotLinked
+        )
+    }
+
     /// Drives `prepareReader()` against a stub reader, so nothing here reaches `PaymentCardReader`.
     private func preparedReader(_ stub: StubReaderSetup) -> FiservCardReader {
         let reader = FiservCardReader()
@@ -269,11 +284,7 @@ final class FiservCardReaderTests: XCTestCase {
     /// clearing it would leave the host with a failure it cannot act on, which is the whole reason
     /// this failure is classified apart from the others.
     func testAnUnlinkedMerchantRefusedASessionIsTermsAndKeepsTheReader() async throws {
-        let stub = StubReaderSetup(
-            linked: false,
-            linkTakes: false,
-            sessionResult: .failure(PayabliTTPError.readerSetupFailed(reason: "refused"))
-        )
+        let stub = StubReaderSetup(linked: false, sessionResult: .failure(termsRefusal))
         let reader = preparedReader(stub)
 
         do {
@@ -339,22 +350,14 @@ final class FiservCardReaderTests: XCTestCase {
         XCTAssertEqual(stub.initializeSessionCalls, 0, "the session must not be opened after this")
     }
 
-    /// **What this classification cannot do, recorded rather than implied.**
+    /// An operational failure is reported as itself even for a merchant who has not accepted.
     ///
-    /// `initializeSession()` is itself compound: it re-requests an expiring token and then prepares
-    /// the reader. So an operational failure inside it, for a merchant who has also not accepted,
-    /// is reported as unaccepted terms. The platform's typed refusal does not survive the vendored
-    /// wrapper, which rewraps every case as its own error carrying prose, so the reader is asked
-    /// instead and answers the same either way.
-    ///
-    /// Bounded rather than harmless: the merchant genuinely has not accepted, so presenting the
-    /// terms is still the host's next step, and the operational failure surfaces again on the
-    /// initialize that follows. This case exists so the limit is on the record and fails here if it
-    /// ever changes.
-    func testAnUnlinkedMerchantsOperationalFailureIsReportedAsTerms() async {
+    /// `initializeSession()` re-requests an expiring token before it prepares the reader, so a
+    /// failure inside it need not be about terms. Acceptance state does not decide the answer;
+    /// the platform's own error does.
+    func testAnUnlinkedMerchantsOperationalFailureIsNotTerms() async {
         let stub = StubReaderSetup(
             linked: false,
-            linkTakes: false,
             sessionResult: .failure(PayabliTTPError.readerSetupFailed(reason: "connection lost"))
         )
         let reader = preparedReader(stub)
@@ -363,21 +366,43 @@ final class FiservCardReaderTests: XCTestCase {
             try await reader.prepareReader { _ in }
             XCTFail("expected a failure")
         } catch PayabliTTPError.termsNotAccepted {
-            // The documented limit, not the ideal answer.
+            XCTFail("an operational failure is not a terms refusal")
+        } catch PayabliTTPError.readerSetupFailed {
+            // expected
         } catch {
             XCTFail("wrong error: \(error)")
         }
     }
 
-    /// The implicit link still runs on this branch, which is what keeps the terms state the narrow
-    /// case until the second pull request removes it.
-    func testAnUnlinkedMerchantIsStillLinkedImplicitly() async throws {
-        let stub = StubReaderSetup(linked: false)
+    /// Setup never presents the sheet, which is the whole of this change.
+    ///
+    /// A merchant who has not accepted now reaches the terms state by the ordinary route: the
+    /// platform refuses to open a session, and the host is told to ask. Nothing in setup asks on
+    /// the merchant's behalf, so nobody meets the sheet by opening the application.
+    func testPreparingNeverPresentsTheSheet() async {
+        let stub = StubReaderSetup(linked: false, sessionResult: .failure(termsRefusal))
+        let reader = preparedReader(stub)
+
+        do {
+            try await reader.prepareReader { _ in }
+            XCTFail("expected the refusal to surface")
+        } catch PayabliTTPError.termsNotAccepted {
+            // expected
+        } catch {
+            XCTFail("wrong error: \(error)")
+        }
+
+        XCTAssertEqual(stub.linkAccountCalls, 0, "setup must never present the sheet")
+    }
+
+    /// A merchant who has accepted gets a prepared reader and is asked for nothing.
+    func testPreparingAnAcceptedMerchantAsksForNothing() async throws {
+        let stub = StubReaderSetup(linked: true)
         let reader = preparedReader(stub)
 
         try await reader.prepareReader { _ in }
 
-        XCTAssertEqual(stub.linkAccountCalls, 1)
+        XCTAssertEqual(stub.linkAccountCalls, 0)
         XCTAssertEqual(stub.initializeSessionCalls, 1)
     }
 }
@@ -390,7 +415,6 @@ final class FiservCardReaderTests: XCTestCase {
 private final class StubReaderSetup: ReaderSetup {
     private let lock = NSLock()
     private var linked: Bool
-    private let linkTakes: Bool
     private let tokenResult: Result<Void, Error>
     private let sessionResult: Result<Void, Error>
 
@@ -401,17 +425,12 @@ private final class StubReaderSetup: ReaderSetup {
     /// reports its configuration progress.
     var eventsWhileOpening: [TapToPayReaderEvent] = []
 
-    /// `linkTakes: false` is the lapse the vendor documents: the request returns and the merchant
-    /// is still not linked. On this branch that is the only route to the terms state, because the
-    /// implicit call otherwise links them before the session is opened.
     init(
         linked: Bool,
-        linkTakes: Bool = true,
         tokenResult: Result<Void, Error> = .success(()),
         sessionResult: Result<Void, Error> = .success(())
     ) {
         self.linked = linked
-        self.linkTakes = linkTakes
         self.tokenResult = tokenResult
         self.sessionResult = sessionResult
     }
@@ -427,9 +446,7 @@ private final class StubReaderSetup: ReaderSetup {
     func linkAccount() async throws {
         lock.withLock {
             linkAccountCalls += 1
-            if linkTakes {
-                linked = true
-            }
+            linked = true
         }
     }
 
