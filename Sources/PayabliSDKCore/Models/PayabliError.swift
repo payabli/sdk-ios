@@ -46,11 +46,9 @@ public enum PayabliErrorCode: String, Sendable, CaseIterable {
     /// HTTP 409. The request conflicts with the state the service holds.
     ///
     /// Says no more than the status does, because the status mapping serves every route. What a
-    /// conflict means is the route's to say: on a money-moving one it is the repeat an idempotency key
-    /// caused the service to recognise, and there the outcome is settled rather than open. Reading that
+    /// conflict means is the route's to say: on a money-moving one it is a repeat the service refused,
+    /// which settles what happens to the key and leaves the payment's outcome open. Reading that
     /// meaning in here would give a conflict on any other route a sense it has not earned.
-    ///
-    /// The sibling platform carries no counterpart yet.
     case conflict = "CONFLICT"
 
     // Client-side error codes (not from the API).

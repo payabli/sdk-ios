@@ -177,12 +177,16 @@ extension PayInOutcome {
 }
 
 extension PayInFailure {
+    /// The refusal is about the key, and the earlier attempt's fate is the open question. Offering a
+    /// fresh attempt as the next step answers it with a second payment: the service holds the key for
+    /// two minutes from the first request, and past that the same key is executed rather than refused.
     private static let duplicateMessage =
         "Duplicate submission (409): this attempt's idempotency key has already "
-            + "been used, so the service refused the repeat rather than taking a payment. "
-            + "It does not answer with the earlier attempt's result, so read that attempt "
-            + "back to see whether it went through. Start a new attempt to send a payment "
-            + "of its own."
+            + "been used, so the service refused this request without running it. That says "
+            + "nothing about the attempt the key first named, which may have taken the payment. "
+            + "Read that attempt back before sending anything else — past the service's "
+            + "two-minute window the same key is executed, so a further attempt is a second "
+            + "payment rather than a retry of the first."
 
     /// What an outcome nobody knows means for a reversal.
     ///

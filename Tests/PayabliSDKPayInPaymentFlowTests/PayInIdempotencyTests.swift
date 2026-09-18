@@ -340,9 +340,10 @@ final class PayInIdempotencyTests: XCTestCase {
         XCTAssertEqual(interrupted.code, .serverError)
     }
 
-    /// A repeat the service recognised is what a key produces at all. Reporting it as unknown would
-    /// tell a caller to resend the key that provoked it.
-    func testARecognisedRepeatReportsNoKey() async {
+    /// A repeat the service recognised says the key was seen and nothing about what the attempt it
+    /// named did. The marker is written before the handler runs and is never rolled back afterwards, so
+    /// the payment may have been taken, and the code still says which answer this was.
+    func testARecognisedRepeatLeavesTheOutcomeOpen() async {
         let transport = RecordingIdempotencyTransport(
             body: Data(#"{"message":"Duplicate request"}"#.utf8),
             status: 409
@@ -353,15 +354,17 @@ final class PayInIdempotencyTests: XCTestCase {
             _ = try await flow.capture(PayInFixture.request(idempotencyKey: nil))
         })
 
-        XCTAssertNil(
-            PayInFixture.interruption(failure),
-            "a 409 is an answer, not an open outcome"
-        )
+        guard let interrupted = PayInFixture.interruption(failure) else {
+            return XCTFail("expected submissionInterrupted, got \(failure)")
+        }
+        XCTAssertEqual(interrupted.code, .conflict)
+        // A decoded body reaches the wrap as the flow's own error, so that is the type named here.
+        XCTAssertEqual(interrupted.causeType, "PayabliSDKPayInPaymentFlow.PayabliPayInPaymentFlowError")
     }
 
     /// The same repeat with no body at all, which is the shape the status mapping answers rather than
-    /// the decoder. Reporting it as open tells a caller to resend the key the service refuses.
-    func testABodylessRecognisedRepeatReportsNoKey() async {
+    /// the decoder. The two routes to a 409 report it the same way, and name different types doing it.
+    func testABodylessRecognisedRepeatLeavesTheOutcomeOpen() async {
         let transport = RecordingIdempotencyTransport(body: Data(), status: 409)
         let flow = PayInFixture.makeFlow(transport: transport, key: "reserved-9")
 
@@ -369,11 +372,11 @@ final class PayInIdempotencyTests: XCTestCase {
             _ = try await flow.capture(PayInFixture.request(idempotencyKey: nil))
         })
 
-        XCTAssertEqual((failure as? any PayabliError)?.code, .conflict)
-        XCTAssertNil(
-            PayInFixture.interruption(failure),
-            "the service already holds the request, so the outcome is settled"
-        )
+        guard let interrupted = PayInFixture.interruption(failure) else {
+            return XCTFail("expected submissionInterrupted, got \(failure)")
+        }
+        XCTAssertEqual(interrupted.code, .conflict)
+        XCTAssertEqual(interrupted.causeType, "PayabliSDKCore.PayabliGenericError")
     }
 
     /// A decline with no body, which the status mapping answers. Still an answer, so still no key.
