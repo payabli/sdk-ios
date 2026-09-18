@@ -104,6 +104,10 @@ final class FiresOnceRetryClock: RetryClock, @unchecked Sendable {
     private let lock = NSLock()
     private var fired = false
 
+    /// Every `seconds` this clock was asked to expire after, in call order — so a case can assert
+    /// `PayabliAuth` raced the bound it documents (30s) rather than some other number.
+    private(set) var requestedDeadlines: [TimeInterval] = []
+
     func elapsed() -> TimeInterval {
         0
     }
@@ -114,6 +118,7 @@ final class FiresOnceRetryClock: RetryClock, @unchecked Sendable {
         lock.lock()
         let isFirst = !fired
         fired = true
+        requestedDeadlines.append(seconds)
         lock.unlock()
         guard isFirst else {
             try await Task.sleep(nanoseconds: .max)

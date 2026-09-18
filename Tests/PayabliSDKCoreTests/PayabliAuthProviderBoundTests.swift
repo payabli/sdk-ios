@@ -9,13 +9,14 @@ final class PayabliAuthProviderBoundTests: XCTestCase {
     /// forever — the whole reason for the bound. `Task.sleep(.max)` is cancellation-cooperative, so the
     /// deadline actually lands instead of orphaning the call.
     func testAProviderThatNeverReturnsIsRefusedAtTheDeadline() async throws {
+        let clock = FiresOnceRetryClock()
         let auth = PayabliAuth(
             config: try makeConfig(tokenProvider: {
                 try await Task.sleep(nanoseconds: .max)
                 return "never"
             }),
             logger: PayabliLogger(category: .auth),
-            clock: FiresOnceRetryClock()
+            clock: clock
         )
 
         let outcome = await outcomeWithinCeiling {
@@ -30,6 +31,9 @@ final class PayabliAuthProviderBoundTests: XCTestCase {
         }
 
         XCTAssertEqual(outcome, PayabliErrorCode.tokenProviderFailed.rawValue)
+        // Proves this raced the 30s bound the doc on `providerTimeout` promises, not some other
+        // number a future edit could quietly drift to.
+        XCTAssertEqual(clock.requestedDeadlines, [30])
     }
 
     /// Every caller joined to the one mint that times out receives the same failure, not just the
