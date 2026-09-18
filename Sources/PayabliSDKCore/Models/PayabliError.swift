@@ -6,17 +6,10 @@ public enum PayabliErrorCode: String, Sendable, CaseIterable {
     case tokenExpired = "TOKEN_EXPIRED"
     case tokenMalformed = "TOKEN_MALFORMED"
 
-    /// The host's `tokenProvider` did not do its job: it hung past the bound, threw, returned a blank or
-    /// unusable token, returned the token the server had just rejected, or read the token it was called to
-    /// mint. Every one of those means the same thing to a caller — fix the callback — so they share this
-    /// code rather than a code each, and most also share ``PayabliError/reason``; a caller branches on
-    /// ``PayabliError/detail`` instead.
-    ///
-    /// Not ``tokenExpired``: that is the service refusing a credential, which is a different answer
-    /// about a different thing. Neither this SDK's own retry logic nor `AuthRecoveryPolicy` treats
-    /// ``tokenExpired`` as worth repeating — both leave it terminal — so the hazard this code exists
-    /// to avoid is a *host's* retry or UI logic reading the code: one written for "the service
-    /// refused this" would call a deadlocked or misbehaving callback again on exactly that read.
+    /// The host's `tokenProvider` hung past the 30s bound, threw, returned a blank or unusable token,
+    /// returned the token the server had just rejected, or read the token it was called to mint. Most
+    /// share ``PayabliError/reason``, so a caller branches on ``PayabliError/detail``. The callback
+    /// has to change before a retry succeeds.
     case tokenProviderFailed = "TOKEN_PROVIDER_FAILED"
     case invalidSignature = "INVALID_SIGNATURE"
     case permissionDenied = "PERMISSION_DENIED"
