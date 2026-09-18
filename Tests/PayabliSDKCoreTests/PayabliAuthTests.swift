@@ -432,6 +432,12 @@ final class PayabliAuthTests: XCTestCase {
             XCTFail("expected throw")
         } catch let err as PayabliGenericError {
             XCTAssertEqual(err.code, .tokenProviderFailed)
+            // The KDoc on ``PayabliErrorCode/tokenProviderFailed`` promises that ``detail``
+            // names the specific failure. A thrown provider error can carry request data, so
+            // the string is a static sentence and the type name reaches the caller through
+            // ``underlying`` instead.
+            XCTAssertEqual(err.detail, "The tokenProvider threw an error.")
+            XCTAssertNotNil(err.underlying, "the redacted type name is on `underlying`")
         } catch {
             XCTFail("wrong error: \(error)")
         }
