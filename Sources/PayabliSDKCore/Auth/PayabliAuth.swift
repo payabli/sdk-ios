@@ -169,9 +169,9 @@ actor PayabliAuth {
 
     /// The ceiling on one call to the host's `tokenProvider`.
     ///
-    /// Matches Android's shipped `DEFAULT_PROVIDER_TIMEOUT_MILLIS` (`PayabliAuth.kt:66`), so a host
-    /// reading both platforms' behaviour sees one number rather than two guesses. Fixed and private:
-    /// no surveyed shipped SDK makes an auth-callback deadline integrator-settable, and the platforms
+    /// Matches Android's `DEFAULT_PROVIDER_TIMEOUT_MILLIS` (`PayabliAuth.kt:66`), so a host reading
+    /// both platforms' behaviour sees one number rather than two guesses. Fixed and private: no
+    /// surveyed shipped SDK makes an auth-callback deadline integrator-settable, and the platforms
     /// should not diverge on that question.
     private static let providerTimeout: TimeInterval = 30
 
