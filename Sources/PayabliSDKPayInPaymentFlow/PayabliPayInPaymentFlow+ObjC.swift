@@ -1,6 +1,9 @@
 import Foundation
 import PayabliSDKCore
 
+/// The `NSError` domain every error this facade hands to an ObjC caller carries, whatever it wraps.
+private let payInPaymentFlowObjCErrorDomain = "com.payabli.payInPaymentFlow"
+
 @objc(PayabliPayInPaymentFlowStoredPaymentMethodObjC)
 public final class PayabliPayInPaymentFlowStoredPaymentMethodObjC: NSObject {
     @objc public let storedMethodId: String?
@@ -44,7 +47,7 @@ public final class PayabliPayInPaymentFlowObjC: NSObject {
         entryPoint: String,
         environment: PayabliEnvironment
     ) throws {
-        let tokenProvider = bridgedTokenProvider(errorDomain: "com.payabli.payInPaymentFlow", tokenHandler)
+        let tokenProvider = bridgedTokenProvider(errorDomain: payInPaymentFlowObjCErrorDomain, tokenHandler)
         let config = try PayabliConfig(
             entryPoint: entryPoint,
             environment: environment,
@@ -162,7 +165,7 @@ public final class PayabliPayInPaymentFlowObjC: NSObject {
 
     private func invalidArgument(_ message: String) -> NSError {
         NSError(
-            domain: "com.payabli.payInPaymentFlow",
+            domain: payInPaymentFlowObjCErrorDomain,
             code: -2,
             userInfo: [NSLocalizedDescriptionKey: message]
         )
@@ -173,7 +176,7 @@ private extension Error {
     func toPayabliPayInPaymentFlowNSError() -> NSError {
         if let payInPaymentFlowError = self as? any PayabliError {
             return NSError(
-                domain: "com.payabli.payInPaymentFlow",
+                domain: payInPaymentFlowObjCErrorDomain,
                 code: -3,
                 userInfo: [
                     NSLocalizedDescriptionKey: payInPaymentFlowError.reason,

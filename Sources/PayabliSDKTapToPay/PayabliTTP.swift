@@ -223,7 +223,7 @@ public final class PayabliTTP: NSObject, ObservableObject {
             environment: PayabliEnvironment
         ) throws {
             try self.init(
-                tokenProvider: bridgedTokenProvider(errorDomain: "com.payabli.ttp", tokenHandler),
+                tokenProvider: bridgedTokenProvider(errorDomain: PayabliTTPError.errorDomain, tokenHandler),
                 entryPoint: entryPoint,
                 appId: appId,
                 environment: environment
