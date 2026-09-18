@@ -531,13 +531,23 @@ being asked. Show a terms screen for the first and not for the second.
 
 ### Handling errors
 
-`PayabliTTPError` covers most of the session and charge lifecycle. The host's
-`tokenProvider` is the exception: a failure there surfaces as `PayabliSDKCore`'s
-own `PayabliGenericError`, because `PayabliAuth` raises it before `PayabliTTP`
-has a phase to wrap it in. It reaches a caller two ways — wrapped as
-`configFailed` when `/config` was the request it broke, or bare when it broke
-device attestation, since `initialize()`'s attestation phase rethrows an
-attestation-time failure as it arrived:
+`PayabliTTPError` covers most of the session and charge lifecycle, but two phases
+in `initialize()` and `charge()` rethrow the underlying error unchanged rather
+than wrapping it: device attestation, and the `/initiate` call that opens a
+charge. A caller therefore also encounters `PayabliSDKCore.PayabliGenericError`
+from either of those phases, carrying any core `PayabliErrorCode` the transport
+produced — `.tokenProviderFailed` when the host's `tokenProvider` failed,
+`.networkError`, `.permissionDenied`, `.serverError`, and so on.
+
+The other phases wrap what they see:
+
+- `/config` becomes `PayabliTTPError.configFailed(reason:)`. A
+  `PayabliErrorCode.tokenProviderFailed` here reaches the caller as
+  `configFailed`, with the classification named in the reason string.
+- `/update` becomes `PayabliTTPError.updateFailed(reason:)`, and
+  `activateDevice(activationCode:)` becomes
+  `PayabliTTPError.activationFailed(reason:)`. Both flatten the underlying
+  taxonomy: only the reason string survives.
 
 ```swift
 import PayabliSDKCore
@@ -561,12 +571,21 @@ do {
 } catch let PayabliTTPError.updateFailed(reason) {
     // /update PATCH failed after retries. Reconcile out of band.
 } catch let PayabliTTPError.configFailed(reason) {
-    // /config was refused — a rejected binding, a rejected bearer, or (per
-    // PayabliErrorCode.tokenProviderFailed) the host's tokenProvider itself
-    // failed, hung past its bound, or returned an unusable token.
-} catch let error as PayabliGenericError where error.code == .tokenProviderFailed {
-    // The tokenProvider failed during device attestation, before /config had a
-    // phase to wrap it as configFailed.
+    // /config was refused — a rejected binding, a rejected bearer, or the host's
+    // tokenProvider itself failed (see PayabliErrorCode.tokenProviderFailed).
+} catch let error as PayabliGenericError {
+    // Rethrown from device attestation or /initiate: any core PayabliErrorCode
+    // is possible. Branch on `error.code` — .tokenProviderFailed says the host
+    // callback misbehaved; other codes name transport or authorization
+    // conditions coming from those two phases.
+    switch error.code {
+    case .tokenProviderFailed:
+        // Fix the tokenProvider callback before retrying.
+        break
+    default:
+        // .networkError, .permissionDenied, .serverError, and so on.
+        break
+    }
 }
 ```
 
