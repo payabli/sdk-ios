@@ -71,6 +71,7 @@ or value-typed `enum`s with associated values.
 | `PayabliTTPInvoiceData(...)` (struct) | `[[PayabliTTPInvoiceDataObjC alloc] initWithInvoiceNumber:]` |
 | `enum PayabliTTPEvent` w/ associated values | `PayabliTTPEventCode` (`@objc Int`) + `payload` dict — see `PayabliTTPEvent.payload` for per-case schema |
 | `enum PayabliTTPError` w/ associated values | `NSError` (domain `"com.payabli.ttp"`, stable per-case `code`) — see `errorCode` table |
+| core `PayabliError` surfaced through the TTP bridge (e.g. an attestation-time `.tokenProviderFailed`) | `NSError` (domain `"com.payabli.ttp"`, `code = -3`, `userInfo["PayabliErrorCode"]` carries the taxonomy's raw name) |
 
 All `@objc` callbacks are dispatched on the main thread because the entire
 `PayabliTTP` surface is `@MainActor`.
