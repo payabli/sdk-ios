@@ -305,10 +305,8 @@ schedule refreshes, or implement debouncing.
 
 The SDK bounds every call to `tokenProvider` at 30 seconds. A call that
 hangs past that, throws, or returns a token the SDK cannot use surfaces
-to the caller as `PayabliErrorCode.tokenProviderFailed`, not as a
-service-side credential refusal — size the backend endpoint's own
-timeout well under 30 seconds so a slow upstream fails fast rather
-than losing the race.
+to the caller as `PayabliErrorCode.tokenProviderFailed`. Size the backend
+call well under 30 seconds so a slow upstream fails fast inside the bound.
 
 ### Initialization and charging
 
@@ -533,14 +531,13 @@ being asked. Show a terms screen for the first and not for the second.
 
 ### Handling errors
 
-`PayabliTTPError` covers most of the session and charge lifecycle. The one
-exception is the host's `tokenProvider`: a failure there surfaces as
-`PayabliSDKCore`'s own `PayabliGenericError`, not as a `PayabliTTPError` case,
-because `PayabliAuth` raises it before `PayabliTTP` has a phase to wrap it in.
-That reaches a caller two ways — wrapped as `configFailed` when `/config` was
-the request it broke, or bare when it broke device attestation instead, since
-`initialize()`'s attestation phase rethrows an attestation-time failure as it
-arrived rather than wrapping it:
+`PayabliTTPError` covers most of the session and charge lifecycle. The host's
+`tokenProvider` is the exception: a failure there surfaces as `PayabliSDKCore`'s
+own `PayabliGenericError`, because `PayabliAuth` raises it before `PayabliTTP`
+has a phase to wrap it in. It reaches a caller two ways — wrapped as
+`configFailed` when `/config` was the request it broke, or bare when it broke
+device attestation, since `initialize()`'s attestation phase rethrows an
+attestation-time failure as it arrived:
 
 ```swift
 import PayabliSDKCore
@@ -568,8 +565,8 @@ do {
     // PayabliErrorCode.tokenProviderFailed) the host's tokenProvider itself
     // failed, hung past its bound, or returned an unusable token.
 } catch let error as PayabliGenericError where error.code == .tokenProviderFailed {
-    // The same tokenProvider failure, reached here instead of configFailed
-    // above because it happened during device attestation rather than /config.
+    // The tokenProvider failed during device attestation, before /config had a
+    // phase to wrap it as configFailed.
 }
 ```
 
