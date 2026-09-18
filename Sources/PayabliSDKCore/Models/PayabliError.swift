@@ -16,10 +16,6 @@ public enum PayabliErrorCode: String, Sendable, CaseIterable {
     /// ``tokenExpired`` as worth repeating — both leave it terminal — so the hazard this code exists
     /// to avoid is a *host's* retry or UI logic reading the code: one written for "the service
     /// refused this" would call a deadlocked or misbehaving callback again on exactly that read.
-    ///
-    /// Ruled 2026-09-15, maintainer, under "A misbehaving `tokenProvider` gets its own code" in this
-    /// SDK's internal design record. Android carries the same agreement; whether `TOKEN_PROVIDER_FAILED`
-    /// has shipped there yet is that platform's own history to check.
     case tokenProviderFailed = "TOKEN_PROVIDER_FAILED"
     case invalidSignature = "INVALID_SIGNATURE"
     case permissionDenied = "PERMISSION_DENIED"
