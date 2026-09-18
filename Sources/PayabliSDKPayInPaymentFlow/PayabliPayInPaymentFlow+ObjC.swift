@@ -44,61 +44,7 @@ public final class PayabliPayInPaymentFlowObjC: NSObject {
         entryPoint: String,
         environment: PayabliEnvironment
     ) throws {
-        let sendable = UncheckedSendableBox(tokenHandler)
-        let tokenProvider: PayabliTokenRefresh = {
-            // Holds the continuation between setup and whichever of the host's completion block or
-            // a cancellation resumes it first. Swapped to nil by whichever gets there, so the other
-            // — a second completion call, or the completion arriving after this task was already
-            // cancelled — is a no-op rather than a double resume.
-            //
-            // The cancellation half matters beyond an ordinary cancelled caller: `PayabliAuth` races
-            // this call against a deadline and cancels it if the host's block never fires. Without
-            // resuming here, that cancellation would do nothing — the continuation stays parked, the
-            // mint's task group cannot leave scope, and every caller joined to it waits past the
-            // bound rather than being refused at it.
-            let pending = Locked<CheckedContinuation<String, Error>?>(nil)
-            return try await withTaskCancellationHandler {
-                try await withCheckedThrowingContinuation { continuation in
-                    pending.withLock { $0 = continuation }
-                    // A cancellation that raced this setup found nothing to resume yet; caught here
-                    // instead, so a task already cancelled when this call started does not wait on a
-                    // host that will never call back.
-                    guard !Task.isCancelled else {
-                        let toResume = pending.withLock { stored -> CheckedContinuation<String, Error>? in
-                            defer { stored = nil }
-                            return stored
-                        }
-                        toResume?.resume(throwing: CancellationError())
-                        return
-                    }
-                    sendable.value { token, error in
-                        let toResume = pending.withLock { stored -> CheckedContinuation<String, Error>? in
-                            defer { stored = nil }
-                            return stored
-                        }
-                        guard let toResume else { return }
-                        if let error {
-                            toResume.resume(throwing: error)
-                        } else if let token {
-                            toResume.resume(returning: token)
-                        } else {
-                            toResume.resume(throwing: NSError(
-                                domain: "com.payabli.payInPaymentFlow",
-                                code: -1,
-                                userInfo: [NSLocalizedDescriptionKey:
-                                    "tokenHandler returned nil token and nil error"]
-                            ))
-                        }
-                    }
-                }
-            } onCancel: {
-                let toResume = pending.withLock { stored -> CheckedContinuation<String, Error>? in
-                    defer { stored = nil }
-                    return stored
-                }
-                toResume?.resume(throwing: CancellationError())
-            }
-        }
+        let tokenProvider = bridgedPayInTokenProvider(tokenHandler)
         let config = try PayabliConfig(
             entryPoint: entryPoint,
             environment: environment,
@@ -220,6 +166,71 @@ public final class PayabliPayInPaymentFlowObjC: NSObject {
             code: -2,
             userInfo: [NSLocalizedDescriptionKey: message]
         )
+    }
+}
+
+/// Wraps `tokenHandler`'s completion-block shape in a `PayabliTokenRefresh` continuation.
+///
+/// A free function rather than inlined into the `init` above, so a test can build one directly and
+/// cancel the `Task` running it with `Task.cancel()` — exercising this cancellation handling at the
+/// point it lives, instead of driving `PayabliAuth`'s real 30s bound to reach the same path.
+///
+/// `pending` holds the continuation between setup and whichever of the host's completion block or a
+/// cancellation resumes it first. Swapped to nil by whichever gets there, so the other — a second
+/// completion call, or the completion arriving after this task was already cancelled — is a no-op
+/// rather than a double resume.
+///
+/// The cancellation handler exists for a call `PayabliAuth` gave up on, not for the host's ordinary
+/// cancellation: `racedMint` now returns at its deadline whether or not this call has answered, so a
+/// caller is never left waiting on it either way. What resuming here prevents is this call otherwise
+/// running forever unseen, holding `tokenHandler` and a continuation neither side is waiting on.
+func bridgedPayInTokenProvider(
+    _ tokenHandler: @escaping (@escaping (String?, NSError?) -> Void) -> Void
+) -> PayabliTokenRefresh {
+    let sendable = UncheckedSendableBox(tokenHandler)
+    return {
+        let pending = Locked<CheckedContinuation<String, Error>?>(nil)
+        return try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { continuation in
+                pending.withLock { $0 = continuation }
+                // A cancellation that raced this setup found nothing to resume yet; caught here
+                // instead, so a task already cancelled when this call started does not wait on a
+                // host that will never call back.
+                guard !Task.isCancelled else {
+                    let toResume = pending.withLock { stored -> CheckedContinuation<String, Error>? in
+                        defer { stored = nil }
+                        return stored
+                    }
+                    toResume?.resume(throwing: CancellationError())
+                    return
+                }
+                sendable.value { token, error in
+                    let toResume = pending.withLock { stored -> CheckedContinuation<String, Error>? in
+                        defer { stored = nil }
+                        return stored
+                    }
+                    guard let toResume else { return }
+                    if let error {
+                        toResume.resume(throwing: error)
+                    } else if let token {
+                        toResume.resume(returning: token)
+                    } else {
+                        toResume.resume(throwing: NSError(
+                            domain: "com.payabli.payInPaymentFlow",
+                            code: -1,
+                            userInfo: [NSLocalizedDescriptionKey:
+                                "tokenHandler returned nil token and nil error"]
+                        ))
+                    }
+                }
+            }
+        } onCancel: {
+            let toResume = pending.withLock { stored -> CheckedContinuation<String, Error>? in
+                defer { stored = nil }
+                return stored
+            }
+            toResume?.resume(throwing: CancellationError())
+        }
     }
 }
 

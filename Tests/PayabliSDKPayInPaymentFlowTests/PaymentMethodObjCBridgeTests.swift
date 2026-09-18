@@ -193,51 +193,39 @@ final class PaymentMethodObjCBridgeTests: XCTestCase {
         await fulfillment(of: [completionExpectation], timeout: 1)
     }
 
-    /// The deadline this closure exists for: a `tokenHandler` that retains its completion instead of
-    /// calling it, the "forgotten completion" case a callback-shaped API invites. `PayabliAuth`
-    /// cancels the provider call at its 30s bound; this proves the ObjC bridge's
-    /// `withTaskCancellationHandler` turns that into a resumed continuation instead of one left
-    /// parked, and that the host's completion finally arriving after does not resume it twice.
+    /// The cancellation path `bridgedPayInTokenProvider` exists for: a `tokenHandler` that retains
+    /// its completion instead of calling it — the "forgotten completion" case a callback-shaped API
+    /// invites — combined with the `Task` running it being cancelled, which is what `PayabliAuth`
+    /// does at its bound rather than waiting on this call forever.
     ///
-    /// Runs the real 30s bound rather than a shortened one: nothing built for this bridge lets a
-    /// test substitute the clock without adding a new initializer to reach it, and the token step
-    /// fails before any network call, so the wait costs time and nothing else.
-    func testTokenHandlerThatNeverCompletesIsRefusedAtTheDeadlineAndALateCallbackIsIgnored() async throws {
-        let completionExpectation = expectation(description: "ObjC token deadline completion")
+    /// Drives that with `Task.cancel()` directly instead of through `PayabliAuth`'s real 30s bound:
+    /// `PayabliAuthProviderBoundTests` already proves that bound end to end with a clock double, and
+    /// re-proving it here would only add a real 30-second wait with no cancellation coverage this
+    /// one lacks.
+    func testBridgedTokenProviderResumesWithCancellationErrorWhenCancelledAndIgnoresALateCallback() async throws {
+        let handlerCalled = expectation(description: "tokenHandler called")
         var lateCompletion: ((String?, NSError?) -> Void)?
-        let component = try PayabliPayInPaymentFlowObjC(
-            tokenHandler: { completion in
-                lateCompletion = completion
-            },
-            entryPoint: "entry",
-            environment: .sandbox
-        )
-
-        component.addCard(
-            cardNumber: "4111111111111111",
-            expiration: "02/28",
-            cardholderName: "Jane Doe",
-            cvv: "123",
-            billingZip: "33139",
-            createAnonymous: false,
-            forceCustomerCreation: false,
-            temporary: false,
-            source: nil
-        ) { result, error in
-            XCTAssertNil(result)
-            XCTAssertEqual(error?.domain, "com.payabli.payInPaymentFlow")
-            XCTAssertEqual(error?.code, -3)
-            XCTAssertEqual(
-                error?.userInfo["PayabliErrorCode"] as? String,
-                PayabliErrorCode.tokenProviderFailed.rawValue
-            )
-            completionExpectation.fulfill()
+        let provider = bridgedPayInTokenProvider { completion in
+            lateCompletion = completion
+            handlerCalled.fulfill()
         }
 
-        await fulfillment(of: [completionExpectation], timeout: 35)
+        let task = Task { try await provider() }
+        await fulfillment(of: [handlerCalled], timeout: 1)
+        task.cancel()
+
+        do {
+            _ = try await task.value
+            XCTFail("a cancelled provider task must throw")
+        } catch is CancellationError {
+            // Expected: the cancellation handler resumed the parked continuation instead of leaving
+            // it running unseen.
+        } catch {
+            XCTFail("expected CancellationError, got \(error)")
+        }
 
         // A crash here (a double resume of the same continuation) is the failure mode this guards:
-        // XCTest reporting green on this call proves the guard, not just this assertion.
+        // XCTest reporting green on this call proves the guard, not just the catch above.
         lateCompletion?("late-token", nil)
     }
 
