@@ -100,13 +100,24 @@ func makeWarmAuth(
 /// one mint against the bound and then prove the next mint is unraced — a clock that kept firing
 /// would also time out the recovery the case is checking, rather than let the provider that answers
 /// it win.
+///
+/// The first `expire(after:)` waits `admissionDelay` before resolving — the same device
+/// `testConcurrentFirstReadsSpendOneProviderCall` uses inside a provider, moved here because this
+/// clock's caller is what races concurrent joiners: without room to be admitted to the one live mint
+/// before it resolves, a caller scheduled late finds the mint already released and starts a second
+/// one, which this clock then parks on forever rather than answering.
 final class FiresOnceRetryClock: RetryClock, @unchecked Sendable {
+    private let admissionDelay: UInt64
     private let lock = NSLock()
     private var fired = false
 
     /// Every `seconds` this clock was asked to expire after, in call order — so a case can assert
     /// `PayabliAuth` raced the bound it documents (30s) rather than some other number.
     private(set) var requestedDeadlines: [TimeInterval] = []
+
+    init(admissionDelay: UInt64 = 0) {
+        self.admissionDelay = admissionDelay
+    }
 
     func elapsed() -> TimeInterval {
         0
@@ -123,6 +134,9 @@ final class FiresOnceRetryClock: RetryClock, @unchecked Sendable {
         guard isFirst else {
             try await Task.sleep(nanoseconds: .max)
             return
+        }
+        if admissionDelay > 0 {
+            try await Task.sleep(nanoseconds: admissionDelay)
         }
     }
 }

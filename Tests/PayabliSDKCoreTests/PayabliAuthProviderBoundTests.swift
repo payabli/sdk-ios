@@ -39,10 +39,11 @@ final class PayabliAuthProviderBoundTests: XCTestCase {
     /// Every caller joined to the one mint that times out receives the same failure, not just the
     /// caller who started it — the mint is shared, and the timeout is a property of that one call.
     ///
-    /// Bounded the same way `outcomeWithinCeiling`'s own callers are: an unordered arrival at the
-    /// actor could in principle land one caller after `releaseMint` and start a second mint, which
-    /// `FiresOnceRetryClock` never times out again, so an unbounded wait here would hang the suite
-    /// on that caller rather than fail on it.
+    /// `FiresOnceRetryClock`'s admission delay gives all five callers room to be admitted to the one
+    /// live mint before it resolves. Without it, an unordered arrival at the actor could in principle
+    /// land one caller after `releaseMint`, starting a second mint that the clock — fired once
+    /// already — never times out again, hanging that caller rather than failing it; `outcomeWithinCeiling`
+    /// bounds that outcome but the delay is what removes it.
     func testConcurrentCallersJoinedToATimedOutMintAllReceiveTheSameFailure() async throws {
         let auth = PayabliAuth(
             config: try makeConfig(tokenProvider: {
@@ -50,7 +51,7 @@ final class PayabliAuthProviderBoundTests: XCTestCase {
                 return "never"
             }),
             logger: PayabliLogger(category: .auth),
-            clock: FiresOnceRetryClock()
+            clock: FiresOnceRetryClock(admissionDelay: 20_000_000)
         )
 
         let outcome = await outcomeWithinCeiling {
