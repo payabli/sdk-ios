@@ -9,7 +9,8 @@ public enum PayabliErrorCode: String, Sendable, CaseIterable {
     /// The host's `tokenProvider` did not do its job: it hung past the bound, threw, returned a blank or
     /// unusable token, returned the token the server had just rejected, or read the token it was called to
     /// mint. Every one of those means the same thing to a caller — fix the callback — so they share this
-    /// code and are distinguished by reason rather than by a code each.
+    /// code rather than a code each, and most also share ``PayabliError/reason``; a caller branches on
+    /// ``PayabliError/detail`` instead.
     ///
     /// Not ``tokenExpired``: that is the service refusing a credential, which is a different answer
     /// about a different thing. Neither this SDK's own retry logic nor `AuthRecoveryPolicy` treats
