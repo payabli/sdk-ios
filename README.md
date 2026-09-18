@@ -533,9 +533,18 @@ being asked. Show a terms screen for the first and not for the second.
 
 ### Handling errors
 
-`PayabliTTPError` covers the entire session and charge lifecycle:
+`PayabliTTPError` covers most of the session and charge lifecycle. The one
+exception is the host's `tokenProvider`: a failure there surfaces as
+`PayabliSDKCore`'s own `PayabliGenericError`, not as a `PayabliTTPError` case,
+because `PayabliAuth` raises it before `PayabliTTP` has a phase to wrap it in.
+That reaches a caller two ways — wrapped as `configFailed` when `/config` was
+the request it broke, or bare when it broke device attestation instead, since
+`initialize()`'s attestation phase rethrows an attestation-time failure as it
+arrived rather than wrapping it:
 
 ```swift
+import PayabliSDKCore
+
 do {
     try await ttp.initialize()
     let result = try await ttp.charge(
@@ -558,6 +567,9 @@ do {
     // /config was refused — a rejected binding, a rejected bearer, or (per
     // PayabliErrorCode.tokenProviderFailed) the host's tokenProvider itself
     // failed, hung past its bound, or returned an unusable token.
+} catch let error as PayabliGenericError where error.code == .tokenProviderFailed {
+    // The same tokenProvider failure, reached here instead of configFailed
+    // above because it happened during device attestation rather than /config.
 }
 ```
 
