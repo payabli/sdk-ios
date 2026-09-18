@@ -8,8 +8,9 @@ public enum PayabliErrorCode: String, Sendable, CaseIterable {
 
     /// The host's `tokenProvider` hung past the 30s bound, threw, returned a blank or unusable token,
     /// returned the token the server had just rejected, or read the token it was called to mint. Most
-    /// share ``PayabliError/reason``, so a caller branches on ``PayabliError/detail``. The callback
-    /// has to change before a retry succeeds.
+    /// share ``PayabliError/reason``, so a caller branches on ``PayabliError/detail``. The SDK does
+    /// not retry the callback on this code; a subsequent SDK call invokes it again and can succeed if
+    /// the underlying failure has cleared.
     case tokenProviderFailed = "TOKEN_PROVIDER_FAILED"
     case invalidSignature = "INVALID_SIGNATURE"
     case permissionDenied = "PERMISSION_DENIED"
