@@ -68,26 +68,19 @@ final class PayabliAuthProviderBoundTests: XCTestCase {
         XCTAssertEqual(outcome, PayabliErrorCode.tokenProviderFailed.rawValue)
     }
 
-    /// Every caller joined to the one mint that times out receives the same failure, not just the
-    /// caller who started it — the mint is shared, and the timeout is a property of that one call.
-    ///
-    /// `GatedFiresOnceRetryClock` holds the deadline until all four joiners are counted, which is what
-    /// makes this deterministic rather than probable: the one caller that starts the mint logs nothing
-    /// on that path, so counting to four rather than five is exactly the other callers, whichever
-    /// five of them they are.
+    /// Every caller joined to the one mint that times out receives the same failure. The mint is
+    /// shared and the timeout is a property of that one call.
     func testConcurrentCallersJoinedToATimedOutMintAllReceiveTheSameFailure() async throws {
         let admitted = Latch()
-        let logger = PayabliLogger(
-            category: .auth,
-            sink: AdmissionCountingLogSink(admittingOn: "Joining an in-flight token mint", occurrence: 4, admitted: admitted)
-        )
+        let joiners = AdmissionCounter(occurrence: 4, admitted: admitted)
         let auth = PayabliAuth(
             config: try makeConfig(tokenProvider: {
                 try await Task.sleep(nanoseconds: .max)
                 return "never"
             }),
-            logger: logger,
-            clock: GatedFiresOnceRetryClock(admittedAfter: admitted)
+            logger: PayabliLogger(category: .auth),
+            clock: GatedFiresOnceRetryClock(admittedAfter: admitted),
+            onJoinedInFlightMint: { joiners.admit() }
         )
 
         let outcome = await outcomeWithinCeiling {

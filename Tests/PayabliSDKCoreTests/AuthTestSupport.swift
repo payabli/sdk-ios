@@ -133,13 +133,10 @@ class FiresOnceRetryClock: RetryClock, @unchecked Sendable {
     func firstDeadlineReached() async {}
 }
 
-/// Fires its first deadline only once `admitted` opens, rather than immediately: a case racing several
-/// callers against the same deadline needs every one of them to have actually joined the one live mint
-/// first, or a caller the actor had not yet reached finds the mint already released — by an earlier
-/// caller's timeout — and starts a second one, which this clock, having fired once, then parks on
-/// forever. `admitted` is driven by counting `PayabliAuth`'s own "joining an in-flight token mint" log
-/// line rather than a wall-clock delay, so the gate is exact instead of hoping a fixed window was long
-/// enough.
+/// Fires its first deadline once `admitted` opens. A case racing several callers against the same
+/// deadline needs every one of them to have actually joined the one live mint first, or a caller
+/// the actor had not yet reached finds the mint already released by an earlier caller's timeout
+/// and starts a second one, which this clock — having fired once — then parks on forever.
 final class GatedFiresOnceRetryClock: FiresOnceRetryClock, @unchecked Sendable {
     private let admitted: Latch
 
@@ -152,24 +149,21 @@ final class GatedFiresOnceRetryClock: FiresOnceRetryClock, @unchecked Sendable {
     }
 }
 
-/// Counts occurrences of `held` and opens `admitted` on the chosen one, so a test can gate a fake
-/// deadline on every intended caller having actually joined the one live mint it is racing, proven by
-/// counting `PayabliAuth`'s own log line rather than assuming a wall-clock window was long enough.
-final class AdmissionCountingLogSink: LogSink, @unchecked Sendable {
-    private let held: String
+/// Opens `admitted` on the `occurrence`th call to `admit()`, so a test can gate a synchronized
+/// deadline on every intended caller having joined the one in-flight mint. Driven by
+/// `PayabliAuth`'s `onJoinedInFlightMint` hook.
+final class AdmissionCounter: @unchecked Sendable {
     private let occurrence: Int
     private let admitted: Latch
     private let lock = NSLock()
     private var seen = 0
 
-    init(admittingOn held: String, occurrence: Int, admitted: Latch) {
-        self.held = held
+    init(occurrence: Int, admitted: Latch) {
         self.occurrence = occurrence
         self.admitted = admitted
     }
 
-    func write(level: PayabliLogger.Level, category: PayabliLogger.Category, message: String) {
-        guard message == held else { return }
+    func admit() {
         lock.lock()
         seen += 1
         let isTheOne = seen == occurrence

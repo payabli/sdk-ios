@@ -19,16 +19,26 @@ actor PayabliAuth {
     /// the same reason `Retry.run` takes one.
     private let clock: any RetryClock
 
+    /// Fired after a caller joined an in-flight mint. Nil in production; a test injects a counter
+    /// to gate a synchronized deadline on every intended joiner having arrived.
+    private let onJoinedInFlightMint: (@Sendable () -> Void)?
+
     init(config: PayabliConfig) {
         self.init(config: config, logger: PayabliLogger(category: .auth))
     }
 
     /// The logger is required rather than defaulted: a holder that built its own would leave a
     /// caller's substitution reaching nothing, and nothing would report it.
-    init(config: PayabliConfig, logger: PayabliLogger, clock: any RetryClock = SystemRetryClock()) {
+    init(
+        config: PayabliConfig,
+        logger: PayabliLogger,
+        clock: any RetryClock = SystemRetryClock(),
+        onJoinedInFlightMint: (@Sendable () -> Void)? = nil
+    ) {
         self.config = config
         self.logger = logger
         self.clock = clock
+        self.onJoinedInFlightMint = onJoinedInFlightMint
     }
 
     /// The token to send, minting one when none is held.
@@ -53,7 +63,7 @@ actor PayabliAuth {
         }
 
         if let existing = inFlightMint {
-            logger.info("Joining an in-flight token mint")
+            onJoinedInFlightMint?()
             return try await join(existing)
         }
 
