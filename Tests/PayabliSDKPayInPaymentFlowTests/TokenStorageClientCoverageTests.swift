@@ -269,7 +269,7 @@ final class TokenStorageClientCoverageTests: XCTestCase {
             ))
             XCTFail("Expected missing token error")
         } catch let error as PayabliGenericError {
-            XCTAssertEqual(error.code, .tokenExpired)
+            XCTAssertEqual(error.code, .tokenProviderFailed)
         } catch {
             XCTFail("Wrong error: \(error)")
         }

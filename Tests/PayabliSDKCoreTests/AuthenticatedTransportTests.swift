@@ -320,7 +320,7 @@ final class AuthenticatedTransportTests: XCTestCase {
 
         let failure = await failure(from: { _ = try await transport.perform(self.ping()) })
 
-        XCTAssertEqual((failure as? PayabliGenericError)?.code, .tokenExpired)
+        XCTAssertEqual((failure as? PayabliGenericError)?.code, .tokenProviderFailed)
         XCTAssertEqual(stub.count, 1, "nothing to refresh with, so nothing is replayed")
     }
 
@@ -337,7 +337,7 @@ final class AuthenticatedTransportTests: XCTestCase {
 
         let failure = await failure(from: { _ = try await transport.perform(self.ping()) })
 
-        XCTAssertEqual((failure as? PayabliGenericError)?.code, .tokenExpired)
+        XCTAssertEqual((failure as? PayabliGenericError)?.code, .tokenProviderFailed)
         XCTAssertEqual(stub.count, 1)
         XCTAssertFalse("\(failure)".contains(sentinel), "the host's own message is not ours to relay")
         XCTAssertFalse(

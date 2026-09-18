@@ -300,8 +300,8 @@ final class PayInPaymentFlowClientTests: XCTestCase {
             XCTFail("Expected the provider failure to surface")
         } catch let error as PayabliGenericError {
             // The holder owns the provider now, so a host failure arrives as this SDK's own
-            // `.tokenExpired` with the cause redacted, rather than as the host's error verbatim.
-            XCTAssertEqual(error.code, .tokenExpired)
+            // `.tokenProviderFailed` with the cause redacted, rather than as the host's error verbatim.
+            XCTAssertEqual(error.code, .tokenProviderFailed)
         }
 
         let rendered = captured.all.joined(separator: "\n")
@@ -346,7 +346,7 @@ final class PayInPaymentFlowClientTests: XCTestCase {
             _ = try await component.capture(cardRequest())
             XCTFail("Expected missing token")
         } catch let error as PayabliGenericError {
-            XCTAssertEqual(error.code, .tokenExpired)
+            XCTAssertEqual(error.code, .tokenProviderFailed)
         } catch {
             XCTFail("Wrong error: \(error)")
         }

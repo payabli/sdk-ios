@@ -14,15 +14,31 @@ actor PayabliAuth {
     /// rather than answering a later rejection.
     private var inFlightMintID: UUID?
 
+    /// What times the provider bound below. A parameter rather than a hardwired `SystemRetryClock()`
+    /// so a test can race the deadline deterministically instead of waiting thirty real seconds —
+    /// the same reason `Retry.run` takes one.
+    private let clock: any RetryClock
+
+    /// Fired after a caller joined an in-flight mint. Nil in production; a test injects a counter
+    /// to gate a synchronized deadline on every intended joiner having arrived.
+    private let onJoinedInFlightMint: (@Sendable () -> Void)?
+
     init(config: PayabliConfig) {
         self.init(config: config, logger: PayabliLogger(category: .auth))
     }
 
     /// The logger is required rather than defaulted: a holder that built its own would leave a
     /// caller's substitution reaching nothing, and nothing would report it.
-    init(config: PayabliConfig, logger: PayabliLogger) {
+    init(
+        config: PayabliConfig,
+        logger: PayabliLogger,
+        clock: any RetryClock = SystemRetryClock(),
+        onJoinedInFlightMint: (@Sendable () -> Void)? = nil
+    ) {
         self.config = config
         self.logger = logger
+        self.clock = clock
+        self.onJoinedInFlightMint = onJoinedInFlightMint
     }
 
     /// The token to send, minting one when none is held.
@@ -40,13 +56,14 @@ actor PayabliAuth {
             // await the call this caller is inside.
             logger.error("The token provider requested a token before returning its first one")
             throw PayabliGenericError(
-                code: .tokenExpired,
+                code: .tokenProviderFailed,
                 reason: "Access token unavailable",
                 detail: "The tokenProvider made a request that needs the token it was asked to supply."
             )
         }
 
         if let existing = inFlightMint {
+            onJoinedInFlightMint?()
             return try await join(existing)
         }
 
@@ -83,7 +100,7 @@ actor PayabliAuth {
             guard let held = currentToken else {
                 logger.error("The token provider requested a token before returning its first one")
                 throw PayabliGenericError(
-                    code: .tokenExpired,
+                    code: .tokenProviderFailed,
                     reason: "Access token unavailable",
                     detail: "The tokenProvider made a request that needs the token it was asked to supply."
                 )
@@ -116,20 +133,32 @@ actor PayabliAuth {
     private func mint(replacing rejectedToken: String?) async throws -> String {
         let provider = config.tokenProvider
         let mintID = UUID()
+        let clock = self.clock
         let task = Task<String, Error> { [logger] in
             logger.info("Requesting an access token from the partner tokenProvider")
             let minted: String
             do {
-                minted = try await RefreshInProgress.withMark(holder: self, refresh: mintID) {
-                    try await provider()
-                }
+                minted = try await Self.racedMint(holder: self, mintID: mintID, provider: provider, clock: clock)
+            } catch is ProviderTimedOut {
+                // Named apart from every other provider throw below: a caller can tell a slow broker
+                // from a rejected credential or a thrown error, which is the whole point of the bound.
+                logger.error("The token provider did not return within the deadline")
+                throw PayabliGenericError(
+                    code: .tokenProviderFailed,
+                    reason: "Token request failed",
+                    detail: "The tokenProvider did not return within \(Int(Self.providerTimeout)) seconds."
+                )
             } catch {
-                // Every throw from the provider lands here, this SDK's own error type
-                // included: it is host code whatever it chose to throw.
+                // Every other throw from the provider lands here, this SDK's own error type
+                // included: it is host code whatever it chose to throw. The detail is a static
+                // sentence rather than the thrown error's message: a host's error can carry
+                // request data, and the reason and detail are displayable strings. The type
+                // name reaches a caller through `underlying` via `RedactedCause`.
                 logger.error("The token provider failed")
                 throw PayabliGenericError(
-                    code: .tokenExpired,
+                    code: .tokenProviderFailed,
                     reason: "Token request failed",
+                    detail: "The tokenProvider threw an error.",
                     underlying: RedactedCause(error)
                 )
             }
@@ -150,6 +179,76 @@ actor PayabliAuth {
         } catch {
             releaseMint(mintID)
             throw error
+        }
+    }
+
+    /// The ceiling on one call to the host's `tokenProvider`. Matches Android's
+    /// `DEFAULT_PROVIDER_TIMEOUT_MILLIS` in `PayabliAuth.kt`.
+    private static let providerTimeout: TimeInterval = 30
+
+    /// Distinguishes a provider that never returned from anything it threw, so `mint(replacing:)` can
+    /// raise a reason naming the timeout rather than folding it into "the provider failed".
+    private struct ProviderTimedOut: Error {}
+
+    /// A value only the first of two racing sides sets. `racedMint` uses it to keep whichever side
+    /// loses from resuming a continuation the other has already resumed.
+    private final class DecidedOnce: @unchecked Sendable {
+        private let lock = NSLock()
+        private var fired = false
+
+        /// True the first call, false every call after.
+        func claim() -> Bool {
+            lock.lock()
+            defer { lock.unlock() }
+            if fired {
+                return false
+            }
+            fired = true
+            return true
+        }
+    }
+
+    /// Races `provider` against `clock`'s deadline and answers with whichever finishes first.
+    ///
+    /// Races through a continuation rather than a `TaskGroup`: a task group cannot leave its own scope
+    /// until every child it started has finished, cancelled or not, and cancellation is only
+    /// cooperative. A provider suspended on an ordinary continuation with no cancellation handling of
+    /// its own — a forgotten completion, the very failure this bound exists to catch — never notices
+    /// `cancel()` and never finishes, so racing it inside a task group would still hang this call on
+    /// exit. This returns the instant either side decides instead; the loser keeps running unawaited,
+    /// and `decided` keeps it from resuming a continuation nobody is waiting on anymore.
+    ///
+    /// **The bound is still only as tight as `provider` is cancellable — for what happens *after* this
+    /// call returns.** A provider that never finishes now runs on unseen rather than hanging this
+    /// call; that closes the hang, not the leak. A provider blocking a thread outside a suspension
+    /// point is unaffected either way, which is the documented limit both platforms share and neither
+    /// closes.
+    private static func racedMint(
+        holder: PayabliAuth,
+        mintID: UUID,
+        provider: @escaping PayabliTokenRefresh,
+        clock: any RetryClock
+    ) async throws -> String {
+        let decided = DecidedOnce()
+        return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<String, Error>) in
+            let providerTask = Task {
+                do {
+                    let token = try await RefreshInProgress.withMark(holder: holder, refresh: mintID) {
+                        try await provider()
+                    }
+                    guard decided.claim() else { return }
+                    continuation.resume(returning: token)
+                } catch {
+                    guard decided.claim() else { return }
+                    continuation.resume(throwing: error)
+                }
+            }
+            Task {
+                try? await clock.expire(after: Self.providerTimeout)
+                guard decided.claim() else { return }
+                providerTask.cancel()
+                continuation.resume(throwing: ProviderTimedOut())
+            }
         }
     }
 
@@ -201,21 +300,21 @@ actor PayabliAuth {
     private static func check(_ fresh: String, replacing rejectedToken: String?) throws {
         guard !fresh.isBlank else {
             throw PayabliGenericError(
-                code: .tokenExpired,
+                code: .tokenProviderFailed,
                 reason: "Token request failed",
                 detail: "The tokenProvider returned a blank token."
             )
         }
         guard fresh.isHeaderSafe else {
             throw PayabliGenericError(
-                code: .tokenMalformed,
+                code: .tokenProviderFailed,
                 reason: "Token request failed",
                 detail: "The tokenProvider returned a token that cannot be an HTTP header value."
             )
         }
         guard fresh != rejectedToken else {
             throw PayabliGenericError(
-                code: .tokenExpired,
+                code: .tokenProviderFailed,
                 reason: "Token request failed",
                 detail: "The tokenProvider returned the token the server rejected."
             )

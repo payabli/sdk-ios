@@ -95,3 +95,80 @@ func makeWarmAuth(
     _ = try await auth.currentAccessToken()
     return auth
 }
+
+/// Fires its first deadline and parks on every one after, so a provider-bound case can race exactly
+/// one mint against the bound and then prove the next mint is unraced — a clock that kept firing
+/// would also time out the recovery the case is checking, rather than let the provider that answers
+/// it win.
+class FiresOnceRetryClock: RetryClock, @unchecked Sendable {
+    private let lock = NSLock()
+    private var fired = false
+
+    /// Every `seconds` this clock was asked to expire after, in call order — so a case can assert
+    /// `PayabliAuth` raced the bound it documents (30s) rather than some other number.
+    private(set) var requestedDeadlines: [TimeInterval] = []
+
+    func elapsed() -> TimeInterval {
+        0
+    }
+
+    func sleep(for seconds: TimeInterval) async throws {}
+
+    func expire(after seconds: TimeInterval) async throws {
+        lock.lock()
+        let isFirst = !fired
+        fired = true
+        requestedDeadlines.append(seconds)
+        lock.unlock()
+        guard isFirst else {
+            try await Task.sleep(nanoseconds: .max)
+            return
+        }
+        await firstDeadlineReached()
+    }
+
+    /// Runs once, when the first `expire(after:)` would otherwise resolve. The base class resolves
+    /// immediately; a subclass gating that moment overrides this rather than `expire(after:)` itself,
+    /// so the recording and the once-only guard above stay in one place.
+    func firstDeadlineReached() async {}
+}
+
+/// Fires its first deadline once `admitted` opens. A case racing several callers against the same
+/// deadline needs every one of them to have actually joined the one live mint first, or a caller
+/// the actor had not yet reached finds the mint already released by an earlier caller's timeout
+/// and starts a second one, which this clock — having fired once — then parks on forever.
+final class GatedFiresOnceRetryClock: FiresOnceRetryClock, @unchecked Sendable {
+    private let admitted: Latch
+
+    init(admittedAfter admitted: Latch) {
+        self.admitted = admitted
+    }
+
+    override func firstDeadlineReached() async {
+        await admitted.wait()
+    }
+}
+
+/// Opens `admitted` on the `occurrence`th call to `admit()`, so a test can gate a synchronized
+/// deadline on every intended caller having joined the one in-flight mint. Driven by
+/// `PayabliAuth`'s `onJoinedInFlightMint` hook.
+final class AdmissionCounter: @unchecked Sendable {
+    private let occurrence: Int
+    private let admitted: Latch
+    private let lock = NSLock()
+    private var seen = 0
+
+    init(occurrence: Int, admitted: Latch) {
+        self.occurrence = occurrence
+        self.admitted = admitted
+    }
+
+    func admit() {
+        lock.lock()
+        seen += 1
+        let isTheOne = seen == occurrence
+        lock.unlock()
+        guard isTheOne else { return }
+        admitted.open()
+    }
+}

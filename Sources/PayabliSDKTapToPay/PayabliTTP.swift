@@ -222,43 +222,8 @@ public final class PayabliTTP: NSObject, ObservableObject {
             appId: String,
             environment: PayabliEnvironment
         ) throws {
-            let bridged: PayabliTokenRefresh = {
-                // ObjC blocks are heap-allocated and copy-on-capture, so the
-                // bridged closure can safely be `@Sendable` even though Swift
-                // does not infer `@Sendable` for the input handler type.
-                let sendable = UncheckedSendableBox(tokenHandler)
-                return { @Sendable in
-                    try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<String, Error>) in
-                        // An ObjC host that invokes the completion block more
-                        // than once would resume the same continuation twice and
-                        // crash, so only the first invocation is honored. The
-                        // lock is because the host may call back from any queue.
-                        let resumed = Locked(false)
-                        sendable.value { token, error in
-                            let firstCall = resumed.withLock { hasResumed in
-                                guard !hasResumed else { return false }
-                                hasResumed = true
-                                return true
-                            }
-                            guard firstCall else { return }
-                            if let error {
-                                continuation.resume(throwing: error)
-                            } else if let token {
-                                continuation.resume(returning: token)
-                            } else {
-                                continuation.resume(throwing: NSError(
-                                    domain: "com.payabli.ttp",
-                                    code: -1,
-                                    userInfo: [NSLocalizedDescriptionKey:
-                                        "tokenHandler returned nil token and nil error"]
-                                ))
-                            }
-                        }
-                    }
-                }
-            }()
             try self.init(
-                tokenProvider: bridged,
+                tokenProvider: bridgedTokenProvider(errorDomain: PayabliTTPError.errorDomain, tokenHandler),
                 entryPoint: entryPoint,
                 appId: appId,
                 environment: environment

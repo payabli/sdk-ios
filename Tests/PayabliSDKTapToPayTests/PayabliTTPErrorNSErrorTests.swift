@@ -1,3 +1,4 @@
+import PayabliSDKCore
 @testable import PayabliSDKTapToPay
 import XCTest
 
@@ -89,6 +90,29 @@ final class PayabliTTPErrorNSErrorTests: XCTestCase {
         let err: Error = DummyError()
         let nsError = err.toPayabliNSError()
         XCTAssertNotEqual(nsError.domain, "com.payabli.ttp")
+    }
+
+    /// An attestation-time `tokenProvider` failure escapes `runAttestationPhase` as a core
+    /// `PayabliGenericError`, not a `PayabliTTPError`. Absent this branch it would fall through
+    /// Swift's default `as NSError` bridging and an ObjC / MAUI caller could not read the code.
+    func testToPayabliNSErrorSurfacesCorePayabliErrorCode() {
+        let err: Error = PayabliGenericError(
+            code: .tokenProviderFailed,
+            reason: "tokenProvider returned no usable token"
+        )
+
+        let nsError = err.toPayabliNSError()
+
+        XCTAssertEqual(nsError.domain, "com.payabli.ttp")
+        XCTAssertEqual(nsError.code, -3)
+        XCTAssertEqual(
+            nsError.userInfo["PayabliErrorCode"] as? String,
+            PayabliErrorCode.tokenProviderFailed.rawValue
+        )
+        XCTAssertEqual(
+            nsError.userInfo[NSLocalizedDescriptionKey] as? String,
+            "tokenProvider returned no usable token"
+        )
     }
 
     // MARK: - Sample table

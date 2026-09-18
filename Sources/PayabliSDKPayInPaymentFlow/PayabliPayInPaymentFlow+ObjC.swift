@@ -1,6 +1,9 @@
 import Foundation
 import PayabliSDKCore
 
+/// The `NSError` domain every error this facade hands to an ObjC caller carries, whatever it wraps.
+private let payInPaymentFlowObjCErrorDomain = "com.payabli.payInPaymentFlow"
+
 @objc(PayabliPayInPaymentFlowStoredPaymentMethodObjC)
 public final class PayabliPayInPaymentFlowStoredPaymentMethodObjC: NSObject {
     @objc public let storedMethodId: String?
@@ -44,32 +47,7 @@ public final class PayabliPayInPaymentFlowObjC: NSObject {
         entryPoint: String,
         environment: PayabliEnvironment
     ) throws {
-        let sendable = UncheckedSendableBox(tokenHandler)
-        let tokenProvider: PayabliTokenRefresh = {
-            try await withCheckedThrowingContinuation { continuation in
-                let resumed = Locked(false)
-                sendable.value { token, error in
-                    let firstCall = resumed.withLock { hasResumed in
-                        guard !hasResumed else { return false }
-                        hasResumed = true
-                        return true
-                    }
-                    guard firstCall else { return }
-                    if let error {
-                        continuation.resume(throwing: error)
-                    } else if let token {
-                        continuation.resume(returning: token)
-                    } else {
-                        continuation.resume(throwing: NSError(
-                            domain: "com.payabli.payInPaymentFlow",
-                            code: -1,
-                            userInfo: [NSLocalizedDescriptionKey:
-                                "tokenHandler returned nil token and nil error"]
-                        ))
-                    }
-                }
-            }
-        }
+        let tokenProvider = bridgedTokenProvider(errorDomain: payInPaymentFlowObjCErrorDomain, tokenHandler)
         let config = try PayabliConfig(
             entryPoint: entryPoint,
             environment: environment,
@@ -187,32 +165,10 @@ public final class PayabliPayInPaymentFlowObjC: NSObject {
 
     private func invalidArgument(_ message: String) -> NSError {
         NSError(
-            domain: "com.payabli.payInPaymentFlow",
+            domain: payInPaymentFlowObjCErrorDomain,
             code: -2,
             userInfo: [NSLocalizedDescriptionKey: message]
         )
-    }
-}
-
-private struct UncheckedSendableBox<Value>: @unchecked Sendable {
-    let value: Value
-    init(_ value: Value) {
-        self.value = value
-    }
-}
-
-private final class Locked<Value>: @unchecked Sendable {
-    private let lock = NSLock()
-    private var value: Value
-
-    init(_ value: Value) {
-        self.value = value
-    }
-
-    func withLock<R>(_ body: (inout Value) -> R) -> R {
-        lock.lock()
-        defer { lock.unlock() }
-        return body(&value)
     }
 }
 
@@ -220,7 +176,7 @@ private extension Error {
     func toPayabliPayInPaymentFlowNSError() -> NSError {
         if let payInPaymentFlowError = self as? any PayabliError {
             return NSError(
-                domain: "com.payabli.payInPaymentFlow",
+                domain: payInPaymentFlowObjCErrorDomain,
                 code: -3,
                 userInfo: [
                     NSLocalizedDescriptionKey: payInPaymentFlowError.reason,

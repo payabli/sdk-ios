@@ -5,6 +5,11 @@ public enum PayabliErrorCode: String, Sendable, CaseIterable {
     case missingToken = "MISSING_TOKEN"
     case tokenExpired = "TOKEN_EXPIRED"
     case tokenMalformed = "TOKEN_MALFORMED"
+
+    /// The host's `tokenProvider` returned no token the SDK could use. ``PayabliError/detail`` names
+    /// the specific failure. The SDK does not retry on this code; a subsequent SDK call invokes the
+    /// callback again.
+    case tokenProviderFailed = "TOKEN_PROVIDER_FAILED"
     case invalidSignature = "INVALID_SIGNATURE"
     case permissionDenied = "PERMISSION_DENIED"
     case sessionBurned = "SESSION_BURNED"

@@ -303,6 +303,11 @@ retries the request with the new token, and deduplicates concurrent
 refreshes. The host application isn't required to track expirations,
 schedule refreshes, or implement debouncing.
 
+The SDK bounds every call to `tokenProvider` at 30 seconds. A call that
+hangs past that, throws, or returns a token the SDK cannot use surfaces
+to the caller as `PayabliErrorCode.tokenProviderFailed`. Size the backend
+call well under 30 seconds so a slow upstream fails fast inside the bound.
+
 ### Initialization and charging
 
 `initialize()` performs device attestation and brings the session to
@@ -526,9 +531,27 @@ being asked. Show a terms screen for the first and not for the second.
 
 ### Handling errors
 
-`PayabliTTPError` covers the entire session and charge lifecycle:
+`PayabliTTPError` covers most of the session and charge lifecycle, but two phases
+in `initialize()` and `charge()` rethrow the underlying error unchanged rather
+than wrapping it: device attestation, and the `/initiate` call that opens a
+charge. A caller therefore also encounters `PayabliSDKCore.PayabliGenericError`
+from either of those phases, carrying any core `PayabliErrorCode` the transport
+produced — `.tokenProviderFailed` when the host's `tokenProvider` failed,
+`.networkError`, `.permissionDenied`, `.serverError`, and so on.
+
+The other phases wrap what they see:
+
+- `/config` becomes `PayabliTTPError.configFailed(reason:)`. A
+  `PayabliErrorCode.tokenProviderFailed` here reaches the caller as
+  `configFailed`, with the classification named in the reason string.
+- `/update` becomes `PayabliTTPError.updateFailed(reason:)`, and
+  `activateDevice(activationCode:)` becomes
+  `PayabliTTPError.activationFailed(reason:)`. Both flatten the underlying
+  taxonomy: only the reason string survives.
 
 ```swift
+import PayabliSDKCore
+
 do {
     try await ttp.initialize()
     let result = try await ttp.charge(
@@ -547,8 +570,22 @@ do {
     // Card removed prematurely, reader timeout, or similar; usually retryable.
 } catch let PayabliTTPError.updateFailed(reason) {
     // /update PATCH failed after retries. Reconcile out of band.
-} catch PayabliTTPError.tokenExpired {
-    // tokenProvider returned no token; re-authentication required.
+} catch let PayabliTTPError.configFailed(reason) {
+    // /config was refused — a rejected binding, a rejected bearer, or the host's
+    // tokenProvider itself failed (see PayabliErrorCode.tokenProviderFailed).
+} catch let error as PayabliGenericError {
+    // Rethrown from device attestation or /initiate: any core PayabliErrorCode
+    // is possible. Branch on `error.code` — .tokenProviderFailed says the host
+    // callback misbehaved; other codes name transport or authorization
+    // conditions coming from those two phases.
+    switch error.code {
+    case .tokenProviderFailed:
+        // Fix the tokenProvider callback before retrying.
+        break
+    default:
+        // .networkError, .permissionDenied, .serverError, and so on.
+        break
+    }
 }
 ```
 
