@@ -39,6 +39,41 @@ final class BridgedTokenProviderTests: XCTestCase {
         lateCompletion?("late-token", nil)
     }
 
+    func testATaskAlreadyCancelledBeforeSetupResumesWithCancellationErrorWithoutCallingTheHost() async throws {
+        let taskStarted = Latch()
+        let release = Latch()
+        var hostCalled = false
+        let provider = bridgedTokenProvider(errorDomain: "com.payabli.test") { completion in
+            hostCalled = true
+            completion("a-token", nil)
+        }
+
+        let task = Task<String, Error> {
+            taskStarted.open()
+            await release.wait()
+            return try await provider()
+        }
+
+        // Gated rather than raced: cancel() is guaranteed to land before `provider()` ever runs,
+        // so this proves the pre-flight `Task.isCancelled` guard rather than the `onCancel` handler
+        // the first test above already covers.
+        await taskStarted.wait()
+        task.cancel()
+        release.open()
+
+        do {
+            _ = try await task.value
+            XCTFail("a task already cancelled before setup must throw")
+        } catch is CancellationError {
+            // Expected: caught by the guard inside the continuation body, before the host's
+            // completion block was ever handed the continuation to resume.
+        } catch {
+            XCTFail("expected CancellationError, got \(error)")
+        }
+
+        XCTAssertFalse(hostCalled, "a task already cancelled before setup must never reach the host")
+    }
+
     func testNilTokenAndNilErrorProducesAnErrorTaggedWithTheGivenDomain() async throws {
         let provider = bridgedTokenProvider(errorDomain: "com.payabli.test") { completion in
             completion(nil, nil)
