@@ -179,44 +179,65 @@ actor PayabliAuth {
     /// raise a reason naming the timeout rather than folding it into "the provider failed".
     private struct ProviderTimedOut: Error {}
 
+    /// A value only the first of two racing sides sets. `racedMint` uses it to keep whichever side
+    /// loses from resuming a continuation the other has already resumed.
+    private final class DecidedOnce: @unchecked Sendable {
+        private let lock = NSLock()
+        private var fired = false
+
+        /// True the first call, false every call after.
+        func claim() -> Bool {
+            lock.lock()
+            defer { lock.unlock() }
+            if fired {
+                return false
+            }
+            fired = true
+            return true
+        }
+    }
+
     /// Races `provider` against `clock`'s deadline and answers with whichever finishes first.
     ///
-    /// A `static` function taking every dependency as a parameter, mirroring `Retry.withBudget`,
-    /// rather than an actor-isolated method reading `self`: both children of the task group below are
-    /// `@Sendable` and must not need an actor hop to reach what they capture. `clock` and `provider`
-    /// are `Sendable` themselves; `holder` is passed only for `RefreshInProgress` to key its mark on,
-    /// never read.
+    /// Races through a continuation rather than a `TaskGroup`: a task group cannot leave its own scope
+    /// until every child it started has finished, cancelled or not, and cancellation is only
+    /// cooperative. A provider suspended on an ordinary continuation with no cancellation handling of
+    /// its own — a forgotten completion, the very failure this bound exists to catch — never notices
+    /// `cancel()` and never finishes, so racing it inside a task group would still hang this call on
+    /// exit. This returns the instant either side decides instead; the loser keeps running unawaited,
+    /// and `decided` keeps it from resuming a continuation nobody is waiting on anymore.
     ///
-    /// **The bound is only as tight as `provider` is cancellable.** The task group cannot leave this
-    /// scope until every child has finished, so reaching the deadline cancels `provider`'s task and
-    /// then waits for it to notice — an `await`-based provider notices at its next suspension point,
-    /// where one blocking a thread outside one does not, which is the documented limit both platforms
-    /// share and neither closes.
+    /// **The bound is still only as tight as `provider` is cancellable — for what happens *after* this
+    /// call returns.** A provider that never finishes now runs on unseen rather than hanging this
+    /// call; that closes the hang, not the leak. A provider blocking a thread outside a suspension
+    /// point is unaffected either way, which is the documented limit both platforms share and neither
+    /// closes.
     private static func racedMint(
         holder: PayabliAuth,
         mintID: UUID,
         provider: @escaping PayabliTokenRefresh,
         clock: any RetryClock
     ) async throws -> String {
-        try await withThrowingTaskGroup(of: String.self) { group in
-            group.addTask {
-                try await RefreshInProgress.withMark(holder: holder, refresh: mintID) {
-                    try await provider()
+        let decided = DecidedOnce()
+        return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<String, Error>) in
+            let providerTask = Task {
+                do {
+                    let token = try await RefreshInProgress.withMark(holder: holder, refresh: mintID) {
+                        try await provider()
+                    }
+                    guard decided.claim() else { return }
+                    continuation.resume(returning: token)
+                } catch {
+                    guard decided.claim() else { return }
+                    continuation.resume(throwing: error)
                 }
             }
-            group.addTask {
-                try await clock.expire(after: Self.providerTimeout)
-                throw ProviderTimedOut()
+            Task {
+                try? await clock.expire(after: Self.providerTimeout)
+                guard decided.claim() else { return }
+                providerTask.cancel()
+                continuation.resume(throwing: ProviderTimedOut())
             }
-            defer { group.cancelAll() }
-            // The first child to finish decides. A provider that wins normally cancels the timer,
-            // which observes it via `Task.checkCancellation` the way every other `expire` caller does;
-            // a timer that fires cancels the provider, best-effort as the doc above says.
-            guard let first = try await group.next() else {
-                // Unreachable: two children were added above and this is the only `next()` call.
-                throw ProviderTimedOut()
-            }
-            return first
         }
     }
 
