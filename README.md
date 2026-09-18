@@ -547,8 +547,10 @@ do {
     // Card removed prematurely, reader timeout, or similar; usually retryable.
 } catch let PayabliTTPError.updateFailed(reason) {
     // /update PATCH failed after retries. Reconcile out of band.
-} catch PayabliTTPError.tokenExpired {
-    // tokenProvider returned no token; re-authentication required.
+} catch let PayabliTTPError.configFailed(reason) {
+    // /config was refused — a rejected binding, a rejected bearer, or (per
+    // PayabliErrorCode.tokenProviderFailed) the host's tokenProvider itself
+    // failed, hung past its bound, or returned an unusable token.
 }
 ```
 
