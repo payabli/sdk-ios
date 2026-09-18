@@ -222,68 +222,8 @@ public final class PayabliTTP: NSObject, ObservableObject {
             appId: String,
             environment: PayabliEnvironment
         ) throws {
-            let bridged: PayabliTokenRefresh = {
-                // ObjC blocks are heap-allocated and copy-on-capture, so the
-                // bridged closure can safely be `@Sendable` even though Swift
-                // does not infer `@Sendable` for the input handler type.
-                let sendable = UncheckedSendableBox(tokenHandler)
-                return { @Sendable in
-                    // Holds the continuation between setup and whichever of the host's completion
-                    // block or a cancellation resumes it first. Swapped to nil by whichever gets
-                    // there, so the other — a second completion call, or the completion arriving
-                    // after this task was already cancelled — is a no-op rather than a double resume.
-                    //
-                    // The cancellation half matters beyond an ordinary cancelled caller: `PayabliAuth`
-                    // races this call against a deadline and cancels it if the host's block never
-                    // fires. Without resuming here, that cancellation would do nothing — the
-                    // continuation stays parked, the mint's task group cannot leave scope, and every
-                    // caller joined to it waits past the bound rather than being refused at it.
-                    let pending = Locked<CheckedContinuation<String, Error>?>(nil)
-                    return try await withTaskCancellationHandler {
-                        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<String, Error>) in
-                            pending.withLock { $0 = continuation }
-                            // A cancellation that raced this setup found nothing to resume yet;
-                            // caught here instead, so a task already cancelled when this call
-                            // started does not wait on a host that will never call back.
-                            guard !Task.isCancelled else {
-                                let toResume = pending.withLock { stored -> CheckedContinuation<String, Error>? in
-                                    defer { stored = nil }
-                                    return stored
-                                }
-                                toResume?.resume(throwing: CancellationError())
-                                return
-                            }
-                            sendable.value { token, error in
-                                let toResume = pending.withLock { stored -> CheckedContinuation<String, Error>? in
-                                    defer { stored = nil }
-                                    return stored
-                                }
-                                guard let toResume else { return }
-                                if let error {
-                                    toResume.resume(throwing: error)
-                                } else if let token {
-                                    toResume.resume(returning: token)
-                                } else {
-                                    toResume.resume(throwing: NSError(
-                                        domain: "com.payabli.ttp",
-                                        code: -1,
-                                        userInfo: [NSLocalizedDescriptionKey:
-                                            "tokenHandler returned nil token and nil error"]
-                                    ))
-                                }
-                            }
-                        }
-                    } onCancel: {
-                        let toResume = pending.withLock { stored -> CheckedContinuation<String, Error>? in
-                            defer { stored = nil }
-                            return stored
-                        }
-                        toResume?.resume(throwing: CancellationError())
-                    }
-                }
-            }()
             try self.init(
-                tokenProvider: bridged,
+                tokenProvider: bridgedTapToPayTokenProvider(tokenHandler),
                 entryPoint: entryPoint,
                 appId: appId,
                 environment: environment
