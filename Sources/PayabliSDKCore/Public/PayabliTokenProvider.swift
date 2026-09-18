@@ -19,6 +19,11 @@ import Foundation
 /// cannot complete until the refresh does, and the refresh cannot complete until this closure
 /// returns.
 ///
+/// The SDK bounds a call to this closure at 30 seconds. A call that hangs past that, throws, or
+/// returns a token the SDK cannot use surfaces to the caller as ``PayabliErrorCode/tokenProviderFailed``
+/// rather than as a rejected credential; size a server-side exchange well under 30 seconds so a slow
+/// upstream fails fast instead of losing that race.
+///
 /// ## Why a closure, not a hard-coded endpoint
 ///
 /// The `clientSecret` that mints a Payabli access token MUST NOT ship in the

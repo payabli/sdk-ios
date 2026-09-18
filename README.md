@@ -303,6 +303,13 @@ retries the request with the new token, and deduplicates concurrent
 refreshes. The host application isn't required to track expirations,
 schedule refreshes, or implement debouncing.
 
+The SDK bounds every call to `tokenProvider` at 30 seconds. A call that
+hangs past that, throws, or returns a token the SDK cannot use surfaces
+to the caller as `PayabliErrorCode.tokenProviderFailed`, not as a
+service-side credential refusal — size the backend endpoint's own
+timeout well under 30 seconds so a slow upstream fails fast rather
+than losing the race.
+
 ### Initialization and charging
 
 `initialize()` performs device attestation and brings the session to
