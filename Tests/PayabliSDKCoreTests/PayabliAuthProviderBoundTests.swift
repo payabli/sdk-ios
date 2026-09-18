@@ -36,22 +36,58 @@ final class PayabliAuthProviderBoundTests: XCTestCase {
         XCTAssertEqual(clock.requestedDeadlines, [30])
     }
 
+    /// `Task.sleep` above is cancellation-cooperative, so it would pass equally against a
+    /// `TaskGroup`-based race — the implementation `racedMint` replaced, which cannot leave its own
+    /// scope until every child has finished and would hang this call forever on a provider that
+    /// never notices `cancel()`. This case's provider is that shape instead: parked on a raw
+    /// continuation with no `onCancel` handling of its own, standing in for the forgotten-completion
+    /// case the bound exists to catch.
+    func testAProviderThatIgnoresCancellationIsRefusedAtTheDeadlineRatherThanHangingForever() async throws {
+        let auth = PayabliAuth(
+            config: try makeConfig(tokenProvider: {
+                try await withCheckedThrowingContinuation { (_: CheckedContinuation<String, Error>) in
+                    // Never resumed, with no cancellation handling to resume it either — the loser
+                    // `racedMint`'s own doc says keeps running unawaited.
+                }
+            }),
+            logger: PayabliLogger(category: .auth),
+            clock: FiresOnceRetryClock()
+        )
+
+        let outcome = await outcomeWithinCeiling {
+            do {
+                _ = try await auth.currentAccessToken()
+                return "no throw"
+            } catch let err as PayabliGenericError {
+                return err.code.rawValue
+            } catch {
+                return "wrong error: \(error)"
+            }
+        }
+
+        XCTAssertEqual(outcome, PayabliErrorCode.tokenProviderFailed.rawValue)
+    }
+
     /// Every caller joined to the one mint that times out receives the same failure, not just the
     /// caller who started it — the mint is shared, and the timeout is a property of that one call.
     ///
-    /// `FiresOnceRetryClock`'s admission delay gives all five callers room to be admitted to the one
-    /// live mint before it resolves. Without it, an unordered arrival at the actor could in principle
-    /// land one caller after `releaseMint`, starting a second mint that the clock — fired once
-    /// already — never times out again, hanging that caller rather than failing it; `outcomeWithinCeiling`
-    /// bounds that outcome but the delay is what removes it.
+    /// `GatedFiresOnceRetryClock` holds the deadline until all four joiners are counted, which is what
+    /// makes this deterministic rather than probable: the one caller that starts the mint logs nothing
+    /// on that path, so counting to four rather than five is exactly the other callers, whichever
+    /// five of them they are.
     func testConcurrentCallersJoinedToATimedOutMintAllReceiveTheSameFailure() async throws {
+        let admitted = Latch()
+        let logger = PayabliLogger(
+            category: .auth,
+            sink: AdmissionCountingLogSink(admittingOn: "Joining an in-flight token mint", occurrence: 4, admitted: admitted)
+        )
         let auth = PayabliAuth(
             config: try makeConfig(tokenProvider: {
                 try await Task.sleep(nanoseconds: .max)
                 return "never"
             }),
-            logger: PayabliLogger(category: .auth),
-            clock: FiresOnceRetryClock(admissionDelay: 20_000_000)
+            logger: logger,
+            clock: GatedFiresOnceRetryClock(admittedAfter: admitted)
         )
 
         let outcome = await outcomeWithinCeiling {

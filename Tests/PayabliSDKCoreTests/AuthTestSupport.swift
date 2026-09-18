@@ -100,24 +100,13 @@ func makeWarmAuth(
 /// one mint against the bound and then prove the next mint is unraced — a clock that kept firing
 /// would also time out the recovery the case is checking, rather than let the provider that answers
 /// it win.
-///
-/// The first `expire(after:)` waits `admissionDelay` before resolving — the same device
-/// `testConcurrentFirstReadsSpendOneProviderCall` uses inside a provider, moved here because this
-/// clock's caller is what races concurrent joiners: without room to be admitted to the one live mint
-/// before it resolves, a caller scheduled late finds the mint already released and starts a second
-/// one, which this clock then parks on forever rather than answering.
-final class FiresOnceRetryClock: RetryClock, @unchecked Sendable {
-    private let admissionDelay: UInt64
+class FiresOnceRetryClock: RetryClock, @unchecked Sendable {
     private let lock = NSLock()
     private var fired = false
 
     /// Every `seconds` this clock was asked to expire after, in call order — so a case can assert
     /// `PayabliAuth` raced the bound it documents (30s) rather than some other number.
     private(set) var requestedDeadlines: [TimeInterval] = []
-
-    init(admissionDelay: UInt64 = 0) {
-        self.admissionDelay = admissionDelay
-    }
 
     func elapsed() -> TimeInterval {
         0
@@ -135,8 +124,57 @@ final class FiresOnceRetryClock: RetryClock, @unchecked Sendable {
             try await Task.sleep(nanoseconds: .max)
             return
         }
-        if admissionDelay > 0 {
-            try await Task.sleep(nanoseconds: admissionDelay)
-        }
+        await firstDeadlineReached()
+    }
+
+    /// Runs once, when the first `expire(after:)` would otherwise resolve. The base class resolves
+    /// immediately; a subclass gating that moment overrides this rather than `expire(after:)` itself,
+    /// so the recording and the once-only guard above stay in one place.
+    func firstDeadlineReached() async {}
+}
+
+/// Fires its first deadline only once `admitted` opens, rather than immediately: a case racing several
+/// callers against the same deadline needs every one of them to have actually joined the one live mint
+/// first, or a caller the actor had not yet reached finds the mint already released — by an earlier
+/// caller's timeout — and starts a second one, which this clock, having fired once, then parks on
+/// forever. `admitted` is driven by counting `PayabliAuth`'s own "joining an in-flight token mint" log
+/// line rather than a wall-clock delay, so the gate is exact instead of hoping a fixed window was long
+/// enough.
+final class GatedFiresOnceRetryClock: FiresOnceRetryClock, @unchecked Sendable {
+    private let admitted: Latch
+
+    init(admittedAfter admitted: Latch) {
+        self.admitted = admitted
+    }
+
+    override func firstDeadlineReached() async {
+        await admitted.wait()
+    }
+}
+
+/// Counts occurrences of `held` and opens `admitted` on the chosen one, so a test can gate a fake
+/// deadline on every intended caller having actually joined the one live mint it is racing, proven by
+/// counting `PayabliAuth`'s own log line rather than assuming a wall-clock window was long enough.
+final class AdmissionCountingLogSink: LogSink, @unchecked Sendable {
+    private let held: String
+    private let occurrence: Int
+    private let admitted: Latch
+    private let lock = NSLock()
+    private var seen = 0
+
+    init(admittingOn held: String, occurrence: Int, admitted: Latch) {
+        self.held = held
+        self.occurrence = occurrence
+        self.admitted = admitted
+    }
+
+    func write(level: PayabliLogger.Level, category: PayabliLogger.Category, message: String) {
+        guard message == held else { return }
+        lock.lock()
+        seen += 1
+        let isTheOne = seen == occurrence
+        lock.unlock()
+        guard isTheOne else { return }
+        admitted.open()
     }
 }

@@ -53,6 +53,7 @@ actor PayabliAuth {
         }
 
         if let existing = inFlightMint {
+            logger.info("Joining an in-flight token mint")
             return try await join(existing)
         }
 
