@@ -115,20 +115,39 @@ extension PayabliTTP {
         return try await runSuccessUpdate(paymentTransId: paymentTransId, readResult: readResult)
     }
 
-    /// Step 3 — success update. No offline fallback: on failure the transaction
-    /// stays authorized on the processor and the host must reconcile manually.
+    /// Step 3 — the update, sent whatever the processor answered. Only an approval is a payment, and a
+    /// refusal stays a refusal even when the update then fails.
     private func runSuccessUpdate(
         paymentTransId: String,
         readResult: CardReadResult
     ) async throws -> TransactionResult {
-        switch await tryUpdate(paymentTransId: paymentTransId, payload: .success(readResult)) {
-        case .succeeded:
+        let update = await tryUpdate(paymentTransId: paymentTransId, payload: .success(readResult))
+        if case .succeeded = update {
             multicaster.emit(.updateCompleted(paymentTransId: paymentTransId))
+        }
+
+        let capture: PayabliTTPCapture
+        switch readResult.outcome {
+        case .declined:
+            throw PayabliTTPError.cardDeclined(paymentTransId: paymentTransId)
+        case .approved:
+            capture = .charged
+        case .indeterminate:
+            capture = .unknown
+        }
+
+        switch update {
+        case .succeeded where capture == .charged:
             return TransactionResult(paymentTransId: paymentTransId)
+        case .succeeded:
+            throw PayabliTTPError.outcomeUnknown(paymentTransId: paymentTransId)
         case let .failed(reason):
-            throw PayabliTTPError.updateFailed(reason: reason, paymentTransId: paymentTransId, capture: .unknown)
+            throw PayabliTTPError.updateFailed(reason: reason, paymentTransId: paymentTransId, capture: capture)
         case .cancelled:
-            throw CancellationError()
+            // The card was read, so a caller who cancelled is still told what the tap did.
+            throw PayabliTTPError.updateFailed(
+                reason: "The update was cancelled", paymentTransId: paymentTransId, capture: capture
+            )
         }
     }
 

@@ -50,6 +50,11 @@ Defined in `../../Models/TapToPayCardRead.swift`.
 | Atomic (Fiserv) — SDK charges during the tap | `Data()` | Full processor response JSON (forwarded verbatim under `fiservResponse` in the PATCH update body) |
 | Payload-only (legacy) — SDK only collects card data, backend charges | Encrypted blob | `nil` |
 
+An atomic provider also sets `outcome` from the processor's own state for the sale: `.approved`,
+`.declined`, or `.indeterminate` for anything else, and `providerState` to that state as the processor
+wrote it. `charge` reports only an approval as a payment, and a result that leaves `outcome` unset is
+`.indeterminate`. Fiserv's mapping is `FiservCardReader.outcome(ofGatewayState:)`.
+
 Always set `provider: Self.providerId`. Set `cardNetwork` when you can extract
 it cheaply (Fiserv: `card.brand`). `providerMetadata` is forwarded as-is to
 the API, so only put string-safe audit info there.

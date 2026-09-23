@@ -307,17 +307,36 @@ package final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
             let cardNetwork = Self.extractCardNetwork(from: responseJSON)
             // `CommerceHubResponse` carries `paymentTokens.tokenData` and the
             // card's expiry, so the log gets the shape of the response.
-            logger.info("[fiserv.charges] ← OK (\(elapsedMs)ms) bytes=\(responseJSON.count) cardNetwork=\(cardNetwork ?? "<nil>")")
+            let state = response.gatewayResponse?.transactionState
+            logger.info(
+                "[fiserv.charges] ← OK (\(elapsedMs)ms) bytes=\(responseJSON.count) " +
+                    "cardNetwork=\(cardNetwork ?? "<nil>") state=\(state ?? "<nil>")"
+            )
             return CardReadResult(
                 provider: Self.providerId,
                 encryptedPayload: Data(),
                 cardNetwork: cardNetwork,
                 providerMetadata: [:],
-                providerResponseJSON: responseJSON
+                providerResponseJSON: responseJSON,
+                outcome: Self.outcome(ofGatewayState: state),
+                providerState: state
             )
         #else
             throw PayabliTTPError.nfcFailed(reason: "Tap to Pay is iOS-only")
         #endif
+    }
+
+    /// A held device auth and a settled sale are both approvals. Anything the gateway has not named as one
+    /// or the other, a missing state included, is neither.
+    static func outcome(ofGatewayState state: String?) -> CardReadOutcome {
+        switch state?.uppercased() {
+        case "AUTHORIZED", "CAPTURED":
+            return .approved
+        case "DECLINED":
+            return .declined
+        default:
+            return .indeterminate
+        }
     }
 
     package func cancelReading() async {

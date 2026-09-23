@@ -573,6 +573,10 @@ do {
     // Session isn't in the required state for this call.
 } catch let PayabliTTPError.attestationFailed(reason) {
     // App Attest or Payabli refused to attest the device.
+} catch let PayabliTTPError.cardDeclined(paymentTransId) {
+    // The processor refused the card. No money moved.
+} catch let PayabliTTPError.outcomeUnknown(paymentTransId) {
+    // The processor answered neither an approval nor a refusal. Reconcile before charging again.
 } catch let PayabliTTPError.nfcFailed(reason, paymentTransId) {
     // Card removed prematurely, reader timeout, or similar. The card may have been
     // charged, so reconcile the payment before charging again.

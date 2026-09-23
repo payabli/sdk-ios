@@ -27,7 +27,8 @@ package final class MockTapToPayProvider: TapToPayProvider, @unchecked Sendable 
             provider: "mock",
             encryptedPayload: Data("encrypted".utf8),
             cardNetwork: "Visa",
-            providerMetadata: ["last4": "1111"]
+            providerMetadata: ["last4": "1111"],
+            outcome: .approved
         )
     )
     package var readingResult: Result<CardReadResult, Error> {

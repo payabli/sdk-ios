@@ -377,7 +377,8 @@ final class PayabliTTPReaderSessionRecoveryTests: XCTestCase {
         encryptedPayload: Data(),
         cardNetwork: "VISA",
         providerMetadata: [:],
-        providerResponseJSON: Data("{}".utf8)
+        providerResponseJSON: Data("{}".utf8),
+        outcome: .approved
     )
 
     private func charge(_ ttp: PayabliTTP) async throws -> TransactionResult {
