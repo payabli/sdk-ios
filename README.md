@@ -550,9 +550,10 @@ The other phases wrap what they see:
   taxonomy: only the reason string survives.
 
 Every `PayabliTTPError` answers `capture` and `paymentTransId`: whether the card was charged, as a
-`PayabliTTPCapture`, and the payment the failure belongs to, or `nil` when it was raised before one was
-opened. Only `.notCharged` means a second attempt cannot take the money twice. A bridged caller reads
-the same two values from `userInfo["capture"]` and `userInfo["paymentTransId"]`.
+`PayabliTTPCapture`, and the payment the failure belongs to, or `nil` when the SDK holds no identifier
+for one. Only `.notCharged` means a second attempt cannot take the money twice. An Objective-C or MAUI
+caller reads the same two values from the `NSError`'s `userInfo["capture"]` and
+`userInfo["paymentTransId"]`. The Flutter and React Native bridges do not forward them yet.
 
 ```swift
 import PayabliSDKCore
