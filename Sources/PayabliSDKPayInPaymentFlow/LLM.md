@@ -342,7 +342,7 @@ Payment method cases for direct capture:
 | --- | --- |
 | `.card(PayabliPayInPaymentFlowCardMethod)` | `data`, `initiator` default `payor`, optional `saveIfSuccess`. |
 | `.ach(PayabliPayInPaymentFlowACHMethod)` | `data`. |
-| `.stored(PayabliPayInPaymentFlowStoredMethod)` | `method` (`card`, `ach`, `wallet`), `storedMethodId`, optional usage type, optional initiator. |
+| `.stored(PayabliPayInPaymentFlowStoredMethod)` | `method` (`card`, `ach`), `storedMethodId`. |
 | `.cloud(PayabliPayInPaymentFlowCloudMethod)` | `device`, optional `saveIfSuccess`. |
 | `.check(PayabliPayInPaymentFlowCheckMethod)` | `holderName`. |
 | `.cash` | No additional fields. |
