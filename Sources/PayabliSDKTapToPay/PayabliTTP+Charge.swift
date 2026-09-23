@@ -9,8 +9,8 @@ private enum TTPUpdateOutcome {
     case succeeded
     case failed(reason: String)
 
-    /// The caller cancelled. Separate from `failed`, because a caller who cancelled is not told the
-    /// update failed, and the best-effort notify after a reader failure ignores it either way.
+    /// The caller cancelled. Separate from `failed`, because no `updateFailed` event is emitted for it,
+    /// and the best-effort notify after a reader failure ignores it either way.
     case cancelled
 }
 
@@ -122,9 +122,6 @@ extension PayabliTTP {
         readResult: CardReadResult
     ) async throws -> TransactionResult {
         let update = await tryUpdate(paymentTransId: paymentTransId, payload: .success(readResult))
-        if case .succeeded = update {
-            multicaster.emit(.updateCompleted(paymentTransId: paymentTransId))
-        }
 
         let capture: PayabliTTPCapture
         switch readResult.outcome {
@@ -138,6 +135,7 @@ extension PayabliTTP {
 
         switch update {
         case .succeeded where capture == .charged:
+            multicaster.emit(.updateCompleted(paymentTransId: paymentTransId))
             return TransactionResult(paymentTransId: paymentTransId)
         case .succeeded:
             throw PayabliTTPError.outcomeUnknown(paymentTransId: paymentTransId)
@@ -274,8 +272,8 @@ extension PayabliTTP {
             }
             return .succeeded
         } catch is CancellationError {
-            // Nothing below retries a cancelled request any more, and reporting it as a failed update
-            // here would put the same misreport back one layer up.
+            // Nothing below retries a cancelled request any more, and the event stream is not told the
+            // update failed. What the caller is told depends on what the tap did.
             return .cancelled
         } catch {
             // The event summarizes what actually failed, not this surface's wrapper for it: a rate limit,

@@ -136,6 +136,32 @@ final class TTPUpdateRetryTests: XCTestCase {
         XCTAssertEqual(Self.updateResponses.sends, 1, "a refusal is still closed")
     }
 
+    /// `updateCompleted` has only ever meant the charge went through, so a refusal must not emit it.
+    func testARefusedCardEmitsNoCompletedUpdate() async throws {
+        Self.updateResponses.script([200])
+        let ttp = try await makeReadyTTP(outcome: .declined)
+
+        let stream = ttp.events()
+        let collector = Task<Bool, Never> {
+            for await event in stream {
+                if case .updateCompleted = event {
+                    return true
+                }
+            }
+            return false
+        }
+
+        _ = await chargeFailure(ttp)
+
+        let deadline = Task {
+            guard (try? await Task.sleep(nanoseconds: 500_000_000)) != nil else { return }
+            collector.cancel()
+        }
+        let completed = await collector.value
+        deadline.cancel()
+        XCTAssertFalse(completed, "a refused card was announced as a completed update")
+    }
+
     func testARefusedCardWhoseCloseFailsIsStillReportedAsRefused() async throws {
         Self.updateResponses.script([400])
         let ttp = try await makeReadyTTP(outcome: .declined)
