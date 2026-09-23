@@ -10,7 +10,6 @@
     - PayabliSDKCore.xcframework        (provides PayabliEnvironment)
     - PayabliSDKTapToPay.xcframework    (the bilingual @objc surface)
     - PayabliSDKPayInPaymentFlow.xcframework (card/ACH payment flow @objc surface)
-    - PayabliCardReaderCore.xcframework (transitive Fiserv reader)
 
   Place the XCFrameworks alongside this csproj (or override the
   `XcframeworksRoot` property) before `dotnet build`.
@@ -54,11 +53,6 @@
         <NativeReference Include="$(XcframeworksRoot)/PayabliSDKPayInPaymentFlow.xcframework">
             <Kind>Framework</Kind>
             <Frameworks>Foundation UIKit</Frameworks>
-            <SmartLink>True</SmartLink>
-        </NativeReference>
-        <NativeReference Include="$(XcframeworksRoot)/PayabliCardReaderCore.xcframework">
-            <Kind>Framework</Kind>
-            <Frameworks>Foundation</Frameworks>
             <SmartLink>True</SmartLink>
         </NativeReference>
     </ItemGroup>

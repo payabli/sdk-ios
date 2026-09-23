@@ -33,7 +33,7 @@ import ProximityReader
 /**
  The destination environment for network requests
  */
-public enum FiservTTPEnvironment {
+package enum FiservTTPEnvironment {
     case Int
     case QA
     case Sandbox
@@ -84,7 +84,7 @@ struct FiservTTPRequestError: Error {
 
 extension FiservTTPRequestError: LocalizedError {
 
-    public var errorDescription: String? {
+    package var errorDescription: String? {
         return NSLocalizedString(errorMessage, comment: "")
     }
 }

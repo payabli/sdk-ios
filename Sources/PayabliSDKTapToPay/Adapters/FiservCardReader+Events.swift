@@ -1,6 +1,6 @@
 import Foundation
 #if canImport(PayabliCardReaderCore) && canImport(ProximityReader)
-    import PayabliCardReaderCore
+    internal import PayabliCardReaderCore
     import ProximityReader
 #endif
 

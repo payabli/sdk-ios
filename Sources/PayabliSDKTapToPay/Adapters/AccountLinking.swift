@@ -1,6 +1,6 @@
 import Foundation
 #if canImport(PayabliCardReaderCore)
-    import PayabliCardReaderCore
+    internal import PayabliCardReaderCore
 #endif
 
 /// What the terms surface asks of a card reader: whether the merchant has accepted, and the request to

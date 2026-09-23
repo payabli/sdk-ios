@@ -31,7 +31,6 @@ Minimal .NET MAUI demo wrapping Tap to Pay and payment flow through the
    cp -R build/release/PayabliSDKCore.xcframework        Bridges/MAUI/Frameworks/
    cp -R build/release/PayabliSDKTapToPay.xcframework    Bridges/MAUI/Frameworks/
    cp -R build/release/PayabliSDKPayInPaymentFlow.xcframework Bridges/MAUI/Frameworks/
-   cp -R build/release/PayabliCardReaderCore.xcframework Bridges/MAUI/Frameworks/
    ```
 3. Restore and build the demo with the .NET 10 iOS workload:
    ```bash

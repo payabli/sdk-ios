@@ -66,7 +66,6 @@ need `PayabliSDKTapToPay`.
 | `PayabliSDKCore`        | Core building blocks (config, auth, transport).                              |
 | `PayabliSDKTapToPay`    | Tap to Pay on iPhone. The product most applications require.                 |
 | `PayabliSDKPayInPaymentFlow` | Opt-in card/ACH stored-method, capture, and authorize component.      |
-| `PayabliCardReaderCore` | Tap to Phone engine. Pulled in transitively; no explicit link required.      |
 | `PayabliSDKTelemetry`   | Optional Sentry and PostHog plumbing; bring your own instance.               |
 
 ---
@@ -186,8 +185,8 @@ Link the required product. Most applications only need
 .product(name: "PayabliSDKTapToPay", package: "sdk-ios")
 ```
 
-`PayabliSDKTapToPay` transitively links `PayabliSDKCore` and
-`PayabliCardReaderCore`; no additional product references are required.
+`PayabliSDKTapToPay` transitively links `PayabliSDKCore`; no additional
+product references are required.
 
 For card PAN or ACH stored-method, capture, or authorize flows, link the
 opt-in PayIn payment flow component:
