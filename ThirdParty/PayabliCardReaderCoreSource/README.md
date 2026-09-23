@@ -21,7 +21,7 @@ in source and in `THIRD_PARTY_LICENSES.txt` at the repository root.
 
 ## What's vendored
 
-Byte-identical copies of the 5 Swift source files from
+Modified copies of the 5 Swift source files from
 `Fiserv/TTPPackage/Sources/FiservTTP/`:
 
 - `FiservPaymentModels.swift`
