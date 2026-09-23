@@ -95,12 +95,26 @@ final class PayabliTTPErrorNSErrorTests: XCTestCase {
         let answers = Dictionary(
             uniqueKeysWithValues: Self.allSamples.map { ($0.expectedCode, $0.error.capture) }
         )
-        XCTAssertEqual(answers[8], .notCharged, "a failed read with no payment opened charged nothing")
+        XCTAssertEqual(answers[8], .unknown, "a failed read was raised once the reader was asked for a card")
         XCTAssertEqual(answers[10], .unknown, "a failed close carries what it was given")
         XCTAssertEqual(answers[16], .notCharged, "a refusal is an answer that no money moved")
         XCTAssertEqual(answers[17], .unknown)
         let beforeTheTap = answers.filter { ![8, 10, 16, 17].contains($0.key) }
         XCTAssertEqual(Set(beforeTheTap.values), [.notCharged])
+    }
+
+    func testAReaderThatWasNeverAskedForACardChargedNothingWhateverPaymentItNames() {
+        let err = PayabliTTPError.readerSetupFailed(reason: "Reader not prepared", paymentTransId: "TXN-9")
+        XCTAssertEqual(err.capture, .notCharged)
+        XCTAssertEqual(err.paymentTransId, "TXN-9")
+    }
+
+    func testAnUnsupportedOSAnswersTheCaptureItWasRaisedWith() {
+        XCTAssertEqual(PayabliTTPError.readerOSVersionNotSupported().capture, .notCharged)
+        let duringARead = PayabliTTPError.readerOSVersionNotSupported(paymentTransId: "TXN-9", capture: .unknown)
+        XCTAssertEqual(duringARead.capture, .unknown)
+        XCTAssertEqual(duringARead.paymentTransId, "TXN-9")
+        XCTAssertEqual((duringARead as NSError).code, 15)
     }
 
     func testAFailedReadForAnOpenedPaymentMayHaveBeenCharged() {
@@ -182,7 +196,7 @@ final class PayabliTTPErrorNSErrorTests: XCTestCase {
         ErrorSample(error: .activationFailed(reason: "x"), expectedCode: 12),
         ErrorSample(error: .networkError(reason: "x"), expectedCode: 13),
         ErrorSample(error: .termsNotAccepted, expectedCode: 14),
-        ErrorSample(error: .readerOSVersionNotSupported, expectedCode: 15),
+        ErrorSample(error: .readerOSVersionNotSupported(), expectedCode: 15),
         ErrorSample(error: .cardDeclined(paymentTransId: "TXN"), expectedCode: 16),
         ErrorSample(error: .outcomeUnknown(paymentTransId: "TXN"), expectedCode: 17)
     ]

@@ -69,7 +69,7 @@ public enum PayabliTTPError: Error, Sendable {
     case attestationRevoked(reason: String)
     case attestationFailed(reason: String)
     case configFailed(reason: String)
-    case readerSetupFailed(reason: String)
+    case readerSetupFailed(reason: String, paymentTransId: String? = nil)
     case nfcFailed(reason: String, paymentTransId: String? = nil)
     case initiateFailed(reason: String)
     case updateFailed(reason: String, paymentTransId: String, capture: PayabliTTPCapture)
@@ -90,7 +90,7 @@ public enum PayabliTTPError: Error, Sendable {
     ///
     /// Appended after `termsNotAccepted` to keep the `errorCode` table below
     /// append-only; those codes are public API.
-    case readerOSVersionNotSupported
+    case readerOSVersionNotSupported(paymentTransId: String? = nil, capture: PayabliTTPCapture = .notCharged)
 
     /// The processor refused the card. No money moved.
     case cardDeclined(paymentTransId: String)
@@ -103,17 +103,15 @@ public extension PayabliTTPError {
     /// Whether this failure took money from the card.
     var capture: PayabliTTPCapture {
         switch self {
-        case .cardDeclined:
-            return .notCharged
-        case let .nfcFailed(_, paymentTransId):
-            return paymentTransId == nil ? .notCharged : .unknown
-        case .outcomeUnknown:
+        case .nfcFailed, .outcomeUnknown:
+            // Raised once the reader was asked for a card, and the processor may take the sale before it answers.
             return .unknown
-        case let .updateFailed(_, _, capture):
+        case let .updateFailed(_, _, capture),
+             let .readerOSVersionNotSupported(_, capture):
             return capture
         case .notInitialized, .invalidState, .notReady, .devicePendingActivation, .attestationRevoked,
              .attestationFailed, .configFailed, .readerSetupFailed, .initiateFailed, .tokenExpired,
-             .activationFailed, .networkError, .termsNotAccepted, .readerOSVersionNotSupported:
+             .activationFailed, .networkError, .termsNotAccepted, .cardDeclined:
             return .notCharged
         }
     }
@@ -121,15 +119,17 @@ public extension PayabliTTPError {
     /// The payment this failure belongs to, or `nil` when the SDK holds no identifier for one.
     var paymentTransId: String? {
         switch self {
-        case let .nfcFailed(_, paymentTransId):
+        case let .nfcFailed(_, paymentTransId),
+             let .readerSetupFailed(_, paymentTransId),
+             let .readerOSVersionNotSupported(paymentTransId, _):
             return paymentTransId
         case let .updateFailed(_, paymentTransId, _),
              let .cardDeclined(paymentTransId),
              let .outcomeUnknown(paymentTransId):
             return paymentTransId
         case .notInitialized, .invalidState, .notReady, .devicePendingActivation, .attestationRevoked,
-             .attestationFailed, .configFailed, .readerSetupFailed, .initiateFailed, .tokenExpired,
-             .activationFailed, .networkError, .termsNotAccepted, .readerOSVersionNotSupported:
+             .attestationFailed, .configFailed, .initiateFailed, .tokenExpired, .activationFailed,
+             .networkError, .termsNotAccepted:
             return nil
         }
     }
@@ -340,12 +340,12 @@ extension PayabliTTPError: CustomNSError, LocalizedError {
         case .outcomeUnknown:
             return "The payment outcome is not known"
         case let .nfcFailed(reason, _),
+             let .readerSetupFailed(reason, _),
              let .updateFailed(reason, _, _):
             return reason
         case let .attestationRevoked(reason),
              let .attestationFailed(reason),
              let .configFailed(reason),
-             let .readerSetupFailed(reason),
              let .initiateFailed(reason),
              let .activationFailed(reason),
              let .networkError(reason):

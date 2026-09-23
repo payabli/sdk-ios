@@ -33,7 +33,7 @@ import XCTest
             }
 
             guard case .readerOSVersionNotSupported = mapped else {
-                return XCTFail("expected .readerOSVersionNotSupported, got \(mapped)")
+                return XCTFail("expected .readerOSVersionNotSupported(), got \(mapped)")
             }
         }
 
@@ -71,7 +71,7 @@ import XCTest
         func testAnUnrecognisedReaderErrorKeepsTheTitleAndTheDescription() {
             let mapped = FiservCardReader.mapError(Self.rebuilt(.readerBusy)) { .readerSetupFailed(reason: $0) }
 
-            guard case let .readerSetupFailed(reason) = mapped else {
+            guard case let .readerSetupFailed(reason, _) = mapped else {
                 return XCTFail("expected .readerSetupFailed, got \(mapped)")
             }
             XCTAssertEqual(
@@ -96,7 +96,7 @@ import XCTest
                 FiservTTPCardReaderError(title: "Missing Token", localizedDescription: "a token is required")
             ) { .readerSetupFailed(reason: $0) }
 
-            guard case let .readerSetupFailed(reason) = mapped else {
+            guard case let .readerSetupFailed(reason, _) = mapped else {
                 return XCTFail("expected .readerSetupFailed, got \(mapped)")
             }
             XCTAssertEqual(reason, "Missing Token: a token is required")
@@ -107,7 +107,7 @@ import XCTest
 
             let mapped = FiservCardReader.mapError(Opaque()) { .readerSetupFailed(reason: $0) }
 
-            guard case let .readerSetupFailed(reason) = mapped else {
+            guard case let .readerSetupFailed(reason, _) = mapped else {
                 return XCTFail("expected .readerSetupFailed, got \(mapped)")
             }
             XCTAssertFalse(reason.isEmpty)

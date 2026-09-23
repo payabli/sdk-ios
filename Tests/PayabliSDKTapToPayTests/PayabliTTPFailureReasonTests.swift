@@ -44,7 +44,7 @@ final class PayabliTTPFailureReasonTests: XCTestCase {
     /// merely would not arm is not: it leaves the device as it was.
     func testOnlyAnUnusableDeviceIsCalledIneligible() {
         XCTAssertEqual(
-            PayabliTTPSessionState.landing(for: PayabliTTPError.readerOSVersionNotSupported),
+            PayabliTTPSessionState.landing(for: PayabliTTPError.readerOSVersionNotSupported()),
             .failed(reason: .deviceIneligible)
         )
         XCTAssertEqual(
@@ -129,7 +129,7 @@ final class PayabliTTPFailureReasonTests: XCTestCase {
             (.activationFailed(reason: "x"), nil),
             (.networkError(reason: "x"), .failed(reason: .serviceUnavailable)),
             (.termsNotAccepted, .pendingTerms),
-            (.readerOSVersionNotSupported, .failed(reason: .deviceIneligible)),
+            (.readerOSVersionNotSupported(), .failed(reason: .deviceIneligible)),
             (.cardDeclined(paymentTransId: "TXN"), nil),
             (.outcomeUnknown(paymentTransId: "TXN"), nil)
         ]

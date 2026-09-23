@@ -109,7 +109,7 @@ extension PayabliTTP {
                 paymentTransId: paymentTransId,
                 payload: .nfcFailure(description: String(describing: error))
             )
-            throw PayabliTTPError.nfcFailed(reason: readFailureReason(error), paymentTransId: paymentTransId)
+            throw readFailure(error, paymentTransId: paymentTransId)
         }
 
         return try await runSuccessUpdate(paymentTransId: paymentTransId, readResult: readResult)
@@ -180,14 +180,20 @@ extension PayabliTTP {
 
     // MARK: - Charge helpers
 
-    private func readFailureReason(_ error: Error) -> String {
+    /// The case the reader raised, with the payment it opened. A failure with no case of its own that can
+    /// carry the payment is reported as `nfcFailed`.
+    private func readFailure(_ error: Error, paymentTransId: String) -> PayabliTTPError {
         switch error as? PayabliTTPError {
         case let .nfcFailed(reason, _):
-            return reason
+            return .nfcFailed(reason: reason, paymentTransId: paymentTransId)
+        case let .readerSetupFailed(reason, _):
+            return .readerSetupFailed(reason: reason, paymentTransId: paymentTransId)
+        case .readerOSVersionNotSupported:
+            return .readerOSVersionNotSupported(paymentTransId: paymentTransId, capture: .unknown)
         case let .some(ttpError):
-            return ttpError.localizedDescription
+            return .nfcFailed(reason: ttpError.localizedDescription, paymentTransId: paymentTransId)
         case .none:
-            return String(describing: error)
+            return .nfcFailed(reason: String(describing: error), paymentTransId: paymentTransId)
         }
     }
 

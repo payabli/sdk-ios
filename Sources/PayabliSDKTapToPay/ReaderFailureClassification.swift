@@ -44,7 +44,7 @@ private func failureText(of error: Error) -> String {
     if let ttpError = error as? PayabliTTPError {
         switch ttpError {
         case let .nfcFailed(reason, _),
-             let .readerSetupFailed(reason):
+             let .readerSetupFailed(reason, _):
             return reason
         default:
             return String(describing: ttpError)

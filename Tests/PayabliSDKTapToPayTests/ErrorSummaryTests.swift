@@ -65,7 +65,7 @@ final class ErrorSummaryTests: XCTestCase {
             (.initiateFailed(reason: reason), "initiateFailed"),
             (.updateFailed(reason: reason, paymentTransId: "TXN", capture: .unknown), "updateFailed"),
             (.termsNotAccepted, "termsNotAccepted"),
-            (.readerOSVersionNotSupported, "readerOSVersionNotSupported"),
+            (.readerOSVersionNotSupported(), "readerOSVersionNotSupported"),
             (.cardDeclined(paymentTransId: "TXN"), "cardDeclined"),
             (.outcomeUnknown(paymentTransId: "TXN"), "outcomeUnknown")
         ]

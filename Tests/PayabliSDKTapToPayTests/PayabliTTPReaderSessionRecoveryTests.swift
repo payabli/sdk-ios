@@ -315,17 +315,37 @@ final class PayabliTTPReaderSessionRecoveryTests: XCTestCase {
         XCTAssertEqual(failure.capture, .unknown, "the processor may take the sale before the reader answers")
     }
 
-    func testAReadFailureOfAnyKindNamesThePayment() async throws {
+    func testAnUntypedReadFailureNamesThePayment() async throws {
         let (ttp, provider, _) = try await makeReadyTTP()
+        provider.readingResult = .failure(URLError(.timedOut))
 
-        for thrown: Error in [PayabliTTPError.readerOSVersionNotSupported, URLError(.timedOut)] {
-            provider.readingResult = .failure(thrown)
+        let failure = try await chargeFailure(ttp)
 
-            let failure = try await chargeFailure(ttp)
+        guard case .nfcFailed = failure else { return XCTFail("got \(failure)") }
+        XCTAssertEqual(failure.paymentTransId, Self.paymentTransId)
+        XCTAssertEqual(failure.capture, .unknown)
+    }
 
-            XCTAssertEqual(failure.paymentTransId, Self.paymentTransId, "\(thrown) lost its payment")
-            XCTAssertEqual(failure.capture, .unknown, "\(thrown) claimed no money moved")
-        }
+    func testAnUnsupportedOSDuringAReadKeepsItsCaseAndNamesThePayment() async throws {
+        let (ttp, provider, _) = try await makeReadyTTP()
+        provider.readingResult = .failure(PayabliTTPError.readerOSVersionNotSupported())
+
+        let failure = try await chargeFailure(ttp)
+
+        XCTAssertEqual((failure as NSError).code, 15, "the remedy is a different device, not a retry")
+        XCTAssertEqual(failure.paymentTransId, Self.paymentTransId)
+        XCTAssertEqual(failure.capture, .unknown, "the reader had been asked for a card")
+    }
+
+    func testAReaderThatWasNotPreparedKeepsItsCaseAndChargedNothing() async throws {
+        let (ttp, provider, _) = try await makeReadyTTP()
+        provider.readingResult = .failure(PayabliTTPError.readerSetupFailed(reason: "Reader not prepared"))
+
+        let failure = try await chargeFailure(ttp)
+
+        XCTAssertEqual((failure as NSError).code, 7)
+        XCTAssertEqual(failure.paymentTransId, Self.paymentTransId)
+        XCTAssertEqual(failure.capture, .notCharged, "the reader was never asked for a card")
     }
 
     // MARK: - Fixtures
