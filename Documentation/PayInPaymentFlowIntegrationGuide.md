@@ -260,9 +260,7 @@ let result = try await paymentFlow.capture(PayabliPayInPaymentFlowRequest(
     paymentDetails: PayabliPayInPaymentFlowPaymentDetails(totalAmount: 25.00),
     paymentMethod: .stored(PayabliPayInPaymentFlowStoredMethod(
         method: .card,
-        storedMethodId: "stored-method-id",
-        storedMethodUsageType: .unscheduled,
-        initiator: "payor"
+        storedMethodId: "stored-method-id"
     )),
     orderId: "ORDER-1001",
     source: "ios-sdk"
