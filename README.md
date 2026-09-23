@@ -544,10 +544,17 @@ The other phases wrap what they see:
 - `/config` becomes `PayabliTTPError.configFailed(reason:)`. A
   `PayabliErrorCode.tokenProviderFailed` here reaches the caller as
   `configFailed`, with the classification named in the reason string.
-- `/update` becomes `PayabliTTPError.updateFailed(reason:)`, and
+- `/update` becomes `PayabliTTPError.updateFailed(reason:paymentTransId:capture:)`, and
   `activateDevice(activationCode:)` becomes
   `PayabliTTPError.activationFailed(reason:)`. Both flatten the underlying
-  taxonomy: only the reason string survives.
+  taxonomy into a reason string. `updateFailed` also carries the payment and
+  whether the card was charged.
+
+Every `PayabliTTPError` answers `capture` and `paymentTransId`: whether the card was charged, as a
+`PayabliTTPCapture`, and the payment the failure belongs to, or `nil` when the SDK holds no identifier
+for one. Only `.notCharged` means a second attempt cannot take the money twice. An Objective-C or MAUI
+caller reads the same two values from the `NSError`'s `userInfo["capture"]` and
+`userInfo["paymentTransId"]`. The Flutter and React Native bridges do not forward them yet.
 
 ```swift
 import PayabliSDKCore
@@ -566,10 +573,11 @@ do {
     // Session isn't in the required state for this call.
 } catch let PayabliTTPError.attestationFailed(reason) {
     // App Attest or Payabli refused to attest the device.
-} catch let PayabliTTPError.nfcFailed(reason) {
-    // Card removed prematurely, reader timeout, or similar; usually retryable.
-} catch let PayabliTTPError.updateFailed(reason) {
-    // /update PATCH failed after retries. Reconcile out of band.
+} catch let PayabliTTPError.nfcFailed(reason, paymentTransId) {
+    // Card removed prematurely, reader timeout, or similar. The card may have been
+    // charged, so reconcile the payment before charging again.
+} catch let PayabliTTPError.updateFailed(reason, paymentTransId, capture) {
+    // /update PATCH failed after retries. `capture` says whether the card was charged.
 } catch let PayabliTTPError.configFailed(reason) {
     // /config was refused — a rejected binding, a rejected bearer, or the host's
     // tokenProvider itself failed (see PayabliErrorCode.tokenProviderFailed).

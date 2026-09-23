@@ -58,6 +58,9 @@ public enum PayabliTTPEvent: Sendable {
 }
 
 /// TTP-specific errors (PRD §20.2).
+///
+/// A charge can also throw a core `PayabliError` from opening the payment. That one is raised before the
+/// card is read, so nothing was charged, and the SDK holds no payment identifier for it.
 public enum PayabliTTPError: Error, Sendable {
     case notInitialized
     case invalidState(current: PayabliTTPSessionState, attempted: String)
@@ -66,10 +69,10 @@ public enum PayabliTTPError: Error, Sendable {
     case attestationRevoked(reason: String)
     case attestationFailed(reason: String)
     case configFailed(reason: String)
-    case readerSetupFailed(reason: String)
-    case nfcFailed(reason: String)
+    case readerSetupFailed(reason: String, paymentTransId: String? = nil)
+    case nfcFailed(reason: String, paymentTransId: String? = nil)
     case initiateFailed(reason: String)
-    case updateFailed(reason: String)
+    case updateFailed(reason: String, paymentTransId: String, capture: PayabliTTPCapture)
     case tokenExpired
     case activationFailed(reason: String)
     case networkError(reason: String)
@@ -87,7 +90,49 @@ public enum PayabliTTPError: Error, Sendable {
     ///
     /// Appended after `termsNotAccepted` to keep the `errorCode` table below
     /// append-only; those codes are public API.
-    case readerOSVersionNotSupported
+    case readerOSVersionNotSupported(paymentTransId: String? = nil, capture: PayabliTTPCapture = .notCharged)
+
+    /// The processor refused the card. No money moved.
+    case cardDeclined(paymentTransId: String)
+
+    /// The processor answered neither an approval nor a refusal, so the SDK cannot say whether money moved.
+    case outcomeUnknown(paymentTransId: String)
+}
+
+public extension PayabliTTPError {
+    /// Whether this failure took money from the card.
+    var capture: PayabliTTPCapture {
+        switch self {
+        case .nfcFailed, .outcomeUnknown:
+            // Raised once the reader was asked for a card, and the processor may take the sale before it answers.
+            return .unknown
+        case let .updateFailed(_, _, capture),
+             let .readerOSVersionNotSupported(_, capture):
+            return capture
+        case .notInitialized, .invalidState, .notReady, .devicePendingActivation, .attestationRevoked,
+             .attestationFailed, .configFailed, .readerSetupFailed, .initiateFailed, .tokenExpired,
+             .activationFailed, .networkError, .termsNotAccepted, .cardDeclined:
+            return .notCharged
+        }
+    }
+
+    /// The payment this failure belongs to, or `nil` when the SDK holds no identifier for one.
+    var paymentTransId: String? {
+        switch self {
+        case let .nfcFailed(_, paymentTransId),
+             let .readerSetupFailed(_, paymentTransId),
+             let .readerOSVersionNotSupported(paymentTransId, _):
+            return paymentTransId
+        case let .updateFailed(_, paymentTransId, _),
+             let .cardDeclined(paymentTransId),
+             let .outcomeUnknown(paymentTransId):
+            return paymentTransId
+        case .notInitialized, .invalidState, .notReady, .devicePendingActivation, .attestationRevoked,
+             .attestationFailed, .configFailed, .initiateFailed, .tokenExpired, .activationFailed,
+             .networkError, .termsNotAccepted:
+            return nil
+        }
+    }
 }
 
 // MARK: - ObjC event-code mapping
@@ -259,40 +304,57 @@ extension PayabliTTPError: CustomNSError, LocalizedError {
         case .networkError: return 13
         case .termsNotAccepted: return 14
         case .readerOSVersionNotSupported: return 15
+        case .cardDeclined: return 16
+        case .outcomeUnknown: return 17
         }
     }
 
+    /// Carries `"capture"`, the raw value of ``capture``, and `"paymentTransId"` where the failure
+    /// belongs to a payment, so a bridged caller can reconcile without the Swift type.
     public var errorUserInfo: [String: Any] {
+        var info: [String: Any] = [NSLocalizedDescriptionKey: localizedReason, "capture": capture.rawValue]
+        if let paymentTransId {
+            info["paymentTransId"] = paymentTransId
+        }
+        return info
+    }
+
+    private var localizedReason: String {
         switch self {
         case .notInitialized:
-            return [NSLocalizedDescriptionKey: "PayabliTTP has not been initialized"]
+            return "PayabliTTP has not been initialized"
         case let .invalidState(current, attempted):
-            return [NSLocalizedDescriptionKey: "Invalid state \(current) for \(attempted)"]
+            return "Invalid state \(current) for \(attempted)"
         case let .notReady(current):
-            return [NSLocalizedDescriptionKey: "Reader not ready (state: \(current))"]
+            return "Reader not ready (state: \(current))"
         case .devicePendingActivation:
-            return [NSLocalizedDescriptionKey: "Device is pending activation"]
+            return "Device is pending activation"
         case .tokenExpired:
-            return [NSLocalizedDescriptionKey: "Access token expired"]
+            return "Access token expired"
         case .termsNotAccepted:
-            return [NSLocalizedDescriptionKey: "Contactless payment terms have not been accepted"]
+            return "Contactless payment terms have not been accepted"
         case .readerOSVersionNotSupported:
-            return [NSLocalizedDescriptionKey: "This OS version does not support contactless payments"]
+            return "This OS version does not support contactless payments"
+        case .cardDeclined:
+            return "The card was refused"
+        case .outcomeUnknown:
+            return "The payment outcome is not known"
+        case let .nfcFailed(reason, _),
+             let .readerSetupFailed(reason, _),
+             let .updateFailed(reason, _, _):
+            return reason
         case let .attestationRevoked(reason),
              let .attestationFailed(reason),
              let .configFailed(reason),
-             let .readerSetupFailed(reason),
-             let .nfcFailed(reason),
              let .initiateFailed(reason),
-             let .updateFailed(reason),
              let .activationFailed(reason),
              let .networkError(reason):
-            return [NSLocalizedDescriptionKey: reason]
+            return reason
         }
     }
 
     public var errorDescription: String? {
-        errorUserInfo[NSLocalizedDescriptionKey] as? String
+        localizedReason
     }
 }
 

@@ -76,6 +76,64 @@ final class PayabliTTPErrorNSErrorTests: XCTestCase {
         XCTAssertEqual(description, "reader timed out")
     }
 
+    // MARK: - Capture and payment
+
+    /// A bridged caller reconciles from `userInfo`, so what the Swift type answers has to arrive there too.
+    func testEveryErrorBridgesItsCaptureAndPayment() {
+        for sample in Self.allSamples {
+            let info = (sample.error as NSError).userInfo
+            XCTAssertEqual(info["capture"] as? Int, sample.error.capture.rawValue, "Wrong capture for \(sample.error)")
+            XCTAssertEqual(
+                info["paymentTransId"] as? String,
+                sample.error.paymentTransId,
+                "Wrong payment for \(sample.error)"
+            )
+        }
+    }
+
+    func testOnlyAFailureAfterTheTapCanHaveTakenMoney() {
+        let answers = Dictionary(
+            uniqueKeysWithValues: Self.allSamples.map { ($0.expectedCode, $0.error.capture) }
+        )
+        XCTAssertEqual(answers[8], .unknown, "a failed read was raised once the reader was asked for a card")
+        XCTAssertEqual(answers[10], .unknown, "a failed close carries what it was given")
+        XCTAssertEqual(answers[16], .notCharged, "a refusal is an answer that no money moved")
+        XCTAssertEqual(answers[17], .unknown)
+        let beforeTheTap = answers.filter { ![8, 10, 16, 17].contains($0.key) }
+        XCTAssertEqual(Set(beforeTheTap.values), [.notCharged])
+    }
+
+    func testAReaderThatWasNeverAskedForACardChargedNothingWhateverPaymentItNames() {
+        let err = PayabliTTPError.readerSetupFailed(reason: "Reader not prepared", paymentTransId: "TXN-9")
+        XCTAssertEqual(err.capture, .notCharged)
+        XCTAssertEqual(err.paymentTransId, "TXN-9")
+    }
+
+    func testAnUnsupportedOSAnswersTheCaptureItWasRaisedWith() {
+        XCTAssertEqual(PayabliTTPError.readerOSVersionNotSupported().capture, .notCharged)
+        let duringARead = PayabliTTPError.readerOSVersionNotSupported(paymentTransId: "TXN-9", capture: .unknown)
+        XCTAssertEqual(duringARead.capture, .unknown)
+        XCTAssertEqual(duringARead.paymentTransId, "TXN-9")
+        XCTAssertEqual((duringARead as NSError).code, 15)
+    }
+
+    func testAFailedReadForAnOpenedPaymentMayHaveBeenCharged() {
+        let err = PayabliTTPError.nfcFailed(reason: "x", paymentTransId: "TXN-9")
+        XCTAssertEqual(err.capture, .unknown)
+        XCTAssertEqual(err.paymentTransId, "TXN-9")
+    }
+
+    func testAFailedCloseAnswersTheCaptureAndPaymentItWasGiven() {
+        let err = PayabliTTPError.updateFailed(reason: "x", paymentTransId: "TXN-9", capture: .charged)
+        XCTAssertEqual(err.capture, .charged)
+        XCTAssertEqual(err.paymentTransId, "TXN-9")
+    }
+
+    func testAFailureBeforeAPaymentWasOpenedNamesNone() {
+        XCTAssertNil(PayabliTTPError.initiateFailed(reason: "x").paymentTransId)
+        XCTAssertNil((PayabliTTPError.initiateFailed(reason: "x") as NSError).userInfo["paymentTransId"])
+    }
+
     // MARK: - toPayabliNSError() helper
 
     func testToPayabliNSErrorPreservesPayabliErrorDomain() {
@@ -133,11 +191,13 @@ final class PayabliTTPErrorNSErrorTests: XCTestCase {
         ErrorSample(error: .readerSetupFailed(reason: "x"), expectedCode: 7),
         ErrorSample(error: .nfcFailed(reason: "x"), expectedCode: 8),
         ErrorSample(error: .initiateFailed(reason: "x"), expectedCode: 9),
-        ErrorSample(error: .updateFailed(reason: "x"), expectedCode: 10),
+        ErrorSample(error: .updateFailed(reason: "x", paymentTransId: "TXN", capture: .unknown), expectedCode: 10),
         ErrorSample(error: .tokenExpired, expectedCode: 11),
         ErrorSample(error: .activationFailed(reason: "x"), expectedCode: 12),
         ErrorSample(error: .networkError(reason: "x"), expectedCode: 13),
         ErrorSample(error: .termsNotAccepted, expectedCode: 14),
-        ErrorSample(error: .readerOSVersionNotSupported, expectedCode: 15)
+        ErrorSample(error: .readerOSVersionNotSupported(), expectedCode: 15),
+        ErrorSample(error: .cardDeclined(paymentTransId: "TXN"), expectedCode: 16),
+        ErrorSample(error: .outcomeUnknown(paymentTransId: "TXN"), expectedCode: 17)
     ]
 }

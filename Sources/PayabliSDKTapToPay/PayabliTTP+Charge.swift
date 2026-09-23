@@ -109,8 +109,7 @@ extension PayabliTTP {
                 paymentTransId: paymentTransId,
                 payload: .nfcFailure(description: String(describing: error))
             )
-            throw error as? PayabliTTPError
-                ?? PayabliTTPError.nfcFailed(reason: String(describing: error))
+            throw readFailure(error, paymentTransId: paymentTransId)
         }
 
         return try await runSuccessUpdate(paymentTransId: paymentTransId, readResult: readResult)
@@ -127,7 +126,7 @@ extension PayabliTTP {
             multicaster.emit(.updateCompleted(paymentTransId: paymentTransId))
             return TransactionResult(paymentTransId: paymentTransId)
         case let .failed(reason):
-            throw PayabliTTPError.updateFailed(reason: reason)
+            throw PayabliTTPError.updateFailed(reason: reason, paymentTransId: paymentTransId, capture: .unknown)
         case .cancelled:
             throw CancellationError()
         }
@@ -180,6 +179,23 @@ extension PayabliTTP {
     }
 
     // MARK: - Charge helpers
+
+    /// The case the reader raised, with the payment it opened. A failure with no case of its own that can
+    /// carry the payment is reported as `nfcFailed`.
+    private func readFailure(_ error: Error, paymentTransId: String) -> PayabliTTPError {
+        switch error as? PayabliTTPError {
+        case let .nfcFailed(reason, _):
+            return .nfcFailed(reason: reason, paymentTransId: paymentTransId)
+        case let .readerSetupFailed(reason, _):
+            return .readerSetupFailed(reason: reason, paymentTransId: paymentTransId)
+        case .readerOSVersionNotSupported:
+            return .readerOSVersionNotSupported(paymentTransId: paymentTransId, capture: .unknown)
+        case let .some(ttpError):
+            return .nfcFailed(reason: ttpError.localizedDescription, paymentTransId: paymentTransId)
+        case .none:
+            return .nfcFailed(reason: String(describing: error), paymentTransId: paymentTransId)
+        }
+    }
 
     /// `POST /MoneyIn/initiate`. Fails loudly if `deviceId` is missing —
     /// otherwise any later `PATCH /update/{id}` would 400 on a non-existent
@@ -251,8 +267,7 @@ extension PayabliTTP {
             )
             // The caller still gets this surface's vocabulary, so the outcome reads the same whatever
             // layer underneath produced the failure.
-            let failure = PayabliTTPError.updateFailed(reason: error.localizedDescription)
-            return .failed(reason: failure.localizedDescription)
+            return .failed(reason: error.localizedDescription)
         }
     }
 

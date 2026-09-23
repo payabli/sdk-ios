@@ -86,7 +86,7 @@ final class TTPUpdateRetryTests: XCTestCase {
         do {
             _ = try await charge(ttp)
             XCTFail("a declined update should reach the caller")
-        } catch let PayabliTTPError.updateFailed(reason) {
+        } catch let PayabliTTPError.updateFailed(reason, _, _) {
             XCTAssertTrue(reason.contains("declined"), "got \(reason)")
         }
 
@@ -122,7 +122,7 @@ final class TTPUpdateRetryTests: XCTestCase {
             XCTFail("expected cancellation")
         } catch is CancellationError {
             // The only acceptable outcome.
-        } catch let PayabliTTPError.updateFailed(reason) {
+        } catch let PayabliTTPError.updateFailed(reason, _, _) {
             XCTFail("cancellation was reported as a failed update: \(reason)")
         }
     }

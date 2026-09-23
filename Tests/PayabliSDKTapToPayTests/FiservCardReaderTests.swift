@@ -22,7 +22,7 @@ final class FiservCardReaderTests: XCTestCase {
                 // On a real iPhone `success`; on an incompatible device
                 // `readerSetupFailed`. Both are acceptable, so the assertion is
                 // only that the error, if any, is not about missing credentials.
-                if case let .failure(err) = result, case let .readerSetupFailed(reason) = err {
+                if case let .failure(err) = result, case let .readerSetupFailed(reason, _) = err {
                     XCTAssertFalse(
                         reason.lowercased().contains("credentials"),
                         "eligibility should not require credentials"
@@ -45,7 +45,7 @@ final class FiservCardReaderTests: XCTestCase {
         do {
             try await reader.prepareReader { _ in }
             XCTFail("expected readerSetupFailed")
-        } catch let PayabliTTPError.readerSetupFailed(reason) {
+        } catch let PayabliTTPError.readerSetupFailed(reason, _) {
             XCTAssertTrue(
                 reason.lowercased().contains("credentials") || reason.lowercased().contains("ios-only"),
                 "unexpected reason: \(reason)"
@@ -80,7 +80,7 @@ final class FiservCardReaderTests: XCTestCase {
                 "apiKey": "a"
             ])
             XCTFail("expected readerSetupFailed")
-        } catch let PayabliTTPError.readerSetupFailed(reason) {
+        } catch let PayabliTTPError.readerSetupFailed(reason, _) {
             XCTAssertTrue(reason.contains("merchantId"))
             XCTAssertTrue(reason.contains("terminalId"))
         } catch {
@@ -98,7 +98,7 @@ final class FiservCardReaderTests: XCTestCase {
                 "terminalId": "t"
             ])
             XCTFail("expected readerSetupFailed")
-        } catch let PayabliTTPError.readerSetupFailed(reason) {
+        } catch let PayabliTTPError.readerSetupFailed(reason, _) {
             XCTAssertTrue(reason.contains("merchantId"))
         } catch {
             XCTFail("wrong error: \(error)")
@@ -225,7 +225,7 @@ final class FiservCardReaderTests: XCTestCase {
             try await reader.presentTerms()
             XCTFail("expected dismissal to surface")
         } catch let error as PayabliTTPError {
-            guard case let .readerSetupFailed(reason) = error else {
+            guard case let .readerSetupFailed(reason, _) = error else {
                 return XCTFail("expected readerSetupFailed, got \(error)")
             }
             XCTAssertTrue(
