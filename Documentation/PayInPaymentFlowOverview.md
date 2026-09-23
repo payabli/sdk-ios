@@ -42,7 +42,8 @@ At a high level, the component provides:
 - MoneyIn capture for SDK-collected card or ACH details in the hosted form
 - MoneyIn capture for card, ACH, stored method, cloud device, check, and cash
   through the direct API
-- card authorization and follow-up capture of a prior authorization
+- authorization of a card, stored card, or cloud device, and follow-up capture
+  of a prior authorization
 - configurable fields, field order, sections, labels, placeholders, hidden
   values, validation, payment summary rows, and visual styling
 - redacted diagnostics, stable accessibility identifiers, Dynamic Type support,
@@ -56,7 +57,7 @@ The component supports four PayIn workflows:
 | --- | --- | --- | --- |
 | Store card or ACH payment method | Hosted form and direct async API | `/api/TokenStorage/add` | Use hosted form when the host app must not access clear PAN. |
 | Capture transaction | Hosted form and direct async API | `/api/v2/MoneyIn/getpaid` | Hosted form collects card or ACH; direct API also supports stored, cloud, check, and cash methods. |
-| Authorize transaction | Hosted form and direct async API | `/api/v2/MoneyIn/authorize` | Card-only today. ACH and stored methods are not valid authorize inputs. |
+| Authorize transaction | Hosted form and direct async API | `/api/v2/MoneyIn/authorize` | The hosted form collects a card only. The direct API accepts a card, a stored card, or a cloud device. |
 | Capture prior authorization | Direct async API | `/api/v2/MoneyIn/capture/{transId}` | Uses a prior authorization transaction ID. |
 
 `PayabliPayInPaymentFlowOperation` selects the hosted form behavior:
@@ -274,7 +275,8 @@ Direct capture supports these payment method cases:
 - `.check(PayabliPayInPaymentFlowCheckMethod)`
 - `.cash`
 
-Direct authorize supports card only today:
+Direct authorize accepts a card, a stored card (`method: .card`), or a cloud
+device, and refuses any other payment method before anything is sent:
 
 ```swift
 try await paymentFlow.authorize(PayabliPayInPaymentFlowRequest(
