@@ -547,7 +547,8 @@ The other phases wrap what they see:
 - `/update` becomes `PayabliTTPError.updateFailed(reason:paymentTransId:capture:)`, and
   `activateDevice(activationCode:)` becomes
   `PayabliTTPError.activationFailed(reason:)`. Both flatten the underlying
-  taxonomy: only the reason string survives.
+  taxonomy into a reason string. `updateFailed` also carries the payment and
+  whether the card was charged.
 
 Every `PayabliTTPError` answers `capture` and `paymentTransId`: whether the card was charged, as a
 `PayabliTTPCapture`, and the payment the failure belongs to, or `nil` when the SDK holds no identifier
