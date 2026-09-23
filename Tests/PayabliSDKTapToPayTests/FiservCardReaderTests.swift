@@ -40,6 +40,23 @@ final class FiservCardReaderTests: XCTestCase {
                 XCTAssertEqual(response.gatewayResponse?.transactionState, state, json)
             }
         }
+
+        /// What `startReading` returns for a response the reader handed back, declined or neither included.
+        func testTheReadResultCarriesTheGatewaysOutcomeAndState() throws {
+            let cases: [(String, CardReadOutcome, String?)] = [
+                (#"{"gatewayResponse":{"transactionState":"CAPTURED"}}"#, .approved, "CAPTURED"),
+                (#"{"gatewayResponse":{"transactionState":"DECLINED"}}"#, .declined, "DECLINED"),
+                (#"{"gatewayResponse":{"transactionState":"WAITING"}}"#, .indeterminate, "WAITING"),
+                (#"{"source":{"brand":"VISA"}}"#, .indeterminate, nil)
+            ]
+            for (json, outcome, state) in cases {
+                let response = try JSONDecoder().decode(Models.CommerceHubResponse.self, from: Data(json.utf8))
+                let result = try FiservCardReader.readResult(from: response)
+                XCTAssertEqual(result.outcome, outcome, json)
+                XCTAssertEqual(result.providerState, state, json)
+                XCTAssertNotNil(result.providerResponseJSON, "the response is still forwarded whatever it says")
+            }
+        }
     #endif
 
     /// Eligibility is platform/hardware-only (PRD FR-11J.2) and is called before
