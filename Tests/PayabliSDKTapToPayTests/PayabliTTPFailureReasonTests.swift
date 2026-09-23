@@ -129,7 +129,9 @@ final class PayabliTTPFailureReasonTests: XCTestCase {
             (.activationFailed(reason: "x"), nil),
             (.networkError(reason: "x"), .failed(reason: .serviceUnavailable)),
             (.termsNotAccepted, .pendingTerms),
-            (.readerOSVersionNotSupported, .failed(reason: .deviceIneligible))
+            (.readerOSVersionNotSupported, .failed(reason: .deviceIneligible)),
+            (.cardDeclined(paymentTransId: "TXN"), nil),
+            (.outcomeUnknown(paymentTransId: "TXN"), nil)
         ]
 
         for (error, expected) in map {
