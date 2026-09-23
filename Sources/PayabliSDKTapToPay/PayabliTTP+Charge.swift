@@ -180,7 +180,6 @@ extension PayabliTTP {
 
     // MARK: - Charge helpers
 
-    /// Every read failure is rethrown as one case, because the payment is open by now and each one has to name it.
     private func readFailureReason(_ error: Error) -> String {
         switch error as? PayabliTTPError {
         case let .nfcFailed(reason, _):
