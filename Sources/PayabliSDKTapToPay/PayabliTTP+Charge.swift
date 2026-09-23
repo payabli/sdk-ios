@@ -109,8 +109,7 @@ extension PayabliTTP {
                 paymentTransId: paymentTransId,
                 payload: .nfcFailure(description: String(describing: error))
             )
-            throw error as? PayabliTTPError
-                ?? PayabliTTPError.nfcFailed(reason: String(describing: error))
+            throw PayabliTTPError.nfcFailed(reason: readFailureReason(error), paymentTransId: paymentTransId)
         }
 
         return try await runSuccessUpdate(paymentTransId: paymentTransId, readResult: readResult)
@@ -127,7 +126,7 @@ extension PayabliTTP {
             multicaster.emit(.updateCompleted(paymentTransId: paymentTransId))
             return TransactionResult(paymentTransId: paymentTransId)
         case let .failed(reason):
-            throw PayabliTTPError.updateFailed(reason: reason)
+            throw PayabliTTPError.updateFailed(reason: reason, paymentTransId: paymentTransId, capture: .unknown)
         case .cancelled:
             throw CancellationError()
         }
@@ -180,6 +179,18 @@ extension PayabliTTP {
     }
 
     // MARK: - Charge helpers
+
+    /// Every read failure is rethrown as one case, because the payment is open by now and each one has to name it.
+    private func readFailureReason(_ error: Error) -> String {
+        switch error as? PayabliTTPError {
+        case let .nfcFailed(reason, _):
+            return reason
+        case let .some(ttpError):
+            return ttpError.localizedDescription
+        case .none:
+            return String(describing: error)
+        }
+    }
 
     /// `POST /MoneyIn/initiate`. Fails loudly if `deviceId` is missing —
     /// otherwise any later `PATCH /update/{id}` would 400 on a non-existent
@@ -251,8 +262,7 @@ extension PayabliTTP {
             )
             // The caller still gets this surface's vocabulary, so the outcome reads the same whatever
             // layer underneath produced the failure.
-            let failure = PayabliTTPError.updateFailed(reason: error.localizedDescription)
-            return .failed(reason: failure.localizedDescription)
+            return .failed(reason: error.localizedDescription)
         }
     }
 

@@ -51,7 +51,7 @@ import XCTest
         func testACancelledReadCarriesTheCancellationPrefix() {
             let mapped = FiservCardReader.mapError(Self.rebuiltRead(.readCancelled)) { .nfcFailed(reason: $0) }
 
-            guard case let .nfcFailed(reason) = mapped else {
+            guard case let .nfcFailed(reason, _) = mapped else {
                 return XCTFail("expected .nfcFailed, got \(mapped)")
             }
             XCTAssertTrue(reason.hasPrefix(FiservCardReader.cancellationReasonPrefix), reason)
@@ -60,7 +60,7 @@ import XCTest
         func testAFailedReadIsNotACancellation() {
             let mapped = FiservCardReader.mapError(Self.rebuiltRead(.cardReadFailed)) { .nfcFailed(reason: $0) }
 
-            guard case let .nfcFailed(reason) = mapped else {
+            guard case let .nfcFailed(reason, _) = mapped else {
                 return XCTFail("expected .nfcFailed, got \(mapped)")
             }
             XCTAssertFalse(reason.hasPrefix(FiservCardReader.cancellationReasonPrefix), reason)

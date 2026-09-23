@@ -305,7 +305,40 @@ final class PayabliTTPReaderSessionRecoveryTests: XCTestCase {
         }
     }
 
+    func testAReadFailureNamesThePaymentItBelongsTo() async throws {
+        let (ttp, provider, _) = try await makeReadyTTP()
+        provider.readingResult = .failure(Self.sessionLevelFailure)
+
+        let failure = try await chargeFailure(ttp)
+
+        XCTAssertEqual(failure.paymentTransId, Self.paymentTransId)
+        XCTAssertEqual(failure.capture, .unknown, "the processor may take the sale before the reader answers")
+    }
+
+    func testAReadFailureOfAnyKindNamesThePayment() async throws {
+        let (ttp, provider, _) = try await makeReadyTTP()
+
+        for thrown: Error in [PayabliTTPError.readerOSVersionNotSupported, URLError(.timedOut)] {
+            provider.readingResult = .failure(thrown)
+
+            let failure = try await chargeFailure(ttp)
+
+            XCTAssertEqual(failure.paymentTransId, Self.paymentTransId, "\(thrown) lost its payment")
+            XCTAssertEqual(failure.capture, .unknown, "\(thrown) claimed no money moved")
+        }
+    }
+
     // MARK: - Fixtures
+
+    private func chargeFailure(_ ttp: PayabliTTP) async throws -> PayabliTTPError {
+        do {
+            _ = try await charge(ttp)
+        } catch let failure as PayabliTTPError {
+            return failure
+        }
+        XCTFail("expected the charge to fail")
+        throw CancellationError()
+    }
 
     private static let paymentTransId = "ttp-txn-1"
 
