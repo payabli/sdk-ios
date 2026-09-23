@@ -1,7 +1,7 @@
 import Foundation
 import PayabliSDKCore
 #if canImport(PayabliCardReaderCore)
-    import PayabliCardReaderCore
+    internal import PayabliCardReaderCore
     import ProximityReader
 #endif
 
