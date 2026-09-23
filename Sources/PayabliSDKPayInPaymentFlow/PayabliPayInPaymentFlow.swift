@@ -229,13 +229,10 @@ public final class PayabliPayInPaymentFlow: NSObject, ObservableObject, PayabliC
         }
     }
 
-    /// Authorizes a card-data transaction using
+    /// Authorizes a card, a stored card, or a cloud-device reading using
     /// `POST /api/v2/MoneyIn/authorize`.
     ///
-    /// Only card data is supported for authorization today. ACH, stored
-    /// methods, cash, check, and cloud transactions cannot be authorized with
-    /// this endpoint. Apple Pay can be added as a separate authorizable method
-    /// when the SDK supports that flow.
+    /// Any other payment method is refused before anything is sent.
     public func authorize(
         _ request: PayabliPayInPaymentFlowRequest
     ) async throws -> PayabliPayInPaymentFlowResult {

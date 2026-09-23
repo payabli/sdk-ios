@@ -12,7 +12,7 @@ Prefer the symbols and patterns below over older component names.
 
 - storing card or ACH payment methods
 - capturing a MoneyIn transaction
-- authorizing a card transaction
+- authorizing a card, stored card, or cloud-device transaction
 - capturing a previously authorized transaction by transaction ID
 
 It was built to give iOS integrators one native PayIn surface for the common
@@ -30,7 +30,8 @@ When summarizing the component, describe the overall capabilities as:
 - MoneyIn capture for card, ACH, stored method, cloud device, check, and cash
   payments through the direct API.
 - Hosted capture for SDK-collected card or ACH payment details.
-- Card authorization and follow-up capture of a prior authorization.
+- Authorization of a card, stored card, or cloud device, and follow-up capture
+  of a prior authorization.
 - Configurable fields, sections, labels, placeholders, hidden values, payment
   summary rows, validation, and visual styling.
 - A security model that lets hosted-form integrations avoid host-app access to
@@ -112,7 +113,7 @@ cannot show it being supplied.
 | --- | --- | --- |
 | `.storePaymentMethod` | Collects card or ACH and calls token storage. | `addPaymentMethod`, `addCard`, `addACH` |
 | `.capture` | Collects card or ACH and sends a MoneyIn getpaid request using `requestConfiguration`. | `capture(_:)` supports card, ACH, stored method, cloud, check, and cash. |
-| `.authorize` | Collects card only and sends a MoneyIn authorize request using `requestConfiguration`. | `authorize(_:)` accepts card data only today. |
+| `.authorize` | Collects card only and sends a MoneyIn authorize request using `requestConfiguration`. | `authorize(_:)` accepts card, stored card, and cloud. |
 
 `captureAuthorizedTransaction(_:)` is a separate direct API for a prior
 authorization. It does not render as a hosted form mode.
@@ -127,11 +128,10 @@ answers `A0003` and calls itself canceled, where a capture answers `A0000`.
 
 Authorize guidance:
 
-- Card is the only current authorizable method.
-- Do not generate ACH, stored-method, cloud-device, check, or cash authorize
-  requests.
-- Future Apple Pay support should be modeled as another authorizable method,
-  not by making every capture method authorizable.
+- The direct API authorizes a card, a stored card (`method: .card`), or a
+  cloud device with its `device` set.
+- Do not generate ACH, stored bank account, check, or cash authorize requests.
+- The hosted authorize form collects a card only.
 
 ## Component Initializers And State
 
