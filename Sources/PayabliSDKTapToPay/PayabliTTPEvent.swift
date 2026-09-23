@@ -59,8 +59,8 @@ public enum PayabliTTPEvent: Sendable {
 
 /// TTP-specific errors (PRD §20.2).
 ///
-/// A charge can also throw a core `PayabliError` from opening the payment. That one is raised before a
-/// payment exists, so it names none and nothing was charged.
+/// A charge can also throw a core `PayabliError` from opening the payment. That one is raised before the
+/// card is read, so nothing was charged, and the SDK holds no payment identifier for it.
 public enum PayabliTTPError: Error, Sendable {
     case notInitialized
     case invalidState(current: PayabliTTPSessionState, attempted: String)
@@ -118,7 +118,7 @@ public extension PayabliTTPError {
         }
     }
 
-    /// The payment this failure belongs to, or `nil` when it was raised before one was opened.
+    /// The payment this failure belongs to, or `nil` when the SDK holds no identifier for one.
     var paymentTransId: String? {
         switch self {
         case let .nfcFailed(_, paymentTransId):
