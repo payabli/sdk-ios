@@ -60,7 +60,8 @@ GitHub metadata — not needed for our use case.
 **A refresh is a merge, never an overwrite.** These copies carry changes of our
 own, so replacing a file with the upstream version silently drops them. Resolve
 the upstream checkout at the new tag, diff each of the 5 files against it, and
-take the upstream changes into ours rather than the other way round.
+take the upstream changes into ours rather than the other way round. Upstream
+declarations arrive `public`; each one merged in becomes `package`.
 
 `Scripts/refresh_vendored_ttp.sh`, which earlier versions of this file
 described, does not exist. It was specified as an `rsync` of the 5 files, which
@@ -75,14 +76,15 @@ and re-cut a patch SDK release if the upstream changes are substantive.
 ## Module renaming
 
 No **in-source** renaming is performed — class names like `FiservTTPCardReader`,
-`FiservTTPConfig`, etc., remain unchanged. Those types are internal
-implementation detail and never appear on the Payabli SDK's public surface.
-Public consumers interact with `PayabliTTP`, which wraps them.
+`FiservTTPConfig`, etc., remain unchanged. Every declaration upstream marks
+`public` is `package` here, so `PayabliSDKTapToPay` reaches them and a host app
+does not. Public consumers interact with `PayabliTTP`, which wraps them.
 
 The **module rename** is achieved entirely via the SPM target name
 (`PayabliCardReaderCore`) declared in the root [`Package.swift`](../../Package.swift).
-Consumers linking the binary see only `PayabliCardReaderCore` in their
-`Package.resolved`, `otool -L`, and Xcode project — Fiserv's name is absent.
+The module is not a product. It is linked statically into `PayabliSDKTapToPay`,
+which loads no separate reader framework, so Fiserv's name is absent from a
+consumer's `otool -L`.
 
 ## MIT compliance checklist
 

@@ -35,12 +35,12 @@ extension Optional where Wrapped == String {
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 // ERROR WRAPPER
 
-public struct FiservTTPErrorWrapper: Identifiable {
-    public let id: UUID
-    public let error: FiservTTPCardReaderError
-    public let guidance: String
+package struct FiservTTPErrorWrapper: Identifiable {
+    package let id: UUID
+    package let error: FiservTTPCardReaderError
+    package let guidance: String
 
-    public init(id: UUID = UUID(), error: FiservTTPCardReaderError, guidance: String) {
+    package init(id: UUID = UUID(), error: FiservTTPCardReaderError, guidance: String) {
         self.id = id
         self.error = error
         self.guidance = guidance
@@ -50,13 +50,13 @@ public struct FiservTTPErrorWrapper: Identifiable {
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 // CHARGE RESPONSE WRAPPER
 
-public struct FiservTTPResponseWrapper: Identifiable {
-    public let id: UUID
-    public let title: String
+package struct FiservTTPResponseWrapper: Identifiable {
+    package let id: UUID
+    package let title: String
     
-    public let responseString: String?
+    package let responseString: String?
     
-    public init(id: UUID = UUID(), title: String, responseString: String? = nil) {
+    package init(id: UUID = UUID(), title: String, responseString: String? = nil) {
         
         self.id = id
         self.title = title
@@ -67,17 +67,17 @@ public struct FiservTTPResponseWrapper: Identifiable {
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 // CONFIGURATION
 
-public struct FiservTTPConfig {
-    public let secretKey: String
-    public let apiKey: String
-    public let environment: FiservTTPEnvironment
-    public let currencyCode: String
-    public let merchantId: String
-    public let appleTtpMerchantId: String?
-    public let merchantName: String
-    public let merchantCategoryCode: String
-    public let terminalId: String
-    public let terminalProfileId: String
+package struct FiservTTPConfig {
+    package let secretKey: String
+    package let apiKey: String
+    package let environment: FiservTTPEnvironment
+    package let currencyCode: String
+    package let merchantId: String
+    package let appleTtpMerchantId: String?
+    package let merchantName: String
+    package let merchantCategoryCode: String
+    package let terminalId: String
+    package let terminalProfileId: String
 
     /**
      Primary Configuration used for all requests
@@ -95,7 +95,7 @@ public struct FiservTTPConfig {
      
      - returns: FiservTTPConfig struct that will be used throughout the app lifecycle
      */
-    public init(secretKey: String,
+    package init(secretKey: String,
                 apiKey: String,
                 environment: FiservTTPEnvironment,
                 currencyCode: String,
@@ -141,19 +141,19 @@ internal struct FiservTTPTokenRequest: Codable {
     let appleTtpMerchantId: String?
 }
 
-public struct FiservTTPTokenResponse: Codable {
-    public let gatewayResponse: FiservTTPChargeResponseGatewayResponse
-    public let accessToken: String
-    public let accessTokenTimeToLive: Int
-    public let accessTokenType: String
+package struct FiservTTPTokenResponse: Codable {
+    package let gatewayResponse: FiservTTPChargeResponseGatewayResponse
+    package let accessToken: String
+    package let accessTokenTimeToLive: Int
+    package let accessTokenType: String
 }
 
 // VALIDATE RESPONSE
-public struct FiservTTPValidateCardResponse: Codable {
+package struct FiservTTPValidateCardResponse: Codable {
     
     let id: String
-    public let generalCardData: String?
-    public let paymentCardData: String?
+    package let generalCardData: String?
+    package let paymentCardData: String?
 }
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -420,92 +420,92 @@ internal struct FiservTTPRefundCardRequest: Codable {
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-public struct FiservTTPServerError: Codable {
-    public let gatewayResponse: FiservTTPServerErrorGatewayResponse
-    public let error: [FiservTTPServerErrorError]?
+package struct FiservTTPServerError: Codable {
+    package let gatewayResponse: FiservTTPServerErrorGatewayResponse
+    package let error: [FiservTTPServerErrorError]?
 }
 
-public struct FiservTTPServerErrorGatewayResponse: Codable {
-    public let transactionType: String?
-    public let transactionState: String?
-    public let transactionProcessingDetails: FiservTTPServerErrorTransactionProcessingDetails?
+package struct FiservTTPServerErrorGatewayResponse: Codable {
+    package let transactionType: String?
+    package let transactionState: String?
+    package let transactionProcessingDetails: FiservTTPServerErrorTransactionProcessingDetails?
 }
 
-public struct FiservTTPServerErrorTransactionProcessingDetails: Codable {
-    public let orderId: String?
-    public let transactionTimestamp: String?
-    public let apiTraceId: String?
-    public let clientRequestId: String?
-    public let transactionId: String?
+package struct FiservTTPServerErrorTransactionProcessingDetails: Codable {
+    package let orderId: String?
+    package let transactionTimestamp: String?
+    package let apiTraceId: String?
+    package let clientRequestId: String?
+    package let transactionId: String?
 }
 
-public struct FiservTTPServerErrorError: Codable {
-    public let type: String?
-    public let field: String?
-    public let code: String?
-    public let message: String?
+package struct FiservTTPServerErrorError: Codable {
+    package let type: String?
+    package let field: String?
+    package let code: String?
+    package let message: String?
 }
 
-public struct FiservTTPPaymentTokenResponse: Codable {
+package struct FiservTTPPaymentTokenResponse: Codable {
     
-    public let tokenData: String
-    public let tokenSource: String
-    public let tokenResponseCode: String
-    public let tokenResponseDescription: String
+    package let tokenData: String
+    package let tokenSource: String
+    package let tokenResponseCode: String
+    package let tokenResponseDescription: String
 }
 
-public struct FiservTTPChargeResponse: Codable {
-    public let gatewayResponse: FiservTTPChargeResponseGatewayResponse?
-    public let source: FiservTTPChargeResponseSource?
-    public let paymentReceipt: FiservTTPChargeResponsePaymentReceipt?
-    public let transactionDetails: FiservTTPChargeResponseTransactionDetails?
-    public let transactionInteraction: FiservTTPChargeResponseTransactionInteraction?
-    public let merchantDetails: FiservTTPChargeResponseMerchantDetails?
-    public let networkDetails: FiservTTPChargeResponseNetworkDetails?
-    public let cardDetails: FiservTTPChargeResponseCardDetails?
-    public let paymentTokens: [FiservTTPPaymentTokenResponse]?
-    public let error: [FiservTTPServerErrorError]?
+package struct FiservTTPChargeResponse: Codable {
+    package let gatewayResponse: FiservTTPChargeResponseGatewayResponse?
+    package let source: FiservTTPChargeResponseSource?
+    package let paymentReceipt: FiservTTPChargeResponsePaymentReceipt?
+    package let transactionDetails: FiservTTPChargeResponseTransactionDetails?
+    package let transactionInteraction: FiservTTPChargeResponseTransactionInteraction?
+    package let merchantDetails: FiservTTPChargeResponseMerchantDetails?
+    package let networkDetails: FiservTTPChargeResponseNetworkDetails?
+    package let cardDetails: FiservTTPChargeResponseCardDetails?
+    package let paymentTokens: [FiservTTPPaymentTokenResponse]?
+    package let error: [FiservTTPServerErrorError]?
 }
 
-public struct FiservTTPChargeResponseGatewayResponse: Codable {
-    public let transactionType: String?
-    public let transactionState: String?
-    public let transactionOrigin: String?
-    public let transactionProcessingDetails: FiservTTPChargeResponseTransactionProcessingDetails?
+package struct FiservTTPChargeResponseGatewayResponse: Codable {
+    package let transactionType: String?
+    package let transactionState: String?
+    package let transactionOrigin: String?
+    package let transactionProcessingDetails: FiservTTPChargeResponseTransactionProcessingDetails?
 }
 
-public struct FiservTTPChargeResponseTransactionProcessingDetails: Codable {
-    public let orderId: String?
-    public let transactionTimestamp: String?
-    public let apiTraceId: String?
-    public let clientRequestId: String?
-    public let transactionId: String?
-    public let apiKey: String?
+package struct FiservTTPChargeResponseTransactionProcessingDetails: Codable {
+    package let orderId: String?
+    package let transactionTimestamp: String?
+    package let apiTraceId: String?
+    package let clientRequestId: String?
+    package let transactionId: String?
+    package let apiKey: String?
 }
 
-public struct FiservTTPChargeResponseSource: Codable {
-    public let sourceType: String?
-    public let card: FiservTTPChargeResponseCard?
-    public let emvData: String?
-    public let generalCardData: String?
+package struct FiservTTPChargeResponseSource: Codable {
+    package let sourceType: String?
+    package let card: FiservTTPChargeResponseCard?
+    package let emvData: String?
+    package let generalCardData: String?
 }
 
-public struct FiservTTPChargeResponseCard: Codable {
-    public let expirationMonth: String?
-    public let expirationYear: String?
-    public let bin: String?
-    public let last4: String?
-    public let scheme: String?
+package struct FiservTTPChargeResponseCard: Codable {
+    package let expirationMonth: String?
+    package let expirationYear: String?
+    package let bin: String?
+    package let last4: String?
+    package let scheme: String?
 }
 
-public struct FiservTTPChargeResponsePaymentReceipt: Codable {
-    public let approvedAmount: FiservTTPChargeResponseApprovedAmount?
-    public let processorResponseDetails: FiservTTPChargeResponseProcessorResponseDetails?
+package struct FiservTTPChargeResponsePaymentReceipt: Codable {
+    package let approvedAmount: FiservTTPChargeResponseApprovedAmount?
+    package let processorResponseDetails: FiservTTPChargeResponseProcessorResponseDetails?
 }
 
-public struct FiservTTPChargeResponseApprovedAmount: Codable {
-    public let total: Decimal?
-    public let currency: String?
+package struct FiservTTPChargeResponseApprovedAmount: Codable {
+    package let total: Decimal?
+    package let currency: String?
 }
 
 extension LosslessStringConvertible {
@@ -523,7 +523,7 @@ extension FiservTTPChargeResponseApprovedAmount {
         case currency = "currency"
     }
 
-    public init(from decoder: Decoder) throws {
+    package init(from decoder: Decoder) throws {
 
         let container = try decoder.container(keyedBy: CodingKeys.self)
 
@@ -533,133 +533,133 @@ extension FiservTTPChargeResponseApprovedAmount {
     }
 }
 
-public struct FiservTTPChargeResponseProcessorResponseDetails: Codable {
-    public let approvalStatus: String?
-    public let approvalCode: String?
-    public let referenceNumber: String?
-    public let processor: String?
-    public let host: String?
-    public let networkRouted: String?
-    public let networkInternationalId: String?
-    public let responseCode: String?
-    public let responseMessage: String?
-    public let hostResponseCode: String?
-    public let hostResponseMessage: String?
-    public let responseIndicators: FiservTTPChargeResponseProcessorResponseIndicators?
-    public let bankAssociationDetails: FiservTTPChargeResponseBankAssociationDetails?
-    public let additionalInfo: [FiservTTPChargeResponseAdditionalInfo]?
+package struct FiservTTPChargeResponseProcessorResponseDetails: Codable {
+    package let approvalStatus: String?
+    package let approvalCode: String?
+    package let referenceNumber: String?
+    package let processor: String?
+    package let host: String?
+    package let networkRouted: String?
+    package let networkInternationalId: String?
+    package let responseCode: String?
+    package let responseMessage: String?
+    package let hostResponseCode: String?
+    package let hostResponseMessage: String?
+    package let responseIndicators: FiservTTPChargeResponseProcessorResponseIndicators?
+    package let bankAssociationDetails: FiservTTPChargeResponseBankAssociationDetails?
+    package let additionalInfo: [FiservTTPChargeResponseAdditionalInfo]?
 }
 
-public struct FiservTTPChargeResponseProcessorResponseIndicators: Codable {
-    public let alternateRouteDebitIndicator: Bool?
-    public let signatureLineIndicator: Bool?
-    public let signatureDebitRouteIndicator: Bool?
+package struct FiservTTPChargeResponseProcessorResponseIndicators: Codable {
+    package let alternateRouteDebitIndicator: Bool?
+    package let signatureLineIndicator: Bool?
+    package let signatureDebitRouteIndicator: Bool?
 }
 
-public struct FiservTTPChargeResponseBankAssociationDetails: Codable {
-    public let associationResponseCode: String?
+package struct FiservTTPChargeResponseBankAssociationDetails: Codable {
+    package let associationResponseCode: String?
 }
 
-public struct FiservTTPChargeResponseAdditionalInfo: Codable {
-    public let name: String?
-    public let value: String?
+package struct FiservTTPChargeResponseAdditionalInfo: Codable {
+    package let name: String?
+    package let value: String?
 }
 
-public struct FiservTTPChargeResponseTransactionDetails: Codable {
-    public let captureFlag: Bool?
-    public let transactionCaptureType: String?
-    public let authentication3DS: Bool?
-    public let processingCode: String?
-    public let merchantTransactionId: String?
-    public let merchantOrderId: String?
-    public let merchantInvoiceNumber: String?
-    public let createToken: Bool?
-    public let retrievalReferenceNumber: String?
+package struct FiservTTPChargeResponseTransactionDetails: Codable {
+    package let captureFlag: Bool?
+    package let transactionCaptureType: String?
+    package let authentication3DS: Bool?
+    package let processingCode: String?
+    package let merchantTransactionId: String?
+    package let merchantOrderId: String?
+    package let merchantInvoiceNumber: String?
+    package let createToken: Bool?
+    package let retrievalReferenceNumber: String?
 }
 
-public struct FiservTTPChargeResponseTransactionInteraction: Codable {
-    public let posEntryMode: String?
-    public let posConditionCode: String?
-    public let additionalPosInformation: FiservTTPChargeResponseAdditionalPosInformation?
-    public let authorizationCharacteristicsIndicator: String?
-    public let hostPosEntryMode: String?
-    public let hostPosConditionCode: String?
+package struct FiservTTPChargeResponseTransactionInteraction: Codable {
+    package let posEntryMode: String?
+    package let posConditionCode: String?
+    package let additionalPosInformation: FiservTTPChargeResponseAdditionalPosInformation?
+    package let authorizationCharacteristicsIndicator: String?
+    package let hostPosEntryMode: String?
+    package let hostPosConditionCode: String?
 }
 
-public struct FiservTTPChargeResponsePosHardwareAndSoftware: Codable {
+package struct FiservTTPChargeResponsePosHardwareAndSoftware: Codable {
     let softwareApplicationName: String
     let softwareVersionNumber: String
 }
 
-public struct FiservTTPChargeResponseAdditionalPosInformation: Codable {
-    public let stan: String?
-    public let dataEntrySource: String?
-    public let posFeatures: FiservTTPChargeResponsePosFeatures?
-    public let posHardwareAndSoftware : FiservTTPChargeResponsePosHardwareAndSoftware?
+package struct FiservTTPChargeResponseAdditionalPosInformation: Codable {
+    package let stan: String?
+    package let dataEntrySource: String?
+    package let posFeatures: FiservTTPChargeResponsePosFeatures?
+    package let posHardwareAndSoftware : FiservTTPChargeResponsePosHardwareAndSoftware?
 }
 
-public struct FiservTTPChargeResponsePosFeatures: Codable {
-    public let pinAuthenticationCapability: String?
-    public let terminalEntryCapability: String?
+package struct FiservTTPChargeResponsePosFeatures: Codable {
+    package let pinAuthenticationCapability: String?
+    package let terminalEntryCapability: String?
 }
 
-public struct FiservTTPChargeResponseMerchantDetails: Codable {
-    public let tokenType: String?
-    public let terminalId: String?
-    public let merchantId: String?
+package struct FiservTTPChargeResponseMerchantDetails: Codable {
+    package let tokenType: String?
+    package let terminalId: String?
+    package let merchantId: String?
 }
 
-public struct FiservTTPChargeResponseNetworkDetails: Codable {
-    public let network: FiservTTPChargeResponseNetwork?
-    public let debitNetworkId: String?
-    public let networkResponseCode: String?
-    public let cardLevelResultCode: String?
-    public let validationCode: String?
-    public let transactionIdentifier: String?
+package struct FiservTTPChargeResponseNetworkDetails: Codable {
+    package let network: FiservTTPChargeResponseNetwork?
+    package let debitNetworkId: String?
+    package let networkResponseCode: String?
+    package let cardLevelResultCode: String?
+    package let validationCode: String?
+    package let transactionIdentifier: String?
 }
 
-public struct FiservTTPChargeResponseNetwork: Codable {
-    public let network: String?
-    public let cardAuthenticationResultCode: String?
+package struct FiservTTPChargeResponseNetwork: Codable {
+    package let network: String?
+    package let cardAuthenticationResultCode: String?
 }
 
-public struct FiservTTPChargeResponseCardDetails: Codable {
-    public let recordType: String?
-    public let lowBin: String?
-    public let highBin: String?
-    public let binLength: String?
-    public let binDetailPan: String?
-    public let issuerBankName: String?
-    public let countryCode: String?
-    public let detailedCardProduct: String?
-    public let detailedCardIndicator: String?
-    public let pinSignatureCapability: String?
-    public let issuerUpdateYear: String?
-    public let issuerUpdateMonth: String?
-    public let issuerUpdateDay: String?
-    public let regulatorIndicator: String?
-    public let cardClass: String?
-    public let debitPinlessIndicator: [FiservTTPChargeResponseDebitPinlessIndicator]?
-    public let nonMoneyTransferOCTsDomestic: String?
-    public let nonMoneyTransferOCTsCrossBorder: String?
-    public let onlineGamblingOCTsDomestic: String?
-    public let onlineGamblingOCTsCrossBorder: String?
-    public let moneyTransferOCTsDomestic: String?
-    public let moneyTransferOCTsCrossBorder: String?
-    public let fastFundsDomesticMoneyTransfer: String?
-    public let fastFundsCrossBorderMoneyTransfer: String?
-    public let fastFundsDomesticNonMoneyTransfer: String?
-    public let fastFundsCrossBorderNonMoneyTransfer: String?
-    public let fastFundsDomesticGambling: String?
-    public let fastFundsCrossBorderGambling: String?
-    public let productId: String?
-    public let accountFundSource: String?
-    public let panLengthMin: String?
-    public let panLengthMax: String?
+package struct FiservTTPChargeResponseCardDetails: Codable {
+    package let recordType: String?
+    package let lowBin: String?
+    package let highBin: String?
+    package let binLength: String?
+    package let binDetailPan: String?
+    package let issuerBankName: String?
+    package let countryCode: String?
+    package let detailedCardProduct: String?
+    package let detailedCardIndicator: String?
+    package let pinSignatureCapability: String?
+    package let issuerUpdateYear: String?
+    package let issuerUpdateMonth: String?
+    package let issuerUpdateDay: String?
+    package let regulatorIndicator: String?
+    package let cardClass: String?
+    package let debitPinlessIndicator: [FiservTTPChargeResponseDebitPinlessIndicator]?
+    package let nonMoneyTransferOCTsDomestic: String?
+    package let nonMoneyTransferOCTsCrossBorder: String?
+    package let onlineGamblingOCTsDomestic: String?
+    package let onlineGamblingOCTsCrossBorder: String?
+    package let moneyTransferOCTsDomestic: String?
+    package let moneyTransferOCTsCrossBorder: String?
+    package let fastFundsDomesticMoneyTransfer: String?
+    package let fastFundsCrossBorderMoneyTransfer: String?
+    package let fastFundsDomesticNonMoneyTransfer: String?
+    package let fastFundsCrossBorderNonMoneyTransfer: String?
+    package let fastFundsDomesticGambling: String?
+    package let fastFundsCrossBorderGambling: String?
+    package let productId: String?
+    package let accountFundSource: String?
+    package let panLengthMin: String?
+    package let panLengthMax: String?
 }
 
-public struct FiservTTPChargeResponseDebitPinlessIndicator: Codable {
-    public let debitNetworkId: String?
-    public let pinnedPOS: String?
+package struct FiservTTPChargeResponseDebitPinlessIndicator: Codable {
+    package let debitNetworkId: String?
+    package let pinnedPOS: String?
 }
 

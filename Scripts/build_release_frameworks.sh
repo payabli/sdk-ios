@@ -3,8 +3,7 @@
 # build_release_frameworks.sh
 # ---------------------------
 # Builds the Payabli iOS SDK distribution XCFrameworks
-# (PayabliSDKCore, PayabliSDKTapToPay, PayabliSDKPayInPaymentFlow,
-# PayabliCardReaderCore) for
+# (PayabliSDKCore, PayabliSDKTapToPay, PayabliSDKPayInPaymentFlow) for
 # device + iOS Simulator slices, with distribution-mode settings and a
 # pinned SOURCE_DATE_EPOCH for reproducible zips.
 #
@@ -29,7 +28,6 @@
 #     payabli-ios-sdk-core-${VERSION}.zip
 #     payabli-ios-sdk-taptopay-${VERSION}.zip
 #     payabli-ios-sdk-payin-payment-flow-${VERSION}.zip
-#     payabli-ios-sdk-card-reader-core-${VERSION}.zip
 #     checksums.txt           (one sha256 per zip, space-separated lines)
 #     THIRD_PARTY_LICENSES.txt  (bundled copy for the upload/publish step)
 #
@@ -73,7 +71,6 @@ SCHEMES=(
     "PayabliSDKCore"
     "PayabliSDKTapToPay"
     "PayabliSDKPayInPaymentFlow"
-    "PayabliCardReaderCore"
 )
 
 # Filename slug (without `payabli-ios-sdk-` prefix), mapped by scheme name.
@@ -82,7 +79,6 @@ slug_for() {
         PayabliSDKCore)          echo "core" ;;
         PayabliSDKTapToPay)      echo "taptopay" ;;
         PayabliSDKPayInPaymentFlow) echo "payin-payment-flow" ;;
-        PayabliCardReaderCore)   echo "card-reader-core" ;;
         *) echo "error: unknown scheme '$1'" >&2; exit 1 ;;
     esac
 }

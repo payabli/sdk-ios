@@ -12,7 +12,6 @@
 #   CORE_SHA256              sha256 of payabli-ios-sdk-core-${VERSION}.zip
 #   TAPTOPAY_SHA256          sha256 of payabli-ios-sdk-taptopay-${VERSION}.zip
 #   PAYIN_PAYMENT_FLOW_SHA256 sha256 of payabli-ios-sdk-payin-payment-flow-${VERSION}.zip
-#   CARD_READER_CORE_SHA256  sha256 of payabli-ios-sdk-card-reader-core-${VERSION}.zip
 #
 # PayInPaymentFlow is rendered as an opt-in public product using
 # PAYIN_PAYMENT_FLOW_SHA256. The older PAYIN_SHA256 placeholder is no longer
@@ -37,7 +36,7 @@ REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$REPO_ROOT"
 
 missing=()
-for var in VERSION S3_PUBLIC_HOST CORE_SHA256 TAPTOPAY_SHA256 PAYIN_PAYMENT_FLOW_SHA256 CARD_READER_CORE_SHA256; do
+for var in VERSION S3_PUBLIC_HOST CORE_SHA256 TAPTOPAY_SHA256 PAYIN_PAYMENT_FLOW_SHA256; do
     if [[ -z "${!var:-}" ]]; then
         missing+=("$var")
     fi
@@ -54,7 +53,7 @@ mkdir -p "$OUTPUT_DIR"
 
 # envsubst substitutes only the variables we pass, so unrelated `$`-strings
 # inside the templates are left intact.
-VARS='${VERSION} ${S3_PUBLIC_HOST} ${CORE_SHA256} ${TAPTOPAY_SHA256} ${PAYIN_PAYMENT_FLOW_SHA256} ${CARD_READER_CORE_SHA256}'
+VARS='${VERSION} ${S3_PUBLIC_HOST} ${CORE_SHA256} ${TAPTOPAY_SHA256} ${PAYIN_PAYMENT_FLOW_SHA256}'
 
 render() {
     local template="$1" output="$2"
