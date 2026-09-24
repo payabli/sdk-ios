@@ -4,6 +4,10 @@ name: Release
 # `PayabliCore.version` from main, after the suite passes, on the commit that was tested, and gives it a
 # GitHub Release carrying the XCFrameworks for integrators who do not use SwiftPM. Only a release is ever
 # tagged.
+#
+# Two jobs. `build` runs the repository's tests and build with a read-only token and no secret. `publish`
+# runs on a fresh runner in the `release` environment, runs nothing from the build, and is the only job that
+# can read the deploy key.
 
 on:
   workflow_dispatch:
@@ -18,19 +22,14 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  release:
-    name: Publish a release
+  build:
+    name: Build and test the release
     runs-on: macos-15
-    # Its required reviewers are who may release, it deploys from main only, and it holds the one key the
-    # tag ruleset lets create a tag.
-    environment: release
     permissions:
-      contents: write
+      contents: read
       actions: read
-
-    env:
-      # Through the environment, so the text is never parsed as shell.
-      RELEASE_NOTES: ${{ inputs.release_notes }}
+    outputs:
+      version: ${{ steps.version.outputs.version }}
 
     steps:
       # Nothing is published from a commit whose CI has not passed, and a run still in progress has not.
@@ -45,17 +44,6 @@ jobs:
             exit 1
           fi
 
-      - name: Check the release key is provisioned
-        env:
-          RELEASE_DEPLOY_KEY: ${{ secrets.RELEASE_DEPLOY_KEY }}
-        run: |
-          if [ -z "$RELEASE_DEPLOY_KEY" ]; then
-            echo "::error::the release environment has no RELEASE_DEPLOY_KEY secret"
-            exit 1
-          fi
-
-      # No credential is left in `.git/config`, so the code under test cannot push. Only the step that
-      # publishes is handed one.
       - name: Checkout
         uses: actions/checkout@v4
         with:
@@ -63,9 +51,11 @@ jobs:
           persist-credentials: false
 
       - name: Check the version
+        id: version
         run: |
           VERSION="$(.github/scripts/release-version.sh "$GITHUB_REF")"
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "tagging $VERSION"
 
       - name: Check tag does not already exist
@@ -107,6 +97,68 @@ jobs:
       - name: Build the XCFrameworks
         timeout-minutes: 45
         run: ./Scripts/build_release_frameworks.sh
+
+      - name: Hand the release files to the publish job
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-files
+          path: |
+            build/release/payabli-ios-sdk-${{ steps.version.outputs.version }}.zip
+            build/release/checksums.txt
+            build/release/THIRD_PARTY_LICENSES.txt
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    name: Publish a release
+    needs: build
+    runs-on: ubuntu-latest
+    # Its required reviewers are who may release, it deploys from main only, and it holds the one key the
+    # tag ruleset lets create a tag.
+    environment: release
+    permissions:
+      contents: write
+
+    env:
+      # Through the environment, so the text is never parsed as shell.
+      RELEASE_NOTES: ${{ inputs.release_notes }}
+      BUILT_VERSION: ${{ needs.build.outputs.version }}
+
+    steps:
+      - name: Check the release key is provisioned
+        env:
+          RELEASE_DEPLOY_KEY: ${{ secrets.RELEASE_DEPLOY_KEY }}
+        run: |
+          if [ -z "$RELEASE_DEPLOY_KEY" ]; then
+            echo "::error::the release environment has no RELEASE_DEPLOY_KEY secret"
+            exit 1
+          fi
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      # Derived again here rather than taken from the build job, whose steps ran the repository's code.
+      - name: Check the version
+        run: |
+          VERSION="$(.github/scripts/release-version.sh "$GITHUB_REF")"
+          if [ "$VERSION" != "$BUILT_VERSION" ]; then
+            echo "::error::the build reported '$BUILT_VERSION' and the tree declares '$VERSION'"
+            exit 1
+          fi
+          if git rev-parse -q --verify "refs/tags/$VERSION" > /dev/null; then
+            echo "::error::tag $VERSION already exists"
+            exit 1
+          fi
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+
+      - name: Download the release files
+        uses: actions/download-artifact@v4
+        with:
+          name: release-files
+          path: build/release
 
       # A draft carries the assets and needs no tag. The tag is then pushed with the deploy key, the only
       # identity the tag ruleset lets create one, and the draft is published onto it. A failure before the

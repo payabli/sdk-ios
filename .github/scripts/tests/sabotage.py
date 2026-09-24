@@ -519,11 +519,13 @@ MUTATIONS = [
         "W12e", "workflows",
     ),
     Mutation(
-        "the release tags a version nobody checked",
+        "the publish job tags whatever version the build reported",
         RELEASE_YML,
-        'VERSION="$(.github/scripts/release-version.sh "$GITHUB_REF")"',
-        'VERSION="0.1.0"',
-        "W15", "workflows",
+        '          VERSION="$(.github/scripts/release-version.sh "$GITHUB_REF")"\n'
+        '          if [ "$VERSION" != "$BUILT_VERSION" ]; then',
+        '          VERSION="$BUILT_VERSION"\n'
+        '          if [ "$VERSION" != "$BUILT_VERSION" ]; then',
+        "W15m", "workflows",
     ),
     Mutation(
         "an input is interpolated into the release's tag command",
@@ -545,6 +547,17 @@ MUTATIONS = [
     Mutation(
         "the release runs outside the environment that says who may release",
         RELEASE_YML, "    environment: release\n", "", "W15i", "workflows",
+    ),
+    Mutation(
+        "the key and the build share a runner again",
+        RELEASE_YML, "      - name: Download the release files\n",
+        "      - name: Rebuild here\n        run: ./Scripts/build_release_frameworks.sh\n\n"
+        "      - name: Download the release files\n",
+        "W15l", "workflows",
+    ),
+    Mutation(
+        "the publish job trusts the version the build reported",
+        RELEASE_YML, '          if [ "$VERSION" != "$BUILT_VERSION" ]; then', "          if false; then", "W15m", "workflows",
     ),
     Mutation(
         "the tag is pushed to whatever host answers first",
@@ -574,7 +587,8 @@ MUTATIONS = [
     ),
     Mutation(
         "the release leaves the push credential where the tested code can read it",
-        RELEASE_YML, "          persist-credentials: false\n", "          persist-credentials: true\n",
+        RELEASE_YML, "          persist-credentials: false\n\n      - name: Check the version\n        id: version\n",
+        "          persist-credentials: true\n\n      - name: Check the version\n        id: version\n",
         "W15f", "workflows",
     ),
     Mutation(

@@ -1312,13 +1312,15 @@ def test_workflows() -> None:
     def first(needle: str) -> int:
         return next((index for index, run in enumerate(runs) if needle in run), -1)
 
-    ci_at = first("actions/workflows/ci.yml/runs?head_sha=$GITHUB_SHA")
-    ci_run = runs[ci_at] if ci_at != -1 else ""
-    jobs = list((release.get("jobs") or {}).values())
+    release_jobs = release.get("jobs") or {}
+    build_job, publish_job = release_jobs.get("build") or {}, release_jobs.get("publish") or {}
+    build_runs = [str(step.get("run", "")) for step in build_job.get("steps") or []]
+    publish_runs = [str(step.get("run", "")) for step in publish_job.get("steps") or []]
+    ci_run = build_runs[0] if build_runs else ""
     check("W15h the release starts only once CI on the commit has completed with success",
-          ci_at == 0 and '!= "completed success"' in ci_run and re.search(r"\bexit [1-9]", ci_run) is not None
-          and all((job.get("permissions") or {}).get("actions") == "read" for job in jobs),
-          (ci_at, ci_run[:160]))
+          "actions/workflows/ci.yml/runs?head_sha=$GITHUB_SHA" in ci_run and '!= "completed success"' in ci_run
+          and re.search(r"\bexit [1-9]", ci_run) is not None
+          and (build_job.get("permissions") or {}).get("actions") == "read", ci_run[:160])
 
     gate_at = first("release-version.sh ")
     test_at, tag_at = first("xcodebuild test"), first("gh release create")
@@ -1331,8 +1333,21 @@ def test_workflows() -> None:
     check("W15c the release tags the commit that was tested",
           re.search(r'gh release create "\$VERSION" --draft --target "\$GITHUB_SHA"', tag_run) is not None
           and re.search(r'git tag -a "\$VERSION" -m "[^"]*" "\$GITHUB_SHA"', tag_run) is not None, tag_run[:200])
-    check("W15i the release runs in the release environment, whose reviewers are who may release",
-          all(job.get("environment") == "release" for job in jobs), [job.get("environment") for job in jobs])
+    check("W15i only the publish job runs in the release environment, and the build job cannot write",
+          publish_job.get("environment") == "release" and "environment" not in build_job
+          and (build_job.get("permissions") or {}).get("contents") == "read",
+          (build_job.get("environment"), publish_job.get("environment"), build_job.get("permissions")))
+    # The deploy key is readable only by a job that runs none of the repository's build: code the tests or
+    # the build ran could otherwise put its own git, gh or ssh ahead on PATH and be handed the key.
+    publish_text = yaml.safe_dump(publish_job)
+    build_text = yaml.safe_dump(build_job)
+    runs_build = [needle for needle in ("xcodebuild", "build_release_frameworks.sh", "ios-toolchain",
+                                        "hardware-only-skips.sh", "Scripts/") if needle in publish_text]
+    check("W15l the job holding the deploy key needs the build and runs none of it",
+          publish_job.get("needs") == "build" and not runs_build and "secrets." not in build_text, runs_build)
+    check("W15m the publish job derives the version itself and refuses one the build reported differently",
+          any('release-version.sh "$GITHUB_REF"' in run and '!= "$BUILT_VERSION"' in run for run in publish_runs),
+          [run[:80] for run in publish_runs])
     # The tag ruleset lets only the deploy key create a tag, so the push goes through it, to a host whose
     # key came from GitHub's API rather than from the first connection.
     text = RELEASE_WORKFLOW.read_text()
