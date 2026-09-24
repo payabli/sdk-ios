@@ -31,6 +31,7 @@ final class PayInPaymentFlowTokenStorageClient: Sendable {
             throw PayabliPayInPaymentFlowTokenStorageError.invalidInput("Entrypoint is required.")
         }
         try paymentMethod.validate(options.validation)
+        let storedMethod = paymentMethod.storedMethodType
 
         let request = try addMethodRequest(
             entryPoint: entry,
@@ -66,7 +67,7 @@ final class PayInPaymentFlowTokenStorageClient: Sendable {
             throw PayabliPayInPaymentFlowTokenStorageError.saveFailed(failure)
         }
         try mapPayabliHTTPError(response: response)
-        return try decodeStoredPaymentMethod(from: response, stored: paymentMethod)
+        return try decodeStoredPaymentMethod(from: response, method: storedMethod)
     }
 
     /// Builds the request. The transport's chain attaches the credential.
@@ -99,7 +100,7 @@ final class PayInPaymentFlowTokenStorageClient: Sendable {
 
     private func decodeStoredPaymentMethod(
         from response: PayabliResponse,
-        stored paymentMethod: PayabliPayInPaymentFlowMethodInput
+        method: PayabliPayInPaymentFlowStoredMethodType
     ) throws -> PayabliPayInPaymentFlowStoredPaymentMethod {
         let decoder = JSONDecoder()
         do {
@@ -110,7 +111,7 @@ final class PayInPaymentFlowTokenStorageClient: Sendable {
             }
             return PayabliPayInPaymentFlowStoredPaymentMethod(
                 storedMethodId: decoded.responseData?.referenceId,
-                method: paymentMethod.storedMethodType,
+                method: method,
                 methodReferenceId: decoded.responseData?.methodReferenceId,
                 resultCode: decoded.responseData?.resultCode,
                 resultText: decoded.responseData?.resultText,
