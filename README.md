@@ -175,7 +175,7 @@ https://github.com/payabli/sdk-ios.git
 Alternatively, declare the dependency in `Package.swift`:
 
 ```swift
-.package(url: "https://github.com/payabli/sdk-ios.git", branch: "main")
+.package(url: "https://github.com/payabli/sdk-ios.git", exact: "0.0.1")
 ```
 
 Link the required product. Most applications only need
@@ -194,6 +194,13 @@ opt-in PayIn payment flow component:
 ```swift
 .product(name: "PayabliSDKPayInPaymentFlow", package: "sdk-ios")
 ```
+
+### XCFrameworks
+
+Each [GitHub Release](https://github.com/payabli/sdk-ios/releases) also carries
+`payabli-ios-sdk-<version>.zip`, with an XCFramework for each module, for projects that
+do not use Swift Package Manager. Embed `PayabliSDKCore.xcframework` and the modules the
+app uses; `checksums.txt` on the same Release holds the zip's sha256.
 
 See [`Documentation/PayInPaymentFlowOverview.md`](Documentation/PayInPaymentFlowOverview.md)
 for the complete feature reference and

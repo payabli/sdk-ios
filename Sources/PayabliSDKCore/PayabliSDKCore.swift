@@ -17,6 +17,6 @@ public enum PayabliCore {
     /// The version this source tree releases as. A release tag must equal it, and it moves to the next
     /// version once that release is cut.
     public static var version: String {
-        "0.1.0"
+        "0.0.1"
     }
 }
