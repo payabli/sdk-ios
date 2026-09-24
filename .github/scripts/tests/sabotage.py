@@ -549,6 +549,24 @@ MUTATIONS = [
         RELEASE_YML, "    environment: release\n", "", "W15i", "workflows",
     ),
     Mutation(
+        "a published release is republished",
+        RELEASE_YML, '              echo "::error::release $VERSION is already published"\n              exit 1\n',
+        "              :\n", "W15n", "workflows",
+    ),
+    Mutation(
+        "a tag on another commit is taken for this release",
+        RELEASE_YML,
+        '          fi\n          tagged="$(git rev-parse -q --verify "refs/tags/$VERSION^{commit}" || true)"\n'
+        '          if [ -n "$tagged" ] && [ "$tagged" != "$GITHUB_SHA" ]; then',
+        '          fi\n          tagged="$(git rev-parse -q --verify "refs/tags/$VERSION^{commit}" || true)"\n'
+        '          if false; then',
+        "W15n", "workflows",
+    ),
+    Mutation(
+        "a resumed run pushes its tag a second time",
+        RELEASE_YML, 'if [ -z "$TAGGED" ]; then', "if true; then", "W15n", "workflows",
+    ),
+    Mutation(
         "the key and the build share a runner again",
         RELEASE_YML, "      - name: Download the release files\n",
         "      - name: Rebuild here\n        run: ./Scripts/build_release_frameworks.sh\n\n"
@@ -582,7 +600,7 @@ MUTATIONS = [
     ),
     Mutation(
         "the release builds the XCFrameworks and ships none of them",
-        RELEASE_YML, '            "$bundle" build/release/checksums.txt', "            build/release/checksums.txt",
+        RELEASE_YML, 'assets=("$bundle" build/release/checksums.txt', "assets=(build/release/checksums.txt",
         "W15g", "workflows",
     ),
     Mutation(

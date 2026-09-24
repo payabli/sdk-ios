@@ -58,10 +58,12 @@ jobs:
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "tagging $VERSION"
 
-      - name: Check tag does not already exist
+      # A tag on this commit is a run that failed after pushing it, and is resumed.
+      - name: Check an existing tag names this commit
         run: |
-          if git rev-parse -q --verify "refs/tags/$VERSION" > /dev/null; then
-            echo "::error::tag $VERSION already exists"
+          tagged="$(git rev-parse -q --verify "refs/tags/$VERSION^{commit}" || true)"
+          if [ -n "$tagged" ] && [ "$tagged" != "$GITHUB_SHA" ]; then
+            echo "::error::tag $VERSION already names $tagged, not $GITHUB_SHA"
             exit 1
           fi
 
@@ -148,11 +150,13 @@ jobs:
             echo "::error::the build reported '$BUILT_VERSION' and the tree declares '$VERSION'"
             exit 1
           fi
-          if git rev-parse -q --verify "refs/tags/$VERSION" > /dev/null; then
-            echo "::error::tag $VERSION already exists"
+          tagged="$(git rev-parse -q --verify "refs/tags/$VERSION^{commit}" || true)"
+          if [ -n "$tagged" ] && [ "$tagged" != "$GITHUB_SHA" ]; then
+            echo "::error::tag $VERSION already names $tagged, not $GITHUB_SHA"
             exit 1
           fi
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "TAGGED=$tagged" >> "$GITHUB_ENV"
 
       - name: Download the release files
         uses: actions/download-artifact@v4
@@ -161,14 +165,15 @@ jobs:
           path: build/release
 
       # A draft carries the assets and needs no tag. The tag is then pushed with the deploy key, the only
-      # identity the tag ruleset lets create one, and the draft is published onto it. A failure before the
-      # push leaves at most a draft; one after it leaves a tag whose draft `gh release edit` publishes.
+      # identity the tag ruleset lets create one, and the draft is published onto it. A run that failed part
+      # way is resumed: a draft on this commit gets its assets again, a tag on this commit is not pushed
+      # twice, and a published release or a draft on another commit is refused.
       - name: Publish the release
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_DEPLOY_KEY: ${{ secrets.RELEASE_DEPLOY_KEY }}
         run: |
-          previous="$(git tag --list '[0-9]*' --sort=-version:refname | head -n 1 || true)"
+          previous="$(git tag --list '[0-9]*' --sort=-version:refname | grep -vx -- "$VERSION" | head -n 1 || true)"
           {
             if [ -n "$RELEASE_NOTES" ]; then
               printf '%s\n\n' "$RELEASE_NOTES"
@@ -185,9 +190,31 @@ jobs:
             echo "::error::no $bundle"
             exit 1
           fi
-          gh release create "$VERSION" --draft --target "$GITHUB_SHA" \
-            --title "Payabli iOS SDK $VERSION" --notes-file release-notes.md \
-            "$bundle" build/release/checksums.txt build/release/THIRD_PARTY_LICENSES.txt
+          assets=("$bundle" build/release/checksums.txt build/release/THIRD_PARTY_LICENSES.txt)
+          if ! existing="$(gh release view "$VERSION" --json isDraft,targetCommitish \
+              --jq '"\(.isDraft) \(.targetCommitish)"' 2>&1)"; then
+            case "$existing" in
+              *"release not found"*) existing="" ;;
+              *) echo "::error::could not read release $VERSION: $existing"; exit 1 ;;
+            esac
+          fi
+          case "$existing" in
+            "")
+              gh release create "$VERSION" --draft --target "$GITHUB_SHA" \
+                --title "Payabli iOS SDK $VERSION" --notes-file release-notes.md "${assets[@]}"
+              ;;
+            "true $GITHUB_SHA")
+              gh release upload "$VERSION" --clobber "${assets[@]}"
+              ;;
+            "false "*)
+              echo "::error::release $VERSION is already published"
+              exit 1
+              ;;
+            *)
+              echo "::error::draft $VERSION targets '${existing#* }', not $GITHUB_SHA; delete it"
+              exit 1
+              ;;
+          esac
 
           # GitHub's host keys come from its API over HTTPS, so the SSH connection is verified rather than
           # trusted on first use.
@@ -199,8 +226,10 @@ jobs:
           gh api meta --jq '.ssh_keys[] | "github.com " + .' > "$hosts"
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git tag -a "$VERSION" -m "Payabli iOS SDK $VERSION" "$GITHUB_SHA"
-          GIT_SSH_COMMAND="ssh -i $key -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$hosts" \
-            git push "git@github.com:$GITHUB_REPOSITORY.git" "refs/tags/$VERSION"
+          if [ -z "$TAGGED" ]; then
+            git tag -a "$VERSION" -m "Payabli iOS SDK $VERSION" "$GITHUB_SHA"
+            GIT_SSH_COMMAND="ssh -i $key -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$hosts" \
+              git push "git@github.com:$GITHUB_REPOSITORY.git" "refs/tags/$VERSION"
+          fi
 
           gh release edit "$VERSION" --draft=false

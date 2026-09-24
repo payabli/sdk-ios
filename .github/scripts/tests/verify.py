@@ -1368,6 +1368,15 @@ def test_workflows() -> None:
     check("W15f the release leaves no credential in .git/config for the code under test",
           bool(checkouts) and all((step.get("with") or {}).get("persist-credentials") is False for step in checkouts),
           [(step.get("with") or {}).get("persist-credentials") for step in checkouts])
+    # A run that failed part way is resumed rather than blocked by what it left: a draft on this commit is
+    # reused, a tag on this commit is not pushed twice, and a published release or a tag elsewhere is refused.
+    check("W15n a failed release resumes, and refuses what it cannot resume",
+          'gh release upload "$VERSION" --clobber' in tag_run and '"true $GITHUB_SHA")' in tag_run
+          and re.search(r'"false "\*\)\s*\n\s*echo "::error::release \$VERSION is already published"\s*\n\s*exit 1',
+                        tag_run) is not None
+          and 'if [ -z "$TAGGED" ]; then' in tag_run
+          and any('[ "$tagged" != "$GITHUB_SHA" ]' in run and "exit 1" in run for run in publish_runs),
+          tag_run[:120])
     triggers = release.get("on", release.get(True)) or {}
     check("W15e the release runs only when dispatched", set(triggers) == {"workflow_dispatch"}, sorted(triggers))
 
