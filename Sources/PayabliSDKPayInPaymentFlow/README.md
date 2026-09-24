@@ -64,6 +64,7 @@ PayabliPayInPaymentFlowView(
         // Keep the identifiers, do not log them: a stored-method id is a token.
         if let storedMethod = result.storedPaymentMethod {
             storedMethodId = storedMethod.storedMethodId
+            storedMethodType = storedMethod.method
         } else {
             paymentTransId = result.transaction?.paymentTransId
         }

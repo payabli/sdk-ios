@@ -128,6 +128,7 @@ final class CardNotPresentOnDeviceTests: XCTestCase {
         // output would carry a way to charge the card again.
         let token = try XCTUnwrap(stored.storedMethodId ?? stored.methodReferenceId, "no stored token came back")
         XCTAssertFalse(token.isEmpty)
+        XCTAssertEqual(stored.method, .card)
         LiveEnvironment.report("PAYABLI_STORED_METHOD env=\(named.name) returned=yes")
     }
 
@@ -245,7 +246,7 @@ final class CardNotPresentOnDeviceTests: XCTestCase {
 
     // MARK: - Stored card
 
-    /// A card stored in this run, charged by its identifier.
+    /// A card stored in this run, charged as the method and identifier the store returned.
     private func storedCard(on flow: PayabliPayInPaymentFlow) async throws -> PayabliPayInPaymentFlowPaymentMethod {
         let stored = try await flow.addCard(
             try card(),
@@ -255,7 +256,7 @@ final class CardNotPresentOnDeviceTests: XCTestCase {
             )
         )
         let storedMethodId = try XCTUnwrap(stored.storedMethodId, "no stored method came back")
-        return .stored(PayabliPayInPaymentFlowStoredMethod(method: .card, storedMethodId: storedMethodId))
+        return .stored(PayabliPayInPaymentFlowStoredMethod(method: stored.method, storedMethodId: storedMethodId))
     }
 
     /// A stored card is authorized by its identifier, then voided.

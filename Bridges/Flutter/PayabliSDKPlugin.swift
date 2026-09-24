@@ -149,19 +149,21 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
     // MARK: - initialize
 
     private func handleInitialize(result: @escaping FlutterResult) {
-        guard let ttp else {
-            result(FlutterError(
-                code: "NOT_CONFIGURED",
-                message: "Call configure() before initialize()",
-                details: nil
-            ))
-            return
-        }
-        ttp.initialize { error in
-            if let error {
-                result(error.toFlutterError(defaultCode: "INIT_FAILED"))
-            } else {
-                result(nil)
+        Task { @MainActor in
+            guard let ttp else {
+                result(FlutterError(
+                    code: "NOT_CONFIGURED",
+                    message: "Call configure() before initialize()",
+                    details: nil
+                ))
+                return
+            }
+            ttp.initialize { error in
+                if let error {
+                    result(error.toFlutterError(defaultCode: "INIT_FAILED"))
+                } else {
+                    result(nil)
+                }
             }
         }
     }
@@ -169,64 +171,66 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
     // MARK: - charge
 
     private func handleCharge(_ arguments: Any?, result: @escaping FlutterResult) {
-        guard let ttp else {
-            result(FlutterError(
-                code: "NOT_CONFIGURED",
-                message: "Call configure() before charge()",
-                details: nil
-            ))
-            return
-        }
-        guard let args = arguments as? [String: Any] else {
-            result(FlutterError(code: "INVALID_ARGS", message: "Missing arguments", details: nil))
-            return
-        }
-        guard let pdDict = args["paymentDetails"] as? [String: Any],
-              let amount = pdDict["amount"] as? Double
-        else {
-            result(FlutterError(
-                code: "INVALID_ARGS",
-                message: "Missing paymentDetails.amount",
-                details: nil
-            ))
-            return
-        }
-
-        let typeRaw = (args["type"] as? Int) ?? 0
-        let serviceFee = (pdDict["serviceFee"] as? Double) ?? 0
-        // Pass through nil so the SDK omits `currency` from `/initiate` and the
-        // backend authorizes in the merchant's configured processor currency.
-        let currency = pdDict["currency"] as? String
-        let paymentDescription = pdDict["paymentDescription"] as? String
-
-        let paymentDetails = PayabliTTPPaymentDetailsObjC(
-            amount: NSDecimalNumber(value: amount),
-            serviceFee: NSDecimalNumber(value: serviceFee),
-            currency: currency,
-            paymentDescription: paymentDescription
-        )
-
-        let customer = (args["customer"] as? [String: Any]).map(Self.customerObjC(from:))
-        let invoice = (args["invoice"] as? [String: Any]).map(Self.invoiceObjC(from:))
-        let orderDescription = args["orderDescription"] as? String
-
-        ttp.charge(
-            type: typeRaw,
-            paymentDetails: paymentDetails,
-            customer: customer,
-            invoice: invoice,
-            orderDescription: orderDescription
-        ) { txnResult, error in
-            if let txnResult {
-                result(["paymentTransId": txnResult.paymentTransId])
-            } else if let error {
-                result(error.toFlutterError(defaultCode: "CHARGE_FAILED"))
-            } else {
+        Task { @MainActor in
+            guard let ttp else {
                 result(FlutterError(
-                    code: "CHARGE_FAILED",
-                    message: "Charge returned neither result nor error",
+                    code: "NOT_CONFIGURED",
+                    message: "Call configure() before charge()",
                     details: nil
                 ))
+                return
+            }
+            guard let args = arguments as? [String: Any] else {
+                result(FlutterError(code: "INVALID_ARGS", message: "Missing arguments", details: nil))
+                return
+            }
+            guard let pdDict = args["paymentDetails"] as? [String: Any],
+                  let amount = pdDict["amount"] as? Double
+            else {
+                result(FlutterError(
+                    code: "INVALID_ARGS",
+                    message: "Missing paymentDetails.amount",
+                    details: nil
+                ))
+                return
+            }
+
+            let typeRaw = (args["type"] as? Int) ?? 0
+            let serviceFee = (pdDict["serviceFee"] as? Double) ?? 0
+            // Pass through nil so the SDK omits `currency` from `/initiate` and the
+            // backend authorizes in the merchant's configured processor currency.
+            let currency = pdDict["currency"] as? String
+            let paymentDescription = pdDict["paymentDescription"] as? String
+
+            let paymentDetails = PayabliTTPPaymentDetailsObjC(
+                amount: NSDecimalNumber(value: amount),
+                serviceFee: NSDecimalNumber(value: serviceFee),
+                currency: currency,
+                paymentDescription: paymentDescription
+            )
+
+            let customer = (args["customer"] as? [String: Any]).map(Self.customerObjC(from:))
+            let invoice = (args["invoice"] as? [String: Any]).map(Self.invoiceObjC(from:))
+            let orderDescription = args["orderDescription"] as? String
+
+            ttp.charge(
+                type: typeRaw,
+                paymentDetails: paymentDetails,
+                customer: customer,
+                invoice: invoice,
+                orderDescription: orderDescription
+            ) { txnResult, error in
+                if let txnResult {
+                    result(["paymentTransId": txnResult.paymentTransId])
+                } else if let error {
+                    result(error.toFlutterError(defaultCode: "CHARGE_FAILED"))
+                } else {
+                    result(FlutterError(
+                        code: "CHARGE_FAILED",
+                        message: "Charge returned neither result nor error",
+                        details: nil
+                    ))
+                }
             }
         }
     }
@@ -234,29 +238,31 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
     // MARK: - activateDevice
 
     private func handleActivateDevice(_ arguments: Any?, result: @escaping FlutterResult) {
-        guard let ttp else {
-            result(FlutterError(
-                code: "NOT_CONFIGURED",
-                message: "Call configure() before activateDevice()",
-                details: nil
-            ))
-            return
-        }
-        guard let args = arguments as? [String: Any],
-              let activationCode = args["activationCode"] as? String
-        else {
-            result(FlutterError(
-                code: "INVALID_ARGS",
-                message: "Missing activationCode",
-                details: nil
-            ))
-            return
-        }
-        ttp.activateDevice(activationCode: activationCode) { error in
-            if let error {
-                result(error.toFlutterError(defaultCode: "ACTIVATION_FAILED"))
-            } else {
-                result(nil)
+        Task { @MainActor in
+            guard let ttp else {
+                result(FlutterError(
+                    code: "NOT_CONFIGURED",
+                    message: "Call configure() before activateDevice()",
+                    details: nil
+                ))
+                return
+            }
+            guard let args = arguments as? [String: Any],
+                  let activationCode = args["activationCode"] as? String
+            else {
+                result(FlutterError(
+                    code: "INVALID_ARGS",
+                    message: "Missing activationCode",
+                    details: nil
+                ))
+                return
+            }
+            ttp.activateDevice(activationCode: activationCode) { error in
+                if let error {
+                    result(error.toFlutterError(defaultCode: "ACTIVATION_FAILED"))
+                } else {
+                    result(nil)
+                }
             }
         }
     }
@@ -267,19 +273,21 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
     /// unavailable, so a Dart caller cannot read "the reader could not be asked"
     /// as "the merchant declined".
     private func handleAreTermsAccepted(result: @escaping FlutterResult) {
-        guard let ttp else {
-            result(FlutterError(
-                code: "NOT_CONFIGURED",
-                message: "Call configure() before areTermsAccepted()",
-                details: nil
-            ))
-            return
-        }
-        ttp.areTermsAccepted { accepted, error in
-            if let error {
-                result(error.toFlutterError(defaultCode: "TERMS_CHECK_FAILED"))
-            } else {
-                result(accepted)
+        Task { @MainActor in
+            guard let ttp else {
+                result(FlutterError(
+                    code: "NOT_CONFIGURED",
+                    message: "Call configure() before areTermsAccepted()",
+                    details: nil
+                ))
+                return
+            }
+            ttp.areTermsAccepted { accepted, error in
+                if let error {
+                    result(error.toFlutterError(defaultCode: "TERMS_CHECK_FAILED"))
+                } else {
+                    result(accepted)
+                }
             }
         }
     }
@@ -290,19 +298,21 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
     /// sheet appeared nor that the merchant accepted. `areTermsAccepted` answers
     /// where the merchant stands.
     private func handlePresentTerms(result: @escaping FlutterResult) {
-        guard let ttp else {
-            result(FlutterError(
-                code: "NOT_CONFIGURED",
-                message: "Call configure() before presentTerms()",
-                details: nil
-            ))
-            return
-        }
-        ttp.presentTerms { error in
-            if let error {
-                result(error.toFlutterError(defaultCode: "TERMS_PRESENT_FAILED"))
-            } else {
-                result(nil)
+        Task { @MainActor in
+            guard let ttp else {
+                result(FlutterError(
+                    code: "NOT_CONFIGURED",
+                    message: "Call configure() before presentTerms()",
+                    details: nil
+                ))
+                return
+            }
+            ttp.presentTerms { error in
+                if let error {
+                    result(error.toFlutterError(defaultCode: "TERMS_PRESENT_FAILED"))
+                } else {
+                    result(nil)
+                }
             }
         }
     }
@@ -471,6 +481,7 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
 
     // MARK: - Event subscription
 
+    @MainActor
     private func subscribeEvents(on ttp: PayabliTTP) {
         let sinkBox = self.eventSink
         eventToken = ttp.addEventListener { code, payload in
@@ -522,6 +533,7 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
 
     private static func storedPaymentMethodMap(_ method: PayabliPayInPaymentFlowStoredPaymentMethod) -> [String: Any] {
         var map: [String: Any] = [
+            "method": method.method.rawValue,
             "responseText": method.responseText,
             "apiResponse": dictionary(from: method.apiResponse)
         ]

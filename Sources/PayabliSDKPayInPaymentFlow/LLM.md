@@ -178,6 +178,7 @@ PayabliPayInPaymentFlowView(
         case .storedPaymentMethod:
             // A stored-method id is a token: keep it, do not log it.
             storedMethodId = result.storedPaymentMethod?.storedMethodId
+            storedMethodType = result.storedPaymentMethod?.method
         case .transaction:
             paymentTransId = result.transaction?.paymentTransId
         }
@@ -720,6 +721,7 @@ Custom fonts:
 Stored-method result fields:
 
 - `storedMethodId`
+- `method`, the `PayabliPayInPaymentFlowStoredMethodType` to charge it as
 - `methodReferenceId`
 - `resultCode`
 - `resultText`

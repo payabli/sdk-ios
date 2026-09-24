@@ -142,27 +142,6 @@ public enum PayabliPayInPaymentFlowACHSecCode: String, CaseIterable, Identifiabl
     }
 }
 
-public struct PayabliPayInPaymentFlowValidation: Sendable {
-    public var requiresLuhnCheck: Bool
-    public var validatesACHRoutingChecksum: Bool
-
-    public init(
-        requiresLuhnCheck: Bool = true,
-        validatesACHRoutingChecksum: Bool = true
-    ) {
-        self.requiresLuhnCheck = requiresLuhnCheck
-        self.validatesACHRoutingChecksum = validatesACHRoutingChecksum
-    }
-
-    public static let `default` = PayabliPayInPaymentFlowValidation()
-}
-
-extension PayabliPayInPaymentFlowValidation {
-    var payabliViewModelSignature: String {
-        "luhn:\(requiresLuhnCheck),achRouting:\(validatesACHRoutingChecksum)"
-    }
-}
-
 public enum PayabliPayInPaymentFlowTokenStorageError: PayabliError {
     case invalidInput(String)
     case missingAccessToken
@@ -572,6 +551,7 @@ public struct PayabliPayInPaymentFlowTokenStorageAPIResponse: Codable, Sendable,
 
 public struct PayabliPayInPaymentFlowStoredPaymentMethod: Sendable, Equatable {
     public let storedMethodId: String?
+    public let method: PayabliPayInPaymentFlowStoredMethodType
     public let methodReferenceId: String?
     public let resultCode: Int?
     public let resultText: String?
@@ -581,6 +561,7 @@ public struct PayabliPayInPaymentFlowStoredPaymentMethod: Sendable, Equatable {
 
     public init(
         storedMethodId: String?,
+        method: PayabliPayInPaymentFlowStoredMethodType,
         methodReferenceId: String?,
         resultCode: Int?,
         resultText: String?,
@@ -589,6 +570,7 @@ public struct PayabliPayInPaymentFlowStoredPaymentMethod: Sendable, Equatable {
         apiResponse: PayabliPayInPaymentFlowTokenStorageAPIResponse? = nil
     ) {
         self.storedMethodId = storedMethodId
+        self.method = method
         self.methodReferenceId = methodReferenceId
         self.resultCode = resultCode
         self.resultText = resultText
