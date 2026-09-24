@@ -1478,6 +1478,7 @@ def test_release() -> None:
             "R3 a declared version that is not major.minor.patch is refused": "0.4",
             "R3b a declared version with a v prefix is refused": "v0.4.1",
             "R3c a declared version that is a pre-release is refused": "0.4.1-QA.20260923143000",
+            "R3d a declared version with a leading zero is refused": "0.04.1",
         }.items():
             code, out, err = run_gate([main_ref], root, declarations=[value])
             check(label, code == 1 and not out and "not <major>.<minor>.<patch>" in err, (code, out, err[:200]))

@@ -43,7 +43,8 @@ if [ -z "$declared" ]; then
     exit 1
 fi
 
-if ! [[ "$declared" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+# SemVer: a numeric component carries no leading zero.
+if ! [[ "$declared" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
     echo "error: the tree declares '$declared', which is not <major>.<minor>.<patch>" >&2
     exit 1
 fi

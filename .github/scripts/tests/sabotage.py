@@ -336,7 +336,13 @@ MUTATIONS = [
     ),
     Mutation(
         "a declared version that is not major.minor.patch is tagged anyway",
-        GATE, 'if ! [[ "$declared" =~ ^[0-9]+\\.[0-9]+\\.[0-9]+$ ]]; then', "if false; then", "R3", "release",
+        GATE, 'if ! [[ "$declared" =~ ^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$ ]]; then', "if false; then",
+        "R3", "release",
+    ),
+    Mutation(
+        "a declared version with a leading zero is tagged",
+        GATE, 'if ! [[ "$declared" =~ ^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$ ]]; then',
+        'if ! [[ "$declared" =~ ^[0-9]+\\.[0-9]+\\.[0-9]+$ ]]; then', "R3d", "release",
     ),
     Mutation(
         "a source declaring the version twice is read as one",
