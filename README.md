@@ -66,7 +66,6 @@ need `PayabliSDKTapToPay`.
 | `PayabliSDKCore`        | Core building blocks (config, auth, transport).                              |
 | `PayabliSDKTapToPay`    | Tap to Pay on iPhone. The product most applications require.                 |
 | `PayabliSDKPayInPaymentFlow` | Opt-in card/ACH stored-method, capture, and authorize component.      |
-| `PayabliCardReaderCore` | Tap to Phone engine. Pulled in transitively; no explicit link required.      |
 | `PayabliSDKTelemetry`   | Optional Sentry and PostHog plumbing; bring your own instance.               |
 
 ---
@@ -186,8 +185,8 @@ Link the required product. Most applications only need
 .product(name: "PayabliSDKTapToPay", package: "sdk-ios")
 ```
 
-`PayabliSDKTapToPay` transitively links `PayabliSDKCore` and
-`PayabliCardReaderCore`; no additional product references are required.
+`PayabliSDKTapToPay` transitively links `PayabliSDKCore`; no additional
+product references are required.
 
 For card PAN or ACH stored-method, capture, or authorize flows, link the
 opt-in PayIn payment flow component:
@@ -333,8 +332,11 @@ The `charge(...)` method does three things:
 2. NFC card read
 3. call `PATCH /MoneyIn/update/{id}`
 
-If the final update fails after retries, the transaction is still authorized on the processor
-side and must be reconciled out of band. This case is rare.
+Only an approval returns a result. A declined card throws `PayabliTTPError.cardDeclined`, even
+when the update then fails. If the update fails or is cancelled after any other answer, the charge
+throws `PayabliTTPError.updateFailed`, whose `capture` says whether the card was charged: `.charged`
+after an approval, which the host reconciles out of band, and `.unknown` when the processor answered
+neither.
 
 ### `charge(...)` reference
 
@@ -544,10 +546,17 @@ The other phases wrap what they see:
 - `/config` becomes `PayabliTTPError.configFailed(reason:)`. A
   `PayabliErrorCode.tokenProviderFailed` here reaches the caller as
   `configFailed`, with the classification named in the reason string.
-- `/update` becomes `PayabliTTPError.updateFailed(reason:)`, and
+- `/update` becomes `PayabliTTPError.updateFailed(reason:paymentTransId:capture:)`, and
   `activateDevice(activationCode:)` becomes
   `PayabliTTPError.activationFailed(reason:)`. Both flatten the underlying
-  taxonomy: only the reason string survives.
+  taxonomy into a reason string. `updateFailed` also carries the payment and
+  whether the card was charged.
+
+Every `PayabliTTPError` answers `capture` and `paymentTransId`: whether the card was charged, as a
+`PayabliTTPCapture`, and the payment the failure belongs to, or `nil` when the SDK holds no identifier
+for one. Only `.notCharged` means a second attempt cannot take the money twice. An Objective-C or MAUI
+caller reads the same two values from the `NSError`'s `userInfo["capture"]` and
+`userInfo["paymentTransId"]`. The Flutter and React Native bridges do not forward them yet.
 
 ```swift
 import PayabliSDKCore
@@ -566,10 +575,15 @@ do {
     // Session isn't in the required state for this call.
 } catch let PayabliTTPError.attestationFailed(reason) {
     // App Attest or Payabli refused to attest the device.
-} catch let PayabliTTPError.nfcFailed(reason) {
-    // Card removed prematurely, reader timeout, or similar; usually retryable.
-} catch let PayabliTTPError.updateFailed(reason) {
-    // /update PATCH failed after retries. Reconcile out of band.
+} catch let PayabliTTPError.cardDeclined(paymentTransId) {
+    // The processor refused the card. No money moved.
+} catch let PayabliTTPError.outcomeUnknown(paymentTransId) {
+    // The processor answered neither an approval nor a refusal. Reconcile before charging again.
+} catch let PayabliTTPError.nfcFailed(reason, paymentTransId) {
+    // Card removed prematurely, reader timeout, or similar. The card may have been
+    // charged, so reconcile the payment before charging again.
+} catch let PayabliTTPError.updateFailed(reason, paymentTransId, capture) {
+    // /update PATCH failed after retries. `capture` says whether the card was charged.
 } catch let PayabliTTPError.configFailed(reason) {
     // /config was refused — a rejected binding, a rejected bearer, or the host's
     // tokenProvider itself failed (see PayabliErrorCode.tokenProviderFailed).

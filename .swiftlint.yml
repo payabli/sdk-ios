@@ -59,9 +59,8 @@ excluded:
   # repository's code nor at a path inside it. Linting it puts an absolute path
   # into the baseline that no other machine can resolve.
   - Example/PayabliDemo/App/Configuration/Secrets.swift
-  # Vendored Fiserv/TTPPackage source is carried byte-identical to upstream
-  # (see Scripts/refresh_vendored_ttp.sh). Linting it would either force us to
-  # fork the style or re-apply diffs on every refresh — neither is worth it.
+  # Vendored Fiserv/TTPPackage source. Linting it would fork its style from the
+  # upstream it is merged from.
   - ThirdParty
 
 line_length:

@@ -27,17 +27,6 @@ public enum PayabliPayInPaymentFlowResultKind: String, Sendable, Equatable {
 public enum PayabliPayInPaymentFlowStoredMethodType: String, CaseIterable, Identifiable, Codable, Sendable {
     case card
     case ach
-    case wallet
-
-    public var id: String {
-        rawValue
-    }
-}
-
-public enum PayabliPayInPaymentFlowStoredUsageType: String, CaseIterable, Identifiable, Codable, Sendable {
-    case unscheduled
-    case subscription
-    case recurring
 
     public var id: String {
         rawValue
@@ -71,19 +60,13 @@ public struct PayabliPayInPaymentFlowACHMethod: Sendable {
 public struct PayabliPayInPaymentFlowStoredMethod: Sendable {
     public let method: PayabliPayInPaymentFlowStoredMethodType
     public let storedMethodId: String
-    public let storedMethodUsageType: PayabliPayInPaymentFlowStoredUsageType?
-    public let initiator: String?
 
     public init(
         method: PayabliPayInPaymentFlowStoredMethodType,
-        storedMethodId: String,
-        storedMethodUsageType: PayabliPayInPaymentFlowStoredUsageType? = .unscheduled,
-        initiator: String? = "payor"
+        storedMethodId: String
     ) {
         self.method = method
         self.storedMethodId = storedMethodId
-        self.storedMethodUsageType = storedMethodUsageType
-        self.initiator = initiator
     }
 }
 
@@ -130,12 +113,14 @@ public enum PayabliPayInPaymentFlowPaymentMethod: Sendable {
         }
     }
 
-    var authorizationMethod: PayabliPayInPaymentFlowAuthorizationMethod? {
+    var isAuthorizable: Bool {
         switch self {
-        case .card:
-            return .card
-        case .ach, .stored, .cloud, .check, .cash:
-            return nil
+        case .card, .cloud:
+            return true
+        case let .stored(stored):
+            return stored.method == .card
+        case .ach, .check, .cash:
+            return false
         }
     }
 }
@@ -618,7 +603,6 @@ extension PayabliPayInPaymentFlowPaymentMethod: Encodable {
         case initiator
         case saveIfSuccess
         case storedMethodId
-        case storedMethodUsageType
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -647,8 +631,8 @@ extension PayabliPayInPaymentFlowPaymentMethod: Encodable {
         case let .stored(method):
             try c.encode(method.method.rawValue, forKey: .method)
             try c.encode(method.storedMethodId.payabliCaptureTrimmed, forKey: .storedMethodId)
-            try c.encodeIfPresent(method.storedMethodUsageType?.rawValue, forKey: .storedMethodUsageType)
-            try c.encodeIfPresent(method.initiator?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty, forKey: .initiator)
+            // Always sent: the payer is present on every charge this surface makes.
+            try c.encode("payor", forKey: .initiator)
 
         case let .cloud(method):
             try c.encode("cloud", forKey: .method)

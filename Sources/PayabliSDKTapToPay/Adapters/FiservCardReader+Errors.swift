@@ -1,7 +1,7 @@
 import Foundation
 import PayabliSDKCore
 #if canImport(PayabliCardReaderCore)
-    import PayabliCardReaderCore
+    internal import PayabliCardReaderCore
     import ProximityReader
 #endif
 
@@ -36,7 +36,7 @@ extension FiservCardReader {
             if let readerError = platform as? PaymentCardReaderError,
                readerError.isUnsupportedOSVersion
             {
-                return .readerOSVersionNotSupported
+                return .readerOSVersionNotSupported()
             }
 
             let detail = readerDetail(error)

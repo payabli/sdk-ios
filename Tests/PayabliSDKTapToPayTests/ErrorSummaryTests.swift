@@ -28,7 +28,10 @@ final class ErrorSummaryTests: XCTestCase {
         let serversWords = "Card belongs to another merchant"
 
         XCTAssertEqual(ErrorSummary.of(PayabliTTPError.initiateFailed(reason: serversWords)), "initiateFailed")
-        XCTAssertEqual(ErrorSummary.of(PayabliTTPError.updateFailed(reason: serversWords)), "updateFailed")
+        XCTAssertEqual(
+            ErrorSummary.of(PayabliTTPError.updateFailed(reason: serversWords, paymentTransId: "TXN", capture: .unknown)),
+            "updateFailed"
+        )
     }
 
     /// Written out case by case, so a value the compiler renders differently one
@@ -60,9 +63,11 @@ final class ErrorSummaryTests: XCTestCase {
             (.activationFailed(reason: reason), "activationFailed"),
             (.networkError(reason: reason), "networkError"),
             (.initiateFailed(reason: reason), "initiateFailed"),
-            (.updateFailed(reason: reason), "updateFailed"),
+            (.updateFailed(reason: reason, paymentTransId: "TXN", capture: .unknown), "updateFailed"),
             (.termsNotAccepted, "termsNotAccepted"),
-            (.readerOSVersionNotSupported, "readerOSVersionNotSupported")
+            (.readerOSVersionNotSupported(), "readerOSVersionNotSupported"),
+            (.cardDeclined(paymentTransId: "TXN"), "cardDeclined"),
+            (.outcomeUnknown(paymentTransId: "TXN"), "outcomeUnknown")
         ]
 
         for (error, published) in expected {

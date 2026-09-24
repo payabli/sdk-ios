@@ -24,7 +24,7 @@ import Foundation
 import Combine
 import ProximityReader
 
-public enum PaymentTransactionType {
+package enum PaymentTransactionType {
     case sale
     case auth
     case capture
@@ -33,7 +33,7 @@ public enum PaymentTransactionType {
 
 extension PaymentTransactionType: CustomStringConvertible {
     
-    public var description: String {
+    package var description: String {
         switch self {
         case .sale:
             return "sale"
@@ -47,7 +47,7 @@ extension PaymentTransactionType: CustomStringConvertible {
     }
 }
 
-public enum RefundTransactionType {
+package enum RefundTransactionType {
     case matched
     case unmatched
     case open
@@ -55,7 +55,7 @@ public enum RefundTransactionType {
 
 extension RefundTransactionType: CustomStringConvertible {
     
-    public var description: String {
+    package var description: String {
         switch self {
         case .open:
             return "open"
@@ -67,20 +67,20 @@ extension RefundTransactionType: CustomStringConvertible {
     }
 }
 
-public struct FiservTTPCardReaderError: Error {
+package struct FiservTTPCardReaderError: Error {
     
-    public let title: String
-    public let localizedDescription: String
-    public let failureReason: String?
+    package let title: String
+    package let localizedDescription: String
+    package let failureReason: String?
 
     /// The error this was rebuilt from, where there was one.
     ///
     /// `title` and `localizedDescription` are strings, so a caller that has to
     /// tell one refusal from another can only match prose. Keeping the original
     /// lets it match on the type instead.
-    public let underlying: Error?
+    package let underlying: Error?
 
-    public init(title: String, localizedDescription: String, failureReason: String? = nil, underlying: Error? = nil) {
+    package init(title: String, localizedDescription: String, failureReason: String? = nil, underlying: Error? = nil) {
         self.title = title
         self.localizedDescription = localizedDescription
         self.failureReason = failureReason
@@ -88,7 +88,7 @@ public struct FiservTTPCardReaderError: Error {
     }
 }
 
-public class FiservTTPCardReader {
+package class FiservTTPCardReader {
     
     private let configuration: FiservTTPConfig
     
@@ -100,7 +100,7 @@ public class FiservTTPCardReader {
     
     private var tokenExp: Double = 0.0
     
-    public var sessionReadySubject: PassthroughSubject<Bool, Never> = .init()
+    package var sessionReadySubject: PassthroughSubject<Bool, Never> = .init()
     
     /// Creates an instance of FiservTTPCardReader
     ///
@@ -114,7 +114,7 @@ public class FiservTTPCardReader {
     ///
     /// - Returns: FiservTTPCardReader
     ///
-    public init(configuration: FiservTTPConfig) {
+    package init(configuration: FiservTTPConfig) {
         self.configuration = configuration
         self.fiservTTPReader = FiservTTPReader(config: configuration)
         self.services = FiservTTPServices(config: configuration)
@@ -123,11 +123,11 @@ public class FiservTTPCardReader {
     /// When you are finished taking payments, you can deallocate the reader
     ///
     /// - Important: Never call `finalize()`, this will potentially require an app restart and is provided here for completeness
-    public func finalize() {
+    package func finalize() {
         self.fiservTTPReader.finalize()
     }
     
-    public func readerIsSupported() -> Bool {
+    package func readerIsSupported() -> Bool {
         return self.fiservTTPReader.readerIsSupported()
     }
     
@@ -139,7 +139,7 @@ public class FiservTTPCardReader {
     ///
     /// - Throws: An error of type FiservTTPCardReaderError
     ///
-    public func requestSessionToken() async throws {
+    package func requestSessionToken() async throws {
             
         let title = "Token Request"
         
@@ -183,7 +183,7 @@ public class FiservTTPCardReader {
     ///
     /// - Throws: An error of type FiservTTPCardReaderError
     ///
-    public func isAccountLinked() async throws -> Bool {
+    package func isAccountLinked() async throws -> Bool {
         
         if let token = self.token {
             
@@ -206,7 +206,7 @@ public class FiservTTPCardReader {
     ///
     /// - Throws: An error of type FiservTTPCardReaderError
     ///
-    public func linkAccount() async throws {
+    package func linkAccount() async throws {
         
         if let token = self.token {
             
@@ -230,7 +230,7 @@ public class FiservTTPCardReader {
     ///   reader raises, for the life of the session. Apple's stream carries the
     ///   configuration percentage as well as the card-read states, and it is one
     ///   stream per reader, so this is the only place either can be read.
-    public func initializeSession(eventHandler: @escaping @MainActor (PaymentCardReader.Event) -> Void = { _ in }) async throws {
+    package func initializeSession(eventHandler: @escaping @MainActor (PaymentCardReader.Event) -> Void = { _ in }) async throws {
             
         if self.token != nil {
             
@@ -282,7 +282,7 @@ public class FiservTTPCardReader {
     ///
     /// - Throws: An error of type FiservTTPCardReaderError
     ///
-    public func validateCard() async throws -> FiservTTPValidateCardResponse {
+    package func validateCard() async throws -> FiservTTPValidateCardResponse {
         
         let title = "Validate Payment Card"
         
@@ -309,7 +309,7 @@ public class FiservTTPCardReader {
     ///
     /// - SeeAlso: [Commerce Hub Verification](https://developer.fiserv.com/product/CommerceHub/api/?type=post&path=/payments-vas/v1/accounts/verification&branch=main&version=1.24.09)
     ///
-    public func accountVerification(transactionDetailsRequest: Models.TransactionDetailsRequest,
+    package func accountVerification(transactionDetailsRequest: Models.TransactionDetailsRequest,
                                     paymentTokenSourceRequest: Models.PaymentTokenSourceRequest? = nil,
                                         billingAddressRequest: Models.BillingAddressRequest? = nil) async throws -> Models.AccountVerificationResponse {
         
@@ -391,7 +391,7 @@ public class FiservTTPCardReader {
     ///
     /// - SeeAlso: [Commerce Hub Tokenization](https://developer.fiserv.com/product/CommerceHub/api/?type=post&path=/payments-vas/v1/tokens&branch=main&version=1.24.09)
     ///
-    public func tokenizeCard(transactionDetailsRequest: Models.TransactionDetailsRequest) async throws -> Models.TokenizeCardResponse {
+    package func tokenizeCard(transactionDetailsRequest: Models.TransactionDetailsRequest) async throws -> Models.TokenizeCardResponse {
         
         let title = "Tokenize Card"
         
@@ -452,7 +452,7 @@ public class FiservTTPCardReader {
     ///
     /// - SeeAlso: [Commerce Hub Inquiry](https://developer.fiserv.com/product/CommerceHub/api/?type=post&path=/payments/v1/transaction-inquiry&branch=main&version=1.24.09)
     ///
-    public func transactionInquiry(referenceTransactionDetailsRequest: Models.ReferenceTransactionDetailsRequest) async throws -> [Models.InquireResponse] {
+    package func transactionInquiry(referenceTransactionDetailsRequest: Models.ReferenceTransactionDetailsRequest) async throws -> [Models.InquireResponse] {
         
         let title = "Transaction Inquiry"
         
@@ -524,7 +524,7 @@ public class FiservTTPCardReader {
     ///
     /// - SeeAlso: [Commerce Hub Charges](https://developer.fiserv.com/product/CommerceHub/api/?type=post&path=/payments/v1/charges&branch=main&version=1.24.09)
     ///
-    public func charges(amount: Decimal,
+    package func charges(amount: Decimal,
                         transactionType: PaymentTransactionType,
                         transactionDetailsRequest: Models.TransactionDetailsRequest,
                         referenceTransactionDetailsRequest: Models.ReferenceTransactionDetailsRequest? = nil,
@@ -680,7 +680,7 @@ public class FiservTTPCardReader {
     ///
     /// - SeeAlso: [Commerce Hub Cancels](https://developer.fiserv.com/product/CommerceHub/api/?type=post&path=/payments/v1/cancels&branch=main&version=1.24.09)
     ///
-    public func cancels(amount: Decimal,
+    package func cancels(amount: Decimal,
                         referenceTransactionDetailsRequest: Models.ReferenceTransactionDetailsRequest) async throws -> Models.CommerceHubResponse {
         
         let title = "Cancel Transaction"
@@ -727,7 +727,7 @@ public class FiservTTPCardReader {
     ///
     /// - SeeAlso: [Commerce Hub Refunds](https://developer.fiserv.com/product/CommerceHub/api/?type=post&path=/payments/v1/refunds&branch=main&version=1.24.09)
     ///
-    public func refunds(amount: Decimal,
+    package func refunds(amount: Decimal,
                         refundTransactionType: RefundTransactionType,
                         transactionDetails: Models.TransactionDetailsRequest? = nil,
                         referenceTransactionDetails: Models.ReferenceTransactionDetailsRequest? = nil) async throws -> Models.CommerceHubResponse {
@@ -826,7 +826,7 @@ public class FiservTTPCardReader {
     /// - Throws: An error of type FiservTTPCardReaderError
     ///
     @available(*, deprecated, message: "This method will not be available in future versions, use the Charges method.")
-    public func readCard(amount: Decimal,
+    package func readCard(amount: Decimal,
                          merchantOrderId: String? = nil,
                          merchantTransactionId: String? = nil,
                          merchantInvoiceNumber: String? = nil) async throws -> FiservTTPChargeResponse {
@@ -900,7 +900,7 @@ public class FiservTTPCardReader {
     /// - Throws: An error of type FiservTTPCardReaderError
     ///
     @available(*, deprecated, message: "This method will not be available in future versions, use the Inquire method.")
-    public func inquiryTransaction(referenceTransactionId: String? = nil,
+    package func inquiryTransaction(referenceTransactionId: String? = nil,
                                    referenceMerchantTransactionId: String? = nil,
                                    referenceMerchantOrderId: String? = nil,
                                    referenceOrderId: String? = nil) async throws -> [FiservTTPChargeResponse] {
@@ -941,7 +941,7 @@ public class FiservTTPCardReader {
     /// - Throws: An error of type FiservTTPCardReaderError
     ///
     @available(*, deprecated, message: "This method will not be available in future versions, use the Cancels method.")
-    public func voidTransaction(amount: Decimal,
+    package func voidTransaction(amount: Decimal,
                                 referenceTransactionId: String? = nil,
                                 referenceMerchantTransactionId: String? = nil) async throws -> FiservTTPChargeResponse {
         
@@ -982,7 +982,7 @@ public class FiservTTPCardReader {
     /// - Throws: An error of type FiservTTPCardReaderError
     ///
     @available(*, deprecated, message: "This method will not be available in future versions, use the Refunds method.")
-    public func refundTransaction(amount: Decimal,
+    package func refundTransaction(amount: Decimal,
                                   referenceTransactionId: String? = nil,
                                   referenceMerchantTransactionId: String? = nil) async throws -> FiservTTPChargeResponse {
         
@@ -1029,7 +1029,7 @@ public class FiservTTPCardReader {
     /// - Throws: An error of type FiservTTPCardReaderError
     ///
     @available(*, deprecated, message: "This method will not be available in future versions, use the Refunds method.")
-    public func refundCard(amount: Decimal,
+    package func refundCard(amount: Decimal,
                            merchantOrderId: String? = nil,
                            merchantTransactionId: String? = nil,
                            merchantInvoiceNumber: String? = nil,

@@ -95,6 +95,10 @@ enum ErrorSummary {
             return "termsNotAccepted"
         case .readerOSVersionNotSupported:
             return "readerOSVersionNotSupported"
+        case .cardDeclined:
+            return "cardDeclined"
+        case .outcomeUnknown:
+            return "outcomeUnknown"
         }
     }
 

@@ -40,7 +40,7 @@ struct StoreMethodView: View {
 
 Set `operation` to `.storePaymentMethod`, `.capture`, or `.authorize`. Capture and authorize require `PayabliPayInPaymentFlowRequestConfiguration` during initialization or direct API calls.
 
-Authorize is intentionally narrower than capture: it accepts card data only today. ACH, stored payment methods, cash, check, and cloud-device payments are rejected before transport for `.authorize`. The authorize capability is modeled separately so Apple Pay or other future authorizable methods can be added without changing the capture/store flows.
+Authorize is narrower than capture. The direct API accepts a card, a stored card, or a cloud device, and refuses any other payment method before anything is sent. The hosted authorize form collects a card only.
 
 The component uses the same mobile access-token approach as the stored-method flow. Do not pass a `requestToken` header directly.
 

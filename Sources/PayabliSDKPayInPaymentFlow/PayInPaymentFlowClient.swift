@@ -39,8 +39,8 @@ final class PayInPaymentFlowClient: Sendable {
         request: PayabliPayInPaymentFlowRequest,
         idempotencyKey: String
     ) async throws -> PayabliPayInPaymentFlowResult {
-        guard request.paymentMethod.authorizationMethod != nil else {
-            throw PayabliPayInPaymentFlowError.invalidInput("Only card data can be authorized.")
+        guard request.paymentMethod.isAuthorizable else {
+            throw PayabliPayInPaymentFlowError.invalidInput("This payment method cannot be authorized.")
         }
         return try await performTransaction(
             path: "/api/v2/MoneyIn/authorize",

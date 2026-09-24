@@ -305,7 +305,60 @@ final class PayabliTTPReaderSessionRecoveryTests: XCTestCase {
         }
     }
 
+    func testAReadFailureNamesThePaymentItBelongsTo() async throws {
+        let (ttp, provider, _) = try await makeReadyTTP()
+        provider.readingResult = .failure(Self.sessionLevelFailure)
+
+        let failure = try await chargeFailure(ttp)
+
+        XCTAssertEqual(failure.paymentTransId, Self.paymentTransId)
+        XCTAssertEqual(failure.capture, .unknown, "the processor may take the sale before the reader answers")
+    }
+
+    func testAnUntypedReadFailureNamesThePayment() async throws {
+        let (ttp, provider, _) = try await makeReadyTTP()
+        provider.readingResult = .failure(URLError(.timedOut))
+
+        let failure = try await chargeFailure(ttp)
+
+        guard case .nfcFailed = failure else { return XCTFail("got \(failure)") }
+        XCTAssertEqual(failure.paymentTransId, Self.paymentTransId)
+        XCTAssertEqual(failure.capture, .unknown)
+    }
+
+    func testAnUnsupportedOSDuringAReadKeepsItsCaseAndNamesThePayment() async throws {
+        let (ttp, provider, _) = try await makeReadyTTP()
+        provider.readingResult = .failure(PayabliTTPError.readerOSVersionNotSupported())
+
+        let failure = try await chargeFailure(ttp)
+
+        XCTAssertEqual((failure as NSError).code, 15, "the remedy is a different device, not a retry")
+        XCTAssertEqual(failure.paymentTransId, Self.paymentTransId)
+        XCTAssertEqual(failure.capture, .unknown, "the reader had been asked for a card")
+    }
+
+    func testAReaderThatWasNotPreparedKeepsItsCaseAndChargedNothing() async throws {
+        let (ttp, provider, _) = try await makeReadyTTP()
+        provider.readingResult = .failure(PayabliTTPError.readerSetupFailed(reason: "Reader not prepared"))
+
+        let failure = try await chargeFailure(ttp)
+
+        XCTAssertEqual((failure as NSError).code, 7)
+        XCTAssertEqual(failure.paymentTransId, Self.paymentTransId)
+        XCTAssertEqual(failure.capture, .notCharged, "the reader was never asked for a card")
+    }
+
     // MARK: - Fixtures
+
+    private func chargeFailure(_ ttp: PayabliTTP) async throws -> PayabliTTPError {
+        do {
+            _ = try await charge(ttp)
+        } catch let failure as PayabliTTPError {
+            return failure
+        }
+        XCTFail("expected the charge to fail")
+        throw CancellationError()
+    }
 
     private static let paymentTransId = "ttp-txn-1"
 
@@ -324,7 +377,8 @@ final class PayabliTTPReaderSessionRecoveryTests: XCTestCase {
         encryptedPayload: Data(),
         cardNetwork: "VISA",
         providerMetadata: [:],
-        providerResponseJSON: Data("{}".utf8)
+        providerResponseJSON: Data("{}".utf8),
+        outcome: .approved
     )
 
     private func charge(_ ttp: PayabliTTP) async throws -> TransactionResult {

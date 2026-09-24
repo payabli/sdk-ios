@@ -52,18 +52,6 @@ let package = Package(
             type: .dynamic,
             targets: ["PayabliSDKPayInPaymentFlow"]
         ),
-        // `PayabliCardReaderCore` is exposed as a library product in the
-        // private Package.swift so `xcodebuild -scheme PayabliCardReaderCore`
-        // (driven by Scripts/build_release_frameworks.sh) can archive it
-        // independently and produce its own XCFramework. Consumers of the
-        // *public* Package.swift never see this as a stand-alone product —
-        // the public template lists CardReaderCore only as a binaryTarget
-        // pulled transitively by PayabliSDKTapToPay.
-        .library(
-            name: "PayabliCardReaderCore",
-            type: .dynamic,
-            targets: ["PayabliCardReaderCore"]
-        ),
         .library(
             name: "PayabliSDKTelemetry",
             type: .dynamic,
@@ -72,10 +60,6 @@ let package = Package(
         // `PayabliSDKTestUtils` is a target and not a product. Its doubles conform to the
         // attestation, provider and storage protocols, so a linkable library of them requires
         // those protocols to be `public`.
-        //
-        // Private, like `PayabliCardReaderCore` above: absent from the public
-        // Package.swift template, so no consumer can link it and the
-        // three-artifact split is unaffected.
         //
         // `Example/PayabliDemo` needs Core, card-present, and card-not-present in
         // one app. This is a constraint of `type: .dynamic` products built from

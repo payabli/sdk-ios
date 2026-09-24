@@ -1,7 +1,7 @@
 import Foundation
 import PayabliSDKCore
 #if canImport(PayabliCardReaderCore)
-    import PayabliCardReaderCore
+    internal import PayabliCardReaderCore
     import ProximityReader
 #endif
 
@@ -303,21 +303,30 @@ package final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
             }
 
             let elapsedMs = Int(Date().timeIntervalSince(started) * 1000)
-            let responseJSON = try Self.encode(response)
-            let cardNetwork = Self.extractCardNetwork(from: responseJSON)
+            let result = try Self.readResult(from: response)
             // `CommerceHubResponse` carries `paymentTokens.tokenData` and the
             // card's expiry, so the log gets the shape of the response.
-            logger.info("[fiserv.charges] ← OK (\(elapsedMs)ms) bytes=\(responseJSON.count) cardNetwork=\(cardNetwork ?? "<nil>")")
-            return CardReadResult(
-                provider: Self.providerId,
-                encryptedPayload: Data(),
-                cardNetwork: cardNetwork,
-                providerMetadata: [:],
-                providerResponseJSON: responseJSON
+            logger.info(
+                "[fiserv.charges] ← OK (\(elapsedMs)ms) bytes=\(result.providerResponseJSON?.count ?? 0) " +
+                    "cardNetwork=\(result.cardNetwork ?? "<nil>") state=\(result.providerState ?? "<nil>")"
             )
+            return result
         #else
             throw PayabliTTPError.nfcFailed(reason: "Tap to Pay is iOS-only")
         #endif
+    }
+
+    /// A held device auth and a settled sale are both approvals. Anything the gateway has not named as one
+    /// or the other, a missing state included, is neither.
+    static func outcome(ofGatewayState state: String?) -> CardReadOutcome {
+        switch state?.uppercased() {
+        case "AUTHORIZED", "CAPTURED":
+            return .approved
+        case "DECLINED":
+            return .declined
+        default:
+            return .indeterminate
+        }
     }
 
     package func cancelReading() async {
@@ -395,6 +404,20 @@ package final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
                     reason: "Failed to encode provider response: \(error.localizedDescription)"
                 )
             }
+        }
+
+        static func readResult(from response: Models.CommerceHubResponse) throws -> CardReadResult {
+            let responseJSON = try encode(response)
+            let state = response.gatewayResponse?.transactionState
+            return CardReadResult(
+                provider: providerId,
+                encryptedPayload: Data(),
+                cardNetwork: extractCardNetwork(from: responseJSON),
+                providerMetadata: [:],
+                providerResponseJSON: responseJSON,
+                outcome: outcome(ofGatewayState: state),
+                providerState: state
+            )
         }
 
         /// Pulls `card.brand` out of the CommerceHub response for

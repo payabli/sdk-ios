@@ -43,7 +43,7 @@ xcodebuild test -scheme PayabliSDK-Package -destination '...' -quiet
 ```
 
 Schemes: `PayabliSDK-Package` (everything, the one CI uses), `PayabliSDK`, `PayabliSDKCore`,
-`PayabliSDKTapToPay`, `PayabliSDKPayInPaymentFlow`, `PayabliSDKTelemetry`, `PayabliCardReaderCore`.
+`PayabliSDKTapToPay`, `PayabliSDKPayInPaymentFlow`, `PayabliSDKTelemetry`.
 `PayabliSDKTestUtils` has no scheme of its own, being a target rather than a product; it builds as a
 dependency of the test targets.
 
@@ -111,8 +111,9 @@ channel, so an app that never accepts card-present never links the certified car
 
 **Vendored:**
 - `PayabliCardReaderCore` - MIT-licensed `Fiserv/TTPPackage` source under
-  `ThirdParty/PayabliCardReaderCoreSource/`, **byte-identical to upstream**, renamed at the SPM target
-  level only. Do not edit the vendored source or strip its copyright headers.
+  `ThirdParty/PayabliCardReaderCoreSource/`, renamed at the SPM target level. Its `public`
+  declarations are `package`, so only TapToPay can reach them. Do not otherwise edit the vendored
+  source or strip its copyright headers.
   **The exception, and it is narrow**: an edit is allowed where the upstream
   boundary destroys something the SDK needs and no code above it can recover —
   the reader's event stream flattened to a case name, and the platform's typed

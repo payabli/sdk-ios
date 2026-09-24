@@ -44,7 +44,7 @@ final class PayabliTTPFailureReasonTests: XCTestCase {
     /// merely would not arm is not: it leaves the device as it was.
     func testOnlyAnUnusableDeviceIsCalledIneligible() {
         XCTAssertEqual(
-            PayabliTTPSessionState.landing(for: PayabliTTPError.readerOSVersionNotSupported),
+            PayabliTTPSessionState.landing(for: PayabliTTPError.readerOSVersionNotSupported()),
             .failed(reason: .deviceIneligible)
         )
         XCTAssertEqual(
@@ -71,7 +71,7 @@ final class PayabliTTPFailureReasonTests: XCTestCase {
         for error in [
             PayabliTTPError.nfcFailed(reason: "x"),
             .initiateFailed(reason: "x"),
-            .updateFailed(reason: "x"),
+            .updateFailed(reason: "x", paymentTransId: "TXN", capture: .unknown),
             .activationFailed(reason: "x")
         ] {
             XCTAssertNil(PayabliTTPSessionState.landing(for: error), "\(error)")
@@ -124,12 +124,14 @@ final class PayabliTTPFailureReasonTests: XCTestCase {
             (.readerSetupFailed(reason: "x"), .failed(reason: .serviceUnavailable)),
             (.nfcFailed(reason: "x"), nil),
             (.initiateFailed(reason: "x"), nil),
-            (.updateFailed(reason: "x"), nil),
+            (.updateFailed(reason: "x", paymentTransId: "TXN", capture: .unknown), nil),
             (.tokenExpired, .failed(reason: .serviceUnavailable)),
             (.activationFailed(reason: "x"), nil),
             (.networkError(reason: "x"), .failed(reason: .serviceUnavailable)),
             (.termsNotAccepted, .pendingTerms),
-            (.readerOSVersionNotSupported, .failed(reason: .deviceIneligible))
+            (.readerOSVersionNotSupported(), .failed(reason: .deviceIneligible)),
+            (.cardDeclined(paymentTransId: "TXN"), nil),
+            (.outcomeUnknown(paymentTransId: "TXN"), nil)
         ]
 
         for (error, expected) in map {

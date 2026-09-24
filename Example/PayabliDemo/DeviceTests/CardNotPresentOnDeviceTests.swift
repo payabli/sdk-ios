@@ -244,9 +244,10 @@ final class CardNotPresentOnDeviceTests: XCTestCase {
         }
     }
 
-    /// A stored card is charged from the store result alone, then voided.
-    func testFChargingAStoredCardWithTheMethodItCameBackWith() async throws {
-        let flow = try makeFlow()
+    // MARK: - Stored card
+
+    /// A card stored in this run, charged as the method and identifier the store returned.
+    private func storedCard(on flow: PayabliPayInPaymentFlow) async throws -> PayabliPayInPaymentFlowPaymentMethod {
         let stored = try await flow.addCard(
             try card(),
             options: PayabliPayInPaymentFlowTokenStorageOptions(
@@ -254,19 +255,34 @@ final class CardNotPresentOnDeviceTests: XCTestCase {
                 customerData: PayInDemoCustomer.customerData
             )
         )
-        let token = try XCTUnwrap(stored.storedMethodId, "no stored token came back")
+        let storedMethodId = try XCTUnwrap(stored.storedMethodId, "no stored method came back")
+        return .stored(PayabliPayInPaymentFlowStoredMethod(method: stored.method, storedMethodId: storedMethodId))
+    }
 
-        let captured = try await flow.capture(request(paying: .stored(PayabliPayInPaymentFlowStoredMethod(
-            method: stored.method,
-            storedMethodId: token
-        ))))
+    /// A stored card is authorized by its identifier, then voided.
+    func testFAuthorizeAStoredCardThenVoid() async throws {
+        let flow = try makeFlow()
+        let authorized = try await flow.authorize(request(paying: try await storedCard(on: flow)))
+        let transId = try XCTUnwrap(
+            authorized.transaction?.paymentTransId,
+            "authorize returned no paymentTransId: code=\(authorized.code) reason=\(authorized.reason ?? "<nil>")"
+        )
+        LiveEnvironment.report("PAYABLI_STORED_AUTHORIZED env=\(named.name) transId=\(transId) code=\(authorized.code)")
+
+        await reverse(transId, on: flow, whenLeftStanding: "the authorization was left open")
+    }
+
+    /// A stored card is captured by its identifier, then voided.
+    func testGCaptureAStoredCardThenVoid() async throws {
+        let flow = try makeFlow()
+        let captured = try await flow.capture(request(paying: try await storedCard(on: flow)))
         let transId = try XCTUnwrap(
             captured.transaction?.paymentTransId,
             "capture returned no paymentTransId: code=\(captured.code) reason=\(captured.reason ?? "<nil>")"
         )
         LiveEnvironment.report("PAYABLI_STORED_CAPTURED env=\(named.name) transId=\(transId) code=\(captured.code)")
 
-        await reverse(transId, on: flow, whenLeftStanding: "the stored-card charge was left standing")
+        await reverse(transId, on: flow, whenLeftStanding: "the transaction was left standing")
     }
 
     // MARK: - Void

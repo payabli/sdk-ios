@@ -262,9 +262,7 @@ let result = try await paymentFlow.capture(PayabliPayInPaymentFlowRequest(
     paymentDetails: PayabliPayInPaymentFlowPaymentDetails(totalAmount: 25.00),
     paymentMethod: .stored(PayabliPayInPaymentFlowStoredMethod(
         method: storedMethodType,
-        storedMethodId: storedMethodId,
-        storedMethodUsageType: .unscheduled,
-        initiator: "payor"
+        storedMethodId: storedMethodId
     )),
     orderId: "ORDER-1001",
     source: "ios-sdk"
@@ -297,9 +295,9 @@ let paymentFlow = PayabliPayInPaymentFlow(
 )
 ```
 
-Authorize supports card data only today. Do not configure ACH, stored methods,
-cash, check, or cloud-device payment methods for authorization. Apple Pay can be
-added later as a separate authorizable method.
+The direct `authorize(_:)` API accepts a card, a stored card, or a cloud device,
+and refuses any other payment method before anything is sent. The hosted
+authorize form collects a card only.
 
 Hosted authorize forms should use card-only configuration:
 

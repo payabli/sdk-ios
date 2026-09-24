@@ -51,7 +51,7 @@ extension PayabliTTPSessionState {
             // the wire.
             return .failed(reason: .sdkInternalError)
 
-        case .nfcFailed, .initiateFailed, .updateFailed, .activationFailed:
+        case .nfcFailed, .initiateFailed, .updateFailed, .activationFailed, .cardDeclined, .outcomeUnknown:
             // A tap or an activation failed and the session did not. Nothing
             // about the session changed.
             return nil

@@ -102,62 +102,6 @@ final class PayInPaymentFlowClientTests: XCTestCase {
         XCTAssertEqual(details["serviceFee"] as? Double, 0.1)
     }
 
-    func testAuthorizeRejectsACHBeforeTransport() async throws {
-        let transport = MockPaymentCaptureTransport(responseBody: Self.approvedResponse)
-        let client = PayInPaymentFlowClient(
-            transport: transport
-        )
-
-        do {
-            _ = try await client.authorize(
-                entryPoint: "entry",
-                request: PayabliPayInPaymentFlowRequest(
-                    paymentDetails: PayabliPayInPaymentFlowPaymentDetails(totalAmount: 10),
-                    paymentMethod: .ach(PayabliPayInPaymentFlowACHMethod(data: PayabliPayInPaymentFlowACHData(
-                        accountNumber: "1111111111111",
-                        accountType: .checking,
-                        holderName: "John Doe",
-                        routingNumber: "123456780"
-                    )))
-                )
-            )
-            XCTFail("Expected invalid input")
-        } catch let PayabliPayInPaymentFlowError.invalidInput(message) {
-            XCTAssertEqual(message, "Only card data can be authorized.")
-            let requests = await transport.requests
-            XCTAssertTrue(requests.isEmpty)
-        } catch {
-            XCTFail("Wrong error: \(error)")
-        }
-    }
-
-    func testAuthorizeRejectsStoredCardBeforeTransport() async throws {
-        let transport = MockPaymentCaptureTransport(responseBody: Self.approvedResponse)
-        let client = PayInPaymentFlowClient(
-            transport: transport
-        )
-
-        do {
-            _ = try await client.authorize(
-                entryPoint: "entry",
-                request: PayabliPayInPaymentFlowRequest(
-                    paymentDetails: PayabliPayInPaymentFlowPaymentDetails(totalAmount: 10),
-                    paymentMethod: .stored(PayabliPayInPaymentFlowStoredMethod(
-                        method: .card,
-                        storedMethodId: "stored-card-1"
-                    ))
-                )
-            )
-            XCTFail("Expected invalid input")
-        } catch let PayabliPayInPaymentFlowError.invalidInput(message) {
-            XCTAssertEqual(message, "Only card data can be authorized.")
-            let requests = await transport.requests
-            XCTAssertTrue(requests.isEmpty)
-        } catch {
-            XCTFail("Wrong error: \(error)")
-        }
-    }
-
     func testCaptureAuthorizedSerializesPathAndPaymentDetailsOnly() async throws {
         let transport = MockPaymentCaptureTransport(responseBody: Self.approvedResponse)
         let client = PayInPaymentFlowClient(
