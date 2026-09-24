@@ -2,6 +2,10 @@ import PayabliSDKCore
 @testable import PayabliSDKPayInPaymentFlow
 import XCTest
 
+/// A bridge completion arrives through a main-actor task, which a runner busy with the rest of the suite can
+/// hold for longer than a second.
+private let mainActorCompletionTimeout: TimeInterval = 10
+
 @MainActor
 final class PaymentMethodObjCBridgeTests: XCTestCase {
     func testAddACHRejectsInvalidHolderType() throws {
@@ -149,7 +153,7 @@ final class PaymentMethodObjCBridgeTests: XCTestCase {
             completionExpectation.fulfill()
         }
 
-        await fulfillment(of: [completionExpectation], timeout: 1)
+        await fulfillment(of: [completionExpectation], timeout: mainActorCompletionTimeout)
     }
 
     func testAccessTokenHandlerErrorIsReturnedAndDoubleCallbacksAreIgnored() async throws {
@@ -192,7 +196,7 @@ final class PaymentMethodObjCBridgeTests: XCTestCase {
             completionExpectation.fulfill()
         }
 
-        await fulfillment(of: [completionExpectation], timeout: 1)
+        await fulfillment(of: [completionExpectation], timeout: mainActorCompletionTimeout)
     }
 
     // Cancellation coverage for the bridge's token provider lives in
@@ -226,6 +230,6 @@ final class PaymentMethodObjCBridgeTests: XCTestCase {
             completionExpectation.fulfill()
         }
 
-        await fulfillment(of: [completionExpectation], timeout: 1)
+        await fulfillment(of: [completionExpectation], timeout: mainActorCompletionTimeout)
     }
 }
