@@ -113,6 +113,7 @@ PayabliPayInPaymentFlowView(
         guard let stored = result.storedPaymentMethod else { return }
         // A stored-method id is a token: keep it, do not log it.
         storedMethodId = stored.storedMethodId
+        storedMethodType = stored.method
     }
 )
 ```
@@ -136,6 +137,7 @@ Button("Add Payment Method") {
     onCompleted: { result in
         // A stored-method id is a token: keep it, do not log it.
         storedMethodId = result.storedPaymentMethod?.storedMethodId
+        storedMethodType = result.storedPaymentMethod?.method
     }
 )
 ```
@@ -259,8 +261,8 @@ Direct capture with a stored method:
 let result = try await paymentFlow.capture(PayabliPayInPaymentFlowRequest(
     paymentDetails: PayabliPayInPaymentFlowPaymentDetails(totalAmount: 25.00),
     paymentMethod: .stored(PayabliPayInPaymentFlowStoredMethod(
-        method: .card,
-        storedMethodId: "stored-method-id",
+        method: storedMethodType,
+        storedMethodId: storedMethodId,
         storedMethodUsageType: .unscheduled,
         initiator: "payor"
     )),
@@ -821,6 +823,7 @@ func handle(_ result: PayabliPayInPaymentFlowResult) {
     case .storedPaymentMethod:
         // A stored-method id is a token: keep it, do not log it.
         storedMethodId = result.storedPaymentMethod?.storedMethodId
+        storedMethodType = result.storedPaymentMethod?.method
 
     case .transaction:
         paymentTransId = result.transaction?.paymentTransId
@@ -842,6 +845,7 @@ func handle(_ result: PayabliPayInPaymentFlowResult) {
 Stored-method fields:
 
 - `storedMethodId`
+- `method`, the `PayabliPayInPaymentFlowStoredMethodType` to charge it as
 - `methodReferenceId`
 - `resultCode`
 - `resultText`
