@@ -3,19 +3,19 @@ import XCTest
 
 final class PaymentMethodWireNameTests: XCTestCase {
     func testEachPaymentMethodSendsTheServiceMethodName() throws {
-        let cases: [(PayabliPayInPaymentMethod, String)] = [
-            (.card(.init(data: Self.card)), "card"),
-            (.bankAccount(.init(data: Self.bankAccount)), "ach"),
-            (.stored(.init(method: .card, storedMethodId: "stored-card")), "card"),
-            (.stored(.init(method: .bankAccount, storedMethodId: "stored-bank")), "ach"),
-            (.cloudDevice(.init(device: "device-1")), "cloud"),
-            (.check(.init(holderName: "Jane Doe")), "check"),
-            (.cash, "cash")
+        let cases: [(String, PayabliPayInPaymentMethod, String)] = [
+            ("card", .card(.init(data: Self.card)), "card"),
+            ("bankAccount", .bankAccount(.init(data: Self.bankAccount)), "ach"),
+            ("stored card", .stored(.init(method: .card, storedMethodId: "stored-card")), "card"),
+            ("stored bankAccount", .stored(.init(method: .bankAccount, storedMethodId: "stored-bank")), "ach"),
+            ("cloudDevice", .cloudDevice(.init(device: "device-1")), "cloud"),
+            ("check", .check(.init(holderName: "Jane Doe")), "check"),
+            ("cash", .cash, "cash")
         ]
 
-        for (paymentMethod, expected) in cases {
-            XCTAssertEqual(try Self.sentMethod(paymentMethod), expected, "\(paymentMethod)")
-            XCTAssertEqual(paymentMethod.method, expected, "\(paymentMethod)")
+        for (name, paymentMethod, expected) in cases {
+            XCTAssertEqual(try Self.sentMethod(paymentMethod), expected, name)
+            XCTAssertEqual(paymentMethod.method, expected, name)
         }
     }
 
