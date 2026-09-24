@@ -1520,6 +1520,9 @@ def test_release() -> None:
         code, _, _ = run_gate(["release"], root, declarations=declared)
         check("R10 the wrong argument count exits 2", code == 2, code)
 
+        code, out, _ = run_gate(["release", main_ref, stamp], root, declarations=declared)
+        check("R10b a release given a stamp exits 2 rather than ignoring it", code == 2 and not out, (code, out))
+
         # Against the real tree, asserting only the shape, so the check survives a version bump and proves
         # the gate reads the declaration as the source writes it.
         code, out, err = run_gate(["release", main_ref], root, root=REPO_ROOT)

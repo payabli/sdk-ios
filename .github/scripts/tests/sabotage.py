@@ -337,6 +337,11 @@ MUTATIONS = [
         GATE, 'if [ "$ref" != "refs/heads/main" ]; then', "if false; then", "R3", "release",
     ),
     Mutation(
+        "a release ignores an argument it does not take",
+        GATE, '        if [ "$#" -ne 2 ]; then\n            echo "usage: release-version.sh release <ref>" >&2',
+        '        if false; then\n            echo "usage: release-version.sh release <ref>" >&2', "R10b", "release",
+    ),
+    Mutation(
         "a declared version that is not major.minor.patch is tagged anyway",
         GATE, 'if ! [[ "$declared" =~ ^[0-9]+\\.[0-9]+\\.[0-9]+$ ]]; then', "if false; then", "R4", "release",
     ),

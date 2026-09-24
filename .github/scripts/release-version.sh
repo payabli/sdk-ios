@@ -58,6 +58,10 @@ fi
 
 case "$kind" in
     release)
+        if [ "$#" -ne 2 ]; then
+            echo "usage: release-version.sh release <ref>" >&2
+            exit 2
+        fi
         if [ "$ref" != "refs/heads/main" ]; then
             echo "error: a release is cut from refs/heads/main, not $ref" >&2
             exit 1
