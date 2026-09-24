@@ -122,6 +122,36 @@ final class TTPUpdateRetryTests: XCTestCase {
         XCTAssertEqual(failure?.paymentTransId, Self.paymentTransId)
     }
 
+    func testCancellingTheCloseOfARefusedCardIsStillReportedAsRefused() async throws {
+        Self.updateResponses.holdOpen()
+        let ttp = try await makeReadyTTP(outcome: .declined)
+
+        let task = Task { try await charge(ttp) }
+        await Self.updateResponses.waitUntilEntered()
+        task.cancel()
+
+        let failure = await chargeFailure(of: task)
+        XCTAssertEqual(failure?.errorCode, PayabliTTPError.cardDeclined(paymentTransId: "").errorCode)
+        XCTAssertEqual(failure?.capture, .notCharged)
+        XCTAssertEqual(failure?.paymentTransId, Self.paymentTransId)
+    }
+
+    func testCancellingTheCloseOfAnOutcomeThatIsNeitherSaysItIsUnknown() async throws {
+        Self.updateResponses.holdOpen()
+        let ttp = try await makeReadyTTP(outcome: .indeterminate)
+
+        let task = Task { try await charge(ttp) }
+        await Self.updateResponses.waitUntilEntered()
+        task.cancel()
+
+        let failure = await chargeFailure(of: task)
+        guard case .updateFailed = failure else {
+            return XCTFail("expected the close to be reported, got \(String(describing: failure))")
+        }
+        XCTAssertEqual(failure?.capture, .unknown)
+        XCTAssertEqual(failure?.paymentTransId, Self.paymentTransId)
+    }
+
     // MARK: - What the processor answered
 
     func testARefusedCardIsNotReportedAsACompletedPayment() async throws {
