@@ -361,17 +361,26 @@ class PayabliPayInPaymentFlowStoredPaymentMethod {
 
   factory PayabliPayInPaymentFlowStoredPaymentMethod._fromMap(
     Map<String, dynamic> map,
-  ) => PayabliPayInPaymentFlowStoredPaymentMethod(
-    storedMethodId: map['storedMethodId'] as String?,
-    method: (map['method'] as String?) ?? '',
-    methodReferenceId: map['methodReferenceId'] as String?,
-    resultCode: map['resultCode'] as int?,
-    resultText: map['resultText'] as String?,
-    customerId: map['customerId'] as int?,
-    responseText: (map['responseText'] as String?) ?? '',
-    apiResponse:
-        (map['apiResponse'] as Map?)?.cast<String, dynamic>() ?? const {},
-  );
+  ) {
+    final method = map['method'] as String?;
+    if (method == null) {
+      throw const PayabliTTPException(
+        code: 'PAYIN_PAYMENT_FLOW_FAILED',
+        message: 'Native store returned no method',
+      );
+    }
+    return PayabliPayInPaymentFlowStoredPaymentMethod(
+      storedMethodId: map['storedMethodId'] as String?,
+      method: method,
+      methodReferenceId: map['methodReferenceId'] as String?,
+      resultCode: map['resultCode'] as int?,
+      resultText: map['resultText'] as String?,
+      customerId: map['customerId'] as int?,
+      responseText: (map['responseText'] as String?) ?? '',
+      apiResponse:
+          (map['apiResponse'] as Map?)?.cast<String, dynamic>() ?? const {},
+    );
+  }
 }
 
 /// Mirrors `PayabliTTPPaymentType`. v1.0 supports only [sale].
