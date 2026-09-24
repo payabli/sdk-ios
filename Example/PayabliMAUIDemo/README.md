@@ -16,7 +16,7 @@ Minimal .NET MAUI demo wrapping Tap to Pay and payment flow through the
   page header.
 - **Card and ACH payment flow** — sample forms calling
   `PayabliPayInPaymentFlowObjC.AddCard(...)` and
-  `PayabliPayInPaymentFlowObjC.AddACH(...)`, then rendering the
+  `PayabliPayInPaymentFlowObjC.AddBankAccount(...)`, then rendering the
   stored-method response.
 
 ## Setup

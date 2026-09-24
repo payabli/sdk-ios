@@ -47,7 +47,7 @@ enum PayInFixture {
         PayabliPayInPaymentFlowRequest(
             paymentDetails: PayabliPayInPaymentFlowPaymentDetails(totalAmount: totalAmount),
             paymentMethod: cardOnly
-                ? .card(PayabliPayInPaymentFlowCardMethod(
+                ? .card(PayabliPayInPaymentMethod.Card(
                     data: PayabliPayInPaymentFlowCardData(
                         cardNumber: "4111 1111 1111 1111",
                         expiration: "02/27",
@@ -57,7 +57,7 @@ enum PayInFixture {
                     ),
                     saveIfSuccess: false
                 ))
-                : .stored(PayabliPayInPaymentFlowStoredMethod(method: .card, storedMethodId: "stored-1")),
+                : .stored(PayabliPayInPaymentMethod.Stored(method: .card, storedMethodId: "stored-1")),
             orderId: orderId,
             idempotencyKey: idempotencyKey
         )

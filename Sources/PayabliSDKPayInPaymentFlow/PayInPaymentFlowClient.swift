@@ -322,7 +322,7 @@ private struct TransactionRequestBody: Encodable {
     let orderDescription: String?
     let orderId: String?
     let paymentDetails: PayabliPayInPaymentFlowPaymentDetails
-    let paymentMethod: PayabliPayInPaymentFlowPaymentMethod
+    let paymentMethod: PayabliPayInPaymentMethod
     let source: String?
     let subdomain: String?
     let subscriptionId: Int64?

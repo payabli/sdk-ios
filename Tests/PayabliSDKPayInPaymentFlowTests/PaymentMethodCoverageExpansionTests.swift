@@ -10,26 +10,26 @@ final class PaymentMethodCoverageExpansionTests: XCTestCase {
     }
 
     func testPaymentMethodTypeIdentifiersAndDisplayNames() {
-        XCTAssertEqual(PayabliPayInPaymentFlowType.card.id, "card")
-        XCTAssertEqual(PayabliPayInPaymentFlowType.card.displayName, "Card")
-        XCTAssertEqual(PayabliPayInPaymentFlowType.ach.id, "ach")
-        XCTAssertEqual(PayabliPayInPaymentFlowType.ach.displayName, "ACH")
+        XCTAssertEqual(PayabliPayInPaymentFlowMethodType.card.id, "card")
+        XCTAssertEqual(PayabliPayInPaymentFlowMethodType.card.displayName, "Card")
+        XCTAssertEqual(PayabliPayInPaymentFlowMethodType.bankAccount.id, "ach")
+        XCTAssertEqual(PayabliPayInPaymentFlowMethodType.bankAccount.displayName, "ACH")
         XCTAssertEqual(PayabliPayInPaymentFlowCardBrand.visa.id, "visa")
         XCTAssertEqual(PayabliPayInPaymentFlowCardBrand.detect(cardNumber: "1"), .unknown)
-        XCTAssertEqual(PayabliPayInPaymentFlowACHAccountType.checking.id, "Checking")
-        XCTAssertEqual(PayabliPayInPaymentFlowACHHolderType.business.id, "business")
-        XCTAssertEqual(PayabliPayInPaymentFlowACHSecCode.web.id, "WEB")
+        XCTAssertEqual(PayabliPayInAccountType.checking.id, "Checking")
+        XCTAssertEqual(PayabliPayInAccountHolderType.business.id, "business")
+        XCTAssertEqual(PayabliPayInSecCode.web.id, "WEB")
     }
 
     func testPaymentMethodInputReportsMethod() {
-        let card = PayabliPayInPaymentFlowInput.card(PayabliPayInPaymentFlowCardData(
+        let card = PayabliPayInPaymentFlowMethodInput.card(PayabliPayInPaymentFlowCardData(
             cardNumber: "4111111111111111",
             expiration: "02/28",
             cardholderName: "Jane Doe",
             cvv: "123",
             billingZip: "33139"
         ))
-        let ach = PayabliPayInPaymentFlowInput.ach(PayabliPayInPaymentFlowACHData(
+        let ach = PayabliPayInPaymentFlowMethodInput.bankAccount(PayabliPayInBankAccountData(
             accountNumber: "1111111111",
             accountType: .checking,
             holderName: "Jane Doe",
@@ -37,7 +37,7 @@ final class PaymentMethodCoverageExpansionTests: XCTestCase {
         ))
 
         XCTAssertEqual(card.method, .card)
-        XCTAssertEqual(ach.method, .ach)
+        XCTAssertEqual(ach.method, .bankAccount)
     }
 
     func testPaymentMethodErrorMetadataAndValidationBranches() throws {
@@ -64,14 +64,14 @@ final class PaymentMethodCoverageExpansionTests: XCTestCase {
             billingZip: "33139"
         ).validate(PayabliPayInPaymentFlowValidation(requiresLuhnCheck: false)))
 
-        try PayabliPayInPaymentFlowACHData(
+        try PayabliPayInBankAccountData(
             accountNumber: "1111111111",
             accountType: .checking,
             holderName: "Jane Doe",
             routingNumber: "123456789"
         ).validate(PayabliPayInPaymentFlowValidation(validatesACHRoutingChecksum: false))
 
-        XCTAssertThrowsError(try PayabliPayInPaymentFlowACHData(
+        XCTAssertThrowsError(try PayabliPayInBankAccountData(
             accountNumber: "1111111111",
             accountType: .checking,
             holderName: "Jane Doe",
@@ -84,7 +84,7 @@ final class PaymentMethodCoverageExpansionTests: XCTestCase {
             XCTAssertEqual(message, "ACH routing number failed validation.")
         }
 
-        XCTAssertThrowsError(try PayabliPayInPaymentFlowACHData(
+        XCTAssertThrowsError(try PayabliPayInBankAccountData(
             accountNumber: "1111111111",
             accountType: .checking,
             holderName: " ",
@@ -97,7 +97,7 @@ final class PaymentMethodCoverageExpansionTests: XCTestCase {
             XCTAssertEqual(message, "ACH account holder is required.")
         }
 
-        XCTAssertThrowsError(try PayabliPayInPaymentFlowACHData(
+        XCTAssertThrowsError(try PayabliPayInBankAccountData(
             accountNumber: "1111111111",
             accountType: .checking,
             holderName: "Jane 🚀",
@@ -106,7 +106,7 @@ final class PaymentMethodCoverageExpansionTests: XCTestCase {
     }
 
     func testPaymentMethodInputEncodingTrimsOptionalACHDevice() throws {
-        let input = PayabliPayInPaymentFlowInput.ach(PayabliPayInPaymentFlowACHData(
+        let input = PayabliPayInPaymentFlowMethodInput.bankAccount(PayabliPayInBankAccountData(
             accountNumber: "1111111111",
             accountType: .checking,
             holderName: "Jane Doe",
@@ -297,8 +297,8 @@ final class PaymentMethodCoverageExpansionTests: XCTestCase {
         let view = PayabliPayInPaymentFlowView(
             component: component,
             configuration: PayabliPayInPaymentFlowFormConfiguration(
-                allowedMethods: [.ach],
-                defaultMethod: .ach,
+                allowedMethods: [.bankAccount],
+                defaultMethod: .bankAccount,
                 requiredFields: [
                     .achDevice,
                     .methodDescription,
@@ -335,8 +335,8 @@ final class PaymentMethodCoverageExpansionTests: XCTestCase {
         let view = PayabliPayInPaymentFlowView(
             component: component,
             configuration: PayabliPayInPaymentFlowFormConfiguration(
-                allowedMethods: [.ach],
-                defaultMethod: .ach,
+                allowedMethods: [.bankAccount],
+                defaultMethod: .bankAccount,
                 achSections: [
                     PayabliPayInPaymentFlowFieldSection(
                         title: "Bank Information",
@@ -382,7 +382,7 @@ final class PaymentMethodCoverageExpansionTests: XCTestCase {
         let view = PayabliPayInPaymentFlowView(
             component: component,
             configuration: PayabliPayInPaymentFlowFormConfiguration(
-                allowedMethods: [.card, .ach],
+                allowedMethods: [.card, .bankAccount],
                 cardBrandIconPlacement: .leading
             ),
             onCompleted: { _ in }
@@ -466,7 +466,7 @@ final class PaymentMethodCoverageExpansionTests: XCTestCase {
             cvv: "123",
             billingZip: "33139"
         ))
-        let achResult = try await component.addACH(PayabliPayInPaymentFlowACHData(
+        let achResult = try await component.addBankAccount(PayabliPayInBankAccountData(
             accountNumber: "1111111111",
             accountType: .checking,
             holderName: "Jane Doe",

@@ -268,11 +268,11 @@ text.
 
 Direct capture supports these payment method cases:
 
-- `.card(PayabliPayInPaymentFlowCardMethod)`
-- `.ach(PayabliPayInPaymentFlowACHMethod)`
-- `.stored(PayabliPayInPaymentFlowStoredMethod)`
-- `.cloud(PayabliPayInPaymentFlowCloudMethod)`
-- `.check(PayabliPayInPaymentFlowCheckMethod)`
+- `.card(PayabliPayInPaymentMethod.Card)`
+- `.bankAccount(PayabliPayInPaymentMethod.BankAccount)`
+- `.stored(PayabliPayInPaymentMethod.Stored)`
+- `.cloudDevice(PayabliPayInPaymentMethod.CloudDevice)`
+- `.check(PayabliPayInPaymentMethod.Check)`
 - `.cash`
 
 Direct authorize accepts a card, a stored card (`method: .card`), or a cloud
@@ -281,7 +281,7 @@ device, and refuses any other payment method before anything is sent:
 ```swift
 try await paymentFlow.authorize(PayabliPayInPaymentFlowRequest(
     paymentDetails: PayabliPayInPaymentFlowPaymentDetails(totalAmount: 1.00),
-    paymentMethod: .card(PayabliPayInPaymentFlowCardMethod(data: cardData))
+    paymentMethod: .card(PayabliPayInPaymentMethod.Card(data: cardData))
 ))
 ```
 

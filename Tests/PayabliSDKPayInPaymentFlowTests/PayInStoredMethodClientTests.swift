@@ -14,7 +14,7 @@ final class PayInStoredMethodClientTests: XCTestCase {
             entryPoint: "entry",
             request: PayabliPayInPaymentFlowRequest(
                 paymentDetails: PayabliPayInPaymentFlowPaymentDetails(totalAmount: 10),
-                paymentMethod: .stored(PayabliPayInPaymentFlowStoredMethod(
+                paymentMethod: .stored(PayabliPayInPaymentMethod.Stored(
                     method: .card,
                     storedMethodId: "stored-card-1"
                 ))

@@ -152,8 +152,8 @@ final class PaymentMethodFormConfigurationTests: XCTestCase {
 
     func testFormConfigurationAppendsACHRequiredFieldsWhenProvidedSectionsAreHidden() {
         let configuration = PayabliPayInPaymentFlowFormConfiguration(
-            allowedMethods: [.ach],
-            defaultMethod: .ach,
+            allowedMethods: [.bankAccount],
+            defaultMethod: .bankAccount,
             achSections: [
                 PayabliPayInPaymentFlowFieldSection(
                     title: "Hidden",
@@ -175,8 +175,8 @@ final class PaymentMethodFormConfigurationTests: XCTestCase {
 
     func testFormConfigurationRoutesRequiredACHAndCustomerFieldsToExistingSections() {
         let configuration = PayabliPayInPaymentFlowFormConfiguration(
-            allowedMethods: [.ach],
-            defaultMethod: .ach,
+            allowedMethods: [.bankAccount],
+            defaultMethod: .bankAccount,
             achSections: [
                 PayabliPayInPaymentFlowFieldSection(
                     title: "Customer",
@@ -466,8 +466,8 @@ final class PaymentMethodFormConfigurationTests: XCTestCase {
         let viewModel = PayabliPayInPaymentFlowViewModel(
             component: component(),
             configuration: PayabliPayInPaymentFlowFormConfiguration(
-                allowedMethods: [.ach],
-                defaultMethod: .ach,
+                allowedMethods: [.bankAccount],
+                defaultMethod: .bankAccount,
                 requiredFields: [
                     .achDevice,
                     .methodDescription,
@@ -533,8 +533,8 @@ final class PaymentMethodFormConfigurationTests: XCTestCase {
         let achViewModel = PayabliPayInPaymentFlowViewModel(
             component: component(),
             configuration: PayabliPayInPaymentFlowFormConfiguration(
-                allowedMethods: [.ach],
-                defaultMethod: .ach,
+                allowedMethods: [.bankAccount],
+                defaultMethod: .bankAccount,
                 requiredFields: [.achHolderType]
             )
         )

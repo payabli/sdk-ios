@@ -301,7 +301,7 @@ class PayabliPayInPaymentFlow {
     }
   }
 
-  static Future<PayabliPayInPaymentFlowStoredPaymentMethod> addACH({
+  static Future<PayabliPayInPaymentFlowStoredPaymentMethod> addBankAccount({
     required String accountNumber,
     required String accountType,
     required String holderName,
@@ -316,7 +316,7 @@ class PayabliPayInPaymentFlow {
   }) async {
     try {
       final result = await _payabliMethodChannel
-          .invokeMapMethod<String, dynamic>('addACH', {
+          .invokeMapMethod<String, dynamic>('addBankAccount', {
             'accountNumber': accountNumber,
             'accountType': accountType,
             'holderName': holderName,

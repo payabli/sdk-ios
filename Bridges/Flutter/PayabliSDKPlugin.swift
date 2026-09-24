@@ -73,8 +73,8 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
             handleConfigurePayInPaymentFlow(call.arguments, result: result)
         case "addCard":
             handleAddCard(call.arguments, result: result)
-        case "addACH":
-            handleAddACH(call.arguments, result: result)
+        case "addBankAccount":
+            handleAddBankAccount(call.arguments, result: result)
         default:
             result(FlutterMethodNotImplemented)
         }
@@ -421,7 +421,7 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
         )
     }
 
-    private func handleAddACH(_ arguments: Any?, result: @escaping FlutterResult) {
+    private func handleAddBankAccount(_ arguments: Any?, result: @escaping FlutterResult) {
         guard let payInPaymentFlow else {
             result(FlutterError(code: "NOT_CONFIGURED", message: "Call PayabliPayInPaymentFlow.configure() first", details: nil))
             return
@@ -429,7 +429,7 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
         guard let args = arguments as? [String: Any],
               let accountNumber = args["accountNumber"] as? String,
               let accountType = args["accountType"] as? String,
-              let resolvedAccountType = PayabliPayInPaymentFlowACHAccountType(rawValue: accountType),
+              let resolvedAccountType = PayabliPayInAccountType(rawValue: accountType),
               let holderName = args["holderName"] as? String,
               let routingNumber = args["routingNumber"] as? String
         else {
@@ -437,16 +437,16 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
             return
         }
 
-        let ach = PayabliPayInPaymentFlowACHData(
+        let ach = PayabliPayInBankAccountData(
             accountNumber: accountNumber,
             accountType: resolvedAccountType,
             holderName: holderName,
             routingNumber: routingNumber,
-            secCode: (args["secCode"] as? String).flatMap(PayabliPayInPaymentFlowACHSecCode.init(rawValue:)),
-            holderType: (args["holderType"] as? String).flatMap(PayabliPayInPaymentFlowACHHolderType.init(rawValue:))
+            secCode: (args["secCode"] as? String).flatMap(PayabliPayInSecCode.init(rawValue:)),
+            holderType: (args["holderType"] as? String).flatMap(PayabliPayInAccountHolderType.init(rawValue:))
         )
         handleAddPaymentMethod(
-            .ach(ach),
+            .bankAccount(ach),
             options: payInPaymentFlowOptions(from: args),
             component: payInPaymentFlow,
             result: result
@@ -454,7 +454,7 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
     }
 
     private func handleAddPaymentMethod(
-        _ payInPaymentFlowInput: PayabliPayInPaymentFlowInput,
+        _ payInPaymentFlowInput: PayabliPayInPaymentFlowMethodInput,
         options: PayabliPayInPaymentFlowOptions,
         component: PayabliPayInPaymentFlow,
         result: @escaping FlutterResult
@@ -531,9 +531,16 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
         )
     }
 
+    private static func methodName(_ method: PayabliPayInPaymentFlowStoredMethodType) -> String {
+        switch method {
+        case .card: return "card"
+        case .bankAccount: return "bankAccount"
+        }
+    }
+
     private static func storedPaymentMethodMap(_ method: PayabliPayInPaymentFlowStoredPaymentMethod) -> [String: Any] {
         var map: [String: Any] = [
-            "method": method.method.rawValue,
+            "method": methodName(method.method),
             "responseText": method.responseText,
             "apiResponse": dictionary(from: method.apiResponse)
         ]

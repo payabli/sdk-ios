@@ -39,7 +39,7 @@ RCT_EXTERN_METHOD(addCard:(NSDictionary *)params
                   resolver:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject)
 
-RCT_EXTERN_METHOD(addACH:(NSDictionary *)params
+RCT_EXTERN_METHOD(addBankAccount:(NSDictionary *)params
                   resolver:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject)
 

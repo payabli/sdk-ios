@@ -93,10 +93,10 @@ export enum PayabliTTPEventCode {
     ReaderPromptDismissed = 28,
 }
 
-export type PayabliPayInPaymentFlowACHAccountType = "Checking" | "Savings";
-export type PayabliPayInPaymentFlowACHHolderType = "personal" | "business";
-export type PayabliPayInPaymentFlowACHSecCode = "PPD" | "WEB" | "TEL" | "CCD" | "BOC";
-export type PayabliPayInPaymentFlowStoredMethodType = "card" | "ach";
+export type PayabliPayInAccountType = "Checking" | "Savings";
+export type PayabliPayInAccountHolderType = "personal" | "business";
+export type PayabliPayInSecCode = "PPD" | "WEB" | "TEL" | "CCD" | "BOC";
+export type PayabliPayInPaymentFlowStoredMethodType = "card" | "bankAccount";
 
 // MARK: - Tap to Pay data shapes
 
@@ -205,13 +205,13 @@ export interface PayabliPayInPaymentFlowCardData extends PayabliPayInPaymentFlow
     billingZip: string;
 }
 
-export interface PayabliPayInPaymentFlowACHData extends PayabliPayInPaymentFlowOptions {
+export interface PayabliPayInBankAccountData extends PayabliPayInPaymentFlowOptions {
     accountNumber: string;
-    accountType: PayabliPayInPaymentFlowACHAccountType;
+    accountType: PayabliPayInAccountType;
     holderName: string;
     routingNumber: string;
-    secCode?: PayabliPayInPaymentFlowACHSecCode;
-    holderType?: PayabliPayInPaymentFlowACHHolderType;
+    secCode?: PayabliPayInSecCode;
+    holderType?: PayabliPayInAccountHolderType;
 }
 
 export interface PayabliPayInPaymentFlowStoredPaymentMethod {
@@ -267,7 +267,7 @@ interface NativePayabliSDKModule {
 
     addCard(params: PayabliPayInPaymentFlowCardData): Promise<PayabliPayInPaymentFlowStoredPaymentMethod>;
 
-    addACH(params: PayabliPayInPaymentFlowACHData): Promise<PayabliPayInPaymentFlowStoredPaymentMethod>;
+    addBankAccount(params: PayabliPayInBankAccountData): Promise<PayabliPayInPaymentFlowStoredPaymentMethod>;
 
     resolvePayInPaymentFlowAccessToken(token: string): void;
 
@@ -418,16 +418,16 @@ export function addCard(
     return requireNativeModule().addCard(params);
 }
 
-export function addACH(
-    params: PayabliPayInPaymentFlowACHData
+export function addBankAccount(
+    params: PayabliPayInBankAccountData
 ): Promise<PayabliPayInPaymentFlowStoredPaymentMethod> {
-    return requireNativeModule().addACH(params);
+    return requireNativeModule().addBankAccount(params);
 }
 
 export const PayabliPayInPaymentFlow = {
     configure: configurePayInPaymentFlow,
     addCard,
-    addACH,
+    addBankAccount,
 };
 
 export default PayabliTTP;

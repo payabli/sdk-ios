@@ -142,7 +142,7 @@ private extension PayabliPayInPaymentFlowMethodInput {
     var storedMethodType: PayabliPayInPaymentFlowStoredMethodType {
         switch self {
         case .card: return .card
-        case .ach: return .ach
+        case .bankAccount: return .bankAccount
         }
     }
 }

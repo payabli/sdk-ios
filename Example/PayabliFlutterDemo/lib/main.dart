@@ -132,10 +132,10 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Future<void> _runAddACH() async {
+  Future<void> _runAddBankAccount() async {
     setState(() => _isSubmittingPayInPaymentFlow = true);
     try {
-      final method = await PayabliPayInPaymentFlow.addACH(
+      final method = await PayabliPayInPaymentFlow.addBankAccount(
         accountNumber: _achAccountController.text,
         accountType: 'Checking',
         holderName: _achHolderController.text,
@@ -435,7 +435,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(height: 8),
             FilledButton(
-              onPressed: _isSubmittingPayInPaymentFlow ? null : _runAddACH,
+              onPressed: _isSubmittingPayInPaymentFlow ? null : _runAddBankAccount,
               child:
                   Text(_isSubmittingPayInPaymentFlow ? 'Saving…' : 'Add ACH'),
             ),

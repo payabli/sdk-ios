@@ -169,8 +169,8 @@ let storedCard = try await paymentFlow.addCard(
 Direct stored ACH:
 
 ```swift
-let storedACH = try await paymentFlow.addACH(
-    PayabliPayInPaymentFlowACHData(
+let storedBankAccount = try await paymentFlow.addBankAccount(
+    PayabliPayInBankAccountData(
         accountNumber: "111111111111",
         accountType: .checking,
         holderName: "Jane Doe",
@@ -245,7 +245,7 @@ let result = try await paymentFlow.capture(PayabliPayInPaymentFlowRequest(
         serviceFee: 0.10,
         currency: "USD"
     ),
-    paymentMethod: .card(PayabliPayInPaymentFlowCardMethod(
+    paymentMethod: .card(PayabliPayInPaymentMethod.Card(
         data: cardData,
         initiator: "payor",
         saveIfSuccess: false
@@ -263,7 +263,7 @@ guard let storedMethodId = stored.storedMethodId else { return }
 
 let result = try await paymentFlow.capture(PayabliPayInPaymentFlowRequest(
     paymentDetails: PayabliPayInPaymentFlowPaymentDetails(totalAmount: 25.00),
-    paymentMethod: .stored(PayabliPayInPaymentFlowStoredMethod(
+    paymentMethod: .stored(PayabliPayInPaymentMethod.Stored(
         method: stored.method,
         storedMethodId: storedMethodId
     )),
@@ -272,7 +272,7 @@ let result = try await paymentFlow.capture(PayabliPayInPaymentFlowRequest(
 ))
 ```
 
-Direct capture also supports `.ach`, `.cloud`, `.check`, and `.cash`.
+Direct capture also supports `.bankAccount`, `.cloudDevice`, `.check`, and `.cash`.
 
 ## 6. Authorize A Transaction
 
@@ -320,7 +320,7 @@ let result = try await paymentFlow.authorize(PayabliPayInPaymentFlowRequest(
         serviceFee: 0.10,
         currency: "USD"
     ),
-    paymentMethod: .card(PayabliPayInPaymentFlowCardMethod(data: cardData)),
+    paymentMethod: .card(PayabliPayInPaymentMethod.Card(data: cardData)),
     orderDescription: "iOS authorization",
     source: "ios-sdk"
 ))
@@ -406,7 +406,7 @@ let labels = PayabliPayInPaymentFlowLabels(
 )
 
 let configuration = PayabliPayInPaymentFlowFormConfiguration(
-    allowedMethods: [.card, .ach],
+    allowedMethods: [.card, .bankAccount],
     defaultMethod: .card,
     cardSections: [
         PayabliPayInPaymentFlowFieldSection(
@@ -490,7 +490,7 @@ let configuration = PayabliPayInPaymentFlowFormConfiguration(
 
 | Field | Default | Description |
 | --- | --- | --- |
-| `allowedMethods` | `[.card, .ach]` | Methods available in the hosted method selector. |
+| `allowedMethods` | `[.card, .bankAccount]` | Methods available in the hosted method selector. |
 | `defaultMethod` | `.card` | Initial selected method. If not allowed, the first allowed method is used. |
 | `cardFieldOrder` | cardholder, number, expiration, CVV, postal code | Flat card order used when `cardSections` is nil. |
 | `achFieldOrder` | holder, routing, account, account type, holder type | Flat ACH order used when `achSections` is nil. |
@@ -938,7 +938,7 @@ payment-method creation. Native Swift integrations should call
 and void transaction flows until those request models are added to the bridge
 APIs.
 
-The `@objc` bridge covers `addCard` and `addACH` only. `voidTransaction(_:)` is
+The `@objc` bridge covers `addCard` and `addBankAccount` only. `voidTransaction(_:)` is
 not bridged, which matches capture, authorize and `captureAuthorizedTransaction`
 rather than being an omission.
 
