@@ -28,10 +28,9 @@ let package = Package(
         // targets on the critical path for primary SDK integrations.
         // PayInPaymentFlow and Telemetry are opt-in products that host apps
         // link explicitly when they need those surfaces.
-        // The public Package.swift template under `.github/templates/` is the
-        // source of truth for what consumers actually receive — it mirrors
-        // the shippable products below as `binaryTarget`s pointing at
-        // signed XCFramework zips on Payabli's CDN.
+        // This manifest is what consumers resolve: a release tag is this file
+        // at that commit. The XCFramework zips attached to a GitHub Release
+        // are for integrators who do not use SwiftPM.
         .library(
             name: "PayabliSDK",
             type: .dynamic,

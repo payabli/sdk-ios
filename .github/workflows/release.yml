@@ -2,7 +2,8 @@ name: Release
 
 # A consumer resolves this package by git tag, so the tag is the publication. This one cuts
 # `PayabliCore.version` from main, after the suite passes, on the commit that was tested, and gives it a
-# GitHub Release. `qa-snapshot.yml` is the pre-release counterpart; .github/RELEASING.md is the procedure.
+# GitHub Release carrying the XCFrameworks for integrators who do not use SwiftPM. `qa-snapshot.yml` is the
+# pre-release counterpart; .github/RELEASING.md is the procedure.
 
 on:
   workflow_dispatch:
@@ -22,12 +23,25 @@ jobs:
     runs-on: macos-15
     permissions:
       contents: write
+      actions: read
 
     env:
       # Through the environment, so the text is never parsed as shell.
       RELEASE_NOTES: ${{ inputs.release_notes }}
 
     steps:
+      # Nothing is published from a commit whose CI has not passed, and a run still in progress has not.
+      - name: Require a passing CI run on this commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          state="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?head_sha=$GITHUB_SHA&per_page=1" \
+            --jq '.workflow_runs[0] // empty | "\(.status) \(.conclusion)"')"
+          if [ "$state" != "completed success" ]; then
+            echo "::error::CI on $GITHUB_SHA is '${state:-not run}', not a completed success"
+            exit 1
+          fi
+
       # No credential is left in `.git/config`, so the code under test cannot push. Only the step that
       # publishes is handed one.
       - name: Checkout
@@ -78,7 +92,12 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             | xcpretty && exit ${PIPESTATUS[0]}
 
-      # One call creates the tag and the Release together, so a failure leaves neither behind.
+      - name: Build the XCFrameworks
+        timeout-minutes: 45
+        run: ./Scripts/build_release_frameworks.sh
+
+      # One call creates the tag and the Release with its assets: a draft, the uploads, then publishing. A
+      # failure leaves at most a draft, and no tag.
       - name: Publish the release
         env:
           GH_TOKEN: ${{ secrets.GHB_PAT_TOKEN }}
@@ -95,5 +114,12 @@ jobs:
               git log -n 50 --pretty=format:"- %s" "$GITHUB_SHA"
             fi
           } > release-notes.md
+          shopt -s nullglob
+          zips=(build/release/payabli-ios-sdk-*-"$VERSION".zip)
+          if [ "${#zips[@]}" -eq 0 ]; then
+            echo "::error::no XCFramework zips in build/release"
+            exit 1
+          fi
           gh release create "$VERSION" --target "$GITHUB_SHA" \
-            --title "Payabli iOS SDK $VERSION" --notes-file release-notes.md
+            --title "Payabli iOS SDK $VERSION" --notes-file release-notes.md \
+            "${zips[@]}" build/release/checksums.txt build/release/THIRD_PARTY_LICENSES.txt

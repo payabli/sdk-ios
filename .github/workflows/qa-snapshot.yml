@@ -18,8 +18,21 @@ jobs:
     runs-on: macos-15
     permissions:
       contents: write
+      actions: read
 
     steps:
+      # Nothing is published from a commit whose CI has not passed, and a run still in progress has not.
+      - name: Require a passing CI run on this commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          state="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?head_sha=$GITHUB_SHA&per_page=1" \
+            --jq '.workflow_runs[0] // empty | "\(.status) \(.conclusion)"')"
+          if [ "$state" != "completed success" ]; then
+            echo "::error::CI on $GITHUB_SHA is '${state:-not run}', not a completed success"
+            exit 1
+          fi
+
       # No credential is left in `.git/config`, so the code under test cannot push. Only the step that
       # publishes is handed one.
       - name: Checkout

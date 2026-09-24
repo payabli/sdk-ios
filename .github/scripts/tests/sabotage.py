@@ -531,6 +531,31 @@ MUTATIONS = [
         "W15b", "workflows",
     ),
     Mutation(
+        "the release starts while CI on the commit is red or still running",
+        RELEASE_YML, 'if [ "$state" != "completed success" ]; then', 'if [ "$state" = "never" ]; then',
+        "W15h", "workflows",
+    ),
+    Mutation(
+        "the QA snapshot starts without asking CI at all",
+        QA_YML,
+        '          state="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?head_sha=$GITHUB_SHA&per_page=1" \\\n',
+        '          state="completed success"; : "$(true \\\n',
+        "W15h", "workflows",
+    ),
+    Mutation(
+        "the release publishes without building the XCFrameworks",
+        RELEASE_YML,
+        "      - name: Build the XCFrameworks\n        timeout-minutes: 45\n"
+        "        run: ./Scripts/build_release_frameworks.sh\n\n",
+        "",
+        "W15g", "workflows",
+    ),
+    Mutation(
+        "the release builds the XCFrameworks and ships none of them",
+        RELEASE_YML, '            "${zips[@]}" build/release/checksums.txt', "            build/release/checksums.txt",
+        "W15g", "workflows",
+    ),
+    Mutation(
         "the release leaves the push credential where the tested code can read it",
         RELEASE_YML, "          persist-credentials: false\n", "          persist-credentials: true\n",
         "W15f", "workflows",

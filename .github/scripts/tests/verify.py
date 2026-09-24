@@ -1332,6 +1332,20 @@ def test_workflows() -> None:
         releases = sum("gh release create" in run for run in runs)
         check(f"W15d {name} {'creates one GitHub Release' if publishes else 'creates no GitHub Release'}",
               releases == (1 if publishes else 0), releases)
+        # Nothing starts on a commit whose CI is red or still running: the check is the first step, reads
+        # CI's run on this exact commit, and accepts one answer.
+        ci_at = first("actions/workflows/ci.yml/runs?head_sha=$GITHUB_SHA")
+        ci_run = runs[ci_at] if ci_at != -1 else ""
+        jobs = list((loaded.get("jobs") or {}).values())
+        check(f"W15h {name} starts only once CI on the commit has completed with success",
+              ci_at == 0 and '!= "completed success"' in ci_run and re.search(r"\bexit [1-9]", ci_run) is not None
+              and all((job.get("permissions") or {}).get("actions") == "read" for job in jobs),
+              (ci_at, ci_run[:160]))
+        if publishes:
+            build_at = first("build_release_frameworks.sh")
+            check(f"W15g {name} builds the XCFrameworks before publishing and attaches them",
+                  build_at != -1 and build_at < tag_at and '"${zips[@]}"' in tag_run
+                  and "build/release/checksums.txt" in tag_run, (build_at, tag_at))
         checkouts = [step for step in wf_steps if str(step.get("uses", "")).startswith("actions/checkout")]
         check(f"W15f {name} leaves no credential in .git/config for the code under test",
               bool(checkouts) and all((step.get("with") or {}).get("persist-credentials") is False
