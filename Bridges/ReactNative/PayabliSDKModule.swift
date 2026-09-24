@@ -157,15 +157,17 @@ public final class PayabliSDKModule: RCTEventEmitter {
         _ resolve: @escaping RCTPromiseResolveBlock,
         rejecter reject: @escaping RCTPromiseRejectBlock
     ) {
-        guard let ttp else {
-            reject("NOT_CONFIGURED", "Call configure() before initialize()", nil)
-            return
-        }
-        ttp.initialize { error in
-            if let error {
-                reject(error.rnCode(default: "INIT_FAILED"), error.rnMessage, error)
-            } else {
-                resolve(nil)
+        Task { @MainActor in
+            guard let ttp else {
+                reject("NOT_CONFIGURED", "Call configure() before initialize()", nil)
+                return
+            }
+            ttp.initialize { error in
+                if let error {
+                    reject(error.rnCode(default: "INIT_FAILED"), error.rnMessage, error)
+                } else {
+                    resolve(nil)
+                }
             }
         }
     }
@@ -177,47 +179,49 @@ public final class PayabliSDKModule: RCTEventEmitter {
         resolver resolve: @escaping RCTPromiseResolveBlock,
         rejecter reject: @escaping RCTPromiseRejectBlock
     ) {
-        guard let ttp else {
-            reject("NOT_CONFIGURED", "Call configure() before charge()", nil)
-            return
-        }
-        guard let pdDict = params["paymentDetails"] as? [String: Any],
-              let amountValue = (pdDict["amount"] as? NSNumber)
-        else {
-            reject("INVALID_ARGS", "Missing paymentDetails.amount", nil)
-            return
-        }
-        let typeRaw = (params["type"] as? Int) ?? 0
-        let serviceFeeValue = (pdDict["serviceFee"] as? NSNumber) ?? 0
-        // Pass through nil so the SDK omits `currency` from `/initiate` and the
-        // backend authorizes in the merchant's configured processor currency.
-        let currency = pdDict["currency"] as? String
-        let paymentDescription = pdDict["paymentDescription"] as? String
+        Task { @MainActor in
+            guard let ttp else {
+                reject("NOT_CONFIGURED", "Call configure() before charge()", nil)
+                return
+            }
+            guard let pdDict = params["paymentDetails"] as? [String: Any],
+                  let amountValue = (pdDict["amount"] as? NSNumber)
+            else {
+                reject("INVALID_ARGS", "Missing paymentDetails.amount", nil)
+                return
+            }
+            let typeRaw = (params["type"] as? Int) ?? 0
+            let serviceFeeValue = (pdDict["serviceFee"] as? NSNumber) ?? 0
+            // Pass through nil so the SDK omits `currency` from `/initiate` and the
+            // backend authorizes in the merchant's configured processor currency.
+            let currency = pdDict["currency"] as? String
+            let paymentDescription = pdDict["paymentDescription"] as? String
 
-        let paymentDetails = PayabliTTPPaymentDetailsObjC(
-            amount: NSDecimalNumber(decimal: amountValue.decimalValue),
-            serviceFee: NSDecimalNumber(decimal: serviceFeeValue.decimalValue),
-            currency: currency,
-            paymentDescription: paymentDescription
-        )
+            let paymentDetails = PayabliTTPPaymentDetailsObjC(
+                amount: NSDecimalNumber(decimal: amountValue.decimalValue),
+                serviceFee: NSDecimalNumber(decimal: serviceFeeValue.decimalValue),
+                currency: currency,
+                paymentDescription: paymentDescription
+            )
 
-        let customer = (params["customer"] as? [String: Any]).map(Self.customerObjC(from:))
-        let invoice = (params["invoice"] as? [String: Any]).map(Self.invoiceObjC(from:))
-        let orderDescription = params["orderDescription"] as? String
+            let customer = (params["customer"] as? [String: Any]).map(Self.customerObjC(from:))
+            let invoice = (params["invoice"] as? [String: Any]).map(Self.invoiceObjC(from:))
+            let orderDescription = params["orderDescription"] as? String
 
-        ttp.charge(
-            type: typeRaw,
-            paymentDetails: paymentDetails,
-            customer: customer,
-            invoice: invoice,
-            orderDescription: orderDescription
-        ) { result, error in
-            if let result {
-                resolve(["paymentTransId": result.paymentTransId])
-            } else if let error {
-                reject(error.rnCode(default: "CHARGE_FAILED"), error.rnMessage, error)
-            } else {
-                reject("CHARGE_FAILED", "Charge returned neither result nor error", nil)
+            ttp.charge(
+                type: typeRaw,
+                paymentDetails: paymentDetails,
+                customer: customer,
+                invoice: invoice,
+                orderDescription: orderDescription
+            ) { result, error in
+                if let result {
+                    resolve(["paymentTransId": result.paymentTransId])
+                } else if let error {
+                    reject(error.rnCode(default: "CHARGE_FAILED"), error.rnMessage, error)
+                } else {
+                    reject("CHARGE_FAILED", "Charge returned neither result nor error", nil)
+                }
             }
         }
     }
@@ -229,15 +233,17 @@ public final class PayabliSDKModule: RCTEventEmitter {
         resolver resolve: @escaping RCTPromiseResolveBlock,
         rejecter reject: @escaping RCTPromiseRejectBlock
     ) {
-        guard let ttp else {
-            reject("NOT_CONFIGURED", "Call configure() before activateDevice()", nil)
-            return
-        }
-        ttp.activateDevice(activationCode: activationCode as String) { error in
-            if let error {
-                reject(error.rnCode(default: "ACTIVATION_FAILED"), error.rnMessage, error)
-            } else {
-                resolve(nil)
+        Task { @MainActor in
+            guard let ttp else {
+                reject("NOT_CONFIGURED", "Call configure() before activateDevice()", nil)
+                return
+            }
+            ttp.activateDevice(activationCode: activationCode as String) { error in
+                if let error {
+                    reject(error.rnCode(default: "ACTIVATION_FAILED"), error.rnMessage, error)
+                } else {
+                    resolve(nil)
+                }
             }
         }
     }
@@ -252,15 +258,17 @@ public final class PayabliSDKModule: RCTEventEmitter {
         _ resolve: @escaping RCTPromiseResolveBlock,
         rejecter reject: @escaping RCTPromiseRejectBlock
     ) {
-        guard let ttp else {
-            reject("NOT_CONFIGURED", "Call configure() before areTermsAccepted()", nil)
-            return
-        }
-        ttp.areTermsAccepted { accepted, error in
-            if let error {
-                reject(error.rnCode(default: "TERMS_CHECK_FAILED"), error.rnMessage, error)
-            } else {
-                resolve(accepted)
+        Task { @MainActor in
+            guard let ttp else {
+                reject("NOT_CONFIGURED", "Call configure() before areTermsAccepted()", nil)
+                return
+            }
+            ttp.areTermsAccepted { accepted, error in
+                if let error {
+                    reject(error.rnCode(default: "TERMS_CHECK_FAILED"), error.rnMessage, error)
+                } else {
+                    resolve(accepted)
+                }
             }
         }
     }
@@ -274,15 +282,17 @@ public final class PayabliSDKModule: RCTEventEmitter {
         _ resolve: @escaping RCTPromiseResolveBlock,
         rejecter reject: @escaping RCTPromiseRejectBlock
     ) {
-        guard let ttp else {
-            reject("NOT_CONFIGURED", "Call configure() before presentTerms()", nil)
-            return
-        }
-        ttp.presentTerms { error in
-            if let error {
-                reject(error.rnCode(default: "TERMS_PRESENT_FAILED"), error.rnMessage, error)
-            } else {
-                resolve(nil)
+        Task { @MainActor in
+            guard let ttp else {
+                reject("NOT_CONFIGURED", "Call configure() before presentTerms()", nil)
+                return
+            }
+            ttp.presentTerms { error in
+                if let error {
+                    reject(error.rnCode(default: "TERMS_PRESENT_FAILED"), error.rnMessage, error)
+                } else {
+                    resolve(nil)
+                }
             }
         }
     }
@@ -488,6 +498,7 @@ public final class PayabliSDKModule: RCTEventEmitter {
 
     // MARK: - Event subscription
 
+    @MainActor
     private func subscribeEvents(on ttp: PayabliTTP) {
         eventToken = ttp.addEventListener { [weak self] code, payload in
             let safePayload = (payload as? [String: Any]) ?? [:]
