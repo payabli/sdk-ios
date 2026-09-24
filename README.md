@@ -175,7 +175,7 @@ https://github.com/payabli/sdk-ios.git
 Alternatively, declare the dependency in `Package.swift`:
 
 ```swift
-.package(url: "https://github.com/payabli/sdk-ios.git", exact: "0.0.1")
+.package(url: "https://github.com/payabli/sdk-ios.git", branch: "main")
 ```
 
 Link the required product. Most applications only need
