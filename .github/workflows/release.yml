@@ -3,7 +3,7 @@ name: Release
 # A consumer resolves this package by git tag, so the tag is the publication. This one cuts
 # `PayabliCore.version` from main, after the suite passes, on the commit that was tested, and gives it a
 # GitHub Release carrying the XCFrameworks for integrators who do not use SwiftPM. Only a release is ever
-# tagged. .github/RELEASING.md is the procedure.
+# tagged.
 
 on:
   workflow_dispatch:
@@ -50,7 +50,7 @@ jobs:
           RELEASE_DEPLOY_KEY: ${{ secrets.RELEASE_DEPLOY_KEY }}
         run: |
           if [ -z "$RELEASE_DEPLOY_KEY" ]; then
-            echo "::error::the release environment has no RELEASE_DEPLOY_KEY secret; .github/RELEASING.md sets it up"
+            echo "::error::the release environment has no RELEASE_DEPLOY_KEY secret"
             exit 1
           fi
 
