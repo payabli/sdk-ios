@@ -48,7 +48,7 @@ been excluded reports a standing skip instead. No count, for the same reason the
 gone: the set changes, and a number written here is wrong by the next round.
 
 **Release checks (`R*`)** run `release-version.sh` against synthetic trees, one refusal at a time, and once
-against this tree. `release.yml` and `qa-snapshot.yml` tag only what it prints, and a tag is what a consumer
+against this tree. `release.yml` tags only what it prints, and a tag is what a consumer
 resolves the package by, so a wrong answer publishes a version that cannot be withdrawn from anyone who
 already resolved it. The run against this tree asserts only the shape of what it prints, so it proves the
 gate reads the declaration as it is written without moving when the version is bumped.

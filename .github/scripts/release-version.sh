@@ -1,28 +1,20 @@
 #!/usr/bin/env bash
 #
-# Prints the version a tag is created under, or refuses with a reason and exits 1.
+# Prints the version a release is tagged under, or refuses with a reason and exits 1.
 #
-#   .github/scripts/release-version.sh release <ref>
-#   .github/scripts/release-version.sh qa <ref> [yyyyMMddHHmmss]
+#   .github/scripts/release-version.sh <ref>
 #
 # Prints the tag on stdout and nothing else. A tag is the publication: a consumer resolves the package by
-# it, so the version comes from `PayabliCore.version`, and a tag outside the scheme cannot be created.
-#
-#   release   <version>, cut from main only.
-#   qa        <version>-QA.<yyyyMMddHHmmss>, stamped in UTC, from any ref. The stamp defaults to now.
-#
-# Nothing else carries `-QA.`, so `git tag -l '*-QA.*'` selects exactly the prunable tags.
+# it, so the version comes from `PayabliCore.version`, and a release is cut from main only.
 
 set -euo pipefail
 
-if [ "$#" -lt 2 ] || [ "$#" -gt 3 ]; then
-    echo "usage: release-version.sh <release|qa> <ref> [yyyyMMddHHmmss]" >&2
+if [ "$#" -ne 1 ]; then
+    echo "usage: release-version.sh <ref>" >&2
     exit 2
 fi
 
-kind="$1"
-ref="$2"
-stamp="${3:-$(date -u +%Y%m%d%H%M%S)}"
+ref="$1"
 source_file="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/Sources/PayabliSDKCore/PayabliSDKCore.swift"
 
 if [ ! -f "$source_file" ]; then
@@ -56,27 +48,9 @@ if ! [[ "$declared" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
     exit 1
 fi
 
-case "$kind" in
-    release)
-        if [ "$#" -ne 2 ]; then
-            echo "usage: release-version.sh release <ref>" >&2
-            exit 2
-        fi
-        if [ "$ref" != "refs/heads/main" ]; then
-            echo "error: a release is cut from refs/heads/main, not $ref" >&2
-            exit 1
-        fi
-        echo "$declared"
-        ;;
-    qa)
-        if ! [[ "$stamp" =~ ^[0-9]{14}$ ]]; then
-            echo "error: '$stamp' is not a yyyyMMddHHmmss stamp" >&2
-            exit 1
-        fi
-        echo "$declared-QA.$stamp"
-        ;;
-    *)
-        echo "error: '$kind' is neither release nor qa" >&2
-        exit 1
-        ;;
-esac
+if [ "$ref" != "refs/heads/main" ]; then
+    echo "error: a release is cut from refs/heads/main, not $ref" >&2
+    exit 1
+fi
+
+echo "$declared"

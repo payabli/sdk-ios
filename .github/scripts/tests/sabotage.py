@@ -41,7 +41,6 @@ COPIED = (
     ".github/workflows/scripts.yml",
     ".github/workflows/ci.yml",
     ".github/workflows/release.yml",
-    ".github/workflows/qa-snapshot.yml",
     ".github/workflows/nightly-report.yml",
     ".github/hardware-only-tests.txt",
     ".github/scripts/release-version.sh",
@@ -50,7 +49,6 @@ COPIED = (
 
 CI_YML = ".github/workflows/ci.yml"
 RELEASE_YML = ".github/workflows/release.yml"
-QA_YML = ".github/workflows/qa-snapshot.yml"
 REPORT_YML = ".github/workflows/nightly-report.yml"
 HARDWARE_LIST = ".github/hardware-only-tests.txt"
 HELPER = ".github/scripts/hardware-only-skips.sh"
@@ -334,37 +332,28 @@ MUTATIONS = [
     # ---- the release version gate ------------------------------------------------------------------
     Mutation(
         "a release is cut from any branch",
-        GATE, 'if [ "$ref" != "refs/heads/main" ]; then', "if false; then", "R3", "release",
-    ),
-    Mutation(
-        "a release ignores an argument it does not take",
-        GATE, '        if [ "$#" -ne 2 ]; then\n            echo "usage: release-version.sh release <ref>" >&2',
-        '        if false; then\n            echo "usage: release-version.sh release <ref>" >&2', "R10b", "release",
+        GATE, 'if [ "$ref" != "refs/heads/main" ]; then', "if false; then", "R2", "release",
     ),
     Mutation(
         "a declared version that is not major.minor.patch is tagged anyway",
-        GATE, 'if ! [[ "$declared" =~ ^[0-9]+\\.[0-9]+\\.[0-9]+$ ]]; then', "if false; then", "R4", "release",
-    ),
-    Mutation(
-        "a QA stamp of any shape is accepted",
-        GATE, 'if ! [[ "$stamp" =~ ^[0-9]{14}$ ]]; then', "if false; then", "R5", "release",
-    ),
-    Mutation(
-        "an unknown kind is treated as a release",
-        GATE, "    release)\n", "    release|rc)\n", "R6", "release",
+        GATE, 'if ! [[ "$declared" =~ ^[0-9]+\\.[0-9]+\\.[0-9]+$ ]]; then', "if false; then", "R3", "release",
     ),
     Mutation(
         "a source declaring the version twice is read as one",
-        GATE, 'if [ "$declarations" -ne 1 ]; then', 'if [ "$declarations" -lt 1 ]; then', "R8", "release",
+        GATE, 'if [ "$declarations" -ne 1 ]; then', 'if [ "$declarations" -lt 1 ]; then', "R5", "release",
     ),
     Mutation(
         "a dead declaration is read as the version",
-        GATE, 'if [ "$declarations" -ne 1 ]; then', "if false; then", "R8b", "release",
+        GATE, 'if [ "$declarations" -ne 1 ]; then', "if false; then", "R5b", "release",
+    ),
+    Mutation(
+        "an argument the gate does not take is ignored",
+        GATE, 'if [ "$#" -ne 1 ]; then', 'if [ "$#" -lt 1 ]; then', "R7b", "release",
     ),
     Mutation(
         "the declaration is written in a form the gate cannot read",
         VERSION_SOURCE, "    public static var version: String {\n", "    public static var version: String {\n\n",
-        "R11", "release",
+        "R8", "release",
     ),
 
     # ---- the workflows -------------------------------------------------------------------------
@@ -526,7 +515,7 @@ MUTATIONS = [
     Mutation(
         "the release tags a version nobody checked",
         RELEASE_YML,
-        'VERSION="$(.github/scripts/release-version.sh release "$GITHUB_REF")"',
+        'VERSION="$(.github/scripts/release-version.sh "$GITHUB_REF")"',
         'VERSION="0.1.0"',
         "W15", "workflows",
     ),
@@ -541,11 +530,11 @@ MUTATIONS = [
         "W15h", "workflows",
     ),
     Mutation(
-        "the QA snapshot starts without asking CI at all",
-        QA_YML,
-        '          state="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?head_sha=$GITHUB_SHA&per_page=1" \\\n',
-        '          state="completed success"; : "$(true \\\n',
-        "W15h", "workflows",
+        "the nightly starts tagging",
+        NIGHTLY, "      - name: Checkout\n        uses: actions/checkout@v4\n",
+        "      - name: Checkout\n        run: git tag nightly && git push origin nightly\n"
+        "      - name: Checkout again\n        uses: actions/checkout@v4\n",
+        "W15d", "workflows",
     ),
     Mutation(
         "the release publishes without building the XCFrameworks",
@@ -569,31 +558,6 @@ MUTATIONS = [
         "the release's tag falls back to the default branch's head",
         RELEASE_YML, 'gh release create "$VERSION" --target "$GITHUB_SHA"', 'gh release create "$VERSION"',
         "W15c", "workflows",
-    ),
-    Mutation(
-        "the QA snapshot tags whatever HEAD is rather than the tested commit",
-        QA_YML, ' "Payabli iOS SDK $VERSION" "$GITHUB_SHA"', ' "Payabli iOS SDK $VERSION"', "W15c", "workflows",
-    ),
-    Mutation(
-        "a QA snapshot is published as a GitHub Release",
-        QA_YML, '            push origin "refs/tags/$VERSION"\n',
-        '            push origin "refs/tags/$VERSION"\n          gh release create "$VERSION"\n',
-        "W15d", "workflows",
-    ),
-    Mutation(
-        "a QA snapshot is tagged on every push",
-        QA_YML, "on:\n  workflow_dispatch:\n", "on:\n  push:\n  workflow_dispatch:\n", "W15e", "workflows",
-    ),
-    Mutation(
-        "the QA snapshot stops applying the hardware-only exclusions",
-        QA_YML, '            ${skips[@]+"${skips[@]}"} \\\n', "", "W12", "workflows",
-    ),
-    Mutation(
-        "the harness stops running on the QA snapshot workflow",
-        SCRIPTS_YML,
-        "      - '.github/workflows/qa-snapshot.yml'\n      - '.github/hardware-only-tests.txt'\n      # The release",
-        "      - '.github/hardware-only-tests.txt'\n      # The release",
-        "W11", "workflows",
     ),
     Mutation(
         "the harness stops running on the file the gate reads",

@@ -1,15 +1,12 @@
 # Releasing
 
-A consumer resolves this package by git tag, so a tag is a release. Two workflows create one, and nothing
-else does. Each refuses to start until **CI** has completed with success on the commit it runs from, then
-derives the version from the tree, runs the test suite, and tags the commit it tested.
+A consumer resolves this package by git tag, so a tag is a release, and only a release is ever tagged.
+**Release** (`release.yml`) creates one, and nothing else does. It refuses to start until **CI** has
+completed with success on the commit it runs from, then derives the version from the tree, runs the test
+suite, builds the XCFrameworks, and creates the tag and the GitHub Release on the commit it tested.
 
-| Workflow | Tag | Run from | GitHub Release |
-|---|---|---|---|
-| **Release** (`release.yml`) | `0.2.0` | `main` | yes, with the XCFramework zips, `checksums.txt` and `THIRD_PARTY_LICENSES.txt` |
-| **QA snapshot** (`qa-snapshot.yml`) | `0.2.0-QA.20260201143000`, stamped in UTC | a branch with a pull request | no |
-
-SwiftPM resolves the tag's source. The zips on a GitHub Release are for integrators who do not use SwiftPM.
+The GitHub Release carries the XCFramework zips, `checksums.txt` and `THIRD_PARTY_LICENSES.txt`. SwiftPM
+resolves the tag's source; the zips are for integrators who do not use SwiftPM.
 
 The version is `PayabliCore.version` in `Sources/PayabliSDKCore/PayabliSDKCore.swift`: the version the tree
 is heading for, which every module reports. There is no `v` prefix, because SwiftPM reads the tag name as the
@@ -30,14 +27,13 @@ version itself.
 
 A published number is never reused. A fix to a release is the next patch.
 
-## Hand someone a QA build
+## A build that is not a release
 
-Only when somebody outside the change needs to consume it: once **CI** has passed on the branch's pull
-request, run **QA snapshot** from the branch, and give them the tag it prints to pin exactly:
+Pin the commit, or build from the branch. Neither needs a tag:
 
 ```swift
-.package(url: "https://github.com/payabli/sdk-ios.git", exact: "0.2.0-QA.20260201143000")
+.package(url: "https://github.com/payabli/sdk-ios.git", revision: "<sha>")
+.package(url: "https://github.com/payabli/sdk-ios.git", branch: "<branch>")
 ```
 
-QA tags can be deleted, and `git tag -l '*-QA.*'` lists exactly them. An app of our own that only needs a
-commit pins it with `.revision("<sha>")` and needs no tag at all.
+Both work for an app. A package that uses version-based dependencies cannot depend on either.

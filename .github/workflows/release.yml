@@ -2,8 +2,8 @@ name: Release
 
 # A consumer resolves this package by git tag, so the tag is the publication. This one cuts
 # `PayabliCore.version` from main, after the suite passes, on the commit that was tested, and gives it a
-# GitHub Release carrying the XCFrameworks for integrators who do not use SwiftPM. `qa-snapshot.yml` is the
-# pre-release counterpart; .github/RELEASING.md is the procedure.
+# GitHub Release carrying the XCFrameworks for integrators who do not use SwiftPM. Only a release is ever
+# tagged. .github/RELEASING.md is the procedure.
 
 on:
   workflow_dispatch:
@@ -52,7 +52,7 @@ jobs:
 
       - name: Check the version
         run: |
-          VERSION="$(.github/scripts/release-version.sh release "$GITHUB_REF")"
+          VERSION="$(.github/scripts/release-version.sh "$GITHUB_REF")"
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
           echo "tagging $VERSION"
 
@@ -102,7 +102,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GHB_PAT_TOKEN }}
         run: |
-          previous="$(git tag --list '[0-9]*' --sort=-version:refname | grep -v -- '-QA\.' | head -n 1 || true)"
+          previous="$(git tag --list '[0-9]*' --sort=-version:refname | head -n 1 || true)"
           {
             if [ -n "$RELEASE_NOTES" ]; then
               printf '%s\n\n' "$RELEASE_NOTES"
