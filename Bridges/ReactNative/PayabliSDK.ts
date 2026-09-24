@@ -96,7 +96,7 @@ export enum PayabliTTPEventCode {
 export type PayabliPayInPaymentFlowACHAccountType = "Checking" | "Savings";
 export type PayabliPayInPaymentFlowACHHolderType = "personal" | "business";
 export type PayabliPayInPaymentFlowACHSecCode = "PPD" | "WEB" | "TEL" | "CCD" | "BOC";
-export type PayabliPayInPaymentFlowStoredMethodType = "card" | "ach" | "wallet";
+export type PayabliPayInPaymentFlowStoredMethodType = "card" | "ach";
 
 // MARK: - Tap to Pay data shapes
 
