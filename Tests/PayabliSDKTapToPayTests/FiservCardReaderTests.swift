@@ -11,6 +11,54 @@ final class FiservCardReaderTests: XCTestCase {
         XCTAssertEqual(FiservCardReader.providerId, "fiserv")
     }
 
+    func testTheGatewaysOwnStateDecidesApprovedDeclinedOrNeither() {
+        let cases: [(String?, CardReadOutcome)] = [
+            ("CAPTURED", .approved),
+            ("AUTHORIZED", .approved),
+            ("authorized", .approved),
+            ("DECLINED", .declined),
+            ("VOIDED", .indeterminate),
+            ("WAITING", .indeterminate),
+            ("SOMETHING_NEW", .indeterminate),
+            (nil, .indeterminate)
+        ]
+        for (state, expected) in cases {
+            XCTAssertEqual(FiservCardReader.outcome(ofGatewayState: state), expected, "\(state ?? "nil")")
+        }
+    }
+
+    #if canImport(PayabliCardReaderCore)
+        /// The state is read from where the gateway's response puts it, and a response without one is neither.
+        func testTheStateIsReadFromTheGatewaysResponse() throws {
+            let cases: [(String, String?)] = [
+                (#"{"gatewayResponse":{"transactionType":"CHARGE","transactionState":"DECLINED"}}"#, "DECLINED"),
+                (#"{"gatewayResponse":{"transactionType":"CHARGE"}}"#, nil),
+                (#"{"source":{"brand":"VISA"}}"#, nil)
+            ]
+            for (json, state) in cases {
+                let response = try JSONDecoder().decode(Models.CommerceHubResponse.self, from: Data(json.utf8))
+                XCTAssertEqual(response.gatewayResponse?.transactionState, state, json)
+            }
+        }
+
+        /// What `startReading` returns for a response the reader handed back, declined or neither included.
+        func testTheReadResultCarriesTheGatewaysOutcomeAndState() throws {
+            let cases: [(String, CardReadOutcome, String?)] = [
+                (#"{"gatewayResponse":{"transactionState":"CAPTURED"}}"#, .approved, "CAPTURED"),
+                (#"{"gatewayResponse":{"transactionState":"DECLINED"}}"#, .declined, "DECLINED"),
+                (#"{"gatewayResponse":{"transactionState":"WAITING"}}"#, .indeterminate, "WAITING"),
+                (#"{"source":{"brand":"VISA"}}"#, .indeterminate, nil)
+            ]
+            for (json, outcome, state) in cases {
+                let response = try JSONDecoder().decode(Models.CommerceHubResponse.self, from: Data(json.utf8))
+                let result = try FiservCardReader.readResult(from: response)
+                XCTAssertEqual(result.outcome, outcome, json)
+                XCTAssertEqual(result.providerState, state, json)
+                XCTAssertNotNil(result.providerResponseJSON, "the response is still forwarded whatever it says")
+            }
+        }
+    #endif
+
     /// Eligibility is platform/hardware-only (PRD FR-11J.2) and is called before
     /// `/config` delivers credentials — so a fresh reader on a supported device
     /// must report `success`.

@@ -102,12 +102,9 @@ final class TTPUpdateRetryTests: XCTestCase {
         XCTAssertEqual(Self.updateResponses.sends, 1)
     }
 
-    /// Cancelling reaches the caller as cancellation, not as a failed update.
-    ///
-    /// The retry layer stops repeating a cancelled request, and this is the other half: the call site
-    /// converts what it catches into this surface's own error, so without a branch for it a caller who
-    /// cancelled would be told the update failed.
-    func testCancellingDuringTheUpdateReachesTheCallerAsCancellation() async throws {
+    /// The card was charged at the tap, so a caller who cancels the close is told that rather than only
+    /// that it cancelled.
+    func testCancellingTheCloseOfAnApprovedSaleSaysTheCardWasCharged() async throws {
         Self.updateResponses.holdOpen()
         let ttp = try await makeReadyTTP()
 
@@ -117,14 +114,129 @@ final class TTPUpdateRetryTests: XCTestCase {
         await Self.updateResponses.waitUntilEntered()
         task.cancel()
 
-        do {
-            _ = try await task.value
-            XCTFail("expected cancellation")
-        } catch is CancellationError {
-            // The only acceptable outcome.
-        } catch let PayabliTTPError.updateFailed(reason, _, _) {
-            XCTFail("cancellation was reported as a failed update: \(reason)")
+        let failure = await chargeFailure(of: task)
+        guard case .updateFailed = failure else {
+            return XCTFail("expected the close to be reported, got \(String(describing: failure))")
         }
+        XCTAssertEqual(failure?.capture, .charged)
+        XCTAssertEqual(failure?.paymentTransId, Self.paymentTransId)
+    }
+
+    func testCancellingTheCloseOfARefusedCardIsStillReportedAsRefused() async throws {
+        Self.updateResponses.holdOpen()
+        let ttp = try await makeReadyTTP(outcome: .declined)
+
+        let task = Task { try await charge(ttp) }
+        await Self.updateResponses.waitUntilEntered()
+        task.cancel()
+
+        let failure = await chargeFailure(of: task)
+        XCTAssertEqual(failure?.errorCode, PayabliTTPError.cardDeclined(paymentTransId: "").errorCode)
+        XCTAssertEqual(failure?.capture, .notCharged)
+        XCTAssertEqual(failure?.paymentTransId, Self.paymentTransId)
+    }
+
+    func testCancellingTheCloseOfAnOutcomeThatIsNeitherSaysItIsUnknown() async throws {
+        Self.updateResponses.holdOpen()
+        let ttp = try await makeReadyTTP(outcome: .indeterminate)
+
+        let task = Task { try await charge(ttp) }
+        await Self.updateResponses.waitUntilEntered()
+        task.cancel()
+
+        let failure = await chargeFailure(of: task)
+        guard case .updateFailed = failure else {
+            return XCTFail("expected the close to be reported, got \(String(describing: failure))")
+        }
+        XCTAssertEqual(failure?.capture, .unknown)
+        XCTAssertEqual(failure?.paymentTransId, Self.paymentTransId)
+    }
+
+    // MARK: - What the processor answered
+
+    func testARefusedCardIsNotReportedAsACompletedPayment() async throws {
+        Self.updateResponses.script([200])
+        let ttp = try await makeReadyTTP(outcome: .declined)
+
+        let failure = await chargeFailure(ttp)
+
+        XCTAssertEqual(failure?.errorCode, PayabliTTPError.cardDeclined(paymentTransId: "").errorCode)
+        XCTAssertEqual(failure?.paymentTransId, Self.paymentTransId)
+        XCTAssertEqual(failure?.capture, .notCharged)
+        XCTAssertEqual(Self.updateResponses.sends, 1, "a refusal is still closed")
+    }
+
+    /// `updateCompleted` has only ever meant the charge went through, so a refusal must not emit it.
+    func testARefusedCardEmitsNoCompletedUpdate() async throws {
+        Self.updateResponses.script([200])
+        let ttp = try await makeReadyTTP(outcome: .declined)
+
+        let stream = ttp.events()
+        let collector = Task<Bool, Never> {
+            for await event in stream {
+                if case .updateCompleted = event {
+                    return true
+                }
+            }
+            return false
+        }
+
+        _ = await chargeFailure(ttp)
+
+        let deadline = Task {
+            guard (try? await Task.sleep(nanoseconds: 500_000_000)) != nil else { return }
+            collector.cancel()
+        }
+        let completed = await collector.value
+        deadline.cancel()
+        XCTAssertFalse(completed, "a refused card was announced as a completed update")
+    }
+
+    func testARefusedCardWhoseCloseFailsIsStillReportedAsRefused() async throws {
+        Self.updateResponses.script([400])
+        let ttp = try await makeReadyTTP(outcome: .declined)
+
+        let failure = await chargeFailure(ttp)
+
+        XCTAssertEqual(failure?.errorCode, PayabliTTPError.cardDeclined(paymentTransId: "").errorCode)
+        XCTAssertEqual(failure?.capture, .notCharged)
+    }
+
+    func testAnOutcomeThatIsNeitherIsNotReportedAsEither() async throws {
+        Self.updateResponses.script([200])
+        let ttp = try await makeReadyTTP(outcome: .indeterminate)
+
+        let failure = await chargeFailure(ttp)
+
+        XCTAssertEqual(failure?.errorCode, PayabliTTPError.outcomeUnknown(paymentTransId: "").errorCode)
+        XCTAssertEqual(failure?.paymentTransId, Self.paymentTransId)
+        XCTAssertEqual(failure?.capture, .unknown)
+        XCTAssertEqual(Self.updateResponses.sends, 1, "an unknown outcome is closed too")
+    }
+
+    func testAnOutcomeThatIsNeitherWhoseCloseFailsReportsTheClose() async throws {
+        Self.updateResponses.script([400])
+        let ttp = try await makeReadyTTP(outcome: .indeterminate)
+
+        let failure = await chargeFailure(ttp)
+
+        guard case .updateFailed = failure else {
+            return XCTFail("expected the close to be reported, got \(String(describing: failure))")
+        }
+        XCTAssertEqual(failure?.capture, .unknown)
+    }
+
+    func testAnApprovedSaleWhoseCloseFailsSaysTheCardWasCharged() async throws {
+        Self.updateResponses.script([400])
+        let ttp = try await makeReadyTTP(outcome: .approved)
+
+        let failure = await chargeFailure(ttp)
+
+        guard case .updateFailed = failure else {
+            return XCTFail("expected the close to be reported, got \(String(describing: failure))")
+        }
+        XCTAssertEqual(failure?.capture, .charged)
+        XCTAssertEqual(failure?.paymentTransId, Self.paymentTransId)
     }
 
     /// The event names what failed, not the wrapper. Once wrapped, a rate limit, a server fault, a
@@ -329,8 +441,12 @@ final class TTPUpdateRetryTests: XCTestCase {
 
     static let updateResponses = ScriptedUpdates()
 
-    private func makeReadyTTP() async throws -> PayabliTTP {
+    private func makeReadyTTP(outcome: CardReadOutcome = .approved) async throws -> PayabliTTP {
         StubURLProtocol.handler = Self.stubHandler
+        let provider = MockTapToPayProvider()
+        provider.readingResult = .success(
+            CardReadResult(provider: "mock", encryptedPayload: Data(), outcome: outcome)
+        )
         let config = try PayabliConfig(
             entryPoint: "e",
             environment: .sandbox,
@@ -339,7 +455,7 @@ final class TTPUpdateRetryTests: XCTestCase {
         let ttp = PayabliTTP(
             config: config,
             appId: "appid",
-            provider: MockTapToPayProvider(),
+            provider: provider,
             attestation: MockDeviceAttestationService(),
             // Three attempts with no wait: the schedule is the retry suite's subject, the count is this
             // suite's.
@@ -363,6 +479,22 @@ final class TTPUpdateRetryTests: XCTestCase {
             type: .sale,
             paymentDetails: PayabliTTPPaymentDetails(amount: 1, currency: "USD")
         )
+    }
+
+    private func chargeFailure(_ ttp: PayabliTTP) async -> PayabliTTPError? {
+        await chargeFailure(of: Task { try await charge(ttp) })
+    }
+
+    private func chargeFailure(of task: Task<TransactionResult, Error>) async -> PayabliTTPError? {
+        do {
+            _ = try await task.value
+            XCTFail("expected the charge to fail")
+        } catch let failure as PayabliTTPError {
+            return failure
+        } catch {
+            XCTFail("expected a PayabliTTPError, got \(error)")
+        }
+        return nil
     }
 
     private static let stubHandler: StubURLProtocol.Handler = { request in

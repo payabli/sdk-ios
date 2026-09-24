@@ -60,17 +60,34 @@ package struct CardReadResult: Sendable {
     /// layer (payload-only providers).
     package let providerResponseJSON: Data?
 
+    /// What the processor answered for this sale. A provider that does not say is `indeterminate`.
+    package let outcome: CardReadOutcome
+
+    /// The processor's own word for the sale's state, kept for diagnosis and never shown to a host.
+    package let providerState: String?
+
     package init(
         provider: String,
         encryptedPayload: Data,
         cardNetwork: String? = nil,
         providerMetadata: [String: String] = [:],
-        providerResponseJSON: Data? = nil
+        providerResponseJSON: Data? = nil,
+        outcome: CardReadOutcome = .indeterminate,
+        providerState: String? = nil
     ) {
         self.provider = provider
         self.encryptedPayload = encryptedPayload
         self.cardNetwork = cardNetwork
         self.providerMetadata = providerMetadata
         self.providerResponseJSON = providerResponseJSON
+        self.outcome = outcome
+        self.providerState = providerState
     }
+}
+
+/// Whether the processor took the sale, refused it, or answered neither.
+package enum CardReadOutcome: Sendable, Equatable {
+    case approved
+    case declined
+    case indeterminate
 }

@@ -9,8 +9,8 @@ private enum TTPUpdateOutcome {
     case succeeded
     case failed(reason: String)
 
-    /// The caller cancelled. Separate from `failed`, because a caller who cancelled is not told the
-    /// update failed, and the best-effort notify after a reader failure ignores it either way.
+    /// The caller cancelled. Separate from `failed`, because no `updateFailed` event is emitted for it,
+    /// and the best-effort notify after a reader failure ignores it either way.
     case cancelled
 }
 
@@ -115,20 +115,37 @@ extension PayabliTTP {
         return try await runSuccessUpdate(paymentTransId: paymentTransId, readResult: readResult)
     }
 
-    /// Step 3 — success update. No offline fallback: on failure the transaction
-    /// stays authorized on the processor and the host must reconcile manually.
+    /// Step 3 — the update, sent whatever the processor answered. Only an approval is a payment, and a
+    /// refusal stays a refusal even when the update then fails.
     private func runSuccessUpdate(
         paymentTransId: String,
         readResult: CardReadResult
     ) async throws -> TransactionResult {
-        switch await tryUpdate(paymentTransId: paymentTransId, payload: .success(readResult)) {
-        case .succeeded:
+        let update = await tryUpdate(paymentTransId: paymentTransId, payload: .success(readResult))
+
+        let capture: PayabliTTPCapture
+        switch readResult.outcome {
+        case .declined:
+            throw PayabliTTPError.cardDeclined(paymentTransId: paymentTransId)
+        case .approved:
+            capture = .charged
+        case .indeterminate:
+            capture = .unknown
+        }
+
+        switch update {
+        case .succeeded where capture == .charged:
             multicaster.emit(.updateCompleted(paymentTransId: paymentTransId))
             return TransactionResult(paymentTransId: paymentTransId)
+        case .succeeded:
+            throw PayabliTTPError.outcomeUnknown(paymentTransId: paymentTransId)
         case let .failed(reason):
-            throw PayabliTTPError.updateFailed(reason: reason, paymentTransId: paymentTransId, capture: .unknown)
+            throw PayabliTTPError.updateFailed(reason: reason, paymentTransId: paymentTransId, capture: capture)
         case .cancelled:
-            throw CancellationError()
+            // The card was read, so a caller who cancelled is still told what the tap did.
+            throw PayabliTTPError.updateFailed(
+                reason: "The update was cancelled", paymentTransId: paymentTransId, capture: capture
+            )
         }
     }
 
@@ -255,8 +272,8 @@ extension PayabliTTP {
             }
             return .succeeded
         } catch is CancellationError {
-            // Nothing below retries a cancelled request any more, and reporting it as a failed update
-            // here would put the same misreport back one layer up.
+            // Nothing below retries a cancelled request any more, and the event stream is not told the
+            // update failed. What the caller is told depends on what the tap did.
             return .cancelled
         } catch {
             // The event summarizes what actually failed, not this surface's wrapper for it: a rate limit,

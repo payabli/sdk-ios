@@ -332,8 +332,11 @@ The `charge(...)` method does three things:
 2. NFC card read
 3. call `PATCH /MoneyIn/update/{id}`
 
-If the final update fails after retries, the transaction is still authorized on the processor
-side and must be reconciled out of band. This case is rare.
+Only an approval returns a result. A declined card throws `PayabliTTPError.cardDeclined`, even
+when the update then fails. If the update fails or is cancelled after any other answer, the charge
+throws `PayabliTTPError.updateFailed`, whose `capture` says whether the card was charged: `.charged`
+after an approval, which the host reconciles out of band, and `.unknown` when the processor answered
+neither.
 
 ### `charge(...)` reference
 
@@ -572,6 +575,10 @@ do {
     // Session isn't in the required state for this call.
 } catch let PayabliTTPError.attestationFailed(reason) {
     // App Attest or Payabli refused to attest the device.
+} catch let PayabliTTPError.cardDeclined(paymentTransId) {
+    // The processor refused the card. No money moved.
+} catch let PayabliTTPError.outcomeUnknown(paymentTransId) {
+    // The processor answered neither an approval nor a refusal. Reconcile before charging again.
 } catch let PayabliTTPError.nfcFailed(reason, paymentTransId) {
     // Card removed prematurely, reader timeout, or similar. The card may have been
     // charged, so reconcile the payment before charging again.

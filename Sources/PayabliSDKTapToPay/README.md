@@ -266,9 +266,10 @@ serial steps. The result of each step feeds the next:
                                                                                       │
                                                                                       ▼
                                                        Retried on a transport failure, a server fault
-                                                       or a rate limit, honouring `Retry-After`. On
-                                                       final failure the charge throws
-                                                       `PayabliTTPError.updateFailed`.
+                                                       or a rate limit, honouring `Retry-After`. A
+                                                       declined card throws `cardDeclined` whether or
+                                                       not the update lands. Otherwise a final failure
+                                                       throws `updateFailed`, carrying the capture.
                                                        There is no offline / pending-update fallback.
 ```
 
@@ -277,7 +278,8 @@ can surface progress without polling the state machine.
 
 > **Note — no offline fallback.** An earlier version of the SDK enqueued failed
 > updates into a `PendingUpdateQueue` for later retry. That subsystem has
-> been removed; if the final `PATCH /update` fails after retries, the
+> been removed; if the final `PATCH /update` fails after retries, the charge
+> reports it, and `capture` says what the tap did. After an approval the
 > transaction is still authorized on the processor side and the host must
 > reconcile manually (processor dashboard or back-office).
 
