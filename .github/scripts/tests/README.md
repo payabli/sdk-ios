@@ -47,13 +47,19 @@ tests or none at all, and nothing downstream notices: the suite still passes and
 been excluded reports a standing skip instead. No count, for the same reason the check count above is
 gone: the set changes, and a number written here is wrong by the next round.
 
+**Release checks (`R*`)** run `release-version.sh` against synthetic trees, one refusal at a time, and once
+against this tree. `release.yml` tags only what it prints, and a tag is what a consumer
+resolves the package by, so a wrong answer publishes a version that cannot be withdrawn from anyone who
+already resolved it. The run against this tree asserts only the shape of what it prints, so it proves the
+gate reads the declaration as it is written without moving when the version is bumped.
+
 **Workflow checks (`W*`)** parse the workflows and assert what the files have to be:
 which triggers the nightly may carry, that exactly one job names the Slack token, how the liveness owner is
 decided, that every suite continues on error and is bounded, that the gate reads every outcome, and that
 this harness runs on every file it makes claims about. Each of those was true of how the files were
 written, which is not the same as being enforced.
 
-Set `NIGHTLY_ONLY` to `collector`, `poster`, `workflows` or `helper` to run one family. The default,
+Set `NIGHTLY_ONLY` to `collector`, `poster`, `workflows`, `helper` or `release` to run one family. The default,
 `both`, runs all of them.
 
 ## sabotage.py

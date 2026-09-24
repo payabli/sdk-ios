@@ -92,5 +92,6 @@ consumer's `otool -L`.
 - [x] Root [`THIRD_PARTY_LICENSES.txt`](../../THIRD_PARTY_LICENSES.txt) reproduces the full MIT license text
       with Fiserv as the copyright holder.
 - [x] This README explicitly credits `Fiserv/TTPPackage` as the upstream.
-- [x] Binary distributions ship `THIRD_PARTY_LICENSES.txt` alongside the
-      XCFramework zips (see `Scripts/build_release_frameworks.sh`).
+- [x] A release tag carries `THIRD_PARTY_LICENSES.txt` at the repository root.
+      `Scripts/build_release_frameworks.sh` puts it inside the release zip, next
+      to the XCFrameworks, and beside the zip on the GitHub Release.

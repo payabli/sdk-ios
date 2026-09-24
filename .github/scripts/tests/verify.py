@@ -48,8 +48,10 @@ CI_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "ci.yml"
 RELEASE_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "release.yml"
 REPORT_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "nightly-report.yml"
 HARDWARE_LIST = REPO_ROOT / ".github" / "hardware-only-tests.txt"
+VERSION_SOURCE = "Sources/PayabliSDKCore/PayabliSDKCore.swift"
+GATE_SCRIPT = REPO_ROOT / ".github" / "scripts" / "release-version.sh"
 
-HALVES = ("collector", "poster", "workflows", "helper", "both")
+HALVES = ("collector", "poster", "workflows", "helper", "release", "both")
 
 # What GitHub accepts as a workflow file, quoting its own documentation: "You can give the workflow
 # file any name you like, but you must use `.yml` or `.yaml` as the file name extension." One copy,
@@ -1217,6 +1219,7 @@ def test_workflows() -> None:
         ".github/scripts/**",
         ".github/workflows/scripts.yml",
         ".github/hardware-only-tests.txt",
+        VERSION_SOURCE,
         *(f".github/workflows/{name}" for name, _ in tiers),
         *(f".github/workflows/{name}" for name in token_holders),
     }
@@ -1300,6 +1303,100 @@ def test_workflows() -> None:
           f"SWITCH_HOURS={poster_module.SWITCH_HOURS} needs >= {needed:.1f} "
           f"(24h cadence + {job_bound}min job bound + {delay_margin_hours}h delay)")
 
+    # The release pushes the tag a consumer resolves by, so the order of its steps is the guarantee:
+    # nothing starts before CI on the commit has passed, nothing is tagged that the gate refused or the suite
+    # failed, and what is tagged is what was tested.
+    release = yaml.safe_load(RELEASE_WORKFLOW.read_text())
+    release_steps = [step for job in (release.get("jobs") or {}).values() for step in job.get("steps") or []]
+    runs = [str(step.get("run", "")) for step in release_steps]
+
+    def first(needle: str) -> int:
+        return next((index for index, run in enumerate(runs) if needle in run), -1)
+
+    release_jobs = release.get("jobs") or {}
+    build_job, publish_job = release_jobs.get("build") or {}, release_jobs.get("publish") or {}
+    build_runs = [str(step.get("run", "")) for step in build_job.get("steps") or []]
+    publish_runs = [str(step.get("run", "")) for step in publish_job.get("steps") or []]
+    ci_run = build_runs[0] if build_runs else ""
+    check("W15h the release starts only once CI on the commit has completed with success",
+          "actions/workflows/ci.yml/runs?head_sha=$GITHUB_SHA" in ci_run and '!= "completed success"' in ci_run
+          and re.search(r"\bexit [1-9]", ci_run) is not None
+          and (build_job.get("permissions") or {}).get("actions") == "read", ci_run[:160])
+
+    gate_at = first("release-version.sh ")
+    test_at, tag_at = first("xcodebuild test"), first("gh release create")
+    check("W15 the release asks the gate for its version and tests before it tags",
+          -1 not in (gate_at, test_at, tag_at) and gate_at < tag_at and test_at < tag_at, (gate_at, test_at, tag_at))
+    check("W15b no input is interpolated into a script body",
+          not any("inputs." in run for run in runs), [run[:80] for run in runs if "inputs." in run])
+    tag_run = runs[tag_at] if tag_at != -1 else ""
+    # On the command that creates the tag, not anywhere in the step: the notes name the same commit.
+    check("W15c the release tags the commit that was tested",
+          re.search(r'gh release create "\$VERSION" --draft --target "\$GITHUB_SHA"', tag_run) is not None
+          and re.search(r'git tag -a "\$VERSION" -m "[^"]*" "\$GITHUB_SHA"', tag_run) is not None, tag_run[:200])
+    check("W15i only the publish job runs in the release environment, and the build job cannot write",
+          publish_job.get("environment") == "release" and "environment" not in build_job
+          and (build_job.get("permissions") or {}).get("contents") == "read",
+          (build_job.get("environment"), publish_job.get("environment"), build_job.get("permissions")))
+    # The deploy key is readable only by a job that runs none of the repository's build: code the tests or
+    # the build ran could otherwise put its own git, gh or ssh ahead on PATH and be handed the key.
+    publish_text = yaml.safe_dump(publish_job)
+    build_text = yaml.safe_dump(build_job)
+    runs_build = [needle for needle in ("xcodebuild", "build_release_frameworks.sh", "ios-toolchain",
+                                        "hardware-only-skips.sh", "Scripts/", ".github/scripts/", "./")
+                  if needle in publish_text]
+    check("W15l the job holding the deploy key needs the build and runs none of it",
+          publish_job.get("needs") == "build" and not runs_build and "secrets." not in build_text, runs_build)
+    # The publish job checks the reported version as data with the gate's own pattern, so the two cannot
+    # accept different versions without this failing.
+    gate_pattern = re.search(r'\[\[ "\$declared" =~ (\S+) \]\]', GATE_SCRIPT.read_text())
+    publish_pattern = next((m for run in publish_runs
+                            for m in [re.search(r'\[\[ "\$BUILT_VERSION" =~ (\S+) \]\]', run)] if m), None)
+    check("W15m the publish job checks the reported version with the gate's pattern, on main only",
+          gate_pattern is not None and publish_pattern is not None
+          and gate_pattern.group(1) == publish_pattern.group(1)
+          and any('[ "$GITHUB_REF" != "refs/heads/main" ]' in run for run in publish_runs),
+          (gate_pattern and gate_pattern.group(1), publish_pattern and publish_pattern.group(1)))
+    # The tag ruleset lets only the deploy key create a tag, so the push goes through it, to a host whose
+    # key came from GitHub's API rather than from the first connection.
+    text = RELEASE_WORKFLOW.read_text()
+    check("W15j the tag is pushed with the deploy key to a verified host, and that key is the only secret",
+          "ssh -i $key" in tag_run and "StrictHostKeyChecking=yes" in tag_run
+          and "gh api meta --jq '.ssh_keys[]" in tag_run
+          and set(re.findall(r"secrets\.(\w+)", text)) == {"RELEASE_DEPLOY_KEY"},
+          sorted(set(re.findall(r"secrets\.(\w+)", text))))
+    order = [tag_run.find(needle) for needle in ("--draft --target", "git push", "--draft=false")]
+    check("W15k the draft is published only after its tag is pushed",
+          -1 not in order and order == sorted(order), order)
+    build_at = first("build_release_frameworks.sh")
+    check("W15g the release builds the XCFrameworks before publishing and attaches the one bundle",
+          build_at != -1 and build_at < tag_at and 'bundle="build/release/payabli-ios-sdk-$VERSION.zip"' in tag_run
+          and '"$bundle" build/release/checksums.txt' in tag_run and '[ ! -f "$bundle" ]' in tag_run,
+          (build_at, tag_at))
+    checkouts = [step for step in release_steps if str(step.get("uses", "")).startswith("actions/checkout")]
+    check("W15f the release leaves no credential in .git/config for the code under test",
+          bool(checkouts) and all((step.get("with") or {}).get("persist-credentials") is False for step in checkouts),
+          [(step.get("with") or {}).get("persist-credentials") for step in checkouts])
+    # A run that failed part way is resumed rather than blocked by what it left: a draft on this commit is
+    # reused, a tag on this commit is not pushed twice, and a published release or a tag elsewhere is refused.
+    check("W15n a failed release resumes, and refuses what it cannot resume",
+          'gh release upload "$VERSION" --clobber' in tag_run and '"true $GITHUB_SHA")' in tag_run
+          and re.search(r'"false "\*\)\s*\n\s*echo "::error::release \$VERSION is already published"\s*\n\s*exit 1',
+                        tag_run) is not None
+          and 'if [ -z "$TAGGED" ]; then' in tag_run
+          and any('[ "$tagged" != "$GITHUB_SHA" ]' in run and "exit 1" in run for run in publish_runs),
+          tag_run[:120])
+    triggers = release.get("on", release.get(True)) or {}
+    check("W15e the release runs only when dispatched", set(triggers) == {"workflow_dispatch"}, sorted(triggers))
+
+    # Only a release is ever tagged: a public tag reaches every clone and every range resolution.
+    tagging = []
+    for path in sorted(p for p in RELEASE_WORKFLOW.parent.iterdir() if p.suffix in WORKFLOW_SUFFIXES):
+        text = path.read_text()
+        if path != RELEASE_WORKFLOW and re.search(r"git (tag|push)\b|gh release create", text):
+            tagging.append(path.name)
+    check("W15d no workflow but the release creates a tag", not tagging, tagging)
+
 
 # --------------------------------------------------------------------------------------------------
 # The exclusion helper.
@@ -1361,6 +1458,105 @@ def test_helper() -> None:
               code == 0 and out.split() == ["-skip-testing:A/B/c"], (code, out))
 
 
+# --------------------------------------------------------------------------------------------------
+# The release version gate.
+#
+# A tag is the publication: a consumer resolves the package by it, and a pushed tag cannot be taken back
+# from anyone who already resolved it. So the gate is run against a synthetic tree, one refusal at a time,
+# and once against the real tree to prove it reads the declaration the source actually carries.
+# --------------------------------------------------------------------------------------------------
+
+def version_source(declarations: list[str]) -> str:
+    body = "\n".join(f'    public static var version: String {{\n        "{value}"\n    }}'
+                     for value in declarations)
+    return f"import Foundation\n\npublic enum PayabliCore {{\n{body}\n}}\n"
+
+
+def run_gate(args: list[str], tmp: Path, *, declarations: list[str] | None = None,
+             root: Path | None = None) -> tuple[int, str, str]:
+    """Run the real gate, against a synthetic tree unless `root` names one."""
+    if root is None:
+        root = tmp / "gate"
+        if root.exists():
+            shutil.rmtree(root)
+        (root / ".github" / "scripts").mkdir(parents=True)
+        shutil.copy(REPO_ROOT / ".github/scripts/release-version.sh", root / ".github" / "scripts")
+        if declarations is not None:
+            source = root / "Sources" / "PayabliSDKCore" / "PayabliSDKCore.swift"
+            source.parent.mkdir(parents=True)
+            source.write_text(version_source(declarations), encoding="utf-8")
+    result = subprocess.run(
+        [str(root / ".github" / "scripts" / "release-version.sh"), *args],
+        capture_output=True, text=True, timeout=60, check=False,
+    )
+    return result.returncode, result.stdout, result.stderr
+
+
+def test_release() -> None:
+    main_ref = "refs/heads/main"
+    branch_ref = "refs/heads/feature/something"
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        declared = ["0.4.1"]
+        source = root / "gate" / "Sources" / "PayabliSDKCore" / "PayabliSDKCore.swift"
+
+        code, out, err = run_gate([main_ref], root, declarations=declared)
+        check("R1 a release from main is the declared version",
+              code == 0 and out == "0.4.1\n", (code, out, err[:200]))
+
+        code, out, err = run_gate([branch_ref], root, declarations=declared)
+        check("R2 a release from a branch is refused",
+              code == 1 and not out and "refs/heads/main" in err, (code, out, err[:200]))
+
+        for label, value in {
+            "R3 a declared version that is not major.minor.patch is refused": "0.4",
+            "R3b a declared version with a v prefix is refused": "v0.4.1",
+            "R3c a declared version that is a pre-release is refused": "0.4.1-QA.20260923143000",
+            "R3d a declared version with a leading zero is refused": "0.04.1",
+        }.items():
+            code, out, err = run_gate([main_ref], root, declarations=[value])
+            check(label, code == 1 and not out and "not <major>.<minor>.<patch>" in err, (code, out, err[:200]))
+
+        code, out, err = run_gate([main_ref], root, declarations=[])
+        check("R4 a source with no declared version is refused",
+              code == 1 and not out and "declares version 0 times" in err, (code, out, err[:200]))
+
+        code, out, err = run_gate([main_ref], root, declarations=["0.4.1", "0.4.1"])
+        check("R5 a source declaring the version twice is refused",
+              code == 1 and not out and "declares version 2 times" in err, (code, out, err[:200]))
+
+        # A dead declaration in the literal's shape beside a live one in another: a text read cannot tell
+        # which the compiler sees, so neither is taken.
+        run_gate([main_ref], root, declarations=declared)
+        source.write_text("public enum PayabliCore {\n#if false\n    public static var version: String {\n"
+                          "        \"9.9.9\"\n    }\n#endif\n    public static var version: String {\n"
+                          "        return \"0.4.1\"\n    }\n}\n", encoding="utf-8")
+        code, out, err = run_gate([main_ref], root, root=root / "gate")
+        check("R5b a declaration hidden in dead code is not read as the version",
+              code == 1 and "9.9.9" not in out, (code, out, err[:200]))
+
+        source.write_text("public enum PayabliCore {\n    public static var version: String { \"0.4.1\" }\n}\n",
+                          encoding="utf-8")
+        code, out, err = run_gate([main_ref], root, root=root / "gate")
+        check("R5c a declaration in any shape but the formatted one is refused",
+              code == 1 and not out and "as a literal" in err, (code, out, err[:200]))
+
+        code, out, err = run_gate([main_ref], root)
+        check("R6 a tree with no version source is refused",
+              code == 1 and not out and "no version source" in err, (code, out, err[:200]))
+
+        code, out, _ = run_gate([], root, declarations=declared)
+        check("R7 no argument exits 2", code == 2 and not out, (code, out))
+        code, out, _ = run_gate([main_ref, "20260923143000"], root, declarations=declared)
+        check("R7b an argument it does not take exits 2 rather than being ignored", code == 2 and not out,
+              (code, out))
+
+        # Against the real tree, asserting only the shape, so the check survives a version bump and proves
+        # the gate reads the declaration as the source writes it.
+        code, out, err = run_gate([main_ref], root, root=REPO_ROOT)
+        check("R8 the gate reads the version the real source declares",
+              code == 0 and re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+\n", out) is not None, (code, out, err[:200]))
+
 def main() -> int:
     if ONLY not in HALVES:
         print(f"NIGHTLY_ONLY={ONLY!r} is not one of {', '.join(HALVES)}")
@@ -1375,6 +1571,8 @@ def main() -> int:
         test_workflows()
     if ONLY in ("helper", "both"):
         test_helper()
+    if ONLY in ("release", "both"):
+        test_release()
 
     for label in PASS:
         print(f"  ok   {label}")

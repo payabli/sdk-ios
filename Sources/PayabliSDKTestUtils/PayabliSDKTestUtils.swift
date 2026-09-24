@@ -8,12 +8,4 @@ import Foundation
 ///
 /// A target rather than a product, and `package` throughout, so no consumer
 /// can import the module.
-package enum PayabliSDKTestUtils {
-    package static var version: String {
-        Bundle(for: VersionMarker.self)
-            .infoDictionary?["CFBundleShortVersionString"] as? String
-            ?? "0.0.0"
-    }
-
-    private final class VersionMarker {}
-}
+package enum PayabliSDKTestUtils {}

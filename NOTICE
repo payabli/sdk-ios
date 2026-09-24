@@ -11,9 +11,8 @@ The following third-party components may be used when their corresponding
 optional modules are included by the host application. Each component is
 governed by its own license.
 
-  * Fiserv FiservTTP SDK — required only when `PayabliSDKPayIn` is configured
-    with the Fiserv Tap to Pay provider. Subject to the Fiserv SDK License
-    Agreement.
+  * PayabliCardReaderCore, derived from Fiserv/TTPPackage — MIT License,
+    included in the `PayabliSDKTapToPay` module. See THIRD_PARTY_LICENSES.txt.
 
   * Apple ProximityReader (Tap to Pay on iPhone) — provided by Apple under the
     Apple Developer Program License Agreement and the ProximityReader

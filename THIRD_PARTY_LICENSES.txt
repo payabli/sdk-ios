@@ -2,9 +2,9 @@
 Third-party licenses bundled with the Payabli iOS SDK
 ================================================================================
 
-This file lists the open-source components redistributed inside the Payabli
-iOS SDK binary artifacts and their respective licenses. Include this file
-when redistributing the compiled Payabli SDK.
+This file lists the open-source components redistributed with the Payabli
+iOS SDK and their respective licenses. Include this file when redistributing
+the Payabli SDK, as source or compiled.
 
 Questions or requests for additional attribution: support@payabli.com
 
@@ -15,10 +15,10 @@ Upstream:    Tag 1.0.7 (commit 047dd91)
 License:     MIT
 
 Vendored under the module name `PayabliCardReaderCore` in the Payabli iOS
-SDK. Source files are byte-identical copies of the upstream Swift sources
-and preserve Fiserv's original per-file copyright headers. The module name
-change is an SPM target rename only; no in-source class renaming is
-performed.
+SDK. Source files are modified copies of the upstream Swift sources and
+preserve Fiserv's original per-file copyright headers. Every declaration
+upstream marks `public` is `package`, and every other change is in the git
+history of ThirdParty/PayabliCardReaderCoreSource/. No class is renamed.
 
 MIT License
 

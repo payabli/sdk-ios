@@ -43,6 +43,8 @@ COPIED = (
     ".github/workflows/release.yml",
     ".github/workflows/nightly-report.yml",
     ".github/hardware-only-tests.txt",
+    ".github/scripts/release-version.sh",
+    "Sources/PayabliSDKCore/PayabliSDKCore.swift",
 )
 
 CI_YML = ".github/workflows/ci.yml"
@@ -54,6 +56,8 @@ REPORT = ".github/scripts/nightly_report.py"
 SLACK = ".github/scripts/nightly_slack.py"
 NIGHTLY = ".github/workflows/nightly.yml"
 SCRIPTS_YML = ".github/workflows/scripts.yml"
+GATE = ".github/scripts/release-version.sh"
+VERSION_SOURCE = "Sources/PayabliSDKCore/PayabliSDKCore.swift"
 
 
 class Mutation:
@@ -325,6 +329,39 @@ MUTATIONS = [
         "H5", "helper",
     ),
 
+    # ---- the release version gate ------------------------------------------------------------------
+    Mutation(
+        "a release is cut from any branch",
+        GATE, 'if [ "$ref" != "refs/heads/main" ]; then', "if false; then", "R2", "release",
+    ),
+    Mutation(
+        "a declared version that is not major.minor.patch is tagged anyway",
+        GATE, 'if ! [[ "$declared" =~ ^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$ ]]; then', "if false; then",
+        "R3", "release",
+    ),
+    Mutation(
+        "a declared version with a leading zero is tagged",
+        GATE, 'if ! [[ "$declared" =~ ^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$ ]]; then',
+        'if ! [[ "$declared" =~ ^[0-9]+\\.[0-9]+\\.[0-9]+$ ]]; then', "R3d", "release",
+    ),
+    Mutation(
+        "a source declaring the version twice is read as one",
+        GATE, 'if [ "$declarations" -ne 1 ]; then', 'if [ "$declarations" -lt 1 ]; then', "R5", "release",
+    ),
+    Mutation(
+        "a dead declaration is read as the version",
+        GATE, 'if [ "$declarations" -ne 1 ]; then', "if false; then", "R5b", "release",
+    ),
+    Mutation(
+        "an argument the gate does not take is ignored",
+        GATE, 'if [ "$#" -ne 1 ]; then', 'if [ "$#" -lt 1 ]; then', "R7b", "release",
+    ),
+    Mutation(
+        "the declaration is written in a form the gate cannot read",
+        VERSION_SOURCE, "    public static var version: String {\n", "    public static var version: String {\n\n",
+        "R8", "release",
+    ),
+
     # ---- the workflows -------------------------------------------------------------------------
     Mutation(
         "the nightly starts running on pull requests",
@@ -458,8 +495,8 @@ MUTATIONS = [
     Mutation(
         "the harness stops running on the file holding the exclusions",
         SCRIPTS_YML,
-        "      - '.github/hardware-only-tests.txt'\n  push:",
-        "  push:",
+        "      - '.github/hardware-only-tests.txt'\n      # The release gate reads",
+        "      # The release gate reads",
         "W11", "workflows",
     ),
     Mutation(
@@ -480,6 +517,107 @@ MUTATIONS = [
         "a failing first bundle abandons the second",
         NIGHTLY, "          set -uo pipefail\n          failed=\"\"", "          set -euo pipefail",
         "W12e", "workflows",
+    ),
+    Mutation(
+        "an input is interpolated into the release's tag command",
+        RELEASE_YML, '--title "Payabli iOS SDK $VERSION"', '--title "${{ inputs.release_notes }}"',
+        "W15b", "workflows",
+    ),
+    Mutation(
+        "the release starts while CI on the commit is red or still running",
+        RELEASE_YML, 'if [ "$state" != "completed success" ]; then', 'if [ "$state" = "never" ]; then',
+        "W15h", "workflows",
+    ),
+    Mutation(
+        "the nightly starts tagging",
+        NIGHTLY, "      - name: Checkout\n        uses: actions/checkout@v4\n",
+        "      - name: Checkout\n        run: git tag nightly && git push origin nightly\n"
+        "      - name: Checkout again\n        uses: actions/checkout@v4\n",
+        "W15d", "workflows",
+    ),
+    Mutation(
+        "the release runs outside the environment that says who may release",
+        RELEASE_YML, "    environment: release\n", "", "W15i", "workflows",
+    ),
+    Mutation(
+        "a published release is republished",
+        RELEASE_YML, '              echo "::error::release $VERSION is already published"\n              exit 1\n',
+        "              :\n", "W15n", "workflows",
+    ),
+    Mutation(
+        "a tag on another commit is taken for this release",
+        RELEASE_YML,
+        '          VERSION="$BUILT_VERSION"\n          tagged="$(git rev-parse -q --verify "refs/tags/$VERSION^{commit}" || true)"\n'
+        '          if [ -n "$tagged" ] && [ "$tagged" != "$GITHUB_SHA" ]; then',
+        '          VERSION="$BUILT_VERSION"\n          tagged="$(git rev-parse -q --verify "refs/tags/$VERSION^{commit}" || true)"\n'
+        '          if false; then',
+        "W15n", "workflows",
+    ),
+    Mutation(
+        "a resumed run pushes its tag a second time",
+        RELEASE_YML, 'if [ -z "$TAGGED" ]; then', "if true; then", "W15n", "workflows",
+    ),
+    Mutation(
+        "the key and the build share a runner again",
+        RELEASE_YML, "      - name: Download the release files\n",
+        "      - name: Rebuild here\n        run: ./Scripts/build_release_frameworks.sh\n\n"
+        "      - name: Download the release files\n",
+        "W15l", "workflows",
+    ),
+    Mutation(
+        "the publish job accepts a version the gate would refuse",
+        RELEASE_YML, 'if ! [[ "$BUILT_VERSION" =~ ^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$ ]]; then',
+        'if ! [[ "$BUILT_VERSION" =~ ^[0-9.]+$ ]]; then', "W15m", "workflows",
+    ),
+    Mutation(
+        "the publish job runs a script from the checkout again",
+        RELEASE_YML, '          VERSION="$BUILT_VERSION"\n',
+        '          VERSION="$(.github/scripts/release-version.sh "$GITHUB_REF")"\n', "W15l", "workflows",
+    ),
+    Mutation(
+        "the tag is pushed to whatever host answers first",
+        RELEASE_YML, "-o StrictHostKeyChecking=yes", "-o StrictHostKeyChecking=accept-new", "W15j", "workflows",
+    ),
+    Mutation(
+        "a personal token comes back into the release",
+        RELEASE_YML, "          GH_TOKEN: ${{ github.token }}\n          RELEASE_DEPLOY_KEY",
+        "          GH_TOKEN: ${{ secrets.GHB_PAT_TOKEN }}\n          RELEASE_DEPLOY_KEY", "W15j", "workflows",
+    ),
+    Mutation(
+        "the draft is published before its tag exists",
+        RELEASE_YML, "          gh release edit \"$VERSION\" --draft=false\n", "", "W15k", "workflows",
+    ),
+    Mutation(
+        "the release publishes without building the XCFrameworks",
+        RELEASE_YML,
+        "      - name: Build the XCFrameworks\n        timeout-minutes: 45\n"
+        "        run: ./Scripts/build_release_frameworks.sh\n\n",
+        "",
+        "W15g", "workflows",
+    ),
+    Mutation(
+        "the release builds the XCFrameworks and ships none of them",
+        RELEASE_YML, 'assets=("$bundle" build/release/checksums.txt', "assets=(build/release/checksums.txt",
+        "W15g", "workflows",
+    ),
+    Mutation(
+        "the release leaves the push credential where the tested code can read it",
+        RELEASE_YML, "          persist-credentials: false\n\n      - name: Check the version\n        id: version\n",
+        "          persist-credentials: true\n\n      - name: Check the version\n        id: version\n",
+        "W15f", "workflows",
+    ),
+    Mutation(
+        "the release's tag falls back to the default branch's head",
+        RELEASE_YML, 'gh release create "$VERSION" --draft --target "$GITHUB_SHA"',
+        'gh release create "$VERSION" --draft', "W15c", "workflows",
+    ),
+    Mutation(
+        "the harness stops running on the file the gate reads",
+        SCRIPTS_YML,
+        "      # The release gate reads the version this file declares.\n"
+        "      - 'Sources/PayabliSDKCore/PayabliSDKCore.swift'\n",
+        "",
+        "W11", "workflows",
     ),
     Mutation(
         "the shared list is emptied",
