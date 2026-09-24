@@ -155,7 +155,7 @@ for scheme in "${SCHEMES[@]}"; do
     ( cd "$XCF_DIR" && ditto -c -k --keepParent "${scheme}.xcframework" "$zip_path" )
 done
 
-# sha256 checksums for Package.swift `binaryTarget`.
+# One sha256 per zip, published on the GitHub Release beside them.
 echo "[release] computing sha256 checksums"
 checksums_file="$BUILD_DIR/checksums.txt"
 : > "$checksums_file"
