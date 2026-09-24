@@ -1,4 +1,5 @@
 import Foundation
+import PayabliSDKCore
 
 /// PayabliSDKTestUtils — in-memory fixtures and stubs (`StubURLProtocol`,
 /// `InMemorySecureStorage`, `MockAppAttestor`, `MockTapToPayProvider`,
@@ -10,10 +11,6 @@ import Foundation
 /// can import the module.
 package enum PayabliSDKTestUtils {
     package static var version: String {
-        Bundle(for: VersionMarker.self)
-            .infoDictionary?["CFBundleShortVersionString"] as? String
-            ?? "0.0.0"
+        PayabliCore.version
     }
-
-    private final class VersionMarker {}
 }

@@ -5,8 +5,8 @@ import UIKit
 import XCTest
 
 final class PaymentMethodCoverageExpansionTests: XCTestCase {
-    func testModuleVersionIsAvailable() {
-        XCTAssertFalse(PayabliPayInPaymentFlowModule.version.isEmpty)
+    func testModuleVersionIsTheCoreVersion() {
+        XCTAssertEqual(PayabliPayInPaymentFlowModule.version, PayabliCore.version)
     }
 
     func testPaymentMethodTypeIdentifiersAndDisplayNames() {

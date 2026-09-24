@@ -42,7 +42,10 @@ on:
       - '.github/workflows/nightly-report.yml'
       - '.github/workflows/ci.yml'
       - '.github/workflows/release.yml'
+      - '.github/workflows/qa-snapshot.yml'
       - '.github/hardware-only-tests.txt'
+      # The release gate reads the version this file declares.
+      - 'Sources/PayabliSDKCore/PayabliSDKCore.swift'
   push:
     branches: [main]
     paths:
@@ -53,7 +56,9 @@ on:
       - '.github/workflows/nightly-report.yml'
       - '.github/workflows/ci.yml'
       - '.github/workflows/release.yml'
+      - '.github/workflows/qa-snapshot.yml'
       - '.github/hardware-only-tests.txt'
+      - 'Sources/PayabliSDKCore/PayabliSDKCore.swift'
 
 concurrency:
   group: scripts-${{ github.ref }}

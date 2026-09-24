@@ -1,31 +1,23 @@
-name: Release
+name: QA snapshot
 
-# A consumer resolves this package by git tag, so the tag is the publication. This one cuts
-# `PayabliCore.version` from main, after the suite passes, on the commit that was tested, and gives it a
-# GitHub Release. `qa-snapshot.yml` is the pre-release counterpart; .github/RELEASING.md is the procedure.
+# Tags `<PayabliCore.version>-QA.<yyyyMMddHHmmss>` on the commit this runs from, after the suite passes, so
+# somebody outside the change can pin a pre-release exactly. On demand only: a tag is visible to everyone who
+# clones the repository, so a build nobody consumes gets none. No GitHub Release, and these tags are prunable.
+# `release.yml` is the release counterpart; .github/RELEASING.md is the procedure.
 
 on:
   workflow_dispatch:
-    inputs:
-      release_notes:
-        description: "Release notes (markdown)"
-        required: false
-        default: ""
 
 concurrency:
-  group: release
+  group: qa-snapshot
   cancel-in-progress: false
 
 jobs:
-  release:
-    name: Publish a release
+  publish:
+    name: Publish a QA snapshot
     runs-on: macos-15
     permissions:
       contents: write
-
-    env:
-      # Through the environment, so the text is never parsed as shell.
-      RELEASE_NOTES: ${{ inputs.release_notes }}
 
     steps:
       # No credential is left in `.git/config`, so the code under test cannot push. Only the step that
@@ -38,7 +30,7 @@ jobs:
 
       - name: Check the version
         run: |
-          VERSION="$(.github/scripts/release-version.sh release "$GITHUB_REF")"
+          VERSION="$(.github/scripts/release-version.sh qa "$GITHUB_REF")"
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
           echo "tagging $VERSION"
 
@@ -78,22 +70,14 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             | xcpretty && exit ${PIPESTATUS[0]}
 
-      # One call creates the tag and the Release together, so a failure leaves neither behind.
-      - name: Publish the release
+      - name: Create and push tag
         env:
-          GH_TOKEN: ${{ secrets.GHB_PAT_TOKEN }}
+          PUSH_TOKEN: ${{ secrets.GHB_PAT_TOKEN }}
         run: |
-          previous="$(git tag --list '[0-9]*' --sort=-version:refname | grep -v -- '-QA\.' | head -n 1 || true)"
-          {
-            if [ -n "$RELEASE_NOTES" ]; then
-              printf '%s\n\n' "$RELEASE_NOTES"
-            fi
-            echo "## Changes since ${previous:-the first commit}"
-            if [ -n "$previous" ]; then
-              git log -n 50 --pretty=format:"- %s" "$previous..$GITHUB_SHA"
-            else
-              git log -n 50 --pretty=format:"- %s" "$GITHUB_SHA"
-            fi
-          } > release-notes.md
-          gh release create "$VERSION" --target "$GITHUB_SHA" \
-            --title "Payabli iOS SDK $VERSION" --notes-file release-notes.md
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "$VERSION" -m "Payabli iOS SDK $VERSION" "$GITHUB_SHA"
+          auth="$(printf 'x-access-token:%s' "$PUSH_TOKEN" | base64 | tr -d '\n')"
+          echo "::add-mask::$auth"
+          git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth" \
+            push origin "refs/tags/$VERSION"

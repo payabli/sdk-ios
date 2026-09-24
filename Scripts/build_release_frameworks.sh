@@ -29,7 +29,7 @@
 #     payabli-ios-sdk-taptopay-${VERSION}.zip
 #     payabli-ios-sdk-payin-payment-flow-${VERSION}.zip
 #     checksums.txt           (one sha256 per zip, space-separated lines)
-#     THIRD_PARTY_LICENSES.txt  (bundled copy for the upload/publish step)
+#     THIRD_PARTY_LICENSES.txt  (the attribution that travels with the zips)
 #
 # Run locally:
 #   VERSION=1.0.0-dev ./Scripts/build_release_frameworks.sh
@@ -164,18 +164,10 @@ for scheme in "${SCHEMES[@]}"; do
     zip_name="payabli-ios-sdk-${slug}-${VERSION}.zip"
     checksum="$(swift package compute-checksum "$BUILD_DIR/$zip_name")"
     printf '%s  %s\n' "$checksum" "$zip_name" >> "$checksums_file"
-    # Also expose individual vars for the render step:
-    #   CORE_SHA256, TAPTOPAY_SHA256, PAYIN_PAYMENT_FLOW_SHA256
-    # (matches render_public_manifests.sh's required vars).
-    upper="$(echo "${slug//-/_}" | tr '[:lower:]' '[:upper:]')"
-    if [[ -n "${GITHUB_ENV:-}" ]]; then
-        printf '%s_SHA256=%s\n' "$upper" "$checksum" >> "$GITHUB_ENV"
-    fi
     printf '[release] %s -> %s\n' "$zip_name" "$checksum"
 done
 
-# Bundle the MIT attribution file alongside the zips so the upload step can
-# ship it to S3 without reaching back into the repo.
+# The MIT attribution travels with the zips.
 cp "$REPO_ROOT/THIRD_PARTY_LICENSES.txt" "$BUILD_DIR/THIRD_PARTY_LICENSES.txt"
 
 echo "[release] done. Artifacts:"

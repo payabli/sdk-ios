@@ -12,10 +12,6 @@ import PayabliSDKCore
 /// namespace with the Swift module itself.
 public enum PayabliPayInPaymentFlowModule {
     public static var version: String {
-        Bundle(for: VersionMarker.self)
-            .infoDictionary?["CFBundleShortVersionString"] as? String
-            ?? "0.0.0"
+        PayabliCore.version
     }
-
-    private final class VersionMarker {}
 }
