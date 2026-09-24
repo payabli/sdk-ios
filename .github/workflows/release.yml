@@ -128,15 +128,14 @@ jobs:
               git log -n 50 --pretty=format:"- %s" "$GITHUB_SHA"
             fi
           } > release-notes.md
-          shopt -s nullglob
-          zips=(build/release/payabli-ios-sdk-*-"$VERSION".zip)
-          if [ "${#zips[@]}" -eq 0 ]; then
-            echo "::error::no XCFramework zips in build/release"
+          bundle="build/release/payabli-ios-sdk-$VERSION.zip"
+          if [ ! -f "$bundle" ]; then
+            echo "::error::no $bundle"
             exit 1
           fi
           gh release create "$VERSION" --draft --target "$GITHUB_SHA" \
             --title "Payabli iOS SDK $VERSION" --notes-file release-notes.md \
-            "${zips[@]}" build/release/checksums.txt build/release/THIRD_PARTY_LICENSES.txt
+            "$bundle" build/release/checksums.txt build/release/THIRD_PARTY_LICENSES.txt
 
           # GitHub's host keys come from its API over HTTPS, so the SSH connection is verified rather than
           # trusted on first use.

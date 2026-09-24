@@ -1345,9 +1345,10 @@ def test_workflows() -> None:
     check("W15k the draft is published only after its tag is pushed",
           -1 not in order and order == sorted(order), order)
     build_at = first("build_release_frameworks.sh")
-    check("W15g the release builds the XCFrameworks before publishing and attaches them",
-          build_at != -1 and build_at < tag_at and '"${zips[@]}"' in tag_run
-          and "build/release/checksums.txt" in tag_run, (build_at, tag_at))
+    check("W15g the release builds the XCFrameworks before publishing and attaches the one bundle",
+          build_at != -1 and build_at < tag_at and 'bundle="build/release/payabli-ios-sdk-$VERSION.zip"' in tag_run
+          and '"$bundle" build/release/checksums.txt' in tag_run and '[ ! -f "$bundle" ]' in tag_run,
+          (build_at, tag_at))
     checkouts = [step for step in release_steps if str(step.get("uses", "")).startswith("actions/checkout")]
     check("W15f the release leaves no credential in .git/config for the code under test",
           bool(checkouts) and all((step.get("with") or {}).get("persist-credentials") is False for step in checkouts),

@@ -569,7 +569,7 @@ MUTATIONS = [
     ),
     Mutation(
         "the release builds the XCFrameworks and ships none of them",
-        RELEASE_YML, '            "${zips[@]}" build/release/checksums.txt', "            build/release/checksums.txt",
+        RELEASE_YML, '            "$bundle" build/release/checksums.txt', "            build/release/checksums.txt",
         "W15g", "workflows",
     ),
     Mutation(

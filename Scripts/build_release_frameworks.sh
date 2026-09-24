@@ -2,34 +2,29 @@
 #
 # build_release_frameworks.sh
 # ---------------------------
-# Builds the Payabli iOS SDK distribution XCFrameworks
-# (PayabliSDKCore, PayabliSDKTapToPay, PayabliSDKPayInPaymentFlow) for
-# device + iOS Simulator slices, with distribution-mode settings and a
-# pinned SOURCE_DATE_EPOCH for reproducible zips.
-#
-# PayInPaymentFlow is shipped as its own opt-in XCFramework. It is not part
-# of the PayabliSDK umbrella product, but it is part of the public release
-# payload below.
+# Builds one XCFramework per shipped module (PayabliSDKCore,
+# PayabliSDKTapToPay, PayabliSDKPayInPaymentFlow, PayabliSDKTelemetry) for
+# device + iOS Simulator slices, with distribution-mode settings, and packs
+# them into one zip whose entry times are SOURCE_DATE_EPOCH. An integrator
+# embeds Core and the modules they use, so an app that never takes a
+# card-present payment never links the card reader.
 #
 # Environment:
-#   VERSION             required. Used as filename suffix.
+#   VERSION             required. Used in the zip's filename.
 #                       Example: 1.0.247-qa
 #                       Passed via $GITHUB_ENV by the CI workflow.
-#   SOURCE_DATE_EPOCH   optional. Defaults to the HEAD commit's timestamp so
-#                       every re-build from the same commit produces a zip
-#                       with the same sha256. Set explicitly in CI for
-#                       extra confidence.
+#   SOURCE_DATE_EPOCH   optional. The zip's entry times. Defaults to the HEAD
+#                       commit's timestamp.
 #   BUILD_CONFIG        optional. Defaults to `Release`.
 #   DEVICE_DESTINATION  optional. Defaults to `generic/platform=iOS`.
 #   SIM_DESTINATION     optional. Defaults to `generic/platform=iOS Simulator`.
 #
 # Outputs:
 #   build/release/
-#     payabli-ios-sdk-core-${VERSION}.zip
-#     payabli-ios-sdk-taptopay-${VERSION}.zip
-#     payabli-ios-sdk-payin-payment-flow-${VERSION}.zip
-#     checksums.txt           (one sha256 per zip, space-separated lines)
-#     THIRD_PARTY_LICENSES.txt  (the attribution that travels with the zips)
+#     payabli-ios-sdk-${VERSION}.zip   PayabliSDK/ holding every XCFramework
+#                                      and THIRD_PARTY_LICENSES.txt
+#     checksums.txt                    the zip's sha256
+#     THIRD_PARTY_LICENSES.txt         the attribution, beside the zip too
 #
 # Run locally:
 #   VERSION=1.0.0-dev ./Scripts/build_release_frameworks.sh
@@ -48,9 +43,8 @@ BUILD_CONFIG="${BUILD_CONFIG:-Release}"
 DEVICE_DESTINATION="${DEVICE_DESTINATION:-generic/platform=iOS}"
 SIM_DESTINATION="${SIM_DESTINATION:-generic/platform=iOS Simulator}"
 
-# Pin SOURCE_DATE_EPOCH to the HEAD commit's timestamp so every rebuild from
-# the same commit produces a byte-identical zip (critical for SPM checksum
-# stability). Overridable via environment.
+# The zip's entry times, so zipping the same frameworks twice gives the same
+# bytes. Overridable via environment.
 if [[ -z "${SOURCE_DATE_EPOCH:-}" ]]; then
     SOURCE_DATE_EPOCH="$(git show -s --format=%ct HEAD)"
 fi
@@ -71,17 +65,8 @@ SCHEMES=(
     "PayabliSDKCore"
     "PayabliSDKTapToPay"
     "PayabliSDKPayInPaymentFlow"
+    "PayabliSDKTelemetry"
 )
-
-# Filename slug (without `payabli-ios-sdk-` prefix), mapped by scheme name.
-slug_for() {
-    case "$1" in
-        PayabliSDKCore)          echo "core" ;;
-        PayabliSDKTapToPay)      echo "taptopay" ;;
-        PayabliSDKPayInPaymentFlow) echo "payin-payment-flow" ;;
-        *) echo "error: unknown scheme '$1'" >&2; exit 1 ;;
-    esac
-}
 
 archive_scheme() {
     local scheme="$1" destination="$2" suffix="$3"
@@ -121,8 +106,6 @@ archive_scheme() {
 }
 
 for scheme in "${SCHEMES[@]}"; do
-    slug="$(slug_for "$scheme")"
-
     archive_scheme "$scheme" "$DEVICE_DESTINATION" "device" > /dev/null
     archive_scheme "$scheme" "$SIM_DESTINATION"   "sim"    > /dev/null
 
@@ -145,29 +128,33 @@ for scheme in "${SCHEMES[@]}"; do
         -framework "$device_framework" \
         -framework "$sim_framework" \
         -output "$xcf_output"
-
-    zip_name="payabli-ios-sdk-${slug}-${VERSION}.zip"
-    zip_path="$BUILD_DIR/$zip_name"
-    rm -f "$zip_path"
-    echo "[release] zipping -> ${zip_name}"
-    # ditto -c -k --keepParent is the Apple-sanctioned reproducible zip tool;
-    # it respects SOURCE_DATE_EPOCH for entry mtimes on recent macOS.
-    ( cd "$XCF_DIR" && ditto -c -k --keepParent "${scheme}.xcframework" "$zip_path" )
 done
 
-# One sha256 per zip, published on the GitHub Release beside them.
-echo "[release] computing sha256 checksums"
-checksums_file="$BUILD_DIR/checksums.txt"
-: > "$checksums_file"
+# One folder, one zip. Every scheme has exactly one XCFramework in it, so a
+# build that lost a module fails here rather than shipping without it.
+BUNDLE_DIR="$BUILD_DIR/PayabliSDK"
+mkdir -p "$BUNDLE_DIR"
 for scheme in "${SCHEMES[@]}"; do
-    slug="$(slug_for "$scheme")"
-    zip_name="payabli-ios-sdk-${slug}-${VERSION}.zip"
-    checksum="$(swift package compute-checksum "$BUILD_DIR/$zip_name")"
-    printf '%s  %s\n' "$checksum" "$zip_name" >> "$checksums_file"
-    printf '[release] %s -> %s\n' "$zip_name" "$checksum"
+    cp -R "$XCF_DIR/${scheme}.xcframework" "$BUNDLE_DIR/"
 done
+cp "$REPO_ROOT/THIRD_PARTY_LICENSES.txt" "$BUNDLE_DIR/"
+bundled="$(find "$BUNDLE_DIR" -maxdepth 1 -name '*.xcframework' | wc -l | tr -d ' ')"
+if [[ "$bundled" -ne "${#SCHEMES[@]}" ]]; then
+    echo "error: the bundle holds ${bundled} XCFrameworks for ${#SCHEMES[@]} schemes" >&2
+    exit 1
+fi
 
-# The MIT attribution travels with the zips.
+zip_name="payabli-ios-sdk-${VERSION}.zip"
+zip_path="$BUILD_DIR/$zip_name"
+rm -f "$zip_path"
+echo "[release] zipping -> ${zip_name}"
+# ditto stores each file's modification time, and a copy is stamped with the
+# time it was made, so every entry is set to SOURCE_DATE_EPOCH first.
+find "$BUNDLE_DIR" -exec touch -h -t "$(date -r "$SOURCE_DATE_EPOCH" +%Y%m%d%H%M.%S)" {} +
+( cd "$BUILD_DIR" && ditto -c -k --keepParent "PayabliSDK" "$zip_path" )
+
+checksums_file="$BUILD_DIR/checksums.txt"
+( cd "$BUILD_DIR" && shasum -a 256 "$zip_name" > "$checksums_file" )
 cp "$REPO_ROOT/THIRD_PARTY_LICENSES.txt" "$BUILD_DIR/THIRD_PARTY_LICENSES.txt"
 
 echo "[release] done. Artifacts:"
