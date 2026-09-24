@@ -59,8 +59,8 @@ struct PayInFormCustomization: Hashable {
     var groupsCardNumber = true
     var dashesExpiry = false
     var masksAccountNumber = true
-    var cardBrandIconPlacement: PayabliPayInPaymentFlowCardBrandIconPlacement = .leading
-    var errorMessagePlacement: PayabliPayInPaymentFlowErrorMessagePlacement = .top
+    var cardBrandIconPlacement: PayabliPayInPaymentFlowCardBrandIconPlacement = .trailing
+    var errorMessagePlacement: PayabliPayInPaymentFlowErrorMessagePlacement = .aboveSubmitButton
     var inputSizing: InputSizing = .standard
 
     init() {}
@@ -103,8 +103,8 @@ struct PayInFormCustomization: Hashable {
         PayabliPayInPaymentFlowFormConfiguration(
             allowedMethods: allowedMethods,
             defaultMethod: methods == .cardAndBank ? startOn : allowedMethods[0],
-            cardSections: sections(paymentFields: Self.cardFields, sectionTitle: "Card"),
-            achSections: sections(paymentFields: Self.bankFields, sectionTitle: "Bank account"),
+            cardSections: sections(paymentFields: Self.cardFields, sectionTitle: "Your card"),
+            achSections: sections(paymentFields: Self.bankFields, sectionTitle: "Your bank"),
             hiddenValues: PayabliPayInPaymentFlowHiddenValues(
                 achHolderType: .personal,
                 methodDescription: QAIdentity.current.note(capturing ? "simple-capture" : "simple-save"),
@@ -231,12 +231,12 @@ struct PayInFormCustomization: Hashable {
             fields: paymentFields
         )
         let customer = PayabliPayInPaymentFlowFieldSection(
-            title: titled ? "Your details" : nil,
+            title: titled ? "About you" : nil,
             fields: customerFields
         )
         let summary = PayabliPayInPaymentFlowFieldSection(
             id: "summary",
-            title: showsAmountSummary ? (titled ? "Order summary" : "Payment Information") : nil,
+            title: showsAmountSummary ? (titled ? "Order total" : "Payment Information") : nil,
             fields: [.amount, .serviceFee]
         )
 
@@ -252,34 +252,48 @@ struct PayInFormCustomization: Hashable {
         let fieldLabels = usesCustomWording
             ? PayabliPayInPaymentFlowLabels.defaultFieldLabels.merging(Self.brandFieldLabels) { _, brand in brand }
             : PayabliPayInPaymentFlowLabels.defaultFieldLabels
-        // With labels hidden and outside the fields, the placeholder is the only text a field has.
-        let placeholders = hidesLabels && !labelsInsideFields ? fieldLabels : [:]
+        // With labels hidden, the placeholder is the only text a field has.
+        let placeholders = hidesLabels ? Self.hiddenLabelPlaceholders : [:]
 
         guard usesCustomWording else {
             return PayabliPayInPaymentFlowLabels(fieldLabels: fieldLabels, fieldPlaceholders: placeholders)
         }
         return PayabliPayInPaymentFlowLabels(
-            title: capturing ? "Checkout" : "Save a card for later",
-            subtitle: "Secure payment powered by Payabli",
-            submitButton: capturing ? "Pay now" : "Save securely",
+            title: "Acme Checkout",
+            subtitle: "Secure payment, powered by Payabli",
+            submitButton: capturing ? "Pay now" : "Save for later",
             fieldLabels: fieldLabels,
             fieldPlaceholders: placeholders
         )
     }
 
     private static let brandFieldLabels: [PayabliPayInPaymentFlowField: String] = [
-        .cardholderName: "Cardholder",
+        .cardholderName: "Name on card",
         .cardNumber: "Card",
         .cardExpiration: "Expires",
         .cardCvv: "Security code",
-        .cardZip: "ZIP",
+        .cardZip: "Billing ZIP",
         .achHolder: "Name on account",
-        .firstName: "First",
-        .lastName: "Last",
-        .customerNumber: "Member number",
-        .billingEmail: "Email for receipt",
-        .amount: "Subtotal",
-        .serviceFee: "Processing fee"
+        .achRouting: "Bank routing",
+        .achAccount: "Bank account",
+        .firstName: "Given name",
+        .lastName: "Family name",
+        .customerNumber: "Member ID",
+        .billingEmail: "Receipt email"
+    ]
+
+    private static let hiddenLabelPlaceholders: [PayabliPayInPaymentFlowField: String] = [
+        .cardholderName: "Name on card",
+        .cardNumber: "Card number",
+        .cardCvv: "CVV",
+        .cardZip: "ZIP",
+        .achHolder: "Account holder",
+        .achRouting: "Routing number",
+        .achAccount: "Account number",
+        .firstName: "First name",
+        .lastName: "Last name",
+        .customerNumber: "Customer number",
+        .billingEmail: "Email"
     ]
 
     private var sdkInputSizing: PayabliPayInPaymentFlowInputSizing {

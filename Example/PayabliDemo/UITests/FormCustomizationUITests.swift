@@ -99,7 +99,7 @@ final class FormCustomizationLiveUITests: XCTestCase {
 
     func testTokenizingUnderTheBrandPreset() {
         app.buttons["Tokenize"].tap()
-        fillAndSubmit("Save securely")
+        fillAndSubmit("Save for later")
         expectResult(prefix: "Saved:")
     }
 

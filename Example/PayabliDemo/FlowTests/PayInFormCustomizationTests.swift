@@ -3,6 +3,7 @@ import XCTest
 
 final class PayInFormCustomizationTests: XCTestCase {
     func testTheDefaultPresetIsTheSettingsTheScreenStartsOn() {
+        let sdkDefault = PayabliPayInPaymentFlowFormConfiguration()
         let preset = PayInFormCustomization(preset: .sdkDefault)
 
         XCTAssertEqual(preset, PayInFormCustomization())
@@ -20,8 +21,8 @@ final class PayInFormCustomizationTests: XCTestCase {
         XCTAssertFalse(preset.customerSectionFirst)
         XCTAssertFalse(preset.requiresCustomerNumber)
         XCTAssertFalse(preset.dashesExpiry)
-        XCTAssertEqual(preset.cardBrandIconPlacement, .leading)
-        XCTAssertEqual(preset.errorMessagePlacement, .top)
+        XCTAssertEqual(preset.cardBrandIconPlacement, sdkDefault.cardBrandIconPlacement)
+        XCTAssertEqual(preset.errorMessagePlacement, sdkDefault.errorMessagePlacement)
         XCTAssertEqual(preset.inputSizing, .standard)
     }
 
@@ -44,8 +45,12 @@ final class PayInFormCustomizationTests: XCTestCase {
 
         XCTAssertEqual(customization.activePreset, .brand)
         XCTAssertEqual(customization.look, .brand)
+        XCTAssertEqual(customization.configuration(capturing: false).labels.submitButton, "Save for later")
         XCTAssertEqual(configuration.labelLayout, .placeholder)
-        XCTAssertEqual(configuration.labels.title, "Checkout")
+        XCTAssertEqual(configuration.labels.title, "Acme Checkout")
+        XCTAssertEqual(configuration.labels.subtitle, "Secure payment, powered by Payabli")
+        XCTAssertEqual(configuration.labels.label(for: .customerNumber), "Member ID")
+        XCTAssertEqual(configuration.cardSections.map(\.title), ["About you", "Your card", "Order total"])
         XCTAssertEqual(configuration.labels.submitButton, "Pay now")
         XCTAssertEqual(configuration.cardSections.first?.fields, [.firstName, .lastName, .customerNumber, .billingEmail])
         XCTAssertTrue(configuration.requiredFields.contains(.customerNumber))
