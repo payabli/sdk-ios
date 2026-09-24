@@ -6,8 +6,8 @@ name: Release
 # tagged.
 #
 # Two jobs. `build` runs the repository's tests and build with a read-only token and no secret. `publish`
-# runs on a fresh runner in the `release` environment, runs nothing from the build, and is the only job that
-# can read the deploy key.
+# runs on a fresh runner in the `release` environment, executes no file from the checkout, and is the only
+# job that can read the deploy key.
 
 on:
   workflow_dispatch:
@@ -142,14 +142,19 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      # Derived again here rather than taken from the build job, whose steps ran the repository's code.
+      # The version is the build job's version step output, set before any test or build step ran. It is
+      # checked here as data, since no file from the checkout runs where the key is.
       - name: Check the version
         run: |
-          VERSION="$(.github/scripts/release-version.sh "$GITHUB_REF")"
-          if [ "$VERSION" != "$BUILT_VERSION" ]; then
-            echo "::error::the build reported '$BUILT_VERSION' and the tree declares '$VERSION'"
+          if ! [[ "$BUILT_VERSION" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+            echo "::error::the build reported '$BUILT_VERSION', which is not <major>.<minor>.<patch>"
             exit 1
           fi
+          if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+            echo "::error::a release is cut from refs/heads/main, not $GITHUB_REF"
+            exit 1
+          fi
+          VERSION="$BUILT_VERSION"
           tagged="$(git rev-parse -q --verify "refs/tags/$VERSION^{commit}" || true)"
           if [ -n "$tagged" ] && [ "$tagged" != "$GITHUB_SHA" ]; then
             echo "::error::tag $VERSION already names $tagged, not $GITHUB_SHA"

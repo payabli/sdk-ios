@@ -519,15 +519,6 @@ MUTATIONS = [
         "W12e", "workflows",
     ),
     Mutation(
-        "the publish job tags whatever version the build reported",
-        RELEASE_YML,
-        '          VERSION="$(.github/scripts/release-version.sh "$GITHUB_REF")"\n'
-        '          if [ "$VERSION" != "$BUILT_VERSION" ]; then',
-        '          VERSION="$BUILT_VERSION"\n'
-        '          if [ "$VERSION" != "$BUILT_VERSION" ]; then',
-        "W15m", "workflows",
-    ),
-    Mutation(
         "an input is interpolated into the release's tag command",
         RELEASE_YML, '--title "Payabli iOS SDK $VERSION"', '--title "${{ inputs.release_notes }}"',
         "W15b", "workflows",
@@ -556,9 +547,9 @@ MUTATIONS = [
     Mutation(
         "a tag on another commit is taken for this release",
         RELEASE_YML,
-        '          fi\n          tagged="$(git rev-parse -q --verify "refs/tags/$VERSION^{commit}" || true)"\n'
+        '          VERSION="$BUILT_VERSION"\n          tagged="$(git rev-parse -q --verify "refs/tags/$VERSION^{commit}" || true)"\n'
         '          if [ -n "$tagged" ] && [ "$tagged" != "$GITHUB_SHA" ]; then',
-        '          fi\n          tagged="$(git rev-parse -q --verify "refs/tags/$VERSION^{commit}" || true)"\n'
+        '          VERSION="$BUILT_VERSION"\n          tagged="$(git rev-parse -q --verify "refs/tags/$VERSION^{commit}" || true)"\n'
         '          if false; then',
         "W15n", "workflows",
     ),
@@ -574,8 +565,14 @@ MUTATIONS = [
         "W15l", "workflows",
     ),
     Mutation(
-        "the publish job trusts the version the build reported",
-        RELEASE_YML, '          if [ "$VERSION" != "$BUILT_VERSION" ]; then', "          if false; then", "W15m", "workflows",
+        "the publish job accepts a version the gate would refuse",
+        RELEASE_YML, 'if ! [[ "$BUILT_VERSION" =~ ^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$ ]]; then',
+        'if ! [[ "$BUILT_VERSION" =~ ^[0-9.]+$ ]]; then', "W15m", "workflows",
+    ),
+    Mutation(
+        "the publish job runs a script from the checkout again",
+        RELEASE_YML, '          VERSION="$BUILT_VERSION"\n',
+        '          VERSION="$(.github/scripts/release-version.sh "$GITHUB_REF")"\n', "W15l", "workflows",
     ),
     Mutation(
         "the tag is pushed to whatever host answers first",

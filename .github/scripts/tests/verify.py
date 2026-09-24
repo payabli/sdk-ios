@@ -49,6 +49,7 @@ RELEASE_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "release.yml"
 REPORT_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "nightly-report.yml"
 HARDWARE_LIST = REPO_ROOT / ".github" / "hardware-only-tests.txt"
 VERSION_SOURCE = "Sources/PayabliSDKCore/PayabliSDKCore.swift"
+GATE_SCRIPT = REPO_ROOT / ".github" / "scripts" / "release-version.sh"
 
 HALVES = ("collector", "poster", "workflows", "helper", "release", "both")
 
@@ -1342,12 +1343,20 @@ def test_workflows() -> None:
     publish_text = yaml.safe_dump(publish_job)
     build_text = yaml.safe_dump(build_job)
     runs_build = [needle for needle in ("xcodebuild", "build_release_frameworks.sh", "ios-toolchain",
-                                        "hardware-only-skips.sh", "Scripts/") if needle in publish_text]
+                                        "hardware-only-skips.sh", "Scripts/", ".github/scripts/", "./")
+                  if needle in publish_text]
     check("W15l the job holding the deploy key needs the build and runs none of it",
           publish_job.get("needs") == "build" and not runs_build and "secrets." not in build_text, runs_build)
-    check("W15m the publish job derives the version itself and refuses one the build reported differently",
-          any('release-version.sh "$GITHUB_REF"' in run and '!= "$BUILT_VERSION"' in run for run in publish_runs),
-          [run[:80] for run in publish_runs])
+    # The publish job checks the reported version as data with the gate's own pattern, so the two cannot
+    # accept different versions without this failing.
+    gate_pattern = re.search(r'\[\[ "\$declared" =~ (\S+) \]\]', GATE_SCRIPT.read_text())
+    publish_pattern = next((m for run in publish_runs
+                            for m in [re.search(r'\[\[ "\$BUILT_VERSION" =~ (\S+) \]\]', run)] if m), None)
+    check("W15m the publish job checks the reported version with the gate's pattern, on main only",
+          gate_pattern is not None and publish_pattern is not None
+          and gate_pattern.group(1) == publish_pattern.group(1)
+          and any('[ "$GITHUB_REF" != "refs/heads/main" ]' in run for run in publish_runs),
+          (gate_pattern and gate_pattern.group(1), publish_pattern and publish_pattern.group(1)))
     # The tag ruleset lets only the deploy key create a tag, so the push goes through it, to a host whose
     # key came from GitHub's API rather than from the first connection.
     text = RELEASE_WORKFLOW.read_text()
