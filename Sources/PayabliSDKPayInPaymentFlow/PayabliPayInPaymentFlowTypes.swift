@@ -113,12 +113,14 @@ public enum PayabliPayInPaymentFlowPaymentMethod: Sendable {
         }
     }
 
-    var authorizationMethod: PayabliPayInPaymentFlowAuthorizationMethod? {
+    var isAuthorizable: Bool {
         switch self {
-        case .card:
-            return .card
-        case .ach, .stored, .cloud, .check, .cash:
-            return nil
+        case .card, .cloud:
+            return true
+        case let .stored(stored):
+            return stored.method == .card
+        case .ach, .check, .cash:
+            return false
         }
     }
 }
