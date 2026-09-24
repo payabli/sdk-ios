@@ -363,7 +363,7 @@ class PayabliPayInPaymentFlowStoredPaymentMethod {
     Map<String, dynamic> map,
   ) => PayabliPayInPaymentFlowStoredPaymentMethod(
     storedMethodId: map['storedMethodId'] as String?,
-    method: map['method'] as String,
+    method: (map['method'] as String?) ?? '',
     methodReferenceId: map['methodReferenceId'] as String?,
     resultCode: map['resultCode'] as int?,
     resultText: map['resultText'] as String?,
