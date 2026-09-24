@@ -15,6 +15,17 @@ struct PayInFormCustomization: Hashable {
         }
     }
 
+    /// The form's style alone: colours, fonts, inputs and the submit button.
+    enum Look: String, CaseIterable, Identifiable {
+        case appTheme = "App theme"
+        case brand = "Brand"
+        case compact = "Compact"
+
+        var id: String {
+            rawValue
+        }
+    }
+
     enum Methods: String, CaseIterable, Identifiable {
         case cardAndBank = "Card and bank"
         case cardOnly = "Card only"
@@ -35,47 +46,55 @@ struct PayInFormCustomization: Hashable {
         }
     }
 
-    /// Colours, fonts, shapes and wording, which only a preset changes.
-    var look: Preset = .sdkDefault
-
+    var look: Look = .appTheme
     var methods: Methods = .cardAndBank
-    var defaultMethod: PayabliPayInPaymentFlowMethodType = .card
-    var labelLayout: PayabliPayInPaymentFlowLabelLayout = .external
-    var showsFieldLabels = true
-    var insertsCardNumberSpaces = true
-    var usesDashExpirationSeparator = false
-    var masksACHAccountEntry = true
-    var showsCustomerSection = false
+    var startOn: PayabliPayInPaymentFlowMethodType = .card
+    var labelsInsideFields = false
+    var hidesLabels = false
+    var usesCustomWording = false
+    var showsCustomerSection = true
     var customerSectionFirst = false
-    var titlesPaymentSummary = true
-    var cardBrandIconPlacement: PayabliPayInPaymentFlowCardBrandIconPlacement = .trailing
-    var errorMessagePlacement: PayabliPayInPaymentFlowErrorMessagePlacement = .aboveSubmitButton
+    var requiresCustomerNumber = false
+    var showsAmountSummary = true
+    var groupsCardNumber = true
+    var dashesExpiry = false
+    var masksAccountNumber = true
+    var cardBrandIconPlacement: PayabliPayInPaymentFlowCardBrandIconPlacement = .leading
+    var errorMessagePlacement: PayabliPayInPaymentFlowErrorMessagePlacement = .top
     var inputSizing: InputSizing = .standard
 
     init() {}
 
     init(preset: Preset) {
-        look = preset
         switch preset {
         case .sdkDefault:
             break
         case .brand:
-            labelLayout = .placeholder
-            showsFieldLabels = false
-            showsCustomerSection = true
+            look = .brand
+            labelsInsideFields = true
+            usesCustomWording = true
             customerSectionFirst = true
+            requiresCustomerNumber = true
+            dashesExpiry = true
             cardBrandIconPlacement = .trailing
             errorMessagePlacement = .top
             inputSizing = .large
         case .minimal:
+            look = .compact
             methods = .cardOnly
-            labelLayout = .placeholder
-            showsFieldLabels = false
-            titlesPaymentSummary = false
+            hidesLabels = true
+            showsCustomerSection = false
+            showsAmountSummary = false
+            groupsCardNumber = false
             cardBrandIconPlacement = .hidden
             errorMessagePlacement = .aboveSubmitButton
             inputSizing = .compact
         }
+    }
+
+    /// The preset these settings equal, if any.
+    var activePreset: Preset? {
+        Preset.allCases.first { PayInFormCustomization(preset: $0) == self }
     }
 
     // MARK: - What the SDK is handed
@@ -83,7 +102,7 @@ struct PayInFormCustomization: Hashable {
     func configuration(capturing: Bool) -> PayabliPayInPaymentFlowFormConfiguration {
         PayabliPayInPaymentFlowFormConfiguration(
             allowedMethods: allowedMethods,
-            defaultMethod: defaultMethod,
+            defaultMethod: methods == .cardAndBank ? startOn : allowedMethods[0],
             cardSections: sections(paymentFields: Self.cardFields, sectionTitle: "Card"),
             achSections: sections(paymentFields: Self.bankFields, sectionTitle: "Bank account"),
             hiddenValues: PayabliPayInPaymentFlowHiddenValues(
@@ -94,24 +113,25 @@ struct PayInFormCustomization: Hashable {
             ),
             options: PayabliPayInPaymentFlowOptions(forceCustomerCreation: true, source: "ios-simple-capture"),
             labels: labels(capturing: capturing),
-            labelLayout: labelLayout,
-            showsFieldLabels: showsFieldLabels,
+            labelLayout: labelsInsideFields ? .placeholder : .external,
+            showsFieldLabels: !hidesLabels,
             formatting: PayabliPayInPaymentFlowFormatting(
-                insertsCardNumberSpaces: insertsCardNumberSpaces,
-                expirationSeparator: usesDashExpirationSeparator ? "-" : "/",
-                masksACHAccountEntry: masksACHAccountEntry
+                insertsCardNumberSpaces: groupsCardNumber,
+                expirationSeparator: dashesExpiry ? "-" : "/",
+                masksACHAccountEntry: masksAccountNumber
             ),
             inputSizing: sdkInputSizing,
             cardBrandIconPlacement: cardBrandIconPlacement,
             errorMessagePlacement: errorMessagePlacement,
+            requiredFields: requiresCustomerNumber ? [.customerNumber] : [],
             paymentSummary: paymentSummary
         )
     }
 
     var style: PayabliPayInPaymentFlowStyle {
         switch look {
-        case .sdkDefault:
-            .default
+        case .appTheme:
+            PayInSharedConfiguration.style
         case .brand:
             PayabliPayInPaymentFlowStyle(
                 accentColor: Self.brandColor,
@@ -151,7 +171,7 @@ struct PayInFormCustomization: Hashable {
                     sectionSpacing: 26
                 )
             )
-        case .minimal:
+        case .compact:
             PayabliPayInPaymentFlowStyle(
                 accentColor: .primary,
                 title: PayabliPayInPaymentFlowTextStyle(font: .headline, color: .primary),
@@ -188,9 +208,9 @@ struct PayInFormCustomization: Hashable {
         .achHolder, .achRouting, .achAccount, .achAccountType
     ]
 
-    private static let customerFields: [PayabliPayInPaymentFlowField] = [
-        .firstName, .lastName, .billingEmail
-    ]
+    private var customerFields: [PayabliPayInPaymentFlowField] {
+        [.firstName, .lastName] + (requiresCustomerNumber ? [.customerNumber] : []) + [.billingEmail]
+    }
 
     private var allowedMethods: [PayabliPayInPaymentFlowMethodType] {
         switch methods {
@@ -200,23 +220,23 @@ struct PayInFormCustomization: Hashable {
         }
     }
 
-    /// On the default look with no customer section this is the layout the SDK builds when handed none.
+    /// The SDK always adds the amount rows to a capture, so an untitled section is as far as they go.
     private func sections(
         paymentFields: [PayabliPayInPaymentFlowField],
         sectionTitle: String
     ) -> [PayabliPayInPaymentFlowFieldSection] {
-        let titled = look == .brand
+        let titled = usesCustomWording
         let payment = PayabliPayInPaymentFlowFieldSection(
             title: titled ? sectionTitle : nil,
             fields: paymentFields
         )
         let customer = PayabliPayInPaymentFlowFieldSection(
             title: titled ? "Your details" : nil,
-            fields: Self.customerFields
+            fields: customerFields
         )
         let summary = PayabliPayInPaymentFlowFieldSection(
             id: "summary",
-            title: titlesPaymentSummary ? (titled ? "Order summary" : "Payment Information") : nil,
+            title: showsAmountSummary ? (titled ? "Order summary" : "Payment Information") : nil,
             fields: [.amount, .serviceFee]
         )
 
@@ -229,24 +249,22 @@ struct PayInFormCustomization: Hashable {
     }
 
     private func labels(capturing: Bool) -> PayabliPayInPaymentFlowLabels {
-        switch look {
-        case .sdkDefault:
-            PayabliPayInPaymentFlowLabels()
-        case .brand:
-            PayabliPayInPaymentFlowLabels(
-                title: capturing ? "Checkout" : "Save a card for later",
-                subtitle: "Secure payment powered by Payabli",
-                submitButton: capturing ? "Pay now" : "Save securely",
-                fieldLabels: PayabliPayInPaymentFlowLabels.defaultFieldLabels.merging(
-                    Self.brandFieldLabels
-                ) { _, brand in brand }
-            )
-        case .minimal:
-            PayabliPayInPaymentFlowLabels(
-                title: capturing ? "Pay" : "Add card",
-                submitButton: capturing ? "Pay" : "Save"
-            )
+        let fieldLabels = usesCustomWording
+            ? PayabliPayInPaymentFlowLabels.defaultFieldLabels.merging(Self.brandFieldLabels) { _, brand in brand }
+            : PayabliPayInPaymentFlowLabels.defaultFieldLabels
+        // With labels hidden and outside the fields, the placeholder is the only text a field has.
+        let placeholders = hidesLabels && !labelsInsideFields ? fieldLabels : [:]
+
+        guard usesCustomWording else {
+            return PayabliPayInPaymentFlowLabels(fieldLabels: fieldLabels, fieldPlaceholders: placeholders)
         }
+        return PayabliPayInPaymentFlowLabels(
+            title: capturing ? "Checkout" : "Save a card for later",
+            subtitle: "Secure payment powered by Payabli",
+            submitButton: capturing ? "Pay now" : "Save securely",
+            fieldLabels: fieldLabels,
+            fieldPlaceholders: placeholders
+        )
     }
 
     private static let brandFieldLabels: [PayabliPayInPaymentFlowField: String] = [
@@ -258,6 +276,7 @@ struct PayInFormCustomization: Hashable {
         .achHolder: "Name on account",
         .firstName: "First",
         .lastName: "Last",
+        .customerNumber: "Member number",
         .billingEmail: "Email for receipt",
         .amount: "Subtotal",
         .serviceFee: "Processing fee"
@@ -292,7 +311,7 @@ struct PayInFormCustomization: Hashable {
                 ),
                 rowSpacing: 10
             )
-        case .sdkDefault, .minimal:
+        case .appTheme, .compact:
             PayabliPayInPaymentFlowPaymentSummaryConfiguration()
         }
     }

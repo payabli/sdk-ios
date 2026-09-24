@@ -2,81 +2,119 @@ import PayabliSDKPayInPaymentFlow
 import XCTest
 
 final class PayInFormCustomizationTests: XCTestCase {
-    private let sdkDefault = PayabliPayInPaymentFlowFormConfiguration()
+    func testTheDefaultPresetIsTheSettingsTheScreenStartsOn() {
+        let preset = PayInFormCustomization(preset: .sdkDefault)
 
-    func testTheDefaultPresetHandsTheFormWhatItWouldHaveUsedAnyway() {
-        let configuration = PayInFormCustomization(preset: .sdkDefault).configuration(capturing: true)
-
-        XCTAssertEqual(configuration.allowedMethods, sdkDefault.allowedMethods)
-        XCTAssertEqual(configuration.labelLayout, sdkDefault.labelLayout)
-        XCTAssertEqual(configuration.showsFieldLabels, sdkDefault.showsFieldLabels)
-        XCTAssertEqual(configuration.cardBrandIconPlacement, sdkDefault.cardBrandIconPlacement)
-        XCTAssertEqual(configuration.errorMessagePlacement, sdkDefault.errorMessagePlacement)
-        XCTAssertEqual(configuration.inputSizing, sdkDefault.inputSizing)
-        XCTAssertEqual(configuration.labels.title, sdkDefault.labels.title)
-        XCTAssertEqual(configuration.labels.submitButton, sdkDefault.labels.submitButton)
-        XCTAssertEqual(configuration.cardSections.map(\.title), sdkDefault.cardSections.map(\.title))
-        XCTAssertEqual(configuration.cardSections.map(\.fields), sdkDefault.cardSections.map(\.fields))
+        XCTAssertEqual(preset, PayInFormCustomization())
+        XCTAssertEqual(preset.activePreset, .sdkDefault)
+        XCTAssertEqual(preset.look, .appTheme)
+        XCTAssertEqual(preset.methods, .cardAndBank)
+        XCTAssertEqual(preset.startOn, .card)
+        XCTAssertTrue(preset.showsCustomerSection)
+        XCTAssertTrue(preset.showsAmountSummary)
+        XCTAssertTrue(preset.groupsCardNumber)
+        XCTAssertTrue(preset.masksAccountNumber)
+        XCTAssertFalse(preset.labelsInsideFields)
+        XCTAssertFalse(preset.hidesLabels)
+        XCTAssertFalse(preset.usesCustomWording)
+        XCTAssertFalse(preset.customerSectionFirst)
+        XCTAssertFalse(preset.requiresCustomerNumber)
+        XCTAssertFalse(preset.dashesExpiry)
+        XCTAssertEqual(preset.cardBrandIconPlacement, .leading)
+        XCTAssertEqual(preset.errorMessagePlacement, .top)
+        XCTAssertEqual(preset.inputSizing, .standard)
     }
 
-    func testTheBrandPresetPutsTheCustomerFirstAndRenamesTheForm() {
-        let configuration = PayInFormCustomization(preset: .brand).configuration(capturing: true)
+    func testTheDefaultPresetHandsTheFormItsOwnWording() {
+        let configuration = PayInFormCustomization(preset: .sdkDefault).configuration(capturing: true)
+        let sdkDefault = PayabliPayInPaymentFlowFormConfiguration()
 
-        XCTAssertEqual(configuration.cardSections.first?.fields, [.firstName, .lastName, .billingEmail])
+        XCTAssertEqual(configuration.allowedMethods, [.card, .bankAccount])
+        XCTAssertEqual(configuration.labelLayout, .external)
+        XCTAssertTrue(configuration.showsFieldLabels)
+        XCTAssertEqual(configuration.labels.title, sdkDefault.labels.title)
+        XCTAssertEqual(configuration.labels.submitButton, sdkDefault.labels.submitButton)
+        XCTAssertEqual(configuration.inputSizing, sdkDefault.inputSizing)
+        XCTAssertEqual(configuration.cardSections.map(\.title), [nil, nil, "Payment Information"])
+    }
+
+    func testTheBrandPreset() {
+        let customization = PayInFormCustomization(preset: .brand)
+        let configuration = customization.configuration(capturing: true)
+
+        XCTAssertEqual(customization.activePreset, .brand)
+        XCTAssertEqual(customization.look, .brand)
         XCTAssertEqual(configuration.labelLayout, .placeholder)
         XCTAssertEqual(configuration.labels.title, "Checkout")
         XCTAssertEqual(configuration.labels.submitButton, "Pay now")
-        XCTAssertEqual(configuration.labels.label(for: .billingEmail), "Email for receipt")
+        XCTAssertEqual(configuration.cardSections.first?.fields, [.firstName, .lastName, .customerNumber, .billingEmail])
+        XCTAssertTrue(configuration.requiredFields.contains(.customerNumber))
+        XCTAssertEqual(configuration.formatting.expirationSeparator, "-")
         XCTAssertEqual(configuration.cardBrandIconPlacement, .trailing)
         XCTAssertEqual(configuration.errorMessagePlacement, .top)
         XCTAssertEqual(configuration.inputSizing.size(for: .cardNumber).height, 60)
     }
 
-    func testTheMinimalPresetStripsTheFormDown() {
-        let configuration = PayInFormCustomization(preset: .minimal).configuration(capturing: true)
+    func testTheMinimalPreset() {
+        let customization = PayInFormCustomization(preset: .minimal)
+        let configuration = customization.configuration(capturing: true)
 
+        XCTAssertEqual(customization.activePreset, .minimal)
+        XCTAssertEqual(customization.look, .compact)
         XCTAssertEqual(configuration.allowedMethods, [.card])
-        XCTAssertEqual(configuration.labelLayout, .placeholder)
         XCTAssertFalse(configuration.showsFieldLabels)
-        XCTAssertEqual(configuration.cardSections.map(\.title), [nil, nil])
+        XCTAssertEqual(configuration.labels.placeholder(for: .cardNumber), "Card number")
+        XCTAssertFalse(configuration.cardSections.flatMap(\.fields).contains(.firstName))
+        XCTAssertNil(configuration.cardSections.last?.title)
+        XCTAssertFalse(configuration.formatting.insertsCardNumberSpaces)
         XCTAssertEqual(configuration.cardBrandIconPlacement, .hidden)
         XCTAssertEqual(configuration.errorMessagePlacement, .aboveSubmitButton)
         XCTAssertEqual(configuration.inputSizing.size(for: .cardNumber).height, 44)
     }
 
-    func testEveryPresetDiffersFromEveryOther() {
-        let presets = PayInFormCustomization.Preset.allCases.map(PayInFormCustomization.init(preset:))
+    func testAChangedSettingLeavesNoPresetActive() {
+        var customization = PayInFormCustomization(preset: .brand)
+        customization.look = .compact
 
-        XCTAssertEqual(Set(presets.map { "\($0)" }).count, presets.count)
+        XCTAssertNil(customization.activePreset)
+    }
+
+    func testStartOnAppliesOnlyWhenBothMethodsAreOffered() {
+        var customization = PayInFormCustomization()
+        customization.startOn = .bankAccount
+
+        XCTAssertEqual(customization.configuration(capturing: true).defaultMethod, .bankAccount)
+
+        customization.methods = .cardOnly
+
+        XCTAssertEqual(customization.configuration(capturing: true).defaultMethod, .card)
     }
 
     func testEachSettingReachesTheFormOnItsOwn() {
-        var customization = PayInFormCustomization(preset: .sdkDefault)
+        var customization = PayInFormCustomization()
         customization.methods = .bankOnly
-        customization.cardBrandIconPlacement = .leading
-        customization.errorMessagePlacement = .top
-        customization.usesDashExpirationSeparator = true
-        customization.insertsCardNumberSpaces = false
-        customization.masksACHAccountEntry = false
-        customization.showsFieldLabels = false
+        customization.labelsInsideFields = true
+        customization.dashesExpiry = true
+        customization.groupsCardNumber = false
+        customization.masksAccountNumber = false
+        customization.cardBrandIconPlacement = .hidden
+        customization.errorMessagePlacement = .aboveSubmitButton
         customization.inputSizing = .large
 
         let configuration = customization.configuration(capturing: false)
 
         XCTAssertEqual(configuration.allowedMethods, [.bankAccount])
-        XCTAssertEqual(configuration.defaultMethod, .bankAccount)
-        XCTAssertEqual(configuration.cardBrandIconPlacement, .leading)
-        XCTAssertEqual(configuration.errorMessagePlacement, .top)
+        XCTAssertEqual(configuration.labelLayout, .placeholder)
         XCTAssertEqual(configuration.formatting.expirationSeparator, "-")
         XCTAssertFalse(configuration.formatting.insertsCardNumberSpaces)
         XCTAssertFalse(configuration.formatting.masksACHAccountEntry)
-        XCTAssertFalse(configuration.showsFieldLabels)
+        XCTAssertEqual(configuration.cardBrandIconPlacement, .hidden)
+        XCTAssertEqual(configuration.errorMessagePlacement, .aboveSubmitButton)
         XCTAssertEqual(configuration.inputSizing.size(for: .achRouting).height, 60)
     }
 
     func testTheCustomerSectionFollowsThePaymentUnlessMovedFirst() {
-        var customization = PayInFormCustomization(preset: .sdkDefault)
-        customization.showsCustomerSection = true
+        var customization = PayInFormCustomization()
 
         XCTAssertEqual(
             customization.configuration(capturing: true).cardSections.map(\.fields.first),
@@ -89,12 +127,5 @@ final class PayInFormCustomizationTests: XCTestCase {
             customization.configuration(capturing: true).cardSections.map(\.fields.first),
             [.firstName, .cardholderName, .amount]
         )
-    }
-
-    func testTheSummaryHeadingCanBeDropped() {
-        var customization = PayInFormCustomization(preset: .sdkDefault)
-        customization.titlesPaymentSummary = false
-
-        XCTAssertNil(customization.configuration(capturing: true).cardSections.last?.title)
     }
 }

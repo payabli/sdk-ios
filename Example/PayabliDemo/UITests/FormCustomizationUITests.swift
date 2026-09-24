@@ -107,6 +107,7 @@ final class FormCustomizationLiveUITests: XCTestCase {
         let entries: [(String, String)] = [
             ("firstName", "Simple"),
             ("lastName", "Capture"),
+            ("customerNumber", "SIMPLE-CAPTURE-IOS"),
             ("billingEmail", "simple-capture@example.com"),
             ("cardholderName", "Simple Capture"),
             ("cardNumber", "4242424242424242"),

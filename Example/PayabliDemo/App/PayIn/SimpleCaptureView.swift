@@ -97,7 +97,7 @@ struct SimpleCaptureView: View {
                     Button {
                         customization = PayInFormCustomization(preset: preset)
                     } label: {
-                        if customization == PayInFormCustomization(preset: preset) {
+                        if customization.activePreset == preset {
                             Label(preset.rawValue, systemImage: "checkmark")
                         } else {
                             Text(preset.rawValue)
@@ -106,41 +106,47 @@ struct SimpleCaptureView: View {
                 }
             }
 
+            Section("Look") {
+                Picker("Look", selection: $customization.look) {
+                    ForEach(PayInFormCustomization.Look.allCases) { Text($0.rawValue).tag($0) }
+                }
+                .pickerStyle(.menu)
+            }
+
             Section("Methods") {
-                Picker("Allowed methods", selection: $customization.methods) {
+                Picker("Payment methods", selection: $customization.methods) {
                     ForEach(PayInFormCustomization.Methods.allCases) { Text($0.rawValue).tag($0) }
                 }
                 .pickerStyle(.menu)
-                Picker("Default method", selection: $customization.defaultMethod) {
+                Picker("Start on", selection: $customization.startOn) {
                     Text("Card").tag(PayabliPayInPaymentFlowMethodType.card)
                     Text("Bank").tag(PayabliPayInPaymentFlowMethodType.bankAccount)
                 }
                 .pickerStyle(.menu)
+                .disabled(customization.methods != .cardAndBank)
             }
 
             Section("Labels") {
-                Picker("Label layout", selection: $customization.labelLayout) {
-                    Text("Above the field").tag(PayabliPayInPaymentFlowLabelLayout.external)
-                    Text("Inside as placeholder").tag(PayabliPayInPaymentFlowLabelLayout.placeholder)
-                }
-                .pickerStyle(.menu)
-                Toggle("Field labels", isOn: $customization.showsFieldLabels)
-            }
-
-            Section("Formatting") {
-                Toggle("Card number spaces", isOn: $customization.insertsCardNumberSpaces)
-                Toggle("Expiry with a dash", isOn: $customization.usesDashExpirationSeparator)
-                Toggle("Mask bank account", isOn: $customization.masksACHAccountEntry)
+                Toggle("Labels inside the fields", isOn: $customization.labelsInsideFields)
+                Toggle("Hide labels", isOn: $customization.hidesLabels)
+                Toggle("Custom wording", isOn: $customization.usesCustomWording)
             }
 
             Section("Sections") {
                 Toggle("Customer section", isOn: $customization.showsCustomerSection)
                 Toggle("Customer section first", isOn: $customization.customerSectionFirst)
                     .disabled(!customization.showsCustomerSection)
-                Toggle("Payment summary heading", isOn: $customization.titlesPaymentSummary)
+                Toggle("Require a customer number", isOn: $customization.requiresCustomerNumber)
+                Toggle("Amount summary", isOn: $customization.showsAmountSummary)
             }
 
-            Section("Layout") {
+            Section("Formatting") {
+                Toggle("Group the card number", isOn: $customization.groupsCardNumber)
+                Toggle("Dash between month and year", isOn: $customization.dashesExpiry)
+                Toggle("Mask the account number", isOn: $customization.masksAccountNumber)
+            }
+
+            Section("iOS only") {
                 Picker("Card brand icon", selection: $customization.cardBrandIconPlacement) {
                     Text("Leading").tag(PayabliPayInPaymentFlowCardBrandIconPlacement.leading)
                     Text("Trailing").tag(PayabliPayInPaymentFlowCardBrandIconPlacement.trailing)
@@ -149,7 +155,7 @@ struct SimpleCaptureView: View {
                 .pickerStyle(.menu)
                 Picker("Error message", selection: $customization.errorMessagePlacement) {
                     Text("Top").tag(PayabliPayInPaymentFlowErrorMessagePlacement.top)
-                    Text("Above submit").tag(PayabliPayInPaymentFlowErrorMessagePlacement.aboveSubmitButton)
+                    Text("Above button").tag(PayabliPayInPaymentFlowErrorMessagePlacement.aboveSubmitButton)
                 }
                 .pickerStyle(.menu)
                 Picker("Input size", selection: $customization.inputSizing) {

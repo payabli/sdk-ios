@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		5DC00000000000000000D042 /* PayInSharedConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000000000000000000004 /* PayInSharedConfiguration.swift */; };
+		5DC00000000000000000D043 /* PayabliDemoColors.swift in Sources */ = {isa = PBXBuildFile; fileRef = D20000000000000000000021 /* PayabliDemoColors.swift */; };
 		5DC00000000000000000D032 /* FormCustomizationUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DC00000000000000000D031 /* FormCustomizationUITests.swift */; };
 		5DC00000000000000000D002 /* PayInFormCustomization.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DC00000000000000000D001 /* PayInFormCustomization.swift */; };
 		5DC00000000000000000D003 /* PayInFormCustomization.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DC00000000000000000D001 /* PayInFormCustomization.swift */; };
@@ -739,6 +741,8 @@
 				A1B2C3D4E5F600000000AD02 /* QAIdentity.swift in Sources */,
 				A1B2C3D4E5F600000000AD12 /* QAAmount.swift in Sources */,
 				5DC00000000000000000D003 /* PayInFormCustomization.swift in Sources */,
+				5DC00000000000000000D042 /* PayInSharedConfiguration.swift in Sources */,
+				5DC00000000000000000D043 /* PayabliDemoColors.swift in Sources */,
 				5DC00000000000000000D022 /* PayInFormCustomizationTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
