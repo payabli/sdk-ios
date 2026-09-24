@@ -146,6 +146,7 @@ final class PaymentMethodCoverageExpansionTests: XCTestCase {
     func testStoredPaymentMethodBuildsDefaultAPIResponse() {
         let storedMethod = PayabliPayInPaymentFlowStoredPaymentMethod(
             storedMethodId: "stored-123",
+            method: .card,
             methodReferenceId: "method-123",
             resultCode: 1,
             resultText: "Approved",

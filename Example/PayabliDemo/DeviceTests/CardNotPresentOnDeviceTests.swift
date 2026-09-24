@@ -90,10 +90,14 @@ final class CardNotPresentOnDeviceTests: XCTestCase {
     /// identifier list is satisfied by, and they belong to the app's configuration
     /// rather than to this file.
     private func request(with card: PayabliPayInPaymentFlowCardData) -> PayabliPayInPaymentFlowRequest {
+        request(paying: .card(PayabliPayInPaymentFlowCardMethod(data: card)))
+    }
+
+    private func request(paying method: PayabliPayInPaymentFlowPaymentMethod) -> PayabliPayInPaymentFlowRequest {
         let configured = PayInRequests.freshCapture(suppliesCustomer: true)
         return PayabliPayInPaymentFlowRequest(
             paymentDetails: configured.paymentDetails,
-            paymentMethod: .card(PayabliPayInPaymentFlowCardMethod(data: card)),
+            paymentMethod: method,
             accountId: configured.accountId,
             customerData: configured.customerData,
             ipAddress: configured.ipAddress,
@@ -124,6 +128,7 @@ final class CardNotPresentOnDeviceTests: XCTestCase {
         // output would carry a way to charge the card again.
         let token = try XCTUnwrap(stored.storedMethodId ?? stored.methodReferenceId, "no stored token came back")
         XCTAssertFalse(token.isEmpty)
+        XCTAssertEqual(stored.method, .card)
         LiveEnvironment.report("PAYABLI_STORED_METHOD env=\(named.name) returned=yes")
     }
 
@@ -237,6 +242,31 @@ final class CardNotPresentOnDeviceTests: XCTestCase {
                 XCTFail("the screen's seam threw, and it needs voiding by hand: \(transId)")
             }
         }
+    }
+
+    /// A stored card is charged from the store result alone, then voided.
+    func testFChargingAStoredCardWithTheMethodItCameBackWith() async throws {
+        let flow = try makeFlow()
+        let stored = try await flow.addCard(
+            try card(),
+            options: PayabliPayInPaymentFlowTokenStorageOptions(
+                forceCustomerCreation: true,
+                customerData: PayInDemoCustomer.customerData
+            )
+        )
+        let token = try XCTUnwrap(stored.storedMethodId, "no stored token came back")
+
+        let captured = try await flow.capture(request(paying: .stored(PayabliPayInPaymentFlowStoredMethod(
+            method: stored.method,
+            storedMethodId: token
+        ))))
+        let transId = try XCTUnwrap(
+            captured.transaction?.paymentTransId,
+            "capture returned no paymentTransId: code=\(captured.code) reason=\(captured.reason ?? "<nil>")"
+        )
+        LiveEnvironment.report("PAYABLI_STORED_CAPTURED env=\(named.name) transId=\(transId) code=\(captured.code)")
+
+        await reverse(transId, on: flow, whenLeftStanding: "the stored-card charge was left standing")
     }
 
     // MARK: - Void

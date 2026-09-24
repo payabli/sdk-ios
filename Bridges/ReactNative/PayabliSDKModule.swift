@@ -547,6 +547,7 @@ public final class PayabliSDKModule: RCTEventEmitter {
         _ method: PayabliPayInPaymentFlowStoredPaymentMethod
     ) -> [String: Any] {
         var map: [String: Any] = [
+            "method": method.method.rawValue,
             "responseText": method.responseText,
             "apiResponse": dictionary(from: method.apiResponse)
         ]

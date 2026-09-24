@@ -522,6 +522,7 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
 
     private static func storedPaymentMethodMap(_ method: PayabliPayInPaymentFlowStoredPaymentMethod) -> [String: Any] {
         var map: [String: Any] = [
+            "method": method.method.rawValue,
             "responseText": method.responseText,
             "apiResponse": dictionary(from: method.apiResponse)
         ]

@@ -40,6 +40,7 @@ final class PaymentMethodObjCBridgeTests: XCTestCase {
     func testStoredPaymentMethodWrapperConvertsValuesAndResponse() {
         let storedMethod = PayabliPayInPaymentFlowStoredPaymentMethod(
             storedMethodId: "stored-123",
+            method: .ach,
             methodReferenceId: "method-123",
             resultCode: 1,
             resultText: "Approved",
@@ -62,6 +63,7 @@ final class PaymentMethodObjCBridgeTests: XCTestCase {
         let wrapper = PayabliPayInPaymentFlowStoredPaymentMethodObjC(storedMethod)
 
         XCTAssertEqual(wrapper.storedMethodId, "stored-123")
+        XCTAssertEqual(wrapper.method, "ach")
         XCTAssertEqual(wrapper.methodReferenceId, "method-123")
         XCTAssertEqual(wrapper.resultCode, 1)
         XCTAssertEqual(wrapper.customerId, 4440)

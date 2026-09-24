@@ -7,6 +7,7 @@ private let payInPaymentFlowObjCErrorDomain = "com.payabli.payInPaymentFlow"
 @objc(PayabliPayInPaymentFlowStoredPaymentMethodObjC)
 public final class PayabliPayInPaymentFlowStoredPaymentMethodObjC: NSObject {
     @objc public let storedMethodId: String?
+    @objc public let method: String
     @objc public let methodReferenceId: String?
     @objc public let resultCode: NSNumber?
     @objc public let resultText: String?
@@ -16,6 +17,7 @@ public final class PayabliPayInPaymentFlowStoredPaymentMethodObjC: NSObject {
 
     init(_ method: PayabliPayInPaymentFlowStoredPaymentMethod) {
         storedMethodId = method.storedMethodId
+        self.method = method.method.rawValue
         methodReferenceId = method.methodReferenceId
         resultCode = method.resultCode.map(NSNumber.init(value:))
         resultText = method.resultText

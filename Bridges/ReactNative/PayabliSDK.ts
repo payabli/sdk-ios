@@ -96,6 +96,7 @@ export enum PayabliTTPEventCode {
 export type PayabliPayInPaymentFlowACHAccountType = "Checking" | "Savings";
 export type PayabliPayInPaymentFlowACHHolderType = "personal" | "business";
 export type PayabliPayInPaymentFlowACHSecCode = "PPD" | "WEB" | "TEL" | "CCD" | "BOC";
+export type PayabliPayInPaymentFlowStoredMethodType = "card" | "ach" | "wallet";
 
 // MARK: - Tap to Pay data shapes
 
@@ -215,6 +216,7 @@ export interface PayabliPayInPaymentFlowACHData extends PayabliPayInPaymentFlowO
 
 export interface PayabliPayInPaymentFlowStoredPaymentMethod {
     storedMethodId?: string;
+    method: PayabliPayInPaymentFlowStoredMethodType;
     methodReferenceId?: string;
     resultCode?: number;
     resultText?: string;

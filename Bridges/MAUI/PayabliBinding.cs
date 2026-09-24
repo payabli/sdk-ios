@@ -312,6 +312,7 @@ namespace Payabli.TapToPay
     public interface PayabliPayInPaymentFlowStoredPaymentMethodObjC
     {
         [NullAllowed, Export("storedMethodId")] string StoredMethodId { get; }
+        [Export("method")] string Method { get; }
         [NullAllowed, Export("methodReferenceId")] string MethodReferenceId { get; }
         [NullAllowed, Export("resultCode")] NSNumber ResultCode { get; }
         [NullAllowed, Export("resultText")] string ResultText { get; }

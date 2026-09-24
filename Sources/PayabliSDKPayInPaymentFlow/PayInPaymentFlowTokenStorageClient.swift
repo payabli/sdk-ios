@@ -66,7 +66,7 @@ final class PayInPaymentFlowTokenStorageClient: Sendable {
             throw PayabliPayInPaymentFlowTokenStorageError.saveFailed(failure)
         }
         try mapPayabliHTTPError(response: response)
-        return try decodeStoredPaymentMethod(from: response)
+        return try decodeStoredPaymentMethod(from: response, stored: paymentMethod)
     }
 
     /// Builds the request. The transport's chain attaches the credential.
@@ -97,7 +97,10 @@ final class PayInPaymentFlowTokenStorageClient: Sendable {
         )
     }
 
-    private func decodeStoredPaymentMethod(from response: PayabliResponse) throws -> PayabliPayInPaymentFlowStoredPaymentMethod {
+    private func decodeStoredPaymentMethod(
+        from response: PayabliResponse,
+        stored paymentMethod: PayabliPayInPaymentFlowMethodInput
+    ) throws -> PayabliPayInPaymentFlowStoredPaymentMethod {
         let decoder = JSONDecoder()
         do {
             let decoded = try decoder.decode(PayabliPayInPaymentFlowTokenStorageAPIResponse.self, from: response.body)
@@ -107,6 +110,7 @@ final class PayInPaymentFlowTokenStorageClient: Sendable {
             }
             return PayabliPayInPaymentFlowStoredPaymentMethod(
                 storedMethodId: decoded.responseData?.referenceId,
+                method: paymentMethod.storedMethodType,
                 methodReferenceId: decoded.responseData?.methodReferenceId,
                 resultCode: decoded.responseData?.resultCode,
                 resultText: decoded.responseData?.resultText,
@@ -129,6 +133,16 @@ final class PayInPaymentFlowTokenStorageClient: Sendable {
         let decoded = try? JSONDecoder().decode(PayabliPayInPaymentFlowTokenStorageAPIResponse.self, from: response.body)
         guard let decoded, decoded.isSuccess == false else { return nil }
         return decoded.failure(httpStatusCode: response.statusCode)
+    }
+}
+
+private extension PayabliPayInPaymentFlowMethodInput {
+    /// What this input is charged as once it is stored.
+    var storedMethodType: PayabliPayInPaymentFlowStoredMethodType {
+        switch self {
+        case .card: return .card
+        case .ach: return .ach
+        }
     }
 }
 
