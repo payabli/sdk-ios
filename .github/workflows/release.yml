@@ -21,6 +21,9 @@ jobs:
   release:
     name: Publish a release
     runs-on: macos-15
+    # Its required reviewers are who may release, it deploys from main only, and it holds the one key the
+    # tag ruleset lets create a tag.
+    environment: release
     permissions:
       contents: write
       actions: read
@@ -39,6 +42,15 @@ jobs:
             --jq '.workflow_runs[0] // empty | "\(.status) \(.conclusion)"')"
           if [ "$state" != "completed success" ]; then
             echo "::error::CI on $GITHUB_SHA is '${state:-not run}', not a completed success"
+            exit 1
+          fi
+
+      - name: Check the release key is provisioned
+        env:
+          RELEASE_DEPLOY_KEY: ${{ secrets.RELEASE_DEPLOY_KEY }}
+        run: |
+          if [ -z "$RELEASE_DEPLOY_KEY" ]; then
+            echo "::error::the release environment has no RELEASE_DEPLOY_KEY secret; .github/RELEASING.md sets it up"
             exit 1
           fi
 
@@ -96,11 +108,13 @@ jobs:
         timeout-minutes: 45
         run: ./Scripts/build_release_frameworks.sh
 
-      # One call creates the tag and the Release with its assets: a draft, the uploads, then publishing. A
-      # failure leaves at most a draft, and no tag.
+      # A draft carries the assets and needs no tag. The tag is then pushed with the deploy key, the only
+      # identity the tag ruleset lets create one, and the draft is published onto it. A failure before the
+      # push leaves at most a draft; one after it leaves a tag whose draft `gh release edit` publishes.
       - name: Publish the release
         env:
-          GH_TOKEN: ${{ secrets.GHB_PAT_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_DEPLOY_KEY: ${{ secrets.RELEASE_DEPLOY_KEY }}
         run: |
           previous="$(git tag --list '[0-9]*' --sort=-version:refname | head -n 1 || true)"
           {
@@ -120,6 +134,22 @@ jobs:
             echo "::error::no XCFramework zips in build/release"
             exit 1
           fi
-          gh release create "$VERSION" --target "$GITHUB_SHA" \
+          gh release create "$VERSION" --draft --target "$GITHUB_SHA" \
             --title "Payabli iOS SDK $VERSION" --notes-file release-notes.md \
             "${zips[@]}" build/release/checksums.txt build/release/THIRD_PARTY_LICENSES.txt
+
+          # GitHub's host keys come from its API over HTTPS, so the SSH connection is verified rather than
+          # trusted on first use.
+          umask 077
+          key="$RUNNER_TEMP/release-key"
+          hosts="$RUNNER_TEMP/github-known-hosts"
+          trap 'rm -f "$key"' EXIT
+          printf '%s\n' "$RELEASE_DEPLOY_KEY" > "$key"
+          gh api meta --jq '.ssh_keys[] | "github.com " + .' > "$hosts"
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "$VERSION" -m "Payabli iOS SDK $VERSION" "$GITHUB_SHA"
+          GIT_SSH_COMMAND="ssh -i $key -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$hosts" \
+            git push "git@github.com:$GITHUB_REPOSITORY.git" "refs/tags/$VERSION"
+
+          gh release edit "$VERSION" --draft=false

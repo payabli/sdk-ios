@@ -1329,7 +1329,21 @@ def test_workflows() -> None:
     tag_run = runs[tag_at] if tag_at != -1 else ""
     # On the command that creates the tag, not anywhere in the step: the notes name the same commit.
     check("W15c the release tags the commit that was tested",
-          re.search(r'gh release create "\$VERSION" --target "\$GITHUB_SHA"', tag_run) is not None, tag_run[:200])
+          re.search(r'gh release create "\$VERSION" --draft --target "\$GITHUB_SHA"', tag_run) is not None
+          and re.search(r'git tag -a "\$VERSION" -m "[^"]*" "\$GITHUB_SHA"', tag_run) is not None, tag_run[:200])
+    check("W15i the release runs in the release environment, whose reviewers are who may release",
+          all(job.get("environment") == "release" for job in jobs), [job.get("environment") for job in jobs])
+    # The tag ruleset lets only the deploy key create a tag, so the push goes through it, to a host whose
+    # key came from GitHub's API rather than from the first connection.
+    text = RELEASE_WORKFLOW.read_text()
+    check("W15j the tag is pushed with the deploy key to a verified host, and that key is the only secret",
+          "ssh -i $key" in tag_run and "StrictHostKeyChecking=yes" in tag_run
+          and "gh api meta --jq '.ssh_keys[]" in tag_run
+          and set(re.findall(r"secrets\.(\w+)", text)) == {"RELEASE_DEPLOY_KEY"},
+          sorted(set(re.findall(r"secrets\.(\w+)", text))))
+    order = [tag_run.find(needle) for needle in ("--draft --target", "git push", "--draft=false")]
+    check("W15k the draft is published only after its tag is pushed",
+          -1 not in order and order == sorted(order), order)
     build_at = first("build_release_frameworks.sh")
     check("W15g the release builds the XCFrameworks before publishing and attaches them",
           build_at != -1 and build_at < tag_at and '"${zips[@]}"' in tag_run

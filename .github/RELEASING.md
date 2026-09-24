@@ -12,6 +12,24 @@ The version is `PayabliCore.version` in `Sources/PayabliSDKCore/PayabliSDKCore.s
 is heading for, which every module reports. There is no `v` prefix, because SwiftPM reads the tag name as the
 version itself.
 
+## Who may release
+
+The `release` environment decides it. The job runs in that environment, so it waits for one of its required
+reviewers, deploys from `main` only, and is the only job that can read `RELEASE_DEPLOY_KEY`. That deploy key is
+the only identity the tag ruleset lets create a tag, so nothing else can publish a version.
+
+Set up once, by a repository admin:
+
+```bash
+ssh-keygen -t ed25519 -N "" -C "sdk-ios release" -f release_key
+gh repo deploy-key add release_key.pub --repo payabli/sdk-ios --allow-write --title "release"
+gh secret set RELEASE_DEPLOY_KEY --repo payabli/sdk-ios --env release < release_key
+rm release_key release_key.pub
+```
+
+Then add **Deploy keys** to the tag ruleset's bypass list. That bypass covers every deploy key with write
+access, so this is the only one there may be.
+
 ## Cut a release
 
 1. Open a pull request that sets the install line in `README.md` to the version being released:
@@ -21,8 +39,9 @@ version itself.
    ```
 
    `.upToNextMinor` because a minor version can break source before 1.0.
-2. Merge it, wait for **CI** on that commit to pass, then run **Release** from `main`. If publishing fails
-   part way, it leaves a draft Release and no tag: delete the draft and run it again.
+2. Merge it, wait for **CI** on that commit to pass, then run **Release** from `main` and approve it. If
+   publishing fails before the tag is pushed, it leaves a draft Release: delete the draft and run it again.
+   If it fails after, the tag exists and `gh release edit <version> --draft=false` publishes its draft.
 3. Open a pull request that moves `PayabliCore.version` to the next version.
 
 A published number is never reused. A fix to a release is the next patch.

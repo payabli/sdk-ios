@@ -537,6 +537,23 @@ MUTATIONS = [
         "W15d", "workflows",
     ),
     Mutation(
+        "the release runs outside the environment that says who may release",
+        RELEASE_YML, "    environment: release\n", "", "W15i", "workflows",
+    ),
+    Mutation(
+        "the tag is pushed to whatever host answers first",
+        RELEASE_YML, "-o StrictHostKeyChecking=yes", "-o StrictHostKeyChecking=accept-new", "W15j", "workflows",
+    ),
+    Mutation(
+        "a personal token comes back into the release",
+        RELEASE_YML, "          GH_TOKEN: ${{ github.token }}\n          RELEASE_DEPLOY_KEY",
+        "          GH_TOKEN: ${{ secrets.GHB_PAT_TOKEN }}\n          RELEASE_DEPLOY_KEY", "W15j", "workflows",
+    ),
+    Mutation(
+        "the draft is published before its tag exists",
+        RELEASE_YML, "          gh release edit \"$VERSION\" --draft=false\n", "", "W15k", "workflows",
+    ),
+    Mutation(
         "the release publishes without building the XCFrameworks",
         RELEASE_YML,
         "      - name: Build the XCFrameworks\n        timeout-minutes: 45\n"
@@ -556,8 +573,8 @@ MUTATIONS = [
     ),
     Mutation(
         "the release's tag falls back to the default branch's head",
-        RELEASE_YML, 'gh release create "$VERSION" --target "$GITHUB_SHA"', 'gh release create "$VERSION"',
-        "W15c", "workflows",
+        RELEASE_YML, 'gh release create "$VERSION" --draft --target "$GITHUB_SHA"',
+        'gh release create "$VERSION" --draft', "W15c", "workflows",
     ),
     Mutation(
         "the harness stops running on the file the gate reads",
