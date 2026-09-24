@@ -29,8 +29,8 @@ let package = Package(
         // PayInPaymentFlow and Telemetry are opt-in products that host apps
         // link explicitly when they need those surfaces.
         // This manifest is what consumers resolve: a release tag is this file
-        // at that commit. The XCFramework zips attached to a GitHub Release
-        // are for integrators who do not use SwiftPM.
+        // at that commit. The zip of XCFrameworks attached to a GitHub Release
+        // is for integrators who do not use SwiftPM.
         .library(
             name: "PayabliSDK",
             type: .dynamic,
