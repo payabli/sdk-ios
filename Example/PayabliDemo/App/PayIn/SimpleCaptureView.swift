@@ -77,10 +77,6 @@ struct SimpleCaptureView: View {
                         .accessibilityIdentifier("simpleCapture.amount")
                 }
             }
-
-            #if DEBUG
-                DebugPrefillButton()
-            #endif
         }
     }
 

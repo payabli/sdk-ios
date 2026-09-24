@@ -104,10 +104,25 @@ final class FormCustomizationLiveUITests: XCTestCase {
     }
 
     private func fillAndSubmit(_ submit: String) {
-        let prefill = app.buttons["Prefill test data (Debug)"]
-        XCTAssertTrue(prefill.waitForExistence(timeout: 10), "no prefill button, so this is not a Debug build")
-        prefill.tap()
+        let entries: [(String, String)] = [
+            ("firstName", "Simple"),
+            ("lastName", "Capture"),
+            ("billingEmail", "simple-capture@example.com"),
+            ("cardholderName", "Simple Capture"),
+            ("cardNumber", "4242424242424242"),
+            ("cardCvv", "999"),
+            ("cardZip", "22039")
+        ]
+        for (field, text) in entries {
+            let identifier = "payabli.payInPaymentFlow.field.\(field)"
+            // The CVV is a secure field, so it is not among the text fields.
+            let box = field == "cardCvv" ? app.secureTextFields[identifier] : app.textFields[identifier]
+            XCTAssertTrue(box.waitForExistence(timeout: 10), "the form has no \(field) box")
+            box.tap()
+            box.typeText(text)
+        }
 
+        // The wheel opens on a future month, so accepting it is the whole choice.
         app.buttons["payabli.payInPaymentFlow.field.cardExpiration"].tap()
         let done = app.buttons["payabli.payInPaymentFlow.control.expirationDone"]
         XCTAssertTrue(done.waitForExistence(timeout: 5), "the expiry picker never opened")
