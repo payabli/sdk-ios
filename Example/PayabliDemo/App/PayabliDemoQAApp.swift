@@ -10,6 +10,12 @@ struct PayabliDemoQAApp: App {
 
     @StateObject private var terminal = TapToPaySessions.terminal()
 
+    @StateObject private var simpleCapture = PayInSessions.capture()
+
+    @StateObject private var simpleSave = PayInSessions.storedMethod()
+
+    @AppStorage(ConfigurationQAView.showsSimpleCaptureKey) private var showsSimpleCapture = false
+
     /// One owner for the token probes, so a tab that has finished its backend
     /// step still reflects an answer another tab has since had. One entry per
     /// token function, because a backend may scope them separately.
@@ -35,6 +41,13 @@ struct PayabliDemoQAApp: App {
                     .tabItem {
                         Label("Capture", systemImage: "dollarsign.circle")
                     }
+
+                if showsSimpleCapture {
+                    SimpleCaptureView(captureFlow: simpleCapture, saveFlow: simpleSave)
+                        .tabItem {
+                            Label("S-Capture", systemImage: "dollarsign.circle")
+                        }
+                }
 
                 PaymentTapToPayQAView(terminal: terminal)
                     .tabItem {
@@ -66,6 +79,14 @@ struct PayabliDemoQAApp: App {
             .tabItem {
                 Label("Capture", systemImage: "dollarsign.circle")
             }
+
+        SimpleCaptureView(
+            captureFlow: PayInSessions.preview(capturing: true),
+            saveFlow: PayInSessions.preview()
+        )
+        .tabItem {
+            Label("S-Capture", systemImage: "dollarsign.circle")
+        }
 
         // The terminal is constructed but never initialized here, so the preview
         // makes no network call and touches neither App Attest nor the reader.

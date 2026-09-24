@@ -7,6 +7,11 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		5DC00000000000000000D032 /* FormCustomizationUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DC00000000000000000D031 /* FormCustomizationUITests.swift */; };
+		5DC00000000000000000D002 /* PayInFormCustomization.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DC00000000000000000D001 /* PayInFormCustomization.swift */; };
+		5DC00000000000000000D003 /* PayInFormCustomization.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DC00000000000000000D001 /* PayInFormCustomization.swift */; };
+		5DC00000000000000000D012 /* SimpleCaptureView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DC00000000000000000D011 /* SimpleCaptureView.swift */; };
+		5DC00000000000000000D022 /* PayInFormCustomizationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DC00000000000000000D021 /* PayInFormCustomizationTests.swift */; };
 		5DC00000000000000000C503 /* PayInOperation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DC00000000000000000C501 /* PayInOperation.swift */; };
 		5DC00000000000000000C502 /* PayInOperation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DC00000000000000000C501 /* PayInOperation.swift */; };
 		5DC00000000000000000C402 /* LoggableError.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F600000000BB51 /* LoggableError.swift */; };
@@ -125,6 +130,10 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		5DC00000000000000000D031 /* FormCustomizationUITests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FormCustomizationUITests.swift; sourceTree = "<group>"; };
+		5DC00000000000000000D001 /* PayInFormCustomization.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PayInFormCustomization.swift; sourceTree = "<group>"; };
+		5DC00000000000000000D011 /* SimpleCaptureView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SimpleCaptureView.swift; sourceTree = "<group>"; };
+		5DC00000000000000000D021 /* PayInFormCustomizationTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PayInFormCustomizationTests.swift; sourceTree = "<group>"; };
 		5DC00000000000000000C501 /* PayInOperation.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PayInOperation.swift; sourceTree = "<group>"; };
 		5DC00000000000000000C301 /* PayInFailureTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PayInFailureTests.swift; sourceTree = "<group>"; };
 		5DC00000000000000000C3B3 /* PayInReversalStateTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PayInReversalStateTests.swift; sourceTree = "<group>"; };
@@ -319,6 +328,7 @@
 				5DC00000000000000000B601 /* PayInSessions.swift */,
 				5DC00000000000000000B501 /* PayInRequests.swift */,
 				5DC00000000000000000B401 /* PayInForms.swift */,
+				5DC00000000000000000D001 /* PayInFormCustomization.swift */,
 				5DC00000000000000000B301 /* PaymentFormHost.swift */,
 				5DC00000000000000000B201 /* PayInFlowHandle.swift */,
 				5DC00000000000000000C3B1 /* PayInReversalState.swift */,
@@ -358,6 +368,7 @@
 				BB9C96115FF840C6491AED9C /* PaymentMethodQAView.swift */,
 				5B1E0F9A8C7D6E5F4A3B2C1D /* PaymentCaptureQAView.swift */,
 				0F5E8CC6E7A24D19A71B0A1C /* PaymentMethodAddedView.swift */,
+				5DC00000000000000000D011 /* SimpleCaptureView.swift */,
 			);
 			path = PayIn;
 			sourceTree = "<group>";
@@ -453,6 +464,7 @@
 			children = (
 				F30000000000000000000021 /* QAWalkthroughUITests.swift */,
 				A1B2C3D4E5F600000000BB61 /* KeyboardDismissalUITests.swift */,
+				5DC00000000000000000D031 /* FormCustomizationUITests.swift */,
 			);
 			path = UITests;
 			sourceTree = "<group>";
@@ -473,6 +485,7 @@
 				A1B2C3D4E5F600000000BB41 /* EntryPointLookupTests.swift */,
 				A1B2C3D4E5F600000000AC11 /* QAAmountTests.swift */,
 				A1B2C3D4E5F600000000AC01 /* QAIdentityTests.swift */,
+				5DC00000000000000000D021 /* PayInFormCustomizationTests.swift */,
 			);
 			path = FlowTests;
 			sourceTree = "<group>";
@@ -679,6 +692,7 @@
 			files = (
 				F30000000000000000000022 /* QAWalkthroughUITests.swift in Sources */,
 				A1B2C3D4E5F600000000BB62 /* KeyboardDismissalUITests.swift in Sources */,
+				5DC00000000000000000D032 /* FormCustomizationUITests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -724,6 +738,8 @@
 				A1B2C3D4E5F600000000AC12 /* QAAmountTests.swift in Sources */,
 				A1B2C3D4E5F600000000AD02 /* QAIdentity.swift in Sources */,
 				A1B2C3D4E5F600000000AD12 /* QAAmount.swift in Sources */,
+				5DC00000000000000000D003 /* PayInFormCustomization.swift in Sources */,
+				5DC00000000000000000D022 /* PayInFormCustomizationTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -775,6 +791,8 @@
 				C9B9D43650B2230A8582B93C /* Secrets.swift in Sources */,
 				E1D2C3B4A5960718293A4B01 /* DebugPrefill.swift in Sources */,
 				D20000000000000000000020 /* PayabliDemoColors.swift in Sources */,
+				5DC00000000000000000D002 /* PayInFormCustomization.swift in Sources */,
+				5DC00000000000000000D012 /* SimpleCaptureView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

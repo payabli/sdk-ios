@@ -21,11 +21,14 @@ enum PayInRequests {
     /// - Parameter suppliesCustomer: whether the request names the customer, which
     ///   the app's customer switch decides. A value the payer types wins over this
     ///   one; the form has no such box.
-    static func freshCapture(suppliesCustomer: Bool) -> PayabliPayInPaymentFlowRequestConfiguration {
+    static func freshCapture(
+        suppliesCustomer: Bool,
+        amount: Double = QAAmount.random()
+    ) -> PayabliPayInPaymentFlowRequestConfiguration {
         let identity = QAIdentity.current
         return PayabliPayInPaymentFlowRequestConfiguration(
             paymentDetails: PayabliPayInPaymentFlowPaymentDetails(
-                totalAmount: QAAmount.random(),
+                totalAmount: amount,
                 serviceFee: 0.10,
                 currency: "USD"
             ),

@@ -1,0 +1,232 @@
+import PayabliSDKPayInPaymentFlow
+import SwiftUI
+
+/// One screen that captures or tokenizes, with the form's customization in reach: pick a preset
+/// from the menu, then change any single setting on top of it.
+///
+/// The two frames mark who draws what: the solid one is this app, the dashed one is the SDK.
+struct SimpleCaptureView: View {
+    @ObservedObject var captureFlow: PayInFlowHandle
+    @ObservedObject var saveFlow: PayInFlowHandle
+
+    @EnvironmentObject private var demoCustomer: DemoCustomerSetting
+    @State private var customization = PayInFormCustomization()
+    @State private var capturing = true
+    @State private var amountText = "10.00"
+    @State private var resultText = ""
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    OwnerFrame(title: "Your app", dashed: false) {
+                        appControls
+                    }
+
+                    OwnerFrame(title: "Payabli SDK", dashed: true) {
+                        PaymentFormHost(
+                            flow: capturing ? captureFlow : saveFlow,
+                            form: form,
+                            onCompleted: handleCompleted,
+                            onFailed: handleFailed
+                        )
+                        // The form keeps part of its configuration from when it was built, so each
+                        // change of setting or of flow builds a new one.
+                        .id(FormIdentity(capturing: capturing, customization: customization))
+                    }
+
+                    if !resultText.isEmpty {
+                        Text(resultText)
+                            .font(.footnote)
+                            .foregroundColor(.payabliOnSurfaceVariant)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .textSelection(.enabled)
+                    }
+                }
+                .padding(16)
+            }
+            .navigationTitle("Simple Capture")
+            .scrollDismissesKeyboard(.interactively)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    settingsMenu
+                }
+            }
+        }
+        .onAppear(perform: applyAmount)
+        .onChange(of: amountText) { _ in applyAmount() }
+    }
+
+    private var appControls: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Picker("Operation", selection: $capturing) {
+                Text("Capture").tag(true)
+                Text("Tokenize").tag(false)
+            }
+            .pickerStyle(.segmented)
+
+            if capturing {
+                HStack {
+                    Text("Amount")
+                    Spacer()
+                    TextField("Amount", text: $amountText)
+                        .keyboardType(.decimalPad)
+                        .multilineTextAlignment(.trailing)
+                        .frame(maxWidth: 120)
+                        .textFieldStyle(.roundedBorder)
+                        .accessibilityIdentifier("simpleCapture.amount")
+                }
+            }
+
+            #if DEBUG
+                DebugPrefillButton()
+            #endif
+        }
+    }
+
+    private var form: PayInFormSetup {
+        PayInFormSetup(
+            operation: capturing ? .capture : .storedMethod,
+            configuration: customization.configuration(capturing: capturing),
+            style: customization.style
+        )
+    }
+
+    // MARK: - The menu
+
+    private var settingsMenu: some View {
+        Menu {
+            Section("Presets") {
+                ForEach(PayInFormCustomization.Preset.allCases) { preset in
+                    Button {
+                        customization = PayInFormCustomization(preset: preset)
+                    } label: {
+                        if customization == PayInFormCustomization(preset: preset) {
+                            Label(preset.rawValue, systemImage: "checkmark")
+                        } else {
+                            Text(preset.rawValue)
+                        }
+                    }
+                }
+            }
+
+            Section("Methods") {
+                Picker("Allowed methods", selection: $customization.methods) {
+                    ForEach(PayInFormCustomization.Methods.allCases) { Text($0.rawValue).tag($0) }
+                }
+                .pickerStyle(.menu)
+                Picker("Default method", selection: $customization.defaultMethod) {
+                    Text("Card").tag(PayabliPayInPaymentFlowMethodType.card)
+                    Text("Bank").tag(PayabliPayInPaymentFlowMethodType.bankAccount)
+                }
+                .pickerStyle(.menu)
+            }
+
+            Section("Labels") {
+                Picker("Label layout", selection: $customization.labelLayout) {
+                    Text("Above the field").tag(PayabliPayInPaymentFlowLabelLayout.external)
+                    Text("Inside as placeholder").tag(PayabliPayInPaymentFlowLabelLayout.placeholder)
+                }
+                .pickerStyle(.menu)
+                Toggle("Field labels", isOn: $customization.showsFieldLabels)
+            }
+
+            Section("Formatting") {
+                Toggle("Card number spaces", isOn: $customization.insertsCardNumberSpaces)
+                Toggle("Expiry with a dash", isOn: $customization.usesDashExpirationSeparator)
+                Toggle("Mask bank account", isOn: $customization.masksACHAccountEntry)
+            }
+
+            Section("Sections") {
+                Toggle("Customer section", isOn: $customization.showsCustomerSection)
+                Toggle("Customer section first", isOn: $customization.customerSectionFirst)
+                    .disabled(!customization.showsCustomerSection)
+                Toggle("Payment summary heading", isOn: $customization.titlesPaymentSummary)
+            }
+
+            Section("Layout") {
+                Picker("Card brand icon", selection: $customization.cardBrandIconPlacement) {
+                    Text("Leading").tag(PayabliPayInPaymentFlowCardBrandIconPlacement.leading)
+                    Text("Trailing").tag(PayabliPayInPaymentFlowCardBrandIconPlacement.trailing)
+                    Text("Hidden").tag(PayabliPayInPaymentFlowCardBrandIconPlacement.hidden)
+                }
+                .pickerStyle(.menu)
+                Picker("Error message", selection: $customization.errorMessagePlacement) {
+                    Text("Top").tag(PayabliPayInPaymentFlowErrorMessagePlacement.top)
+                    Text("Above submit").tag(PayabliPayInPaymentFlowErrorMessagePlacement.aboveSubmitButton)
+                }
+                .pickerStyle(.menu)
+                Picker("Input size", selection: $customization.inputSizing) {
+                    ForEach(PayInFormCustomization.InputSizing.allCases) { Text($0.rawValue).tag($0) }
+                }
+                .pickerStyle(.menu)
+            }
+        } label: {
+            Image(systemName: "ellipsis.circle")
+                .accessibilityLabel("Form settings")
+        }
+        .accessibilityIdentifier("simpleCapture.menu")
+    }
+
+    // MARK: - Actions
+
+    /// Each amount is a new attempt with its own key. Not while a submission is in flight, which the
+    /// handle refuses.
+    private func applyAmount() {
+        guard let amount = Double(amountText), amount > 0 else { return }
+        _ = captureFlow.startNewAttempt(suppliesCustomer: demoCustomer.suppliesPayInCustomer, amount: amount)
+    }
+
+    private func handleCompleted(_ outcome: PayInOutcome) {
+        if let method = outcome.storedMethod {
+            resultText = "Saved: \(method.storedMethodId ?? "-")\n\(method.responseText)"
+        } else {
+            resultText = "Captured: \(outcome.code), \(outcome.transaction?.paymentTransId ?? "-")"
+            // The next submit is a payment of its own.
+            applyAmount()
+        }
+    }
+
+    private func handleFailed(_ failure: PayInFailure) {
+        guard !failure.refusedForAnotherSubmission else { return }
+        resultText = "Failed: \(failure.message)"
+    }
+}
+
+private struct FormIdentity: Hashable {
+    let capturing: Bool
+    let customization: PayInFormCustomization
+}
+
+/// A labelled border in this app's own colours, whichever style the form is given. The label sits
+/// outside the border so it never reads as part of what is inside.
+private struct OwnerFrame<Content: View>: View {
+    let title: String
+    let dashed: Bool
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title)
+                .font(.caption.weight(.semibold))
+                .foregroundColor(.payabliOnSurfaceVariant)
+            content
+                .padding(12)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .strokeBorder(
+                            Color.payabliOutline,
+                            style: StrokeStyle(lineWidth: 1.5, dash: dashed ? [6, 4] : [])
+                        )
+                )
+        }
+    }
+}
+
+#Preview {
+    SimpleCaptureView(
+        captureFlow: PayInSessions.preview(capturing: true),
+        saveFlow: PayInSessions.preview()
+    )
+    .environmentObject(DemoCustomerSetting())
+}
