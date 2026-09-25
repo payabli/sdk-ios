@@ -4,29 +4,91 @@ import SwiftUI
 
 @MainActor
 final class PayabliPayInPaymentFlowViewModel: ObservableObject {
-    @Published var selectedMethod: PayabliPayInPaymentFlowMethodType
-    @Published private var cardholderNameStorage = ""
-    @Published private var cardNumberStorage = ""
-    @Published var cardExpiration = ""
-    @Published var cardExpirationMonth: Int?
-    @Published var cardExpirationYear: Int?
-    @Published private var cardCvvStorage = ""
-    @Published private var cardZipStorage = ""
-    @Published private var achHolderStorage = ""
-    @Published private var achRoutingStorage = ""
-    @Published private var achAccountStorage = ""
-    @Published var achAccountType: PayabliPayInAccountType = .checking
-    @Published var achHolderType: PayabliPayInAccountHolderType = .personal
-    @Published var achSecCode: PayabliPayInSecCode = .web
-    @Published var achDevice = ""
+    @Published var selectedMethod: PayabliPayInPaymentFlowMethodType {
+        didSet { dropMarksOffScreen() }
+    }
+
+    @Published private var cardholderNameStorage = "" {
+        didSet { acceptEdit(of: .cardholderName) }
+    }
+
+    @Published private var cardNumberStorage = "" {
+        didSet { acceptEdit(of: .cardNumber) }
+    }
+
+    @Published var cardExpiration = "" {
+        didSet { acceptEdit(of: .cardExpiration) }
+    }
+
+    @Published var cardExpirationMonth: Int? {
+        didSet { acceptEdit(of: .cardExpiration) }
+    }
+
+    @Published var cardExpirationYear: Int? {
+        didSet { acceptEdit(of: .cardExpiration) }
+    }
+
+    @Published private var cardCvvStorage = "" {
+        didSet { acceptEdit(of: .cardCvv) }
+    }
+
+    @Published private var cardZipStorage = "" {
+        didSet { acceptEdit(of: .cardZip) }
+    }
+
+    @Published private var achHolderStorage = "" {
+        didSet { acceptEdit(of: .achHolder) }
+    }
+
+    @Published private var achRoutingStorage = "" {
+        didSet { acceptEdit(of: .achRouting) }
+    }
+
+    @Published private var achAccountStorage = "" {
+        didSet { acceptEdit(of: .achAccount) }
+    }
+
+    @Published var achAccountType: PayabliPayInAccountType = .checking {
+        didSet { acceptEdit(of: .achAccountType) }
+    }
+
+    @Published var achHolderType: PayabliPayInAccountHolderType = .personal {
+        didSet { acceptEdit(of: .achHolderType) }
+    }
+
+    @Published var achSecCode: PayabliPayInSecCode = .web {
+        didSet { acceptEdit(of: .achSecCode) }
+    }
+
+    @Published var achDevice = "" {
+        didSet { acceptEdit(of: .achDevice) }
+    }
+
     @Published var methodDescription = ""
-    @Published var firstName = ""
-    @Published var lastName = ""
-    @Published var customerNumber = ""
-    @Published var billingEmail = ""
-    @Published private var billingZipStorage = ""
+    @Published var firstName = "" {
+        didSet { acceptEdit(of: .firstName) }
+    }
+
+    @Published var lastName = "" {
+        didSet { acceptEdit(of: .lastName) }
+    }
+
+    @Published var customerNumber = "" {
+        didSet { acceptEdit(of: .customerNumber) }
+    }
+
+    @Published var billingEmail = "" {
+        didSet { acceptEdit(of: .billingEmail) }
+    }
+
+    @Published private var billingZipStorage = "" {
+        didSet { acceptEdit(of: .billingZip) }
+    }
+
     @Published private(set) var isSubmitting = false
     @Published private(set) var errorMessage: String?
+    /// The fields the last refusal named that still hold the value it refused.
+    @Published private(set) var rejectedFields: Set<PayabliPayInPaymentFlowField> = []
 
     private(set) var component: PayabliPayInPaymentFlow
     private var configuration: PayabliPayInPaymentFlowFormConfiguration
@@ -65,6 +127,7 @@ final class PayabliPayInPaymentFlowViewModel: ObservableObject {
         self.component = component
         self.configuration = configuration
         lifecycleSignature = nextSignature
+        clearMarks()
 
         let methods = availableMethods
         if !methods.contains(selectedMethod) {
@@ -178,6 +241,7 @@ final class PayabliPayInPaymentFlowViewModel: ObservableObject {
     }
 
     var canSubmit: Bool {
+        guard rejectedFields.isDisjoint(with: activeFields) else { return false }
         switch effectiveSelectedMethod {
         case .card:
             return fieldHasRequiredValue(.cardholderName)
@@ -199,6 +263,7 @@ final class PayabliPayInPaymentFlowViewModel: ObservableObject {
 
     func submit() async throws -> PayabliPayInPaymentFlowResult {
         errorMessage = nil
+        clearMarks()
         guard !isSubmitting else {
             let error = PayabliPayInPaymentFlowError.submissionInProgress
             errorMessage = Self.message(for: error)
@@ -231,6 +296,8 @@ final class PayabliPayInPaymentFlowViewModel: ObservableObject {
             return result
         } catch {
             clearSensitiveFieldsAfterFailure()
+            // After the clear, because its edits take a mark off.
+            rejectedFields = PayabliPayInPaymentFlowRejectedFields.fields(in: error).intersection(activeFields)
             errorMessage = Self.message(for: error)
             throw error
         }
@@ -357,6 +424,85 @@ final class PayabliPayInPaymentFlowViewModel: ObservableObject {
         .joined(separator: "|")
     }
 
+    private var selectedExpirationMonth: Int? {
+        if let cardExpirationMonth {
+            return cardExpirationMonth
+        }
+        let digits = cardExpiration.payabliCaptureDigitsOnly
+        guard digits.count >= 2 else { return nil }
+        let monthText = String(digits.prefix(2))
+        guard let month = Int(monthText), (1 ... 12).contains(month) else { return nil }
+        return month
+    }
+
+    private var selectedExpirationYear: Int? {
+        if let cardExpirationYear {
+            return cardExpirationYear
+        }
+        let digits = cardExpiration.payabliCaptureDigitsOnly
+        guard digits.count >= 4 else { return nil }
+        let yearSuffix = String(digits.suffix(2))
+        guard let year = Int(yearSuffix) else { return nil }
+        return 2000 + year
+    }
+
+    private func synchronizeExpirationText() {
+        guard let month = cardExpirationMonth, let year = cardExpirationYear else { return }
+        cardExpiration = String(format: "%02d%@%02d", month, configuration.formatting.expirationSeparator, year % 100)
+    }
+
+    private func clearSensitiveFields() {
+        cardNumberStorage = ""
+        cardExpiration = ""
+        cardExpirationMonth = nil
+        cardExpirationYear = nil
+        cardCvvStorage = ""
+        achRoutingStorage = ""
+        achAccountStorage = ""
+    }
+
+    private func clearSensitiveFieldsAfterFailure() {
+        cardNumberStorage = ""
+        cardExpiration = ""
+        cardExpirationMonth = nil
+        cardExpirationYear = nil
+        cardCvvStorage = ""
+        achRoutingStorage = ""
+        achAccountStorage = ""
+    }
+
+    private static func message(for error: Error) -> String {
+        let message: String = if let payabliError = error as? any PayabliError {
+            if let detail = payabliError.detail?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty, detail != payabliError.reason {
+                "\(payabliError.reason)\n\(detail)"
+            } else {
+                payabliError.reason
+            }
+        } else {
+            String(describing: error)
+        }
+        return PayabliPayInPaymentFlowSensitiveDataRedactor.redact(message)
+    }
+
+    private static func passesLuhn(_ digits: String) -> Bool {
+        var sum = 0
+        var shouldDouble = false
+        for character in digits.reversed() {
+            guard var value = Int(String(character)) else { return false }
+            if shouldDouble {
+                value *= 2
+                if value > 9 {
+                    value -= 9
+                }
+            }
+            sum += value
+            shouldDouble.toggle()
+        }
+        return sum % 10 == 0
+    }
+}
+
+extension PayabliPayInPaymentFlowViewModel {
     private func methodInput() -> PayabliPayInPaymentFlowMethodInput {
         switch effectiveSelectedMethod {
         case .card:
@@ -553,80 +699,22 @@ final class PayabliPayInPaymentFlowViewModel: ObservableObject {
         }
     }
 
-    private var selectedExpirationMonth: Int? {
-        if let cardExpirationMonth {
-            return cardExpirationMonth
+    private func acceptEdit(of field: PayabliPayInPaymentFlowField) {
+        if rejectedFields.contains(field) {
+            rejectedFields.remove(field)
         }
-        let digits = cardExpiration.payabliCaptureDigitsOnly
-        guard digits.count >= 2 else { return nil }
-        let monthText = String(digits.prefix(2))
-        guard let month = Int(monthText), (1 ... 12).contains(month) else { return nil }
-        return month
     }
 
-    private var selectedExpirationYear: Int? {
-        if let cardExpirationYear {
-            return cardExpirationYear
+    private func clearMarks() {
+        if !rejectedFields.isEmpty {
+            rejectedFields = []
         }
-        let digits = cardExpiration.payabliCaptureDigitsOnly
-        guard digits.count >= 4 else { return nil }
-        let yearSuffix = String(digits.suffix(2))
-        guard let year = Int(yearSuffix) else { return nil }
-        return 2000 + year
     }
 
-    private func synchronizeExpirationText() {
-        guard let month = cardExpirationMonth, let year = cardExpirationYear else { return }
-        cardExpiration = String(format: "%02d%@%02d", month, configuration.formatting.expirationSeparator, year % 100)
-    }
-
-    private func clearSensitiveFields() {
-        cardNumberStorage = ""
-        cardExpiration = ""
-        cardExpirationMonth = nil
-        cardExpirationYear = nil
-        cardCvvStorage = ""
-        achRoutingStorage = ""
-        achAccountStorage = ""
-    }
-
-    private func clearSensitiveFieldsAfterFailure() {
-        cardNumberStorage = ""
-        cardExpiration = ""
-        cardExpirationMonth = nil
-        cardExpirationYear = nil
-        cardCvvStorage = ""
-        achRoutingStorage = ""
-        achAccountStorage = ""
-    }
-
-    private static func message(for error: Error) -> String {
-        let message: String = if let payabliError = error as? any PayabliError {
-            if let detail = payabliError.detail?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty, detail != payabliError.reason {
-                "\(payabliError.reason)\n\(detail)"
-            } else {
-                payabliError.reason
-            }
-        } else {
-            String(describing: error)
+    private func dropMarksOffScreen() {
+        let onScreen = rejectedFields.intersection(activeFields)
+        if onScreen != rejectedFields {
+            rejectedFields = onScreen
         }
-        return PayabliPayInPaymentFlowSensitiveDataRedactor.redact(message)
-    }
-
-    private static func passesLuhn(_ digits: String) -> Bool {
-        var sum = 0
-        var shouldDouble = false
-        for character in digits.reversed() {
-            guard var value = Int(String(character)) else { return false }
-            if shouldDouble {
-                value *= 2
-                if value > 9 {
-                    value -= 9
-                }
-            }
-            sum += value
-            shouldDouble.toggle()
-        }
-        return sum % 10 == 0
     }
 }

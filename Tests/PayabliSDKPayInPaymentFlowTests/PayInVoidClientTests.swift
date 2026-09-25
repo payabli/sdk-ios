@@ -86,19 +86,30 @@ final class PayInVoidClientTests: XCTestCase {
     func testAVoidTheServiceWillNotReverseCarriesItsReason() async throws {
         let transport = MockPaymentCaptureTransport(
             statusCode: 400,
-            responseBody: #"{"isSuccess":false,"responseText":"Invalid transaction status"}"#
+            responseBody: """
+            {
+              "type": "about:blank",
+              "title": "Bad Request",
+              "status": 400,
+              "detail": "Invalid transaction status",
+              "instance": "/api/v2/MoneyIn/void/trans-1",
+              "code": "E7037",
+              "errors": {"transId": [{"message": "Invalid transaction status", "suggestion": ""}]},
+              "token": null
+            }
+            """
         )
         let client = PayInPaymentFlowClient(transport: transport)
 
         do {
             _ = try await client.void(transId: "trans-1")
             XCTFail("a refusal must not read as a reversal")
-        } catch let error as PayabliPayInPaymentFlowError {
-            guard case let .transactionFailed(failure) = error else {
-                return XCTFail("Wrong error: \(error)")
-            }
-            XCTAssertEqual(failure.reason, "Invalid transaction status")
-            XCTAssertEqual(failure.httpStatusCode, 400)
+        } catch let PayabliPaymentError.validation(refusal) {
+            XCTAssertEqual(refusal.detail, "Invalid transaction status")
+            XCTAssertEqual(refusal.rawCode, "E7037")
+            XCTAssertEqual(refusal.errors?.keys.first, "transId")
+        } catch {
+            XCTFail("Wrong error: \(error)")
         }
     }
 

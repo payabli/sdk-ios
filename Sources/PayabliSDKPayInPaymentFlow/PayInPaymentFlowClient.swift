@@ -280,6 +280,10 @@ final class PayInPaymentFlowClient: Sendable {
     }
 
     private func decodeResult(from response: PayabliResponse) throws -> PayabliPayInPaymentFlowResult {
+        // First, because the envelope decodes this body too and keeps none of the fields it names.
+        if response.statusCode == 400 {
+            try mapPayabliHTTPError(response: response)
+        }
         let decoder = JSONDecoder()
         if let decoded = try? decoder.decode(PayabliPayInPaymentFlowAPIResponse.self, from: response.body) {
             guard decoded.isApproved else {

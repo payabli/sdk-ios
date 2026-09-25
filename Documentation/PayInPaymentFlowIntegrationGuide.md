@@ -363,9 +363,11 @@ published one: a screen showing what a payment did does not start showing what w
 done to it afterwards.
 
 Which transactions can still be reversed is the service's to decide, and the SDK
-mirrors no rule of its own. A state it will not reverse arrives as
-`PayabliPayInPaymentFlowError.transactionFailed`, carrying the service's own
-reason. A reversal answers `A0003` and calls itself canceled, where a capture
+mirrors no rule of its own. A refused request arrives as
+`PayabliPaymentError.validation`, whose `errors` names each parameter it refused,
+as it does for a capture or an authorization. A reversal that is declined arrives
+as `PayabliPayInPaymentFlowError.transactionFailed`. Both carry the service's own
+code and reason. A reversal answers `A0003` and calls itself canceled, where a capture
 answers `A0000`, so read the code rather than comparing against one literal.
 
 ## 9. Complete Form Configuration Example

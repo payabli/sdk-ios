@@ -7,6 +7,7 @@ import UIKit
 public struct PayabliPayInPaymentFlowView: View {
     @StateObject var viewModel: PayabliPayInPaymentFlowViewModel
     @State var isExpirationPickerPresented = false
+    @State var announcedRejectedFields: Set<PayabliPayInPaymentFlowField> = []
     @FocusState var focusedField: PayabliPayInPaymentFlowField?
     @AccessibilityFocusState var isErrorAccessibilityFocused: Bool
     @Environment(\.payabliPayInPaymentFlowStyle) var environmentStyle
@@ -97,6 +98,13 @@ public struct PayabliPayInPaymentFlowView: View {
                 field: .cardNumber,
                 message: message
             )
+        }
+        .onChange(of: viewModel.rejectedFields) { fields in
+            // A new mark only; the rest were announced when they arrived.
+            let marked = fields.subtracting(announcedRejectedFields)
+            announcedRejectedFields = fields
+            guard let field = viewModel.activeFields.first(where: marked.contains) else { return }
+            announceFieldError(field: field, message: rejectedMessage(for: field))
         }
     }
 
@@ -690,7 +698,7 @@ public struct PayabliPayInPaymentFlowView: View {
 
             content()
 
-            if let errorMessage {
+            if let errorMessage = errorMessage ?? rejectedMessage(for: field) {
                 fieldErrorText(errorMessage, for: field)
             } else if let reservedErrorMessage {
                 fieldErrorText(reservedErrorMessage, for: field)
@@ -843,7 +851,13 @@ extension PayabliPayInPaymentFlowView {
     }
 
     func fieldHasError(_ field: PayabliPayInPaymentFlowField?) -> Bool {
-        field == .cardNumber && viewModel.cardNumberValidationMessage != nil
+        guard let field else { return false }
+        return (field == .cardNumber && viewModel.cardNumberValidationMessage != nil)
+            || viewModel.rejectedFields.contains(field)
+    }
+
+    func rejectedMessage(for field: PayabliPayInPaymentFlowField) -> String? {
+        viewModel.rejectedFields.contains(field) ? "That was not accepted" : nil
     }
 
     var inputShape: RoundedRectangle {
