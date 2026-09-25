@@ -147,6 +147,10 @@ struct SimpleCaptureView: View {
                 Toggle("Custom wording", isOn: $customization.usesCustomWording)
             }
 
+            Section("Hidden values") {
+                Toggle("Fixed holder type", isOn: $customization.fixesHolderType)
+            }
+
             Section("Sections") {
                 Toggle("Customer section", isOn: $customization.showsCustomerSection)
                 Toggle("Customer section first", isOn: $customization.customerSectionFirst)

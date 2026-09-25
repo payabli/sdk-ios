@@ -8,7 +8,8 @@ final class PayInFormCustomizationTests: XCTestCase {
 
         XCTAssertEqual(preset, PayInFormCustomization())
         XCTAssertEqual(preset.activePreset, .sdkDefault)
-        XCTAssertEqual(preset.look, .appTheme)
+        XCTAssertEqual(preset.look, .sdkDefault)
+        XCTAssertFalse(preset.fixesHolderType)
         XCTAssertEqual(preset.methods, .cardAndBank)
         XCTAssertEqual(preset.startOn, .card)
         XCTAssertFalse(preset.showsCustomerSection)
@@ -38,6 +39,11 @@ final class PayInFormCustomizationTests: XCTestCase {
         XCTAssertEqual(configuration.inputSizing, sdkDefault.inputSizing)
         XCTAssertEqual(configuration.cardSections.map(\.title), sdkDefault.cardSections.map(\.title))
         XCTAssertEqual(configuration.cardSections.map(\.fields), sdkDefault.cardSections.map(\.fields))
+        XCTAssertEqual(configuration.achSections.map(\.fields), sdkDefault.achSections.map(\.fields))
+        XCTAssertNil(configuration.hiddenValues.achHolderType)
+        let style = PayInFormCustomization(preset: .sdkDefault).style
+        XCTAssertEqual(style.accentColor, PayabliPayInPaymentFlowStyle.default.accentColor)
+        XCTAssertEqual(style.input.backgroundColor, PayabliPayInPaymentFlowStyle.default.input.backgroundColor)
     }
 
     func testTheBrandPreset() {

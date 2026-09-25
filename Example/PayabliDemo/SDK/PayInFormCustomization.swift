@@ -20,7 +20,7 @@ struct PayInFormCustomization: Hashable {
 
     /// The form's style alone: colours, fonts, inputs and the submit button.
     enum Look: String, CaseIterable, Identifiable {
-        case appTheme = "App theme"
+        case sdkDefault = "SDK default"
         case brand = "Brand"
         case compact = "Compact"
 
@@ -49,7 +49,7 @@ struct PayInFormCustomization: Hashable {
         }
     }
 
-    var look: Look = .appTheme
+    var look: Look = .sdkDefault
     var methods: Methods = .cardAndBank
     var startOn: PayabliPayInPaymentFlowMethodType = .card
     var labelsInsideFields = false
@@ -62,6 +62,7 @@ struct PayInFormCustomization: Hashable {
     var groupsCardNumber = true
     var dashesExpiry = false
     var masksAccountNumber = true
+    var fixesHolderType = false
     var cardBrandIconPlacement: PayabliPayInPaymentFlowCardBrandIconPlacement = .trailing
     var errorMessagePlacement: PayabliPayInPaymentFlowErrorMessagePlacement = .aboveSubmitButton
     var inputSizing: InputSizing = .standard
@@ -76,6 +77,7 @@ struct PayInFormCustomization: Hashable {
             look = .brand
             labelsInsideFields = true
             usesCustomWording = true
+            fixesHolderType = true
             showsCustomerSection = true
             customerSectionFirst = true
             requiresCustomerNumber = true
@@ -87,6 +89,7 @@ struct PayInFormCustomization: Hashable {
             look = .compact
             methods = .cardOnly
             hidesLabels = true
+            fixesHolderType = true
             titlesAmountSummary = false
             groupsCardNumber = false
             cardBrandIconPlacement = .hidden
@@ -107,9 +110,9 @@ struct PayInFormCustomization: Hashable {
             allowedMethods: allowedMethods,
             defaultMethod: methods == .cardAndBank ? startOn : allowedMethods[0],
             cardSections: sections(paymentFields: Self.cardFields, sectionTitle: "Your card"),
-            achSections: sections(paymentFields: Self.bankFields, sectionTitle: "Your bank"),
+            achSections: sections(paymentFields: bankFields, sectionTitle: "Your bank"),
             hiddenValues: PayabliPayInPaymentFlowHiddenValues(
-                achHolderType: .personal,
+                achHolderType: fixesHolderType ? .personal : nil,
                 methodDescription: QAIdentity.current.note(capturing ? "simple-capture" : "simple-save"),
                 // A capture names its customer on the request instead.
                 customerData: capturing ? nil : PayInDemoCustomer.customerData
@@ -133,8 +136,8 @@ struct PayInFormCustomization: Hashable {
 
     var style: PayabliPayInPaymentFlowStyle {
         switch look {
-        case .appTheme:
-            PayInSharedConfiguration.style
+        case .sdkDefault:
+            .default
         case .brand:
             PayabliPayInPaymentFlowStyle(
                 accentColor: Self.brandColor,
@@ -207,9 +210,11 @@ struct PayInFormCustomization: Hashable {
         .cardholderName, .cardNumber, .cardExpiration, .cardCvv, .cardZip
     ]
 
-    private static let bankFields: [PayabliPayInPaymentFlowField] = [
-        .achHolder, .achRouting, .achAccount, .achAccountType
-    ]
+    /// A holder type supplied as a hidden value takes the place of its picker.
+    private var bankFields: [PayabliPayInPaymentFlowField] {
+        let fields = PayabliPayInPaymentFlowFormConfiguration.defaultACHFieldOrder
+        return fixesHolderType ? fields.filter { $0 != .achHolderType } : fields
+    }
 
     private var customerFields: [PayabliPayInPaymentFlowField] {
         [.firstName, .lastName] + (requiresCustomerNumber ? [.customerNumber] : []) + [.billingEmail]
@@ -328,7 +333,7 @@ struct PayInFormCustomization: Hashable {
                 ),
                 rowSpacing: 10
             )
-        case .appTheme, .compact:
+        case .sdkDefault, .compact:
             PayabliPayInPaymentFlowPaymentSummaryConfiguration()
         }
     }
