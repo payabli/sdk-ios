@@ -22,18 +22,19 @@ final class FormCustomizationUITests: XCTestCase {
         XCTAssertTrue(tab.waitForExistence(timeout: 10), "the S-Capture tab is not shown")
         tab.tap()
 
-        let cardNumber = app.textFields["payabli.payInPaymentFlow.field.cardNumber"]
+        let cardNumber = app.textFields["payabli.payIn.field.cardNumber"]
         XCTAssertTrue(cardNumber.waitForExistence(timeout: 10), "the form never appeared")
-        let firstName = app.textFields["payabli.payInPaymentFlow.field.firstName"]
+        let firstName = app.textFields["payabli.payIn.field.firstName"]
         XCTAssertFalse(firstName.exists, "the Default preset shows a customer section the SDK's default has not")
         attachScreenshot("default-capture")
 
         choosePreset("Brand", in: app)
         XCTAssertTrue(firstName.waitForExistence(timeout: 10), "the Brand preset shows no customer section")
+        XCTAssertTrue(app.buttons["Bank account"].exists, "the Brand preset offers no bank account")
         attachScreenshot("brand-capture")
 
         choosePreset("Minimal", in: app)
-        XCTAssertFalse(app.buttons["ACH"].exists, "the card-only preset still offers a bank account")
+        XCTAssertFalse(app.buttons["Bank account"].exists, "the card-only preset still offers a bank account")
         attachScreenshot("minimal-capture")
 
         choosePreset("Brand", in: app)
@@ -48,7 +49,7 @@ final class FormCustomizationUITests: XCTestCase {
         XCTAssertTrue(tab.waitForExistence(timeout: 10), "the S-Capture tab is not shown")
         tab.tap()
 
-        let cardNumber = app.textFields["payabli.payInPaymentFlow.field.cardNumber"]
+        let cardNumber = app.textFields["payabli.payIn.field.cardNumber"]
         XCTAssertTrue(cardNumber.waitForExistence(timeout: 10), "the form never appeared")
 
         let amount = app.textFields["simpleCapture.amount"]
@@ -142,7 +143,7 @@ final class FormCustomizationLiveUITests: XCTestCase {
             ("cardZip", "22039")
         ]
         for (field, text) in entries {
-            let identifier = "payabli.payInPaymentFlow.field.\(field)"
+            let identifier = "payabli.payIn.field.\(field)"
             // The CVV is a secure field, so it is not among the text fields.
             let box = field == "cardCvv" ? app.secureTextFields[identifier] : app.textFields[identifier]
             XCTAssertTrue(box.waitForExistence(timeout: 10), "the form has no \(field) box")
@@ -151,8 +152,8 @@ final class FormCustomizationLiveUITests: XCTestCase {
         }
 
         // The wheel opens on the current month, which is still a valid expiry, so accepting it is the whole choice.
-        app.buttons["payabli.payInPaymentFlow.field.cardExpiration"].tap()
-        let done = app.buttons["payabli.payInPaymentFlow.control.expirationDone"]
+        app.buttons["payabli.payIn.field.cardExpiration"].tap()
+        let done = app.buttons["payabli.payIn.control.expirationDone"]
         XCTAssertTrue(done.waitForExistence(timeout: 5), "the expiry picker never opened")
         done.tap()
 
