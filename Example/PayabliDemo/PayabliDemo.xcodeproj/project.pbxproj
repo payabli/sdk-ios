@@ -56,6 +56,9 @@
 		A1B2C3D4E5F600000000BB62 /* KeyboardDismissalUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F600000000BB61 /* KeyboardDismissalUITests.swift */; };
 		A1B2C3D4E5F600000000AA02 /* DemoCustomerSetting.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F600000000AA01 /* DemoCustomerSetting.swift */; };
 		A1B2C3D4E5F600000000AB12 /* QAAmount.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F600000000AB11 /* QAAmount.swift */; };
+		5DC0000000000000000E0002 /* AmountEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DC0000000000000000E0001 /* AmountEntry.swift */; };
+		5DC0000000000000000E0003 /* AmountEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DC0000000000000000E0001 /* AmountEntry.swift */; };
+		5DC0000000000000000E0012 /* AmountEntryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DC0000000000000000E0011 /* AmountEntryTests.swift */; };
 		A1B2C3D4E5F600000000AB02 /* QAIdentity.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F600000000AB01 /* QAIdentity.swift */; };
 		A1B2C3D4E5F600000000BB02 /* TokenServerHealth.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F600000000BB01 /* TokenServerHealth.swift */; };
 		A1B2C3D4E5F600000000BB03 /* TokenServerHealth.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F600000000BB01 /* TokenServerHealth.swift */; };
@@ -168,6 +171,8 @@
 		F30000000000000000000050 /* PayabliDemoUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PayabliDemoUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		A1B2C3D4E5F600000000AA01 /* DemoCustomerSetting.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DemoCustomerSetting.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F600000000AB11 /* QAAmount.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = QAAmount.swift; sourceTree = "<group>"; };
+		5DC0000000000000000E0001 /* AmountEntry.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AmountEntry.swift; sourceTree = "<group>"; };
+		5DC0000000000000000E0011 /* AmountEntryTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AmountEntryTests.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F600000000AB01 /* QAIdentity.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = QAIdentity.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F60000000000F4 /* TokenProbeResultsTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TokenProbeResultsTests.swift; sourceTree = "<group>"; };
 		0F5E8CC6E7A24D19A71B0A1C /* PaymentMethodAddedView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PaymentMethodAddedView.swift; sourceTree = "<group>"; };
@@ -434,6 +439,7 @@
 				A1B2C3D4E5F60000000000F1 /* TokenProbeResults.swift */,
 				A1B2C3D4E5F600000000AA01 /* DemoCustomerSetting.swift */,
 				A1B2C3D4E5F600000000AB11 /* QAAmount.swift */,
+				5DC0000000000000000E0001 /* AmountEntry.swift */,
 				A1B2C3D4E5F600000000AB01 /* QAIdentity.swift */,
 			);
 			path = Shared;
@@ -486,6 +492,7 @@
 				A1B2C3D4E5F600000000BB11 /* TokenServerHealthTests.swift */,
 				A1B2C3D4E5F600000000BB41 /* EntryPointLookupTests.swift */,
 				A1B2C3D4E5F600000000AC11 /* QAAmountTests.swift */,
+				5DC0000000000000000E0011 /* AmountEntryTests.swift */,
 				A1B2C3D4E5F600000000AC01 /* QAIdentityTests.swift */,
 				5DC00000000000000000D021 /* PayInFormCustomizationTests.swift */,
 			);
@@ -738,8 +745,10 @@
 				A1B2C3D4E5F600000000BB42 /* EntryPointLookupTests.swift in Sources */,
 				A1B2C3D4E5F600000000AC02 /* QAIdentityTests.swift in Sources */,
 				A1B2C3D4E5F600000000AC12 /* QAAmountTests.swift in Sources */,
+				5DC0000000000000000E0012 /* AmountEntryTests.swift in Sources */,
 				A1B2C3D4E5F600000000AD02 /* QAIdentity.swift in Sources */,
 				A1B2C3D4E5F600000000AD12 /* QAAmount.swift in Sources */,
+				5DC0000000000000000E0003 /* AmountEntry.swift in Sources */,
 				5DC00000000000000000D003 /* PayInFormCustomization.swift in Sources */,
 				5DC00000000000000000D042 /* PayInSharedConfiguration.swift in Sources */,
 				5DC00000000000000000D043 /* PayabliDemoColors.swift in Sources */,
@@ -790,6 +799,7 @@
 				A1B2C3D4E5F600000000BB52 /* LoggableError.swift in Sources */,
 				A1B2C3D4E5F600000000AA02 /* DemoCustomerSetting.swift in Sources */,
 				A1B2C3D4E5F600000000AB12 /* QAAmount.swift in Sources */,
+				5DC0000000000000000E0002 /* AmountEntry.swift in Sources */,
 				A1B2C3D4E5F600000000AB02 /* QAIdentity.swift in Sources */,
 				0F5E8CC7E7A24D19A71B0A1C /* PaymentMethodAddedView.swift in Sources */,
 				C9B9D43650B2230A8582B93C /* Secrets.swift in Sources */,

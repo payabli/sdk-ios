@@ -12,7 +12,7 @@ struct SimpleCaptureView: View {
     @EnvironmentObject private var demoCustomer: DemoCustomerSetting
     @State private var customization = PayInFormCustomization()
     @State private var capturing = true
-    @State private var amountText = "10.00"
+    @State private var amountText = AmountEntry.text(for: 10)
     @State private var resultText = ""
 
     var body: some View {
@@ -177,7 +177,7 @@ struct SimpleCaptureView: View {
     /// Each amount is a new attempt with its own key. Not while a submission is in flight, which the
     /// handle refuses.
     private func applyAmount() {
-        guard let amount = try? Double(amountText, format: .number), amount > 0 else { return }
+        guard let amount = AmountEntry.amount(from: amountText) else { return }
         _ = captureFlow.startNewAttempt(
             suppliesCustomer: demoCustomer.suppliesPayInCustomer,
             amount: amount,
