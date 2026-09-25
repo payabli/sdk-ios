@@ -1,12 +1,26 @@
 import Foundation
 
+/// Carries the configuration itself into a change handler, which may otherwise read the view's
+/// previous value.
+struct PayInPaymentFlowConfigurationChange: Equatable {
+    let configuration: PayabliPayInPaymentFlowFormConfiguration
+
+    init(_ configuration: PayabliPayInPaymentFlowFormConfiguration) {
+        self.configuration = configuration
+    }
+
+    static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.configuration.payabliViewModelSignature == rhs.configuration.payabliViewModelSignature
+    }
+}
+
 extension PayabliPayInPaymentFlowFormConfiguration {
     var payabliViewModelSignature: String {
         [
             "allowed:\(allowedMethods.map(\.rawValue).joined(separator: ","))",
             "default:\(defaultMethod.rawValue)",
             "cardFields:\(cardFieldOrder.map(\.rawValue).joined(separator: ","))",
-            "achFields:\(achFieldOrder.map(\.rawValue).joined(separator: ","))",
+            "achFields:\(bankFieldOrder.map(\.rawValue).joined(separator: ","))",
             "hidden:\(hiddenValues.payabliViewModelSignature)",
             "options:\(options.payabliViewModelSignature)",
             "labels:\(labels.payabliViewModelSignature)",
@@ -21,9 +35,9 @@ extension PayabliPayInPaymentFlowFormConfiguration {
 private extension PayabliPayInPaymentFlowHiddenValues {
     var payabliViewModelSignature: String {
         [
-            "achHolderType:\(achHolderType?.rawValue ?? "")",
-            "achSecCode:\(achSecCode?.rawValue ?? "")",
-            "achDevice:\(achDevice ?? "")",
+            "achHolderType:\(accountHolderType?.rawValue ?? "")",
+            "achSecCode:\(secCode?.rawValue ?? "")",
+            "achDevice:\(deviceId ?? "")",
             "methodDescription:\(methodDescription ?? "")",
             "customerData:\(customerData.payabliJSONSignature)"
         ]
@@ -49,7 +63,7 @@ private extension PayabliPayInPaymentFlowFormatting {
         [
             "spaces:\(insertsCardNumberSpaces)",
             "separator:\(expirationSeparator)",
-            "masksACH:\(masksACHAccountEntry)"
+            "masksACH:\(masksAccountNumber)"
         ]
         .joined(separator: ",")
     }

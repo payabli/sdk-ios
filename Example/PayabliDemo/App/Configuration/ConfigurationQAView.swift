@@ -168,8 +168,8 @@ struct ConfigurationQAView: View {
                     .map(\.rawValue).joined(separator: ", ")
             )
             QADetailRow(
-                label: "ACH fields",
-                value: PayInSharedConfiguration.achFieldOrder
+                label: "Bank account fields",
+                value: PayInSharedConfiguration.bankFieldOrder
                     .map(\.rawValue).joined(separator: ", ")
             )
             QADetailRow(
@@ -181,8 +181,8 @@ struct ConfigurationQAView: View {
                 label: "Formatting",
                 value: "card spaces "
                     + (PayInSharedConfiguration.formatting.insertsCardNumberSpaces ? "on" : "off")
-                    + ", ACH masking "
-                    + (PayInSharedConfiguration.formatting.masksACHAccountEntry ? "on" : "off")
+                    + ", account number masking "
+                    + (PayInSharedConfiguration.formatting.masksAccountNumber ? "on" : "off")
             )
 
             Toggle("Show Simple Capture", isOn: $showsSimpleCapture)

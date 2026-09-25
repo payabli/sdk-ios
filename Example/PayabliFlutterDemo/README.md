@@ -14,7 +14,7 @@ MethodChannel + EventChannel bridge in `Bridges/Flutter/`.
   rendered into a list.
 - **Session badge** — current `PayabliTTPSessionState` color-coded in
   the app bar.
-- **Card and ACH payment flow** — sample Flutter forms calling
+- **Card and bank account payment flow** — sample Flutter forms calling
   `PayabliPayInPaymentFlow.addCard(...)` and
   `PayabliPayInPaymentFlow.addBankAccount(...)`, then rendering the stored-method
   response.

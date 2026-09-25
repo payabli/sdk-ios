@@ -9,7 +9,7 @@ extension PayabliPayInPaymentFlowField {
     /// rather than typed, so none of them raises one at all.
     var keyboardType: UIKeyboardType {
         switch self {
-        case .cardNumber, .cardCvv, .achRouting, .achAccount:
+        case .cardNumber, .cardCvv, .routingNumber, .accountNumber:
             .numberPad
         case .cardZip, .billingZip:
             .numbersAndPunctuation

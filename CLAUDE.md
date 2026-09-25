@@ -36,16 +36,15 @@ xcodebuild test -scheme PayabliSDK-Package -destination 'platform=iOS Simulator,
   -only-testing:PayabliSDKCoreTests/PayabliSessionTests
 
 # One module in isolation
-xcodebuild build -scheme PayabliSDKCore -destination 'platform=iOS Simulator,name=iPhone 17 Pro'
+xcodebuild build -scheme PayabliSDKTapToPay -destination 'platform=iOS Simulator,name=iPhone 17 Pro'
 
 # Quieter output when you only care about pass or fail
 xcodebuild test -scheme PayabliSDK-Package -destination '...' -quiet
 ```
 
-Schemes: `PayabliSDK-Package` (everything, the one CI uses), `PayabliSDK`, `PayabliSDKCore`,
-`PayabliSDKTapToPay`, `PayabliSDKPayInPaymentFlow`, `PayabliSDKTelemetry`.
-`PayabliSDKTestUtils` has no scheme of its own, being a target rather than a product; it builds as a
-dependency of the test targets.
+Schemes: `PayabliSDK-Package` (everything, the one CI uses), `PayabliSDK`, `PayabliSDKTapToPay`,
+`PayabliSDKPayInPaymentFlow`. A scheme exists per product, so Core, Telemetry and `PayabliSDKTestUtils`
+have none; they build as dependencies of the products and the test targets.
 
 ## Code Quality
 
@@ -97,12 +96,13 @@ channel, so an app that never accepts card-present never links the certified car
 - `PayabliSDKTapToPay` - the entire Tap to Pay on iPhone surface: `PayabliTTP` facade, App Attest
   attestation, `SessionManager`, `KeychainStorage`, the card-reader adapter stack (depends on Core,
   `PayabliCardReaderCore` under an iOS-only condition)
-- `PayabliSDKPayInPaymentFlow` - card-not-present tokenization, capture, Apple Pay, card and ACH forms
+- `PayabliSDKPayInPaymentFlow` - card-not-present tokenization, capture, Apple Pay, card and bank account forms
   (depends on Core)
 
-**Opt-in:**
+**Shared:**
 - `PayabliSDKTelemetry` - Sentry and PostHog transports, bring your own instance, opt out via
-  `PayabliConfig.telemetryEnabled` (depends on Core)
+  `PayabliConfig.telemetryEnabled` (depends on Core). Every product carries it; it has no product of
+  its own, for the same reason Core has none (see `Package.swift`).
 
 **Test-only:**
 - `PayabliSDKTestUtils` - a target rather than a product, carrying every in-memory fixture (depends on
@@ -125,7 +125,12 @@ channel, so an app that never accepts card-present never links the certified car
   silently.
 
 **Umbrella:**
-- `PayabliSDK` - aggregates Core + TapToPay.
+- `PayabliSDK` - aggregates Core, TapToPay, PayInPaymentFlow and Telemetry. An app links it or the
+  capability products, never both.
+
+**Release XCFrameworks:** `Scripts/build_release_frameworks.sh` ships Core, Telemetry, TapToPay and
+PayInPaymentFlow, each once. TapToPay and PayInPaymentFlow load Core and Telemetry rather than carrying
+them, and the script refuses a build where that stops being true.
 
 ### Key Patterns
 

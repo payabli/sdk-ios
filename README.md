@@ -4,7 +4,7 @@
 
 The Payabli iOS SDK enables iPhone applications to accept in-person
 card payments using Apple's Tap to Pay on iPhone and, through opt-in
-MoneyIn modules, save card PAN or ACH account data as Payabli stored
+MoneyIn modules, save card PAN or bank account data as Payabli stored
 payment methods or submit v2 auth/capture transactions. No external card
 reader is required for Tap to Pay:
 any iPhone XS or newer running iOS 16.7 or later is supported. The SDK
@@ -40,7 +40,7 @@ print("Transaction captured. ID:", result.paymentTransId)
 | Capability                    | Notes                                                                    |
 | ----------------------------- | ------------------------------------------------------------------------ |
 | Tap to Pay on iPhone          | Card-present NFC; no external reader required.                           |
-| Card and ACH payment method   | Opt-in SwiftUI component and direct API for stored payment methods.       |
+| Card and bank account payment method   | Opt-in SwiftUI component and direct API for stored payment methods.       |
 | Payment capture and auth      | Opt-in SwiftUI component and direct API for v2 MoneyIn getpaid, authorize, and capture flows. |
 | Swift and Objective-C APIs    | First-class `@objc` surface for MAUI, Flutter, and React Native hosts.   |
 | Built-in App Attest           | Cold and warm device attestation, cached automatically.                  |
@@ -57,16 +57,19 @@ You need the following to build and run the SDK:
 
 ### Modules
 
-The SDK ships as several focused frameworks. Most applications only
-need `PayabliSDKTapToPay`.
+The SDK ships as focused frameworks. Select `PayabliSDK`, or one or both
+of the capability products, but never `PayabliSDK` together with a
+capability product.
 
-| Module                  | When to select it                                                            |
-| ----------------------- | ---------------------------------------------------------------------------- |
-| `PayabliSDK`            | Umbrella product linking Core and TapToPay together.                         |
-| `PayabliSDKCore`        | Core building blocks (config, auth, transport).                              |
-| `PayabliSDKTapToPay`    | Tap to Pay on iPhone. The product most applications require.                 |
-| `PayabliSDKPayInPaymentFlow` | Opt-in card/ACH stored-method, capture, and authorize component.      |
-| `PayabliSDKTelemetry`   | Optional Sentry and PostHog plumbing; bring your own instance.               |
+| Product                      | When to select it                                                   |
+| ---------------------------- | ------------------------------------------------------------------- |
+| `PayabliSDK`                 | Everything: Tap to Pay and the PayIn payment flow.                  |
+| `PayabliSDKTapToPay`         | Tap to Pay on iPhone.                                               |
+| `PayabliSDKPayInPaymentFlow` | Card/bank account stored-method, capture, and authorize component.  |
+
+Every product includes `PayabliSDKCore` (config, auth, transport) and
+`PayabliSDKTelemetry` (Sentry and PostHog plumbing; bring your own instance).
+Import them by module name when you need their types.
 
 ---
 
@@ -185,10 +188,10 @@ Link the required product. Most applications only need
 .product(name: "PayabliSDKTapToPay", package: "sdk-ios")
 ```
 
-`PayabliSDKTapToPay` transitively links `PayabliSDKCore`; no additional
-product references are required.
+`PayabliSDKTapToPay` links `PayabliSDKCore` and `PayabliSDKTelemetry`; no
+additional product references are required.
 
-For card PAN or ACH stored-method, capture, or authorize flows, link the
+For card PAN or bank account stored-method, capture, or authorize flows, link the
 opt-in PayIn payment flow component:
 
 ```swift
@@ -199,6 +202,22 @@ See [`Documentation/PayInPaymentFlowOverview.md`](Documentation/PayInPaymentFlow
 for the complete feature reference and
 [`Documentation/PayInPaymentFlowIntegrationGuide.md`](Documentation/PayInPaymentFlowIntegrationGuide.md)
 for SwiftUI integration examples.
+
+To use both capabilities, link both products, or link `PayabliSDK` alone.
+Linking `PayabliSDK` together with either capability product fails to build.
+
+### XCFrameworks
+
+Each GitHub Release attaches `payabli-ios-sdk-<version>.zip`, for apps that
+do not use Swift Package Manager. Add the XCFrameworks you need to your app
+target and set each to **Embed & Sign**:
+
+- `PayabliSDKTapToPay.xcframework`, `PayabliSDKPayInPaymentFlow.xcframework`,
+  or both.
+- `PayabliSDKCore.xcframework` and `PayabliSDKTelemetry.xcframework`, always.
+  Both capabilities load them, and an app without them fails at launch.
+
+Imports are the same as with Swift Package Manager.
 
 Example apps live under `Example/`, including native iOS, Flutter, .NET MAUI,
 and React Native/Expo scaffolds.

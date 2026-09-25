@@ -290,8 +290,8 @@ final class QAWalkthroughUITests: XCTestCase {
     /// a frame. Prefilled too early it fills the card boxes it can still see, the bank ones stay empty, and the
     /// form refuses itself. Measured on Android, where three of four devices lost that race.
     private func chooseTheBankAccount() {
-        tap(app.buttons["ACH"], named: "the bank-account option")
-        let routing = app.textFields["payabli.payInPaymentFlow.field.achRouting"]
+        tap(app.buttons["Bank account"], named: "the bank-account option")
+        let routing = app.textFields["payabli.payIn.field.routingNumber"]
         XCTAssertTrue(routing.waitForExistence(timeout: composes), "the form never switched to the bank account")
     }
 
@@ -306,7 +306,7 @@ final class QAWalkthroughUITests: XCTestCase {
         // "Empty", never its text, so a card number cannot be read back out of the form. Which values the
         // identity produces is covered by `QAIdentityTests`.
         for field in ["lastName", "billingEmail"] + (customerNumber ? ["customerNumber"] : []) {
-            let box = app.textFields["payabli.payInPaymentFlow.field.\(field)"]
+            let box = app.textFields["payabli.payIn.field.\(field)"]
             XCTAssertTrue(box.waitForExistence(timeout: composes), "the form has no \(field) box")
             XCTAssertEqual(box.value as? String, "Entered", "the prefill left \(field) empty")
         }
@@ -314,12 +314,12 @@ final class QAWalkthroughUITests: XCTestCase {
 
     /// The expiry is a wheel the prefill cannot reach, so it is opened and accepted.
     ///
-    /// The field preselects a valid month when it opens, so accepting is the whole interaction. ACH has no
+    /// The field preselects a valid month when it opens, so accepting is the whole interaction. A bank account has no
     /// expiry, which is why this is a step of the card flows only.
     private func chooseAnExpiry() {
-        tap(app.buttons["payabli.payInPaymentFlow.field.cardExpiration"], named: "the expiry field")
+        tap(app.buttons["payabli.payIn.field.cardExpiration"], named: "the expiry field")
         tap(
-            app.buttons["payabli.payInPaymentFlow.control.expirationDone"],
+            app.buttons["payabli.payIn.control.expirationDone"],
             named: "the expiry picker's Done button"
         )
     }
@@ -382,6 +382,6 @@ final class QAWalkthroughUITests: XCTestCase {
     /// No network in it: a control on its way to the screen, or form state the next frame draws.
     private let composes: TimeInterval = 5
 
-    /// Enough to cross the longest form the walk meets, which is ACH with a customer number.
+    /// Enough to cross the longest form the walk meets, which is the bank account with a customer number.
     private let scrolls = 6
 }

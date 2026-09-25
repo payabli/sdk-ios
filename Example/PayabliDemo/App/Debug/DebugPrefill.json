@@ -5,8 +5,8 @@
   "cardExpiration": "07/30",
   "firstName": "Name On",
   "lastName": "Card Test1",
-  "achHolder": "Name On Card Test1",
-  "achRouting": "121000248",
-  "achAccount": "1234567890",
+  "accountHolder": "Name On Card Test1",
+  "routingNumber": "121000248",
+  "accountNumber": "1234567890",
   "cardZip": "22039"
 }

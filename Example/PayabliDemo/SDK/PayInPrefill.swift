@@ -18,13 +18,13 @@ enum PayInPrefillField: CaseIterable {
     case lastName
     case billingEmail
     case customerNumber
-    case achHolder
-    case achRouting
-    case achAccount
+    case accountHolder
+    case routingNumber
+    case accountNumber
 
     /// What the SDK sets on the rendered text field.
     var accessibilityIdentifier: String {
-        "payabli.payInPaymentFlow.field.\(field.rawValue)"
+        "payabli.payIn.field.\(field.rawValue)"
     }
 
     private var field: PayabliPayInPaymentFlowField {
@@ -37,9 +37,9 @@ enum PayInPrefillField: CaseIterable {
         case .lastName: return .lastName
         case .billingEmail: return .billingEmail
         case .customerNumber: return .customerNumber
-        case .achHolder: return .achHolder
-        case .achRouting: return .achRouting
-        case .achAccount: return .achAccount
+        case .accountHolder: return .accountHolder
+        case .routingNumber: return .routingNumber
+        case .accountNumber: return .accountNumber
         }
     }
 }

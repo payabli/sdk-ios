@@ -77,8 +77,8 @@ public struct PayabliPayInPaymentFlowView: View {
             syncViewModelConfiguration()
             viewModel.normalizeSelectedMethodForAvailableMethods()
         }
-        .onChange(of: configuration.payabliViewModelSignature) { _ in
-            syncViewModelConfiguration()
+        .onChange(of: PayInPaymentFlowConfigurationChange(configuration)) { change in
+            viewModel.update(component: component, configuration: change.configuration)
         }
         .onChange(of: viewModel.availableMethods) { _ in
             viewModel.normalizeSelectedMethodForAvailableMethods()
@@ -151,7 +151,7 @@ public struct PayabliPayInPaymentFlowView: View {
         case .card:
             configuration.cardSections
         case .bankAccount:
-            configuration.achSections
+            configuration.bankSections
         }
         guard viewModel.component.operation == .storePaymentMethod else {
             return sections
@@ -258,7 +258,7 @@ public struct PayabliPayInPaymentFlowView: View {
         switch field {
         case .cardholderName, .cardNumber, .cardExpiration, .cardCvv, .cardZip:
             cardFieldView(field)
-        case .achHolder, .achRouting, .achAccount, .achAccountType, .achHolderType, .achSecCode, .achDevice:
+        case .accountHolder, .routingNumber, .accountNumber, .accountType, .accountHolderType, .secCode, .deviceId:
             achFieldView(field)
         case .methodDescription, .firstName, .lastName, .customerNumber, .billingEmail, .billingZip:
             customerFieldView(field)
@@ -302,30 +302,30 @@ public struct PayabliPayInPaymentFlowView: View {
     @ViewBuilder
     func achFieldView(_ field: PayabliPayInPaymentFlowField) -> some View {
         switch field {
-        case .achHolder:
+        case .accountHolder:
             textField(
                 field,
                 text: achHolderBinding,
                 textContentType: .name,
                 autocapitalization: .words,
-                sanitize: viewModel.limitACHHolderName
+                sanitize: viewModel.limitAccountHolderName
             )
-        case .achRouting:
-            textField(field, text: achRoutingBinding, sanitize: viewModel.limitACHRouting)
-        case .achAccount:
-            if configuration.formatting.masksACHAccountEntry {
-                secureField(field, text: achAccountBinding, sanitize: viewModel.limitACHAccount)
+        case .routingNumber:
+            textField(field, text: achRoutingBinding, sanitize: viewModel.limitRoutingNumber)
+        case .accountNumber:
+            if configuration.formatting.masksAccountNumber {
+                secureField(field, text: achAccountBinding, sanitize: viewModel.limitAccountNumber)
             } else {
-                textField(field, text: achAccountBinding, sanitize: viewModel.limitACHAccount)
+                textField(field, text: achAccountBinding, sanitize: viewModel.limitAccountNumber)
             }
-        case .achAccountType:
-            pickerField(field, selection: $viewModel.achAccountType, values: PayabliPayInAccountType.allCases)
-        case .achHolderType:
-            pickerField(field, selection: $viewModel.achHolderType, values: PayabliPayInAccountHolderType.allCases)
-        case .achSecCode:
-            pickerField(field, selection: $viewModel.achSecCode, values: PayabliPayInSecCode.allCases)
-        case .achDevice:
-            textField(field, text: $viewModel.achDevice)
+        case .accountType:
+            pickerField(field, selection: $viewModel.accountType, values: PayabliPayInAccountType.allCases)
+        case .accountHolderType:
+            pickerField(field, selection: $viewModel.accountHolderType, values: PayabliPayInAccountHolderType.allCases)
+        case .secCode:
+            pickerField(field, selection: $viewModel.secCode, values: PayabliPayInSecCode.allCases)
+        case .deviceId:
+            textField(field, text: $viewModel.deviceId)
         default:
             EmptyView()
         }
@@ -933,22 +933,22 @@ extension PayabliPayInPaymentFlowView {
 
     var achHolderBinding: Binding<String> {
         Binding(
-            get: { viewModel.achHolder },
-            set: { viewModel.achHolder = $0 }
+            get: { viewModel.accountHolder },
+            set: { viewModel.accountHolder = $0 }
         )
     }
 
     var achRoutingBinding: Binding<String> {
         Binding(
-            get: { viewModel.achRouting },
-            set: { viewModel.achRouting = $0 }
+            get: { viewModel.routingNumber },
+            set: { viewModel.routingNumber = $0 }
         )
     }
 
     var achAccountBinding: Binding<String> {
         Binding(
-            get: { viewModel.achAccount },
-            set: { viewModel.achAccount = $0 }
+            get: { viewModel.accountNumber },
+            set: { viewModel.accountNumber = $0 }
         )
     }
 
