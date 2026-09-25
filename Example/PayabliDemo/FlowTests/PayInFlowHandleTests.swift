@@ -42,6 +42,15 @@ final class PayInFlowHandleTests: XCTestCase {
         XCTAssertEqual(handle.requestTotal.map { $0 > 0 }, true, "the attempt charges nothing")
     }
 
+    func testDrawingAnAttemptForwardsTheAmountAndSourceItIsGiven() throws {
+        let handle = try makeHandle()
+
+        XCTAssertTrue(handle.startNewAttempt(suppliesCustomer: false, amount: 12.34, source: "test-source"))
+
+        XCTAssertEqual(handle.requestTotal, 12.34)
+        XCTAssertEqual(handle.requestSource, "test-source")
+    }
+
     /// Moving the customer switch answers a different question, so it leaves the
     /// attempt's identity alone. Without this the retry of the payment on screen
     /// would become a payment of its own.
@@ -99,6 +108,10 @@ private extension PayInFlowHandle {
 
     var requestTotal: Double? {
         flow.requestConfiguration?.paymentDetails.totalAmount
+    }
+
+    var requestSource: String? {
+        flow.requestConfiguration?.source
     }
 
     var requestCustomerNumber: String? {
