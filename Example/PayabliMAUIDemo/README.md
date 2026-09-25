@@ -28,9 +28,10 @@ Minimal .NET MAUI demo wrapping Tap to Pay and payment flow through the
 2. Drop the output XCFrameworks into `Bridges/MAUI/Frameworks/`:
    ```bash
    mkdir -p Bridges/MAUI/Frameworks
-   cp -R build/release/PayabliSDKCore.xcframework        Bridges/MAUI/Frameworks/
-   cp -R build/release/PayabliSDKTapToPay.xcframework    Bridges/MAUI/Frameworks/
-   cp -R build/release/PayabliSDKPayInPaymentFlow.xcframework Bridges/MAUI/Frameworks/
+   cp -R build/release/xcframeworks/PayabliSDKCore.xcframework        Bridges/MAUI/Frameworks/
+   cp -R build/release/xcframeworks/PayabliSDKTelemetry.xcframework   Bridges/MAUI/Frameworks/
+   cp -R build/release/xcframeworks/PayabliSDKTapToPay.xcframework    Bridges/MAUI/Frameworks/
+   cp -R build/release/xcframeworks/PayabliSDKPayInPaymentFlow.xcframework Bridges/MAUI/Frameworks/
    ```
 3. Restore and build the demo with the .NET 10 iOS workload:
    ```bash

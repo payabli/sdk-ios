@@ -3,7 +3,7 @@
 //
 // The C# surface produced by `sharpie bind` against the
 // `PayabliSDKTapToPay.xcframework`, `PayabliSDKPayInPaymentFlow.xcframework`,
-// and `PayabliSDKCore.xcframework` for `PayabliEnvironment`. Host MAUI apps consume this via a binding
+// with `PayabliSDKCore.xcframework` and `PayabliSDKTelemetry.xcframework`, which both load. Host MAUI apps consume this via a binding
 // library project (see `Payabli.MAUI.csproj` next to this file) and
 // drive the Tap to Pay on iPhone flow from C#.
 //

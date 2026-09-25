@@ -21,79 +21,40 @@ let package = Package(
         .iOS("16.7")
     ],
     products: [
-        // Dynamic per PRD NFR-11 — distributed as a dynamic XCFramework with
-        // BUILD_LIBRARY_FOR_DISTRIBUTION=YES at binary-framework time.
+        // Core and Telemetry are shared targets with no product of their own.
+        // A product named like a target that two products contain stops SwiftPM
+        // building that target once, and an app linking both products fails.
         //
-        // The umbrella `PayabliSDK` library aggregates the Core + Tap to Pay
-        // targets on the critical path for primary SDK integrations.
-        // PayInPaymentFlow and Telemetry are opt-in products that host apps
-        // link explicitly when they need those surfaces.
+        // An app links `PayabliSDK`, or `PayabliSDKTapToPay` and/or
+        // `PayabliSDKPayInPaymentFlow`, never the umbrella with either: each
+        // capability target is in the umbrella and has a product of its own.
+        //
         // This manifest is what consumers resolve: a release tag is this file
         // at that commit. The zip of XCFrameworks attached to a GitHub Release
         // is for integrators who do not use SwiftPM.
         .library(
             name: "PayabliSDK",
             type: .dynamic,
-            targets: ["PayabliSDKCore", "PayabliSDKTapToPay"]
-        ),
-        .library(
-            name: "PayabliSDKCore",
-            type: .dynamic,
-            targets: ["PayabliSDKCore"]
+            targets: [
+                "PayabliSDKCore",
+                "PayabliSDKTapToPay",
+                "PayabliSDKPayInPaymentFlow",
+                "PayabliSDKTelemetry"
+            ]
         ),
         .library(
             name: "PayabliSDKTapToPay",
             type: .dynamic,
-            targets: ["PayabliSDKTapToPay"]
+            targets: ["PayabliSDKTapToPay", "PayabliSDKTelemetry"]
         ),
         .library(
             name: "PayabliSDKPayInPaymentFlow",
             type: .dynamic,
-            targets: ["PayabliSDKPayInPaymentFlow"]
-        ),
-        .library(
-            name: "PayabliSDKTelemetry",
-            type: .dynamic,
-            targets: ["PayabliSDKTelemetry"]
-        ),
+            targets: ["PayabliSDKPayInPaymentFlow", "PayabliSDKTelemetry"]
+        )
         // `PayabliSDKTestUtils` is a target and not a product. Its doubles conform to the
         // attestation, provider and storage protocols, so a linkable library of them requires
         // those protocols to be `public`.
-        //
-        // `Example/PayabliDemo` needs Core, card-present, and card-not-present in
-        // one app. This is a constraint of `type: .dynamic` products built from
-        // source, and nothing to do with the artifact split: linking two dynamic
-        // products that both require the `PayabliSDKCore` *target* makes Xcode
-        // try to hoist that target into its own dynamic library, which collides
-        // with the same-named `PayabliSDKCore` *product*. One aggregate product
-        // is one dylib, so there is nothing to hoist.
-        //
-        // Two alternatives that do not work:
-        //   - Dropping `type: .dynamic` from the three products makes the demo
-        //     link all three individually with no aggregate at all. It is not an
-        //     option, because `xcodebuild archive` then emits a bare
-        //     `PayabliSDKCore.o` instead of `PayabliSDKCore.framework`, which is
-        //     what `Scripts/build_release_frameworks.sh` packages. `.dynamic` is
-        //     load-bearing for release; this product is the price of keeping it.
-        //   - A shim package under `Example/` wrapping the three products
-        //     reproduces the original error, so the aggregation has to sit in the
-        //     package that owns the Core target.
-        //   - Consumers never hit any of this. The public manifest ships
-        //     `binaryTarget`s, which are prebuilt frameworks with no shared source
-        //     target to hoist.
-        //
-        // Demo and QA hosts only. A real integrator links the individual
-        // capability products, which is what keeps an app that never accepts
-        // card-present from linking the card reader engine at all.
-        .library(
-            name: "PayabliSDKExampleAggregate",
-            type: .dynamic,
-            targets: [
-                "PayabliSDKCore",
-                "PayabliSDKTapToPay",
-                "PayabliSDKPayInPaymentFlow"
-            ]
-        )
     ],
     // Zero external SPM dependencies. PayabliCardReaderCore (MIT-licensed Tap
     // to Phone engine) is vendored at `ThirdParty/PayabliCardReaderCoreSource/`
