@@ -58,7 +58,7 @@ struct PayInFormCustomization: Hashable {
     var showsCustomerSection = true
     var customerSectionFirst = false
     var requiresCustomerNumber = false
-    var showsAmountSummary = true
+    var titlesAmountSummary = true
     var groupsCardNumber = true
     var dashesExpiry = false
     var masksAccountNumber = true
@@ -87,7 +87,7 @@ struct PayInFormCustomization: Hashable {
             methods = .cardOnly
             hidesLabels = true
             showsCustomerSection = false
-            showsAmountSummary = false
+            titlesAmountSummary = false
             groupsCardNumber = false
             cardBrandIconPlacement = .hidden
             errorMessagePlacement = .aboveSubmitButton
@@ -239,7 +239,7 @@ struct PayInFormCustomization: Hashable {
         )
         let summary = PayabliPayInPaymentFlowFieldSection(
             id: "summary",
-            title: showsAmountSummary ? (titled ? "Order total" : "Payment Information") : nil,
+            title: titlesAmountSummary ? (titled ? "Order total" : "Payment Information") : nil,
             fields: [.amount, .serviceFee]
         )
 
