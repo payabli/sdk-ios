@@ -74,6 +74,8 @@ struct SimpleCaptureView: View {
                         .multilineTextAlignment(.trailing)
                         .frame(maxWidth: 120)
                         .textFieldStyle(.roundedBorder)
+                        // The attempt in flight keeps its amount, so the field does too.
+                        .disabled(captureFlow.isSubmitting)
                         .accessibilityIdentifier("simpleCapture.amount")
                 }
             }
@@ -175,7 +177,7 @@ struct SimpleCaptureView: View {
     /// Each amount is a new attempt with its own key. Not while a submission is in flight, which the
     /// handle refuses.
     private func applyAmount() {
-        guard let amount = Double(amountText), amount > 0 else { return }
+        guard let amount = try? Double(amountText, format: .number), amount > 0 else { return }
         _ = captureFlow.startNewAttempt(
             suppliesCustomer: demoCustomer.suppliesPayInCustomer,
             amount: amount,
