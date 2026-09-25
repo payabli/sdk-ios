@@ -12,8 +12,11 @@ import SwiftUI
 struct ConfigurationQAView: View {
     @EnvironmentObject private var tokenProbes: TokenProbeResults
     @EnvironmentObject private var demoCustomer: DemoCustomerSetting
+    @AppStorage(Self.showsSimpleCaptureKey) private var showsSimpleCapture = false
     @State private var healthCheckText = ""
     @State private var isWorking = false
+
+    static let showsSimpleCaptureKey = "showsSimpleCapture"
 
     var body: some View {
         NavigationStack {
@@ -181,6 +184,14 @@ struct ConfigurationQAView: View {
                     + ", account number masking "
                     + (PayInSharedConfiguration.formatting.masksAccountNumber ? "on" : "off")
             )
+
+            Toggle("Show Simple Capture", isOn: $showsSimpleCapture)
+                .font(.subheadline)
+                .accessibilityIdentifier("config.showsSimpleCapture")
+            Text("Adds a fifth tab: one screen, the fewest calls a card capture takes.")
+                .font(.caption)
+                .foregroundColor(.payabliOnSurfaceVariant)
+                .frame(maxWidth: .infinity, alignment: .leading)
 
             Toggle("Send a customer number", isOn: $demoCustomer.suppliesPayInCustomer)
                 .font(.subheadline)

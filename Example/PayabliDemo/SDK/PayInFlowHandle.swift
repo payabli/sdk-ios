@@ -56,10 +56,18 @@ final class PayInFlowHandle: ObservableObject {
     /// - Returns: whether an attempt was drawn. A screen showing the last failure
     ///   clears it on `true` only: cleared on a refusal it would report an attempt
     ///   that was never made, over a request still holding the earlier key.
-    func startNewAttempt(suppliesCustomer: Bool) -> Bool {
+    func startNewAttempt(
+        suppliesCustomer: Bool,
+        amount: Double = QAAmount.random(),
+        source: String = "ios-payment-capture-qa"
+    ) -> Bool {
         guard !flow.isSubmitting else { return false }
         flow.configure(
-            requestConfiguration: PayInRequests.freshCapture(suppliesCustomer: suppliesCustomer)
+            requestConfiguration: PayInRequests.freshCapture(
+                suppliesCustomer: suppliesCustomer,
+                amount: amount,
+                source: source
+            )
         )
         return true
     }
