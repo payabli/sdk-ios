@@ -176,7 +176,11 @@ struct SimpleCaptureView: View {
     /// handle refuses.
     private func applyAmount() {
         guard let amount = Double(amountText), amount > 0 else { return }
-        _ = captureFlow.startNewAttempt(suppliesCustomer: demoCustomer.suppliesPayInCustomer, amount: amount)
+        _ = captureFlow.startNewAttempt(
+            suppliesCustomer: demoCustomer.suppliesPayInCustomer,
+            amount: amount,
+            source: PayInFormCustomization.source
+        )
     }
 
     private func handleCompleted(_ outcome: PayInOutcome) {

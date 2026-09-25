@@ -5,6 +5,9 @@ import SwiftUI
 ///
 /// A preset sets every field at once. Each field can then be changed on its own.
 struct PayInFormCustomization: Hashable {
+    /// Names this tab on every request it sends, a capture and a save alike.
+    static let source = "ios-simple-capture"
+
     enum Preset: String, CaseIterable, Identifiable {
         case sdkDefault = "Default"
         case brand = "Brand"
@@ -111,7 +114,7 @@ struct PayInFormCustomization: Hashable {
                 // A capture names its customer on the request instead.
                 customerData: capturing ? nil : PayInDemoCustomer.customerData
             ),
-            options: PayabliPayInPaymentFlowOptions(forceCustomerCreation: true, source: "ios-simple-capture"),
+            options: PayabliPayInPaymentFlowOptions(forceCustomerCreation: true, source: Self.source),
             labels: labels(capturing: capturing),
             labelLayout: labelsInsideFields ? .placeholder : .external,
             showsFieldLabels: !hidesLabels,

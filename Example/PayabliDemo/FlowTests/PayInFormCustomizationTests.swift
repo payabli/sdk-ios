@@ -133,4 +133,12 @@ final class PayInFormCustomizationTests: XCTestCase {
             [.firstName, .cardholderName, .amount]
         )
     }
+
+    func testACaptureAndASaveNameTheSameSource() {
+        let capture = PayInRequests.freshCapture(suppliesCustomer: false, source: PayInFormCustomization.source)
+        let save = PayInFormCustomization().configuration(capturing: false)
+
+        XCTAssertEqual(capture.source, PayInFormCustomization.source)
+        XCTAssertEqual(save.options.source, PayInFormCustomization.source)
+    }
 }

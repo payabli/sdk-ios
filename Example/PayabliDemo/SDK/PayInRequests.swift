@@ -23,7 +23,8 @@ enum PayInRequests {
     ///   one; the form has no such box.
     static func freshCapture(
         suppliesCustomer: Bool,
-        amount: Double = QAAmount.random()
+        amount: Double = QAAmount.random(),
+        source: String = "ios-payment-capture-qa"
     ) -> PayabliPayInPaymentFlowRequestConfiguration {
         let identity = QAIdentity.current
         return PayabliPayInPaymentFlowRequestConfiguration(
@@ -35,7 +36,7 @@ enum PayInRequests {
             customerData: suppliesCustomer ? PayInDemoCustomer.customerData : nil,
             orderDescription: identity.note("capture"),
             orderId: identity.orderId(at: Date()),
-            source: "ios-payment-capture-qa",
+            source: source,
             idempotencyKey: UUID().uuidString,
             forceCustomerCreation: true
         )
