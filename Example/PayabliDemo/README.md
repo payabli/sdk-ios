@@ -38,25 +38,6 @@ xcodebuild build -project PayabliDemo.xcodeproj -scheme PayabliDemo \
   -destination 'platform=iOS Simulator,name=iPhone 17 Pro'
 ```
 
-### Why the target links one aggregate product
-
-The target links the private `PayabliSDKExampleAggregate` product rather than
-`PayabliSDKTapToPay` and `PayabliSDKPayInPaymentFlow` separately. Linking two
-dynamic products that both need the `PayabliSDKCore` **target** makes Xcode try
-to hoist that target into its own dynamic library, which collides with the
-same-named `PayabliSDKCore` **product**:
-
-```text
-error: Swift package target 'PayabliSDKCore' is linked as a static library by
-'PayabliDemo' and 'PayabliSDKPayInPaymentFlow', but cannot be built dynamically
-because there is a package product with the same name.
-```
-
-One aggregate product is one dylib, so there is nothing to hoist. This is a
-demo-host workaround and **not** how an integrator links the SDK: a real app
-links the individual capability products, which is what keeps a card-not-present
-app from linking the card reader engine at all.
-
 ### Required entitlements
 
 Tap to Pay on iPhone needs two Apple entitlements that you must add to the

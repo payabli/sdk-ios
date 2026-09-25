@@ -7,7 +7,8 @@
   The actual binding declarations live in `PayabliBinding.cs` (sharpie-style
   ApiDefinitions). The XCFrameworks come from the SDK release artifacts:
 
-    - PayabliSDKCore.xcframework        (provides PayabliEnvironment)
+    - PayabliSDKCore.xcframework        (loaded by both capabilities)
+    - PayabliSDKTelemetry.xcframework   (loaded by both capabilities)
     - PayabliSDKTapToPay.xcframework    (the bilingual @objc surface)
     - PayabliSDKPayInPaymentFlow.xcframework (card/ACH payment flow @objc surface)
 
@@ -43,6 +44,11 @@
         <NativeReference Include="$(XcframeworksRoot)/PayabliSDKCore.xcframework">
             <Kind>Framework</Kind>
             <Frameworks>Foundation UIKit DeviceCheck</Frameworks>
+            <SmartLink>True</SmartLink>
+        </NativeReference>
+        <NativeReference Include="$(XcframeworksRoot)/PayabliSDKTelemetry.xcframework">
+            <Kind>Framework</Kind>
+            <Frameworks>Foundation</Frameworks>
             <SmartLink>True</SmartLink>
         </NativeReference>
         <NativeReference Include="$(XcframeworksRoot)/PayabliSDKTapToPay.xcframework">
