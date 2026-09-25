@@ -96,7 +96,7 @@ channel, so an app that never accepts card-present never links the certified car
 - `PayabliSDKTapToPay` - the entire Tap to Pay on iPhone surface: `PayabliTTP` facade, App Attest
   attestation, `SessionManager`, `KeychainStorage`, the card-reader adapter stack (depends on Core,
   `PayabliCardReaderCore` under an iOS-only condition)
-- `PayabliSDKPayInPaymentFlow` - card-not-present tokenization, capture, Apple Pay, card and ACH forms
+- `PayabliSDKPayInPaymentFlow` - card-not-present tokenization, capture, Apple Pay, card and bank account forms
   (depends on Core)
 
 **Shared:**

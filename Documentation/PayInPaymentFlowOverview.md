@@ -38,9 +38,9 @@ At a high level, the component provides:
 
 - hosted SwiftUI payment forms that can render inline or in a sheet
 - direct async APIs for advanced or server-controlled workflows
-- card and ACH payment-method storage through Token Storage
-- MoneyIn capture for SDK-collected card or ACH details in the hosted form
-- MoneyIn capture for card, ACH, stored method, cloud device, check, and cash
+- card and bank account payment-method storage through Token Storage
+- MoneyIn capture for SDK-collected card or bank account details in the hosted form
+- MoneyIn capture for card, bank account, stored method, cloud device, check, and cash
   through the direct API
 - authorization of a card, stored card, or cloud device, and follow-up capture
   of a prior authorization
@@ -55,8 +55,8 @@ The component supports four PayIn workflows:
 
 | Workflow | API surface | Endpoint family | Notes |
 | --- | --- | --- | --- |
-| Store card or ACH payment method | Hosted form and direct async API | `/api/TokenStorage/add` | Use hosted form when the host app must not access clear PAN. |
-| Capture transaction | Hosted form and direct async API | `/api/v2/MoneyIn/getpaid` | Hosted form collects card or ACH; direct API also supports stored, cloud, check, and cash methods. |
+| Store card or bank account payment method | Hosted form and direct async API | `/api/TokenStorage/add` | Use hosted form when the host app must not access clear PAN. |
+| Capture transaction | Hosted form and direct async API | `/api/v2/MoneyIn/getpaid` | Hosted form collects card or bank account; direct API also supports stored, cloud, check, and cash methods. |
 | Authorize transaction | Hosted form and direct async API | `/api/v2/MoneyIn/authorize` | The hosted form collects a card only. The direct API accepts a card, a stored card, or a cloud device. |
 | Capture prior authorization | Direct async API | `/api/v2/MoneyIn/capture/{transId}` | Uses a prior authorization transaction ID. |
 
@@ -92,16 +92,16 @@ integrators to manually supply a `requestToken` header.
 The hosted SwiftUI form and sheet are recommended for integrations where the
 host app must avoid direct access to clear card data. In hosted form mode:
 
-- the SDK owns card and ACH field state
+- the SDK owns card and bank account field state
 - clear PAN is not written into host-visible `UITextField.text`
-- PAN, CVV, ACH account, routing number, tokens, and customer contact fields are
+- PAN, CVV, account number, routing number, tokens, and customer contact fields are
   redacted from diagnostics
 - accessibility values do not expose sensitive values
 - completion callbacks return stored-method or transaction results, not raw
   card or bank data
 
 Direct APIs are available for advanced or server-controlled workflows, but they
-are PCI-sensitive because the host app constructs and passes card or ACH data.
+are PCI-sensitive because the host app constructs and passes card or bank account data.
 
 ## Hosted UI Capabilities
 
@@ -111,7 +111,7 @@ sheet form.
 
 The hosted form supports:
 
-- card and ACH method selection for store and capture flows
+- card and bank account method selection for store and capture flows
 - card-only method selection for authorize flows
 - inline form or sheet presentation
 - configurable form title, subtitle, submit button text, labels, and
@@ -127,7 +127,7 @@ The hosted form supports:
 - per-section vertical and horizontal input spacing
 - per-field vertical spacing after specific inputs
 - required optional customer fields
-- hidden values for ACH holder type, SEC code, ACH device, method description,
+- hidden values for account holder type, SEC code, device ID, method description,
   and customer data
 - card brand detection with leading, trailing, or hidden brand icons
 - read-only amount and fee summary rows for capture and authorize
@@ -137,8 +137,8 @@ The hosted form supports:
 ## Field And Section Model
 
 Fields are represented by `PayabliPayInPaymentFlowField`. They can be ordered
-flatly with `cardFieldOrder` and `achFieldOrder`, or grouped into sections with
-`cardSections` and `achSections`.
+flatly with `cardFieldOrder` and `bankFieldOrder`, or grouped into sections with
+`cardSections` and `bankSections`.
 
 Supported fields:
 
@@ -149,13 +149,13 @@ Supported fields:
 | `.cardExpiration` | Expiration | Card input |
 | `.cardCvv` | CVV | Card input |
 | `.cardZip` | Postal Code | Card input |
-| `.achHolder` | Account holder | ACH input |
-| `.achRouting` | Routing number | ACH input |
-| `.achAccount` | Account number | ACH input |
-| `.achAccountType` | Account type | ACH input |
-| `.achHolderType` | Holder type | ACH input or hidden value |
-| `.achSecCode` | SEC code | Hidden by default |
-| `.achDevice` | Device | Optional ACH metadata |
+| `.accountHolder` | Account holder | bank account input |
+| `.routingNumber` | Routing number | bank account input |
+| `.accountNumber` | Account number | bank account input |
+| `.accountType` | Account type | bank account input |
+| `.accountHolderType` | Holder type | bank account input or hidden value |
+| `.secCode` | SEC code | Hidden by default |
+| `.deviceId` | Device | Optional bank account metadata |
 | `.methodDescription` | Description | Stored-method metadata |
 | `.firstName` | First name | Customer information |
 | `.lastName` | Last name | Customer information |
@@ -301,7 +301,7 @@ try await paymentFlow.authorize(PayabliPayInPaymentFlowRequest(
 
 Diagnostics are disabled by default. When enabled, request, response, and
 failure events are delivered through a handler. Diagnostics redact sensitive
-headers and bodies, including access tokens, request tokens, card data, ACH
+headers and bodies, including access tokens, request tokens, card data, bank account
 data, stored method identifiers, customer identifiers, emails, phones, and
 addresses.
 
@@ -314,7 +314,7 @@ let diagnostics = PayabliPayInPaymentFlowDiagnostics.enabled { entry in
 ## Bridge Scope
 
 Flutter, React Native, and .NET MAUI bridge files currently expose stored card
-and ACH payment-method creation. Native Swift apps should call
+and bank account payment-method creation. Native Swift apps should call
 `PayabliSDKPayInPaymentFlow` directly for capture, authorize, and
 capture-authorized transaction flows until those request models are promoted
 into the bridge APIs.

@@ -24,11 +24,11 @@ enum PayInSharedConfiguration {
         .cardZip
     ]
 
-    static let achFieldOrder: [PayabliPayInPaymentFlowField] = [
-        .achHolder,
-        .achRouting,
-        .achAccount,
-        .achAccountType
+    static let bankFieldOrder: [PayabliPayInPaymentFlowField] = [
+        .accountHolder,
+        .routingNumber,
+        .accountNumber,
+        .accountType
     ]
 
     // MARK: - Presentation
@@ -39,7 +39,7 @@ enum PayInSharedConfiguration {
 
     static let formatting = PayabliPayInPaymentFlowFormatting(
         insertsCardNumberSpaces: true,
-        masksACHAccountEntry: true
+        masksAccountNumber: true
     )
 
     static let inputSizing = PayabliPayInPaymentFlowInputSizing(
@@ -57,10 +57,10 @@ enum PayInSharedConfiguration {
         .cardExpiration,
         .cardCvv,
         .cardZip,
-        .achHolder,
-        .achRouting,
-        .achAccount,
-        .achAccountType,
+        .accountHolder,
+        .routingNumber,
+        .accountNumber,
+        .accountType,
         .firstName,
         .lastName,
         .billingEmail

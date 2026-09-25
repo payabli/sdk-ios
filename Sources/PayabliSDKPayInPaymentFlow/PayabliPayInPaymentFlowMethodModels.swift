@@ -12,7 +12,7 @@ public enum PayabliPayInPaymentFlowMethodType: String, CaseIterable, Identifiabl
     public var displayName: String {
         switch self {
         case .card: return "Card"
-        case .bankAccount: return "ACH"
+        case .bankAccount: return "Bank account"
         }
     }
 
@@ -704,31 +704,32 @@ extension PayabliPayInPaymentFlowCardData {
 extension PayabliPayInBankAccountData {
     func validate(_ validation: PayabliPayInPaymentFlowValidation) throws {
         let account = accountNumber.digitsOnly
-        guard (PayabliPayInPaymentFlowInputLimits.minimumACHAccountDigits ... PayabliPayInPaymentFlowInputLimits.maximumACHAccountDigits)
-            .contains(account.count)
+        let minimumDigits = PayabliPayInPaymentFlowInputLimits.minimumAccountNumberDigits
+        let maximumDigits = PayabliPayInPaymentFlowInputLimits.maximumAccountNumberDigits
+        guard (minimumDigits ... maximumDigits).contains(account.count)
         else {
-            throw PayabliPayInPaymentFlowTokenStorageError.invalidInput("ACH account number must be 4 to 17 digits.")
+            throw PayabliPayInPaymentFlowTokenStorageError.invalidInput("Account number must be 4 to 17 digits.")
         }
         let routing = routingNumber.digitsOnly
-        guard routing.count == PayabliPayInPaymentFlowInputLimits.achRoutingDigits else {
-            throw PayabliPayInPaymentFlowTokenStorageError.invalidInput("ACH routing number must be 9 digits.")
+        guard routing.count == PayabliPayInPaymentFlowInputLimits.routingNumberDigits else {
+            throw PayabliPayInPaymentFlowTokenStorageError.invalidInput("Routing number must be 9 digits.")
         }
-        if validation.validatesACHRoutingChecksum, !Self.passesABAChecksum(routing) {
-            throw PayabliPayInPaymentFlowTokenStorageError.invalidInput("ACH routing number failed validation.")
+        if validation.validatesRoutingNumberChecksum, !Self.passesABAChecksum(routing) {
+            throw PayabliPayInPaymentFlowTokenStorageError.invalidInput("Routing number failed validation.")
         }
         let trimmedHolderName = holderName.trimmed
         guard !trimmedHolderName.isEmpty else {
-            throw PayabliPayInPaymentFlowTokenStorageError.invalidInput("ACH account holder is required.")
+            throw PayabliPayInPaymentFlowTokenStorageError.invalidInput("Account holder is required.")
         }
-        guard trimmedHolderName.count <= PayabliPayInPaymentFlowInputLimits.maximumACHHolderNameCharacters else {
-            throw PayabliPayInPaymentFlowTokenStorageError.invalidInput("ACH account holder must be 60 characters or fewer.")
+        guard trimmedHolderName.count <= PayabliPayInPaymentFlowInputLimits.maximumAccountHolderNameCharacters else {
+            throw PayabliPayInPaymentFlowTokenStorageError.invalidInput("Account holder must be 60 characters or fewer.")
         }
         let allowed = trimmedHolderName.range(
             of: #"^[A-Za-z0-9 .'\-]+$"#,
             options: .regularExpression
         ) != nil
         guard allowed else {
-            throw PayabliPayInPaymentFlowTokenStorageError.invalidInput("ACH holder contains unsupported characters.")
+            throw PayabliPayInPaymentFlowTokenStorageError.invalidInput("Account holder contains unsupported characters.")
         }
     }
 

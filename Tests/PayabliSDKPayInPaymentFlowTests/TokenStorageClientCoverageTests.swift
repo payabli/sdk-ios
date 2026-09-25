@@ -298,12 +298,12 @@ final class TokenStorageClientCoverageTests: XCTestCase {
             configuration: PayabliPayInPaymentFlowFormConfiguration(
                 allowedMethods: [.bankAccount],
                 defaultMethod: .bankAccount,
-                hiddenValues: PayabliPayInPaymentFlowHiddenValues(achSecCode: nil)
+                hiddenValues: PayabliPayInPaymentFlowHiddenValues(secCode: nil)
             )
         )
-        viewModel.achHolder = "Jane Business"
-        viewModel.achRouting = "123456780"
-        viewModel.achAccount = "1111111111111"
+        viewModel.accountHolder = "Jane Business"
+        viewModel.routingNumber = "123456780"
+        viewModel.accountNumber = "1111111111111"
 
         _ = try await viewModel.submit()
 

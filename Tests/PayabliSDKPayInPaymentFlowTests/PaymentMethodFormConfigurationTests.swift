@@ -154,52 +154,52 @@ final class PaymentMethodFormConfigurationTests: XCTestCase {
         let configuration = PayabliPayInPaymentFlowFormConfiguration(
             allowedMethods: [.bankAccount],
             defaultMethod: .bankAccount,
-            achSections: [
+            bankSections: [
                 PayabliPayInPaymentFlowFieldSection(
                     title: "Hidden",
-                    fields: [.achSecCode]
+                    fields: [.secCode]
                 )
             ]
         )
 
-        XCTAssertEqual(configuration.achSections.count, 2)
-        XCTAssertEqual(configuration.achSections[0].fields, [
-            .achHolder,
-            .achRouting,
-            .achAccount,
-            .achAccountType
+        XCTAssertEqual(configuration.bankSections.count, 2)
+        XCTAssertEqual(configuration.bankSections[0].fields, [
+            .accountHolder,
+            .routingNumber,
+            .accountNumber,
+            .accountType
         ])
-        XCTAssertEqual(configuration.achSections[1].title, "Payment Information")
-        XCTAssertEqual(configuration.achSections[1].fields, [.amount, .serviceFee])
+        XCTAssertEqual(configuration.bankSections[1].title, "Payment Information")
+        XCTAssertEqual(configuration.bankSections[1].fields, [.amount, .serviceFee])
     }
 
     func testFormConfigurationRoutesRequiredACHAndCustomerFieldsToExistingSections() {
         let configuration = PayabliPayInPaymentFlowFormConfiguration(
             allowedMethods: [.bankAccount],
             defaultMethod: .bankAccount,
-            achSections: [
+            bankSections: [
                 PayabliPayInPaymentFlowFieldSection(
                     title: "Customer",
                     fields: [.firstName]
                 ),
                 PayabliPayInPaymentFlowFieldSection(
                     title: "Bank",
-                    fields: [.achHolder]
+                    fields: [.accountHolder]
                 )
             ],
-            requiredFields: [.billingZip, .achDevice]
+            requiredFields: [.billingZip, .deviceId]
         )
 
-        XCTAssertEqual(configuration.achSections[0].fields, [
+        XCTAssertEqual(configuration.bankSections[0].fields, [
             .firstName,
-            .achDevice,
+            .deviceId,
             .billingZip
         ])
-        XCTAssertEqual(configuration.achSections[1].fields, [
-            .achHolder,
-            .achRouting,
-            .achAccount,
-            .achAccountType
+        XCTAssertEqual(configuration.bankSections[1].fields, [
+            .accountHolder,
+            .routingNumber,
+            .accountNumber,
+            .accountType
         ])
     }
 
@@ -337,9 +337,9 @@ final class PaymentMethodFormConfigurationTests: XCTestCase {
         XCTAssertEqual(viewModel.formatCardNumber(String(repeating: "4", count: 25)).digitsOnly.count, 19)
         XCTAssertEqual(viewModel.limitCardCvv("12345"), "1234")
         XCTAssertEqual(viewModel.limitPostalCode("A1A 1A1-EXTRA").count, 12)
-        XCTAssertEqual(viewModel.limitACHHolderName(String(repeating: "A", count: 61)).count, 60)
-        XCTAssertEqual(viewModel.limitACHRouting("1234567890"), "123456789")
-        XCTAssertEqual(viewModel.limitACHAccount(String(repeating: "1", count: 20)).count, 17)
+        XCTAssertEqual(viewModel.limitAccountHolderName(String(repeating: "A", count: 61)).count, 60)
+        XCTAssertEqual(viewModel.limitRoutingNumber("1234567890"), "123456789")
+        XCTAssertEqual(viewModel.limitAccountNumber(String(repeating: "1", count: 20)).count, 17)
 
         viewModel.cardholderName = String(repeating: "A", count: 61)
         XCTAssertEqual(viewModel.cardholderName.count, 60)
@@ -353,14 +353,14 @@ final class PaymentMethodFormConfigurationTests: XCTestCase {
         viewModel.cardZip = "A1A 1A1-EXTRA"
         XCTAssertEqual(viewModel.cardZip.count, 12)
 
-        viewModel.achHolder = String(repeating: "A", count: 61)
-        XCTAssertEqual(viewModel.achHolder.count, 60)
+        viewModel.accountHolder = String(repeating: "A", count: 61)
+        XCTAssertEqual(viewModel.accountHolder.count, 60)
 
-        viewModel.achRouting = "1234567890"
-        XCTAssertEqual(viewModel.achRouting, "123456789")
+        viewModel.routingNumber = "1234567890"
+        XCTAssertEqual(viewModel.routingNumber, "123456789")
 
-        viewModel.achAccount = String(repeating: "1", count: 20)
-        XCTAssertEqual(viewModel.achAccount.count, 17)
+        viewModel.accountNumber = String(repeating: "1", count: 20)
+        XCTAssertEqual(viewModel.accountNumber.count, 17)
 
         viewModel.billingZip = "1234567890123"
         XCTAssertEqual(viewModel.billingZip.count, 12)
@@ -469,7 +469,7 @@ final class PaymentMethodFormConfigurationTests: XCTestCase {
                 allowedMethods: [.bankAccount],
                 defaultMethod: .bankAccount,
                 requiredFields: [
-                    .achDevice,
+                    .deviceId,
                     .methodDescription,
                     .firstName,
                     .lastName,
@@ -479,10 +479,10 @@ final class PaymentMethodFormConfigurationTests: XCTestCase {
                 ]
             )
         )
-        viewModel.achHolder = "Jane Business"
-        viewModel.achRouting = "123456780"
-        viewModel.achAccount = "1111111111"
-        viewModel.achDevice = "terminal-1"
+        viewModel.accountHolder = "Jane Business"
+        viewModel.routingNumber = "123456780"
+        viewModel.accountNumber = "1111111111"
+        viewModel.deviceId = "terminal-1"
         viewModel.methodDescription = "Business account"
         viewModel.firstName = "Jane"
 
@@ -497,11 +497,11 @@ final class PaymentMethodFormConfigurationTests: XCTestCase {
             XCTFail("Wrong error: \(error)")
         }
 
-        XCTAssertEqual(viewModel.achRouting, "")
-        XCTAssertEqual(viewModel.achAccount, "")
+        XCTAssertEqual(viewModel.routingNumber, "")
+        XCTAssertEqual(viewModel.accountNumber, "")
 
-        viewModel.achRouting = "123456780"
-        viewModel.achAccount = "1111111111"
+        viewModel.routingNumber = "123456780"
+        viewModel.accountNumber = "1111111111"
         viewModel.lastName = "Doe"
         viewModel.customerNumber = "cust-1"
         viewModel.billingEmail = "jane@example.com"
@@ -535,12 +535,12 @@ final class PaymentMethodFormConfigurationTests: XCTestCase {
             configuration: PayabliPayInPaymentFlowFormConfiguration(
                 allowedMethods: [.bankAccount],
                 defaultMethod: .bankAccount,
-                requiredFields: [.achHolderType]
+                requiredFields: [.accountHolderType]
             )
         )
-        achViewModel.achHolder = "Jane Business"
-        achViewModel.achRouting = "123456780"
-        achViewModel.achAccount = "1111111111"
+        achViewModel.accountHolder = "Jane Business"
+        achViewModel.routingNumber = "123456780"
+        achViewModel.accountNumber = "1111111111"
 
         XCTAssertTrue(achViewModel.canSubmit)
     }

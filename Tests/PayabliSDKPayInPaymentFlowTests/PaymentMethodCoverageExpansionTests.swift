@@ -13,7 +13,7 @@ final class PaymentMethodCoverageExpansionTests: XCTestCase {
         XCTAssertEqual(PayabliPayInPaymentFlowMethodType.card.id, "card")
         XCTAssertEqual(PayabliPayInPaymentFlowMethodType.card.displayName, "Card")
         XCTAssertEqual(PayabliPayInPaymentFlowMethodType.bankAccount.id, "ach")
-        XCTAssertEqual(PayabliPayInPaymentFlowMethodType.bankAccount.displayName, "ACH")
+        XCTAssertEqual(PayabliPayInPaymentFlowMethodType.bankAccount.displayName, "Bank account")
         XCTAssertEqual(PayabliPayInPaymentFlowCardBrand.visa.id, "visa")
         XCTAssertEqual(PayabliPayInPaymentFlowCardBrand.detect(cardNumber: "1"), .unknown)
         XCTAssertEqual(PayabliPayInAccountType.checking.id, "Checking")
@@ -69,7 +69,7 @@ final class PaymentMethodCoverageExpansionTests: XCTestCase {
             accountType: .checking,
             holderName: "Jane Doe",
             routingNumber: "123456789"
-        ).validate(PayabliPayInPaymentFlowValidation(validatesACHRoutingChecksum: false))
+        ).validate(PayabliPayInPaymentFlowValidation(validatesRoutingNumberChecksum: false))
 
         XCTAssertThrowsError(try PayabliPayInBankAccountData(
             accountNumber: "1111111111",
@@ -81,7 +81,7 @@ final class PaymentMethodCoverageExpansionTests: XCTestCase {
                 XCTFail("Expected invalid input error")
                 return
             }
-            XCTAssertEqual(message, "ACH routing number failed validation.")
+            XCTAssertEqual(message, "Routing number failed validation.")
         }
 
         XCTAssertThrowsError(try PayabliPayInBankAccountData(
@@ -89,12 +89,12 @@ final class PaymentMethodCoverageExpansionTests: XCTestCase {
             accountType: .checking,
             holderName: " ",
             routingNumber: "123456789"
-        ).validate(PayabliPayInPaymentFlowValidation(validatesACHRoutingChecksum: false))) { error in
+        ).validate(PayabliPayInPaymentFlowValidation(validatesRoutingNumberChecksum: false))) { error in
             guard case let PayabliPayInPaymentFlowTokenStorageError.invalidInput(message) = error else {
                 XCTFail("Expected invalid input error")
                 return
             }
-            XCTAssertEqual(message, "ACH account holder is required.")
+            XCTAssertEqual(message, "Account holder is required.")
         }
 
         XCTAssertThrowsError(try PayabliPayInBankAccountData(
@@ -300,7 +300,7 @@ final class PaymentMethodCoverageExpansionTests: XCTestCase {
                 allowedMethods: [.bankAccount],
                 defaultMethod: .bankAccount,
                 requiredFields: [
-                    .achDevice,
+                    .deviceId,
                     .methodDescription,
                     .firstName,
                     .lastName,
@@ -337,13 +337,13 @@ final class PaymentMethodCoverageExpansionTests: XCTestCase {
             configuration: PayabliPayInPaymentFlowFormConfiguration(
                 allowedMethods: [.bankAccount],
                 defaultMethod: .bankAccount,
-                achSections: [
+                bankSections: [
                     PayabliPayInPaymentFlowFieldSection(
                         title: "Bank Information",
-                        fields: [.achHolder, .achRouting, .achAccount, .achAccountType, .achHolderType],
+                        fields: [.accountHolder, .routingNumber, .accountNumber, .accountType, .accountHolderType],
                         inputVerticalSpacing: 2,
                         inputHorizontalSpacing: 4,
-                        fieldVerticalSpacings: [.achHolder: 1]
+                        fieldVerticalSpacings: [.accountHolder: 1]
                     ),
                     PayabliPayInPaymentFlowFieldSection(
                         title: "Customer Information",
@@ -351,11 +351,11 @@ final class PaymentMethodCoverageExpansionTests: XCTestCase {
                     )
                 ],
                 labels: PayabliPayInPaymentFlowLabels(
-                    title: "ACH form",
+                    title: "Bank account form",
                     subtitle: "Collect bank details"
                 ),
                 labelLayout: .placeholder,
-                formatting: PayabliPayInPaymentFlowFormatting(masksACHAccountEntry: false),
+                formatting: PayabliPayInPaymentFlowFormatting(masksAccountNumber: false),
                 requiredFields: [.firstName, .lastName, .billingEmail]
             ),
             onCompleted: { _ in }

@@ -3,7 +3,7 @@ import SwiftUI
 import UIKit
 import XCTest
 
-/// Which keyboards get a Done bar. The card number, CVV and the two ACH fields
+/// Which keyboards get a Done bar. The card number, CVV and the two bank account fields
 /// use a number pad, which has no return key, so without the bar the keyboard
 /// covers the form and nothing on screen takes it back.
 final class PaymentMethodKeyboardAccessoryTests: XCTestCase {
@@ -55,7 +55,7 @@ final class PaymentMethodKeyboardAccessoryTests: XCTestCase {
     /// The form's numeric fields, named, so a field moved off a number pad shows up
     /// here as well as in the sweep above.
     func testTheFormsNumericFieldsAreOnANumberPad() {
-        let numeric: [PayabliPayInPaymentFlowField] = [.cardNumber, .cardCvv, .achRouting, .achAccount]
+        let numeric: [PayabliPayInPaymentFlowField] = [.cardNumber, .cardCvv, .routingNumber, .accountNumber]
         for field in numeric {
             XCTAssertEqual(field.keyboardType, .numberPad, field.rawValue)
         }

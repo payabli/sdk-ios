@@ -244,7 +244,7 @@ class PayabliTTP {
 /// Mirrors `PayabliEnvironment` raw values.
 enum PayabliEnvironment { local, qa, sandbox, production }
 
-/// Dart API for the Payabli card/ACH payment flow surface.
+/// Dart API for the Payabli card and bank account payment flow surface.
 ///
 /// The access token must come from your backend. Do not embed a private
 /// Payabli API key in Flutter code.

@@ -10,7 +10,7 @@
     - PayabliSDKCore.xcframework        (loaded by both capabilities)
     - PayabliSDKTelemetry.xcframework   (loaded by both capabilities)
     - PayabliSDKTapToPay.xcframework    (the bilingual @objc surface)
-    - PayabliSDKPayInPaymentFlow.xcframework (card/ACH payment flow @objc surface)
+    - PayabliSDKPayInPaymentFlow.xcframework (card and bank account payment flow @objc surface)
 
   Place the XCFrameworks alongside this csproj (or override the
   `XcframeworksRoot` property) before `dotnet build`.

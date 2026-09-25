@@ -4,8 +4,8 @@ import PayabliSDKCore
 /// Unified Pay In component for storing payment methods and running v2 MoneyIn
 /// auth/capture flows.
 ///
-/// The component can exchange card or ACH data for a stored payment method, or
-/// send card, ACH, stored-method, cash, check, or cloud-device payment requests
+/// The component can exchange card or bank account data for a stored payment method, or
+/// send card, bank account, stored-method, cash, check, or cloud-device payment requests
 /// to the v2 MoneyIn endpoints. It does not log, persist, or expose raw PAN,
 /// CVV, bank account, or routing values after submission.
 @MainActor
@@ -184,7 +184,7 @@ public final class PayabliPayInPaymentFlow: NSObject, ObservableObject, PayabliC
         return PayabliPayInPaymentFlowResult(storedPaymentMethod: storedPaymentMethod)
     }
 
-    /// Stores card or ACH payment data using `POST /api/TokenStorage/add`.
+    /// Stores card or bank account payment data using `POST /api/TokenStorage/add`.
     public func addPaymentMethod(
         _ paymentMethod: PayabliPayInPaymentFlowMethodInput,
         options: PayabliPayInPaymentFlowTokenStorageOptions = PayabliPayInPaymentFlowTokenStorageOptions()

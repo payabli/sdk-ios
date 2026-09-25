@@ -333,19 +333,19 @@ final class TokenStorageClientTests: XCTestCase {
                 accountType: .checking,
                 holderName: "John Doe",
                 routingNumber: "123456780"
-            ), "ACH account number must be 4 to 17 digits."),
+            ), "Account number must be 4 to 17 digits."),
             (PayabliPayInBankAccountData(
                 accountNumber: "1111111111111",
                 accountType: .checking,
                 holderName: "John Doe",
                 routingNumber: "1234567800"
-            ), "ACH routing number must be 9 digits."),
+            ), "Routing number must be 9 digits."),
             (PayabliPayInBankAccountData(
                 accountNumber: "1111111111111",
                 accountType: .checking,
                 holderName: String(repeating: "A", count: 61),
                 routingNumber: "123456780"
-            ), "ACH account holder must be 60 characters or fewer.")
+            ), "Account holder must be 60 characters or fewer.")
         ]
 
         for (paymentMethod, expectedMessage) in scenarios {
@@ -691,19 +691,19 @@ final class TokenStorageClientTests: XCTestCase {
             configuration: PayabliPayInPaymentFlowFormConfiguration(
                 allowedMethods: [.bankAccount],
                 defaultMethod: .bankAccount,
-                achFieldOrder: [.achHolder, .achRouting, .achAccount, .achAccountType, .achSecCode],
+                bankFieldOrder: [.accountHolder, .routingNumber, .accountNumber, .accountType, .secCode],
                 hiddenValues: PayabliPayInPaymentFlowHiddenValues(
-                    achHolderType: .business,
-                    achSecCode: .ccd
+                    accountHolderType: .business,
+                    secCode: .ccd
                 )
             )
         )
 
-        XCTAssertFalse(viewModel.activeFields.contains(PayabliPayInPaymentFlowField.achSecCode))
+        XCTAssertFalse(viewModel.activeFields.contains(PayabliPayInPaymentFlowField.secCode))
 
-        viewModel.achHolder = "Jane Business"
-        viewModel.achRouting = "123456780"
-        viewModel.achAccount = "1111111111111"
+        viewModel.accountHolder = "Jane Business"
+        viewModel.routingNumber = "123456780"
+        viewModel.accountNumber = "1111111111111"
         XCTAssertTrue(viewModel.canSubmit)
 
         let result = try await viewModel.submit()
@@ -778,10 +778,10 @@ final class TokenStorageClientTests: XCTestCase {
                 defaultMethod: .bankAccount
             )
         )
-        viewModel.achHolder = "Jane Business"
-        viewModel.achRouting = "123456780"
-        viewModel.achAccount = "1111111111111"
-        viewModel.achAccountType = .checking
+        viewModel.accountHolder = "Jane Business"
+        viewModel.routingNumber = "123456780"
+        viewModel.accountNumber = "1111111111111"
+        viewModel.accountType = .checking
 
         do {
             _ = try await viewModel.submit()
@@ -789,10 +789,10 @@ final class TokenStorageClientTests: XCTestCase {
         } catch let PayabliPayInPaymentFlowTokenStorageError.saveFailed(failure) {
             XCTAssertEqual(failure.responseText, "Server Error")
             XCTAssertEqual(viewModel.errorMessage, "Unable to save payment method right now. Please try again.")
-            XCTAssertEqual(viewModel.achHolder, "Jane Business")
-            XCTAssertEqual(viewModel.achRouting, "")
-            XCTAssertEqual(viewModel.achAccount, "")
-            XCTAssertEqual(viewModel.achAccountType, .checking)
+            XCTAssertEqual(viewModel.accountHolder, "Jane Business")
+            XCTAssertEqual(viewModel.routingNumber, "")
+            XCTAssertEqual(viewModel.accountNumber, "")
+            XCTAssertEqual(viewModel.accountType, .checking)
         } catch {
             XCTFail("Wrong error: \(error)")
         }

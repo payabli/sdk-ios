@@ -15,10 +15,10 @@ final class PayabliPayInPaymentFlowViewModel: ObservableObject {
     @Published private var achHolderStorage = ""
     @Published private var achRoutingStorage = ""
     @Published private var achAccountStorage = ""
-    @Published var achAccountType: PayabliPayInAccountType = .checking
-    @Published var achHolderType: PayabliPayInAccountHolderType = .personal
-    @Published var achSecCode: PayabliPayInSecCode = .web
-    @Published var achDevice = ""
+    @Published var accountType: PayabliPayInAccountType = .checking
+    @Published var accountHolderType: PayabliPayInAccountHolderType = .personal
+    @Published var secCode: PayabliPayInSecCode = .web
+    @Published var deviceId = ""
     @Published var methodDescription = ""
     @Published var firstName = ""
     @Published var lastName = ""
@@ -94,19 +94,19 @@ final class PayabliPayInPaymentFlowViewModel: ObservableObject {
         set { cardZipStorage = limitPostalCode(newValue) }
     }
 
-    var achHolder: String {
+    var accountHolder: String {
         get { achHolderStorage }
-        set { achHolderStorage = limitACHHolderName(newValue) }
+        set { achHolderStorage = limitAccountHolderName(newValue) }
     }
 
-    var achRouting: String {
+    var routingNumber: String {
         get { achRoutingStorage }
-        set { achRoutingStorage = limitACHRouting(newValue) }
+        set { achRoutingStorage = limitRoutingNumber(newValue) }
     }
 
-    var achAccount: String {
+    var accountNumber: String {
         get { achAccountStorage }
-        set { achAccountStorage = limitACHAccount(newValue) }
+        set { achAccountStorage = limitAccountNumber(newValue) }
     }
 
     var billingZip: String {
@@ -119,7 +119,7 @@ final class PayabliPayInPaymentFlowViewModel: ObservableObject {
         case .card:
             configuration.cardFieldOrder
         case .bankAccount:
-            configuration.achFieldOrder
+            configuration.bankFieldOrder
         }
 
         guard component.operation == .storePaymentMethod else { return fields }
@@ -189,9 +189,9 @@ final class PayabliPayInPaymentFlowViewModel: ObservableObject {
                 && operationConfigurationIsValid
                 && requiredFieldsAreSatisfied
         case .bankAccount:
-            return fieldHasRequiredValue(.achHolder)
-                && fieldHasRequiredValue(.achRouting)
-                && fieldHasRequiredValue(.achAccount)
+            return fieldHasRequiredValue(.accountHolder)
+                && fieldHasRequiredValue(.routingNumber)
+                && fieldHasRequiredValue(.accountNumber)
                 && operationConfigurationIsValid
                 && requiredFieldsAreSatisfied
         }
@@ -262,16 +262,16 @@ final class PayabliPayInPaymentFlowViewModel: ObservableObject {
         String(value.prefix(PayabliPayInPaymentFlowInputLimits.maximumPostalCodeCharacters))
     }
 
-    func limitACHHolderName(_ value: String) -> String {
-        String(value.prefix(PayabliPayInPaymentFlowInputLimits.maximumACHHolderNameCharacters))
+    func limitAccountHolderName(_ value: String) -> String {
+        String(value.prefix(PayabliPayInPaymentFlowInputLimits.maximumAccountHolderNameCharacters))
     }
 
-    func limitACHRouting(_ value: String) -> String {
-        String(value.payabliCaptureDigitsOnly.prefix(PayabliPayInPaymentFlowInputLimits.achRoutingDigits))
+    func limitRoutingNumber(_ value: String) -> String {
+        String(value.payabliCaptureDigitsOnly.prefix(PayabliPayInPaymentFlowInputLimits.routingNumberDigits))
     }
 
-    func limitACHAccount(_ value: String) -> String {
-        String(value.payabliCaptureDigitsOnly.prefix(PayabliPayInPaymentFlowInputLimits.maximumACHAccountDigits))
+    func limitAccountNumber(_ value: String) -> String {
+        String(value.payabliCaptureDigitsOnly.prefix(PayabliPayInPaymentFlowInputLimits.maximumAccountNumberDigits))
     }
 
     func formatExpiration(_ value: String) -> String {
@@ -369,13 +369,13 @@ final class PayabliPayInPaymentFlowViewModel: ObservableObject {
             ))
         case .bankAccount:
             return .bankAccount(PayabliPayInBankAccountData(
-                accountNumber: achAccount,
-                accountType: achAccountType,
-                holderName: achHolder,
-                routingNumber: achRouting,
-                secCode: configuration.hiddenValues.achSecCode ?? .web,
-                holderType: fieldIsVisible(.achHolderType) ? achHolderType : configuration.hiddenValues.achHolderType,
-                device: fieldIsVisible(.achDevice) ? achDevice : configuration.hiddenValues.achDevice
+                accountNumber: accountNumber,
+                accountType: accountType,
+                holderName: accountHolder,
+                routingNumber: routingNumber,
+                secCode: configuration.hiddenValues.secCode ?? .web,
+                holderType: fieldIsVisible(.accountHolderType) ? accountHolderType : configuration.hiddenValues.accountHolderType,
+                device: fieldIsVisible(.deviceId) ? deviceId : configuration.hiddenValues.deviceId
             ))
         }
     }
@@ -395,13 +395,13 @@ final class PayabliPayInPaymentFlowViewModel: ObservableObject {
         case .bankAccount:
             return .bankAccount(PayabliPayInPaymentMethod.BankAccount(
                 data: PayabliPayInBankAccountData(
-                    accountNumber: achAccount,
-                    accountType: achAccountType,
-                    holderName: achHolder,
-                    routingNumber: achRouting,
-                    secCode: configuration.hiddenValues.achSecCode ?? .web,
-                    holderType: fieldIsVisible(.achHolderType) ? achHolderType : configuration.hiddenValues.achHolderType,
-                    device: fieldIsVisible(.achDevice) ? achDevice : configuration.hiddenValues.achDevice
+                    accountNumber: accountNumber,
+                    accountType: accountType,
+                    holderName: accountHolder,
+                    routingNumber: routingNumber,
+                    secCode: configuration.hiddenValues.secCode ?? .web,
+                    holderType: fieldIsVisible(.accountHolderType) ? accountHolderType : configuration.hiddenValues.accountHolderType,
+                    device: fieldIsVisible(.deviceId) ? deviceId : configuration.hiddenValues.deviceId
                 )
             ))
         }
@@ -468,7 +468,7 @@ final class PayabliPayInPaymentFlowViewModel: ObservableObject {
         switch field {
         case .cardholderName, .cardNumber, .cardExpiration, .cardCvv, .cardZip:
             return cardFieldHasRequiredValue(field)
-        case .achHolder, .achRouting, .achAccount, .achAccountType, .achHolderType, .achSecCode, .achDevice:
+        case .accountHolder, .routingNumber, .accountNumber, .accountType, .accountHolderType, .secCode, .deviceId:
             return achFieldHasRequiredValue(field)
         case .methodDescription, .firstName, .lastName, .customerNumber, .billingEmail, .billingZip:
             return customerFieldHasRequiredValue(field)
@@ -500,22 +500,22 @@ final class PayabliPayInPaymentFlowViewModel: ObservableObject {
 
     private func achFieldHasRequiredValue(_ field: PayabliPayInPaymentFlowField) -> Bool {
         switch field {
-        case .achHolder:
-            return !achHolder.payabliCaptureTrimmed.isEmpty
-        case .achRouting:
-            return achRouting.payabliCaptureDigitsOnly.count == PayabliPayInPaymentFlowInputLimits.achRoutingDigits
-        case .achAccount:
-            return (PayabliPayInPaymentFlowInputLimits.minimumACHAccountDigits ... PayabliPayInPaymentFlowInputLimits
-                .maximumACHAccountDigits)
-                .contains(achAccount.payabliCaptureDigitsOnly.count)
-        case .achAccountType:
+        case .accountHolder:
+            return !accountHolder.payabliCaptureTrimmed.isEmpty
+        case .routingNumber:
+            return routingNumber.payabliCaptureDigitsOnly.count == PayabliPayInPaymentFlowInputLimits.routingNumberDigits
+        case .accountNumber:
+            return (PayabliPayInPaymentFlowInputLimits.minimumAccountNumberDigits ... PayabliPayInPaymentFlowInputLimits
+                .maximumAccountNumberDigits)
+                .contains(accountNumber.payabliCaptureDigitsOnly.count)
+        case .accountType:
             return true
-        case .achHolderType:
-            return fieldIsVisible(.achHolderType) || configuration.hiddenValues.achHolderType != nil
-        case .achSecCode:
+        case .accountHolderType:
+            return fieldIsVisible(.accountHolderType) || configuration.hiddenValues.accountHolderType != nil
+        case .secCode:
             return true
-        case .achDevice:
-            return !achDevice.payabliCaptureTrimmed.isEmpty || configuration.hiddenValues.achDevice?.payabliCaptureTrimmed
+        case .deviceId:
+            return !deviceId.payabliCaptureTrimmed.isEmpty || configuration.hiddenValues.deviceId?.payabliCaptureTrimmed
                 .payabliCaptureNilIfEmpty != nil
         default:
             return true

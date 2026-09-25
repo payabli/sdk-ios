@@ -36,8 +36,8 @@ final class PaymentMethodReseedTests: XCTestCase {
         XCTAssertEqual(viewModel.cardholderName, "Name On Card Test1")
         XCTAssertEqual(viewModel.cardCvv, "999")
         XCTAssertEqual(viewModel.cardZip, "22039")
-        XCTAssertEqual(viewModel.achRouting, "121000248")
-        XCTAssertEqual(viewModel.achAccount, "1234567890")
+        XCTAssertEqual(viewModel.routingNumber, "121000248")
+        XCTAssertEqual(viewModel.accountNumber, "1234567890")
     }
 
     /// An update carrying nothing new does not republish. A host re-renders on
@@ -137,7 +137,7 @@ final class PaymentMethodReseedTests: XCTestCase {
         viewModel.cardNumber = "4111111111111111"
         viewModel.cardCvv = "999"
         viewModel.cardZip = "22039"
-        viewModel.achRouting = "121000248"
-        viewModel.achAccount = "1234567890"
+        viewModel.routingNumber = "121000248"
+        viewModel.accountNumber = "1234567890"
     }
 }
