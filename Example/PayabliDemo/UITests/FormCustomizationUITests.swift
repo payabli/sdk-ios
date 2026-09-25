@@ -123,7 +123,7 @@ final class FormCustomizationLiveUITests: XCTestCase {
             box.typeText(text)
         }
 
-        // The wheel opens on a future month, so accepting it is the whole choice.
+        // The wheel opens on the current month, which is still a valid expiry, so accepting it is the whole choice.
         app.buttons["payabli.payInPaymentFlow.field.cardExpiration"].tap()
         let done = app.buttons["payabli.payInPaymentFlow.control.expirationDone"]
         XCTAssertTrue(done.waitForExistence(timeout: 5), "the expiry picker never opened")
