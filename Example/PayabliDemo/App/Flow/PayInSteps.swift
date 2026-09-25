@@ -32,7 +32,7 @@ enum PayInSteps {
     static func forStoringMethod(_ progress: PayInProgress) -> PayInFlowSteps {
         steps(
             progress,
-            formTitle: "Enter the card or ACH details",
+            formTitle: "Enter the card or bank account details",
             resultTitle: "Stored method",
             resultDetail: "A successful submit returns a reusable stored-method id."
         )

@@ -79,7 +79,7 @@ let stored = try await paymentFlow.addCard(PayabliPayInPaymentFlowCardData(
 ))
 ```
 
-Direct card/ACH calls are PCI-sensitive because the host app supplies the data.
+Direct card/bank account calls are PCI-sensitive because the host app supplies the data.
 
 ## 4. Store A Payment Method
 
@@ -130,7 +130,7 @@ Button("Add Payment Method") {
     configuration: storeConfiguration,
     sheetConfiguration: PayabliPayInPaymentFlowSheetConfiguration(
         title: "Add Payment Method",
-        subtitle: "Card or ACH",
+        subtitle: "Card or bank account",
         dismissButton: .close
     ),
     style: payabliStyle,
@@ -166,7 +166,7 @@ let storedCard = try await paymentFlow.addCard(
 )
 ```
 
-Direct stored ACH:
+Direct stored bank account:
 
 ```swift
 let storedBankAccount = try await paymentFlow.addBankAccount(
@@ -224,7 +224,7 @@ PayabliPayInPaymentFlowView(
 )
 ```
 
-The hosted capture form can collect card or ACH. The read-only payment summary
+The hosted capture form can collect card or bank account. The read-only payment summary
 is displayed before the submit button and is derived from
 `requestConfiguration.paymentDetails`.
 
@@ -377,7 +377,7 @@ This configuration creates:
 - separate `Customer Information` and `Payment Information` sections
 - read-only amount and fee rows
 - visible card brand icons
-- hidden ACH SEC code and holder type defaults
+- hidden SEC code and holder type defaults
 
 ```swift
 let placeholderFields: [PayabliPayInPaymentFlowField] = [
@@ -430,10 +430,10 @@ let configuration = PayabliPayInPaymentFlowFormConfiguration(
             inputVerticalSpacing: 6
         )
     ],
-    achSections: [
+    bankSections: [
         PayabliPayInPaymentFlowFieldSection(
             title: "Bank Information",
-            fields: [.achHolder, .achRouting, .achAccount, .achAccountType],
+            fields: [.accountHolder, .routingNumber, .accountNumber, .accountType],
             inputVerticalSpacing: 8,
             inputHorizontalSpacing: 8
         ),
@@ -447,8 +447,8 @@ let configuration = PayabliPayInPaymentFlowFormConfiguration(
         )
     ],
     hiddenValues: PayabliPayInPaymentFlowHiddenValues(
-        achHolderType: .personal,
-        achSecCode: .web,
+        accountHolderType: .personal,
+        secCode: .web,
         methodDescription: "iOS payment flow"
     ),
     options: PayabliPayInPaymentFlowOptions(
@@ -463,7 +463,7 @@ let configuration = PayabliPayInPaymentFlowFormConfiguration(
     formatting: PayabliPayInPaymentFlowFormatting(
         insertsCardNumberSpaces: true,
         expirationSeparator: "/",
-        masksACHAccountEntry: true
+        masksAccountNumber: true
     ),
     inputSizing: PayabliPayInPaymentFlowInputSizing(
         defaultSize: PayabliPayInPaymentFlowInputSize(height: 52, horizontalPadding: 14),
@@ -493,16 +493,16 @@ let configuration = PayabliPayInPaymentFlowFormConfiguration(
 | `allowedMethods` | `[.card, .bankAccount]` | Methods available in the hosted method selector. |
 | `defaultMethod` | `.card` | Initial selected method. If not allowed, the first allowed method is used. |
 | `cardFieldOrder` | cardholder, number, expiration, CVV, postal code | Flat card order used when `cardSections` is nil. |
-| `achFieldOrder` | holder, routing, account, account type, holder type | Flat ACH order used when `achSections` is nil. |
+| `bankFieldOrder` | holder, routing, account, account type, holder type | Flat bank account order used when `bankSections` is nil. |
 | `cardSections` | nil | Custom card sections. Required and payment summary fields are appended if missing. |
-| `achSections` | nil | Custom ACH sections. `achSecCode` is not rendered. Required and payment summary fields are appended if missing. |
+| `bankSections` | nil | Custom bank account sections. `secCode` is not rendered. Required and payment summary fields are appended if missing. |
 | `hiddenValues` | default hidden values | Non-editable values submitted with the hosted form. |
 | `options` | empty options | Token-storage options for hosted `.storePaymentMethod`. |
 | `labels` | default labels | Title, subtitle, submit text, labels, placeholders. |
 | `labelLayout` | `.external` | `.external` for visible labels, `.placeholder` for placeholder-first UI. |
 | `showsFieldLabels` | nil | Optional global visible-label override. Nil follows `labelLayout`. |
 | `hiddenFieldLabels` | `[]` | Hide visible labels for specific fields. Accessibility labels remain. |
-| `formatting` | default formatting | Card spacing, expiration separator, ACH account masking. |
+| `formatting` | default formatting | Card spacing, expiration separator, account number masking. |
 | `inputSizing` | default input sizing | Default and per-field input sizes. |
 | `cardBrandIconPlacement` | `.trailing` | `.leading`, `.trailing`, or `.hidden`. |
 | `errorMessagePlacement` | `.aboveSubmitButton` | `.top` or `.aboveSubmitButton`. |
@@ -540,13 +540,13 @@ Default field labels:
 | `.cardExpiration` | Expiration |
 | `.cardCvv` | CVV |
 | `.cardZip` | Postal Code |
-| `.achHolder` | Account holder |
-| `.achRouting` | Routing number |
-| `.achAccount` | Account number |
-| `.achAccountType` | Account type |
-| `.achHolderType` | Holder type |
-| `.achSecCode` | SEC code |
-| `.achDevice` | Device |
+| `.accountHolder` | Account holder |
+| `.routingNumber` | Routing number |
+| `.accountNumber` | Account number |
+| `.accountType` | Account type |
+| `.accountHolderType` | Holder type |
+| `.secCode` | SEC code |
+| `.deviceId` | Device |
 | `.methodDescription` | Description |
 | `.firstName` | First name |
 | `.lastName` | Last name |
@@ -560,9 +560,9 @@ Default field labels:
 
 | Field | Default | Description |
 | --- | --- | --- |
-| `achHolderType` | nil | ACH holder type submitted without rendering the field. |
-| `achSecCode` | `.web` | ACH SEC code submitted without rendering the field. |
-| `achDevice` | nil | ACH device value submitted without rendering the field. |
+| `accountHolderType` | nil | account holder type submitted without rendering the field. |
+| `secCode` | `.web` | SEC code submitted without rendering the field. |
+| `deviceId` | nil | device ID submitted without rendering the field. |
 | `methodDescription` | nil | Stored-method description submitted without rendering the field. |
 | `customerData` | nil | Default customer data merged with visible customer fields. |
 
@@ -572,7 +572,7 @@ Default field labels:
 | --- | --- | --- |
 | `insertsCardNumberSpaces` | true | Adds visual card number grouping. |
 | `expirationSeparator` | `/` | Expiration separator. Empty resolves to `/`. |
-| `masksACHAccountEntry` | true | Masks ACH account input. |
+| `masksAccountNumber` | true | Masks account number input. |
 
 ### `PayabliPayInPaymentFlowInputSizing`
 
@@ -814,7 +814,7 @@ Fields:
 | Field | Default | Description |
 | --- | --- | --- |
 | `requiresLuhnCheck` | true | Runs client-side Luhn validation for cards. |
-| `validatesACHRoutingChecksum` | true | Runs client-side ACH routing checksum validation. |
+| `validatesRoutingNumberChecksum` | true | Runs client-side routing number checksum validation. |
 
 ## 14. Result Handling
 
@@ -915,8 +915,7 @@ Diagnostic entries include:
 - `errorDescription`
 
 The SDK redacts sensitive fields, including authorization headers, request
-tokens, access tokens, client secrets, card number, CVV, ACH account, ACH
-routing, stored method IDs, customer IDs, names, emails, phones, and addresses.
+tokens, access tokens, client secrets, card number, CVV, account number, routing, stored method IDs, customer IDs, names, emails, phones, and addresses.
 
 ## 16. Accessibility Checklist
 
@@ -924,7 +923,7 @@ When customizing:
 
 - Keep input and submit heights at or above the SDK minimum touch target.
 - If visual labels are hidden, keep `fieldLabels` meaningful for accessibility.
-- Do not put clear PAN, CVV, ACH account, routing number, tokens, or customer
+- Do not put clear PAN, CVV, account number, routing number, tokens, or customer
   contact values in custom labels, placeholders, diagnostics, or result UI.
 - Keep section titles concise and meaningful.
 - Test Dynamic Type, especially accessibility sizes.
@@ -932,7 +931,7 @@ When customizing:
 
 ## 17. Bridge Scope
 
-Flutter, React Native, and .NET MAUI bridges currently expose stored card/ACH
+Flutter, React Native, and .NET MAUI bridges currently expose stored card/bank account
 payment-method creation. Native Swift integrations should call
 `PayabliSDKPayInPaymentFlow` directly for capture, authorize, capture-authorized
 and void transaction flows until those request models are added to the bridge

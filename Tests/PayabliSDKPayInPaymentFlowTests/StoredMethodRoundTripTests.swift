@@ -33,9 +33,9 @@ final class StoredMethodRoundTripTests: XCTestCase {
             component: component,
             configuration: PayabliPayInPaymentFlowFormConfiguration(allowedMethods: [.bankAccount], defaultMethod: .bankAccount)
         )
-        viewModel.achHolder = "Jane Doe"
-        viewModel.achRouting = "123456780"
-        viewModel.achAccount = "1111111111111"
+        viewModel.accountHolder = "Jane Doe"
+        viewModel.routingNumber = "123456780"
+        viewModel.accountNumber = "1111111111111"
 
         let submitted = try await viewModel.submit()
         let stored = try XCTUnwrap(submitted.storedPaymentMethod)

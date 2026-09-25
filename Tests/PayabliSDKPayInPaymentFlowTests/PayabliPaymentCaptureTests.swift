@@ -153,7 +153,7 @@ final class PayabliPayInPaymentFlowTests: XCTestCase {
         XCTAssertEqual(viewModel.availableMethods, [.card])
         XCTAssertEqual(viewModel.effectiveSelectedMethod, .card)
         XCTAssertTrue(viewModel.activeFields.contains(.cardNumber))
-        XCTAssertFalse(viewModel.activeFields.contains(.achAccount))
+        XCTAssertFalse(viewModel.activeFields.contains(.accountNumber))
     }
 
     func testViewModelUpdateReconcilesChangedComponentOperationAndConfiguration() {

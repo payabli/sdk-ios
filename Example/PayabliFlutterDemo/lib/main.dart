@@ -407,7 +407,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ]),
           const SizedBox(height: 16),
-          _section('ACH payment flow', [
+          _section('Bank account payment flow', [
             TextField(
               controller: _achAccountController,
               keyboardType: TextInputType.number,
@@ -437,7 +437,7 @@ class _HomeScreenState extends State<HomeScreen> {
             FilledButton(
               onPressed: _isSubmittingPayInPaymentFlow ? null : _runAddBankAccount,
               child:
-                  Text(_isSubmittingPayInPaymentFlow ? 'Saving…' : 'Add ACH'),
+                  Text(_isSubmittingPayInPaymentFlow ? 'Saving…' : 'Add bank account'),
             ),
           ]),
           const SizedBox(height: 16),

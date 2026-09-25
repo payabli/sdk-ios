@@ -30,7 +30,7 @@ enum PayInForms {
                 allowedMethods: PayInSharedConfiguration.allowedMethods,
                 defaultMethod: PayInSharedConfiguration.defaultMethod,
                 cardFieldOrder: PayInSharedConfiguration.cardFieldOrder,
-                achFieldOrder: PayInSharedConfiguration.achFieldOrder,
+                bankFieldOrder: PayInSharedConfiguration.bankFieldOrder,
                 cardSections: [
                     sectionTitled("Card Information", fields: [
                         .cardholderName,
@@ -41,18 +41,18 @@ enum PayInForms {
                     ]),
                     sectionTitled("Customer Information", fields: storedMethodCustomerFields)
                 ],
-                achSections: [
+                bankSections: [
                     sectionTitled("Bank Information", fields: [
-                        .achHolder,
-                        .achRouting,
-                        .achAccount,
-                        .achAccountType
+                        .accountHolder,
+                        .routingNumber,
+                        .accountNumber,
+                        .accountType
                     ]),
                     sectionTitled("Customer Information", fields: storedMethodCustomerFields)
                 ],
                 hiddenValues: PayabliPayInPaymentFlowHiddenValues(
-                    achHolderType: .personal,
-                    achSecCode: .web,
+                    accountHolderType: .personal,
+                    secCode: .web,
                     methodDescription: QAIdentity.current.note("save")
                 ),
                 options: PayabliPayInPaymentFlowOptions(
@@ -66,7 +66,7 @@ enum PayInForms {
                 ),
                 labels: PayabliPayInPaymentFlowLabels(
                     title: "Save Payment Method",
-                    subtitle: "Create a card or ACH token.",
+                    subtitle: "Create a card or bank account token.",
                     fieldPlaceholders: placeholders
                 ),
                 labelLayout: PayInSharedConfiguration.labelLayout,
@@ -89,7 +89,7 @@ enum PayInForms {
                 allowedMethods: PayInSharedConfiguration.allowedMethods,
                 defaultMethod: PayInSharedConfiguration.defaultMethod,
                 cardFieldOrder: PayInSharedConfiguration.cardFieldOrder,
-                achFieldOrder: PayInSharedConfiguration.achFieldOrder,
+                bankFieldOrder: PayInSharedConfiguration.bankFieldOrder,
                 cardSections: [
                     sectionTitled("Card Information", fields: [
                         .cardholderName,
@@ -101,19 +101,19 @@ enum PayInForms {
                     sectionTitled("Customer Information", fields: captureCustomerFields),
                     sectionTitled("Payment Information", fields: [.amount, .serviceFee])
                 ],
-                achSections: [
+                bankSections: [
                     sectionTitled("Bank Information", fields: [
-                        .achHolder,
-                        .achRouting,
-                        .achAccount,
-                        .achAccountType
+                        .accountHolder,
+                        .routingNumber,
+                        .accountNumber,
+                        .accountType
                     ]),
                     sectionTitled("Customer Information", fields: captureCustomerFields),
                     sectionTitled("Payment Information", fields: [.amount, .serviceFee])
                 ],
                 hiddenValues: PayabliPayInPaymentFlowHiddenValues(
-                    achHolderType: .personal,
-                    achSecCode: .web,
+                    accountHolderType: .personal,
+                    secCode: .web,
                     // What a transaction list shows as the note, and what names the device that sent it. Here
                     // rather than only on the request configuration because this value wins over that one: the
                     // component merges the form's description over the request's before it sends.
@@ -121,7 +121,7 @@ enum PayInForms {
                 ),
                 labels: PayabliPayInPaymentFlowLabels(
                     title: "Payment Capture",
-                    subtitle: "Submit a card or ACH payment.",
+                    subtitle: "Submit a card or bank account payment.",
                     submitButton: "Submit Payment",
                     fieldPlaceholders: placeholders
                 ),

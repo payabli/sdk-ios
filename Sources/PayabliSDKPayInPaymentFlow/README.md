@@ -1,10 +1,10 @@
 # PayabliSDKPayInPaymentFlow
 
-`PayabliSDKPayInPaymentFlow` is the unified PayIn component for iOS card and ACH flows.
+`PayabliSDKPayInPaymentFlow` is the unified PayIn component for iOS card and bank account flows.
 
 Use it to:
 
-- store card or ACH payment methods with `/api/TokenStorage/add`
+- store card or bank account payment methods with `/api/TokenStorage/add`
 - capture or authorize MoneyIn v2 transactions
 - capture a prior authorization by transaction ID
 - reverse a transaction by transaction ID
@@ -86,8 +86,8 @@ Use `.payabliPayInPaymentFlowSheet(...)` for the sheet presentation. It renders 
 `PayabliPayInPaymentFlowFormConfiguration` controls displayed fields and behavior:
 
 - `allowedMethods` and `defaultMethod`
-- `cardFieldOrder`, `achFieldOrder`
-- `cardSections`, `achSections`
+- `cardFieldOrder`, `bankFieldOrder`
+- `cardSections`, `bankSections`
 - `hiddenValues`
 - `options`
 - `labels`
@@ -140,7 +140,7 @@ The form is built for standard iOS accessibility checks:
 
 - minimum 44 pt touch targets
 - accessible labels even when visible labels are hidden
-- secure accessibility values for card number, CVV, ACH account, and ACH routing fields
+- secure accessibility values for card number, CVV, account number, and routing number fields
 - card-number validation announcements
 - stable accessibility identifiers via `PayabliPayInPaymentFlowAccessibility.fieldIdentifier(_:)`
 - Dynamic Type support, including unpairing horizontal fields at accessibility sizes

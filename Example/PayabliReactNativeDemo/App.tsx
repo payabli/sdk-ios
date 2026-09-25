@@ -141,7 +141,7 @@ export default function App() {
   };
 
   const addBankAccount = async () => {
-    await run("Add ACH", async () => {
+    await run("Add bank account", async () => {
       const stored = await PayabliPayInPaymentFlow.addBankAccount({
         accountNumber: achAccount,
         accountType: "Checking",
@@ -222,11 +222,11 @@ export default function App() {
           <ActionButton title="Add Card" disabled={isWorking || !configured} onPress={addCard} />
         </Section>
 
-        <Section title="ACH PayIn Flow">
+        <Section title="Bank account PayIn Flow">
           <TextInput value={achAccount} onChangeText={setAchAccount} keyboardType="number-pad" placeholder="Account number" secureTextEntry style={styles.input} />
           <TextInput value={achRouting} onChangeText={setAchRouting} keyboardType="number-pad" placeholder="Routing number" style={styles.input} />
           <TextInput value={achHolder} onChangeText={setAchHolder} placeholder="Account holder" style={styles.input} />
-          <ActionButton title="Add ACH" disabled={isWorking || !configured} onPress={addBankAccount} />
+          <ActionButton title="Add bank account" disabled={isWorking || !configured} onPress={addBankAccount} />
           <Text style={styles.resultText}>{payInResult}</Text>
         </Section>
 

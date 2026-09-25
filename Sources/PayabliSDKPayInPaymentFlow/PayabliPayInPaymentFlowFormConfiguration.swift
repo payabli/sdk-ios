@@ -7,13 +7,13 @@ public enum PayabliPayInPaymentFlowField: String, CaseIterable, Identifiable, Se
     case cardExpiration
     case cardCvv
     case cardZip
-    case achHolder
-    case achRouting
-    case achAccount
-    case achAccountType
-    case achHolderType
-    case achSecCode
-    case achDevice
+    case accountHolder
+    case routingNumber
+    case accountNumber
+    case accountType
+    case accountHolderType
+    case secCode
+    case deviceId
     case methodDescription
     case firstName
     case lastName
@@ -51,36 +51,36 @@ public enum PayabliPayInPaymentFlowErrorMessagePlacement: Sendable, Equatable {
 public struct PayabliPayInPaymentFlowFormatting: Sendable {
     public let insertsCardNumberSpaces: Bool
     public let expirationSeparator: String
-    public let masksACHAccountEntry: Bool
+    public let masksAccountNumber: Bool
 
     public init(
         insertsCardNumberSpaces: Bool = true,
         expirationSeparator: String = "/",
-        masksACHAccountEntry: Bool = true
+        masksAccountNumber: Bool = true
     ) {
         self.insertsCardNumberSpaces = insertsCardNumberSpaces
         self.expirationSeparator = expirationSeparator.isEmpty ? "/" : expirationSeparator
-        self.masksACHAccountEntry = masksACHAccountEntry
+        self.masksAccountNumber = masksAccountNumber
     }
 }
 
 public struct PayabliPayInPaymentFlowHiddenValues: Sendable {
-    public let achHolderType: PayabliPayInAccountHolderType?
-    public let achSecCode: PayabliPayInSecCode?
-    public let achDevice: String?
+    public let accountHolderType: PayabliPayInAccountHolderType?
+    public let secCode: PayabliPayInSecCode?
+    public let deviceId: String?
     public let methodDescription: String?
     public let customerData: PayabliPayInPaymentFlowCustomerData?
 
     public init(
-        achHolderType: PayabliPayInAccountHolderType? = nil,
-        achSecCode: PayabliPayInSecCode? = .web,
-        achDevice: String? = nil,
+        accountHolderType: PayabliPayInAccountHolderType? = nil,
+        secCode: PayabliPayInSecCode? = .web,
+        deviceId: String? = nil,
         methodDescription: String? = nil,
         customerData: PayabliPayInPaymentFlowCustomerData? = nil
     ) {
-        self.achHolderType = achHolderType
-        self.achSecCode = achSecCode
-        self.achDevice = achDevice
+        self.accountHolderType = accountHolderType
+        self.secCode = secCode
+        self.deviceId = deviceId
         self.methodDescription = methodDescription
         self.customerData = customerData
     }
@@ -139,13 +139,13 @@ public struct PayabliPayInPaymentFlowLabels: Sendable {
         .cardExpiration: "Expiration",
         .cardCvv: "CVV",
         .cardZip: "Postal Code",
-        .achHolder: "Account holder",
-        .achRouting: "Routing number",
-        .achAccount: "Account number",
-        .achAccountType: "Account type",
-        .achHolderType: "Holder type",
-        .achSecCode: "SEC code",
-        .achDevice: "Device",
+        .accountHolder: "Account holder",
+        .routingNumber: "Routing number",
+        .accountNumber: "Account number",
+        .accountType: "Account type",
+        .accountHolderType: "Holder type",
+        .secCode: "SEC code",
+        .deviceId: "Device",
         .methodDescription: "Description",
         .firstName: "First name",
         .lastName: "Last name",
@@ -333,7 +333,7 @@ public struct PayabliPayInPaymentFlowFormConfiguration: Sendable {
     public let allowedMethods: [PayabliPayInPaymentFlowMethodType]
     public let defaultMethod: PayabliPayInPaymentFlowMethodType
     public let cardFieldOrder: [PayabliPayInPaymentFlowField]
-    public let achFieldOrder: [PayabliPayInPaymentFlowField]
+    public let bankFieldOrder: [PayabliPayInPaymentFlowField]
     public let hiddenValues: PayabliPayInPaymentFlowHiddenValues
     public let options: PayabliPayInPaymentFlowOptions
     public let labels: PayabliPayInPaymentFlowLabels
@@ -346,16 +346,16 @@ public struct PayabliPayInPaymentFlowFormConfiguration: Sendable {
     public let errorMessagePlacement: PayabliPayInPaymentFlowErrorMessagePlacement
     public let requiredFields: Set<PayabliPayInPaymentFlowField>
     public let cardSections: [PayabliPayInPaymentFlowFieldSection]
-    public let achSections: [PayabliPayInPaymentFlowFieldSection]
+    public let bankSections: [PayabliPayInPaymentFlowFieldSection]
     public let paymentSummary: PayabliPayInPaymentFlowPaymentSummaryConfiguration
 
     public init(
         allowedMethods: [PayabliPayInPaymentFlowMethodType] = [.card, .bankAccount],
         defaultMethod: PayabliPayInPaymentFlowMethodType = .card,
         cardFieldOrder: [PayabliPayInPaymentFlowField] = Self.defaultCardFieldOrder,
-        achFieldOrder: [PayabliPayInPaymentFlowField] = Self.defaultACHFieldOrder,
+        bankFieldOrder: [PayabliPayInPaymentFlowField] = Self.defaultBankFieldOrder,
         cardSections: [PayabliPayInPaymentFlowFieldSection]? = nil,
-        achSections: [PayabliPayInPaymentFlowFieldSection]? = nil,
+        bankSections: [PayabliPayInPaymentFlowFieldSection]? = nil,
         hiddenValues: PayabliPayInPaymentFlowHiddenValues = PayabliPayInPaymentFlowHiddenValues(),
         options: PayabliPayInPaymentFlowOptions = PayabliPayInPaymentFlowOptions(),
         labels: PayabliPayInPaymentFlowLabels = PayabliPayInPaymentFlowLabels(),
@@ -372,26 +372,26 @@ public struct PayabliPayInPaymentFlowFormConfiguration: Sendable {
         let methods = allowedMethods.isEmpty ? [defaultMethod] : allowedMethods
         let visibleRequiredFields = Self.visibleRequiredFields(from: requiredFields)
         let requiredCardFields = Self.requiredCardFields + Self.cardRequiredFields(from: visibleRequiredFields)
-        let requiredACHFields = Self.requiredACHFields + Self.achRequiredFields(from: visibleRequiredFields)
+        let requiredBankFields = Self.requiredBankFields + Self.bankRequiredFields(from: visibleRequiredFields)
         let normalizedCardSections = Self.normalizedSections(
             cardSections,
             defaultSections: Self.defaultCardSections(cardFieldOrder: cardFieldOrder),
             required: requiredCardFields,
             appendedFields: Self.paymentDetailFields
         )
-        let normalizedACHSections = Self.normalizedSections(
-            achSections,
-            defaultSections: Self.defaultACHSections(achFieldOrder: achFieldOrder),
-            required: requiredACHFields,
+        let normalizedBankSections = Self.normalizedSections(
+            bankSections,
+            defaultSections: Self.defaultBankSections(bankFieldOrder: bankFieldOrder),
+            required: requiredBankFields,
             appendedFields: Self.paymentDetailFields,
-            hiddenFields: [.achSecCode]
+            hiddenFields: [.secCode]
         )
         self.allowedMethods = methods
         self.defaultMethod = methods.contains(defaultMethod) ? defaultMethod : methods[0]
         self.cardFieldOrder = normalizedCardSections.flatMap(\.fields)
-        self.achFieldOrder = normalizedACHSections.flatMap(\.fields)
+        self.bankFieldOrder = normalizedBankSections.flatMap(\.fields)
         self.cardSections = normalizedCardSections
-        self.achSections = normalizedACHSections
+        self.bankSections = normalizedBankSections
         self.hiddenValues = hiddenValues
         self.options = options
         self.labels = labels
@@ -414,12 +414,12 @@ public struct PayabliPayInPaymentFlowFormConfiguration: Sendable {
         .cardZip
     ]
 
-    public static let defaultACHFieldOrder: [PayabliPayInPaymentFlowField] = [
-        .achHolder,
-        .achRouting,
-        .achAccount,
-        .achAccountType,
-        .achHolderType
+    public static let defaultBankFieldOrder: [PayabliPayInPaymentFlowField] = [
+        .accountHolder,
+        .routingNumber,
+        .accountNumber,
+        .accountType,
+        .accountHolderType
     ]
 
     private static let requiredCardFields: [PayabliPayInPaymentFlowField] = [
@@ -431,11 +431,11 @@ public struct PayabliPayInPaymentFlowFormConfiguration: Sendable {
         .amount
     ]
 
-    private static let requiredACHFields: [PayabliPayInPaymentFlowField] = [
-        .achHolder,
-        .achRouting,
-        .achAccount,
-        .achAccountType,
+    private static let requiredBankFields: [PayabliPayInPaymentFlowField] = [
+        .accountHolder,
+        .routingNumber,
+        .accountNumber,
+        .accountType,
         .amount
     ]
 
@@ -451,11 +451,11 @@ public struct PayabliPayInPaymentFlowFormConfiguration: Sendable {
         ]
     }
 
-    private static func defaultACHSections(
-        achFieldOrder: [PayabliPayInPaymentFlowField]
+    private static func defaultBankSections(
+        bankFieldOrder: [PayabliPayInPaymentFlowField]
     ) -> [PayabliPayInPaymentFlowFieldSection] {
         [
-            PayabliPayInPaymentFlowFieldSection(fields: visibleACHFields(from: achFieldOrder)),
+            PayabliPayInPaymentFlowFieldSection(fields: visibleBankFields(from: bankFieldOrder)),
             PayabliPayInPaymentFlowFieldSection(title: "Payment Information", fields: paymentDetailFields)
         ]
     }
@@ -509,9 +509,9 @@ public struct PayabliPayInPaymentFlowFormConfiguration: Sendable {
             sections.lastIndex { section in
                 section.fields.contains { customerFields.contains($0) }
             } ?? sections.index(before: sections.endIndex)
-        } else if defaultACHFieldOrder.contains(field) {
+        } else if defaultBankFieldOrder.contains(field) {
             sections.firstIndex { section in
-                section.fields.contains { defaultACHFieldOrder.contains($0) }
+                section.fields.contains { defaultBankFieldOrder.contains($0) }
             } ?? sections.startIndex
         } else {
             sections.firstIndex { section in
@@ -523,16 +523,16 @@ public struct PayabliPayInPaymentFlowFormConfiguration: Sendable {
         sections[targetIndex] = section.replacingFields(section.fields + [field])
     }
 
-    private static func visibleACHFields(
+    private static func visibleBankFields(
         from fields: [PayabliPayInPaymentFlowField]
     ) -> [PayabliPayInPaymentFlowField] {
-        fields.filter { $0 != .achSecCode }
+        fields.filter { $0 != .secCode }
     }
 
     private static func visibleRequiredFields(
         from fields: Set<PayabliPayInPaymentFlowField>
     ) -> Set<PayabliPayInPaymentFlowField> {
-        fields.subtracting([.achSecCode])
+        fields.subtracting([.secCode])
     }
 
     private static func cardRequiredFields(
@@ -542,10 +542,10 @@ public struct PayabliPayInPaymentFlowFormConfiguration: Sendable {
         return PayabliPayInPaymentFlowField.allCases.filter { fields.contains($0) && supported.contains($0) }
     }
 
-    private static func achRequiredFields(
+    private static func bankRequiredFields(
         from fields: Set<PayabliPayInPaymentFlowField>
     ) -> [PayabliPayInPaymentFlowField] {
-        let supported = Set(defaultACHFieldOrder + [.achDevice] + customerFields + paymentDetailFields)
+        let supported = Set(defaultBankFieldOrder + [.deviceId] + customerFields + paymentDetailFields)
         return PayabliPayInPaymentFlowField.allCases.filter { fields.contains($0) && supported.contains($0) }
     }
 
@@ -563,9 +563,9 @@ public struct PayabliPayInPaymentFlowFormConfiguration: Sendable {
             allowedMethods: allowedMethods,
             defaultMethod: defaultMethod,
             cardFieldOrder: cardFieldOrder,
-            achFieldOrder: achFieldOrder,
+            bankFieldOrder: bankFieldOrder,
             cardSections: cardSections,
-            achSections: achSections,
+            bankSections: bankSections,
             hiddenValues: hiddenValues,
             options: options,
             labels: labels,

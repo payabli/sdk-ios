@@ -440,7 +440,7 @@ public final class PayabliSDKModule: RCTEventEmitter {
               let holderName = params["holderName"] as? String,
               let routingNumber = params["routingNumber"] as? String
         else {
-            reject("INVALID_ARGS", "Missing required ACH fields", nil)
+            reject("INVALID_ARGS", "Missing required bank account fields", nil)
             return
         }
 

@@ -2,14 +2,14 @@ import Foundation
 
 public struct PayabliPayInPaymentFlowValidation: Sendable {
     public var requiresLuhnCheck: Bool
-    public var validatesACHRoutingChecksum: Bool
+    public var validatesRoutingNumberChecksum: Bool
 
     public init(
         requiresLuhnCheck: Bool = true,
-        validatesACHRoutingChecksum: Bool = true
+        validatesRoutingNumberChecksum: Bool = true
     ) {
         self.requiresLuhnCheck = requiresLuhnCheck
-        self.validatesACHRoutingChecksum = validatesACHRoutingChecksum
+        self.validatesRoutingNumberChecksum = validatesRoutingNumberChecksum
     }
 
     public static let `default` = PayabliPayInPaymentFlowValidation()
@@ -17,6 +17,6 @@ public struct PayabliPayInPaymentFlowValidation: Sendable {
 
 extension PayabliPayInPaymentFlowValidation {
     var payabliViewModelSignature: String {
-        "luhn:\(requiresLuhnCheck),achRouting:\(validatesACHRoutingChecksum)"
+        "luhn:\(requiresLuhnCheck),routingNumber:\(validatesRoutingNumberChecksum)"
     }
 }

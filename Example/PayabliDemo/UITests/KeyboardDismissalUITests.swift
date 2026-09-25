@@ -26,7 +26,7 @@ final class KeyboardDismissalUITests: XCTestCase {
     /// A `UITextField` keeps first responder when Return is pressed unless its
     /// delegate gives it up, so this is the fields that carry no accessory.
     func testReturnDismissesTheKeyboardOnAFieldThatHasOne() {
-        let name = app.textFields["payabli.payInPaymentFlow.field.cardholderName"]
+        let name = app.textFields["payabli.payIn.field.cardholderName"]
         XCTAssertTrue(name.waitForExistence(timeout: 10), "the cardholder field never appeared")
         name.tap()
         XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 10), "no keyboard was raised")
@@ -42,7 +42,7 @@ final class KeyboardDismissalUITests: XCTestCase {
     /// Attached rather than asserted: what a number pad looks like with the
     /// accessory attached is a rendering question, and this is the answer to it.
     func testWhatTheNumberPadShows() {
-        let cardNumber = app.textFields["payabli.payInPaymentFlow.field.cardNumber"]
+        let cardNumber = app.textFields["payabli.payIn.field.cardNumber"]
         XCTAssertTrue(cardNumber.waitForExistence(timeout: 10), "the card number field never appeared")
         cardNumber.tap()
         XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 10), "no keyboard was raised")
@@ -64,7 +64,7 @@ final class KeyboardDismissalUITests: XCTestCase {
         app.tabBars.buttons["Save"].tap()
         app.buttons["Check token endpoint"].tap()
 
-        let cardholder = app.textFields["payabli.payInPaymentFlow.field.cardholderName"]
+        let cardholder = app.textFields["payabli.payIn.field.cardholderName"]
         guard cardholder.waitForExistence(timeout: 15) else {
             throw XCTSkip("the token server answered nothing, so the form stayed blocked")
         }

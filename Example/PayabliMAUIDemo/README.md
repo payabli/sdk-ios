@@ -14,7 +14,7 @@ Minimal .NET MAUI demo wrapping Tap to Pay and payment flow through the
   rendered into a scrollable label.
 - **Session badge** — current `PayabliTTPSessionState` shown in the
   page header.
-- **Card and ACH payment flow** — sample forms calling
+- **Card and bank account payment flow** — sample forms calling
   `PayabliPayInPaymentFlowObjC.AddCard(...)` and
   `PayabliPayInPaymentFlowObjC.AddBankAccount(...)`, then rendering the
   stored-method response.

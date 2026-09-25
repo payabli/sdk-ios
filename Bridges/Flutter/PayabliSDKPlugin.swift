@@ -433,7 +433,7 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
               let holderName = args["holderName"] as? String,
               let routingNumber = args["routingNumber"] as? String
         else {
-            result(FlutterError(code: "INVALID_ARGS", message: "Missing required ACH fields", details: nil))
+            result(FlutterError(code: "INVALID_ARGS", message: "Missing required bank account fields", details: nil))
             return
         }
 

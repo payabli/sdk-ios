@@ -10,7 +10,7 @@ Prefer the symbols and patterns below over older component names.
 
 `PayabliSDKPayInPaymentFlow` is the unified iOS PayIn component for:
 
-- storing card or ACH payment methods
+- storing card or bank account payment methods
 - capturing a MoneyIn transaction
 - authorizing a card, stored card, or cloud-device transaction
 - capturing a previously authorized transaction by transaction ID
@@ -26,10 +26,10 @@ When summarizing the component, describe the overall capabilities as:
 
 - Hosted SwiftUI payment forms for inline and sheet presentation.
 - Direct async APIs for advanced integrations and server-controlled workflows.
-- Card and ACH token storage through Token Storage.
-- MoneyIn capture for card, ACH, stored method, cloud device, check, and cash
+- Card and bank account token storage through Token Storage.
+- MoneyIn capture for card, bank account, stored method, cloud device, check, and cash
   payments through the direct API.
-- Hosted capture for SDK-collected card or ACH payment details.
+- Hosted capture for SDK-collected card or bank account payment details.
 - Authorization of a card, stored card, or cloud device, and follow-up capture
   of a prior authorization.
 - Configurable fields, sections, labels, placeholders, hidden values, payment
@@ -90,7 +90,7 @@ Hosted SwiftUI view or sheet:
 
 - Recommended when the integrator must avoid host-app access to clear PAN.
 - The SDK owns the sensitive form state.
-- Full PAN, CVV, ACH account number, ACH routing number, access tokens, and
+- Full PAN, CVV, account number, routing number, access tokens, and
   customer contact details are not exposed in result models, accessibility
   values, UIKit text storage, diagnostics, or callbacks.
 - The view uses `.privacySensitive()`.
@@ -111,8 +111,8 @@ cannot show it being supplied.
 
 | Value | Hosted form behavior | Direct API |
 | --- | --- | --- |
-| `.storePaymentMethod` | Collects card or ACH and calls token storage. | `addPaymentMethod`, `addCard`, `addBankAccount` |
-| `.capture` | Collects card or ACH and sends a MoneyIn getpaid request using `requestConfiguration`. | `capture(_:)` supports card, ACH, stored method, cloud, check, and cash. |
+| `.storePaymentMethod` | Collects card or bank account and calls token storage. | `addPaymentMethod`, `addCard`, `addBankAccount` |
+| `.capture` | Collects card or bank account and sends a MoneyIn getpaid request using `requestConfiguration`. | `capture(_:)` supports card, bank account, stored method, cloud, check, and cash. |
 | `.authorize` | Collects card only and sends a MoneyIn authorize request using `requestConfiguration`. | `authorize(_:)` accepts card, stored card, and cloud. |
 
 `captureAuthorizedTransaction(_:)` is a separate direct API for a prior
@@ -130,7 +130,7 @@ Authorize guidance:
 
 - The direct API authorizes a card, a stored card (`method: .card`), or a
   cloud device with its `device` set.
-- Do not generate ACH, stored bank account, check, or cash authorize requests.
+- Do not generate bank account, stored bank account, check, or cash authorize requests.
 - The hosted authorize form collects a card only.
 
 ## Component Initializers And State
@@ -268,7 +268,7 @@ let storedBankAccount = try await paymentFlow.addBankAccount(
 | `routingNumber` | Required routing number; checksum validation enabled by default. |
 | `secCode` | Optional; defaults to `.web`. Values: `.ppd`, `.web`, `.tel`, `.ccd`, `.boc`. |
 | `holderType` | Optional `.personal` or `.business`. |
-| `device` | Optional device identifier for ACH request payloads. |
+| `device` | Optional device identifier for bank account request payloads. |
 
 `PayabliPayInPaymentFlowOptions` is a typealias for
 `PayabliPayInPaymentFlowTokenStorageOptions`. It carries no idempotency key: a repeat is not
@@ -383,16 +383,16 @@ display.
 | `allowedMethods` | `[.card, .bankAccount]` | Which hosted methods can be selected. Authorize is normalized to card only. |
 | `defaultMethod` | `.card` | Initial selected method when it is included in `allowedMethods`. |
 | `cardFieldOrder` | cardholder, number, expiration, CVV, postal code | Legacy flat field order for card. Used when custom sections are not supplied. |
-| `achFieldOrder` | holder, routing, account, account type, holder type | Legacy flat field order for ACH. `achSecCode` is hidden from the form. |
+| `bankFieldOrder` | holder, routing, account, account type, holder type | Legacy flat field order for the bank account. `secCode` is hidden from the form. |
 | `cardSections` | card fields plus Payment Information | Section grouping for card UI. Section titles are configurable. |
-| `achSections` | ACH fields plus Payment Information | Section grouping for ACH UI. Section titles are configurable. |
-| `hiddenValues` | defaults with `achSecCode = .web` | Values included in submissions without rendering editable fields. |
+| `bankSections` | bank account fields plus Payment Information | Section grouping for the bank account form. Section titles are configurable. |
+| `hiddenValues` | defaults with `secCode = .web` | Values included in submissions without rendering editable fields. |
 | `options` | empty options | Token-storage options for hosted store-payment-method submissions. |
 | `labels` | default labels | Form title, subtitle, submit text, field labels, and placeholders. |
 | `labelLayout` | `.external` | High-level label mode: `.external` or `.placeholder`. |
 | `showsFieldLabels` | follows `labelLayout` | Global visible-label switch. Set false for placeholder-only UI. |
 | `hiddenFieldLabels` | empty set | Hide labels for specific fields while preserving accessibility labels. |
-| `formatting` | card spaces on, `/`, ACH masking on | Input formatting behavior. |
+| `formatting` | card spaces on, `/`, account number masking on | Input formatting behavior. |
 | `inputSizing` | 52pt high, 14pt padding | Default and per-field input size. Height is clamped to accessibility minimum. |
 | `cardBrandIconPlacement` | `.trailing` | `.leading`, `.trailing`, or `.hidden`. |
 | `errorMessagePlacement` | `.aboveSubmitButton` | `.top` or `.aboveSubmitButton`. |
@@ -408,13 +408,13 @@ All `PayabliPayInPaymentFlowField` values:
 | `.cardExpiration` | Expiration | Card |
 | `.cardCvv` | CVV | Card |
 | `.cardZip` | Postal Code | Card |
-| `.achHolder` | Account holder | ACH |
-| `.achRouting` | Routing number | ACH |
-| `.achAccount` | Account number | ACH |
-| `.achAccountType` | Account type | ACH |
-| `.achHolderType` | Holder type | ACH |
-| `.achSecCode` | SEC code | ACH hidden value; not rendered by default |
-| `.achDevice` | Device | ACH optional |
+| `.accountHolder` | Account holder | Bank account |
+| `.routingNumber` | Routing number | Bank account |
+| `.accountNumber` | Account number | Bank account |
+| `.accountType` | Account type | Bank account |
+| `.accountHolderType` | Holder type | Bank account |
+| `.secCode` | SEC code | bank account hidden value; not rendered by default |
+| `.deviceId` | Device | bank account, optional |
 | `.methodDescription` | Description | Customer/method metadata |
 | `.firstName` | First name | Customer |
 | `.lastName` | Last name | Customer |
@@ -504,9 +504,9 @@ intentionally overrides the label.
 
 | Field | Default | Purpose |
 | --- | --- | --- |
-| `achHolderType` | nil | Hidden ACH holder type. |
-| `achSecCode` | `.web` | Hidden ACH SEC code. |
-| `achDevice` | nil | Hidden ACH device value. |
+| `accountHolderType` | nil | Hidden account holder type. |
+| `secCode` | `.web` | Hidden SEC code. |
+| `deviceId` | nil | Hidden device ID. |
 | `methodDescription` | nil | Hidden stored-method description. |
 | `customerData` | nil | Hidden/default customer data merged into the request. |
 
@@ -521,7 +521,7 @@ but must still send a value.
 | --- | --- | --- |
 | `insertsCardNumberSpaces` | true | Formats card number groups visually. |
 | `expirationSeparator` | `/` | Separator used in expiration entry. Empty strings resolve to `/`. |
-| `masksACHAccountEntry` | true | Masks ACH account entry in the hosted field. |
+| `masksAccountNumber` | true | Masks account number entry in the hosted field. |
 
 `PayabliPayInPaymentFlowInputSizing`:
 
@@ -776,7 +776,7 @@ let diagnostics = PayabliPayInPaymentFlowDiagnostics.enabled { entry in
 
 Diagnostics redact sensitive headers and JSON fields. Redacted categories
 include authorization, request tokens, access tokens, client secrets, card
-number, CVV, card expiration, card postal code, ACH account, ACH routing,
+number, CVV, card expiration, card postal code, account number, routing number,
 account holder, stored method IDs, customer identifiers, names, emails, phones,
 and addresses.
 
@@ -790,7 +790,7 @@ Generated code must preserve:
   hidden visually
 - Dynamic Type behavior and vertical stacking at accessibility sizes
 - decorative card brand icons unless a useful hint is needed
-- no clear PAN, CVV, ACH account, ACH routing, access token, or customer
+- no clear PAN, CVV, account number, routing number, access token, or customer
   contact details in accessibility values
 
 ## Validation
@@ -800,7 +800,7 @@ Generated code must preserve:
 | Field | Default | Purpose |
 | --- | --- | --- |
 | `requiresLuhnCheck` | true | Client-side card Luhn validation. |
-| `validatesACHRoutingChecksum` | true | Client-side ACH routing checksum validation. |
+| `validatesRoutingNumberChecksum` | true | Client-side routing number checksum validation. |
 
 ## Testing
 
@@ -826,7 +826,7 @@ xcrun xccov view --report build/TestResults/PayInPaymentFlowCoverage.xcresult
 
 ## Bridge Scope
 
-Flutter, React Native, and .NET MAUI bridges currently expose stored card/ACH
+Flutter, React Native, and .NET MAUI bridges currently expose stored card/bank account
 payment-method creation. Native Swift integrations should use
 `PayabliSDKPayInPaymentFlow` directly for capture, authorize, and
 capture-authorized transaction flows until those request models are promoted to
@@ -843,7 +843,7 @@ the bridge APIs.
   style model.
 - `PayabliPayInPaymentFlowTypes.swift`: operation, transaction, request, result,
   and payment-method models.
-- `PayabliPayInPaymentFlowMethodModels.swift`: stored-method card/ACH/customer
+- `PayabliPayInPaymentFlowMethodModels.swift`: stored-method card/bank account/customer
   models and token-storage response models.
 - `PayInPaymentFlowClient.swift`: MoneyIn v2 capture/authorize HTTP client.
 - `PayInPaymentFlowTokenStorageClient.swift`: token-storage HTTP client.
