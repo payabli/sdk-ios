@@ -39,8 +39,8 @@ final class PayInFormCustomizationTests: XCTestCase {
         XCTAssertEqual(configuration.inputSizing, sdkDefault.inputSizing)
         XCTAssertEqual(configuration.cardSections.map(\.title), sdkDefault.cardSections.map(\.title))
         XCTAssertEqual(configuration.cardSections.map(\.fields), sdkDefault.cardSections.map(\.fields))
-        XCTAssertEqual(configuration.achSections.map(\.fields), sdkDefault.achSections.map(\.fields))
-        XCTAssertNil(configuration.hiddenValues.achHolderType)
+        XCTAssertEqual(configuration.bankSections.map(\.fields), sdkDefault.bankSections.map(\.fields))
+        XCTAssertNil(configuration.hiddenValues.accountHolderType)
         let style = PayInFormCustomization(preset: .sdkDefault).style
         XCTAssertEqual(style.accentColor, PayabliPayInPaymentFlowStyle.default.accentColor)
         XCTAssertEqual(style.input.backgroundColor, PayabliPayInPaymentFlowStyle.default.input.backgroundColor)
@@ -119,10 +119,10 @@ final class PayInFormCustomizationTests: XCTestCase {
         XCTAssertEqual(configuration.labelLayout, .placeholder)
         XCTAssertEqual(configuration.formatting.expirationSeparator, "-")
         XCTAssertFalse(configuration.formatting.insertsCardNumberSpaces)
-        XCTAssertFalse(configuration.formatting.masksACHAccountEntry)
+        XCTAssertFalse(configuration.formatting.masksAccountNumber)
         XCTAssertEqual(configuration.cardBrandIconPlacement, .hidden)
         XCTAssertEqual(configuration.errorMessagePlacement, .aboveSubmitButton)
-        XCTAssertEqual(configuration.inputSizing.size(for: .achRouting).height, 60)
+        XCTAssertEqual(configuration.inputSizing.size(for: .routingNumber).height, 60)
     }
 
     func testTheCustomerSectionFollowsThePaymentUnlessMovedFirst() {

@@ -110,9 +110,9 @@ struct PayInFormCustomization: Hashable {
             allowedMethods: allowedMethods,
             defaultMethod: methods == .cardAndBank ? startOn : allowedMethods[0],
             cardSections: sections(paymentFields: Self.cardFields, sectionTitle: "Your card"),
-            achSections: sections(paymentFields: bankFields, sectionTitle: "Your bank"),
+            bankSections: sections(paymentFields: bankFields, sectionTitle: "Your bank"),
             hiddenValues: PayabliPayInPaymentFlowHiddenValues(
-                achHolderType: fixesHolderType ? .personal : nil,
+                accountHolderType: fixesHolderType ? .personal : nil,
                 methodDescription: QAIdentity.current.note(capturing ? "simple-capture" : "simple-save"),
                 // A capture names its customer on the request instead.
                 customerData: capturing ? nil : PayInDemoCustomer.customerData
@@ -124,7 +124,7 @@ struct PayInFormCustomization: Hashable {
             formatting: PayabliPayInPaymentFlowFormatting(
                 insertsCardNumberSpaces: groupsCardNumber,
                 expirationSeparator: dashesExpiry ? "-" : "/",
-                masksACHAccountEntry: masksAccountNumber
+                masksAccountNumber: masksAccountNumber
             ),
             inputSizing: sdkInputSizing,
             cardBrandIconPlacement: cardBrandIconPlacement,
@@ -212,8 +212,8 @@ struct PayInFormCustomization: Hashable {
 
     /// A holder type supplied as a hidden value takes the place of its picker.
     private var bankFields: [PayabliPayInPaymentFlowField] {
-        let fields = PayabliPayInPaymentFlowFormConfiguration.defaultACHFieldOrder
-        return fixesHolderType ? fields.filter { $0 != .achHolderType } : fields
+        let fields = PayabliPayInPaymentFlowFormConfiguration.defaultBankFieldOrder
+        return fixesHolderType ? fields.filter { $0 != .accountHolderType } : fields
     }
 
     private var customerFields: [PayabliPayInPaymentFlowField] {
@@ -281,9 +281,9 @@ struct PayInFormCustomization: Hashable {
         .cardExpiration: "Expires",
         .cardCvv: "Security code",
         .cardZip: "Billing ZIP",
-        .achHolder: "Name on account",
-        .achRouting: "Bank routing",
-        .achAccount: "Bank account",
+        .accountHolder: "Name on account",
+        .routingNumber: "Bank routing",
+        .accountNumber: "Bank account",
         .firstName: "Given name",
         .lastName: "Family name",
         .customerNumber: "Member ID",
@@ -295,9 +295,9 @@ struct PayInFormCustomization: Hashable {
         .cardNumber: "Card number",
         .cardCvv: "CVV",
         .cardZip: "ZIP",
-        .achHolder: "Account holder",
-        .achRouting: "Routing number",
-        .achAccount: "Account number",
+        .accountHolder: "Account holder",
+        .routingNumber: "Routing number",
+        .accountNumber: "Account number",
         .firstName: "First name",
         .lastName: "Last name",
         .customerNumber: "Customer number",
