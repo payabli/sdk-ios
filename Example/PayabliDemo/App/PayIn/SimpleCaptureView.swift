@@ -200,7 +200,8 @@ struct SimpleCaptureView: View {
 
     private func handleCompleted(_ outcome: PayInOutcome) {
         if let method = outcome.storedMethod {
-            resultText = "Saved: \(method.storedMethodId ?? "-")\n\(method.responseText)"
+            // Never the stored-method id: it charges the card again, and tests keep screenshots of this text.
+            resultText = "Saved: \(method.responseText)"
         } else {
             resultText = "Captured: \(outcome.code), \(outcome.transaction?.paymentTransId ?? "-")"
             // The next submit is a payment of its own.
