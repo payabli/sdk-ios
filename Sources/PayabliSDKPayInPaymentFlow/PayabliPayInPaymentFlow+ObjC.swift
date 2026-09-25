@@ -17,7 +17,7 @@ public final class PayabliPayInPaymentFlowStoredPaymentMethodObjC: NSObject {
 
     init(_ method: PayabliPayInPaymentFlowStoredPaymentMethod) {
         storedMethodId = method.storedMethodId
-        self.method = method.method.rawValue
+        self.method = Self.name(of: method.method)
         methodReferenceId = method.methodReferenceId
         resultCode = method.resultCode.map(NSNumber.init(value:))
         resultText = method.resultText
@@ -25,6 +25,13 @@ public final class PayabliPayInPaymentFlowStoredPaymentMethodObjC: NSObject {
         responseText = method.responseText
         apiResponse = Self.dictionary(from: method.apiResponse)
         super.init()
+    }
+
+    private static func name(of method: PayabliPayInPaymentFlowStoredMethodType) -> String {
+        switch method {
+        case .card: return "card"
+        case .bankAccount: return "bankAccount"
+        }
     }
 
     private static func dictionary(from response: PayabliPayInPaymentFlowTokenStorageAPIResponse) -> NSDictionary {
@@ -90,7 +97,7 @@ public final class PayabliPayInPaymentFlowObjC: NSObject {
     }
 
     // swiftlint:disable:next function_parameter_count
-    @objc public func addACH(
+    @objc public func addBankAccount(
         accountNumber: String,
         accountType: String,
         holderName: String,
@@ -104,13 +111,13 @@ public final class PayabliPayInPaymentFlowObjC: NSObject {
         source: String?,
         completion: @escaping (PayabliPayInPaymentFlowStoredPaymentMethodObjC?, NSError?) -> Void
     ) {
-        guard let resolvedAccountType = PayabliPayInPaymentFlowACHAccountType(rawValue: accountType) else {
+        guard let resolvedAccountType = PayabliPayInAccountType(rawValue: accountType) else {
             completion(nil, invalidArgument("accountType must be Checking or Savings"))
             return
         }
-        let resolvedSecCode: PayabliPayInPaymentFlowACHSecCode
+        let resolvedSecCode: PayabliPayInSecCode
         if let secCode {
-            guard let secCode = PayabliPayInPaymentFlowACHSecCode(rawValue: secCode) else {
+            guard let secCode = PayabliPayInSecCode(rawValue: secCode) else {
                 completion(nil, invalidArgument("secCode must be PPD, WEB, TEL, CCD, or BOC"))
                 return
             }
@@ -118,9 +125,9 @@ public final class PayabliPayInPaymentFlowObjC: NSObject {
         } else {
             resolvedSecCode = .web
         }
-        let resolvedHolderType: PayabliPayInPaymentFlowACHHolderType?
+        let resolvedHolderType: PayabliPayInAccountHolderType?
         if let holderType {
-            guard let holderType = PayabliPayInPaymentFlowACHHolderType(rawValue: holderType) else {
+            guard let holderType = PayabliPayInAccountHolderType(rawValue: holderType) else {
                 completion(nil, invalidArgument("holderType must be personal or business"))
                 return
             }
@@ -129,7 +136,7 @@ public final class PayabliPayInPaymentFlowObjC: NSObject {
             resolvedHolderType = nil
         }
 
-        let ach = PayabliPayInPaymentFlowACHData(
+        let ach = PayabliPayInBankAccountData(
             accountNumber: accountNumber,
             accountType: resolvedAccountType,
             holderName: holderName,
@@ -144,7 +151,7 @@ public final class PayabliPayInPaymentFlowObjC: NSObject {
             temporary: temporary,
             source: source
         )
-        addPaymentMethod(.ach(ach), options: options, completion: completion)
+        addPaymentMethod(.bankAccount(ach), options: options, completion: completion)
     }
 
     private func addPaymentMethod(

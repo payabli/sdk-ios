@@ -98,7 +98,7 @@ Hosted SwiftUI view or sheet:
 Direct async APIs:
 
 - PCI-sensitive because the host app creates `PayabliPayInPaymentFlowCardData`
-  or `PayabliPayInPaymentFlowACHData`.
+  or `PayabliPayInBankAccountData`.
 - Use only when the host app is prepared to handle clear card or bank data.
 - Do not describe direct APIs as PAN-isolating.
 
@@ -111,7 +111,7 @@ cannot show it being supplied.
 
 | Value | Hosted form behavior | Direct API |
 | --- | --- | --- |
-| `.storePaymentMethod` | Collects card or ACH and calls token storage. | `addPaymentMethod`, `addCard`, `addACH` |
+| `.storePaymentMethod` | Collects card or ACH and calls token storage. | `addPaymentMethod`, `addCard`, `addBankAccount` |
 | `.capture` | Collects card or ACH and sends a MoneyIn getpaid request using `requestConfiguration`. | `capture(_:)` supports card, ACH, stored method, cloud, check, and cash. |
 | `.authorize` | Collects card only and sends a MoneyIn authorize request using `requestConfiguration`. | `authorize(_:)` accepts card, stored card, and cloud. |
 
@@ -236,8 +236,8 @@ let storedCard = try await paymentFlow.addCard(
 ```
 
 ```swift
-let storedACH = try await paymentFlow.addACH(
-    PayabliPayInPaymentFlowACHData(
+let storedBankAccount = try await paymentFlow.addBankAccount(
+    PayabliPayInBankAccountData(
         accountNumber: "111111111111",
         accountType: .checking,
         holderName: "Jane Doe",
@@ -258,7 +258,7 @@ let storedACH = try await paymentFlow.addACH(
 | `cvv` | Required. Direct API only; PCI-sensitive. |
 | `billingZip` | Postal code for card billing. Default label is `Postal Code`. |
 
-`PayabliPayInPaymentFlowACHData` fields:
+`PayabliPayInBankAccountData` fields:
 
 | Field | Notes |
 | --- | --- |
@@ -329,7 +329,7 @@ let request = PayabliPayInPaymentFlowRequest(
         serviceFee: 0.10,
         currency: "USD"
     ),
-    paymentMethod: .card(PayabliPayInPaymentFlowCardMethod(data: cardData)),
+    paymentMethod: .card(PayabliPayInPaymentMethod.Card(data: cardData)),
     orderDescription: "iOS checkout",
     source: "ios-sdk"
 )
@@ -341,11 +341,11 @@ Payment method cases for direct capture:
 
 | Case | Fields |
 | --- | --- |
-| `.card(PayabliPayInPaymentFlowCardMethod)` | `data`, `initiator` default `payor`, optional `saveIfSuccess`. |
-| `.ach(PayabliPayInPaymentFlowACHMethod)` | `data`. |
-| `.stored(PayabliPayInPaymentFlowStoredMethod)` | `method` (`card`, `ach`), `storedMethodId`. |
-| `.cloud(PayabliPayInPaymentFlowCloudMethod)` | `device`, optional `saveIfSuccess`. |
-| `.check(PayabliPayInPaymentFlowCheckMethod)` | `holderName`. |
+| `.card(PayabliPayInPaymentMethod.Card)` | `data`, `initiator` default `payor`, optional `saveIfSuccess`. |
+| `.bankAccount(PayabliPayInPaymentMethod.BankAccount)` | `data`. |
+| `.stored(PayabliPayInPaymentMethod.Stored)` | `method` (`.card`, `.bankAccount`), `storedMethodId`. |
+| `.cloudDevice(PayabliPayInPaymentMethod.CloudDevice)` | `device`, optional `saveIfSuccess`. |
+| `.check(PayabliPayInPaymentMethod.Check)` | `holderName`. |
 | `.cash` | No additional fields. |
 
 Direct authorize:
@@ -353,7 +353,7 @@ Direct authorize:
 ```swift
 let authorized = try await paymentFlow.authorize(PayabliPayInPaymentFlowRequest(
     paymentDetails: PayabliPayInPaymentFlowPaymentDetails(totalAmount: 1.00),
-    paymentMethod: .card(PayabliPayInPaymentFlowCardMethod(data: cardData))
+    paymentMethod: .card(PayabliPayInPaymentMethod.Card(data: cardData))
 ))
 ```
 
@@ -380,7 +380,7 @@ display.
 
 | Field | Default | Purpose |
 | --- | --- | --- |
-| `allowedMethods` | `[.card, .ach]` | Which hosted methods can be selected. Authorize is normalized to card only. |
+| `allowedMethods` | `[.card, .bankAccount]` | Which hosted methods can be selected. Authorize is normalized to card only. |
 | `defaultMethod` | `.card` | Initial selected method when it is included in `allowedMethods`. |
 | `cardFieldOrder` | cardholder, number, expiration, CVV, postal code | Legacy flat field order for card. Used when custom sections are not supplied. |
 | `achFieldOrder` | holder, routing, account, account type, holder type | Legacy flat field order for ACH. `achSecCode` is hidden from the form. |

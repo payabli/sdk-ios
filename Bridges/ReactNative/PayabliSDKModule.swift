@@ -32,7 +32,7 @@ import UIKit
 ///   - `configurePayInPaymentFlow(config, resolver, rejecter)` — entryPoint,
 ///     environment.
 ///   - `addCard(params, resolver, rejecter)`
-///   - `addACH(params, resolver, rejecter)`
+///   - `addBankAccount(params, resolver, rejecter)`
 ///   - `resolvePayInPaymentFlowAccessToken(token)` /
 ///     `rejectPayInPaymentFlowAccessToken(reason)` — responses to the
 ///     `PayInPaymentFlowAccessTokenRequested` event.
@@ -425,18 +425,18 @@ public final class PayabliSDKModule: RCTEventEmitter {
         )
     }
 
-    @objc public func addACH(
+    @objc public func addBankAccount(
         _ params: NSDictionary,
         resolver resolve: @escaping RCTPromiseResolveBlock,
         rejecter reject: @escaping RCTPromiseRejectBlock
     ) {
         guard let payInPaymentFlow else {
-            reject("NOT_CONFIGURED", "Call PayabliPayInPaymentFlow.configure() before addACH()", nil)
+            reject("NOT_CONFIGURED", "Call PayabliPayInPaymentFlow.configure() before addBankAccount()", nil)
             return
         }
         guard let accountNumber = params["accountNumber"] as? String,
               let accountType = params["accountType"] as? String,
-              let resolvedAccountType = PayabliPayInPaymentFlowACHAccountType(rawValue: accountType),
+              let resolvedAccountType = PayabliPayInAccountType(rawValue: accountType),
               let holderName = params["holderName"] as? String,
               let routingNumber = params["routingNumber"] as? String
         else {
@@ -444,16 +444,16 @@ public final class PayabliSDKModule: RCTEventEmitter {
             return
         }
 
-        let ach = PayabliPayInPaymentFlowACHData(
+        let ach = PayabliPayInBankAccountData(
             accountNumber: accountNumber,
             accountType: resolvedAccountType,
             holderName: holderName,
             routingNumber: routingNumber,
-            secCode: (params["secCode"] as? String).flatMap(PayabliPayInPaymentFlowACHSecCode.init(rawValue:)),
-            holderType: (params["holderType"] as? String).flatMap(PayabliPayInPaymentFlowACHHolderType.init(rawValue:))
+            secCode: (params["secCode"] as? String).flatMap(PayabliPayInSecCode.init(rawValue:)),
+            holderType: (params["holderType"] as? String).flatMap(PayabliPayInAccountHolderType.init(rawValue:))
         )
         addPaymentMethod(
-            .ach(ach),
+            .bankAccount(ach),
             options: Self.payInOptions(from: params),
             component: payInPaymentFlow,
             resolve: resolve,
@@ -479,7 +479,7 @@ public final class PayabliSDKModule: RCTEventEmitter {
     }
 
     private func addPaymentMethod(
-        _ input: PayabliPayInPaymentFlowInput,
+        _ input: PayabliPayInPaymentFlowMethodInput,
         options: PayabliPayInPaymentFlowOptions,
         component: PayabliPayInPaymentFlow,
         resolve: @escaping RCTPromiseResolveBlock,
@@ -554,11 +554,18 @@ public final class PayabliSDKModule: RCTEventEmitter {
         )
     }
 
+    private static func methodName(_ method: PayabliPayInPaymentFlowStoredMethodType) -> String {
+        switch method {
+        case .card: return "card"
+        case .bankAccount: return "bankAccount"
+        }
+    }
+
     private static func storedPaymentMethodMap(
         _ method: PayabliPayInPaymentFlowStoredPaymentMethod
     ) -> [String: Any] {
         var map: [String: Any] = [
-            "method": method.method.rawValue,
+            "method": methodName(method.method),
             "responseText": method.responseText,
             "apiResponse": dictionary(from: method.apiResponse)
         ]

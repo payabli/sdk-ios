@@ -221,7 +221,7 @@ public partial class MainPage : ContentPage
     {
         if (_payInPaymentFlow is null || _isSubmittingPayInPaymentFlow) return;
         SetSubmittingPayInPaymentFlow(true);
-        _payInPaymentFlow.AddACH(
+        _payInPaymentFlow.AddBankAccount(
             accountNumber: AchAccountEntry.Text ?? "",
             accountType: "Checking",
             holderName: AchHolderEntry.Text ?? "",

@@ -20,15 +20,15 @@ final class PaymentMethodReseedTests: XCTestCase {
     func testAnUpdateLeavesTypedValuesAlone() {
         let viewModel = PayabliPayInPaymentFlowViewModel(
             component: makeComponent(),
-            configuration: PayabliPayInPaymentFlowFormConfiguration(allowedMethods: [.card, .ach])
+            configuration: PayabliPayInPaymentFlowFormConfiguration(allowedMethods: [.card, .bankAccount])
         )
         type(into: viewModel)
 
         viewModel.update(
             component: makeComponent(entryPoint: "a-different-entry"),
             configuration: PayabliPayInPaymentFlowFormConfiguration(
-                allowedMethods: [.card, .ach],
-                defaultMethod: .ach
+                allowedMethods: [.card, .bankAccount],
+                defaultMethod: .bankAccount
             )
         )
 
@@ -60,7 +60,7 @@ final class PaymentMethodReseedTests: XCTestCase {
 
         viewModel.update(
             component: component,
-            configuration: PayabliPayInPaymentFlowFormConfiguration(allowedMethods: [.card, .ach])
+            configuration: PayabliPayInPaymentFlowFormConfiguration(allowedMethods: [.card, .bankAccount])
         )
 
         XCTAssertEqual(publishes, 1, "a changed configuration did not republish")
@@ -72,7 +72,7 @@ final class PaymentMethodReseedTests: XCTestCase {
         let viewModel = PayabliPayInPaymentFlowViewModel(
             component: makeComponent(),
             configuration: PayabliPayInPaymentFlowFormConfiguration(
-                allowedMethods: [.card, .ach],
+                allowedMethods: [.card, .bankAccount],
                 defaultMethod: .card
             )
         )
@@ -81,12 +81,12 @@ final class PaymentMethodReseedTests: XCTestCase {
         viewModel.update(
             component: makeComponent(),
             configuration: PayabliPayInPaymentFlowFormConfiguration(
-                allowedMethods: [.ach],
-                defaultMethod: .ach
+                allowedMethods: [.bankAccount],
+                defaultMethod: .bankAccount
             )
         )
 
-        XCTAssertEqual(viewModel.selectedMethod, .ach, "a method the caller withdrew stayed selected")
+        XCTAssertEqual(viewModel.selectedMethod, .bankAccount, "a method the caller withdrew stayed selected")
     }
 
     // MARK: - What the caller can seed

@@ -90,10 +90,10 @@ final class CardNotPresentOnDeviceTests: XCTestCase {
     /// identifier list is satisfied by, and they belong to the app's configuration
     /// rather than to this file.
     private func request(with card: PayabliPayInPaymentFlowCardData) -> PayabliPayInPaymentFlowRequest {
-        request(paying: .card(PayabliPayInPaymentFlowCardMethod(data: card)))
+        request(paying: .card(PayabliPayInPaymentMethod.Card(data: card)))
     }
 
-    private func request(paying method: PayabliPayInPaymentFlowPaymentMethod) -> PayabliPayInPaymentFlowRequest {
+    private func request(paying method: PayabliPayInPaymentMethod) -> PayabliPayInPaymentFlowRequest {
         let configured = PayInRequests.freshCapture(suppliesCustomer: true)
         return PayabliPayInPaymentFlowRequest(
             paymentDetails: configured.paymentDetails,
@@ -175,7 +175,7 @@ final class CardNotPresentOnDeviceTests: XCTestCase {
         )
         let request = PayabliPayInPaymentFlowRequest(
             paymentDetails: configured.paymentDetails,
-            paymentMethod: .card(PayabliPayInPaymentFlowCardMethod(data: try card())),
+            paymentMethod: .card(PayabliPayInPaymentMethod.Card(data: try card())),
             customerData: payer,
             orderDescription: configured.orderDescription,
             orderId: configured.orderId,
@@ -247,7 +247,7 @@ final class CardNotPresentOnDeviceTests: XCTestCase {
     // MARK: - Stored card
 
     /// A card stored in this run, charged as the method and identifier the store returned.
-    private func storedCard(on flow: PayabliPayInPaymentFlow) async throws -> PayabliPayInPaymentFlowPaymentMethod {
+    private func storedCard(on flow: PayabliPayInPaymentFlow) async throws -> PayabliPayInPaymentMethod {
         let stored = try await flow.addCard(
             try card(),
             options: PayabliPayInPaymentFlowTokenStorageOptions(
@@ -256,7 +256,7 @@ final class CardNotPresentOnDeviceTests: XCTestCase {
             )
         )
         let storedMethodId = try XCTUnwrap(stored.storedMethodId, "no stored method came back")
-        return .stored(PayabliPayInPaymentFlowStoredMethod(method: stored.method, storedMethodId: storedMethodId))
+        return .stored(PayabliPayInPaymentMethod.Stored(method: stored.method, storedMethodId: storedMethodId))
     }
 
     /// A stored card is authorized by its identifier, then voided.

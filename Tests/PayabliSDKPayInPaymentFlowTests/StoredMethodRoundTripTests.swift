@@ -31,7 +31,7 @@ final class StoredMethodRoundTripTests: XCTestCase {
         let component = PayabliPayInPaymentFlow(entryPoint: "entry", environment: .sandbox, transport: transport)
         let viewModel = PayabliPayInPaymentFlowViewModel(
             component: component,
-            configuration: PayabliPayInPaymentFlowFormConfiguration(allowedMethods: [.ach], defaultMethod: .ach)
+            configuration: PayabliPayInPaymentFlowFormConfiguration(allowedMethods: [.bankAccount], defaultMethod: .bankAccount)
         )
         viewModel.achHolder = "Jane Doe"
         viewModel.achRouting = "123456780"
@@ -52,7 +52,7 @@ final class StoredMethodRoundTripTests: XCTestCase {
     ) async throws -> [String: Any] {
         _ = try await component.capture(PayabliPayInPaymentFlowRequest(
             paymentDetails: PayabliPayInPaymentFlowPaymentDetails(totalAmount: 1),
-            paymentMethod: .stored(PayabliPayInPaymentFlowStoredMethod(
+            paymentMethod: .stored(PayabliPayInPaymentMethod.Stored(
                 method: stored.method,
                 storedMethodId: try XCTUnwrap(stored.storedMethodId)
             ))

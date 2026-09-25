@@ -28,7 +28,7 @@ final class PayabliPayInPaymentFlowTests: XCTestCase {
 
         let result = try await component.capture(PayabliPayInPaymentFlowRequest(
             paymentDetails: PayabliPayInPaymentFlowPaymentDetails(totalAmount: 12.34),
-            paymentMethod: .stored(PayabliPayInPaymentFlowStoredMethod(
+            paymentMethod: .stored(PayabliPayInPaymentMethod.Stored(
                 method: .card,
                 storedMethodId: "stored-123"
             ))
@@ -108,7 +108,7 @@ final class PayabliPayInPaymentFlowTests: XCTestCase {
         )
 
         let request = try XCTUnwrap(component.requestConfiguration?.request(
-            paymentMethod: .card(PayabliPayInPaymentFlowCardMethod(data: PayabliPayInPaymentFlowCardData(
+            paymentMethod: .card(PayabliPayInPaymentMethod.Card(data: PayabliPayInPaymentFlowCardData(
                 cardNumber: "4111111111111111",
                 expiration: "02/27",
                 cardholderName: "Jane Doe",
@@ -141,8 +141,8 @@ final class PayabliPayInPaymentFlowTests: XCTestCase {
             )
         )
         let configuration = PayabliPayInPaymentFlowFormConfiguration(
-            allowedMethods: [.ach],
-            defaultMethod: .ach
+            allowedMethods: [.bankAccount],
+            defaultMethod: .bankAccount
         )
 
         let viewModel = PayabliPayInPaymentFlowViewModel(
@@ -164,15 +164,15 @@ final class PayabliPayInPaymentFlowTests: XCTestCase {
             operation: .storePaymentMethod
         )
         let storeConfiguration = PayabliPayInPaymentFlowFormConfiguration(
-            allowedMethods: [.ach],
-            defaultMethod: .ach
+            allowedMethods: [.bankAccount],
+            defaultMethod: .bankAccount
         )
         let viewModel = PayabliPayInPaymentFlowViewModel(
             component: component,
             configuration: storeConfiguration
         )
 
-        XCTAssertEqual(viewModel.effectiveSelectedMethod, .ach)
+        XCTAssertEqual(viewModel.effectiveSelectedMethod, .bankAccount)
         XCTAssertFalse(viewModel.activeFields.contains(.amount))
 
         component.configure(

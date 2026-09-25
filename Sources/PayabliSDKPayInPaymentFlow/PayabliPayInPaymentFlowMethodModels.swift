@@ -3,7 +3,7 @@ import PayabliSDKCore
 
 public enum PayabliPayInPaymentFlowMethodType: String, CaseIterable, Identifiable, Sendable {
     case card
-    case ach
+    case bankAccount = "ach"
 
     public var id: String {
         rawValue
@@ -12,7 +12,7 @@ public enum PayabliPayInPaymentFlowMethodType: String, CaseIterable, Identifiabl
     public var displayName: String {
         switch self {
         case .card: return "Card"
-        case .ach: return "ACH"
+        case .bankAccount: return "ACH"
         }
     }
 
@@ -20,13 +20,11 @@ public enum PayabliPayInPaymentFlowMethodType: String, CaseIterable, Identifiabl
         switch self {
         case .card:
             return .card
-        case .ach:
+        case .bankAccount:
             return nil
         }
     }
 }
-
-public typealias PayabliPayInPaymentFlowType = PayabliPayInPaymentFlowMethodType
 
 public enum PayabliPayInPaymentFlowCardBrand: String, CaseIterable, Identifiable, Sendable, Equatable {
     case unknown
@@ -112,7 +110,7 @@ public enum PayabliPayInPaymentFlowCardBrand: String, CaseIterable, Identifiable
     }
 }
 
-public enum PayabliPayInPaymentFlowACHAccountType: String, CaseIterable, Identifiable, Codable, Sendable {
+public enum PayabliPayInAccountType: String, CaseIterable, Identifiable, Codable, Sendable {
     case checking = "Checking"
     case savings = "Savings"
 
@@ -121,7 +119,7 @@ public enum PayabliPayInPaymentFlowACHAccountType: String, CaseIterable, Identif
     }
 }
 
-public enum PayabliPayInPaymentFlowACHHolderType: String, CaseIterable, Identifiable, Codable, Sendable {
+public enum PayabliPayInAccountHolderType: String, CaseIterable, Identifiable, Codable, Sendable {
     case personal
     case business
 
@@ -130,7 +128,7 @@ public enum PayabliPayInPaymentFlowACHHolderType: String, CaseIterable, Identifi
     }
 }
 
-public enum PayabliPayInPaymentFlowACHSecCode: String, CaseIterable, Identifiable, Codable, Sendable {
+public enum PayabliPayInSecCode: String, CaseIterable, Identifiable, Codable, Sendable {
     case ppd = "PPD"
     case web = "WEB"
     case tel = "TEL"
@@ -249,22 +247,22 @@ public struct PayabliPayInPaymentFlowCardData: Sendable {
     }
 }
 
-public struct PayabliPayInPaymentFlowACHData: Sendable {
+public struct PayabliPayInBankAccountData: Sendable {
     public var accountNumber: String
-    public var accountType: PayabliPayInPaymentFlowACHAccountType
+    public var accountType: PayabliPayInAccountType
     public var holderName: String
     public var routingNumber: String
-    public var secCode: PayabliPayInPaymentFlowACHSecCode?
-    public var holderType: PayabliPayInPaymentFlowACHHolderType?
+    public var secCode: PayabliPayInSecCode?
+    public var holderType: PayabliPayInAccountHolderType?
     public var device: String?
 
     public init(
         accountNumber: String,
-        accountType: PayabliPayInPaymentFlowACHAccountType,
+        accountType: PayabliPayInAccountType,
         holderName: String,
         routingNumber: String,
-        secCode: PayabliPayInPaymentFlowACHSecCode? = .web,
-        holderType: PayabliPayInPaymentFlowACHHolderType? = nil,
+        secCode: PayabliPayInSecCode? = .web,
+        holderType: PayabliPayInAccountHolderType? = nil,
         device: String? = nil
     ) {
         self.accountNumber = accountNumber
@@ -279,17 +277,15 @@ public struct PayabliPayInPaymentFlowACHData: Sendable {
 
 public enum PayabliPayInPaymentFlowMethodInput: Sendable {
     case card(PayabliPayInPaymentFlowCardData)
-    case ach(PayabliPayInPaymentFlowACHData)
+    case bankAccount(PayabliPayInBankAccountData)
 
     public var method: PayabliPayInPaymentFlowMethodType {
         switch self {
         case .card: return .card
-        case .ach: return .ach
+        case .bankAccount: return .bankAccount
         }
     }
 }
-
-public typealias PayabliPayInPaymentFlowInput = PayabliPayInPaymentFlowMethodInput
 
 public struct PayabliPayInPaymentFlowCustomerData: Codable, Sendable {
     public var additionalData: [String: String]?
@@ -617,8 +613,8 @@ extension PayabliPayInPaymentFlowMethodInput: Encodable {
             try c.encode(data.cvv.digitsOnly, forKey: .cardcvv)
             try c.encode(data.billingZip.trimmed, forKey: .cardzip)
 
-        case let .ach(data):
-            try c.encode(PayabliPayInPaymentFlowMethodType.ach.rawValue, forKey: .method)
+        case let .bankAccount(data):
+            try c.encode(PayabliPayInPaymentFlowMethodType.bankAccount.rawValue, forKey: .method)
             try c.encode(data.accountNumber.digitsOnly, forKey: .achAccount)
             try c.encode(data.accountType.rawValue, forKey: .achAccountType)
             try c.encode(data.holderName.trimmed, forKey: .achHolder)
@@ -635,7 +631,7 @@ public extension PayabliPayInPaymentFlowMethodInput {
         switch self {
         case let .card(data):
             try data.validate(validation)
-        case let .ach(data):
+        case let .bankAccount(data):
             try data.validate(validation)
         }
     }
@@ -705,7 +701,7 @@ extension PayabliPayInPaymentFlowCardData {
     }
 }
 
-extension PayabliPayInPaymentFlowACHData {
+extension PayabliPayInBankAccountData {
     func validate(_ validation: PayabliPayInPaymentFlowValidation) throws {
         let account = accountNumber.digitsOnly
         guard (PayabliPayInPaymentFlowInputLimits.minimumACHAccountDigits ... PayabliPayInPaymentFlowInputLimits.maximumACHAccountDigits)

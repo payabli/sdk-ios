@@ -8,7 +8,7 @@ private let mainActorCompletionTimeout: TimeInterval = 10
 
 @MainActor
 final class PaymentMethodObjCBridgeTests: XCTestCase {
-    func testAddACHRejectsInvalidHolderType() throws {
+    func testAddBankAccountRejectsInvalidHolderType() throws {
         let component = try PayabliPayInPaymentFlowObjC(
             tokenHandler: { completion in
                 completion("token", nil)
@@ -18,7 +18,7 @@ final class PaymentMethodObjCBridgeTests: XCTestCase {
         )
         let expectation = expectation(description: "completion called")
 
-        component.addACH(
+        component.addBankAccount(
             accountNumber: "123456789",
             accountType: "Checking",
             holderName: "Jane Doe",
@@ -44,7 +44,7 @@ final class PaymentMethodObjCBridgeTests: XCTestCase {
     func testStoredPaymentMethodWrapperConvertsValuesAndResponse() {
         let storedMethod = PayabliPayInPaymentFlowStoredPaymentMethod(
             storedMethodId: "stored-123",
-            method: .ach,
+            method: .bankAccount,
             methodReferenceId: "method-123",
             resultCode: 1,
             resultText: "Approved",
@@ -67,7 +67,7 @@ final class PaymentMethodObjCBridgeTests: XCTestCase {
         let wrapper = PayabliPayInPaymentFlowStoredPaymentMethodObjC(storedMethod)
 
         XCTAssertEqual(wrapper.storedMethodId, "stored-123")
-        XCTAssertEqual(wrapper.method, "ach")
+        XCTAssertEqual(wrapper.method, "bankAccount")
         XCTAssertEqual(wrapper.methodReferenceId, "method-123")
         XCTAssertEqual(wrapper.resultCode, 1)
         XCTAssertEqual(wrapper.customerId, 4440)
@@ -75,7 +75,7 @@ final class PaymentMethodObjCBridgeTests: XCTestCase {
         XCTAssertEqual(wrapper.apiResponse["responseText"] as? String, "Success")
     }
 
-    func testAddACHRejectsInvalidArgumentsSynchronously() throws {
+    func testAddBankAccountRejectsInvalidArgumentsSynchronously() throws {
         let component = try PayabliPayInPaymentFlowObjC(
             tokenHandler: { completion in completion("unused", nil) },
             entryPoint: "entry",
@@ -83,7 +83,7 @@ final class PaymentMethodObjCBridgeTests: XCTestCase {
         )
 
         var invalidAccountTypeError: NSError?
-        component.addACH(
+        component.addBankAccount(
             accountNumber: "111111111",
             accountType: "Business",
             holderName: "Jane Doe",
@@ -101,9 +101,9 @@ final class PaymentMethodObjCBridgeTests: XCTestCase {
         }
 
         var invalidSecCodeError: NSError?
-        component.addACH(
+        component.addBankAccount(
             accountNumber: "111111111",
-            accountType: PayabliPayInPaymentFlowACHAccountType.checking.rawValue,
+            accountType: PayabliPayInAccountType.checking.rawValue,
             holderName: "Jane Doe",
             routingNumber: "123456780",
             secCode: "POP",
@@ -211,13 +211,13 @@ final class PaymentMethodObjCBridgeTests: XCTestCase {
             environment: .sandbox
         )
 
-        component.addACH(
+        component.addBankAccount(
             accountNumber: "1111111111",
-            accountType: PayabliPayInPaymentFlowACHAccountType.checking.rawValue,
+            accountType: PayabliPayInAccountType.checking.rawValue,
             holderName: "Jane Doe",
             routingNumber: "123456780",
             secCode: nil,
-            holderType: PayabliPayInPaymentFlowACHHolderType.personal.rawValue,
+            holderType: PayabliPayInAccountHolderType.personal.rawValue,
             achValidation: true,
             createAnonymous: false,
             forceCustomerCreation: false,

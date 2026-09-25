@@ -208,11 +208,11 @@ public final class PayabliPayInPaymentFlow: NSObject, ObservableObject, PayabliC
         try await addPaymentMethod(.card(card), options: options)
     }
 
-    public func addACH(
-        _ ach: PayabliPayInPaymentFlowACHData,
+    public func addBankAccount(
+        _ ach: PayabliPayInBankAccountData,
         options: PayabliPayInPaymentFlowTokenStorageOptions = PayabliPayInPaymentFlowTokenStorageOptions()
     ) async throws -> PayabliPayInPaymentFlowStoredPaymentMethod {
-        try await addPaymentMethod(.ach(ach), options: options)
+        try await addPaymentMethod(.bankAccount(ach), options: options)
     }
 
     /// Authorizes and captures a transaction in one step using

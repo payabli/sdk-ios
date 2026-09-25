@@ -65,15 +65,15 @@ public struct PayabliPayInPaymentFlowFormatting: Sendable {
 }
 
 public struct PayabliPayInPaymentFlowHiddenValues: Sendable {
-    public let achHolderType: PayabliPayInPaymentFlowACHHolderType?
-    public let achSecCode: PayabliPayInPaymentFlowACHSecCode?
+    public let achHolderType: PayabliPayInAccountHolderType?
+    public let achSecCode: PayabliPayInSecCode?
     public let achDevice: String?
     public let methodDescription: String?
     public let customerData: PayabliPayInPaymentFlowCustomerData?
 
     public init(
-        achHolderType: PayabliPayInPaymentFlowACHHolderType? = nil,
-        achSecCode: PayabliPayInPaymentFlowACHSecCode? = .web,
+        achHolderType: PayabliPayInAccountHolderType? = nil,
+        achSecCode: PayabliPayInSecCode? = .web,
         achDevice: String? = nil,
         methodDescription: String? = nil,
         customerData: PayabliPayInPaymentFlowCustomerData? = nil
@@ -350,7 +350,7 @@ public struct PayabliPayInPaymentFlowFormConfiguration: Sendable {
     public let paymentSummary: PayabliPayInPaymentFlowPaymentSummaryConfiguration
 
     public init(
-        allowedMethods: [PayabliPayInPaymentFlowMethodType] = [.card, .ach],
+        allowedMethods: [PayabliPayInPaymentFlowMethodType] = [.card, .bankAccount],
         defaultMethod: PayabliPayInPaymentFlowMethodType = .card,
         cardFieldOrder: [PayabliPayInPaymentFlowField] = Self.defaultCardFieldOrder,
         achFieldOrder: [PayabliPayInPaymentFlowField] = Self.defaultACHFieldOrder,

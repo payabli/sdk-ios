@@ -26,85 +26,85 @@ public enum PayabliPayInPaymentFlowResultKind: String, Sendable, Equatable {
 
 public enum PayabliPayInPaymentFlowStoredMethodType: String, CaseIterable, Identifiable, Codable, Sendable {
     case card
-    case ach
+    case bankAccount = "ach"
 
     public var id: String {
         rawValue
     }
 }
 
-public struct PayabliPayInPaymentFlowCardMethod: Sendable {
-    public let data: PayabliPayInPaymentFlowCardData
-    public let initiator: String?
-    public let saveIfSuccess: Bool?
-
-    public init(
-        data: PayabliPayInPaymentFlowCardData,
-        initiator: String? = "payor",
-        saveIfSuccess: Bool? = nil
-    ) {
-        self.data = data
-        self.initiator = initiator
-        self.saveIfSuccess = saveIfSuccess
-    }
-}
-
-public struct PayabliPayInPaymentFlowACHMethod: Sendable {
-    public let data: PayabliPayInPaymentFlowACHData
-
-    public init(data: PayabliPayInPaymentFlowACHData) {
-        self.data = data
-    }
-}
-
-public struct PayabliPayInPaymentFlowStoredMethod: Sendable {
-    public let method: PayabliPayInPaymentFlowStoredMethodType
-    public let storedMethodId: String
-
-    public init(
-        method: PayabliPayInPaymentFlowStoredMethodType,
-        storedMethodId: String
-    ) {
-        self.method = method
-        self.storedMethodId = storedMethodId
-    }
-}
-
-public struct PayabliPayInPaymentFlowCloudMethod: Sendable {
-    public let device: String
-    public let saveIfSuccess: Bool?
-
-    public init(device: String, saveIfSuccess: Bool? = nil) {
-        self.device = device
-        self.saveIfSuccess = saveIfSuccess
-    }
-}
-
-public struct PayabliPayInPaymentFlowCheckMethod: Sendable {
-    public let holderName: String
-
-    public init(holderName: String) {
-        self.holderName = holderName
-    }
-}
-
-public enum PayabliPayInPaymentFlowPaymentMethod: Sendable {
-    case card(PayabliPayInPaymentFlowCardMethod)
-    case ach(PayabliPayInPaymentFlowACHMethod)
-    case stored(PayabliPayInPaymentFlowStoredMethod)
-    case cloud(PayabliPayInPaymentFlowCloudMethod)
-    case check(PayabliPayInPaymentFlowCheckMethod)
+public enum PayabliPayInPaymentMethod: Sendable {
+    case card(Card)
+    case bankAccount(BankAccount)
+    case stored(Stored)
+    case cloudDevice(CloudDevice)
+    case check(Check)
     case cash
+
+    public struct Card: Sendable {
+        public let data: PayabliPayInPaymentFlowCardData
+        public let initiator: String?
+        public let saveIfSuccess: Bool?
+
+        public init(
+            data: PayabliPayInPaymentFlowCardData,
+            initiator: String? = "payor",
+            saveIfSuccess: Bool? = nil
+        ) {
+            self.data = data
+            self.initiator = initiator
+            self.saveIfSuccess = saveIfSuccess
+        }
+    }
+
+    public struct BankAccount: Sendable {
+        public let data: PayabliPayInBankAccountData
+
+        public init(data: PayabliPayInBankAccountData) {
+            self.data = data
+        }
+    }
+
+    public struct Stored: Sendable {
+        public let method: PayabliPayInPaymentFlowStoredMethodType
+        public let storedMethodId: String
+
+        public init(
+            method: PayabliPayInPaymentFlowStoredMethodType,
+            storedMethodId: String
+        ) {
+            self.method = method
+            self.storedMethodId = storedMethodId
+        }
+    }
+
+    public struct CloudDevice: Sendable {
+        public let device: String
+        public let saveIfSuccess: Bool?
+
+        public init(device: String, saveIfSuccess: Bool? = nil) {
+            self.device = device
+            self.saveIfSuccess = saveIfSuccess
+        }
+    }
+
+    public struct Check: Sendable {
+        public let holderName: String
+
+        public init(holderName: String) {
+            self.holderName = holderName
+        }
+    }
 
     public var method: String {
         switch self {
         case .card:
             return "card"
-        case .ach:
+        case .bankAccount:
             return "ach"
         case let .stored(stored):
             return stored.method.rawValue
-        case .cloud:
+        case .cloudDevice:
             return "cloud"
         case .check:
             return "check"
@@ -115,11 +115,11 @@ public enum PayabliPayInPaymentFlowPaymentMethod: Sendable {
 
     var isAuthorizable: Bool {
         switch self {
-        case .card, .cloud:
+        case .card, .cloudDevice:
             return true
         case let .stored(stored):
             return stored.method == .card
-        case .ach, .check, .cash:
+        case .bankAccount, .check, .cash:
             return false
         }
     }
@@ -162,7 +162,7 @@ extension PayabliPayInPaymentFlowPaymentDetails {
 
 public struct PayabliPayInPaymentFlowRequest: Sendable {
     public let paymentDetails: PayabliPayInPaymentFlowPaymentDetails
-    public let paymentMethod: PayabliPayInPaymentFlowPaymentMethod
+    public let paymentMethod: PayabliPayInPaymentMethod
     public let accountId: String?
     public let customerData: PayabliPayInPaymentFlowCustomerData?
     public let ipAddress: String?
@@ -178,7 +178,7 @@ public struct PayabliPayInPaymentFlowRequest: Sendable {
 
     public init(
         paymentDetails: PayabliPayInPaymentFlowPaymentDetails,
-        paymentMethod: PayabliPayInPaymentFlowPaymentMethod,
+        paymentMethod: PayabliPayInPaymentMethod,
         accountId: String? = nil,
         customerData: PayabliPayInPaymentFlowCustomerData? = nil,
         ipAddress: String? = nil,
@@ -257,7 +257,7 @@ public struct PayabliPayInPaymentFlowRequestConfiguration: Sendable {
     }
 
     public func request(
-        paymentMethod: PayabliPayInPaymentFlowPaymentMethod,
+        paymentMethod: PayabliPayInPaymentMethod,
         customerData formCustomerData: PayabliPayInPaymentFlowCustomerData? = nil,
         orderDescription formOrderDescription: String? = nil
     ) -> PayabliPayInPaymentFlowRequest {
@@ -585,7 +585,7 @@ public struct PayabliPayInPaymentFlowResponseData: Codable, Sendable, Equatable 
     }
 }
 
-extension PayabliPayInPaymentFlowPaymentMethod: Encodable {
+extension PayabliPayInPaymentMethod: Encodable {
     enum CodingKeys: String, CodingKey {
         case method
         case cardcvv
@@ -618,7 +618,7 @@ extension PayabliPayInPaymentFlowPaymentMethod: Encodable {
             try c.encodeIfPresent(method.initiator?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty, forKey: .initiator)
             try c.encodeIfPresent(method.saveIfSuccess, forKey: .saveIfSuccess)
 
-        case let .ach(method):
+        case let .bankAccount(method):
             try c.encode("ach", forKey: .method)
             try c.encode(method.data.accountNumber.payabliCaptureDigitsOnly, forKey: .achAccount)
             try c.encode(method.data.accountType.rawValue, forKey: .achAccountType)
@@ -634,7 +634,7 @@ extension PayabliPayInPaymentFlowPaymentMethod: Encodable {
             // Always sent: the payer is present on every charge this surface makes.
             try c.encode("payor", forKey: .initiator)
 
-        case let .cloud(method):
+        case let .cloudDevice(method):
             try c.encode("cloud", forKey: .method)
             try c.encode(method.device.payabliCaptureTrimmed, forKey: .device)
             try c.encodeIfPresent(method.saveIfSuccess, forKey: .saveIfSuccess)
@@ -649,18 +649,18 @@ extension PayabliPayInPaymentFlowPaymentMethod: Encodable {
     }
 }
 
-extension PayabliPayInPaymentFlowPaymentMethod {
+extension PayabliPayInPaymentMethod {
     func validate(_ validation: PayabliPayInPaymentFlowValidation) throws {
         switch self {
         case let .card(method):
             try PayabliPayInPaymentFlowMethodInput.card(method.data).validate(validation)
-        case let .ach(method):
-            try PayabliPayInPaymentFlowMethodInput.ach(method.data).validate(validation)
+        case let .bankAccount(method):
+            try PayabliPayInPaymentFlowMethodInput.bankAccount(method.data).validate(validation)
         case let .stored(method):
             guard !method.storedMethodId.payabliCaptureTrimmed.isEmpty else {
                 throw PayabliPayInPaymentFlowError.invalidInput("Stored payment method ID is required.")
             }
-        case let .cloud(method):
+        case let .cloudDevice(method):
             guard !method.device.payabliCaptureTrimmed.isEmpty else {
                 throw PayabliPayInPaymentFlowError.invalidInput("Cloud device is required.")
             }

@@ -349,8 +349,8 @@ namespace Payabli.TapToPay
             PayabliPayInPaymentFlowCompletion completion
         );
 
-        [Export("addACHWithAccountNumber:accountType:holderName:routingNumber:secCode:holderType:achValidation:createAnonymous:forceCustomerCreation:temporary:source:completion:")]
-        void AddACH(
+        [Export("addBankAccountWithAccountNumber:accountType:holderName:routingNumber:secCode:holderType:achValidation:createAnonymous:forceCustomerCreation:temporary:source:completion:")]
+        void AddBankAccount(
             string accountNumber,
             string accountType,
             string holderName,

@@ -150,7 +150,7 @@ public struct PayabliPayInPaymentFlowView: View {
         let sections = switch viewModel.effectiveSelectedMethod {
         case .card:
             configuration.cardSections
-        case .ach:
+        case .bankAccount:
             configuration.achSections
         }
         guard viewModel.component.operation == .storePaymentMethod else {
@@ -319,11 +319,11 @@ public struct PayabliPayInPaymentFlowView: View {
                 textField(field, text: achAccountBinding, sanitize: viewModel.limitACHAccount)
             }
         case .achAccountType:
-            pickerField(field, selection: $viewModel.achAccountType, values: PayabliPayInPaymentFlowACHAccountType.allCases)
+            pickerField(field, selection: $viewModel.achAccountType, values: PayabliPayInAccountType.allCases)
         case .achHolderType:
-            pickerField(field, selection: $viewModel.achHolderType, values: PayabliPayInPaymentFlowACHHolderType.allCases)
+            pickerField(field, selection: $viewModel.achHolderType, values: PayabliPayInAccountHolderType.allCases)
         case .achSecCode:
-            pickerField(field, selection: $viewModel.achSecCode, values: PayabliPayInPaymentFlowACHSecCode.allCases)
+            pickerField(field, selection: $viewModel.achSecCode, values: PayabliPayInSecCode.allCases)
         case .achDevice:
             textField(field, text: $viewModel.achDevice)
         default:

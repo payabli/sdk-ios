@@ -423,7 +423,7 @@ final class PayInPaymentFlowClientTests: XCTestCase {
                 serviceFee: serviceFee,
                 currency: "USD"
             ),
-            paymentMethod: .card(PayabliPayInPaymentFlowCardMethod(
+            paymentMethod: .card(PayabliPayInPaymentMethod.Card(
                 data: PayabliPayInPaymentFlowCardData(
                     cardNumber: "4111 1111 1111 1111",
                     expiration: "02/27",

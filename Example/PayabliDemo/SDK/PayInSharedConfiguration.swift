@@ -13,7 +13,7 @@ import SwiftUI
 enum PayInSharedConfiguration {
     // MARK: - Methods
 
-    static let allowedMethods: [PayabliPayInPaymentFlowMethodType] = [.card, .ach]
+    static let allowedMethods: [PayabliPayInPaymentFlowMethodType] = [.card, .bankAccount]
     static let defaultMethod: PayabliPayInPaymentFlowMethodType = .card
 
     static let cardFieldOrder: [PayabliPayInPaymentFlowField] = [

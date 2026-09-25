@@ -16,7 +16,7 @@ MethodChannel + EventChannel bridge in `Bridges/Flutter/`.
   the app bar.
 - **Card and ACH payment flow** — sample Flutter forms calling
   `PayabliPayInPaymentFlow.addCard(...)` and
-  `PayabliPayInPaymentFlow.addACH(...)`, then rendering the stored-method
+  `PayabliPayInPaymentFlow.addBankAccount(...)`, then rendering the stored-method
   response.
 
 ## Setup

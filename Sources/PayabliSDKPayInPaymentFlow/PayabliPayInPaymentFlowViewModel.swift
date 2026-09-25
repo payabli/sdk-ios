@@ -15,9 +15,9 @@ final class PayabliPayInPaymentFlowViewModel: ObservableObject {
     @Published private var achHolderStorage = ""
     @Published private var achRoutingStorage = ""
     @Published private var achAccountStorage = ""
-    @Published var achAccountType: PayabliPayInPaymentFlowACHAccountType = .checking
-    @Published var achHolderType: PayabliPayInPaymentFlowACHHolderType = .personal
-    @Published var achSecCode: PayabliPayInPaymentFlowACHSecCode = .web
+    @Published var achAccountType: PayabliPayInAccountType = .checking
+    @Published var achHolderType: PayabliPayInAccountHolderType = .personal
+    @Published var achSecCode: PayabliPayInSecCode = .web
     @Published var achDevice = ""
     @Published var methodDescription = ""
     @Published var firstName = ""
@@ -118,7 +118,7 @@ final class PayabliPayInPaymentFlowViewModel: ObservableObject {
         let fields = switch effectiveSelectedMethod {
         case .card:
             configuration.cardFieldOrder
-        case .ach:
+        case .bankAccount:
             configuration.achFieldOrder
         }
 
@@ -188,7 +188,7 @@ final class PayabliPayInPaymentFlowViewModel: ObservableObject {
                 && fieldHasRequiredValue(.cardZip)
                 && operationConfigurationIsValid
                 && requiredFieldsAreSatisfied
-        case .ach:
+        case .bankAccount:
             return fieldHasRequiredValue(.achHolder)
                 && fieldHasRequiredValue(.achRouting)
                 && fieldHasRequiredValue(.achAccount)
@@ -367,8 +367,8 @@ final class PayabliPayInPaymentFlowViewModel: ObservableObject {
                 cvv: cardCvv,
                 billingZip: cardZip
             ))
-        case .ach:
-            return .ach(PayabliPayInPaymentFlowACHData(
+        case .bankAccount:
+            return .bankAccount(PayabliPayInBankAccountData(
                 accountNumber: achAccount,
                 accountType: achAccountType,
                 holderName: achHolder,
@@ -380,10 +380,10 @@ final class PayabliPayInPaymentFlowViewModel: ObservableObject {
         }
     }
 
-    private func paymentMethod() -> PayabliPayInPaymentFlowPaymentMethod {
+    private func paymentMethod() -> PayabliPayInPaymentMethod {
         switch effectiveSelectedMethod {
         case .card:
-            return .card(PayabliPayInPaymentFlowCardMethod(
+            return .card(PayabliPayInPaymentMethod.Card(
                 data: PayabliPayInPaymentFlowCardData(
                     cardNumber: cardNumber,
                     expiration: cardExpiration,
@@ -392,9 +392,9 @@ final class PayabliPayInPaymentFlowViewModel: ObservableObject {
                     billingZip: cardZip
                 )
             ))
-        case .ach:
-            return .ach(PayabliPayInPaymentFlowACHMethod(
-                data: PayabliPayInPaymentFlowACHData(
+        case .bankAccount:
+            return .bankAccount(PayabliPayInPaymentMethod.BankAccount(
+                data: PayabliPayInBankAccountData(
                     accountNumber: achAccount,
                     accountType: achAccountType,
                     holderName: achHolder,

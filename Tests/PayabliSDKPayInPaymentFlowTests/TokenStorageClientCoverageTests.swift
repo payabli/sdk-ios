@@ -296,8 +296,8 @@ final class TokenStorageClientCoverageTests: XCTestCase {
                 transport: transport
             ),
             configuration: PayabliPayInPaymentFlowFormConfiguration(
-                allowedMethods: [.ach],
-                defaultMethod: .ach,
+                allowedMethods: [.bankAccount],
+                defaultMethod: .bankAccount,
                 hiddenValues: PayabliPayInPaymentFlowHiddenValues(achSecCode: nil)
             )
         )

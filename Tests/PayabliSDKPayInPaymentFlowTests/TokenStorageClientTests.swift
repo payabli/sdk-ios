@@ -100,7 +100,7 @@ final class TokenStorageClientTests: XCTestCase {
 
         _ = try await client.addMethod(
             entryPoint: "f743aed24a",
-            paymentMethod: .ach(PayabliPayInPaymentFlowACHData(
+            paymentMethod: .bankAccount(PayabliPayInBankAccountData(
                 accountNumber: "1111111111111",
                 accountType: .checking,
                 holderName: "John Doe",
@@ -151,7 +151,7 @@ final class TokenStorageClientTests: XCTestCase {
 
         _ = try await client.addMethod(
             entryPoint: "f743aed24a",
-            paymentMethod: .ach(PayabliPayInPaymentFlowACHData(
+            paymentMethod: .bankAccount(PayabliPayInBankAccountData(
                 accountNumber: "1111111111111",
                 accountType: .checking,
                 holderName: "John Doe",
@@ -327,20 +327,20 @@ final class TokenStorageClientTests: XCTestCase {
     }
 
     func testACHLengthLimitsDoNotReachTransport() async throws {
-        let scenarios: [(PayabliPayInPaymentFlowACHData, String)] = [
-            (PayabliPayInPaymentFlowACHData(
+        let scenarios: [(PayabliPayInBankAccountData, String)] = [
+            (PayabliPayInBankAccountData(
                 accountNumber: String(repeating: "1", count: 18),
                 accountType: .checking,
                 holderName: "John Doe",
                 routingNumber: "123456780"
             ), "ACH account number must be 4 to 17 digits."),
-            (PayabliPayInPaymentFlowACHData(
+            (PayabliPayInBankAccountData(
                 accountNumber: "1111111111111",
                 accountType: .checking,
                 holderName: "John Doe",
                 routingNumber: "1234567800"
             ), "ACH routing number must be 9 digits."),
-            (PayabliPayInPaymentFlowACHData(
+            (PayabliPayInBankAccountData(
                 accountNumber: "1111111111111",
                 accountType: .checking,
                 holderName: String(repeating: "A", count: 61),
@@ -357,7 +357,7 @@ final class TokenStorageClientTests: XCTestCase {
             do {
                 _ = try await client.addMethod(
                     entryPoint: "entry",
-                    paymentMethod: .ach(paymentMethod)
+                    paymentMethod: .bankAccount(paymentMethod)
                 )
                 XCTFail("Expected validation error")
             } catch let PayabliPayInPaymentFlowTokenStorageError.invalidInput(message) {
@@ -460,7 +460,7 @@ final class TokenStorageClientTests: XCTestCase {
         do {
             _ = try await client.addMethod(
                 entryPoint: "entry",
-                paymentMethod: .ach(PayabliPayInPaymentFlowACHData(
+                paymentMethod: .bankAccount(PayabliPayInBankAccountData(
                     accountNumber: "1111111111111",
                     accountType: .checking,
                     holderName: "John Doe",
@@ -689,8 +689,8 @@ final class TokenStorageClientTests: XCTestCase {
         let viewModel = PayabliPayInPaymentFlowViewModel(
             component: component,
             configuration: PayabliPayInPaymentFlowFormConfiguration(
-                allowedMethods: [.ach],
-                defaultMethod: .ach,
+                allowedMethods: [.bankAccount],
+                defaultMethod: .bankAccount,
                 achFieldOrder: [.achHolder, .achRouting, .achAccount, .achAccountType, .achSecCode],
                 hiddenValues: PayabliPayInPaymentFlowHiddenValues(
                     achHolderType: .business,
@@ -774,8 +774,8 @@ final class TokenStorageClientTests: XCTestCase {
                 transport: transport
             ),
             configuration: PayabliPayInPaymentFlowFormConfiguration(
-                allowedMethods: [.ach],
-                defaultMethod: .ach
+                allowedMethods: [.bankAccount],
+                defaultMethod: .bankAccount
             )
         )
         viewModel.achHolder = "Jane Business"

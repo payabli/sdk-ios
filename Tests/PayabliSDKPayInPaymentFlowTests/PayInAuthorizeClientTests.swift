@@ -10,7 +10,7 @@ final class PayInAuthorizeClientTests: XCTestCase {
         let transport = MockPaymentCaptureTransport(responseBody: Self.authorizedResponse)
 
         _ = try await authorize(
-            .stored(PayabliPayInPaymentFlowStoredMethod(method: .card, storedMethodId: "stored-card-1")),
+            .stored(PayabliPayInPaymentMethod.Stored(method: .card, storedMethodId: "stored-card-1")),
             on: transport
         )
 
@@ -25,7 +25,7 @@ final class PayInAuthorizeClientTests: XCTestCase {
     func testACloudDeviceIsAuthorized() async throws {
         let transport = MockPaymentCaptureTransport(responseBody: Self.authorizedResponse)
 
-        _ = try await authorize(.cloud(PayabliPayInPaymentFlowCloudMethod(device: "device-1")), on: transport)
+        _ = try await authorize(.cloudDevice(PayabliPayInPaymentMethod.CloudDevice(device: "device-1")), on: transport)
 
         let request = try await firstRequest(from: transport)
         XCTAssertEqual(request.path, "/api/v2/MoneyIn/authorize")
@@ -36,27 +36,27 @@ final class PayInAuthorizeClientTests: XCTestCase {
 
     func testACloudDeviceWithNoDeviceIsRefusedBeforeAnythingIsSent() async throws {
         try await assertRefused(
-            .cloud(PayabliPayInPaymentFlowCloudMethod(device: "  ")),
+            .cloudDevice(PayabliPayInPaymentMethod.CloudDevice(device: "  ")),
             message: "Cloud device is required."
         )
     }
 
     func testAStoredBankAccountIsRefusedBeforeAnythingIsSent() async throws {
         try await assertRefused(
-            .stored(PayabliPayInPaymentFlowStoredMethod(method: .ach, storedMethodId: "stored-ach-1")),
+            .stored(PayabliPayInPaymentMethod.Stored(method: .bankAccount, storedMethodId: "stored-ach-1")),
             message: "This payment method cannot be authorized."
         )
     }
 
     func testABankAccountACheckAndCashAreRefusedBeforeAnythingIsSent() async throws {
-        let methods: [PayabliPayInPaymentFlowPaymentMethod] = [
-            .ach(PayabliPayInPaymentFlowACHMethod(data: PayabliPayInPaymentFlowACHData(
+        let methods: [PayabliPayInPaymentMethod] = [
+            .bankAccount(PayabliPayInPaymentMethod.BankAccount(data: PayabliPayInBankAccountData(
                 accountNumber: "1111111111111",
                 accountType: .checking,
                 holderName: "John Doe",
                 routingNumber: "123456780"
             ))),
-            .check(PayabliPayInPaymentFlowCheckMethod(holderName: "John Doe")),
+            .check(PayabliPayInPaymentMethod.Check(holderName: "John Doe")),
             .cash
         ]
         for method in methods {
@@ -67,7 +67,7 @@ final class PayInAuthorizeClientTests: XCTestCase {
     // MARK: - Support
 
     private func authorize(
-        _ method: PayabliPayInPaymentFlowPaymentMethod,
+        _ method: PayabliPayInPaymentMethod,
         on transport: MockPaymentCaptureTransport
     ) async throws -> PayabliPayInPaymentFlowResult {
         try await PayInPaymentFlowClient(transport: transport).authorize(
@@ -81,7 +81,7 @@ final class PayInAuthorizeClientTests: XCTestCase {
     }
 
     private func assertRefused(
-        _ method: PayabliPayInPaymentFlowPaymentMethod,
+        _ method: PayabliPayInPaymentMethod,
         message expected: String,
         file: StaticString = #filePath,
         line: UInt = #line

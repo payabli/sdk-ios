@@ -11,7 +11,7 @@ npx create-expo-app@latest Example/PayabliReactNativeDemo --template blank-types
 ## What It Covers
 
 - Tap to Pay configure, initialize, charge, activate-device, state polling, and event logging.
-- PayIn stored card and ACH calls through `PayabliPayInPaymentFlow.addCard(...)` and `PayabliPayInPaymentFlow.addACH(...)`.
+- PayIn stored card and ACH calls through `PayabliPayInPaymentFlow.addCard(...)` and `PayabliPayInPaymentFlow.addBankAccount(...)`.
 
 ## Setup
 
