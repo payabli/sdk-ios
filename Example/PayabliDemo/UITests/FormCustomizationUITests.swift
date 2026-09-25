@@ -24,9 +24,12 @@ final class FormCustomizationUITests: XCTestCase {
 
         let cardNumber = app.textFields["payabli.payInPaymentFlow.field.cardNumber"]
         XCTAssertTrue(cardNumber.waitForExistence(timeout: 10), "the form never appeared")
+        let firstName = app.textFields["payabli.payInPaymentFlow.field.firstName"]
+        XCTAssertFalse(firstName.exists, "the Default preset shows a customer section the SDK's default has not")
         attachScreenshot("default-capture")
 
         choosePreset("Brand", in: app)
+        XCTAssertTrue(firstName.waitForExistence(timeout: 10), "the Brand preset shows no customer section")
         attachScreenshot("brand-capture")
 
         choosePreset("Minimal", in: app)

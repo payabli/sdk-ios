@@ -11,7 +11,7 @@ final class PayInFormCustomizationTests: XCTestCase {
         XCTAssertEqual(preset.look, .appTheme)
         XCTAssertEqual(preset.methods, .cardAndBank)
         XCTAssertEqual(preset.startOn, .card)
-        XCTAssertTrue(preset.showsCustomerSection)
+        XCTAssertFalse(preset.showsCustomerSection)
         XCTAssertTrue(preset.titlesAmountSummary)
         XCTAssertTrue(preset.groupsCardNumber)
         XCTAssertTrue(preset.masksAccountNumber)
@@ -36,7 +36,8 @@ final class PayInFormCustomizationTests: XCTestCase {
         XCTAssertEqual(configuration.labels.title, sdkDefault.labels.title)
         XCTAssertEqual(configuration.labels.submitButton, sdkDefault.labels.submitButton)
         XCTAssertEqual(configuration.inputSizing, sdkDefault.inputSizing)
-        XCTAssertEqual(configuration.cardSections.map(\.title), [nil, nil, "Payment Information"])
+        XCTAssertEqual(configuration.cardSections.map(\.title), sdkDefault.cardSections.map(\.title))
+        XCTAssertEqual(configuration.cardSections.map(\.fields), sdkDefault.cardSections.map(\.fields))
     }
 
     func testTheBrandPreset() {
@@ -120,6 +121,7 @@ final class PayInFormCustomizationTests: XCTestCase {
 
     func testTheCustomerSectionFollowsThePaymentUnlessMovedFirst() {
         var customization = PayInFormCustomization()
+        customization.showsCustomerSection = true
 
         XCTAssertEqual(
             customization.configuration(capturing: true).cardSections.map(\.fields.first),

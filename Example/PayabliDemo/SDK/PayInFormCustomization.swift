@@ -55,7 +55,7 @@ struct PayInFormCustomization: Hashable {
     var labelsInsideFields = false
     var hidesLabels = false
     var usesCustomWording = false
-    var showsCustomerSection = true
+    var showsCustomerSection = false
     var customerSectionFirst = false
     var requiresCustomerNumber = false
     var titlesAmountSummary = true
@@ -76,6 +76,7 @@ struct PayInFormCustomization: Hashable {
             look = .brand
             labelsInsideFields = true
             usesCustomWording = true
+            showsCustomerSection = true
             customerSectionFirst = true
             requiresCustomerNumber = true
             dashesExpiry = true
@@ -86,7 +87,6 @@ struct PayInFormCustomization: Hashable {
             look = .compact
             methods = .cardOnly
             hidesLabels = true
-            showsCustomerSection = false
             titlesAmountSummary = false
             groupsCardNumber = false
             cardBrandIconPlacement = .hidden
