@@ -23,16 +23,19 @@ struct SimpleCaptureView: View {
                         appControls
                     }
 
-                    OwnerFrame(title: "Payabli SDK", dashed: true) {
-                        PaymentFormHost(
-                            flow: capturing ? captureFlow : saveFlow,
-                            form: form,
-                            onCompleted: handleCompleted,
-                            onFailed: handleFailed
-                        )
-                        // The form keeps part of its configuration from when it was built, so each
-                        // change of setting or of flow builds a new one.
-                        .id(FormIdentity(capturing: capturing, customization: customization))
+                    // A capture needs an amount, so without a valid one there is no form to submit.
+                    if !capturing || enteredAmount != nil {
+                        OwnerFrame(title: "Payabli SDK", dashed: true) {
+                            PaymentFormHost(
+                                flow: capturing ? captureFlow : saveFlow,
+                                form: form,
+                                onCompleted: handleCompleted,
+                                onFailed: handleFailed
+                            )
+                            // The form keeps part of its configuration from when it was built, so each
+                            // change of setting or of flow builds a new one.
+                            .id(FormIdentity(capturing: capturing, customization: customization))
+                        }
                     }
 
                     if !resultText.isEmpty {
@@ -78,8 +81,18 @@ struct SimpleCaptureView: View {
                         .disabled(captureFlow.isSubmitting)
                         .accessibilityIdentifier("simpleCapture.amount")
                 }
+                if enteredAmount == nil {
+                    Text("A positive amount, up to two decimals.")
+                        .font(.footnote)
+                        .foregroundColor(.payabliError)
+                        .accessibilityIdentifier("simpleCapture.amountError")
+                }
             }
         }
+    }
+
+    private var enteredAmount: Double? {
+        AmountEntry.amount(from: amountText)
     }
 
     private var form: PayInFormSetup {
@@ -177,7 +190,7 @@ struct SimpleCaptureView: View {
     /// Each amount is a new attempt with its own key. Not while a submission is in flight, which the
     /// handle refuses.
     private func applyAmount() {
-        guard let amount = AmountEntry.amount(from: amountText) else { return }
+        guard let amount = enteredAmount else { return }
         _ = captureFlow.startNewAttempt(
             suppliesCustomer: demoCustomer.suppliesPayInCustomer,
             amount: amount,

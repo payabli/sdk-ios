@@ -7,8 +7,15 @@ enum AmountEntry {
         amount.formatted(.number.precision(.fractionLength(2)).grouping(.never).locale(locale))
     }
 
+    /// A positive amount written as digits with at most two decimal places, or nil.
     static func amount(from text: String, locale: Locale = .autoupdatingCurrent) -> Double? {
-        guard let amount = try? Double(text, format: .number.locale(locale)), amount > 0 else { return nil }
+        let separator = locale.decimalSeparator ?? "."
+        let pattern = "^[0-9]+(" + NSRegularExpression.escapedPattern(for: separator) + "[0-9]{1,2})?$"
+        let trimmed = text.trimmingCharacters(in: .whitespaces)
+        guard trimmed.range(of: pattern, options: .regularExpression) != nil,
+              let amount = Double(trimmed.replacingOccurrences(of: separator, with: ".")),
+              amount > 0
+        else { return nil }
         return amount
     }
 }

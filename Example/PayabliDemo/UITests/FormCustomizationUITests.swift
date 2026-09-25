@@ -42,6 +42,30 @@ final class FormCustomizationUITests: XCTestCase {
         attachScreenshot("brand-tokenize")
     }
 
+    func testAnInvalidAmountTakesTheFormAway() {
+        let app = launch(showingSimpleCapture: true)
+        let tab = app.tabBars.buttons["S-Capture"]
+        XCTAssertTrue(tab.waitForExistence(timeout: 10), "the S-Capture tab is not shown")
+        tab.tap()
+
+        let cardNumber = app.textFields["payabli.payInPaymentFlow.field.cardNumber"]
+        XCTAssertTrue(cardNumber.waitForExistence(timeout: 10), "the form never appeared")
+
+        let amount = app.textFields["simpleCapture.amount"]
+        // At the trailing edge the caret lands after the text, so each delete takes one character.
+        amount.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)).tap()
+        let typed = (amount.value as? String) ?? ""
+        amount.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: typed.count) + "0")
+        XCTAssertEqual(amount.value as? String, "0")
+
+        XCTAssertTrue(app.staticTexts["simpleCapture.amountError"].waitForExistence(timeout: 5))
+        XCTAssertFalse(cardNumber.exists, "the form is still drawn over an amount of zero")
+
+        amount.typeText("5")
+        XCTAssertTrue(cardNumber.waitForExistence(timeout: 10), "the form did not return for a valid amount")
+        XCTAssertFalse(app.staticTexts["simpleCapture.amountError"].exists)
+    }
+
     private func launch(showingSimpleCapture: Bool) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments = ["-PayabliEnvironment", "qa", "-showsSimpleCapture", showingSimpleCapture ? "YES" : "NO"]
