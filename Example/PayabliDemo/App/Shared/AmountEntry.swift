@@ -23,6 +23,7 @@ enum AmountEntry {
         }
         guard ascii.range(of: "^[0-9]+(\\.[0-9]{1,2})?$", options: .regularExpression) != nil,
               let amount = Double(ascii),
+              amount.isFinite,
               amount > 0
         else { return nil }
         return amount

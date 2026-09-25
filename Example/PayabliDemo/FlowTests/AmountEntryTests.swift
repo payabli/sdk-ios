@@ -19,5 +19,9 @@ final class AmountEntryTests: XCTestCase {
         for text in ["", "0", "0,00", "-1", "+1", "12,345", "1.000,00", "12.50", "1e3", "abc", "12,", "1 2"] {
             XCTAssertNil(AmountEntry.amount(from: text, locale: german), "\(text) was read")
         }
+        XCTAssertNil(
+            AmountEntry.amount(from: String(repeating: "9", count: 400), locale: german),
+            "an amount too large for a Double was read as infinity"
+        )
     }
 }
