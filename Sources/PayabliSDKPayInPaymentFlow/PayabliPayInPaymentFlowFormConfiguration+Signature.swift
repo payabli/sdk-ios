@@ -1,5 +1,19 @@
 import Foundation
 
+/// Carries the configuration itself into a change handler, which may otherwise read the view's
+/// previous value.
+struct PayInPaymentFlowConfigurationChange: Equatable {
+    let configuration: PayabliPayInPaymentFlowFormConfiguration
+
+    init(_ configuration: PayabliPayInPaymentFlowFormConfiguration) {
+        self.configuration = configuration
+    }
+
+    static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.configuration.payabliViewModelSignature == rhs.configuration.payabliViewModelSignature
+    }
+}
+
 extension PayabliPayInPaymentFlowFormConfiguration {
     var payabliViewModelSignature: String {
         [
