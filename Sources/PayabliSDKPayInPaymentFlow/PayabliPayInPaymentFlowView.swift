@@ -77,8 +77,8 @@ public struct PayabliPayInPaymentFlowView: View {
             syncViewModelConfiguration()
             viewModel.normalizeSelectedMethodForAvailableMethods()
         }
-        .onChange(of: configuration.payabliViewModelSignature) { _ in
-            syncViewModelConfiguration()
+        .onChange(of: PayInPaymentFlowConfigurationChange(configuration)) { change in
+            viewModel.update(component: component, configuration: change.configuration)
         }
         .onChange(of: viewModel.availableMethods) { _ in
             viewModel.normalizeSelectedMethodForAvailableMethods()
