@@ -27,10 +27,10 @@ malformed edit but not a wrong signature.
 
 The current Flutter, .NET MAUI, and React Native payment-flow bridge surfaces
 expose stored card/bank account payment-method creation. Native Swift apps should use
-`PayabliSDKPayInPaymentFlow` directly for capture, authorize, and
+`PayabliSDKPayIn` directly for capture, authorize, and
 capture-authorized transaction flows until those request models are promoted
 into the bridge APIs.
 
 For payment flow-specific bridge setup, access-token handling, and sample
 stored card/bank account calls, see
-[`Documentation/PayInPaymentFlowIntegrationGuide.md`](../Documentation/PayInPaymentFlowIntegrationGuide.md).
+[`Documentation/PayInIntegrationGuide.md`](../Documentation/PayInIntegrationGuide.md).

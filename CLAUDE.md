@@ -43,7 +43,7 @@ xcodebuild test -scheme PayabliSDK-Package -destination '...' -quiet
 ```
 
 Schemes: `PayabliSDK-Package` (everything, the one CI uses), `PayabliSDK`, `PayabliSDKTapToPay`,
-`PayabliSDKPayInPaymentFlow`. A scheme exists per product, so Core, Telemetry and `PayabliSDKTestUtils`
+`PayabliSDKPayIn`. A scheme exists per product, so Core, Telemetry and `PayabliSDKTestUtils`
 have none; they build as dependencies of the products and the test targets.
 
 ## Code Quality
@@ -96,7 +96,7 @@ channel, so an app that never accepts card-present never links the certified car
 - `PayabliSDKTapToPay` - the entire Tap to Pay on iPhone surface: `PayabliTTP` facade, App Attest
   attestation, `SessionManager`, `KeychainStorage`, the card-reader adapter stack (depends on Core,
   `PayabliCardReaderCore` under an iOS-only condition)
-- `PayabliSDKPayInPaymentFlow` - card-not-present tokenization, capture, Apple Pay, card and bank account forms
+- `PayabliSDKPayIn` - card-not-present tokenization, capture, Apple Pay, card and bank account forms
   (depends on Core)
 
 **Shared:**
@@ -125,11 +125,11 @@ channel, so an app that never accepts card-present never links the certified car
   silently.
 
 **Umbrella:**
-- `PayabliSDK` - aggregates Core, TapToPay, PayInPaymentFlow and Telemetry. An app links it or the
+- `PayabliSDK` - aggregates Core, TapToPay, PayIn and Telemetry. An app links it or the
   capability products, never both.
 
 **Release XCFrameworks:** `Scripts/build_release_frameworks.sh` ships Core, Telemetry, TapToPay and
-PayInPaymentFlow, each once. TapToPay and PayInPaymentFlow load Core and Telemetry rather than carrying
+PayIn, each once. TapToPay and PayIn load Core and Telemetry rather than carrying
 them, and the script refuses a build where that stops being true.
 
 ### Key Patterns
@@ -202,7 +202,7 @@ them, and the script refuses a build where that stops being true.
 - `Sources/` - first-party code, one directory per target
 - `ThirdParty/PayabliCardReaderCoreSource/README.md` - the vendoring contract; read it before refreshing
 - `Sources/PayabliSDKTapToPay/README.md` - the full TapToPay file map
-- `Sources/PayabliSDKPayInPaymentFlow/README.md` - the PayIn surface
+- `Sources/PayabliSDKPayIn/README.md` - the PayIn surface
 - `Tests/` - one XCTest target per module
 - `Example/PayabliDemo/` - sample app; needs `Secrets.swift`, copy `Secrets.swift.sample`
 - `Bridges/` - Flutter, .NET MAUI and React Native wrappers. Not built by SPM; leave them alone during

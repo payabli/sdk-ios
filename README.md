@@ -65,7 +65,7 @@ capability product.
 | ---------------------------- | ------------------------------------------------------------------- |
 | `PayabliSDK`                 | Everything: Tap to Pay and the PayIn payment flow.                  |
 | `PayabliSDKTapToPay`         | Tap to Pay on iPhone.                                               |
-| `PayabliSDKPayInPaymentFlow` | Card/bank account stored-method, capture, and authorize component.  |
+| `PayabliSDKPayIn` | Card/bank account stored-method, capture, and authorize component.  |
 
 Every product includes `PayabliSDKCore` (config, auth, transport) and
 `PayabliSDKTelemetry` (Sentry and PostHog plumbing; bring your own instance).
@@ -195,12 +195,12 @@ For card PAN or bank account stored-method, capture, or authorize flows, link th
 opt-in PayIn payment flow component:
 
 ```swift
-.product(name: "PayabliSDKPayInPaymentFlow", package: "sdk-ios")
+.product(name: "PayabliSDKPayIn", package: "sdk-ios")
 ```
 
-See [`Documentation/PayInPaymentFlowOverview.md`](Documentation/PayInPaymentFlowOverview.md)
+See [`Documentation/PayInOverview.md`](Documentation/PayInOverview.md)
 for the complete feature reference and
-[`Documentation/PayInPaymentFlowIntegrationGuide.md`](Documentation/PayInPaymentFlowIntegrationGuide.md)
+[`Documentation/PayInIntegrationGuide.md`](Documentation/PayInIntegrationGuide.md)
 for SwiftUI integration examples.
 
 To use both capabilities, link both products, or link `PayabliSDK` alone.
@@ -212,7 +212,7 @@ Each GitHub Release attaches `payabli-ios-sdk-<version>.zip`, for apps that
 do not use Swift Package Manager. Add the XCFrameworks you need to your app
 target and set each to **Embed & Sign**:
 
-- `PayabliSDKTapToPay.xcframework`, `PayabliSDKPayInPaymentFlow.xcframework`,
+- `PayabliSDKTapToPay.xcframework`, `PayabliSDKPayIn.xcframework`,
   or both.
 - `PayabliSDKCore.xcframework` and `PayabliSDKTelemetry.xcframework`, always.
   Both capabilities load them, and an app without them fails at launch.

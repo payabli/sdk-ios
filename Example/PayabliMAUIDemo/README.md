@@ -15,8 +15,8 @@ Minimal .NET MAUI demo wrapping Tap to Pay and payment flow through the
 - **Session badge** — current `PayabliTTPSessionState` shown in the
   page header.
 - **Card and bank account payment flow** — sample forms calling
-  `PayabliPayInPaymentFlowObjC.AddCard(...)` and
-  `PayabliPayInPaymentFlowObjC.AddBankAccount(...)`, then rendering the
+  `PayabliPayInObjC.AddCard(...)` and
+  `PayabliPayInObjC.AddBankAccount(...)`, then rendering the
   stored-method response.
 
 ## Setup
@@ -31,7 +31,7 @@ Minimal .NET MAUI demo wrapping Tap to Pay and payment flow through the
    cp -R build/release/xcframeworks/PayabliSDKCore.xcframework        Bridges/MAUI/Frameworks/
    cp -R build/release/xcframeworks/PayabliSDKTelemetry.xcframework   Bridges/MAUI/Frameworks/
    cp -R build/release/xcframeworks/PayabliSDKTapToPay.xcframework    Bridges/MAUI/Frameworks/
-   cp -R build/release/xcframeworks/PayabliSDKPayInPaymentFlow.xcframework Bridges/MAUI/Frameworks/
+   cp -R build/release/xcframeworks/PayabliSDKPayIn.xcframework Bridges/MAUI/Frameworks/
    ```
 3. Restore and build the demo with the .NET 10 iOS workload:
    ```bash
@@ -47,7 +47,7 @@ Minimal .NET MAUI demo wrapping Tap to Pay and payment flow through the
    sudo dotnet workload install maui-ios mobile-librarybuilder
    ```
 4. Wire `FetchAccessTokenFromPartnerBackend()` and
-   `FetchPayInPaymentFlowAccessTokenFromPartnerBackend()` in `MainPage.xaml.cs` to
+   `FetchPayInAccessTokenFromPartnerBackend()` in `MainPage.xaml.cs` to
    your backend's Tap to Pay token and payment flow access-token endpoints,
    then update the `Secrets` constants (`EntryPoint`, `AppId`).
 5. Run on a physical iPhone XS or newer.

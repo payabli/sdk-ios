@@ -11,7 +11,7 @@ npx create-expo-app@latest Example/PayabliReactNativeDemo --template blank-types
 ## What It Covers
 
 - Tap to Pay configure, initialize, charge, activate-device, state polling, and event logging.
-- PayIn stored card and bank account calls through `PayabliPayInPaymentFlow.addCard(...)` and `PayabliPayInPaymentFlow.addBankAccount(...)`.
+- PayIn stored card and bank account calls through `PayabliPayIn.addCard(...)` and `PayabliPayIn.addBankAccount(...)`.
 
 ## Setup
 
@@ -32,7 +32,7 @@ After prebuild, add the native iOS bridge to the generated app target:
 
 - Add `Bridges/ReactNative/PayabliSDKModule.swift` to the iOS target.
 - Add `Bridges/ReactNative/PayabliSDKModuleBridge.m` to the same iOS target so React Native exports the Swift module.
-- Add the local Swift package products `PayabliSDKTapToPay` and `PayabliSDKPayInPaymentFlow` to the generated Xcode project. `PayabliSDKCore` and `PayabliCardReaderCore` are linked transitively where needed.
+- Add the local Swift package products `PayabliSDKTapToPay` and `PayabliSDKPayIn` to the generated Xcode project. `PayabliSDKCore` and `PayabliCardReaderCore` are linked transitively where needed.
 - Add Tap to Pay entitlements to the iOS target before running on a physical device.
 
 ## Secrets
