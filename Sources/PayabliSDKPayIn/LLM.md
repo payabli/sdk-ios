@@ -297,6 +297,7 @@ recognizable on the store route, so a key sent there is read by nothing.
 | --- | --- |
 | `totalAmount` | Required. Must be greater than 0. |
 | `serviceFee` | Optional. Must not be negative. Currency JSON is normalized to two decimals such as `0.10`. |
+| `surchargeFee` | Optional. Currency JSON is normalized to two decimals such as `0.30`. |
 | `currency` | Optional processor currency, for example `USD`. |
 | `checkNumber` | Optional for check flows. |
 | `checkUniqueId` | Optional for check flows. |
@@ -423,6 +424,7 @@ All `PayabliPayInField` values:
 | `.billingZip` | Billing Postal Code | Customer |
 | `.amount` | Amount | Payment summary |
 | `.serviceFee` | Fee | Payment summary |
+| `.surchargeFee` | Surcharge | Payment summary |
 
 `PayabliPayInFieldSection`:
 
@@ -548,10 +550,7 @@ submit. Rows are vertical. Labels are left aligned; values are right aligned.
 | Field | Default | Purpose |
 | --- | --- | --- |
 | `amountLabelText` | derived from `.amount` label plus colon | Override amount label text. |
-| `amountValueText` | derived from `paymentDetails.totalAmount` | Override amount display value. |
 | `feeLabelText` | derived from `.serviceFee` label plus colon | Override fee label text. |
-| `feeValueText` | derived from `paymentDetails.serviceFee` | Override fee display value. |
-| `currencySymbol` | `$` | Symbol used by generated display values. |
 | `labelStyle` | subheadline secondary | Font and color for summary labels. |
 | `valueStyle` | semibold subheadline primary | Font and color for summary values. |
 | `rowSpacing` | 8 | Vertical spacing between amount and fee rows. |
@@ -561,9 +560,7 @@ Example:
 ```swift
 PayabliPayInPaymentSummaryConfiguration(
     amountLabelText: "Amount:",
-    amountValueText: "$ 1.00",
     feeLabelText: "Fee:",
-    feeValueText: "$ 0.10",
     labelStyle: PayabliPayInPaymentSummaryTextStyle(
         font: .footnote,
         color: .secondary

@@ -86,7 +86,8 @@ final class PayInPaymentFlowClientTests: XCTestCase {
             entryPoint: "entry",
             request: cardRequest(
                 totalAmount: 1,
-                serviceFee: 0.1 + 0.000_000_000_001
+                serviceFee: 0.1 + 0.000_000_000_001,
+                surchargeFee: 0.3 + 0.000_000_000_001
             )
         )
 
@@ -95,11 +96,34 @@ final class PayInPaymentFlowClientTests: XCTestCase {
         let bodyText = try XCTUnwrap(String(data: body, encoding: .utf8))
         XCTAssertTrue(bodyText.contains(#""totalAmount":1.00"#), bodyText)
         XCTAssertTrue(bodyText.contains(#""serviceFee":0.10"#), bodyText)
+        XCTAssertTrue(bodyText.contains(#""surchargeFee":0.30"#), bodyText)
 
         let parsedBody = try parseBody(request)
         let details = try XCTUnwrap(parsedBody["paymentDetails"] as? [String: Any])
         XCTAssertEqual(details["totalAmount"] as? Double, 1)
         XCTAssertEqual(details["serviceFee"] as? Double, 0.1)
+        XCTAssertEqual(details["surchargeFee"] as? Double, 0.3)
+    }
+
+    func testPaymentDetailsWithoutASurchargeSendNone() async throws {
+        let transport = MockPaymentCaptureTransport(responseBody: Self.approvedResponse)
+        let client = PayInPaymentFlowClient(
+            transport: transport
+        )
+
+        _ = try await client.capture(
+            entryPoint: "entry",
+            request: cardRequest(surchargeFee: nil)
+        )
+
+        let request = try await firstRequest(from: transport)
+        let body = try XCTUnwrap(request.body)
+        let bodyText = try XCTUnwrap(String(data: body, encoding: .utf8))
+        XCTAssertFalse(bodyText.contains("surchargeFee"), bodyText)
+
+        let parsedBody = try parseBody(request)
+        let details = try XCTUnwrap(parsedBody["paymentDetails"] as? [String: Any])
+        XCTAssertNil(details["surchargeFee"])
     }
 
     func testCaptureAuthorizedSerializesPathAndPaymentDetailsOnly() async throws {
@@ -412,6 +436,7 @@ final class PayInPaymentFlowClientTests: XCTestCase {
     private func cardRequest(
         totalAmount: Double = 100,
         serviceFee: Double? = 5,
+        surchargeFee: Double? = nil,
         achValidation: Bool? = nil,
         forceCustomerCreation: Bool? = nil,
         idempotencyKey: String? = nil,
@@ -421,6 +446,7 @@ final class PayInPaymentFlowClientTests: XCTestCase {
             paymentDetails: PayabliPayInPaymentDetails(
                 totalAmount: totalAmount,
                 serviceFee: serviceFee,
+                surchargeFee: surchargeFee,
                 currency: "USD"
             ),
             paymentMethod: .card(PayabliPayInPaymentMethod.Card(

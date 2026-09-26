@@ -22,6 +22,7 @@ public enum PayabliPayInField: String, CaseIterable, Identifiable, Sendable {
     case billingZip
     case amount
     case serviceFee
+    case surchargeFee
 
     public var id: String {
         rawValue
@@ -149,7 +150,8 @@ public struct PayabliPayInLabels: Sendable {
         .billingEmail: "Billing email",
         .billingZip: "Billing Postal Code",
         .amount: "Amount",
-        .serviceFee: "Fee"
+        .serviceFee: "Fee",
+        .surchargeFee: "Surcharge"
     ]
 }
 
@@ -228,20 +230,14 @@ public struct PayabliPayInPaymentSummaryTextStyle: Sendable {
 
 public struct PayabliPayInPaymentSummaryConfiguration: Sendable {
     public let amountLabelText: String?
-    public let amountValueText: String?
     public let feeLabelText: String?
-    public let feeValueText: String?
-    public let currencySymbol: String
     public let labelStyle: PayabliPayInPaymentSummaryTextStyle
     public let valueStyle: PayabliPayInPaymentSummaryTextStyle
     public let rowSpacing: CGFloat
 
     public init(
         amountLabelText: String? = nil,
-        amountValueText: String? = nil,
         feeLabelText: String? = nil,
-        feeValueText: String? = nil,
-        currencySymbol: String = "$",
         labelStyle: PayabliPayInPaymentSummaryTextStyle = PayabliPayInPaymentSummaryTextStyle(
             font: .subheadline,
             color: .secondary
@@ -253,10 +249,7 @@ public struct PayabliPayInPaymentSummaryConfiguration: Sendable {
         rowSpacing: CGFloat = 8
     ) {
         self.amountLabelText = amountLabelText?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty
-        self.amountValueText = amountValueText?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty
         self.feeLabelText = feeLabelText?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty
-        self.feeValueText = feeValueText?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty
-        self.currencySymbol = currencySymbol.payabliCaptureTrimmed.payabliCaptureNilIfEmpty ?? "$"
         self.labelStyle = labelStyle
         self.valueStyle = valueStyle
         self.rowSpacing = max(0, rowSpacing)
@@ -271,6 +264,8 @@ public struct PayabliPayInPaymentSummaryConfiguration: Sendable {
             return amountLabelText ?? Self.defaultLabelText(label: labels.label(for: field))
         case .serviceFee:
             return feeLabelText ?? Self.defaultLabelText(label: labels.label(for: field))
+        case .surchargeFee:
+            return Self.defaultLabelText(label: labels.label(for: field))
         default:
             return labels.label(for: field)
         }
@@ -282,15 +277,11 @@ public struct PayabliPayInPaymentSummaryConfiguration: Sendable {
     ) -> String {
         switch field {
         case .amount:
-            return amountValueText ?? Self.defaultValueText(
-                currencySymbol: currencySymbol,
-                value: paymentDetails?.totalAmount ?? 0
-            )
+            return Self.defaultValueText(value: paymentDetails?.totalAmount ?? 0)
         case .serviceFee:
-            return feeValueText ?? Self.defaultValueText(
-                currencySymbol: currencySymbol,
-                value: paymentDetails?.serviceFee ?? 0
-            )
+            return Self.defaultValueText(value: paymentDetails?.serviceFee ?? 0)
+        case .surchargeFee:
+            return Self.defaultValueText(value: paymentDetails?.surchargeFee ?? 0)
         default:
             return ""
         }
@@ -314,10 +305,9 @@ public struct PayabliPayInPaymentSummaryConfiguration: Sendable {
     }
 
     private static func defaultValueText(
-        currencySymbol: String,
         value: Double
     ) -> String {
-        "\(currencySymbol) \(String(format: "%.2f", value))"
+        "$ \(String(format: "%.2f", value))"
     }
 }
 
@@ -340,6 +330,7 @@ public struct PayabliPayInFormConfiguration: Sendable {
     public let cardSections: [PayabliPayInFieldSection]
     public let bankSections: [PayabliPayInFieldSection]
     public let paymentSummary: PayabliPayInPaymentSummaryConfiguration
+    public let showsBaseAmount: Bool
 
     public init(
         allowedMethods: [PayabliPayInMethodType] = [.card, .bankAccount],
@@ -359,7 +350,8 @@ public struct PayabliPayInFormConfiguration: Sendable {
         cardBrandIconPlacement: PayabliPayInCardBrandIconPlacement = .trailing,
         errorMessagePlacement: PayabliPayInErrorMessagePlacement = .aboveSubmitButton,
         requiredFields: Set<PayabliPayInField> = [],
-        paymentSummary: PayabliPayInPaymentSummaryConfiguration = PayabliPayInPaymentSummaryConfiguration()
+        paymentSummary: PayabliPayInPaymentSummaryConfiguration = PayabliPayInPaymentSummaryConfiguration(),
+        showsBaseAmount: Bool = true
     ) {
         let methods = allowedMethods.isEmpty ? [defaultMethod] : allowedMethods
         let visibleRequiredFields = Self.visibleRequiredFields(from: requiredFields)
@@ -396,6 +388,7 @@ public struct PayabliPayInFormConfiguration: Sendable {
         self.errorMessagePlacement = errorMessagePlacement
         self.requiredFields = visibleRequiredFields.union(Self.requiredPaymentFields)
         self.paymentSummary = paymentSummary
+        self.showsBaseAmount = showsBaseAmount
     }
 
     public static let defaultCardFieldOrder: [PayabliPayInField] = [
@@ -569,7 +562,8 @@ public struct PayabliPayInFormConfiguration: Sendable {
             cardBrandIconPlacement: cardBrandIconPlacement,
             errorMessagePlacement: errorMessagePlacement,
             requiredFields: requiredFields,
-            paymentSummary: paymentSummary
+            paymentSummary: paymentSummary,
+            showsBaseAmount: showsBaseAmount
         )
     }
 }

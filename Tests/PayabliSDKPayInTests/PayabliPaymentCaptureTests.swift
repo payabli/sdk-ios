@@ -37,9 +37,41 @@ final class PayabliPayInTests: XCTestCase {
         XCTAssertFalse(component.isSubmitting)
         XCTAssertEqual(component.lastResult?.code, "A0000")
         XCTAssertEqual(result.transaction?.paymentTransId, "trans-1")
+        XCTAssertNil(result.transaction?.surchargeFee)
         let request = try await firstFacadeRequest(from: transport)
         XCTAssertNil(request.headers["Authorization"], "the client contributes no credential")
         XCTAssertNil(request.headers["requestToken"])
+    }
+
+    func testTheCapturedTransactionDecodesTheSurchargeFee() async throws {
+        let transport = FacadeTransport(responseBody: """
+        {
+          "code": "A0000",
+          "reason": "Approved",
+          "explanation": "Approved.",
+          "action": "No action required.",
+          "data": {
+            "paymentTransId": "trans-1",
+            "method": "card",
+            "operation": "Sale",
+            "surchargeFee": 0.30
+          },
+          "token": null
+        }
+        """)
+        let component = PayabliPayIn(
+            entryPoint: "entry",
+            environment: .sandbox,
+            transport: transport
+        )
+
+        let result = try await component.capture(PayabliPayInRequest(
+            paymentDetails: PayabliPayInPaymentDetails(totalAmount: 12.34),
+            paymentMethod: .cash
+        ))
+
+        XCTAssertEqual(result.transaction?.surchargeFee, 0.30)
+        XCTAssertEqual(component.lastResult?.transaction?.surchargeFee, 0.30)
     }
 
     func testConfigureRebuildsClientWithNewEnvironmentAndEntrypoint() async throws {
@@ -296,6 +328,7 @@ final class PayabliPayInTests: XCTestCase {
         let paymentDetails = PayabliPayInPaymentDetails(
             totalAmount: 1,
             serviceFee: 0.10,
+            surchargeFee: 0.30,
             currency: "USD"
         )
         let labels = PayabliPayInLabels()
@@ -318,15 +351,21 @@ final class PayabliPayInTests: XCTestCase {
             "$ 0.10"
         )
         XCTAssertEqual(
-            defaultSummary.accessibilityText(for: .amount, labels: labels, paymentDetails: paymentDetails),
-            "Amount: $ 1.00"
+            defaultSummary.labelText(for: .surchargeFee, labels: labels),
+            "Surcharge:"
+        )
+        XCTAssertEqual(
+            defaultSummary.valueText(for: .surchargeFee, paymentDetails: paymentDetails),
+            "$ 0.30"
+        )
+        XCTAssertEqual(
+            defaultSummary.accessibilityText(for: .surchargeFee, labels: labels, paymentDetails: paymentDetails),
+            "Surcharge: $ 0.30"
         )
 
         let customSummary = PayabliPayInPaymentSummaryConfiguration(
             amountLabelText: "Today:",
-            amountValueText: "USD 1.00",
             feeLabelText: "Processing:",
-            feeValueText: "USD 0.10",
             rowSpacing: 4
         )
         XCTAssertEqual(
@@ -335,7 +374,7 @@ final class PayabliPayInTests: XCTestCase {
         )
         XCTAssertEqual(
             customSummary.valueText(for: .amount, paymentDetails: paymentDetails),
-            "USD 1.00"
+            "$ 1.00"
         )
         XCTAssertEqual(
             customSummary.labelText(for: .serviceFee, labels: labels),
@@ -343,7 +382,7 @@ final class PayabliPayInTests: XCTestCase {
         )
         XCTAssertEqual(
             customSummary.valueText(for: .serviceFee, paymentDetails: paymentDetails),
-            "USD 0.10"
+            "$ 0.10"
         )
         XCTAssertEqual(customSummary.rowSpacing, 4)
     }

@@ -262,7 +262,7 @@ public struct PayabliPayInView: View {
             achFieldView(field)
         case .methodDescription, .firstName, .lastName, .customerNumber, .billingEmail, .billingZip:
             customerFieldView(field)
-        case .amount, .serviceFee:
+        case .amount, .serviceFee, .surchargeFee:
             paymentFieldView(field)
         }
     }
@@ -368,7 +368,7 @@ public struct PayabliPayInView: View {
     @ViewBuilder
     func paymentFieldView(_ field: PayabliPayInField) -> some View {
         switch field {
-        case .amount, .serviceFee:
+        case .amount, .serviceFee, .surchargeFee:
             paymentSummaryRow(field)
         default:
             EmptyView()
