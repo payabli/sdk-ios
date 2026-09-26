@@ -16,17 +16,11 @@ final class PayabliPayInPaymentFlowViewModel: ObservableObject {
         didSet { acceptEdit(of: .cardNumber) }
     }
 
-    @Published var cardExpiration = "" {
-        didSet { acceptEdit(of: .cardExpiration) }
-    }
+    @Published var cardExpiration = ""
 
-    @Published var cardExpirationMonth: Int? {
-        didSet { acceptEdit(of: .cardExpiration) }
-    }
+    @Published var cardExpirationMonth: Int?
 
-    @Published var cardExpirationYear: Int? {
-        didSet { acceptEdit(of: .cardExpiration) }
-    }
+    @Published var cardExpirationYear: Int?
 
     @Published private var cardCvvStorage = "" {
         didSet { acceptEdit(of: .cardCvv) }
@@ -87,7 +81,7 @@ final class PayabliPayInPaymentFlowViewModel: ObservableObject {
 
     @Published private(set) var isSubmitting = false
     @Published private(set) var errorMessage: String?
-    /// The fields the last refusal named that still hold the value it refused.
+    /// The fields the last refusal named, until the payer edits one or its box leaves the screen.
     @Published private(set) var rejectedFields: Set<PayabliPayInPaymentFlowField> = []
 
     private(set) var component: PayabliPayInPaymentFlow
@@ -352,11 +346,15 @@ final class PayabliPayInPaymentFlowViewModel: ObservableObject {
     func selectExpirationMonth(_ month: Int) {
         cardExpirationMonth = min(max(month, 1), 12)
         synchronizeExpirationText()
+        // The wheel is the payer's pick, so an assignment here answers a mark. The pre-fill
+        // that opens the wheel assigns too, and answers nothing.
+        acceptEdit(of: .cardExpiration)
     }
 
     func selectExpirationYear(_ year: Int) {
         cardExpirationYear = year
         synchronizeExpirationText()
+        acceptEdit(of: .cardExpiration)
     }
 
     func ensureExpirationSelection(defaultDate: Date = Date()) {

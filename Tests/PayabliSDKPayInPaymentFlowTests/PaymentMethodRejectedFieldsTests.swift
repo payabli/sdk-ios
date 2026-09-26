@@ -130,6 +130,28 @@ final class PaymentMethodRejectedFieldsTests: XCTestCase {
         XCTAssertEqual(viewModel.rejectedFields, [.firstName])
     }
 
+    /// The pre-fill that opens the wheel is not a pick, so it leaves the mark standing until the payer
+    /// chooses a date.
+    @MainActor
+    func testOpeningTheExpiryPickerDoesNotClearItsMark() async {
+        let viewModel = filledCardForm(
+            transport: MockPaymentCaptureTransport(
+                statusCode: 400,
+                responseBody: Self.refusal(naming: ["paymentMethod.cardexp"])
+            )
+        )
+        _ = try? await viewModel.submit()
+        XCTAssertEqual(viewModel.rejectedFields, [.cardExpiration])
+
+        viewModel.ensureExpirationSelection(defaultDate: Date(timeIntervalSince1970: 0))
+
+        XCTAssertEqual(viewModel.rejectedFields, [.cardExpiration])
+
+        viewModel.selectExpirationMonth(3)
+
+        XCTAssertEqual(viewModel.rejectedFields, [])
+    }
+
     @MainActor
     func testAFailureThatNamesNoFieldMarksNothingAndClearsTheLastMarks() async {
         let transport = SequencedCaptureTransport(responses: [

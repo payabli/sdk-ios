@@ -103,8 +103,9 @@ public struct PayabliPayInPaymentFlowView: View {
             // A new mark only; the rest were announced when they arrived.
             let marked = fields.subtracting(announcedRejectedFields)
             announcedRejectedFields = fields
-            guard let field = viewModel.activeFields.first(where: marked.contains) else { return }
-            announceFieldError(field: field, message: rejectedMessage(for: field))
+            for field in viewModel.activeFields where marked.contains(field) {
+                announceFieldError(field: field, message: rejectedMessage(for: field))
+            }
         }
     }
 
@@ -567,8 +568,8 @@ public struct PayabliPayInPaymentFlowView: View {
                 .frame(width: inputSize.width)
                 .frame(minHeight: inputSize.height)
                 .frame(maxWidth: inputSize.width == nil ? .infinity : nil)
-                .background(fieldBackground(nil))
-                .overlay(fieldBorder(nil))
+                .background(fieldBackground(field))
+                .overlay(fieldBorder(field))
                 .clipShape(inputShape)
             }
             .buttonStyle(.plain)
@@ -668,8 +669,8 @@ public struct PayabliPayInPaymentFlowView: View {
                 .frame(width: inputSize.width)
                 .frame(minHeight: inputSize.height)
                 .frame(maxWidth: inputSize.width == nil ? .infinity : nil)
-                .background(fieldBackground(nil))
-                .overlay(fieldBorder(nil))
+                .background(fieldBackground(field))
+                .overlay(fieldBorder(field))
                 .clipShape(inputShape)
             }
             .buttonStyle(.plain)
