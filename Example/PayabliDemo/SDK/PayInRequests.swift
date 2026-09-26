@@ -1,5 +1,5 @@
 import Foundation
-import PayabliSDKPayInPaymentFlow
+import PayabliSDKPayIn
 
 /// What this app asks the service for, for one capture attempt.
 enum PayInRequests {
@@ -25,10 +25,10 @@ enum PayInRequests {
         suppliesCustomer: Bool,
         amount: Double = QAAmount.random(),
         source: String = "ios-payment-capture-qa"
-    ) -> PayabliPayInPaymentFlowRequestConfiguration {
+    ) -> PayabliPayInRequestConfiguration {
         let identity = QAIdentity.current
-        return PayabliPayInPaymentFlowRequestConfiguration(
-            paymentDetails: PayabliPayInPaymentFlowPaymentDetails(
+        return PayabliPayInRequestConfiguration(
+            paymentDetails: PayabliPayInPaymentDetails(
                 totalAmount: amount,
                 serviceFee: 0.10,
                 currency: "USD"
@@ -50,13 +50,13 @@ enum PayInRequests {
     /// about to confirm, and a new key would make the next submit a second payment
     /// rather than a retry of this one.
     static func sameAttempt(
-        as current: PayabliPayInPaymentFlowRequestConfiguration,
-        customerData: PayabliPayInPaymentFlowCustomerData?,
+        as current: PayabliPayInRequestConfiguration,
+        customerData: PayabliPayInCustomerData?,
         idempotencyKey: String?
-    ) -> PayabliPayInPaymentFlowRequestConfiguration {
+    ) -> PayabliPayInRequestConfiguration {
         // Every field, not the ones this sample happens to set: anything omitted
         // here is silently reset the moment the switch moves.
-        PayabliPayInPaymentFlowRequestConfiguration(
+        PayabliPayInRequestConfiguration(
             paymentDetails: current.paymentDetails,
             accountId: current.accountId,
             customerData: customerData,

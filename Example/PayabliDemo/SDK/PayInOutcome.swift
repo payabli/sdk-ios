@@ -1,6 +1,6 @@
 import Foundation
 import PayabliSDKCore
-import PayabliSDKPayInPaymentFlow
+import PayabliSDKPayIn
 
 /// What a submission ended as, in this app's own words.
 ///
@@ -104,7 +104,7 @@ struct PayInFailure {
 }
 
 extension PayInOutcome {
-    init(_ result: PayabliPayInPaymentFlowResult) {
+    init(_ result: PayabliPayInResult) {
         code = result.code
         reason = result.reason
         explanation = result.explanation
@@ -131,7 +131,7 @@ extension PayInOutcome {
     /// Built row by row rather than as one array of pairs mapped into rows. Thirteen
     /// heterogeneous literals and a `map` is enough for the type checker to give up
     /// on a slower machine, which it did in CI while compiling here.
-    private static func rows(for result: PayabliPayInPaymentFlowResult) -> [PayInSummaryRow] {
+    private static func rows(for result: PayabliPayInResult) -> [PayInSummaryRow] {
         let transaction = result.transaction
         var rows: [PayInSummaryRow] = []
         rows.append(PayInSummaryRow(label: "Code", value: result.code))
@@ -156,7 +156,7 @@ extension PayInOutcome {
         return value
     }
 
-    private static func json(for result: PayabliPayInPaymentFlowResult) -> String {
+    private static func json(for result: PayabliPayInResult) -> String {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         guard
@@ -232,7 +232,7 @@ extension PayInFailure {
     }
 
     private static func refusedForAnotherSubmission(_ error: Error) -> Bool {
-        if case .submissionInProgress = error as? PayabliPayInPaymentFlowError {
+        if case .submissionInProgress = error as? PayabliPayInError {
             return true
         }
         return false
@@ -240,14 +240,14 @@ extension PayInFailure {
 
     /// Whether the request may have reached the service, so sending it again is not safe to offer.
     private static func leavesOutcomeUnknown(_ error: Error) -> Bool {
-        if case .submissionInterrupted = error as? PayabliPayInPaymentFlowError {
+        if case .submissionInterrupted = error as? PayabliPayInError {
             return true
         }
         return false
     }
 
     private static func isDuplicateSubmission(_ error: Error) -> Bool {
-        if case let PayabliPayInPaymentFlowError.transactionFailed(failure) = error,
+        if case let PayabliPayInError.transactionFailed(failure) = error,
            failure.httpStatusCode == 409
         {
             return true

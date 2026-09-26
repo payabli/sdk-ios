@@ -1,6 +1,6 @@
 import Flutter
 import PayabliSDKCore
-import PayabliSDKPayInPaymentFlow
+import PayabliSDKPayIn
 import PayabliSDKTapToPay
 import UIKit
 
@@ -29,7 +29,7 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
 
     private var ttp: PayabliTTP?
     private var eventToken: PayabliTTPEventToken?
-    private var payInPaymentFlow: PayabliPayInPaymentFlow?
+    private var payIn: PayabliPayIn?
 
     init(methodChannel: FlutterMethodChannel, eventChannel: FlutterEventChannel) {
         self.methodChannel = methodChannel
@@ -69,8 +69,8 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
             handlePresentTerms(result: result)
         case "getSessionState":
             handleGetSessionState(result: result)
-        case "configurePayInPaymentFlow":
-            handleConfigurePayInPaymentFlow(call.arguments, result: result)
+        case "configurePayIn":
+            handleConfigurePayIn(call.arguments, result: result)
         case "addCard":
             handleAddCard(call.arguments, result: result)
         case "addBankAccount":
@@ -332,7 +332,7 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
 
     // MARK: - PayIn payment flow
 
-    private func handleConfigurePayInPaymentFlow(_ arguments: Any?, result: @escaping FlutterResult) {
+    private func handleConfigurePayIn(_ arguments: Any?, result: @escaping FlutterResult) {
         guard let args = arguments as? [String: Any],
               let entryPoint = args["entryPoint"] as? String,
               let envRaw = args["environment"] as? Int,
@@ -372,7 +372,7 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
 
                     tokenProvider: tokenProvider
                 )
-                self.payInPaymentFlow = PayabliPayInPaymentFlow(
+                self.payIn = PayabliPayIn(
                     session: PayabliSession(config: config)
                 )
                 result(nil)
@@ -387,8 +387,8 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
     }
 
     private func handleAddCard(_ arguments: Any?, result: @escaping FlutterResult) {
-        guard let payInPaymentFlow else {
-            result(FlutterError(code: "NOT_CONFIGURED", message: "Call PayabliPayInPaymentFlow.configure() first", details: nil))
+        guard let payIn else {
+            result(FlutterError(code: "NOT_CONFIGURED", message: "Call PayabliPayIn.configure() first", details: nil))
             return
         }
         guard let args = arguments as? [String: Any],
@@ -406,7 +406,7 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
             return
         }
 
-        let card = PayabliPayInPaymentFlowCardData(
+        let card = PayabliPayInCardData(
             cardNumber: cardNumber,
             expiration: expiration,
             cardholderName: cardholderName,
@@ -415,15 +415,15 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
         )
         handleAddPaymentMethod(
             .card(card),
-            options: payInPaymentFlowOptions(from: args),
-            component: payInPaymentFlow,
+            options: payInOptions(from: args),
+            component: payIn,
             result: result
         )
     }
 
     private func handleAddBankAccount(_ arguments: Any?, result: @escaping FlutterResult) {
-        guard let payInPaymentFlow else {
-            result(FlutterError(code: "NOT_CONFIGURED", message: "Call PayabliPayInPaymentFlow.configure() first", details: nil))
+        guard let payIn else {
+            result(FlutterError(code: "NOT_CONFIGURED", message: "Call PayabliPayIn.configure() first", details: nil))
             return
         }
         guard let args = arguments as? [String: Any],
@@ -447,30 +447,30 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
         )
         handleAddPaymentMethod(
             .bankAccount(ach),
-            options: payInPaymentFlowOptions(from: args),
-            component: payInPaymentFlow,
+            options: payInOptions(from: args),
+            component: payIn,
             result: result
         )
     }
 
     private func handleAddPaymentMethod(
-        _ payInPaymentFlowInput: PayabliPayInPaymentFlowMethodInput,
-        options: PayabliPayInPaymentFlowOptions,
-        component: PayabliPayInPaymentFlow,
+        _ payInInput: PayabliPayInMethodInput,
+        options: PayabliPayInOptions,
+        component: PayabliPayIn,
         result: @escaping FlutterResult
     ) {
         Task { @MainActor in
             do {
-                let method = try await component.addPaymentMethod(payInPaymentFlowInput, options: options)
+                let method = try await component.addPaymentMethod(payInInput, options: options)
                 result(Self.storedPaymentMethodMap(method))
             } catch {
-                result((error as NSError).toFlutterError(defaultCode: "PAYIN_PAYMENT_FLOW_FAILED"))
+                result((error as NSError).toFlutterError(defaultCode: "PAYIN_FAILED"))
             }
         }
     }
 
-    private func payInPaymentFlowOptions(from args: [String: Any]) -> PayabliPayInPaymentFlowOptions {
-        PayabliPayInPaymentFlowOptions(
+    private func payInOptions(from args: [String: Any]) -> PayabliPayInOptions {
+        PayabliPayInOptions(
             achValidation: args["achValidation"] as? Bool,
             createAnonymous: args["createAnonymous"] as? Bool,
             forceCustomerCreation: args["forceCustomerCreation"] as? Bool,
@@ -531,14 +531,14 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
         )
     }
 
-    private static func methodName(_ method: PayabliPayInPaymentFlowStoredMethodType) -> String {
+    private static func methodName(_ method: PayabliPayInStoredMethodType) -> String {
         switch method {
         case .card: return "card"
         case .bankAccount: return "bankAccount"
         }
     }
 
-    private static func storedPaymentMethodMap(_ method: PayabliPayInPaymentFlowStoredPaymentMethod) -> [String: Any] {
+    private static func storedPaymentMethodMap(_ method: PayabliPayInStoredPaymentMethod) -> [String: Any] {
         var map: [String: Any] = [
             "method": methodName(method.method),
             "responseText": method.responseText,
@@ -562,7 +562,7 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
         return map
     }
 
-    private static func dictionary(from response: PayabliPayInPaymentFlowTokenStorageAPIResponse) -> [String: Any] {
+    private static func dictionary(from response: PayabliPayInTokenStorageAPIResponse) -> [String: Any] {
         guard let data = try? JSONEncoder().encode(response),
               let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
         else {

@@ -1,9 +1,9 @@
-import PayabliSDKPayInPaymentFlow
+import PayabliSDKPayIn
 import XCTest
 
 final class PayInFormCustomizationTests: XCTestCase {
     func testTheDefaultPresetIsTheSettingsTheScreenStartsOn() {
-        let sdkDefault = PayabliPayInPaymentFlowFormConfiguration()
+        let sdkDefault = PayabliPayInFormConfiguration()
         let preset = PayInFormCustomization(preset: .sdkDefault)
 
         XCTAssertEqual(preset, PayInFormCustomization())
@@ -29,7 +29,7 @@ final class PayInFormCustomizationTests: XCTestCase {
 
     func testTheDefaultPresetHandsTheFormItsOwnWording() {
         let configuration = PayInFormCustomization(preset: .sdkDefault).configuration(capturing: true)
-        let sdkDefault = PayabliPayInPaymentFlowFormConfiguration()
+        let sdkDefault = PayabliPayInFormConfiguration()
 
         XCTAssertEqual(configuration.allowedMethods, [.card, .bankAccount])
         XCTAssertEqual(configuration.labelLayout, .external)
@@ -42,8 +42,8 @@ final class PayInFormCustomizationTests: XCTestCase {
         XCTAssertEqual(configuration.bankSections.map(\.fields), sdkDefault.bankSections.map(\.fields))
         XCTAssertNil(configuration.hiddenValues.accountHolderType)
         let style = PayInFormCustomization(preset: .sdkDefault).style
-        XCTAssertEqual(style.accentColor, PayabliPayInPaymentFlowStyle.default.accentColor)
-        XCTAssertEqual(style.input.backgroundColor, PayabliPayInPaymentFlowStyle.default.input.backgroundColor)
+        XCTAssertEqual(style.accentColor, PayabliPayInStyle.default.accentColor)
+        XCTAssertEqual(style.input.backgroundColor, PayabliPayInStyle.default.input.backgroundColor)
     }
 
     func testTheBrandPreset() {

@@ -1,4 +1,4 @@
-import PayabliSDKPayInPaymentFlow
+import PayabliSDKPayIn
 import SwiftUI
 
 /// PayIn configuration shared by the stored-method and capture tabs.
@@ -13,10 +13,10 @@ import SwiftUI
 enum PayInSharedConfiguration {
     // MARK: - Methods
 
-    static let allowedMethods: [PayabliPayInPaymentFlowMethodType] = [.card, .bankAccount]
-    static let defaultMethod: PayabliPayInPaymentFlowMethodType = .card
+    static let allowedMethods: [PayabliPayInMethodType] = [.card, .bankAccount]
+    static let defaultMethod: PayabliPayInMethodType = .card
 
-    static let cardFieldOrder: [PayabliPayInPaymentFlowField] = [
+    static let cardFieldOrder: [PayabliPayInField] = [
         .cardholderName,
         .cardNumber,
         .cardExpiration,
@@ -24,7 +24,7 @@ enum PayInSharedConfiguration {
         .cardZip
     ]
 
-    static let bankFieldOrder: [PayabliPayInPaymentFlowField] = [
+    static let bankFieldOrder: [PayabliPayInField] = [
         .accountHolder,
         .routingNumber,
         .accountNumber,
@@ -33,25 +33,25 @@ enum PayInSharedConfiguration {
 
     // MARK: - Presentation
 
-    static let labelLayout: PayabliPayInPaymentFlowLabelLayout = .external
+    static let labelLayout: PayabliPayInLabelLayout = .external
     static let showsFieldLabels = true
-    static let cardBrandIconPlacement: PayabliPayInPaymentFlowCardBrandIconPlacement = .trailing
+    static let cardBrandIconPlacement: PayabliPayInCardBrandIconPlacement = .trailing
 
-    static let formatting = PayabliPayInPaymentFlowFormatting(
+    static let formatting = PayabliPayInFormatting(
         insertsCardNumberSpaces: true,
         masksAccountNumber: true
     )
 
-    static let inputSizing = PayabliPayInPaymentFlowInputSizing(
-        defaultSize: PayabliPayInPaymentFlowInputSize(height: 52),
+    static let inputSizing = PayabliPayInInputSizing(
+        defaultSize: PayabliPayInInputSize(height: 52),
         fieldSizes: [
-            .cardExpiration: PayabliPayInPaymentFlowInputSize(height: 48),
-            .cardCvv: PayabliPayInPaymentFlowInputSize(height: 48)
+            .cardExpiration: PayabliPayInInputSize(height: 48),
+            .cardCvv: PayabliPayInInputSize(height: 48)
         ]
     )
 
     /// Fields whose label is hidden because the placeholder already says it.
-    static let fieldsWithHiddenLabels: [PayabliPayInPaymentFlowField] = [
+    static let fieldsWithHiddenLabels: [PayabliPayInField] = [
         .cardholderName,
         .cardNumber,
         .cardExpiration,
@@ -69,27 +69,27 @@ enum PayInSharedConfiguration {
     /// Placeholders that match the SDK's own field labels, so hiding a label
     /// loses no information.
     static func labelMatchingPlaceholders(
-        for fields: [PayabliPayInPaymentFlowField] = fieldsWithHiddenLabels
-    ) -> [PayabliPayInPaymentFlowField: String] {
+        for fields: [PayabliPayInField] = fieldsWithHiddenLabels
+    ) -> [PayabliPayInField: String] {
         Dictionary(uniqueKeysWithValues: fields.map { field in
             (
                 field,
-                PayabliPayInPaymentFlowLabels.defaultFieldLabels[field] ?? field.rawValue
+                PayabliPayInLabels.defaultFieldLabels[field] ?? field.rawValue
             )
         })
     }
 
     // MARK: - Style
 
-    static let style = PayabliPayInPaymentFlowStyle(
+    static let style = PayabliPayInStyle(
         accentColor: .payabliPrimary,
-        input: PayabliPayInPaymentFlowInputStyle(
+        input: PayabliPayInInputStyle(
             backgroundColor: Color.payabliBackground,
             borderColor: Color.payabliOutlineVariant.opacity(0.6),
             cornerRadius: 8
         ),
-        submitButton: PayabliPayInPaymentFlowSubmitButtonStyle(cornerRadius: 8),
-        layout: PayabliPayInPaymentFlowLayoutStyle(
+        submitButton: PayabliPayInSubmitButtonStyle(cornerRadius: 8),
+        layout: PayabliPayInLayoutStyle(
             contentSpacing: 18,
             fieldGroupSpacing: 14,
             pairedFieldSpacing: 12,
@@ -99,7 +99,7 @@ enum PayInSharedConfiguration {
     )
 
     /// Section-title styling, repeated verbatim on every section in both tabs.
-    static let sectionTitleStyle = PayabliPayInPaymentFlowTextStyle(
+    static let sectionTitleStyle = PayabliPayInTextStyle(
         font: .headline.weight(.semibold),
         color: .primary
     )

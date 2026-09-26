@@ -13,10 +13,10 @@ namespace PayabliMauiDemo;
 public partial class MainPage : ContentPage
 {
     private PayabliTTP? _ttp;
-    private PayabliPayInPaymentFlowObjC? _payInPaymentFlow;
+    private PayabliPayInObjC? _payIn;
     private PayabliTTPEventToken? _eventToken;
     private bool _isWorking;
-    private bool _isSubmittingPayInPaymentFlow;
+    private bool _isSubmittingPayIn;
 
     public MainPage()
     {
@@ -67,14 +67,14 @@ public partial class MainPage : ContentPage
             {
                 throw new System.Exception(ttpError.LocalizedDescription);
             }
-            _payInPaymentFlow = new PayabliPayInPaymentFlowObjC(
+            _payIn = new PayabliPayInObjC(
                 tokenHandler: (completion) =>
                 {
                     Task.Run(async () =>
                     {
                         try
                         {
-                            var token = await FetchPayInPaymentFlowAccessTokenFromPartnerBackend();
+                            var token = await FetchPayInAccessTokenFromPartnerBackend();
                             completion(token, null);
                         }
                         catch (System.Exception ex)
@@ -116,12 +116,12 @@ public partial class MainPage : ContentPage
         return await Task.FromResult(Secrets.PlaceholderAccessToken);
     }
 
-    private async Task<string> FetchPayInPaymentFlowAccessTokenFromPartnerBackend()
+    private async Task<string> FetchPayInAccessTokenFromPartnerBackend()
     {
         // Replace with a real call to your backend that exchanges your
         // server-side clientId + clientSecret for an access_token scoped for
         // PayIn payment flow submissions.
-        return await Task.FromResult(Secrets.PlaceholderPayInPaymentFlowAccessToken);
+        return await Task.FromResult(Secrets.PlaceholderPayInAccessToken);
     }
 
     // MARK: - Lifecycle handlers
@@ -195,9 +195,9 @@ public partial class MainPage : ContentPage
 
     private void OnAddCardClicked(object? sender, EventArgs e)
     {
-        if (_payInPaymentFlow is null || _isSubmittingPayInPaymentFlow) return;
-        SetSubmittingPayInPaymentFlow(true);
-        _payInPaymentFlow.AddCard(
+        if (_payIn is null || _isSubmittingPayIn) return;
+        SetSubmittingPayIn(true);
+        _payIn.AddCard(
             cardNumber: CardNumberEntry.Text ?? "",
             expiration: CardExpirationEntry.Text ?? "",
             cardholderName: CardHolderEntry.Text ?? "",
@@ -209,7 +209,7 @@ public partial class MainPage : ContentPage
             source: "maui-demo",
             completion: (method, error) =>
             {
-                SetSubmittingPayInPaymentFlow(false);
+                SetSubmittingPayIn(false);
                 ResultLabel.Text = method is not null
                     ? $"✓ Added · stored method {method.StoredMethodId ?? "—"} · {method.ResponseText}"
                     : $"✗ {error?.LocalizedDescription ?? "unknown payment flow error"}";
@@ -219,9 +219,9 @@ public partial class MainPage : ContentPage
 
     private void OnAddAchClicked(object? sender, EventArgs e)
     {
-        if (_payInPaymentFlow is null || _isSubmittingPayInPaymentFlow) return;
-        SetSubmittingPayInPaymentFlow(true);
-        _payInPaymentFlow.AddBankAccount(
+        if (_payIn is null || _isSubmittingPayIn) return;
+        SetSubmittingPayIn(true);
+        _payIn.AddBankAccount(
             accountNumber: AchAccountEntry.Text ?? "",
             accountType: "Checking",
             holderName: AchHolderEntry.Text ?? "",
@@ -235,7 +235,7 @@ public partial class MainPage : ContentPage
             source: "maui-demo",
             completion: (method, error) =>
             {
-                SetSubmittingPayInPaymentFlow(false);
+                SetSubmittingPayIn(false);
                 ResultLabel.Text = method is not null
                     ? $"✓ Added · stored method {method.StoredMethodId ?? "—"} · {method.ResponseText}"
                     : $"✗ {error?.LocalizedDescription ?? "unknown payment flow error"}";
@@ -271,9 +271,9 @@ public partial class MainPage : ContentPage
         ActivateButton.IsEnabled = !working;
     }
 
-    private void SetSubmittingPayInPaymentFlow(bool isSubmitting)
+    private void SetSubmittingPayIn(bool isSubmitting)
     {
-        _isSubmittingPayInPaymentFlow = isSubmitting;
+        _isSubmittingPayIn = isSubmitting;
         AddCardButton.IsEnabled = !isSubmitting;
         AddAchButton.IsEnabled = !isSubmitting;
     }
@@ -306,5 +306,5 @@ internal static class Secrets
     public const string EntryPoint = "<YOUR_ENTRY_POINT>";
     public const string AppId = "<TEAM_ID>.<BUNDLE_ID>";
     public const string PlaceholderAccessToken = "placeholder-token";
-    public const string PlaceholderPayInPaymentFlowAccessToken = "placeholder-payin-payment-flow-access-token";
+    public const string PlaceholderPayInAccessToken = "placeholder-payin-access-token";
 }

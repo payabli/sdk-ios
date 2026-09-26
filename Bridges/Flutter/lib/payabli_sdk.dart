@@ -213,12 +213,12 @@ class PayabliTTP {
       return await provider();
     }
     if (call.method == 'accessToken') {
-      final provider = PayabliPayInPaymentFlow._accessToken;
+      final provider = PayabliPayIn._accessToken;
       if (provider == null) {
         throw PlatformException(
           code: 'NO_ACCESS_TOKEN_PROVIDER',
           message:
-              'PayabliPayInPaymentFlow.configure() was not called with an accessTokenProvider',
+              'PayabliPayIn.configure() was not called with an accessTokenProvider',
         );
       }
       return await provider();
@@ -248,8 +248,8 @@ enum PayabliEnvironment { local, qa, sandbox, production }
 ///
 /// The access token must come from your backend. Do not embed a private
 /// Payabli API key in Flutter code.
-class PayabliPayInPaymentFlow {
-  PayabliPayInPaymentFlow._();
+class PayabliPayIn {
+  PayabliPayIn._();
 
   static Future<String> Function()? _accessToken;
 
@@ -264,12 +264,12 @@ class PayabliPayInPaymentFlow {
     );
 
     await _payabliMethodChannel.invokeMethod<void>(
-      'configurePayInPaymentFlow',
+      'configurePayIn',
       {'entryPoint': entryPoint, 'environment': environment.index},
     );
   }
 
-  static Future<PayabliPayInPaymentFlowStoredPaymentMethod> addCard({
+  static Future<PayabliPayInStoredPaymentMethod> addCard({
     required String cardNumber,
     required String expiration,
     required String cardholderName,
@@ -293,7 +293,7 @@ class PayabliPayInPaymentFlow {
             'temporary': temporary,
             'source': source,
           });
-      return PayabliPayInPaymentFlowStoredPaymentMethod._fromMap(
+      return PayabliPayInStoredPaymentMethod._fromMap(
         result ?? const {},
       );
     } on PlatformException catch (e) {
@@ -301,7 +301,7 @@ class PayabliPayInPaymentFlow {
     }
   }
 
-  static Future<PayabliPayInPaymentFlowStoredPaymentMethod> addBankAccount({
+  static Future<PayabliPayInStoredPaymentMethod> addBankAccount({
     required String accountNumber,
     required String accountType,
     required String holderName,
@@ -329,7 +329,7 @@ class PayabliPayInPaymentFlow {
             'temporary': temporary,
             'source': source,
           });
-      return PayabliPayInPaymentFlowStoredPaymentMethod._fromMap(
+      return PayabliPayInStoredPaymentMethod._fromMap(
         result ?? const {},
       );
     } on PlatformException catch (e) {
@@ -338,8 +338,8 @@ class PayabliPayInPaymentFlow {
   }
 }
 
-class PayabliPayInPaymentFlowStoredPaymentMethod {
-  const PayabliPayInPaymentFlowStoredPaymentMethod({
+class PayabliPayInStoredPaymentMethod {
+  const PayabliPayInStoredPaymentMethod({
     required this.method,
     required this.responseText,
     required this.apiResponse,
@@ -359,17 +359,17 @@ class PayabliPayInPaymentFlowStoredPaymentMethod {
   final String responseText;
   final Map<String, dynamic> apiResponse;
 
-  factory PayabliPayInPaymentFlowStoredPaymentMethod._fromMap(
+  factory PayabliPayInStoredPaymentMethod._fromMap(
     Map<String, dynamic> map,
   ) {
     final method = map['method'] as String?;
     if (method == null) {
       throw const PayabliTTPException(
-        code: 'PAYIN_PAYMENT_FLOW_FAILED',
+        code: 'PAYIN_FAILED',
         message: 'Native store returned no method',
       );
     }
-    return PayabliPayInPaymentFlowStoredPaymentMethod(
+    return PayabliPayInStoredPaymentMethod(
       storedMethodId: map['storedMethodId'] as String?,
       method: method,
       methodReferenceId: map['methodReferenceId'] as String?,

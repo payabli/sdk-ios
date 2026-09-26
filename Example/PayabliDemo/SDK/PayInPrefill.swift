@@ -1,4 +1,4 @@
-import PayabliSDKPayInPaymentFlow
+import PayabliSDKPayIn
 
 /// The form fields this app can fill, and how to find one on screen.
 ///
@@ -27,7 +27,7 @@ enum PayInPrefillField: CaseIterable {
         "payabli.payIn.field.\(field.rawValue)"
     }
 
-    private var field: PayabliPayInPaymentFlowField {
+    private var field: PayabliPayInField {
         switch self {
         case .cardholderName: return .cardholderName
         case .cardNumber: return .cardNumber

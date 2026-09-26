@@ -72,7 +72,7 @@
 		0F5E8CC7E7A24D19A71B0A1C /* PaymentMethodAddedView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F5E8CC6E7A24D19A71B0A1C /* PaymentMethodAddedView.swift */; };
 		1C7A9E9B6D2F4C0F8A1B3D5E /* PaymentCaptureQAView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B1E0F9A8C7D6E5F4A3B2C1D /* PaymentCaptureQAView.swift */; };
 		3F9C8D7E6A5B4C3D2E1F0A9B /* PayabliSDKTapToPay in Frameworks */ = {isa = PBXBuildFile; productRef = 4A0D9E8F7B6C5D4E3F2A1B0C /* PayabliSDKTapToPay */; };
-		E31640000000000000000003 /* PayabliSDKPayInPaymentFlow in Frameworks */ = {isa = PBXBuildFile; productRef = E31640000000000000000000 /* PayabliSDKPayInPaymentFlow */; };
+		E31640000000000000000003 /* PayabliSDKPayIn in Frameworks */ = {isa = PBXBuildFile; productRef = E31640000000000000000000 /* PayabliSDKPayIn */; };
 		60EDCF1CBB535529F6138573 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F201F43C477597B328446F93 /* Foundation.framework */; };
 		A1B2C3D4E5F60000000000A2 /* PaymentTapToPayQAView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60000000000A1 /* PaymentTapToPayQAView.swift */; };
 		A1B2C3D4E5F60000000000B2 /* TapToPayPreflight.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60000000000B1 /* TapToPayPreflight.swift */; };
@@ -91,7 +91,7 @@
 		E1D2C3B4A5960718293A4B01 /* DebugPrefill.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1D2C3B4A5960718293A4B02 /* DebugPrefill.swift */; };
 		E1D2C3B4A5960718293A4B03 /* DebugPrefill.json in Resources */ = {isa = PBXBuildFile; fileRef = E1D2C3B4A5960718293A4B04 /* DebugPrefill.json */; };
 		F10000000000000000000030 /* PayabliSDKTapToPay in Embed Frameworks */ = {isa = PBXBuildFile; productRef = 4A0D9E8F7B6C5D4E3F2A1B0C /* PayabliSDKTapToPay */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
-		E31640000000000000000004 /* PayabliSDKPayInPaymentFlow in Embed Frameworks */ = {isa = PBXBuildFile; productRef = E31640000000000000000000 /* PayabliSDKPayInPaymentFlow */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		E31640000000000000000004 /* PayabliSDKPayIn in Embed Frameworks */ = {isa = PBXBuildFile; productRef = E31640000000000000000000 /* PayabliSDKPayIn */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		F20000000000000000000002 /* StepStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000001 /* StepStatus.swift */; };
 		F20000000000000000000004 /* TapToPaySteps.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000003 /* TapToPaySteps.swift */; };
 		F20000000000000000000006 /* PayInSteps.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000005 /* PayInSteps.swift */; };
@@ -102,16 +102,16 @@
 		F20000000000000000000024 /* TapToPayStepsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000023 /* TapToPayStepsTests.swift */; };
 		F20000000000000000000026 /* PayInStepsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000025 /* PayInStepsTests.swift */; };
 		F40000000000000000000040 /* PayabliSDKTapToPay in Frameworks */ = {isa = PBXBuildFile; productRef = F40000000000000000000041 /* PayabliSDKTapToPay */; };
-		E31640000000000000000007 /* PayabliSDKPayInPaymentFlow in Frameworks */ = {isa = PBXBuildFile; productRef = E31640000000000000000002 /* PayabliSDKPayInPaymentFlow */; };
+		E31640000000000000000007 /* PayabliSDKPayIn in Frameworks */ = {isa = PBXBuildFile; productRef = E31640000000000000000002 /* PayabliSDKPayIn */; };
 		F40000000000000000000022 /* KeychainOnDeviceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F40000000000000000000021 /* KeychainOnDeviceTests.swift */; };
 		F40000000000000000000024 /* InstallIdentifierOnDeviceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F40000000000000000000023 /* InstallIdentifierOnDeviceTests.swift */; };
 		F40000000000000000000026 /* LiveEnvironment.swift in Sources */ = {isa = PBXBuildFile; fileRef = F40000000000000000000025 /* LiveEnvironment.swift */; };
 		F40000000000000000000028 /* TapToPayOnDeviceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F40000000000000000000027 /* TapToPayOnDeviceTests.swift */; };
 		F4000000000000000000002A /* CardNotPresentOnDeviceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F40000000000000000000029 /* CardNotPresentOnDeviceTests.swift */; };
 		F20000000000000000000040 /* PayabliSDKTapToPay in Frameworks */ = {isa = PBXBuildFile; productRef = F20000000000000000000041 /* PayabliSDKTapToPay */; };
-		E31640000000000000000005 /* PayabliSDKPayInPaymentFlow in Frameworks */ = {isa = PBXBuildFile; productRef = E31640000000000000000001 /* PayabliSDKPayInPaymentFlow */; };
+		E31640000000000000000005 /* PayabliSDKPayIn in Frameworks */ = {isa = PBXBuildFile; productRef = E31640000000000000000001 /* PayabliSDKPayIn */; };
 		F20000000000000000000042 /* PayabliSDKTapToPay in Embed Frameworks */ = {isa = PBXBuildFile; productRef = F20000000000000000000041 /* PayabliSDKTapToPay */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
-		E31640000000000000000006 /* PayabliSDKPayInPaymentFlow in Embed Frameworks */ = {isa = PBXBuildFile; productRef = E31640000000000000000001 /* PayabliSDKPayInPaymentFlow */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		E31640000000000000000006 /* PayabliSDKPayIn in Embed Frameworks */ = {isa = PBXBuildFile; productRef = E31640000000000000000001 /* PayabliSDKPayIn */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -122,7 +122,7 @@
 			dstSubfolderSpec = 10;
 			files = (
 				F20000000000000000000042 /* PayabliSDKTapToPay in Embed Frameworks */,
-				E31640000000000000000006 /* PayabliSDKPayInPaymentFlow in Embed Frameworks */,
+				E31640000000000000000006 /* PayabliSDKPayIn in Embed Frameworks */,
 			);
 			name = "Embed Frameworks";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -134,7 +134,7 @@
 			dstSubfolderSpec = 10;
 			files = (
 				F10000000000000000000030 /* PayabliSDKTapToPay in Embed Frameworks */,
-				E31640000000000000000004 /* PayabliSDKPayInPaymentFlow in Embed Frameworks */,
+				E31640000000000000000004 /* PayabliSDKPayIn in Embed Frameworks */,
 			);
 			name = "Embed Frameworks";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -237,7 +237,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				F20000000000000000000040 /* PayabliSDKTapToPay in Frameworks */,
-				E31640000000000000000005 /* PayabliSDKPayInPaymentFlow in Frameworks */,
+				E31640000000000000000005 /* PayabliSDKPayIn in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -247,7 +247,7 @@
 			files = (
 				60EDCF1CBB535529F6138573 /* Foundation.framework in Frameworks */,
 				3F9C8D7E6A5B4C3D2E1F0A9B /* PayabliSDKTapToPay in Frameworks */,
-				E31640000000000000000003 /* PayabliSDKPayInPaymentFlow in Frameworks */,
+				E31640000000000000000003 /* PayabliSDKPayIn in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -554,7 +554,7 @@
 			name = PayabliDemoDeviceTests;
 			packageProductDependencies = (
 				F40000000000000000000041 /* PayabliSDKTapToPay */,
-				E31640000000000000000002 /* PayabliSDKPayInPaymentFlow */,
+				E31640000000000000000002 /* PayabliSDKPayIn */,
 			);
 			productName = PayabliDemoDeviceTests;
 			productReference = F40000000000000000000050 /* PayabliDemoDeviceTests.xctest */;
@@ -592,7 +592,7 @@
 			name = PayabliDemoFlowTests;
 			packageProductDependencies = (
 				F20000000000000000000041 /* PayabliSDKTapToPay */,
-				E31640000000000000000001 /* PayabliSDKPayInPaymentFlow */,
+				E31640000000000000000001 /* PayabliSDKPayIn */,
 			);
 			productName = PayabliDemoFlowTests;
 			productReference = F20000000000000000000050 /* PayabliDemoFlowTests.xctest */;
@@ -615,7 +615,7 @@
 			name = PayabliDemo;
 			packageProductDependencies = (
 				4A0D9E8F7B6C5D4E3F2A1B0C /* PayabliSDKTapToPay */,
-				E31640000000000000000000 /* PayabliSDKPayInPaymentFlow */,
+				E31640000000000000000000 /* PayabliSDKPayIn */,
 			);
 			productName = PayabliDemo;
 			productReference = F427A5EA0CEF029F22AF2170 /* PayabliDemo.app */;
@@ -704,7 +704,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				F40000000000000000000040 /* PayabliSDKTapToPay in Frameworks */,
-				E31640000000000000000007 /* PayabliSDKPayInPaymentFlow in Frameworks */,
+				E31640000000000000000007 /* PayabliSDKPayIn in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1227,30 +1227,30 @@
 			package = 9D53E7C2DDF2C3C9B8D4F07B /* XCLocalSwiftPackageReference "../.." */;
 			productName = PayabliSDKTapToPay;
 		};
-		E31640000000000000000002 /* PayabliSDKPayInPaymentFlow */ = {
+		E31640000000000000000002 /* PayabliSDKPayIn */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 9D53E7C2DDF2C3C9B8D4F07B /* XCLocalSwiftPackageReference "../.." */;
-			productName = PayabliSDKPayInPaymentFlow;
+			productName = PayabliSDKPayIn;
 		};
 		F20000000000000000000041 /* PayabliSDKTapToPay */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 9D53E7C2DDF2C3C9B8D4F07B /* XCLocalSwiftPackageReference "../.." */;
 			productName = PayabliSDKTapToPay;
 		};
-		E31640000000000000000001 /* PayabliSDKPayInPaymentFlow */ = {
+		E31640000000000000000001 /* PayabliSDKPayIn */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 9D53E7C2DDF2C3C9B8D4F07B /* XCLocalSwiftPackageReference "../.." */;
-			productName = PayabliSDKPayInPaymentFlow;
+			productName = PayabliSDKPayIn;
 		};
 		4A0D9E8F7B6C5D4E3F2A1B0C /* PayabliSDKTapToPay */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 9D53E7C2DDF2C3C9B8D4F07B /* XCLocalSwiftPackageReference "../.." */;
 			productName = PayabliSDKTapToPay;
 		};
-		E31640000000000000000000 /* PayabliSDKPayInPaymentFlow */ = {
+		E31640000000000000000000 /* PayabliSDKPayIn */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 9D53E7C2DDF2C3C9B8D4F07B /* XCLocalSwiftPackageReference "../.." */;
-			productName = PayabliSDKPayInPaymentFlow;
+			productName = PayabliSDKPayIn;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

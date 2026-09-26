@@ -1,5 +1,5 @@
 import PayabliSDKCore
-import PayabliSDKPayInPaymentFlow
+import PayabliSDKPayIn
 import XCTest
 
 /// What drawing a new capture attempt does to the request the next submit carries.
@@ -83,7 +83,7 @@ final class PayInFlowHandleTests: XCTestCase {
 
     private func makeHandle() throws -> PayInFlowHandle {
         PayInFlowHandle(
-            PayabliPayInPaymentFlow(
+            PayabliPayIn(
                 session: PayabliSession(config: try PayabliConfig(
                     entryPoint: "test-entry",
                     environment: DemoEnvironment.sandbox.sdkEnvironment,

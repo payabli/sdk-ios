@@ -31,7 +31,7 @@ RCT_EXTERN_METHOD(resolveTokenRefresh:(NSString *)token)
 
 RCT_EXTERN_METHOD(rejectTokenRefresh:(NSString *)reason)
 
-RCT_EXTERN_METHOD(configurePayInPaymentFlow:(NSDictionary *)config
+RCT_EXTERN_METHOD(configurePayIn:(NSDictionary *)config
                   resolver:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject)
 
@@ -43,8 +43,8 @@ RCT_EXTERN_METHOD(addBankAccount:(NSDictionary *)params
                   resolver:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject)
 
-RCT_EXTERN_METHOD(resolvePayInPaymentFlowAccessToken:(NSString *)token)
+RCT_EXTERN_METHOD(resolvePayInAccessToken:(NSString *)token)
 
-RCT_EXTERN_METHOD(rejectPayInPaymentFlowAccessToken:(NSString *)reason)
+RCT_EXTERN_METHOD(rejectPayInAccessToken:(NSString *)reason)
 
 @end
