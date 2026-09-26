@@ -1,6 +1,6 @@
-# PayabliSDKPayInPaymentFlow
+# PayabliSDKPayIn
 
-`PayabliSDKPayInPaymentFlow` is the unified PayIn component for iOS card and bank account flows.
+`PayabliSDKPayIn` is the unified PayIn component for iOS card and bank account flows.
 
 Use it to:
 
@@ -15,7 +15,7 @@ Use it to:
 
 ```swift
 import PayabliSDKCore
-import PayabliSDKPayInPaymentFlow
+import PayabliSDKPayIn
 
 // Once, where a rejected configuration can be handled.
 let config = try PayabliConfig(
@@ -27,10 +27,10 @@ let session = PayabliSession(config: config)
 
 // Then the view takes the session.
 struct StoreMethodView: View {
-    @StateObject private var paymentFlow: PayabliPayInPaymentFlow
+    @StateObject private var paymentFlow: PayabliPayIn
 
     init(session: PayabliSession) {
-        _paymentFlow = StateObject(wrappedValue: PayabliPayInPaymentFlow(
+        _paymentFlow = StateObject(wrappedValue: PayabliPayIn(
             session: session,
             operation: .storePaymentMethod
         ))
@@ -38,7 +38,7 @@ struct StoreMethodView: View {
 }
 ```
 
-Set `operation` to `.storePaymentMethod`, `.capture`, or `.authorize`. Capture and authorize require `PayabliPayInPaymentFlowRequestConfiguration` during initialization or direct API calls.
+Set `operation` to `.storePaymentMethod`, `.capture`, or `.authorize`. Capture and authorize require `PayabliPayInRequestConfiguration` during initialization or direct API calls.
 
 Authorize is narrower than capture. The direct API accepts a card, a stored card, or a cloud device, and refuses any other payment method before anything is sent. The hosted authorize form collects a card only.
 
@@ -52,12 +52,12 @@ Use `voidTransaction(_:)` for `/api/v2/MoneyIn/void/{transId}`, which releases a
 
 When an app uses the SDK-hosted SwiftUI view or sheet, clear PAN is kept inside SDK-owned state and is not written into the hosted `UITextField.text`, accessibility value, diagnostics, or public callbacks. The public component initializers always use the SDK transport; custom transport injection is reserved for internal tests.
 
-Direct card-data APIs such as `addCard(_:)`, `capture(_:)`, and `authorize(_:)` are PCI-sensitive by design because the host app creates and passes `PayabliPayInPaymentFlowCardData`. Use the hosted form when the integration goal is to avoid host-app access to clear PAN.
+Direct card-data APIs such as `addCard(_:)`, `capture(_:)`, and `authorize(_:)` are PCI-sensitive by design because the host app creates and passes `PayabliPayInCardData`. Use the hosted form when the integration goal is to avoid host-app access to clear PAN.
 
 ## SwiftUI
 
 ```swift
-PayabliPayInPaymentFlowView(
+PayabliPayInView(
     component: paymentFlow,
     configuration: configuration,
     onCompleted: { result in
@@ -76,14 +76,14 @@ PayabliPayInPaymentFlowView(
         message = error.localizedDescription
     }
 )
-.payabliPayInPaymentFlowStyle(style)
+.payabliPayInStyle(style)
 ```
 
-Use `.payabliPayInPaymentFlowSheet(...)` for the sheet presentation. It renders the same form and accepts the same configuration and style.
+Use `.payabliPayInSheet(...)` for the sheet presentation. It renders the same form and accepts the same configuration and style.
 
 ## Form Configuration
 
-`PayabliPayInPaymentFlowFormConfiguration` controls displayed fields and behavior:
+`PayabliPayInFormConfiguration` controls displayed fields and behavior:
 
 - `allowedMethods` and `defaultMethod`
 - `cardFieldOrder`, `bankFieldOrder`
@@ -100,16 +100,16 @@ Use `.payabliPayInPaymentFlowSheet(...)` for the sheet presentation. It renders 
 - `requiredFields`
 - `paymentSummary`
 
-Labels and section names are configurable. Input placeholders can be configured per field with `PayabliPayInPaymentFlowLabels(fieldPlaceholders:)`. Use `labelLayout: .placeholder` or `showsFieldLabels: false` to hide visible labels while keeping accessible labels.
+Labels and section names are configurable. Input placeholders can be configured per field with `PayabliPayInLabels(fieldPlaceholders:)`. Use `labelLayout: .placeholder` or `showsFieldLabels: false` to hide visible labels while keeping accessible labels.
 
 The default field labels use `Postal Code` and `Billing Postal Code`.
 
 ## Sections And Spacing
 
-Group fields with `PayabliPayInPaymentFlowFieldSection`:
+Group fields with `PayabliPayInFieldSection`:
 
 ```swift
-PayabliPayInPaymentFlowFieldSection(
+PayabliPayInFieldSection(
     title: "Card Information",
     fields: [.cardholderName, .cardNumber, .cardExpiration, .cardCvv, .cardZip],
     inputVerticalSpacing: 4,
@@ -125,7 +125,7 @@ Capture and authorize forms include a `Payment Information` section for non-edit
 
 ## Styling
 
-`PayabliPayInPaymentFlowStyle` controls:
+`PayabliPayInStyle` controls:
 
 - title, subtitle, label, section title, error, and submit button text styles
 - SwiftUI input font and UIKit text-field font with `input.uiFont`
@@ -142,7 +142,7 @@ The form is built for standard iOS accessibility checks:
 - accessible labels even when visible labels are hidden
 - secure accessibility values for card number, CVV, account number, and routing number fields
 - card-number validation announcements
-- stable accessibility identifiers via `PayabliPayInPaymentFlowAccessibility.fieldIdentifier(_:)`
+- stable accessibility identifiers via `PayabliPayInAccessibility.fieldIdentifier(_:)`
 - Dynamic Type support, including unpairing horizontal fields at accessibility sizes
 
 Run focused tests with:
@@ -150,5 +150,5 @@ Run focused tests with:
 ```bash
 xcodebuild test -scheme PayabliSDK-Package \
   -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.4.1' \
-  -only-testing:PayabliSDKPayInPaymentFlowTests
+  -only-testing:PayabliSDKPayInTests
 ```

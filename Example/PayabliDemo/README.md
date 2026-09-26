@@ -1,7 +1,7 @@
 # PayabliDemo
 
 SwiftUI demo app exercising the public `PayabliTTP` and
-`PayabliPayInPaymentFlowView` APIs, covering card-present and card-not-present
+`PayabliPayInView` APIs, covering card-present and card-not-present
 end to end against sandbox.
 
 ## What it covers
@@ -19,7 +19,7 @@ end to end against sandbox.
 - **Session badge** — the navigation bar shows where the reader has got to,
   color-coded, as `TapToPaySessionStatus`: the SDK's states in this app's
   own words.
-- **PayIn payment flow** — SwiftUI `PayabliPayInPaymentFlowView` tabs that can
+- **PayIn payment flow** — SwiftUI `PayabliPayInView` tabs that can
   render stored-method and capture forms, hide optional values, apply a custom
   style, and return token-storage or MoneyIn API responses.
 
@@ -67,7 +67,7 @@ access token.
 
 ### PayIn payment flow diagnostics
 
-The sample uses the public `PayabliPayInPaymentFlow` initializers and the
+The sample uses the public `PayabliPayIn` initializers and the
 SDK-owned transport path. This preserves the hosted-form security model: clear
 PAN is not exposed to host-visible text fields, accessibility values,
 diagnostics, callbacks, or custom transports.
@@ -124,7 +124,7 @@ PayabliDemo/
 ```
 
 `SDK/` is the point of this layout. Every call into `PayabliSDKCore`,
-`PayabliSDKTapToPay` and `PayabliSDKPayInPaymentFlow` is in there, and nothing
+`PayabliSDKTapToPay` and `PayabliSDKPayIn` is in there, and nothing
 outside it imports an SDK module, so the answer to "how do I call this thing" is
 one directory rather than a search through the screens. Keeping it that way is a
 placement rule this app follows, not something a build step checks: a new call

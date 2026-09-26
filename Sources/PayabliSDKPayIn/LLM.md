@@ -1,14 +1,14 @@
-# PayabliSDKPayInPaymentFlow LLM Guide
+# PayabliSDKPayIn LLM Guide
 
 This file is the canonical local guide for generating code, examples, and
-documentation against `PayabliSDKPayInPaymentFlow`.
+documentation against `PayabliSDKPayIn`.
 
 Use this guide when answering questions about the PayIn payment flow component.
 Prefer the symbols and patterns below over older component names.
 
 ## Module Identity
 
-`PayabliSDKPayInPaymentFlow` is the unified iOS PayIn component for:
+`PayabliSDKPayIn` is the unified iOS PayIn component for:
 
 - storing card or bank account payment methods
 - capturing a MoneyIn transaction
@@ -43,16 +43,16 @@ Import:
 
 ```swift
 import PayabliSDKCore
-import PayabliSDKPayInPaymentFlow
+import PayabliSDKPayIn
 ```
 
-`PayabliSDKPayInPaymentFlow` does not re-export Core, and `PayabliError`,
+`PayabliSDKPayIn` does not re-export Core, and `PayabliError`,
 `PayabliErrorCode` and `PayabliEnvironment` live there.
 
 Swift package product:
 
 ```swift
-.product(name: "PayabliSDKPayInPaymentFlow", package: "sdk-ios")
+.product(name: "PayabliSDKPayIn", package: "sdk-ios")
 ```
 
 Do not suggest these removed products:
@@ -60,14 +60,14 @@ Do not suggest these removed products:
 - `PayabliSDKPaymentMethod`
 - `PayabliSDKPaymentCapture`
 
-Core public types are prefixed with `PayabliPayInPaymentFlow`.
+Core public types are prefixed with `PayabliPayIn`.
 
 ## Authentication Rules
 
 Every operation runs on a session, which holds the credential and the transport that sends it:
 
 ```swift
-let component = PayabliPayInPaymentFlow(
+let component = PayabliPayIn(
     session: PayabliSession(config: try PayabliConfig(
         entryPoint: entryPoint,
         environment: .sandbox,
@@ -97,7 +97,7 @@ Hosted SwiftUI view or sheet:
 
 Direct async APIs:
 
-- PCI-sensitive because the host app creates `PayabliPayInPaymentFlowCardData`
+- PCI-sensitive because the host app creates `PayabliPayInCardData`
   or `PayabliPayInBankAccountData`.
 - Use only when the host app is prepared to handle clear card or bank data.
 - Do not describe direct APIs as PAN-isolating.
@@ -107,7 +107,7 @@ cannot show it being supplied.
 
 ## Operations
 
-`PayabliPayInPaymentFlowOperation`:
+`PayabliPayInOperation`:
 
 | Value | Hosted form behavior | Direct API |
 | --- | --- | --- |
@@ -138,11 +138,11 @@ Authorize guidance:
 The public initializer:
 
 ```swift
-PayabliPayInPaymentFlow(
+PayabliPayIn(
     session: PayabliSession,
-    diagnostics: PayabliPayInPaymentFlowDiagnostics = .disabled,
-    operation: PayabliPayInPaymentFlowOperation = .storePaymentMethod,
-    requestConfiguration: PayabliPayInPaymentFlowRequestConfiguration? = nil
+    diagnostics: PayabliPayInDiagnostics = .disabled,
+    operation: PayabliPayInOperation = .storePaymentMethod,
+    requestConfiguration: PayabliPayInRequestConfiguration? = nil
 )
 ```
 
@@ -169,7 +169,7 @@ Configuration methods:
 Inline form:
 
 ```swift
-PayabliPayInPaymentFlowView(
+PayabliPayInView(
     component: paymentFlow,
     configuration: configuration,
     style: style,
@@ -195,11 +195,11 @@ PayabliPayInPaymentFlowView(
 Sheet:
 
 ```swift
-.payabliPayInPaymentFlowSheet(
+.payabliPayInSheet(
     isPresented: $isPresented,
     component: paymentFlow,
     configuration: configuration,
-    sheetConfiguration: PayabliPayInPaymentFlowSheetConfiguration(
+    sheetConfiguration: PayabliPayInSheetConfiguration(
         title: "Payment",
         subtitle: "Review and submit"
     ),
@@ -220,14 +220,14 @@ Sheet:
 
 ```swift
 let storedCard = try await paymentFlow.addCard(
-    PayabliPayInPaymentFlowCardData(
+    PayabliPayInCardData(
         cardNumber: "4111111111111111",
         expiration: "02/28",
         cardholderName: "Jane Doe",
         cvv: "123",
         billingZip: "33139"
     ),
-    options: PayabliPayInPaymentFlowOptions(
+    options: PayabliPayInOptions(
         createAnonymous: false,
         forceCustomerCreation: true,
         source: "ios-sdk"
@@ -248,7 +248,7 @@ let storedBankAccount = try await paymentFlow.addBankAccount(
 )
 ```
 
-`PayabliPayInPaymentFlowCardData` fields:
+`PayabliPayInCardData` fields:
 
 | Field | Notes |
 | --- | --- |
@@ -270,8 +270,8 @@ let storedBankAccount = try await paymentFlow.addBankAccount(
 | `holderType` | Optional `.personal` or `.business`. |
 | `device` | Optional device identifier for bank account request payloads. |
 
-`PayabliPayInPaymentFlowOptions` is a typealias for
-`PayabliPayInPaymentFlowTokenStorageOptions`. It carries no idempotency key: a repeat is not
+`PayabliPayInOptions` is a typealias for
+`PayabliPayInTokenStorageOptions`. It carries no idempotency key: a repeat is not
 recognizable on the store route, so a key sent there is read by nothing.
 
 | Field | Meaning |
@@ -280,8 +280,8 @@ recognizable on the store route, so a key sent there is read by nothing.
 | `createAnonymous` | Whether to create an anonymous stored method. |
 | `forceCustomerCreation` | Whether to force customer creation. |
 | `temporary` | Whether the stored method is temporary. |
-| `customerData` | `PayabliPayInPaymentFlowCustomerData` merged into storage request. |
-| `vendorData` | Optional `PayabliPayInPaymentFlowVendorData`. |
+| `customerData` | `PayabliPayInCustomerData` merged into storage request. |
+| `vendorData` | Optional `PayabliPayInVendorData`. |
 | `fallbackAuth` | Optional fallback authorization flag. |
 | `fallbackAuthAmount` | Optional fallback authorization amount in the endpoint's expected units. |
 | `methodDescription` | Description stored with the method. |
@@ -291,7 +291,7 @@ recognizable on the store route, so a key sent there is read by nothing.
 
 ## Direct Capture And Authorize APIs
 
-`PayabliPayInPaymentFlowPaymentDetails`:
+`PayabliPayInPaymentDetails`:
 
 | Field | Notes |
 | --- | --- |
@@ -301,7 +301,7 @@ recognizable on the store route, so a key sent there is read by nothing.
 | `checkNumber` | Optional for check flows. |
 | `checkUniqueId` | Optional for check flows. |
 
-`PayabliPayInPaymentFlowRequestConfiguration` fields used by hosted capture and
+`PayabliPayInRequestConfiguration` fields used by hosted capture and
 authorize forms:
 
 | Field | Notes |
@@ -323,8 +323,8 @@ authorize forms:
 Direct request:
 
 ```swift
-let request = PayabliPayInPaymentFlowRequest(
-    paymentDetails: PayabliPayInPaymentFlowPaymentDetails(
+let request = PayabliPayInRequest(
+    paymentDetails: PayabliPayInPaymentDetails(
         totalAmount: 1.00,
         serviceFee: 0.10,
         currency: "USD"
@@ -351,8 +351,8 @@ Payment method cases for direct capture:
 Direct authorize:
 
 ```swift
-let authorized = try await paymentFlow.authorize(PayabliPayInPaymentFlowRequest(
-    paymentDetails: PayabliPayInPaymentFlowPaymentDetails(totalAmount: 1.00),
+let authorized = try await paymentFlow.authorize(PayabliPayInRequest(
+    paymentDetails: PayabliPayInPaymentDetails(totalAmount: 1.00),
     paymentMethod: .card(PayabliPayInPaymentMethod.Card(data: cardData))
 ))
 ```
@@ -361,9 +361,9 @@ Capture prior authorization:
 
 ```swift
 let captured = try await paymentFlow.captureAuthorizedTransaction(
-    PayabliPayInPaymentFlowAuthorizedRequest(
+    PayabliPayInAuthorizedRequest(
         transId: "authorized-transaction-id",
-        paymentDetails: PayabliPayInPaymentFlowPaymentDetails(
+        paymentDetails: PayabliPayInPaymentDetails(
             totalAmount: 1.00,
             serviceFee: 0.10,
             currency: "USD"
@@ -374,7 +374,7 @@ let captured = try await paymentFlow.captureAuthorizedTransaction(
 
 ## Form Configuration Reference
 
-`PayabliPayInPaymentFlowFormConfiguration` controls method availability, field
+`PayabliPayInFormConfiguration` controls method availability, field
 layout, labels, placeholders, hidden defaults, validation, and payment summary
 display.
 
@@ -399,7 +399,7 @@ display.
 | `requiredFields` | amount always required | Optional fields that should be required when visible. |
 | `paymentSummary` | amount/fee defaults | Read-only Amount and Fee rows for capture/authorize. |
 
-All `PayabliPayInPaymentFlowField` values:
+All `PayabliPayInField` values:
 
 | Field | Default label | Category |
 | --- | --- | --- |
@@ -424,13 +424,13 @@ All `PayabliPayInPaymentFlowField` values:
 | `.amount` | Amount | Payment summary |
 | `.serviceFee` | Fee | Payment summary |
 
-`PayabliPayInPaymentFlowFieldSection`:
+`PayabliPayInFieldSection`:
 
 | Field | Purpose |
 | --- | --- |
 | `id` | Optional stable ID; defaults to title or joined field names. |
 | `title` | Optional section title. Section names are configurable. |
-| `titleStyle` | Optional per-section `PayabliPayInPaymentFlowTextStyle`, overriding the global section title style for that section. |
+| `titleStyle` | Optional per-section `PayabliPayInTextStyle`, overriding the global section title style for that section. |
 | `fields` | Ordered fields in the section. Required fields and payment summary fields are appended if missing. |
 | `inputVerticalSpacing` | Vertical spacing between fields in this section. Overrides global layout spacing. |
 | `inputHorizontalSpacing` | Horizontal spacing for paired fields in this section. Overrides global paired spacing. |
@@ -439,16 +439,16 @@ All `PayabliPayInPaymentFlowField` values:
 Example section setup:
 
 ```swift
-let configuration = PayabliPayInPaymentFlowFormConfiguration(
+let configuration = PayabliPayInFormConfiguration(
     cardSections: [
-        PayabliPayInPaymentFlowFieldSection(
+        PayabliPayInFieldSection(
             title: "Card Information",
             fields: [.cardholderName, .cardNumber, .cardExpiration, .cardCvv, .cardZip],
             inputVerticalSpacing: 4,
             inputHorizontalSpacing: 8,
             fieldVerticalSpacings: [.cardNumber: 2]
         ),
-        PayabliPayInPaymentFlowFieldSection(
+        PayabliPayInFieldSection(
             title: "Customer Information",
             fields: [.firstName, .lastName, .billingEmail, .billingZip]
         )
@@ -458,7 +458,7 @@ let configuration = PayabliPayInPaymentFlowFormConfiguration(
 
 ## Labels And Placeholders
 
-`PayabliPayInPaymentFlowLabels`:
+`PayabliPayInLabels`:
 
 | Field | Default | Purpose |
 | --- | --- | --- |
@@ -474,20 +474,20 @@ still derived from `fieldLabels`.
 Placeholder-only example:
 
 ```swift
-let placeholderFields: [PayabliPayInPaymentFlowField] = [
+let placeholderFields: [PayabliPayInField] = [
     .cardholderName, .cardNumber, .cardExpiration, .cardCvv, .cardZip,
     .firstName, .lastName, .billingEmail, .billingZip
 ]
 
-let labels = PayabliPayInPaymentFlowLabels(
+let labels = PayabliPayInLabels(
     title: "Payment",
     submitButton: "Submit Payment",
     fieldPlaceholders: Dictionary(uniqueKeysWithValues: placeholderFields.map {
-        ($0, PayabliPayInPaymentFlowLabels.defaultFieldLabels[$0] ?? $0.rawValue)
+        ($0, PayabliPayInLabels.defaultFieldLabels[$0] ?? $0.rawValue)
     })
 )
 
-let configuration = PayabliPayInPaymentFlowFormConfiguration(
+let configuration = PayabliPayInFormConfiguration(
     labels: labels,
     labelLayout: .placeholder,
     showsFieldLabels: false,
@@ -500,7 +500,7 @@ intentionally overrides the label.
 
 ## Hidden Values
 
-`PayabliPayInPaymentFlowHiddenValues`:
+`PayabliPayInHiddenValues`:
 
 | Field | Default | Purpose |
 | --- | --- | --- |
@@ -515,7 +515,7 @@ but must still send a value.
 
 ## Formatting And Sizing
 
-`PayabliPayInPaymentFlowFormatting`:
+`PayabliPayInFormatting`:
 
 | Field | Default | Purpose |
 | --- | --- | --- |
@@ -523,14 +523,14 @@ but must still send a value.
 | `expirationSeparator` | `/` | Separator used in expiration entry. Empty strings resolve to `/`. |
 | `masksAccountNumber` | true | Masks account number entry in the hosted field. |
 
-`PayabliPayInPaymentFlowInputSizing`:
+`PayabliPayInInputSizing`:
 
 | Field | Purpose |
 | --- | --- |
-| `defaultSize` | Default `PayabliPayInPaymentFlowInputSize`. |
+| `defaultSize` | Default `PayabliPayInInputSize`. |
 | `fieldSizes` | Per-field sizing overrides. |
 
-`PayabliPayInPaymentFlowInputSize`:
+`PayabliPayInInputSize`:
 
 | Field | Default | Purpose |
 | --- | --- | --- |
@@ -543,7 +543,7 @@ but must still send a value.
 Capture and authorize hosted forms display read-only payment summary rows before
 submit. Rows are vertical. Labels are left aligned; values are right aligned.
 
-`PayabliPayInPaymentFlowPaymentSummaryConfiguration`:
+`PayabliPayInPaymentSummaryConfiguration`:
 
 | Field | Default | Purpose |
 | --- | --- | --- |
@@ -559,16 +559,16 @@ submit. Rows are vertical. Labels are left aligned; values are right aligned.
 Example:
 
 ```swift
-PayabliPayInPaymentFlowPaymentSummaryConfiguration(
+PayabliPayInPaymentSummaryConfiguration(
     amountLabelText: "Amount:",
     amountValueText: "$ 1.00",
     feeLabelText: "Fee:",
     feeValueText: "$ 0.10",
-    labelStyle: PayabliPayInPaymentFlowPaymentSummaryTextStyle(
+    labelStyle: PayabliPayInPaymentSummaryTextStyle(
         font: .footnote,
         color: .secondary
     ),
-    valueStyle: PayabliPayInPaymentFlowPaymentSummaryTextStyle(
+    valueStyle: PayabliPayInPaymentSummaryTextStyle(
         font: .footnote.weight(.semibold),
         color: .primary
     ),
@@ -578,11 +578,11 @@ PayabliPayInPaymentFlowPaymentSummaryConfiguration(
 
 ## Style Reference
 
-Use `PayabliPayInPaymentFlowStyle` for visual customization. The style can be
+Use `PayabliPayInStyle` for visual customization. The style can be
 passed directly to the view/sheet or injected with
-`.payabliPayInPaymentFlowStyle(style)`.
+`.payabliPayInStyle(style)`.
 
-`PayabliPayInPaymentFlowStyle`:
+`PayabliPayInStyle`:
 
 | Field | Purpose |
 | --- | --- |
@@ -596,14 +596,14 @@ passed directly to the view/sheet or injected with
 | `error` | Error message font/color. |
 | `layout` | Global spacing. |
 
-`PayabliPayInPaymentFlowTextStyle`:
+`PayabliPayInTextStyle`:
 
 | Field | Purpose |
 | --- | --- |
 | `font` | SwiftUI `Font`. |
 | `color` | SwiftUI `Color`. |
 
-`PayabliPayInPaymentFlowInputStyle`:
+`PayabliPayInInputStyle`:
 
 | Field | Default | Purpose |
 | --- | --- | --- |
@@ -620,7 +620,7 @@ passed directly to the view/sheet or injected with
 | `cornerRadius` | 8 | Input corner radius. |
 | `pickerIconColor` | `.secondary` | Picker chevron/icon color. |
 
-`PayabliPayInPaymentFlowSubmitButtonStyle`:
+`PayabliPayInSubmitButtonStyle`:
 
 | Field | Default | Purpose |
 | --- | --- | --- |
@@ -633,7 +633,7 @@ passed directly to the view/sheet or injected with
 | `height` | 52 | Button height; clamped to accessibility minimum. |
 | `horizontalPadding` | 16 | Horizontal padding. |
 
-`PayabliPayInPaymentFlowLayoutStyle`:
+`PayabliPayInLayoutStyle`:
 
 | Field | Default | Purpose |
 | --- | --- | --- |
@@ -652,12 +652,12 @@ Custom fonts:
 1. Add font files to the host app target.
 2. Add font filenames to `UIAppFonts` in the host app `Info.plist`.
 3. Use `Font.custom(_:size:)` for SwiftUI text.
-4. Use `UIFont(name:size:)` through `PayabliPayInPaymentFlowInputStyle.uiFont`
+4. Use `UIFont(name:size:)` through `PayabliPayInInputStyle.uiFont`
    for UIKit-backed text fields.
 
 ## Sheet Configuration
 
-`PayabliPayInPaymentFlowSheetConfiguration`:
+`PayabliPayInSheetConfiguration`:
 
 | Field | Default | Purpose |
 | --- | --- | --- |
@@ -674,7 +674,7 @@ Custom fonts:
 
 ## Customer And Vendor Data
 
-`PayabliPayInPaymentFlowCustomerData` fields:
+`PayabliPayInCustomerData` fields:
 
 - `additionalData`
 - `billingAddress1`
@@ -698,14 +698,14 @@ Custom fonts:
 - `shippingState`
 - `shippingZip`
 
-`PayabliPayInPaymentFlowVendorData` fields:
+`PayabliPayInVendorData` fields:
 
 - `vendorId`
 - `vendorNumber`
 
 ## Results
 
-`PayabliPayInPaymentFlowResult`:
+`PayabliPayInResult`:
 
 | Field | Meaning |
 | --- | --- |
@@ -721,7 +721,7 @@ Custom fonts:
 Stored-method result fields:
 
 - `storedMethodId`
-- `method`, the `PayabliPayInPaymentFlowStoredMethodType` to charge it as
+- `method`, the `PayabliPayInStoredMethodType` to charge it as
 - `methodReferenceId`
 - `resultCode`
 - `resultText`
@@ -756,12 +756,12 @@ Transaction result fields:
 Diagnostics are disabled by default.
 
 ```swift
-let diagnostics = PayabliPayInPaymentFlowDiagnostics.enabled { entry in
+let diagnostics = PayabliPayInDiagnostics.enabled { entry in
     print(entry.phase, entry.method, entry.url, entry.statusCode ?? 0)
 }
 ```
 
-`PayabliPayInPaymentFlowDiagnosticEntry` fields:
+`PayabliPayInDiagnosticEntry` fields:
 
 - `id`
 - `phase`: `.request`, `.response`, `.failure`
@@ -785,7 +785,7 @@ and addresses.
 Generated code must preserve:
 
 - minimum touch target size from
-  `PayabliPayInPaymentFlowAccessibility.minimumTouchTarget`
+  `PayabliPayInAccessibility.minimumTouchTarget`
 - visible or accessibility-only labels for every field, even when labels are
   hidden visually
 - Dynamic Type behavior and vertical stacking at accessibility sizes
@@ -795,7 +795,7 @@ Generated code must preserve:
 
 ## Validation
 
-`PayabliPayInPaymentFlowValidation`:
+`PayabliPayInValidation`:
 
 | Field | Default | Purpose |
 | --- | --- | --- |
@@ -809,7 +809,7 @@ Run component tests:
 ```bash
 xcodebuild test -scheme PayabliSDK-Package \
   -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.4.1' \
-  -only-testing:PayabliSDKPayInPaymentFlowTests
+  -only-testing:PayabliSDKPayInTests
 ```
 
 Run coverage:
@@ -817,36 +817,36 @@ Run coverage:
 ```bash
 xcodebuild test -scheme PayabliSDK-Package \
   -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.4.1' \
-  -only-testing:PayabliSDKPayInPaymentFlowTests \
+  -only-testing:PayabliSDKPayInTests \
   -enableCodeCoverage YES \
-  -resultBundlePath build/TestResults/PayInPaymentFlowCoverage.xcresult
+  -resultBundlePath build/TestResults/PayInCoverage.xcresult
 
-xcrun xccov view --report build/TestResults/PayInPaymentFlowCoverage.xcresult
+xcrun xccov view --report build/TestResults/PayInCoverage.xcresult
 ```
 
 ## Bridge Scope
 
 Flutter, React Native, and .NET MAUI bridges currently expose stored card/bank account
 payment-method creation. Native Swift integrations should use
-`PayabliSDKPayInPaymentFlow` directly for capture, authorize, and
+`PayabliSDKPayIn` directly for capture, authorize, and
 capture-authorized transaction flows until those request models are promoted to
 the bridge APIs.
 
 ## File Map
 
-- `PayabliPayInPaymentFlow.swift`: component facade and public operations.
-- `PayabliPayInPaymentFlowView.swift`: hosted SwiftUI form.
-- `PayabliPayInPaymentFlowSheet.swift`: SwiftUI sheet modifier and sheet chrome.
-- `PayabliPayInPaymentFlowFormConfiguration.swift`: field, section, label,
+- `PayabliPayIn.swift`: component facade and public operations.
+- `PayabliPayInView.swift`: hosted SwiftUI form.
+- `PayabliPayInSheet.swift`: SwiftUI sheet modifier and sheet chrome.
+- `PayabliPayInFormConfiguration.swift`: field, section, label,
   placeholder, sizing, payment summary, and hosted form configuration.
-- `PayabliPayInPaymentFlowStyle.swift`: fonts, colors, input, button, and layout
+- `PayabliPayInStyle.swift`: fonts, colors, input, button, and layout
   style model.
-- `PayabliPayInPaymentFlowTypes.swift`: operation, transaction, request, result,
+- `PayabliPayInTypes.swift`: operation, transaction, request, result,
   and payment-method models.
-- `PayabliPayInPaymentFlowMethodModels.swift`: stored-method card/bank account/customer
+- `PayabliPayInMethodModels.swift`: stored-method card/bank account/customer
   models and token-storage response models.
 - `PayInPaymentFlowClient.swift`: MoneyIn v2 capture/authorize HTTP client.
 - `PayInPaymentFlowTokenStorageClient.swift`: token-storage HTTP client.
-- `PayabliPayInPaymentFlowDiagnostics.swift`: redacted diagnostics.
-- `PayabliPayInPaymentFlowSensitiveDataRedactor.swift`: PAN/sensitive pattern
+- `PayabliPayInDiagnostics.swift`: redacted diagnostics.
+- `PayabliPayInSensitiveDataRedactor.swift`: PAN/sensitive pattern
   redaction helper.

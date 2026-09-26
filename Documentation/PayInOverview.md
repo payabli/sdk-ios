@@ -1,6 +1,6 @@
-# PayabliSDKPayInPaymentFlow Overview
+# PayabliSDKPayIn Overview
 
-`PayabliSDKPayInPaymentFlow` is the unified iOS PayIn component for native
+`PayabliSDKPayIn` is the unified iOS PayIn component for native
 Payabli payment flows. It replaces the older separate payment-method and
 payment-capture components with one Swift package product that can store payment
 methods, submit MoneyIn transactions, and render an SDK-owned SwiftUI form.
@@ -8,13 +8,13 @@ methods, submit MoneyIn transactions, and render an SDK-owned SwiftUI form.
 Add the product:
 
 ```swift
-.product(name: "PayabliSDKPayInPaymentFlow", package: "sdk-ios")
+.product(name: "PayabliSDKPayIn", package: "sdk-ios")
 ```
 
 Import:
 
 ```swift
-import PayabliSDKPayInPaymentFlow
+import PayabliSDKPayIn
 ```
 
 ## Why We Built This
@@ -25,7 +25,7 @@ capturing a prior authorization. Before this component, those jobs were split
 across separate payment-method and payment-capture surfaces, which made native
 iOS integrations harder to configure, secure, test, and document consistently.
 
-`PayabliSDKPayInPaymentFlow` provides one native SwiftUI and async API surface
+`PayabliSDKPayIn` provides one native SwiftUI and async API surface
 for the common PayIn lifecycle. It centralizes mobile access-token usage,
 SDK-owned sensitive-field collection, MoneyIn request construction, result
 handling, diagnostics redaction, accessibility behavior, and visual
@@ -60,7 +60,7 @@ The component supports four PayIn workflows:
 | Authorize transaction | Hosted form and direct async API | `/api/v2/MoneyIn/authorize` | The hosted form collects a card only. The direct API accepts a card, a stored card, or a cloud device. |
 | Capture prior authorization | Direct async API | `/api/v2/MoneyIn/capture/{transId}` | Uses a prior authorization transaction ID. |
 
-`PayabliPayInPaymentFlowOperation` selects the hosted form behavior:
+`PayabliPayInOperation` selects the hosted form behavior:
 
 - `.storePaymentMethod`
 - `.capture`
@@ -73,7 +73,7 @@ The default is `.storePaymentMethod`.
 Every operation runs on a session, which holds the credential and asks for one when it needs it:
 
 ```swift
-let paymentFlow = PayabliPayInPaymentFlow(
+let paymentFlow = PayabliPayIn(
     session: PayabliSession(config: try PayabliConfig(
         entryPoint: entryPoint,
         environment: .sandbox,
@@ -105,8 +105,8 @@ are PCI-sensitive because the host app constructs and passes card or bank accoun
 
 ## Hosted UI Capabilities
 
-`PayabliPayInPaymentFlowView` can be embedded inline. The sheet modifier
-`.payabliPayInPaymentFlowSheet(...)` presents the same component in SwiftUI
+`PayabliPayInView` can be embedded inline. The sheet modifier
+`.payabliPayInSheet(...)` presents the same component in SwiftUI
 sheet form.
 
 The hosted form supports:
@@ -136,7 +136,7 @@ The hosted form supports:
 
 ## Field And Section Model
 
-Fields are represented by `PayabliPayInPaymentFlowField`. They can be ordered
+Fields are represented by `PayabliPayInField`. They can be ordered
 flatly with `cardFieldOrder` and `bankFieldOrder`, or grouped into sections with
 `cardSections` and `bankSections`.
 
@@ -168,7 +168,7 @@ Supported fields:
 Section names are fully configurable:
 
 ```swift
-PayabliPayInPaymentFlowFieldSection(
+PayabliPayInFieldSection(
     title: "Customer Information",
     fields: [.firstName, .lastName, .billingEmail, .billingZip]
 )
@@ -183,7 +183,7 @@ Each section can also configure:
 
 ## Labels And Placeholders
 
-`PayabliPayInPaymentFlowLabels` controls:
+`PayabliPayInLabels` controls:
 
 - `title`
 - `subtitle`
@@ -196,7 +196,7 @@ and use placeholder text while the component continues to use the label strings
 for accessibility.
 
 ```swift
-let labels = PayabliPayInPaymentFlowLabels(
+let labels = PayabliPayInLabels(
     title: "Payment",
     submitButton: "Submit Payment",
     fieldPlaceholders: [
@@ -208,7 +208,7 @@ let labels = PayabliPayInPaymentFlowLabels(
     ]
 )
 
-let configuration = PayabliPayInPaymentFlowFormConfiguration(
+let configuration = PayabliPayInFormConfiguration(
     labels: labels,
     labelLayout: .placeholder,
     showsFieldLabels: false,
@@ -223,13 +223,13 @@ code is `Billing Postal Code`.
 
 Capture and authorize forms include a non-editable payment summary section
 before the submit button. By default it displays generated values from
-`PayabliPayInPaymentFlowPaymentDetails`:
+`PayabliPayInPaymentDetails`:
 
 - `Amount: $ 1.00`
 - `Fee: $ 0.10`
 
 The text and styling are configurable through
-`PayabliPayInPaymentFlowPaymentSummaryConfiguration`:
+`PayabliPayInPaymentSummaryConfiguration`:
 
 - `amountLabelText`
 - `amountValueText`
@@ -244,7 +244,7 @@ Rows are vertical. Labels are left aligned and values are right aligned.
 
 ## Styling Capabilities
 
-Use `PayabliPayInPaymentFlowStyle` to style the hosted form.
+Use `PayabliPayInStyle` to style the hosted form.
 
 Configurable style areas:
 
@@ -261,7 +261,7 @@ Configurable style areas:
 
 Custom fonts are supplied by the host application. Add the font files to the
 app target, list them in `UIAppFonts`, use `Font.custom(_:size:)` for SwiftUI
-text, and set `PayabliPayInPaymentFlowInputStyle.uiFont` for UIKit-backed input
+text, and set `PayabliPayInInputStyle.uiFont` for UIKit-backed input
 text.
 
 ## Direct API Payment Methods
@@ -279,15 +279,15 @@ Direct authorize accepts a card, a stored card (`method: .card`), or a cloud
 device, and refuses any other payment method before anything is sent:
 
 ```swift
-try await paymentFlow.authorize(PayabliPayInPaymentFlowRequest(
-    paymentDetails: PayabliPayInPaymentFlowPaymentDetails(totalAmount: 1.00),
+try await paymentFlow.authorize(PayabliPayInRequest(
+    paymentDetails: PayabliPayInPaymentDetails(totalAmount: 1.00),
     paymentMethod: .card(PayabliPayInPaymentMethod.Card(data: cardData))
 ))
 ```
 
 ## Results
 
-`PayabliPayInPaymentFlowResult` is a unified result wrapper:
+`PayabliPayInResult` is a unified result wrapper:
 
 - `kind == .storedPaymentMethod` for token-storage success
 - `storedPaymentMethod` contains stored-method identifiers, the `method` to charge
@@ -306,7 +306,7 @@ data, stored method identifiers, customer identifiers, emails, phones, and
 addresses.
 
 ```swift
-let diagnostics = PayabliPayInPaymentFlowDiagnostics.enabled { entry in
+let diagnostics = PayabliPayInDiagnostics.enabled { entry in
     print(entry.phase, entry.method, entry.statusCode ?? 0)
 }
 ```
@@ -315,13 +315,13 @@ let diagnostics = PayabliPayInPaymentFlowDiagnostics.enabled { entry in
 
 Flutter, React Native, and .NET MAUI bridge files currently expose stored card
 and bank account payment-method creation. Native Swift apps should call
-`PayabliSDKPayInPaymentFlow` directly for capture, authorize, and
+`PayabliSDKPayIn` directly for capture, authorize, and
 capture-authorized transaction flows until those request models are promoted
 into the bridge APIs.
 
 ## Reference Docs
 
-- `Sources/PayabliSDKPayInPaymentFlow/LLM.md`: exhaustive local reference for
+- `Sources/PayabliSDKPayIn/LLM.md`: exhaustive local reference for
   code generation and field-level configuration.
-- `Documentation/PayInPaymentFlowIntegrationGuide.md`: step-by-step integration
+- `Documentation/PayInIntegrationGuide.md`: step-by-step integration
   guide with detailed examples.

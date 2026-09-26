@@ -15,8 +15,8 @@ MethodChannel + EventChannel bridge in `Bridges/Flutter/`.
 - **Session badge** — current `PayabliTTPSessionState` color-coded in
   the app bar.
 - **Card and bank account payment flow** — sample Flutter forms calling
-  `PayabliPayInPaymentFlow.addCard(...)` and
-  `PayabliPayInPaymentFlow.addBankAccount(...)`, then rendering the stored-method
+  `PayabliPayIn.addCard(...)` and
+  `PayabliPayIn.addBankAccount(...)`, then rendering the stored-method
   response.
 
 ## Setup
@@ -69,8 +69,8 @@ the form requires a valid Bearer access token from your backend for
   native `refreshToken` MethodChannel callback. It takes no token: the
   SDK asks the callback for the first one as well as for a replacement,
   so minting stays end-to-end in your code.
-- `PayabliPayInPaymentFlow.configure()` sets up the native
-  `PayabliPayInPaymentFlow` component and wires the Dart-side
+- `PayabliPayIn.configure()` sets up the native
+  `PayabliPayIn` component and wires the Dart-side
   `accessTokenProvider` callback to the native `accessToken`
   MethodChannel callback. Keep private Payabli credentials on your backend.
 - Lifecycle events arrive via `PayabliTTP.events()` — a broadcast
