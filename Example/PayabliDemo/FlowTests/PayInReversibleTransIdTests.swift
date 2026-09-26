@@ -1,4 +1,4 @@
-import PayabliSDKPayInPaymentFlow
+import PayabliSDKPayIn
 import XCTest
 
 /// Which payments the capture screen offers a reversal for.

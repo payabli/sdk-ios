@@ -1,5 +1,5 @@
 import Combine
-import PayabliSDKPayInPaymentFlow
+import PayabliSDKPayIn
 
 /// A screen's grip on the flow it submits through.
 ///
@@ -9,11 +9,11 @@ import PayabliSDKPayInPaymentFlow
 /// integration rather than most of it.
 @MainActor
 final class PayInFlowHandle: ObservableObject {
-    let flow: PayabliPayInPaymentFlow
+    let flow: PayabliPayIn
 
     private var forwarding: AnyCancellable?
 
-    init(_ flow: PayabliPayInPaymentFlow) {
+    init(_ flow: PayabliPayIn) {
         self.flow = flow
         // Screens observe this object, so the flow's publishes have to arrive here
         // or a submission redraws nothing.

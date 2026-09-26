@@ -14,7 +14,7 @@ enum QAAmount {
     private static let minimumCents = 200
     private static let maximumCents = 1499
 
-    /// A `Double` because that is what `PayabliPayInPaymentFlowPaymentDetails`
+    /// A `Double` because that is what `PayabliPayInPaymentDetails`
     /// takes. Drawn in whole cents and divided, rather than drawn as a fraction, so
     /// the figure is one of the 1300 the range actually contains.
     static func random() -> Double {

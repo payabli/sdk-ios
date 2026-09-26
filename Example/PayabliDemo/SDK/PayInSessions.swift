@@ -1,5 +1,5 @@
 import PayabliSDKCore
-import PayabliSDKPayInPaymentFlow
+import PayabliSDKPayIn
 
 /// Where this app's card-not-present flows are built.
 ///
@@ -31,7 +31,7 @@ enum PayInSessions {
     /// Storing an instrument for later.
     static func storedMethod() -> PayInFlowHandle {
         PayInFlowHandle(
-            PayabliPayInPaymentFlow(
+            PayabliPayIn(
                 session: session(
                     entryPoint: DemoConfiguration.entryPoint,
                     tokenProvider: { try await Secrets.fetchPaymentMethodAccessToken() }
@@ -51,7 +51,7 @@ enum PayInSessions {
     /// states it rather than reading it.
     static func capture() -> PayInFlowHandle {
         PayInFlowHandle(
-            PayabliPayInPaymentFlow(
+            PayabliPayIn(
                 session: session(
                     entryPoint: DemoConfiguration.entryPoint,
                     tokenProvider: { try await Secrets.fetchPaymentCaptureAccessToken() }
@@ -69,15 +69,15 @@ enum PayInSessions {
     /// A flow for a canvas preview, which makes no network call.
     static func preview(capturing: Bool = false) -> PayInFlowHandle {
         PayInFlowHandle(
-            PayabliPayInPaymentFlow(
+            PayabliPayIn(
                 session: session(
                     entryPoint: "preview-entry",
                     tokenProvider: { "preview-token" }
                 ),
                 operation: capturing ? .capture : .storePaymentMethod,
                 requestConfiguration: capturing
-                    ? PayabliPayInPaymentFlowRequestConfiguration(
-                        paymentDetails: PayabliPayInPaymentFlowPaymentDetails(
+                    ? PayabliPayInRequestConfiguration(
+                        paymentDetails: PayabliPayInPaymentDetails(
                             totalAmount: 1,
                             serviceFee: 0.10,
                             currency: "USD"

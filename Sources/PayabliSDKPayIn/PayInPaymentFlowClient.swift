@@ -1,0 +1,518 @@
+import Foundation
+import PayabliSDKCore
+
+/// HTTP client for v2 MoneyIn transaction endpoints.
+///
+/// It builds requests and reads responses. The credential is attached by the chain inside the
+/// transport, so nothing here holds a token or a token source.
+final class PayInPaymentFlowClient: Sendable {
+    private let transport: any PayabliTransport
+    private let baseURL: URL?
+    private let diagnostics: PayabliPayInDiagnostics
+
+    init(
+        transport: any PayabliTransport,
+        baseURL: URL? = nil,
+        diagnostics: PayabliPayInDiagnostics = .disabled
+    ) {
+        self.transport = transport
+        self.baseURL = baseURL
+        self.diagnostics = diagnostics
+    }
+
+    func capture(
+        entryPoint: String,
+        request: PayabliPayInRequest,
+        idempotencyKey: String
+    ) async throws -> PayabliPayInResult {
+        try await performTransaction(
+            path: "/api/v2/MoneyIn/getpaid",
+            entryPoint: entryPoint,
+            request: request,
+            idempotencyKey: idempotencyKey,
+            allowsACHValidation: true
+        )
+    }
+
+    func authorize(
+        entryPoint: String,
+        request: PayabliPayInRequest,
+        idempotencyKey: String
+    ) async throws -> PayabliPayInResult {
+        guard request.paymentMethod.isAuthorizable else {
+            throw PayabliPayInError.invalidInput("This payment method cannot be authorized.")
+        }
+        return try await performTransaction(
+            path: "/api/v2/MoneyIn/authorize",
+            entryPoint: entryPoint,
+            request: request,
+            idempotencyKey: idempotencyKey,
+            allowsACHValidation: false
+        )
+    }
+
+    func captureAuthorized(
+        _ request: PayabliPayInAuthorizedRequest,
+        idempotencyKey: String
+    ) async throws -> PayabliPayInResult {
+        let transId = request.transId.payabliCaptureTrimmed
+        guard !transId.isEmpty else {
+            throw PayabliPayInError.invalidInput("Transaction ID is required.")
+        }
+        try request.paymentDetails.validate()
+
+        let body = AuthorizedCaptureBody(paymentDetails: request.paymentDetails)
+        let payabliRequest = try buildRequest(
+            path: "/api/v2/MoneyIn/capture/\(PercentEncoding.segment(transId))",
+            query: [],
+            idempotencyKey: idempotencyKey,
+            body: body
+        )
+        // Whether a key went out, not which one: nothing reports a key, and `perform` needs only to
+        // know that this route carries one so a failure that leaves the outcome open says so.
+        return try await perform(payabliRequest, carriesKey: payabliRequest.headers["idempotencyKey"] != nil)
+    }
+
+    /// Reverses a transaction, releasing an authorization's hold or undoing a capture that has not
+    /// settled.
+    ///
+    /// No body: the route carries the identifier in its path and takes nothing else, so there is no
+    /// partial void. Which states can still be reversed is the service's to decide and is not mirrored
+    /// here; a state it refuses arrives as the refusal it sent, carrying its own reason.
+    func void(
+        transId: String,
+        idempotencyKey: String
+    ) async throws -> PayabliPayInResult {
+        let transId = transId.payabliCaptureTrimmed
+        guard !transId.isEmpty else {
+            throw PayabliPayInError.invalidInput("Transaction ID is required.")
+        }
+        // `.` and `..` are unreserved, so the encoder passes them through as themselves and the
+        // identifier names a route rather than a transaction. Refused here because whether a value is
+        // usable is the caller's question rather than the encoder's, and this matches the sibling.
+        guard transId != ".", transId != ".." else {
+            throw PayabliPayInError.invalidInput("Transaction ID is required.")
+        }
+
+        let payabliRequest = try buildRequest(
+            path: "/api/v2/MoneyIn/void/\(PercentEncoding.segment(transId))",
+            query: [],
+            idempotencyKey: idempotencyKey
+        )
+        // Whether a key went out, not which one: nothing reports a key, and `perform` needs only to
+        // know that this route carries one so a failure that leaves the outcome open says so.
+        return try await perform(payabliRequest, carriesKey: payabliRequest.headers["idempotencyKey"] != nil)
+    }
+
+    private func performTransaction(
+        path: String,
+        entryPoint: String,
+        request: PayabliPayInRequest,
+        idempotencyKey: String,
+        allowsACHValidation: Bool
+    ) async throws -> PayabliPayInResult {
+        let entry = entryPoint.payabliCaptureTrimmed
+        guard !entry.isEmpty else {
+            throw PayabliPayInError.invalidInput("Entrypoint is required.")
+        }
+        try request.paymentDetails.validate()
+        try request.paymentMethod.validate(request.validation)
+
+        let body = TransactionRequestBody(
+            accountId: request.accountId?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty,
+            customerData: request.customerData,
+            entryPoint: entry,
+            ipaddress: request.ipAddress?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty,
+            orderDescription: request.orderDescription?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty,
+            orderId: request.orderId?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty,
+            paymentDetails: request.paymentDetails,
+            paymentMethod: request.paymentMethod,
+            source: request.source?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty,
+            subdomain: request.subdomain?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty,
+            subscriptionId: request.subscriptionId
+        )
+        let payabliRequest = try buildRequest(
+            path: path,
+            query: request.queryItems(allowsACHValidation: allowsACHValidation),
+            idempotencyKey: idempotencyKey,
+            body: body
+        )
+        // Whether a key went out, not which one: nothing reports a key, and `perform` needs only to
+        // know that this route carries one so a failure that leaves the outcome open says so.
+        return try await perform(payabliRequest, carriesKey: payabliRequest.headers["idempotencyKey"] != nil)
+    }
+
+    /// Builds the request. The transport's chain attaches the credential and the content type.
+    ///
+    /// The idempotency key is set here because the chain runs once per attempt, and a key minted
+    /// there would differ on a replay.
+    private func buildRequest(
+        path: String,
+        query: [URLQueryItem],
+        idempotencyKey: String?,
+        body: some Encodable
+    ) throws -> PayabliRequest {
+        try PayabliRequest(
+            method: .post,
+            path: path,
+            query: query,
+            headers: Self.headers(idempotencyKey: idempotencyKey),
+            body: PayInPaymentFlowJSONBody.encode(body)
+        )
+    }
+
+    /// Builds a request for a route that carries everything it needs in its path.
+    ///
+    /// The body stays absent rather than being an empty object: the two are different requests, and
+    /// only the first is what the route was measured against.
+    private func buildRequest(
+        path: String,
+        query: [URLQueryItem],
+        idempotencyKey: String?
+    ) throws -> PayabliRequest {
+        try PayabliRequest(
+            method: .post,
+            path: path,
+            query: query,
+            headers: Self.headers(idempotencyKey: idempotencyKey)
+        )
+    }
+
+    private static func headers(idempotencyKey: String?) throws -> [String: String] {
+        guard let idempotencyKey else { return [:] }
+        return ["idempotencyKey": try sendableKey(idempotencyKey)]
+    }
+
+    /// The key as it will be sent, or a refusal.
+    ///
+    /// A value that is blank once trimmed is refused rather than dropped. Dropping it sends a
+    /// money-moving request with no duplicate protection to a caller who set a key and believes it is
+    /// protected. A value that cannot sit in a header is refused for the reason `isHeaderSafe` exists:
+    /// `URLRequest.setValue` mangles a header holding a carriage return rather than reporting it, so the
+    /// request would go out unprotected and the failure would name something else.
+    private static func sendableKey(_ key: String) throws -> String {
+        let trimmed = key.payabliCaptureTrimmed
+        guard !trimmed.isBlank else {
+            throw PayabliPayInError.invalidInput("The idempotency key cannot be blank.")
+        }
+        guard trimmed.isHeaderSafe else {
+            throw PayabliPayInError
+                .invalidInput("The idempotency key may contain printable ASCII only.")
+        }
+        return trimmed
+    }
+
+    /// Whether a failure leaves the outcome of a money-moving request open.
+    ///
+    /// Open, so the failure is wrapped: a cancellation, a network failure, a 5xx, a response that could
+    /// not be decoded, and anything unclassified. In each the payment may already have been taken, which
+    /// is what the wrapping says and all it says. No key is reported to a caller and none is held for a
+    /// later submission, so what resolves an open outcome is reading the transaction back.
+    ///
+    /// A recognised repeat is open for a different reason than the rest. The service answered, and what
+    /// it answered is that it has seen this key inside the window. The marker is written before the
+    /// handler runs and is never rolled back afterwards, so the attempt that key named may have taken
+    /// the payment and may have failed while taking it. A `409` settles what happens to the key and
+    /// says nothing about the payment.
+    ///
+    /// Settled, so none is: a decline and a validation refusal are answers, a rate limit is a refusal
+    /// to act, and a refused credential never reached the operation. Reporting a key for any of those
+    /// would suggest a retry that is either a new payment or one the service refuses again.
+    ///
+    /// Decided on the code alone: this client publishes no key on any route, so a rule that never asks
+    /// whose key was sent is one it can state exactly.
+    private static func leavesOutcomeUnknown(_ failure: any Error) -> Bool {
+        guard let code = (failure as? any PayabliError)?.code else {
+            // Not this SDK's error at all, so nothing classified it and nothing can say it settled.
+            return true
+        }
+        switch code {
+        case .networkError, .decodingError, .userCancelled, .serverError, .unknown, .conflict:
+            return true
+        case .paymentDeclined, .rateLimited, .missingToken, .tokenExpired,
+             .tokenMalformed, .tokenProviderFailed, .invalidSignature, .permissionDenied,
+             .sessionBurned, .invalidConfiguration, .validation:
+            return false
+        }
+    }
+
+    private func perform(
+        _ request: PayabliRequest,
+        carriesKey: Bool = false
+    ) async throws -> PayabliPayInResult {
+        do {
+            return try await send(request)
+        } catch {
+            // A credential that was never obtained arrives as `.tokenExpired` or
+            // `.tokenProviderFailed`, both of which `leavesOutcomeUnknown` answers false for: nothing
+            // was sent, so the outcome is known and there is no key to report.
+            guard carriesKey, Self.leavesOutcomeUnknown(error) else { throw error }
+            throw PayabliPayInError.submissionInterrupted(
+                code: (error as? any PayabliError)?.code ?? .unknown,
+                // One definition of what is kept from a failure, reused rather than restated.
+                causeType: RedactedCause(error).originalType
+            )
+        }
+    }
+
+    private func send(_ request: PayabliRequest) async throws -> PayabliPayInResult {
+        diagnostics.logRequest(request, baseURL: baseURL)
+        let start = Date()
+        let response: PayabliResponse
+        do {
+            response = try await transport.perform(request)
+        } catch {
+            diagnostics.logFailure(
+                error,
+                request: request,
+                baseURL: baseURL,
+                durationMilliseconds: Date().timeIntervalSince(start) * 1000
+            )
+            throw error
+        }
+        diagnostics.logResponse(
+            response,
+            request: request,
+            baseURL: baseURL,
+            durationMilliseconds: Date().timeIntervalSince(start) * 1000
+        )
+        return try decodeResult(from: response)
+    }
+
+    private func decodeResult(from response: PayabliResponse) throws -> PayabliPayInResult {
+        let decoder = JSONDecoder()
+        if let decoded = try? decoder.decode(PayabliPayInAPIResponse.self, from: response.body) {
+            guard decoded.isApproved else {
+                throw PayabliPayInError.transactionFailed(decoded.failure(httpStatusCode: response.statusCode))
+            }
+            return PayabliPayInResult(apiResponse: decoded)
+        }
+
+        if let failure = decodeFailure(from: response, decoder: decoder) {
+            throw PayabliPayInError.transactionFailed(failure)
+        }
+
+        try mapPayabliHTTPError(response: response)
+        throw PayabliGenericError(
+            code: .decodingError,
+            reason: "Failed to decode payment capture response"
+        )
+    }
+
+    private func decodeFailure(
+        from response: PayabliResponse,
+        decoder: JSONDecoder
+    ) -> PayabliPayInFailure? {
+        guard
+            let envelope = try? decoder.decode(PayInPaymentFlowFailureEnvelope.self, from: response.body),
+            envelope.isFailure(httpStatusCode: response.statusCode)
+        else {
+            return nil
+        }
+
+        return envelope.failure(httpStatusCode: response.statusCode)
+    }
+}
+
+private struct TransactionRequestBody: Encodable {
+    let accountId: String?
+    let customerData: PayabliPayInCustomerData?
+    let entryPoint: String
+    let ipaddress: String?
+    let orderDescription: String?
+    let orderId: String?
+    let paymentDetails: PayabliPayInPaymentDetails
+    let paymentMethod: PayabliPayInPaymentMethod
+    let source: String?
+    let subdomain: String?
+    let subscriptionId: Int64?
+}
+
+private struct AuthorizedCaptureBody: Encodable {
+    let paymentDetails: PayabliPayInPaymentDetails
+}
+
+private struct PayInPaymentFlowFailureEnvelope: Decodable {
+    let isSuccess: Bool?
+    let code: String?
+    let reason: String?
+    let explanation: String?
+    let action: String?
+    let status: Int?
+    let title: String?
+    let detail: String?
+    let message: String?
+    let error: String?
+    let responseText: String?
+    let responseCode: Int?
+    let responseData: PayInPaymentFlowFailureResponseData?
+
+    enum CodingKeys: String, CodingKey {
+        case isSuccess
+        case code
+        case reason
+        case explanation
+        case action
+        case status
+        case title
+        case detail
+        case message
+        case error
+        case responseText
+        case responseCode
+        case responseData
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        isSuccess = try c.decodeIfPresent(Bool.self, forKey: .isSuccess)
+        code = c.decodeLossyStringIfPresent(forKey: .code)
+        reason = try c.decodeIfPresent(String.self, forKey: .reason)
+        explanation = try c.decodeIfPresent(String.self, forKey: .explanation)
+        action = try c.decodeIfPresent(String.self, forKey: .action)
+        status = c.decodeLossyIntIfPresent(forKey: .status)
+        title = try c.decodeIfPresent(String.self, forKey: .title)
+        detail = try c.decodeIfPresent(String.self, forKey: .detail)
+        message = try c.decodeIfPresent(String.self, forKey: .message)
+        error = try c.decodeIfPresent(String.self, forKey: .error)
+        responseText = try c.decodeIfPresent(String.self, forKey: .responseText)
+        responseCode = c.decodeLossyIntIfPresent(forKey: .responseCode)
+        responseData = try c.decodeIfPresent(PayInPaymentFlowFailureResponseData.self, forKey: .responseData)
+    }
+
+    func isFailure(httpStatusCode: Int) -> Bool {
+        if isSuccess == false {
+            return true
+        }
+        if let code = code?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty {
+            return !code.hasPrefix("A")
+        }
+        if !(200 ..< 300).contains(httpStatusCode), preferredMessage != nil {
+            return true
+        }
+        return false
+    }
+
+    func failure(httpStatusCode: Int) -> PayabliPayInFailure {
+        let failureCode = Self.firstNonEmpty(code, responseData?.resultCode)
+        let failureReason = Self.firstNonEmpty(
+            reason,
+            responseData?.resultText,
+            title,
+            responseText,
+            message,
+            error
+        )
+        let failureExplanation = Self.firstNonEmpty(
+            explanation,
+            responseData?.explanation,
+            detail,
+            responseData?.detail
+        )
+        let failureAction = Self.firstNonEmpty(action, responseData?.todoAction)
+        let failureDetail = Self.firstNonEmpty(detail, responseData?.detail)
+
+        return PayabliPayInFailure(
+            code: failureCode,
+            reason: failureReason,
+            explanation: failureExplanation,
+            action: failureAction,
+            status: status ?? responseCode,
+            detail: failureDetail,
+            httpStatusCode: httpStatusCode
+        )
+    }
+
+    private var preferredMessage: String? {
+        Self.firstNonEmpty(
+            explanation,
+            responseData?.explanation,
+            reason,
+            responseData?.resultText,
+            title,
+            detail,
+            responseData?.detail,
+            responseText,
+            message,
+            error
+        )
+    }
+
+    private static func firstNonEmpty(_ values: String?...) -> String? {
+        for value in values {
+            if let trimmed = value?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty {
+                return trimmed
+            }
+        }
+        return nil
+    }
+}
+
+private struct PayInPaymentFlowFailureResponseData: Decodable {
+    let resultCode: String?
+    let resultText: String?
+    let explanation: String?
+    let todoAction: String?
+    let detail: String?
+
+    enum CodingKeys: String, CodingKey {
+        case resultCode
+        case resultText
+        case explanation
+        case todoAction
+        case detail
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        resultCode = c.decodeLossyStringIfPresent(forKey: .resultCode)
+        resultText = try c.decodeIfPresent(String.self, forKey: .resultText)
+        explanation = try c.decodeIfPresent(String.self, forKey: .explanation)
+        todoAction = try c.decodeIfPresent(String.self, forKey: .todoAction)
+        detail = try c.decodeIfPresent(String.self, forKey: .detail)
+    }
+}
+
+private extension PayabliPayInRequest {
+    func queryItems(allowsACHValidation: Bool) -> [URLQueryItem] {
+        var items: [URLQueryItem] = []
+        if allowsACHValidation {
+            appendBool(achValidation, name: "achValidation", to: &items)
+        }
+        appendBool(forceCustomerCreation, name: "forceCustomerCreation", to: &items)
+        return items
+    }
+
+    func appendBool(_ value: Bool?, name: String, to items: inout [URLQueryItem]) {
+        guard let value else { return }
+        items.append(URLQueryItem(name: name, value: value ? "true" : "false"))
+    }
+}
+
+private extension KeyedDecodingContainer {
+    func decodeLossyStringIfPresent(forKey key: Key) -> String? {
+        if let value = try? decodeIfPresent(String.self, forKey: key) {
+            return value
+        }
+        if let value = try? decodeIfPresent(Int.self, forKey: key) {
+            return String(value)
+        }
+        if let value = try? decodeIfPresent(Int64.self, forKey: key) {
+            return String(value)
+        }
+        if let value = try? decodeIfPresent(Double.self, forKey: key) {
+            return String(value)
+        }
+        return nil
+    }
+
+    func decodeLossyIntIfPresent(forKey key: Key) -> Int? {
+        if let value = try? decodeIfPresent(Int.self, forKey: key) {
+            return value
+        }
+        if let value = try? decodeIfPresent(String.self, forKey: key) {
+            return Int(value)
+        }
+        return nil
+    }
+}

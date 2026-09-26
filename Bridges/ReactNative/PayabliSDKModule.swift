@@ -1,6 +1,6 @@
 import Foundation
 import PayabliSDKCore
-import PayabliSDKPayInPaymentFlow
+import PayabliSDKPayIn
 import PayabliSDKTapToPay
 import UIKit
 
@@ -9,7 +9,7 @@ import UIKit
 #endif
 
 /// React Native Native Module bridging the bilingual `@objc` surface of
-/// `PayabliSDKTapToPay` and `PayabliSDKPayInPaymentFlow` to JavaScript.
+/// `PayabliSDKTapToPay` and `PayabliSDKPayIn` to JavaScript.
 /// Inherits `RCTEventEmitter`, which pushes lifecycle events to JS without
 /// polling.
 ///
@@ -29,21 +29,21 @@ import UIKit
 ///     of the current `PayabliTTPSessionState`.
 ///   - `resolveTokenRefresh(token)` / `rejectTokenRefresh(reason)` —
 ///     responses to the `TTPTokenRefreshRequested` event.
-///   - `configurePayInPaymentFlow(config, resolver, rejecter)` — entryPoint,
+///   - `configurePayIn(config, resolver, rejecter)` — entryPoint,
 ///     environment.
 ///   - `addCard(params, resolver, rejecter)`
 ///   - `addBankAccount(params, resolver, rejecter)`
-///   - `resolvePayInPaymentFlowAccessToken(token)` /
-///     `rejectPayInPaymentFlowAccessToken(reason)` — responses to the
-///     `PayInPaymentFlowAccessTokenRequested` event.
+///   - `resolvePayInAccessToken(token)` /
+///     `rejectPayInAccessToken(reason)` — responses to the
+///     `PayInAccessTokenRequested` event.
 ///
 /// Events (RCTEventEmitter):
 ///   - `TTPEvent`: `{code: Int, payload: {...}}` per `PayabliTTPEvent`.
 ///   - `TTPTokenRefreshRequested`: signals JS to fetch a fresh token from
 ///     its own backend; resolve via `resolveTokenRefresh:`.
-///   - `PayInPaymentFlowAccessTokenRequested`: signals JS to fetch a scoped
+///   - `PayInAccessTokenRequested`: signals JS to fetch a scoped
 ///     PayIn token from its own backend; resolve via
-///     `resolvePayInPaymentFlowAccessToken:`.
+///     `resolvePayInAccessToken:`.
 ///
 /// ## Authentication
 ///
@@ -64,7 +64,7 @@ public final class PayabliSDKModule: RCTEventEmitter {
         [
             "TTPEvent",
             "TTPTokenRefreshRequested",
-            "PayInPaymentFlowAccessTokenRequested"
+            "PayInAccessTokenRequested"
         ]
     }
 
@@ -72,7 +72,7 @@ public final class PayabliSDKModule: RCTEventEmitter {
 
     private var ttp: PayabliTTP?
     private var eventToken: PayabliTTPEventToken?
-    private var payInPaymentFlow: PayabliPayInPaymentFlow?
+    private var payIn: PayabliPayIn?
     private var pendingRefresh: CheckedContinuation<String, Error>?
     private var pendingPayInAccessToken: CheckedContinuation<String, Error>?
     private let refreshQueue = DispatchQueue(label: "com.payabli.sdk.rn.refresh")
@@ -334,7 +334,7 @@ public final class PayabliSDKModule: RCTEventEmitter {
 
     // MARK: - PayIn payment flow
 
-    @objc public func configurePayInPaymentFlow(
+    @objc public func configurePayIn(
         _ config: NSDictionary,
         resolver resolve: @escaping RCTPromiseResolveBlock,
         rejecter reject: @escaping RCTPromiseRejectBlock
@@ -360,7 +360,7 @@ public final class PayabliSDKModule: RCTEventEmitter {
                     if self.pendingPayInAccessToken == nil {
                         self.pendingPayInAccessToken = continuation
                         DispatchQueue.main.async {
-                            self.sendEvent(withName: "PayInPaymentFlowAccessTokenRequested", body: nil)
+                            self.sendEvent(withName: "PayInAccessTokenRequested", body: nil)
                         }
                     } else {
                         continuation.resume(throwing: PayabliGenericError(
@@ -380,7 +380,7 @@ public final class PayabliSDKModule: RCTEventEmitter {
 
                     tokenProvider: tokenProvider
                 )
-                self.payInPaymentFlow = PayabliPayInPaymentFlow(
+                self.payIn = PayabliPayIn(
                     session: PayabliSession(config: config)
                 )
                 resolve(nil)
@@ -395,8 +395,8 @@ public final class PayabliSDKModule: RCTEventEmitter {
         resolver resolve: @escaping RCTPromiseResolveBlock,
         rejecter reject: @escaping RCTPromiseRejectBlock
     ) {
-        guard let payInPaymentFlow else {
-            reject("NOT_CONFIGURED", "Call PayabliPayInPaymentFlow.configure() before addCard()", nil)
+        guard let payIn else {
+            reject("NOT_CONFIGURED", "Call PayabliPayIn.configure() before addCard()", nil)
             return
         }
         guard let cardNumber = params["cardNumber"] as? String,
@@ -409,7 +409,7 @@ public final class PayabliSDKModule: RCTEventEmitter {
             return
         }
 
-        let card = PayabliPayInPaymentFlowCardData(
+        let card = PayabliPayInCardData(
             cardNumber: cardNumber,
             expiration: expiration,
             cardholderName: cardholderName,
@@ -419,7 +419,7 @@ public final class PayabliSDKModule: RCTEventEmitter {
         addPaymentMethod(
             .card(card),
             options: Self.payInOptions(from: params),
-            component: payInPaymentFlow,
+            component: payIn,
             resolve: resolve,
             reject: reject
         )
@@ -430,8 +430,8 @@ public final class PayabliSDKModule: RCTEventEmitter {
         resolver resolve: @escaping RCTPromiseResolveBlock,
         rejecter reject: @escaping RCTPromiseRejectBlock
     ) {
-        guard let payInPaymentFlow else {
-            reject("NOT_CONFIGURED", "Call PayabliPayInPaymentFlow.configure() before addBankAccount()", nil)
+        guard let payIn else {
+            reject("NOT_CONFIGURED", "Call PayabliPayIn.configure() before addBankAccount()", nil)
             return
         }
         guard let accountNumber = params["accountNumber"] as? String,
@@ -455,20 +455,20 @@ public final class PayabliSDKModule: RCTEventEmitter {
         addPaymentMethod(
             .bankAccount(ach),
             options: Self.payInOptions(from: params),
-            component: payInPaymentFlow,
+            component: payIn,
             resolve: resolve,
             reject: reject
         )
     }
 
-    @objc public func resolvePayInPaymentFlowAccessToken(_ token: NSString) {
+    @objc public func resolvePayInAccessToken(_ token: NSString) {
         payInAccessTokenQueue.sync {
             self.pendingPayInAccessToken?.resume(returning: token as String)
             self.pendingPayInAccessToken = nil
         }
     }
 
-    @objc public func rejectPayInPaymentFlowAccessToken(_ reason: NSString) {
+    @objc public func rejectPayInAccessToken(_ reason: NSString) {
         payInAccessTokenQueue.sync {
             self.pendingPayInAccessToken?.resume(throwing: PayabliGenericError(
                 code: .missingToken,
@@ -479,9 +479,9 @@ public final class PayabliSDKModule: RCTEventEmitter {
     }
 
     private func addPaymentMethod(
-        _ input: PayabliPayInPaymentFlowMethodInput,
-        options: PayabliPayInPaymentFlowOptions,
-        component: PayabliPayInPaymentFlow,
+        _ input: PayabliPayInMethodInput,
+        options: PayabliPayInOptions,
+        component: PayabliPayIn,
         resolve: @escaping RCTPromiseResolveBlock,
         reject: @escaping RCTPromiseRejectBlock
     ) {
@@ -491,7 +491,7 @@ public final class PayabliSDKModule: RCTEventEmitter {
                 resolve(Self.storedPaymentMethodMap(result))
             } catch {
                 let nsError = error as NSError
-                reject(nsError.rnCode(default: "PAYIN_PAYMENT_FLOW_FAILED"), nsError.rnMessage, nsError)
+                reject(nsError.rnCode(default: "PAYIN_FAILED"), nsError.rnMessage, nsError)
             }
         }
     }
@@ -544,8 +544,8 @@ public final class PayabliSDKModule: RCTEventEmitter {
         )
     }
 
-    private static func payInOptions(from params: NSDictionary) -> PayabliPayInPaymentFlowOptions {
-        PayabliPayInPaymentFlowOptions(
+    private static func payInOptions(from params: NSDictionary) -> PayabliPayInOptions {
+        PayabliPayInOptions(
             achValidation: params["achValidation"] as? Bool,
             createAnonymous: params["createAnonymous"] as? Bool,
             forceCustomerCreation: params["forceCustomerCreation"] as? Bool,
@@ -554,7 +554,7 @@ public final class PayabliSDKModule: RCTEventEmitter {
         )
     }
 
-    private static func methodName(_ method: PayabliPayInPaymentFlowStoredMethodType) -> String {
+    private static func methodName(_ method: PayabliPayInStoredMethodType) -> String {
         switch method {
         case .card: return "card"
         case .bankAccount: return "bankAccount"
@@ -562,7 +562,7 @@ public final class PayabliSDKModule: RCTEventEmitter {
     }
 
     private static func storedPaymentMethodMap(
-        _ method: PayabliPayInPaymentFlowStoredPaymentMethod
+        _ method: PayabliPayInStoredPaymentMethod
     ) -> [String: Any] {
         var map: [String: Any] = [
             "method": methodName(method.method),
@@ -588,7 +588,7 @@ public final class PayabliSDKModule: RCTEventEmitter {
     }
 
     private static func dictionary(
-        from response: PayabliPayInPaymentFlowTokenStorageAPIResponse
+        from response: PayabliPayInTokenStorageAPIResponse
     ) -> [String: Any] {
         guard let data = try? JSONEncoder().encode(response),
               let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any]

@@ -269,7 +269,7 @@ def test_collector() -> None:
 
         healthy_cov = xccov_json([
             ("PayabliSDKCore", 100, 80),
-            ("PayabliSDKPayInPaymentFlow", 0, 0),
+            ("PayabliSDKPayIn", 0, 0),
             ("PayabliSDKTapToPay", 50, 25),
             # PayabliSDKTelemetry deliberately absent, so the missing state is exercised.
         ])
@@ -437,7 +437,7 @@ def test_collector() -> None:
                 for m in (at((facts or {}).get("coverage") or [], 0).get("modules") or [])}
         check("C14 a measured module carries a percentage", rows.get("PayabliSDKCore") == "measured", rows)
         check("C14b a module with no executable lines is empty, not zero per cent",
-              rows.get("PayabliSDKPayInPaymentFlow") == "empty", rows)
+              rows.get("PayabliSDKPayIn") == "empty", rows)
         check("C14c a module absent from the report is missing, not empty",
               rows.get("PayabliSDKTelemetry") == "missing", rows)
         check("C14d every module is named on every night",

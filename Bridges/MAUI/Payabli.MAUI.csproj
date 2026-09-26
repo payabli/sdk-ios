@@ -2,7 +2,7 @@
   Payabli.MAUI — .NET binding library for the Payabli iOS XCFrameworks.
 
   This project produces a managed assembly that re-exports the @objc surface
-  of `PayabliSDKTapToPay.xcframework` and `PayabliSDKPayInPaymentFlow.xcframework`
+  of `PayabliSDKTapToPay.xcframework` and `PayabliSDKPayIn.xcframework`
   to .NET MAUI / .NET iOS host apps.
   The actual binding declarations live in `PayabliBinding.cs` (sharpie-style
   ApiDefinitions). The XCFrameworks come from the SDK release artifacts:
@@ -10,7 +10,7 @@
     - PayabliSDKCore.xcframework        (loaded by both capabilities)
     - PayabliSDKTelemetry.xcframework   (loaded by both capabilities)
     - PayabliSDKTapToPay.xcframework    (the bilingual @objc surface)
-    - PayabliSDKPayInPaymentFlow.xcframework (card and bank account payment flow @objc surface)
+    - PayabliSDKPayIn.xcframework (card and bank account payment flow @objc surface)
 
   Place the XCFrameworks alongside this csproj (or override the
   `XcframeworksRoot` property) before `dotnet build`.
@@ -56,7 +56,7 @@
             <Frameworks>Foundation UIKit ProximityReader DeviceCheck</Frameworks>
             <SmartLink>True</SmartLink>
         </NativeReference>
-        <NativeReference Include="$(XcframeworksRoot)/PayabliSDKPayInPaymentFlow.xcframework">
+        <NativeReference Include="$(XcframeworksRoot)/PayabliSDKPayIn.xcframework">
             <Kind>Framework</Kind>
             <Frameworks>Foundation UIKit</Frameworks>
             <SmartLink>True</SmartLink>

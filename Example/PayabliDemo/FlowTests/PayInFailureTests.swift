@@ -1,5 +1,5 @@
 import PayabliSDKCore
-import PayabliSDKPayInPaymentFlow
+import PayabliSDKPayIn
 import XCTest
 
 /// How a failure reads on each of the two flows.
@@ -82,7 +82,7 @@ final class PayInFailureTests: XCTestCase {
         XCTAssertFalse(failure.message.contains("Start a new attempt"), failure.message)
     }
 
-    private static let interruptedReversal = PayabliPayInPaymentFlowError.submissionInterrupted(
+    private static let interruptedReversal = PayabliPayInError.submissionInterrupted(
         code: .networkError,
         causeType: "PayabliSDKCore.PayabliGenericError"
     )
@@ -92,7 +92,7 @@ final class PayInFailureTests: XCTestCase {
     /// not arise there. The `causeType` is the one the bodyless route produces; a `409` answered with a
     /// body names the flow's own error type instead. Nothing here reads it — the adapter branches on the
     /// code — and both values are pinned where they are derived, in the SDK's own idempotency cases.
-    private static let interruptedConflict = PayabliPayInPaymentFlowError.submissionInterrupted(
+    private static let interruptedConflict = PayabliPayInError.submissionInterrupted(
         code: .conflict,
         causeType: "PayabliSDKCore.PayabliGenericError"
     )
@@ -129,8 +129,8 @@ final class PayInFailureTests: XCTestCase {
 
     func testAFailureThatIsNotAConflictReadsAsItself() {
         let failure = PayInFailure(
-            PayabliPayInPaymentFlowError.transactionFailed(
-                PayabliPayInPaymentFlowFailure(reason: "Declined", httpStatusCode: 402)
+            PayabliPayInError.transactionFailed(
+                PayabliPayInFailure(reason: "Declined", httpStatusCode: 402)
             ),
             operation: .capture
         )
@@ -168,8 +168,8 @@ final class PayInFailureTests: XCTestCase {
     // MARK: -
 
     private var typedConflict: Error {
-        PayabliPayInPaymentFlowError.transactionFailed(
-            PayabliPayInPaymentFlowFailure(reason: "Conflict", httpStatusCode: 409)
+        PayabliPayInError.transactionFailed(
+            PayabliPayInFailure(reason: "Conflict", httpStatusCode: 409)
         )
     }
 }

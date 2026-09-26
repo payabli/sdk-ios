@@ -1,8 +1,8 @@
 import Foundation
 import os
-import PayabliSDKPayInPaymentFlow
+import PayabliSDKPayIn
 
-extension PayabliPayInPaymentFlowDiagnostics {
+extension PayabliPayInDiagnostics {
     /// Builds the diagnostics handler for one flow.
     ///
     /// Parameterised by the gating flag, the logger category and the destination
@@ -10,7 +10,7 @@ extension PayabliPayInPaymentFlowDiagnostics {
     ///
     /// The SDK redacts before handing an entry over; nothing here re-redacts, and
     /// nothing here prints a token.
-    static func qaLogging(enabled: Bool, store: DiagnosticsStore) -> PayabliPayInPaymentFlowDiagnostics {
+    static func qaLogging(enabled: Bool, store: DiagnosticsStore) -> PayabliPayInDiagnostics {
         guard enabled else { return .disabled }
 
         let logger = Logger(
@@ -19,7 +19,7 @@ extension PayabliPayInPaymentFlowDiagnostics {
         )
 
         return .enabled { entry in
-            let request = "[PayabliPayInPaymentFlowDiagnostics] "
+            let request = "[PayabliPayInDiagnostics] "
                 + "\(entry.phase.rawValue.uppercased()) \(entry.method) \(entry.url)"
             var summary = [request]
             if let statusCode = entry.statusCode {

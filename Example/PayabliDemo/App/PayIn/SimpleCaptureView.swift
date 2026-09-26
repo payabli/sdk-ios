@@ -1,4 +1,4 @@
-import PayabliSDKPayInPaymentFlow
+import PayabliSDKPayIn
 import SwiftUI
 
 /// One screen that captures or tokenizes, with the form's customization in reach: pick a preset
@@ -134,8 +134,8 @@ struct SimpleCaptureView: View {
                 }
                 .pickerStyle(.menu)
                 Picker("Start on", selection: $customization.startOn) {
-                    Text("Card").tag(PayabliPayInPaymentFlowMethodType.card)
-                    Text("Bank").tag(PayabliPayInPaymentFlowMethodType.bankAccount)
+                    Text("Card").tag(PayabliPayInMethodType.card)
+                    Text("Bank").tag(PayabliPayInMethodType.bankAccount)
                 }
                 .pickerStyle(.menu)
                 .disabled(customization.methods != .cardAndBank)
@@ -167,14 +167,14 @@ struct SimpleCaptureView: View {
 
             Section("iOS only") {
                 Picker("Card brand icon", selection: $customization.cardBrandIconPlacement) {
-                    Text("Leading").tag(PayabliPayInPaymentFlowCardBrandIconPlacement.leading)
-                    Text("Trailing").tag(PayabliPayInPaymentFlowCardBrandIconPlacement.trailing)
-                    Text("Hidden").tag(PayabliPayInPaymentFlowCardBrandIconPlacement.hidden)
+                    Text("Leading").tag(PayabliPayInCardBrandIconPlacement.leading)
+                    Text("Trailing").tag(PayabliPayInCardBrandIconPlacement.trailing)
+                    Text("Hidden").tag(PayabliPayInCardBrandIconPlacement.hidden)
                 }
                 .pickerStyle(.menu)
                 Picker("Error message", selection: $customization.errorMessagePlacement) {
-                    Text("Top").tag(PayabliPayInPaymentFlowErrorMessagePlacement.top)
-                    Text("Above button").tag(PayabliPayInPaymentFlowErrorMessagePlacement.aboveSubmitButton)
+                    Text("Top").tag(PayabliPayInErrorMessagePlacement.top)
+                    Text("Above button").tag(PayabliPayInErrorMessagePlacement.aboveSubmitButton)
                 }
                 .pickerStyle(.menu)
                 Picker("Input size", selection: $customization.inputSizing) {

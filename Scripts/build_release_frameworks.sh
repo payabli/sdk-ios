@@ -3,10 +3,10 @@
 # build_release_frameworks.sh
 # ---------------------------
 # Builds one XCFramework per shipped module (PayabliSDKCore,
-# PayabliSDKTelemetry, PayabliSDKTapToPay, PayabliSDKPayInPaymentFlow) for
+# PayabliSDKTelemetry, PayabliSDKTapToPay, PayabliSDKPayIn) for
 # device + iOS Simulator slices, with distribution-mode settings, and packs
 # them into one zip whose entry times are SOURCE_DATE_EPOCH. An integrator
-# embeds TapToPay, PayInPaymentFlow or both, and always Core and Telemetry,
+# embeds TapToPay, PayIn or both, and always Core and Telemetry,
 # which both capabilities load. An app that never takes a card-present
 # payment never links the card reader.
 #
@@ -72,12 +72,12 @@ MODULES=(
     "PayabliSDKCore"
     "PayabliSDKTelemetry"
     "PayabliSDKTapToPay"
-    "PayabliSDKPayInPaymentFlow"
+    "PayabliSDKPayIn"
 )
 # The two that link Core and Telemetry rather than carrying them.
 CAPABILITIES=(
     "PayabliSDKTapToPay"
-    "PayabliSDKPayInPaymentFlow"
+    "PayabliSDKPayIn"
 )
 
 # The resource bundle each framework carries, where its generated `.module`
@@ -86,7 +86,7 @@ bundle_for() {
     case "$1" in
         PayabliSDKCore) echo "PayabliSDK_PayabliSDKCore.bundle" ;;
         PayabliSDKTapToPay) echo "PayabliSDK_PayabliCardReaderCore.bundle" ;;
-        PayabliSDKPayInPaymentFlow) echo "PayabliSDK_PayabliSDKPayInPaymentFlow.bundle" ;;
+        PayabliSDKPayIn) echo "PayabliSDK_PayabliSDKPayIn.bundle" ;;
         *) echo "" ;;
     esac
 }
@@ -107,12 +107,12 @@ let package = Package(
     targets: [
         .target(name: "PayabliReleaseClient", dependencies: [
             .product(name: "PayabliSDKTapToPay", package: "$package_identity"),
-            .product(name: "PayabliSDKPayInPaymentFlow", package: "$package_identity")
+            .product(name: "PayabliSDKPayIn", package: "$package_identity")
         ])
     ]
 )
 EOF
-printf 'import PayabliSDKTapToPay\nimport PayabliSDKPayInPaymentFlow\n' \
+printf 'import PayabliSDKTapToPay\nimport PayabliSDKPayIn\n' \
     > "$CLIENT_DIR/Sources/PayabliReleaseClient/Client.swift"
 
 # Prints the products directory the build wrote.

@@ -1,5 +1,5 @@
 import PayabliSDKCore
-import PayabliSDKPayInPaymentFlow
+import PayabliSDKPayIn
 import XCTest
 
 /// The transitions that decide whether a payment can be reversed twice.
@@ -140,7 +140,7 @@ final class PayInReversalStateTests: XCTestCase {
 
     private var interrupted: PayInFailure {
         PayInFailure(
-            PayabliPayInPaymentFlowError.submissionInterrupted(
+            PayabliPayInError.submissionInterrupted(
                 code: .networkError,
                 causeType: "PayabliSDKCore.PayabliGenericError"
             ),
@@ -150,8 +150,8 @@ final class PayInReversalStateTests: XCTestCase {
 
     private var refused: PayInFailure {
         PayInFailure(
-            PayabliPayInPaymentFlowError.transactionFailed(
-                PayabliPayInPaymentFlowFailure(
+            PayabliPayInError.transactionFailed(
+                PayabliPayInFailure(
                     code: "D0001",
                     reason: "Declined",
                     explanation: nil,
@@ -164,6 +164,6 @@ final class PayInReversalStateTests: XCTestCase {
     }
 
     private var refusedForAnotherSubmission: PayInFailure {
-        PayInFailure(PayabliPayInPaymentFlowError.submissionInProgress, operation: .void)
+        PayInFailure(PayabliPayInError.submissionInProgress, operation: .void)
     }
 }
