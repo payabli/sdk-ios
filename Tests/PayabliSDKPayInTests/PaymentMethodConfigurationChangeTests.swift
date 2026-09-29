@@ -66,6 +66,28 @@ final class PaymentMethodConfigurationChangeTests: XCTestCase {
         XCTAssertNotEqual(withBaseAmount, withoutBaseAmount)
     }
 
+    @MainActor
+    func testTheSheetHeaderMoveKeepsTheBaseAmountSwitch() {
+        let component = flowOnSession()
+        let content = PayabliPayInSheetContent(
+            isPresented: .constant(true),
+            component: component,
+            configuration: PayabliPayInFormConfiguration(
+                allowedMethods: [.card],
+                showsBaseAmount: false
+            ),
+            sheetConfiguration: PayabliPayInSheetConfiguration(movesFormHeaderToSheetHeader: true),
+            style: nil,
+            onCompleted: { _ in },
+            onError: { _ in }
+        )
+
+        XCTAssertFalse(
+            content.formConfiguration.showsBaseAmount,
+            "the sheet path rebuilds the form configuration, so the switch a host set must survive the rebuild"
+        )
+    }
+
     // MARK: - Fixtures
 
     private func configuration(

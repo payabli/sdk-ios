@@ -219,7 +219,7 @@ struct PayabliPayInSheetContent: View {
         return configuration.labels.subtitle?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty
     }
 
-    private var formConfiguration: PayabliPayInFormConfiguration {
+    var formConfiguration: PayabliPayInFormConfiguration {
         guard sheetConfiguration.movesFormHeaderToSheetHeader else { return configuration }
 
         let labels = PayabliPayInLabels(
@@ -247,7 +247,8 @@ struct PayabliPayInSheetContent: View {
             cardBrandIconPlacement: configuration.cardBrandIconPlacement,
             errorMessagePlacement: configuration.errorMessagePlacement,
             requiredFields: configuration.requiredFields,
-            paymentSummary: configuration.paymentSummary
+            paymentSummary: configuration.paymentSummary,
+            showsBaseAmount: configuration.showsBaseAmount
         )
     }
 
