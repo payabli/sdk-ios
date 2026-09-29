@@ -146,7 +146,7 @@ let result = try await ttp.charge(
     customer: PayabliTTPCustomerData(firstName: "Jane", lastName: "Doe"),
     invoice: PayabliTTPInvoiceData(invoiceNumber: "INV-9001")
 )
-print("Charged:", result.paymentTransId)
+order.paymentTransId = result.paymentTransId // store it; don't log it
 ```
 
 | Parameter | Type | Notes |
