@@ -737,6 +737,7 @@ Transaction result fields:
 - `totalAmount`
 - `netAmount`
 - `feeAmount`
+- `surchargeFee`
 - `settlementStatus`
 - `operation`
 - `responseData`

@@ -862,6 +862,7 @@ Transaction fields include:
 - `totalAmount`
 - `netAmount`
 - `feeAmount`
+- `surchargeFee`
 - `settlementStatus`
 - `operation`
 - `responseData`
