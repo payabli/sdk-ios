@@ -333,16 +333,14 @@ changes nothing.
 ## Versioning and support
 
 > [!WARNING]
-> **The Payabli iOS and Android SDKs are both in beta.** Until a stable version is released, expect changes
-> to the public interface that aren't backward compatible, on either platform, and read the changes on
-> `main` before you update.
+> **The Payabli iOS SDK is in beta.** Until a stable version is released, expect changes to the public
+> interface that aren't backward compatible, and read the changes on `main` before you update.
 
-- **No version has been released on either platform.** Add the package by branch or by commit as [Installation](#installation)
+- **No version has been released.** Add the package by branch or by commit as [Installation](#installation)
   describes.
 - **`main` changes without notice.** A build that tracks `main` takes whatever is there when the package
   resolves. Use the commit rule for a build that doesn't change.
-- **When a stable version is released,** it is released for both platforms, and this section gives the
-  version to depend on.
+- **When a stable version is released,** this section gives the version to depend on.
 
 ## Support
 
