@@ -453,10 +453,10 @@ final class PayabliPayInViewModel: ObservableObject {
         return fields
     }
 
-    /// What the payer typed into a field the configuration no longer offers a box for goes with the
-    /// field, so the form holds nothing the payer cannot see or correct. Nothing is written when
-    /// nothing was held, so an update a payer has not typed into publishes once. Host-supplied
-    /// hidden values are not payer-typed and are untouched.
+    /// What the payer typed into a field no offered instrument shows any more goes with the field,
+    /// so the form holds a value only while the configuration offers the field somewhere. Nothing
+    /// is written when nothing was held, so an update a payer has not typed into publishes once.
+    /// Host-supplied hidden values are not payer-typed and are untouched.
     private func dropValuesWithoutAField() {
         let boxes = fieldsWithABox
         dropCardValuesWithoutABox(boxes)
