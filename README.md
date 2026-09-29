@@ -90,7 +90,10 @@ const app = express();
 const PAYABLI_URL = process.env.PAYABLI_URL ?? "https://api-sandbox.payabli.com/api";
 
 app.post("/payabli/token", async (req, res) => {
-  // Authenticate your own user here before returning a token.
+  // Replace with your app's own authentication. Never return a token to an unauthenticated caller.
+  if (!req.headers.authorization) {
+    return res.status(401).json({ error: "unauthenticated" });
+  }
   const upstream = await fetch(`${PAYABLI_URL}/v2/token/serverside`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
