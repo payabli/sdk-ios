@@ -83,12 +83,11 @@ A phone takes Tap to Pay payments for a paypoint only after it is activated with
 Until then, `initialize()` throws `PayabliTTPError.devicePendingActivation`, and `sessionState` is
 `.pendingActivation`.
 
-1. Your backend requests a code with
+1. Issue a code for the phone. In the Payabli portal, under **Device Management**, the waiting device's
+   options include **Activate device**. The code is valid for 30 minutes, and asking again before it expires
+   returns the same code. The API route,
    [Generate Tap to Pay activation code](https://docs.payabli.com/developers/api-reference/device/activation-challenge),
-   `POST /api/v2/device/taptopay/activate/challenge`, which takes the entry point and the device's ID. The
-   code is valid for 30 minutes. Asking again before it expires returns the same code. The SDK doesn't
-   return the device's ID. In the Payabli portal, under **Device Management**, the waiting device's
-   options include **Activate device**, which issues its code.
+   takes the device's ID, which the SDK doesn't return, so issue codes from the portal.
 
    The code is six digits and can start with zero, so keep it as a string.
 2. Deliver the code to the person holding the phone, and have your app ask for it.
@@ -171,8 +170,9 @@ Every `PayabliTTPError` carries `capture` and `paymentTransId`:
 | `tokenExpired`, `networkError(reason:)` | The token or the network failed. Retry later. |
 | `activationFailed(reason:)` | The activation code was refused. |
 
-Device attestation and opening a transaction can also throw `PayabliGenericError` from
-`PayabliSDKCore`. Branch on its `code`; `.tokenProviderFailed` means your token provider failed.
+Device attestation and opening a transaction can also throw a core `PayabliError` from `PayabliSDKCore`,
+for example `PayabliGenericError` or `PayabliPaymentError`. Catch `any PayabliError` and branch on its
+`code`; `.tokenProviderFailed` means your token provider failed.
 
 ## Session states
 

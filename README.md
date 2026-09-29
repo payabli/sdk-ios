@@ -35,8 +35,8 @@ token from your backend, and the SDK calls it when it needs one.
    [OAuth authentication](https://docs.payabli.com/developers/oauth-authentication). Tap to Pay needs the
    `tools_init`, `pos_create` and `inboundpayments_create` permissions, listed in
    [Accept Tap to Pay payments](https://docs.payabli.com/guides/pay-in-developer-tap-to-pay#permissions).
-   Card-not-present needs permission to create transactions and to store payment methods; confirm the
-   permission names with your Payabli representative.
+   Card-not-present needs `inboundpayments_create` to charge, authorize and capture, `inboundpayments_void`
+   to void, and `tokens_create` to store a payment method.
 3. **Build your token endpoint.** See [Build your token endpoint](#build-your-token-endpoint).
 4. **For Tap to Pay only:** request Apple's Tap to Pay entitlement and register your app on the
    paypoint's allowlist. See the
@@ -78,7 +78,8 @@ configuration types. Import it by name where you use them.
 Your backend holds the client ID and client secret. It calls `POST /api/v2/token/serverside` with them
 and returns the access token to your app. The client secret never reaches the device.
 
-This Node.js and Express example returns the token as `{ "accessToken": "..." }`:
+This example needs Node.js 18 or later and `"type": "module"` in `package.json`. It returns the token as
+`{ "accessToken": "..." }`:
 
 ```js
 // server.js
@@ -258,6 +259,10 @@ Every charge ends in one of these outcomes. Only **not charged** is safe to retr
 | **Unknown** | `PayabliPayInError.submissionInterrupted` | an error whose `capture` is `.unknown` | Not until you've checked |
 | **Charged, not confirmed** | — | an error whose `capture` is `.charged` | No. Reconcile the payment |
 
+On card-not-present, the other errors mean nothing was charged: `invalidInput`, `missingAccessToken` and
+`submissionInProgress` are refused before anything is sent, and a core error such as a validation
+failure, a refused credential or a rate limit is the service's answer.
+
 When the outcome is unknown, look the transaction up from your backend with
 [`GET /api/MoneyIn/details/{transId}`](https://docs.payabli.com/developers/api-reference/moneyin/get-details-for-a-processed-transaction)
 before you charge again. `PayabliPayInError.submissionInterrupted` carries no transaction ID, so set
@@ -267,8 +272,8 @@ carries no transaction ID, find the transaction in the portal. Store the transac
 ## Objective-C and cross-platform apps
 
 `PayabliTTP` has an `@objc` companion, taking a completion handler, for every `async` method, and its errors
-bridge to `NSError`. On `PayabliPayIn`, the Objective-C surface covers construction, `addCard` and
-`addBankAccount`. Wrappers for Flutter, .NET MAUI and React Native are in [`Bridges/`](Bridges/README.md), which
+bridge to `NSError`. For card-not-present, Objective-C uses `PayabliPayInObjC`, built with
+`initWithTokenHandler:entryPoint:environment:error:`, which offers `addCard` and `addBankAccount`. Wrappers for Flutter, .NET MAUI and React Native are in [`Bridges/`](Bridges/README.md), which
 lists the status of each.
 
 ## Sample app
