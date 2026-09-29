@@ -112,6 +112,10 @@ app.post("/payabli/token", async (req, res) => {
   if (!user) {
     return res.status(401).json({ error: "unauthenticated" });
   }
+  // mayTakePayments is your app's own rule for who may take payments for this paypoint.
+  if (!mayTakePayments(user)) {
+    return res.status(403).json({ error: "forbidden" });
+  }
   const upstream = await fetch(`${PAYABLI_URL}/v2/token/serverside`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -131,8 +135,9 @@ app.post("/payabli/token", async (req, res) => {
 app.listen(process.env.PORT ?? 3000);
 ```
 
-Anyone who can call the route gets a token for your paypoint, so it has to authenticate the caller the way
-the rest of your app does. The sample app ships a complete token server in
+Anyone who can call the route gets a token that can charge, store payment methods and void for your
+paypoint, so it has to authenticate the caller and check that they may take payments, the way the rest of
+your app does. The sample app ships a complete token server in
 [`Example/PayabliDemo/LocalTokenServer`](Example/PayabliDemo/LocalTokenServer/README.md).
 
 ### Configure the SDK
