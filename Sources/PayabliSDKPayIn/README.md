@@ -105,8 +105,9 @@ In sandbox, use Payabli's [test cards](https://docs.payabli.com/guides/test-acco
 ### Store a payment method and charge it later
 
 `addCard(_:options:)`, `addBankAccount(_:options:)` and `addPaymentMethod(_:options:)` save a method and
-return its stored ID. The form does the same with `.storePaymentMethod`. To charge a saved method, pass
-`.stored(.init(method: .card, storedMethodId: id))` as the payment method.
+return a `PayabliPayInStoredPaymentMethod`. The form does the same with `.storePaymentMethod`. Its
+`storedMethodId` is optional, and is `nil` when the service's answer names no ID. To charge a saved
+method, pass `.stored(.init(method: .card, storedMethodId: id))` as the payment method.
 
 ### Authorize, then capture
 
