@@ -3,6 +3,7 @@ import PayabliSDKCore
 import SwiftUI
 
 @MainActor
+// swiftlint:disable:next type_body_length
 final class PayabliPayInViewModel: ObservableObject {
     @Published var selectedMethod: PayabliPayInMethodType
     @Published private var cardholderNameStorage = ""
@@ -72,6 +73,7 @@ final class PayabliPayInViewModel: ObservableObject {
                 ? configuration.defaultMethod
                 : methods[0]
         }
+        dropValuesWithoutAField()
     }
 
     var cardholderName: String {
@@ -434,6 +436,99 @@ final class PayabliPayInViewModel: ObservableObject {
 
     private func fieldIsVisible(_ field: PayabliPayInField) -> Bool {
         activeFields.contains(field)
+    }
+
+    /// Every field the configuration offers a box for, on any method the form offers the payer.
+    ///
+    /// A field on the instrument the payer is not on still counts: its tab is where the payer
+    /// corrects it, so a value for it is not held out of sight.
+    private var fieldsWithABox: Set<PayabliPayInField> {
+        var fields = Set<PayabliPayInField>()
+        if availableMethods.contains(.card) {
+            fields.formUnion(configuration.cardFieldOrder)
+        }
+        if availableMethods.contains(.bankAccount) {
+            fields.formUnion(configuration.bankFieldOrder)
+        }
+        return fields
+    }
+
+    /// What the payer typed into a field no offered instrument shows any more goes with the field,
+    /// so the form holds a value only while the configuration offers the field somewhere. Nothing
+    /// is written when nothing was held, so an update a payer has not typed into publishes once.
+    /// Host-supplied hidden values are not payer-typed and are untouched.
+    private func dropValuesWithoutAField() {
+        let boxes = fieldsWithABox
+        dropCardValuesWithoutABox(boxes)
+        dropBankValuesWithoutABox(boxes)
+        dropCustomerValuesWithoutABox(boxes)
+    }
+
+    private func dropCardValuesWithoutABox(_ boxes: Set<PayabliPayInField>) {
+        if !boxes.contains(.cardholderName), !cardholderNameStorage.isEmpty {
+            cardholderNameStorage = ""
+        }
+        if !boxes.contains(.cardNumber), !cardNumberStorage.isEmpty {
+            cardNumberStorage = ""
+        }
+        if !boxes.contains(.cardExpiration),
+           !cardExpiration.isEmpty || cardExpirationMonth != nil || cardExpirationYear != nil
+        {
+            cardExpiration = ""
+            cardExpirationMonth = nil
+            cardExpirationYear = nil
+        }
+        if !boxes.contains(.cardCvv), !cardCvvStorage.isEmpty {
+            cardCvvStorage = ""
+        }
+        if !boxes.contains(.cardZip), !cardZipStorage.isEmpty {
+            cardZipStorage = ""
+        }
+    }
+
+    private func dropBankValuesWithoutABox(_ boxes: Set<PayabliPayInField>) {
+        if !boxes.contains(.accountHolder), !achHolderStorage.isEmpty {
+            achHolderStorage = ""
+        }
+        if !boxes.contains(.routingNumber), !achRoutingStorage.isEmpty {
+            achRoutingStorage = ""
+        }
+        if !boxes.contains(.accountNumber), !achAccountStorage.isEmpty {
+            achAccountStorage = ""
+        }
+        if !boxes.contains(.accountType), accountType != .checking {
+            accountType = .checking
+        }
+        if !boxes.contains(.accountHolderType), accountHolderType != .personal {
+            accountHolderType = .personal
+        }
+        if !boxes.contains(.secCode), secCode != .web {
+            secCode = .web
+        }
+        if !boxes.contains(.deviceId), !deviceId.isEmpty {
+            deviceId = ""
+        }
+    }
+
+    private func dropCustomerValuesWithoutABox(_ boxes: Set<PayabliPayInField>) {
+        if !boxes.contains(.methodDescription), !methodDescription.isEmpty {
+            methodDescription = ""
+        }
+        if !boxes.contains(.firstName), !firstName.isEmpty {
+            firstName = ""
+        }
+        if !boxes.contains(.lastName), !lastName.isEmpty {
+            lastName = ""
+        }
+        if !boxes.contains(.customerNumber), !customerNumber.isEmpty {
+            customerNumber = ""
+        }
+        if !boxes.contains(.billingEmail), !billingEmail.isEmpty {
+            billingEmail = ""
+        }
+        if !boxes.contains(.billingZip), !billingZipStorage.isEmpty {
+            billingZipStorage = ""
+        }
     }
 
     private var requiredFieldsAreSatisfied: Bool {
