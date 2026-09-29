@@ -53,10 +53,15 @@ No version is tagged, so add the package by branch or by commit. In Xcode, choos
 https://github.com/payabli/sdk-ios.git
 ```
 
-Or declare it in `Package.swift`, tracking `main` or pinned to one commit:
+Or declare it in `Package.swift`, tracking `main`:
 
 ```swift
 .package(url: "https://github.com/payabli/sdk-ios.git", branch: "main")
+```
+
+or pinned to one commit:
+
+```swift
 .package(url: "https://github.com/payabli/sdk-ios.git", revision: "<commit SHA>")
 ```
 
