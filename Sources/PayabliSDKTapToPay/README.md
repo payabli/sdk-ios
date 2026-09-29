@@ -196,8 +196,9 @@ Every `PayabliTTPError` carries `capture` and `paymentTransId`:
 | `activationFailed(reason:)` | The activation code was refused. |
 
 Device attestation and opening a transaction can also throw a core `PayabliError` from `PayabliSDKCore`,
-for example `PayabliGenericError` or `PayabliPaymentError`. Catch `any PayabliError` and branch on its
-`code`; `.tokenProviderFailed` means your token provider failed.
+for example `PayabliGenericError` or `PayabliPaymentError`. It carries no `capture`: `charge` throws one
+only before the card is read, so nothing was charged. Catch `any PayabliError` and branch on its `code`;
+`.tokenProviderFailed` means your token provider failed.
 
 From Objective-C, these errors arrive as `NSError`. See
 [Language support](../../README.md#language-support) in the root README.
