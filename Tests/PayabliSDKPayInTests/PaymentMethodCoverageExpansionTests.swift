@@ -1,0 +1,626 @@
+@testable import PayabliSDKCore
+@testable import PayabliSDKPayIn
+import SwiftUI
+import UIKit
+import XCTest
+
+final class PaymentMethodCoverageExpansionTests: XCTestCase {
+    func testModuleVersionIsTheCoreVersion() {
+        XCTAssertEqual(PayabliPayInModule.version, PayabliCore.version)
+    }
+
+    func testPaymentMethodTypeIdentifiersAndDisplayNames() {
+        XCTAssertEqual(PayabliPayInMethodType.card.id, "card")
+        XCTAssertEqual(PayabliPayInMethodType.card.displayName, "Card")
+        XCTAssertEqual(PayabliPayInMethodType.bankAccount.id, "ach")
+        XCTAssertEqual(PayabliPayInMethodType.bankAccount.displayName, "Bank account")
+        XCTAssertEqual(PayabliPayInCardBrand.visa.id, "visa")
+        XCTAssertEqual(PayabliPayInCardBrand.detect(cardNumber: "1"), .unknown)
+        XCTAssertEqual(PayabliPayInAccountType.checking.id, "Checking")
+        XCTAssertEqual(PayabliPayInAccountHolderType.business.id, "business")
+        XCTAssertEqual(PayabliPayInSecCode.web.id, "WEB")
+    }
+
+    func testPaymentMethodInputReportsMethod() {
+        let card = PayabliPayInMethodInput.card(PayabliPayInCardData(
+            cardNumber: "4111111111111111",
+            expiration: "02/28",
+            cardholderName: "Jane Doe",
+            cvv: "123",
+            billingZip: "33139"
+        ))
+        let ach = PayabliPayInMethodInput.bankAccount(PayabliPayInBankAccountData(
+            accountNumber: "1111111111",
+            accountType: .checking,
+            holderName: "Jane Doe",
+            routingNumber: "123456780"
+        ))
+
+        XCTAssertEqual(card.method, .card)
+        XCTAssertEqual(ach.method, .bankAccount)
+    }
+
+    func testPaymentMethodErrorMetadataAndValidationBranches() throws {
+        let fallbackFailure = PayabliPayInSaveFailure(responseText: "   ")
+        let detailedFailure = PayabliPayInSaveFailure(
+            responseText: "Gateway response",
+            explanation: "Gateway declined",
+            todoAction: "Use another account."
+        )
+
+        XCTAssertEqual(fallbackFailure.reason, "Unable to save payment method.")
+        XCTAssertNil(PayabliPayInTokenStorageError.missingAccessToken.detail)
+        XCTAssertEqual(PayabliPayInTokenStorageError.missingAccessToken.code, .missingToken)
+        XCTAssertEqual(PayabliPayInTokenStorageError.missingAccessToken.reason, "Missing access token")
+        XCTAssertEqual(PayabliPayInTokenStorageError.saveFailed(detailedFailure).code, .unknown)
+        XCTAssertEqual(PayabliPayInTokenStorageError.saveFailed(detailedFailure).reason, "Gateway declined")
+        XCTAssertEqual(PayabliPayInTokenStorageError.saveFailed(detailedFailure).detail, "Use another account.")
+
+        XCTAssertThrowsError(try PayabliPayInCardData(
+            cardNumber: "4111111111111111",
+            expiration: "13/28",
+            cardholderName: "Jane Doe",
+            cvv: "123",
+            billingZip: "33139"
+        ).validate(PayabliPayInValidation(requiresLuhnCheck: false)))
+
+        try PayabliPayInBankAccountData(
+            accountNumber: "1111111111",
+            accountType: .checking,
+            holderName: "Jane Doe",
+            routingNumber: "123456789"
+        ).validate(PayabliPayInValidation(validatesRoutingNumberChecksum: false))
+
+        XCTAssertThrowsError(try PayabliPayInBankAccountData(
+            accountNumber: "1111111111",
+            accountType: .checking,
+            holderName: "Jane Doe",
+            routingNumber: "123456789"
+        ).validate(.default)) { error in
+            guard case let PayabliPayInTokenStorageError.invalidInput(message) = error else {
+                XCTFail("Expected invalid input error")
+                return
+            }
+            XCTAssertEqual(message, "Routing number failed validation.")
+        }
+
+        XCTAssertThrowsError(try PayabliPayInBankAccountData(
+            accountNumber: "1111111111",
+            accountType: .checking,
+            holderName: " ",
+            routingNumber: "123456789"
+        ).validate(PayabliPayInValidation(validatesRoutingNumberChecksum: false))) { error in
+            guard case let PayabliPayInTokenStorageError.invalidInput(message) = error else {
+                XCTFail("Expected invalid input error")
+                return
+            }
+            XCTAssertEqual(message, "Account holder is required.")
+        }
+
+        XCTAssertThrowsError(try PayabliPayInBankAccountData(
+            accountNumber: "1111111111",
+            accountType: .checking,
+            holderName: "Jane 🚀",
+            routingNumber: "123456780"
+        ).validate(.default))
+    }
+
+    func testPaymentMethodInputEncodingTrimsOptionalACHDevice() throws {
+        let input = PayabliPayInMethodInput.bankAccount(PayabliPayInBankAccountData(
+            accountNumber: "1111111111",
+            accountType: .checking,
+            holderName: "Jane Doe",
+            routingNumber: "123456780",
+            device: " terminal-1 "
+        ))
+
+        let data = try JSONEncoder().encode(input)
+        let object = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+
+        XCTAssertEqual(object["achCode"] as? String, "WEB")
+        XCTAssertEqual(object["device"] as? String, "terminal-1")
+    }
+
+    func testPaymentMethodAPIResponseDecodesStringNumbers() throws {
+        let data = Data("""
+        {
+          "isSuccess": true,
+          "responseText": "Success",
+          "responseCode": "200",
+          "responseData": {
+            "referenceId": "stored-123",
+            "resultCode": "1",
+            "customerId": "4440",
+            "methodReferenceId": "method-123"
+          }
+        }
+        """.utf8)
+
+        let response = try JSONDecoder().decode(PayabliPayInTokenStorageAPIResponse.self, from: data)
+
+        XCTAssertEqual(response.responseCode, 200)
+        XCTAssertEqual(response.responseData?.resultCode, 1)
+        XCTAssertEqual(response.responseData?.customerId, 4440)
+    }
+
+    func testStoredPaymentMethodBuildsDefaultAPIResponse() {
+        let storedMethod = PayabliPayInStoredPaymentMethod(
+            storedMethodId: "stored-123",
+            method: .card,
+            methodReferenceId: "method-123",
+            resultCode: 1,
+            resultText: "Approved",
+            customerId: 4440,
+            responseText: "Success"
+        )
+
+        XCTAssertEqual(storedMethod.apiResponse.responseText, "Success")
+        XCTAssertEqual(storedMethod.apiResponse.responseData?.referenceId, "stored-123")
+        XCTAssertEqual(storedMethod.apiResponse.responseData?.methodReferenceId, "method-123")
+    }
+
+    func testPaymentMethodFailureFallbackReasonUsesResponseText() {
+        let failure = PayabliPayInSaveFailure(responseText: "Gateway declined")
+
+        XCTAssertEqual(failure.reason, "Gateway declined")
+    }
+
+    func testSheetDismissButtonMetadata() {
+        XCTAssertEqual(PayabliPayInSheetDismissButton.close.systemImageName, "xmark")
+        XCTAssertEqual(PayabliPayInSheetDismissButton.close.accessibilityLabel, "Close")
+        XCTAssertEqual(PayabliPayInSheetDismissButton.back.systemImageName, "chevron.left")
+        XCTAssertEqual(PayabliPayInSheetDismissButton.back.accessibilityLabel, "Back")
+        XCTAssertNil(PayabliPayInSheetDismissButton.hidden.systemImageName)
+        XCTAssertEqual(PayabliPayInSheetDismissButton.hidden.accessibilityLabel, "")
+    }
+
+    @MainActor
+    func testPaymentMethodSheetModifierPresents() {
+        let component = flowOnSession(
+            token: "access-token",
+            entryPoint: "entry",
+            environment: .sandbox
+        )
+        let rootView = PaymentMethodSheetHarness(
+            component: component,
+            configuration: PayabliPayInFormConfiguration(
+                allowedMethods: [.card],
+                labels: PayabliPayInLabels(
+                    title: "Inline title",
+                    subtitle: "Inline subtitle"
+                )
+            ),
+            sheetConfiguration: PayabliPayInSheetConfiguration(
+                title: "Sheet title",
+                subtitle: "Sheet subtitle",
+                dismissButton: .back,
+                detents: [.medium, .large],
+                movesFormHeaderToSheetHeader: true
+            )
+        )
+        let host = UIHostingController(rootView: rootView)
+        let window = UIWindow(frame: UIScreen.main.bounds)
+        window.rootViewController = host
+        window.makeKeyAndVisible()
+
+        waitForPresentedViewController(from: host)
+
+        XCTAssertNotNil(host.presentedViewController)
+    }
+
+    @MainActor
+    func testPaymentMethodSheetContentRendersFormFields() {
+        var isPresented = true
+        let component = flowOnSession(
+            token: "access-token",
+            entryPoint: "entry",
+            environment: .sandbox
+        )
+        let view = PayabliPayInSheetContent(
+            isPresented: Binding(get: { isPresented }, set: { isPresented = $0 }),
+            component: component,
+            configuration: PayabliPayInFormConfiguration(
+                allowedMethods: [.card],
+                labels: PayabliPayInLabels(
+                    title: "Inline title",
+                    subtitle: "Inline subtitle"
+                )
+            ),
+            sheetConfiguration: PayabliPayInSheetConfiguration(
+                title: "Sheet title",
+                subtitle: "Sheet subtitle",
+                dismissButton: .back,
+                detents: [.large],
+                movesFormHeaderToSheetHeader: true
+            ),
+            style: nil,
+            onCompleted: { _ in },
+            onError: { _ in }
+        )
+        let host = UIHostingController(rootView: view)
+        let window = UIWindow(frame: UIScreen.main.bounds)
+        window.rootViewController = host
+        window.makeKeyAndVisible()
+
+        waitForRenderedSubviews(in: host.view)
+        let textFields = host.view.payabliCoverageAllSubviews.compactMap { $0 as? UITextField }
+        XCTAssertTrue(textFields.contains { $0.accessibilityLabel == "Card number" })
+    }
+
+    @MainActor
+    func testPaymentMethodSheetContentRendersInlineHeaderWhenSheetHeaderIsHidden() {
+        var isPresented = true
+        let component = flowOnSession(
+            token: "access-token",
+            entryPoint: "entry",
+            environment: .sandbox
+        )
+        let view = PayabliPayInSheetContent(
+            isPresented: Binding(get: { isPresented }, set: { isPresented = $0 }),
+            component: component,
+            configuration: PayabliPayInFormConfiguration(
+                allowedMethods: [.card],
+                labels: PayabliPayInLabels(
+                    title: "Inline card form",
+                    subtitle: "Inline subtitle"
+                )
+            ),
+            sheetConfiguration: PayabliPayInSheetConfiguration(
+                dismissButton: .hidden,
+                detents: [.height(360)],
+                movesFormHeaderToSheetHeader: false,
+                sizesToContentWhenPossible: false,
+                expandsToLargeWhenContentDoesNotFit: false
+            ),
+            style: nil,
+            onCompleted: { _ in },
+            onError: { _ in }
+        )
+        let host = UIHostingController(rootView: view)
+        let window = UIWindow(frame: UIScreen.main.bounds)
+        window.rootViewController = host
+        window.makeKeyAndVisible()
+
+        waitForRenderedSubviews(in: host.view)
+        let textFields = host.view.payabliCoverageAllSubviews.compactMap { $0 as? UITextField }
+
+        XCTAssertTrue(textFields.contains { $0.accessibilityLabel == "Card number" })
+    }
+
+    @MainActor
+    func testHostedACHFormRendersAccountPickerAndCustomerFields() {
+        let component = flowOnSession(
+            token: "access-token",
+            entryPoint: "entry",
+            environment: .sandbox
+        )
+        let view = PayabliPayInView(
+            component: component,
+            configuration: PayabliPayInFormConfiguration(
+                allowedMethods: [.bankAccount],
+                defaultMethod: .bankAccount,
+                requiredFields: [
+                    .deviceId,
+                    .methodDescription,
+                    .firstName,
+                    .lastName,
+                    .customerNumber,
+                    .billingEmail,
+                    .billingZip
+                ]
+            ),
+            onCompleted: { _ in }
+        )
+        let host = host(view)
+
+        waitForRenderedSubviews(in: host.view)
+        let textFields = host.view.payabliCoverageAllSubviews.compactMap { $0 as? UITextField }
+        let labels = Set(textFields.compactMap(\.accessibilityLabel))
+
+        XCTAssertTrue(labels.contains("Account holder"))
+        XCTAssertTrue(labels.contains("Routing number"))
+        XCTAssertTrue(labels.contains("Account number"))
+        XCTAssertTrue(labels.contains("Device"))
+        XCTAssertTrue(labels.contains("Description"))
+        XCTAssertTrue(labels.contains("Billing email"))
+    }
+
+    @MainActor
+    func testHostedACHFormRendersPlaceholderSectionsAndUnmaskedAccount() throws {
+        let component = flowOnSession(
+            token: "access-token",
+            entryPoint: "entry",
+            environment: .sandbox
+        )
+        let view = PayabliPayInView(
+            component: component,
+            configuration: PayabliPayInFormConfiguration(
+                allowedMethods: [.bankAccount],
+                defaultMethod: .bankAccount,
+                bankSections: [
+                    PayabliPayInFieldSection(
+                        title: "Bank Information",
+                        fields: [.accountHolder, .routingNumber, .accountNumber, .accountType, .accountHolderType],
+                        inputVerticalSpacing: 2,
+                        inputHorizontalSpacing: 4,
+                        fieldVerticalSpacings: [.accountHolder: 1]
+                    ),
+                    PayabliPayInFieldSection(
+                        title: "Customer Information",
+                        fields: [.firstName, .lastName, .billingEmail]
+                    )
+                ],
+                labels: PayabliPayInLabels(
+                    title: "Bank account form",
+                    subtitle: "Collect bank details"
+                ),
+                labelLayout: .placeholder,
+                formatting: PayabliPayInFormatting(masksAccountNumber: false),
+                requiredFields: [.firstName, .lastName, .billingEmail]
+            ),
+            onCompleted: { _ in }
+        )
+        .environment(\.dynamicTypeSize, .accessibility1)
+        let host = host(view)
+
+        waitForRenderedSubviews(in: host.view)
+        let textFields = host.view.payabliCoverageAllSubviews.compactMap { $0 as? UITextField }
+        let accountField = try XCTUnwrap(textFields.first { $0.accessibilityLabel == "Account number" })
+        let holderField = try XCTUnwrap(textFields.first { $0.accessibilityLabel == "Account holder" })
+
+        XCTAssertFalse(accountField.isSecureTextEntry)
+        XCTAssertEqual(holderField.attributedPlaceholder?.string, "Account holder")
+    }
+
+    @MainActor
+    func testHostedCombinedFormRendersMethodSelectorAndCardValidationError() throws {
+        let component = flowOnSession(
+            token: "access-token",
+            entryPoint: "entry",
+            environment: .sandbox
+        )
+        let view = PayabliPayInView(
+            component: component,
+            configuration: PayabliPayInFormConfiguration(
+                allowedMethods: [.card, .bankAccount],
+                cardBrandIconPlacement: .leading
+            ),
+            onCompleted: { _ in }
+        )
+        let host = host(view)
+
+        waitForRenderedSubviews(in: host.view)
+        let cardNumberField = try XCTUnwrap(
+            host.view.payabliCoverageAllSubviews
+                .compactMap { $0 as? UITextField }
+                .first { $0.accessibilityLabel == "Card number" }
+        )
+        cardNumberField.text = "4111111111111112"
+        _ = cardNumberField.delegate?.textField?(
+            cardNumberField,
+            shouldChangeCharactersIn: NSRange(location: 0, length: 0),
+            replacementString: "4111111111111112"
+        )
+        RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.1))
+
+        XCTAssertEqual(cardNumberField.accessibilityLabel, "Card number")
+    }
+
+    @MainActor
+    func testHostedCardEntryMasksPANFromHostVisibleTextAndAccessibility() throws {
+        let component = flowOnSession(
+            token: "access-token",
+            entryPoint: "entry",
+            environment: .sandbox
+        )
+        let view = PayabliPayInView(
+            component: component,
+            configuration: PayabliPayInFormConfiguration(allowedMethods: [.card]),
+            onCompleted: { _ in }
+        )
+        let host = host(view)
+
+        waitForRenderedSubviews(in: host.view)
+        let cardNumberField = try XCTUnwrap(
+            host.view.payabliCoverageAllSubviews
+                .compactMap { $0 as? UITextField }
+                .first { $0.accessibilityLabel == "Card number" }
+        )
+
+        _ = cardNumberField.delegate?.textField?(
+            cardNumberField,
+            shouldChangeCharactersIn: NSRange(location: 0, length: 0),
+            replacementString: "4111111111111111"
+        )
+        RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.1))
+
+        XCTAssertEqual(cardNumberField.text, "•••• •••• •••• 1111")
+        XCTAssertFalse(cardNumberField.text?.contains("4111111111111111") == true)
+        XCTAssertFalse(cardNumberField.text?.contains("4111 1111 1111 1111") == true)
+        XCTAssertEqual(cardNumberField.accessibilityValue, "Entered")
+    }
+
+    @MainActor
+    func testPaymentMethodConvenienceInitializersAndSubmitHelpers() async throws {
+        let transport = CoverageTransport(responseBody: """
+        {
+          "responseText": "Success",
+          "isSuccess": true,
+          "responseData": {
+            "referenceId": "stored-123",
+            "resultCode": 1,
+            "resultText": "Approved"
+          }
+        }
+        """)
+        let component = PayabliPayIn(
+            entryPoint: "entry",
+            environment: .sandbox,
+            transport: transport
+        )
+
+        let cardResult = try await component.addCard(PayabliPayInCardData(
+            cardNumber: "4111111111111111",
+            expiration: "02/28",
+            cardholderName: "Jane Doe",
+            cvv: "123",
+            billingZip: "33139"
+        ))
+        let achResult = try await component.addBankAccount(PayabliPayInBankAccountData(
+            accountNumber: "1111111111",
+            accountType: .checking,
+            holderName: "Jane Doe",
+            routingNumber: "123456780"
+        ))
+
+        XCTAssertEqual(cardResult.storedMethodId, "stored-123")
+        XCTAssertEqual(achResult.storedMethodId, "stored-123")
+        XCTAssertEqual(component.lastStoredPaymentMethod?.storedMethodId, "stored-123")
+        let requestCount = await transport.capturedRequestCount()
+        XCTAssertEqual(requestCount, 2)
+    }
+
+    @MainActor
+    func testHostedUIKitTextFieldUpdateSanitizesInitialTextAndAppliesMetadata() throws {
+        let host = host(UIKitTextFieldSanitizingHarness())
+
+        waitForRenderedSubviews(in: host.view)
+        let textField = try XCTUnwrap(
+            host.view.payabliCoverageAllSubviews
+                .compactMap { $0 as? UITextField }
+                .first { $0.accessibilityLabel == "Hosted card number" }
+        )
+        RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.2))
+
+        XCTAssertEqual(textField.text, "12")
+        XCTAssertEqual(textField.keyboardType, .numberPad)
+        XCTAssertEqual(textField.textContentType, .creditCardNumber)
+        XCTAssertEqual(textField.autocapitalizationType, .none)
+        XCTAssertEqual(textField.isSecureTextEntry, false)
+        XCTAssertEqual(textField.accessibilityHint, "Digits only")
+        XCTAssertEqual(
+            textField.accessibilityIdentifier,
+            PayabliPayInAccessibility.fieldIdentifier(.cardNumber)
+        )
+        XCTAssertEqual(textField.accessibilityValue, "12")
+        XCTAssertEqual(textField.attributedPlaceholder?.string, "Hosted card number")
+    }
+
+    @MainActor
+    private func waitForPresentedViewController(
+        from host: UIViewController,
+        timeout: TimeInterval = 1
+    ) {
+        let deadline = Date().addingTimeInterval(timeout)
+        while host.presentedViewController == nil, Date() < deadline {
+            RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.05))
+        }
+    }
+
+    @MainActor
+    private func waitForRenderedSubviews(
+        in view: UIView,
+        timeout: TimeInterval = 1
+    ) {
+        let deadline = Date().addingTimeInterval(timeout)
+        repeat {
+            view.setNeedsLayout()
+            view.layoutIfNeeded()
+            RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.05))
+        } while view.payabliCoverageAllSubviews.compactMap({ $0 as? UITextField }).isEmpty && Date() < deadline
+    }
+
+    @MainActor
+    private func host<Content: View>(_ view: Content) -> UIHostingController<Content> {
+        let host = UIHostingController(rootView: view)
+        let window = UIWindow(frame: UIScreen.main.bounds)
+        window.rootViewController = host
+        window.makeKeyAndVisible()
+        CoverageWindowStore.windows.append(window)
+        return host
+    }
+}
+
+private struct PaymentMethodSheetHarness: View {
+    @State private var isPresented = true
+
+    let component: PayabliPayIn
+    let configuration: PayabliPayInFormConfiguration
+    let sheetConfiguration: PayabliPayInSheetConfiguration
+
+    var body: some View {
+        Text("Host")
+            .payabliPayInSheet(
+                isPresented: $isPresented,
+                component: component,
+                configuration: configuration,
+                sheetConfiguration: sheetConfiguration,
+                onCompleted: { _ in }
+            )
+    }
+}
+
+private struct UIKitTextFieldSanitizingHarness: View {
+    @State private var text = "12ab"
+    @State private var focusedField: PayabliPayInField?
+
+    var body: some View {
+        PayabliPayInUIKitTextField(
+            text: $text,
+            placeholder: "Hosted card number",
+            field: .cardNumber,
+            focusedField: $focusedField,
+            keyboardType: .numberPad,
+            textContentType: .creditCardNumber,
+            autocapitalization: .none,
+            isSecure: false,
+            font: UIFont.systemFont(ofSize: 18),
+            textColor: .systemRed,
+            placeholderColor: .systemBlue,
+            accessibilityLabel: "Hosted card number",
+            accessibilityHint: "Digits only",
+            sanitize: \.digitsOnly
+        )
+        .frame(width: 240, height: 44)
+    }
+}
+
+private extension UIView {
+    var payabliCoverageAllSubviews: [UIView] {
+        subviews + subviews.flatMap(\.payabliCoverageAllSubviews)
+    }
+}
+
+@MainActor
+private enum CoverageWindowStore {
+    static var windows: [UIWindow] = []
+}
+
+private actor CoverageTransport: PayabliTransport {
+    private let responseBody: String
+    private(set) var requestCount = 0
+
+    init(responseBody: String) {
+        self.responseBody = responseBody
+    }
+
+    func perform(_ request: PayabliRequest) async throws -> PayabliResponse {
+        requestCount += 1
+        return PayabliResponse(
+            statusCode: 200,
+            headers: [:],
+            body: Data(responseBody.utf8)
+        )
+    }
+
+    func capturedRequestCount() -> Int {
+        requestCount
+    }
+
+    func performV2<T: Decodable & Sendable>(
+        _ request: PayabliRequest,
+        decoding: T.Type
+    ) async throws -> PayabliV2Envelope<T> {
+        throw PayabliGenericError(code: .unknown, reason: "performV2 is not used")
+    }
+}

@@ -96,7 +96,7 @@ export enum PayabliTTPEventCode {
 export type PayabliPayInAccountType = "Checking" | "Savings";
 export type PayabliPayInAccountHolderType = "personal" | "business";
 export type PayabliPayInSecCode = "PPD" | "WEB" | "TEL" | "CCD" | "BOC";
-export type PayabliPayInPaymentFlowStoredMethodType = "card" | "bankAccount";
+export type PayabliPayInStoredMethodType = "card" | "bankAccount";
 
 // MARK: - Tap to Pay data shapes
 
@@ -183,13 +183,13 @@ export interface PayabliTTPChargeRequest {
 
 // MARK: - PayIn payment flow data shapes
 
-export interface PayabliPayInPaymentFlowConfig {
+export interface PayabliPayInConfig {
     entryPoint: string;
     environment?: PayabliEnvironment;
     accessTokenProvider: () => Promise<string>;
 }
 
-export interface PayabliPayInPaymentFlowOptions {
+export interface PayabliPayInOptions {
     achValidation?: boolean;
     createAnonymous?: boolean;
     forceCustomerCreation?: boolean;
@@ -197,7 +197,7 @@ export interface PayabliPayInPaymentFlowOptions {
     source?: string;
 }
 
-export interface PayabliPayInPaymentFlowCardData extends PayabliPayInPaymentFlowOptions {
+export interface PayabliPayInCardData extends PayabliPayInOptions {
     cardNumber: string;
     expiration: string;
     cardholderName: string;
@@ -205,7 +205,7 @@ export interface PayabliPayInPaymentFlowCardData extends PayabliPayInPaymentFlow
     billingZip: string;
 }
 
-export interface PayabliPayInBankAccountData extends PayabliPayInPaymentFlowOptions {
+export interface PayabliPayInBankAccountData extends PayabliPayInOptions {
     accountNumber: string;
     accountType: PayabliPayInAccountType;
     holderName: string;
@@ -214,9 +214,9 @@ export interface PayabliPayInBankAccountData extends PayabliPayInPaymentFlowOpti
     holderType?: PayabliPayInAccountHolderType;
 }
 
-export interface PayabliPayInPaymentFlowStoredPaymentMethod {
+export interface PayabliPayInStoredPaymentMethod {
     storedMethodId?: string;
-    method: PayabliPayInPaymentFlowStoredMethodType;
+    method: PayabliPayInStoredMethodType;
     methodReferenceId?: string;
     resultCode?: number;
     resultText?: string;
@@ -260,18 +260,18 @@ interface NativePayabliSDKModule {
 
     rejectTokenRefresh(reason: string): void;
 
-    configurePayInPaymentFlow(config: {
+    configurePayIn(config: {
         entryPoint: string;
         environment: number;
     }): Promise<void>;
 
-    addCard(params: PayabliPayInPaymentFlowCardData): Promise<PayabliPayInPaymentFlowStoredPaymentMethod>;
+    addCard(params: PayabliPayInCardData): Promise<PayabliPayInStoredPaymentMethod>;
 
-    addBankAccount(params: PayabliPayInBankAccountData): Promise<PayabliPayInPaymentFlowStoredPaymentMethod>;
+    addBankAccount(params: PayabliPayInBankAccountData): Promise<PayabliPayInStoredPaymentMethod>;
 
-    resolvePayInPaymentFlowAccessToken(token: string): void;
+    resolvePayInAccessToken(token: string): void;
 
-    rejectPayInPaymentFlowAccessToken(reason: string): void;
+    rejectPayInAccessToken(reason: string): void;
 }
 
 // MARK: - Tap to Pay public API
@@ -386,46 +386,46 @@ export const PayabliTTP = {
 
 let payInAccessTokenSubscription: EmitterSubscription | null = null;
 
-export async function configurePayInPaymentFlow(
-    config: PayabliPayInPaymentFlowConfig
+export async function configurePayIn(
+    config: PayabliPayInConfig
 ): Promise<void> {
     const module = requireNativeModule();
     const eventEmitter = requireEmitter();
 
     payInAccessTokenSubscription?.remove();
     payInAccessTokenSubscription = eventEmitter.addListener(
-        "PayInPaymentFlowAccessTokenRequested",
+        "PayInAccessTokenRequested",
         async () => {
             try {
                 const token = await config.accessTokenProvider();
-                module.resolvePayInPaymentFlowAccessToken(token);
+                module.resolvePayInAccessToken(token);
             } catch (e) {
                 const message = e instanceof Error ? e.message : String(e);
-                module.rejectPayInPaymentFlowAccessToken(message);
+                module.rejectPayInAccessToken(message);
             }
         }
     );
 
-    await module.configurePayInPaymentFlow({
+    await module.configurePayIn({
         entryPoint: config.entryPoint,
         environment: config.environment ?? PayabliEnvironment.Sandbox,
     });
 }
 
 export function addCard(
-    params: PayabliPayInPaymentFlowCardData
-): Promise<PayabliPayInPaymentFlowStoredPaymentMethod> {
+    params: PayabliPayInCardData
+): Promise<PayabliPayInStoredPaymentMethod> {
     return requireNativeModule().addCard(params);
 }
 
 export function addBankAccount(
     params: PayabliPayInBankAccountData
-): Promise<PayabliPayInPaymentFlowStoredPaymentMethod> {
+): Promise<PayabliPayInStoredPaymentMethod> {
     return requireNativeModule().addBankAccount(params);
 }
 
-export const PayabliPayInPaymentFlow = {
-    configure: configurePayInPaymentFlow,
+export const PayabliPayIn = {
+    configure: configurePayIn,
     addCard,
     addBankAccount,
 };

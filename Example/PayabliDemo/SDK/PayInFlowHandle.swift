@@ -1,5 +1,5 @@
 import Combine
-import PayabliSDKPayInPaymentFlow
+import PayabliSDKPayIn
 
 /// A screen's grip on the flow it submits through.
 ///
@@ -9,11 +9,11 @@ import PayabliSDKPayInPaymentFlow
 /// integration rather than most of it.
 @MainActor
 final class PayInFlowHandle: ObservableObject {
-    let flow: PayabliPayInPaymentFlow
+    let flow: PayabliPayIn
 
     private var forwarding: AnyCancellable?
 
-    init(_ flow: PayabliPayInPaymentFlow) {
+    init(_ flow: PayabliPayIn) {
         self.flow = flow
         // Screens observe this object, so the flow's publishes have to arrive here
         // or a submission redraws nothing.
@@ -56,10 +56,18 @@ final class PayInFlowHandle: ObservableObject {
     /// - Returns: whether an attempt was drawn. A screen showing the last failure
     ///   clears it on `true` only: cleared on a refusal it would report an attempt
     ///   that was never made, over a request still holding the earlier key.
-    func startNewAttempt(suppliesCustomer: Bool) -> Bool {
+    func startNewAttempt(
+        suppliesCustomer: Bool,
+        amount: Double = QAAmount.random(),
+        source: String = "ios-payment-capture-qa"
+    ) -> Bool {
         guard !flow.isSubmitting else { return false }
         flow.configure(
-            requestConfiguration: PayInRequests.freshCapture(suppliesCustomer: suppliesCustomer)
+            requestConfiguration: PayInRequests.freshCapture(
+                suppliesCustomer: suppliesCustomer,
+                amount: amount,
+                source: source
+            )
         )
         return true
     }

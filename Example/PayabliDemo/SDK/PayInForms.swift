@@ -1,4 +1,4 @@
-import PayabliSDKPayInPaymentFlow
+import PayabliSDKPayIn
 
 /// What this app hands the SDK's form, for one operation.
 ///
@@ -11,8 +11,8 @@ import PayabliSDKPayInPaymentFlow
 /// as a repeat of an attempt the service already holds.
 struct PayInFormSetup {
     let operation: PayInOperation
-    let configuration: PayabliPayInPaymentFlowFormConfiguration
-    let style: PayabliPayInPaymentFlowStyle
+    let configuration: PayabliPayInFormConfiguration
+    let style: PayabliPayInStyle
 }
 
 /// The two forms this app shows.
@@ -26,11 +26,11 @@ enum PayInForms {
     static var storedMethod: PayInFormSetup {
         PayInFormSetup(
             operation: .storedMethod,
-            configuration: PayabliPayInPaymentFlowFormConfiguration(
+            configuration: PayabliPayInFormConfiguration(
                 allowedMethods: PayInSharedConfiguration.allowedMethods,
                 defaultMethod: PayInSharedConfiguration.defaultMethod,
                 cardFieldOrder: PayInSharedConfiguration.cardFieldOrder,
-                achFieldOrder: PayInSharedConfiguration.achFieldOrder,
+                bankFieldOrder: PayInSharedConfiguration.bankFieldOrder,
                 cardSections: [
                     sectionTitled("Card Information", fields: [
                         .cardholderName,
@@ -41,21 +41,21 @@ enum PayInForms {
                     ]),
                     sectionTitled("Customer Information", fields: storedMethodCustomerFields)
                 ],
-                achSections: [
+                bankSections: [
                     sectionTitled("Bank Information", fields: [
-                        .achHolder,
-                        .achRouting,
-                        .achAccount,
-                        .achAccountType
+                        .accountHolder,
+                        .routingNumber,
+                        .accountNumber,
+                        .accountType
                     ]),
                     sectionTitled("Customer Information", fields: storedMethodCustomerFields)
                 ],
-                hiddenValues: PayabliPayInPaymentFlowHiddenValues(
-                    achHolderType: .personal,
-                    achSecCode: .web,
+                hiddenValues: PayabliPayInHiddenValues(
+                    accountHolderType: .personal,
+                    secCode: .web,
                     methodDescription: QAIdentity.current.note("save")
                 ),
-                options: PayabliPayInPaymentFlowOptions(
+                options: PayabliPayInOptions(
                     // `createAnonymous` and `temporary` are left unset so the paypoint's
                     // own settings decide them. The encoder omits only nil, so passing
                     // `false` sends `createAnonymous=false` and `temporary=false`, which
@@ -64,9 +64,9 @@ enum PayInForms {
                     forceCustomerCreation: true,
                     source: "ios-payment-method-qa"
                 ),
-                labels: PayabliPayInPaymentFlowLabels(
+                labels: PayabliPayInLabels(
                     title: "Save Payment Method",
-                    subtitle: "Create a card or ACH token.",
+                    subtitle: "Create a card or bank account token.",
                     fieldPlaceholders: placeholders
                 ),
                 labelLayout: PayInSharedConfiguration.labelLayout,
@@ -85,11 +85,11 @@ enum PayInForms {
     static var capture: PayInFormSetup {
         PayInFormSetup(
             operation: .capture,
-            configuration: PayabliPayInPaymentFlowFormConfiguration(
+            configuration: PayabliPayInFormConfiguration(
                 allowedMethods: PayInSharedConfiguration.allowedMethods,
                 defaultMethod: PayInSharedConfiguration.defaultMethod,
                 cardFieldOrder: PayInSharedConfiguration.cardFieldOrder,
-                achFieldOrder: PayInSharedConfiguration.achFieldOrder,
+                bankFieldOrder: PayInSharedConfiguration.bankFieldOrder,
                 cardSections: [
                     sectionTitled("Card Information", fields: [
                         .cardholderName,
@@ -101,27 +101,27 @@ enum PayInForms {
                     sectionTitled("Customer Information", fields: captureCustomerFields),
                     sectionTitled("Payment Information", fields: [.amount, .serviceFee])
                 ],
-                achSections: [
+                bankSections: [
                     sectionTitled("Bank Information", fields: [
-                        .achHolder,
-                        .achRouting,
-                        .achAccount,
-                        .achAccountType
+                        .accountHolder,
+                        .routingNumber,
+                        .accountNumber,
+                        .accountType
                     ]),
                     sectionTitled("Customer Information", fields: captureCustomerFields),
                     sectionTitled("Payment Information", fields: [.amount, .serviceFee])
                 ],
-                hiddenValues: PayabliPayInPaymentFlowHiddenValues(
-                    achHolderType: .personal,
-                    achSecCode: .web,
+                hiddenValues: PayabliPayInHiddenValues(
+                    accountHolderType: .personal,
+                    secCode: .web,
                     // What a transaction list shows as the note, and what names the device that sent it. Here
                     // rather than only on the request configuration because this value wins over that one: the
                     // component merges the form's description over the request's before it sends.
                     methodDescription: QAIdentity.current.note("capture")
                 ),
-                labels: PayabliPayInPaymentFlowLabels(
+                labels: PayabliPayInLabels(
                     title: "Payment Capture",
-                    subtitle: "Submit a card or ACH payment.",
+                    subtitle: "Submit a card or bank account payment.",
                     submitButton: "Submit Payment",
                     fieldPlaceholders: placeholders
                 ),
@@ -131,12 +131,12 @@ enum PayInForms {
                 formatting: PayInSharedConfiguration.formatting,
                 inputSizing: PayInSharedConfiguration.inputSizing,
                 cardBrandIconPlacement: PayInSharedConfiguration.cardBrandIconPlacement,
-                paymentSummary: PayabliPayInPaymentFlowPaymentSummaryConfiguration(
-                    labelStyle: PayabliPayInPaymentFlowPaymentSummaryTextStyle(
+                paymentSummary: PayabliPayInPaymentSummaryConfiguration(
+                    labelStyle: PayabliPayInPaymentSummaryTextStyle(
                         font: .subheadline,
                         color: .secondary
                     ),
-                    valueStyle: PayabliPayInPaymentFlowPaymentSummaryTextStyle(
+                    valueStyle: PayabliPayInPaymentSummaryTextStyle(
                         font: .subheadline.weight(.semibold),
                         color: .primary
                     ),
@@ -152,20 +152,20 @@ enum PayInForms {
     /// A stored method belongs to a customer, and the number is what a later charge
     /// finds it by. The capture form leaves it out for the opposite reason: nothing
     /// is being stored against a customer there.
-    private static let storedMethodCustomerFields: [PayabliPayInPaymentFlowField] = [
+    private static let storedMethodCustomerFields: [PayabliPayInField] = [
         .firstName,
         .lastName,
         .customerNumber,
         .billingEmail
     ]
 
-    private static let captureCustomerFields: [PayabliPayInPaymentFlowField] = [
+    private static let captureCustomerFields: [PayabliPayInField] = [
         .firstName,
         .lastName,
         .billingEmail
     ]
 
-    private static var placeholders: [PayabliPayInPaymentFlowField: String] {
+    private static var placeholders: [PayabliPayInField: String] {
         PayInSharedConfiguration.labelMatchingPlaceholders(
             for: PayInSharedConfiguration.fieldsWithHiddenLabels
         )
@@ -175,9 +175,9 @@ enum PayInForms {
     /// caller states.
     private static func sectionTitled(
         _ title: String,
-        fields: [PayabliPayInPaymentFlowField]
-    ) -> PayabliPayInPaymentFlowFieldSection {
-        PayabliPayInPaymentFlowFieldSection(
+        fields: [PayabliPayInField]
+    ) -> PayabliPayInFieldSection {
+        PayabliPayInFieldSection(
             title: title,
             titleStyle: PayInSharedConfiguration.sectionTitleStyle,
             fields: fields

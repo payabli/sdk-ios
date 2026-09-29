@@ -1,4 +1,4 @@
-import PayabliSDKPayInPaymentFlow
+import PayabliSDKPayIn
 import PayabliSDKTapToPay
 
 /// The stand-in customer this app sends on a card-not-present capture.
@@ -8,7 +8,7 @@ enum PayInDemoCustomer {
     /// This device rather than one constant, because several devices run the
     /// card-not-present flows at once and a shared number would put every row on
     /// one record.
-    static let customerData = PayabliPayInPaymentFlowCustomerData(
+    static let customerData = PayabliPayInCustomerData(
         customerNumber: QAIdentity.current.customerNumber
     )
 

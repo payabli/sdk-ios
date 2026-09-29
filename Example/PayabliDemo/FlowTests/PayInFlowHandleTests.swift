@@ -1,5 +1,5 @@
 import PayabliSDKCore
-import PayabliSDKPayInPaymentFlow
+import PayabliSDKPayIn
 import XCTest
 
 /// What drawing a new capture attempt does to the request the next submit carries.
@@ -42,6 +42,15 @@ final class PayInFlowHandleTests: XCTestCase {
         XCTAssertEqual(handle.requestTotal.map { $0 > 0 }, true, "the attempt charges nothing")
     }
 
+    func testDrawingAnAttemptForwardsTheAmountAndSourceItIsGiven() throws {
+        let handle = try makeHandle()
+
+        XCTAssertTrue(handle.startNewAttempt(suppliesCustomer: false, amount: 12.34, source: "test-source"))
+
+        XCTAssertEqual(handle.requestTotal, 12.34)
+        XCTAssertEqual(handle.requestSource, "test-source")
+    }
+
     /// Moving the customer switch answers a different question, so it leaves the
     /// attempt's identity alone. Without this the retry of the payment on screen
     /// would become a payment of its own.
@@ -74,7 +83,7 @@ final class PayInFlowHandleTests: XCTestCase {
 
     private func makeHandle() throws -> PayInFlowHandle {
         PayInFlowHandle(
-            PayabliPayInPaymentFlow(
+            PayabliPayIn(
                 session: PayabliSession(config: try PayabliConfig(
                     entryPoint: "test-entry",
                     environment: DemoEnvironment.sandbox.sdkEnvironment,
@@ -99,6 +108,10 @@ private extension PayInFlowHandle {
 
     var requestTotal: Double? {
         flow.requestConfiguration?.paymentDetails.totalAmount
+    }
+
+    var requestSource: String? {
+        flow.requestConfiguration?.source
     }
 
     var requestCustomerNumber: String? {

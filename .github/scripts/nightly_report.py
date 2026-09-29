@@ -56,7 +56,7 @@ MAX_ATTRIBUTED_FAILURES = 12
 # measures, minus the fixtures package it excludes from coverage for the same reason.
 COVERAGE_TARGETS = (
     "PayabliSDKCore",
-    "PayabliSDKPayInPaymentFlow",
+    "PayabliSDKPayIn",
     "PayabliSDKTapToPay",
     "PayabliSDKTelemetry",
 )

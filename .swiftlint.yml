@@ -159,7 +159,7 @@ custom_rules:
   # name would report three of its own lines. Terminating rather than exact text,
   # because `\(token, privacy: .private)` and `\(response.token)` are both the
   # value reaching the log, and the second is how the reusable payment-method token
-  # on `PayabliPayInPaymentFlowAPIResponse` would get there. `\(eventToken)` and
+  # on `PayabliPayInAPIResponse` would get there. `\(eventToken)` and
   # `\(tokenProvider)` stay unmatched: neither ends the interpolation at `token`.
   #
   # `secretKey` and `apiKey` are the reader's own credentials, off the `/config`

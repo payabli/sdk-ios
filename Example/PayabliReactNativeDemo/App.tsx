@@ -13,7 +13,7 @@ import {
 } from "react-native";
 import {
   PayabliEnvironment,
-  PayabliPayInPaymentFlow,
+  PayabliPayIn,
   PayabliTTP,
   PayabliTTPEventCode,
   PayabliTTPSessionState,
@@ -24,7 +24,7 @@ const Secrets = {
   entryPoint: "<YOUR_ENTRY_POINT>",
   appId: "<TEAM_ID>.<BUNDLE_ID>",
   fetchAccessToken: async () => "placeholder-token",
-  fetchPayInPaymentFlowAccessToken: async () => "placeholder-payin-payment-flow-access-token",
+  fetchPayInAccessToken: async () => "placeholder-payin-access-token",
 };
 
 export default function App() {
@@ -68,8 +68,8 @@ export default function App() {
         appId: Secrets.appId,
         environment: PayabliEnvironment.Sandbox,
       });
-      await PayabliPayInPaymentFlow.configure({
-        accessTokenProvider: Secrets.fetchPayInPaymentFlowAccessToken,
+      await PayabliPayIn.configure({
+        accessTokenProvider: Secrets.fetchPayInAccessToken,
         entryPoint: Secrets.entryPoint,
         environment: PayabliEnvironment.Sandbox,
       });
@@ -125,7 +125,7 @@ export default function App() {
 
   const addCard = async () => {
     await run("Add card", async () => {
-      const stored = await PayabliPayInPaymentFlow.addCard({
+      const stored = await PayabliPayIn.addCard({
         cardNumber,
         expiration,
         cardholderName,
@@ -141,8 +141,8 @@ export default function App() {
   };
 
   const addBankAccount = async () => {
-    await run("Add ACH", async () => {
-      const stored = await PayabliPayInPaymentFlow.addBankAccount({
+    await run("Add bank account", async () => {
+      const stored = await PayabliPayIn.addBankAccount({
         accountNumber: achAccount,
         accountType: "Checking",
         holderName: achHolder,
@@ -222,11 +222,11 @@ export default function App() {
           <ActionButton title="Add Card" disabled={isWorking || !configured} onPress={addCard} />
         </Section>
 
-        <Section title="ACH PayIn Flow">
+        <Section title="Bank account PayIn Flow">
           <TextInput value={achAccount} onChangeText={setAchAccount} keyboardType="number-pad" placeholder="Account number" secureTextEntry style={styles.input} />
           <TextInput value={achRouting} onChangeText={setAchRouting} keyboardType="number-pad" placeholder="Routing number" style={styles.input} />
           <TextInput value={achHolder} onChangeText={setAchHolder} placeholder="Account holder" style={styles.input} />
-          <ActionButton title="Add ACH" disabled={isWorking || !configured} onPress={addBankAccount} />
+          <ActionButton title="Add bank account" disabled={isWorking || !configured} onPress={addBankAccount} />
           <Text style={styles.resultText}>{payInResult}</Text>
         </Section>
 

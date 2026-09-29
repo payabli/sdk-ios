@@ -6,7 +6,7 @@ import XCTest
 /// invites — combined with the `Task` running it being cancelled, which is what `PayabliAuth` does
 /// at its bound rather than waiting on this call forever.
 ///
-/// One case here covers both `PayabliSDKPayInPaymentFlow` and `PayabliSDKTapToPay`, which share
+/// One case here covers both `PayabliSDKPayIn` and `PayabliSDKTapToPay`, which share
 /// this implementation. Drives that with `Task.cancel()` directly rather than through either
 /// facade's real init and `PayabliAuth`'s 30s bound — `PayabliAuthProviderBoundTests` already
 /// proves that bound end to end with a clock double, and TapToPay's `initialize()` pipeline cannot

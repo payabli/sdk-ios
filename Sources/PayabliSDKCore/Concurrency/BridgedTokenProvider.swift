@@ -2,7 +2,7 @@ import Foundation
 
 /// Wraps an ObjC completion-block token source in a `PayabliTokenRefresh` continuation.
 ///
-/// `package` so `PayabliSDKPayInPaymentFlow` and `PayabliSDKTapToPay` share one implementation of
+/// `package` so `PayabliSDKPayIn` and `PayabliSDKTapToPay` share one implementation of
 /// cancellation-sensitive logic instead of each carrying its own copy: a fix to one bridge landing
 /// without the other is exactly the drift a single caller cannot cause. `errorDomain` is the only
 /// thing that varies between them, for the `NSError` a nil token and nil error both produce.

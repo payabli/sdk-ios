@@ -1,4 +1,4 @@
-import PayabliSDKPayInPaymentFlow
+import PayabliSDKPayIn
 import SwiftUI
 
 /// Where the SDK's payment form mounts.
@@ -17,13 +17,13 @@ struct PaymentFormHost: View {
     let onFailed: (PayInFailure) -> Void
 
     var body: some View {
-        PayabliPayInPaymentFlowView(
+        PayabliPayInView(
             component: flow.flow,
             configuration: form.configuration,
             onCompleted: { onCompleted(PayInOutcome($0)) },
             onError: { onFailed(PayInFailure($0, operation: form.operation)) }
         )
-        .payabliPayInPaymentFlowStyle(form.style)
+        .payabliPayInStyle(form.style)
     }
 }
 
@@ -37,11 +37,11 @@ extension View {
         onCompleted: @escaping (PayInOutcome) -> Void,
         onFailed: @escaping (PayInFailure) -> Void
     ) -> some View {
-        payabliPayInPaymentFlowSheet(
+        payabliPayInSheet(
             isPresented: isPresented,
             component: flow.flow,
             configuration: form.configuration,
-            sheetConfiguration: PayabliPayInPaymentFlowSheetConfiguration(
+            sheetConfiguration: PayabliPayInSheetConfiguration(
                 title: title,
                 dismissButton: .back
             ),

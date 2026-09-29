@@ -31,9 +31,9 @@
             var lastName: String?
             var billingEmail: String?
             var customerNumber: String?
-            var achHolder: String?
-            var achRouting: String?
-            var achAccount: String?
+            var accountHolder: String?
+            var routingNumber: String?
+            var accountNumber: String?
         }
 
         /// Decoded once from `DebugPrefill.json` in the app bundle.
@@ -72,9 +72,9 @@
                 (.lastName, identity.lastName),
                 (.billingEmail, identity.billingEmail),
                 (.customerNumber, identity.customerNumber),
-                (.achHolder, identity.holderName),
-                (.achRouting, values.achRouting),
-                (.achAccount, values.achAccount)
+                (.accountHolder, identity.holderName),
+                (.routingNumber, values.routingNumber),
+                (.accountNumber, values.accountNumber)
             ]
 
             let textFields = onScreenTextFields()

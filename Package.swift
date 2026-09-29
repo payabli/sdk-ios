@@ -26,7 +26,7 @@ let package = Package(
         // building that target once, and an app linking both products fails.
         //
         // An app links `PayabliSDK`, or `PayabliSDKTapToPay` and/or
-        // `PayabliSDKPayInPaymentFlow`, never the umbrella with either: each
+        // `PayabliSDKPayIn`, never the umbrella with either: each
         // capability target is in the umbrella and has a product of its own.
         //
         // This manifest is what consumers resolve: a release tag is this file
@@ -38,7 +38,7 @@ let package = Package(
             targets: [
                 "PayabliSDKCore",
                 "PayabliSDKTapToPay",
-                "PayabliSDKPayInPaymentFlow",
+                "PayabliSDKPayIn",
                 "PayabliSDKTelemetry"
             ]
         ),
@@ -48,9 +48,9 @@ let package = Package(
             targets: ["PayabliSDKTapToPay", "PayabliSDKTelemetry"]
         ),
         .library(
-            name: "PayabliSDKPayInPaymentFlow",
+            name: "PayabliSDKPayIn",
             type: .dynamic,
-            targets: ["PayabliSDKPayInPaymentFlow", "PayabliSDKTelemetry"]
+            targets: ["PayabliSDKPayIn", "PayabliSDKTelemetry"]
         )
         // `PayabliSDKTestUtils` is a target and not a product. Its doubles conform to the
         // attestation, provider and storage protocols, so a linkable library of them requires
@@ -99,9 +99,9 @@ let package = Package(
             path: "Sources/PayabliSDKTelemetry"
         ),
         .target(
-            name: "PayabliSDKPayInPaymentFlow",
+            name: "PayabliSDKPayIn",
             dependencies: ["PayabliSDKCore"],
-            path: "Sources/PayabliSDKPayInPaymentFlow",
+            path: "Sources/PayabliSDKPayIn",
             exclude: [
                 "README.md",
                 "LLM.md"
@@ -134,9 +134,9 @@ let package = Package(
             path: "Tests/PayabliSDKTelemetryTests"
         ),
         .testTarget(
-            name: "PayabliSDKPayInPaymentFlowTests",
-            dependencies: ["PayabliSDKCore", "PayabliSDKPayInPaymentFlow"],
-            path: "Tests/PayabliSDKPayInPaymentFlowTests"
+            name: "PayabliSDKPayInTests",
+            dependencies: ["PayabliSDKCore", "PayabliSDKPayIn"],
+            path: "Tests/PayabliSDKPayInTests"
         ),
         .testTarget(
             name: "PayabliSDKTestUtilsTests",

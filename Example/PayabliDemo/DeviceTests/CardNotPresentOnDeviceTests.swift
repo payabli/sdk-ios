@@ -1,6 +1,6 @@
 @testable import PayabliDemo
 @testable import PayabliSDKCore
-import PayabliSDKPayInPaymentFlow
+import PayabliSDKPayIn
 import XCTest
 
 /// The card-not-present surface against a live paypoint on real hardware:
@@ -62,9 +62,9 @@ final class CardNotPresentOnDeviceTests: XCTestCase {
     }
 
     /// The test card, from the file the app prefills its form from.
-    private func card() throws -> PayabliPayInPaymentFlowCardData {
+    private func card() throws -> PayabliPayInCardData {
         let values = try XCTUnwrap(DebugPrefill.values, "DebugPrefill.json is not in the bundle")
-        return PayabliPayInPaymentFlowCardData(
+        return PayabliPayInCardData(
             cardNumber: try XCTUnwrap(values.cardNumber).filter(\.isNumber),
             expiration: try XCTUnwrap(values.cardExpiration),
             cardholderName: QAIdentity.current.holderName,
@@ -73,8 +73,8 @@ final class CardNotPresentOnDeviceTests: XCTestCase {
         )
     }
 
-    private func makeFlow() throws -> PayabliPayInPaymentFlow {
-        PayabliPayInPaymentFlow(
+    private func makeFlow() throws -> PayabliPayIn {
+        PayabliPayIn(
             session: PayabliSession(config: try PayabliConfig(
                 entryPoint: named.entry,
                 environment: named.environment,
@@ -89,13 +89,13 @@ final class CardNotPresentOnDeviceTests: XCTestCase {
     /// `forceCustomerCreation` and the customer number are what a paypoint's
     /// identifier list is satisfied by, and they belong to the app's configuration
     /// rather than to this file.
-    private func request(with card: PayabliPayInPaymentFlowCardData) -> PayabliPayInPaymentFlowRequest {
+    private func request(with card: PayabliPayInCardData) -> PayabliPayInRequest {
         request(paying: .card(PayabliPayInPaymentMethod.Card(data: card)))
     }
 
-    private func request(paying method: PayabliPayInPaymentMethod) -> PayabliPayInPaymentFlowRequest {
+    private func request(paying method: PayabliPayInPaymentMethod) -> PayabliPayInRequest {
         let configured = PayInRequests.freshCapture(suppliesCustomer: true)
-        return PayabliPayInPaymentFlowRequest(
+        return PayabliPayInRequest(
             paymentDetails: configured.paymentDetails,
             paymentMethod: method,
             accountId: configured.accountId,
@@ -117,7 +117,7 @@ final class CardNotPresentOnDeviceTests: XCTestCase {
     func testAStoringACardReturnsAToken() async throws {
         let stored = try await makeFlow().addCard(
             try card(),
-            options: PayabliPayInPaymentFlowTokenStorageOptions(
+            options: PayabliPayInTokenStorageOptions(
                 forceCustomerCreation: true,
                 customerData: PayInDemoCustomer.customerData
             )
@@ -168,12 +168,12 @@ final class CardNotPresentOnDeviceTests: XCTestCase {
     func testDTheToggleOffShapeNamesAPayerWithoutANumber() async throws {
         let identity = QAIdentity.current
         let configured = PayInRequests.freshCapture(suppliesCustomer: false)
-        let payer = PayabliPayInPaymentFlowCustomerData(
+        let payer = PayabliPayInCustomerData(
             billingEmail: identity.billingEmail,
             firstName: identity.firstName,
             lastName: identity.lastName
         )
-        let request = PayabliPayInPaymentFlowRequest(
+        let request = PayabliPayInRequest(
             paymentDetails: configured.paymentDetails,
             paymentMethod: .card(PayabliPayInPaymentMethod.Card(data: try card())),
             customerData: payer,
@@ -247,10 +247,10 @@ final class CardNotPresentOnDeviceTests: XCTestCase {
     // MARK: - Stored card
 
     /// A card stored in this run, charged as the method and identifier the store returned.
-    private func storedCard(on flow: PayabliPayInPaymentFlow) async throws -> PayabliPayInPaymentMethod {
+    private func storedCard(on flow: PayabliPayIn) async throws -> PayabliPayInPaymentMethod {
         let stored = try await flow.addCard(
             try card(),
-            options: PayabliPayInPaymentFlowTokenStorageOptions(
+            options: PayabliPayInTokenStorageOptions(
                 forceCustomerCreation: true,
                 customerData: PayInDemoCustomer.customerData
             )
@@ -296,7 +296,7 @@ final class CardNotPresentOnDeviceTests: XCTestCase {
     /// SDK mints a key per call and the service has nothing to recognise the repeat by.
     private func reverse(
         _ transId: String,
-        on flow: PayabliPayInPaymentFlow,
+        on flow: PayabliPayIn,
         whenLeftStanding standing: String
     ) async {
         do {

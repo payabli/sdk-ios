@@ -1,0 +1,294 @@
+import Foundation
+import PayabliSDKCore
+
+public typealias PayabliPayInDiagnosticHandler = @Sendable (PayabliPayInDiagnosticEntry) -> Void
+
+public struct PayabliPayInDiagnostics: Sendable {
+    public let isEnabled: Bool
+    public let handler: PayabliPayInDiagnosticHandler?
+
+    public init(
+        isEnabled: Bool = false,
+        handler: PayabliPayInDiagnosticHandler? = nil
+    ) {
+        self.isEnabled = isEnabled
+        self.handler = handler
+    }
+
+    public static let disabled = PayabliPayInDiagnostics()
+
+    public static func enabled(
+        handler: @escaping PayabliPayInDiagnosticHandler
+    ) -> PayabliPayInDiagnostics {
+        PayabliPayInDiagnostics(isEnabled: true, handler: handler)
+    }
+}
+
+public struct PayabliPayInDiagnosticEntry: Identifiable, Sendable {
+    public enum Phase: String, Sendable {
+        case request
+        case response
+        case failure
+    }
+
+    public let id: UUID
+    public let phase: Phase
+    public let timestamp: Date
+    public let method: String
+    public let url: String
+    public let statusCode: Int?
+    public let headers: [String: String]
+    public let body: String?
+    public let durationMilliseconds: Double?
+    public let errorDescription: String?
+
+    public init(
+        id: UUID = UUID(),
+        phase: Phase,
+        timestamp: Date = Date(),
+        method: String,
+        url: String,
+        statusCode: Int? = nil,
+        headers: [String: String] = [:],
+        body: String? = nil,
+        durationMilliseconds: Double? = nil,
+        errorDescription: String? = nil
+    ) {
+        self.id = id
+        self.phase = phase
+        self.timestamp = timestamp
+        self.method = method
+        self.url = url
+        self.statusCode = statusCode
+        self.headers = headers
+        self.body = body
+        self.durationMilliseconds = durationMilliseconds
+        self.errorDescription = errorDescription
+    }
+}
+
+extension PayabliPayInDiagnostics {
+    func logRequest(_ request: PayabliRequest, baseURL: URL?) {
+        guard isEnabled, let handler else { return }
+        handler(PayabliPayInDiagnosticEntry(
+            phase: .request,
+            method: request.method.rawValue,
+            url: Self.urlString(for: request, baseURL: baseURL),
+            headers: Self.redactedHeaders(request.headers, phase: .request),
+            body: Self.redactedBodyString(request.body, phase: .request)
+        ))
+    }
+
+    func logResponse(
+        _ response: PayabliResponse,
+        request: PayabliRequest,
+        baseURL: URL?,
+        durationMilliseconds: Double
+    ) {
+        guard isEnabled, let handler else { return }
+        handler(PayabliPayInDiagnosticEntry(
+            phase: .response,
+            method: request.method.rawValue,
+            url: Self.urlString(for: request, baseURL: baseURL),
+            statusCode: response.statusCode,
+            headers: Self.redactedHeaders(response.headers, phase: .response),
+            body: Self.redactedBodyString(response.body, phase: .response),
+            durationMilliseconds: durationMilliseconds
+        ))
+    }
+
+    func logFailure(
+        _ error: Error,
+        request: PayabliRequest,
+        baseURL: URL?,
+        durationMilliseconds: Double
+    ) {
+        guard isEnabled, let handler else { return }
+        handler(PayabliPayInDiagnosticEntry(
+            phase: .failure,
+            method: request.method.rawValue,
+            url: Self.urlString(for: request, baseURL: baseURL),
+            headers: Self.redactedHeaders(request.headers, phase: .failure),
+            durationMilliseconds: durationMilliseconds,
+            errorDescription: Self.diagnosticMessage(for: error)
+        ))
+    }
+
+    private static func urlString(for request: PayabliRequest, baseURL: URL?) -> String {
+        guard let baseURL,
+              var components = URLComponents(
+                  url: baseURL.appendingPathComponent(request.path),
+                  resolvingAgainstBaseURL: false
+              )
+        else {
+            var path = request.path
+            if !request.query.isEmpty {
+                var components = URLComponents()
+                components.queryItems = request.query
+                path += components.url?.absoluteString ?? ""
+            }
+            return path
+        }
+
+        if !request.query.isEmpty {
+            components.queryItems = request.query
+        }
+        return components.url?.absoluteString ?? request.path
+    }
+
+    private static func redactedHeaders(
+        _ headers: [String: String],
+        phase: PayabliPayInDiagnosticEntry.Phase
+    ) -> [String: String] {
+        Dictionary(uniqueKeysWithValues: headers.map { key, value in
+            if isSensitiveKey(key, phase: phase) {
+                return (key, PayabliLogger.redactFully(value))
+            }
+            return (key, value)
+        })
+    }
+
+    private static func redactedBodyString(
+        _ body: Data?,
+        phase: PayabliPayInDiagnosticEntry.Phase
+    ) -> String? {
+        guard let body, !body.isEmpty else { return nil }
+
+        do {
+            let object = try JSONSerialization.jsonObject(with: body)
+            let redacted = redactJSONValue(object, key: nil, phase: phase)
+            let data = try PayInPaymentFlowJSONBody.data(
+                from: PayInPaymentFlowJSONBody.normalizingCurrencyFields(in: redacted)
+            )
+            return String(data: data, encoding: .utf8)
+        } catch {
+            return "[REDACTED NON-JSON BODY; \(body.count) bytes]"
+        }
+    }
+
+    private static func redactJSONValue(
+        _ value: Any,
+        key: String?,
+        phase: PayabliPayInDiagnosticEntry.Phase
+    ) -> Any {
+        if let key, isSensitiveKey(key, phase: phase) {
+            return "[REDACTED]"
+        }
+
+        if let dictionary = value as? [String: Any] {
+            return dictionary.reduce(into: [String: Any]()) { result, pair in
+                result[pair.key] = redactJSONValue(pair.value, key: pair.key, phase: phase)
+            }
+        }
+
+        if let array = value as? [Any] {
+            return array.map { redactJSONValue($0, key: nil, phase: phase) }
+        }
+
+        return value
+    }
+
+    /// Names whose value is a verification outcome rather than a submitted one, checked before the
+    /// rules below because the substring `cvv` catches them.
+    private static let verificationResultKeys: Set<String> = [
+        "cvvresponse",
+        "cvvresponsetext"
+    ]
+
+    /// Names redacted on their own rather than by a substring rule.
+    private static let sensitiveExactKeys: Set<String> = [
+        "authorization",
+        // Generated here and sent from here, so nothing outside this SDK is meant to hold it, and a
+        // diagnostics entry a host can read is a surface like any other.
+        "idempotencykey",
+        "requesttoken",
+        "accesstoken",
+        "clientsecret",
+        "cardnumber",
+        "cardcvv",
+        "cvv",
+        "cardexp",
+        "cardzip",
+        "cardholder",
+        "achaccount",
+        "achrouting",
+        "achholder",
+        "accountnumber",
+        "referenceid",
+        "methodreferenceid",
+        "routingnumber",
+        "storedmethodid",
+        "customerid",
+        "customernumber",
+        "billingemail",
+        "billingphone",
+        "billingaddress1",
+        "billingaddress2",
+        "billingcity",
+        "billingstate",
+        "billingzip",
+        "shippingaddress1",
+        "shippingaddress2",
+        "shippingcity",
+        "shippingstate",
+        "shippingzip",
+        "firstname",
+        "lastname",
+        "name",
+        "email",
+        "phone"
+    ]
+
+    private static func isSensitiveKey(
+        _ key: String,
+        phase: PayabliPayInDiagnosticEntry.Phase
+    ) -> Bool {
+        let normalized = key
+            .lowercased()
+            .filter { $0.isLetter || $0.isNumber }
+
+        // Verification outcomes, checked before the rules below because the
+        // substring `cvv` catches them. These carry a result code, never a
+        // cardholder value: `cvvresponse` is `M`, `N` or `P`, and its text is the
+        // sentence that goes with it. They are also the only fields that say why a
+        // transaction was declined, so redacting them left a diagnostics log that
+        // reported a failure and withheld its reason.
+        //
+        // A response only, because they are the gateway's answer. `additionalData`
+        // takes any key a caller puts in it, so on a request these names are a
+        // submitted value wearing the answer's name.
+        if phase == .response, verificationResultKeys.contains(normalized) {
+            return false
+        }
+
+        if sensitiveExactKeys.contains(normalized) {
+            return true
+        }
+
+        return normalized.contains("secret") ||
+            normalized.contains("token") ||
+            normalized.contains("password") ||
+            normalized.contains("account") ||
+            normalized.contains("routing") ||
+            normalized.contains("cardnumber") ||
+            normalized.contains("cvv") ||
+            normalized.contains("email") ||
+            normalized.contains("phone") ||
+            normalized.contains("address")
+    }
+}
+
+extension PayabliPayInDiagnostics {
+    private static func diagnosticMessage(for error: Error) -> String {
+        let message: String = if let payabliError = error as? any PayabliError {
+            if let detail = payabliError.detail?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty, detail != payabliError.reason {
+                "\(payabliError.reason) \(detail)"
+            } else {
+                payabliError.reason
+            }
+        } else {
+            String(describing: error)
+        }
+        return PayabliPayInSensitiveDataRedactor.redact(message)
+    }
+}

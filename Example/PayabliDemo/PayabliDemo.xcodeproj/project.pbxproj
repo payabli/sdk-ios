@@ -7,6 +7,13 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		5DC00000000000000000D042 /* PayInSharedConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000000000000000000004 /* PayInSharedConfiguration.swift */; };
+		5DC00000000000000000D043 /* PayabliDemoColors.swift in Sources */ = {isa = PBXBuildFile; fileRef = D20000000000000000000021 /* PayabliDemoColors.swift */; };
+		5DC00000000000000000D032 /* FormCustomizationUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DC00000000000000000D031 /* FormCustomizationUITests.swift */; };
+		5DC00000000000000000D002 /* PayInFormCustomization.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DC00000000000000000D001 /* PayInFormCustomization.swift */; };
+		5DC00000000000000000D003 /* PayInFormCustomization.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DC00000000000000000D001 /* PayInFormCustomization.swift */; };
+		5DC00000000000000000D012 /* SimpleCaptureView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DC00000000000000000D011 /* SimpleCaptureView.swift */; };
+		5DC00000000000000000D022 /* PayInFormCustomizationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DC00000000000000000D021 /* PayInFormCustomizationTests.swift */; };
 		5DC00000000000000000C503 /* PayInOperation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DC00000000000000000C501 /* PayInOperation.swift */; };
 		5DC00000000000000000C502 /* PayInOperation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DC00000000000000000C501 /* PayInOperation.swift */; };
 		5DC00000000000000000C402 /* LoggableError.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F600000000BB51 /* LoggableError.swift */; };
@@ -49,6 +56,9 @@
 		A1B2C3D4E5F600000000BB62 /* KeyboardDismissalUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F600000000BB61 /* KeyboardDismissalUITests.swift */; };
 		A1B2C3D4E5F600000000AA02 /* DemoCustomerSetting.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F600000000AA01 /* DemoCustomerSetting.swift */; };
 		A1B2C3D4E5F600000000AB12 /* QAAmount.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F600000000AB11 /* QAAmount.swift */; };
+		5DC0000000000000000E0002 /* AmountEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DC0000000000000000E0001 /* AmountEntry.swift */; };
+		5DC0000000000000000E0003 /* AmountEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DC0000000000000000E0001 /* AmountEntry.swift */; };
+		5DC0000000000000000E0012 /* AmountEntryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DC0000000000000000E0011 /* AmountEntryTests.swift */; };
 		A1B2C3D4E5F600000000AB02 /* QAIdentity.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F600000000AB01 /* QAIdentity.swift */; };
 		A1B2C3D4E5F600000000BB02 /* TokenServerHealth.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F600000000BB01 /* TokenServerHealth.swift */; };
 		A1B2C3D4E5F600000000BB03 /* TokenServerHealth.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F600000000BB01 /* TokenServerHealth.swift */; };
@@ -62,7 +72,7 @@
 		0F5E8CC7E7A24D19A71B0A1C /* PaymentMethodAddedView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F5E8CC6E7A24D19A71B0A1C /* PaymentMethodAddedView.swift */; };
 		1C7A9E9B6D2F4C0F8A1B3D5E /* PaymentCaptureQAView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B1E0F9A8C7D6E5F4A3B2C1D /* PaymentCaptureQAView.swift */; };
 		3F9C8D7E6A5B4C3D2E1F0A9B /* PayabliSDKTapToPay in Frameworks */ = {isa = PBXBuildFile; productRef = 4A0D9E8F7B6C5D4E3F2A1B0C /* PayabliSDKTapToPay */; };
-		E31640000000000000000003 /* PayabliSDKPayInPaymentFlow in Frameworks */ = {isa = PBXBuildFile; productRef = E31640000000000000000000 /* PayabliSDKPayInPaymentFlow */; };
+		E31640000000000000000003 /* PayabliSDKPayIn in Frameworks */ = {isa = PBXBuildFile; productRef = E31640000000000000000000 /* PayabliSDKPayIn */; };
 		60EDCF1CBB535529F6138573 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F201F43C477597B328446F93 /* Foundation.framework */; };
 		A1B2C3D4E5F60000000000A2 /* PaymentTapToPayQAView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60000000000A1 /* PaymentTapToPayQAView.swift */; };
 		A1B2C3D4E5F60000000000B2 /* TapToPayPreflight.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60000000000B1 /* TapToPayPreflight.swift */; };
@@ -81,7 +91,7 @@
 		E1D2C3B4A5960718293A4B01 /* DebugPrefill.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1D2C3B4A5960718293A4B02 /* DebugPrefill.swift */; };
 		E1D2C3B4A5960718293A4B03 /* DebugPrefill.json in Resources */ = {isa = PBXBuildFile; fileRef = E1D2C3B4A5960718293A4B04 /* DebugPrefill.json */; };
 		F10000000000000000000030 /* PayabliSDKTapToPay in Embed Frameworks */ = {isa = PBXBuildFile; productRef = 4A0D9E8F7B6C5D4E3F2A1B0C /* PayabliSDKTapToPay */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
-		E31640000000000000000004 /* PayabliSDKPayInPaymentFlow in Embed Frameworks */ = {isa = PBXBuildFile; productRef = E31640000000000000000000 /* PayabliSDKPayInPaymentFlow */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		E31640000000000000000004 /* PayabliSDKPayIn in Embed Frameworks */ = {isa = PBXBuildFile; productRef = E31640000000000000000000 /* PayabliSDKPayIn */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		F20000000000000000000002 /* StepStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000001 /* StepStatus.swift */; };
 		F20000000000000000000004 /* TapToPaySteps.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000003 /* TapToPaySteps.swift */; };
 		F20000000000000000000006 /* PayInSteps.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000005 /* PayInSteps.swift */; };
@@ -92,16 +102,16 @@
 		F20000000000000000000024 /* TapToPayStepsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000023 /* TapToPayStepsTests.swift */; };
 		F20000000000000000000026 /* PayInStepsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000025 /* PayInStepsTests.swift */; };
 		F40000000000000000000040 /* PayabliSDKTapToPay in Frameworks */ = {isa = PBXBuildFile; productRef = F40000000000000000000041 /* PayabliSDKTapToPay */; };
-		E31640000000000000000007 /* PayabliSDKPayInPaymentFlow in Frameworks */ = {isa = PBXBuildFile; productRef = E31640000000000000000002 /* PayabliSDKPayInPaymentFlow */; };
+		E31640000000000000000007 /* PayabliSDKPayIn in Frameworks */ = {isa = PBXBuildFile; productRef = E31640000000000000000002 /* PayabliSDKPayIn */; };
 		F40000000000000000000022 /* KeychainOnDeviceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F40000000000000000000021 /* KeychainOnDeviceTests.swift */; };
 		F40000000000000000000024 /* InstallIdentifierOnDeviceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F40000000000000000000023 /* InstallIdentifierOnDeviceTests.swift */; };
 		F40000000000000000000026 /* LiveEnvironment.swift in Sources */ = {isa = PBXBuildFile; fileRef = F40000000000000000000025 /* LiveEnvironment.swift */; };
 		F40000000000000000000028 /* TapToPayOnDeviceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F40000000000000000000027 /* TapToPayOnDeviceTests.swift */; };
 		F4000000000000000000002A /* CardNotPresentOnDeviceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F40000000000000000000029 /* CardNotPresentOnDeviceTests.swift */; };
 		F20000000000000000000040 /* PayabliSDKTapToPay in Frameworks */ = {isa = PBXBuildFile; productRef = F20000000000000000000041 /* PayabliSDKTapToPay */; };
-		E31640000000000000000005 /* PayabliSDKPayInPaymentFlow in Frameworks */ = {isa = PBXBuildFile; productRef = E31640000000000000000001 /* PayabliSDKPayInPaymentFlow */; };
+		E31640000000000000000005 /* PayabliSDKPayIn in Frameworks */ = {isa = PBXBuildFile; productRef = E31640000000000000000001 /* PayabliSDKPayIn */; };
 		F20000000000000000000042 /* PayabliSDKTapToPay in Embed Frameworks */ = {isa = PBXBuildFile; productRef = F20000000000000000000041 /* PayabliSDKTapToPay */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
-		E31640000000000000000006 /* PayabliSDKPayInPaymentFlow in Embed Frameworks */ = {isa = PBXBuildFile; productRef = E31640000000000000000001 /* PayabliSDKPayInPaymentFlow */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		E31640000000000000000006 /* PayabliSDKPayIn in Embed Frameworks */ = {isa = PBXBuildFile; productRef = E31640000000000000000001 /* PayabliSDKPayIn */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -112,7 +122,7 @@
 			dstSubfolderSpec = 10;
 			files = (
 				F20000000000000000000042 /* PayabliSDKTapToPay in Embed Frameworks */,
-				E31640000000000000000006 /* PayabliSDKPayInPaymentFlow in Embed Frameworks */,
+				E31640000000000000000006 /* PayabliSDKPayIn in Embed Frameworks */,
 			);
 			name = "Embed Frameworks";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -124,7 +134,7 @@
 			dstSubfolderSpec = 10;
 			files = (
 				F10000000000000000000030 /* PayabliSDKTapToPay in Embed Frameworks */,
-				E31640000000000000000004 /* PayabliSDKPayInPaymentFlow in Embed Frameworks */,
+				E31640000000000000000004 /* PayabliSDKPayIn in Embed Frameworks */,
 			);
 			name = "Embed Frameworks";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -132,6 +142,10 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		5DC00000000000000000D031 /* FormCustomizationUITests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FormCustomizationUITests.swift; sourceTree = "<group>"; };
+		5DC00000000000000000D001 /* PayInFormCustomization.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PayInFormCustomization.swift; sourceTree = "<group>"; };
+		5DC00000000000000000D011 /* SimpleCaptureView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SimpleCaptureView.swift; sourceTree = "<group>"; };
+		5DC00000000000000000D021 /* PayInFormCustomizationTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PayInFormCustomizationTests.swift; sourceTree = "<group>"; };
 		5DC00000000000000000C501 /* PayInOperation.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PayInOperation.swift; sourceTree = "<group>"; };
 		5DC00000000000000000C301 /* PayInFailureTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PayInFailureTests.swift; sourceTree = "<group>"; };
 		5DC00000000000000000C3B3 /* PayInReversalStateTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PayInReversalStateTests.swift; sourceTree = "<group>"; };
@@ -164,6 +178,8 @@
 		F30000000000000000000050 /* PayabliDemoUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PayabliDemoUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		A1B2C3D4E5F600000000AA01 /* DemoCustomerSetting.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DemoCustomerSetting.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F600000000AB11 /* QAAmount.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = QAAmount.swift; sourceTree = "<group>"; };
+		5DC0000000000000000E0001 /* AmountEntry.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AmountEntry.swift; sourceTree = "<group>"; };
+		5DC0000000000000000E0011 /* AmountEntryTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AmountEntryTests.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F600000000AB01 /* QAIdentity.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = QAIdentity.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F60000000000F4 /* TokenProbeResultsTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TokenProbeResultsTests.swift; sourceTree = "<group>"; };
 		0F5E8CC6E7A24D19A71B0A1C /* PaymentMethodAddedView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PaymentMethodAddedView.swift; sourceTree = "<group>"; };
@@ -221,7 +237,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				F20000000000000000000040 /* PayabliSDKTapToPay in Frameworks */,
-				E31640000000000000000005 /* PayabliSDKPayInPaymentFlow in Frameworks */,
+				E31640000000000000000005 /* PayabliSDKPayIn in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -231,7 +247,7 @@
 			files = (
 				60EDCF1CBB535529F6138573 /* Foundation.framework in Frameworks */,
 				3F9C8D7E6A5B4C3D2E1F0A9B /* PayabliSDKTapToPay in Frameworks */,
-				E31640000000000000000003 /* PayabliSDKPayInPaymentFlow in Frameworks */,
+				E31640000000000000000003 /* PayabliSDKPayIn in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -328,6 +344,7 @@
 				5DC00000000000000000B601 /* PayInSessions.swift */,
 				5DC00000000000000000B501 /* PayInRequests.swift */,
 				5DC00000000000000000B401 /* PayInForms.swift */,
+				5DC00000000000000000D001 /* PayInFormCustomization.swift */,
 				5DC00000000000000000B301 /* PaymentFormHost.swift */,
 				5DC00000000000000000B201 /* PayInFlowHandle.swift */,
 				5DC00000000000000000C3B1 /* PayInReversalState.swift */,
@@ -367,6 +384,7 @@
 				BB9C96115FF840C6491AED9C /* PaymentMethodQAView.swift */,
 				5B1E0F9A8C7D6E5F4A3B2C1D /* PaymentCaptureQAView.swift */,
 				0F5E8CC6E7A24D19A71B0A1C /* PaymentMethodAddedView.swift */,
+				5DC00000000000000000D011 /* SimpleCaptureView.swift */,
 			);
 			path = PayIn;
 			sourceTree = "<group>";
@@ -430,6 +448,7 @@
 				A1B2C3D4E5F60000000000F1 /* TokenProbeResults.swift */,
 				A1B2C3D4E5F600000000AA01 /* DemoCustomerSetting.swift */,
 				A1B2C3D4E5F600000000AB11 /* QAAmount.swift */,
+				5DC0000000000000000E0001 /* AmountEntry.swift */,
 				A1B2C3D4E5F600000000AB01 /* QAIdentity.swift */,
 			);
 			path = Shared;
@@ -462,6 +481,7 @@
 			children = (
 				F30000000000000000000021 /* QAWalkthroughUITests.swift */,
 				A1B2C3D4E5F600000000BB61 /* KeyboardDismissalUITests.swift */,
+				5DC00000000000000000D031 /* FormCustomizationUITests.swift */,
 			);
 			path = UITests;
 			sourceTree = "<group>";
@@ -481,7 +501,9 @@
 				A1B2C3D4E5F600000000BB11 /* TokenServerHealthTests.swift */,
 				A1B2C3D4E5F600000000BB41 /* EntryPointLookupTests.swift */,
 				A1B2C3D4E5F600000000AC11 /* QAAmountTests.swift */,
+				5DC0000000000000000E0011 /* AmountEntryTests.swift */,
 				A1B2C3D4E5F600000000AC01 /* QAIdentityTests.swift */,
+				5DC00000000000000000D021 /* PayInFormCustomizationTests.swift */,
 			);
 			path = FlowTests;
 			sourceTree = "<group>";
@@ -532,7 +554,7 @@
 			name = PayabliDemoDeviceTests;
 			packageProductDependencies = (
 				F40000000000000000000041 /* PayabliSDKTapToPay */,
-				E31640000000000000000002 /* PayabliSDKPayInPaymentFlow */,
+				E31640000000000000000002 /* PayabliSDKPayIn */,
 			);
 			productName = PayabliDemoDeviceTests;
 			productReference = F40000000000000000000050 /* PayabliDemoDeviceTests.xctest */;
@@ -570,7 +592,7 @@
 			name = PayabliDemoFlowTests;
 			packageProductDependencies = (
 				F20000000000000000000041 /* PayabliSDKTapToPay */,
-				E31640000000000000000001 /* PayabliSDKPayInPaymentFlow */,
+				E31640000000000000000001 /* PayabliSDKPayIn */,
 			);
 			productName = PayabliDemoFlowTests;
 			productReference = F20000000000000000000050 /* PayabliDemoFlowTests.xctest */;
@@ -593,7 +615,7 @@
 			name = PayabliDemo;
 			packageProductDependencies = (
 				4A0D9E8F7B6C5D4E3F2A1B0C /* PayabliSDKTapToPay */,
-				E31640000000000000000000 /* PayabliSDKPayInPaymentFlow */,
+				E31640000000000000000000 /* PayabliSDKPayIn */,
 			);
 			productName = PayabliDemo;
 			productReference = F427A5EA0CEF029F22AF2170 /* PayabliDemo.app */;
@@ -682,7 +704,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				F40000000000000000000040 /* PayabliSDKTapToPay in Frameworks */,
-				E31640000000000000000007 /* PayabliSDKPayInPaymentFlow in Frameworks */,
+				E31640000000000000000007 /* PayabliSDKPayIn in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -692,6 +714,7 @@
 			files = (
 				F30000000000000000000022 /* QAWalkthroughUITests.swift in Sources */,
 				A1B2C3D4E5F600000000BB62 /* KeyboardDismissalUITests.swift in Sources */,
+				5DC00000000000000000D032 /* FormCustomizationUITests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -735,8 +758,14 @@
 				A1B2C3D4E5F600000000BB42 /* EntryPointLookupTests.swift in Sources */,
 				A1B2C3D4E5F600000000AC02 /* QAIdentityTests.swift in Sources */,
 				A1B2C3D4E5F600000000AC12 /* QAAmountTests.swift in Sources */,
+				5DC0000000000000000E0012 /* AmountEntryTests.swift in Sources */,
 				A1B2C3D4E5F600000000AD02 /* QAIdentity.swift in Sources */,
 				A1B2C3D4E5F600000000AD12 /* QAAmount.swift in Sources */,
+				5DC0000000000000000E0003 /* AmountEntry.swift in Sources */,
+				5DC00000000000000000D003 /* PayInFormCustomization.swift in Sources */,
+				5DC00000000000000000D042 /* PayInSharedConfiguration.swift in Sources */,
+				5DC00000000000000000D043 /* PayabliDemoColors.swift in Sources */,
+				5DC00000000000000000D022 /* PayInFormCustomizationTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -783,11 +812,14 @@
 				A1B2C3D4E5F600000000BB52 /* LoggableError.swift in Sources */,
 				A1B2C3D4E5F600000000AA02 /* DemoCustomerSetting.swift in Sources */,
 				A1B2C3D4E5F600000000AB12 /* QAAmount.swift in Sources */,
+				5DC0000000000000000E0002 /* AmountEntry.swift in Sources */,
 				A1B2C3D4E5F600000000AB02 /* QAIdentity.swift in Sources */,
 				0F5E8CC7E7A24D19A71B0A1C /* PaymentMethodAddedView.swift in Sources */,
 				C9B9D43650B2230A8582B93C /* Secrets.swift in Sources */,
 				E1D2C3B4A5960718293A4B01 /* DebugPrefill.swift in Sources */,
 				D20000000000000000000020 /* PayabliDemoColors.swift in Sources */,
+				5DC00000000000000000D002 /* PayInFormCustomization.swift in Sources */,
+				5DC00000000000000000D012 /* SimpleCaptureView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1195,30 +1227,30 @@
 			package = 9D53E7C2DDF2C3C9B8D4F07B /* XCLocalSwiftPackageReference "../.." */;
 			productName = PayabliSDKTapToPay;
 		};
-		E31640000000000000000002 /* PayabliSDKPayInPaymentFlow */ = {
+		E31640000000000000000002 /* PayabliSDKPayIn */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 9D53E7C2DDF2C3C9B8D4F07B /* XCLocalSwiftPackageReference "../.." */;
-			productName = PayabliSDKPayInPaymentFlow;
+			productName = PayabliSDKPayIn;
 		};
 		F20000000000000000000041 /* PayabliSDKTapToPay */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 9D53E7C2DDF2C3C9B8D4F07B /* XCLocalSwiftPackageReference "../.." */;
 			productName = PayabliSDKTapToPay;
 		};
-		E31640000000000000000001 /* PayabliSDKPayInPaymentFlow */ = {
+		E31640000000000000000001 /* PayabliSDKPayIn */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 9D53E7C2DDF2C3C9B8D4F07B /* XCLocalSwiftPackageReference "../.." */;
-			productName = PayabliSDKPayInPaymentFlow;
+			productName = PayabliSDKPayIn;
 		};
 		4A0D9E8F7B6C5D4E3F2A1B0C /* PayabliSDKTapToPay */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 9D53E7C2DDF2C3C9B8D4F07B /* XCLocalSwiftPackageReference "../.." */;
 			productName = PayabliSDKTapToPay;
 		};
-		E31640000000000000000000 /* PayabliSDKPayInPaymentFlow */ = {
+		E31640000000000000000000 /* PayabliSDKPayIn */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 9D53E7C2DDF2C3C9B8D4F07B /* XCLocalSwiftPackageReference "../.." */;
-			productName = PayabliSDKPayInPaymentFlow;
+			productName = PayabliSDKPayIn;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

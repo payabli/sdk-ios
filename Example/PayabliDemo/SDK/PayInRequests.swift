@@ -1,5 +1,5 @@
 import Foundation
-import PayabliSDKPayInPaymentFlow
+import PayabliSDKPayIn
 
 /// What this app asks the service for, for one capture attempt.
 enum PayInRequests {
@@ -21,18 +21,22 @@ enum PayInRequests {
     /// - Parameter suppliesCustomer: whether the request names the customer, which
     ///   the app's customer switch decides. A value the payer types wins over this
     ///   one; the form has no such box.
-    static func freshCapture(suppliesCustomer: Bool) -> PayabliPayInPaymentFlowRequestConfiguration {
+    static func freshCapture(
+        suppliesCustomer: Bool,
+        amount: Double = QAAmount.random(),
+        source: String = "ios-payment-capture-qa"
+    ) -> PayabliPayInRequestConfiguration {
         let identity = QAIdentity.current
-        return PayabliPayInPaymentFlowRequestConfiguration(
-            paymentDetails: PayabliPayInPaymentFlowPaymentDetails(
-                totalAmount: QAAmount.random(),
+        return PayabliPayInRequestConfiguration(
+            paymentDetails: PayabliPayInPaymentDetails(
+                totalAmount: amount,
                 serviceFee: 0.10,
                 currency: "USD"
             ),
             customerData: suppliesCustomer ? PayInDemoCustomer.customerData : nil,
             orderDescription: identity.note("capture"),
             orderId: identity.orderId(at: Date()),
-            source: "ios-payment-capture-qa",
+            source: source,
             idempotencyKey: UUID().uuidString,
             forceCustomerCreation: true
         )
@@ -46,13 +50,13 @@ enum PayInRequests {
     /// about to confirm, and a new key would make the next submit a second payment
     /// rather than a retry of this one.
     static func sameAttempt(
-        as current: PayabliPayInPaymentFlowRequestConfiguration,
-        customerData: PayabliPayInPaymentFlowCustomerData?,
+        as current: PayabliPayInRequestConfiguration,
+        customerData: PayabliPayInCustomerData?,
         idempotencyKey: String?
-    ) -> PayabliPayInPaymentFlowRequestConfiguration {
+    ) -> PayabliPayInRequestConfiguration {
         // Every field, not the ones this sample happens to set: anything omitted
         // here is silently reset the moment the switch moves.
-        PayabliPayInPaymentFlowRequestConfiguration(
+        PayabliPayInRequestConfiguration(
             paymentDetails: current.paymentDetails,
             accountId: current.accountId,
             customerData: customerData,
