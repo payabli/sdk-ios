@@ -227,7 +227,8 @@ From Objective-C, these errors arrive as `NSError`. See
 
 ### Events
 
-`events()` returns an `AsyncStream<PayabliTTPEvent>` for progress UI and logging. Each stream receives the
+`events()` returns an `AsyncStream<PayabliTTPEvent>` for progress UI. Don't log whole events:
+`.chargeInitiated` and others carry the transaction ID. Each stream receives the
 events emitted after it opens, and nothing emitted before. Open it before you call `initialize()` or
 `charge`, and read it in its own task, since the `for await` loop runs until the stream ends:
 
