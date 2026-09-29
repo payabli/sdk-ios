@@ -411,7 +411,8 @@ final class PayabliPayInTests: XCTestCase {
             .cardExpiration,
             .cardholderName,
             .cardCvv,
-            .cardZip
+            .cardZip,
+            .surchargeFee
         ])
     }
 

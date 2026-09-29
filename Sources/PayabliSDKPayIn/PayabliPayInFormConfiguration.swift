@@ -425,7 +425,7 @@ public struct PayabliPayInFormConfiguration: Sendable {
     ]
 
     private static let requiredPaymentFields: Set<PayabliPayInField> = [.amount]
-    private static let paymentDetailFields: [PayabliPayInField] = [.amount, .serviceFee]
+    private static let paymentDetailFields: [PayabliPayInField] = [.amount, .serviceFee, .surchargeFee]
 
     private static func defaultCardSections(
         cardFieldOrder: [PayabliPayInField]
