@@ -149,8 +149,9 @@ print("Charged:", result.paymentTransId)
 
 ## Outcomes and errors
 
-A cancelled task is rethrown as `CancellationError` and carries no transaction ID. Cancelling after the card
-was presented doesn't mean nothing was charged: find the transaction before charging again.
+Cancelling the task running `charge` after the transaction has opened doesn't end it silently: it throws
+`nfcFailed` or `updateFailed`, carrying `paymentTransId` and `capture`. Follow `capture` as for any other
+error.
 
 Every `PayabliTTPError` carries `capture` and `paymentTransId`:
 
