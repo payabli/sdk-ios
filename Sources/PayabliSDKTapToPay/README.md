@@ -39,7 +39,9 @@ The call needs the `pos_create` permission. An API token in the `requestToken` h
 the bearer token. `friendlyName` is optional. Calling it again with the same
 values is safe. Register each bundle ID you ship, including debug and white-label builds.
 
-An app that isn't on the allowlist is refused when the device attests, and `initialize()` fails.
+An app that isn't on the allowlist is refused when the device attests. `initialize()` throws a
+`PayabliGenericError` whose `code` is `.permissionDenied`, and `sessionState` is `.pendingActivation`, the
+same state as a phone that needs a code.
 
 ## Create the Tap to Pay session
 
@@ -79,6 +81,8 @@ A phone takes Tap to Pay payments for a paypoint only after it is activated with
 
 - Activation is **per phone and per paypoint**. It isn't per user.
 - A reinstall, a restore to a new phone, or a new phone needs a new code.
+
+The allowlist miss above lands in the same state, so check the allowlist before issuing a code.
 
 Until then, `initialize()` throws `PayabliTTPError.devicePendingActivation`, and `sessionState` is
 `.pendingActivation`.
@@ -165,7 +169,7 @@ Every `PayabliTTPError` carries `capture` and `paymentTransId`:
 | `nfcFailed(reason:paymentTransId:)` | The card read failed, for example the card moved away too soon. |
 | `updateFailed(reason:paymentTransId:capture:)` | The step after the card read failed. `capture` says whether the card was charged. |
 | `initiateFailed(reason:)` | The transaction couldn't be opened. Nothing was charged. |
-| `attestationFailed(reason:)`, `attestationRevoked(reason:)` | The device couldn't prove its identity. Check the allowlist and the entitlements. |
+| `attestationFailed(reason:)`, `attestationRevoked(reason:)` | The device couldn't prove its identity. Check the entitlements. |
 | `configFailed(reason:)` | Fetching the device's configuration failed. `reason` says why: a setup gap on the paypoint or device, or a token, network or service failure. |
 | `readerSetupFailed(reason:paymentTransId:)` | The reader couldn't be prepared. |
 | `readerOSVersionNotSupported(paymentTransId:capture:)` | The iOS version doesn't support Tap to Pay. |
@@ -186,7 +190,7 @@ for example `PayabliGenericError` or `PayabliPaymentError`. Catch `any PayabliEr
 | `.idle` | Not started, or activated and waiting for `initialize()`. |
 | `.attestingDevice`, `.fetchingConfig`, `.initializingReader(percent:)` | `initialize()` is running. |
 | `.ready` | Ready to charge. |
-| `.pendingActivation` | The phone needs an activation code. |
+| `.pendingActivation` | The phone needs an activation code, or the app isn't on the paypoint's allowlist. |
 | `.pendingTerms` | The merchant hasn't accepted Apple's terms. |
 | `.sessionExpired` | The session needs refreshing. The next `charge` refreshes it. |
 | `.reinitializing` | The session is being refreshed. |
@@ -195,7 +199,7 @@ for example `PayabliGenericError` or `PayabliPaymentError`. Catch `any PayabliEr
 | `failureReason` | What to do |
 |---|---|
 | `.configurationRejected` | Fetching the configuration failed. Read the `configFailed` reason: a token, network or service failure can clear on retry, and a setup gap on the paypoint or device needs Payabli. |
-| `.attestationRequired` | The device's identity was refused. Check the allowlist and entitlements, then initialize again. |
+| `.attestationRequired` | The device's attestation was refused or revoked. Check the entitlements, then initialize again. |
 | `.serviceUnavailable` | The service or the reader wasn't available. Try again later. |
 | `.deviceIneligible` | This iPhone or iOS version can't take Tap to Pay payments. |
 | `.sdkInternalError` | Report it to Payabli. |
