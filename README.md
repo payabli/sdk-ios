@@ -9,8 +9,9 @@ The Payabli iOS SDK lets an iPhone app take payments through Payabli in two ways
   external reader. This is the `PayabliSDKTapToPay` module, documented in
   [`Sources/PayabliSDKTapToPay/README.md`](Sources/PayabliSDKTapToPay/README.md).
 
-Your app never holds a Payabli credential. It supplies a function that fetches a short-lived access
-token from your backend, and the SDK calls it when it needs one.
+Your app never holds your Payabli client ID or client secret. It supplies a function that fetches a
+short-lived access token from your backend, and the SDK calls it when it needs one. The SDK holds that
+token in memory while the session runs.
 
 ## Terms used in this guide
 
