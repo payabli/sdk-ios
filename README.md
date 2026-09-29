@@ -90,8 +90,9 @@ const app = express();
 const PAYABLI_URL = process.env.PAYABLI_URL ?? "https://api-sandbox.payabli.com/api";
 
 app.post("/payabli/token", async (req, res) => {
-  // Replace with your app's own authentication. Never return a token to an unauthenticated caller.
-  if (!req.headers.authorization) {
+  // authenticateUser is your app's own check of the caller's session. Never return a token without it.
+  const user = await authenticateUser(req);
+  if (!user) {
     return res.status(401).json({ error: "unauthenticated" });
   }
   const upstream = await fetch(`${PAYABLI_URL}/v2/token/serverside`, {
@@ -151,6 +152,8 @@ func fetchPayabliAccessToken() async throws -> String {
 
     var request = URLRequest(url: URL(string: "https://your-backend.example.com/payabli/token")!)
     request.httpMethod = "POST"
+    // Your app's own session credential, which your token endpoint verifies.
+    request.setValue("Bearer \(yourSessionToken)", forHTTPHeaderField: "Authorization")
     let (data, _) = try await URLSession.shared.data(for: request)
     return try JSONDecoder().decode(Response.self, from: data).accessToken
 }
