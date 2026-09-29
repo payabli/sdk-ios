@@ -162,7 +162,7 @@ can quote what was submitted. Log `(error as? any PayabliError)?.code` instead.
 
 | Method | What it does |
 |---|---|
-| `capture(_:)` | Charges a card, bank account or stored payment method |
+| `capture(_:)` | Charges a card, bank account, stored payment method, cloud device, check or cash |
 | `authorize(_:)` | Authorizes a card, a stored card or a cloud device |
 | `captureAuthorizedTransaction(_:)` | Captures an earlier authorization |
 | `voidTransaction(_:)` | Voids a transaction that hasn't settled |
