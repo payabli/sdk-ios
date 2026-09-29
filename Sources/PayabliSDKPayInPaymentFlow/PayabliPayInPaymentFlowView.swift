@@ -212,7 +212,7 @@ public struct PayabliPayInPaymentFlowView: View {
         .buttonStyle(.plain)
         .disabled(!viewModel.canSubmit || viewModel.isSubmitting)
         .accessibilityLabel(viewModel.isSubmitting ? "Submitting payment" : configuration.labels.submitButton)
-        .accessibilityHint(viewModel.canSubmit ? "Submits the payment." : "Complete required fields before submitting.")
+        .accessibilityHint(submitAccessibilityHint)
     }
 
     func fieldSection(_ section: PayabliPayInPaymentFlowFieldSection) -> some View {
@@ -859,6 +859,16 @@ extension PayabliPayInPaymentFlowView {
 
     func rejectedMessage(for field: PayabliPayInPaymentFlowField) -> String? {
         viewModel.rejectedFields.contains(field) ? "That was not accepted" : nil
+    }
+
+    var submitAccessibilityHint: String {
+        if viewModel.canSubmit {
+            return "Submits the payment."
+        }
+        if viewModel.hasMarkedFieldOnScreen {
+            return "Edit the fields that were not accepted before submitting."
+        }
+        return "Complete required fields before submitting."
     }
 
     var inputShape: RoundedRectangle {

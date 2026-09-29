@@ -234,8 +234,12 @@ final class PayabliPayInPaymentFlowViewModel: ObservableObject {
         selectedExpirationMonth != nil || selectedExpirationYear != nil
     }
 
+    var hasMarkedFieldOnScreen: Bool {
+        !rejectedFields.isDisjoint(with: activeFields)
+    }
+
     var canSubmit: Bool {
-        guard rejectedFields.isDisjoint(with: activeFields) else { return false }
+        guard !hasMarkedFieldOnScreen else { return false }
         switch effectiveSelectedMethod {
         case .card:
             return fieldHasRequiredValue(.cardholderName)
