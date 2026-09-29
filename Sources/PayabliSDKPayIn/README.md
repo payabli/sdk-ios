@@ -141,8 +141,9 @@ For a charge, the outcomes are the ones in the root README's
 | `PayabliPayInError.invalidInput`, `.submissionInProgress` | Not charged; refused before anything was sent | Fix the input, or wait for the running submission |
 | A core `PayabliError` whose `code` is `.tokenProviderFailed` | Not charged; your token provider failed | Fix the token provider |
 | `PayabliPayInError.submissionInterrupted` | Unknown | After `capture(_:)` or `authorize(_:)`, find the transaction by `orderId` in the Payabli portal. After `captureAuthorizedTransaction(_:)` or `voidTransaction(_:)`, look up the transaction ID you passed. Then decide whether to call again |
-| A core `PayabliError`, such as a validation failure, a refused credential or a rate limit | Not charged; the service's answer | Branch on its `code` |
+| A core `PayabliError`, such as a validation failure, a refused credential or a rate limit | On a charge, not charged; the service's answer | Branch on its `code` |
 | `PayabliPayInTokenStorageError` | The method wasn't saved | `invalidInput` was refused before sending; `saveFailed` is the service's answer |
+| A core `PayabliError` from `addCard`, `addBankAccount` or `addPaymentMethod` whose `code` is `.networkError`, `.serverError` or `.decodingError` | Unknown: the method may have been saved | Read the stored methods back before saving again |
 
 Show `error.localizedDescription` to the payer, since it names what the service rejected. Don't log it: it
 can quote what was submitted. Log `(error as? any PayabliError)?.code` instead.
