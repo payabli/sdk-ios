@@ -136,7 +136,7 @@ print("Charged:", result.paymentTransId)
 | Parameter | Type | Notes |
 |---|---|---|
 | `type` | `PayabliTTPPaymentType` | `.sale` is the only type accepted. |
-| `paymentDetails` | `PayabliTTPPaymentDetails` | `amount` is required. `serviceFee` defaults to `0`. Leave `currency` out to charge in the paypoint's currency. `paymentDescription` is optional. |
+| `paymentDetails` | `PayabliTTPPaymentDetails` | `amount`, the total charged, is required. `serviceFee` defaults to `0`. `serviceFee` is part of `amount`, not added to it: the card is charged `amount`. Leave `currency` out to charge in the paypoint's currency. `paymentDescription` is optional. |
 | `customer` | `PayabliTTPCustomerData` | Name the payer with at least one of `firstName`, `lastName`, `customerNumber` or `customerId`. A charge that names nobody can be refused. The other fields (email, phone, billing and shipping address) are optional, and blank values are ignored. |
 | `invoice` | `PayabliTTPInvoiceData` | Optional. `invoiceNumber`. |
 | `orderDescription` | `String?` | Optional. |
