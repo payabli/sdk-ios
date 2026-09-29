@@ -121,7 +121,9 @@ The sample app ships a complete token server in
 
 ## Configure the SDK
 
-Both modules take the same three values: your entry point, the environment, and a token provider.
+Both modules need your entry point, the environment and a token provider. `PayabliPayIn` takes them as a
+`PayabliConfig`, below. `PayabliTTP` takes them directly, with your app ID; see the
+[Tap to Pay guide](Sources/PayabliSDKTapToPay/README.md#create-the-tap-to-pay-session).
 
 ```swift
 import PayabliSDKCore
