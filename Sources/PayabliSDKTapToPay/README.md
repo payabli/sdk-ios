@@ -166,7 +166,7 @@ Every `PayabliTTPError` carries `capture` and `paymentTransId`:
 | `updateFailed(reason:paymentTransId:capture:)` | The step after the card read failed. `capture` says whether the card was charged. |
 | `initiateFailed(reason:)` | The transaction couldn't be opened. Nothing was charged. |
 | `attestationFailed(reason:)`, `attestationRevoked(reason:)` | The device couldn't prove its identity. Check the allowlist and the entitlements. |
-| `configFailed(reason:)` | The paypoint or device isn't set up for Tap to Pay. |
+| `configFailed(reason:)` | Fetching the device's configuration failed. `reason` says why: a setup gap on the paypoint or device, or a token, network or service failure. |
 | `readerSetupFailed(reason:paymentTransId:)` | The reader couldn't be prepared. |
 | `readerOSVersionNotSupported(paymentTransId:capture:)` | The iOS version doesn't support Tap to Pay. |
 | `invalidState(current:attempted:)`, `notReady(current:)`, `notInitialized` | The call was made in the wrong session state. |
@@ -194,7 +194,7 @@ for example `PayabliGenericError` or `PayabliPaymentError`. Catch `any PayabliEr
 
 | `failureReason` | What to do |
 |---|---|
-| `.configurationRejected` | The paypoint, the device or its setup is missing something. Retrying won't help; contact Payabli. |
+| `.configurationRejected` | Fetching the configuration failed. Read the `configFailed` reason: a token, network or service failure can clear on retry, and a setup gap on the paypoint or device needs Payabli. |
 | `.attestationRequired` | The device's identity was refused. Check the allowlist and entitlements, then initialize again. |
 | `.serviceUnavailable` | The service or the reader wasn't available. Try again later. |
 | `.deviceIneligible` | This iPhone or iOS version can't take Tap to Pay payments. |
