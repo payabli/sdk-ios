@@ -121,8 +121,10 @@ A phone takes Tap to Pay payments for a paypoint only after it is activated with
 - A reinstall, a restore to a new phone, or a new phone needs a new code.
 
 Until the phone is activated, `initialize()` throws `PayabliTTPError.devicePendingActivation` and
-`sessionState` is `.pendingActivation`. An app that isn't on the allowlist, or credentials without the Tap to
-Pay permissions, land in the same state, so check both before issuing a code.
+`sessionState` is `.pendingActivation`. An app that isn't on the allowlist, or credentials without `tools_init`
+or `pos_create`, land in the same state, so check both before issuing a code. Credentials without
+`inboundpayments_create` reach `.ready`, and `charge` then throws a core `PayabliError` whose `code` is
+`.permissionDenied`, before the card is read.
 
 1. Issue a code for the phone. In the Payabli portal, under **Device Management**, the waiting device's
    options include **Activate device**. The code is valid for 30 minutes, and asking again before it
@@ -214,7 +216,7 @@ From Objective-C, these errors arrive as `NSError`. See
 | `.idle` | Not started, or activated and waiting for `initialize()`. |
 | `.attestingDevice`, `.fetchingConfig`, `.initializingReader(percent:)` | `initialize()` is running. |
 | `.ready` | Ready to charge. |
-| `.pendingActivation` | The phone needs an activation code, the app isn't on the paypoint's allowlist, or the credentials lack a Tap to Pay permission. |
+| `.pendingActivation` | The phone needs an activation code, the app isn't on the paypoint's allowlist, or the credentials lack `tools_init` or `pos_create`. |
 | `.pendingTerms` | The merchant hasn't accepted Apple's terms. |
 | `.sessionExpired` | The session needs refreshing. The next `charge` refreshes it. |
 | `.reinitializing` | The session is being refreshed. |
