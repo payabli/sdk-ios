@@ -7,7 +7,6 @@ import UIKit
 public struct PayabliPayInView: View {
     @StateObject var viewModel: PayabliPayInViewModel
     @State var isExpirationPickerPresented = false
-    @State var announcedRejectedFields: Set<PayabliPayInField> = []
     @FocusState var focusedField: PayabliPayInField?
     @AccessibilityFocusState var isErrorAccessibilityFocused: Bool
     @Environment(\.payabliPayInStyle) var environmentStyle
@@ -101,14 +100,6 @@ public struct PayabliPayInView: View {
                 field: .cardNumber,
                 message: message
             )
-        }
-        .onChange(of: viewModel.rejectedFields) { fields in
-            // A new mark only; the rest were announced when they arrived.
-            let marked = fields.subtracting(announcedRejectedFields)
-            announcedRejectedFields = fields
-            for field in viewModel.activeFields where marked.contains(field) {
-                announceFieldError(field: field, message: rejectedMessage(for: field))
-            }
         }
     }
 
