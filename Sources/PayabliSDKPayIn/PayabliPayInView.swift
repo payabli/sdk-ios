@@ -851,6 +851,8 @@ extension PayabliPayInView {
             || viewModel.rejectedFields.contains(field)
     }
 
+    /// The mark's own text. A refusal announces nothing: the mark and the error chrome are what a
+    /// screen reader meets on navigation.
     func rejectedMessage(for field: PayabliPayInField) -> String? {
         viewModel.rejectedFields.contains(field) ? "That was not accepted" : nil
     }
