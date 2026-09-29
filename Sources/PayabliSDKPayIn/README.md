@@ -107,8 +107,8 @@ return its stored ID. The form does the same with `.storePaymentMethod`. To char
 
 ### Authorize, then capture
 
-`authorize(_:)` holds an amount on a card or stored card without charging it. The form authorizes a card
-only. `captureAuthorizedTransaction(_:)` captures that authorization later, and `voidTransaction(_:)`
+`authorize(_:)` holds an amount on a card, a stored card or a cloud device without charging it. The form
+authorizes a card only. `captureAuthorizedTransaction(_:)` captures that authorization later, and `voidTransaction(_:)`
 releases it or voids a transaction that hasn't settled.
 
 ### Retry safely
@@ -148,7 +148,7 @@ can quote what was submitted. Log `(error as? any PayabliError)?.code` instead.
 | Method | What it does |
 |---|---|
 | `capture(_:)` | Charges a card, bank account or stored payment method |
-| `authorize(_:)` | Authorizes a card or stored card |
+| `authorize(_:)` | Authorizes a card, a stored card or a cloud device |
 | `captureAuthorizedTransaction(_:)` | Captures an earlier authorization |
 | `voidTransaction(_:)` | Voids a transaction that hasn't settled |
 | `addCard(_:options:)`, `addBankAccount(_:options:)`, `addPaymentMethod(_:options:)` | Saves a payment method and returns its stored ID |
