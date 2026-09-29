@@ -337,8 +337,8 @@ Fill in `Secrets.swift`, then start the token server as its
 
 ## Privacy and data collection
 
-The SDK doesn't send error or usage reports to Payabli. `PayabliConfig` accepts `telemetryEnabled`, which
-no part of the SDK reads yet.
+The SDK sends no error or usage reports to Payabli. `PayabliConfig` accepts `telemetryEnabled`, which
+changes nothing.
 
 ## Versioning and support
 
