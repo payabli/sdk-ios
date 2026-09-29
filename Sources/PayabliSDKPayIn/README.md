@@ -201,9 +201,9 @@ for the text fields.
 
 - Touch targets of at least 44 points.
 - Accessible labels, including when the visible labels are hidden.
-- Secure accessibility values for the card number, CVV, account number and routing number.
+- Secure accessibility values for the card number and CVV, and for the account number while
+  `formatting.masksAccountNumber` is on, which is the default. The routing number isn't masked.
 - Announcements when card number validation changes.
-- Stable identifiers from `PayabliPayInAccessibility.fieldIdentifier(_:)`, for UI tests.
 - Dynamic Type, with paired fields stacked at accessibility sizes.
 
 ## Go live
