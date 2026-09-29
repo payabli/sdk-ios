@@ -45,7 +45,8 @@ let payIn = PayabliPayIn(
 )
 ```
 
-Capture and authorize need a `PayabliPayInRequestConfiguration`, here or on the direct call.
+A form that captures or authorizes needs this `PayabliPayInRequestConfiguration`. A direct call takes a
+`PayabliPayInRequest` instead.
 
 ## Take a payment
 
