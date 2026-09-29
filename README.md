@@ -124,17 +124,23 @@ app.post("/payabli/token", async (req, res) => {
   if (!mayTakePayments(user)) {
     return res.status(403).json({ error: "forbidden" });
   }
-  const upstream = await fetch(`${PAYABLI_URL}/v2/token/serverside`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      clientId: process.env.PAYABLI_CLIENT_ID,
-      clientSecret: process.env.PAYABLI_CLIENT_SECRET,
-    }),
-  });
-  const body = await upstream.json();
-  const accessToken = body.access_token ?? body.accessToken;
-  if (!upstream.ok || !accessToken) {
+  let accessToken;
+  try {
+    const upstream = await fetch(`${PAYABLI_URL}/v2/token/serverside`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        clientId: process.env.PAYABLI_CLIENT_ID,
+        clientSecret: process.env.PAYABLI_CLIENT_SECRET,
+      }),
+      signal: AbortSignal.timeout(10_000), // well inside the SDK's 30 seconds
+    });
+    const body = await upstream.json();
+    accessToken = upstream.ok ? (body.access_token ?? body.accessToken) : undefined;
+  } catch {
+    // A timeout, a network failure, or an answer that isn't JSON.
+  }
+  if (!accessToken) {
     return res.status(502).json({ error: "token exchange failed" });
   }
   res.json({ accessToken });
