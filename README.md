@@ -35,6 +35,8 @@ token from your backend, and the SDK calls it when it needs one.
    [OAuth authentication](https://docs.payabli.com/developers/oauth-authentication). Tap to Pay needs the
    `tools_init`, `pos_create` and `inboundpayments_create` permissions, listed in
    [Accept Tap to Pay payments](https://docs.payabli.com/guides/pay-in-developer-tap-to-pay#permissions).
+   Card-not-present needs permission to create transactions and to store payment methods; confirm the
+   permission names with your Payabli representative.
 3. **Build your token endpoint.** See [Build your token endpoint](#build-your-token-endpoint).
 4. **For Tap to Pay only:** request Apple's Tap to Pay entitlement and register your app on the
    paypoint's allowlist. See the
@@ -210,7 +212,7 @@ let result = try await payIn.capture(
     PayabliPayInRequest(
         paymentDetails: PayabliPayInPaymentDetails(totalAmount: 12.34),
         paymentMethod: .card(.init(data: PayabliPayInCardData(
-            cardNumber: "4111111111111111",
+            cardNumber: "4012000098765439",
             expiration: "12/30",
             cardholderName: "Jane Doe",
             cvv: "999",
@@ -233,9 +235,12 @@ Use Payabli's sandbox [test cards](https://docs.payabli.com/guides/test-accounts
 
 To charge a saved method, pass `.stored(.init(method: .card, storedMethodId: id))` as the payment method.
 
-More detail: [`Documentation/PayInOverview.md`](Documentation/PayInOverview.md),
-[`Documentation/PayInIntegrationGuide.md`](Documentation/PayInIntegrationGuide.md) and
-[Pay In Payment Flow](https://docs.payabli.com/guides/mobile-components-payin).
+A charge always sends an idempotency key. The SDK mints one per call when you don't set
+`PayabliPayInRequest.idempotencyKey`, so calling again without your own key is a second payment, not a
+retry. Set your own key, and send the same key to retry a charge whose outcome is unknown.
+
+More detail: [`Documentation/PayInOverview.md`](Documentation/PayInOverview.md) and
+[`Documentation/PayInIntegrationGuide.md`](Documentation/PayInIntegrationGuide.md).
 
 ## Tap to Pay payments
 
@@ -251,15 +256,19 @@ Every charge ends in one of three outcomes. Only one of them is safe to retry.
 | **Charged** | The call returns a result | `charge` returns a `TransactionResult` | No |
 | **Not charged** | `PayabliPayInError.transactionFailed`, for example a decline | an error whose `capture` is `.notCharged` | Yes |
 | **Unknown** | `PayabliPayInError.submissionInterrupted` | an error whose `capture` is `.unknown` | Not until you've checked |
+| **Charged, not confirmed** | — | an error whose `capture` is `.charged` | No. Reconcile the payment |
 
 When the outcome is unknown, look the transaction up from your backend with
 [`GET /api/MoneyIn/details/{transId}`](https://docs.payabli.com/developers/api-reference/moneyin/get-details-for-a-processed-transaction)
-before you charge again. Store the transaction ID with your order every time you get one.
+before you charge again. `PayabliPayInError.submissionInterrupted` carries no transaction ID: resend the
+same request with the same idempotency key, or find the transaction in the Payabli portal. When a Tap to Pay
+error carries no transaction ID, find the transaction in the portal. Store the transaction ID with your order every time you get one.
 
 ## Objective-C and cross-platform apps
 
-Every Swift `async` method has an `@objc` companion that takes a completion handler, and errors bridge to
-`NSError`. Wrappers for Flutter, .NET MAUI and React Native are in [`Bridges/`](Bridges/README.md), which
+`PayabliTTP` has an `@objc` companion, taking a completion handler, for every `async` method, and its errors
+bridge to `NSError`. On `PayabliPayIn`, the Objective-C surface covers construction, `addCard` and
+`addBankAccount`. Wrappers for Flutter, .NET MAUI and React Native are in [`Bridges/`](Bridges/README.md), which
 lists the status of each.
 
 ## Sample app

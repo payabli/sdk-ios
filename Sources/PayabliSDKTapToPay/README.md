@@ -35,7 +35,8 @@ curl -X POST "https://api-sandbox.payabli.com/api/v2/paypoint/{entryPoint}/apps"
   -d '{ "deviceOs": "ios", "appId": "TEAM123456.com.example.checkout", "friendlyName": "Checkout" }'
 ```
 
-The call needs the `pos_create` permission. `friendlyName` is optional. Calling it again with the same
+The call needs the `pos_create` permission. An API token in the `requestToken` header works in place of
+the bearer token. `friendlyName` is optional. Calling it again with the same
 values is safe. Register each bundle ID you ship, including debug and white-label builds.
 
 An app that isn't on the allowlist is refused when the device attests, and `initialize()` fails.
@@ -84,8 +85,10 @@ Until then, `initialize()` throws `PayabliTTPError.devicePendingActivation`, and
 
 1. Your backend requests a code with
    [Generate Tap to Pay activation code](https://docs.payabli.com/developers/api-reference/device/activation-challenge),
-   `POST /api/v2/device/taptopay/activate/challenge`. The code is valid for 30 minutes. Asking again
-   before it expires returns the same code.
+   `POST /api/v2/device/taptopay/activate/challenge`, which takes the entry point and the device's ID. The
+   code is valid for 30 minutes. Asking again before it expires returns the same code. The SDK doesn't
+   return the device's ID. A device waiting for activation, and its code, are shown in the Payabli portal
+   under **Devices**.
 2. Deliver the code to the person holding the phone, and have your app ask for it.
 3. Activate, then initialize again:
 
@@ -116,7 +119,8 @@ try await ttp.initialize()
 
 ## Charge
 
-When `isReady` is `true`:
+When `isReady` is `true`, or `sessionState` is `.sessionExpired`, which `charge` refreshes before it reads
+the card:
 
 ```swift
 let result = try await ttp.charge(
@@ -145,7 +149,7 @@ Every `PayabliTTPError` carries `capture` and `paymentTransId`:
 | `capture` | Meaning | What to do |
 |---|---|---|
 | `.notCharged` | The card wasn't charged. | You can retry. |
-| `.unknown` | The outcome isn't known. | Look up `paymentTransId` with [`GET /api/MoneyIn/details/{transId}`](https://docs.payabli.com/developers/api-reference/moneyin/get-details-for-a-processed-transaction) before charging again. |
+| `.unknown` | The outcome isn't known. | Look up `paymentTransId` with [`GET /api/MoneyIn/details/{transId}`](https://docs.payabli.com/developers/api-reference/moneyin/get-details-for-a-processed-transaction) before charging again. When there's no ID, find the transaction in the Payabli portal. |
 | `.charged` | The card was charged, but a later step failed. | Don't charge again. Reconcile the payment. |
 
 | Error | When |
@@ -179,7 +183,8 @@ Device attestation and opening a transaction can also throw `PayabliGenericError
 | `.ready` | Ready to charge. |
 | `.pendingActivation` | The phone needs an activation code. |
 | `.pendingTerms` | The merchant hasn't accepted Apple's terms. |
-| `.sessionExpired`, `.reinitializing` | The session is being refreshed. The next `charge` does this for you. |
+| `.sessionExpired` | The session needs refreshing. The next `charge` refreshes it. |
+| `.reinitializing` | The session is being refreshed. |
 | `.failed(reason:)` | The session stopped. `reason` says what to do. |
 
 | `failureReason` | What to do |
