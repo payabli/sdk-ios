@@ -143,7 +143,7 @@ app.post("/payabli/token", async (req, res) => {
   if (!accessToken) {
     return res.status(502).json({ error: "token exchange failed" });
   }
-  res.json({ accessToken });
+  res.set("Cache-Control", "no-store").json({ accessToken });
 });
 
 app.listen(process.env.PORT ?? 3000);
