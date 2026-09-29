@@ -276,7 +276,8 @@ retry.
 When the outcome is unknown, look the transaction up from your backend with
 [`GET /api/MoneyIn/details/{transId}`](https://docs.payabli.com/developers/api-reference/moneyin/get-details-for-a-processed-transaction)
 before you charge again. `PayabliPayInError.submissionInterrupted` carries no transaction ID, so set
-`orderId` on each request and find the transaction by it in the Payabli portal. When a Tap to Pay error
+`orderId` on each request and find the transaction by it in the Payabli portal. After
+`captureAuthorizedTransaction(_:)`, look up the transaction ID you passed. When a Tap to Pay error
 carries no transaction ID, find the transaction in the portal. Store the transaction ID with your order
 every time you get one.
 

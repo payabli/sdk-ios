@@ -140,7 +140,7 @@ For a charge, the outcomes are the ones in the root README's
 | `PayabliPayInError.transactionFailed`, for example a decline | Not charged | You can retry |
 | `PayabliPayInError.invalidInput`, `.submissionInProgress` | Not charged; refused before anything was sent | Fix the input, or wait for the running submission |
 | A core `PayabliError` whose `code` is `.tokenProviderFailed` | Not charged; your token provider failed | Fix the token provider |
-| `PayabliPayInError.submissionInterrupted` | Unknown | Find the transaction by `orderId` in the Payabli portal before charging again |
+| `PayabliPayInError.submissionInterrupted` | Unknown | After `capture(_:)` or `authorize(_:)`, find the transaction by `orderId` in the Payabli portal. After `captureAuthorizedTransaction(_:)` or `voidTransaction(_:)`, look up the transaction ID you passed. Then decide whether to call again |
 | A core `PayabliError`, such as a validation failure, a refused credential or a rate limit | Not charged; the service's answer | Branch on its `code` |
 | `PayabliPayInTokenStorageError` | The method wasn't saved | `invalidInput` was refused before sending; `saveFailed` is the service's answer |
 
