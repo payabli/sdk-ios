@@ -19,6 +19,20 @@ final class PaymentMethodFieldNamingTests: XCTestCase {
         XCTAssertEqual(spelledWithTheRail, [])
     }
 
+    func testTheMoneyFieldsTakeTheServiceWords() {
+        let moneyFields: [PayabliPayInField] = [.amount, .serviceFee, .surchargeFee]
+
+        XCTAssertEqual(moneyFields.map(\.rawValue), ["amount", "serviceFee", "surchargeFee"])
+    }
+
+    func testEveryFieldHasADefaultLabelAndTheSurchargeIsNamedForItsField() {
+        XCTAssertEqual(
+            Set(PayabliPayInLabels.defaultFieldLabels.keys),
+            Set(PayabliPayInField.allCases)
+        )
+        XCTAssertEqual(PayabliPayInLabels.defaultFieldLabels[.surchargeFee], "Surcharge")
+    }
+
     func testAccessibilityIdentifiersTakeTheFinalPrefix() {
         XCTAssertEqual(PayabliPayInAccessibility.fieldIdentifier(.accountHolder), "payabli.payIn.field.accountHolder")
         XCTAssertEqual(PayabliPayInAccessibility.expirationDoneIdentifier, "payabli.payIn.control.expirationDone")

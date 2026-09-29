@@ -126,7 +126,7 @@ final class PayabliPayInViewModel: ObservableObject {
 
         guard component.operation == .storePaymentMethod else { return fields }
         return fields.filter { field in
-            field != .amount && field != .serviceFee
+            field != .amount && field != .serviceFee && field != .surchargeFee
         }
     }
 
@@ -567,7 +567,7 @@ final class PayabliPayInViewModel: ObservableObject {
             return achFieldHasRequiredValue(field)
         case .methodDescription, .firstName, .lastName, .customerNumber, .billingEmail, .billingZip:
             return customerFieldHasRequiredValue(field)
-        case .amount, .serviceFee:
+        case .amount, .serviceFee, .surchargeFee:
             return paymentFieldHasRequiredValue(field)
         }
     }

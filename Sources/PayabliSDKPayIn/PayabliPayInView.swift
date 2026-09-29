@@ -153,13 +153,29 @@ public struct PayabliPayInView: View {
         case .bankAccount:
             configuration.bankSections
         }
-        guard viewModel.component.operation == .storePaymentMethod else {
-            return sections
-        }
         return sections.compactMap { section in
-            let fields = section.fields.filter { !isPaymentSummaryField($0) }
+            let fields = section.fields.filter(isDrawn)
             guard !fields.isEmpty else { return nil }
             return section.replacingFields(fields)
+        }
+    }
+
+    func isDrawn(_ field: PayabliPayInField) -> Bool {
+        if viewModel.component.operation == .storePaymentMethod, isPaymentSummaryField(field) {
+            return false
+        }
+        if field == .surchargeFee, surchargeFigureIsPresent == false {
+            return false
+        }
+        return true
+    }
+
+    private var surchargeFigureIsPresent: Bool {
+        switch component.requestConfiguration?.paymentDetails.surchargeFee {
+        case let .some(surcharge):
+            surcharge != 0
+        case .none:
+            false
         }
     }
 
@@ -262,7 +278,7 @@ public struct PayabliPayInView: View {
             achFieldView(field)
         case .methodDescription, .firstName, .lastName, .customerNumber, .billingEmail, .billingZip:
             customerFieldView(field)
-        case .amount, .serviceFee:
+        case .amount, .serviceFee, .surchargeFee:
             paymentFieldView(field)
         }
     }
@@ -368,7 +384,7 @@ public struct PayabliPayInView: View {
     @ViewBuilder
     func paymentFieldView(_ field: PayabliPayInField) -> some View {
         switch field {
-        case .amount, .serviceFee:
+        case .amount, .serviceFee, .surchargeFee:
             paymentSummaryRow(field)
         default:
             EmptyView()
@@ -770,7 +786,7 @@ extension PayabliPayInView {
     }
 
     func isPaymentSummaryField(_ field: PayabliPayInField) -> Bool {
-        field == .amount || field == .serviceFee
+        field == .amount || field == .serviceFee || field == .surchargeFee
     }
 
     func placeholder(

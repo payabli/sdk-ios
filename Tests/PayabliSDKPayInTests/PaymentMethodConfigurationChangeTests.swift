@@ -59,17 +59,48 @@ final class PaymentMethodConfigurationChangeTests: XCTestCase {
         XCTAssertEqual(textField(labelled: "Name on card", in: host)?.text, "Ada Lovelace")
     }
 
+    func testChangingTheBaseAmountSwitchAloneIsAConfigurationChange() {
+        let withBaseAmount = PayInPaymentFlowConfigurationChange(configuration(showsBaseAmount: true))
+        let withoutBaseAmount = PayInPaymentFlowConfigurationChange(configuration(showsBaseAmount: false))
+
+        XCTAssertNotEqual(withBaseAmount, withoutBaseAmount)
+    }
+
+    @MainActor
+    func testTheSheetHeaderMoveKeepsTheBaseAmountSwitch() {
+        let component = flowOnSession()
+        let content = PayabliPayInSheetContent(
+            isPresented: .constant(true),
+            component: component,
+            configuration: PayabliPayInFormConfiguration(
+                allowedMethods: [.card],
+                showsBaseAmount: false
+            ),
+            sheetConfiguration: PayabliPayInSheetConfiguration(movesFormHeaderToSheetHeader: true),
+            style: nil,
+            onCompleted: { _ in },
+            onError: { _ in }
+        )
+
+        XCTAssertFalse(
+            content.formConfiguration.showsBaseAmount,
+            "the sheet path rebuilds the form configuration, so the switch a host set must survive the rebuild"
+        )
+    }
+
     // MARK: - Fixtures
 
     private func configuration(
         allowedMethods: [PayabliPayInMethodType] = [.card],
-        amountLabel: String? = nil
+        amountLabel: String? = nil,
+        showsBaseAmount: Bool = true
     ) -> PayabliPayInFormConfiguration {
         PayabliPayInFormConfiguration(
             allowedMethods: allowedMethods,
             defaultMethod: .card,
             cardFieldOrder: [.amount] + PayabliPayInFormConfiguration.defaultCardFieldOrder,
-            paymentSummary: PayabliPayInPaymentSummaryConfiguration(amountLabelText: amountLabel)
+            paymentSummary: PayabliPayInPaymentSummaryConfiguration(amountLabelText: amountLabel),
+            showsBaseAmount: showsBaseAmount
         )
     }
 

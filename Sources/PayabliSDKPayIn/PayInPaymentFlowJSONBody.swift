@@ -78,7 +78,7 @@ enum PayInPaymentFlowJSONBody {
     }
 
     private static func isCurrencyField(_ key: String) -> Bool {
-        key == "totalAmount" || key == "serviceFee"
+        key == "totalAmount" || key == "serviceFee" || key == "surchargeFee"
     }
 
     private static func doubleValue(_ value: Any) -> Double? {
