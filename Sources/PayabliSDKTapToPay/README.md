@@ -6,14 +6,25 @@ external reader. Set up the package, your configuration and your token endpoint 
 
 ## Requirements
 
+### Your app
+
+- iOS 16.7 or later as the deployment target.
+- Apple's Tap to Pay entitlement and the App Attest environment entitlement, in
+  [Request Apple's entitlement](#request-apples-entitlement).
+
+### The phone
+
 - A physical iPhone XS or newer on iOS 16.7 or later, in a region where Apple supports Tap to Pay on
   iPhone. The simulator can't take a Tap to Pay payment.
+
+### Your account
+
 - A paypoint with Tap to Pay enabled. Ask your Payabli representative.
 - OAuth2 credentials with the `tools_init`, `pos_create` and `inboundpayments_create` permissions.
 
-## Before you write code
+## Before you start
 
-### 1. Request Apple's entitlement
+### Request Apple's entitlement
 
 Your app needs `com.apple.developer.proximity-reader.payment.acceptance`. Apple approves it on request,
 and approval takes weeks, so request it early. See
@@ -22,11 +33,11 @@ and approval takes weeks, so request it early. See
 Your app also needs `com.apple.developer.devicecheck.appattest-environment`: `development` for
 development builds and `production` for builds you distribute.
 
-### 2. Register your app on the paypoint's allowlist
+### Register your app on the allowlist
 
-The SDK identifies your app to Payabli by its **app ID**, your Apple Team ID and bundle ID joined by a
-dot: `<TEAM_ID>.<BUNDLE_ID>`, for example `TEAM123456.com.example.checkout`. Register it once per paypoint,
-from your backend:
+The allowlist entry for iOS is your app's **app ID**, your Apple Team ID and bundle ID joined by a dot:
+`<TEAM_ID>.<BUNDLE_ID>`, for example `TEAM123456.com.example.checkout`. Register it once per paypoint, from
+your backend:
 
 ```bash
 curl -X POST "https://api-sandbox.payabli.com/api/v2/paypoint/{entryPoint}/apps" \
@@ -35,9 +46,10 @@ curl -X POST "https://api-sandbox.payabli.com/api/v2/paypoint/{entryPoint}/apps"
   -d '{ "deviceOs": "ios", "appId": "TEAM123456.com.example.checkout", "friendlyName": "Checkout" }'
 ```
 
-The call needs the `pos_create` permission. An API token in the `requestToken` header works in place of
-the bearer token. `friendlyName` is optional. Calling it again with the same
-values is safe. Register each bundle ID you ship, including debug and white-label builds.
+- The call needs the `pos_create` permission. An API token in the `requestToken` header works in place of
+  the bearer token.
+- `friendlyName` is optional. Calling it again with the same values is safe.
+- Register each bundle ID you ship, including debug and white-label builds.
 
 An app that isn't on the allowlist is refused when the device attests. `initialize()` throws a
 `PayabliGenericError` whose `code` is `.permissionDenied`, and `sessionState` is `.pendingActivation`, the
@@ -57,8 +69,9 @@ let ttp = try PayabliTTP(
 )
 ```
 
-`PayabliTTP` builds its own session from these values. It is an `ObservableObject`: bind `sessionState`
-and `isReady` in SwiftUI.
+- `PayabliTTP` builds its own session from these values. It is an `ObservableObject`: bind `sessionState`
+  and `isReady` in SwiftUI.
+- **One paypoint per session.** A `PayabliTTP` serves the entry point it was created with.
 
 ## Initialize
 
@@ -75,34 +88,7 @@ do {
 `initialize()` attests the device, fetches its configuration and prepares the reader. The first run on a
 phone takes longer than later ones.
 
-## Activate a phone
-
-A phone takes Tap to Pay payments for a paypoint only after it is activated with a 6-digit code.
-
-- Activation is **per phone and per paypoint**. It isn't per user.
-- A reinstall, a restore to a new phone, or a new phone needs a new code.
-
-The allowlist miss above lands in the same state, so check the allowlist before issuing a code.
-
-Until then, `initialize()` throws `PayabliTTPError.devicePendingActivation`, and `sessionState` is
-`.pendingActivation`.
-
-1. Issue a code for the phone. In the Payabli portal, under **Device Management**, the waiting device's
-   options include **Activate device**. The code is valid for 30 minutes, and asking again before it expires
-   returns the same code. The API route,
-   [Generate Tap to Pay activation code](https://docs.payabli.com/developers/api-reference/device/activation-challenge),
-   takes the device's ID, which the SDK doesn't return, so issue codes from the portal.
-
-   The code is six digits and can start with zero, so keep it as a string.
-2. Deliver the code to the person holding the phone, and have your app ask for it.
-3. Activate, then initialize again:
-
-```swift
-try await ttp.activateDevice(activationCode: code)
-try await ttp.initialize()
-```
-
-## Accept Apple's terms
+### Accept Apple's terms
 
 A merchant accepts Apple's Tap to Pay terms **once per merchant**, not once per phone. Until they do,
 `initialize()` stops at `.pendingTerms`, emits `.termsRequired` and throws
@@ -121,6 +107,32 @@ try await ttp.initialize()
 - Ask each time instead of caching the answer. Acceptance can change outside your app.
 - `areTermsAccepted()` returns `false` when the merchant hasn't accepted, and throws
   `PayabliTTPError.readerSetupFailed` when the reader couldn't answer.
+
+## Activate a phone
+
+A phone takes Tap to Pay payments for a paypoint only after it is activated with a 6-digit code.
+
+- Activation is **per phone and per paypoint**. It isn't per user.
+- A reinstall, a restore to a new phone, or a new phone needs a new code.
+
+Until the phone is activated, `initialize()` throws `PayabliTTPError.devicePendingActivation` and
+`sessionState` is `.pendingActivation`. An app that isn't on the allowlist lands in the same state, so check
+the allowlist before issuing a code.
+
+1. Issue a code for the phone. In the Payabli portal, under **Device Management**, the waiting device's
+   options include **Activate device**. The code is valid for 30 minutes, and asking again before it
+   expires returns the same code. The API route,
+   [Generate Tap to Pay activation code](https://docs.payabli.com/developers/api-reference/device/activation-challenge),
+   takes the device's ID, which the SDK doesn't return, so issue codes from the portal.
+
+   The code is six digits and can start with zero, so keep it as a string.
+2. Deliver the code to the person holding the phone, and have your app ask for it.
+3. Activate, then initialize again:
+
+```swift
+try await ttp.activateDevice(activationCode: code)
+try await ttp.initialize()
+```
 
 ## Charge
 
@@ -182,7 +194,10 @@ Device attestation and opening a transaction can also throw a core `PayabliError
 for example `PayabliGenericError` or `PayabliPaymentError`. Catch `any PayabliError` and branch on its
 `code`; `.tokenProviderFailed` means your token provider failed.
 
-## Session states
+From Objective-C, these errors arrive as `NSError`. See
+[Language support](../../README.md#language-support) in the root README.
+
+## Session states and events
 
 `sessionState` is a `PayabliTTPSessionState`:
 
@@ -205,11 +220,11 @@ for example `PayabliGenericError` or `PayabliPaymentError`. Catch `any PayabliEr
 | `.deviceIneligible` | This iPhone or iOS version can't take Tap to Pay payments. |
 | `.sdkInternalError` | Report it to Payabli. |
 
-## Events
+### Events
 
 `events()` returns an `AsyncStream<PayabliTTPEvent>` for progress UI and logging. Each stream receives the
 events emitted after it opens, and nothing emitted before. Open it before you call `initialize()` or
-`charge`.
+`charge`, and read it in its own task, since the `for await` loop runs until the stream ends:
 
 ```swift
 let events = ttp.events()          // open the stream first
@@ -226,17 +241,8 @@ eventTask = Task {                  // keep the task, and cancel it when your sc
 try await ttp.initialize()
 ```
 
-The `for await` loop runs until the stream ends, so read it in its own task.
-
 `.chargeInitiated` carries the transaction ID before the card is read. Keep it, so you can reconcile a
 charge whose outcome is unknown. A stream opened after the charge started misses it.
-
-## Objective-C
-
-Every `async` method has an `@objc` companion. Construct with
-`initWithTokenHandler:entryPoint:appId:environment:error:`. Errors bridge to `NSError` in the
-`com.payabli.ttp` domain. `userInfo["capture"]` holds the `PayabliTTPCapture` raw value: `0` not charged,
-`1` unknown, `2` charged. `userInfo["paymentTransId"]` is absent when there is no transaction ID.
 
 ## Go live
 

@@ -2,18 +2,21 @@
 
 The Payabli iOS SDK lets an iPhone app take payments through Payabli in two ways:
 
-- **Card-not-present.** Your app collects card or bank account details, in the SDK's form or in your own
-  UI, and the SDK stores them as a payment method or charges them. This is the `PayabliSDKPayIn`
-  module.
+- **Card-not-present.** Your app collects card or bank account details, in the SDK's SwiftUI form or in
+  your own UI, and the SDK stores them as a payment method or charges them.
 - **Tap to Pay on iPhone.** The payer taps a contactless card, phone or watch on the iPhone, with no
-  external reader. This is the `PayabliSDKTapToPay` module, documented in
-  [`Sources/PayabliSDKTapToPay/README.md`](Sources/PayabliSDKTapToPay/README.md).
+  external reader.
 
 Your app never holds your Payabli client ID or client secret. It supplies a function that fetches a
 short-lived access token from your backend, and the SDK calls it when it needs one. The SDK holds that
 token in memory while the session runs.
 
-## Terms used in this guide
+[Payabli developer documentation](https://docs.payabli.com/guides/mobile-components-overview) ·
+[Tap to Pay guide](Sources/PayabliSDKTapToPay/README.md) · [Sample app](Example/PayabliDemo/)
+
+> **No version has been released yet.** See [Versioning and support](#versioning-and-support).
+
+## Key terms
 
 | Term | Meaning |
 |---|---|
@@ -22,35 +25,44 @@ token in memory while the session runs.
 | **Token endpoint** | A route on your own backend that exchanges your Payabli client ID and client secret for a short-lived access token and returns the token to your app. |
 | **Allowlist** | The list of apps a paypoint accepts Tap to Pay requests from. |
 
+## Modules
+
+| Product | Use it for | Guide |
+|---|---|---|
+| `PayabliSDKPayIn` | Card-not-present | [Card-not-present payments](#card-not-present-payments) |
+| `PayabliSDKTapToPay` | Tap to Pay | [`Sources/PayabliSDKTapToPay/README.md`](Sources/PayabliSDKTapToPay/README.md) |
+| `PayabliSDK` | Both | |
+
+Every product includes `PayabliSDKCore`, which holds the configuration types. Import it by name where you
+use them.
+
 ## Requirements
 
-- iOS 16.7 or later.
-- Xcode 15 or later and Swift 5.9 or later.
-- A physical iPhone XS or newer for Tap to Pay. Card-not-present runs in the simulator.
+| | Requirement |
+|---|---|
+| iOS | 16.7 or later |
+| Toolchain | Xcode 15 or later, Swift 5.9 or later |
+| Tap to Pay | A physical iPhone XS or newer. See [the Tap to Pay guide](Sources/PayabliSDKTapToPay/README.md#requirements). Card-not-present runs in the simulator |
 
-## Before you write code
+## Before you start
 
 1. **Get a sandbox paypoint.** Ask your Payabli representative for a sandbox entry point, with Tap to Pay
    enabled if you plan to use it.
 2. **Create OAuth2 credentials.** Provision a client ID and client secret for the sandbox. See
-   [OAuth authentication](https://docs.payabli.com/developers/oauth-authentication). Tap to Pay needs the
-   `tools_init`, `pos_create` and `inboundpayments_create` permissions, listed in
-   [Accept Tap to Pay payments](https://docs.payabli.com/guides/pay-in-developer-tap-to-pay#permissions).
-   Card-not-present needs `inboundpayments_create` to charge, authorize and capture, `inboundpayments_void`
-   to void, and `tokens_create` to store a payment method.
+   [OAuth authentication](https://docs.payabli.com/developers/oauth-authentication).
+   - Card-not-present needs `inboundpayments_create` to charge, authorize and capture,
+     `inboundpayments_void` to void, and `tokens_create` to store a payment method.
+   - Tap to Pay needs `tools_init`, `pos_create` and `inboundpayments_create`.
 3. **Build your token endpoint.** See [Build your token endpoint](#build-your-token-endpoint).
-4. **For Tap to Pay only:** request Apple's Tap to Pay entitlement and register your app on the
-   paypoint's allowlist. See the
-   [Tap to Pay guide](Sources/PayabliSDKTapToPay/README.md#before-you-write-code).
+4. **For Tap to Pay only:** request Apple's Tap to Pay entitlement, and register the app on the paypoint's
+   allowlist. See [the Tap to Pay guide](Sources/PayabliSDKTapToPay/README.md#before-you-start).
 
-## Install
+## Installation
 
-**No version of the SDK has been released yet.** The repository has no tags, so the only way to add the
-package today is from the `main` branch. Your build picks up whatever is on `main` when the package
-resolves. Pin a commit in `Package.resolved` if you need a fixed build.
+### Add the SDK
 
-In Xcode, choose **File > Add Package Dependencies**, enter the repository URL, and choose the `main`
-branch:
+No version is tagged, so add the package from the `main` branch. In Xcode, choose
+**File > Add Package Dependencies**, enter the repository URL, and choose the `main` branch:
 
 ```text
 https://github.com/payabli/sdk-ios.git
@@ -62,19 +74,17 @@ Or declare it in `Package.swift`:
 .package(url: "https://github.com/payabli/sdk-ios.git", branch: "main")
 ```
 
-Then link the products you need:
+Then link the products you need, from [Modules](#modules). Link `PayabliSDK` alone, or one or both of the
+capability products. Linking `PayabliSDK` together with a capability product fails to build.
 
-| Product | Link it for |
-|---|---|
-| `PayabliSDKPayIn` | Card-not-present |
-| `PayabliSDKTapToPay` | Tap to Pay |
-| `PayabliSDK` | Both |
+### Configure your app
 
-Link `PayabliSDK` alone, or one or both of the capability products. Linking `PayabliSDK` together with a
-capability product fails to build. Every product includes `PayabliSDKCore`, which holds the
-configuration types. Import it by name where you use them.
+Card-not-present needs no app configuration. Tap to Pay needs two entitlements, in
+[the Tap to Pay guide](Sources/PayabliSDKTapToPay/README.md#before-you-start).
 
-## Build your token endpoint
+## Get started
+
+### Build your token endpoint
 
 Your backend holds the client ID and client secret. It calls `POST /api/v2/token/serverside` with them
 and returns the access token to your app. The client secret never reaches the device.
@@ -114,17 +124,15 @@ app.post("/payabli/token", async (req, res) => {
 app.listen(process.env.PORT ?? 3000);
 ```
 
-Protect the route with the same authentication your app already uses. Anyone who can call it gets a
-token for your paypoint.
-
-The sample app ships a complete token server in
+Anyone who can call the route gets a token for your paypoint, so it has to authenticate the caller the way
+the rest of your app does. The sample app ships a complete token server in
 [`Example/PayabliDemo/LocalTokenServer`](Example/PayabliDemo/LocalTokenServer/README.md).
 
-## Configure the SDK
+### Configure the SDK
 
 Both modules need your entry point, the environment and a token provider. `PayabliPayIn` takes them as a
-`PayabliConfig`, below. `PayabliTTP` takes them directly, with your app ID; see the
-[Tap to Pay guide](Sources/PayabliSDKTapToPay/README.md#create-the-tap-to-pay-session).
+`PayabliConfig`, below. `PayabliTTP` takes them directly, with your app ID; see
+[the Tap to Pay guide](Sources/PayabliSDKTapToPay/README.md#create-the-tap-to-pay-session).
 
 ```swift
 import PayabliSDKCore
@@ -136,12 +144,12 @@ let config = try PayabliConfig(
 )
 ```
 
-`PayabliConfig` throws when the entry point is blank.
-
 | Environment | API host |
 |---|---|
 | `.sandbox` | `https://api-sandbox.payabli.com` |
 | `.production` | `https://api.payabli.com` |
+
+- `PayabliConfig` throws when the entry point is blank.
 
 The token provider is an `async throws` function that returns a new access token from your token
 endpoint:
@@ -182,17 +190,10 @@ let payIn = PayabliPayIn(
 )
 ```
 
-`operation` says what a form submission does:
-
-| Operation | What happens |
-|---|---|
-| `.storePaymentMethod` | Saves the card or bank account as a stored payment method. The default. |
-| `.capture` | Charges the payment method. |
-| `.authorize` | Authorizes a card without capturing it. |
-
 ### Use the SDK's form
 
-`PayabliPayInView` renders a card and bank account form and submits it with the operation you chose:
+`PayabliPayInView` renders a card and bank account form and submits it with the operation you chose.
+`operation` says what a submission does:
 
 ```swift
 import SwiftUI
@@ -210,6 +211,12 @@ struct CheckoutView: View {
     }
 }
 ```
+
+| Operation | What happens |
+|---|---|
+| `.storePaymentMethod` | Saves the card or bank account as a stored payment method. The default. |
+| `.capture` | Charges the payment method. |
+| `.authorize` | Authorizes a card without capturing it. |
 
 To show the form in a sheet, use `.payabliPayInSheet(isPresented:component:configuration:sheetConfiguration:style:onCompleted:onError:)`.
 `PayabliPayInFormConfiguration` chooses the payment methods and fields, and `PayabliPayInStyle` sets the
@@ -254,8 +261,27 @@ More detail: [`Documentation/PayInOverview.md`](Documentation/PayInOverview.md) 
 
 ## Tap to Pay payments
 
-See [`Sources/PayabliSDKTapToPay/README.md`](Sources/PayabliSDKTapToPay/README.md). It covers the Apple
-entitlement, the allowlist, device activation, Apple's terms, charging and errors.
+`PayabliTTP` builds its own session from your entry point and app ID. After the setup in
+[the Tap to Pay guide](Sources/PayabliSDKTapToPay/README.md), a payment takes three calls:
+
+```swift
+import PayabliSDKTapToPay
+
+let ttp = try PayabliTTP(
+    tokenProvider: { try await fetchPayabliAccessToken() },
+    entryPoint: "your-entry-point",
+    appId: "TEAM123456.com.example.checkout",
+    environment: .sandbox
+)
+try await ttp.initialize()
+let result = try await ttp.charge(
+    type: .sale,
+    paymentDetails: PayabliTTPPaymentDetails(amount: 9.99),
+    customer: PayabliTTPCustomerData(firstName: "Jane", lastName: "Doe")
+)
+```
+
+The guide covers the entitlements, the allowlist, activating a phone, Apple's terms, charging and errors.
 
 ## Outcomes
 
@@ -276,19 +302,26 @@ When the outcome is unknown, look the transaction up from your backend with
 [`GET /api/MoneyIn/details/{transId}`](https://docs.payabli.com/developers/api-reference/moneyin/get-details-for-a-processed-transaction)
 before you charge again. `PayabliPayInError.submissionInterrupted` carries no transaction ID, so set
 `orderId` on each request and find the transaction by it in the Payabli portal. When a Tap to Pay error
-carries no transaction ID, find the transaction in the portal. Store the transaction ID with your order every time you get one.
+carries no transaction ID, find the transaction in the portal. Store the transaction ID with your order
+every time you get one.
 
-## Objective-C and cross-platform apps
+## Language support
 
-`PayabliTTP` has an `@objc` companion, taking a completion handler, for every `async` method, and its errors
-bridge to `NSError`. For card-not-present, Objective-C uses `PayabliPayInObjC`, built with
-`initWithTokenHandler:entryPoint:environment:error:`, which offers `addCard` and `addBankAccount`. Wrappers for Flutter, .NET MAUI and React Native are in [`Bridges/`](Bridges/README.md), which
-lists the status of each.
+The SDK is written in Swift, and the card-not-present form is a SwiftUI view.
+
+- **Objective-C.** `PayabliTTP` has an `@objc` companion, taking a completion handler, for every `async`
+  method. Construct it with `initWithTokenHandler:entryPoint:appId:environment:error:`. Its errors bridge
+  to `NSError` in the `com.payabli.ttp` domain: `userInfo["capture"]` holds the `PayabliTTPCapture` raw
+  value (`0` not charged, `1` unknown, `2` charged), and `userInfo["paymentTransId"]` is absent when there
+  is no transaction ID. For card-not-present, Objective-C uses `PayabliPayInObjC`, built with
+  `initWithTokenHandler:entryPoint:environment:error:`, which offers `addCard` and `addBankAccount`.
+- **Flutter, .NET MAUI and React Native.** Wrappers are in [`Bridges/`](Bridges/README.md), which lists the
+  status of each.
 
 ## Sample app
 
-[`Example/PayabliDemo`](Example/PayabliDemo/) is a SwiftUI app that runs both card-not-present and Tap to
-Pay against your sandbox paypoint, with a bundled token server.
+[`Example/PayabliDemo`](Example/PayabliDemo/) is a SwiftUI app that runs card-not-present and Tap to Pay
+against your sandbox paypoint, with a bundled token server.
 
 ```bash
 git clone https://github.com/payabli/sdk-ios.git
@@ -299,6 +332,18 @@ cp App/Configuration/Secrets.swift.sample App/Configuration/Secrets.swift
 Fill in `Secrets.swift`, then start the token server as its
 [README](Example/PayabliDemo/LocalTokenServer/README.md) describes.
 
+## Privacy and data collection
+
+The SDK doesn't send error or usage reports to Payabli. `PayabliConfig` accepts `telemetryEnabled`, which
+no part of the SDK reads yet.
+
+## Versioning and support
+
+No version of the SDK has been released, and the repository has no tags. Until one is, add the package
+from `main` as [Installation](#installation) describes. `main` changes without notice, so your build picks
+up whatever is on `main` when the package resolves. Pin a commit in `Package.resolved` if you need a fixed
+build. This section gives the version to depend on once a release exists.
+
 ## Support
 
 - Payabli developer documentation: <https://docs.payabli.com/guides/mobile-components-overview>
@@ -307,4 +352,4 @@ Fill in `Secrets.swift`, then start the token server as its
 ## License
 
 Commercial. See [LICENSE](LICENSE). The bundled card reader engine is MIT-licensed; attribution is in
-`THIRD_PARTY_LICENSES.txt`.
+[`THIRD_PARTY_LICENSES.txt`](THIRD_PARTY_LICENSES.txt).
