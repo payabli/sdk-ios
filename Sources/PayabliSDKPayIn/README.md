@@ -119,16 +119,27 @@ retry. Don't resend a charge whose outcome is unknown. Find the transaction firs
 
 ## Outcomes and errors
 
-The outcomes are the ones in the root README's [Handle the outcome](../../README.md#handle-the-outcome):
+A returned result means what the call did, which depends on the call:
+
+| Call | A result means | `transactionFailed` means |
+|---|---|---|
+| `capture(_:)` | The payment was charged | Not charged |
+| `authorize(_:)` | An amount is held. Nothing is charged until you capture it | No hold was placed |
+| `captureAuthorizedTransaction(_:)` | The held amount was charged | The hold wasn't captured |
+| `voidTransaction(_:)` | The transaction was voided | The void was refused. It doesn't mean the original payment wasn't charged |
+
+For a charge, the outcomes are the ones in the root README's
+[Handle the outcome](../../README.md#handle-the-outcome):
 
 | Result | Outcome | What to do |
 |---|---|---|
 | The call returns a `PayabliPayInResult` | Charged, or saved | Store the transaction ID or the stored method ID |
 | `PayabliPayInError.transactionFailed`, for example a decline | Not charged | You can retry |
-| `PayabliPayInError.invalidInput`, `.missingAccessToken`, `.submissionInProgress` | Not charged; refused before anything was sent | Fix the input, the token provider, or wait for the running submission |
+| `PayabliPayInError.invalidInput`, `.submissionInProgress` | Not charged; refused before anything was sent | Fix the input, or wait for the running submission |
+| A core `PayabliError` whose `code` is `.tokenProviderFailed` | Not charged; your token provider failed | Fix the token provider |
 | `PayabliPayInError.submissionInterrupted` | Unknown | Find the transaction by `orderId` in the Payabli portal before charging again |
 | A core `PayabliError`, such as a validation failure, a refused credential or a rate limit | Not charged; the service's answer | Branch on its `code` |
-| `PayabliPayInTokenStorageError` | The method wasn't saved | `invalidInput` and `missingAccessToken` were refused before sending; `saveFailed` is the service's answer |
+| `PayabliPayInTokenStorageError` | The method wasn't saved | `invalidInput` was refused before sending; `saveFailed` is the service's answer |
 
 Show `error.localizedDescription` to the payer, since it names what the service rejected. Don't log it: it
 can quote what was submitted. Log `(error as? any PayabliError)?.code` instead.
