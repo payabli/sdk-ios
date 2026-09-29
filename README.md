@@ -61,18 +61,21 @@ use them.
 
 ### Add the SDK
 
-No version is tagged, so add the package from the `main` branch. In Xcode, choose
-**File > Add Package Dependencies**, enter the repository URL, and choose the `main` branch:
+No version is tagged, so add the package by branch or by commit. In Xcode, choose
+**File > Add Package Dependencies** and enter the repository URL:
 
 ```text
 https://github.com/payabli/sdk-ios.git
 ```
 
-Or declare it in `Package.swift`:
+Or declare it in `Package.swift`, tracking `main` or pinned to one commit:
 
 ```swift
 .package(url: "https://github.com/payabli/sdk-ios.git", branch: "main")
+.package(url: "https://github.com/payabli/sdk-ios.git", revision: "<commit SHA>")
 ```
+
+In Xcode, the same choice is the **Branch** or **Commit** dependency rule.
 
 Then link the products you need, from [Modules](#modules). Link `PayabliSDK` alone, or one or both of the
 capability products. Linking `PayabliSDK` together with a capability product fails to build.
@@ -340,9 +343,9 @@ no part of the SDK reads yet.
 ## Versioning and support
 
 No version of the SDK has been released, and the repository has no tags. Until one is, add the package
-from `main` as [Installation](#installation) describes. `main` changes without notice, so your build picks
-up whatever is on `main` when the package resolves. Pin a commit in `Package.resolved` if you need a fixed
-build. This section gives the version to depend on once a release exists.
+by branch or by commit as [Installation](#installation) describes. `main` changes without notice, so a
+build that tracks `main` picks up whatever is there when the package resolves. Use the commit rule for a
+fixed build. This section gives the version to depend on once a release exists.
 
 ## Support
 
