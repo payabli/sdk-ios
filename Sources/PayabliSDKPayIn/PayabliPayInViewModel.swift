@@ -502,6 +502,9 @@ final class PayabliPayInViewModel: ObservableObject {
         if !boxes.contains(.accountHolderType), accountHolderType != .personal {
             accountHolderType = .personal
         }
+        if !boxes.contains(.secCode), secCode != .web {
+            secCode = .web
+        }
         if !boxes.contains(.deviceId), !deviceId.isEmpty {
             deviceId = ""
         }

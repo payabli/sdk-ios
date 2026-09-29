@@ -281,6 +281,25 @@ final class PaymentMethodReseedTests: XCTestCase {
         XCTAssertEqual(viewModel.billingZip, "", "a typed value survived its field going")
     }
 
+    /// A picked SEC code in a section the configuration takes away and returns starts empty.
+    ///
+    /// A card section can carry the SEC field, and its picker writes the same storage the hidden
+    /// value replaces at submission, so a picked code goes with the field like every other value.
+    func testAPickedSecCodeInASectionTheConfigurationTakesAwayAndReturnsStartsEmpty() {
+        let component = makeComponent()
+        let viewModel = PayabliPayInViewModel(
+            component: component,
+            configuration: Self.cardConfiguration(showingSecCode: true)
+        )
+        viewModel.secCode = .ppd
+
+        viewModel.update(component: component, configuration: Self.cardConfiguration(showingSecCode: false))
+        XCTAssertEqual(viewModel.secCode, .web, "a picked value survived its field going")
+
+        viewModel.update(component: component, configuration: Self.cardConfiguration(showingSecCode: true))
+        XCTAssertEqual(viewModel.secCode, .web, "a dropped value returned with its field")
+    }
+
     // MARK: -
 
     /// The customer fields the reseed tests type into, shown where the payer can correct them.
@@ -294,6 +313,15 @@ final class PaymentMethodReseedTests: XCTestCase {
             allowedMethods: [.card],
             cardSections: showingBillingZip
                 ? [PayabliPayInFieldSection(title: "Customer", fields: [.billingZip])]
+                : nil
+        )
+    }
+
+    private static func cardConfiguration(showingSecCode: Bool) -> PayabliPayInFormConfiguration {
+        PayabliPayInFormConfiguration(
+            allowedMethods: [.card],
+            cardSections: showingSecCode
+                ? [PayabliPayInFieldSection(fields: [.secCode])]
                 : nil
         )
     }
