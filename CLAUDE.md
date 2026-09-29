@@ -202,7 +202,7 @@ them, and the script refuses a build where that stops being true.
 - `Sources/` - first-party code, one directory per target
 - `ThirdParty/PayabliCardReaderCoreSource/README.md` - the vendoring contract; read it before refreshing
 - `Sources/PayabliSDKTapToPay/README.md` - the Tap to Pay integration guide
-- `Sources/PayabliSDKPayIn/README.md` - the PayIn surface
+- `Sources/PayabliSDKPayIn/README.md` - the card-not-present integration guide
 - `Tests/` - one XCTest target per module
 - `Example/PayabliDemo/` - sample app; needs `Secrets.swift`, copy `Secrets.swift.sample`
 - `Bridges/` - Flutter, .NET MAUI and React Native wrappers. Not built by SPM; leave them alone during

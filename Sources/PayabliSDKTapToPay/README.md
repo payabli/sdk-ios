@@ -1,8 +1,7 @@
 # Tap to Pay on iPhone
 
 `PayabliSDKTapToPay` lets your app take a contactless card, phone or watch payment on an iPhone, with no
-external reader. Set up the package, your configuration and your token endpoint first, as the
-[root README](../../README.md) describes. This guide covers what Tap to Pay adds.
+external reader. This guide is part of the [Payabli iOS SDK](../../README.md); set up the SDK there first.
 
 ## Requirements
 
@@ -55,7 +54,7 @@ An app that isn't on the allowlist is refused when the device attests. `initiali
 `PayabliGenericError` whose `code` is `.permissionDenied`, and `sessionState` is `.pendingActivation`, the
 same state as a phone that needs a code.
 
-## Create the Tap to Pay session
+## Set up
 
 ```swift
 import PayabliSDKCore
@@ -73,7 +72,9 @@ let ttp = try PayabliTTP(
   and `isReady` in SwiftUI.
 - **One paypoint per session.** A `PayabliTTP` serves the entry point it was created with.
 
-## Initialize
+## Take a payment
+
+### Initialize
 
 ```swift
 do {
@@ -108,7 +109,7 @@ try await ttp.initialize()
 - `areTermsAccepted()` returns `false` when the merchant hasn't accepted, and throws
   `PayabliTTPError.readerSetupFailed` when the reader couldn't answer.
 
-## Activate a phone
+### Activate a phone
 
 A phone takes Tap to Pay payments for a paypoint only after it is activated with a 6-digit code.
 
@@ -134,7 +135,7 @@ try await ttp.activateDevice(activationCode: code)
 try await ttp.initialize()
 ```
 
-## Charge
+### Charge
 
 When `isReady` is `true`, or `sessionState` is `.sessionExpired`, which `charge` refreshes before it reads
 the card:
@@ -197,7 +198,9 @@ for example `PayabliGenericError` or `PayabliPaymentError`. Catch `any PayabliEr
 From Objective-C, these errors arrive as `NSError`. See
 [Language support](../../README.md#language-support) in the root README.
 
-## Session states and events
+## Reference
+
+### Session states
 
 `sessionState` is a `PayabliTTPSessionState`:
 
@@ -211,6 +214,8 @@ From Objective-C, these errors arrive as `NSError`. See
 | `.sessionExpired` | The session needs refreshing. The next `charge` refreshes it. |
 | `.reinitializing` | The session is being refreshed. |
 | `.failed(reason:)` | The session stopped. `reason` says what to do. |
+
+### Failure reasons
 
 | `failureReason` | What to do |
 |---|---|
@@ -250,3 +255,11 @@ charge whose outcome is unknown. A stream opened after the charge started misses
 - Your release bundle ID on your **production** paypoint's allowlist.
 - Apple's terms accepted by the merchant.
 - One phone activated and one payment approved end to end, then looked up by its transaction ID.
+
+## Related docs
+
+- [Payabli iOS SDK](../../README.md): setup, the token endpoint, outcomes and go-live
+- [Card-not-present payments on iOS](../PayabliSDKPayIn/README.md)
+- [Sample app](../../Example/PayabliDemo/)
+- [Accept Tap to Pay payments](https://docs.payabli.com/guides/pay-in-developer-tap-to-pay) on docs.payabli.com
+- [Generate Tap to Pay activation code](https://docs.payabli.com/developers/api-reference/device/activation-challenge)
