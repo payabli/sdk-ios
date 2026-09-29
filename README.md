@@ -214,7 +214,8 @@ let payIn = PayabliPayIn(
     session: PayabliSession(config: config),
     operation: .capture,
     requestConfiguration: PayabliPayInRequestConfiguration(
-        paymentDetails: PayabliPayInPaymentDetails(totalAmount: 12.34)
+        paymentDetails: PayabliPayInPaymentDetails(totalAmount: 12.34),
+        orderId: order.id // your own reference, to find the payment if its outcome is unknown
     )
 )
 
