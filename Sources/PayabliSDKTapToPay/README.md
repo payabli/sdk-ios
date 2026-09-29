@@ -212,15 +212,21 @@ events emitted after it opens, and nothing emitted before. Open it before you ca
 `charge`.
 
 ```swift
-for await event in ttp.events() {
-    switch event {
-    case .chargeInitiated(let paymentTransId): pendingTransId = paymentTransId
-    case .readerReady: showReady()
-    case .cardDetected: showReading()
-    default: break
+let events = ttp.events()          // open the stream first
+eventTask = Task {                  // keep the task, and cancel it when your screen goes away
+    for await event in events {
+        switch event {
+        case .chargeInitiated(let paymentTransId): pendingTransId = paymentTransId
+        case .readerReady: showReady()
+        case .cardDetected: showReading()
+        default: break
+        }
     }
 }
+try await ttp.initialize()
 ```
+
+The `for await` loop runs until the stream ends, so read it in its own task.
 
 `.chargeInitiated` carries the transaction ID before the card is read. Keep it, so you can reconcile a
 charge whose outcome is unknown. A stream opened after the charge started misses it.
