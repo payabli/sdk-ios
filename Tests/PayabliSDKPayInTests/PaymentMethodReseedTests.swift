@@ -300,6 +300,56 @@ final class PaymentMethodReseedTests: XCTestCase {
         XCTAssertEqual(viewModel.secCode, .web, "a dropped value returned with its field")
     }
 
+    /// A method the update withdraws takes its fields' values with it.
+    ///
+    /// The withdrawn method's tab is gone, so its boxes are gone with it: the values the payer
+    /// typed under it have nowhere to live, and the offered method's values stay.
+    func testAMethodTheUpdateWithdrawsTakesItsFieldsValuesWithIt() {
+        let component = makeComponent()
+        let viewModel = PayabliPayInViewModel(
+            component: component,
+            configuration: PayabliPayInFormConfiguration(allowedMethods: [.card, .bankAccount])
+        )
+        viewModel.cardholderName = "Jane Doe"
+        viewModel.cardNumber = "4111111111111111"
+        viewModel.cardExpiration = "02/28"
+        viewModel.cardCvv = "123"
+        viewModel.cardZip = "33139"
+        viewModel.accountHolder = "Jane Business"
+        viewModel.routingNumber = "123456780"
+        viewModel.accountNumber = "1111111111"
+        viewModel.accountType = .savings
+
+        viewModel.update(
+            component: component,
+            configuration: PayabliPayInFormConfiguration(
+                allowedMethods: [.bankAccount],
+                defaultMethod: .bankAccount
+            )
+        )
+
+        XCTAssertEqual(viewModel.cardholderName, "", "a typed value survived its method going")
+        XCTAssertEqual(viewModel.cardNumber, "", "a typed value survived its method going")
+        XCTAssertEqual(viewModel.cardExpiration, "", "a typed value survived its method going")
+        XCTAssertEqual(viewModel.cardCvv, "", "a typed value survived its method going")
+        XCTAssertEqual(viewModel.cardZip, "", "a typed value survived its method going")
+        XCTAssertEqual(viewModel.accountHolder, "Jane Business", "an offered method's value went")
+        XCTAssertEqual(viewModel.routingNumber, "123456780", "an offered method's value went")
+        XCTAssertEqual(viewModel.accountNumber, "1111111111", "an offered method's value went")
+        XCTAssertEqual(viewModel.accountType, .savings, "an offered method's value went")
+
+        viewModel.update(
+            component: component,
+            configuration: PayabliPayInFormConfiguration(allowedMethods: [.card])
+        )
+
+        XCTAssertEqual(viewModel.accountHolder, "", "a typed value survived its method going")
+        XCTAssertEqual(viewModel.routingNumber, "", "a typed value survived its method going")
+        XCTAssertEqual(viewModel.accountNumber, "", "a typed value survived its method going")
+        XCTAssertEqual(viewModel.accountType, .checking, "a picked value survived its method going")
+        XCTAssertEqual(viewModel.cardholderName, "", "a dropped value returned with its method")
+    }
+
     // MARK: -
 
     /// The customer fields the reseed tests type into, shown where the payer can correct them.
