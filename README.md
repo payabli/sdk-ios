@@ -210,7 +210,7 @@ struct CheckoutView: View {
     var body: some View {
         PayabliPayInView(
             component: payIn,
-            onCompleted: { result in /* charged */ },
+            onCompleted: { result in order.paymentTransId = result.transaction?.paymentTransId },
             onError: { error in /* see Handle the outcome */ }
         )
     }
@@ -240,6 +240,7 @@ let result = try await ttp.charge(
     paymentDetails: PayabliTTPPaymentDetails(amount: 9.99),
     customer: PayabliTTPCustomerData(firstName: "Jane", lastName: "Doe")
 )
+order.paymentTransId = result.paymentTransId // store it; don't log it
 ```
 
 The guide covers the entitlements, the allowlist, activating a phone, Apple's terms, and the session
