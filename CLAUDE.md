@@ -201,7 +201,7 @@ them, and the script refuses a build where that stops being true.
 - `Package.swift` - the target graph and the deployment floor
 - `Sources/` - first-party code, one directory per target
 - `ThirdParty/PayabliCardReaderCoreSource/README.md` - the vendoring contract; read it before refreshing
-- `Sources/PayabliSDKTapToPay/README.md` - the full TapToPay file map
+- `Sources/PayabliSDKTapToPay/README.md` - the Tap to Pay integration guide
 - `Sources/PayabliSDKPayIn/README.md` - the PayIn surface
 - `Tests/` - one XCTest target per module
 - `Example/PayabliDemo/` - sample app; needs `Secrets.swift`, copy `Secrets.swift.sample`
