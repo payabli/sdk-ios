@@ -202,8 +202,9 @@ for example `PayabliGenericError` or `PayabliPaymentError`. Catch `any PayabliEr
 
 ## Events
 
-`events()` returns an `AsyncStream<PayabliTTPEvent>` for progress UI and logging. Every subscriber
-receives every event.
+`events()` returns an `AsyncStream<PayabliTTPEvent>` for progress UI and logging. Each stream receives the
+events emitted after it opens, and nothing emitted before. Open it before you call `initialize()` or
+`charge`.
 
 ```swift
 for await event in ttp.events() {
@@ -217,7 +218,7 @@ for await event in ttp.events() {
 ```
 
 `.chargeInitiated` carries the transaction ID before the card is read. Keep it, so you can reconcile a
-charge whose outcome is unknown.
+charge whose outcome is unknown. A stream opened after the charge started misses it.
 
 ## Objective-C
 
