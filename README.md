@@ -237,7 +237,7 @@ To charge a saved method, pass `.stored(.init(method: .card, storedMethodId: id)
 
 A charge always sends an idempotency key. The SDK mints one per call when you don't set
 `PayabliPayInRequest.idempotencyKey`, so calling again without your own key is a second payment, not a
-retry. Set your own key, and send the same key to retry a charge whose outcome is unknown.
+retry. Don't resend a charge whose outcome is unknown. Find the transaction first.
 
 More detail: [`Documentation/PayInOverview.md`](Documentation/PayInOverview.md) and
 [`Documentation/PayInIntegrationGuide.md`](Documentation/PayInIntegrationGuide.md).
@@ -249,7 +249,7 @@ entitlement, the allowlist, device activation, Apple's terms, charging and error
 
 ## Outcomes
 
-Every charge ends in one of three outcomes. Only one of them is safe to retry.
+Every charge ends in one of these outcomes. Only **not charged** is safe to retry.
 
 | Outcome | Card-not-present | Tap to Pay | Retry? |
 |---|---|---|---|
@@ -260,9 +260,9 @@ Every charge ends in one of three outcomes. Only one of them is safe to retry.
 
 When the outcome is unknown, look the transaction up from your backend with
 [`GET /api/MoneyIn/details/{transId}`](https://docs.payabli.com/developers/api-reference/moneyin/get-details-for-a-processed-transaction)
-before you charge again. `PayabliPayInError.submissionInterrupted` carries no transaction ID: resend the
-same request with the same idempotency key, or find the transaction in the Payabli portal. When a Tap to Pay
-error carries no transaction ID, find the transaction in the portal. Store the transaction ID with your order every time you get one.
+before you charge again. `PayabliPayInError.submissionInterrupted` carries no transaction ID, so set
+`orderId` on each request and find the transaction by it in the Payabli portal. When a Tap to Pay error
+carries no transaction ID, find the transaction in the portal. Store the transaction ID with your order every time you get one.
 
 ## Objective-C and cross-platform apps
 

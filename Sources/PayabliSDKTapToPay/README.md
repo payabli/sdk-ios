@@ -87,8 +87,10 @@ Until then, `initialize()` throws `PayabliTTPError.devicePendingActivation`, and
    [Generate Tap to Pay activation code](https://docs.payabli.com/developers/api-reference/device/activation-challenge),
    `POST /api/v2/device/taptopay/activate/challenge`, which takes the entry point and the device's ID. The
    code is valid for 30 minutes. Asking again before it expires returns the same code. The SDK doesn't
-   return the device's ID. A device waiting for activation, and its code, are shown in the Payabli portal
-   under **Devices**.
+   return the device's ID. In the Payabli portal, under **Device Management**, the waiting device's
+   options include **Activate device**, which issues its code.
+
+   The code is six digits and can start with zero, so keep it as a string.
 2. Deliver the code to the person holding the phone, and have your app ask for it.
 3. Activate, then initialize again:
 
@@ -218,8 +220,8 @@ charge whose outcome is unknown.
 
 Every `async` method has an `@objc` companion. Construct with
 `initWithTokenHandler:entryPoint:appId:environment:error:`. Errors bridge to `NSError` in the
-`com.payabli.ttp` domain, and `userInfo["capture"]` and `userInfo["paymentTransId"]` carry the two values
-described in [Outcomes and errors](#outcomes-and-errors).
+`com.payabli.ttp` domain. `userInfo["capture"]` holds the `PayabliTTPCapture` raw value: `0` not charged,
+`1` unknown, `2` charged. `userInfo["paymentTransId"]` is absent when there is no transaction ID.
 
 ## Go live
 
