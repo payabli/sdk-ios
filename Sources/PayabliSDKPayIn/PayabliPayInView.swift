@@ -71,6 +71,9 @@ public struct PayabliPayInView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .privacySensitive()
+        // Read-only while a submission is in flight: a refusal applies to the state that was
+        // submitted, and an edit after the request left would mark a value it never saw.
+        .disabled(viewModel.isSubmitting)
         .sheet(isPresented: $isExpirationPickerPresented) {
             expirationWheelSheet
         }
