@@ -12,7 +12,10 @@ token in memory while the session runs.
 [Card-not-present guide](Sources/PayabliSDKPayIn/README.md) ·
 [Tap to Pay guide](Sources/PayabliSDKTapToPay/README.md) · [Sample app](Example/PayabliDemo/)
 
-> **No version has been released yet.** See [Versioning and support](#versioning-and-support).
+> [!WARNING]
+> **This SDK is in beta and under active development.** Its public interface can change in ways that
+> aren't backward compatible, including the names, parameters and behavior of its types and methods.
+> No stable version has been released. See [Versioning and support](#versioning-and-support).
 
 ## How it works
 
@@ -329,10 +332,15 @@ changes nothing.
 
 ## Versioning and support
 
-No version of the SDK has been released, and the repository has no tags. Until one is, add the package
-by branch or by commit as [Installation](#installation) describes. `main` changes without notice, so a
-build that tracks `main` picks up whatever is there when the package resolves. Use the commit rule for a
-fixed build. This section gives the version to depend on once a release exists.
+> [!WARNING]
+> **This SDK is in beta.** Until a stable version is released, expect changes to the public interface that
+> aren't backward compatible, and read the changes on `main` before you update.
+
+- **No version has been released,** and the repository has no tags. Add the package by branch or by commit
+  as [Installation](#installation) describes.
+- **`main` changes without notice.** A build that tracks `main` takes whatever is there when the package
+  resolves. Use the commit rule for a build that doesn't change.
+- **When a stable version is released,** this section gives the version to depend on.
 
 ## Support
 
