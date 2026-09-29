@@ -139,7 +139,7 @@ can quote what was submitted. Log `(error as? any PayabliError)?.code` instead.
 
 | Operation | What a form submission does |
 |---|---|
-| `.storePaymentMethod` | Saves the card or bank account as a stored payment method. The default |
+| `.storePaymentMethod` | Saves the card or bank account as a stored payment method. This is the default |
 | `.capture` | Charges the payment method |
 | `.authorize` | Authorizes a card without capturing it |
 
