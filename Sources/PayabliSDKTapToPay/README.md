@@ -145,6 +145,9 @@ print("Charged:", result.paymentTransId)
 
 ## Outcomes and errors
 
+A cancelled task is rethrown as `CancellationError` and carries no transaction ID. Cancelling after the card
+was presented doesn't mean nothing was charged: find the transaction before charging again.
+
 Every `PayabliTTPError` carries `capture` and `paymentTransId`:
 
 | `capture` | Meaning | What to do |
