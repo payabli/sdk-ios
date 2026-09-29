@@ -770,7 +770,7 @@ extension PayabliPayInView {
     }
 
     func isPaymentSummaryField(_ field: PayabliPayInField) -> Bool {
-        field == .amount || field == .serviceFee
+        field == .amount || field == .serviceFee || field == .surchargeFee
     }
 
     func placeholder(
