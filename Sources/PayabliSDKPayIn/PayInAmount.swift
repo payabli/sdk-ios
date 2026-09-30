@@ -1,6 +1,6 @@
 import Foundation
 
-/// An amount as the wire carries it: two decimal places, rounded half up.
+/// An amount as the wire carries it: two decimal places, a tie rounded away from zero.
 enum PayInAmount {
     static let wireFractionDigits = 2
 
