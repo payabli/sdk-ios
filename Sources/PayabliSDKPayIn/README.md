@@ -1,110 +1,189 @@
-# PayabliSDKPayIn
+# Card-not-present payments on iOS
 
-`PayabliSDKPayIn` is the unified PayIn component for iOS card and bank account flows.
+Take a card or bank account payment that the payer enters, in the SDK's SwiftUI form or in your own UI.
+This guide is part of the [Payabli iOS SDK](../../README.md); set up the SDK there first.
 
-Use it to:
+> [!WARNING]
+> **This SDK is in beta.** Its public interface can change in ways that aren't backward compatible. See
+> [Versioning and support](../../README.md#versioning-and-support).
 
-- store card or bank account payment methods with `/api/TokenStorage/add`
-- capture or authorize MoneyIn v2 transactions
-- capture a prior authorization by transaction ID
-- reverse a transaction by transaction ID
-- render the same SwiftUI form inline or in the SDK bottom sheet
-- configure labels, placeholders, sections, per-section spacing, per-field spacing, fonts, colors, card-brand icons, diagnostics, and accessibility metadata
+## Requirements
 
-## Component
+### Your app
+
+- iOS 16.7 or later as the deployment target. The form runs in the simulator.
+
+### Your account
+
+- OAuth2 credentials with `inboundpayments_create` to charge, authorize and capture,
+  `inboundpayments_void` to void, and `tokens_create` to store a payment method.
+
+## Before you start
+
+### Choose the form or your own UI
+
+- **The SDK's form** keeps the card number inside SDK-owned state. It isn't written into a text field's
+  `text`, an accessibility value, diagnostics or a callback, so your code never handles a card number.
+- **Your own UI** passes `PayabliPayInCardData` you collected to the direct API. Your app then handles card
+  numbers and security codes, which brings it into scope for PCI DSS.
+
+## Set up
+
+`PayabliPayIn` runs on a `PayabliSession` built from your configuration. It is `@MainActor`.
 
 ```swift
 import PayabliSDKCore
 import PayabliSDKPayIn
 
-// Once, where a rejected configuration can be handled.
-let config = try PayabliConfig(
-    entryPoint: "merchant-entry",
-    environment: .sandbox,
-    tokenProvider: { try await Backend.shared.fetchMobilePayInToken() }
+let payIn = PayabliPayIn(
+    session: PayabliSession(config: config),
+    operation: .capture,
+    requestConfiguration: PayabliPayInRequestConfiguration(
+        paymentDetails: PayabliPayInPaymentDetails(totalAmount: 12.34),
+        orderId: order.id // your own reference, to find the payment if its outcome is unknown
+    )
 )
-let session = PayabliSession(config: config)
+```
 
-// Then the view takes the session.
-struct StoreMethodView: View {
-    @StateObject private var paymentFlow: PayabliPayIn
+A form that captures or authorizes needs this `PayabliPayInRequestConfiguration`. A direct call takes a
+`PayabliPayInRequest` instead.
 
-    init(session: PayabliSession) {
-        _paymentFlow = StateObject(wrappedValue: PayabliPayIn(
-            session: session,
-            operation: .storePaymentMethod
-        ))
+## Take a payment
+
+### Use the SDK's form
+
+`PayabliPayInView` renders a card and bank account form and submits it with the operation you chose:
+
+```swift
+import SwiftUI
+import PayabliSDKPayIn
+
+struct CheckoutView: View {
+    let payIn: PayabliPayIn
+
+    var body: some View {
+        PayabliPayInView(
+            component: payIn,
+            onCompleted: { result in
+                // Store the identifiers; don't log them.
+                if let stored = result.storedPaymentMethod {
+                    order.storedMethodId = stored.storedMethodId
+                } else {
+                    order.paymentTransId = result.transaction?.paymentTransId
+                }
+            },
+            onError: { error in /* see Outcomes and errors */ }
+        )
     }
 }
 ```
 
-Set `operation` to `.storePaymentMethod`, `.capture`, or `.authorize`. Capture and authorize require `PayabliPayInRequestConfiguration` during initialization or direct API calls.
+To show the form in a sheet, use `.payabliPayInSheet(isPresented:component:configuration:sheetConfiguration:style:onCompleted:onError:)`.
+It renders the same form and takes the same configuration and style.
 
-Authorize is narrower than capture. The direct API accepts a card, a stored card, or a cloud device, and refuses any other payment method before anything is sent. The hosted authorize form collects a card only.
-
-The component uses the same mobile access-token approach as the stored-method flow. Do not pass a `requestToken` header directly.
-
-Use `captureAuthorizedTransaction(_:)` for `/api/v2/MoneyIn/capture/{transId}`. That operation is a direct API; the hosted form supports stored-method, capture, and authorize submissions.
-
-Use `voidTransaction(_:)` for `/api/v2/MoneyIn/void/{transId}`, which releases an authorization's hold or undoes a capture that has not settled. Also a direct API. Which transactions can still be reversed is the service's to decide, so the SDK mirrors no rule of its own: a state it will not reverse arrives as the refusal it sent, carrying its own reason.
-
-## Security Model
-
-When an app uses the SDK-hosted SwiftUI view or sheet, clear PAN is kept inside SDK-owned state and is not written into the hosted `UITextField.text`, accessibility value, diagnostics, or public callbacks. The public component initializers always use the SDK transport; custom transport injection is reserved for internal tests.
-
-Direct card-data APIs such as `addCard(_:)`, `capture(_:)`, and `authorize(_:)` are PCI-sensitive by design because the host app creates and passes `PayabliPayInCardData`. Use the hosted form when the integration goal is to avoid host-app access to clear PAN.
-
-## SwiftUI
+### Call the API from your own UI
 
 ```swift
-PayabliPayInView(
-    component: paymentFlow,
-    configuration: configuration,
-    onCompleted: { result in
-        // Keep the identifiers, do not log them: a stored-method id is a token.
-        if let storedMethod = result.storedPaymentMethod {
-            storedMethodId = storedMethod.storedMethodId
-            storedMethodType = storedMethod.method
-        } else {
-            paymentTransId = result.transaction?.paymentTransId
-        }
-    },
-    onError: { error in
-        // Show this: it names what the service rejected. Do not log it. The
-        // description carries the service's own wording, which can quote what was
-        // submitted; log `(error as? any PayabliError)?.code` instead.
-        message = error.localizedDescription
-    }
+let result = try await payIn.capture(
+    PayabliPayInRequest(
+        paymentDetails: PayabliPayInPaymentDetails(totalAmount: 12.34),
+        paymentMethod: .card(.init(data: PayabliPayInCardData(
+            cardNumber: "4012000098765439",
+            expiration: "12/30",
+            cardholderName: "Jane Doe",
+            cvv: "999",
+            billingZip: "12345"
+        ))),
+        orderId: order.id
+    )
 )
-.payabliPayInStyle(style)
+order.paymentTransId = result.transaction?.paymentTransId // store it; don't log it
 ```
 
-Use `.payabliPayInSheet(...)` for the sheet presentation. It renders the same form and accepts the same configuration and style.
+In sandbox, use Payabli's [test cards](https://docs.payabli.com/guides/test-accounts-reference).
 
-## Form Configuration
+### Store a payment method and charge it later
 
-`PayabliPayInFormConfiguration` controls displayed fields and behavior:
+`addCard(_:options:)`, `addBankAccount(_:options:)` and `addPaymentMethod(_:options:)` save a method and
+return a `PayabliPayInStoredPaymentMethod`. The form does the same with `.storePaymentMethod`. Its
+`storedMethodId` is optional, and is `nil` when the service's answer names no ID. To charge a saved
+method, pass `.stored(.init(method: .card, storedMethodId: id))` as the payment method.
 
-- `allowedMethods` and `defaultMethod`
-- `cardFieldOrder`, `bankFieldOrder`
-- `cardSections`, `bankSections`
-- `hiddenValues`
-- `options`
-- `labels`
-- `labelLayout`
-- `showsFieldLabels`
-- `hiddenFieldLabels`
-- `formatting`
-- `inputSizing`
-- `cardBrandIconPlacement`
-- `requiredFields`
-- `paymentSummary`
+### Authorize, then capture
 
-Labels and section names are configurable. Input placeholders can be configured per field with `PayabliPayInLabels(fieldPlaceholders:)`. Use `labelLayout: .placeholder` or `showsFieldLabels: false` to hide visible labels while keeping accessible labels.
+`authorize(_:)` holds an amount on a card, a stored card or a cloud device without charging it. The form
+authorizes a card only. `captureAuthorizedTransaction(_:)` captures that authorization later, and `voidTransaction(_:)`
+releases it or voids a transaction that hasn't settled.
 
-The default field labels use `Postal Code` and `Billing Postal Code`.
+### Retry safely
 
-## Sections And Spacing
+A charge always sends an idempotency key. The SDK mints one per call when you don't set
+`PayabliPayInRequest.idempotencyKey`, so calling again without your own key is a second payment, not a
+retry. Don't resend a charge whose outcome is unknown. Find the transaction first.
+
+## Outcomes and errors
+
+A returned result means what the call did, which depends on the call:
+
+| Call | A result means | `transactionFailed` means |
+|---|---|---|
+| `capture(_:)` | The payment was charged | Not charged |
+| `authorize(_:)` | An amount is held. Nothing is charged until you capture it | No hold was placed |
+| `captureAuthorizedTransaction(_:)` | The held amount was charged | The hold wasn't captured |
+| `voidTransaction(_:)` | The transaction was voided | The void was refused. It doesn't mean the original payment wasn't charged |
+
+For a charge, the outcomes are the ones in the root README's
+[Handle the outcome](../../README.md#handle-the-outcome):
+
+| Result | Outcome | What to do |
+|---|---|---|
+| The call returns a `PayabliPayInResult` | Charged, or saved | Store the transaction ID or the stored method ID |
+| `PayabliPayInError.transactionFailed`, for example a decline | Not charged | You can retry |
+| `PayabliPayInError.invalidInput`, `.submissionInProgress` | Not charged; refused before anything was sent | Fix the input, or wait for the running submission |
+| A core `PayabliError` whose `code` is `.tokenProviderFailed` | Not charged; your token provider failed | Fix the token provider |
+| `PayabliPayInError.submissionInterrupted` | Unknown | After `capture(_:)` or `authorize(_:)`, find the transaction by `orderId` in the Payabli portal. After `captureAuthorizedTransaction(_:)` or `voidTransaction(_:)`, look up the transaction ID you passed. Then decide whether to call again |
+| A core `PayabliError`, such as a validation failure, a refused credential or a rate limit | On a charge, not charged; the service's answer | Branch on its `code` |
+| `PayabliPayInTokenStorageError` | The method wasn't saved | `invalidInput` was refused before sending; `saveFailed` is the service's answer |
+| A core `PayabliError` from `addCard`, `addBankAccount` or `addPaymentMethod` whose `code` is `.networkError`, `.serverError` or `.decodingError` | Unknown: the method may have been saved | Read the stored methods back before saving again |
+
+Show `error.localizedDescription` to the payer, since it names what the service rejected. Don't log it: it
+can quote what was submitted. Log `(error as? any PayabliError)?.code` instead.
+
+## Reference
+
+### Operations
+
+| Operation | What a form submission does |
+|---|---|
+| `.storePaymentMethod` | Saves the card or bank account as a stored payment method. This is the default |
+| `.capture` | Charges the payment method |
+| `.authorize` | Authorizes a card without capturing it |
+
+### Methods
+
+| Method | What it does |
+|---|---|
+| `capture(_:)` | Charges a card, bank account, stored payment method, cloud device, check or cash |
+| `authorize(_:)` | Authorizes a card, a stored card or a cloud device |
+| `captureAuthorizedTransaction(_:)` | Captures an earlier authorization |
+| `voidTransaction(_:)` | Voids a transaction that hasn't settled |
+| `addCard(_:options:)`, `addBankAccount(_:options:)`, `addPaymentMethod(_:options:)` | Saves a payment method and returns its stored ID |
+
+### Form configuration
+
+`PayabliPayInFormConfiguration` chooses what the form shows:
+
+| Parameter | Sets |
+|---|---|
+| `allowedMethods`, `defaultMethod` | Card, bank account, or both, and which opens first |
+| `cardFieldOrder`, `bankFieldOrder`, `cardSections`, `bankSections` | The fields, their order, and their sections |
+| `requiredFields`, `hiddenValues`, `options` | Fields the payer must fill, values sent without a field, and form options |
+| `labels`, `labelLayout`, `showsFieldLabels`, `hiddenFieldLabels` | Wording, and where labels sit or whether they show |
+| `formatting`, `inputSizing`, `cardBrandIconPlacement` | Formatting, field sizes, and the card brand icon |
+| `paymentSummary` | The amount and fee rows |
+
+`PayabliPayInLabels(fieldPlaceholders:)` sets placeholders per field. `labelLayout: .placeholder` or
+`showsFieldLabels: false` hides the visible labels and keeps the accessible ones.
 
 Group fields with `PayabliPayInFieldSection`:
 
@@ -114,41 +193,47 @@ PayabliPayInFieldSection(
     fields: [.cardholderName, .cardNumber, .cardExpiration, .cardCvv, .cardZip],
     inputVerticalSpacing: 4,
     inputHorizontalSpacing: 8,
-    fieldVerticalSpacings: [
-        .cardNumber: 2,
-        .cardCvv: 2
-    ]
+    fieldVerticalSpacings: [.cardNumber: 2, .cardCvv: 2]
 )
 ```
 
-Capture and authorize forms include a `Payment Information` section for non-editable amount and fee rows. Store-payment-method mode filters those payment summary rows from the rendered form.
+Capture and authorize forms add a **Payment Information** section with the amount and fee. A form storing
+a payment method leaves it out.
 
-## Styling
+### Styling
 
-`PayabliPayInStyle` controls:
+`PayabliPayInStyle`, applied with `.payabliPayInStyle(_:)`, sets:
 
-- title, subtitle, label, section title, error, and submit button text styles
-- SwiftUI input font and UIKit text-field font with `input.uiFont`
-- input text, placeholder, background, focus, border, and picker icon colors
-- layout spacing
+- the title, subtitle, label, section title, error and submit button text styles;
+- the input font, with `input.uiFont` for the UIKit-backed text fields;
+- the input text, placeholder, background, focus, border and picker icon colors;
+- the layout spacing.
 
-Custom fonts must be registered by the host app. Add the font files to the app target, list them in `UIAppFonts` in `Info.plist`, then use both `Font.custom(_:size:)` for SwiftUI text and `UIFont(name:size:)` for UIKit-backed text fields.
+A custom font must be registered by your app: add the files to the app target, list them under
+`UIAppFonts` in `Info.plist`, and use `Font.custom(_:size:)` for SwiftUI text and `UIFont(name:size:)`
+for the text fields.
 
-## Accessibility
+### Accessibility
 
-The form is built for standard iOS accessibility checks:
+- Touch targets of at least 44 points.
+- Accessible labels, including when the visible labels are hidden.
+- Secure accessibility values for the card number and CVV, and for the account number while
+  `formatting.masksAccountNumber` is on, which is the default. The routing number isn't masked.
+- Announcements when card number validation changes.
+- Dynamic Type, with paired fields stacked at accessibility sizes.
 
-- minimum 44 pt touch targets
-- accessible labels even when visible labels are hidden
-- secure accessibility values for card number, CVV, account number, and routing number fields
-- card-number validation announcements
-- stable accessibility identifiers via `PayabliPayInAccessibility.fieldIdentifier(_:)`
-- Dynamic Type support, including unpairing horizontal fields at accessibility sizes
+## Go live
 
-Run focused tests with:
+- `.production` and a production entry point, with credentials carrying the permissions in
+  [Requirements](#requirements).
+- Production card details only. The sandbox test cards don't work in production.
+- The transaction ID stored with every order, so any outcome can be reconciled.
 
-```bash
-xcodebuild test -scheme PayabliSDK-Package \
-  -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.4.1' \
-  -only-testing:PayabliSDKPayInTests
-```
+## Related docs
+
+- [Payabli iOS SDK](../../README.md): setup, the token endpoint, outcomes and go-live
+- [Tap to Pay on iPhone](../PayabliSDKTapToPay/README.md)
+- [`Documentation/PayInIntegrationGuide.md`](../../Documentation/PayInIntegrationGuide.md): every
+  configuration and styling option, with examples
+- [Sample app](../../Example/PayabliDemo/)
+- [Pay In API reference](https://docs.payabli.com/developers/api-reference/moneyin/get-details-for-a-processed-transaction)

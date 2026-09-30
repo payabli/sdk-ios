@@ -1,355 +1,273 @@
-# PayabliSDKTapToPay
+# Tap to Pay on iPhone
 
-Everything the SDK needs to run a Tap-to-Pay-on-iPhone charge lives in this
-module: the public facade, the session lifecycle, device
-attestation, the backend clients, and the processor-agnostic adapter
-contract.
+`PayabliSDKTapToPay` lets your app take a contactless card, phone or watch payment on an iPhone, with no
+external reader. This guide is part of the [Payabli iOS SDK](../../README.md); set up the SDK there first.
 
-> Layout note: this module was promoted from
-> `Sources/PayabliSDKPayIn/TapToPay/` to its own SPM target so consumers can
-> link Tap to Pay independently of `PayabliSDKPayIn`. PayIn no longer
-> depends on `PayabliCardReaderCore`; the TTP transitive dependency lives
-> only here.
+> [!WARNING]
+> **This SDK is in beta.** Its public interface can change in ways that aren't backward compatible. See
+> [Versioning and support](../../README.md#versioning-and-support).
 
-The module is flat by design — PRD §7.2 fixes the layout and forbids
-sub-folders for the TapToPay module (except `Adapters/`, which is the one
-sub-folder the PRD does allow). To keep it scalable we rely on three
-conventions instead of folders: naming prefixes, companion files, and one
-principal type per file.
+## Requirements
 
----
+### Your app
 
-## 1. File groups
+- iOS 16.7 or later as the deployment target.
+- Apple's Tap to Pay entitlement and the App Attest environment entitlement, in
+  [Request Apple's entitlement](#request-apples-entitlement).
 
-Files cluster by concern. Prefixes tell you what concern at a glance.
+### The phone
 
-### Facade — `PayabliTTP*`
+- A physical iPhone XS or newer on iOS 16.7 or later, in a region where Apple supports Tap to Pay on
+  iPhone. The simulator can't take a Tap to Pay payment.
 
-The public entry point that host apps consume. Split across companion files
-(PRD §7.2 allows companion files in the same folder):
+### Your account
 
-| File | Responsibility |
-|---|---|
-| `PayabliTTP.swift` | Class declaration, stored properties, init, `events()`, `syncPublished()` |
-| `PayabliTTP+Initialize.swift` | `initialize()` (cold/warm path) and `reinitializeIfNeeded()` (fresh `/config` after 401) |
-| `PayabliTTP+Activation.swift` | `activateDevice()` for pending-device flows. Emits `activationStarted` / `activationCompleted` / `activationFailed`. The partner provisions the activation code out-of-band (PRD §9.7) |
-| `PayabliTTP+Charge.swift` | 3-step sale pipeline: `/initiate` → `startReading` → `/update` (PRD §19.1) |
-| `PayabliTTP+Terms.swift` | `areTermsAccepted()`, asked of the platform on every call rather than cached. A provider that cannot be asked throws, so a caller can tell that from "not accepted". `presentTerms()` asks the platform to present its sheet from a screen the host chose; returning means the request completed, which is neither proof that a sheet appeared nor that the merchant accepted |
-| `PayabliTTPEvent.swift` | `PayabliTTPEvent` (lifecycle cases) + `PayabliTTPError` (PRD §20) + `PayabliTTPEventCode` (`@objc`) + per-case `payload` schema + `CustomNSError` bridging |
-| `PayabliTTPTypes.swift` | `PayabliTTPSessionState`, `PayabliTTPPaymentType`, `TransactionResult` |
-| `PayabliTTPTransactionData.swift` | `PayabliTTPCustomerData`, `PayabliTTPPaymentDetails`, `PayabliTTPInvoiceData`, internal `TTPTransactionContext` |
-| `PayabliTTPTransactionData+ObjC.swift` | `@objc` companion classes (`PayabliTTPCustomerDataObjC`, `PayabliTTPPaymentDetailsObjC`, `PayabliTTPInvoiceDataObjC`, `PayabliTTPTransactionResultObjC`) used by ObjC / MAUI / Flutter / RN consumers |
+- A paypoint with Tap to Pay enabled. Ask your Payabli representative.
+- OAuth2 credentials with the `tools_init`, `pos_create` and `inboundpayments_create` permissions.
 
----
+## Before you start
 
-## 1.5. ObjC interop (bilingual contract)
+### Request Apple's entitlement
 
-`PayabliSDKTapToPay` is bilingual Swift/ObjC, following the
-[URLSession](https://developer.apple.com/documentation/foundation/urlsession)
-and [Stripe Terminal](https://stripe.com/docs/terminal) patterns. Every
-Swift `async throws` method has a callback-based `@objc` companion in the
-same file; structs have `*ObjC` companion classes; events expose a
-`PayabliTTPEventCode` int + `[String: Any]` payload alongside the
-associated-value enum; errors bridge cleanly to `NSError` with domain
-`"com.payabli.ttp"` and stable per-case codes.
+Your app needs `com.apple.developer.proximity-reader.payment.acceptance`. Apple approves it on request,
+and approval takes weeks, so request it early. See
+[Setting up the entitlement for Tap to Pay on iPhone](https://developer.apple.com/documentation/proximityreader/setting-up-the-entitlement-for-tap-to-pay-on-iphone).
 
-This unblocks the MAUI/Xamarin binding (sharpie consumes the generated
-ObjC header), the Flutter `MethodChannel` plugin, and the React Native
-`Native Module` — none of which can express Swift `async`, `AsyncStream`,
-or value-typed `enum`s with associated values.
+Your app also needs `com.apple.developer.devicecheck.appattest-environment`: `development` for
+development builds and `production` for builds you distribute.
 
-| Swift API (unchanged) | ObjC / MAUI / RN companion |
-|---|---|
-| `try await ttp.initialize()` | `[ttp initializeWithCompletion:^(NSError *err){...}]` |
-| `try await ttp.charge(type:paymentDetails:customer:invoice:orderDescription:)` | `[ttp chargeWithType:paymentDetails:customer:invoice:orderDescription:completion:]` returning `PayabliTTPTransactionResultObjC*` + `NSError*` |
-| `try await ttp.activateDevice(activationCode:)` | `[ttp activateDeviceWithActivationCode:completion:]` |
-| `try await ttp.areTermsAccepted()` | `[ttp areTermsAcceptedWithCompletion:^(BOOL accepted, NSError *err){...}]` — `accepted` is `NO` on the failure path as a bridging default and never an answer, so read `err` first |
-| `try await ttp.presentTerms()` | `[ttp presentTermsWithCompletion:^(NSError *err){...}]` — `err` is `nil` once the request completes, which is neither proof that a sheet appeared nor that the merchant accepted; ask `areTermsAccepted()` |
-| `for await event in ttp.events()` | `[ttp addEventListenerWithHandler:^(PayabliTTPEventCode code, NSDictionary *payload){...}]` returning a `PayabliTTPEventToken` (call `[token cancel]` to stop) |
-| `PayabliTTPCustomerData(...)` (struct) | `[[PayabliTTPCustomerDataObjC alloc] initWithFirstName:lastName:customerNumber:email:phone:customerId:company:billingAddress1:billingAddress2:billingCity:billingState:billingZip:billingCountry:billingPhone:billingEmail:shippingAddress1:shippingAddress2:shippingCity:shippingState:shippingZip:shippingCountry:]` |
-| `PayabliTTPPaymentDetails(...)` (struct) | `[[PayabliTTPPaymentDetailsObjC alloc] initWithAmount:serviceFee:currency:paymentDescription:]` |
-| `PayabliTTPInvoiceData(...)` (struct) | `[[PayabliTTPInvoiceDataObjC alloc] initWithInvoiceNumber:]` |
-| `enum PayabliTTPEvent` w/ associated values | `PayabliTTPEventCode` (`@objc Int`) + `payload` dict — see `PayabliTTPEvent.payload` for per-case schema |
-| `enum PayabliTTPError` w/ associated values | `NSError` (domain `"com.payabli.ttp"`, stable per-case `code`) — see `errorCode` table |
-| core `PayabliError` surfaced through the TTP bridge (e.g. an attestation-time `.tokenProviderFailed`) | `NSError` (domain `"com.payabli.ttp"`, `code = -3`, `userInfo["PayabliErrorCode"]` carries the taxonomy's raw name) |
+### Register your app on the allowlist
 
-All `@objc` callbacks are dispatched on the main thread because the entire
-`PayabliTTP` surface is `@MainActor`.
+The allowlist entry for iOS is your app's **app ID**, your Apple Team ID and bundle ID joined by a dot:
+`<TEAM_ID>.<BUNDLE_ID>`, for example `TEAM123456.com.example.checkout`. Register it once per paypoint, from
+your backend:
 
-**Maintenance contract.** Any change to the public Swift API — new
-method, new event case, new error case, new struct field — **must** be
-reflected in the ObjC companion at the same time. The companion is part
-of the public API and downstream bridges depend on it. CI tests in
-`PayabliTTPObjCInteropTests`, `PayabliTTPEventCodeMappingTests`, and
-`PayabliTTPErrorNSErrorTests` lock the integer codes and payload schemas
-so silent breakage is caught at build time.
-
-`@Published` setters are `public internal(set)` so the companion extensions
-in this folder can mutate state without weakening the public read-only
-contract.
-
-### Session — `SessionManager`
-
-`SessionManager.swift` owns the transition matrix (PRD §17). The
-facade calls `transition(to:)` before each phase and `syncPublished()` to
-re-publish into its own `@Published` properties. Invalid transitions are
-rejected, keeping the machine honest.
-
-### Attestation — `AppAttest*`, `DeviceAttestationService`, `AppAttestor`
-
-| File | Role |
-|---|---|
-| `DeviceAttestationService.swift` | Protocol the facade depends on (`attest`, `generateAssertion`, `activateDevice`, cache) |
-| `AppAttestor.swift` | Apple `DCAppAttestService` seam (`RealAppAttestor` prod, `MockAppAttestor` in tests) |
-| `AppAttestService.swift` | Production implementation (class + cache/clear) |
-| `AppAttestService+Attest.swift` | `attest()` flow + per-request assertion generation |
-| `AppAttestService+Activation.swift` | `/activate` endpoint (consumes an activation code provisioned by the partner) |
-| `AppAttestService+Requests.swift` | Shared envelope decoding for the attestation endpoints |
-| `AppAttestService+Defaults.swift` | Default hardware-identifier providers (model, OS, device name) |
-| `AppAttestWireFormat.swift` | Backend DTOs for the attestation endpoints only |
-
-The split mirrors the facade pattern: one class declaration, one file per
-concern. The convenience init on `PayabliTTP` is only available where
-`DeviceCheck` can be imported. Package floor is already iOS 16.7 (from
-`PayabliCardReaderCore` / `ProximityReader`) and macOS 12 — both well above
-`DCAppAttestService`'s own minimums — so no inline `@available` gates are
-required. Where `DeviceCheck` cannot be imported, no public initializer builds a
-session: the initializers taking a `DeviceAttestationService` are `package`.
-
-### Networking — `TTPConfigClient*`, `TTPTransactionClient*`
-
-Backend clients and their wire formats. DTOs always live in a
-`*WireFormat.swift` companion; the client file stays focused on request
-building, envelope handling, and error mapping.
-
-| File | Endpoint(s) |
-|---|---|
-| `TTPConfigClient.swift` | `GET /api/v2/device/taptopay/config/{entry}` (attestation-protected, FR-11B.3) |
-| `TTPConfigWireFormat.swift` | `ConfigCredentialsPayload` |
-| `TTPTransactionClient.swift` | `POST /api/v2/MoneyIn/initiate`, `PATCH /api/v2/MoneyIn/update/{id}` |
-| `TTPTransactionWireFormat.swift` | Initiate / update request-response DTOs, `ProviderResponsePayload` (opaque-JSON vs payload-only) |
-
-Response envelopes shared across both clients (`isSuccess: false` decoding,
-`Success<Payload>`, `EmptyPayload`) live in
-`PayabliSDKCore/Networking/ResponseEnvelope.swift` under the `PayabliEnvelope`
-namespace — don't re-declare them here.
-
-### Persistence — `SecureStorage`, `KeychainStorage`
-
-Only identity tokens survive across launches; everything else is RAM-only.
-
-| File | Persists to | Holds |
-|---|---|---|
-| `KeychainStorage.swift` (impl of `SecureStorage`) | iOS Keychain | `keyId`, `deviceId` — identity tokens (NFR-5E) |
-| `SecureStorage.swift` | — | Protocol + in-memory fake for tests |
-
-Nothing else persists. Credentials, access tokens, Fiserv secrets, and
-in-flight transaction bodies: RAM only (NFR-5D).
-
-### Runtime helpers — `EventMulticaster`, `RetryPolicy`
-
-| File | Role |
-|---|---|
-| `EventMulticaster.swift` | Fan-out of `PayabliTTPEvent` to every `events()` caller (FR-11G.2) |
-| `RetryPolicy.swift` | Backoff + jitter for `/update` (PRD §21.1) |
-
-### Provider abstraction — `TapToPayProvider*`, `Adapters/`
-
-| File | Role |
-|---|---|
-| `TapToPayProvider.swift` | The protocol every adapter implements |
-| `Adapters/` | Concrete implementations. See `Adapters/README.md` for the full contract, credentials policy, error-mapping rules, and onboarding checklist |
-
----
-
-## 2. Session lifecycle (PRD §17)
-
-The state machine in `PayabliTTPSessionState` is the single source of truth
-for what the facade can do next. A facade method that acts on the session asserts
-`sessionState ∈ {allowed}` before acting.
-
-The terms members are the exception and it is deliberate: `areTermsAccepted()` and
-`presentTerms()` carry no state guard, because what they need is a prepared reader
-rather than a state. Guarding them would refuse at `.pendingTerms`, which is the
-one moment a host asks.
-
-```
-             ┌──────────────────────────────────────────────┐
-             ▼                                              │
-.idle ─▶ .attestingDevice ─▶ .fetchingConfig ─▶ .initializingReader ─▶ .ready
-  │              │                   │                     │
-  │              └──────┐            │                     └─▶ .pendingTerms ─▶ (back to .attestingDevice)
-  │                     ▼            └─▶ .pendingActivation ─▶ (back to .idle / .attestingDevice)
-  │              .pendingActivation
-  ▼
-.error ◀── (from anywhere on unrecoverable failure)
-
-Both `.pendingTerms` and `.pendingActivation` wait on a person rather than on the
-SDK: the host resolves what the session is waiting for, then initializes again.
-
-.ready ─▶ .sessionExpired ─▶ .reinitializing ─▶ .fetchingConfig ─▶ .initializingReader ─▶ .ready
+```bash
+curl -X POST "https://api-sandbox.payabli.com/api/v2/paypoint/{entryPoint}/apps" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
+  -d '{ "deviceOs": "ios", "appId": "TEAM123456.com.example.checkout", "friendlyName": "Checkout" }'
 ```
 
-The transition matrix lives in `SessionManager.isValidTransition(from:to:)`.
-An **edge** is that matrix and nothing else.
+- The call needs the `pos_create` permission. An API token in the `requestToken` header works in place of
+  the bearer token.
+- `friendlyName` is optional. Calling it again with the same values is safe.
+- Register each bundle ID you ship, including debug and white-label builds.
 
-A **state** is not, and this list is written from what adding `.pendingTerms`
-actually touched. The raw values are public API and are mirrored by hand in three
-bridges, so a state that stops at the matrix ships a number the wrappers cannot
-name:
+An app that isn't on the allowlist is refused when the device attests. `initialize()` throws a
+`PayabliGenericError` whose `code` is `.permissionDenied`, and `sessionState` is `.pendingActivation`, the
+same state as a phone that needs a code.
 
-- `PayabliTTPSessionState`, appended, never renumbered
-- `SessionManager.isValidTransition(from:to:)`, and its cases
-- the facade extension that enters or leaves it
-- `ErrorSummary.name(of:)`, or a diagnostic prints the raw number
-- `Bridges/ReactNative/PayabliSDK.ts`, `Bridges/Flutter/lib/payabli_sdk.dart`,
-  `Bridges/MAUI/PayabliEnums.cs` and `PayabliBinding.cs`
-- the sample app's `TapToPaySessionStatus` and the step sequence that switches on
-  it, which build from their own scheme and so stay green in the package suite
-- the exhaustive tables in `ErrorSummaryTests`, `StepStatusTests` and
-  `TapToPayStepsTests`
-- this diagram
-
----
-
-## 3. State vs events
-
-`SessionManager` and `EventMulticaster` both live on the facade but answer
-different questions. The overlap is cosmetic — they fire together because
-transitions and announcements usually coincide — but they don't replace each
-other.
-
-|  | `SessionManager` | `EventMulticaster` |
-|---|---|---|
-| Answers | "What can the facade do right now?" | "What just happened?" |
-| Shape | Single state (`PayabliTTPSessionState`) | Stream of discrete `PayabliTTPEvent`s |
-| Durability | Persistent within the session | Ephemeral — if no one is listening, the event is gone |
-| Invariants | Enforced — invalid transitions are rejected | None — fire-and-forget |
-| Cardinality | One value, many readers | One event, N subscribers |
-| Consumers | Internal guards (`guard sessionState == .ready`), SwiftUI `@Published` bindings | Host apps subscribing via `ttp.events()` — spinners, logs, analytics |
-
-A typical phase in `PayabliTTP+Initialize.swift` touches both:
+## Set up
 
 ```swift
-_ = sessionManager.transition(to: .attestingDevice)   // state: I can attest
-syncPublished()                                        // UI re-renders
-multicaster.emit(.attestationStarted)                  // "heads up, I'm attesting"
+import PayabliSDKCore
+import PayabliSDKTapToPay
+
+let ttp = try PayabliTTP(
+    tokenProvider: { try await fetchPayabliAccessToken() },
+    entryPoint: "your-entry-point",
+    appId: "TEAM123456.com.example.checkout",
+    environment: .sandbox
+)
 ```
 
-**When to use which?**
+- `PayabliTTP` builds its own session from these values. It is an `ObservableObject`: bind `sessionState`
+  and `isReady` in SwiftUI.
+- **One paypoint per session.** A `PayabliTTP` serves the entry point it was created with.
 
-- Need to decide whether an operation is legal right now → **state**.
-- Need to react to a moment in time (even if the state didn't change) → **event**.
-  Example: `.nfcCompleted` fires while the session is still `.ready` both
-  before and after. There's no transition, but the host still needs to know
-  the tap succeeded.
+## Take a payment
 
-Collapsing these into one abstraction was considered and rejected — state-only
-loses "what just happened" granularity when no transition occurs, and
-events-only forces the SDK and its callers to reconstruct "what am I allowed
-to do" from a log of past announcements.
+### Initialize
 
----
-
-## 4. Charge pipeline (PRD §19.1)
-
-`PayabliTTP.charge(type:paymentDetails:customer:invoice:orderDescription:)` in `PayabliTTP+Charge.swift` runs three
-serial steps. The result of each step feeds the next:
-
-```
-┌── /initiate ───────────────────────┐    ┌── provider.startReading ─────┐    ┌── /update ──────────────┐
-│ POST /api/v2/MoneyIn/initiate      │    │ CardReadRequest(amount,      │    │ PATCH /MoneyIn/update/  │
-│ ← paymentTransId                   │ ─▶ │   merchantTransactionId=...) │ ─▶ │       {paymentTransId}  │
-│ (deviceId from attestation cache)  │    │ → CardReadResult             │    │ success: fiservResponse │
-└────────────────────────────────────┘    │   (providerResponseJSON)     │    │ failure: error body     │
-                                          └──────────────────────────────┘    └─────────────────────────┘
-                                                                                      │
-                                                                                      ▼
-                                                       Retried on a transport failure, a server fault
-                                                       or a rate limit, honouring `Retry-After`. A
-                                                       declined card throws `cardDeclined` whether or
-                                                       not the update lands. Otherwise a final failure
-                                                       throws `updateFailed`, carrying the capture.
-                                                       There is no offline / pending-update fallback.
+```swift
+do {
+    try await ttp.initialize()
+} catch PayabliTTPError.devicePendingActivation {
+    // The phone needs an activation code. See Activate a phone.
+} catch PayabliTTPError.termsNotAccepted {
+    // The merchant hasn't accepted Apple's terms. See Accept Apple's terms.
+}
 ```
 
-Every stage emits a `PayabliTTPEvent` through the multicaster so host apps
-can surface progress without polling the state machine.
+`initialize()` attests the device, fetches its configuration and prepares the reader. The first run on a
+phone takes longer than later ones.
 
-> **Note — no offline fallback.** An earlier version of the SDK enqueued failed
-> updates into a `PendingUpdateQueue` for later retry. That subsystem has
-> been removed; if the final `PATCH /update` fails after retries, the charge
-> reports it, and `capture` says what the tap did. After an approval the
-> transaction is still authorized on the processor side and the host must
-> reconcile manually (processor dashboard or back-office).
+### Accept Apple's terms
 
----
+A merchant accepts Apple's Tap to Pay terms **once per merchant**, not once per phone. Until they do,
+`initialize()` stops at `.pendingTerms`, emits `.termsRequired` and throws
+`PayabliTTPError.termsNotAccepted`.
 
-## 5. Security boundaries
+Present the terms from a screen where someone with the authority to accept is present, then initialize
+again:
 
-The SDK handles two data classes with different persistence rules:
+```swift
+try await ttp.presentTerms()
+guard try await ttp.areTermsAccepted() else { return } // declined, or dismissed
+try await ttp.initialize()
+```
 
-| Data | Where it lives | Lifetime | Reference |
-|---|---|---|---|
-| Device bindings: `entry`, `deviceId`, `keyId`, one per paypoint | Keychain (`KeychainStorage`), one item | Until a refusal drops it, `clearCache(for:)` resets it, the key it names is gone, or device wipe | NFR-5E, PRD §22.1 |
-| Install identifier: a UUID minted on first use (`InstallIdentifier`) | Keychain (`KeychainStorage`), one item | Until device wipe or the app's Keychain items are removed. Outlives every binding, and `clearCache(for:)` does not touch it | NFR-5E, PRD §22.1 |
-| Pending App Attest key id, one per entry point | Keychain (`KeychainStorage`), one item | Until that key is attested or the paypoint's binding is cleared | NFR-5E, PRD §22.1 |
-| Access token, provider credentials (Fiserv), assertions, in-flight transaction bodies | RAM only, adapter + auth objects | Seconds to minutes | NFR-5D |
+- `presentTerms()` returning doesn't mean the merchant accepted. Ask `areTermsAccepted()`.
+- Ask each time instead of caching the answer. Acceptance can change outside your app.
+- `areTermsAccepted()` returns `false` when the merchant hasn't accepted, and throws
+  `PayabliTTPError.readerSetupFailed` when the reader couldn't answer.
 
-The install identifier is never sent. What registration receives is a digest of
-it with the bundle identifier and this module's name, so the stored value stays
-on the device and the value sent differs per app. It has to outlive a binding:
-an install that lost it registers as a device that has never been seen.
+### Activate a phone
 
-Nothing else persists to disk. Adapters must drop `self.credentials = nil`
-as soon as the processor SDK has its own copy (typically the same call
-stack as `prepareReader`). See `Adapters/README.md §3`.
+A phone takes Tap to Pay payments for a paypoint only after it is activated with a 6-digit code.
 
-> **Note — activation code is partner-issued.** The SDK does **not** request
-> activation codes. When a device lands in `.pendingActivation`, the partner
-> must obtain the OTP out-of-band (typically via their admin dashboard
-> hitting `POST /api/v2/device/taptopay/activate/challenge` server-side) and
-> deliver it to the device user through their own channel. The SDK only
-> consumes the code via `activateDevice(activationCode:)`. This keeps
-> code-issuance controls — rate limiting, audit, merchant identity — on the
-> partner backend, outside the mobile trust zone.
+- Activation is **per phone and per paypoint**. It isn't per user.
+- A reinstall, a restore to a new phone, or a new phone needs a new code.
 
----
+Until the phone is activated, `initialize()` throws `PayabliTTPError.devicePendingActivation` and
+`sessionState` is `.pendingActivation`. An app that isn't on the allowlist, or credentials without `tools_init`
+or `pos_create`, land in the same state, so check both before issuing a code. Credentials without
+`inboundpayments_create` reach `.ready`, and `charge` then throws a core `PayabliError` whose `code` is
+`.permissionDenied`, before the card is read.
 
-## 6. Extending the module
+1. Issue a code for the phone. In the Payabli portal, under **Device Management**, the waiting device's
+   options include **Activate device**. The code is valid for 30 minutes, and asking again before it
+   expires returns the same code. The API route,
+   [Generate Tap to Pay activation code](https://docs.payabli.com/developers/api-reference/device/activation-challenge),
+   takes the device's ID, which the SDK doesn't return, so issue codes from the portal.
 
-Rules of thumb when adding new capability in this folder:
+   The code is six digits and can start with zero, so keep it as a string.
+2. Deliver the code to the person holding the phone, and have your app ask for it.
+3. Activate, then initialize again:
 
-1. **Keep the folder flat.** No new sub-folders — PRD §7.2 only allows
-   `Adapters/`. Use prefixes (`PayabliTTP*`, `AppAttestService+*`,
-   `TTPConfigClient*`) instead.
-2. **One principal type per file.** DTOs, helpers, and extensions belong in
-   companion files (`*WireFormat.swift`, `TypeName+Topic.swift`).
-3. **Companion files > giant files.** Once a file crosses ~200 lines or
-   mixes concerns (protocol + implementation + DTOs), split into a
-   `+Topic.swift` companion.
-4. **Wire formats next to their client.** Don't put DTOs in
-   `PayabliSDKCore`; keep them alongside the client that owns them so the
-   surface is obvious.
-5. **Reuse `PayabliEnvelope`.** Any new endpoint that returns the standard
-   `isSuccess`/`responseData` envelope should decode via
-   `PayabliSDKCore.PayabliEnvelope` rather than rolling its own types.
-6. **New states / events / errors stay typed.** Extending the lifecycle
-   means updating `PayabliTTPSessionState`, the transition matrix in
-   `SessionManager`, `PayabliTTPEvent`, and `PayabliTTPError` together.
+```swift
+try await ttp.activateDevice(activationCode: code)
+try await ttp.initialize()
+```
 
-For adding a new card-reader implementation, see `Adapters/README.md`.
+### Charge
 
----
+When `isReady` is `true`, or `sessionState` is `.sessionExpired`, which `charge` refreshes before it reads
+the card:
 
-## References
+```swift
+let result = try await ttp.charge(
+    type: .sale,
+    paymentDetails: PayabliTTPPaymentDetails(amount: 9.99),
+    customer: PayabliTTPCustomerData(firstName: "Jane", lastName: "Doe"),
+    invoice: PayabliTTPInvoiceData(invoiceNumber: "INV-9001")
+)
+order.paymentTransId = result.paymentTransId // store it; don't log it
+```
 
-- PRD `§7.2` — directory layout
-- PRD `§17` — the session state machine
-- PRD `§18` — App Attest integration
-- PRD `§19.1` — charge pipeline
-- PRD `§20` — events + errors
-- PRD `§21.1` — retry policy (pending-update queue from §21.2 is no longer implemented)
-- PRD `§22.1` — Keychain persistence
-- PRD `FR-11A..E..J`, `NFR-5D`, `NFR-5E`
-- `Adapters/README.md` — provider contract and onboarding
+| Parameter | Type | Notes |
+|---|---|---|
+| `type` | `PayabliTTPPaymentType` | `.sale` is the only type accepted. |
+| `paymentDetails` | `PayabliTTPPaymentDetails` | `amount`, the total charged, is required. `serviceFee` defaults to `0`. `serviceFee` is part of `amount`, not added to it: the card is charged `amount`. Leave `currency` out to charge in the paypoint's currency. `paymentDescription` is optional. |
+| `customer` | `PayabliTTPCustomerData` | Name the payer with at least one of `firstName`, `lastName`, `customerNumber` or `customerId`. A charge that names nobody can be refused. The other fields (email, phone, billing and shipping address) are optional, and blank values are ignored. |
+| `invoice` | `PayabliTTPInvoiceData` | Optional. `invoiceNumber`. |
+| `orderDescription` | `String?` | Optional. |
+
+`charge` returns only when the payment is approved. Store `result.paymentTransId` with your order.
+
+## Outcomes and errors
+
+Cancelling the task running `charge` after the transaction has opened doesn't end it silently: it throws
+`nfcFailed` or `updateFailed`, carrying `paymentTransId` and `capture`. Follow `capture` as for any other
+error.
+
+Every `PayabliTTPError` carries `capture` and `paymentTransId`:
+
+| `capture` | Meaning | What to do |
+|---|---|---|
+| `.notCharged` | The card wasn't charged. | You can retry. |
+| `.unknown` | The outcome isn't known. | Look up `paymentTransId` with [`GET /api/MoneyIn/details/{transId}`](https://docs.payabli.com/developers/api-reference/moneyin/get-details-for-a-processed-transaction) before charging again. When there's no ID, find the transaction in the Payabli portal. |
+| `.charged` | The card was charged, but a later step failed. | Don't charge again. Reconcile the payment. |
+
+| Error | When |
+|---|---|
+| `devicePendingActivation` | The phone needs an activation code. |
+| `termsNotAccepted` | The merchant hasn't accepted Apple's terms. |
+| `cardDeclined(paymentTransId:)` | The card was declined. |
+| `outcomeUnknown(paymentTransId:)` | The processor answered neither an approval nor a decline. |
+| `nfcFailed(reason:paymentTransId:)` | The card read failed, for example the card moved away too soon. |
+| `updateFailed(reason:paymentTransId:capture:)` | The step after the card read failed. `capture` says whether the card was charged. |
+| `initiateFailed(reason:)` | The transaction couldn't be opened. Nothing was charged. |
+| `attestationFailed(reason:)`, `attestationRevoked(reason:)` | The device couldn't prove its identity. Check the entitlements. |
+| `configFailed(reason:)` | Fetching the device's configuration failed. `reason` says why: a setup gap on the paypoint or device, or a token, network or service failure. |
+| `readerSetupFailed(reason:paymentTransId:)` | The reader couldn't be prepared. |
+| `readerOSVersionNotSupported(paymentTransId:capture:)` | The iOS version doesn't support Tap to Pay. |
+| `invalidState(current:attempted:)`, `notReady(current:)`, `notInitialized` | The call was made in the wrong session state. |
+| `tokenExpired`, `networkError(reason:)` | The token or the network failed. Retry later. |
+| `activationFailed(reason:)` | The activation code was refused. |
+
+Device attestation and opening a transaction can also throw a core `PayabliError` from `PayabliSDKCore`,
+for example `PayabliGenericError` or `PayabliPaymentError`. It carries no `capture`: `charge` throws one
+only before the card is read, so nothing was charged. Catch `any PayabliError` and branch on its `code`;
+`.tokenProviderFailed` means your token provider failed.
+
+From Objective-C, these errors arrive as `NSError`. See
+[Language support](../../README.md#language-support) in the root README.
+
+## Reference
+
+### Session states
+
+`sessionState` is a `PayabliTTPSessionState`:
+
+| State | Meaning |
+|---|---|
+| `.idle` | Not started, or activated and waiting for `initialize()`. |
+| `.attestingDevice`, `.fetchingConfig`, `.initializingReader(percent:)` | `initialize()` is running. |
+| `.ready` | Ready to charge. |
+| `.pendingActivation` | The phone needs an activation code, the app isn't on the paypoint's allowlist, or the credentials lack `tools_init` or `pos_create`. |
+| `.pendingTerms` | The merchant hasn't accepted Apple's terms. |
+| `.sessionExpired` | The session needs refreshing. The next `charge` refreshes it. |
+| `.reinitializing` | The session is being refreshed. |
+| `.failed(reason:)` | The session stopped. `reason` says what to do. |
+
+### Failure reasons
+
+| `failureReason` | What to do |
+|---|---|
+| `.configurationRejected` | The paypoint, the device or its setup is missing something. Retrying won't help; contact Payabli. A token, network or service failure while fetching the configuration lands on `.serviceUnavailable` instead. |
+| `.attestationRequired` | The device's attestation was refused or revoked. Check the entitlements, then initialize again. |
+| `.serviceUnavailable` | The service or the reader wasn't available. Try again later. |
+| `.deviceIneligible` | This iPhone or iOS version can't take Tap to Pay payments, or the card reader refused it. If an iPhone that meets the requirements lands here, contact Payabli before replacing it. |
+| `.sdkInternalError` | Report it to Payabli. |
+
+### Events
+
+`events()` returns an `AsyncStream<PayabliTTPEvent>` for progress UI. Don't log whole events:
+`.chargeInitiated` and others carry the transaction ID. Each stream receives the
+events emitted after it opens, and nothing emitted before. Open it before you call `initialize()` or
+`charge`, and read it in its own task, since the `for await` loop runs until the stream ends:
+
+```swift
+let events = ttp.events()          // open the stream first
+eventTask = Task {                  // keep the task, and cancel it when your screen goes away
+    for await event in events {
+        switch event {
+        case .chargeInitiated(let paymentTransId): pendingTransId = paymentTransId
+        case .readerReady: showReady()
+        case .cardDetected: showReading()
+        default: break
+        }
+    }
+}
+try await ttp.initialize()
+```
+
+`.chargeInitiated` carries the transaction ID before the card is read. Keep it, so you can reconcile a
+charge whose outcome is unknown. A stream opened after the charge started misses it.
+
+## Go live
+
+- Apple's entitlement on your release build, with `appattest-environment` set to `production`.
+- Your release bundle ID on your **production** paypoint's allowlist.
+- Apple's terms accepted by the merchant.
+- One phone activated and one payment approved end to end, then looked up by its transaction ID.
+
+## Related docs
+
+- [Payabli iOS SDK](../../README.md): setup, the token endpoint, outcomes and go-live
+- [Card-not-present payments on iOS](../PayabliSDKPayIn/README.md)
+- [Sample app](../../Example/PayabliDemo/)
+- [Accept Tap to Pay payments](https://docs.payabli.com/guides/pay-in-developer-tap-to-pay) on docs.payabli.com
+- [Generate Tap to Pay activation code](https://docs.payabli.com/developers/api-reference/device/activation-challenge)

@@ -17,6 +17,8 @@ Two modes for the token itself:
 
 ## Setup
 
+Node 18 or later. The server uses Node's global `fetch` and has no dependencies.
+
 ```bash
 cd Example/PayabliDemo/LocalTokenServer
 cp .env.example .env
@@ -36,7 +38,8 @@ node server.mjs
 
 By default the server binds only to `127.0.0.1`. Keep that default when testing
 in Simulator so local credentials and returned access tokens are not exposed on
-your LAN.
+your LAN. The server authenticates no caller: a request with no `Origin` header
+is answered, so anything that can reach the port gets a token.
 
 The iOS Simulator can call:
 
@@ -137,10 +140,12 @@ Only add hosts for trusted local test infrastructure. Do not point credential
 exchange at arbitrary URLs, because that would send the configured
 `clientSecret` to that host.
 
-Then call the same sample URL:
+Then call `/payabli/exchange-token`, as above. `/payabli/access-token` still answers in this mode, but
+from a cache kept for `PAYABLI_TOKEN_CACHE_TTL_SECONDS` seconds, default `300`, so it can hand back a
+token that was just rejected:
 
 ```text
-http://127.0.0.1:8787/payabli/access-token
+http://127.0.0.1:8787/payabli/exchange-token
 ```
 
 You can also pass credentials per request for quick experiments:
@@ -294,8 +299,7 @@ curl -X POST http://127.0.0.1:8787/payabli/activation-code \
 
 Pass the `deviceId`. It is the only field that identifies a single device.
 Serial number is the app's `identifierForVendor`, and several device records can
-share one serial: one handset on this entrypoint has ten records with the same
-serial, eight of them pending.
+share one serial.
 
 A host app has no `deviceId` to pass. The attestation service holding it is internal
 to the SDK, and activating does not need it: once the session reports
@@ -308,12 +312,12 @@ reports which path was used: `request`, `onlyPendingDevice`, or
 `newestOf<count>Pending` — the count is in the value, so `newestOf8Pending`
 tells you the choice was made from eight candidates and is worth checking.
 
-Device listing uses `/Cloud/list`. `/Device/list` omits pending devices.
+Device listing uses `/Cloud/list`.
 
 Activation code behavior:
 
 - 6 digits, zero-padded. Keep it a string.
-- Expires in 30 minutes. 5 failed attempts discard it server-side.
+- Expires in 30 minutes.
 - Idempotent within the validity window: an unexpired code is returned again
   with `alreadyIssued: true` rather than reissued, so a resend is a repeat call.
 - A device that is already active returns

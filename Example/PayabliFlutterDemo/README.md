@@ -78,5 +78,5 @@ the form requires a valid Bearer access token from your backend for
   carries a `code` (typed `PayabliTTPEventCode` enum) and a `payload`
   map (per-case schema documented in the bridge source).
 - Errors thrown by the SDK surface as `PayabliTTPException` with the
-  stable code `TTP_<n>` for typed `PayabliTTPError`s — see the native
-  module README for the code table.
+  stable code `TTP_<n>` for typed `PayabliTTPError`s — `<n>` is `PayabliTTPError.errorCode`, in
+  [`PayabliTTPEvent.swift`](../../Sources/PayabliSDKTapToPay/PayabliTTPEvent.swift).

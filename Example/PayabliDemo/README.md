@@ -140,7 +140,7 @@ The environment works the same way and is worth calling out, because it is the o
 an integrator changes first. This app owns `DemoEnvironment` and decides which one
 runs; `SDK/PayabliEnvironmentMapping.swift` says what the SDK calls it, and nothing
 above holds an SDK environment to point a session somewhere. The Android sample
-splits it the same way, mapping in `app/sdk/PayInSessionSource.kt`.
+splits it the same way, mapping in `sdk/DemoEnvironment.kt`.
 
 ### The Config tab
 
@@ -231,16 +231,14 @@ tab's Build section.
 |---|---|---|
 | `Debug` (default) | `source` | compiles the SDK as part of the build |
 | `Release` | `source` | same |
-| `Debug-XCFramework` | `xcframework` | **fails closed** — not wired yet |
+| `Debug-XCFramework` | `xcframework` | **fails closed** |
 
 `Debug-XCFramework` is a hook, not a working mode: every build with it fails on
 purpose rather than quietly falling back to source.
 
 It cannot work as one configuration. Which products a target links is set on the
 target, so switching configuration cannot unlink the package and would leave the
-build linking both the package sources and any framework it found. A second
-target that links the frameworks instead is what makes it real, and that belongs
-with the binary-release work.
+build linking both the package sources and any framework it found.
 
 ## Not included
 
