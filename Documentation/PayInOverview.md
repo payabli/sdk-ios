@@ -235,7 +235,7 @@ The styling is configurable through `PayabliPayInPaymentSummaryConfiguration`:
 - `valueStyle`
 - `rowSpacing`
 
-Relabel a money row through `PayabliPayInLabels.fieldLabels`, and the Total row
+Relabel a money row through `PayabliPayInLabels.fieldLabels`, and the Total label
 through `PayabliPayInLabels.total`.
 
 Rows are vertical. Labels are left aligned and values are right aligned.

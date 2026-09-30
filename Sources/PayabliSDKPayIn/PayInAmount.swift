@@ -14,7 +14,7 @@ enum PayInAmount {
         return rounded
     }
 
-    /// The amount as it would be sent, or nil when it cannot be sent at all.
+    /// The amount as sent, or nil when it cannot be sent.
     static func sendable(_ value: Double) -> Decimal? {
         // Checked as a Double first: `Decimal(_:)` traps on a non-finite value and is unreliable far past the
         // wire's range.
