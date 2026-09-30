@@ -88,6 +88,17 @@ final class PaymentMethodConfigurationChangeTests: XCTestCase {
         )
     }
 
+    func testChangingTheTotalLabelAloneIsAConfigurationChange() {
+        let before = PayInPaymentFlowConfigurationChange(
+            PayabliPayInFormConfiguration(allowedMethods: [.card], labels: PayabliPayInLabels())
+        )
+        let after = PayInPaymentFlowConfigurationChange(
+            PayabliPayInFormConfiguration(allowedMethods: [.card], labels: PayabliPayInLabels(total: "Amount due"))
+        )
+
+        XCTAssertNotEqual(before, after)
+    }
+
     @MainActor
     func testTheSheetHeaderMoveKeepsTheTotalLabel() {
         let component = flowOnSession()

@@ -53,7 +53,8 @@ private extension PayabliPayInLabels {
             "subtitle:\(subtitle ?? "")",
             "submit:\(submitButton)",
             "labels:\(fieldLabels.payabliViewModelSignature)",
-            "placeholders:\(fieldPlaceholders.payabliViewModelSignature)"
+            "placeholders:\(fieldPlaceholders.payabliViewModelSignature)",
+            "total:\(total ?? "")"
         ]
         .joined(separator: "|")
     }
