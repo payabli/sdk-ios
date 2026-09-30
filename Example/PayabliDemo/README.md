@@ -140,7 +140,7 @@ The environment works the same way and is worth calling out, because it is the o
 an integrator changes first. This app owns `DemoEnvironment` and decides which one
 runs; `SDK/PayabliEnvironmentMapping.swift` says what the SDK calls it, and nothing
 above holds an SDK environment to point a session somewhere. The Android sample
-splits it the same way, mapping in `app/sdk/PayInSessionSource.kt`.
+splits it the same way, mapping in `sdk/DemoEnvironment.kt`.
 
 ### The Config tab
 
