@@ -49,7 +49,7 @@ token in memory while the session runs.
 
 ### Add the SDK
 
-No version is tagged, so add the package by branch or by commit. In Xcode, choose
+Add the package by branch or by commit. In Xcode, choose
 **File > Add Package Dependencies** and enter the repository URL:
 
 ```text
