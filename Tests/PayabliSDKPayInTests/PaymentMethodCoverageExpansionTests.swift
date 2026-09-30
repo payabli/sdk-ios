@@ -203,7 +203,7 @@ final class PaymentMethodCoverageExpansionTests: XCTestCase {
         window.rootViewController = host
         window.makeKeyAndVisible()
 
-        waitForPresentedViewController(from: host)
+        PayInUIKitHostingSupport.waitForPresentedViewController(from: host)
 
         XCTAssertNotNil(host.presentedViewController)
     }
@@ -242,7 +242,7 @@ final class PaymentMethodCoverageExpansionTests: XCTestCase {
         window.rootViewController = host
         window.makeKeyAndVisible()
 
-        waitForRenderedSubviews(in: host.view)
+        PayInUIKitHostingSupport.waitForRenderedSubviews(in: host.view)
         let textFields = host.view.payabliCoverageAllSubviews.compactMap { $0 as? UITextField }
         XCTAssertTrue(textFields.contains { $0.accessibilityLabel == "Card number" })
     }
@@ -281,7 +281,7 @@ final class PaymentMethodCoverageExpansionTests: XCTestCase {
         window.rootViewController = host
         window.makeKeyAndVisible()
 
-        waitForRenderedSubviews(in: host.view)
+        PayInUIKitHostingSupport.waitForRenderedSubviews(in: host.view)
         let textFields = host.view.payabliCoverageAllSubviews.compactMap { $0 as? UITextField }
 
         XCTAssertTrue(textFields.contains { $0.accessibilityLabel == "Card number" })
@@ -311,9 +311,9 @@ final class PaymentMethodCoverageExpansionTests: XCTestCase {
             ),
             onCompleted: { _ in }
         )
-        let host = host(view)
+        let host = PayInUIKitHostingSupport.host(view)
 
-        waitForRenderedSubviews(in: host.view)
+        PayInUIKitHostingSupport.waitForRenderedSubviews(in: host.view)
         let textFields = host.view.payabliCoverageAllSubviews.compactMap { $0 as? UITextField }
         let labels = Set(textFields.compactMap(\.accessibilityLabel))
 
@@ -361,9 +361,9 @@ final class PaymentMethodCoverageExpansionTests: XCTestCase {
             onCompleted: { _ in }
         )
         .environment(\.dynamicTypeSize, .accessibility1)
-        let host = host(view)
+        let host = PayInUIKitHostingSupport.host(view)
 
-        waitForRenderedSubviews(in: host.view)
+        PayInUIKitHostingSupport.waitForRenderedSubviews(in: host.view)
         let textFields = host.view.payabliCoverageAllSubviews.compactMap { $0 as? UITextField }
         let accountField = try XCTUnwrap(textFields.first { $0.accessibilityLabel == "Account number" })
         let holderField = try XCTUnwrap(textFields.first { $0.accessibilityLabel == "Account holder" })
@@ -387,9 +387,9 @@ final class PaymentMethodCoverageExpansionTests: XCTestCase {
             ),
             onCompleted: { _ in }
         )
-        let host = host(view)
+        let host = PayInUIKitHostingSupport.host(view)
 
-        waitForRenderedSubviews(in: host.view)
+        PayInUIKitHostingSupport.waitForRenderedSubviews(in: host.view)
         let cardNumberField = try XCTUnwrap(
             host.view.payabliCoverageAllSubviews
                 .compactMap { $0 as? UITextField }
@@ -418,9 +418,9 @@ final class PaymentMethodCoverageExpansionTests: XCTestCase {
             configuration: PayabliPayInFormConfiguration(allowedMethods: [.card]),
             onCompleted: { _ in }
         )
-        let host = host(view)
+        let host = PayInUIKitHostingSupport.host(view)
 
-        waitForRenderedSubviews(in: host.view)
+        PayInUIKitHostingSupport.waitForRenderedSubviews(in: host.view)
         let cardNumberField = try XCTUnwrap(
             host.view.payabliCoverageAllSubviews
                 .compactMap { $0 as? UITextField }
@@ -482,9 +482,9 @@ final class PaymentMethodCoverageExpansionTests: XCTestCase {
 
     @MainActor
     func testHostedUIKitTextFieldUpdateSanitizesInitialTextAndAppliesMetadata() throws {
-        let host = host(UIKitTextFieldSanitizingHarness())
+        let host = PayInUIKitHostingSupport.host(UIKitTextFieldSanitizingHarness())
 
-        waitForRenderedSubviews(in: host.view)
+        PayInUIKitHostingSupport.waitForRenderedSubviews(in: host.view)
         let textField = try XCTUnwrap(
             host.view.payabliCoverageAllSubviews
                 .compactMap { $0 as? UITextField }
@@ -506,38 +506,46 @@ final class PaymentMethodCoverageExpansionTests: XCTestCase {
         XCTAssertEqual(textField.attributedPlaceholder?.string, "Hosted card number")
     }
 
+    /// The form disables its UIKit fields while a submission is in flight, and a wrapped text
+    /// field refuses the keyboard only when the representable carries SwiftUI's disabled state
+    /// into it: the framework's own controls read that environment themselves, and UIKit's do not.
     @MainActor
-    private func waitForPresentedViewController(
-        from host: UIViewController,
+    func testADisabledContainerMakesTheUIKitFieldRefuseInputAndDropTheKeyboard() throws {
+        let store = UIKitTextFieldDisableStore()
+        let host = PayInUIKitHostingSupport.host(UIKitTextFieldDisableHarness(store: store))
+
+        PayInUIKitHostingSupport.waitForRenderedSubviews(in: host.view)
+        let textField = try XCTUnwrap(
+            host.view.payabliCoverageAllSubviews
+                .compactMap { $0 as? UITextField }
+                .first { $0.accessibilityLabel == "Hosted card number" }
+        )
+        RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.2))
+
+        XCTAssertTrue(textField.isEnabled)
+        XCTAssertTrue(textField.becomeFirstResponder())
+        XCTAssertTrue(textField.isFirstResponder)
+
+        store.disabled = true
+
+        store.disabled = true
+        waitForDisabledField(in: host.view, textField)
+
+        XCTAssertFalse(textField.isEnabled)
+        XCTAssertFalse(textField.isFirstResponder)
+    }
+
+    @MainActor
+    private func waitForDisabledField(
+        in view: UIView,
+        _ textField: UITextField,
         timeout: TimeInterval = 1
     ) {
         let deadline = Date().addingTimeInterval(timeout)
-        while host.presentedViewController == nil, Date() < deadline {
+        while textField.isEnabled || textField.isFirstResponder, Date() < deadline {
+            view.setNeedsLayout()
             RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.05))
         }
-    }
-
-    @MainActor
-    private func waitForRenderedSubviews(
-        in view: UIView,
-        timeout: TimeInterval = 1
-    ) {
-        let deadline = Date().addingTimeInterval(timeout)
-        repeat {
-            view.setNeedsLayout()
-            view.layoutIfNeeded()
-            RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.05))
-        } while view.payabliCoverageAllSubviews.compactMap({ $0 as? UITextField }).isEmpty && Date() < deadline
-    }
-
-    @MainActor
-    private func host<Content: View>(_ view: Content) -> UIHostingController<Content> {
-        let host = UIHostingController(rootView: view)
-        let window = UIWindow(frame: UIScreen.main.bounds)
-        window.rootViewController = host
-        window.makeKeyAndVisible()
-        CoverageWindowStore.windows.append(window)
-        return host
     }
 }
 
@@ -585,15 +593,28 @@ private struct UIKitTextFieldSanitizingHarness: View {
     }
 }
 
-private extension UIView {
-    var payabliCoverageAllSubviews: [UIView] {
-        subviews + subviews.flatMap(\.payabliCoverageAllSubviews)
-    }
+@MainActor
+private final class UIKitTextFieldDisableStore: ObservableObject {
+    @Published var disabled = false
 }
 
-@MainActor
-private enum CoverageWindowStore {
-    static var windows: [UIWindow] = []
+private struct UIKitTextFieldDisableHarness: View {
+    @ObservedObject var store: UIKitTextFieldDisableStore
+    @State private var text = ""
+    @State private var focusedField: PayabliPayInField?
+
+    var body: some View {
+        PayabliPayInUIKitTextField(
+            text: $text,
+            placeholder: "Hosted card number",
+            field: .cardNumber,
+            focusedField: $focusedField,
+            keyboardType: .numberPad,
+            accessibilityLabel: "Hosted card number"
+        )
+        .disabled(store.disabled)
+        .frame(width: 240, height: 44)
+    }
 }
 
 private actor CoverageTransport: PayabliTransport {

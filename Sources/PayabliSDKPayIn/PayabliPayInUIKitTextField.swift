@@ -26,6 +26,7 @@ struct PayabliPayInUIKitTextField: UIViewRepresentable {
     var placeholder: String
     var field: PayabliPayInField
     @Binding var focusedField: PayabliPayInField?
+    @Environment(\.isEnabled) private var isEnabled
     var keyboardType: UIKeyboardType
     var textContentType: UITextContentType?
     var autocapitalization: UITextAutocapitalizationType
@@ -136,6 +137,14 @@ struct PayabliPayInUIKitTextField: UIViewRepresentable {
         )
         textField.accessibilityHint = accessibilityHint
         textField.accessibilityIdentifier = PayabliPayInAccessibility.fieldIdentifier(field)
+
+        // The field's own flag carries the environment's disabled state: the framework applies it
+        // to a wrapped view on current runtimes but documents nothing, so the deployment floor
+        // cannot rely on that.
+        textField.isEnabled = isEnabled
+        if !isEnabled, textField.isFirstResponder {
+            textField.resignFirstResponder()
+        }
 
         Self.applyAccessory(to: textField, keyboardType: keyboardType, from: context.coordinator)
     }
