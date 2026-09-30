@@ -151,8 +151,9 @@ app.listen(process.env.PORT ?? 3000);
 
 Anyone who can call the route gets a token that can charge, store payment methods and void for your
 paypoint, so it has to authenticate the caller and check that they may take payments, the way the rest of
-your app does. The sample app ships a complete token server in
-[`Example/PayabliDemo/LocalTokenServer`](Example/PayabliDemo/LocalTokenServer/README.md).
+your app does. The sample app's development token server is in
+[`Example/PayabliDemo/LocalTokenServer`](Example/PayabliDemo/LocalTokenServer/README.md). It
+authenticates no caller, so run it only on your own machine.
 
 ### Configure the SDK
 
