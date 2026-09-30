@@ -299,8 +299,7 @@ curl -X POST http://127.0.0.1:8787/payabli/activation-code \
 
 Pass the `deviceId`. It is the only field that identifies a single device.
 Serial number is the app's `identifierForVendor`, and several device records can
-share one serial: one handset on this entrypoint has ten records with the same
-serial, eight of them pending.
+share one serial.
 
 A host app has no `deviceId` to pass. The attestation service holding it is internal
 to the SDK, and activating does not need it: once the session reports
@@ -313,12 +312,12 @@ reports which path was used: `request`, `onlyPendingDevice`, or
 `newestOf<count>Pending` — the count is in the value, so `newestOf8Pending`
 tells you the choice was made from eight candidates and is worth checking.
 
-Device listing uses `/Cloud/list`. `/Device/list` omits pending devices.
+Device listing uses `/Cloud/list`.
 
 Activation code behavior:
 
 - 6 digits, zero-padded. Keep it a string.
-- Expires in 30 minutes. 5 failed attempts discard it server-side.
+- Expires in 30 minutes.
 - Idempotent within the validity window: an unexpired code is returned again
   with `alreadyIssued: true` rather than reissued, so a resend is a repeat call.
 - A device that is already active returns
