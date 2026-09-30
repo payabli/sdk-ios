@@ -548,6 +548,12 @@ Capture and authorize hosted forms display read-only payment summary rows before
 submit. Rows are vertical. Labels are left aligned; values are right aligned.
 Relabel a money row through `PayabliPayInLabels.fieldLabels`, and the Total row
 through `PayabliPayInLabels.total`.
+A host that draws its own summary reads each row from the same configuration, so its figures
+match the form's. `labelText(for:labels:)` and `totalLabelText(labels:)` give the labels.
+`rowAmount(for:paymentDetails:)` and `totalRowAmount(paymentDetails:)` give the figures as
+`Decimal?`, where nil means the form draws no row. Amount is the total amount less the service
+fee, and Total is the total amount plus any surcharge. `formattedAmount(_:currency:)` writes a
+figure the way the form does.
 
 `PayabliPayInPaymentSummaryConfiguration`:
 

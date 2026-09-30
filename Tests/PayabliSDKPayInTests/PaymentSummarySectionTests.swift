@@ -7,6 +7,14 @@ final class PaymentSummarySectionTests: XCTestCase {
         XCTAssertEqual(PayabliPayInLabels(total: "Amount due").total, "Amount due")
     }
 
+    func testTheTotalRowTakesTheHostLabelOrTotal() {
+        let summary = PayabliPayInPaymentSummaryConfiguration()
+
+        XCTAssertEqual(summary.totalLabelText(labels: PayabliPayInLabels()), "Total:")
+        XCTAssertEqual(summary.totalLabelText(labels: PayabliPayInLabels(total: "  ")), "Total:")
+        XCTAssertEqual(summary.totalLabelText(labels: PayabliPayInLabels(total: "Amount due")), "Amount due:")
+    }
+
     func testASectionTakesInputUnlessMarkedAsTheSummary() {
         XCTAssertEqual(PayabliPayInFieldSection(fields: [.cardNumber]).style, .inputs)
         XCTAssertEqual(PayabliPayInFieldSection(fields: [.amount], style: .summary).style, .summary)
