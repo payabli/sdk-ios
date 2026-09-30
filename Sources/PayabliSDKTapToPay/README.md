@@ -28,7 +28,7 @@ external reader. This guide is part of the [Payabli iOS SDK](../../README.md); s
   | Operation | Permission |
   |---|---|
   | `initialize()` | `tools_init` and `pos_create` |
-  | `activateDevice(activationCode:)` | `pos_create` |
+  | `activateDevice(activationCode:)` | `tools_init` and `pos_create` |
   | `charge` | `inboundpayments_create` |
   | Registering an authorized app through the API | `pos_create` |
 
