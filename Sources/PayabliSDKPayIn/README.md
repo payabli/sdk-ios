@@ -3,8 +3,8 @@
 Take a card or bank account payment that the payer enters, in the SDK's SwiftUI form or in your own UI.
 This guide is part of the [Payabli iOS SDK](../../README.md); set up the SDK there first.
 
-> [!WARNING]
-> **This SDK is in beta.** Its public interface can change in ways that aren't backward compatible. See
+> [!IMPORTANT]
+> **Notice:** This SDK is in beta. Its public interface can change in ways that aren't backward compatible. See
 > [Versioning and support](../../README.md#versioning-and-support).
 
 ## Requirements

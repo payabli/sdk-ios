@@ -3,8 +3,8 @@
 `PayabliSDKTapToPay` lets your app take a contactless card, phone or watch payment on an iPhone, with no
 external reader. This guide is part of the [Payabli iOS SDK](../../README.md); set up the SDK there first.
 
-> [!WARNING]
-> **This SDK is in beta.** Its public interface can change in ways that aren't backward compatible. See
+> [!IMPORTANT]
+> **Notice:** This SDK is in beta. Its public interface can change in ways that aren't backward compatible. See
 > [Versioning and support](../../README.md#versioning-and-support).
 
 ## Requirements
