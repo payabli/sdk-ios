@@ -36,7 +36,8 @@ node server.mjs
 
 By default the server binds only to `127.0.0.1`. Keep that default when testing
 in Simulator so local credentials and returned access tokens are not exposed on
-your LAN.
+your LAN. The server authenticates no caller: a request with no `Origin` header
+is answered, so anything that can reach the port gets a token.
 
 The iOS Simulator can call:
 
