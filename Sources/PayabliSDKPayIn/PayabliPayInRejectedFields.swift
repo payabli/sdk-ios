@@ -16,7 +16,9 @@ enum PayabliPayInRejectedFields {
     private typealias MethodKey = PayabliPayInPaymentMethod.CodingKeys
 
     /// Card and bank-account names are the encoder's own keys; the customer names are checked against an
-    /// encoded request by a test, because `Codable` synthesises them.
+    /// encoded request by a test, because `Codable` synthesises them. The amount, the fee and the
+    /// description carry no mapping: the figures are read back rather than typed, so a mark on either
+    /// could not be cleared by editing it, and no refusal names the description.
     static let fieldsByWireName: [String: PayabliPayInField] = {
         let pairs: [(String, PayabliPayInField)] = [
             (MethodKey.cardHolder.stringValue, .cardholderName),

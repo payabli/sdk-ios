@@ -210,7 +210,7 @@ extension PayabliPayInViewModel {
             return achFieldHasRequiredValue(field)
         case .methodDescription, .firstName, .lastName, .customerNumber, .billingEmail, .billingZip:
             return customerFieldHasRequiredValue(field)
-        case .amount, .serviceFee:
+        case .amount, .serviceFee, .surchargeFee:
             return paymentFieldHasRequiredValue(field)
         }
     }

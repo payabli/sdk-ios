@@ -26,7 +26,8 @@ extension PayabliPayInFormConfiguration {
             "labels:\(labels.payabliViewModelSignature)",
             "formatting:\(formatting.payabliViewModelSignature)",
             "required:\(requiredFields.map(\.rawValue).sorted().joined(separator: ","))",
-            "paymentSummary:\(paymentSummary.payabliViewModelSignature)"
+            "paymentSummary:\(paymentSummary.payabliViewModelSignature)",
+            "showsBaseAmount:\(showsBaseAmount)"
         ]
         .joined(separator: "|")
     }
@@ -73,10 +74,7 @@ private extension PayabliPayInPaymentSummaryConfiguration {
     var payabliViewModelSignature: String {
         [
             "amountLabel:\(amountLabelText ?? "")",
-            "amountValue:\(amountValueText ?? "")",
             "feeLabel:\(feeLabelText ?? "")",
-            "feeValue:\(feeValueText ?? "")",
-            "currency:\(currencySymbol)",
             "rowSpacing:\(rowSpacing)"
         ]
         .joined(separator: ",")

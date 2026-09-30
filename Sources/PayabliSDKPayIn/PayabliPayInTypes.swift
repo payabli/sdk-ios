@@ -128,6 +128,7 @@ public enum PayabliPayInPaymentMethod: Sendable {
 public struct PayabliPayInPaymentDetails: Codable, Sendable, Equatable {
     public let totalAmount: Double
     public let serviceFee: Double?
+    public let surchargeFee: Double?
     public let currency: String?
     public let checkNumber: String?
     public let checkUniqueId: String?
@@ -135,12 +136,14 @@ public struct PayabliPayInPaymentDetails: Codable, Sendable, Equatable {
     public init(
         totalAmount: Double,
         serviceFee: Double? = nil,
+        surchargeFee: Double? = nil,
         currency: String? = nil,
         checkNumber: String? = nil,
         checkUniqueId: String? = nil
     ) {
         self.totalAmount = totalAmount
         self.serviceFee = serviceFee
+        self.surchargeFee = surchargeFee
         self.currency = currency
         self.checkNumber = checkNumber
         self.checkUniqueId = checkUniqueId
@@ -152,6 +155,7 @@ extension PayabliPayInPaymentDetails {
         [
             "totalAmount:\(totalAmount)",
             "serviceFee:\(serviceFee.map { "\($0)" } ?? "")",
+            "surchargeFee:\(surchargeFee.map { "\($0)" } ?? "")",
             "currency:\(currency ?? "")",
             "checkNumber:\(checkNumber ?? "")",
             "checkUniqueId:\(checkUniqueId ?? "")"
@@ -455,6 +459,7 @@ public struct PayabliPayInTransaction: Codable, Sendable, Equatable {
     public let totalAmount: Double?
     public let netAmount: Double?
     public let feeAmount: Double?
+    public let surchargeFee: Double?
     public let settlementStatus: Int?
     public let operation: String?
     public let responseData: PayabliPayInResponseData?
@@ -476,6 +481,7 @@ public struct PayabliPayInTransaction: Codable, Sendable, Equatable {
         totalAmount: Double? = nil,
         netAmount: Double? = nil,
         feeAmount: Double? = nil,
+        surchargeFee: Double? = nil,
         settlementStatus: Int? = nil,
         operation: String? = nil,
         responseData: PayabliPayInResponseData? = nil,
@@ -496,6 +502,7 @@ public struct PayabliPayInTransaction: Codable, Sendable, Equatable {
         self.totalAmount = totalAmount
         self.netAmount = netAmount
         self.feeAmount = feeAmount
+        self.surchargeFee = surchargeFee
         self.settlementStatus = settlementStatus
         self.operation = operation
         self.responseData = responseData

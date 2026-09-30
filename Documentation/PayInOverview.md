@@ -164,6 +164,7 @@ Supported fields:
 | `.billingZip` | Billing Postal Code | Customer information |
 | `.amount` | Amount | Read-only payment summary |
 | `.serviceFee` | Fee | Read-only payment summary |
+| `.surchargeFee` | Surcharge | Read-only payment summary |
 
 Section names are fully configurable:
 
@@ -232,10 +233,7 @@ The text and styling are configurable through
 `PayabliPayInPaymentSummaryConfiguration`:
 
 - `amountLabelText`
-- `amountValueText`
 - `feeLabelText`
-- `feeValueText`
-- `currencySymbol`
 - `labelStyle`
 - `valueStyle`
 - `rowSpacing`

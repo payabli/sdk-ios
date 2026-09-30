@@ -479,9 +479,7 @@ let configuration = PayabliPayInFormConfiguration(
     requiredFields: [.firstName, .lastName, .billingEmail],
     paymentSummary: PayabliPayInPaymentSummaryConfiguration(
         amountLabelText: "Amount:",
-        amountValueText: "$ 1.00",
         feeLabelText: "Fee:",
-        feeValueText: "$ 0.10",
         rowSpacing: 6
     )
 )
@@ -558,6 +556,7 @@ Default field labels:
 | `.billingZip` | Billing Postal Code |
 | `.amount` | Amount |
 | `.serviceFee` | Fee |
+| `.surchargeFee` | Surcharge |
 
 ### `PayabliPayInHiddenValues`
 
@@ -597,10 +596,7 @@ Default field labels:
 | Field | Default | Description |
 | --- | --- | --- |
 | `amountLabelText` | derived from label | Override amount label. |
-| `amountValueText` | derived from amount | Override amount value. |
 | `feeLabelText` | derived from label | Override fee label. |
-| `feeValueText` | derived from fee | Override fee value. |
-| `currencySymbol` | `$` | Symbol for generated value text. |
 | `labelStyle` | subheadline secondary | Label font/color. |
 | `valueStyle` | semibold subheadline primary | Value font/color. |
 | `rowSpacing` | 8 | Vertical spacing between rows. |
@@ -764,6 +760,7 @@ let sheetConfiguration = PayabliPayInSheetConfiguration(
 | --- | --- |
 | `totalAmount` | Required amount. Must be greater than 0. |
 | `serviceFee` | Optional service fee. Must not be negative. Serialized as currency, for example `0.10`. |
+| `surchargeFee` | Optional surcharge. Serialized as currency, for example `0.30`. |
 | `currency` | Optional currency, for example `USD`. |
 | `checkNumber` | Optional check number for check workflows. |
 | `checkUniqueId` | Optional check unique ID for check workflows. |
@@ -868,6 +865,7 @@ Transaction fields include:
 - `totalAmount`
 - `netAmount`
 - `feeAmount`
+- `surchargeFee`
 - `settlementStatus`
 - `operation`
 - `responseData`

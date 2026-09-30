@@ -117,7 +117,8 @@ final class PaymentMethodFormConfigurationTests: XCTestCase {
             .lastName,
             .billingEmail,
             .amount,
-            .serviceFee
+            .serviceFee,
+            .surchargeFee
         ])
     }
 
@@ -170,7 +171,7 @@ final class PaymentMethodFormConfigurationTests: XCTestCase {
             .accountType
         ])
         XCTAssertEqual(configuration.bankSections[1].title, "Payment Information")
-        XCTAssertEqual(configuration.bankSections[1].fields, [.amount, .serviceFee])
+        XCTAssertEqual(configuration.bankSections[1].fields, [.amount, .serviceFee, .surchargeFee])
     }
 
     func testFormConfigurationRoutesRequiredACHAndCustomerFieldsToExistingSections() {
