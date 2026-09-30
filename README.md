@@ -133,12 +133,13 @@ app.post("/payabli/token", async (req, res) => {
         clientId: process.env.PAYABLI_CLIENT_ID,
         clientSecret: process.env.PAYABLI_CLIENT_SECRET,
       }),
+      redirect: "error", // never replay the client secret to another origin
       signal: AbortSignal.timeout(10_000), // well inside the SDK's 30 seconds
     });
     const body = await upstream.json();
     accessToken = upstream.ok ? (body.access_token ?? body.accessToken) : undefined;
   } catch {
-    // A timeout, a network failure, or an answer that isn't JSON.
+    // A timeout, a redirect, a network failure, or an answer that isn't JSON.
   }
   if (!accessToken) {
     return res.status(502).json({ error: "token exchange failed" });
