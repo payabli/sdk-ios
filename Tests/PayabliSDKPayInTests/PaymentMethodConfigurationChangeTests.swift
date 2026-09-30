@@ -42,7 +42,7 @@ final class PaymentMethodConfigurationChangeTests: XCTestCase {
 
         viewModel.update(component: component, configuration: configuration(amountLabel: "Due today"))
 
-        XCTAssertEqual(viewModel.paymentSummaryLabelText(for: .amount), "Due today")
+        XCTAssertEqual(viewModel.paymentSummaryLabelText(for: .amount), "Due today:")
         XCTAssertEqual(viewModel.cardholderName, "Ada Lovelace")
     }
 
@@ -118,7 +118,9 @@ final class PaymentMethodConfigurationChangeTests: XCTestCase {
             allowedMethods: allowedMethods,
             defaultMethod: .card,
             cardFieldOrder: [.amount] + PayabliPayInFormConfiguration.defaultCardFieldOrder,
-            paymentSummary: PayabliPayInPaymentSummaryConfiguration(amountLabelText: amountLabel),
+            labels: PayabliPayInLabels(
+                fieldLabels: amountLabel.map { [.amount: $0] } ?? PayabliPayInLabels.defaultFieldLabels
+            ),
             showsBaseAmount: showsBaseAmount
         )
     }

@@ -246,15 +246,11 @@ public struct PayabliPayInPaymentSummaryTextStyle: Sendable {
 }
 
 public struct PayabliPayInPaymentSummaryConfiguration: Sendable {
-    public let amountLabelText: String?
-    public let feeLabelText: String?
     public let labelStyle: PayabliPayInPaymentSummaryTextStyle
     public let valueStyle: PayabliPayInPaymentSummaryTextStyle
     public let rowSpacing: CGFloat
 
     public init(
-        amountLabelText: String? = nil,
-        feeLabelText: String? = nil,
         labelStyle: PayabliPayInPaymentSummaryTextStyle = PayabliPayInPaymentSummaryTextStyle(
             font: .subheadline,
             color: .secondary
@@ -265,8 +261,6 @@ public struct PayabliPayInPaymentSummaryConfiguration: Sendable {
         ),
         rowSpacing: CGFloat = 8
     ) {
-        self.amountLabelText = amountLabelText?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty
-        self.feeLabelText = feeLabelText?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty
         self.labelStyle = labelStyle
         self.valueStyle = valueStyle
         self.rowSpacing = max(0, rowSpacing)
@@ -277,11 +271,7 @@ public struct PayabliPayInPaymentSummaryConfiguration: Sendable {
         labels: PayabliPayInLabels
     ) -> String {
         switch field {
-        case .amount:
-            return amountLabelText ?? Self.defaultLabelText(label: labels.label(for: field))
-        case .serviceFee:
-            return feeLabelText ?? Self.defaultLabelText(label: labels.label(for: field))
-        case .surchargeFee:
+        case .amount, .serviceFee, .surchargeFee:
             return Self.defaultLabelText(label: labels.label(for: field))
         default:
             return labels.label(for: field)

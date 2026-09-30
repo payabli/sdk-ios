@@ -73,8 +73,6 @@ private extension PayabliPayInFormatting {
 private extension PayabliPayInPaymentSummaryConfiguration {
     var payabliViewModelSignature: String {
         [
-            "amountLabel:\(amountLabelText ?? "")",
-            "feeLabel:\(feeLabelText ?? "")",
             "rowSpacing:\(rowSpacing)"
         ]
         .joined(separator: ",")

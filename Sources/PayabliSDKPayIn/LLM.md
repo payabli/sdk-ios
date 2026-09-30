@@ -546,13 +546,13 @@ but must still send a value.
 
 Capture and authorize hosted forms display read-only payment summary rows before
 submit. Rows are vertical. Labels are left aligned; values are right aligned.
+Relabel a money row through `PayabliPayInLabels.fieldLabels`, and the Total row
+through `PayabliPayInLabels.total`.
 
 `PayabliPayInPaymentSummaryConfiguration`:
 
 | Field | Default | Purpose |
 | --- | --- | --- |
-| `amountLabelText` | derived from `.amount` label plus colon | Override amount label text. |
-| `feeLabelText` | derived from `.serviceFee` label plus colon | Override fee label text. |
 | `labelStyle` | subheadline secondary | Font and color for summary labels. |
 | `valueStyle` | semibold subheadline primary | Font and color for summary values. |
 | `rowSpacing` | 8 | Vertical spacing between amount and fee rows. |
@@ -561,8 +561,6 @@ Example:
 
 ```swift
 PayabliPayInPaymentSummaryConfiguration(
-    amountLabelText: "Amount:",
-    feeLabelText: "Fee:",
     labelStyle: PayabliPayInPaymentSummaryTextStyle(
         font: .footnote,
         color: .secondary

@@ -363,13 +363,10 @@ final class PayabliPayInTests: XCTestCase {
             "Surcharge: $ 0.30"
         )
 
-        let customSummary = PayabliPayInPaymentSummaryConfiguration(
-            amountLabelText: "Today:",
-            feeLabelText: "Processing:",
-            rowSpacing: 4
-        )
+        let customSummary = PayabliPayInPaymentSummaryConfiguration(rowSpacing: 4)
+        let relabelled = PayabliPayInLabels(fieldLabels: [.amount: "Today", .serviceFee: "Processing"])
         XCTAssertEqual(
-            customSummary.labelText(for: .amount, labels: labels),
+            customSummary.labelText(for: .amount, labels: relabelled),
             "Today:"
         )
         XCTAssertEqual(
@@ -377,7 +374,7 @@ final class PayabliPayInTests: XCTestCase {
             "$ 1.00"
         )
         XCTAssertEqual(
-            customSummary.labelText(for: .serviceFee, labels: labels),
+            customSummary.labelText(for: .serviceFee, labels: relabelled),
             "Processing:"
         )
         XCTAssertEqual(
