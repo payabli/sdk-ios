@@ -227,7 +227,8 @@ struct PayabliPayInSheetContent: View {
             subtitle: nil,
             submitButton: configuration.labels.submitButton,
             fieldLabels: configuration.labels.fieldLabels,
-            fieldPlaceholders: configuration.labels.fieldPlaceholders
+            fieldPlaceholders: configuration.labels.fieldPlaceholders,
+            total: configuration.labels.total
         )
         return PayabliPayInFormConfiguration(
             allowedMethods: configuration.allowedMethods,

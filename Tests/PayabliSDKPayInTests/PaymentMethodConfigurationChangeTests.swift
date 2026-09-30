@@ -88,6 +88,25 @@ final class PaymentMethodConfigurationChangeTests: XCTestCase {
         )
     }
 
+    @MainActor
+    func testTheSheetHeaderMoveKeepsTheTotalLabel() {
+        let component = flowOnSession()
+        let content = PayabliPayInSheetContent(
+            isPresented: .constant(true),
+            component: component,
+            configuration: PayabliPayInFormConfiguration(
+                allowedMethods: [.card],
+                labels: PayabliPayInLabels(total: "Amount due")
+            ),
+            sheetConfiguration: PayabliPayInSheetConfiguration(movesFormHeaderToSheetHeader: true),
+            style: nil,
+            onCompleted: { _ in },
+            onError: { _ in }
+        )
+
+        XCTAssertEqual(content.formConfiguration.labels.total, "Amount due")
+    }
+
     // MARK: - Fixtures
 
     private func configuration(

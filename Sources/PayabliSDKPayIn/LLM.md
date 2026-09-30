@@ -437,6 +437,7 @@ All `PayabliPayInField` values:
 | `inputVerticalSpacing` | Vertical spacing between fields in this section. Overrides global layout spacing. |
 | `inputHorizontalSpacing` | Horizontal spacing for paired fields in this section. Overrides global paired spacing. |
 | `fieldVerticalSpacings` | Per-field spacing after a field. Use for tight card rows or extra breathing room. |
+| `style` | `.inputs` by default. `.summary` marks where the operation's amounts are drawn and under what title. |
 
 Example section setup:
 
@@ -469,6 +470,7 @@ let configuration = PayabliPayInFormConfiguration(
 | `submitButton` | `Add Payment Method` | Submit button text. |
 | `fieldLabels` | `defaultFieldLabels` | Visible and accessibility labels per field. |
 | `fieldPlaceholders` | empty | Placeholder text per field. |
+| `total` | nil (`Total`) | Label on the payment summary's Total row. |
 
 Visual labels can be hidden globally or per field. Accessibility labels are
 still derived from `fieldLabels`.

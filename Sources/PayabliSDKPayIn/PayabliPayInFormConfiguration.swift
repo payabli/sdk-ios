@@ -29,6 +29,15 @@ public enum PayabliPayInField: String, CaseIterable, Identifiable, Sendable {
     }
 }
 
+/// Whether a section takes input or reads the operation's amounts back.
+public enum PayabliPayInSectionStyle: Sendable, Equatable {
+    case inputs
+
+    /// Where the operation's amounts are drawn, and under what title. A form with amounts to show and no
+    /// summary gets one.
+    case summary
+}
+
 public enum PayabliPayInLabelLayout: Sendable {
     case external
     case placeholder
@@ -107,19 +116,23 @@ public struct PayabliPayInLabels: Sendable {
     public let submitButton: String
     public let fieldLabels: [PayabliPayInField: String]
     public let fieldPlaceholders: [PayabliPayInField: String]
+    /// The label on the summary's Total row; nil or blank reads "Total".
+    public let total: String?
 
     public init(
         title: String = "Save Payment Method",
         subtitle: String? = nil,
         submitButton: String = "Add Payment Method",
         fieldLabels: [PayabliPayInField: String] = Self.defaultFieldLabels,
-        fieldPlaceholders: [PayabliPayInField: String] = [:]
+        fieldPlaceholders: [PayabliPayInField: String] = [:],
+        total: String? = nil
     ) {
         self.title = title
         self.subtitle = subtitle
         self.submitButton = submitButton
         self.fieldLabels = fieldLabels
         self.fieldPlaceholders = fieldPlaceholders
+        self.total = total
     }
 
     public func label(for field: PayabliPayInField) -> String {
@@ -163,6 +176,7 @@ public struct PayabliPayInFieldSection: Identifiable, Sendable {
     public let inputVerticalSpacing: CGFloat?
     public let inputHorizontalSpacing: CGFloat?
     public let fieldVerticalSpacings: [PayabliPayInField: CGFloat]
+    public let style: PayabliPayInSectionStyle
 
     public init(
         id: String? = nil,
@@ -171,7 +185,8 @@ public struct PayabliPayInFieldSection: Identifiable, Sendable {
         fields: [PayabliPayInField],
         inputVerticalSpacing: CGFloat? = nil,
         inputHorizontalSpacing: CGFloat? = nil,
-        fieldVerticalSpacings: [PayabliPayInField: CGFloat] = [:]
+        fieldVerticalSpacings: [PayabliPayInField: CGFloat] = [:],
+        style: PayabliPayInSectionStyle = .inputs
     ) {
         let resolvedTitle = title?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty
         self.id = id?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty
@@ -183,6 +198,7 @@ public struct PayabliPayInFieldSection: Identifiable, Sendable {
         self.inputVerticalSpacing = inputVerticalSpacing.map { max(0, $0) }
         self.inputHorizontalSpacing = inputHorizontalSpacing.map { max(0, $0) }
         self.fieldVerticalSpacings = fieldVerticalSpacings.mapValues { max(0, $0) }
+        self.style = style
     }
 
     func replacingFields(_ fields: [PayabliPayInField]) -> PayabliPayInFieldSection {
@@ -193,7 +209,8 @@ public struct PayabliPayInFieldSection: Identifiable, Sendable {
             fields: fields,
             inputVerticalSpacing: inputVerticalSpacing,
             inputHorizontalSpacing: inputHorizontalSpacing,
-            fieldVerticalSpacings: fieldVerticalSpacings
+            fieldVerticalSpacings: fieldVerticalSpacings,
+            style: style
         )
     }
 }
@@ -432,7 +449,7 @@ public struct PayabliPayInFormConfiguration: Sendable {
     ) -> [PayabliPayInFieldSection] {
         [
             PayabliPayInFieldSection(fields: cardFieldOrder),
-            PayabliPayInFieldSection(title: "Payment Information", fields: paymentDetailFields)
+            PayabliPayInFieldSection(title: "Payment Information", fields: paymentDetailFields, style: .summary)
         ]
     }
 
@@ -441,7 +458,7 @@ public struct PayabliPayInFormConfiguration: Sendable {
     ) -> [PayabliPayInFieldSection] {
         [
             PayabliPayInFieldSection(fields: visibleBankFields(from: bankFieldOrder)),
-            PayabliPayInFieldSection(title: "Payment Information", fields: paymentDetailFields)
+            PayabliPayInFieldSection(title: "Payment Information", fields: paymentDetailFields, style: .summary)
         ]
     }
 
