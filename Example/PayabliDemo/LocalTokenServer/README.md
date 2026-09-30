@@ -17,6 +17,8 @@ Two modes for the token itself:
 
 ## Setup
 
+Node 18 or later. The server uses Node's global `fetch` and has no dependencies.
+
 ```bash
 cd Example/PayabliDemo/LocalTokenServer
 cp .env.example .env
