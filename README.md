@@ -104,7 +104,8 @@ Each operation needs its own permission on those credentials:
 | Charge, authorize, or capture an authorization | `inboundpayments_create` |
 | Void a transaction | `inboundpayments_void` |
 | Save a payment method | `tokens_create` |
-| Set up a phone for Tap to Pay | `tools_init` and `pos_create` |
+| Initialize Tap to Pay on a phone | `tools_init` and `pos_create` |
+| Activate a phone with its code | `pos_create` |
 | Take a Tap to Pay payment | `inboundpayments_create` |
 | Register an authorized app through the API | `pos_create` |
 
