@@ -70,9 +70,9 @@ have none; they build as dependencies of the products and the test targets.
   set: leave it out of the diagnostic payload rather than marking it private. The same goes for a
   reusable payment-method token, including in a test whose log someone will paste.
 - **Sensitive input must use a zeroizable buffer overwritten after encryption, never an immutable
-  `String`** — and no such buffer exists here yet, so this is a requirement for new code rather than a
+  `String`** — and no such buffer exists here, so this is a requirement for new code rather than a
   description of the current model. A Swift `String` cannot be scrubbed: it is immutable and the runtime
-  may hold copies. Until the buffer type exists, shorten the value's life instead — do not hold it on a
+  may hold copies. Without the buffer, shorten the value's life instead — do not hold it on a
   long-lived observable object, and do not put it in a type whose description is synthesized. A type
   holding such a value implements `CustomStringConvertible` itself, because a synthesized description
   prints every property and reaches assertion failures and crash reports without passing the logger.
@@ -143,9 +143,8 @@ them, and the script refuses a build where that stops being true.
   holds `String?`, calls the provider on the first read and again after a rejection, and shares one
   call between concurrent callers. It checks every token it installs, which is why
   `BearerDecoration` checks none.
-- **Two facades do not share one session today.** The card-present facade's public initialisers
-  build a fresh one, and the card-not-present facade is handed one. Converging them changes what an
-  integrator supplies and is tracked separately.
+- **Two facades do not share one session.** The card-present facade's public initialisers
+  build a fresh one, and the card-not-present facade is handed one.
 - **`package` is the level for anything a capability target needs and a consumer must not have**:
   the transport seam, the request and envelope types, the attestation and storage protocols, the
   logger, and the retry primitive. `internal` is for what only its own module needs, and the
