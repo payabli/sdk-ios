@@ -352,7 +352,7 @@ public struct PayabliPayInPaymentSummaryConfiguration: Sendable {
     static func formattedAmount(_ amount: Decimal, currency: String?, locale: Locale) -> String {
         let formatter = NumberFormatter()
         formatter.locale = locale
-        let code = currency?.trimmingCharacters(in: .whitespaces).uppercased()
+        let code = currency?.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
         if let code, isoCurrencyCodes.contains(code) {
             formatter.numberStyle = .currency
             formatter.currencyCode = code
@@ -551,7 +551,7 @@ public struct PayabliPayInFormConfiguration: Sendable {
         if paymentDetailFields.contains(field),
            sections.contains(where: { section in section.fields.contains { paymentDetailFields.contains($0) } }) == false
         {
-            sections.append(PayabliPayInFieldSection(title: "Payment Information", fields: [field]))
+            sections.append(PayabliPayInFieldSection(title: "Payment Information", fields: [field], style: .summary))
             return
         }
 

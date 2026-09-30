@@ -130,6 +130,7 @@ final class PaymentSummaryAmountTests: XCTestCase {
 
     func testACodeInLowerCaseOrWithSpacesIsStillTheCurrencyItNames() {
         XCTAssertEqual(formatted("12.34", " usd ", "en_US"), "$12.34")
+        XCTAssertEqual(formatted("12.34", "USD\n", "en_US"), "$12.34")
     }
 
     func testANegativeFigureIsWrittenWithItsSign() {

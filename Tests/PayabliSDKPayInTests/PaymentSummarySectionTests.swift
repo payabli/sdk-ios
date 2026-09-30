@@ -30,6 +30,18 @@ final class PaymentSummarySectionTests: XCTestCase {
         }
     }
 
+    func testThePaymentSectionTheSDKAppendsIsTheSummary() {
+        let configuration = PayabliPayInFormConfiguration(
+            allowedMethods: [.card],
+            cardSections: [
+                PayabliPayInFieldSection(fields: [.cardholderName, .cardNumber, .cardExpiration, .cardCvv, .cardZip])
+            ]
+        )
+
+        XCTAssertEqual(configuration.cardSections.map(\.style), [.inputs, .summary])
+        XCTAssertEqual(configuration.cardSections.last?.title, "Payment Information")
+    }
+
     func testAHostSummaryKeepsItsStyleThroughNormalization() {
         let configuration = PayabliPayInFormConfiguration(
             allowedMethods: [.card],
