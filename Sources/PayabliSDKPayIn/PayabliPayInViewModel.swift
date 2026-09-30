@@ -42,6 +42,8 @@ final class PayabliPayInViewModel: ObservableObject {
         didSet { acceptEdit(of: .accountNumber) }
     }
 
+    /// A pick clears its mark even when the value is unchanged, because the menu reports every tap,
+    /// including the one on the standing option, and the mark answers the tap rather than the change.
     @Published var accountType: PayabliPayInAccountType = .checking {
         didSet { acceptEdit(of: .accountType) }
     }
