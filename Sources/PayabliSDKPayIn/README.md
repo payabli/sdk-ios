@@ -15,8 +15,13 @@ This guide is part of the [Payabli iOS SDK](../../README.md); set up the SDK the
 
 ### Your account
 
-- OAuth2 credentials with `inboundpayments_create` to charge, authorize and capture,
-  `inboundpayments_void` to void, and `tokens_create` to store a payment method.
+OAuth2 credentials with a permission for each operation you use:
+
+| Operation | Permission |
+|---|---|
+| `capture(_:)`, `authorize(_:)`, `captureAuthorizedTransaction(_:)` | `inboundpayments_create` |
+| `voidTransaction(_:)` | `inboundpayments_void` |
+| `addCard`, `addBankAccount`, `addPaymentMethod` | `tokens_create` |
 
 ## Before you start
 

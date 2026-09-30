@@ -23,7 +23,13 @@ external reader. This guide is part of the [Payabli iOS SDK](../../README.md); s
 ### Your account
 
 - A paypoint with Tap to Pay enabled. Ask your Payabli representative.
-- OAuth2 credentials with the `tools_init`, `pos_create` and `inboundpayments_create` permissions.
+- OAuth2 credentials with these permissions:
+
+  | Operation | Permission |
+  |---|---|
+  | `initialize()` and activating a phone | `tools_init` and `pos_create` |
+  | `charge` | `inboundpayments_create` |
+  | Registering an authorized app through the API | `pos_create` |
 
 ## Before you start
 
@@ -36,11 +42,12 @@ and approval takes weeks, so request it early. See
 Your app also needs `com.apple.developer.devicecheck.appattest-environment`: `development` for
 development builds and `production` for builds you distribute.
 
-### Register your app on the allowlist
+### Register your app as an authorized app
 
-The allowlist entry for iOS is your app's **app ID**, your Apple Team ID and bundle ID joined by a dot:
-`<TEAM_ID>.<BUNDLE_ID>`, for example `TEAM123456.com.example.checkout`. Register it once per paypoint, from
-your backend:
+The authorized app entry for iOS is your app's **app ID**, your Apple Team ID and bundle ID joined by a dot:
+`<TEAM_ID>.<BUNDLE_ID>`, for example `TEAM123456.com.example.checkout`. Register it once per paypoint,
+in the Payabli portal under **Pay In > Devices > Device management**, **⋯ > Authorized apps**, or from your
+backend:
 
 ```bash
 curl -X POST "https://api-sandbox.payabli.com/api/v2/paypoint/{entryPoint}/apps" \
@@ -54,9 +61,11 @@ curl -X POST "https://api-sandbox.payabli.com/api/v2/paypoint/{entryPoint}/apps"
 - `friendlyName` is optional. Calling it again with the same values is safe.
 - Register each bundle ID you ship, including debug and white-label builds.
 
-An app that isn't on the allowlist is refused when the device attests. `initialize()` throws a
-`PayabliGenericError` whose `code` is `.permissionDenied`, and `sessionState` is `.pendingActivation`, the
-same state as a phone that needs a code.
+An app that isn't an authorized app is refused when the device attests, with an HTTP 403. `initialize()`
+throws a `PayabliGenericError` whose `code` is `.permissionDenied`, not `attestationFailed`, and
+`sessionState` is `.pendingActivation`, the same state as a phone that needs a code. An activation code
+doesn't clear it: register the app, then initialize again. So a phone that lands on `.pendingActivation`
+straight after setup may be running an app that isn't registered.
 
 ## Set up
 
@@ -108,6 +117,11 @@ guard try await ttp.areTermsAccepted() else { return } // declined, or dismissed
 try await ttp.initialize()
 ```
 
+- `presentTerms()` shows Apple's Tap to Pay on iPhone Terms and Conditions sheet, where the merchant
+  accepts for their merchant identifier. Once accepted on one iPhone, other iPhones for the same merchant
+  don't ask again. Apple's
+  [Tap to Pay on iPhone guidelines](https://developer.apple.com/design/human-interface-guidelines/tap-to-pay-on-iphone)
+  say when to show it and to whom.
 - `presentTerms()` returning doesn't mean the merchant accepted. Ask `areTermsAccepted()`.
 - Ask each time instead of caching the answer. Acceptance can change outside your app.
 - `areTermsAccepted()` returns `false` when the merchant hasn't accepted, and throws
@@ -121,13 +135,13 @@ A phone takes Tap to Pay payments for a paypoint only after it is activated with
 - A reinstall, a restore to a new phone, or a new phone needs a new code.
 
 Until the phone is activated, `initialize()` throws `PayabliTTPError.devicePendingActivation` and
-`sessionState` is `.pendingActivation`. An app that isn't on the allowlist, or credentials without `tools_init`
+`sessionState` is `.pendingActivation`. An app that isn't an authorized app, or credentials without `tools_init`
 or `pos_create`, land in the same state, so check both before issuing a code. Credentials without
 `inboundpayments_create` reach `.ready`, and `charge` then throws a core `PayabliError` whose `code` is
 `.permissionDenied`, before the card is read.
 
-1. Issue a code for the phone. In the Payabli portal, under **Device Management**, the waiting device's
-   options include **Activate device**. The code is valid for 30 minutes, and asking again before it
+1. Issue a code for the phone. In the Payabli portal, under **Pay In > Devices > Device management**, choose
+   **⋯ > Generate activation code**. The code is valid for 30 minutes, and asking again before it
    expires returns the same code. The API route,
    [Generate Tap to Pay activation code](https://docs.payabli.com/developers/api-reference/device/activation-challenge),
    takes the device's ID, which the SDK doesn't return, so issue codes from the portal.
@@ -216,7 +230,7 @@ From Objective-C, these errors arrive as `NSError`. See
 | `.idle` | Not started, or activated and waiting for `initialize()`. |
 | `.attestingDevice`, `.fetchingConfig`, `.initializingReader(percent:)` | `initialize()` is running. |
 | `.ready` | Ready to charge. |
-| `.pendingActivation` | The phone needs an activation code, the app isn't on the paypoint's allowlist, or the credentials lack `tools_init` or `pos_create`. |
+| `.pendingActivation` | The phone needs an activation code, the app isn't one of the paypoint's authorized apps, or the credentials lack `tools_init` or `pos_create`. |
 | `.pendingTerms` | The merchant hasn't accepted Apple's terms. |
 | `.sessionExpired` | The session needs refreshing. The next `charge` refreshes it. |
 | `.reinitializing` | The session is being refreshed. |
@@ -260,7 +274,7 @@ charge whose outcome is unknown. A stream opened after the charge started misses
 ## Go live
 
 - Apple's entitlement on your release build, with `appattest-environment` set to `production`.
-- Your release bundle ID on your **production** paypoint's allowlist.
+- Your release bundle ID among your **production** paypoint's authorized apps.
 - Apple's terms accepted by the merchant.
 - One phone activated and one payment approved end to end, then looked up by its transaction ID.
 

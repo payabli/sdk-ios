@@ -35,7 +35,7 @@ token in memory while the session runs.
 | **Paypoint** | A merchant account in Payabli. Payments are made to a paypoint. |
 | **Entry point** | The identifier of a paypoint, for example `acmePay`. You pass it to the SDK. Payabli gives it to you, and it is also the path in the paypoint's portal address, `https://app.payabli.com/<entryPoint>/signin`. |
 | **Token endpoint** | A route on your own backend that exchanges your Payabli client ID and client secret for a short-lived access token and returns the token to your app. |
-| **Allowlist** | The list of apps a paypoint accepts Tap to Pay requests from. |
+| **Authorized apps** | The apps a paypoint accepts Tap to Pay requests from. The Payabli portal lists them under **Authorized apps**. |
 
 ## Requirements
 
@@ -49,7 +49,7 @@ token in memory while the session runs.
 
 ### Add the SDK
 
-No version is tagged, so add the package by branch or by commit. In Xcode, choose
+Add the package by branch or by commit. In Xcode, choose
 **File > Add Package Dependencies** and enter the repository URL:
 
 ```text
@@ -93,11 +93,20 @@ Card-not-present needs no app configuration. Tap to Pay needs two entitlements, 
    enabled if you plan to use it.
 2. **Create OAuth2 credentials.** Provision a client ID and client secret for the sandbox. See
    [OAuth authentication](https://docs.payabli.com/developers/oauth-authentication).
-   - Card-not-present needs `inboundpayments_create` to charge, authorize and capture,
-     `inboundpayments_void` to void, and `tokens_create` to store a payment method.
-   - Tap to Pay needs `tools_init`, `pos_create` and `inboundpayments_create`.
-3. **For Tap to Pay**, request Apple's entitlement and register the app on the paypoint's allowlist, as
+   Give them the permissions in the table below.
+3. **For Tap to Pay**, request Apple's entitlement and register the app as one of the paypoint's authorized apps, as
    the [Tap to Pay guide](Sources/PayabliSDKTapToPay/README.md#before-you-start) describes.
+
+Each operation needs its own permission on those credentials:
+
+| Operation | Permission |
+|---|---|
+| Charge, authorize, or capture an authorization | `inboundpayments_create` |
+| Void a transaction | `inboundpayments_void` |
+| Save a payment method | `tokens_create` |
+| Set up a phone for Tap to Pay | `tools_init` and `pos_create` |
+| Take a Tap to Pay payment | `inboundpayments_create` |
+| Register an authorized app through the API | `pos_create` |
 
 ### Build your token endpoint
 
@@ -133,12 +142,13 @@ app.post("/payabli/token", async (req, res) => {
         clientId: process.env.PAYABLI_CLIENT_ID,
         clientSecret: process.env.PAYABLI_CLIENT_SECRET,
       }),
+      redirect: "error", // never replay the client secret to another origin
       signal: AbortSignal.timeout(10_000), // well inside the SDK's 30 seconds
     });
     const body = await upstream.json();
     accessToken = upstream.ok ? (body.access_token ?? body.accessToken) : undefined;
   } catch {
-    // A timeout, a network failure, or an answer that isn't JSON.
+    // A timeout, a redirect, a network failure, or an answer that isn't JSON.
   }
   if (!accessToken) {
     return res.status(502).json({ error: "token exchange failed" });
@@ -259,7 +269,7 @@ let result = try await ttp.charge(
 order.paymentTransId = result.paymentTransId // store it; don't log it
 ```
 
-The guide covers the entitlements, the allowlist, activating a phone, Apple's terms, and the session
+The guide covers the entitlements, authorized apps, activating a phone, Apple's terms, and the session
 states.
 
 ## Handle the outcome
@@ -301,7 +311,7 @@ and [Tap to Pay](Sources/PayabliSDKTapToPay/README.md#outcomes-and-errors).
 | Guide | Covers |
 |---|---|
 | [Card-not-present](Sources/PayabliSDKPayIn/README.md) | The form, the direct API, stored methods, authorize and capture, void, configuration and styling |
-| [Tap to Pay](Sources/PayabliSDKTapToPay/README.md) | Entitlements, the allowlist, activation, Apple's terms, states, events and errors |
+| [Tap to Pay](Sources/PayabliSDKTapToPay/README.md) | Entitlements, authorized apps, activation, Apple's terms, states, events and errors |
 | [`Documentation/PayInIntegrationGuide.md`](Documentation/PayInIntegrationGuide.md) and [`PayInOverview.md`](Documentation/PayInOverview.md) | Every card-not-present configuration and styling option |
 | [Sample app](Example/PayabliDemo/) | Running both ways to pay against your sandbox paypoint |
 | [Payabli developer documentation](https://docs.payabli.com/guides/mobile-components-overview) | The API, OAuth, test accounts and the portal |
