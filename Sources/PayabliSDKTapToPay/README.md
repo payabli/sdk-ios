@@ -61,9 +61,11 @@ curl -X POST "https://api-sandbox.payabli.com/api/v2/paypoint/{entryPoint}/apps"
 - `friendlyName` is optional. Calling it again with the same values is safe.
 - Register each bundle ID you ship, including debug and white-label builds.
 
-An app that isn't an authorized app is refused when the device attests. `initialize()` throws a
-`PayabliGenericError` whose `code` is `.permissionDenied`, and `sessionState` is `.pendingActivation`, the
-same state as a phone that needs a code.
+An app that isn't an authorized app is refused when the device attests, with an HTTP 403. `initialize()`
+throws a `PayabliGenericError` whose `code` is `.permissionDenied`, not `attestationFailed`, and
+`sessionState` is `.pendingActivation`, the same state as a phone that needs a code. An activation code
+doesn't clear it: register the app, then initialize again. So a phone that lands on `.pendingActivation`
+straight after setup may be running an app that isn't registered.
 
 ## Set up
 
