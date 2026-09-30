@@ -12,8 +12,8 @@ token in memory while the session runs.
 [Card-not-present guide](Sources/PayabliSDKPayIn/README.md) ·
 [Tap to Pay guide](Sources/PayabliSDKTapToPay/README.md) · [Sample app](Example/PayabliDemo/)
 
-> [!WARNING]
-> **This SDK is in beta and under active development.** Its public interface can change in ways that
+> [!IMPORTANT]
+> **Notice:** This SDK is in beta and under active development. Its public interface can change in ways that
 > aren't backward compatible, including the names, parameters and behavior of its types and methods.
 > No stable version has been released. See [Versioning and support](#versioning-and-support).
 
@@ -341,8 +341,8 @@ changes nothing.
 
 ## Versioning and support
 
-> [!WARNING]
-> **The Payabli iOS SDK is in beta.** Until a stable version is released, expect changes to the public
+> [!IMPORTANT]
+> **Notice:** The Payabli iOS SDK is in beta. Until a stable version is released, expect changes to the public
 > interface that aren't backward compatible, and read the changes on `main` before you update.
 
 - **No version has been released.** Add the package by branch or by commit as [Installation](#installation)
