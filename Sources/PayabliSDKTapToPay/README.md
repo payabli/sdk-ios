@@ -117,6 +117,11 @@ guard try await ttp.areTermsAccepted() else { return } // declined, or dismissed
 try await ttp.initialize()
 ```
 
+- `presentTerms()` shows Apple's Tap to Pay on iPhone Terms and Conditions sheet, where the merchant
+  accepts for their merchant identifier. Once accepted on one iPhone, other iPhones for the same merchant
+  don't ask again. Apple's
+  [Tap to Pay on iPhone guidelines](https://developer.apple.com/design/human-interface-guidelines/tap-to-pay-on-iphone)
+  say when to show it and to whom.
 - `presentTerms()` returning doesn't mean the merchant accepted. Ask `areTermsAccepted()`.
 - Ask each time instead of caching the answer. Acceptance can change outside your app.
 - `areTermsAccepted()` returns `false` when the merchant hasn't accepted, and throws
