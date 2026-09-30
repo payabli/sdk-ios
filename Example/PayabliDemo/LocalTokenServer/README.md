@@ -137,10 +137,12 @@ Only add hosts for trusted local test infrastructure. Do not point credential
 exchange at arbitrary URLs, because that would send the configured
 `clientSecret` to that host.
 
-Then call the same sample URL:
+Then call `/payabli/exchange-token`, as above. `/payabli/access-token` still answers in this mode, but
+from a cache kept for `PAYABLI_TOKEN_CACHE_TTL_SECONDS` seconds, default `300`, so it can hand back a
+token that was just rejected:
 
 ```text
-http://127.0.0.1:8787/payabli/access-token
+http://127.0.0.1:8787/payabli/exchange-token
 ```
 
 You can also pass credentials per request for quick experiments:
