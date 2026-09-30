@@ -23,7 +23,13 @@ external reader. This guide is part of the [Payabli iOS SDK](../../README.md); s
 ### Your account
 
 - A paypoint with Tap to Pay enabled. Ask your Payabli representative.
-- OAuth2 credentials with the `tools_init`, `pos_create` and `inboundpayments_create` permissions.
+- OAuth2 credentials with these permissions:
+
+  | Operation | Permission |
+  |---|---|
+  | `initialize()` and activating a phone | `tools_init` and `pos_create` |
+  | `charge` | `inboundpayments_create` |
+  | Registering an authorized app through the API | `pos_create` |
 
 ## Before you start
 
