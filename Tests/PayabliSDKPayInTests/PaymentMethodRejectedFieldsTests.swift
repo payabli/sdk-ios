@@ -130,6 +130,78 @@ final class PaymentMethodRejectedFieldsTests: XCTestCase {
         XCTAssertEqual(viewModel.rejectedFields, [.firstName])
     }
 
+    @MainActor
+    func testAConfigurationUpdateKeepsTheMarksWhoseBoxesStay() async {
+        let component = captureFlow(
+            transport: MockPaymentCaptureTransport(
+                statusCode: 400,
+                responseBody: Self.refusal(naming: ["paymentMethod.cardHolder", "customerData.firstName"])
+            )
+        )
+        let withFirstName = PayabliPayInFormConfiguration.defaultCardFieldOrder + [.firstName]
+        let viewModel = PayabliPayInViewModel(
+            component: component,
+            configuration: PayabliPayInFormConfiguration(allowedMethods: [.card], cardFieldOrder: withFirstName)
+        )
+        fillCard(viewModel)
+        viewModel.firstName = "Jane"
+        _ = try? await viewModel.submit()
+        fillCard(viewModel)
+
+        viewModel.update(
+            component: component,
+            configuration: PayabliPayInFormConfiguration(
+                allowedMethods: [.card],
+                cardFieldOrder: withFirstName,
+                labels: PayabliPayInLabels(title: "Pay now")
+            )
+        )
+        XCTAssertEqual(viewModel.rejectedFields, [.cardholderName, .firstName])
+        XCTAssertFalse(viewModel.canSubmit)
+
+        viewModel.update(
+            component: component,
+            configuration: PayabliPayInFormConfiguration(allowedMethods: [.card])
+        )
+        XCTAssertEqual(viewModel.rejectedFields, [.cardholderName])
+    }
+
+    @MainActor
+    func testANewComponentClearsTheLastFlowsMarks() async {
+        let viewModel = filledCardForm(
+            transport: MockPaymentCaptureTransport(
+                statusCode: 400,
+                responseBody: Self.refusal(naming: ["paymentMethod.cardHolder"])
+            )
+        )
+        _ = try? await viewModel.submit()
+        XCTAssertEqual(viewModel.rejectedFields, [.cardholderName])
+
+        viewModel.update(
+            component: captureFlow(transport: UnreachableTransport()),
+            configuration: viewModel.configuration
+        )
+
+        XCTAssertEqual(viewModel.rejectedFields, [])
+    }
+
+    @MainActor
+    func testARefusalOfAFlowReplacedInFlightMarksNothing() async {
+        let transport = HeldRefusalTransport(responseBody: Self.refusal(naming: ["paymentMethod.cardHolder"]))
+        let viewModel = filledCardForm(transport: transport)
+        let submission = Task { try await viewModel.submit() }
+        await transport.waitForRequest()
+
+        viewModel.update(
+            component: captureFlow(transport: UnreachableTransport()),
+            configuration: viewModel.configuration
+        )
+        await transport.release()
+        _ = try? await submission.value
+
+        XCTAssertEqual(viewModel.rejectedFields, [])
+    }
+
     /// The pre-fill that opens the wheel is not a pick, so it leaves the mark standing until the payer
     /// chooses a date.
     @MainActor
@@ -391,6 +463,43 @@ private actor SequencedCaptureTransport: PayabliTransport {
     func perform(_: PayabliRequest) async throws -> PayabliResponse {
         let (statusCode, body) = responses.removeFirst()
         return PayabliResponse(statusCode: statusCode, headers: [:], body: Data(body.utf8))
+    }
+
+    func performV2<T: Decodable & Sendable>(
+        _: PayabliRequest,
+        decoding _: T.Type
+    ) async throws -> PayabliV2Envelope<T> {
+        throw URLError(.notConnectedToInternet)
+    }
+}
+
+/// Holds the first call's refusal until released, so a test can act while a submission is in flight.
+private actor HeldRefusalTransport: PayabliTransport {
+    private let responseBody: String
+    private var requested = false
+    private var requestWaiter: CheckedContinuation<Void, Never>?
+    private var responseWaiter: CheckedContinuation<Void, Never>?
+
+    init(responseBody: String) {
+        self.responseBody = responseBody
+    }
+
+    func waitForRequest() async {
+        guard !requested else { return }
+        await withCheckedContinuation { requestWaiter = $0 }
+    }
+
+    func release() {
+        responseWaiter?.resume()
+        responseWaiter = nil
+    }
+
+    func perform(_: PayabliRequest) async throws -> PayabliResponse {
+        requested = true
+        requestWaiter?.resume()
+        requestWaiter = nil
+        await withCheckedContinuation { responseWaiter = $0 }
+        return PayabliResponse(statusCode: 400, headers: [:], body: Data(responseBody.utf8))
     }
 
     func performV2<T: Decodable & Sendable>(

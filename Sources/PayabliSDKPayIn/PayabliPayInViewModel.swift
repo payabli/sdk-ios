@@ -120,10 +120,14 @@ final class PayabliPayInViewModel: ObservableObject {
         guard nextSignature != lifecycleSignature else { return }
 
         objectWillChange.send()
+        // A new component is a new payment flow, so the last flow's refusal describes nothing on it.
+        let replacesFlow = component !== self.component
         self.component = component
         self.configuration = configuration
         lifecycleSignature = nextSignature
-        clearMarks()
+        if replacesFlow {
+            clearMarks()
+        }
 
         let methods = availableMethods
         if !methods.contains(selectedMethod) {
@@ -132,6 +136,7 @@ final class PayabliPayInViewModel: ObservableObject {
                 : methods[0]
         }
         dropValuesWithoutAField()
+        dropMarksOffScreen()
     }
 
     var cardholderName: String {
@@ -272,6 +277,7 @@ final class PayabliPayInViewModel: ObservableObject {
         }
         isSubmitting = true
         defer { isSubmitting = false }
+        let submittedFlow = component
 
         do {
             try validateRequiredFields()
@@ -297,8 +303,11 @@ final class PayabliPayInViewModel: ObservableObject {
             return result
         } catch {
             clearSensitiveFieldsAfterFailure()
-            // After the clear, because its edits take a mark off.
-            rejectedFields = PayabliPayInRejectedFields.fields(in: error).intersection(activeFields)
+            // After the clear, because its edits take a mark off. A refusal of a flow replaced while
+            // it was in flight marks nothing.
+            if component === submittedFlow {
+                rejectedFields = PayabliPayInRejectedFields.fields(in: error).intersection(activeFields)
+            }
             errorMessage = Self.message(for: error)
             throw error
         }
