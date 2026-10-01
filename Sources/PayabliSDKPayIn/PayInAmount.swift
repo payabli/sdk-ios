@@ -17,8 +17,11 @@ enum PayInAmount {
     /// The amount as sent, or nil when it cannot be sent.
     static func sendable(_ value: Double) -> Decimal? {
         // Checked as a Double first: `Decimal(_:)` traps on a non-finite value.
-        guard value.isFinite, abs(value) < 1e28 else { return nil }
-        let rounded = atWireScale(Decimal(value))
+        guard value.isFinite, abs(value) < 1e28,
+              // The shortest decimal that reads back as this Double, so `1.005` is the tie it was written as.
+              let exact = Decimal(string: String(value), locale: Locale(identifier: "en_US_POSIX"))
+        else { return nil }
+        let rounded = atWireScale(exact)
         guard !rounded.isNaN, abs(rounded) <= wireMaximum else { return nil }
         return rounded
     }

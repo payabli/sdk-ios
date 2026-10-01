@@ -18,22 +18,23 @@ enum PayInPaymentFlowJSONBody {
         try Data(jsonString(from: value).utf8)
     }
 
-    static func normalizingCurrencyFields(in value: Any) throws -> Any {
+    static func normalizingCurrencyFields(in value: Any, path: String = "") throws -> Any {
         if let dictionary = value as? [String: Any] {
             return try dictionary.reduce(into: [String: Any]()) { result, pair in
+                let keyPath = path.isEmpty ? pair.key : "\(path).\(pair.key)"
                 if isCurrencyField(pair.key), let amount = doubleValue(pair.value) {
                     guard let sent = PayInAmount.sendable(amount) else {
-                        throw PayabliPayInError.invalidInput("\(pair.key) is out of range.")
+                        throw PayabliPayInError.invalidInput("\(keyPath) is out of range.")
                     }
                     result[pair.key] = RawNumber(text: formattedCurrencyAmount(sent))
                 } else {
-                    result[pair.key] = try normalizingCurrencyFields(in: pair.value)
+                    result[pair.key] = try normalizingCurrencyFields(in: pair.value, path: keyPath)
                 }
             }
         }
 
         if let array = value as? [Any] {
-            return try array.map(normalizingCurrencyFields)
+            return try array.map { try normalizingCurrencyFields(in: $0, path: path) }
         }
 
         return value
@@ -84,15 +85,19 @@ enum PayInPaymentFlowJSONBody {
         key == "totalAmount" || key == "serviceFee" || key == "surchargeFee"
     }
 
+    /// A number, or a string that is a plain decimal numeral. Anything else, a Boolean, `"0x10"` or `"inf"`
+    /// among them, is not an amount and is sent as it was given.
     private static func doubleValue(_ value: Any) -> Double? {
         if let number = value as? NSNumber {
-            return number.doubleValue
+            return CFGetTypeID(number) == CFBooleanGetTypeID() ? nil : number.doubleValue
         }
-        if let string = value as? String {
+        if let string = value as? String, string.range(of: decimalNumeral, options: .regularExpression) != nil {
             return Double(string)
         }
         return nil
     }
+
+    private static let decimalNumeral = #"^-?[0-9]+(\.[0-9]+)?([eE][+-]?[0-9]+)?$"#
 
     private static func formattedCurrencyAmount(_ rounded: Decimal) -> String {
         let formatter = NumberFormatter()

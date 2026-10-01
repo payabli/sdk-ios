@@ -51,16 +51,34 @@ final class PaymentDetailsValidationTests: XCTestCase {
         XCTAssertNil(refusal(PayabliPayInPaymentDetails(totalAmount: 12.34, surchargeFee: -0.31)))
     }
 
-    func testANonFiniteAmountInAdditionalDataIsRefusedNotSent() {
-        for text in ["inf", "nan", "-inf"] {
-            let body: [String: Any] = ["customerData": ["additionalData": ["surchargeFee": text]]]
+    func testAValueUnderAnAmountKeyThatIsNoDecimalNumeralIsSentAsGiven() throws {
+        for value in ["inf", "nan", "inf ", "0x10", "0x1.0p4", true] as [Any] {
+            let body: [String: Any] = ["additionalData": ["surchargeFee": value]]
+            let normalized = try PayInPaymentFlowJSONBody.normalizingCurrencyFields(in: body)
+            let additional = try XCTUnwrap((normalized as? [String: Any])?["additionalData"] as? [String: Any])
 
-            XCTAssertThrowsError(try PayInPaymentFlowJSONBody.normalizingCurrencyFields(in: body)) { error in
-                guard case PayabliPayInError.invalidInput = error else {
-                    return XCTFail("expected invalidInput, got \(error)")
-                }
-            }
+            XCTAssertEqual(String(describing: additional["surchargeFee"] ?? ""), String(describing: value))
         }
+    }
+
+    func testANumeralUnderAnAmountKeyThatCannotBeSentIsRefusedNamingWhereItWas() {
+        let body: [String: Any] = ["customerData": ["additionalData": ["totalAmount": "1e400"]]]
+
+        XCTAssertThrowsError(try PayInPaymentFlowJSONBody.normalizingCurrencyFields(in: body)) { error in
+            XCTAssertEqual(
+                error as? PayabliPayInError,
+                .invalidInput("customerData.additionalData.totalAmount is out of range.")
+            )
+        }
+    }
+
+    func testATieIsRoundedAsTheDecimalItWasWrittenAs() throws {
+        XCTAssertEqual(PayInAmount.sendable(1.005), Decimal(string: "1.01"))
+        XCTAssertEqual(PayInAmount.sendable(0.235), Decimal(string: "0.24"))
+
+        let body: [String: Any] = ["paymentDetails": ["totalAmount": 2.005]]
+        let data = try PayInPaymentFlowJSONBody.data(from: PayInPaymentFlowJSONBody.normalizingCurrencyFields(in: body))
+        XCTAssertEqual(String(data: data, encoding: .utf8), #"{"paymentDetails":{"totalAmount":2.01}}"#)
     }
 
     func testASendableAmountIsWrittenAtTwoPlaces() throws {
