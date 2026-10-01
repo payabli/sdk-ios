@@ -53,7 +53,8 @@ private extension PayabliPayInLabels {
             "subtitle:\(subtitle ?? "")",
             "submit:\(submitButton)",
             "labels:\(fieldLabels.payabliViewModelSignature)",
-            "placeholders:\(fieldPlaceholders.payabliViewModelSignature)"
+            "placeholders:\(fieldPlaceholders.payabliViewModelSignature)",
+            "total:\(total ?? "")"
         ]
         .joined(separator: "|")
     }
@@ -73,8 +74,6 @@ private extension PayabliPayInFormatting {
 private extension PayabliPayInPaymentSummaryConfiguration {
     var payabliViewModelSignature: String {
         [
-            "amountLabel:\(amountLabelText ?? "")",
-            "feeLabel:\(feeLabelText ?? "")",
             "rowSpacing:\(rowSpacing)"
         ]
         .joined(separator: ",")

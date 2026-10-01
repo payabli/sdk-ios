@@ -42,7 +42,7 @@ final class PaymentMethodConfigurationChangeTests: XCTestCase {
 
         viewModel.update(component: component, configuration: configuration(amountLabel: "Due today"))
 
-        XCTAssertEqual(viewModel.paymentSummaryLabelText(for: .amount), "Due today")
+        XCTAssertEqual(viewModel.paymentSummaryLabelText(for: .amount), "Due today:")
         XCTAssertEqual(viewModel.cardholderName, "Ada Lovelace")
     }
 
@@ -88,6 +88,36 @@ final class PaymentMethodConfigurationChangeTests: XCTestCase {
         )
     }
 
+    func testChangingTheTotalLabelAloneIsAConfigurationChange() {
+        let before = PayInPaymentFlowConfigurationChange(
+            PayabliPayInFormConfiguration(allowedMethods: [.card], labels: PayabliPayInLabels())
+        )
+        let after = PayInPaymentFlowConfigurationChange(
+            PayabliPayInFormConfiguration(allowedMethods: [.card], labels: PayabliPayInLabels(total: "Amount due"))
+        )
+
+        XCTAssertNotEqual(before, after)
+    }
+
+    @MainActor
+    func testTheSheetHeaderMoveKeepsTheTotalLabel() {
+        let component = flowOnSession()
+        let content = PayabliPayInSheetContent(
+            isPresented: .constant(true),
+            component: component,
+            configuration: PayabliPayInFormConfiguration(
+                allowedMethods: [.card],
+                labels: PayabliPayInLabels(total: "Amount due")
+            ),
+            sheetConfiguration: PayabliPayInSheetConfiguration(movesFormHeaderToSheetHeader: true),
+            style: nil,
+            onCompleted: { _ in },
+            onError: { _ in }
+        )
+
+        XCTAssertEqual(content.formConfiguration.labels.total, "Amount due")
+    }
+
     // MARK: - Fixtures
 
     private func configuration(
@@ -99,7 +129,9 @@ final class PaymentMethodConfigurationChangeTests: XCTestCase {
             allowedMethods: allowedMethods,
             defaultMethod: .card,
             cardFieldOrder: [.amount] + PayabliPayInFormConfiguration.defaultCardFieldOrder,
-            paymentSummary: PayabliPayInPaymentSummaryConfiguration(amountLabelText: amountLabel),
+            labels: PayabliPayInLabels(
+                fieldLabels: amountLabel.map { [.amount: $0] } ?? PayabliPayInLabels.defaultFieldLabels
+            ),
             showsBaseAmount: showsBaseAmount
         )
     }

@@ -229,14 +229,14 @@ before the submit button. By default it displays generated values from
 - `Amount: $ 1.00`
 - `Fee: $ 0.10`
 
-The text and styling are configurable through
-`PayabliPayInPaymentSummaryConfiguration`:
+The styling is configurable through `PayabliPayInPaymentSummaryConfiguration`:
 
-- `amountLabelText`
-- `feeLabelText`
 - `labelStyle`
 - `valueStyle`
 - `rowSpacing`
+
+Relabel a money row through `PayabliPayInLabels.fieldLabels`, and the Total label
+through `PayabliPayInLabels.total`.
 
 Rows are vertical. Labels are left aligned and values are right aligned.
 

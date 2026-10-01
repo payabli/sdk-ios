@@ -29,6 +29,14 @@ public enum PayabliPayInField: String, CaseIterable, Identifiable, Sendable {
     }
 }
 
+/// Whether a section takes input or reads the operation's amounts back.
+public enum PayabliPayInSectionStyle: Sendable, Equatable {
+    case inputs
+
+    /// The section for the operation's amounts.
+    case summary
+}
+
 public enum PayabliPayInLabelLayout: Sendable {
     case external
     case placeholder
@@ -107,19 +115,23 @@ public struct PayabliPayInLabels: Sendable {
     public let submitButton: String
     public let fieldLabels: [PayabliPayInField: String]
     public let fieldPlaceholders: [PayabliPayInField: String]
+    /// The label `totalLabelText(labels:)` reads; nil or blank reads "Total".
+    public let total: String?
 
     public init(
         title: String = "Save Payment Method",
         subtitle: String? = nil,
         submitButton: String = "Add Payment Method",
         fieldLabels: [PayabliPayInField: String] = Self.defaultFieldLabels,
-        fieldPlaceholders: [PayabliPayInField: String] = [:]
+        fieldPlaceholders: [PayabliPayInField: String] = [:],
+        total: String? = nil
     ) {
         self.title = title
         self.subtitle = subtitle
         self.submitButton = submitButton
         self.fieldLabels = fieldLabels
         self.fieldPlaceholders = fieldPlaceholders
+        self.total = total
     }
 
     public func label(for field: PayabliPayInField) -> String {
@@ -163,6 +175,7 @@ public struct PayabliPayInFieldSection: Identifiable, Sendable {
     public let inputVerticalSpacing: CGFloat?
     public let inputHorizontalSpacing: CGFloat?
     public let fieldVerticalSpacings: [PayabliPayInField: CGFloat]
+    public let style: PayabliPayInSectionStyle
 
     public init(
         id: String? = nil,
@@ -171,7 +184,8 @@ public struct PayabliPayInFieldSection: Identifiable, Sendable {
         fields: [PayabliPayInField],
         inputVerticalSpacing: CGFloat? = nil,
         inputHorizontalSpacing: CGFloat? = nil,
-        fieldVerticalSpacings: [PayabliPayInField: CGFloat] = [:]
+        fieldVerticalSpacings: [PayabliPayInField: CGFloat] = [:],
+        style: PayabliPayInSectionStyle = .inputs
     ) {
         let resolvedTitle = title?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty
         self.id = id?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty
@@ -183,6 +197,7 @@ public struct PayabliPayInFieldSection: Identifiable, Sendable {
         self.inputVerticalSpacing = inputVerticalSpacing.map { max(0, $0) }
         self.inputHorizontalSpacing = inputHorizontalSpacing.map { max(0, $0) }
         self.fieldVerticalSpacings = fieldVerticalSpacings.mapValues { max(0, $0) }
+        self.style = style
     }
 
     func replacingFields(_ fields: [PayabliPayInField]) -> PayabliPayInFieldSection {
@@ -193,7 +208,8 @@ public struct PayabliPayInFieldSection: Identifiable, Sendable {
             fields: fields,
             inputVerticalSpacing: inputVerticalSpacing,
             inputHorizontalSpacing: inputHorizontalSpacing,
-            fieldVerticalSpacings: fieldVerticalSpacings
+            fieldVerticalSpacings: fieldVerticalSpacings,
+            style: style
         )
     }
 }
@@ -229,15 +245,11 @@ public struct PayabliPayInPaymentSummaryTextStyle: Sendable {
 }
 
 public struct PayabliPayInPaymentSummaryConfiguration: Sendable {
-    public let amountLabelText: String?
-    public let feeLabelText: String?
     public let labelStyle: PayabliPayInPaymentSummaryTextStyle
     public let valueStyle: PayabliPayInPaymentSummaryTextStyle
     public let rowSpacing: CGFloat
 
     public init(
-        amountLabelText: String? = nil,
-        feeLabelText: String? = nil,
         labelStyle: PayabliPayInPaymentSummaryTextStyle = PayabliPayInPaymentSummaryTextStyle(
             font: .subheadline,
             color: .secondary
@@ -248,8 +260,6 @@ public struct PayabliPayInPaymentSummaryConfiguration: Sendable {
         ),
         rowSpacing: CGFloat = 8
     ) {
-        self.amountLabelText = amountLabelText?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty
-        self.feeLabelText = feeLabelText?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty
         self.labelStyle = labelStyle
         self.valueStyle = valueStyle
         self.rowSpacing = max(0, rowSpacing)
@@ -260,18 +270,14 @@ public struct PayabliPayInPaymentSummaryConfiguration: Sendable {
         labels: PayabliPayInLabels
     ) -> String {
         switch field {
-        case .amount:
-            return amountLabelText ?? Self.defaultLabelText(label: labels.label(for: field))
-        case .serviceFee:
-            return feeLabelText ?? Self.defaultLabelText(label: labels.label(for: field))
-        case .surchargeFee:
+        case .amount, .serviceFee, .surchargeFee:
             return Self.defaultLabelText(label: labels.label(for: field))
         default:
             return labels.label(for: field)
         }
     }
 
-    public func valueText(
+    func valueText(
         for field: PayabliPayInField,
         paymentDetails: PayabliPayInPaymentDetails?
     ) -> String {
@@ -287,7 +293,7 @@ public struct PayabliPayInPaymentSummaryConfiguration: Sendable {
         }
     }
 
-    public func accessibilityText(
+    func accessibilityText(
         for field: PayabliPayInField,
         labels: PayabliPayInLabels,
         paymentDetails: PayabliPayInPaymentDetails?
@@ -299,6 +305,69 @@ public struct PayabliPayInPaymentSummaryConfiguration: Sendable {
         .filter { !$0.isEmpty }
         .joined(separator: " ")
     }
+
+    public func totalLabelText(labels: PayabliPayInLabels) -> String {
+        Self.defaultLabelText(label: labels.total?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty ?? "Total")
+    }
+
+    /// A money row's figure at the two places it is sent, or nil when the row has no figure.
+    ///
+    /// Amount is the total amount less the service fee, and has a figure only while a fee or a surcharge sits
+    /// beside it.
+    public func rowAmount(for field: PayabliPayInField, paymentDetails: PayabliPayInPaymentDetails?) -> Decimal? {
+        guard let paymentDetails else { return nil }
+        let fee = PayInAmount.shown(paymentDetails.serviceFee)
+        let surcharge = PayInAmount.shown(paymentDetails.surchargeFee)
+        switch field {
+        case .amount:
+            guard fee != nil || surcharge != nil,
+                  let charge = PayInAmount.shown(paymentDetails.totalAmount)
+            else { return nil }
+            let base = charge - (fee ?? 0)
+            return base.isZero ? nil : base
+        case .serviceFee:
+            return fee
+        case .surchargeFee:
+            return surcharge
+        default:
+            return nil
+        }
+    }
+
+    /// What the service charges, the total amount plus any surcharge, or nil when that is nothing.
+    public func totalRowAmount(paymentDetails: PayabliPayInPaymentDetails?) -> Decimal? {
+        guard let paymentDetails, let charge = PayInAmount.shown(paymentDetails.totalAmount) else { return nil }
+        let total = charge + (PayInAmount.shown(paymentDetails.surchargeFee) ?? 0)
+        return total.isZero ? nil : total
+    }
+
+    /// A figure in the device locale's separators, with the currency's symbol, at two places.
+    ///
+    /// A currency that is absent or not an ISO 4217 code writes the number alone, since the charge is then made
+    /// in a currency the request does not name.
+    public func formattedAmount(_ amount: Decimal, currency: String?) -> String {
+        Self.formattedAmount(amount, currency: currency, locale: .current)
+    }
+
+    static func formattedAmount(_ amount: Decimal, currency: String?, locale: Locale) -> String {
+        let formatter = NumberFormatter()
+        formatter.locale = locale
+        let code = currency?.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        if let code, isoCurrencyCodes.contains(code) {
+            formatter.numberStyle = .currency
+            formatter.currencyCode = code
+        } else {
+            formatter.numberStyle = .decimal
+        }
+        // The two places the wire carries, whatever the currency's own convention, so the text is the figure sent.
+        formatter.minimumFractionDigits = PayInAmount.wireFractionDigits
+        formatter.maximumFractionDigits = PayInAmount.wireFractionDigits
+        formatter.roundingMode = .halfUp
+        let sent = PayInAmount.atWireScale(amount)
+        return formatter.string(from: NSDecimalNumber(decimal: sent)) ?? "\(sent)"
+    }
+
+    private static let isoCurrencyCodes = Set(Locale.Currency.isoCurrencies.map(\.identifier))
 
     private static func defaultLabelText(label: String) -> String {
         "\(label):"
@@ -432,7 +501,7 @@ public struct PayabliPayInFormConfiguration: Sendable {
     ) -> [PayabliPayInFieldSection] {
         [
             PayabliPayInFieldSection(fields: cardFieldOrder),
-            PayabliPayInFieldSection(title: "Payment Information", fields: paymentDetailFields)
+            PayabliPayInFieldSection(title: "Payment Information", fields: paymentDetailFields, style: .summary)
         ]
     }
 
@@ -441,7 +510,7 @@ public struct PayabliPayInFormConfiguration: Sendable {
     ) -> [PayabliPayInFieldSection] {
         [
             PayabliPayInFieldSection(fields: visibleBankFields(from: bankFieldOrder)),
-            PayabliPayInFieldSection(title: "Payment Information", fields: paymentDetailFields)
+            PayabliPayInFieldSection(title: "Payment Information", fields: paymentDetailFields, style: .summary)
         ]
     }
 
@@ -482,7 +551,7 @@ public struct PayabliPayInFormConfiguration: Sendable {
         if paymentDetailFields.contains(field),
            sections.contains(where: { section in section.fields.contains { paymentDetailFields.contains($0) } }) == false
         {
-            sections.append(PayabliPayInFieldSection(title: "Payment Information", fields: [field]))
+            sections.append(PayabliPayInFieldSection(title: "Payment Information", fields: [field], style: .summary))
             return
         }
 

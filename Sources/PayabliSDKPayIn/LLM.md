@@ -437,6 +437,7 @@ All `PayabliPayInField` values:
 | `inputVerticalSpacing` | Vertical spacing between fields in this section. Overrides global layout spacing. |
 | `inputHorizontalSpacing` | Horizontal spacing for paired fields in this section. Overrides global paired spacing. |
 | `fieldVerticalSpacings` | Per-field spacing after a field. Use for tight card rows or extra breathing room. |
+| `style` | `.inputs` by default. `.summary` marks the section for the operation's amounts. |
 
 Example section setup:
 
@@ -469,6 +470,7 @@ let configuration = PayabliPayInFormConfiguration(
 | `submitButton` | `Add Payment Method` | Submit button text. |
 | `fieldLabels` | `defaultFieldLabels` | Visible and accessibility labels per field. |
 | `fieldPlaceholders` | empty | Placeholder text per field. |
+| `total` | nil (`Total`) | Total label, read by `totalLabelText(labels:)`. |
 
 Visual labels can be hidden globally or per field. Accessibility labels are
 still derived from `fieldLabels`.
@@ -544,13 +546,18 @@ but must still send a value.
 
 Capture and authorize hosted forms display read-only payment summary rows before
 submit. Rows are vertical. Labels are left aligned; values are right aligned.
+Relabel a money row through `PayabliPayInLabels.fieldLabels`, and the Total label
+through `PayabliPayInLabels.total`.
+A host that draws its own summary reads each row from the configuration. `labelText(for:labels:)` and `totalLabelText(labels:)` give the labels.
+`rowAmount(for:paymentDetails:)` and `totalRowAmount(paymentDetails:)` give the figures as
+`Decimal?`, where nil means the row has no figure. Amount is the total amount less the service
+fee, and Total is the total amount plus any surcharge. `formattedAmount(_:currency:)` writes a
+figure in the device locale with the currency's symbol.
 
 `PayabliPayInPaymentSummaryConfiguration`:
 
 | Field | Default | Purpose |
 | --- | --- | --- |
-| `amountLabelText` | derived from `.amount` label plus colon | Override amount label text. |
-| `feeLabelText` | derived from `.serviceFee` label plus colon | Override fee label text. |
 | `labelStyle` | subheadline secondary | Font and color for summary labels. |
 | `valueStyle` | semibold subheadline primary | Font and color for summary values. |
 | `rowSpacing` | 8 | Vertical spacing between amount and fee rows. |
@@ -559,8 +566,6 @@ Example:
 
 ```swift
 PayabliPayInPaymentSummaryConfiguration(
-    amountLabelText: "Amount:",
-    feeLabelText: "Fee:",
     labelStyle: PayabliPayInPaymentSummaryTextStyle(
         font: .footnote,
         color: .secondary
