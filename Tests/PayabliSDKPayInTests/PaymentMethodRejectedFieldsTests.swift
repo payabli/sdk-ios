@@ -202,6 +202,43 @@ final class PaymentMethodRejectedFieldsTests: XCTestCase {
         XCTAssertEqual(viewModel.rejectedFields, [])
     }
 
+    /// A box a reconfiguration brings on screen holds a value the request already carried, because every
+    /// typed customer value is sent whichever box is drawn.
+    @MainActor
+    func testAReconfigurationInFlightMarksOnlyAValueTheRequestCarried() async throws {
+        let transport = HeldRefusalTransport(responseBody: Self.refusal(naming: ["customerData.firstName"]))
+        let component = captureFlow(transport: transport)
+        let viewModel = PayabliPayInViewModel(
+            component: component,
+            configuration: PayabliPayInFormConfiguration(
+                allowedMethods: [.card, .bankAccount],
+                bankFieldOrder: PayabliPayInFormConfiguration.defaultBankFieldOrder + [.firstName]
+            )
+        )
+        fillCard(viewModel)
+        viewModel.firstName = "Jane"
+        let submission = Task { try await viewModel.submit() }
+        await transport.waitForRequest()
+
+        viewModel.update(
+            component: component,
+            configuration: PayabliPayInFormConfiguration(
+                allowedMethods: [.card, .bankAccount],
+                cardFieldOrder: PayabliPayInFormConfiguration.defaultCardFieldOrder + [.firstName],
+                bankFieldOrder: PayabliPayInFormConfiguration.defaultBankFieldOrder + [.firstName]
+            )
+        )
+        await transport.release()
+        _ = try? await submission.value
+
+        let held = await transport.body
+        let body = try XCTUnwrap(held)
+        let sent = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
+        let customer = try XCTUnwrap(sent["customerData"] as? [String: Any])
+        XCTAssertEqual(customer["firstName"] as? String, viewModel.firstName)
+        XCTAssertEqual(viewModel.rejectedFields, [.firstName])
+    }
+
     /// The pre-fill that opens the wheel is not a pick, so it leaves the mark standing until the payer
     /// chooses a date.
     @MainActor
@@ -476,6 +513,7 @@ private actor SequencedCaptureTransport: PayabliTransport {
 /// Holds the first call's refusal until released, so a test can act while a submission is in flight.
 private actor HeldRefusalTransport: PayabliTransport {
     private let responseBody: String
+    private(set) var body: Data?
     private var requested = false
     private var requestWaiter: CheckedContinuation<Void, Never>?
     private var responseWaiter: CheckedContinuation<Void, Never>?
@@ -494,7 +532,8 @@ private actor HeldRefusalTransport: PayabliTransport {
         responseWaiter = nil
     }
 
-    func perform(_: PayabliRequest) async throws -> PayabliResponse {
+    func perform(_ request: PayabliRequest) async throws -> PayabliResponse {
+        body = request.body
         requested = true
         requestWaiter?.resume()
         requestWaiter = nil
