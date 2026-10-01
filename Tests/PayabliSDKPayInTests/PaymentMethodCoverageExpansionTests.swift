@@ -506,9 +506,9 @@ final class PaymentMethodCoverageExpansionTests: XCTestCase {
         XCTAssertEqual(textField.attributedPlaceholder?.string, "Hosted card number")
     }
 
-    /// The form disables its UIKit fields while a submission is in flight, and a wrapped text
-    /// field refuses the keyboard only when the representable carries SwiftUI's disabled state
-    /// into it: the framework's own controls read that environment themselves, and UIKit's do not.
+    /// The form disables its UIKit fields while a submission is in flight, end to end. Current runtimes
+    /// carry a container's disabled state into the wrapped view themselves, so this cannot tell the
+    /// representable's own application from the framework's; the helper test asserts that directly.
     @MainActor
     func testADisabledContainerMakesTheUIKitFieldRefuseInputAndDropTheKeyboard() throws {
         let store = UIKitTextFieldDisableStore()
