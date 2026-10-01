@@ -492,11 +492,18 @@ public struct PayabliPayInFormConfiguration: Sendable {
         // A summary draws amounts only, so a field the payer fills in that a host listed there is moved to an
         // inputs section, as a money field listed among the inputs is drawn in the summary.
         var displaced: [PayabliPayInField] = []
+        // The summary's own listing decides the order of its rows, so a money field it lists is not claimed by
+        // an inputs section listed before it.
+        let summaryRows = Set(sourceSections.first { $0.style == .summary }?.fields ?? [])
+            .intersection(paymentDetailFields)
         var output = sourceSections.compactMap { section -> PayabliPayInFieldSection? in
             let visibleFields = section.fields.filter { field in
                 guard !hiddenFields.contains(field) else { return false }
                 if section.style == .summary, !paymentDetailFields.contains(field) {
                     displaced.append(field)
+                    return false
+                }
+                if section.style == .inputs, summaryRows.contains(field) {
                     return false
                 }
                 return seenFields.insert(field).inserted

@@ -1,4 +1,4 @@
-import PayabliSDKPayIn
+@testable import PayabliSDKPayIn
 import XCTest
 
 final class PaymentSummarySectionTests: XCTestCase {
@@ -80,6 +80,24 @@ final class PaymentSummarySectionTests: XCTestCase {
         XCTAssertTrue(inputs.contains(.billingZip))
         XCTAssertFalse(summary.contains(.cardNumber))
         XCTAssertFalse(summary.contains(.billingZip))
+    }
+
+    func testTheSummaryListingDecidesTheRowOrderOverAnEarlierInputsSection() {
+        let configuration = PayabliPayInFormConfiguration(
+            allowedMethods: [.card],
+            cardSections: [
+                PayabliPayInFieldSection(fields: [.cardholderName, .cardNumber, .cardExpiration, .cardCvv, .cardZip, .serviceFee]),
+                PayabliPayInFieldSection(title: "Due today", fields: [.serviceFee, .amount], style: .summary)
+            ]
+        )
+        let drawn = PayInSummaryPlacement.place(
+            configuration.cardSections,
+            paymentDetails: PayabliPayInPaymentDetails(totalAmount: 12.34, serviceFee: 0.5, currency: "USD"),
+            summary: configuration.paymentSummary,
+            showsBaseAmount: true
+        )
+
+        XCTAssertEqual(drawn.last?.rows.map(\.field), [.serviceFee, .amount])
     }
 
     func testAHostSummaryKeepsItsStyleThroughNormalization() {
