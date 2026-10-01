@@ -495,8 +495,13 @@ public struct PayabliPayInFormConfiguration: Sendable {
         // With a summary, every money field is its row: none stays among the inputs, so the summary's own
         // listing and then the standard order decide where each row goes.
         let hasSummary = sourceSections.contains { $0.style == .summary }
+        // Only the first summary is drawn, so a later one claims no row.
+        let firstSummaryID = sourceSections.first { $0.style == .summary }?.id
         var output = sourceSections.compactMap { section -> PayabliPayInFieldSection? in
             let visibleFields = section.fields.filter { field in
+                if section.style == .summary, section.id != firstSummaryID, paymentDetailFields.contains(field) {
+                    return false
+                }
                 guard !hiddenFields.contains(field) else { return false }
                 if section.style == .summary, !paymentDetailFields.contains(field) {
                     displaced.append(field)
