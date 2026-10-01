@@ -324,64 +324,17 @@ final class PayabliPayInTests: XCTestCase {
         XCTAssertEqual(paymentMethod["cardnumber"] as? String, "4111111111111111")
     }
 
-    func testPaymentSummaryTextDefaultsAndOverrides() {
-        let paymentDetails = PayabliPayInPaymentDetails(
-            totalAmount: 1,
-            serviceFee: 0.10,
-            surchargeFee: 0.30,
-            currency: "USD"
-        )
+    func testPaymentSummaryLabelsDefaultsAndOverrides() {
         let labels = PayabliPayInLabels()
-        let defaultSummary = PayabliPayInPaymentSummaryConfiguration()
-
-        XCTAssertEqual(
-            defaultSummary.labelText(for: .amount, labels: labels),
-            "Amount:"
-        )
-        XCTAssertEqual(
-            defaultSummary.valueText(for: .amount, paymentDetails: paymentDetails),
-            "$ 1.00"
-        )
-        XCTAssertEqual(
-            defaultSummary.labelText(for: .serviceFee, labels: labels),
-            "Fee:"
-        )
-        XCTAssertEqual(
-            defaultSummary.valueText(for: .serviceFee, paymentDetails: paymentDetails),
-            "$ 0.10"
-        )
-        XCTAssertEqual(
-            defaultSummary.labelText(for: .surchargeFee, labels: labels),
-            "Surcharge:"
-        )
-        XCTAssertEqual(
-            defaultSummary.valueText(for: .surchargeFee, paymentDetails: paymentDetails),
-            "$ 0.30"
-        )
-        XCTAssertEqual(
-            defaultSummary.accessibilityText(for: .surchargeFee, labels: labels, paymentDetails: paymentDetails),
-            "Surcharge: $ 0.30"
-        )
-
-        let customSummary = PayabliPayInPaymentSummaryConfiguration(rowSpacing: 4)
+        let summary = PayabliPayInPaymentSummaryConfiguration(rowSpacing: 4)
         let relabelled = PayabliPayInLabels(fieldLabels: [.amount: "Today", .serviceFee: "Processing"])
-        XCTAssertEqual(
-            customSummary.labelText(for: .amount, labels: relabelled),
-            "Today:"
-        )
-        XCTAssertEqual(
-            customSummary.valueText(for: .amount, paymentDetails: paymentDetails),
-            "$ 1.00"
-        )
-        XCTAssertEqual(
-            customSummary.labelText(for: .serviceFee, labels: relabelled),
-            "Processing:"
-        )
-        XCTAssertEqual(
-            customSummary.valueText(for: .serviceFee, paymentDetails: paymentDetails),
-            "$ 0.10"
-        )
-        XCTAssertEqual(customSummary.rowSpacing, 4)
+
+        XCTAssertEqual(summary.labelText(for: .amount, labels: labels), "Amount:")
+        XCTAssertEqual(summary.labelText(for: .serviceFee, labels: labels), "Fee:")
+        XCTAssertEqual(summary.labelText(for: .surchargeFee, labels: labels), "Surcharge:")
+        XCTAssertEqual(summary.labelText(for: .amount, labels: relabelled), "Today:")
+        XCTAssertEqual(summary.labelText(for: .serviceFee, labels: relabelled), "Processing:")
+        XCTAssertEqual(summary.rowSpacing, 4)
     }
 
     func testFieldSectionsCanConfigurePerSectionTitleStyle() {

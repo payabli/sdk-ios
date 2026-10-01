@@ -25,12 +25,12 @@ final class PaymentMethodStoreRouteFieldTests: XCTestCase {
                 "a stored method charges nothing, so \(moneyField.rawValue) draws no row"
             )
             XCTAssertFalse(
-                view.activeSections.contains { $0.fields.contains(moneyField) },
+                view.drawnSections.contains { $0.section.fields.contains(moneyField) || $0.rows.contains { $0.field == moneyField } },
                 "a stored method charges nothing, so \(moneyField.rawValue) draws no row"
             )
         }
 
         XCTAssertTrue(viewModel.activeFields.contains(.cardNumber))
-        XCTAssertTrue(view.activeSections.contains { $0.fields.contains(.cardNumber) })
+        XCTAssertTrue(view.drawnSections.contains { $0.section.fields.contains(.cardNumber) })
     }
 }

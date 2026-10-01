@@ -54,8 +54,12 @@ public struct PayabliPayInView: View {
             }
 
             VStack(alignment: .leading, spacing: resolvedStyle.layout.sectionSpacing) {
-                ForEach(Array(activeSections.enumerated()), id: \.offset) { _, section in
-                    fieldSection(section)
+                ForEach(Array(drawnSections.enumerated()), id: \.offset) { _, drawn in
+                    if drawn.isSummary {
+                        summarySection(drawn)
+                    } else {
+                        fieldSection(drawn.section)
+                    }
                 }
             }
 
@@ -149,37 +153,20 @@ public struct PayabliPayInView: View {
         .accessibilityHint("Selects the payment method type.")
     }
 
-    var activeSections: [PayabliPayInFieldSection] {
+    var drawnSections: [PayInDrawnSection] {
         let sections = switch viewModel.effectiveSelectedMethod {
         case .card:
             configuration.cardSections
         case .bankAccount:
             configuration.bankSections
         }
-        return sections.compactMap { section in
-            let fields = section.fields.filter(isDrawn)
-            guard !fields.isEmpty else { return nil }
-            return section.replacingFields(fields)
-        }
-    }
-
-    func isDrawn(_ field: PayabliPayInField) -> Bool {
-        if viewModel.component.operation == .storePaymentMethod, isPaymentSummaryField(field) {
-            return false
-        }
-        if field == .surchargeFee, surchargeFigureIsPresent == false {
-            return false
-        }
-        return true
-    }
-
-    private var surchargeFigureIsPresent: Bool {
-        switch component.requestConfiguration?.paymentDetails.surchargeFee {
-        case let .some(surcharge):
-            surcharge != 0
-        case .none:
-            false
-        }
+        let charges = viewModel.component.operation != .storePaymentMethod
+        return PayInSummaryPlacement.place(
+            sections,
+            paymentDetails: charges ? component.requestConfiguration?.paymentDetails : nil,
+            summary: configuration.paymentSummary,
+            showsBaseAmount: configuration.showsBaseAmount
+        )
     }
 
     var submitButton: some View {
@@ -282,7 +269,7 @@ public struct PayabliPayInView: View {
         case .methodDescription, .firstName, .lastName, .customerNumber, .billingEmail, .billingZip:
             customerFieldView(field)
         case .amount, .serviceFee, .surchargeFee:
-            paymentFieldView(field)
+            EmptyView()
         }
     }
 
@@ -384,30 +371,51 @@ public struct PayabliPayInView: View {
         }
     }
 
-    @ViewBuilder
-    func paymentFieldView(_ field: PayabliPayInField) -> some View {
-        switch field {
-        case .amount, .serviceFee, .surchargeFee:
-            paymentSummaryRow(field)
-        default:
-            EmptyView()
+    func summarySection(_ drawn: PayInDrawnSection) -> some View {
+        let summary = configuration.paymentSummary
+        let currency = component.requestConfiguration?.paymentDetails.currency
+
+        return VStack(alignment: .leading, spacing: drawn.section.title == nil ? 0 : resolvedStyle.layout.sectionTitleSpacing) {
+            if let title = drawn.section.title {
+                let titleStyle = drawn.section.titleStyle ?? resolvedStyle.sectionTitle
+
+                Text(title)
+                    .font(titleStyle.font)
+                    .foregroundStyle(titleStyle.color)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityAddTraits(.isHeader)
+            }
+
+            VStack(alignment: .leading, spacing: summary.rowSpacing) {
+                ForEach(drawn.rows, id: \.field) { row in
+                    summaryRow(
+                        label: summary.labelText(for: row.field, labels: configuration.labels),
+                        value: summary.formattedAmount(row.amount, currency: currency),
+                        identifier: fieldIdentifier(row.field)
+                    )
+                }
+
+                if let total = drawn.total {
+                    summaryRow(
+                        label: summary.totalLabelText(labels: configuration.labels),
+                        value: summary.formattedAmount(total, currency: currency),
+                        identifier: PayabliPayInAccessibility.totalIdentifier
+                    )
+                }
+            }
         }
     }
 
-    func paymentSummaryRow(_ field: PayabliPayInField) -> some View {
-        let labelText = viewModel.paymentSummaryLabelText(for: field)
-        let valueText = viewModel.paymentSummaryValueText(for: field)
-        let accessibilityText = viewModel.paymentSummaryAccessibilityText(for: field)
-
-        return HStack(alignment: .firstTextBaseline, spacing: 12) {
-            Text(labelText)
+    func summaryRow(label: String, value: String, identifier: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 12) {
+            Text(label)
                 .font(configuration.paymentSummary.labelStyle.font)
                 .foregroundStyle(configuration.paymentSummary.labelStyle.color)
                 .fixedSize(horizontal: false, vertical: true)
 
             Spacer(minLength: 12)
 
-            Text(valueText)
+            Text(value)
                 .font(configuration.paymentSummary.valueStyle.font)
                 .foregroundStyle(configuration.paymentSummary.valueStyle.color)
                 .multilineTextAlignment(.trailing)
@@ -416,8 +424,8 @@ public struct PayabliPayInView: View {
         .fixedSize(horizontal: false, vertical: true)
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(accessibilityText)
-        .accessibilityIdentifier(fieldIdentifier(field))
+        .accessibilityLabel("\(label) \(value)")
+        .accessibilityIdentifier(identifier)
     }
 
     func textField(
@@ -764,10 +772,6 @@ extension PayabliPayInView {
             }
         }
 
-        if fields.contains(where: isPaymentSummaryField) {
-            return configuration.paymentSummary.rowSpacing
-        }
-
         return inputVerticalSpacing(in: section)
     }
 
@@ -786,10 +790,6 @@ extension PayabliPayInView {
         default:
             return false
         }
-    }
-
-    func isPaymentSummaryField(_ field: PayabliPayInField) -> Bool {
-        field == .amount || field == .serviceFee || field == .surchargeFee
     }
 
     func placeholder(

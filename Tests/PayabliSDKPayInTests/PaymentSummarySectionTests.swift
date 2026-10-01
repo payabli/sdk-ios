@@ -42,6 +42,17 @@ final class PaymentSummarySectionTests: XCTestCase {
         XCTAssertEqual(configuration.cardSections.last?.title, "Payment Information")
     }
 
+    func testARequiredInputFieldIsAppendedToAnInputsSectionNotTheSummary() {
+        let configuration = PayabliPayInFormConfiguration(
+            allowedMethods: [.bankAccount],
+            defaultMethod: .bankAccount,
+            requiredFields: [.billingEmail]
+        )
+
+        let holding = configuration.bankSections.filter { $0.fields.contains(.billingEmail) }
+        XCTAssertEqual(holding.map(\.style), [.inputs])
+    }
+
     func testAHostSummaryKeepsItsStyleThroughNormalization() {
         let configuration = PayabliPayInFormConfiguration(
             allowedMethods: [.card],

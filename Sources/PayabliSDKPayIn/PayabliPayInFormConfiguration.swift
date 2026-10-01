@@ -277,35 +277,6 @@ public struct PayabliPayInPaymentSummaryConfiguration: Sendable {
         }
     }
 
-    func valueText(
-        for field: PayabliPayInField,
-        paymentDetails: PayabliPayInPaymentDetails?
-    ) -> String {
-        switch field {
-        case .amount:
-            return Self.defaultValueText(value: paymentDetails?.totalAmount ?? 0)
-        case .serviceFee:
-            return Self.defaultValueText(value: paymentDetails?.serviceFee ?? 0)
-        case .surchargeFee:
-            return Self.defaultValueText(value: paymentDetails?.surchargeFee ?? 0)
-        default:
-            return ""
-        }
-    }
-
-    func accessibilityText(
-        for field: PayabliPayInField,
-        labels: PayabliPayInLabels,
-        paymentDetails: PayabliPayInPaymentDetails?
-    ) -> String {
-        [
-            labelText(for: field, labels: labels),
-            valueText(for: field, paymentDetails: paymentDetails)
-        ]
-        .filter { !$0.isEmpty }
-        .joined(separator: " ")
-    }
-
     public func totalLabelText(labels: PayabliPayInLabels) -> String {
         Self.defaultLabelText(label: labels.total?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty ?? "Total")
     }
@@ -371,12 +342,6 @@ public struct PayabliPayInPaymentSummaryConfiguration: Sendable {
 
     private static func defaultLabelText(label: String) -> String {
         "\(label):"
-    }
-
-    private static func defaultValueText(
-        value: Double
-    ) -> String {
-        "$ \(String(format: "%.2f", value))"
     }
 }
 
@@ -555,22 +520,36 @@ public struct PayabliPayInFormConfiguration: Sendable {
             return
         }
 
-        let targetIndex: Int = if paymentDetailFields.contains(field) {
-            sections.lastIndex { section in
+        if paymentDetailFields.contains(field) {
+            let targetIndex = sections.lastIndex { section in
                 section.fields.contains { paymentDetailFields.contains($0) }
             } ?? sections.index(before: sections.endIndex)
-        } else if customerFields.contains(field) {
+            let section = sections[targetIndex]
+            sections[targetIndex] = section.replacingFields(section.fields + [field])
+            return
+        }
+
+        // A summary draws amounts only, so a field the payer fills in goes to an inputs section.
+        guard let lastInputs = sections.lastIndex(where: { $0.style == .inputs }),
+              let firstInputs = sections.firstIndex(where: { $0.style == .inputs })
+        else {
+            let at = sections.firstIndex { $0.style == .summary } ?? sections.endIndex
+            sections.insert(PayabliPayInFieldSection(fields: [field]), at: at)
+            return
+        }
+
+        let targetIndex: Int = if customerFields.contains(field) {
             sections.lastIndex { section in
-                section.fields.contains { customerFields.contains($0) }
-            } ?? sections.index(before: sections.endIndex)
+                section.style == .inputs && section.fields.contains { customerFields.contains($0) }
+            } ?? lastInputs
         } else if defaultBankFieldOrder.contains(field) {
             sections.firstIndex { section in
-                section.fields.contains { defaultBankFieldOrder.contains($0) }
-            } ?? sections.startIndex
+                section.style == .inputs && section.fields.contains { defaultBankFieldOrder.contains($0) }
+            } ?? firstInputs
         } else {
             sections.firstIndex { section in
-                section.fields.contains { defaultCardFieldOrder.contains($0) }
-            } ?? sections.startIndex
+                section.style == .inputs && section.fields.contains { defaultCardFieldOrder.contains($0) }
+            } ?? firstInputs
         }
 
         let section = sections[targetIndex]

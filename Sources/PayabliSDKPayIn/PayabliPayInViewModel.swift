@@ -391,21 +391,6 @@ final class PayabliPayInViewModel: ObservableObject {
         )
     }
 
-    func paymentSummaryValueText(for field: PayabliPayInField) -> String {
-        configuration.paymentSummary.valueText(
-            for: field,
-            paymentDetails: component.requestConfiguration?.paymentDetails
-        )
-    }
-
-    func paymentSummaryAccessibilityText(for field: PayabliPayInField) -> String {
-        configuration.paymentSummary.accessibilityText(
-            for: field,
-            labels: configuration.labels,
-            paymentDetails: component.requestConfiguration?.paymentDetails
-        )
-    }
-
     private var validation: PayabliPayInValidation {
         component.requestConfiguration?.validation ?? configuration.options.validation
     }
