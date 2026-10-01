@@ -85,6 +85,10 @@ final class PaymentSummaryAmountTests: XCTestCase {
         XCTAssertNil(summary.totalRowAmount(paymentDetails: cancelled))
     }
 
+    func testAChargeSentAsZeroHasNoTotalEvenBesideASurcharge() {
+        XCTAssertNil(summary.totalRowAmount(paymentDetails: details(0.001, surcharge: 0.5)))
+    }
+
     func testAChargeThatIsAllFeeHasTheFeeAndTheTotalAndNoAmount() {
         let allFee = details(0.5, fee: 0.5)
 
