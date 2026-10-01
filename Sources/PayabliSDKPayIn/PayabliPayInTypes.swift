@@ -680,7 +680,7 @@ extension PayabliPayInPaymentMethod {
 }
 
 extension PayabliPayInPaymentDetails {
-    /// Each amount is checked as it is sent, at two places: `0.001` is more than zero and goes out as `0.00`.
+    /// Each amount is checked as it is sent, at two places, so a total of `0.001`, sent as `0.00`, is refused.
     func validate() throws {
         guard let total = PayInAmount.sendable(totalAmount) else {
             throw PayabliPayInError.invalidInput("Total amount is out of range.")
