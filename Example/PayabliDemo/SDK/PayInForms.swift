@@ -99,7 +99,7 @@ enum PayInForms {
                         .cardZip
                     ]),
                     sectionTitled("Customer Information", fields: captureCustomerFields),
-                    sectionTitled("Payment Information", fields: [.amount, .serviceFee])
+                    sectionTitled("Payment Information", fields: [.amount, .serviceFee], style: .summary)
                 ],
                 bankSections: [
                     sectionTitled("Bank Information", fields: [
@@ -109,7 +109,7 @@ enum PayInForms {
                         .accountType
                     ]),
                     sectionTitled("Customer Information", fields: captureCustomerFields),
-                    sectionTitled("Payment Information", fields: [.amount, .serviceFee])
+                    sectionTitled("Payment Information", fields: [.amount, .serviceFee], style: .summary)
                 ],
                 hiddenValues: PayabliPayInHiddenValues(
                     accountHolderType: .personal,
@@ -175,12 +175,14 @@ enum PayInForms {
     /// caller states.
     private static func sectionTitled(
         _ title: String,
-        fields: [PayabliPayInField]
+        fields: [PayabliPayInField],
+        style: PayabliPayInSectionStyle = .inputs
     ) -> PayabliPayInFieldSection {
         PayabliPayInFieldSection(
             title: title,
             titleStyle: PayInSharedConfiguration.sectionTitleStyle,
-            fields: fields
+            fields: fields,
+            style: style
         )
     }
 }
