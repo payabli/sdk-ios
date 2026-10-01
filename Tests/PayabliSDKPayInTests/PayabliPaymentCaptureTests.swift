@@ -353,6 +353,8 @@ final class PayabliPayInTests: XCTestCase {
         } catch {
             XCTAssertEqual(viewModel.errorMessage, "Total amount must be greater than 0.")
         }
+        XCTAssertEqual(viewModel.cardNumber.filter(\.isNumber), "4111111111111111", "only the host can fix the amount")
+        XCTAssertEqual(viewModel.cardCvv, "999")
         let requests = await transport.requests
         XCTAssertTrue(requests.isEmpty)
     }

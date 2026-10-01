@@ -279,6 +279,16 @@ final class PayabliPayInViewModel: ObservableObject {
         defer { isSubmitting = false }
         let submittedFlow = component
 
+        // Refused before anything else, and without clearing what the payer typed: only the host can change it.
+        if component.operation != .storePaymentMethod, let details = component.requestConfiguration?.paymentDetails {
+            do {
+                try details.validate()
+            } catch {
+                errorMessage = Self.message(for: error)
+                throw error
+            }
+        }
+
         do {
             try validateRequiredFields()
             let result: PayabliPayInResult
