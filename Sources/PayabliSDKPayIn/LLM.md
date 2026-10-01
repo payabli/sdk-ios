@@ -545,9 +545,10 @@ but must still send a value.
 ## Payment Summary
 
 Capture and authorize hosted forms display read-only payment summary rows before
-submit: one per amount sent as something other than zero, then Total. The first
-`.summary` section places and titles them; without one, a summary is added after
-the inputs. Rows are vertical. Labels are left aligned; values are right aligned.
+submit: Fee and Surcharge when sent as something other than zero, Amount (the total
+less the fee) beside either one unless `showsBaseAmount` is false, and Total
+whenever it is not zero. The first `.summary` section places and titles them;
+without one, a summary is added after the inputs. Rows are vertical. Labels are left aligned; values are right aligned.
 Relabel a money row through `PayabliPayInLabels.fieldLabels`, and the Total label
 through `PayabliPayInLabels.total`.
 A host that draws its own summary reads each row from the configuration. `labelText(for:labels:)` and `totalLabelText(labels:)` give the labels.

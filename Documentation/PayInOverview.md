@@ -223,9 +223,10 @@ code is `Billing Postal Code`.
 ## Payment Summary
 
 Capture and authorize forms include a non-editable payment summary section,
-drawn from `PayabliPayInPaymentDetails`. A row appears for each amount sent as
-something other than zero, and the summary ends with Total, what the payment
-charges. With a $1.00 total and a $0.10 fee it reads:
+drawn from `PayabliPayInPaymentDetails`. A fee or surcharge sent as something
+other than zero gets its own row, an Amount row shows the total less the fee
+beside either one, and Total, what the payment charges, ends the summary
+whenever it is not zero. With a $1.00 total and a $0.10 fee it reads:
 
 - `Amount: $0.90`
 - `Fee: $0.10`
