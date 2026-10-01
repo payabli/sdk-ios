@@ -527,8 +527,6 @@ final class PaymentMethodCoverageExpansionTests: XCTestCase {
         XCTAssertTrue(textField.isFirstResponder)
 
         store.disabled = true
-
-        store.disabled = true
         waitForDisabledField(in: host.view, textField)
 
         XCTAssertFalse(textField.isEnabled)
