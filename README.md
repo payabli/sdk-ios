@@ -49,26 +49,27 @@ token in memory while the session runs.
 
 ### Add the SDK
 
-Add the package by branch or by commit. In Xcode, choose
-**File > Add Package Dependencies** and enter the repository URL:
+Add the package with Swift Package Manager, tracking the `main` branch, which is the recommended
+setup. In Xcode, choose **File > Add Package Dependencies**, enter the repository URL, and choose the
+**Branch** rule with `main`:
 
 ```text
 https://github.com/payabli/sdk-ios.git
 ```
 
-Or declare it in `Package.swift`, tracking `main`:
+Or declare it in `Package.swift`:
 
 ```swift
 .package(url: "https://github.com/payabli/sdk-ios.git", branch: "main")
 ```
 
-or pinned to one commit:
+To build the same code every time, pin one commit instead, with Xcode's **Commit** rule or:
 
 ```swift
 .package(url: "https://github.com/payabli/sdk-ios.git", revision: "<commit SHA>")
 ```
 
-In Xcode, the same choice is the **Branch** or **Commit** dependency rule. Then link what you use:
+Then link what you use:
 
 | Product | Adds |
 |---|---|
@@ -104,7 +105,8 @@ Each operation needs its own permission on those credentials:
 | Charge, authorize, or capture an authorization | `inboundpayments_create` |
 | Void a transaction | `inboundpayments_void` |
 | Save a payment method | `tokens_create` |
-| Set up a phone for Tap to Pay | `tools_init` and `pos_create` |
+| Initialize Tap to Pay on a phone | `tools_init` and `pos_create` |
+| Activate a phone with its code | `tools_init` and `pos_create` |
 | Take a Tap to Pay payment | `inboundpayments_create` |
 | Register an authorized app through the API | `pos_create` |
 
