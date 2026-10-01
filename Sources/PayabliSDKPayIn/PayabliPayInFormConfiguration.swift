@@ -496,10 +496,10 @@ public struct PayabliPayInFormConfiguration: Sendable {
         // listing and then the standard order decide where each row goes.
         let hasSummary = sourceSections.contains { $0.style == .summary }
         // Only the first summary is drawn, so a later one claims no row.
-        let firstSummaryID = sourceSections.first { $0.style == .summary }?.id
-        var output = sourceSections.compactMap { section -> PayabliPayInFieldSection? in
+        let firstSummary = sourceSections.firstIndex { $0.style == .summary }
+        var output = sourceSections.enumerated().compactMap { index, section -> PayabliPayInFieldSection? in
             let visibleFields = section.fields.filter { field in
-                if section.style == .summary, section.id != firstSummaryID, paymentDetailFields.contains(field) {
+                if section.style == .summary, index != firstSummary, paymentDetailFields.contains(field) {
                     return false
                 }
                 guard !hiddenFields.contains(field) else { return false }

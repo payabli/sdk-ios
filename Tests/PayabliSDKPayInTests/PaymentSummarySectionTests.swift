@@ -138,6 +138,25 @@ final class PaymentSummarySectionTests: XCTestCase {
         XCTAssertEqual(drawn.last?.rows.map(\.field), [.amount, .serviceFee, .surchargeFee])
     }
 
+    func testALaterSummarySharingTheFirstOnesTitleClaimsNoRow() {
+        let configuration = PayabliPayInFormConfiguration(
+            allowedMethods: [.card],
+            cardSections: [
+                PayabliPayInFieldSection(fields: [.cardholderName, .cardNumber, .cardExpiration, .cardCvv, .cardZip]),
+                PayabliPayInFieldSection(title: "Payment", fields: [.amount], style: .summary),
+                PayabliPayInFieldSection(title: "Payment", fields: [.serviceFee], style: .summary)
+            ]
+        )
+        let drawn = PayInSummaryPlacement.place(
+            configuration.cardSections,
+            paymentDetails: PayabliPayInPaymentDetails(totalAmount: 12.34, serviceFee: 0.5, surchargeFee: 0.31),
+            summary: configuration.paymentSummary,
+            showsBaseAmount: true
+        )
+
+        XCTAssertEqual(drawn.last?.rows.map(\.field), [.amount, .serviceFee, .surchargeFee])
+    }
+
     func testAHostSummaryKeepsItsStyleThroughNormalization() {
         let configuration = PayabliPayInFormConfiguration(
             allowedMethods: [.card],
