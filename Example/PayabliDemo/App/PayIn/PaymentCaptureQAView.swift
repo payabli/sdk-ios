@@ -64,8 +64,6 @@ struct PaymentCaptureQAView: View {
                                 onFailed: handleError
                             )
 
-                            totalRow
-
                             // The step that failed shows why. A failed form
                             // blocks the result row, which is the only other
                             // place this text renders, so leaving it there
@@ -195,18 +193,6 @@ struct PaymentCaptureQAView: View {
                 }
             }
         #endif
-    }
-
-    /// What the request charges, which the form's own summary does not show.
-    ///
-    /// The summary reads back an amount and a service fee and never their sum, so the figure that leaves the
-    /// payer's account appears nowhere before submitting. The SDK renders the fields it knows and a total is not
-    /// one of them, so showing it there would mean widening a public enum for the sample app's benefit.
-    ///
-    /// No arithmetic at submission: `totalAmount` is what the request already carries and the fee is part of it,
-    /// so this reads that one value off the component rather than adding the rows up on screen.
-    private var totalRow: some View {
-        QADetailRow(label: "Total", value: paymentFlow.formattedTotal)
     }
 
     // MARK: - The sequence

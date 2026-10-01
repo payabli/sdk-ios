@@ -79,9 +79,9 @@ final class QAWalkthroughUITests: XCTestCase {
     func testCapturingACardThePayerEntered() {
         openTheForm(tab: "Capture", submit: capture)
 
-        // The figure the request carries, under a form whose own summary reads back an amount and a fee and
-        // never their sum. A payer sees what leaves the account or the screen is lying by omission.
-        XCTAssertTrue(app.staticTexts["Total"].waitForExistence(timeout: composes), "the total is not on screen")
+        // The form's summary ends with the figure the request charges.
+        let total = app.descendants(matching: .any)["payabli.payIn.summary.total"]
+        XCTAssertTrue(total.waitForExistence(timeout: composes), "the total is not on screen")
 
         prefill()
         chooseAnExpiry()

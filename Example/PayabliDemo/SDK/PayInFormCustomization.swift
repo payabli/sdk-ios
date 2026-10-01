@@ -245,7 +245,8 @@ struct PayInFormCustomization: Hashable {
         let summary = PayabliPayInFieldSection(
             id: "summary",
             title: titlesAmountSummary ? (titled ? "Order total" : "Payment Information") : nil,
-            fields: [.amount, .serviceFee]
+            fields: [.amount, .serviceFee],
+            style: .summary
         )
 
         let entry = switch (showsCustomerSection, customerSectionFirst) {
