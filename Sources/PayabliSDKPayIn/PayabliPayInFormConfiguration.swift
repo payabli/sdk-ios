@@ -33,7 +33,8 @@ public enum PayabliPayInField: String, CaseIterable, Identifiable, Sendable {
 public enum PayabliPayInSectionStyle: Sendable, Equatable {
     case inputs
 
-    /// The section for the operation's amounts.
+    /// Where the operation's amounts are drawn, and under what title. A form with amounts to show and no
+    /// summary gets one.
     case summary
 }
 
@@ -115,7 +116,7 @@ public struct PayabliPayInLabels: Sendable {
     public let submitButton: String
     public let fieldLabels: [PayabliPayInField: String]
     public let fieldPlaceholders: [PayabliPayInField: String]
-    /// The label `totalLabelText(labels:)` reads; nil or blank reads "Total".
+    /// The label on the summary's Total row; nil or blank reads "Total".
     public let total: String?
 
     public init(
@@ -281,7 +282,7 @@ public struct PayabliPayInPaymentSummaryConfiguration: Sendable {
         Self.defaultLabelText(label: labels.total?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty ?? "Total")
     }
 
-    /// A money row's figure at the two places it is sent, or nil when the row has no figure.
+    /// The figure a money row shows, at the two places it is sent, or nil when the form draws no row for it.
     ///
     /// Amount is the total amount less the service fee, and has a figure only while a fee or a surcharge sits
     /// beside it.
@@ -312,7 +313,7 @@ public struct PayabliPayInPaymentSummaryConfiguration: Sendable {
         return total.isZero ? nil : total
     }
 
-    /// A figure in the device locale's separators, with the currency's symbol, at two places.
+    /// A figure as the form writes it: the device locale's separators, the currency's symbol, two places.
     ///
     /// A currency that is absent or not an ISO 4217 code writes the number alone, since the charge is then made
     /// in a currency the request does not name.

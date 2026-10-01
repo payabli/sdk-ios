@@ -222,12 +222,19 @@ code is `Billing Postal Code`.
 
 ## Payment Summary
 
-Capture and authorize forms include a non-editable payment summary section
-before the submit button. By default it displays generated values from
-`PayabliPayInPaymentDetails`:
+Capture and authorize forms include a non-editable payment summary section,
+drawn from `PayabliPayInPaymentDetails`. A row appears for each amount sent as
+something other than zero, and the summary ends with Total, what the payment
+charges. With a $1.00 total and a $0.10 fee it reads:
 
-- `Amount: $ 1.00`
-- `Fee: $ 0.10`
+- `Amount: $0.90`
+- `Fee: $0.10`
+- `Total: $1.00`
+
+The device locale writes the number and `currency` supplies the symbol. Mark a
+section `style: .summary` to place the rows and title them; without one, the
+form adds a summary after the inputs. `showsBaseAmount: false` drops the Amount
+row.
 
 The styling is configurable through `PayabliPayInPaymentSummaryConfiguration`:
 
