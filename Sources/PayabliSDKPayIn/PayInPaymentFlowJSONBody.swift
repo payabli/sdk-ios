@@ -18,19 +18,22 @@ enum PayInPaymentFlowJSONBody {
         try Data(jsonString(from: value).utf8)
     }
 
-    static func normalizingCurrencyFields(in value: Any) -> Any {
+    static func normalizingCurrencyFields(in value: Any) throws -> Any {
         if let dictionary = value as? [String: Any] {
-            return dictionary.reduce(into: [String: Any]()) { result, pair in
+            return try dictionary.reduce(into: [String: Any]()) { result, pair in
                 if isCurrencyField(pair.key), let amount = doubleValue(pair.value) {
-                    result[pair.key] = RawNumber(text: formattedCurrencyAmount(amount))
+                    guard let sent = PayInAmount.sendable(amount) else {
+                        throw PayabliPayInError.invalidInput("\(pair.key) is out of range.")
+                    }
+                    result[pair.key] = RawNumber(text: formattedCurrencyAmount(sent))
                 } else {
-                    result[pair.key] = normalizingCurrencyFields(in: pair.value)
+                    result[pair.key] = try normalizingCurrencyFields(in: pair.value)
                 }
             }
         }
 
         if let array = value as? [Any] {
-            return array.map(normalizingCurrencyFields)
+            return try array.map(normalizingCurrencyFields)
         }
 
         return value
@@ -91,11 +94,7 @@ enum PayInPaymentFlowJSONBody {
         return nil
     }
 
-    private static func formattedCurrencyAmount(_ value: Double) -> String {
-        var decimal = Decimal(value)
-        var rounded = Decimal()
-        NSDecimalRound(&rounded, &decimal, 2, .plain)
-
+    private static func formattedCurrencyAmount(_ rounded: Decimal) -> String {
         let formatter = NumberFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.numberStyle = .decimal
@@ -103,6 +102,6 @@ enum PayInPaymentFlowJSONBody {
         formatter.maximumFractionDigits = 2
         formatter.usesGroupingSeparator = false
 
-        return formatter.string(from: NSDecimalNumber(decimal: rounded)) ?? String(format: "%.2f", value)
+        return formatter.string(from: NSDecimalNumber(decimal: rounded)) ?? "\(rounded)"
     }
 }

@@ -158,7 +158,7 @@ extension PayabliPayInDiagnostics {
             let object = try JSONSerialization.jsonObject(with: body)
             let redacted = redactJSONValue(object, key: nil, phase: phase)
             let data = try PayInPaymentFlowJSONBody.data(
-                from: PayInPaymentFlowJSONBody.normalizingCurrencyFields(in: redacted)
+                from: try PayInPaymentFlowJSONBody.normalizingCurrencyFields(in: redacted)
             )
             return String(data: data, encoding: .utf8)
         } catch {
