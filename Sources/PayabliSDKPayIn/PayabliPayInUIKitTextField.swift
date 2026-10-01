@@ -26,6 +26,7 @@ struct PayabliPayInUIKitTextField: UIViewRepresentable {
     var placeholder: String
     var field: PayabliPayInField
     @Binding var focusedField: PayabliPayInField?
+    @Environment(\.isEnabled) private var isEnabled
     var keyboardType: UIKeyboardType
     var textContentType: UITextContentType?
     var autocapitalization: UITextAutocapitalizationType
@@ -137,7 +138,24 @@ struct PayabliPayInUIKitTextField: UIViewRepresentable {
         textField.accessibilityHint = accessibilityHint
         textField.accessibilityIdentifier = PayabliPayInAccessibility.fieldIdentifier(field)
 
+        Self.applyEnabledState(to: textField, isEnabled: isEnabled)
         Self.applyAccessory(to: textField, keyboardType: keyboardType, from: context.coordinator)
+    }
+
+    /// Separate from `updateUIView` because a `Context` cannot be built outside SwiftUI, so this is
+    /// the only place the application can be checked.
+    ///
+    /// The field's own flag carries the environment's disabled state: the framework applies it to a
+    /// wrapped view on current runtimes but documents nothing, so the deployment floor cannot rely
+    /// on that.
+    static func applyEnabledState(
+        to textField: UITextField,
+        isEnabled: Bool
+    ) {
+        textField.isEnabled = isEnabled
+        if !isEnabled, textField.isFirstResponder {
+            textField.resignFirstResponder()
+        }
     }
 
     /// Separate from `updateUIView` because a `Context` cannot be built outside

@@ -70,6 +70,9 @@ public struct PayabliPayInView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .privacySensitive()
+        // Read-only while a submission is in flight: a refusal applies to the state that was
+        // submitted, and an edit after the request left would mark a value it never saw.
+        .disabled(viewModel.isSubmitting)
         .sheet(isPresented: $isExpirationPickerPresented) {
             expirationWheelSheet
         }
@@ -219,7 +222,7 @@ public struct PayabliPayInView: View {
         .buttonStyle(.plain)
         .disabled(!viewModel.canSubmit || viewModel.isSubmitting)
         .accessibilityLabel(viewModel.isSubmitting ? "Submitting payment" : configuration.labels.submitButton)
-        .accessibilityHint(viewModel.canSubmit ? "Submits the payment." : "Complete required fields before submitting.")
+        .accessibilityHint(submitAccessibilityHint)
     }
 
     func fieldSection(_ section: PayabliPayInFieldSection) -> some View {
@@ -575,8 +578,8 @@ public struct PayabliPayInView: View {
                 .frame(width: inputSize.width)
                 .frame(minHeight: inputSize.height)
                 .frame(maxWidth: inputSize.width == nil ? .infinity : nil)
-                .background(fieldBackground(nil))
-                .overlay(fieldBorder(nil))
+                .background(fieldBackground(field))
+                .overlay(fieldBorder(field))
                 .clipShape(inputShape)
             }
             .buttonStyle(.plain)
@@ -676,8 +679,8 @@ public struct PayabliPayInView: View {
                 .frame(width: inputSize.width)
                 .frame(minHeight: inputSize.height)
                 .frame(maxWidth: inputSize.width == nil ? .infinity : nil)
-                .background(fieldBackground(nil))
-                .overlay(fieldBorder(nil))
+                .background(fieldBackground(field))
+                .overlay(fieldBorder(field))
                 .clipShape(inputShape)
             }
             .buttonStyle(.plain)
@@ -706,7 +709,7 @@ public struct PayabliPayInView: View {
 
             content()
 
-            if let errorMessage {
+            if let errorMessage = errorMessage ?? rejectedMessage(for: field) {
                 fieldErrorText(errorMessage, for: field)
             } else if let reservedErrorMessage {
                 fieldErrorText(reservedErrorMessage, for: field)
@@ -859,7 +862,25 @@ extension PayabliPayInView {
     }
 
     func fieldHasError(_ field: PayabliPayInField?) -> Bool {
-        field == .cardNumber && viewModel.cardNumberValidationMessage != nil
+        guard let field else { return false }
+        return (field == .cardNumber && viewModel.cardNumberValidationMessage != nil)
+            || viewModel.rejectedFields.contains(field)
+    }
+
+    /// The mark's own text. A refusal announces nothing: the mark and the error chrome are what a
+    /// screen reader meets on navigation.
+    func rejectedMessage(for field: PayabliPayInField) -> String? {
+        viewModel.rejectedFields.contains(field) ? "That was not accepted" : nil
+    }
+
+    var submitAccessibilityHint: String {
+        if viewModel.canSubmit {
+            return "Submits the payment."
+        }
+        if viewModel.hasMarkedFieldOnScreen {
+            return "Edit the fields that were not accepted before submitting."
+        }
+        return "Complete required fields before submitting."
     }
 
     var inputShape: RoundedRectangle {

@@ -8,6 +8,28 @@ import XCTest
 /// `Coordinator` directly against a bare `UITextField`, with no hosting controller — distinct from
 /// the SwiftUI-hosted rendering tests that stayed behind.
 final class PaymentMethodUIKitFieldCoordinatorTests: XCTestCase {
+    /// The helper the update path calls, asserted directly: the framework propagates a container's
+    /// disabled state to a wrapped view on current runtimes, so a hosted assertion cannot tell the
+    /// representable's own application from the framework's.
+    @MainActor
+    func testUIKitFieldEnabledStateHelperRefusesInputAndDropsTheKeyboard() {
+        let field = UITextField()
+        field.frame = CGRect(x: 0, y: 0, width: 240, height: 44)
+        let window = UIWindow(frame: UIScreen.main.bounds)
+        window.addSubview(field)
+        window.makeKeyAndVisible()
+
+        PayabliPayInUIKitTextField.applyEnabledState(to: field, isEnabled: true)
+        XCTAssertTrue(field.isEnabled)
+        XCTAssertTrue(field.becomeFirstResponder())
+        XCTAssertTrue(field.isFirstResponder)
+
+        PayabliPayInUIKitTextField.applyEnabledState(to: field, isEnabled: false)
+
+        XCTAssertFalse(field.isEnabled)
+        XCTAssertFalse(field.isFirstResponder)
+    }
+
     @MainActor
     func testUIKitTextFieldCoordinatorSanitizesAndTracksFocus() {
         var text = "12"

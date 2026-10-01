@@ -3,34 +3,91 @@ import PayabliSDKCore
 import SwiftUI
 
 @MainActor
-// swiftlint:disable:next type_body_length
 final class PayabliPayInViewModel: ObservableObject {
-    @Published var selectedMethod: PayabliPayInMethodType
-    @Published private var cardholderNameStorage = ""
-    @Published private var cardNumberStorage = ""
+    @Published var selectedMethod: PayabliPayInMethodType {
+        didSet { dropMarksOffScreen() }
+    }
+
+    @Published var cardholderNameStorage = "" {
+        didSet { acceptEdit(of: .cardholderName) }
+    }
+
+    @Published var cardNumberStorage = "" {
+        didSet { acceptEdit(of: .cardNumber) }
+    }
+
     @Published var cardExpiration = ""
+
     @Published var cardExpirationMonth: Int?
+
     @Published var cardExpirationYear: Int?
-    @Published private var cardCvvStorage = ""
-    @Published private var cardZipStorage = ""
-    @Published private var achHolderStorage = ""
-    @Published private var achRoutingStorage = ""
-    @Published private var achAccountStorage = ""
-    @Published var accountType: PayabliPayInAccountType = .checking
-    @Published var accountHolderType: PayabliPayInAccountHolderType = .personal
-    @Published var secCode: PayabliPayInSecCode = .web
-    @Published var deviceId = ""
+
+    @Published var cardCvvStorage = "" {
+        didSet { acceptEdit(of: .cardCvv) }
+    }
+
+    @Published var cardZipStorage = "" {
+        didSet { acceptEdit(of: .cardZip) }
+    }
+
+    @Published var achHolderStorage = "" {
+        didSet { acceptEdit(of: .accountHolder) }
+    }
+
+    @Published var achRoutingStorage = "" {
+        didSet { acceptEdit(of: .routingNumber) }
+    }
+
+    @Published var achAccountStorage = "" {
+        didSet { acceptEdit(of: .accountNumber) }
+    }
+
+    /// A pick clears its mark even when the value is unchanged, because the menu reports every tap,
+    /// including the one on the standing option, and the mark answers the tap rather than the change.
+    @Published var accountType: PayabliPayInAccountType = .checking {
+        didSet { acceptEdit(of: .accountType) }
+    }
+
+    @Published var accountHolderType: PayabliPayInAccountHolderType = .personal {
+        didSet { acceptEdit(of: .accountHolderType) }
+    }
+
+    @Published var secCode: PayabliPayInSecCode = .web {
+        didSet { acceptEdit(of: .secCode) }
+    }
+
+    @Published var deviceId = "" {
+        didSet { acceptEdit(of: .deviceId) }
+    }
+
     @Published var methodDescription = ""
-    @Published var firstName = ""
-    @Published var lastName = ""
-    @Published var customerNumber = ""
-    @Published var billingEmail = ""
-    @Published private var billingZipStorage = ""
+    @Published var firstName = "" {
+        didSet { acceptEdit(of: .firstName) }
+    }
+
+    @Published var lastName = "" {
+        didSet { acceptEdit(of: .lastName) }
+    }
+
+    @Published var customerNumber = "" {
+        didSet { acceptEdit(of: .customerNumber) }
+    }
+
+    @Published var billingEmail = "" {
+        didSet { acceptEdit(of: .billingEmail) }
+    }
+
+    @Published var billingZipStorage = "" {
+        didSet { acceptEdit(of: .billingZip) }
+    }
+
     @Published private(set) var isSubmitting = false
     @Published private(set) var errorMessage: String?
+    /// The fields the last refusal named, until the payer edits one or its box leaves the screen.
+    @Published var rejectedFields: Set<PayabliPayInField> = []
 
     private(set) var component: PayabliPayIn
-    private var configuration: PayabliPayInFormConfiguration
+    var configuration: PayabliPayInFormConfiguration
     private var lifecycleSignature: String
 
     init(
@@ -63,9 +120,14 @@ final class PayabliPayInViewModel: ObservableObject {
         guard nextSignature != lifecycleSignature else { return }
 
         objectWillChange.send()
+        // A new component is a new payment flow, so the last flow's refusal describes nothing on it.
+        let replacesFlow = component !== self.component
         self.component = component
         self.configuration = configuration
         lifecycleSignature = nextSignature
+        if replacesFlow {
+            clearMarks()
+        }
 
         let methods = availableMethods
         if !methods.contains(selectedMethod) {
@@ -74,6 +136,7 @@ final class PayabliPayInViewModel: ObservableObject {
                 : methods[0]
         }
         dropValuesWithoutAField()
+        dropMarksOffScreen()
     }
 
     var cardholderName: String {
@@ -179,7 +242,12 @@ final class PayabliPayInViewModel: ObservableObject {
         selectedExpirationMonth != nil || selectedExpirationYear != nil
     }
 
+    var hasMarkedFieldOnScreen: Bool {
+        !rejectedFields.isDisjoint(with: activeFields)
+    }
+
     var canSubmit: Bool {
+        guard !hasMarkedFieldOnScreen else { return false }
         switch effectiveSelectedMethod {
         case .card:
             return fieldHasRequiredValue(.cardholderName)
@@ -201,6 +269,7 @@ final class PayabliPayInViewModel: ObservableObject {
 
     func submit() async throws -> PayabliPayInResult {
         errorMessage = nil
+        clearMarks()
         guard !isSubmitting else {
             let error = PayabliPayInError.submissionInProgress
             errorMessage = Self.message(for: error)
@@ -208,6 +277,7 @@ final class PayabliPayInViewModel: ObservableObject {
         }
         isSubmitting = true
         defer { isSubmitting = false }
+        let submittedFlow = component
 
         do {
             try validateRequiredFields()
@@ -233,6 +303,11 @@ final class PayabliPayInViewModel: ObservableObject {
             return result
         } catch {
             clearSensitiveFieldsAfterFailure()
+            // After the clear, because its edits take a mark off. A refusal of a flow replaced while
+            // it was in flight marks nothing.
+            if component === submittedFlow {
+                rejectedFields = PayabliPayInRejectedFields.fields(in: error).intersection(activeFields)
+            }
             errorMessage = Self.message(for: error)
             throw error
         }
@@ -287,11 +362,15 @@ final class PayabliPayInViewModel: ObservableObject {
     func selectExpirationMonth(_ month: Int) {
         cardExpirationMonth = min(max(month, 1), 12)
         synchronizeExpirationText()
+        // The wheel is the payer's pick, so an assignment here answers a mark. The pre-fill
+        // that opens the wheel assigns too, and answers nothing.
+        acceptEdit(of: .cardExpiration)
     }
 
     func selectExpirationYear(_ year: Int) {
         cardExpirationYear = year
         synchronizeExpirationText()
+        acceptEdit(of: .cardExpiration)
     }
 
     func ensureExpirationSelection(defaultDate: Date = Date()) {
@@ -357,295 +436,6 @@ final class PayabliPayInViewModel: ObservableObject {
             "configuration:\(configuration.payabliViewModelSignature)"
         ]
         .joined(separator: "|")
-    }
-
-    private func methodInput() -> PayabliPayInMethodInput {
-        switch effectiveSelectedMethod {
-        case .card:
-            return .card(PayabliPayInCardData(
-                cardNumber: cardNumber,
-                expiration: cardExpiration,
-                cardholderName: cardholderName,
-                cvv: cardCvv,
-                billingZip: cardZip
-            ))
-        case .bankAccount:
-            return .bankAccount(PayabliPayInBankAccountData(
-                accountNumber: accountNumber,
-                accountType: accountType,
-                holderName: accountHolder,
-                routingNumber: routingNumber,
-                secCode: configuration.hiddenValues.secCode ?? .web,
-                holderType: fieldIsVisible(.accountHolderType) ? accountHolderType : configuration.hiddenValues.accountHolderType,
-                device: fieldIsVisible(.deviceId) ? deviceId : configuration.hiddenValues.deviceId
-            ))
-        }
-    }
-
-    private func paymentMethod() -> PayabliPayInPaymentMethod {
-        switch effectiveSelectedMethod {
-        case .card:
-            return .card(PayabliPayInPaymentMethod.Card(
-                data: PayabliPayInCardData(
-                    cardNumber: cardNumber,
-                    expiration: cardExpiration,
-                    cardholderName: cardholderName,
-                    cvv: cardCvv,
-                    billingZip: cardZip
-                )
-            ))
-        case .bankAccount:
-            return .bankAccount(PayabliPayInPaymentMethod.BankAccount(
-                data: PayabliPayInBankAccountData(
-                    accountNumber: accountNumber,
-                    accountType: accountType,
-                    holderName: accountHolder,
-                    routingNumber: routingNumber,
-                    secCode: configuration.hiddenValues.secCode ?? .web,
-                    holderType: fieldIsVisible(.accountHolderType) ? accountHolderType : configuration.hiddenValues.accountHolderType,
-                    device: fieldIsVisible(.deviceId) ? deviceId : configuration.hiddenValues.deviceId
-                )
-            ))
-        }
-    }
-
-    private func mergedCustomerData() -> PayabliPayInCustomerData? {
-        var customer = component.requestConfiguration?.customerData
-            ?? configuration.options.customerData
-            ?? PayabliPayInCustomerData()
-        customer.payabliCaptureMerge(configuration.hiddenValues.customerData)
-        customer.payabliCaptureApply(\.firstName, firstName.payabliCaptureTrimmed.payabliCaptureNilIfEmpty)
-        customer.payabliCaptureApply(\.lastName, lastName.payabliCaptureTrimmed.payabliCaptureNilIfEmpty)
-        customer.payabliCaptureApply(\.customerNumber, customerNumber.payabliCaptureTrimmed.payabliCaptureNilIfEmpty)
-        customer.payabliCaptureApply(\.billingEmail, billingEmail.payabliCaptureTrimmed.payabliCaptureNilIfEmpty)
-        customer.payabliCaptureApply(\.billingZip, billingZip.payabliCaptureTrimmed.payabliCaptureNilIfEmpty)
-        return customer.payabliCaptureHasAnyValue ? customer : nil
-    }
-
-    private func mergedOrderDescription() -> String? {
-        methodDescription.payabliCaptureTrimmed.payabliCaptureNilIfEmpty
-            ?? configuration.hiddenValues.methodDescription?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty
-    }
-
-    private func mergedTokenStorageOptions() -> PayabliPayInTokenStorageOptions {
-        var options = configuration.options
-        options.customerData = mergedCustomerData()
-        options.methodDescription = mergedOrderDescription()
-        return options
-    }
-
-    private func fieldIsVisible(_ field: PayabliPayInField) -> Bool {
-        activeFields.contains(field)
-    }
-
-    /// Every field the configuration offers a box for, on any method the form offers the payer.
-    ///
-    /// A field on the instrument the payer is not on still counts: its tab is where the payer
-    /// corrects it, so a value for it is not held out of sight.
-    private var fieldsWithABox: Set<PayabliPayInField> {
-        var fields = Set<PayabliPayInField>()
-        if availableMethods.contains(.card) {
-            fields.formUnion(configuration.cardFieldOrder)
-        }
-        if availableMethods.contains(.bankAccount) {
-            fields.formUnion(configuration.bankFieldOrder)
-        }
-        return fields
-    }
-
-    /// What the payer typed into a field no offered instrument shows any more goes with the field,
-    /// so the form holds a value only while the configuration offers the field somewhere. Nothing
-    /// is written when nothing was held, so an update a payer has not typed into publishes once.
-    /// Host-supplied hidden values are not payer-typed and are untouched.
-    private func dropValuesWithoutAField() {
-        let boxes = fieldsWithABox
-        dropCardValuesWithoutABox(boxes)
-        dropBankValuesWithoutABox(boxes)
-        dropCustomerValuesWithoutABox(boxes)
-    }
-
-    private func dropCardValuesWithoutABox(_ boxes: Set<PayabliPayInField>) {
-        if !boxes.contains(.cardholderName), !cardholderNameStorage.isEmpty {
-            cardholderNameStorage = ""
-        }
-        if !boxes.contains(.cardNumber), !cardNumberStorage.isEmpty {
-            cardNumberStorage = ""
-        }
-        if !boxes.contains(.cardExpiration),
-           !cardExpiration.isEmpty || cardExpirationMonth != nil || cardExpirationYear != nil
-        {
-            cardExpiration = ""
-            cardExpirationMonth = nil
-            cardExpirationYear = nil
-        }
-        if !boxes.contains(.cardCvv), !cardCvvStorage.isEmpty {
-            cardCvvStorage = ""
-        }
-        if !boxes.contains(.cardZip), !cardZipStorage.isEmpty {
-            cardZipStorage = ""
-        }
-    }
-
-    private func dropBankValuesWithoutABox(_ boxes: Set<PayabliPayInField>) {
-        if !boxes.contains(.accountHolder), !achHolderStorage.isEmpty {
-            achHolderStorage = ""
-        }
-        if !boxes.contains(.routingNumber), !achRoutingStorage.isEmpty {
-            achRoutingStorage = ""
-        }
-        if !boxes.contains(.accountNumber), !achAccountStorage.isEmpty {
-            achAccountStorage = ""
-        }
-        if !boxes.contains(.accountType), accountType != .checking {
-            accountType = .checking
-        }
-        if !boxes.contains(.accountHolderType), accountHolderType != .personal {
-            accountHolderType = .personal
-        }
-        if !boxes.contains(.secCode), secCode != .web {
-            secCode = .web
-        }
-        if !boxes.contains(.deviceId), !deviceId.isEmpty {
-            deviceId = ""
-        }
-    }
-
-    private func dropCustomerValuesWithoutABox(_ boxes: Set<PayabliPayInField>) {
-        if !boxes.contains(.methodDescription), !methodDescription.isEmpty {
-            methodDescription = ""
-        }
-        if !boxes.contains(.firstName), !firstName.isEmpty {
-            firstName = ""
-        }
-        if !boxes.contains(.lastName), !lastName.isEmpty {
-            lastName = ""
-        }
-        if !boxes.contains(.customerNumber), !customerNumber.isEmpty {
-            customerNumber = ""
-        }
-        if !boxes.contains(.billingEmail), !billingEmail.isEmpty {
-            billingEmail = ""
-        }
-        if !boxes.contains(.billingZip), !billingZipStorage.isEmpty {
-            billingZipStorage = ""
-        }
-    }
-
-    private var requiredFieldsAreSatisfied: Bool {
-        activeRequiredFields.allSatisfy(fieldHasRequiredValue)
-    }
-
-    private var operationConfigurationIsValid: Bool {
-        if component.operation == .storePaymentMethod {
-            return true
-        }
-        return paymentDetailsAreValid
-    }
-
-    private var paymentDetailsAreValid: Bool {
-        guard let paymentDetails = component.requestConfiguration?.paymentDetails else { return false }
-        return paymentDetails.totalAmount > 0 && (paymentDetails.serviceFee ?? 0) >= 0
-    }
-
-    private func validateRequiredFields() throws {
-        for field in activeRequiredFields {
-            guard fieldHasRequiredValue(field) else {
-                throw PayabliPayInError.invalidInput("\(configuration.labels.label(for: field)) is required.")
-            }
-        }
-    }
-
-    private var activeRequiredFields: [PayabliPayInField] {
-        activeFields.filter { configuration.requiredFields.contains($0) }
-    }
-
-    private func fieldHasRequiredValue(_ field: PayabliPayInField) -> Bool {
-        switch field {
-        case .cardholderName, .cardNumber, .cardExpiration, .cardCvv, .cardZip:
-            return cardFieldHasRequiredValue(field)
-        case .accountHolder, .routingNumber, .accountNumber, .accountType, .accountHolderType, .secCode, .deviceId:
-            return achFieldHasRequiredValue(field)
-        case .methodDescription, .firstName, .lastName, .customerNumber, .billingEmail, .billingZip:
-            return customerFieldHasRequiredValue(field)
-        case .amount, .serviceFee, .surchargeFee:
-            return paymentFieldHasRequiredValue(field)
-        }
-    }
-
-    private func cardFieldHasRequiredValue(_ field: PayabliPayInField) -> Bool {
-        switch field {
-        case .cardholderName:
-            return !cardholderName.payabliCaptureTrimmed.isEmpty
-        case .cardNumber:
-            return (PayabliPayInInputLimits.minimumCardNumberDigits ... PayabliPayInInputLimits
-                .maximumCardNumberDigits)
-                .contains(cardNumber.payabliCaptureDigitsOnly.count)
-                && cardNumberValidationMessage == nil
-        case .cardExpiration:
-            return cardExpiration.payabliCaptureDigitsOnly.count >= 4
-        case .cardCvv:
-            return (PayabliPayInInputLimits.minimumCardCvvDigits ... PayabliPayInInputLimits.maximumCardCvvDigits)
-                .contains(cardCvv.payabliCaptureDigitsOnly.count)
-        case .cardZip:
-            return !cardZip.payabliCaptureTrimmed.isEmpty
-        default:
-            return true
-        }
-    }
-
-    private func achFieldHasRequiredValue(_ field: PayabliPayInField) -> Bool {
-        switch field {
-        case .accountHolder:
-            return !accountHolder.payabliCaptureTrimmed.isEmpty
-        case .routingNumber:
-            return routingNumber.payabliCaptureDigitsOnly.count == PayabliPayInInputLimits.routingNumberDigits
-        case .accountNumber:
-            return (PayabliPayInInputLimits.minimumAccountNumberDigits ... PayabliPayInInputLimits
-                .maximumAccountNumberDigits)
-                .contains(accountNumber.payabliCaptureDigitsOnly.count)
-        case .accountType:
-            return true
-        case .accountHolderType:
-            return fieldIsVisible(.accountHolderType) || configuration.hiddenValues.accountHolderType != nil
-        case .secCode:
-            return true
-        case .deviceId:
-            return !deviceId.payabliCaptureTrimmed.isEmpty || configuration.hiddenValues.deviceId?.payabliCaptureTrimmed
-                .payabliCaptureNilIfEmpty != nil
-        default:
-            return true
-        }
-    }
-
-    private func customerFieldHasRequiredValue(_ field: PayabliPayInField) -> Bool {
-        switch field {
-        case .methodDescription:
-            return !methodDescription.payabliCaptureTrimmed.isEmpty || configuration.hiddenValues.methodDescription?.payabliCaptureTrimmed
-                .payabliCaptureNilIfEmpty != nil
-        case .firstName:
-            return !firstName.payabliCaptureTrimmed.isEmpty
-        case .lastName:
-            return !lastName.payabliCaptureTrimmed.isEmpty
-        case .customerNumber:
-            return !customerNumber.payabliCaptureTrimmed.isEmpty
-        case .billingEmail:
-            return !billingEmail.payabliCaptureTrimmed.isEmpty
-        case .billingZip:
-            return !billingZip.payabliCaptureTrimmed.isEmpty
-        default:
-            return true
-        }
-    }
-
-    private func paymentFieldHasRequiredValue(_ field: PayabliPayInField) -> Bool {
-        switch field {
-        case .amount:
-            return component.requestConfiguration?.paymentDetails.totalAmount ?? 0 > 0
-        case .serviceFee:
-            return component.requestConfiguration?.paymentDetails.serviceFee.map { $0 >= 0 } ?? true
-        default:
-            return true
-        }
     }
 
     private var selectedExpirationMonth: Int? {
