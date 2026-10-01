@@ -53,6 +53,35 @@ final class PaymentSummarySectionTests: XCTestCase {
         XCTAssertEqual(holding.map(\.style), [.inputs])
     }
 
+    func testAHostSummaryWithNoFieldsKeepsItsPlaceAndTitle() {
+        let card = PayabliPayInFieldSection(fields: [.cardholderName, .cardNumber, .cardExpiration, .cardCvv, .cardZip])
+        let customer = PayabliPayInFieldSection(title: "Customer", fields: [.firstName])
+        let configuration = PayabliPayInFormConfiguration(
+            allowedMethods: [.card],
+            cardSections: [card, PayabliPayInFieldSection(title: "Due today", fields: [], style: .summary), customer]
+        )
+
+        XCTAssertEqual(configuration.cardSections.map(\.title), [nil, "Due today", "Customer"])
+        XCTAssertEqual(configuration.cardSections.filter { $0.style == .summary }.count, 1)
+    }
+
+    func testAnInputFieldListedInTheSummaryIsMovedToTheInputs() {
+        let configuration = PayabliPayInFormConfiguration(
+            allowedMethods: [.card],
+            cardSections: [
+                PayabliPayInFieldSection(fields: [.cardholderName, .cardExpiration, .cardCvv, .cardZip]),
+                PayabliPayInFieldSection(title: "Due today", fields: [.amount, .cardNumber, .billingZip], style: .summary)
+            ]
+        )
+
+        let inputs = configuration.cardSections.filter { $0.style == .inputs }.flatMap(\.fields)
+        let summary = configuration.cardSections.filter { $0.style == .summary }.flatMap(\.fields)
+        XCTAssertTrue(inputs.contains(.cardNumber))
+        XCTAssertTrue(inputs.contains(.billingZip))
+        XCTAssertFalse(summary.contains(.cardNumber))
+        XCTAssertFalse(summary.contains(.billingZip))
+    }
+
     func testAHostSummaryKeepsItsStyleThroughNormalization() {
         let configuration = PayabliPayInFormConfiguration(
             allowedMethods: [.card],

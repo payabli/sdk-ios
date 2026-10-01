@@ -489,12 +489,26 @@ public struct PayabliPayInFormConfiguration: Sendable {
     ) -> [PayabliPayInFieldSection] {
         let sourceSections = sections?.isEmpty == false ? sections ?? [] : defaultSections
         var seenFields = Set<PayabliPayInField>()
+        // A summary draws amounts only, so a field the payer fills in that a host listed there is moved to an
+        // inputs section, as a money field listed among the inputs is drawn in the summary.
+        var displaced: [PayabliPayInField] = []
         var output = sourceSections.compactMap { section -> PayabliPayInFieldSection? in
             let visibleFields = section.fields.filter { field in
-                !hiddenFields.contains(field) && seenFields.insert(field).inserted
+                guard !hiddenFields.contains(field) else { return false }
+                if section.style == .summary, !paymentDetailFields.contains(field) {
+                    displaced.append(field)
+                    return false
+                }
+                return seenFields.insert(field).inserted
             }
-            guard !visibleFields.isEmpty else { return nil }
+            // A summary with no fields of its own is kept: it still places and titles the amounts.
+            guard !visibleFields.isEmpty || section.style == .summary else { return nil }
             return section.replacingFields(visibleFields)
+        }
+
+        for field in displaced where !seenFields.contains(field) {
+            append(field, to: &output)
+            seenFields.insert(field)
         }
 
         for field in required + appendedFields where !hiddenFields.contains(field) && !seenFields.contains(field) {
@@ -515,16 +529,18 @@ public struct PayabliPayInFormConfiguration: Sendable {
         }
 
         if paymentDetailFields.contains(field),
-           sections.contains(where: { section in section.fields.contains { paymentDetailFields.contains($0) } }) == false
+           sections.contains(where: { section in
+               section.style == .summary || section.fields.contains { paymentDetailFields.contains($0) }
+           }) == false
         {
             sections.append(PayabliPayInFieldSection(title: "Payment Information", fields: [field], style: .summary))
             return
         }
 
         if paymentDetailFields.contains(field) {
-            let targetIndex = sections.lastIndex { section in
-                section.fields.contains { paymentDetailFields.contains($0) }
-            } ?? sections.index(before: sections.endIndex)
+            let targetIndex = sections.firstIndex { $0.style == .summary }
+                ?? sections.lastIndex { section in section.fields.contains { paymentDetailFields.contains($0) } }
+                ?? sections.index(before: sections.endIndex)
             let section = sections[targetIndex]
             sections[targetIndex] = section.replacingFields(section.fields + [field])
             return
