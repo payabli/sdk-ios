@@ -51,24 +51,22 @@ final class PaymentDetailsValidationTests: XCTestCase {
         XCTAssertNil(refusal(PayabliPayInPaymentDetails(totalAmount: 12.34, surchargeFee: -0.31)))
     }
 
-    func testAValueUnderAnAmountKeyThatIsNoDecimalNumeralIsSentAsGiven() throws {
-        for value in ["inf", "nan", "inf ", "0x10", "0x1.0p4", true] as [Any] {
-            let body: [String: Any] = ["additionalData": ["surchargeFee": value]]
+    func testAdditionalDataIsSentAsTheHostGaveItWhateverItsKeysAreCalled() throws {
+        for value in ["12.345", "9007199254740993.01", "inf", "0x10", true, 1e30] as [Any] {
+            let body: [String: Any] = ["customerData": ["additionalData": ["totalAmount": value]]]
             let normalized = try PayInPaymentFlowJSONBody.normalizingCurrencyFields(in: body)
-            let additional = try XCTUnwrap((normalized as? [String: Any])?["additionalData"] as? [String: Any])
+            let customer = try XCTUnwrap((normalized as? [String: Any])?["customerData"] as? [String: Any])
+            let additional = try XCTUnwrap(customer["additionalData"] as? [String: Any])
 
-            XCTAssertEqual(String(describing: additional["surchargeFee"] ?? ""), String(describing: value))
+            XCTAssertEqual(String(describing: additional["totalAmount"] ?? ""), String(describing: value))
         }
     }
 
-    func testANumeralUnderAnAmountKeyThatCannotBeSentIsRefusedNamingWhereItWas() {
-        let body: [String: Any] = ["customerData": ["additionalData": ["totalAmount": "1e400"]]]
+    func testAPaymentAmountThatCannotBeSentIsRefusedNamingIt() {
+        let body: [String: Any] = ["paymentDetails": ["totalAmount": 1e30]]
 
         XCTAssertThrowsError(try PayInPaymentFlowJSONBody.normalizingCurrencyFields(in: body)) { error in
-            XCTAssertEqual(
-                error as? PayabliPayInError,
-                .invalidInput("customerData.additionalData.totalAmount is out of range.")
-            )
+            XCTAssertEqual(error as? PayabliPayInError, .invalidInput("paymentDetails.totalAmount is out of range."))
         }
     }
 

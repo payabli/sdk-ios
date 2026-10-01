@@ -18,26 +18,25 @@ enum PayInPaymentFlowJSONBody {
         try Data(jsonString(from: value).utf8)
     }
 
-    static func normalizingCurrencyFields(in value: Any, path: String = "") throws -> Any {
-        if let dictionary = value as? [String: Any] {
-            return try dictionary.reduce(into: [String: Any]()) { result, pair in
-                let keyPath = path.isEmpty ? pair.key : "\(path).\(pair.key)"
-                if isCurrencyField(pair.key), let amount = doubleValue(pair.value) {
-                    guard let sent = PayInAmount.sendable(amount) else {
-                        throw PayabliPayInError.invalidInput("\(keyPath) is out of range.")
-                    }
-                    result[pair.key] = RawNumber(text: formattedCurrencyAmount(sent))
-                } else {
-                    result[pair.key] = try normalizingCurrencyFields(in: pair.value, path: keyPath)
-                }
+    /// Writes the payment's own amounts at two places. Nothing else is read as money: free-form data such as
+    /// `additionalData` is sent exactly as the host gave it, whatever its keys are called.
+    static func normalizingCurrencyFields(in value: Any) throws -> Any {
+        guard var body = value as? [String: Any], let details = body["paymentDetails"] as? [String: Any] else {
+            return value
+        }
+        body["paymentDetails"] = try details.reduce(into: [String: Any]()) { result, pair in
+            guard isCurrencyField(pair.key), let number = pair.value as? NSNumber,
+                  CFGetTypeID(number) != CFBooleanGetTypeID()
+            else {
+                result[pair.key] = pair.value
+                return
             }
+            guard let sent = PayInAmount.sendable(number.doubleValue) else {
+                throw PayabliPayInError.invalidInput("paymentDetails.\(pair.key) is out of range.")
+            }
+            result[pair.key] = RawNumber(text: formattedCurrencyAmount(sent))
         }
-
-        if let array = value as? [Any] {
-            return try array.map { try normalizingCurrencyFields(in: $0, path: path) }
-        }
-
-        return value
+        return body
     }
 
     private static func jsonString(from value: Any) throws -> String {
@@ -84,20 +83,6 @@ enum PayInPaymentFlowJSONBody {
     private static func isCurrencyField(_ key: String) -> Bool {
         key == "totalAmount" || key == "serviceFee" || key == "surchargeFee"
     }
-
-    /// A number, or a string that is a plain decimal numeral. Anything else, a Boolean, `"0x10"` or `"inf"`
-    /// among them, is not an amount and is sent as it was given.
-    private static func doubleValue(_ value: Any) -> Double? {
-        if let number = value as? NSNumber {
-            return CFGetTypeID(number) == CFBooleanGetTypeID() ? nil : number.doubleValue
-        }
-        if let string = value as? String, string.range(of: decimalNumeral, options: .regularExpression) != nil {
-            return Double(string)
-        }
-        return nil
-    }
-
-    private static let decimalNumeral = #"^-?[0-9]+(\.[0-9]+)?([eE][+-]?[0-9]+)?$"#
 
     private static func formattedCurrencyAmount(_ rounded: Decimal) -> String {
         let formatter = NumberFormatter()
