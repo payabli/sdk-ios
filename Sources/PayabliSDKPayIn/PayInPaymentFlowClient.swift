@@ -231,7 +231,8 @@ final class PayInPaymentFlowClient: Sendable {
             return true
         case .paymentDeclined, .rateLimited, .missingToken, .tokenExpired,
              .tokenMalformed, .tokenProviderFailed, .invalidSignature, .permissionDenied,
-             .sessionBurned, .invalidConfiguration, .validation:
+             .sessionBurned, .invalidConfiguration, .validation,
+             .deviceKeyUnavailable, .attestationNotSupported:
             return false
         }
     }

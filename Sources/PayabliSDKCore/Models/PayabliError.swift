@@ -50,6 +50,109 @@ public enum PayabliErrorCode: String, Sendable, CaseIterable {
     case userCancelled = "USER_CANCELLED"
     case validation = "VALIDATION_ERROR"
     case unknown = "UNKNOWN"
+
+    // Card-present.
+    case deviceKeyUnavailable = "DEVICE_KEY_UNAVAILABLE"
+    case attestationNotSupported = "ATTESTATION_NOT_SUPPORTED"
+}
+
+/// What a host does about a failure. Each ``PayabliErrorCode`` belongs to one.
+public enum PayabliErrorCategory: String, Sendable, CaseIterable {
+    /// Obtain a new token.
+    case credential = "CREDENTIAL"
+
+    /// The same call may work later.
+    case retryLater = "RETRY_LATER"
+
+    /// The call may have taken effect; check before repeating it.
+    case outcomeUnknown = "OUTCOME_UNKNOWN"
+
+    /// Someone changes the setup.
+    case configuration = "CONFIGURATION"
+
+    /// The request has to change.
+    case invalidRequest = "INVALID_REQUEST"
+
+    /// Do not repeat it.
+    case declined = "DECLINED"
+
+    /// This handset cannot do it.
+    case device = "DEVICE"
+
+    /// Report it.
+    case `internal` = "INTERNAL"
+}
+
+/// The catalog: one number, message and category per code, the same on every platform the SDK ships on.
+/// Numbers are allocated by area, core in the 1000s and card-present in the 3000s, and are never reused.
+public extension PayabliErrorCode {
+    var number: Int {
+        switch self {
+        case .missingToken: 1001
+        case .tokenExpired: 1002
+        case .tokenMalformed: 1003
+        case .tokenProviderFailed: 1004
+        case .invalidSignature: 1005
+        case .permissionDenied: 1006
+        case .sessionBurned: 1007
+        case .paymentDeclined: 1008
+        case .serverError: 1009
+        case .rateLimited: 1010
+        case .conflict: 1011
+        case .invalidConfiguration: 1012
+        case .networkError: 1013
+        case .decodingError: 1014
+        case .userCancelled: 1015
+        case .validation: 1016
+        case .unknown: 1017
+        case .deviceKeyUnavailable: 3001
+        case .attestationNotSupported: 3002
+        }
+    }
+
+    /// Fixed SDK text. The service's own words stay in ``PayabliError/reason`` and ``PayabliError/detail``.
+    var message: String {
+        switch self {
+        case .missingToken: "No access token is available."
+        case .tokenExpired: "The access token expired or was rejected."
+        case .tokenMalformed: "The access token could not be read."
+        case .tokenProviderFailed: "The token provider did not return a usable token."
+        case .invalidSignature: "The request signature was rejected."
+        case .permissionDenied: "The credentials are not permitted to make this request."
+        case .sessionBurned: "The session can no longer be used."
+        case .paymentDeclined: "The payment was declined."
+        case .serverError: "The service could not process the request."
+        case .rateLimited: "Too many requests. Try again later."
+        case .conflict: "The request conflicts with the state the service holds."
+        case .invalidConfiguration: "The SDK is not configured correctly."
+        case .networkError: "The service could not be reached."
+        case .decodingError: "The response could not be read."
+        case .userCancelled: "The person cancelled."
+        case .validation: "The request was refused as invalid."
+        case .unknown: "An unexpected error occurred."
+        case .deviceKeyUnavailable: "The device's key facility could not confirm this device's key."
+        case .attestationNotSupported: "This device does not support app attestation."
+        }
+    }
+
+    var category: PayabliErrorCategory {
+        switch self {
+        case .missingToken, .tokenExpired, .tokenMalformed, .tokenProviderFailed, .invalidSignature, .sessionBurned:
+            .credential
+        case .permissionDenied, .invalidConfiguration:
+            .configuration
+        case .paymentDeclined, .conflict:
+            .declined
+        case .serverError, .networkError, .decodingError, .userCancelled, .unknown:
+            .outcomeUnknown
+        case .rateLimited, .deviceKeyUnavailable:
+            .retryLater
+        case .validation:
+            .invalidRequest
+        case .attestationNotSupported:
+            .device
+        }
+    }
 }
 
 /// Root error type for PayabliSDK.
