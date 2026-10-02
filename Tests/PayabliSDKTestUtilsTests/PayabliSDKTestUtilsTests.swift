@@ -94,4 +94,29 @@ final class PayabliSDKTestUtilsTests: XCTestCase {
         let mock = MockTapToPayProvider()
         XCTAssertNotNil(mock)
     }
+
+    func testAKeyThatIsGoneIsNotAnEnrolmentEither() async throws {
+        let attestation = MockDeviceAttestationService()
+        attestation.bindings = ["entryA": "devA"]
+        attestation.heldKeyIsGone = true
+
+        let attested = try await attestation.isAttested(for: "entryA")
+
+        XCTAssertFalse(attested)
+        XCTAssertNil(try attestation.cachedDeviceId(for: "entryA"), "the binding naming the gone key is dropped")
+    }
+
+    func testAKeyThatIsGoneDropsTheBindingWhenTheIdIsAskedFor() async throws {
+        let attestation = MockDeviceAttestationService()
+        attestation.bindings = ["entryA": "devA"]
+        attestation.heldKeyIsGone = true
+
+        attestation.bindingKeys = ["entryA": "keyA"]
+
+        let deviceId = try await attestation.usableDeviceId(for: "entryA")
+
+        XCTAssertNil(deviceId)
+        XCTAssertNil(try attestation.cachedDeviceId(for: "entryA"))
+        XCTAssertNil(attestation.bindingKeys["entryA"], "the key went with the binding")
+    }
 }

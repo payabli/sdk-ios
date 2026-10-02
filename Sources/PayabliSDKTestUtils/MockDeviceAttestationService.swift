@@ -60,7 +60,12 @@ package final class MockDeviceAttestationService: DeviceAttestationService, @unc
             if let storedReadFailure {
                 throw storedReadFailure
             }
-            return storedBindings[entry] != nil || storedBindings[Self.anyEntry] != nil
+            guard storedBindings[entry] != nil || storedBindings[Self.anyEntry] != nil else { return false }
+            if storedHeldKeyIsGone {
+                dropBinding(for: entry)
+                return false
+            }
+            return true
         }
     }
 
@@ -71,6 +76,37 @@ package final class MockDeviceAttestationService: DeviceAttestationService, @unc
             }
             return storedBindings[entry] ?? storedBindings[Self.anyEntry]
         }
+    }
+
+    /// Makes every binding name a key the platform will no longer sign with.
+    package var heldKeyIsGone: Bool {
+        get { lock.withLock { storedHeldKeyIsGone } }
+        set { lock.withLock { storedHeldKeyIsGone = newValue } }
+    }
+
+    private var storedHeldKeyIsGone = false
+
+    /// A key that is gone drops the binding that names it, as the real check does.
+    /// One turn of the lock, so a write from another task cannot land between the
+    /// read and the drop.
+    package func usableDeviceId(for entry: String) async throws -> String? {
+        try lock.withLock {
+            if let storedReadFailure {
+                throw storedReadFailure
+            }
+            guard let deviceId = storedBindings[entry] ?? storedBindings[Self.anyEntry] else { return nil }
+            guard storedHeldKeyIsGone else { return deviceId }
+            dropBinding(for: entry)
+            return nil
+        }
+    }
+
+    /// Called with the lock held. The key goes with the binding that named it.
+    private func dropBinding(for entry: String) {
+        storedBindings[entry] = nil
+        storedBindings[Self.anyEntry] = nil
+        storedKeys[entry] = nil
+        storedKeys[Self.anyEntry] = nil
     }
 
     private var storedAttestResult: Result<AttestationResult, Error> = .success(

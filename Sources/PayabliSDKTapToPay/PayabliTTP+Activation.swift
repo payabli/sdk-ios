@@ -80,7 +80,12 @@ public extension PayabliTTP {
     /// active. `nil` when the SDK holds no usable id for it, for any reason; call `initialize()`, which
     /// enrolls the device or throws why it could not.
     func deviceId() async -> String? {
-        nil
+        do {
+            return try await attestation.usableDeviceId(for: entryPoint)
+        } catch {
+            logger.info("[attest] the stored binding could not be read")
+            return nil
+        }
     }
 
     /// `@objc` companion to `deviceId()`, answering the same way.
