@@ -34,4 +34,8 @@ public enum PayabliTTPFailureReason: Int, Sendable, CaseIterable {
     /// The SDK and the service disagree about the contract, or the SDK has a
     /// defect. A failure inside the service is ``serviceUnavailable``.
     case sdkInternalError = 4
+
+    /// The phone's key facility failed, so the SDK cannot tell whether this device's key still
+    /// works. Calling initialize again may succeed; a failure that persists is the device's.
+    case deviceKeyUnavailable = 5
 }

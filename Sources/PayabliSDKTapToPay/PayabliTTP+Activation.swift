@@ -75,4 +75,20 @@ public extension PayabliTTP {
             }
         }
     }
+
+    /// The id Payabli assigned this device on the session's paypoint, whether pending activation or
+    /// active. `nil` when the SDK holds no usable id for it, for any reason; call `initialize()`, which
+    /// enrolls the device or throws why it could not.
+    func deviceId() async -> String? {
+        nil
+    }
+
+    /// `@objc` companion to `deviceId()`, answering the same way.
+    @objc func deviceId(
+        completion: @escaping (String?) -> Void
+    ) {
+        Task { @MainActor in
+            completion(await self.deviceId())
+        }
+    }
 }
