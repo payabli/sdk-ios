@@ -220,6 +220,8 @@ struct PaymentTapToPayQAView: View {
     private var activationSheet: some View {
         NavigationStack {
             Form {
+                ActivationDeviceIdSection(terminal: terminal)
+
                 Section("Activation code") {
                     TextField("6 digits", text: $activationCode)
                         .keyboardType(.numberPad)
@@ -635,4 +637,19 @@ struct TapToPayQAEventEntry: Identifiable {
     let id = UUID()
     let label: String
     let detail: String
+}
+
+/// The id a backend sends with the paypoint to issue this device's activation code.
+private struct ActivationDeviceIdSection: View {
+    let terminal: TapToPayTerminal
+    @State private var deviceId: String?
+
+    var body: some View {
+        Section("Device ID") {
+            Text(deviceId ?? "None held. Enable the terminal first.")
+                .font(.footnote.monospaced())
+                .textSelection(.enabled)
+        }
+        .task { deviceId = await terminal.deviceId() }
+    }
 }
