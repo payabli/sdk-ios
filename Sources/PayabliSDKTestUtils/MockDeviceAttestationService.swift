@@ -87,17 +87,26 @@ package final class MockDeviceAttestationService: DeviceAttestationService, @unc
     private var storedHeldKeyIsGone = false
 
     /// A key that is gone drops the binding that names it, as the real check does.
+    /// One turn of the lock, so a write from another task cannot land between the
+    /// read and the drop.
     package func usableDeviceId(for entry: String) async throws -> String? {
-        guard let deviceId = try cachedDeviceId(for: entry) else { return nil }
-        guard heldKeyIsGone else { return deviceId }
-        lock.withLock { dropBinding(for: entry) }
-        return nil
+        try lock.withLock {
+            if let storedReadFailure {
+                throw storedReadFailure
+            }
+            guard let deviceId = storedBindings[entry] ?? storedBindings[Self.anyEntry] else { return nil }
+            guard storedHeldKeyIsGone else { return deviceId }
+            dropBinding(for: entry)
+            return nil
+        }
     }
 
-    /// Called with the lock held.
+    /// Called with the lock held. The key goes with the binding that named it.
     private func dropBinding(for entry: String) {
         storedBindings[entry] = nil
         storedBindings[Self.anyEntry] = nil
+        storedKeys[entry] = nil
+        storedKeys[Self.anyEntry] = nil
     }
 
     private var storedAttestResult: Result<AttestationResult, Error> = .success(
