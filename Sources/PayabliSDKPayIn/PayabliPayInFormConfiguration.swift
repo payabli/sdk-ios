@@ -137,9 +137,21 @@ public struct PayabliPayInLabels: Sendable {
 
     /// The host's label for `field`, or the default when the host's is absent or blank.
     public func label(for field: PayabliPayInField) -> String {
-        fieldLabels[field].flatMap { $0.payabliCaptureTrimmed.isEmpty ? nil : $0 }
+        fieldLabels[field].flatMap { Self.isBlank($0) ? nil : $0 }
             ?? Self.defaultFieldLabels[field]
             ?? field.rawValue
+    }
+
+    /// Blank as Kotlin's `isBlank` reads it, so a label falls back on both platforms for the same text.
+    static func isBlank(_ text: String) -> Bool {
+        text.unicodeScalars.allSatisfy { scalar in
+            switch scalar.properties.generalCategory {
+            case .spaceSeparator, .lineSeparator, .paragraphSeparator:
+                return true
+            default:
+                return (0x09 ... 0x0D).contains(scalar.value) || (0x1C ... 0x1F).contains(scalar.value)
+            }
+        }
     }
 
     public func placeholder(for field: PayabliPayInField) -> String? {

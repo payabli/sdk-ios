@@ -1,4 +1,4 @@
-import PayabliSDKPayIn
+@testable import PayabliSDKPayIn
 import XCTest
 
 final class PaymentFormLabelTextTests: XCTestCase {
@@ -51,6 +51,15 @@ final class PaymentFormLabelTextTests: XCTestCase {
         XCTAssertEqual(labels.label(for: .amount), "Amount")
         XCTAssertEqual(labels.label(for: .serviceFee), "Fee")
         XCTAssertEqual(labels.label(for: .surchargeFee), "Extra")
+    }
+
+    func testBlankIsReadAsTheAndroidSDKReadsIt() {
+        for blank in ["", " ", "\t\n", "\u{1C}", "\u{1F}", "\u{00A0}", "\u{2028}", "\u{3000}"] {
+            XCTAssertTrue(PayabliPayInLabels.isBlank(blank), blank.unicodeScalars.map { String($0.value, radix: 16) }.joined())
+        }
+        for notBlank in ["\u{85}", "\u{200B}", " a "] {
+            XCTAssertFalse(PayabliPayInLabels.isBlank(notBlank), notBlank.unicodeScalars.map { String($0.value, radix: 16) }.joined())
+        }
     }
 
     func testAHostLabelIsUsedAsGiven() {
