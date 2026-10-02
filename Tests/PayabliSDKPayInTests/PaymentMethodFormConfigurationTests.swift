@@ -46,8 +46,8 @@ final class PaymentMethodFormConfigurationTests: XCTestCase {
     func testPaymentMethodLabelsUsePostalCodeCopy() {
         let labels = PayabliPayInLabels()
 
-        XCTAssertEqual(labels.label(for: .cardZip), "Postal Code")
-        XCTAssertEqual(labels.label(for: .billingZip), "Billing Postal Code")
+        XCTAssertEqual(labels.label(for: .cardZip), "Postal code")
+        XCTAssertEqual(labels.label(for: .billingZip), "Billing postal code")
     }
 
     func testPaymentMethodLabelsCanConfigureFieldPlaceholders() {

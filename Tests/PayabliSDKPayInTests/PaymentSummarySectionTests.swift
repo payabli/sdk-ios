@@ -10,9 +10,9 @@ final class PaymentSummarySectionTests: XCTestCase {
     func testTheTotalRowTakesTheHostLabelOrTotal() {
         let summary = PayabliPayInPaymentSummaryConfiguration()
 
-        XCTAssertEqual(summary.totalLabelText(labels: PayabliPayInLabels()), "Total:")
-        XCTAssertEqual(summary.totalLabelText(labels: PayabliPayInLabels(total: "  ")), "Total:")
-        XCTAssertEqual(summary.totalLabelText(labels: PayabliPayInLabels(total: "Amount due")), "Amount due:")
+        XCTAssertEqual(summary.totalLabelText(labels: PayabliPayInLabels()), "Total")
+        XCTAssertEqual(summary.totalLabelText(labels: PayabliPayInLabels(total: "  ")), "Total")
+        XCTAssertEqual(summary.totalLabelText(labels: PayabliPayInLabels(total: "Amount due")), "Amount due")
     }
 
     func testASectionTakesInputUnlessMarkedAsTheSummary() {

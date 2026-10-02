@@ -42,7 +42,7 @@ final class PaymentMethodConfigurationChangeTests: XCTestCase {
 
         viewModel.update(component: component, configuration: configuration(amountLabel: "Due today"))
 
-        XCTAssertEqual(viewModel.paymentSummaryLabelText(for: .amount), "Due today:")
+        XCTAssertEqual(viewModel.paymentSummaryLabelText(for: .amount), "Due today")
         XCTAssertEqual(viewModel.cardholderName, "Ada Lovelace")
     }
 

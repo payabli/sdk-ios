@@ -400,8 +400,8 @@ let labels = PayabliPayInLabels(
     subtitle: "Enter your payment details",
     submitButton: "Submit Payment",
     fieldLabels: PayabliPayInLabels.defaultFieldLabels.merging([
-        .cardZip: "Postal Code",
-        .billingZip: "Billing Postal Code"
+        .cardZip: "Postal code",
+        .billingZip: "Billing postal code"
     ]) { _, new in new },
     fieldPlaceholders: Dictionary(uniqueKeysWithValues: placeholderFields.map {
         ($0, PayabliPayInLabels.defaultFieldLabels[$0] ?? $0.rawValue)
@@ -538,7 +538,7 @@ Default field labels:
 | `.cardNumber` | Card number |
 | `.cardExpiration` | Expiration |
 | `.cardCvv` | CVV |
-| `.cardZip` | Postal Code |
+| `.cardZip` | Postal code |
 | `.accountHolder` | Account holder |
 | `.routingNumber` | Routing number |
 | `.accountNumber` | Account number |
@@ -551,7 +551,7 @@ Default field labels:
 | `.lastName` | Last name |
 | `.customerNumber` | Customer number |
 | `.billingEmail` | Billing email |
-| `.billingZip` | Billing Postal Code |
+| `.billingZip` | Billing postal code |
 | `.amount` | Amount |
 | `.serviceFee` | Fee |
 | `.surchargeFee` | Surcharge |
