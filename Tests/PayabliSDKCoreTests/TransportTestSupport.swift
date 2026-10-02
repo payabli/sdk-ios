@@ -329,20 +329,36 @@ final class Slot<Value: Sendable>: @unchecked Sendable {
     }
 }
 
+/// How many 25 ms polls a wait for work that has to finish allows: 30 seconds. The work answers in
+/// milliseconds, so a passing run never reaches it; it has to outlast a runner slow to schedule the
+/// task.
+let mustFinishPolls = 1200
+
 /// Runs `work` under a ceiling and returns its outcome, or nil if it never finished.
 ///
-/// The run is abandoned rather than awaited when the ceiling expires. Awaiting it instead would hang
-/// the whole suite, and a hung suite prints no failure and reads exactly like a passing one, which is
-/// why the case this exists for was skipped rather than left to run.
-func outcomeWithinCeiling(_ work: @escaping @Sendable () async -> String) async -> String? {
+/// The run is cancelled and abandoned rather than awaited when the ceiling expires. Awaiting it instead
+/// would hang the whole suite, and a hung suite prints no failure and reads exactly like a passing one,
+/// which is why the case this exists for was skipped rather than left to run. Reaching the ceiling is
+/// reported as its own failure, ahead of whatever the caller then asserts about the nil.
+func outcomeWithinCeiling(
+    file: StaticString = #filePath,
+    line: UInt = #line,
+    _ work: @escaping @Sendable () async -> String
+) async -> String? {
     let slot = Slot<String>()
-    Task { slot.set(await work()) }
-    for _ in 0 ..< 200 {
+    let running = Task { slot.set(await work()) }
+    for _ in 0 ..< mustFinishPolls {
         if let seen = slot.value {
             return seen
         }
         try? await Task.sleep(nanoseconds: 25_000_000)
     }
+    // Read once more: the work can land during the last sleep.
+    if let seen = slot.value {
+        return seen
+    }
+    running.cancel()
+    XCTFail("the work did not finish within \(mustFinishPolls * 25 / 1000) seconds", file: file, line: line)
     return nil
 }
 
@@ -381,13 +397,15 @@ final class Latch: @unchecked Sendable {
 /// The slot's value once something sets it, or nil if nothing did inside the ceiling.
 ///
 /// Polled rather than awaited, for a task nothing else owns. Bounded for the same reason as
-/// `outcomeWithinCeiling`.
-func valueWithinCeiling(_ slot: Slot<String>, attempts: Int = 200) async -> String? {
+/// `outcomeWithinCeiling`. A caller asserting that something has not happened yet passes a short
+/// `attempts` and expects nil; every other caller takes the default.
+func valueWithinCeiling(_ slot: Slot<String>, attempts: Int = mustFinishPolls) async -> String? {
     for _ in 0 ..< attempts {
         if let seen = slot.value {
             return seen
         }
         try? await Task.sleep(nanoseconds: 25_000_000)
     }
-    return nil
+    // Read once more: the value can land during the last sleep.
+    return slot.value
 }
