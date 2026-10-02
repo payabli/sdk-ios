@@ -167,9 +167,8 @@ final class PayabliTTPFailureReasonTests: XCTestCase {
         XCTAssertEqual(PayabliTTPSessionStateCode.pendingTerms.rawValue, 9)
     }
 
-    /// The members mirror the sibling platform's published vocabulary, so a
-    /// host branching on one branches on the same set on both.
-    func testTheVocabularyMirrorsTheSibling() {
+    /// The published vocabulary, each member at a fixed integer.
+    func testThePublishedVocabularyKeepsItsIntegers() {
         XCTAssertEqual(PayabliTTPFailureReason.allCases.count, 6)
         XCTAssertEqual(PayabliTTPFailureReason.attestationRequired.rawValue, 0)
         XCTAssertEqual(PayabliTTPFailureReason.configurationRejected.rawValue, 1)
