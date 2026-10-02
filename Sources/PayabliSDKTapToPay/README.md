@@ -141,11 +141,23 @@ or `pos_create`, land in the same state, so check both before issuing a code. Cr
 `inboundpayments_create` reach `.ready`, and `charge` then throws a core `PayabliError` whose `code` is
 `.permissionDenied`, before the card is read.
 
-1. Issue a code for the phone. In the Payabli portal, under **Pay In > Devices > Device management**, choose
-   **⋯ > Generate activation code**. The code is valid for 30 minutes, and asking again before it
-   expires returns the same code. The API route,
-   [Generate Tap to Pay activation code](https://docs.payabli.com/developers/api-reference/device/activation-challenge),
-   takes the device's ID, which the SDK doesn't return, so issue codes from the portal.
+1. Issue a code for the phone, from your backend or from the Payabli portal. The code is valid for 30
+   minutes, and asking again before it expires returns the same code.
+
+   - **From your backend:** call
+     [Generate Tap to Pay activation code](https://docs.payabli.com/developers/api-reference/device/activation-challenge)
+     with the paypoint's entry point and the phone's device ID. Read the device ID with `deviceId()`
+     once `sessionState` is `.pendingActivation`, and send it to your backend:
+
+     ```swift
+     guard let deviceId = await ttp.deviceId() else {
+         // The SDK holds no usable ID for this phone. Initialize again.
+         return
+     }
+     ```
+
+   - **From the portal:** under **Pay In > Devices > Device management**, choose
+     **⋯ > Generate activation code**.
 
    The code is six digits and can start with zero, so keep it as a string.
 2. Deliver the code to the person holding the phone, and have your app ask for it.
