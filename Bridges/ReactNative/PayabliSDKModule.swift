@@ -302,17 +302,19 @@ public final class PayabliSDKModule: RCTEventEmitter {
     // MARK: - deviceId
 
     /// Resolves the id, or `null` when the SDK holds no usable one. Never rejects
-    /// once configured.
+    /// once configured. `NSNull`, because a nil reaches JavaScript as `undefined`.
     @objc public func deviceId(
         _ resolve: @escaping RCTPromiseResolveBlock,
         rejecter reject: @escaping RCTPromiseRejectBlock
     ) {
-        guard let ttp else {
-            reject("NOT_CONFIGURED", "Call configure() before deviceId()", nil)
-            return
-        }
-        ttp.deviceId { deviceId in
-            resolve(deviceId)
+        Task { @MainActor in
+            guard let ttp else {
+                reject("NOT_CONFIGURED", "Call configure() before deviceId()", nil)
+                return
+            }
+            ttp.deviceId { deviceId in
+                resolve(deviceId ?? NSNull())
+            }
         }
     }
 
