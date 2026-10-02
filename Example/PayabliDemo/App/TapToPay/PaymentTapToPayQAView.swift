@@ -651,7 +651,7 @@ private struct ActivationDeviceIdSection: View {
             case .none:
                 ProgressView()
             case .some(.none):
-                Text("None held. Enable the terminal again.")
+                Text("None held.")
             case let .some(.some(deviceId)):
                 Text(deviceId)
                     .font(.footnote.monospaced())

@@ -151,7 +151,8 @@ or `pos_create`, land in the same state, so check both before issuing a code. Cr
 
      ```swift
      guard let deviceId = await ttp.deviceId() else {
-         // The SDK holds no usable ID for this phone. Initialize again.
+         // The SDK holds no usable ID for this phone. Initializing enrolls it again.
+         try await ttp.initialize()
          return
      }
      ```
