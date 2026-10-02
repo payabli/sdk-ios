@@ -301,11 +301,9 @@ Pass the `deviceId`. It is the only field that identifies a single device.
 Serial number is the app's `identifierForVendor`, and several device records can
 share one serial.
 
-A host app has no `deviceId` to pass. The attestation service holding it is internal
-to the SDK, and activating does not need it: once the session reports
-`.pendingActivation`, `PayabliTTP.activateDevice(activationCode:)` resolves the binding
-the SDK is holding. The on-device tests reach the service through `@testable` and are
-where a specific binding can be named.
+A host app reads the `deviceId` with `PayabliTTP.deviceId()` once the session reports
+`.pendingActivation`, and sends it here. The sample app shows it on the activation
+sheet.
 
 With no `deviceId`, the server uses the newest pending device. `resolvedFrom`
 reports which path was used: `request`, `onlyPendingDevice`, or

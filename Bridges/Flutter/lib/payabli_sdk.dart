@@ -167,6 +167,20 @@ class PayabliTTP {
     }
   }
 
+  // MARK: - deviceId
+
+  /// The id Payabli assigned this device on the session's paypoint, whether
+  /// pending activation or active. `null` when the SDK holds no usable id for
+  /// it, for any reason; call [initialize], which enrolls the device or throws
+  /// why it could not.
+  static Future<String?> deviceId() async {
+    try {
+      return await _payabliMethodChannel.invokeMethod<String>('deviceId');
+    } on PlatformException catch (e) {
+      throw PayabliTTPException._fromPlatform(e);
+    }
+  }
+
   // MARK: - getSessionState
 
   /// Polls the session state and what its case carries.
