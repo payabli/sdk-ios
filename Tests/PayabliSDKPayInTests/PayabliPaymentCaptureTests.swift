@@ -364,11 +364,11 @@ final class PayabliPayInTests: XCTestCase {
         let summary = PayabliPayInPaymentSummaryConfiguration(rowSpacing: 4)
         let relabelled = PayabliPayInLabels(fieldLabels: [.amount: "Today", .serviceFee: "Processing"])
 
-        XCTAssertEqual(summary.labelText(for: .amount, labels: labels), "Amount:")
-        XCTAssertEqual(summary.labelText(for: .serviceFee, labels: labels), "Fee:")
-        XCTAssertEqual(summary.labelText(for: .surchargeFee, labels: labels), "Surcharge:")
-        XCTAssertEqual(summary.labelText(for: .amount, labels: relabelled), "Today:")
-        XCTAssertEqual(summary.labelText(for: .serviceFee, labels: relabelled), "Processing:")
+        XCTAssertEqual(summary.labelText(for: .amount, labels: labels), "Amount")
+        XCTAssertEqual(summary.labelText(for: .serviceFee, labels: labels), "Fee")
+        XCTAssertEqual(summary.labelText(for: .surchargeFee, labels: labels), "Surcharge")
+        XCTAssertEqual(summary.labelText(for: .amount, labels: relabelled), "Today")
+        XCTAssertEqual(summary.labelText(for: .serviceFee, labels: relabelled), "Processing")
         XCTAssertEqual(summary.rowSpacing, 4)
     }
 

@@ -256,7 +256,7 @@ let storedBankAccount = try await paymentFlow.addBankAccount(
 | `expiration` | Accepts `MMYY` or `MM/YY`; normalized to `MM/YY` for capture. |
 | `cardholderName` | Required. |
 | `cvv` | Required. Direct API only; PCI-sensitive. |
-| `billingZip` | Postal code for card billing. Default label is `Postal Code`. |
+| `billingZip` | Postal code for card billing. Default label is `Postal code`. |
 
 `PayabliPayInBankAccountData` fields:
 
@@ -408,7 +408,7 @@ All `PayabliPayInField` values:
 | `.cardNumber` | Card number | Card |
 | `.cardExpiration` | Expiration | Card |
 | `.cardCvv` | CVV | Card |
-| `.cardZip` | Postal Code | Card |
+| `.cardZip` | Postal code | Card |
 | `.accountHolder` | Account holder | Bank account |
 | `.routingNumber` | Routing number | Bank account |
 | `.accountNumber` | Account number | Bank account |
@@ -421,7 +421,7 @@ All `PayabliPayInField` values:
 | `.lastName` | Last name | Customer |
 | `.customerNumber` | Customer number | Customer |
 | `.billingEmail` | Billing email | Customer |
-| `.billingZip` | Billing Postal Code | Customer |
+| `.billingZip` | Billing postal code | Customer |
 | `.amount` | Amount | Payment summary |
 | `.serviceFee` | Fee | Payment summary |
 | `.surchargeFee` | Surcharge | Payment summary |
@@ -499,7 +499,7 @@ let configuration = PayabliPayInFormConfiguration(
 )
 ```
 
-Use `Postal Code` for postal-code user-facing copy unless an integrator
+Use `Postal code` for postal-code user-facing copy unless an integrator
 intentionally overrides the label.
 
 ## Hidden Values

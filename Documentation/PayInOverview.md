@@ -148,7 +148,7 @@ Supported fields:
 | `.cardNumber` | Card number | Card input |
 | `.cardExpiration` | Expiration | Card input |
 | `.cardCvv` | CVV | Card input |
-| `.cardZip` | Postal Code | Card input |
+| `.cardZip` | Postal code | Card input |
 | `.accountHolder` | Account holder | bank account input |
 | `.routingNumber` | Routing number | bank account input |
 | `.accountNumber` | Account number | bank account input |
@@ -161,7 +161,7 @@ Supported fields:
 | `.lastName` | Last name | Customer information |
 | `.customerNumber` | Customer number | Customer information |
 | `.billingEmail` | Billing email | Customer information |
-| `.billingZip` | Billing Postal Code | Customer information |
+| `.billingZip` | Billing postal code | Customer information |
 | `.amount` | Amount | Read-only payment summary |
 | `.serviceFee` | Fee | Read-only payment summary |
 | `.surchargeFee` | Surcharge | Read-only payment summary |
@@ -205,7 +205,7 @@ let labels = PayabliPayInLabels(
         .cardNumber: "Card number",
         .cardExpiration: "Expiration",
         .cardCvv: "CVV",
-        .cardZip: "Postal Code"
+        .cardZip: "Postal code"
     ]
 )
 
@@ -217,8 +217,8 @@ let configuration = PayabliPayInFormConfiguration(
 )
 ```
 
-The default card postal-code label is `Postal Code`; customer billing postal
-code is `Billing Postal Code`.
+The default card postal-code label is `Postal code`; customer billing postal
+code is `Billing postal code`.
 
 ## Payment Summary
 
@@ -228,9 +228,11 @@ other than zero gets its own row, an Amount row shows the total less the fee
 beside either one, and Total, what the payment charges, ends the summary
 whenever it is not zero. With a $1.00 total and a $0.10 fee it reads:
 
-- `Amount: $0.90`
-- `Fee: $0.10`
-- `Total: $1.00`
+| Label | Figure |
+| --- | --- |
+| Amount | $0.90 |
+| Fee | $0.10 |
+| Total | $1.00 |
 
 The device locale writes the number and `currency` supplies the symbol. Mark a
 section `style: .summary` to place the rows and title them; without one, the

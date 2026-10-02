@@ -135,8 +135,23 @@ public struct PayabliPayInLabels: Sendable {
         self.total = total
     }
 
+    /// The host's label for `field`, or the default when the host's is absent or blank.
     public func label(for field: PayabliPayInField) -> String {
-        fieldLabels[field] ?? Self.defaultFieldLabels[field] ?? field.rawValue
+        fieldLabels[field].flatMap { Self.isBlank($0) ? nil : $0 }
+            ?? Self.defaultFieldLabels[field]
+            ?? field.rawValue
+    }
+
+    /// Blank as Kotlin's `isBlank` reads it, so a label falls back on both platforms for the same text.
+    static func isBlank(_ text: String) -> Bool {
+        text.unicodeScalars.allSatisfy { scalar in
+            switch scalar.properties.generalCategory {
+            case .spaceSeparator, .lineSeparator, .paragraphSeparator:
+                return true
+            default:
+                return (0x09 ... 0x0D).contains(scalar.value) || (0x1C ... 0x1F).contains(scalar.value)
+            }
+        }
     }
 
     public func placeholder(for field: PayabliPayInField) -> String? {
@@ -148,7 +163,7 @@ public struct PayabliPayInLabels: Sendable {
         .cardNumber: "Card number",
         .cardExpiration: "Expiration",
         .cardCvv: "CVV",
-        .cardZip: "Postal Code",
+        .cardZip: "Postal code",
         .accountHolder: "Account holder",
         .routingNumber: "Routing number",
         .accountNumber: "Account number",
@@ -161,7 +176,7 @@ public struct PayabliPayInLabels: Sendable {
         .lastName: "Last name",
         .customerNumber: "Customer number",
         .billingEmail: "Billing email",
-        .billingZip: "Billing Postal Code",
+        .billingZip: "Billing postal code",
         .amount: "Amount",
         .serviceFee: "Fee",
         .surchargeFee: "Surcharge"
@@ -270,16 +285,11 @@ public struct PayabliPayInPaymentSummaryConfiguration: Sendable {
         for field: PayabliPayInField,
         labels: PayabliPayInLabels
     ) -> String {
-        switch field {
-        case .amount, .serviceFee, .surchargeFee:
-            return Self.defaultLabelText(label: labels.label(for: field))
-        default:
-            return labels.label(for: field)
-        }
+        labels.label(for: field)
     }
 
     public func totalLabelText(labels: PayabliPayInLabels) -> String {
-        Self.defaultLabelText(label: labels.total?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty ?? "Total")
+        labels.total?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty ?? "Total"
     }
 
     /// The figure a money row shows, at the two places it is sent, or nil when the form draws no row for it.
@@ -340,10 +350,6 @@ public struct PayabliPayInPaymentSummaryConfiguration: Sendable {
     }
 
     private static let isoCurrencyCodes = Set(Locale.Currency.isoCurrencies.map(\.identifier))
-
-    private static func defaultLabelText(label: String) -> String {
-        "\(label):"
-    }
 }
 
 public struct PayabliPayInFormConfiguration: Sendable {
