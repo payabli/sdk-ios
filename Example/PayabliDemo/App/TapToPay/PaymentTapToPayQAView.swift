@@ -642,14 +642,22 @@ struct TapToPayQAEventEntry: Identifiable {
 /// The id a backend sends with the paypoint to issue this device's activation code.
 private struct ActivationDeviceIdSection: View {
     let terminal: TapToPayTerminal
-    @State private var deviceId: String?
+    /// `nil` until the read returns; the inner `nil` is the SDK holding no usable id.
+    @State private var read: String??
 
     var body: some View {
         Section("Device ID") {
-            Text(deviceId ?? "None held. Enable the terminal first.")
-                .font(.footnote.monospaced())
-                .textSelection(.enabled)
+            switch read {
+            case .none:
+                ProgressView()
+            case .some(.none):
+                Text("None held. Enable the terminal again.")
+            case let .some(.some(deviceId)):
+                Text(deviceId)
+                    .font(.footnote.monospaced())
+                    .textSelection(.enabled)
+            }
         }
-        .task { deviceId = await terminal.deviceId() }
+        .task { read = .some(await terminal.deviceId()) }
     }
 }
