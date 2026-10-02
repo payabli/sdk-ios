@@ -7,6 +7,9 @@ enum PayabliPayInAccessibility {
         "payabli.payIn.field.\(field.rawValue)"
     }
 
+    /// The summary's Total row, which is no field.
+    static let totalIdentifier = "payabli.payIn.summary.total"
+
     /// The control that accepts the expiry wheel. Every field in that view can be
     /// addressed by identifier and this button could only be found by its title,
     /// which is a visible string and the one thing a caller should not depend on.

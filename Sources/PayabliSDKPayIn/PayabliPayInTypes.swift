@@ -680,12 +680,24 @@ extension PayabliPayInPaymentMethod {
 }
 
 extension PayabliPayInPaymentDetails {
+    /// Each amount is checked as it is sent, at two places, so a total of `0.001`, sent as `0.00`, is refused.
     func validate() throws {
-        guard totalAmount > 0 else {
+        guard let total = PayInAmount.sendable(totalAmount) else {
+            throw PayabliPayInError.invalidInput("Total amount is out of range.")
+        }
+        guard total > 0 else {
             throw PayabliPayInError.invalidInput("Total amount must be greater than 0.")
         }
-        if let serviceFee, serviceFee < 0 {
-            throw PayabliPayInError.invalidInput("Service fee cannot be negative.")
+        if let serviceFee {
+            guard let fee = PayInAmount.sendable(serviceFee) else {
+                throw PayabliPayInError.invalidInput("Service fee is out of range.")
+            }
+            guard fee >= 0 else {
+                throw PayabliPayInError.invalidInput("Service fee cannot be negative.")
+            }
+        }
+        if let surchargeFee, PayInAmount.sendable(surchargeFee) == nil {
+            throw PayabliPayInError.invalidInput("Surcharge is out of range.")
         }
     }
 }

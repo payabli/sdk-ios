@@ -18,22 +18,25 @@ enum PayInPaymentFlowJSONBody {
         try Data(jsonString(from: value).utf8)
     }
 
-    static func normalizingCurrencyFields(in value: Any) -> Any {
-        if let dictionary = value as? [String: Any] {
-            return dictionary.reduce(into: [String: Any]()) { result, pair in
-                if isCurrencyField(pair.key), let amount = doubleValue(pair.value) {
-                    result[pair.key] = RawNumber(text: formattedCurrencyAmount(amount))
-                } else {
-                    result[pair.key] = normalizingCurrencyFields(in: pair.value)
-                }
+    /// Writes the payment's own amounts at two places. Nothing else is read as money: free-form data such as
+    /// `additionalData` is sent exactly as the host gave it, whatever its keys are called.
+    static func normalizingCurrencyFields(in value: Any) throws -> Any {
+        guard var body = value as? [String: Any], let details = body["paymentDetails"] as? [String: Any] else {
+            return value
+        }
+        body["paymentDetails"] = try details.reduce(into: [String: Any]()) { result, pair in
+            guard isCurrencyField(pair.key), let number = pair.value as? NSNumber,
+                  CFGetTypeID(number) != CFBooleanGetTypeID()
+            else {
+                result[pair.key] = pair.value
+                return
             }
+            guard let sent = PayInAmount.sendable(number.doubleValue) else {
+                throw PayabliPayInError.invalidInput("paymentDetails.\(pair.key) is out of range.")
+            }
+            result[pair.key] = RawNumber(text: formattedCurrencyAmount(sent))
         }
-
-        if let array = value as? [Any] {
-            return array.map(normalizingCurrencyFields)
-        }
-
-        return value
+        return body
     }
 
     private static func jsonString(from value: Any) throws -> String {
@@ -81,21 +84,7 @@ enum PayInPaymentFlowJSONBody {
         key == "totalAmount" || key == "serviceFee" || key == "surchargeFee"
     }
 
-    private static func doubleValue(_ value: Any) -> Double? {
-        if let number = value as? NSNumber {
-            return number.doubleValue
-        }
-        if let string = value as? String {
-            return Double(string)
-        }
-        return nil
-    }
-
-    private static func formattedCurrencyAmount(_ value: Double) -> String {
-        var decimal = Decimal(value)
-        var rounded = Decimal()
-        NSDecimalRound(&rounded, &decimal, 2, .plain)
-
+    private static func formattedCurrencyAmount(_ rounded: Decimal) -> String {
         let formatter = NumberFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.numberStyle = .decimal
@@ -103,6 +92,6 @@ enum PayInPaymentFlowJSONBody {
         formatter.maximumFractionDigits = 2
         formatter.usesGroupingSeparator = false
 
-        return formatter.string(from: NSDecimalNumber(decimal: rounded)) ?? String(format: "%.2f", value)
+        return formatter.string(from: NSDecimalNumber(decimal: rounded)) ?? "\(rounded)"
     }
 }

@@ -279,6 +279,16 @@ final class PayabliPayInViewModel: ObservableObject {
         defer { isSubmitting = false }
         let submittedFlow = component
 
+        // Refused before anything else, and without clearing what the payer typed: only the host can change it.
+        if component.operation != .storePaymentMethod, let details = component.requestConfiguration?.paymentDetails {
+            do {
+                try details.validate()
+            } catch {
+                errorMessage = Self.message(for: error)
+                throw error
+            }
+        }
+
         do {
             try validateRequiredFields()
             let result: PayabliPayInResult
@@ -388,21 +398,6 @@ final class PayabliPayInViewModel: ObservableObject {
         configuration.paymentSummary.labelText(
             for: field,
             labels: configuration.labels
-        )
-    }
-
-    func paymentSummaryValueText(for field: PayabliPayInField) -> String {
-        configuration.paymentSummary.valueText(
-            for: field,
-            paymentDetails: component.requestConfiguration?.paymentDetails
-        )
-    }
-
-    func paymentSummaryAccessibilityText(for field: PayabliPayInField) -> String {
-        configuration.paymentSummary.accessibilityText(
-            for: field,
-            labels: configuration.labels,
-            paymentDetails: component.requestConfiguration?.paymentDetails
         )
     }
 

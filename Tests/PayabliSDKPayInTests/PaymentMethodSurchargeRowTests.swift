@@ -11,7 +11,7 @@ final class PaymentMethodSurchargeRowTests: XCTestCase {
         ))
 
         XCTAssertTrue(
-            view.activeSections.contains { $0.fields.contains(.surchargeFee) },
+            view.drawnSections.contains { $0.rows.contains { $0.field == .surchargeFee } },
             "a surcharge the request carries draws its row"
         )
     }
@@ -21,7 +21,7 @@ final class PaymentMethodSurchargeRowTests: XCTestCase {
         let view = captureForm(paymentDetails: PayabliPayInPaymentDetails(totalAmount: 12.34))
 
         XCTAssertFalse(
-            view.activeSections.contains { $0.fields.contains(.surchargeFee) },
+            view.drawnSections.contains { $0.rows.contains { $0.field == .surchargeFee } },
             "an absent surcharge draws no row and no label"
         )
     }
@@ -34,7 +34,7 @@ final class PaymentMethodSurchargeRowTests: XCTestCase {
         ))
 
         XCTAssertFalse(
-            view.activeSections.contains { $0.fields.contains(.surchargeFee) },
+            view.drawnSections.contains { $0.rows.contains { $0.field == .surchargeFee } },
             "a zero surcharge draws no row"
         )
     }
@@ -47,7 +47,7 @@ final class PaymentMethodSurchargeRowTests: XCTestCase {
         ))
 
         XCTAssertTrue(
-            view.activeSections.contains { $0.fields.contains(.surchargeFee) },
+            view.drawnSections.contains { $0.rows.contains { $0.field == .surchargeFee } },
             "a negative surcharge draws as the minus figure it is"
         )
     }

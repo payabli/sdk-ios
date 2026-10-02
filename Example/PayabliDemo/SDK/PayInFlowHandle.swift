@@ -34,16 +34,6 @@ final class PayInFlowHandle: ObservableObject {
         flow.lastResult != nil
     }
 
-    /// The figure this attempt will charge, formatted for display.
-    ///
-    /// The currency comes from the same payment details as the figure, so the two
-    /// cannot disagree, and the reader's own locale decides the grouping and the
-    /// decimal mark.
-    var formattedTotal: String {
-        guard let details = flow.requestConfiguration?.paymentDetails else { return "-" }
-        return details.totalAmount.formatted(.currency(code: details.currency ?? "USD"))
-    }
-
     /// Draws a new attempt: a fresh amount, a fresh idempotency key, and whatever
     /// the customer switch says now. This is the one place a key is minted, and it
     /// is the only action here that may charge a second time.

@@ -182,12 +182,12 @@ extension PayabliPayInViewModel {
         if component.operation == .storePaymentMethod {
             return true
         }
-        return paymentDetailsAreValid
+        return paymentDetailsArePresent
     }
 
-    private var paymentDetailsAreValid: Bool {
-        guard let paymentDetails = component.requestConfiguration?.paymentDetails else { return false }
-        return paymentDetails.totalAmount > 0 && (paymentDetails.serviceFee ?? 0) >= 0
+    private var paymentDetailsArePresent: Bool {
+        // Present, not valid: an amount the request cannot send is refused at submission with its own message.
+        component.requestConfiguration?.paymentDetails != nil
     }
 
     func validateRequiredFields() throws {
@@ -282,10 +282,8 @@ extension PayabliPayInViewModel {
 
     private func paymentFieldHasRequiredValue(_ field: PayabliPayInField) -> Bool {
         switch field {
-        case .amount:
-            return component.requestConfiguration?.paymentDetails.totalAmount ?? 0 > 0
-        case .serviceFee:
-            return component.requestConfiguration?.paymentDetails.serviceFee.map { $0 >= 0 } ?? true
+        case .amount, .serviceFee, .surchargeFee:
+            return paymentDetailsArePresent
         default:
             return true
         }

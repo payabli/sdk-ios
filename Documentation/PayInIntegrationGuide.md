@@ -517,7 +517,7 @@ let configuration = PayabliPayInFormConfiguration(
 | `inputVerticalSpacing` | Section-level vertical spacing between inputs. |
 | `inputHorizontalSpacing` | Section-level horizontal spacing for paired inputs. |
 | `fieldVerticalSpacings` | Per-field vertical spacing after specific fields. |
-| `style` | `.inputs` by default. `.summary` marks the section for the payment amounts. |
+| `style` | `.inputs` by default. `.summary` marks where the payment amounts are drawn, and under what title. |
 
 ### `PayabliPayInLabels`
 
@@ -528,7 +528,7 @@ let configuration = PayabliPayInFormConfiguration(
 | `submitButton` | `Add Payment Method` | Submit button label. |
 | `fieldLabels` | default labels | Visible and accessibility labels by field. |
 | `fieldPlaceholders` | empty | Placeholder text by field. |
-| `total` | nil (`Total`) | Total label, read by `totalLabelText(labels:)`. |
+| `total` | nil (`Total`) | Label on the payment summary's Total row. |
 
 Default field labels:
 
