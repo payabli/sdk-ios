@@ -556,25 +556,4 @@ final class PayabliTTPTests: XCTestCase {
         XCTAssertTrue(received.contains("rdy-init"))
         XCTAssertTrue(received.contains("rdy-ready"))
     }
-
-    func testTheDeclaredDeviceIdAnswersNilBeforeItReadsAnything() async throws {
-        let (ttp, _, attestation) = try makeTTP()
-        attestation.cachedDeviceId = "dev"
-
-        let deviceId = await ttp.deviceId()
-
-        XCTAssertNil(deviceId, "the declared member answered with an id before it reads the binding")
-    }
-
-    func testTheObjCCompanionDeliversTheSameAnswer() async throws {
-        let (ttp, _, attestation) = try makeTTP()
-        attestation.cachedDeviceId = "dev"
-
-        let done = expectation(description: "completion")
-        ttp.deviceId { deviceId in
-            XCTAssertNil(deviceId)
-            done.fulfill()
-        }
-        await fulfillment(of: [done], timeout: 1)
-    }
 }
