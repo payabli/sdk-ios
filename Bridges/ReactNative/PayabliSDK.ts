@@ -252,6 +252,8 @@ interface NativePayabliSDKModule {
     activateDevice(activationCode: string): Promise<void>;
 
     areTermsAccepted(): Promise<boolean>;
+
+    deviceId(): Promise<string | null>;
     presentTerms(): Promise<void>;
 
     getSessionState(): Promise<PayabliTTPSessionSnapshot>;
@@ -356,6 +358,16 @@ export function presentTerms(): Promise<void> {
     return requireNativeModule().presentTerms();
 }
 
+/**
+ * The id Payabli assigned this device on the session's paypoint, whether
+ * pending activation or active. `null` when the SDK holds no usable id for it,
+ * for any reason; call `initialize()`, which enrolls the device or rejects with
+ * why it could not.
+ */
+export function deviceId(): Promise<string | null> {
+    return requireNativeModule().deviceId();
+}
+
 export async function getSessionState(): Promise<PayabliTTPSessionSnapshot> {
     return requireNativeModule().getSessionState();
 }
@@ -378,6 +390,7 @@ export const PayabliTTP = {
     activateDevice,
     areTermsAccepted,
     presentTerms,
+    deviceId,
     getSessionState,
     addEventListener,
 };

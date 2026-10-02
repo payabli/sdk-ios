@@ -25,6 +25,8 @@ import UIKit
 ///   - `areTermsAccepted(resolver, rejecter)` — resolves a bool. Rejects
 ///     rather than resolving `false` when the reader cannot answer, whether
 ///     none is prepared or the platform raised.
+///   - `deviceId(resolver, rejecter)` — resolves the id, or `null` when the SDK
+///     holds no usable one.
 ///   - `getSessionState(resolver, rejecter)` — resolves the int raw value
 ///     of the current `PayabliTTPSessionState`.
 ///   - `resolveTokenRefresh(token)` / `rejectTokenRefresh(reason)` —
@@ -294,6 +296,23 @@ public final class PayabliSDKModule: RCTEventEmitter {
                     resolve(nil)
                 }
             }
+        }
+    }
+
+    // MARK: - deviceId
+
+    /// Resolves the id, or `null` when the SDK holds no usable one. Never rejects
+    /// once configured.
+    @objc public func deviceId(
+        _ resolve: @escaping RCTPromiseResolveBlock,
+        rejecter reject: @escaping RCTPromiseRejectBlock
+    ) {
+        guard let ttp else {
+            reject("NOT_CONFIGURED", "Call configure() before deviceId()", nil)
+            return
+        }
+        ttp.deviceId { deviceId in
+            resolve(deviceId)
         }
     }
 
