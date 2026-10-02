@@ -167,18 +167,18 @@ final class PayabliTTPFailureReasonTests: XCTestCase {
         XCTAssertEqual(PayabliTTPSessionStateCode.pendingTerms.rawValue, 9)
     }
 
-    /// The five members mirror the sibling platform's published vocabulary, so a
-    /// host branching on one branches on the same set on both.
-    func testTheVocabularyMirrorsTheSibling() {
-        XCTAssertEqual(PayabliTTPFailureReason.allCases.count, 5)
+    /// The published vocabulary, each member at a fixed integer.
+    func testThePublishedVocabularyKeepsItsIntegers() {
+        XCTAssertEqual(PayabliTTPFailureReason.allCases.count, 6)
         XCTAssertEqual(PayabliTTPFailureReason.attestationRequired.rawValue, 0)
         XCTAssertEqual(PayabliTTPFailureReason.configurationRejected.rawValue, 1)
         XCTAssertEqual(PayabliTTPFailureReason.serviceUnavailable.rawValue, 2)
         XCTAssertEqual(PayabliTTPFailureReason.deviceIneligible.rawValue, 3)
         XCTAssertEqual(PayabliTTPFailureReason.sdkInternalError.rawValue, 4)
+        XCTAssertEqual(PayabliTTPFailureReason.deviceKeyUnavailable.rawValue, 5)
         // The bridges read these integers, so a member is appended and never
         // renumbered. This is what makes an append visible here first.
-        XCTAssertNil(PayabliTTPFailureReason(rawValue: 5))
+        XCTAssertNil(PayabliTTPFailureReason(rawValue: 6))
     }
 
     /// A transport refusal lands by its code.
