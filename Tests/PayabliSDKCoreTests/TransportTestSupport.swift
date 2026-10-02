@@ -336,23 +336,28 @@ let mustFinishPolls = 1200
 
 /// Runs `work` under a ceiling and returns its outcome, or nil if it never finished.
 ///
-/// The run is abandoned rather than awaited when the ceiling expires. Awaiting it instead would hang
-/// the whole suite, and a hung suite prints no failure and reads exactly like a passing one, which is
-/// why the case this exists for was skipped rather than left to run. Reaching the ceiling is reported
-/// as its own failure, so a hang does not read as a wrong answer.
+/// The run is cancelled and abandoned rather than awaited when the ceiling expires. Awaiting it instead
+/// would hang the whole suite, and a hung suite prints no failure and reads exactly like a passing one,
+/// which is why the case this exists for was skipped rather than left to run. Reaching the ceiling is
+/// reported as its own failure, ahead of whatever the caller then asserts about the nil.
 func outcomeWithinCeiling(
     file: StaticString = #filePath,
     line: UInt = #line,
     _ work: @escaping @Sendable () async -> String
 ) async -> String? {
     let slot = Slot<String>()
-    Task { slot.set(await work()) }
+    let running = Task { slot.set(await work()) }
     for _ in 0 ..< mustFinishPolls {
         if let seen = slot.value {
             return seen
         }
         try? await Task.sleep(nanoseconds: 25_000_000)
     }
+    // Read once more: the work can land during the last sleep.
+    if let seen = slot.value {
+        return seen
+    }
+    running.cancel()
     XCTFail("the work did not finish within \(mustFinishPolls * 25 / 1000) seconds", file: file, line: line)
     return nil
 }
@@ -401,5 +406,6 @@ func valueWithinCeiling(_ slot: Slot<String>, attempts: Int = mustFinishPolls) a
         }
         try? await Task.sleep(nanoseconds: 25_000_000)
     }
-    return nil
+    // Read once more: the value can land during the last sleep.
+    return slot.value
 }
