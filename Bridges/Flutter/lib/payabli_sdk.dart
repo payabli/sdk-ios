@@ -221,18 +221,7 @@ class PayabliTTP {
       if (provider == null) {
         throw PlatformException(
           code: 'NO_TOKEN_PROVIDER',
-          message: 'configure() was not called with a tokenProvider',
-        );
-      }
-      return await provider();
-    }
-    if (call.method == 'accessToken') {
-      final provider = PayabliPayIn._accessToken;
-      if (provider == null) {
-        throw PlatformException(
-          code: 'NO_ACCESS_TOKEN_PROVIDER',
-          message:
-              'PayabliPayIn.configure() was not called with an accessTokenProvider',
+          message: 'neither PayabliTTP.configure() nor PayabliPayIn.configure() has been called',
         );
       }
       return await provider();
@@ -262,17 +251,18 @@ enum PayabliEnvironment { local, qa, sandbox, production }
 ///
 /// The access token must come from your backend. Do not embed a private
 /// Payabli API key in Flutter code.
+///
+/// The SDK runs one session with one token source, so [tokenProvider] answers the same
+/// `refreshToken` call as [PayabliTTP.configure]'s, and the latest configure's provider is asked.
 class PayabliPayIn {
   PayabliPayIn._();
 
-  static Future<String> Function()? _accessToken;
-
   static Future<void> configure({
-    required Future<String> Function() accessTokenProvider,
+    required Future<String> Function() tokenProvider,
     required String entryPoint,
     PayabliEnvironment environment = PayabliEnvironment.sandbox,
   }) async {
-    _accessToken = accessTokenProvider;
+    PayabliTTP._tokenRefresh = tokenProvider;
     _payabliMethodChannel.setMethodCallHandler(
       PayabliTTP._handleNativeCallback,
     );

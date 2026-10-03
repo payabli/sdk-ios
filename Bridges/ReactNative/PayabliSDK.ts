@@ -186,7 +186,7 @@ export interface PayabliTTPChargeRequest {
 export interface PayabliPayInConfig {
     entryPoint: string;
     environment?: PayabliEnvironment;
-    accessTokenProvider: () => Promise<string>;
+    tokenProvider: () => Promise<string>;
 }
 
 export interface PayabliPayInOptions {
@@ -270,26 +270,22 @@ interface NativePayabliSDKModule {
     addCard(params: PayabliPayInCardData): Promise<PayabliPayInStoredPaymentMethod>;
 
     addBankAccount(params: PayabliPayInBankAccountData): Promise<PayabliPayInStoredPaymentMethod>;
-
-    resolvePayInAccessToken(token: string): void;
-
-    rejectPayInAccessToken(reason: string): void;
 }
 
 // MARK: - Tap to Pay public API
 
 let refreshSubscription: EmitterSubscription | null = null;
 
-export async function configure(config: PayabliTTPConfig): Promise<void> {
+// The SDK runs one session with one token source, so both capabilities answer the one event, and
+// the provider from the latest configure call is the one asked.
+function answerTokenRequests(tokenProvider: () => Promise<string>): void {
     const module = requireNativeModule();
-    const eventEmitter = requireEmitter();
-
     refreshSubscription?.remove();
-    refreshSubscription = eventEmitter.addListener(
+    refreshSubscription = requireEmitter().addListener(
         "TTPTokenRefreshRequested",
         async () => {
             try {
-                const token = await config.tokenProvider();
+                const token = await tokenProvider();
                 module.resolveTokenRefresh(token);
             } catch (e) {
                 const message = e instanceof Error ? e.message : String(e);
@@ -297,6 +293,11 @@ export async function configure(config: PayabliTTPConfig): Promise<void> {
             }
         }
     );
+}
+
+export async function configure(config: PayabliTTPConfig): Promise<void> {
+    const module = requireNativeModule();
+    answerTokenRequests(config.tokenProvider);
 
     await module.configure({
         entryPoint: config.entryPoint,
@@ -397,27 +398,11 @@ export const PayabliTTP = {
 
 // MARK: - PayIn payment flow public API
 
-let payInAccessTokenSubscription: EmitterSubscription | null = null;
-
 export async function configurePayIn(
     config: PayabliPayInConfig
 ): Promise<void> {
     const module = requireNativeModule();
-    const eventEmitter = requireEmitter();
-
-    payInAccessTokenSubscription?.remove();
-    payInAccessTokenSubscription = eventEmitter.addListener(
-        "PayInAccessTokenRequested",
-        async () => {
-            try {
-                const token = await config.accessTokenProvider();
-                module.resolvePayInAccessToken(token);
-            } catch (e) {
-                const message = e instanceof Error ? e.message : String(e);
-                module.rejectPayInAccessToken(message);
-            }
-        }
-    );
+    answerTokenRequests(config.tokenProvider);
 
     await module.configurePayIn({
         entryPoint: config.entryPoint,

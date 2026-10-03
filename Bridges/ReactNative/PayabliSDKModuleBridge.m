@@ -46,8 +46,4 @@ RCT_EXTERN_METHOD(addBankAccount:(NSDictionary *)params
                   resolver:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject)
 
-RCT_EXTERN_METHOD(resolvePayInAccessToken:(NSString *)token)
-
-RCT_EXTERN_METHOD(rejectPayInAccessToken:(NSString *)reason)
-
 @end
