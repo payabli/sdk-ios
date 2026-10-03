@@ -63,7 +63,7 @@ public struct PayabliConfig: Sendable {
     ) throws {
         guard !entryPoint.isBlank else {
             throw PayabliGenericError(
-                code: .invalidConfiguration,
+                type: .invalidConfiguration,
                 reason: "Invalid configuration",
                 detail: "entryPoint is blank."
             )

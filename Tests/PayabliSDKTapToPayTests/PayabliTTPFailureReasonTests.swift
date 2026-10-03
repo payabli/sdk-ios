@@ -97,7 +97,7 @@ final class PayabliTTPFailureReasonTests: XCTestCase {
     /// A status nothing has been seen producing has no agreed meaning, so it
     /// lands where being wrong costs a retry rather than a bug report.
     func testAStatusNoRouteHasProducedIsTreatedAsTransient() {
-        let burned = PayabliGenericError(code: .sessionBurned, reason: "Gone (410)")
+        let burned = PayabliGenericError(type: .sessionBurned, reason: "Gone (410)")
 
         XCTAssertEqual(
             PayabliTTPSessionState.landing(for: burned),
@@ -185,7 +185,7 @@ final class PayabliTTPFailureReasonTests: XCTestCase {
     func testATransportPermissionRefusalAsksForAnActivation() {
         XCTAssertEqual(
             PayabliTTPSessionState.landing(
-                for: PayabliGenericError(code: .permissionDenied, reason: "Forbidden (403)")
+                for: PayabliGenericError(type: .permissionDenied, reason: "Forbidden (403)")
             ),
             .pendingActivation
         )

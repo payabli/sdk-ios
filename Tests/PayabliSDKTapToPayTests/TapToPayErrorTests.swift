@@ -4,16 +4,19 @@ import XCTest
 
 final class TapToPayErrorTests: XCTestCase {
     func testItIsOneOfTheSDKsErrorsAndCarriesItsCode() {
-        let error: any Error = TapToPayError(code: .deviceKeyUnavailable, reason: "r", detail: "d")
+        let error: any Error = TapToPayError(type: .deviceKeyUnavailable, reason: "r", detail: "d")
 
         let payabli = error as? any PayabliError
-        XCTAssertEqual(payabli?.code, .deviceKeyUnavailable)
+        XCTAssertEqual(payabli?.type, .deviceKeyUnavailable)
+        XCTAssertEqual(payabli?.code, 3001)
+        XCTAssertEqual(payabli?.category, .retryLater)
+        XCTAssertEqual(payabli?.message, "The device's key facility could not confirm this device's key.")
         XCTAssertEqual(payabli?.reason, "r")
         XCTAssertEqual(payabli?.detail, "d")
     }
 
     func testABridgedCallerReadsTheCatalogNumberAsTheErrorCode() {
-        let error = TapToPayError(code: .attestationNotSupported, reason: "r", detail: nil) as NSError
+        let error = TapToPayError(type: .attestationNotSupported, reason: "r", detail: nil) as NSError
 
         XCTAssertEqual(error.domain, TapToPayError.errorDomain)
         XCTAssertEqual(error.code, 3002)
@@ -21,7 +24,7 @@ final class TapToPayErrorTests: XCTestCase {
     }
 
     func testAFailureOutsideAPaymentMovedNoMoney() {
-        let error = TapToPayError(code: .deviceKeyUnavailable, reason: "r", detail: nil)
+        let error = TapToPayError(type: .deviceKeyUnavailable, reason: "r", detail: nil)
 
         XCTAssertEqual(error.capture, .notCharged)
         XCTAssertNil(error.paymentTransId)
@@ -29,7 +32,7 @@ final class TapToPayErrorTests: XCTestCase {
     }
 
     func testAPaymentsIdentifierReachesABridgedCaller() {
-        let error = TapToPayError(code: .networkError, reason: "r", detail: nil, paymentTransId: "txn", capture: .unknown)
+        let error = TapToPayError(type: .networkError, reason: "r", detail: nil, paymentTransId: "txn", capture: .unknown)
 
         XCTAssertEqual((error as NSError).userInfo["paymentTransId"] as? String, "txn")
         XCTAssertEqual((error as NSError).userInfo["capture"] as? Int, PayabliTTPCapture.unknown.rawValue)
@@ -38,7 +41,7 @@ final class TapToPayErrorTests: XCTestCase {
     /// The conversion every completion handler applies, which a plain cast does not exercise.
     func testTheCompletionHandlersConversionKeepsTheCatalogNumberAndThePayment() {
         let error: any Error = TapToPayError(
-            code: .deviceKeyUnavailable,
+            type: .deviceKeyUnavailable,
             reason: "r",
             detail: nil,
             paymentTransId: "txn",

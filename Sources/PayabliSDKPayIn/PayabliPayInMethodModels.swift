@@ -145,7 +145,7 @@ public enum PayabliPayInTokenStorageError: PayabliError {
     case missingAccessToken
     case saveFailed(PayabliPayInSaveFailure)
 
-    public var code: PayabliErrorCode {
+    public var type: PayabliErrorType {
         switch self {
         case .invalidInput:
             return .validation

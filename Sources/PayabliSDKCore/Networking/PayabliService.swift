@@ -108,7 +108,7 @@ package final class PayabliService: PayabliTransport, Sendable {
             let (data, urlResponse) = try await session.data(for: urlRequest)
             guard let http = urlResponse as? HTTPURLResponse else {
                 throw PayabliGenericError(
-                    code: .networkError,
+                    type: .networkError,
                     reason: "Non-HTTP response"
                 )
             }
@@ -133,7 +133,7 @@ package final class PayabliService: PayabliTransport, Sendable {
         } catch {
             logger.error("Network error on \(decorated.path): \(error.localizedDescription)")
             throw PayabliGenericError(
-                code: .networkError,
+                type: .networkError,
                 reason: "Network request failed",
                 underlying: error
             )
@@ -163,13 +163,13 @@ package final class PayabliService: PayabliTransport, Sendable {
         }
         let tail = request.path.hasPrefix("/") ? request.path : "/" + request.path
         guard var components = URLComponents(string: base + tail) else {
-            throw PayabliGenericError(code: .invalidConfiguration, reason: "Invalid URL")
+            throw PayabliGenericError(type: .invalidConfiguration, reason: "Invalid URL")
         }
         if !request.query.isEmpty {
             components.queryItems = request.query
         }
         guard let url = components.url else {
-            throw PayabliGenericError(code: .invalidConfiguration, reason: "Invalid URL")
+            throw PayabliGenericError(type: .invalidConfiguration, reason: "Invalid URL")
         }
 
         var urlRequest = URLRequest(url: url)
@@ -231,7 +231,7 @@ package func mapPayabliHTTPError(
         throw PayabliPaymentError.validation(validation)
 
     case 401:
-        throw PayabliGenericError(code: .tokenExpired, reason: "Unauthorized (401)")
+        throw PayabliGenericError(type: .tokenExpired, reason: "Unauthorized (401)")
 
     case 402:
         let decline = (try? decoder.decode(PayabliDeclineError.self, from: response.body))
@@ -239,19 +239,19 @@ package func mapPayabliHTTPError(
         throw PayabliPaymentError.decline(decline)
 
     case 403:
-        throw PayabliGenericError(code: .permissionDenied, reason: "Forbidden (403)")
+        throw PayabliGenericError(type: .permissionDenied, reason: "Forbidden (403)")
 
     case 408:
         // RFC 9110 Section 15.5.9: the server did not receive a complete request in time and "the client
         // MAY repeat the request without modifications at any later time". Retryable, and classified as a
         // network failure because that is what it is: the request did not arrive, so nothing ran.
-        throw PayabliGenericError(code: .networkError, reason: "Request timeout (408)")
+        throw PayabliGenericError(type: .networkError, reason: "Request timeout (408)")
 
     case 409:
-        throw PayabliGenericError(code: .conflict, reason: "Conflict (409)")
+        throw PayabliGenericError(type: .conflict, reason: "Conflict (409)")
 
     case 410:
-        throw PayabliGenericError(code: .sessionBurned, reason: "Session burned (410)")
+        throw PayabliGenericError(type: .sessionBurned, reason: "Session burned (410)")
 
     case 429:
         throw PayabliRateLimitError(retryAfter: RetryAfterHeader.value(from: response))
@@ -271,7 +271,7 @@ package func mapPayabliHTTPError(
 
     default:
         throw PayabliGenericError(
-            code: .unknown,
+            type: .unknown,
             reason: "HTTP \(response.statusCode)"
         )
     }

@@ -83,11 +83,11 @@ final class TTPConfigClient: Sendable {
             if code == 401 {
                 guard dropRefusedBinding(entry: entry, presented: headers) else {
                     throw PayabliGenericError(
-                        code: .tokenExpired,
+                        type: .tokenExpired,
                         reason: "\(reason) — the stored binding could not be dropped"
                     )
                 }
-                throw PayabliGenericError(code: .tokenExpired, reason: reason)
+                throw PayabliGenericError(type: .tokenExpired, reason: reason)
             }
             if code == 403 {
                 throw PayabliTTPError.devicePendingActivation

@@ -255,7 +255,7 @@ extension PayInFailure {
         // An empty body carries no code of its own, so the status mapping supplies one. The code says
         // a conflict and no more; that a conflict here is a repeat is what the operation above adds,
         // since only an operation that sends a key can have one refused.
-        if let payabliError = error as? any PayabliError, payabliError.code == .conflict {
+        if let payabliError = error as? any PayabliError, payabliError.type == .conflict {
             return true
         }
         return false

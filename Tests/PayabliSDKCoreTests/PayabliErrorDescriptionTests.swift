@@ -11,7 +11,7 @@ final class PayabliErrorDescriptionTests: XCTestCase {
 
     func testPaymentErrorDoesNotRenderAsACaseIndex() {
         let error = PayabliPaymentError.generic(
-            PayabliGenericError(code: .networkError, reason: "Could not reach the host")
+            PayabliGenericError(type: .networkError, reason: "Could not reach the host")
         )
 
         let message = (error as Error).localizedDescription
@@ -22,7 +22,7 @@ final class PayabliErrorDescriptionTests: XCTestCase {
 
     func testGenericErrorJoinsReasonAndDetail() {
         let error = PayabliGenericError(
-            code: .invalidConfiguration,
+            type: .invalidConfiguration,
             reason: "Missing entry point",
             detail: "Set entryPoint on PayabliConfig"
         )
@@ -43,7 +43,7 @@ final class PayabliErrorDescriptionTests: XCTestCase {
 
         let umbrella: Error = PayabliPaymentError.validation(validation)
 
-        XCTAssertEqual((umbrella as? any PayabliError)?.code, .validation)
+        XCTAssertEqual((umbrella as? any PayabliError)?.type, .validation)
         XCTAssertEqual((umbrella as? any PayabliError)?.reason, "Validation failed")
     }
 

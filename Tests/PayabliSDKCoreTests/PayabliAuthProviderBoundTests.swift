@@ -24,13 +24,13 @@ final class PayabliAuthProviderBoundTests: XCTestCase {
                 _ = try await auth.currentAccessToken()
                 return "no throw"
             } catch let err as PayabliGenericError {
-                return err.code.rawValue
+                return err.type.rawValue
             } catch {
                 return "wrong error: \(error)"
             }
         }
 
-        XCTAssertEqual(outcome, PayabliErrorCode.tokenProviderFailed.rawValue)
+        XCTAssertEqual(outcome, PayabliErrorType.tokenProviderFailed.rawValue)
         // Proves this raced the 30s bound the doc on `providerTimeout` promises, not some other
         // number a future edit could quietly drift to.
         XCTAssertEqual(clock.requestedDeadlines, [30])
@@ -59,13 +59,13 @@ final class PayabliAuthProviderBoundTests: XCTestCase {
                 _ = try await auth.currentAccessToken()
                 return "no throw"
             } catch let err as PayabliGenericError {
-                return err.code.rawValue
+                return err.type.rawValue
             } catch {
                 return "wrong error: \(error)"
             }
         }
 
-        XCTAssertEqual(outcome, PayabliErrorCode.tokenProviderFailed.rawValue)
+        XCTAssertEqual(outcome, PayabliErrorType.tokenProviderFailed.rawValue)
     }
 
     /// Every caller joined to the one mint that times out receives the same failure. The mint is
@@ -91,7 +91,7 @@ final class PayabliAuthProviderBoundTests: XCTestCase {
                             _ = try await auth.currentAccessToken()
                             return "no throw"
                         } catch let err as PayabliGenericError {
-                            return err.code.rawValue
+                            return err.type.rawValue
                         } catch {
                             return "wrong error: \(error)"
                         }
@@ -109,7 +109,7 @@ final class PayabliAuthProviderBoundTests: XCTestCase {
         guard let outcome else {
             return XCTFail("the joined callers never all finished")
         }
-        let expected = Array(repeating: PayabliErrorCode.tokenProviderFailed.rawValue, count: 5)
+        let expected = Array(repeating: PayabliErrorType.tokenProviderFailed.rawValue, count: 5)
         XCTAssertEqual(outcome, expected.joined(separator: ","))
     }
 
@@ -134,12 +134,12 @@ final class PayabliAuthProviderBoundTests: XCTestCase {
                 _ = try await auth.currentAccessToken()
                 return "no throw"
             } catch let err as PayabliGenericError {
-                return err.code.rawValue
+                return err.type.rawValue
             } catch {
                 return "wrong error: \(error)"
             }
         }
-        XCTAssertEqual(firstOutcome, PayabliErrorCode.tokenProviderFailed.rawValue)
+        XCTAssertEqual(firstOutcome, PayabliErrorType.tokenProviderFailed.rawValue)
 
         let recovered = await outcomeWithinCeiling {
             (try? await auth.currentAccessToken()) ?? "threw"

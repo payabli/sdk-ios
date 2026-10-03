@@ -3,7 +3,7 @@ import XCTest
 
 /// The published catalog: every code's number, category and message, exactly as both SDKs declare them.
 final class PayabliErrorCatalogTests: XCTestCase {
-    private typealias Row = (PayabliErrorCode, Int, PayabliErrorCategory, String)
+    private typealias Row = (PayabliErrorType, Int, PayabliErrorCategory, String)
 
     private let table: [Row] = [
         (.missingToken, 1001, .credential, "No access token is available."),
@@ -66,17 +66,17 @@ final class PayabliErrorCatalogTests: XCTestCase {
     }
 
     func testTheTableCoversEveryCode() {
-        XCTAssertEqual(Set(table.map(\.0)), Set(PayabliErrorCode.allCases))
+        XCTAssertEqual(Set(table.map(\.0)), Set(PayabliErrorType.allCases))
     }
 
     func testNoTwoCodesShareANumber() {
-        let numbers = PayabliErrorCode.allCases.map(\.number)
+        let numbers = PayabliErrorType.allCases.map(\.number)
         XCTAssertEqual(Set(numbers).count, numbers.count)
     }
 
     func testTheNewCodesKeepTheirWireNames() {
-        XCTAssertEqual(PayabliErrorCode.deviceKeyUnavailable.rawValue, "DEVICE_KEY_UNAVAILABLE")
-        XCTAssertEqual(PayabliErrorCode.attestationNotSupported.rawValue, "ATTESTATION_NOT_SUPPORTED")
+        XCTAssertEqual(PayabliErrorType.deviceKeyUnavailable.rawValue, "DEVICE_KEY_UNAVAILABLE")
+        XCTAssertEqual(PayabliErrorType.attestationNotSupported.rawValue, "ATTESTATION_NOT_SUPPORTED")
     }
 
     func testTheCategoriesAreTheEightRemedies() {

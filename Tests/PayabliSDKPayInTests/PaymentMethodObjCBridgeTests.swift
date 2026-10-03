@@ -148,7 +148,7 @@ final class PaymentMethodObjCBridgeTests: XCTestCase {
         ) { result, error in
             XCTAssertNil(result)
             XCTAssertEqual(error?.code, -3)
-            XCTAssertEqual(error?.userInfo["PayabliErrorCode"] as? String, PayabliErrorCode.validation.rawValue)
+            XCTAssertEqual(error?.userInfo["PayabliErrorCode"] as? String, PayabliErrorType.validation.rawValue)
             XCTAssertEqual(error?.localizedDescription, "Cardholder name is required.")
             completionExpectation.fulfill()
         }
@@ -191,7 +191,7 @@ final class PaymentMethodObjCBridgeTests: XCTestCase {
             XCTAssertEqual(error?.code, -3)
             XCTAssertEqual(
                 error?.userInfo["PayabliErrorCode"] as? String,
-                PayabliErrorCode.tokenProviderFailed.rawValue
+                PayabliErrorType.tokenProviderFailed.rawValue
             )
             completionExpectation.fulfill()
         }

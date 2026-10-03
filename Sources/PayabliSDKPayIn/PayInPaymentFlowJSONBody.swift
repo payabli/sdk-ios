@@ -63,7 +63,7 @@ enum PayInPaymentFlowJSONBody {
             return "null"
         default:
             throw PayabliGenericError(
-                code: .decodingError,
+                type: .decodingError,
                 reason: "Failed to serialize payment capture JSON body"
             )
         }
@@ -73,7 +73,7 @@ enum PayInPaymentFlowJSONBody {
         let data = try JSONSerialization.data(withJSONObject: [value])
         guard let text = String(data: data, encoding: .utf8) else {
             throw PayabliGenericError(
-                code: .decodingError,
+                type: .decodingError,
                 reason: "Failed to serialize payment capture JSON string"
             )
         }

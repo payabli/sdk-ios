@@ -200,21 +200,21 @@ actor AttemptCounter {
     }
 }
 
-/// A `PayabliError` with a caller-chosen code, so a case can name the classification it is testing.
+/// A `PayabliError` with a caller-chosen type, so a case can name the classification it is testing.
 struct TestFailure: PayabliError {
-    let code: PayabliErrorCode
+    let type: PayabliErrorType
     let reason: String
     let detail: String? = nil
 
-    init(_ code: PayabliErrorCode, reason: String = "test failure") {
-        self.code = code
+    init(_ type: PayabliErrorType, reason: String = "test failure") {
+        self.type = type
         self.reason = reason
     }
 }
 
 /// A retryable failure carrying a server hint, which only a 429 or a 5xx can.
 struct TestHintedFailure: PayabliError, PayabliRetryAfter {
-    let code: PayabliErrorCode
+    let type: PayabliErrorType
     let retryAfter: TimeInterval?
     let reason = "test failure with a hint"
     let detail: String? = nil

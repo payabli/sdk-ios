@@ -95,18 +95,18 @@ package enum Retry {
         if let serverHint, serverHint > policy.maxRetryAfter {
             // Shortening it would ignore the limit the server just stated, and waiting it out is not
             // something to do on a caller's behalf. Stop, and report what the server actually said.
-            logger.warning("retry-after exceeds the ceiling; not retrying (\(failure.code.rawValue))")
+            logger.warning("retry-after exceeds the ceiling; not retrying (\(failure.type.rawValue))")
             throw failure
         }
 
         let wait = serverHint ?? policy.delay(forAttempt: attempt + 1)
         if let remaining = remainingBudget(policy, clock: clock, startedAt: startedAt), wait >= remaining {
             // Sleeping past the budget only delays the same failure.
-            logger.warning("total budget exhausted; not retrying (\(failure.code.rawValue))")
+            logger.warning("total budget exhausted; not retrying (\(failure.type.rawValue))")
             throw failure
         }
 
-        logger.debug("attempt \(attempt) failed with \(failure.code.rawValue); retrying in \(wait)s")
+        logger.debug("attempt \(attempt) failed with \(failure.type.rawValue); retrying in \(wait)s")
         try await clock.sleep(for: wait)
 
         // Checked again on the far side. A wait that fits when it is planned can still overrun: a
@@ -114,7 +114,7 @@ package enum Retry {
         // deadline. Reporting the synthetic timeout then would discard the 429 or 5xx that caused the
         // wait, where the branch above keeps it.
         if let remaining = remainingBudget(policy, clock: clock, startedAt: startedAt), remaining <= 0 {
-            logger.warning("total budget exhausted while waiting; not retrying (\(failure.code.rawValue))")
+            logger.warning("total budget exhausted while waiting; not retrying (\(failure.type.rawValue))")
             throw failure
         }
         return attempt + 1
@@ -132,7 +132,7 @@ package enum Retry {
     private static func budgetExhausted(logger: PayabliLogger, phase: String) -> PayabliGenericError {
         logger.warning("operation exceeded its total timeout (\(phase))")
         return PayabliGenericError(
-            code: .networkError,
+            type: .networkError,
             reason: "Operation exceeded its total timeout"
         )
     }

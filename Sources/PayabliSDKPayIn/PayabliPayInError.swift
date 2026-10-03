@@ -39,13 +39,13 @@ public enum PayabliPayInError: PayabliError, Equatable {
     /// payment: a refusal, a validation failure, a refused credential, a locally refused request, and a
     /// refusal for too many requests.
     ///
-    /// `code` is the classification to branch on. `causeType` names the failing type and carries none
+    /// `type` is the classification to branch on. `causeType` names the failing type and carries none
     /// of its message, because that message can quote a response body or name a host's own endpoint,
     /// and an error's associated values are rendered wherever the chain is walked, a crash reporter
     /// included.
-    case submissionInterrupted(code: PayabliErrorCode, causeType: String)
+    case submissionInterrupted(type: PayabliErrorType, causeType: String)
 
-    public var code: PayabliErrorCode {
+    public var type: PayabliErrorType {
         switch self {
         case .invalidInput, .submissionInProgress:
             return .validation
@@ -53,8 +53,8 @@ public enum PayabliPayInError: PayabliError, Equatable {
             return .missingToken
         case let .transactionFailed(failure):
             return Self.classification(of: failure)
-        case let .submissionInterrupted(code, _):
-            return code
+        case let .submissionInterrupted(type, _):
+            return type
         }
     }
 
@@ -98,7 +98,7 @@ public enum PayabliPayInError: PayabliError, Equatable {
     /// status to classify at all.
     private static func classification(
         of failure: PayabliPayInFailure
-    ) -> PayabliErrorCode {
+    ) -> PayabliErrorType {
         if failure.code?.hasPrefix(declinedFamily) == true {
             return .paymentDeclined
         }
@@ -113,7 +113,7 @@ public enum PayabliPayInError: PayabliError, Equatable {
             // neither an approval nor a refusal.
             return .serverError
         } catch {
-            return (error as? any PayabliError)?.code ?? .unknown
+            return (error as? any PayabliError)?.type ?? .unknown
         }
     }
 

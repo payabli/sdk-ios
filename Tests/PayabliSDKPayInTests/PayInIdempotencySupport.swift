@@ -15,14 +15,14 @@ enum PayInFixture {
     /// The parts of an interruption, or nil when the failure was classified as an answer.
     static func interruption(
         _ failure: any Error
-    ) -> (code: PayabliErrorCode, causeType: String)? {
+    ) -> (type: PayabliErrorType, causeType: String)? {
         guard
-            case let .submissionInterrupted(code, causeType) =
+            case let .submissionInterrupted(type, causeType) =
             failure as? PayabliPayInError
         else {
             return nil
         }
-        return (code, causeType)
+        return (type, causeType)
     }
 
     static func makeFlow(
@@ -72,7 +72,7 @@ enum PayInFixture {
         do {
             try await block()
             XCTFail("expected a failure, got a success", file: file, line: line)
-            return PayabliGenericError(code: .unknown, reason: "no failure")
+            return PayabliGenericError(type: .unknown, reason: "no failure")
         } catch {
             return error
         }

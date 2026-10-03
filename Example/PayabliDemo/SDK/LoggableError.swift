@@ -11,7 +11,7 @@ import PayabliSDKCore
 enum LoggableError {
     static func label(for error: Error) -> String {
         if let payabli = error as? any PayabliError {
-            return payabli.code.rawValue
+            return payabli.type.rawValue
         }
         return String(describing: type(of: error))
     }

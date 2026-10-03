@@ -20,7 +20,7 @@ import Foundation
 /// returns.
 ///
 /// The SDK bounds every call to this closure at 30 seconds. A call that hangs past that, throws,
-/// or returns a token the SDK cannot use surfaces to the caller as ``PayabliErrorCode/tokenProviderFailed``.
+/// or returns a token the SDK cannot use surfaces to the caller as ``PayabliErrorType/tokenProviderFailed``.
 /// Size the backend call well under 30 seconds so a slow upstream fails fast inside the bound.
 ///
 /// ## Why a closure, not a hard-coded endpoint

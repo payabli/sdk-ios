@@ -28,7 +28,7 @@ extension AuthRecoveryPolicy {
     ///
     /// Carries no text from the response. A 401 body belongs to the service.
     func exhausted() -> PayabliGenericError {
-        PayabliGenericError(code: .tokenExpired, reason: "Refresh token rejected")
+        PayabliGenericError(type: .tokenExpired, reason: "Refresh token rejected")
     }
 }
 

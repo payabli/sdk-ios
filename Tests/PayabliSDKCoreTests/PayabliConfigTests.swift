@@ -26,7 +26,7 @@ final class PayabliConfigTests: XCTestCase {
                 _ = try makeConfig(entryPoint: blank)
                 XCTFail("expected throw for \(blank.debugDescription)")
             } catch let err as PayabliGenericError {
-                XCTAssertEqual(err.code, .invalidConfiguration, blank.debugDescription)
+                XCTAssertEqual(err.type, .invalidConfiguration, blank.debugDescription)
             }
         }
     }

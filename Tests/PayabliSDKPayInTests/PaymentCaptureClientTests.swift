@@ -269,7 +269,7 @@ final class PayInPaymentFlowClientTests: XCTestCase {
         } catch let error as PayabliGenericError {
             // The holder owns the provider now, so a host failure arrives as this SDK's own
             // `.tokenProviderFailed` with the cause redacted, rather than as the host's error verbatim.
-            XCTAssertEqual(error.code, .tokenProviderFailed)
+            XCTAssertEqual(error.type, .tokenProviderFailed)
         }
 
         let rendered = captured.all.joined(separator: "\n")
@@ -314,7 +314,7 @@ final class PayInPaymentFlowClientTests: XCTestCase {
             _ = try await component.capture(cardRequest())
             XCTFail("Expected missing token")
         } catch let error as PayabliGenericError {
-            XCTAssertEqual(error.code, .tokenProviderFailed)
+            XCTAssertEqual(error.type, .tokenProviderFailed)
         } catch {
             XCTFail("Wrong error: \(error)")
         }

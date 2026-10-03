@@ -1,7 +1,7 @@
 import Foundation
 
 /// Platform-aligned error codes from PRD §8 "Error Codes".
-public enum PayabliErrorCode: String, Sendable, CaseIterable {
+public enum PayabliErrorType: String, Sendable, CaseIterable {
     case missingToken = "MISSING_TOKEN"
     case tokenExpired = "TOKEN_EXPIRED"
     case tokenMalformed = "TOKEN_MALFORMED"
@@ -86,7 +86,7 @@ public enum PayabliErrorCode: String, Sendable, CaseIterable {
     case paymentNotHeld = "PAYMENT_NOT_HELD"
 }
 
-/// What a host does about a failure. Each ``PayabliErrorCode`` belongs to one.
+/// What a host does about a failure. Each ``PayabliErrorType`` belongs to one.
 public enum PayabliErrorCategory: String, Sendable, CaseIterable {
     /// The SDK could not obtain or use a credential, a token or this device's identity. The SDK asks
     /// the token provider again on the next call, so a provider that can return a working token
@@ -118,7 +118,7 @@ public enum PayabliErrorCategory: String, Sendable, CaseIterable {
 
 /// The catalog: one number, message and category per code, the same on every platform the SDK ships on.
 /// Numbers are allocated by area, core in the 1000s and card-present in the 3000s, and are never reused.
-public extension PayabliErrorCode {
+public extension PayabliErrorType {
     var number: Int {
         switch self {
         case .missingToken: 1001
@@ -263,8 +263,8 @@ public extension PayabliErrorCode {
 ///
 /// See PRD §8 and §20.2.
 public protocol PayabliError: LocalizedError, Sendable {
-    /// Machine-readable code.
-    var code: PayabliErrorCode { get }
+    /// The catalog entry. A host switches on it.
+    var type: PayabliErrorType { get }
 
     /// Human-readable short description.
     var reason: String { get }
@@ -274,6 +274,21 @@ public protocol PayabliError: LocalizedError, Sendable {
 }
 
 public extension PayabliError {
+    /// The catalog number, the same value as the bridged `NSError` code.
+    var code: Int {
+        type.number
+    }
+
+    /// What a host does about the failure.
+    var category: PayabliErrorCategory {
+        type.category
+    }
+
+    /// Fixed SDK text, the same on every platform.
+    var message: String {
+        type.message
+    }
+
     /// What `localizedDescription` returns, which is what a host app puts in
     /// front of a merchant. Without this every one of these reads "The
     /// operation couldn't be completed. (Module.Type error N.)", and the
@@ -286,18 +301,18 @@ public extension PayabliError {
 
 /// A generic transport or client-side error.
 public struct PayabliGenericError: PayabliError {
-    public let code: PayabliErrorCode
+    public let type: PayabliErrorType
     public let reason: String
     public let detail: String?
     public let underlying: Error?
 
     public init(
-        code: PayabliErrorCode,
+        type: PayabliErrorType,
         reason: String,
         detail: String? = nil,
         underlying: Error? = nil
     ) {
-        self.code = code
+        self.type = type
         self.reason = reason
         self.detail = detail
         self.underlying = underlying
@@ -331,7 +346,7 @@ public struct PayabliFieldError: Decodable, Sendable {
 
 /// HTTP 400 validation error (RFC 7807). See PRD §8.1.1 "Validation Error".
 public struct PayabliValidationError: PayabliError, Decodable {
-    public let type: String?
+    public let problemType: String?
     public let title: String?
     public let status: Int?
     public let detail: String?
@@ -340,7 +355,7 @@ public struct PayabliValidationError: PayabliError, Decodable {
     public let errors: [String: [PayabliFieldError]]?
     public let token: String?
 
-    public var code: PayabliErrorCode {
+    public var type: PayabliErrorType {
         .validation
     }
 
@@ -376,7 +391,7 @@ public struct PayabliValidationError: PayabliError, Decodable {
     /// One unreadable entry drops the whole map.
     public init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        type = try container.decodeIfPresent(String.self, forKey: .type)
+        problemType = try container.decodeIfPresent(String.self, forKey: .problemType)
         title = try container.decodeIfPresent(String.self, forKey: .title)
         status = try container.decodeIfPresent(Int.self, forKey: .status)
         detail = try container.decodeIfPresent(String.self, forKey: .detail)
@@ -388,7 +403,7 @@ public struct PayabliValidationError: PayabliError, Decodable {
 
     /// The empty error, for a 400 whose body will not decode at all.
     init() {
-        type = nil
+        problemType = nil
         title = nil
         status = nil
         detail = nil
@@ -399,13 +414,15 @@ public struct PayabliValidationError: PayabliError, Decodable {
     }
 
     enum CodingKeys: String, CodingKey {
-        case type, title, status, detail, instance, errors, token
+        case problemType = "type"
+        case title, status, detail, instance, errors, token
         case rawCode = "code"
     }
 }
 
 /// HTTP 500 server error. See PRD §8.1.1 "Server Error".
 public struct PayabliServerError: PayabliError, Decodable, PayabliRetryAfter {
+    public let problemType: String?
     public let title: String?
     public let status: Int?
     public let detail: String?
@@ -416,7 +433,7 @@ public struct PayabliServerError: PayabliError, Decodable, PayabliRetryAfter {
 
     public let retryAfter: TimeInterval?
 
-    public var code: PayabliErrorCode {
+    public var type: PayabliErrorType {
         .serverError
     }
 
@@ -426,6 +443,7 @@ public struct PayabliServerError: PayabliError, Decodable, PayabliRetryAfter {
 
     /// The empty error, for a 5xx whose body will not decode at all.
     init(httpStatus: Int? = nil, retryAfter: TimeInterval? = nil) {
+        problemType = nil
         title = nil
         status = nil
         detail = nil
@@ -436,6 +454,7 @@ public struct PayabliServerError: PayabliError, Decodable, PayabliRetryAfter {
 
     public init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
+        problemType = try container.decodeIfPresent(String.self, forKey: .problemType)
         title = try container.decodeIfPresent(String.self, forKey: .title)
         status = try container.decodeIfPresent(Int.self, forKey: .status)
         detail = try container.decodeIfPresent(String.self, forKey: .detail)
@@ -445,6 +464,7 @@ public struct PayabliServerError: PayabliError, Decodable, PayabliRetryAfter {
     }
 
     private init(
+        problemType: String?,
         title: String?,
         status: Int?,
         detail: String?,
@@ -452,6 +472,7 @@ public struct PayabliServerError: PayabliError, Decodable, PayabliRetryAfter {
         httpStatus: Int?,
         retryAfter: TimeInterval?
     ) {
+        self.problemType = problemType
         self.title = title
         self.status = status
         self.detail = detail
@@ -463,6 +484,7 @@ public struct PayabliServerError: PayabliError, Decodable, PayabliRetryAfter {
     /// The same error, carrying the two things only the response envelope knows.
     func carrying(httpStatus: Int, retryAfter: TimeInterval?) -> PayabliServerError {
         PayabliServerError(
+            problemType: problemType,
             title: title,
             status: status,
             detail: detail,
@@ -473,6 +495,7 @@ public struct PayabliServerError: PayabliError, Decodable, PayabliRetryAfter {
     }
 
     enum CodingKeys: String, CodingKey {
+        case problemType = "type"
         case title, status, detail, instance
     }
 }
@@ -487,7 +510,7 @@ public struct PayabliDeclineError: PayabliError, Decodable {
 
     static let defaultReason = "Payment declined (402)"
 
-    public var code: PayabliErrorCode {
+    public var type: PayabliErrorType {
         .paymentDeclined
     }
 
@@ -554,8 +577,8 @@ public enum PayabliPaymentError: PayabliError, PayabliRetryAfter, Sendable {
         }
     }
 
-    public var code: PayabliErrorCode {
-        asPayabliError.code
+    public var type: PayabliErrorType {
+        asPayabliError.type
     }
 
     public var reason: String {

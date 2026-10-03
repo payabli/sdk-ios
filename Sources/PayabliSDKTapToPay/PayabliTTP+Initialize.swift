@@ -225,7 +225,7 @@ extension PayabliTTP {
         } catch PayabliTTPError.devicePendingActivation {
             markPendingActivation()
             throw PayabliTTPError.devicePendingActivation
-        } catch let err as PayabliGenericError where err.code == .tokenExpired {
+        } catch let err as PayabliGenericError where err.type == .tokenExpired {
             // Two failures arrive as `.tokenExpired` here: the service refusing the
             // binding the request presented, and the transport refusing the bearer
             // after its retry. The first is dropped by the config call, which knows

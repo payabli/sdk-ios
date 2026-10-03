@@ -377,7 +377,7 @@ extension Error {
                 code: -3,
                 userInfo: [
                     NSLocalizedDescriptionKey: payabliError.reason,
-                    "PayabliErrorCode": payabliError.code.rawValue
+                    "PayabliErrorCode": payabliError.type.rawValue
                 ]
             )
         }

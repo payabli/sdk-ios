@@ -21,7 +21,7 @@ enum SessionTierValidator {
         let actual = detectedTier(from: config)
         guard actual.rawValue >= required.rawValue else {
             throw PayabliGenericError(
-                code: .permissionDenied,
+                type: .permissionDenied,
                 reason: "Session tier mismatch",
                 detail: "\(component.componentId) requires tier \(required.rawValue); session is tier \(actual.rawValue)."
             )

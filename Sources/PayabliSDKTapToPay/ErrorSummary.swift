@@ -15,7 +15,7 @@ enum ErrorSummary {
         case let payment as PayabliPaymentError:
             return of(payment)
         case let payabli as any PayabliError:
-            return payabli.code.rawValue
+            return payabli.type.rawValue
         default:
             // `NSError` on its own says nothing; the domain and code are what
             // identify a platform failure, and neither is server text.
@@ -38,9 +38,9 @@ enum ErrorSummary {
             let status = server.httpStatus ?? server.status
             return "server(\(status.map(String.init) ?? "no status"))"
         case let .validation(validation):
-            return validation.code.rawValue
+            return validation.type.rawValue
         case let .generic(generic):
-            return generic.code.rawValue
+            return generic.type.rawValue
         }
     }
 
