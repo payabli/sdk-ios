@@ -8,7 +8,7 @@
 // drive the Tap to Pay on iPhone flow from C#.
 //
 // All types in this file map 1:1 to the `@objc` companions in
-// `Sources/PayabliSDKTapToPay/`. The Swift surface stays untouched;
+// `Sources/PayabliSDKCore/`, `Sources/PayabliSDKTapToPay/` and `Sources/PayabliSDKPayIn/`. The Swift surface stays untouched;
 // the @objc additions added in the same PR make this binding possible
 // without a separate shim framework.
 
@@ -99,13 +99,6 @@ namespace Payabli.TapToPay
     );
 
     public delegate void TokenRefreshRequest(TokenRefreshCompletion completion);
-
-    public delegate void AccessTokenCompletion(
-        [NullAllowed] string token,
-        [NullAllowed] NSError error
-    );
-
-    public delegate void AccessTokenRequest(AccessTokenCompletion completion);
 
     public delegate void PayabliTTPCompletion([NullAllowed] NSError error);
 
@@ -241,27 +234,37 @@ namespace Payabli.TapToPay
         [Export("cancel")] void Cancel();
     }
 
+    // MARK: - PayabliSessionObjC (the one session)
+
+    [BaseType(typeof(NSObject))]
+    [DisableDefaultCtor]
+    public interface PayabliSessionObjC
+    {
+        // Installs the one session every facade runs on. The token handler is the only source of a
+        // credential: the SDK asks it for the first token as well as for a replacement. A second
+        // call with the same entry point, environment and telemetry setting is a no-op; a different
+        // one fails.
+        [Static]
+        [Export("initializeWithTokenHandler:entryPoint:environment:telemetryEnabled:error:")]
+        bool Initialize(
+            TokenRefreshRequest tokenHandler,
+            string entryPoint,
+            PayabliEnvironment environment,
+            bool telemetryEnabled,
+            out NSError error
+        );
+    }
+
     // MARK: - PayabliTTP (façade)
 
     [BaseType(typeof(NSObject))]
     [DisableDefaultCtor]
     public interface PayabliTTP
     {
-        // Convenience init that takes the completion-style token refresh —
-        // the @objc-friendly counterpart of the Swift PayabliTokenRefresh
-        // closure. It is required: the SDK asks it for the first token as well as for a
-        // replacement, so there is no token at all without it.
-        // Carries `error:` because the Swift initialiser throws: it rejects an empty entry point.
-        // The selector must match the generated header exactly or the binding calls
-        // one that does not exist.
-        [Export("initWithTokenHandler:entryPoint:appId:environment:error:")]
-        IntPtr Constructor(
-            TokenRefreshRequest tokenHandler,
-            string entryPoint,
-            string appId,
-            PayabliEnvironment environment,
-            out NSError error
-        );
+        // Runs on the session PayabliSessionObjC.Initialize installed. Carries `error:` because the
+        // Swift initialiser throws when no session is installed.
+        [Export("initWithAppId:error:")]
+        IntPtr Constructor(string appId, out NSError error);
 
         // Lifecycle (all @MainActor — completion fires on main thread).
 
@@ -332,15 +335,11 @@ namespace Payabli.TapToPay
     [DisableDefaultCtor]
     public interface PayabliPayInObjC
     {
-        // Carries `error:` because the Swift initialiser throws: it builds the configuration and
-        // the session itself, an Objective-C caller being unable to hold a Swift-only session.
-        [Export("initWithTokenHandler:entryPoint:environment:error:")]
-        IntPtr Constructor(
-            AccessTokenRequest tokenHandler,
-            string entryPoint,
-            PayabliEnvironment environment,
-            out NSError error
-        );
+        // Builds the facade on the installed session, and fails with `error` when none is installed.
+        [Static]
+        [Export("createAndReturnError:")]
+        [return: NullAllowed]
+        PayabliPayInObjC Create(out NSError error);
 
         [Export("addCardWithCardNumber:expiration:cardholderName:cvv:billingZip:createAnonymous:forceCustomerCreation:temporary:source:completion:")]
         void AddCard(

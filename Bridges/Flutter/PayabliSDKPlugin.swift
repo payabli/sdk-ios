@@ -124,12 +124,12 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
             // the previous facade and its event subscription exactly as they were.
             let ttp: PayabliTTP
             do {
-                ttp = try PayabliTTP(
-                    tokenProvider: tokenProvider,
+                try PayabliSession.initialize(config: PayabliConfig(
                     entryPoint: entryPoint,
-                    appId: appId,
-                    environment: environment
-                )
+                    environment: environment,
+                    tokenProvider: tokenProvider
+                ))
+                ttp = try PayabliTTP(appId: appId)
             } catch {
                 result(FlutterError(
                     code: "INVALID_CONFIGURATION",
@@ -393,7 +393,7 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
                     tokenProvider: tokenProvider
                 )
                 self.payIn = PayabliPayIn(
-                    session: PayabliSession(config: config)
+                    session: try PayabliSession.initialize(config: config)
                 )
                 result(nil)
             } catch {

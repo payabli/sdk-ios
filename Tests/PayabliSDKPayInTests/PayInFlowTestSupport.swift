@@ -1,4 +1,4 @@
-import PayabliSDKCore
+@testable import PayabliSDKCore
 @testable import PayabliSDKPayIn
 
 /// A flow on a real session, for the tests whose subject is the flow rather than the network.

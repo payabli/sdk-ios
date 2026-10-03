@@ -30,12 +30,19 @@ final class TapToPayOnDeviceTests: XCTestCase {
         _ = try await LiveEnvironment.requireAToken()
     }
 
+    /// On a session of its own for the named environment, which may not be the one the host app
+    /// installed at launch.
     private func makeTTP() throws -> PayabliTTP {
-        try PayabliTTP(
-            tokenProvider: { try await Secrets.fetchAccessToken() },
-            entryPoint: named.entry,
+        let session = PayabliSession(config: try LiveEnvironment.config(for: named))
+        return PayabliTTP(
+            session: session,
             appId: Secrets.appId,
-            environment: named.environment
+            provider: FiservCardReader(),
+            attestation: AppAttestService(
+                transport: session.transport,
+                attestor: RealAppAttestor(),
+                storage: KeychainStorage()
+            )
         )
     }
 

@@ -7,35 +7,11 @@ import PayabliSDKPayIn
 /// The app holds the handles these return and never the flow inside them.
 @MainActor
 enum PayInSessions {
-    /// A session for one operation's token endpoint.
-    ///
-    /// The initialiser rejects an empty entry point, which is a constant here, so this app treats a
-    /// rejection as a build it should not ship. A host reading one from its own backend catches
-    /// instead, and shows the payer something.
-    private static func session(
-        entryPoint: String,
-        tokenProvider: @escaping PayabliTokenRefresh
-    ) -> PayabliSession {
-        do {
-            return PayabliSession(config: try PayabliConfig(
-                entryPoint: entryPoint,
-                environment: DemoConfiguration.environment.sdkEnvironment,
-
-                tokenProvider: tokenProvider
-            ))
-        } catch {
-            preconditionFailure("The entry point is not usable: \(error)")
-        }
-    }
-
     /// Storing an instrument for later.
     static func storedMethod() -> PayInFlowHandle {
         PayInFlowHandle(
             PayabliPayIn(
-                session: session(
-                    entryPoint: DemoConfiguration.entryPoint,
-                    tokenProvider: { try await Secrets.fetchPaymentMethodAccessToken() }
-                ),
+                session: DemoSession.start(),
                 diagnostics: .qaLogging(
                     enabled: Secrets.paymentMethodDiagnosticsEnabled,
                     store: .paymentMethod
@@ -52,10 +28,7 @@ enum PayInSessions {
     static func capture() -> PayInFlowHandle {
         PayInFlowHandle(
             PayabliPayIn(
-                session: session(
-                    entryPoint: DemoConfiguration.entryPoint,
-                    tokenProvider: { try await Secrets.fetchPaymentCaptureAccessToken() }
-                ),
+                session: DemoSession.start(),
                 diagnostics: .qaLogging(
                     enabled: Secrets.paymentCaptureDiagnosticsEnabled,
                     store: .paymentCapture
@@ -70,10 +43,7 @@ enum PayInSessions {
     static func preview(capturing: Bool = false) -> PayInFlowHandle {
         PayInFlowHandle(
             PayabliPayIn(
-                session: session(
-                    entryPoint: "preview-entry",
-                    tokenProvider: { "preview-token" }
-                ),
+                session: DemoSession.startPreview(),
                 operation: capturing ? .capture : .storePaymentMethod,
                 requestConfiguration: capturing
                     ? PayabliPayInRequestConfiguration(
