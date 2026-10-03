@@ -25,6 +25,7 @@ final class PayabliPayInInstalledSessionTests: XCTestCase {
 
         component.configure(config: try makeConfig(entryPoint: "other"))
         XCTAssertTrue(component.session === installed, "configure built a second session")
+        XCTAssertEqual(component.entryPoint, "demo", "a refused configuration was published")
 
         do {
             _ = try await component.capture(PayabliPayInRequest(

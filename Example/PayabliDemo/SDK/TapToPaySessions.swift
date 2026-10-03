@@ -20,7 +20,7 @@ enum TapToPaySessions {
     /// makes no network call and touches neither App Attest nor the reader.
     @MainActor
     static func preview() -> TapToPayTerminal {
-        DemoSession.startPreview()
+        DemoSession.start()
         do {
             return TapToPayTerminal(
                 try PayabliTTP(appId: "PREVIEW0000.\(Bundle.main.bundleIdentifier ?? "preview")")

@@ -120,24 +120,15 @@ enum DemoSession {
     /// The entry point is a constant here, so this app treats a rejection as a build it should not
     /// ship. A host reading one from its own backend catches instead, and shows the payer something.
     @discardableResult
-    static func start(
-        entryPoint: String = DemoConfiguration.entryPoint,
-        tokenProvider: @escaping PayabliTokenRefresh = { try await Secrets.fetchAccessToken() }
-    ) -> PayabliSession {
+    static func start() -> PayabliSession {
         do {
             return try PayabliSession.initialize(config: PayabliConfig(
-                entryPoint: entryPoint,
+                entryPoint: DemoConfiguration.entryPoint,
                 environment: DemoConfiguration.environment.sdkEnvironment,
-                tokenProvider: tokenProvider
+                tokenProvider: { try await Secrets.fetchAccessToken() }
             ))
         } catch {
             preconditionFailure("The session could not start: \(error)")
         }
-    }
-
-    /// The session a canvas preview runs on, which makes no network call.
-    @discardableResult
-    static func startPreview() -> PayabliSession {
-        start(entryPoint: "preview-entry", tokenProvider: { "preview-token" })
     }
 }
