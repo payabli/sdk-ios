@@ -119,13 +119,16 @@ enum DemoSession {
     ///
     /// The entry point is a constant here, so this app treats a rejection as a build it should not
     /// ship. A host reading one from its own backend catches instead, and shows the payer something.
+    ///
+    /// A canvas preview gets a session no merchant answers to, so a preview cannot reach a backend.
     @discardableResult
     static func start() -> PayabliSession {
+        let isPreview = ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1"
         do {
             return try PayabliSession.initialize(config: PayabliConfig(
-                entryPoint: DemoConfiguration.entryPoint,
+                entryPoint: isPreview ? "preview-entry" : DemoConfiguration.entryPoint,
                 environment: DemoConfiguration.environment.sdkEnvironment,
-                tokenProvider: { try await Secrets.fetchAccessToken() }
+                tokenProvider: isPreview ? { "preview-token" } : { try await Secrets.fetchAccessToken() }
             ))
         } catch {
             preconditionFailure("The session could not start: \(error)")
