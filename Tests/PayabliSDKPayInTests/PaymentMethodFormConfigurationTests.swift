@@ -323,6 +323,8 @@ final class PaymentMethodFormConfigurationTests: XCTestCase {
 
             tokenProvider: { "access-token" }
         )
+        try PayabliSession.initialize(config: config)
+        defer { PayabliSession.resetForTesting() }
 
         component.configure(config: config, theme: .default)
 
