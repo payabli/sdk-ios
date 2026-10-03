@@ -118,7 +118,7 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
     ///
     /// The process has one session, so a different configuration, or none installed, is not applied:
     /// the flow keeps its entry point and environment, and every submission after it fails with
-    /// `invalidConfiguration` rather than reach a merchant the session was not configured for.
+    /// `invalidConfiguration`.
     public func configure(config: PayabliConfig) {
         let transport: any PayabliTransport
         if let injectedTransport {
