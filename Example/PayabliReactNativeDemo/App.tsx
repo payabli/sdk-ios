@@ -24,7 +24,6 @@ const Secrets = {
   entryPoint: "<YOUR_ENTRY_POINT>",
   appId: "<TEAM_ID>.<BUNDLE_ID>",
   fetchAccessToken: async () => "placeholder-token",
-  fetchPayInAccessToken: async () => "placeholder-payin-access-token",
 };
 
 export default function App() {
@@ -69,7 +68,7 @@ export default function App() {
         environment: PayabliEnvironment.Sandbox,
       });
       await PayabliPayIn.configure({
-        accessTokenProvider: Secrets.fetchPayInAccessToken,
+        tokenProvider: Secrets.fetchAccessToken,
         entryPoint: Secrets.entryPoint,
         environment: PayabliEnvironment.Sandbox,
       });

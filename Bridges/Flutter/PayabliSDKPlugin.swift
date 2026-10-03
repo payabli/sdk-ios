@@ -31,10 +31,42 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
     private var eventToken: PayabliTTPEventToken?
     private var payIn: PayabliPayIn?
 
+    /// The plugin of the engine running now. The session outlives an engine, so its token provider
+    /// asks this rather than holding the channel of the plugin that configured it.
+    private weak static var livePlugin: PayabliSDKPlugin?
+    private static let livePluginLock = NSLock()
+
     init(methodChannel: FlutterMethodChannel, eventChannel: FlutterEventChannel) {
         self.methodChannel = methodChannel
         self.eventChannel = eventChannel
         super.init()
+        Self.livePluginLock.withLock { Self.livePlugin = self }
+    }
+
+    /// The session's only token source, whichever configure started it: the process has one session
+    /// and it takes one provider, so both capabilities ask Dart over the one `refreshToken` call.
+    private static let sessionTokenProvider: PayabliTokenRefresh = { @Sendable in
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<String, Error>) in
+            Task { @MainActor in
+                guard let channel = PayabliSDKPlugin.livePluginLock.withLock({ PayabliSDKPlugin.livePlugin?.methodChannel }) else {
+                    continuation.resume(throwing: PayabliGenericError(
+                        type: .tokenExpired,
+                        reason: "No Flutter engine is running the plugin"
+                    ))
+                    return
+                }
+                channel.invokeMethod("refreshToken", arguments: nil) { value in
+                    if let token = value as? String {
+                        continuation.resume(returning: token)
+                    } else {
+                        continuation.resume(throwing: PayabliGenericError(
+                            type: .tokenExpired,
+                            reason: "Dart side did not return a refreshed token"
+                        ))
+                    }
+                }
+            }
+        }
     }
 
     public static func register(with registrar: FlutterPluginRegistrar) {
@@ -99,24 +131,6 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
             return
         }
 
-        let methodChannel = self.methodChannel
-        let tokenProvider: PayabliTokenRefresh = { @Sendable [methodChannel] in
-            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<String, Error>) in
-                Task { @MainActor in
-                    methodChannel.invokeMethod("refreshToken", arguments: nil) { value in
-                        if let token = value as? String {
-                            continuation.resume(returning: token)
-                        } else {
-                            continuation.resume(throwing: PayabliGenericError(
-                                type: .tokenExpired,
-                                reason: "Dart side did not return a refreshed token"
-                            ))
-                        }
-                    }
-                }
-            }
-        }
-
         Task { @MainActor in
             // Constructed before anything is torn down: the initialiser rejects an
             // access token that cannot be sent as a header and an empty entry point,
@@ -127,7 +141,7 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
                 try PayabliSession.initialize(config: PayabliConfig(
                     entryPoint: entryPoint,
                     environment: environment,
-                    tokenProvider: tokenProvider
+                    tokenProvider: Self.sessionTokenProvider
                 ))
                 ttp = try PayabliTTP(appId: appId)
             } catch {
@@ -366,31 +380,12 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
             return
         }
 
-        let methodChannel = self.methodChannel
-        let tokenProvider: PayabliTokenRefresh = { @Sendable [methodChannel] in
-            try await withCheckedThrowingContinuation { continuation in
-                Task { @MainActor in
-                    methodChannel.invokeMethod("accessToken", arguments: nil) { value in
-                        if let token = value as? String {
-                            continuation.resume(returning: token)
-                        } else {
-                            continuation.resume(throwing: PayabliGenericError(
-                                type: .missingToken,
-                                reason: "Dart side did not return a PayIn payment flow access token"
-                            ))
-                        }
-                    }
-                }
-            }
-        }
-
         Task { @MainActor in
             do {
                 let config = try PayabliConfig(
                     entryPoint: entryPoint,
                     environment: environment,
-
-                    tokenProvider: tokenProvider
+                    tokenProvider: Self.sessionTokenProvider
                 )
                 self.payIn = PayabliPayIn(
                     session: try PayabliSession.initialize(config: config)
