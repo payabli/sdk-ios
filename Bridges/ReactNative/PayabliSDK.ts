@@ -275,17 +275,23 @@ interface NativePayabliSDKModule {
 // MARK: - Tap to Pay public API
 
 let refreshSubscription: EmitterSubscription | null = null;
+let sessionTokenProvider: (() => Promise<string>) | null = null;
 
 // The SDK runs one session with one token source, so both capabilities answer the one event, and
-// the provider from the latest configure call is the one asked.
-function answerTokenRequests(tokenProvider: () => Promise<string>): void {
+// the provider from the latest successful configure call is the one asked.
+function listenForTokenRequests(): void {
+    if (refreshSubscription) {
+        return;
+    }
     const module = requireNativeModule();
-    refreshSubscription?.remove();
     refreshSubscription = requireEmitter().addListener(
         "TTPTokenRefreshRequested",
         async () => {
             try {
-                const token = await tokenProvider();
+                if (!sessionTokenProvider) {
+                    throw new Error("No configure call has succeeded");
+                }
+                const token = await sessionTokenProvider();
                 module.resolveTokenRefresh(token);
             } catch (e) {
                 const message = e instanceof Error ? e.message : String(e);
@@ -297,13 +303,14 @@ function answerTokenRequests(tokenProvider: () => Promise<string>): void {
 
 export async function configure(config: PayabliTTPConfig): Promise<void> {
     const module = requireNativeModule();
-    answerTokenRequests(config.tokenProvider);
+    listenForTokenRequests();
 
     await module.configure({
         entryPoint: config.entryPoint,
         appId: config.appId,
         environment: config.environment ?? PayabliEnvironment.Sandbox,
     });
+    sessionTokenProvider = config.tokenProvider;
 }
 
 export function initialize(): Promise<void> {
@@ -402,12 +409,13 @@ export async function configurePayIn(
     config: PayabliPayInConfig
 ): Promise<void> {
     const module = requireNativeModule();
-    answerTokenRequests(config.tokenProvider);
+    listenForTokenRequests();
 
     await module.configurePayIn({
         entryPoint: config.entryPoint,
         environment: config.environment ?? PayabliEnvironment.Sandbox,
     });
+    sessionTokenProvider = config.tokenProvider;
 }
 
 export function addCard(
