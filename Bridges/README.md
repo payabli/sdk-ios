@@ -32,7 +32,7 @@ capture-authorized transaction flows until those request models are promoted
 into the bridge APIs.
 
 Each bridge runs one session with one token callback: `configure` and `configurePayIn` both take a
-`tokenProvider`, and when a host calls both, the callback from the later call answers every token request.
+`tokenProvider`, and when a host calls both, the callback from the later successful call answers every token request.
 
 For payment flow-specific bridge setup, access-token handling, and sample
 stored card/bank account calls, see
