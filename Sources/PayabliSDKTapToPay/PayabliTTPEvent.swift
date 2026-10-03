@@ -368,6 +368,9 @@ extension Error {
         if let ttpError = self as? PayabliTTPError {
             return ttpError as NSError
         }
+        if let tapToPayError = self as? TapToPayError {
+            return tapToPayError as NSError
+        }
         if let payabliError = self as? any PayabliError {
             return NSError(
                 domain: PayabliTTPError.errorDomain,
