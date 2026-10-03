@@ -1,4 +1,4 @@
-import PayabliSDKCore
+@testable import PayabliSDKCore
 @testable import PayabliSDKPayIn
 import XCTest
 
@@ -8,13 +8,23 @@ private let mainActorCompletionTimeout: TimeInterval = 10
 
 @MainActor
 final class PaymentMethodObjCBridgeTests: XCTestCase {
+    override func tearDown() {
+        PayabliSession.resetForTesting()
+        super.tearDown()
+    }
+
+    private func makeBridge(
+        tokenHandler: @escaping (@escaping (String?, NSError?) -> Void) -> Void
+    ) throws -> PayabliPayInObjC {
+        try PayabliSessionObjC.initialize(tokenHandler: tokenHandler, entryPoint: "entry", environment: .sandbox, telemetryEnabled: true)
+        return try PayabliPayInObjC.create()
+    }
+
     func testAddBankAccountRejectsInvalidHolderType() throws {
-        let component = try PayabliPayInObjC(
+        let component = try makeBridge(
             tokenHandler: { completion in
                 completion("token", nil)
-            },
-            entryPoint: "entry",
-            environment: .sandbox
+            }
         )
         let expectation = expectation(description: "completion called")
 
@@ -76,10 +86,8 @@ final class PaymentMethodObjCBridgeTests: XCTestCase {
     }
 
     func testAddBankAccountRejectsInvalidArgumentsSynchronously() throws {
-        let component = try PayabliPayInObjC(
-            tokenHandler: { completion in completion("unused", nil) },
-            entryPoint: "entry",
-            environment: .sandbox
+        let component = try makeBridge(
+            tokenHandler: { completion in completion("unused", nil) }
         )
 
         var invalidAccountTypeError: NSError?
@@ -129,10 +137,8 @@ final class PaymentMethodObjCBridgeTests: XCTestCase {
 
     func testAddCardReturnsValidationErrorWithoutCallingTokenHandler() async throws {
         let completionExpectation = expectation(description: "ObjC card completion")
-        let component = try PayabliPayInObjC(
-            tokenHandler: { _ in XCTFail("Token handler should not be called before local validation fails") },
-            entryPoint: "entry",
-            environment: .sandbox
+        let component = try makeBridge(
+            tokenHandler: { _ in XCTFail("Token handler should not be called before local validation fails") }
         )
 
         component.addCard(
@@ -163,13 +169,11 @@ final class PaymentMethodObjCBridgeTests: XCTestCase {
             code: 42,
             userInfo: [NSLocalizedDescriptionKey: "Token unavailable"]
         )
-        let component = try PayabliPayInObjC(
+        let component = try makeBridge(
             tokenHandler: { completion in
                 completion(nil, tokenError)
                 completion("late-token", nil)
-            },
-            entryPoint: "entry",
-            environment: .sandbox
+            }
         )
 
         component.addCard(
@@ -205,10 +209,8 @@ final class PaymentMethodObjCBridgeTests: XCTestCase {
 
     func testNilTokenAndNilErrorProducesInvalidTokenProviderError() async throws {
         let completionExpectation = expectation(description: "ObjC nil token completion")
-        let component = try PayabliPayInObjC(
-            tokenHandler: { completion in completion(nil, nil) },
-            entryPoint: "entry",
-            environment: .sandbox
+        let component = try makeBridge(
+            tokenHandler: { completion in completion(nil, nil) }
         )
 
         component.addBankAccount(

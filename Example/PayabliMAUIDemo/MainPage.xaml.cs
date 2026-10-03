@@ -25,8 +25,8 @@ public partial class MainPage : ContentPage
     }
 
     /// <summary>
-    /// Bootstraps a single PayabliTTP instance. The token handler is the only source of a
-    /// credential: the SDK asks it for the first token as well as for a replacement, so the app
+    /// Starts the one session, then builds both facades on it. The token handler is the only source
+    /// of a credential: the SDK asks it for the first token as well as for a replacement, so the app
     /// holds none. Wire it to your own /payabli/token endpoint, and never embed the clientSecret
     /// in the mobile binary.
     /// </summary>
@@ -34,7 +34,7 @@ public partial class MainPage : ContentPage
     {
         try
         {
-            _ttp = new PayabliTTP(
+            PayabliSessionObjC.Initialize(
                 tokenHandler: (completion) =>
                 {
                     Task.Run(async () =>
@@ -46,47 +46,25 @@ public partial class MainPage : ContentPage
                         }
                         catch (System.Exception ex)
                         {
-                            var nsError = new NSError(
-                                new NSString("com.payabli.demo"),
-                                -1,
-                                NSDictionary.FromObjectsAndKeys(
-                                    new object[] { new NSString(ex.Message) },
-                                    new object[] { NSError.LocalizedDescriptionKey }
-                                )
-                            );
-                            completion(null, nsError);
-                        }
-                    });
-                },
-                entryPoint: Secrets.EntryPoint,
-                appId: Secrets.AppId,
-                environment: PayabliEnvironment.Sandbox,
-                error: out var ttpError
-            );
-            if (ttpError is not null)
-            {
-                throw new System.Exception(ttpError.LocalizedDescription);
-            }
-            _payIn = new PayabliPayInObjC(
-                tokenHandler: (completion) =>
-                {
-                    Task.Run(async () =>
-                    {
-                        try
-                        {
-                            var token = await FetchPayInAccessTokenFromPartnerBackend();
-                            completion(token, null);
-                        }
-                        catch (System.Exception ex)
-                        {
                             completion(null, DemoNSError(ex.Message));
                         }
                     });
                 },
                 entryPoint: Secrets.EntryPoint,
                 environment: PayabliEnvironment.Sandbox,
-                error: out var payInError
+                telemetryEnabled: true,
+                error: out var sessionError
             );
+            if (sessionError is not null)
+            {
+                throw new System.Exception(sessionError.LocalizedDescription);
+            }
+            _ttp = new PayabliTTP(appId: Secrets.AppId, error: out var ttpError);
+            if (ttpError is not null)
+            {
+                throw new System.Exception(ttpError.LocalizedDescription);
+            }
+            _payIn = PayabliPayInObjC.Create(out var payInError);
             if (payInError is not null)
             {
                 throw new System.Exception(payInError.LocalizedDescription);
@@ -114,14 +92,6 @@ public partial class MainPage : ContentPage
         // Replace with a real call to your backend that exchanges your
         // server-side clientId + clientSecret for an access_token.
         return await Task.FromResult(Secrets.PlaceholderAccessToken);
-    }
-
-    private async Task<string> FetchPayInAccessTokenFromPartnerBackend()
-    {
-        // Replace with a real call to your backend that exchanges your
-        // server-side clientId + clientSecret for an access_token scoped for
-        // PayIn payment flow submissions.
-        return await Task.FromResult(Secrets.PlaceholderPayInAccessToken);
     }
 
     // MARK: - Lifecycle handlers
@@ -306,5 +276,4 @@ internal static class Secrets
     public const string EntryPoint = "<YOUR_ENTRY_POINT>";
     public const string AppId = "<TEAM_ID>.<BUNDLE_ID>";
     public const string PlaceholderAccessToken = "placeholder-token";
-    public const string PlaceholderPayInAccessToken = "placeholder-payin-access-token";
 }

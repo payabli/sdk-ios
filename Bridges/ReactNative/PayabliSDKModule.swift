@@ -133,12 +133,12 @@ public final class PayabliSDKModule: RCTEventEmitter {
             // the previous facade and its event subscription exactly as they were.
             let ttp: PayabliTTP
             do {
-                ttp = try PayabliTTP(
-                    tokenProvider: tokenProvider,
+                try PayabliSession.initialize(config: PayabliConfig(
                     entryPoint: entryPoint,
-                    appId: appId,
-                    environment: environment
-                )
+                    environment: environment,
+                    tokenProvider: tokenProvider
+                ))
+                ttp = try PayabliTTP(appId: appId)
             } catch {
                 reject("INVALID_CONFIGURATION", error.localizedDescription, error)
                 return
@@ -402,7 +402,7 @@ public final class PayabliSDKModule: RCTEventEmitter {
                     tokenProvider: tokenProvider
                 )
                 self.payIn = PayabliPayIn(
-                    session: PayabliSession(config: config)
+                    session: try PayabliSession.initialize(config: config)
                 )
                 resolve(nil)
             } catch {
