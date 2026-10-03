@@ -1,9 +1,14 @@
 import Foundation
 import os
+import PayabliSDKCore
 import SwiftUI
 
 @main
 struct PayabliDemoQAApp: App {
+    init() {
+        DemoSession.start()
+    }
+
     @StateObject private var paymentMethod = PayInSessions.storedMethod()
 
     @StateObject private var paymentCapture = PayInSessions.capture()
@@ -103,4 +108,30 @@ struct PayabliDemoQAApp: App {
     }
     .environmentObject(TokenProbeResults.inert())
     .environmentObject(DemoCustomerSetting())
+}
+
+/// The one session this app runs on, started before any flow or terminal is built.
+///
+/// Each token function in `Secrets` stays its own setting for the probes on the Config tab. The
+/// session takes one provider, because the process has one session for every capability.
+enum DemoSession {
+    /// Idempotent: a second call with the same values returns the session already started.
+    ///
+    /// The entry point is a constant here, so this app treats a rejection as a build it should not
+    /// ship. A host reading one from its own backend catches instead, and shows the payer something.
+    ///
+    /// A canvas preview gets a session no merchant answers to, so a preview cannot reach a backend.
+    @discardableResult
+    static func start() -> PayabliSession {
+        let isPreview = ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1"
+        do {
+            return try PayabliSession.initialize(config: PayabliConfig(
+                entryPoint: isPreview ? "preview-entry" : DemoConfiguration.entryPoint,
+                environment: DemoConfiguration.environment.sdkEnvironment,
+                tokenProvider: isPreview ? { "preview-token" } : { try await Secrets.fetchAccessToken() }
+            ))
+        } catch {
+            preconditionFailure("The session could not start: \(error)")
+        }
+    }
 }

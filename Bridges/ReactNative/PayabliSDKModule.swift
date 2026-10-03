@@ -35,17 +35,12 @@ import UIKit
 ///     environment.
 ///   - `addCard(params, resolver, rejecter)`
 ///   - `addBankAccount(params, resolver, rejecter)`
-///   - `resolvePayInAccessToken(token)` /
-///     `rejectPayInAccessToken(reason)` — responses to the
-///     `PayInAccessTokenRequested` event.
 ///
 /// Events (RCTEventEmitter):
 ///   - `TTPEvent`: `{code: Int, payload: {...}}` per `PayabliTTPEvent`.
 ///   - `TTPTokenRefreshRequested`: signals JS to fetch a fresh token from
-///     its own backend; resolve via `resolveTokenRefresh:`.
-///   - `PayInAccessTokenRequested`: signals JS to fetch a scoped
-///     PayIn token from its own backend; resolve via
-///     `resolvePayInAccessToken:`.
+///     its own backend; resolve via `resolveTokenRefresh:`. The one session
+///     asks through this event for card-present and card-not-present alike.
 ///
 /// ## Authentication
 ///
@@ -65,8 +60,7 @@ public final class PayabliSDKModule: RCTEventEmitter {
     @objc override public func supportedEvents() -> [String]! {
         [
             "TTPEvent",
-            "TTPTokenRefreshRequested",
-            "PayInAccessTokenRequested"
+            "TTPTokenRefreshRequested"
         ]
     }
 
@@ -76,9 +70,53 @@ public final class PayabliSDKModule: RCTEventEmitter {
     private var eventToken: PayabliTTPEventToken?
     private var payIn: PayabliPayIn?
     private var pendingRefresh: CheckedContinuation<String, Error>?
-    private var pendingPayInAccessToken: CheckedContinuation<String, Error>?
     private let refreshQueue = DispatchQueue(label: "com.payabli.sdk.rn.refresh")
-    private let payInAccessTokenQueue = DispatchQueue(label: "com.payabli.sdk.rn.payin-token")
+
+    /// The module React Native is running now. The session outlives a JS reload, so its token
+    /// provider asks for this rather than holding the module that configured it.
+    private weak static var liveModule: PayabliSDKModule?
+    private static let liveModuleLock = NSLock()
+
+    private static var live: PayabliSDKModule? {
+        liveModuleLock.withLock { liveModule }
+    }
+
+    override public init() {
+        super.init()
+        Self.liveModuleLock.withLock { Self.liveModule = self }
+    }
+
+    /// The session's only token source, whichever configure started it: the process has one session
+    /// and it takes one provider, so both capabilities ask JS through the one event.
+    private static let sessionTokenProvider: PayabliTokenRefresh = { @Sendable in
+        try await withCheckedThrowingContinuation { continuation in
+            guard let module = PayabliSDKModule.live else {
+                continuation.resume(throwing: PayabliGenericError(
+                    code: .tokenExpired,
+                    reason: "Native module deallocated"
+                ))
+                return
+            }
+            module.refreshQueue.sync {
+                // Coalesce concurrent refreshes: only emit the JS event
+                // for the first caller; subsequent waiters share the
+                // same continuation outcome.
+                if module.pendingRefresh == nil {
+                    module.pendingRefresh = continuation
+                    DispatchQueue.main.async {
+                        module.sendEvent(withName: "TTPTokenRefreshRequested", body: nil)
+                    }
+                } else {
+                    // Best effort: RN offers no multi-await semantics, so a
+                    // second caller arriving during a refresh gets an error.
+                    continuation.resume(throwing: PayabliGenericError(
+                        code: .tokenExpired,
+                        reason: "A token refresh is already in flight"
+                    ))
+                }
+            }
+        }
+    }
 
     // MARK: - configure
 
@@ -96,36 +134,6 @@ public final class PayabliSDKModule: RCTEventEmitter {
             return
         }
 
-        let tokenProvider: PayabliTokenRefresh = { @Sendable [weak self] in
-            try await withCheckedThrowingContinuation { continuation in
-                guard let self else {
-                    continuation.resume(throwing: PayabliGenericError(
-                        code: .tokenExpired,
-                        reason: "Native module deallocated"
-                    ))
-                    return
-                }
-                self.refreshQueue.sync {
-                    // Coalesce concurrent refreshes: only emit the JS event
-                    // for the first caller; subsequent waiters share the
-                    // same continuation outcome.
-                    if self.pendingRefresh == nil {
-                        self.pendingRefresh = continuation
-                        DispatchQueue.main.async {
-                            self.sendEvent(withName: "TTPTokenRefreshRequested", body: nil)
-                        }
-                    } else {
-                        // Best effort: RN offers no multi-await semantics, so a
-                        // second caller arriving during a refresh gets an error.
-                        continuation.resume(throwing: PayabliGenericError(
-                            code: .tokenExpired,
-                            reason: "A token refresh is already in flight"
-                        ))
-                    }
-                }
-            }
-        }
-
         Task { @MainActor in
             // Constructed before anything is torn down: the initialiser rejects an
             // access token that cannot be sent as a header and an empty entry point,
@@ -133,12 +141,12 @@ public final class PayabliSDKModule: RCTEventEmitter {
             // the previous facade and its event subscription exactly as they were.
             let ttp: PayabliTTP
             do {
-                ttp = try PayabliTTP(
-                    tokenProvider: tokenProvider,
+                try PayabliSession.initialize(config: PayabliConfig(
                     entryPoint: entryPoint,
-                    appId: appId,
-                    environment: environment
-                )
+                    environment: environment,
+                    tokenProvider: Self.sessionTokenProvider
+                ))
+                ttp = try PayabliTTP(appId: appId)
             } catch {
                 reject("INVALID_CONFIGURATION", error.localizedDescription, error)
                 return
@@ -368,41 +376,15 @@ public final class PayabliSDKModule: RCTEventEmitter {
             return
         }
 
-        let tokenProvider: PayabliTokenRefresh = { @Sendable [weak self] in
-            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<String, Error>) in
-                guard let self else {
-                    continuation.resume(throwing: PayabliGenericError(
-                        code: .missingToken,
-                        reason: "Native module deallocated"
-                    ))
-                    return
-                }
-                self.payInAccessTokenQueue.sync {
-                    if self.pendingPayInAccessToken == nil {
-                        self.pendingPayInAccessToken = continuation
-                        DispatchQueue.main.async {
-                            self.sendEvent(withName: "PayInAccessTokenRequested", body: nil)
-                        }
-                    } else {
-                        continuation.resume(throwing: PayabliGenericError(
-                            code: .missingToken,
-                            reason: "A PayIn access token request is already in flight"
-                        ))
-                    }
-                }
-            }
-        }
-
         Task { @MainActor in
             do {
                 let config = try PayabliConfig(
                     entryPoint: entryPoint,
                     environment: environment,
-
-                    tokenProvider: tokenProvider
+                    tokenProvider: Self.sessionTokenProvider
                 )
                 self.payIn = PayabliPayIn(
-                    session: PayabliSession(config: config)
+                    session: try PayabliSession.initialize(config: config)
                 )
                 resolve(nil)
             } catch {
@@ -480,23 +462,6 @@ public final class PayabliSDKModule: RCTEventEmitter {
             resolve: resolve,
             reject: reject
         )
-    }
-
-    @objc public func resolvePayInAccessToken(_ token: NSString) {
-        payInAccessTokenQueue.sync {
-            self.pendingPayInAccessToken?.resume(returning: token as String)
-            self.pendingPayInAccessToken = nil
-        }
-    }
-
-    @objc public func rejectPayInAccessToken(_ reason: NSString) {
-        payInAccessTokenQueue.sync {
-            self.pendingPayInAccessToken?.resume(throwing: PayabliGenericError(
-                code: .missingToken,
-                reason: reason as String
-            ))
-            self.pendingPayInAccessToken = nil
-        }
     }
 
     private func addPaymentMethod(

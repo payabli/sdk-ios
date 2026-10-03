@@ -46,10 +46,9 @@ Minimal .NET MAUI demo wrapping Tap to Pay and payment flow through the
    ```bash
    sudo dotnet workload install maui-ios mobile-librarybuilder
    ```
-4. Wire `FetchAccessTokenFromPartnerBackend()` and
-   `FetchPayInAccessTokenFromPartnerBackend()` in `MainPage.xaml.cs` to
-   your backend's Tap to Pay token and payment flow access-token endpoints,
-   then update the `Secrets` constants (`EntryPoint`, `AppId`).
+4. Wire `FetchAccessTokenFromPartnerBackend()` in `MainPage.xaml.cs` to your
+   backend's access-token endpoint. It feeds the one session both facades run
+   on. Then update the `Secrets` constants (`EntryPoint`, `AppId`).
 5. Run on a physical iPhone XS or newer.
 
 ## Required iOS entitlements (host app)

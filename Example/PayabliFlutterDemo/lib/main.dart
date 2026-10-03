@@ -98,7 +98,7 @@ class _HomeScreenState extends State<HomeScreen> {
         environment: PayabliEnvironment.sandbox,
       );
       await PayabliPayIn.configure(
-        accessTokenProvider: Secrets.fetchPayInAccessToken,
+        tokenProvider: Secrets.fetchAccessToken,
         entryPoint: Secrets.entryPoint,
         environment: PayabliEnvironment.sandbox,
       );
@@ -515,9 +515,6 @@ class Secrets {
   /// below returns a placeholder so the app boots without network access
   /// — initialize() will fail with a clear error if the token is invalid.
   static Future<String> fetchAccessToken() async => 'placeholder-token';
-
-  static Future<String> fetchPayInAccessToken() async =>
-      'placeholder-payin-access-token';
 
   static String get tokenEndpoint => _tokenEndpoint;
 }

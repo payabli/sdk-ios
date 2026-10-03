@@ -48,7 +48,6 @@ class PayabliTTP {
     required String appId,
     PayabliEnvironment environment = PayabliEnvironment.sandbox,
   }) async {
-    _tokenRefresh = tokenProvider;
     _payabliMethodChannel.setMethodCallHandler(_handleNativeCallback);
 
     await _payabliMethodChannel.invokeMethod<void>('configure', {
@@ -56,6 +55,7 @@ class PayabliTTP {
       'appId': appId,
       'environment': environment.index,
     });
+    _tokenRefresh = tokenProvider;
   }
 
   // MARK: - initialize
@@ -221,18 +221,7 @@ class PayabliTTP {
       if (provider == null) {
         throw PlatformException(
           code: 'NO_TOKEN_PROVIDER',
-          message: 'configure() was not called with a tokenProvider',
-        );
-      }
-      return await provider();
-    }
-    if (call.method == 'accessToken') {
-      final provider = PayabliPayIn._accessToken;
-      if (provider == null) {
-        throw PlatformException(
-          code: 'NO_ACCESS_TOKEN_PROVIDER',
-          message:
-              'PayabliPayIn.configure() was not called with an accessTokenProvider',
+          message: 'neither PayabliTTP.configure() nor PayabliPayIn.configure() has succeeded',
         );
       }
       return await provider();
@@ -262,17 +251,17 @@ enum PayabliEnvironment { local, qa, sandbox, production }
 ///
 /// The access token must come from your backend. Do not embed a private
 /// Payabli API key in Flutter code.
+///
+/// The SDK runs one session with one token source, so [tokenProvider] answers the same
+/// `refreshToken` call as [PayabliTTP.configure]'s, and the latest successful configure's provider is asked.
 class PayabliPayIn {
   PayabliPayIn._();
 
-  static Future<String> Function()? _accessToken;
-
   static Future<void> configure({
-    required Future<String> Function() accessTokenProvider,
+    required Future<String> Function() tokenProvider,
     required String entryPoint,
     PayabliEnvironment environment = PayabliEnvironment.sandbox,
   }) async {
-    _accessToken = accessTokenProvider;
     _payabliMethodChannel.setMethodCallHandler(
       PayabliTTP._handleNativeCallback,
     );
@@ -281,6 +270,7 @@ class PayabliPayIn {
       'configurePayIn',
       {'entryPoint': entryPoint, 'environment': environment.index},
     );
+    PayabliTTP._tokenRefresh = tokenProvider;
   }
 
   static Future<PayabliPayInStoredPaymentMethod> addCard({
