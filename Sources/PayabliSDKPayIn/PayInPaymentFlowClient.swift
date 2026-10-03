@@ -227,12 +227,19 @@ final class PayInPaymentFlowClient: Sendable {
             return true
         }
         switch code {
-        case .networkError, .decodingError, .userCancelled, .serverError, .unknown, .conflict:
+        case .networkError, .decodingError, .userCancelled, .serverError, .unknown, .conflict, .tapNotCompleted,
+             .paymentOutcomeUnknown, .paymentNotClosed:
             return true
         case .paymentDeclined, .rateLimited, .missingToken, .tokenExpired,
              .tokenMalformed, .tokenProviderFailed, .invalidSignature, .permissionDenied,
              .sessionBurned, .invalidConfiguration, .validation,
-             .deviceKeyUnavailable, .attestationNotSupported:
+             .deviceKeyUnavailable, .attestationNotSupported, .sdkInternalError, .attestationServicesOutdated,
+             .devicePendingActivation, .attestationRequired, .attestationRefused, .attestationUnavailable,
+             .attestationNotConfigured, .entryPointRefused, .readerCredentialsUnusable, .deviceOSUnsupported,
+             .deviceHardwareUnsupported, .termsNotAccepted, .cardPresentNotEnabled, .readerDeviceRefused,
+             .readerUnavailable, .readerSessionExpired, .paymentNotOpened, .cardDeclined, .activationCodeMalformed,
+             .activationCodeIncorrect, .activationCodeExpired, .activationAttemptsExhausted, .activationCodeNotIssued,
+             .deviceNotPending, .terminalNotReady, .tooManyOpenCharges, .paymentNotHeld:
             return false
         }
     }

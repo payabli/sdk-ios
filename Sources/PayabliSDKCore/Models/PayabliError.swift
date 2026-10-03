@@ -50,10 +50,40 @@ public enum PayabliErrorCode: String, Sendable, CaseIterable {
     case userCancelled = "USER_CANCELLED"
     case validation = "VALIDATION_ERROR"
     case unknown = "UNKNOWN"
+    case sdkInternalError = "SDK_INTERNAL_ERROR"
 
     // Card-present.
     case deviceKeyUnavailable = "DEVICE_KEY_UNAVAILABLE"
     case attestationNotSupported = "ATTESTATION_NOT_SUPPORTED"
+    case attestationServicesOutdated = "ATTESTATION_SERVICES_OUTDATED"
+    case devicePendingActivation = "DEVICE_PENDING_ACTIVATION"
+    case attestationRequired = "ATTESTATION_REQUIRED"
+    case attestationRefused = "ATTESTATION_REFUSED"
+    case attestationUnavailable = "ATTESTATION_UNAVAILABLE"
+    case attestationNotConfigured = "ATTESTATION_NOT_CONFIGURED"
+    case entryPointRefused = "ENTRY_POINT_REFUSED"
+    case readerCredentialsUnusable = "READER_CREDENTIALS_UNUSABLE"
+    case deviceOSUnsupported = "DEVICE_OS_UNSUPPORTED"
+    case deviceHardwareUnsupported = "DEVICE_HARDWARE_UNSUPPORTED"
+    case termsNotAccepted = "TERMS_NOT_ACCEPTED"
+    case cardPresentNotEnabled = "CARD_PRESENT_NOT_ENABLED"
+    case readerDeviceRefused = "READER_DEVICE_REFUSED"
+    case readerUnavailable = "READER_UNAVAILABLE"
+    case readerSessionExpired = "READER_SESSION_EXPIRED"
+    case tapNotCompleted = "TAP_NOT_COMPLETED"
+    case paymentNotOpened = "PAYMENT_NOT_OPENED"
+    case cardDeclined = "CARD_DECLINED"
+    case paymentOutcomeUnknown = "PAYMENT_OUTCOME_UNKNOWN"
+    case paymentNotClosed = "PAYMENT_NOT_CLOSED"
+    case activationCodeMalformed = "ACTIVATION_CODE_MALFORMED"
+    case activationCodeIncorrect = "ACTIVATION_CODE_INCORRECT"
+    case activationCodeExpired = "ACTIVATION_CODE_EXPIRED"
+    case activationAttemptsExhausted = "ACTIVATION_ATTEMPTS_EXHAUSTED"
+    case activationCodeNotIssued = "ACTIVATION_CODE_NOT_ISSUED"
+    case deviceNotPending = "DEVICE_NOT_PENDING"
+    case terminalNotReady = "TERMINAL_NOT_READY"
+    case tooManyOpenCharges = "TOO_MANY_OPEN_CHARGES"
+    case paymentNotHeld = "PAYMENT_NOT_HELD"
 }
 
 /// What a host does about a failure. Each ``PayabliErrorCode`` belongs to one.
@@ -108,8 +138,38 @@ public extension PayabliErrorCode {
         case .userCancelled: 1015
         case .validation: 1016
         case .unknown: 1017
+        case .sdkInternalError: 1018
         case .deviceKeyUnavailable: 3001
         case .attestationNotSupported: 3002
+        case .attestationServicesOutdated: 3003
+        case .devicePendingActivation: 3004
+        case .attestationRequired: 3005
+        case .attestationRefused: 3006
+        case .attestationUnavailable: 3007
+        case .attestationNotConfigured: 3008
+        case .entryPointRefused: 3009
+        case .readerCredentialsUnusable: 3010
+        case .deviceOSUnsupported: 3011
+        case .deviceHardwareUnsupported: 3012
+        case .termsNotAccepted: 3013
+        case .cardPresentNotEnabled: 3014
+        case .readerDeviceRefused: 3015
+        case .readerUnavailable: 3016
+        case .readerSessionExpired: 3017
+        case .tapNotCompleted: 3018
+        case .paymentNotOpened: 3019
+        case .cardDeclined: 3020
+        case .paymentOutcomeUnknown: 3021
+        case .paymentNotClosed: 3022
+        case .activationCodeMalformed: 3023
+        case .activationCodeIncorrect: 3024
+        case .activationCodeExpired: 3025
+        case .activationAttemptsExhausted: 3026
+        case .activationCodeNotIssued: 3027
+        case .deviceNotPending: 3028
+        case .terminalNotReady: 3029
+        case .tooManyOpenCharges: 3030
+        case .paymentNotHeld: 3031
         }
     }
 
@@ -133,27 +193,65 @@ public extension PayabliErrorCode {
         case .userCancelled: "The person cancelled."
         case .validation: "The request was refused as invalid."
         case .unknown: "An unexpected error occurred."
+        case .sdkInternalError: "The SDK failed before the request was sent."
         case .deviceKeyUnavailable: "The device's key facility could not confirm this device's key."
         case .attestationNotSupported: "This device does not support app attestation."
+        case .attestationServicesOutdated: "This device's attestation services must be installed or updated."
+        case .devicePendingActivation: "This device is waiting for its activation code."
+        case .attestationRequired: "This device must be attested again."
+        case .attestationRefused: "This device's attestation was refused."
+        case .attestationUnavailable: "Attestation is temporarily unavailable."
+        case .attestationNotConfigured: "Attestation is not configured for this app or environment."
+        case .entryPointRefused: "The entry point is not available for this request."
+        case .readerCredentialsUnusable: "The card reader's configuration is incomplete."
+        case .deviceOSUnsupported: "This device's operating system version cannot take contactless payments."
+        case .deviceHardwareUnsupported: "This device cannot take contactless payments."
+        case .termsNotAccepted: "The merchant has not accepted the Tap to Pay terms."
+        case .cardPresentNotEnabled: "Card-present payments are not enabled for this paypoint."
+        case .readerDeviceRefused: "The card reader refused this device."
+        case .readerUnavailable: "The card reader could not be started."
+        case .readerSessionExpired: "The card reader session expired."
+        case .tapNotCompleted: "The card read did not complete."
+        case .paymentNotOpened: "The service did not open the payment."
+        case .cardDeclined: "The card was declined."
+        case .paymentOutcomeUnknown: "The payment's outcome could not be confirmed."
+        case .paymentNotClosed: "The payment could not be closed."
+        case .activationCodeMalformed: "The activation code must be six digits."
+        case .activationCodeIncorrect: "The activation code is incorrect."
+        case .activationCodeExpired: "The activation code has expired."
+        case .activationAttemptsExhausted: "Too many incorrect activation codes were entered."
+        case .activationCodeNotIssued: "No activation code has been issued for this device."
+        case .deviceNotPending: "This device is not waiting for activation."
+        case .terminalNotReady: "The terminal is not ready for this call."
+        case .tooManyOpenCharges: "Too many charges are waiting to be resolved."
+        case .paymentNotHeld: "No captured payment is held under that identifier."
         }
     }
 
     var category: PayabliErrorCategory {
         switch self {
-        case .missingToken, .tokenExpired, .tokenMalformed, .tokenProviderFailed, .invalidSignature, .sessionBurned:
+        case .missingToken, .tokenExpired, .tokenMalformed, .tokenProviderFailed, .invalidSignature, .sessionBurned,
+             .attestationRequired:
             .credential
-        case .permissionDenied, .invalidConfiguration:
+        case .permissionDenied, .invalidConfiguration, .attestationServicesOutdated, .devicePendingActivation,
+             .attestationNotConfigured, .entryPointRefused, .readerCredentialsUnusable, .termsNotAccepted,
+             .cardPresentNotEnabled, .activationCodeExpired, .activationAttemptsExhausted, .activationCodeNotIssued:
             .configuration
-        case .paymentDeclined:
+        case .paymentDeclined, .paymentNotOpened, .cardDeclined:
             .declined
-        case .serverError, .networkError, .decodingError, .userCancelled, .unknown, .conflict:
+        case .serverError, .networkError, .decodingError, .userCancelled, .unknown, .conflict, .tapNotCompleted,
+             .paymentOutcomeUnknown, .paymentNotClosed:
             .outcomeUnknown
-        case .rateLimited, .deviceKeyUnavailable:
+        case .rateLimited, .deviceKeyUnavailable, .attestationUnavailable, .readerUnavailable, .readerSessionExpired:
             .retryLater
-        case .validation:
+        case .validation, .activationCodeMalformed, .activationCodeIncorrect, .deviceNotPending, .terminalNotReady,
+             .tooManyOpenCharges, .paymentNotHeld:
             .invalidRequest
-        case .attestationNotSupported:
+        case .attestationNotSupported, .attestationRefused, .deviceOSUnsupported, .deviceHardwareUnsupported,
+             .readerDeviceRefused:
             .device
+        case .sdkInternalError:
+            .internal
         }
     }
 }
