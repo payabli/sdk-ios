@@ -80,6 +80,20 @@ public final class PayabliSDKModule: RCTEventEmitter {
     private let refreshQueue = DispatchQueue(label: "com.payabli.sdk.rn.refresh")
     private let payInAccessTokenQueue = DispatchQueue(label: "com.payabli.sdk.rn.payin-token")
 
+    /// The module React Native is running now. The session outlives a JS reload, so its token
+    /// provider asks for this rather than holding the module that configured it.
+    private weak static var liveModule: PayabliSDKModule?
+    private static let liveModuleLock = NSLock()
+
+    private static var live: PayabliSDKModule? {
+        liveModuleLock.withLock { liveModule }
+    }
+
+    override public init() {
+        super.init()
+        Self.liveModuleLock.withLock { Self.liveModule = self }
+    }
+
     // MARK: - configure
 
     @objc public func configure(
@@ -96,23 +110,23 @@ public final class PayabliSDKModule: RCTEventEmitter {
             return
         }
 
-        let tokenProvider: PayabliTokenRefresh = { @Sendable [weak self] in
+        let tokenProvider: PayabliTokenRefresh = { @Sendable in
             try await withCheckedThrowingContinuation { continuation in
-                guard let self else {
+                guard let module = PayabliSDKModule.live else {
                     continuation.resume(throwing: PayabliGenericError(
                         code: .tokenExpired,
                         reason: "Native module deallocated"
                     ))
                     return
                 }
-                self.refreshQueue.sync {
+                module.refreshQueue.sync {
                     // Coalesce concurrent refreshes: only emit the JS event
                     // for the first caller; subsequent waiters share the
                     // same continuation outcome.
-                    if self.pendingRefresh == nil {
-                        self.pendingRefresh = continuation
+                    if module.pendingRefresh == nil {
+                        module.pendingRefresh = continuation
                         DispatchQueue.main.async {
-                            self.sendEvent(withName: "TTPTokenRefreshRequested", body: nil)
+                            module.sendEvent(withName: "TTPTokenRefreshRequested", body: nil)
                         }
                     } else {
                         // Best effort: RN offers no multi-await semantics, so a
@@ -368,20 +382,20 @@ public final class PayabliSDKModule: RCTEventEmitter {
             return
         }
 
-        let tokenProvider: PayabliTokenRefresh = { @Sendable [weak self] in
+        let tokenProvider: PayabliTokenRefresh = { @Sendable in
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<String, Error>) in
-                guard let self else {
+                guard let module = PayabliSDKModule.live else {
                     continuation.resume(throwing: PayabliGenericError(
                         code: .missingToken,
                         reason: "Native module deallocated"
                     ))
                     return
                 }
-                self.payInAccessTokenQueue.sync {
-                    if self.pendingPayInAccessToken == nil {
-                        self.pendingPayInAccessToken = continuation
+                module.payInAccessTokenQueue.sync {
+                    if module.pendingPayInAccessToken == nil {
+                        module.pendingPayInAccessToken = continuation
                         DispatchQueue.main.async {
-                            self.sendEvent(withName: "PayInAccessTokenRequested", body: nil)
+                            module.sendEvent(withName: "PayInAccessTokenRequested", body: nil)
                         }
                     } else {
                         continuation.resume(throwing: PayabliGenericError(

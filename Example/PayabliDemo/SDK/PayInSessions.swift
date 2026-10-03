@@ -43,7 +43,7 @@ enum PayInSessions {
     static func preview(capturing: Bool = false) -> PayInFlowHandle {
         PayInFlowHandle(
             PayabliPayIn(
-                session: DemoSession.startPreview(),
+                session: DemoSession.start(),
                 operation: capturing ? .capture : .storePaymentMethod,
                 requestConfiguration: capturing
                     ? PayabliPayInRequestConfiguration(
