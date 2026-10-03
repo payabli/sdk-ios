@@ -16,7 +16,7 @@ final class PayabliErrorCatalogTests: XCTestCase {
         (.paymentDeclined, 1008, .declined, "The payment was declined."),
         (.serverError, 1009, .outcomeUnknown, "The service could not process the request."),
         (.rateLimited, 1010, .retryLater, "Too many requests. Try again later."),
-        (.conflict, 1011, .declined, "The request conflicts with the state the service holds."),
+        (.conflict, 1011, .outcomeUnknown, "The request conflicts with the state the service holds."),
         (.invalidConfiguration, 1012, .configuration, "The SDK is not configured correctly."),
         (.networkError, 1013, .outcomeUnknown, "The service could not be reached."),
         (.decodingError, 1014, .outcomeUnknown, "The response could not be read."),

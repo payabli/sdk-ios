@@ -141,9 +141,9 @@ public extension PayabliErrorCode {
             .credential
         case .permissionDenied, .invalidConfiguration:
             .configuration
-        case .paymentDeclined, .conflict:
+        case .paymentDeclined:
             .declined
-        case .serverError, .networkError, .decodingError, .userCancelled, .unknown:
+        case .serverError, .networkError, .decodingError, .userCancelled, .unknown, .conflict:
             .outcomeUnknown
         case .rateLimited, .deviceKeyUnavailable:
             .retryLater
