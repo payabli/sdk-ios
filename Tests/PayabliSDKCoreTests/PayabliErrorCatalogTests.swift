@@ -117,10 +117,20 @@ final class PayabliErrorCatalogTests: XCTestCase {
         XCTAssertEqual(Set(numbers).count, numbers.count)
     }
 
-    func testTheCategoriesAreTheEightRemedies() {
-        XCTAssertEqual(
-            Set(PayabliErrorCategory.allCases),
-            [.credential, .retryLater, .outcomeUnknown, .configuration, .invalidRequest, .declined, .device, .internal]
-        )
+    func testTheCategoriesAreTheEightRemediesUnderTheirWireNames() {
+        let names: [PayabliErrorCategory: String] = [
+            .credential: "CREDENTIAL",
+            .retryLater: "RETRY_LATER",
+            .outcomeUnknown: "OUTCOME_UNKNOWN",
+            .configuration: "CONFIGURATION",
+            .invalidRequest: "INVALID_REQUEST",
+            .declined: "DECLINED",
+            .device: "DEVICE",
+            .internal: "INTERNAL"
+        ]
+        XCTAssertEqual(Set(PayabliErrorCategory.allCases), Set(names.keys))
+        for (category, name) in names {
+            XCTAssertEqual(category.rawValue, name, "\(category)")
+        }
     }
 }
