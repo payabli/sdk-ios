@@ -42,7 +42,7 @@ extension TapToPayError: CustomNSError {
     public var errorUserInfo: [String: Any] {
         var info: [String: Any] = [
             NSLocalizedDescriptionKey: errorDescription ?? reason,
-            "PayabliErrorCode": type.rawValue,
+            "PayabliErrorType": type.rawValue,
             "capture": capture.rawValue
         ]
         if let paymentTransId {

@@ -164,7 +164,7 @@ final class PayabliTTPErrorNSErrorTests: XCTestCase {
         XCTAssertEqual(nsError.domain, "com.payabli.ttp")
         XCTAssertEqual(nsError.code, -3)
         XCTAssertEqual(
-            nsError.userInfo["PayabliErrorCode"] as? String,
+            nsError.userInfo["PayabliErrorType"] as? String,
             PayabliErrorType.tokenProviderFailed.rawValue
         )
         XCTAssertEqual(

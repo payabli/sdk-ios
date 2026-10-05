@@ -189,7 +189,7 @@ private extension Error {
                 code: -3,
                 userInfo: [
                     NSLocalizedDescriptionKey: payInError.reason,
-                    "PayabliErrorCode": payInError.type.rawValue
+                    "PayabliErrorType": payInError.type.rawValue
                 ]
             )
         }

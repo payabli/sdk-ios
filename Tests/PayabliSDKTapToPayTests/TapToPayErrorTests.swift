@@ -20,7 +20,7 @@ final class TapToPayErrorTests: XCTestCase {
 
         XCTAssertEqual(error.domain, TapToPayError.errorDomain)
         XCTAssertEqual(error.code, 3002)
-        XCTAssertEqual(error.userInfo["PayabliErrorCode"] as? String, "ATTESTATION_NOT_SUPPORTED")
+        XCTAssertEqual(error.userInfo["PayabliErrorType"] as? String, "ATTESTATION_NOT_SUPPORTED")
     }
 
     func testAFailureOutsideAPaymentMovedNoMoney() {
