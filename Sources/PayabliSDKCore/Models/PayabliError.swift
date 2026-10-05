@@ -274,7 +274,7 @@ public protocol PayabliError: LocalizedError, Sendable {
 }
 
 public extension PayabliError {
-    /// The catalog number, the same value as the bridged `NSError` code.
+    /// The catalog number.
     var code: Int {
         type.number
     }
