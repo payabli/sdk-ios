@@ -253,6 +253,12 @@ namespace Payabli.TapToPay
             bool telemetryEnabled,
             PayabliSessionCompletion completionHandler
         );
+
+        // This device's identity, null before Initialize and while the device's secure storage
+        // cannot be read.
+        [Static, NullAllowed]
+        [Export("deviceId")]
+        string DeviceId { get; }
     }
 
     // MARK: - PayabliTTP (façade)
