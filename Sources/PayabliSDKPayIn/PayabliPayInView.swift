@@ -188,7 +188,7 @@ public struct PayabliPayInView: View {
                         .accessibilityHidden(true)
                 }
 
-                Text(viewModel.isSubmitting ? "Submitting" : submitButtonText)
+                Text(submitButtonText)
                     .font(resolvedStyle.submitButton.font)
             }
             .frame(maxWidth: .infinity, minHeight: resolvedStyle.submitButton.height)
@@ -208,7 +208,7 @@ public struct PayabliPayInView: View {
         }
         .buttonStyle(.plain)
         .disabled(!viewModel.canSubmit || viewModel.isSubmitting)
-        .accessibilityLabel(viewModel.isSubmitting ? "Submitting payment" : submitButtonText)
+        .accessibilityLabel(submitButtonText)
         .accessibilityHint(submitAccessibilityHint)
     }
 
@@ -888,7 +888,8 @@ extension PayabliPayInView {
     }
 
     var submitButtonText: String {
-        configuration.labels.hostSubmitButton ?? "Add Payment Method"
+        PayInSubmitWording(viewModel.component.operation)
+            .text(hostWording: configuration.labels.hostSubmitButton, isSubmitting: viewModel.isSubmitting)
     }
 
     var submitButtonBackgroundColor: Color {

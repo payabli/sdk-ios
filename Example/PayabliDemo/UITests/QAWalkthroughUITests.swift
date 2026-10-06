@@ -371,7 +371,7 @@ final class QAWalkthroughUITests: XCTestCase {
         return trimmed.isEmpty ? nil : trimmed
     }
 
-    private let save = "Add Payment Method"
+    private let save = "Save payment method"
     private let capture = "Submit Payment"
     private let methodFailure = "Payment method failed:"
     private let captureFailure = "Payment capture failed:"

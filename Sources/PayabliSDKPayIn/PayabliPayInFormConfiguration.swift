@@ -114,7 +114,7 @@ public struct PayabliPayInLabels: Sendable {
     /// The form's heading; nil or blank draws none.
     public let title: String?
     public let subtitle: String?
-    /// The submit button's wording; nil or blank reads the SDK's default.
+    /// The submit button's wording; nil or blank reads the operation's own.
     public let submitButton: String?
     public let fieldLabels: [PayabliPayInField: String]
     public let fieldPlaceholders: [PayabliPayInField: String]

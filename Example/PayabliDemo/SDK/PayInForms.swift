@@ -67,6 +67,7 @@ enum PayInForms {
                 labels: PayabliPayInLabels(
                     title: "Save Payment Method",
                     subtitle: "Create a card or bank account token.",
+                    submitButton: "Save payment method",
                     fieldPlaceholders: placeholders
                 ),
                 labelLayout: PayInSharedConfiguration.labelLayout,
