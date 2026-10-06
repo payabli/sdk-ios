@@ -259,6 +259,8 @@ interface NativePayabliSDKModule {
 
     getSessionState(): Promise<PayabliTTPSessionSnapshot>;
 
+    sessionDeviceId(): Promise<string | null>;
+
     resolveTokenRefresh(token: string): void;
 
     rejectTokenRefresh(reason: string): void;
@@ -423,6 +425,20 @@ export const PayabliPayIn = {
     configure: configurePayIn,
     addCard,
     addBankAccount,
+};
+
+// MARK: - Session
+
+/** The one session every capability runs on. */
+export const PayabliSession = {
+    /**
+     * This device's identity, the same for every capability and stable for the
+     * install. `null` before a configure has succeeded, and while the device's
+     * secure storage can't be read.
+     */
+    deviceId(): Promise<string | null> {
+        return requireNativeModule().sessionDeviceId();
+    },
 };
 
 export default PayabliTTP;

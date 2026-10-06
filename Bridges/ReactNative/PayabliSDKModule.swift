@@ -24,6 +24,8 @@ import UIKit
 ///   - `areTermsAccepted(resolver, rejecter)` — resolves a bool. Rejects
 ///     rather than resolving `false` when the reader cannot answer, whether
 ///     none is prepared or the platform raised.
+///   - `sessionDeviceId(resolver, rejecter)` — resolves the session's device
+///     id, or `null`.
 ///   - `getSessionState(resolver, rejecter)` — resolves the int raw value
 ///     of the current `PayabliTTPSessionState`.
 ///   - `resolveTokenRefresh(token)` / `rejectTokenRefresh(reason)` —
@@ -305,6 +307,16 @@ public final class PayabliSDKModule: RCTEventEmitter {
     }
 
     // MARK: - getSessionState
+
+    /// Resolves the session's device id, or `NSNull`, because a nil reaches JavaScript as `undefined`.
+    @objc public func sessionDeviceId(
+        _ resolve: @escaping RCTPromiseResolveBlock,
+        rejecter reject: @escaping RCTPromiseRejectBlock
+    ) {
+        Task { @MainActor in
+            resolve(PayabliSessionObjC.deviceId ?? NSNull())
+        }
+    }
 
     @objc public func getSessionState(
         _ resolve: @escaping RCTPromiseResolveBlock,

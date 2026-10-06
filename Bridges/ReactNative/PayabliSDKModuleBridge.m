@@ -31,6 +31,9 @@ RCT_EXTERN_METHOD(resolveTokenRefresh:(NSString *)token)
 
 RCT_EXTERN_METHOD(rejectTokenRefresh:(NSString *)reason)
 
+RCT_EXTERN_METHOD(sessionDeviceId:(RCTPromiseResolveBlock)resolve
+                  rejecter:(RCTPromiseRejectBlock)reject)
+
 RCT_EXTERN_METHOD(configurePayIn:(NSDictionary *)config
                   resolver:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject)

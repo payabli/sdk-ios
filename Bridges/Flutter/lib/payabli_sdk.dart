@@ -232,6 +232,18 @@ class PayabliTTP {
 /// Mirrors `PayabliEnvironment` raw values.
 enum PayabliEnvironment { local, qa, sandbox, production }
 
+/// The one session every capability runs on.
+class PayabliSession {
+  PayabliSession._();
+
+  /// This device's identity, the same for every capability and stable for the
+  /// install. `null` before a configure has succeeded, and while the device's
+  /// secure storage can't be read.
+  static Future<String?> deviceId() async {
+    return _payabliMethodChannel.invokeMethod<String>('sessionDeviceId');
+  }
+}
+
 /// Dart API for the Payabli card and bank account payment flow surface.
 ///
 /// The access token must come from your backend. Do not embed a private

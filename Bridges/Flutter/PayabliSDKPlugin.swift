@@ -103,6 +103,8 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
             handleAreTermsAccepted(result: result)
         case "presentTerms":
             handlePresentTerms(result: result)
+        case "sessionDeviceId":
+            handleSessionDeviceId(result: result)
         case "getSessionState":
             handleGetSessionState(result: result)
         case "configurePayIn":
@@ -336,6 +338,12 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
     }
 
     // MARK: - getSessionState
+
+    private func handleSessionDeviceId(result: @escaping FlutterResult) {
+        Task { @MainActor in
+            result(PayabliSessionObjC.deviceId)
+        }
+    }
 
     private func handleGetSessionState(result: @escaping FlutterResult) {
         Task { @MainActor in
