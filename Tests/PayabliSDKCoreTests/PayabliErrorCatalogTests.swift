@@ -29,7 +29,7 @@ final class PayabliErrorCatalogTests: XCTestCase {
             "DEVICE_KEY_UNAVAILABLE",
             3001,
             .retryLater,
-            "The device's key facility could not confirm this device's key."
+            "This device's secure storage is unavailable."
         ),
         (.deviceSetupUnsupported, "DEVICE_SETUP_UNSUPPORTED", 3002, .device, "This device cannot be set up for card-present payments."),
         (
