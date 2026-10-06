@@ -186,7 +186,7 @@ private extension Error {
         if let payInError = self as? any PayabliError {
             return NSError(
                 domain: payInObjCErrorDomain,
-                code: -3,
+                code: payInError.code,
                 userInfo: [
                     NSLocalizedDescriptionKey: payInError.reason,
                     "PayabliErrorType": payInError.type.rawValue

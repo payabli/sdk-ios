@@ -147,7 +147,7 @@ final class PaymentMethodObjCBridgeTests: XCTestCase {
             source: nil
         ) { result, error in
             XCTAssertNil(result)
-            XCTAssertEqual(error?.code, -3)
+            XCTAssertEqual(error?.code, PayabliErrorType.validation.number)
             XCTAssertEqual(error?.userInfo["PayabliErrorType"] as? String, PayabliErrorType.validation.rawValue)
             XCTAssertEqual(error?.localizedDescription, "Cardholder name is required.")
             completionExpectation.fulfill()
@@ -188,7 +188,7 @@ final class PaymentMethodObjCBridgeTests: XCTestCase {
             // SDK's `.tokenProviderFailed` and reaches the bridge as a PayabliError rather than
             // verbatim.
             XCTAssertEqual(error?.domain, "com.payabli.payIn")
-            XCTAssertEqual(error?.code, -3)
+            XCTAssertEqual(error?.code, PayabliErrorType.tokenProviderFailed.number)
             XCTAssertEqual(
                 error?.userInfo["PayabliErrorType"] as? String,
                 PayabliErrorType.tokenProviderFailed.rawValue
@@ -226,7 +226,9 @@ final class PaymentMethodObjCBridgeTests: XCTestCase {
         ) { result, error in
             XCTAssertNil(result)
             XCTAssertEqual(error?.domain, "com.payabli.payIn")
-            XCTAssertEqual(error?.code, -3)
+            let type = (error?.userInfo["PayabliErrorType"] as? String).flatMap(PayabliErrorType.init(rawValue:))
+            XCTAssertNotNil(type)
+            XCTAssertEqual(error?.code, type?.number)
             completionExpectation.fulfill()
         }
 

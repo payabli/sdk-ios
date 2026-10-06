@@ -162,7 +162,7 @@ final class PayabliTTPErrorNSErrorTests: XCTestCase {
         let nsError = err.toPayabliNSError()
 
         XCTAssertEqual(nsError.domain, "com.payabli.ttp")
-        XCTAssertEqual(nsError.code, -3)
+        XCTAssertEqual(nsError.code, PayabliErrorType.tokenProviderFailed.number)
         XCTAssertEqual(
             nsError.userInfo["PayabliErrorType"] as? String,
             PayabliErrorType.tokenProviderFailed.rawValue
