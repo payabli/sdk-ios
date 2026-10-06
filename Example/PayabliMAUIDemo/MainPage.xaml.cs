@@ -32,33 +32,47 @@ public partial class MainPage : ContentPage
     /// </summary>
     private void ConfigurePayabli()
     {
+        PayabliSessionObjC.Initialize(
+            tokenHandler: (completion) =>
+            {
+                Task.Run(async () =>
+                {
+                    try
+                    {
+                        var fresh = await FetchAccessTokenFromPartnerBackend();
+                        completion(fresh, null);
+                    }
+                    catch (System.Exception ex)
+                    {
+                        completion(null, DemoNSError(ex.Message));
+                    }
+                });
+            },
+            entryPoint: Secrets.EntryPoint,
+            environment: PayabliEnvironment.Sandbox,
+            telemetryEnabled: true,
+            completionHandler: sessionError =>
+            {
+                MainThread.BeginInvokeOnMainThread(() =>
+                {
+                    if (sessionError is not null)
+                    {
+                        ResultLabel.Text = $"✗ Configure failed: {sessionError.LocalizedDescription}";
+                        return;
+                    }
+                    BuildFacades();
+                });
+            }
+        );
+    }
+
+    /// <summary>
+    /// Runs only once the session is installed, because both facades run on it.
+    /// </summary>
+    private void BuildFacades()
+    {
         try
         {
-            PayabliSessionObjC.Initialize(
-                tokenHandler: (completion) =>
-                {
-                    Task.Run(async () =>
-                    {
-                        try
-                        {
-                            var fresh = await FetchAccessTokenFromPartnerBackend();
-                            completion(fresh, null);
-                        }
-                        catch (System.Exception ex)
-                        {
-                            completion(null, DemoNSError(ex.Message));
-                        }
-                    });
-                },
-                entryPoint: Secrets.EntryPoint,
-                environment: PayabliEnvironment.Sandbox,
-                telemetryEnabled: true,
-                error: out var sessionError
-            );
-            if (sessionError is not null)
-            {
-                throw new System.Exception(sessionError.LocalizedDescription);
-            }
             _ttp = new PayabliTTP(appId: Secrets.AppId, error: out var ttpError);
             if (ttpError is not null)
             {
