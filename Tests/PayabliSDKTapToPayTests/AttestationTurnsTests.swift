@@ -318,7 +318,16 @@ final class AttestationTurnsTests: XCTestCase {
         async let holdersResult = holder.attest(entry: "myEntry")
         await reached.wait()
 
-        let check = Task { try await checker.isAttested(for: "myEntry") }
+        // An inverted expectation, so the check is given the time to finish and must not use it: one that
+        // read the store without waiting would answer before the attestation is let go.
+        let answeredEarly = expectation(description: "the check answered while the attestation was held")
+        answeredEarly.isInverted = true
+        let check = Task {
+            let answer = try await checker.isAttested(for: "myEntry")
+            answeredEarly.fulfill()
+            return answer
+        }
+        await fulfillment(of: [answeredEarly], timeout: 1)
         held.open()
 
         let attested = try await check.value
