@@ -62,7 +62,7 @@ public final class PayabliPayInObjC: NSObject {
     /// Builds the facade on the installed session. Throws `invalidConfiguration` when none is installed.
     @objc public static func create() throws -> PayabliPayInObjC {
         guard let session = PayabliSession.current else {
-            throw PayabliGenericError(code: .invalidConfiguration, reason: "no session is initialized")
+            throw PayabliGenericError(type: .invalidConfiguration, reason: "no session is initialized")
         }
         return PayabliPayInObjC(component: PayabliPayIn(session: session))
     }

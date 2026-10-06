@@ -34,7 +34,7 @@ final class PayabliPayInInstalledSessionTests: XCTestCase {
             ))
             XCTFail("a submission after a refused configuration was sent")
         } catch {
-            XCTAssertEqual((error as? PayabliGenericError)?.code, .invalidConfiguration)
+            XCTAssertEqual((error as? PayabliGenericError)?.type, .invalidConfiguration)
         }
     }
 
@@ -76,7 +76,7 @@ final class PayabliPayInInstalledSessionTests: XCTestCase {
             )
             XCTFail("a different configuration was accepted")
         } catch {
-            XCTAssertEqual((error as? PayabliGenericError)?.code, .invalidConfiguration)
+            XCTAssertEqual((error as? PayabliGenericError)?.type, .invalidConfiguration)
         }
     }
 

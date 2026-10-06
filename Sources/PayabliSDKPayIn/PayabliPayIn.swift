@@ -132,7 +132,7 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
             transport = installed.transport
         } else {
             transport = RefusedTransport(refusal: PayabliGenericError(
-                code: .invalidConfiguration,
+                type: .invalidConfiguration,
                 reason: "the configuration is not the one the session was initialized with"
             ))
         }

@@ -63,7 +63,7 @@ public final class PayabliSession: @unchecked Sendable {
             if let current = installed {
                 guard current.identity == identity else {
                     throw PayabliGenericError(
-                        code: .invalidConfiguration,
+                        type: .invalidConfiguration,
                         reason: "a session is already initialized with a different configuration"
                     )
                 }

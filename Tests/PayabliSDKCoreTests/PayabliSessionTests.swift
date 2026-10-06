@@ -102,7 +102,7 @@ final class PayabliSessionTests: XCTestCase {
             try await PayabliSession.initialize(config: config())
             XCTFail("expected a different configuration to be refused", file: file, line: line)
         } catch {
-            XCTAssertEqual((error as? PayabliGenericError)?.code, .invalidConfiguration, file: file, line: line)
+            XCTAssertEqual((error as? PayabliGenericError)?.type, .invalidConfiguration, file: file, line: line)
         }
     }
 
