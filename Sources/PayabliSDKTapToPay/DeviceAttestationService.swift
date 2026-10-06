@@ -54,7 +54,8 @@ package protocol DeviceAttestationService: AnyObject, Sendable {
     ///
     /// Raises when the store could not be read, which is a third answer: `false`
     /// runs the cold sequence and registers a second device for a paypoint that is
-    /// already enrolled.
+    /// already enrolled. Raises too when the key check cannot answer, and the
+    /// binding is kept.
     func isAttested(for entry: String) async throws -> Bool
 
     /// The backend-assigned `deviceId` this entry point was registered under, or

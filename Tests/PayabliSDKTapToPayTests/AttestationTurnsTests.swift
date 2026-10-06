@@ -290,6 +290,51 @@ final class AttestationTurnsTests: XCTestCase {
         XCTAssertEqual(try second.binding(for: "myEntry")?.deviceId, results[1].deviceId)
     }
 
+    /// The warm check takes the same turn: one asked while an attestation is running waits for it, and
+    /// answers about the binding that attestation wrote rather than the empty store it found first.
+    func testAWarmCheckWaitsForAnAttestationOfTheSameEntryPoint() async throws {
+        StubURLProtocol.handler = { request in
+            switch request.url!.path {
+            case "/api/v2/device/taptopay/challenge":
+                return AttestFixture.ok(request, ["challengeId": "c_1", "challenge": "Y2hhbGxlbmdl"])
+            case "/api/v2/device/taptopay/register":
+                return AttestFixture.ok(request, ["deviceId": "dev_1"])
+            default:
+                return AttestFixture.ok(request, ["ok": true])
+            }
+        }
+
+        let storage = InMemorySecureStorage()
+        let (holder, holdingAttestor, _) = try AttestFixture.makeService(storage: storage)
+        let (checker, _, _) = try AttestFixture.makeService(storage: storage)
+
+        let held = AsyncGate()
+        let reached = AsyncGate()
+        holdingAttestor.beforeGenerateKey = {
+            reached.open()
+            await held.wait()
+        }
+
+        async let holdersResult = holder.attest(entry: "myEntry")
+        await reached.wait()
+
+        // An inverted expectation, so the check is given the time to finish and must not use it: one that
+        // read the store without waiting would answer before the attestation is let go.
+        let answeredEarly = expectation(description: "the check answered while the attestation was held")
+        answeredEarly.isInverted = true
+        let check = Task {
+            let answer = try await checker.isAttested(for: "myEntry")
+            answeredEarly.fulfill()
+            return answer
+        }
+        await fulfillment(of: [answeredEarly], timeout: 1)
+        held.open()
+
+        let attested = try await check.value
+        _ = try await holdersResult
+        XCTAssertTrue(attested, "the check read the store before the attestation it overlapped wrote to it")
+    }
+
     /// Different entry points are what the bindings exist for, so they never wait
     /// for each other.
     /// One entry point held open, and the other has to get all the way through

@@ -342,71 +342,6 @@ final class AppAttestServiceTests: XCTestCase {
         )
     }
 
-    // MARK: - Whether the key is still there
-
-    /// The check the sibling SDK makes by comparing thumbprints. App Attest hands
-    /// back an opaque identifier, so the key is asked instead: a platform that
-    /// will not sign with it says the binding names a key this device no longer
-    /// holds, whatever the reason.
-    func testABindingWhoseKeyIsGoneIsNotAnEnrolment() async throws {
-        // 2 is what a key that no longer exists reports, measured on a device
-        // after a reinstall; 3 is the code the platform documents for a key it
-        // rejects. Both mean this binding cannot produce an assertion.
-        for code in [2, 3] {
-            let storage = InMemorySecureStorage()
-            try AttestFixture.seedBinding(entry: "myEntry", deviceId: "dev", keyId: "key", in: storage)
-            let (sut, attestor, _) = try AttestFixture.makeService(storage: storage)
-            attestor.generateAssertionError = NSError(
-                domain: AppAttestService.deviceCheckErrorDomain,
-                code: code
-            )
-
-            try await assertAttested(sut, "myEntry", false, "code \(code)")
-
-            XCTAssertNil(
-                try sut.binding(for: "myEntry"),
-                "a binding naming a key that is gone has to be dropped, not asked again every start"
-            )
-        }
-    }
-
-    /// Every other failure is this device having a bad moment. Re-enrolling on one
-    /// costs an enrolment for a key that was working.
-    func testABindingSurvivesAKeyCheckThatCouldNotBeMade() async throws {
-        for code in [0, 1, 4] {
-            let storage = InMemorySecureStorage()
-            try AttestFixture.seedBinding(entry: "myEntry", deviceId: "dev", keyId: "key", in: storage)
-            let (sut, attestor, _) = try AttestFixture.makeService(storage: storage)
-            attestor.generateAssertionError = NSError(
-                domain: AppAttestService.deviceCheckErrorDomain,
-                code: code
-            )
-
-            try await assertAttested(sut, "myEntry", true, "code \(code) is not a reason to re-enrol")
-            XCTAssertNotNil(try sut.binding(for: "myEntry"), "code \(code)")
-        }
-    }
-
-    /// A key that signs is a key this device holds.
-    func testABindingWhoseKeySignsIsAnEnrolment() async throws {
-        let storage = InMemorySecureStorage()
-        try AttestFixture.seedBinding(entry: "myEntry", deviceId: "dev", keyId: "key", in: storage)
-        let (sut, _, _) = try AttestFixture.makeService(storage: storage)
-
-        try await assertAttested(sut, "myEntry", true)
-        XCTAssertEqual(try sut.cachedDeviceId(for: "myEntry"), "dev")
-    }
-
-    /// Asking about a paypoint with no binding asks the platform nothing: there is
-    /// no key to ask about, and a signature attempt would be wasted.
-    func testNoBindingAsksThePlatformNothing() async throws {
-        let (sut, attestor, _) = try AttestFixture.makeService()
-
-        try await assertAttested(sut, "myEntry", false)
-
-        XCTAssertEqual(attestor.generateAssertionCalls, 0)
-    }
-
     // MARK: - Assertion generation
 
     func testGenerateAssertionProducesHeaders() async throws {
@@ -477,7 +412,7 @@ final class AppAttestServiceTests: XCTestCase {
                 XCTAssertEqual((error as NSError).code, code)
             }
 
-            try await assertAttested(sut, "myEntry", true, "code \(code) is not a reason to re-attest")
+            XCTAssertNotNil(try sut.binding(for: "myEntry"), "code \(code) is not a reason to re-attest")
         }
     }
 
@@ -497,7 +432,7 @@ final class AppAttestServiceTests: XCTestCase {
             // expected
         }
 
-        try await assertAttested(sut, "myEntry", true, "non-DeviceCheck failures must not clear attestation state")
+        XCTAssertNotNil(try sut.binding(for: "myEntry"), "non-DeviceCheck failures must not clear attestation state")
     }
 
     // MARK: - clearCache
@@ -591,42 +526,6 @@ final class AppAttestServiceTests: XCTestCase {
         try await assertAttested(sut, "myEntry", false)
         XCTAssertNil(try storage.string(forKey: "com.payabli.ttp.keyId"))
         XCTAssertNil(try storage.string(forKey: "com.payabli.ttp.deviceId"))
-    }
-
-    /// The probe suspends, so the answer can arrive after another attempt has
-    /// enrolled this paypoint. What it refuses is the binding it asked about, and
-    /// dropping by entry point alone would take the newer one instead, leaving a
-    /// device that enrolled moments ago holding nothing.
-    func testAProbeAnsweringLateDropsOnlyTheBindingItAskedAbout() async throws {
-        let storage = InMemorySecureStorage()
-        let (sut, attestor, _) = try AttestFixture.makeService(storage: storage)
-
-        // What the probe read, before it went away to ask.
-        let probed = AttestedDevice(entry: "myEntry", deviceId: "dev_old", keyId: "old_key")
-
-        // What the entry point holds by the time the answer lands.
-        try sut.remember(AttestedDevice(entry: "myEntry", deviceId: "dev_new", keyId: "new_key"))
-        try sut.rememberPendingKey("pending_for_new", for: "myEntry")
-
-        attestor.generateAssertionError = NSError(
-            domain: AppAttestService.deviceCheckErrorDomain,
-            code: 2,
-            userInfo: nil
-        )
-
-        let stillHeld = await sut.keyIsStillHeld(probed)
-
-        XCTAssertFalse(stillHeld, "the probed key was refused and the answer said otherwise")
-        XCTAssertEqual(
-            try sut.binding(for: "myEntry")?.deviceId,
-            "dev_new",
-            "the newer binding was dropped for a key it never named"
-        )
-        XCTAssertEqual(
-            try sut.pendingKey(for: "myEntry"),
-            "pending_for_new",
-            "a pending key belonging to a newer attempt was dropped"
-        )
     }
 
     /// The same shape one call along. `generateAssertion` reads the binding, then

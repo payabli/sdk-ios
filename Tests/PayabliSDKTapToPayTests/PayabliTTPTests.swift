@@ -62,6 +62,20 @@ final class PayabliTTPTests: XCTestCase {
         return (ttp, provider, attestation)
     }
 
+    /// The call throws and the state carries the same reason, as every failed reason does.
+    func testAKeyCheckThatCannotTellThrowsAndLandsOnDeviceKeyUnavailable() async throws {
+        let (ttp, _, attestation) = try makeTTP()
+        attestation.readFailure = TapToPayError(type: .deviceKeyUnavailable, reason: "x", detail: nil)
+
+        do {
+            try await ttp.initialize()
+            XCTFail("initialize proceeded past a key check that could not tell")
+        } catch {
+            XCTAssertEqual((error as? TapToPayError)?.type, .deviceKeyUnavailable, "\(error)")
+        }
+        XCTAssertEqual(ttp.sessionState, .failed(reason: .deviceKeyUnavailable))
+    }
+
     func testColdInitializeRunsAttestation() async throws {
         let (ttp, provider, attestation) = try makeTTP()
         attestation.isAlreadyAttested = false
