@@ -327,7 +327,8 @@ The SDK is written in Swift, and the card-not-present form is a SwiftUI view.
   number, with the type's name in `userInfo["PayabliErrorType"]`. Tap to Pay errors are in the
   `com.payabli.ttp` domain, where `userInfo["capture"]` holds the `PayabliTTPCapture` raw value (`0` not
   charged, `1` unknown, `2` charged) and `userInfo["paymentTransId"]` is absent when there is no
-  transaction ID. Card-not-present errors are in the `com.payabli.payIn` domain.
+  transaction ID. Card-not-present errors are in the `com.payabli.payIn` domain, and errors from
+  `PayabliSessionObjC`'s initializer are in `com.payabli.session`.
 - **Flutter, .NET MAUI and React Native.** Wrappers are in [`Bridges/`](Bridges/README.md), which lists the
   status of each.
 
