@@ -111,18 +111,20 @@ public struct PayabliPayInInputSize: Sendable, Equatable {
 }
 
 public struct PayabliPayInLabels: Sendable {
-    public let title: String
+    /// The form's heading; nil or blank draws none.
+    public let title: String?
     public let subtitle: String?
-    public let submitButton: String
+    /// The submit button's wording; nil or blank reads the SDK's default.
+    public let submitButton: String?
     public let fieldLabels: [PayabliPayInField: String]
     public let fieldPlaceholders: [PayabliPayInField: String]
     /// The label on the summary's Total row; nil or blank reads "Total".
     public let total: String?
 
     public init(
-        title: String = "Save Payment Method",
+        title: String? = nil,
         subtitle: String? = nil,
-        submitButton: String = "Add Payment Method",
+        submitButton: String? = nil,
         fieldLabels: [PayabliPayInField: String] = Self.defaultFieldLabels,
         fieldPlaceholders: [PayabliPayInField: String] = [:],
         total: String? = nil
@@ -140,6 +142,16 @@ public struct PayabliPayInLabels: Sendable {
         fieldLabels[field].flatMap { Self.isBlank($0) ? nil : $0 }
             ?? Self.defaultFieldLabels[field]
             ?? field.rawValue
+    }
+
+    /// The heading to draw, trimmed, or nil when the host's is absent or blank.
+    var drawnTitle: String? {
+        title?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty
+    }
+
+    /// The host's button wording, trimmed, or nil when it is absent or blank.
+    var hostSubmitButton: String? {
+        submitButton?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty
     }
 
     /// Blank as Kotlin's `isBlank` reads it, so a label falls back on both platforms for the same text.

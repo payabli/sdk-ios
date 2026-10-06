@@ -208,7 +208,7 @@ struct PayabliPayInSheetContent: View {
             return configuredTitle
         }
         guard sheetConfiguration.movesFormHeaderToSheetHeader else { return nil }
-        return configuration.labels.title.payabliCaptureTrimmed.payabliCaptureNilIfEmpty
+        return configuration.labels.drawnTitle
     }
 
     private var sheetSubtitle: String? {
@@ -223,7 +223,7 @@ struct PayabliPayInSheetContent: View {
         guard sheetConfiguration.movesFormHeaderToSheetHeader else { return configuration }
 
         let labels = PayabliPayInLabels(
-            title: "",
+            title: nil,
             subtitle: nil,
             submitButton: configuration.labels.submitButton,
             fieldLabels: configuration.labels.fieldLabels,

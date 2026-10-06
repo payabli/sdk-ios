@@ -67,4 +67,18 @@ final class PaymentFormLabelTextTests: XCTestCase {
 
         XCTAssertEqual(labels.label(for: .cardNumber), " Card # ")
     }
+
+    func testAnAbsentOrBlankTitleDrawsNoHeading() {
+        for title in [nil, "", "   ", "\u{3000}"] {
+            XCTAssertNil(PayabliPayInLabels(title: title).drawnTitle, String(describing: title))
+        }
+        XCTAssertEqual(PayabliPayInLabels(title: " Checkout ").drawnTitle, "Checkout")
+    }
+
+    func testAnAbsentOrBlankButtonWordingIsNotTheHosts() {
+        for wording in [nil, "", "\t\n"] {
+            XCTAssertNil(PayabliPayInLabels(submitButton: wording).hostSubmitButton, String(describing: wording))
+        }
+        XCTAssertEqual(PayabliPayInLabels(submitButton: " Pay now ").hostSubmitButton, "Pay now")
+    }
 }

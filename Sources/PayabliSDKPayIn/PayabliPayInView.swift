@@ -117,12 +117,12 @@ public struct PayabliPayInView: View {
 
     @ViewBuilder
     var header: some View {
-        let title = configuration.labels.title.payabliCaptureTrimmed
+        let title = configuration.labels.drawnTitle
         let subtitle = configuration.labels.subtitle?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty
 
-        if !title.isEmpty || subtitle != nil {
+        if title != nil || subtitle != nil {
             VStack(alignment: .leading, spacing: resolvedStyle.layout.headerSpacing) {
-                if !title.isEmpty {
+                if let title {
                     Text(title)
                         .font(resolvedStyle.title.font)
                         .foregroundStyle(resolvedStyle.title.color)
@@ -188,7 +188,7 @@ public struct PayabliPayInView: View {
                         .accessibilityHidden(true)
                 }
 
-                Text(viewModel.isSubmitting ? "Submitting" : configuration.labels.submitButton)
+                Text(viewModel.isSubmitting ? "Submitting" : submitButtonText)
                     .font(resolvedStyle.submitButton.font)
             }
             .frame(maxWidth: .infinity, minHeight: resolvedStyle.submitButton.height)
@@ -208,7 +208,7 @@ public struct PayabliPayInView: View {
         }
         .buttonStyle(.plain)
         .disabled(!viewModel.canSubmit || viewModel.isSubmitting)
-        .accessibilityLabel(viewModel.isSubmitting ? "Submitting payment" : configuration.labels.submitButton)
+        .accessibilityLabel(viewModel.isSubmitting ? "Submitting payment" : submitButtonText)
         .accessibilityHint(submitAccessibilityHint)
     }
 
@@ -885,6 +885,10 @@ extension PayabliPayInView {
 
     var inputShape: RoundedRectangle {
         RoundedRectangle(cornerRadius: resolvedStyle.input.cornerRadius)
+    }
+
+    var submitButtonText: String {
+        configuration.labels.hostSubmitButton ?? "Add Payment Method"
     }
 
     var submitButtonBackgroundColor: Color {

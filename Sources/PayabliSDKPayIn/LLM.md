@@ -468,9 +468,9 @@ let configuration = PayabliPayInFormConfiguration(
 
 | Field | Default | Purpose |
 | --- | --- | --- |
-| `title` | `Save Payment Method` | Form header title. |
+| `title` | `nil` | Form header title. `nil` or blank draws none. |
 | `subtitle` | nil | Optional form header subtitle. |
-| `submitButton` | `Add Payment Method` | Submit button text. |
+| `submitButton` | `nil` | Submit button text. `nil` or blank uses the SDK's wording. |
 | `fieldLabels` | `defaultFieldLabels` | Visible and accessibility labels per field. |
 | `fieldPlaceholders` | empty | Placeholder text per field. |
 | `total` | nil (`Total`) | Label on the payment summary's Total row. |
