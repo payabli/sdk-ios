@@ -285,6 +285,22 @@ final class PayInIdempotencyTests: XCTestCase {
         XCTAssertEqual(interrupted.type, .userCancelled)
     }
 
+    /// A device that cannot be identified is refused before any request leaves it, so the outcome is
+    /// settled. Injected for the same reason as the cancellation above: no card-not-present path raises it.
+    func testAnUnidentifiableDeviceReportsNoKey() async {
+        let transport = RecordingIdempotencyTransport(
+            failure: PayabliGenericError(type: .deviceIdentityUnavailable, reason: "No device identity")
+        )
+        let flow = PayInFixture.makeFlow(transport: transport, key: "reserved-9")
+
+        let failure = await PayInFixture.failure(from: {
+            _ = try await flow.capture(PayInFixture.request(idempotencyKey: nil))
+        })
+
+        XCTAssertEqual((failure as? any PayabliError)?.type, .deviceIdentityUnavailable)
+        XCTAssertNil(PayInFixture.interruption(failure), "a refused device settles the outcome")
+    }
+
     /// An answer the SDK cannot read is the case the key exists for: the payment may well have been
     /// taken, and the only record of it is on the service.
     func testAnUnreadableAnswerReportsTheKey() async {
