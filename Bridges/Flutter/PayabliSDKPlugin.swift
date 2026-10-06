@@ -31,8 +31,9 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
     private var eventToken: PayabliTTPEventToken?
     private var payIn: PayabliPayIn?
 
-    /// The plugin of the engine running now. The session outlives an engine, so its token provider
-    /// asks this rather than holding the channel of the plugin that configured it.
+    /// The plugin whose configure last succeeded. The session outlives an engine, so its token
+    /// provider asks this rather than holding the channel of the plugin that configured it, and an
+    /// engine that never configures, or is refused, takes no token requests from the one that did.
     private weak static var livePlugin: PayabliSDKPlugin?
     private static let livePluginLock = NSLock()
 
@@ -40,6 +41,9 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
         self.methodChannel = methodChannel
         self.eventChannel = eventChannel
         super.init()
+    }
+
+    private func becomeLive() {
         Self.livePluginLock.withLock { Self.livePlugin = self }
     }
 
@@ -157,6 +161,7 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
             self.eventToken = nil
             self.ttp = ttp
             self.subscribeEvents(on: ttp)
+            self.becomeLive()
             result(nil)
         }
     }
@@ -389,6 +394,7 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
                 self.payIn = PayabliPayIn(
                     session: try await PayabliSession.initialize(config: config)
                 )
+                self.becomeLive()
                 result(nil)
             } catch {
                 result(FlutterError(
