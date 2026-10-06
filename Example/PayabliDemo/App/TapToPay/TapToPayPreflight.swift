@@ -150,6 +150,15 @@ enum TapToPayPreflight {
     /// The Team ID this binary is actually signed with, read from the profile
     /// rather than from `Secrets`. That is what lets the App ID check below
     /// compare the configured value against reality instead of against itself.
+    /// The prefix of the profile's `application-identifier`, which is the prefix the SDK attests with.
+    /// It is the Team ID for most apps and can differ from it for an older App ID.
+    static var resolvedAppIdPrefix: String? {
+        guard let applicationIdentifier = provisioningEntitlements?["application-identifier"] as? String,
+              let prefix = applicationIdentifier.split(separator: ".").first
+        else { return nil }
+        return String(prefix)
+    }
+
     static var resolvedTeamIdentifier: String? {
         guard let entitlements = provisioningEntitlements else { return nil }
         if let team = entitlements["com.apple.developer.team-identifier"] as? String {
@@ -297,16 +306,16 @@ enum TapToPayPreflight {
     }
 
     private static func appIdCheck(bundleId: String) -> Check {
-        guard let team = resolvedTeamIdentifier else {
+        guard let prefix = resolvedAppIdPrefix else {
             return Check(
                 title: "App ID cannot be read here",
-                detail: "No embedded profile, so the team prefix is unknown. Check it on a device build.",
+                detail: "No embedded profile, so the App ID prefix is unknown. Check it on a device build.",
                 status: .warn
             )
         }
         return Check(
             title: "App ID to register",
-            detail: "\(team).\(bundleId) is the authorized app this build attests as.",
+            detail: "\(prefix).\(bundleId) is the authorized app this build attests as.",
             status: .pass
         )
     }

@@ -57,8 +57,8 @@ final class KeychainOnDeviceTests: XCTestCase {
         let group = try storage.accessGroup(forKey: "sample_key")
         let derived = AppIdentifier.derive(accessGroup: group)
         let bundleId = try XCTUnwrap(Bundle.main.bundleIdentifier)
-        if let team = TapToPayPreflight.resolvedTeamIdentifier {
-            XCTAssertEqual(derived, "\(team).\(bundleId)")
+        if let prefix = TapToPayPreflight.resolvedAppIdPrefix {
+            XCTAssertEqual(derived, "\(prefix).\(bundleId)")
         } else {
             let appId = try XCTUnwrap(derived)
             XCTAssertTrue(appId.hasSuffix(".\(bundleId)"), appId)

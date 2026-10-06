@@ -45,8 +45,9 @@ development builds and `production` for builds you distribute.
 
 ### Register your app as an authorized app
 
-The authorized app entry for iOS is your app's **app ID**, your Apple Team ID and bundle ID joined by a dot:
-`<TEAM_ID>.<BUNDLE_ID>`, for example `TEAM123456.com.example.checkout`. Register it once per paypoint,
+The authorized app entry for iOS is your app's **app ID**, its App ID prefix and bundle ID joined by a dot:
+`<APP_ID_PREFIX>.<BUNDLE_ID>`, for example `TEAM123456.com.example.checkout`. The App ID prefix is your
+Team ID for most apps; an older App ID can have a different one, shown in the Apple Developer portal. Register it once per paypoint,
 in the Payabli portal under **Pay In > Devices > Device management**, **⋯ > Authorized apps**, or from your
 backend:
 
