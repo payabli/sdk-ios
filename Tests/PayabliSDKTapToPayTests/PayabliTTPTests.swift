@@ -117,8 +117,7 @@ final class PayabliTTPTests: XCTestCase {
         do {
             try await ttp.initialize()
             XCTFail("expected eligibility failure")
-        } catch let error as TapToPayError where error.type == .unknown {
-            XCTAssertEqual(error.detail, "no entitlement")
+        } catch let error as TapToPayError where error.type == .unknown && error.detail == "no entitlement" {
             XCTAssertEqual(ttp.sessionState.code, .failed)
         } catch {
             XCTFail("wrong error: \(error)")
@@ -212,7 +211,9 @@ final class PayabliTTPTests: XCTestCase {
         do {
             try await ttp.initialize()
             XCTFail("expected a failure")
-        } catch let error as TapToPayError where error.type == .unknown {
+        } catch let error as TapToPayError
+            where error.type == .unknown && error.detail?.contains("no registration is stored") == true
+        {
         } catch {
             XCTFail("wrong error: \(error)")
         }

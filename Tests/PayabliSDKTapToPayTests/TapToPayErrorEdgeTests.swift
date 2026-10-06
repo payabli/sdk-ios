@@ -51,6 +51,31 @@ final class TapToPayErrorEdgeTests: XCTestCase {
         }
     }
 
+    func testACancelledActivationStaysACancellation() async throws {
+        let (ttp, attestation) = try await makePendingTTP()
+        attestation.activationResult = .failure(CancellationError())
+
+        do {
+            try await ttp.activateDevice(activationCode: "ABC123")
+            XCTFail("expected the cancellation")
+        } catch is CancellationError {
+        } catch {
+            XCTFail("wrong error: \(error)")
+        }
+    }
+
+    func testAnActivationRefusedByTheTransportKeepsItsCode() async throws {
+        let (ttp, attestation) = try await makePendingTTP()
+        attestation.activationResult = .failure(PayabliGenericError(type: .rateLimited, reason: "Too many requests"))
+
+        do {
+            try await ttp.activateDevice(activationCode: "ABC123")
+            XCTFail("expected the refusal")
+        } catch let error as TapToPayError {
+            XCTAssertEqual(error.type, .rateLimited)
+        }
+    }
+
     // MARK: - Objective-C
 
     func testEveryObjectiveCCompanionCompletesWithTheCatalogNumber() async throws {
@@ -100,6 +125,23 @@ final class TapToPayErrorEdgeTests: XCTestCase {
     }
 
     // MARK: - Fixtures
+
+    /// A device the service holds pending activation, after `initialize()` reported it.
+    private func makePendingTTP() async throws -> (PayabliTTP, MockDeviceAttestationService) {
+        let attestation = MockDeviceAttestationService()
+        attestation.pendingRegistration = "dev"
+        let config = try PayabliConfig(entryPoint: "e", environment: .sandbox, tokenProvider: { "seed_token" })
+        let ttp = PayabliTTP(
+            config: config,
+            provider: MockTapToPayProvider(),
+            attestation: attestation,
+            retryPolicy: RetryPolicy(maxAttempts: 1, baseDelay: 0, maxDelay: 0, multiplier: 1, maxJitter: 0),
+            session: StubURLProtocol.makeSession()
+        )
+        _ = try? await ttp.initialize()
+        XCTAssertEqual(ttp.sessionState, .pendingActivation(activationId: "dev"))
+        return (ttp, attestation)
+    }
 
     private static let paymentDetails = PayabliTTPPaymentDetails(amount: 1)
 

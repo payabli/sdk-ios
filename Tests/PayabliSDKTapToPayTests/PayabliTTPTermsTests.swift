@@ -93,6 +93,7 @@ final class PayabliTTPTermsTests: XCTestCase {
             XCTFail("expected the provider's failure to surface")
         } catch let error as TapToPayError {
             XCTAssertEqual(error.type, .unknown)
+            XCTAssertEqual(error.detail, "Reader not prepared")
         }
     }
 
@@ -246,6 +247,7 @@ final class PayabliTTPTermsTests: XCTestCase {
             XCTFail("expected the failure to reach the caller")
         } catch let error as TapToPayError {
             XCTAssertEqual(error.type, .unknown)
+            XCTAssertEqual(error.detail, "Reader not prepared")
         }
     }
 

@@ -341,6 +341,7 @@ final class PayabliTTPReaderSessionRecoveryTests: XCTestCase {
         let failure = try await chargeFailure(ttp)
 
         XCTAssertEqual(failure.type, .unknown)
+        XCTAssertEqual(failure.detail, "Reader not prepared")
         XCTAssertEqual(failure.paymentTransId, Self.paymentTransId)
         XCTAssertEqual(failure.capture, .notCharged, "the reader was never asked for a card")
     }

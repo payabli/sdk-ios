@@ -71,6 +71,20 @@ final class TapToPayErrorTranslationTests: XCTestCase {
         XCTAssertEqual(host.toPayabliNSError().userInfo["retryAfter"] as? TimeInterval, 30)
     }
 
+    func testACoreErrorKeepsEverythingItShowsAfterItsReason() throws {
+        struct Refused: PayabliError {
+            let type = PayabliErrorType.validation
+            let reason = "Bad request"
+            let detail: String? = "One field is wrong"
+            var errorDescription: String? {
+                "Bad request · One field is wrong · zip: must be five digits"
+            }
+        }
+        let host = try translated(Refused())
+        XCTAssertEqual(host.detail, "One field is wrong · zip: must be five digits")
+        XCTAssertTrue(host.localizedDescription.contains("zip: must be five digits"), host.localizedDescription)
+    }
+
     // MARK: - What passes through
 
     func testATapToPayErrorPassesThroughUnchanged() throws {

@@ -61,9 +61,10 @@ public extension PayabliTTP {
             // The reason is the error's parsed description rather than a rendering
             // of its fields.
             let mapped = PayabliTTPError.activationFailed(reason: error.localizedDescription)
-            // The state is marked from the activation's failure. A core error is
-            // thrown as it arrived, so its code and its wait reach the caller.
-            let failure: Error = error is any PayabliError ? error : mapped
+            // The state is marked from the activation's failure. A core error or a
+            // cancellation is thrown as it arrived, so its code and its wait reach
+            // the caller.
+            let failure: Error = error is any PayabliError || error is CancellationError ? error : mapped
             markError(mapped)
             syncPublished()
             multicaster.emit(.activationFailed(error: TapToPayErrorTranslation.eventName(of: failure)))

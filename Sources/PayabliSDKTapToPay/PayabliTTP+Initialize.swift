@@ -230,11 +230,11 @@ extension PayabliTTP {
             }
             throw PayabliTTPError.devicePendingActivation
         } catch {
-            // A core error keeps its own code and the wait the service asked for.
+            // A core error keeps its own code and the wait the service asked for, and a cancellation stays one.
             // Anything else is wrapped with its parsed description, so the fields
             // the service named still reach the merchant. `String(describing:)`
             // renders every stored property instead, the page token among them.
-            let failure: Error = if error is PayabliTTPError || error is any PayabliError {
+            let failure: Error = if error is PayabliTTPError || error is any PayabliError || error is CancellationError {
                 error
             } else {
                 PayabliTTPError.configFailed(reason: error.localizedDescription)

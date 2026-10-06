@@ -25,7 +25,7 @@ enum TapToPayErrorTranslation {
             return TapToPayError(
                 type: error.type,
                 reason: error.reason,
-                detail: error.detail,
+                detail: displayedDetail(of: error),
                 retryAfter: (error as? PayabliRetryAfter)?.retryAfter
             )
         default:
@@ -33,8 +33,7 @@ enum TapToPayErrorTranslation {
         }
     }
 
-    /// The catalog wire name of the error a host receives for `error`, which is what a card-present event
-    /// carries.
+    /// The catalog wire name `error` reaches a host under, which is what a card-present event carries.
     static func eventName(of error: Error) -> String {
         guard let hostError = hostError(for: error) as? TapToPayError else {
             return ErrorSummary.of(error)
@@ -83,6 +82,16 @@ enum TapToPayErrorTranslation {
     }
 
     // swiftlint:enable cyclomatic_complexity
+
+    /// Everything a core error shows after its reason: its detail, and the field errors or the payer's next
+    /// step some of them add.
+    private static func displayedDetail(of error: any PayabliError) -> String? {
+        guard let shown = error.errorDescription, shown != error.reason else { return error.detail }
+        for separator in [" · ", ": "] where shown.hasPrefix(error.reason + separator) {
+            return String(shown.dropFirst(error.reason.count + separator.count))
+        }
+        return error.detail
+    }
 
     /// A person dismissed the platform's sheet. The reader marks it at the start of the case's reason.
     private static func isCancellation(_ reason: String) -> Bool {
