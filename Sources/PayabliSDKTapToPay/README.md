@@ -242,7 +242,7 @@ From Objective-C, these errors arrive as `NSError`. See
 | `failureReason` | What to do |
 |---|---|
 | `.configurationRejected` | The paypoint, the device or its setup is missing something. Retrying won't help; contact Payabli. A token, network or service failure while fetching the configuration lands on `.serviceUnavailable` instead. |
-| `.attestationRequired` | The device's attestation was refused or revoked. Check the entitlements, then initialize again. |
+| `.deviceSetupRequired` | This device must be set up again: its setup was refused or revoked. Check the entitlements, then initialize again. |
 | `.serviceUnavailable` | The service or the reader wasn't available. Try again later. |
 | `.deviceIneligible` | This iPhone or iOS version can't take Tap to Pay payments, or the card reader refused it. If an iPhone that meets the requirements lands here, contact Payabli before replacing it. |
 | `.sdkInternalError` | Report it to Payabli. |

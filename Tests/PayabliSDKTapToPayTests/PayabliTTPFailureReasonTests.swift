@@ -18,7 +18,7 @@ final class PayabliTTPFailureReasonTests: XCTestCase {
         ] {
             XCTAssertEqual(
                 PayabliTTPSessionState.landing(for: error),
-                .failed(reason: .attestationRequired),
+                .failed(reason: .deviceSetupRequired),
                 "\(error)"
             )
         }
@@ -118,8 +118,8 @@ final class PayabliTTPFailureReasonTests: XCTestCase {
             (.invalidState(current: .ready, attempted: "x"), .failed(reason: .sdkInternalError)),
             (.notReady(current: .idle), .failed(reason: .sdkInternalError)),
             (.devicePendingActivation, .pendingActivation),
-            (.attestationRevoked(reason: "x"), .failed(reason: .attestationRequired)),
-            (.attestationFailed(reason: "x"), .failed(reason: .attestationRequired)),
+            (.attestationRevoked(reason: "x"), .failed(reason: .deviceSetupRequired)),
+            (.attestationFailed(reason: "x"), .failed(reason: .deviceSetupRequired)),
             (.configFailed(reason: "x"), .failed(reason: .configurationRejected)),
             (.readerSetupFailed(reason: "x"), .failed(reason: .serviceUnavailable)),
             (.nfcFailed(reason: "x"), nil),
@@ -170,7 +170,7 @@ final class PayabliTTPFailureReasonTests: XCTestCase {
     /// The published vocabulary, each member at a fixed integer.
     func testThePublishedVocabularyKeepsItsIntegers() {
         XCTAssertEqual(PayabliTTPFailureReason.allCases.count, 6)
-        XCTAssertEqual(PayabliTTPFailureReason.attestationRequired.rawValue, 0)
+        XCTAssertEqual(PayabliTTPFailureReason.deviceSetupRequired.rawValue, 0)
         XCTAssertEqual(PayabliTTPFailureReason.configurationRejected.rawValue, 1)
         XCTAssertEqual(PayabliTTPFailureReason.serviceUnavailable.rawValue, 2)
         XCTAssertEqual(PayabliTTPFailureReason.deviceIneligible.rawValue, 3)

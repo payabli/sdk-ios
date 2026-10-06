@@ -32,7 +32,7 @@ extension PayabliTTPSessionState {
         case .attestationRevoked, .attestationFailed:
             // Discarding the device's identity needs a positive match, and both
             // of these name the attestation.
-            return .failed(reason: .attestationRequired)
+            return .failed(reason: .deviceSetupRequired)
 
         case .configFailed:
             return .failed(reason: .configurationRejected)
