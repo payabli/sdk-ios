@@ -301,9 +301,8 @@ Pass the `deviceId`. It is the only field that identifies a single device.
 Serial number is the app's `identifierForVendor`, and several device records can
 share one serial.
 
-A host app reads the `deviceId` with `PayabliTTP.deviceId()` once the session reports
-`.pendingActivation`, and sends it here. The sample app shows it on the activation
-sheet.
+A host app reads the id from the session state, `.pendingActivation(activationId:)`,
+and sends it here as `deviceId`. The sample app shows it on the activation sheet.
 
 With no `deviceId`, the server uses the newest pending device. `resolvedFrom`
 reports which path was used: `request`, `onlyPendingDevice`, or

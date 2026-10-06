@@ -64,9 +64,8 @@ curl -X POST "https://api-sandbox.payabli.com/api/v2/paypoint/{entryPoint}/apps"
 
 An app that isn't an authorized app is refused when the device attests, with an HTTP 403. `initialize()`
 throws a `PayabliGenericError` whose `type` is `.permissionDenied`, not `attestationFailed`, and
-`sessionState` is `.pendingActivation`, the same state as a phone that needs a code. An activation code
-doesn't clear it: register the app, then initialize again. So a phone that lands on `.pendingActivation`
-straight after setup may be running an app that isn't registered.
+`sessionState` is `.failed(reason: .configurationRejected)`: the phone was never registered, so there is
+nothing to activate. Register the app, then initialize again.
 
 ## Set up
 
@@ -136,8 +135,9 @@ A phone takes Tap to Pay payments for a paypoint only after it is activated with
 - A reinstall, a restore to a new phone, or a new phone needs a new code.
 
 Until the phone is activated, `initialize()` throws `PayabliTTPError.devicePendingActivation` and
-`sessionState` is `.pendingActivation`. An app that isn't an authorized app, or credentials without `tools_init`
-or `pos_create`, land in the same state, so check both before issuing a code. Credentials without
+`sessionState` is `.pendingActivation(activationId:)`. An app that isn't an authorized app, or credentials
+without `tools_init` or `pos_create`, land on `.failed(reason: .configurationRejected)` on a phone that
+hasn't registered yet. Credentials without
 `inboundpayments_create` reach `.ready`, and `charge` then throws a core `PayabliError` whose `type` is
 `.permissionDenied`, before the card is read.
 
@@ -146,16 +146,17 @@ or `pos_create`, land in the same state, so check both before issuing a code. Cr
 
    - **From your backend:** call
      [Generate Tap to Pay activation code](https://docs.payabli.com/developers/api-reference/device/activation-challenge)
-     with the paypoint's entry point and the phone's device ID. Read the device ID with `deviceId()`
-     once `sessionState` is `.pendingActivation`, and send it to your backend:
+     with the paypoint's entry point and the phone's activation ID in the request's `deviceId` field.
+     The activation ID is on the pending state, and only there:
 
      ```swift
-     guard let deviceId = await ttp.deviceId() else {
-         // The SDK holds no usable ID for this phone. Initializing enrolls it again.
-         try await ttp.initialize()
-         return
+     if case let .pendingActivation(activationId) = ttp.sessionState {
+         // Send activationId to your backend.
      }
      ```
+
+     From Objective-C, read `ttp.activationId`, which is `nil` unless an activation is owed. An app that
+     lost the ID initializes again and lands on the same one.
 
    - **From the portal:** under **Pay In > Devices > Device management**, choose
      **⋯ > Generate activation code**.
@@ -244,7 +245,7 @@ From Objective-C, these errors arrive as `NSError`. See
 | `.idle` | Not started, or activated and waiting for `initialize()`. |
 | `.attestingDevice`, `.fetchingConfig`, `.initializingReader(percent:)` | `initialize()` is running. |
 | `.ready` | Ready to charge. |
-| `.pendingActivation` | The phone needs an activation code, the app isn't one of the paypoint's authorized apps, or the credentials lack `tools_init` or `pos_create`. |
+| `.pendingActivation(activationId:)` | The phone needs an activation code. `activationId` is what the activation route's `deviceId` field takes. |
 | `.pendingTerms` | The merchant hasn't accepted Apple's terms. |
 | `.sessionExpired` | The session needs refreshing. The next `charge` refreshes it. |
 | `.reinitializing` | The session is being refreshed. |
@@ -259,6 +260,7 @@ From Objective-C, these errors arrive as `NSError`. See
 | `.serviceUnavailable` | The service or the reader wasn't available. Try again later. |
 | `.deviceIneligible` | This iPhone or iOS version can't take Tap to Pay payments, or the card reader refused it. If an iPhone that meets the requirements lands here, contact Payabli before replacing it. |
 | `.sdkInternalError` | Report it to Payabli. |
+| `.deviceKeyUnavailable` | This device's secure storage could not be read, for example before the first unlock after a restart. Initialize again; if it persists, the device is the cause. |
 
 ### Events
 

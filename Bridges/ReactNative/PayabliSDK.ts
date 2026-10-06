@@ -159,6 +159,7 @@ export enum PayabliTTPFailureReason {
     ServiceUnavailable = 2,
     DeviceIneligible = 3,
     SdkInternalError = 4,
+    DeviceKeyUnavailable = 5,
 }
 
 export interface PayabliTTPEvent {
