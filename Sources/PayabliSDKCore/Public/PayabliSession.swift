@@ -41,7 +41,7 @@ public final class PayabliSession: @unchecked Sendable {
         config: PayabliConfig,
         urlSession: URLSession? = nil,
         deviceIdentity: DeviceIdentity = DeviceIdentity {
-            try InstallIdentifier.hardwareId(storage: InstallIdentifier.store)
+            try InstallIdentifier.hardwareId(storage: KeychainStorage(migrating: [InstallIdentifier.storageKey]))
         }
     ) {
         self.config = config

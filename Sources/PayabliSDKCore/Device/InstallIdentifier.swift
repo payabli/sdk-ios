@@ -11,9 +11,6 @@ package enum InstallIdentifier {
 
     package static let storageKey = "com.payabli.ttp.installId"
 
-    /// Opened on first use, once per process, so a read that keeps failing does not reopen the store.
-    static let store = KeychainStorage(migrating: [storageKey])
-
     /// One lock for every caller in the process, so two entry points enrolling at
     /// once cannot mint two UUIDs and register two devices for one install.
     private static let lock = NSLock()
