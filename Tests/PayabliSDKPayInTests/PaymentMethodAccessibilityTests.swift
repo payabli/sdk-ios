@@ -56,17 +56,15 @@ final class PaymentMethodAccessibilityTests: XCTestCase {
             "In progress"
         )
         XCTAssertEqual(
-            PayabliPayInAccessibility.submitHint(canSubmit: false, isSubmitting: false),
-            "Complete the required fields before saving."
+            PayabliPayInAccessibility.submitHint(canSubmit: false, hasMarkedField: false),
+            "Complete required fields before submitting."
         )
         XCTAssertEqual(
-            PayabliPayInAccessibility.submitHint(canSubmit: true, isSubmitting: false),
-            "Saves the payment method."
+            PayabliPayInAccessibility.submitHint(canSubmit: false, hasMarkedField: true),
+            "Edit the fields that were not accepted before submitting."
         )
-        XCTAssertEqual(
-            PayabliPayInAccessibility.submitHint(canSubmit: true, isSubmitting: true),
-            "Saving payment method."
-        )
+        XCTAssertEqual(PayabliPayInAccessibility.submitHint(canSubmit: true, hasMarkedField: false), "")
+        XCTAssertEqual(PayabliPayInAccessibility.submitHint(canSubmit: true, hasMarkedField: true), "")
         XCTAssertEqual(
             PayabliPayInAccessibility.errorAnnouncement(for: "Unable to save"),
             "Error: Unable to save"

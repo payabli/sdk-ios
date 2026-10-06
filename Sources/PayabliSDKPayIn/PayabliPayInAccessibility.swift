@@ -46,16 +46,17 @@ enum PayabliPayInAccessibility {
         "Opens \(label.lowercased()) options."
     }
 
+    /// Empty while the button can submit, since its label names the action. Otherwise it says what is missing.
     static func submitHint(
         canSubmit: Bool,
-        isSubmitting: Bool
+        hasMarkedField: Bool
     ) -> String {
-        if isSubmitting {
-            return "Saving payment method."
+        if canSubmit {
+            return ""
         }
-        return canSubmit
-            ? "Saves the payment method."
-            : "Complete the required fields before saving."
+        return hasMarkedField
+            ? "Edit the fields that were not accepted before submitting."
+            : "Complete required fields before submitting."
     }
 
     static func submitValue(

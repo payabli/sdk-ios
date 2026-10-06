@@ -874,13 +874,10 @@ extension PayabliPayInView {
     }
 
     var submitAccessibilityHint: String {
-        if viewModel.canSubmit {
-            return "Submits the payment."
-        }
-        if viewModel.hasMarkedFieldOnScreen {
-            return "Edit the fields that were not accepted before submitting."
-        }
-        return "Complete required fields before submitting."
+        PayabliPayInAccessibility.submitHint(
+            canSubmit: viewModel.canSubmit,
+            hasMarkedField: viewModel.hasMarkedFieldOnScreen
+        )
     }
 
     var inputShape: RoundedRectangle {
