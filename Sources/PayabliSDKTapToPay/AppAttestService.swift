@@ -91,29 +91,37 @@ package final class AppAttestService: DeviceAttestationService, @unchecked Senda
     ///
     /// Raises when the store could not be read, which is not the same answer as
     /// `false`: `false` runs the cold sequence and registers a second device for a
-    /// paypoint that is already enrolled.
+    /// paypoint that is already enrolled. Raises too when the key check cannot answer.
     package func isAttested(for entry: String) async throws -> Bool {
         guard let binding = try binding(for: entry) else {
             return false
         }
-        return await keyIsStillHeld(binding)
+        return try await keyIsStillHeld(binding)
     }
 
     /// The probe suspends, so the binding is read again after it: an id read before
-    /// the probe names a device the store may no longer hold.
+    /// the probe names a device the store may no longer hold. A check that cannot
+    /// answer keeps the binding, so its id is still the device's.
     package func usableDeviceId(for entry: String) async throws -> String? {
-        guard let binding = try binding(for: entry), await keyIsStillHeld(binding) else {
+        guard let binding = try binding(for: entry) else {
             return nil
         }
+        do {
+            guard try await keyIsStillHeld(binding) else {
+                return nil
+            }
+        } catch is TapToPayError {}
         return try self.binding(for: entry) == binding ? binding.deviceId : nil
     }
 
     /// Whether the platform will still sign with this binding's key.
     ///
     /// Signs over a fixed hash that is sent nowhere: the answer is whether the call
-    /// throws. Only `deviceCheckUnusableKeyCodes` mean the key cannot be used;
-    /// re-enrolling on any other answer costs an enrolment for a working key.
-    func keyIsStillHeld(_ binding: AttestedDevice) async -> Bool {
+    /// throws. Only `deviceCheckUnusableKeyCodes` mean the key cannot be used, and
+    /// drop the binding. `featureUnsupported` raises `deviceSetupUnsupported`, and
+    /// any other failure raises `deviceKeyUnavailable`; both keep the binding,
+    /// because re-enrolling costs an enrolment for a key that may still work.
+    func keyIsStillHeld(_ binding: AttestedDevice) async throws -> Bool {
         do {
             _ = try await attestor.generateAssertion(
                 AppAttestKeyId(binding.keyId),
@@ -122,11 +130,22 @@ package final class AppAttestService: DeviceAttestationService, @unchecked Senda
             return true
         } catch {
             let nsError = error as NSError
-            guard nsError.domain == Self.deviceCheckErrorDomain,
-                  Self.deviceCheckUnusableKeyCodes.contains(nsError.code)
-            else {
+            let isDeviceCheck = nsError.domain == Self.deviceCheckErrorDomain
+            if isDeviceCheck, nsError.code == Self.deviceCheckFeatureUnsupportedCode {
+                logger.info("[attest] this device cannot check its key; keeping the binding")
+                throw TapToPayError(
+                    type: .deviceSetupUnsupported,
+                    reason: "App Attest is not supported on this device",
+                    detail: nil
+                )
+            }
+            guard isDeviceCheck, Self.deviceCheckUnusableKeyCodes.contains(nsError.code) else {
                 logger.info("[attest] the key could not be checked; keeping the binding")
-                return true
+                throw TapToPayError(
+                    type: .deviceKeyUnavailable,
+                    reason: "The device key could not be checked",
+                    detail: "\(nsError.domain) \(nsError.code)"
+                )
             }
             logger.info("[attest] the stored binding names a key this device no longer holds")
             forgetIfUnchanged(binding)

@@ -31,13 +31,17 @@ extension AppAttestService {
         // otherwise register a second device to replace. Answering from the binding
         // claims no activation; `/config` answers for it as it does on the warm
         // path.
-        if let held = try binding(for: entry), await keyIsStillHeld(held) {
+        if let held = try binding(for: entry), try await keyIsStillHeld(held) {
             logger.info("[attest] this paypoint was enrolled while this attempt waited")
             return AttestationResult(keyId: held.keyId, deviceId: held.deviceId)
         }
 
         guard attestor.isSupported else {
-            throw PayabliTTPError.attestationFailed(reason: "App Attest not supported on this device")
+            throw TapToPayError(
+                type: .deviceSetupUnsupported,
+                reason: "App Attest is not supported on this device",
+                detail: nil
+            )
         }
 
         // 1. POST /challenge
@@ -173,6 +177,9 @@ extension AppAttestService {
     /// to the pending slot, and `DCErrorServerUnavailable` asks for a retry with
     /// the same key to preserve the device's risk metric.
     static let deviceCheckUnusableKeyCodes: Set<Int> = [2, 3]
+
+    /// `DCErrorFeatureUnsupported`: this device cannot use App Attest at all.
+    static let deviceCheckFeatureUnsupportedCode = 1
 
     static let platform = "Ios"
 
