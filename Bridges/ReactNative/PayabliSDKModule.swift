@@ -580,18 +580,18 @@ public final class PayabliSDKModule: RCTEventEmitter {
 // MARK: - Error → RN error code/message
 
 private extension Error {
-    /// The catalog number for a Payabli error, `TTP_<n>` for a `PayabliTTPError`, and `fallback`
-    /// for anything else. A card-present call hands over the `NSError` its completion built, which
-    /// carries the number as its code beside the `PayabliErrorType` key.
+    /// The catalog number for a Payabli error, and `fallback` for anything else. A card-present call
+    /// hands over the `NSError` its completion built, which carries the number as its code beside the
+    /// `PayabliErrorType` key.
     func bridgeCode(default fallback: String) -> String {
         if let payabliError = self as? any PayabliError {
             return String(payabliError.code)
         }
         let nsError = self as NSError
-        guard nsError.domain == PayabliTTPError.errorDomain else {
+        guard nsError.domain == TapToPayError.errorDomain, nsError.userInfo["PayabliErrorType"] != nil else {
             return fallback
         }
-        return nsError.userInfo["PayabliErrorType"] == nil ? "TTP_\(nsError.code)" : String(nsError.code)
+        return String(nsError.code)
     }
 }
 

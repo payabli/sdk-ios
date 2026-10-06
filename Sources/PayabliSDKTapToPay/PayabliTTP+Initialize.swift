@@ -15,7 +15,9 @@ extension PayabliTTP {
     ///   3. Hand credentials to the provider (NFR-5D — runtime only).
     ///   4. Prepare reader, transition to `.ready`.
     public func initialize() async throws {
-        try await runSessionSetup(.initialize) { try await self.runInitialize() }
+        try await reportingToHost(.initialize) {
+            try await runSessionSetup(.initialize) { try await self.runInitialize() }
+        }
     }
 
     /// Serialises the operations that move the session's state. A caller of the same kind joins the one
@@ -83,7 +85,7 @@ extension PayabliTTP {
     /// `@objc` companion to `initialize()` for ObjC / MAUI / Flutter / RN
     /// consumers. Bridges the `async throws` Swift method to a callback-based
     /// signature: `completion(nil)` on success, `completion(NSError)` on
-    /// failure (domain `"com.payabli.ttp"` for typed `PayabliTTPError`s).
+    /// failure, a ``TapToPayError`` with its catalog number as the code.
     ///
     /// The completion handler is always invoked on the main thread because
     /// the entire `PayabliTTP` surface is `@MainActor`.
@@ -105,6 +107,10 @@ extension PayabliTTP {
     /// `initialize()`. NFR-5D forbids providers from caching credentials
     /// across sessions, so every refresh re-fetches `/config`.
     public func reinitializeIfNeeded() async throws {
+        try await reportingToHost(.reinitialize) { try await reinitialize() }
+    }
+
+    func reinitialize() async throws {
         try await runSessionSetup(.reinitialize) { try await self.runReinitializeIfNeeded() }
     }
 
@@ -238,10 +244,8 @@ extension PayabliTTP {
             multicaster.emit(.configFailed(error: ErrorSummary.of(failure)))
             throw failure
         } catch {
-            // Wrapped, because the domain and code are a contract: `configFailed`
-            // bridges as `com.payabli.ttp` code 6, and the Flutter plugin reads
-            // `TTP_6` from it. An error thrown as it arrived carries another
-            // domain, and every bridge reports it as a bare initialize failure.
+            // Wrapped, so a host receives every configuration failure under the
+            // `configFailed` case's catalog entry.
             //
             // The reason is the error's own parsed description, so the fields the
             // service named still reach the merchant. `String(describing:)` renders

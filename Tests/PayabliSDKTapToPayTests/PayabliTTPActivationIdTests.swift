@@ -49,7 +49,7 @@ final class PayabliTTPActivationIdTests: XCTestCase {
         do {
             try await ttp.initialize()
             XCTFail("expected pending activation")
-        } catch PayabliTTPError.devicePendingActivation {}
+        } catch let error as TapToPayError where error.type == .devicePendingActivation {}
 
         XCTAssertEqual(ttp.sessionState, .pendingActivation(activationId: "dev_e"))
     }
@@ -77,7 +77,7 @@ final class PayabliTTPActivationIdTests: XCTestCase {
         do {
             try await ttp.initialize()
             XCTFail("expected a failure")
-        } catch PayabliTTPError.configFailed {
+        } catch let error as TapToPayError where error.type == .entryPointRefused {
         } catch {
             XCTFail("wrong error: \(error)")
         }
@@ -99,7 +99,7 @@ final class PayabliTTPActivationIdTests: XCTestCase {
         do {
             try await ttp.initialize()
             XCTFail("expected a failure")
-        } catch PayabliTTPError.configFailed {
+        } catch let error as TapToPayError where error.type == .entryPointRefused {
         } catch {
             XCTFail("wrong error: \(error)")
         }
@@ -130,8 +130,9 @@ final class PayabliTTPActivationIdTests: XCTestCase {
         do {
             try await ttp.initialize()
             XCTFail("expected the refusal")
-        } catch let error as PayabliGenericError {
+        } catch let error as TapToPayError {
             XCTAssertEqual(error.type, .permissionDenied)
+            XCTAssertEqual(error.reason, "Forbidden (403)")
         }
 
         XCTAssertEqual(ttp.sessionState, .failed(reason: .configurationRejected))
@@ -164,7 +165,7 @@ final class PayabliTTPActivationIdTests: XCTestCase {
         do {
             try await ttp.activateDevice(activationCode: "123456")
             XCTFail("expected a failure")
-        } catch PayabliTTPError.activationFailed {
+        } catch let error as TapToPayError where error.type == .activationCodeIncorrect {
         } catch {
             XCTFail("wrong error: \(error)")
         }

@@ -32,11 +32,29 @@ extension PayabliTTP {
         invoice: PayabliTTPInvoiceData = PayabliTTPInvoiceData(),
         orderDescription: String? = nil
     ) async throws -> TransactionResult {
+        try await reportingToHost(.charge) {
+            try await runCharge(
+                type: type,
+                paymentDetails: paymentDetails,
+                customer: customer,
+                invoice: invoice,
+                orderDescription: orderDescription
+            )
+        }
+    }
+
+    private func runCharge(
+        type: PayabliTTPPaymentType,
+        paymentDetails: PayabliTTPPaymentDetails,
+        customer: PayabliTTPCustomerData,
+        invoice: PayabliTTPInvoiceData,
+        orderDescription: String?
+    ) async throws -> TransactionResult {
         guard type == .sale else {
             throw PayabliTTPError.invalidState(current: sessionState, attempted: "charge(non-sale)")
         }
 
-        try await reinitializeIfNeeded()
+        try await reinitialize()
 
         guard sessionState == .ready else {
             throw PayabliTTPError.notReady(current: sessionState)
@@ -163,9 +181,9 @@ extension PayabliTTP {
     ///
     /// On success the completion is invoked with a non-nil
     /// `PayabliTTPTransactionResultObjC` and `nil` error. On failure the
-    /// completion receives a nil result and an `NSError` (domain
-    /// `"com.payabli.ttp"` for typed `PayabliTTPError`s). The completion is
-    /// always invoked on the main thread.
+    /// completion receives a nil result and an `NSError`, a ``TapToPayError``
+    /// with its catalog number as the code. The completion is always invoked
+    /// on the main thread.
     @objc public func charge(
         type: Int,
         paymentDetails: PayabliTTPPaymentDetailsObjC,

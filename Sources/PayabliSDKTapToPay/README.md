@@ -96,9 +96,9 @@ let ttp = try await PayabliTTP.create()
 ```swift
 do {
     try await ttp.initialize()
-} catch PayabliTTPError.devicePendingActivation {
+} catch let error as TapToPayError where error.type == .devicePendingActivation {
     // The phone needs an activation code. See Activate a phone.
-} catch PayabliTTPError.termsNotAccepted {
+} catch let error as TapToPayError where error.type == .termsNotAccepted {
     // The merchant hasn't accepted Apple's terms. See Accept Apple's terms.
 }
 ```
@@ -109,8 +109,8 @@ phone takes longer than later ones.
 ### Accept Apple's terms
 
 A merchant accepts Apple's Tap to Pay terms **once per merchant**, not once per phone. Until they do,
-`initialize()` stops at `.pendingTerms`, emits `.termsRequired` and throws
-`PayabliTTPError.termsNotAccepted`.
+`initialize()` stops at `.pendingTerms`, emits `.termsRequired` and throws a `TapToPayError` whose
+`type` is `.termsNotAccepted`.
 
 Present the terms from a screen where someone with the authority to accept is present, then initialize
 again:
@@ -128,8 +128,8 @@ try await ttp.initialize()
   say when to show it and to whom.
 - `presentTerms()` returning doesn't mean the merchant accepted. Ask `areTermsAccepted()`.
 - Ask each time instead of caching the answer. Acceptance can change outside your app.
-- `areTermsAccepted()` returns `false` when the merchant hasn't accepted, and throws
-  `PayabliTTPError.readerSetupFailed` when the reader couldn't answer.
+- `areTermsAccepted()` returns `false` when the merchant hasn't accepted, and throws a `TapToPayError`
+  when the reader couldn't answer.
 
 ### Activate a phone
 
@@ -138,7 +138,8 @@ A phone takes Tap to Pay payments for a paypoint only after it is activated with
 - Activation is **per phone and per paypoint**. It isn't per user.
 - A reinstall, a restore to a new phone, or a new phone needs a new code.
 
-Until the phone is activated, `initialize()` throws `PayabliTTPError.devicePendingActivation` and
+Until the phone is activated, `initialize()` throws a `TapToPayError` whose `type` is
+`.devicePendingActivation`, and
 `sessionState` is `.pendingActivation(activationId:)`. An app that isn't an authorized app, or credentials
 without `tools_init` or `pos_create`, land on `.failed(reason: .configurationRejected)` on a phone that
 hasn't registered yet. Credentials without
@@ -201,11 +202,20 @@ order.paymentTransId = result.paymentTransId // store it; don't log it
 
 ## Outcomes and errors
 
-Cancelling the task running `charge` after the transaction has opened doesn't end it silently: it throws
-`nfcFailed` or `updateFailed`, carrying `paymentTransId` and `capture`. Follow `capture` as for any other
-error.
+Every failure is a `TapToPayError`, apart from a task cancellation before the transaction opens, which
+is rethrown as `CancellationError`. Cancelling the task running `charge` after the transaction has opened
+doesn't end it silently: it throws a `TapToPayError` carrying `paymentTransId` and `capture`. Follow
+`capture` as for any other error.
 
-Every `PayabliTTPError` carries `capture` and `paymentTransId`:
+A `TapToPayError` carries the catalog entry for its cause:
+
+- `category` says what to do, such as `.credential` (call `initialize()` again) or `.outcomeUnknown`
+  (find the transaction before repeating the call).
+- `type` names the cause, for a case your app handles on its own, such as `.devicePendingActivation`.
+- `code` is the catalog number Payabli support reads. Give it to them with the failure.
+- `message` is fixed text. `detail` holds the service's or the reader's own words, when there are any.
+
+It also carries `capture` and `paymentTransId`:
 
 | `capture` | Meaning | What to do |
 |---|---|---|
@@ -213,30 +223,8 @@ Every `PayabliTTPError` carries `capture` and `paymentTransId`:
 | `.unknown` | The outcome isn't known. | Look up `paymentTransId` with [`GET /api/MoneyIn/details/{transId}`](https://docs.payabli.com/developers/api-reference/moneyin/get-details-for-a-processed-transaction) before charging again. When there's no ID, find the transaction in the Payabli portal. |
 | `.charged` | The card was charged, but a later step failed. | Don't charge again. Reconcile the payment. |
 
-| Error | When |
-|---|---|
-| `devicePendingActivation` | The phone needs an activation code. |
-| `termsNotAccepted` | The merchant hasn't accepted Apple's terms. |
-| `cardDeclined(paymentTransId:)` | The card was declined. |
-| `outcomeUnknown(paymentTransId:)` | The processor answered neither an approval nor a decline. |
-| `nfcFailed(reason:paymentTransId:)` | The card read failed, for example the card moved away too soon. |
-| `updateFailed(reason:paymentTransId:capture:)` | The step after the card read failed. `capture` says whether the card was charged. |
-| `initiateFailed(reason:)` | The transaction couldn't be opened. Nothing was charged. |
-| `attestationFailed(reason:)`, `attestationRevoked(reason:)` | The device couldn't prove its identity. Check the entitlements. |
-| `configFailed(reason:)` | Fetching the device's configuration failed. `reason` says why: a setup gap on the paypoint or device, or a token, network or service failure. |
-| `readerSetupFailed(reason:paymentTransId:)` | The reader couldn't be prepared. |
-| `readerOSVersionNotSupported(paymentTransId:capture:)` | The iOS version doesn't support Tap to Pay. |
-| `invalidState(current:attempted:)`, `notReady(current:)` | The call was made in the wrong session state. |
-| `tokenExpired`, `networkError(reason:)` | The token or the network failed. Retry later. |
-| `activationFailed(reason:)` | The activation code was refused. |
-
 `PayabliTTP.create()` throws a `TapToPayError` whose `type` is `.sessionNotInitialized` (1019) when no session
 has been started: call `PayabliSession.initialize` first.
-
-Device attestation and opening a transaction can also throw a core `PayabliError` from `PayabliSDKCore`,
-for example `PayabliGenericError` or `PayabliPaymentError`. It carries no `capture`: `charge` throws one
-only before the card is read, so nothing was charged. Catch `any PayabliError` and branch on its `type`;
-`.tokenProviderFailed` means your token provider failed.
 
 From Objective-C, these errors arrive as `NSError`. See
 [Language support](../../README.md#language-support) in the root README.

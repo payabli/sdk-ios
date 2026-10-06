@@ -14,7 +14,9 @@ public extension PayabliTTP {
     /// so the caller can immediately re-run `initialize()` for a fresh cold
     /// attestation — `.sessionExpired` is also emitted in that sub-case.
     func activateDevice(activationCode: String) async throws {
-        try await runSessionSetup(.activate) { try await self.runActivateDevice(activationCode: activationCode) }
+        try await reportingToHost(.activateDevice) {
+            try await runSessionSetup(.activate) { try await self.runActivateDevice(activationCode: activationCode) }
+        }
     }
 
     private func runActivateDevice(activationCode: String) async throws {
@@ -73,8 +75,8 @@ public extension PayabliTTP {
 
     /// `@objc` companion to `activateDevice(activationCode:)` for ObjC /
     /// MAUI / Flutter / RN consumers. `completion(nil)` on success,
-    /// `completion(NSError)` on failure (domain `"com.payabli.ttp"` for
-    /// typed `PayabliTTPError`s).
+    /// `completion(NSError)` on failure, a ``TapToPayError`` with its catalog
+    /// number as the code.
     ///
     /// The completion handler is always invoked on the main thread because
     /// the entire `PayabliTTP` surface is `@MainActor`.

@@ -104,7 +104,7 @@ final class PayabliTTPTests: XCTestCase {
         do {
             try await ttp.initialize()
             XCTFail("expected pending activation")
-        } catch PayabliTTPError.devicePendingActivation {
+        } catch let error as TapToPayError where error.type == .devicePendingActivation {
             XCTAssertEqual(ttp.sessionState, .pendingActivation(activationId: "dev"))
         } catch {
             XCTFail("wrong error: \(error)")
@@ -117,7 +117,8 @@ final class PayabliTTPTests: XCTestCase {
         do {
             try await ttp.initialize()
             XCTFail("expected eligibility failure")
-        } catch PayabliTTPError.readerSetupFailed {
+        } catch let error as TapToPayError where error.type == .readerUnavailable {
+            XCTAssertEqual(error.detail, "no entitlement")
             XCTAssertEqual(ttp.sessionState.code, .failed)
         } catch {
             XCTFail("wrong error: \(error)")
@@ -140,7 +141,7 @@ final class PayabliTTPTests: XCTestCase {
         do {
             try await ttp.activateDevice(activationCode: "X")
             XCTFail("expected invalid state")
-        } catch PayabliTTPError.invalidState {
+        } catch let error as TapToPayError where error.type == .deviceNotPending {
             // ok
         } catch {
             XCTFail("wrong error: \(error)")
@@ -211,7 +212,7 @@ final class PayabliTTPTests: XCTestCase {
         do {
             try await ttp.initialize()
             XCTFail("expected a failure")
-        } catch PayabliTTPError.configFailed {
+        } catch let error as TapToPayError where error.type == .entryPointRefused {
         } catch {
             XCTFail("wrong error: \(error)")
         }
@@ -395,8 +396,8 @@ final class PayabliTTPTests: XCTestCase {
         XCTAssertFalse(text.contains("dev_old"), "a handle captured during initialize() was sent")
     }
 
-    /// The event and the thrown error carry the wrapper; the state carries the
-    /// remedy for the failure underneath it.
+    /// The event names the wrapper and the thrown error its catalog entry; the
+    /// state carries the remedy for the failure underneath it.
     func testConfigFailureThrowsTheWrapperAndLandsTheRemedyOfWhatFailed() async throws {
         let (ttp, _, _) = try makeTTP()
         StubURLProtocol.handler = { request in
@@ -431,8 +432,8 @@ final class PayabliTTPTests: XCTestCase {
         let raised = try XCTUnwrap(thrown, "initialize() returned instead of failing")
         let marked = try XCTUnwrap(ttp.sessionManager.lastError, "the session recorded no error")
 
-        XCTAssertEqual(reported, ErrorSummary.of(raised), "the event must summarise what was thrown")
-        XCTAssertTrue(raised is PayabliTTPError, "the bridges read the domain of this type")
+        XCTAssertEqual(reported, "configFailed")
+        XCTAssertEqual((raised as? TapToPayError)?.type, .entryPointRefused, "got \(raised)")
         XCTAssertFalse(
             marked is PayabliTTPError,
             "the state is classified from the failure as it arrived, not from the wrapper"
@@ -456,7 +457,7 @@ final class PayabliTTPTests: XCTestCase {
             try await ttp.initialize()
             XCTFail("expected the config phase to fail")
         } catch {
-            XCTAssertTrue(error is PayabliTTPError, "the bridges read the domain of this type")
+            XCTAssertEqual((error as? TapToPayError)?.type, .entryPointRefused, "got \(error)")
         }
 
         // The same bytes get the same answer, so a retry is not the remedy. A 500
@@ -501,8 +502,8 @@ final class PayabliTTPTests: XCTestCase {
 
         // The other half of the split: what the event withholds, the caller gets.
         let raised = try XCTUnwrap(thrown)
-        XCTAssertTrue(raised.localizedDescription.contains(serversWords), raised.localizedDescription)
-        XCTAssertTrue(raised is PayabliTTPError, "the bridges read the domain of this type")
+        let host = try XCTUnwrap(raised as? TapToPayError, "got \(raised)")
+        XCTAssertTrue(host.detail?.contains(serversWords) == true, String(describing: host.detail))
     }
 
     /// The 401 branch does four things and had a test for none of them: it clears

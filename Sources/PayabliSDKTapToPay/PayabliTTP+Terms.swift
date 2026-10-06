@@ -20,18 +20,18 @@ public extension PayabliTTP {
     /// No charge can be taken until this answers `true`.
     ///
     /// - Returns: `true` when the merchant has accepted.
-    /// - Throws: `PayabliTTPError.readerSetupFailed(reason:)` when there is no
-    ///   reader to ask — which is a different answer from `false`, and a caller
-    ///   showing a terms screen should tell them apart.
+    /// - Throws: ``TapToPayError`` with ``PayabliErrorType/readerUnavailable``
+    ///   when there is no reader to ask — which is a different answer from
+    ///   `false`, and a caller showing a terms screen should tell them apart.
     func areTermsAccepted() async throws -> Bool {
-        try await provider.areTermsAccepted()
+        try await reportingToHost(.terms) { try await provider.areTermsAccepted() }
     }
 
     /// `@objc` companion to `areTermsAccepted()` for ObjC / MAUI / Flutter / RN
     /// consumers. Bridges the `async throws` Swift method to a callback-based
     /// signature: `completion(accepted, nil)` on success, `completion(false,
-    /// NSError)` on failure (domain `"com.payabli.ttp"` for typed
-    /// `PayabliTTPError`s).
+    /// NSError)` on failure, a ``TapToPayError`` with its catalog number as the
+    /// code.
     ///
     /// `false` on the failure path is the bridging default and never an answer.
     /// Read the error first; the two cases are only distinguishable by it.
@@ -78,16 +78,17 @@ public extension PayabliTTP {
     /// There is no separate call for re-presenting them after acceptance lapses.
     /// This is that call too.
     ///
-    /// - Throws: `PayabliTTPError.readerSetupFailed(reason:)` when there is no
-    ///   reader to present from. `initialize()` is what builds one.
+    /// - Throws: ``TapToPayError`` with ``PayabliErrorType/readerUnavailable``
+    ///   when there is no reader to present from. `initialize()` is what builds
+    ///   one.
     func presentTerms() async throws {
-        try await provider.presentTerms()
+        try await reportingToHost(.terms) { try await provider.presentTerms() }
     }
 
     /// `@objc` companion to `presentTerms()` for ObjC / MAUI / Flutter / RN
     /// consumers. Bridges the `async throws` Swift method to a callback-based
-    /// signature: `completion(nil)` on success, `completion(NSError)` on failure
-    /// (domain `"com.payabli.ttp"` for typed `PayabliTTPError`s).
+    /// signature: `completion(nil)` on success, `completion(NSError)` on failure,
+    /// a ``TapToPayError`` with its catalog number as the code.
     ///
     /// The completion handler is always invoked on the main thread because the
     /// entire `PayabliTTP` surface is `@MainActor`.

@@ -109,7 +109,7 @@ final class TapToPayTerminal: ObservableObject {
     // MARK: -
 
     /// One place where a failure becomes this app's own, so no caller sees a
-    /// `PayabliTTPError` and every caller gets the same shape.
+    /// `TapToPayError` and every caller gets the same shape.
     private func run<T>(_ body: () async throws -> T) async throws -> T {
         do {
             return try await body()
@@ -139,11 +139,7 @@ struct TapToPayFailure: LocalizedError {
 
     init(_ error: Error) {
         message = error.localizedDescription
-        if let ttpError = error as? PayabliTTPError, case .attestationRevoked = ttpError {
-            isAttestationRevoked = true
-        } else {
-            isAttestationRevoked = false
-        }
+        isAttestationRevoked = (error as? TapToPayError)?.type == .deviceSetupRequired
     }
 }
 

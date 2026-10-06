@@ -263,10 +263,9 @@ final class PayabliTTPReaderSessionRecoveryTests: XCTestCase {
 
     // MARK: - Error text reaching the host
 
-    /// A host shows `localizedDescription`. When the facade re-wraps an error
-    /// that is already a `PayabliTTPError`, that value becomes the whole enum
-    /// printed back — case name, parentheses, and the inner string escaped —
-    /// which is what a person then reads on screen.
+    /// A host shows `localizedDescription`. The adapter's own words reach it as
+    /// written, never as an internal value printed back — case name,
+    /// parentheses, and the inner string escaped.
     func testPrepareFailureKeepsTheAdapterMessage() async throws {
         let provider = MockTapToPayProvider()
         provider.prepareReaderResult = .failure(
@@ -280,11 +279,10 @@ final class PayabliTTPReaderSessionRecoveryTests: XCTestCase {
             try await bounded { try await ttp.initialize() }
             XCTFail("expected initialize to fail")
         } catch {
+            let adapterWords = "passcodeDisabled: Error that indicates the device doesn't have an active passcode."
+            XCTAssertEqual((error as? TapToPayError)?.detail, adapterWords)
             let shown = error.localizedDescription
-            XCTAssertEqual(
-                shown,
-                "passcodeDisabled: Error that indicates the device doesn't have an active passcode."
-            )
+            XCTAssertTrue(shown.hasSuffix(adapterWords), shown)
             XCTAssertFalse(shown.contains("readerSetupFailed("), "the enum itself leaked into the message")
             XCTAssertFalse(shown.contains("\\'"), "the inner string was escaped for display")
         }
@@ -298,10 +296,9 @@ final class PayabliTTPReaderSessionRecoveryTests: XCTestCase {
             _ = try await charge(ttp)
             XCTFail("expected the charge to fail")
         } catch {
-            XCTAssertEqual(
-                error.localizedDescription,
-                "noReaderSession: no reader session available or the session isn't ready"
-            )
+            let readerWords = "noReaderSession: no reader session available or the session isn't ready"
+            XCTAssertEqual((error as? TapToPayError)?.detail, readerWords)
+            XCTAssertTrue(error.localizedDescription.hasSuffix(readerWords), error.localizedDescription)
         }
     }
 
@@ -321,7 +318,7 @@ final class PayabliTTPReaderSessionRecoveryTests: XCTestCase {
 
         let failure = try await chargeFailure(ttp)
 
-        guard case .nfcFailed = failure else { return XCTFail("got \(failure)") }
+        XCTAssertEqual(failure.type, .tapNotCompleted)
         XCTAssertEqual(failure.paymentTransId, Self.paymentTransId)
         XCTAssertEqual(failure.capture, .unknown)
     }
@@ -332,7 +329,7 @@ final class PayabliTTPReaderSessionRecoveryTests: XCTestCase {
 
         let failure = try await chargeFailure(ttp)
 
-        XCTAssertEqual((failure as NSError).code, 15, "the remedy is a different device, not a retry")
+        XCTAssertEqual(failure.type, .deviceOSUnsupported, "the remedy is a different device, not a retry")
         XCTAssertEqual(failure.paymentTransId, Self.paymentTransId)
         XCTAssertEqual(failure.capture, .unknown, "the reader had been asked for a card")
     }
@@ -343,17 +340,17 @@ final class PayabliTTPReaderSessionRecoveryTests: XCTestCase {
 
         let failure = try await chargeFailure(ttp)
 
-        XCTAssertEqual((failure as NSError).code, 7)
+        XCTAssertEqual(failure.type, .readerUnavailable)
         XCTAssertEqual(failure.paymentTransId, Self.paymentTransId)
         XCTAssertEqual(failure.capture, .notCharged, "the reader was never asked for a card")
     }
 
     // MARK: - Fixtures
 
-    private func chargeFailure(_ ttp: PayabliTTP) async throws -> PayabliTTPError {
+    private func chargeFailure(_ ttp: PayabliTTP) async throws -> TapToPayError {
         do {
             _ = try await charge(ttp)
-        } catch let failure as PayabliTTPError {
+        } catch let failure as TapToPayError {
             return failure
         }
         XCTFail("expected the charge to fail")

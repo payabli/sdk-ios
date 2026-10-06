@@ -596,10 +596,8 @@ class PayabliTTPInvoiceData {
 }
 
 /// Thrown by [PayabliTTP] methods. [code] mirrors the native error code:
-///   - the catalog number, such as `"1004"` or `"3001"`, when the underlying
-///     error is a `PayabliError`.
-///   - `"TTP_<n>"` when the underlying error is a `PayabliTTPError`
-///     (`<n>` matches the stable code documented in the native module).
+///   - the catalog number, such as `"1004"` or `"3001"`, for any failure the
+///     SDK raised.
 ///   - `"INIT_FAILED"`, `"CHARGE_FAILED"`, `"ACTIVATION_FAILED"`,
 ///     `"INVALID_ARGS"`, `"NOT_CONFIGURED"`, `"NO_TOKEN_PROVIDER"` for
 ///     bridge-level failures.

@@ -91,10 +91,8 @@ final class PayabliTTPTermsTests: XCTestCase {
         do {
             _ = try await ttp.areTermsAccepted()
             XCTFail("expected the provider's failure to surface")
-        } catch let error as PayabliTTPError {
-            guard case .readerSetupFailed = error else {
-                return XCTFail("expected readerSetupFailed, got \(error)")
-            }
+        } catch let error as TapToPayError {
+            XCTAssertEqual(error.type, .readerUnavailable)
         }
     }
 
@@ -130,10 +128,8 @@ final class PayabliTTPTermsTests: XCTestCase {
         do {
             try await ttp.initialize()
             XCTFail("expected initialize to report unaccepted terms")
-        } catch let error as PayabliTTPError {
-            guard case .termsNotAccepted = error else {
-                return XCTFail("expected termsNotAccepted, got \(error)")
-            }
+        } catch let error as TapToPayError {
+            XCTAssertEqual(error.type, .termsNotAccepted)
         }
 
         XCTAssertNotEqual(ttp.sessionState, .ready)
@@ -153,10 +149,8 @@ final class PayabliTTPTermsTests: XCTestCase {
         do {
             try await ttp.initialize()
             XCTFail("expected initialize to report unaccepted terms")
-        } catch let error as PayabliTTPError {
-            guard case .termsNotAccepted = error else {
-                return XCTFail("expected termsNotAccepted, got \(error)")
-            }
+        } catch let error as TapToPayError {
+            XCTAssertEqual(error.type, .termsNotAccepted)
         }
 
         XCTAssertEqual(ttp.sessionState, .pendingTerms)
@@ -250,10 +244,8 @@ final class PayabliTTPTermsTests: XCTestCase {
         do {
             try await ttp.presentTerms()
             XCTFail("expected the failure to reach the caller")
-        } catch let error as PayabliTTPError {
-            guard case .readerSetupFailed = error else {
-                return XCTFail("expected readerSetupFailed, got \(error)")
-            }
+        } catch let error as TapToPayError {
+            XCTAssertEqual(error.type, .readerUnavailable)
         }
     }
 
@@ -331,7 +323,7 @@ final class PayabliTTPTermsTests: XCTestCase {
         ttp.areTermsAccepted { accepted, error in
             XCTAssertFalse(accepted)
             XCTAssertEqual(error?.domain, "com.payabli.ttp")
-            XCTAssertEqual(error?.code, 14)
+            XCTAssertEqual(error?.code, PayabliErrorType.termsNotAccepted.number)
             done.fulfill()
         }
         await fulfillment(of: [done], timeout: 1)

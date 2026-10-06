@@ -1,0 +1,200 @@
+import PayabliSDKCore
+@testable import PayabliSDKTapToPay
+import XCTest
+
+/// What a host is handed for each failure the SDK raises: always a `TapToPayError`, under the catalog entry
+/// for its cause, still naming the payment it belongs to.
+final class TapToPayErrorTranslationTests: XCTestCase {
+    // MARK: - Every case reaches its catalog code
+
+    func testEveryCaseReachesAHostUnderItsCatalogCode() {
+        for error in Self.allSamples {
+            let host = TapToPayErrorTranslation.hostError(for: error, raisedBy: .initialize)
+            guard let host = host as? TapToPayError else {
+                XCTFail("\(error) reached a host as \(type(of: host))")
+                continue
+            }
+            XCTAssertEqual(host.type, Self.expectedType(of: error), "Wrong entry for \(error)")
+            XCTAssertEqual(host.code, Self.expectedType(of: error).number)
+        }
+    }
+
+    func testAnOutOfOrderCallIsAnInvalidRequestOnAChargeAndANotPendingDeviceOnActivation() {
+        let error = PayabliTTPError.invalidState(current: .ready, attempted: "x")
+        XCTAssertEqual(TapToPayErrorTranslation.catalogType(of: error, raisedBy: .charge), .validation)
+        XCTAssertEqual(TapToPayErrorTranslation.catalogType(of: error, raisedBy: .activateDevice), .deviceNotPending)
+    }
+
+    // MARK: - Reason and detail
+
+    func testACardPresentCaseCarriesItsCodesTextAsTheReasonAndItsOwnWordsAsTheDetail() throws {
+        let host = try translated(PayabliTTPError.configFailed(reason: "entry point is disabled"))
+        XCTAssertEqual(host.reason, PayabliErrorType.entryPointRefused.message)
+        XCTAssertEqual(host.detail, "entry point is disabled")
+    }
+
+    func testAnEmptyReasonIsNeverOfferedAsTheDetail() throws {
+        XCTAssertNil(try translated(PayabliTTPError.attestationFailed(reason: "")).detail)
+        XCTAssertNil(try translated(PayabliTTPError.nfcFailed(reason: "  \n")).detail)
+    }
+
+    func testACaseWithNoTextCarriesNoDetail() throws {
+        XCTAssertNil(try translated(PayabliTTPError.devicePendingActivation).detail)
+    }
+
+    func testATransportFailureKeepsItsCodeReasonAndDetail() throws {
+        let host = try translated(
+            PayabliGenericError(type: .tokenProviderFailed, reason: "no usable token", detail: "provider threw")
+        )
+        XCTAssertEqual(host.type, .tokenProviderFailed)
+        XCTAssertEqual(host.reason, "no usable token")
+        XCTAssertEqual(host.detail, "provider threw")
+        XCTAssertEqual(host.capture, .notCharged)
+        XCTAssertNil(host.paymentTransId)
+    }
+
+    // MARK: - What passes through
+
+    func testATapToPayErrorPassesThroughUnchanged() throws {
+        let raised = TapToPayError(
+            type: .deviceKeyUnavailable, reason: "r", detail: "d", paymentTransId: "TXN-9", capture: .unknown
+        )
+        let host = try translated(raised)
+        XCTAssertEqual(host.type, raised.type)
+        XCTAssertEqual(host.reason, raised.reason)
+        XCTAssertEqual(host.detail, raised.detail)
+        XCTAssertEqual(host.paymentTransId, raised.paymentTransId)
+        XCTAssertEqual(host.capture, raised.capture)
+    }
+
+    func testCancellationStaysACancellation() {
+        let host = TapToPayErrorTranslation.hostError(for: CancellationError(), raisedBy: .charge)
+        XCTAssertTrue(host is CancellationError, "got \(host)")
+    }
+
+    func testAnErrorTheSDKDoesNotKnowIsUnknown() throws {
+        struct Unrecognised: Error {}
+        let host = try translated(Unrecognised())
+        XCTAssertEqual(host.type, .unknown)
+        XCTAssertEqual(host.reason, PayabliErrorType.unknown.message)
+        XCTAssertNil(host.detail)
+    }
+
+    // MARK: - Capture and payment
+
+    func testAFailureStillNamesThePaymentAndWhatItTook() throws {
+        let host = try translated(PayabliTTPError.updateFailed(reason: "x", paymentTransId: "TXN-9", capture: .charged))
+        XCTAssertEqual(host.paymentTransId, "TXN-9")
+        XCTAssertEqual(host.capture, .charged)
+    }
+
+    func testOnlyAFailureAfterTheTapCanHaveTakenMoney() {
+        for error in Self.allSamples {
+            switch error {
+            case .nfcFailed, .outcomeUnknown, .updateFailed:
+                XCTAssertEqual(error.capture, .unknown, "\(error) was raised once a card was asked for")
+            case .notInitialized, .invalidState, .notReady, .devicePendingActivation, .attestationRevoked,
+                 .attestationFailed, .configFailed, .readerSetupFailed, .initiateFailed, .tokenExpired,
+                 .activationFailed, .networkError, .termsNotAccepted, .readerOSVersionNotSupported, .cardDeclined:
+                XCTAssertEqual(error.capture, .notCharged, "\(error) took no money")
+            }
+        }
+    }
+
+    func testAReaderThatWasNeverAskedForACardChargedNothingWhateverPaymentItNames() {
+        let err = PayabliTTPError.readerSetupFailed(reason: "Reader not prepared", paymentTransId: "TXN-9")
+        XCTAssertEqual(err.capture, .notCharged)
+        XCTAssertEqual(err.paymentTransId, "TXN-9")
+    }
+
+    func testAnUnsupportedOSAnswersTheCaptureItWasRaisedWith() {
+        XCTAssertEqual(PayabliTTPError.readerOSVersionNotSupported().capture, .notCharged)
+        let duringARead = PayabliTTPError.readerOSVersionNotSupported(paymentTransId: "TXN-9", capture: .unknown)
+        XCTAssertEqual(duringARead.capture, .unknown)
+        XCTAssertEqual(duringARead.paymentTransId, "TXN-9")
+    }
+
+    func testAFailedReadForAnOpenedPaymentMayHaveBeenCharged() {
+        let err = PayabliTTPError.nfcFailed(reason: "x", paymentTransId: "TXN-9")
+        XCTAssertEqual(err.capture, .unknown)
+        XCTAssertEqual(err.paymentTransId, "TXN-9")
+    }
+
+    func testAFailureBeforeAPaymentWasOpenedNamesNone() {
+        XCTAssertNil(PayabliTTPError.initiateFailed(reason: "x").paymentTransId)
+    }
+
+    // MARK: - The NSError an Objective-C caller receives
+
+    func testAnObjectiveCCallerReceivesTheCatalogNumberCaptureAndPayment() throws {
+        let host = try translated(PayabliTTPError.cardDeclined(paymentTransId: "TXN-9"))
+        let nsError = host.toPayabliNSError()
+        XCTAssertEqual(nsError.domain, "com.payabli.ttp")
+        XCTAssertEqual(nsError.code, PayabliErrorType.cardDeclined.number)
+        XCTAssertEqual(nsError.userInfo["PayabliErrorType"] as? String, PayabliErrorType.cardDeclined.rawValue)
+        XCTAssertEqual(nsError.userInfo["capture"] as? Int, PayabliTTPCapture.notCharged.rawValue)
+        XCTAssertEqual(nsError.userInfo["paymentTransId"] as? String, "TXN-9")
+    }
+
+    func testACancellationBridgesAsSwiftDoes() {
+        let nsError = CancellationError().toPayabliNSError()
+        XCTAssertNotEqual(nsError.domain, "com.payabli.ttp")
+    }
+
+    // MARK: - Fixtures
+
+    private func translated(_ error: Error, file: StaticString = #filePath, line: UInt = #line) throws -> TapToPayError {
+        let host = TapToPayErrorTranslation.hostError(for: error, raisedBy: .initialize)
+        return try XCTUnwrap(host as? TapToPayError, "got \(type(of: host))", file: file, line: line)
+    }
+
+    // swiftlint:disable cyclomatic_complexity
+
+    /// The published entry for each case, written out independently of the table under test. A new case
+    /// stops this compiling until it is given one.
+    private static func expectedType(of error: PayabliTTPError) -> PayabliErrorType {
+        switch error {
+        case .notInitialized: return .sessionNotInitialized
+        case .invalidState: return .validation
+        case .notReady: return .terminalNotReady
+        case .devicePendingActivation: return .devicePendingActivation
+        case .attestationRevoked: return .deviceSetupRequired
+        case .attestationFailed: return .deviceSetupRefused
+        case .configFailed: return .entryPointRefused
+        case .readerSetupFailed: return .readerUnavailable
+        case .nfcFailed: return .tapNotCompleted
+        case .initiateFailed: return .paymentNotOpened
+        case .updateFailed: return .paymentNotClosed
+        case .tokenExpired: return .tokenExpired
+        case .activationFailed: return .activationCodeIncorrect
+        case .networkError: return .networkError
+        case .termsNotAccepted: return .termsNotAccepted
+        case .readerOSVersionNotSupported: return .deviceOSUnsupported
+        case .cardDeclined: return .cardDeclined
+        case .outcomeUnknown: return .paymentOutcomeUnknown
+        }
+    }
+
+    // swiftlint:enable cyclomatic_complexity
+
+    private static let allSamples: [PayabliTTPError] = [
+        .notInitialized,
+        .invalidState(current: .ready, attempted: "x"),
+        .notReady(current: .idle),
+        .devicePendingActivation,
+        .attestationRevoked(reason: "x"),
+        .attestationFailed(reason: "x"),
+        .configFailed(reason: "x"),
+        .readerSetupFailed(reason: "x"),
+        .nfcFailed(reason: "x"),
+        .initiateFailed(reason: "x"),
+        .updateFailed(reason: "x", paymentTransId: "TXN", capture: .unknown),
+        .tokenExpired,
+        .activationFailed(reason: "x"),
+        .networkError(reason: "x"),
+        .termsNotAccepted,
+        .readerOSVersionNotSupported(),
+        .cardDeclined(paymentTransId: "TXN"),
+        .outcomeUnknown(paymentTransId: "TXN")
+    ]
+}

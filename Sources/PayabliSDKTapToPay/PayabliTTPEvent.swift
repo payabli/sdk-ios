@@ -57,11 +57,9 @@ public enum PayabliTTPEvent: Sendable {
     case readerPromptDismissed
 }
 
-/// TTP-specific errors (PRD §20.2).
-///
-/// A charge can also throw a core `PayabliError` from opening the payment. That one is raised before the
-/// card is read, so nothing was charged, and the SDK holds no payment identifier for it.
-public enum PayabliTTPError: Error, Sendable {
+/// The SDK's own card-present failures. A host never receives one: every public call hands its failure
+/// over as ``TapToPayError``, through ``TapToPayErrorTranslation``.
+package enum PayabliTTPError: Error, Sendable {
     case notInitialized
     case invalidState(current: PayabliTTPSessionState, attempted: String)
     case notReady(current: PayabliTTPSessionState)
@@ -78,18 +76,12 @@ public enum PayabliTTPError: Error, Sendable {
     case networkError(reason: String)
     /// The merchant has not accepted the terms their platform requires before it
     /// will take a contactless payment. The SDK does not accept on their behalf.
-    ///
-    /// Appended after `networkError` to keep the `errorCode` table below
-    /// append-only; those codes are public API.
     case termsNotAccepted
 
     /// This OS build cannot take contactless payments, and nothing the app or
     /// the merchant does reaches that. The remedy is a different device or an
     /// OS upgrade, where every other reader failure is transient or
     /// environmental.
-    ///
-    /// Appended after `termsNotAccepted` to keep the `errorCode` table below
-    /// append-only; those codes are public API.
     case readerOSVersionNotSupported(paymentTransId: String? = nil, capture: PayabliTTPCapture = .notCharged)
 
     /// The processor refused the card. No money moved.
@@ -99,7 +91,7 @@ public enum PayabliTTPError: Error, Sendable {
     case outcomeUnknown(paymentTransId: String)
 }
 
-public extension PayabliTTPError {
+package extension PayabliTTPError {
     /// Whether this failure took money from the card.
     var capture: PayabliTTPCapture {
         switch self {
@@ -274,51 +266,9 @@ public extension PayabliTTPEvent {
     }
 }
 
-// MARK: - PayabliTTPError NSError bridging
+// MARK: - PayabliTTPError description
 
-/// `PayabliTTPError` bridges to `NSError` with domain `"com.payabli.ttp"` and
-/// stable per-case integer codes so ObjC / MAUI consumers can branch on the
-/// `code` property without parsing localized strings. The `code` table is
-/// part of the public API: do not reorder or renumber. New cases must be
-/// appended at the end with a new code.
-extension PayabliTTPError: CustomNSError, LocalizedError {
-    public static var errorDomain: String {
-        "com.payabli.ttp"
-    }
-
-    public var errorCode: Int {
-        switch self {
-        case .notInitialized: return 0
-        case .invalidState: return 1
-        case .notReady: return 2
-        case .devicePendingActivation: return 3
-        case .attestationRevoked: return 4
-        case .attestationFailed: return 5
-        case .configFailed: return 6
-        case .readerSetupFailed: return 7
-        case .nfcFailed: return 8
-        case .initiateFailed: return 9
-        case .updateFailed: return 10
-        case .tokenExpired: return 11
-        case .activationFailed: return 12
-        case .networkError: return 13
-        case .termsNotAccepted: return 14
-        case .readerOSVersionNotSupported: return 15
-        case .cardDeclined: return 16
-        case .outcomeUnknown: return 17
-        }
-    }
-
-    /// Carries `"capture"`, the raw value of ``capture``, and `"paymentTransId"` where the failure
-    /// belongs to a payment, so a bridged caller can reconcile without the Swift type.
-    public var errorUserInfo: [String: Any] {
-        var info: [String: Any] = [NSLocalizedDescriptionKey: localizedReason, "capture": capture.rawValue]
-        if let paymentTransId {
-            info["paymentTransId"] = paymentTransId
-        }
-        return info
-    }
-
+extension PayabliTTPError: LocalizedError {
     private var localizedReason: String {
         switch self {
         case .notInitialized:
@@ -353,24 +303,19 @@ extension PayabliTTPError: CustomNSError, LocalizedError {
         }
     }
 
-    public var errorDescription: String? {
+    package var errorDescription: String? {
         localizedReason
     }
 }
 
 extension Error {
-    /// Bridges any `Error` to an `NSError` for the `@objc` callback companions. A Payabli
-    /// taxonomy is discoverable in the `"com.payabli.ttp"` domain: `PayabliTTPError` through its
-    /// stable per-case `code`, and any `PayabliError` through its catalog number as the code, with
-    /// the type's wire name in `userInfo["PayabliErrorType"]`. Everything else falls through
-    /// Swift's default bridging.
+    /// Bridges a public call's failure to the `NSError` its `@objc` companion completes with: a
+    /// ``TapToPayError`` carries its catalog number as the code in the `"com.payabli.ttp"` domain, and
+    /// a cancellation bridges as Swift does.
     func toPayabliNSError() -> NSError {
-        if let ttpError = self as? PayabliTTPError {
-            return ttpError as NSError
-        }
         if let tapToPayError = self as? TapToPayError {
             return tapToPayError as NSError
         }
-        return payabliNSError(domain: PayabliTTPError.errorDomain)
+        return payabliNSError(domain: TapToPayError.errorDomain)
     }
 }
