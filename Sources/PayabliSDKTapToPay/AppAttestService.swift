@@ -96,7 +96,20 @@ package final class AppAttestService: DeviceAttestationService, @unchecked Senda
         guard let binding = try binding(for: entry) else {
             return false
         }
-        return try await keyIsStillHeld(binding)
+        do {
+            return try await keyIsStillHeld(binding)
+        } catch let failure as TapToPayError {
+            // The probe suspends: a check that could not answer about a binding replaced meanwhile
+            // says nothing about the one held now.
+            let current = try self.binding(for: entry)
+            if current == binding {
+                throw failure
+            }
+            guard let current else {
+                return false
+            }
+            return try await keyIsStillHeld(current)
+        }
     }
 
     /// Whether the platform will still sign with this binding's key.
