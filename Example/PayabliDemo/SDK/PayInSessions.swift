@@ -8,10 +8,10 @@ import PayabliSDKPayIn
 @MainActor
 enum PayInSessions {
     /// Storing an instrument for later.
-    static func storedMethod() -> PayInFlowHandle {
+    static func storedMethod(session: PayabliSession) -> PayInFlowHandle {
         PayInFlowHandle(
             PayabliPayIn(
-                session: DemoSession.start(),
+                session: session,
                 diagnostics: .qaLogging(
                     enabled: Secrets.paymentMethodDiagnosticsEnabled,
                     store: .paymentMethod
@@ -25,10 +25,10 @@ enum PayInSessions {
     /// The customer switch that governs the launch request does not exist yet at
     /// this point, and its own default is the same answer, so the launch request
     /// states it rather than reading it.
-    static func capture() -> PayInFlowHandle {
+    static func capture(session: PayabliSession) -> PayInFlowHandle {
         PayInFlowHandle(
             PayabliPayIn(
-                session: DemoSession.start(),
+                session: session,
                 diagnostics: .qaLogging(
                     enabled: Secrets.paymentCaptureDiagnosticsEnabled,
                     store: .paymentCapture
@@ -40,10 +40,10 @@ enum PayInSessions {
     }
 
     /// A flow for a canvas preview, which makes no network call.
-    static func preview(capturing: Bool = false) -> PayInFlowHandle {
+    static func preview(session: PayabliSession, capturing: Bool = false) -> PayInFlowHandle {
         PayInFlowHandle(
             PayabliPayIn(
-                session: DemoSession.start(),
+                session: session,
                 operation: capturing ? .capture : .storePaymentMethod,
                 requestConfiguration: capturing
                     ? PayabliPayInRequestConfiguration(

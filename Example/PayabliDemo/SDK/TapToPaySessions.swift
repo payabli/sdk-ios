@@ -5,10 +5,9 @@ import PayabliSDKTapToPay
 enum TapToPaySessions {
     /// The terminal the app runs on a device.
     ///
-    /// Runs on the session `DemoSession` started, so it shares the card-not-present flows' token.
+    /// Built after `DemoSession` has started, so it runs on the session the card-not-present flows share.
     @MainActor
     static func terminal() -> TapToPayTerminal {
-        DemoSession.start()
         do {
             return TapToPayTerminal(try PayabliTTP(appId: Secrets.appId))
         } catch {
@@ -20,7 +19,6 @@ enum TapToPaySessions {
     /// makes no network call and touches neither App Attest nor the reader.
     @MainActor
     static func preview() -> TapToPayTerminal {
-        DemoSession.start()
         do {
             return TapToPayTerminal(
                 try PayabliTTP(appId: "PREVIEW0000.\(Bundle.main.bundleIdentifier ?? "preview")")

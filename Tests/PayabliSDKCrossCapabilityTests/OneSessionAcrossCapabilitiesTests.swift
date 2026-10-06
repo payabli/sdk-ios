@@ -12,7 +12,7 @@ final class OneSessionAcrossCapabilitiesTests: XCTestCase {
 
     func testBothCapabilitiesHoldOneCredentialHolder() async throws {
         let calls = ProviderCalls()
-        let (payIn, ttp) = try makeBothFacades(tokenProvider: {
+        let (payIn, ttp) = try await makeBothFacades(tokenProvider: {
             await calls.increment()
             return "tok"
         })
@@ -30,8 +30,8 @@ final class OneSessionAcrossCapabilitiesTests: XCTestCase {
 
     private func makeBothFacades(
         tokenProvider: @escaping PayabliTokenRefresh
-    ) throws -> (PayabliPayIn, PayabliTTP) {
-        let session = try PayabliSession.initialize(config: PayabliConfig(
+    ) async throws -> (PayabliPayIn, PayabliTTP) {
+        let session = try await PayabliSession.initialize(config: PayabliConfig(
             entryPoint: "demo",
             environment: .sandbox,
             tokenProvider: tokenProvider

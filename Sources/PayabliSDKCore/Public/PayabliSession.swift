@@ -53,7 +53,7 @@ public final class PayabliSession: @unchecked Sendable {
     /// A different configuration throws `invalidConfiguration` and leaves the installed session in
     /// place, because every facade already built is running on it.
     @discardableResult
-    public static func initialize(config: PayabliConfig) throws -> PayabliSession {
+    public static func initialize(config: PayabliConfig) async throws -> PayabliSession {
         try install(config: config)
     }
 

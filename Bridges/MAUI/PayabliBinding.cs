@@ -100,6 +100,8 @@ namespace Payabli.TapToPay
 
     public delegate void TokenRefreshRequest(TokenRefreshCompletion completion);
 
+    public delegate void PayabliSessionCompletion([NullAllowed] NSError error);
+
     public delegate void PayabliTTPCompletion([NullAllowed] NSError error);
 
     public delegate void PayabliTTPChargeCompletion(
@@ -243,15 +245,15 @@ namespace Payabli.TapToPay
         // Installs the one session every facade runs on. The token handler is the only source of a
         // credential: the SDK asks it for the first token as well as for a replacement. A second
         // call with the same entry point, environment and telemetry setting is a no-op; a different
-        // one fails.
+        // one fails with the error the completion receives.
         [Static]
-        [Export("initializeWithTokenHandler:entryPoint:environment:telemetryEnabled:error:")]
-        bool Initialize(
+        [Export("initializeWithTokenHandler:entryPoint:environment:telemetryEnabled:completionHandler:")]
+        void Initialize(
             TokenRefreshRequest tokenHandler,
             string entryPoint,
             PayabliEnvironment environment,
             bool telemetryEnabled,
-            out NSError error
+            PayabliSessionCompletion completionHandler
         );
     }
 

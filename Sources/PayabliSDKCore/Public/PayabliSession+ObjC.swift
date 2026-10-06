@@ -20,13 +20,13 @@ public final class PayabliSessionObjC: NSObject {
         entryPoint: String,
         environment: PayabliEnvironment,
         telemetryEnabled: Bool
-    ) throws {
+    ) async throws {
         let config = try PayabliConfig(
             entryPoint: entryPoint,
             environment: environment,
             tokenProvider: bridgedTokenProvider(errorDomain: "com.payabli.session", tokenHandler),
             telemetryEnabled: telemetryEnabled
         )
-        try PayabliSession.initialize(config: config)
+        try await PayabliSession.initialize(config: config)
     }
 }

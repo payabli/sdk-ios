@@ -40,45 +40,44 @@ final class PayabliSessionTests: XCTestCase {
         XCTAssertEqual(response.body, expectedBody)
     }
 
-    func testInitializeWithAnEqualConfigurationReturnsTheInstalledSession() throws {
-        let first = try PayabliSession.initialize(config: makeConfig())
-        let second = try PayabliSession.initialize(config: makeConfig())
+    func testInitializeWithAnEqualConfigurationReturnsTheInstalledSession() async throws {
+        let first = try await PayabliSession.initialize(config: makeConfig())
+        let second = try await PayabliSession.initialize(config: makeConfig())
 
         XCTAssertTrue(first === second)
     }
 
-    func testInitializeRefusesADifferentEntryPointAndKeepsTheInstalledSession() throws {
-        let installed = try PayabliSession.initialize(config: makeConfig())
+    func testInitializeRefusesADifferentEntryPointAndKeepsTheInstalledSession() async throws {
+        let installed = try await PayabliSession.initialize(config: makeConfig())
 
-        XCTAssertThrowsError(try PayabliSession.initialize(config: makeConfig(entryPoint: "other"))) { error in
-            XCTAssertEqual((error as? PayabliGenericError)?.code, .invalidConfiguration)
-        }
-        XCTAssertTrue(try PayabliSession.initialize(config: makeConfig()) === installed)
+        await assertRefused(try makeConfig(entryPoint: "other"))
+        let again = try await PayabliSession.initialize(config: makeConfig())
+        XCTAssertTrue(again === installed)
     }
 
-    func testInitializeRefusesADifferentEnvironment() throws {
-        try PayabliSession.initialize(config: makeConfig())
+    func testInitializeRefusesADifferentEnvironment() async throws {
+        try await PayabliSession.initialize(config: makeConfig())
 
-        XCTAssertThrowsError(try PayabliSession.initialize(config: makeConfig(environment: .production))) { error in
-            XCTAssertEqual((error as? PayabliGenericError)?.code, .invalidConfiguration)
-        }
+        await assertRefused(try makeConfig(environment: .production))
     }
 
-    func testInitializeRefusesADifferentTelemetrySetting() throws {
-        try PayabliSession.initialize(config: makeConfig())
+    func testInitializeRefusesADifferentTelemetrySetting() async throws {
+        try await PayabliSession.initialize(config: makeConfig())
 
-        XCTAssertThrowsError(try PayabliSession.initialize(config: makeConfig(telemetryEnabled: false))) { error in
-            XCTAssertEqual((error as? PayabliGenericError)?.code, .invalidConfiguration)
-        }
+        await assertRefused(try makeConfig(telemetryEnabled: false))
     }
 
-    func testConcurrentInitializeInstallsOneSession() throws {
+    func testConcurrentInitializeInstallsOneSession() async throws {
         let config = try makeConfig()
         let installed = InstalledSessions()
 
-        DispatchQueue.concurrentPerform(iterations: 64) { _ in
-            if let session = try? PayabliSession.initialize(config: config) {
-                installed.record(session)
+        await withTaskGroup(of: Void.self) { group in
+            for _ in 0 ..< 64 {
+                group.addTask {
+                    if let session = try? await PayabliSession.initialize(config: config) {
+                        installed.record(session)
+                    }
+                }
             }
         }
 
@@ -87,11 +86,24 @@ final class PayabliSessionTests: XCTestCase {
     }
 
     func testASecondProviderDoesNotReplaceTheFirst() async throws {
-        let session = try PayabliSession.initialize(config: makeConfig(tokenProvider: { "first" }))
-        try PayabliSession.initialize(config: makeConfig(tokenProvider: { "second" }))
+        let session = try await PayabliSession.initialize(config: makeConfig(tokenProvider: { "first" }))
+        try await PayabliSession.initialize(config: makeConfig(tokenProvider: { "second" }))
 
         let token = try await session.auth.currentAccessToken()
         XCTAssertEqual(token, "first")
+    }
+
+    private func assertRefused(
+        _ config: @autoclosure () throws -> PayabliConfig,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) async {
+        do {
+            try await PayabliSession.initialize(config: config())
+            XCTFail("expected a different configuration to be refused", file: file, line: line)
+        } catch {
+            XCTAssertEqual((error as? PayabliGenericError)?.code, .invalidConfiguration, file: file, line: line)
+        }
     }
 
     private func makeConfig(

@@ -138,7 +138,7 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
             // the previous facade and its event subscription exactly as they were.
             let ttp: PayabliTTP
             do {
-                try PayabliSession.initialize(config: PayabliConfig(
+                try await PayabliSession.initialize(config: PayabliConfig(
                     entryPoint: entryPoint,
                     environment: environment,
                     tokenProvider: Self.sessionTokenProvider
@@ -388,7 +388,7 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
                     tokenProvider: Self.sessionTokenProvider
                 )
                 self.payIn = PayabliPayIn(
-                    session: try PayabliSession.initialize(config: config)
+                    session: try await PayabliSession.initialize(config: config)
                 )
                 result(nil)
             } catch {

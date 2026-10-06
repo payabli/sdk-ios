@@ -8,7 +8,7 @@ import PayabliSDKCore
 /// See PRD §19.1.
 ///
 /// ```swift
-/// try PayabliSession.initialize(config: PayabliConfig(
+/// try await PayabliSession.initialize(config: PayabliConfig(
 ///     entryPoint: "myEntry",
 ///     environment: .sandbox,
 ///     tokenProvider: { try await myBackend.payabliToken() }

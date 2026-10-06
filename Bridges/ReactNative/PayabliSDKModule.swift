@@ -141,7 +141,7 @@ public final class PayabliSDKModule: RCTEventEmitter {
             // the previous facade and its event subscription exactly as they were.
             let ttp: PayabliTTP
             do {
-                try PayabliSession.initialize(config: PayabliConfig(
+                try await PayabliSession.initialize(config: PayabliConfig(
                     entryPoint: entryPoint,
                     environment: environment,
                     tokenProvider: Self.sessionTokenProvider
@@ -384,7 +384,7 @@ public final class PayabliSDKModule: RCTEventEmitter {
                     tokenProvider: Self.sessionTokenProvider
                 )
                 self.payIn = PayabliPayIn(
-                    session: try PayabliSession.initialize(config: config)
+                    session: try await PayabliSession.initialize(config: config)
                 )
                 resolve(nil)
             } catch {

@@ -17,8 +17,8 @@ final class PayabliTTPInstalledSessionTests: XCTestCase {
         }
     }
 
-    func testRunsOnTheInstalledSession() throws {
-        let installed = try PayabliSession.initialize(config: PayabliConfig(
+    func testRunsOnTheInstalledSession() async throws {
+        let installed = try await PayabliSession.initialize(config: PayabliConfig(
             entryPoint: "demo",
             environment: .sandbox,
             tokenProvider: { "tok" }

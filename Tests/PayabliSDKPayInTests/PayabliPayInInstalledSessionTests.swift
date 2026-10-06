@@ -9,8 +9,8 @@ final class PayabliPayInInstalledSessionTests: XCTestCase {
         super.tearDown()
     }
 
-    func testConfigureWithTheInstalledConfigurationKeepsTheInstalledSession() throws {
-        let installed = try PayabliSession.initialize(config: makeConfig(entryPoint: "demo"))
+    func testConfigureWithTheInstalledConfigurationKeepsTheInstalledSession() async throws {
+        let installed = try await PayabliSession.initialize(config: makeConfig(entryPoint: "demo"))
         let component = PayabliPayIn(session: installed)
 
         component.configure(config: try makeConfig(entryPoint: "demo"))
@@ -20,7 +20,7 @@ final class PayabliPayInInstalledSessionTests: XCTestCase {
 
     func testConfigureWithADifferentConfigurationRefusesTheNextSubmission() async throws {
         continueAfterFailure = false
-        let installed = try PayabliSession.initialize(config: makeConfig(entryPoint: "demo"))
+        let installed = try await PayabliSession.initialize(config: makeConfig(entryPoint: "demo"))
         let component = PayabliPayIn(session: installed)
 
         component.configure(config: try makeConfig(entryPoint: "other"))
@@ -38,8 +38,8 @@ final class PayabliPayInInstalledSessionTests: XCTestCase {
         }
     }
 
-    func testObjectiveCFacadeRunsOnTheInstalledSession() throws {
-        let installed = try PayabliSession.initialize(config: makeConfig(entryPoint: "demo"))
+    func testObjectiveCFacadeRunsOnTheInstalledSession() async throws {
+        let installed = try await PayabliSession.initialize(config: makeConfig(entryPoint: "demo"))
 
         let bridged = try PayabliPayInObjC.create()
 
@@ -50,8 +50,8 @@ final class PayabliPayInInstalledSessionTests: XCTestCase {
         XCTAssertThrowsError(try PayabliPayInObjC.create())
     }
 
-    func testObjectiveCEntryPointInstallsTheSessionSwiftReads() throws {
-        try PayabliSessionObjC.initialize(
+    func testObjectiveCEntryPointInstallsTheSessionSwiftReads() async throws {
+        try await PayabliSessionObjC.initialize(
             tokenHandler: { completion in completion("tok", nil) },
             entryPoint: "demo",
             environment: .sandbox,
@@ -59,20 +59,23 @@ final class PayabliPayInInstalledSessionTests: XCTestCase {
         )
 
         let bridged = try PayabliPayInObjC.create()
-        let fromSwift = try PayabliSession.initialize(config: makeConfig(entryPoint: "demo"))
+        let fromSwift = try await PayabliSession.initialize(config: makeConfig(entryPoint: "demo"))
 
         XCTAssertTrue(bridged.component.session === fromSwift)
     }
 
-    func testObjectiveCEntryPointRefusesADifferentConfiguration() throws {
-        try PayabliSession.initialize(config: makeConfig(entryPoint: "demo"))
+    func testObjectiveCEntryPointRefusesADifferentConfiguration() async throws {
+        try await PayabliSession.initialize(config: makeConfig(entryPoint: "demo"))
 
-        XCTAssertThrowsError(try PayabliSessionObjC.initialize(
-            tokenHandler: { completion in completion("tok", nil) },
-            entryPoint: "other",
-            environment: .sandbox,
-            telemetryEnabled: true
-        )) { error in
+        do {
+            try await PayabliSessionObjC.initialize(
+                tokenHandler: { completion in completion("tok", nil) },
+                entryPoint: "other",
+                environment: .sandbox,
+                telemetryEnabled: true
+            )
+            XCTFail("a different configuration was accepted")
+        } catch {
             XCTAssertEqual((error as? PayabliGenericError)?.code, .invalidConfiguration)
         }
     }

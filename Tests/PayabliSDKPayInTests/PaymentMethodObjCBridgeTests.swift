@@ -15,13 +15,18 @@ final class PaymentMethodObjCBridgeTests: XCTestCase {
 
     private func makeBridge(
         tokenHandler: @escaping (@escaping (String?, NSError?) -> Void) -> Void
-    ) throws -> PayabliPayInObjC {
-        try PayabliSessionObjC.initialize(tokenHandler: tokenHandler, entryPoint: "entry", environment: .sandbox, telemetryEnabled: true)
+    ) async throws -> PayabliPayInObjC {
+        try await PayabliSessionObjC.initialize(
+            tokenHandler: tokenHandler,
+            entryPoint: "entry",
+            environment: .sandbox,
+            telemetryEnabled: true
+        )
         return try PayabliPayInObjC.create()
     }
 
-    func testAddBankAccountRejectsInvalidHolderType() throws {
-        let component = try makeBridge(
+    func testAddBankAccountRejectsInvalidHolderType() async throws {
+        let component = try await makeBridge(
             tokenHandler: { completion in
                 completion("token", nil)
             }
@@ -48,7 +53,7 @@ final class PaymentMethodObjCBridgeTests: XCTestCase {
             expectation.fulfill()
         }
 
-        wait(for: [expectation], timeout: 1)
+        await fulfillment(of: [expectation], timeout: 1)
     }
 
     func testStoredPaymentMethodWrapperConvertsValuesAndResponse() {
@@ -85,8 +90,8 @@ final class PaymentMethodObjCBridgeTests: XCTestCase {
         XCTAssertEqual(wrapper.apiResponse["responseText"] as? String, "Success")
     }
 
-    func testAddBankAccountRejectsInvalidArgumentsSynchronously() throws {
-        let component = try makeBridge(
+    func testAddBankAccountRejectsInvalidArgumentsSynchronously() async throws {
+        let component = try await makeBridge(
             tokenHandler: { completion in completion("unused", nil) }
         )
 
@@ -137,7 +142,7 @@ final class PaymentMethodObjCBridgeTests: XCTestCase {
 
     func testAddCardReturnsValidationErrorWithoutCallingTokenHandler() async throws {
         let completionExpectation = expectation(description: "ObjC card completion")
-        let component = try makeBridge(
+        let component = try await makeBridge(
             tokenHandler: { _ in XCTFail("Token handler should not be called before local validation fails") }
         )
 
@@ -169,7 +174,7 @@ final class PaymentMethodObjCBridgeTests: XCTestCase {
             code: 42,
             userInfo: [NSLocalizedDescriptionKey: "Token unavailable"]
         )
-        let component = try makeBridge(
+        let component = try await makeBridge(
             tokenHandler: { completion in
                 completion(nil, tokenError)
                 completion("late-token", nil)
@@ -209,7 +214,7 @@ final class PaymentMethodObjCBridgeTests: XCTestCase {
 
     func testNilTokenAndNilErrorProducesInvalidTokenProviderError() async throws {
         let completionExpectation = expectation(description: "ObjC nil token completion")
-        let component = try makeBridge(
+        let component = try await makeBridge(
             tokenHandler: { completion in completion(nil, nil) }
         )
 
