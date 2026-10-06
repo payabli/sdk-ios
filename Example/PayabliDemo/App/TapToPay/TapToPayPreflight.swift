@@ -147,9 +147,6 @@ enum TapToPayPreflight {
         return entitlements["com.apple.developer.proximity-reader.payment.acceptance"] as? Bool ?? false
     }
 
-    /// The Team ID this binary is actually signed with, read from the profile
-    /// rather than from `Secrets`. That is what lets the App ID check below
-    /// compare the configured value against reality instead of against itself.
     /// The prefix of the profile's `application-identifier`, which is the prefix the SDK attests with.
     /// It is the Team ID for most apps and can differ from it for an older App ID.
     static var resolvedAppIdPrefix: String? {
@@ -159,6 +156,7 @@ enum TapToPayPreflight {
         return String(prefix)
     }
 
+    /// The Team ID this binary is signed with, read from the profile.
     static var resolvedTeamIdentifier: String? {
         guard let entitlements = provisioningEntitlements else { return nil }
         if let team = entitlements["com.apple.developer.team-identifier"] as? String {
