@@ -17,7 +17,7 @@ final class PayabliTTPFailureReasonTests: XCTestCase {
             .attestationFailed(reason: "x")
         ] {
             XCTAssertEqual(
-                PayabliTTPSessionState.landing(for: error),
+                PayabliTTPSessionState.landing(for: error, registration: .held(activationId: "dev")),
                 .failed(reason: .deviceSetupRequired),
                 "\(error)"
             )
@@ -28,14 +28,14 @@ final class PayabliTTPFailureReasonTests: XCTestCase {
     /// identity. The device is as it was and the same call may work later.
     func testAnExpiredTokenDoesNotDiscardTheIdentity() {
         XCTAssertEqual(
-            PayabliTTPSessionState.landing(for: PayabliTTPError.tokenExpired),
+            PayabliTTPSessionState.landing(for: PayabliTTPError.tokenExpired, registration: .held(activationId: "dev")),
             .failed(reason: .serviceUnavailable)
         )
     }
 
     func testAnAccountThatIsNotSetUpAsksSomeoneToChangeIt() {
         XCTAssertEqual(
-            PayabliTTPSessionState.landing(for: PayabliTTPError.configFailed(reason: "x")),
+            PayabliTTPSessionState.landing(for: PayabliTTPError.configFailed(reason: "x"), registration: .held(activationId: "dev")),
             .failed(reason: .configurationRejected)
         )
     }
@@ -44,11 +44,11 @@ final class PayabliTTPFailureReasonTests: XCTestCase {
     /// merely would not arm is not: it leaves the device as it was.
     func testOnlyAnUnusableDeviceIsCalledIneligible() {
         XCTAssertEqual(
-            PayabliTTPSessionState.landing(for: PayabliTTPError.readerOSVersionNotSupported()),
+            PayabliTTPSessionState.landing(for: PayabliTTPError.readerOSVersionNotSupported(), registration: .held(activationId: "dev")),
             .failed(reason: .deviceIneligible)
         )
         XCTAssertEqual(
-            PayabliTTPSessionState.landing(for: PayabliTTPError.readerSetupFailed(reason: "x")),
+            PayabliTTPSessionState.landing(for: PayabliTTPError.readerSetupFailed(reason: "x"), registration: .held(activationId: "dev")),
             .failed(reason: .serviceUnavailable)
         )
     }
@@ -57,11 +57,11 @@ final class PayabliTTPFailureReasonTests: XCTestCase {
     /// has not accepted terms. Each has a state of its own.
     func testWhatIsNotAFailureDoesNotLandAsOne() {
         XCTAssertEqual(
-            PayabliTTPSessionState.landing(for: PayabliTTPError.devicePendingActivation),
-            .pendingActivation
+            PayabliTTPSessionState.landing(for: PayabliTTPError.devicePendingActivation, registration: .held(activationId: "dev")),
+            .pendingActivation(activationId: "dev")
         )
         XCTAssertEqual(
-            PayabliTTPSessionState.landing(for: PayabliTTPError.termsNotAccepted),
+            PayabliTTPSessionState.landing(for: PayabliTTPError.termsNotAccepted, registration: .held(activationId: "dev")),
             .pendingTerms
         )
     }
@@ -74,7 +74,7 @@ final class PayabliTTPFailureReasonTests: XCTestCase {
             .updateFailed(reason: "x", paymentTransId: "TXN", capture: .unknown),
             .activationFailed(reason: "x")
         ] {
-            XCTAssertNil(PayabliTTPSessionState.landing(for: error), "\(error)")
+            XCTAssertNil(PayabliTTPSessionState.landing(for: error, registration: .held(activationId: "dev")), "\(error)")
         }
     }
 
@@ -89,7 +89,7 @@ final class PayabliTTPFailureReasonTests: XCTestCase {
         )
 
         XCTAssertEqual(
-            PayabliTTPSessionState.landing(for: refused),
+            PayabliTTPSessionState.landing(for: refused, registration: .held(activationId: "dev")),
             .failed(reason: .sdkInternalError)
         )
     }
@@ -98,7 +98,7 @@ final class PayabliTTPFailureReasonTests: XCTestCase {
         let error = TapToPayError(type: .deviceKeyUnavailable, reason: "x", detail: nil)
 
         XCTAssertEqual(
-            PayabliTTPSessionState.landing(for: error),
+            PayabliTTPSessionState.landing(for: error, registration: .held(activationId: "dev")),
             .failed(reason: .deviceKeyUnavailable)
         )
     }
@@ -107,7 +107,7 @@ final class PayabliTTPFailureReasonTests: XCTestCase {
         let error = TapToPayError(type: .deviceSetupUnsupported, reason: "x", detail: nil)
 
         XCTAssertEqual(
-            PayabliTTPSessionState.landing(for: error),
+            PayabliTTPSessionState.landing(for: error, registration: .held(activationId: "dev")),
             .failed(reason: .deviceIneligible)
         )
     }
@@ -118,7 +118,7 @@ final class PayabliTTPFailureReasonTests: XCTestCase {
         let burned = PayabliGenericError(type: .sessionBurned, reason: "Gone (410)")
 
         XCTAssertEqual(
-            PayabliTTPSessionState.landing(for: burned),
+            PayabliTTPSessionState.landing(for: burned, registration: .held(activationId: "dev")),
             .failed(reason: .serviceUnavailable)
         )
     }
@@ -135,7 +135,7 @@ final class PayabliTTPFailureReasonTests: XCTestCase {
             (.notInitialized, .failed(reason: .sdkInternalError)),
             (.invalidState(current: .ready, attempted: "x"), .failed(reason: .sdkInternalError)),
             (.notReady(current: .idle), .failed(reason: .sdkInternalError)),
-            (.devicePendingActivation, .pendingActivation),
+            (.devicePendingActivation, .pendingActivation(activationId: "dev")),
             (.attestationRevoked(reason: "x"), .failed(reason: .deviceSetupRequired)),
             (.attestationFailed(reason: "x"), .failed(reason: .deviceSetupRequired)),
             (.configFailed(reason: "x"), .failed(reason: .configurationRejected)),
@@ -153,7 +153,7 @@ final class PayabliTTPFailureReasonTests: XCTestCase {
         ]
 
         for (error, expected) in map {
-            XCTAssertEqual(PayabliTTPSessionState.landing(for: error), expected, "\(error)")
+            XCTAssertEqual(PayabliTTPSessionState.landing(for: error, registration: .held(activationId: "dev")), expected, "\(error)")
         }
     }
 
@@ -203,9 +203,47 @@ final class PayabliTTPFailureReasonTests: XCTestCase {
     func testATransportPermissionRefusalAsksForAnActivation() {
         XCTAssertEqual(
             PayabliTTPSessionState.landing(
-                for: PayabliGenericError(type: .permissionDenied, reason: "Forbidden (403)")
+                for: PayabliGenericError(type: .permissionDenied, reason: "Forbidden (403)"),
+                registration: .held(activationId: "dev")
             ),
-            .pendingActivation
+            .pendingActivation(activationId: "dev")
         )
+    }
+
+    /// With no registration there is no device to activate, so the refusal is the paypoint's.
+    func testARefusalWithNothingRegisteredIsTheConfiguration() {
+        XCTAssertEqual(
+            PayabliTTPSessionState.landing(
+                for: PayabliGenericError(type: .permissionDenied, reason: "Forbidden (403)"),
+                registration: .none
+            ),
+            .failed(reason: .configurationRejected)
+        )
+        XCTAssertEqual(
+            PayabliTTPSessionState.landing(for: PayabliTTPError.devicePendingActivation, registration: .none),
+            .failed(reason: .configurationRejected)
+        )
+    }
+
+    /// A registration the store could not read is the device's storage, not the paypoint's.
+    func testARefusalWhoseRegistrationCannotBeReadIsTheDevicesStorage() {
+        XCTAssertEqual(
+            PayabliTTPSessionState.landing(
+                for: PayabliGenericError(type: .permissionDenied, reason: "Forbidden (403)"),
+                registration: .unreadable
+            ),
+            .failed(reason: .deviceKeyUnavailable)
+        )
+        XCTAssertEqual(
+            PayabliTTPSessionState.landing(for: PayabliTTPError.devicePendingActivation, registration: .unreadable),
+            .failed(reason: .deviceKeyUnavailable)
+        )
+    }
+
+    func testTheStateCarriesTheIdOnlyWhileActivationIsOwed() {
+        XCTAssertEqual(PayabliTTPSessionState.pendingActivation(activationId: "dev").activationId, "dev")
+        XCTAssertEqual(PayabliTTPSessionState.pendingActivation(activationId: "dev").code, .pendingActivation)
+        XCTAssertNil(PayabliTTPSessionState.ready.activationId)
+        XCTAssertNil(PayabliTTPSessionState.failed(reason: .configurationRejected).activationId)
     }
 }

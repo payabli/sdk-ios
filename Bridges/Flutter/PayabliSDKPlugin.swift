@@ -101,8 +101,6 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
             handleActivateDevice(call.arguments, result: result)
         case "areTermsAccepted":
             handleAreTermsAccepted(result: result)
-        case "deviceId":
-            handleDeviceId(result: result)
         case "presentTerms":
             handlePresentTerms(result: result)
         case "getSessionState":
@@ -333,24 +331,6 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
                 } else {
                     result(nil)
                 }
-            }
-        }
-    }
-
-    // MARK: - deviceId
-
-    private func handleDeviceId(result: @escaping FlutterResult) {
-        Task { @MainActor in
-            guard let ttp else {
-                result(FlutterError(
-                    code: "NOT_CONFIGURED",
-                    message: "Call configure() before deviceId()",
-                    details: nil
-                ))
-                return
-            }
-            ttp.deviceId { deviceId in
-                result(deviceId)
             }
         }
     }

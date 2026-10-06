@@ -85,13 +85,13 @@ final class PayabliTTPTests: XCTestCase {
 
     func testPendingActivationSurfacesError() async throws {
         let (ttp, _, attestation) = try makeTTP()
-        attestation.attestResult = .failure(PayabliTTPError.devicePendingActivation)
+        attestation.pendingRegistration = "dev"
 
         do {
             try await ttp.initialize()
             XCTFail("expected pending activation")
         } catch PayabliTTPError.devicePendingActivation {
-            XCTAssertEqual(ttp.sessionState, .pendingActivation)
+            XCTAssertEqual(ttp.sessionState, .pendingActivation(activationId: "dev"))
         } catch {
             XCTFail("wrong error: \(error)")
         }
@@ -112,9 +112,9 @@ final class PayabliTTPTests: XCTestCase {
 
     func testActivationFromPendingState() async throws {
         let (ttp, _, attestation) = try makeTTP()
-        attestation.attestResult = .failure(PayabliTTPError.devicePendingActivation)
+        attestation.pendingRegistration = "dev"
         _ = try? await ttp.initialize()
-        XCTAssertEqual(ttp.sessionState, .pendingActivation)
+        XCTAssertEqual(ttp.sessionState, .pendingActivation(activationId: "dev"))
 
         try await ttp.activateDevice(activationCode: "ABC123")
         XCTAssertEqual(attestation.activateCalls, 1)
@@ -180,6 +180,31 @@ final class PayabliTTPTests: XCTestCase {
         let found = await collector.value
         deadline.cancel()
         return try XCTUnwrap(found, "no \(name) event arrived")
+    }
+
+    /// The service says pending and nothing is stored: what is thrown, where the session lands
+    /// and what is emitted all name the paypoint's configuration.
+    func testPendingWithNothingStoredThrowsWhatTheSessionLandsOn() async throws {
+        let (ttp, _, attestation) = try makeTTP()
+        attestation.attestResult = .failure(PayabliTTPError.devicePendingActivation)
+        let collector = collect(from: ttp.events()) { event in
+            if case let .attestationFailed(error) = event {
+                return error
+            }
+            return nil
+        }
+
+        do {
+            try await ttp.initialize()
+            XCTFail("expected a failure")
+        } catch PayabliTTPError.configFailed {
+        } catch {
+            XCTFail("wrong error: \(error)")
+        }
+
+        XCTAssertEqual(ttp.sessionState, .failed(reason: .configurationRejected))
+        let reported = try await value(of: collector, named: "attestationFailed")
+        XCTAssertEqual(reported, "configFailed")
     }
 
     /// An `initialize()` that fails in the attestation phase says so on the event
@@ -507,7 +532,7 @@ final class PayabliTTPTests: XCTestCase {
     func testActivationFailureEventNamesTheCaseWithoutItsReason() async throws {
         let (ttp, _, attestation) = try makeTTP()
         let serversWords = "Device belongs to another merchant"
-        attestation.attestResult = .failure(PayabliTTPError.devicePendingActivation)
+        attestation.pendingRegistration = "dev"
         _ = try? await ttp.initialize()
         attestation.activationResult = .failure(
             PayabliTTPError.activationFailed(reason: serversWords)

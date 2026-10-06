@@ -164,7 +164,7 @@ extension PayabliTTP {
 
     private func runEligibility() async throws {
         guard case let .failure(err) = await provider.checkEligibility() else { return }
-        sessionManager.markError(err)
+        markError(err)
         syncPublished()
         throw err
     }
@@ -197,10 +197,13 @@ extension PayabliTTP {
             _ = sessionManager.transition(to: .fetchingConfig)
             syncPublished()
         } catch PayabliTTPError.devicePendingActivation {
-            markPendingActivation()
+            if let failure = landPendingActivation() {
+                multicaster.emit(.attestationFailed(error: ErrorSummary.of(failure)))
+                throw failure
+            }
             throw PayabliTTPError.devicePendingActivation
         } catch {
-            sessionManager.markError(error)
+            markError(error)
             syncPublished()
             multicaster.emit(.attestationFailed(error: ErrorSummary.of(error)))
             throw error
@@ -223,7 +226,10 @@ extension PayabliTTP {
         do {
             return try await configClient.fetchConfig(entry: entryPoint)
         } catch PayabliTTPError.devicePendingActivation {
-            markPendingActivation()
+            if let failure = landPendingActivation() {
+                multicaster.emit(.configFailed(error: ErrorSummary.of(failure)))
+                throw failure
+            }
             throw PayabliTTPError.devicePendingActivation
         } catch let err as PayabliGenericError where err.type == .tokenExpired {
             // Two failures arrive as `.tokenExpired` here: the service refusing the
@@ -233,7 +239,7 @@ extension PayabliTTP {
             // nothing. The reason is relayed either way, so it names which happened
             // instead of this layer claiming an outcome for both.
             let failure = PayabliTTPError.configFailed(reason: "Config rejected (401): \(err.reason)")
-            sessionManager.markError(err)
+            markError(err)
             syncPublished()
             multicaster.emit(.configFailed(error: ErrorSummary.of(failure)))
             throw failure
@@ -251,7 +257,7 @@ extension PayabliTTP {
             // Marked as it arrived, so a permission this paypoint has not
             // granted still reaches `.pendingActivation` and a service that was
             // briefly away still reads as one to try again.
-            sessionManager.markError(error)
+            markError(error)
             syncPublished()
             multicaster.emit(.configFailed(error: ErrorSummary.of(failure)))
             throw failure
@@ -266,7 +272,7 @@ extension PayabliTTP {
         do {
             try provider.configure(credentials: credentials)
         } catch {
-            sessionManager.markError(error)
+            markError(error)
             syncPublished()
             throw error as? PayabliTTPError
                 ?? PayabliTTPError.readerSetupFailed(reason: String(describing: error))
@@ -303,7 +309,7 @@ extension PayabliTTP {
             markPendingTerms()
             throw PayabliTTPError.termsNotAccepted
         } catch {
-            sessionManager.markError(error)
+            markError(error)
             syncPublished()
             throw error as? PayabliTTPError
                 ?? PayabliTTPError.readerSetupFailed(reason: String(describing: error))
@@ -312,10 +318,42 @@ extension PayabliTTP {
 
     // MARK: - Shared transitions
 
-    private func markPendingActivation() {
-        _ = sessionManager.transition(to: .pendingActivation)
+    /// Lands the service's pending answer against the stored registration, which registration
+    /// writes before the service reports the device pending. `nil` when pending activation was
+    /// landed; otherwise the failure the session landed on, for the caller to throw.
+    private func landPendingActivation() -> Error? {
+        let failure: Error
+        switch storedRegistration() {
+        case let .held(activationId):
+            _ = sessionManager.transition(to: .pendingActivation(activationId: activationId))
+            syncPublished()
+            multicaster.emit(.devicePendingActivation)
+            return nil
+        case .none:
+            failure = PayabliTTPError.configFailed(reason: "The device is pending activation, and no registration is stored for it")
+        case .unreadable:
+            failure = TapToPayError(
+                type: .deviceKeyUnavailable,
+                reason: "The stored registration could not be read",
+                detail: nil
+            )
+        }
+        sessionManager.markError(failure, registration: .none)
         syncPublished()
-        multicaster.emit(.devicePendingActivation)
+        return failure
+    }
+
+    /// Lands `error` against this entry point's registration.
+    func markError(_ error: Error) {
+        sessionManager.markError(error, registration: storedRegistration())
+    }
+
+    private func storedRegistration() -> StoredRegistration {
+        do {
+            return try attestation.cachedDeviceId(for: entryPoint).map { .held(activationId: $0) } ?? .none
+        } catch {
+            return .unreadable
+        }
     }
 
     private func markPendingTerms() {

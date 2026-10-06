@@ -22,6 +22,12 @@ public final class PayabliSession: @unchecked Sendable {
     /// `package`, so a capability target can reach it and a host app cannot.
     package let transport: any PayabliTransport
 
+    /// This device's identity, the same for every capability and stable for the install. `nil` while
+    /// the device's secure store cannot be read, such as before the first unlock after a restart.
+    public var deviceId: String? {
+        nil
+    }
+
     private let identity: ConfigIdentity
 
     /// A process-wide lock, because the installed session is process-wide.

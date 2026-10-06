@@ -61,12 +61,6 @@ package protocol DeviceAttestationService: AnyObject, Sendable {
     /// `nil` when it holds no binding.
     func cachedDeviceId(for entry: String) throws -> String?
 
-    /// The `deviceId` this entry point was registered under while the key its binding
-    /// names still signs, or `nil` when it holds no binding or that key is gone.
-    ///
-    /// Raises when the store could not be read.
-    func usableDeviceId(for entry: String) async throws -> String?
-
     /// Runs the first-run attestation flow: challenge → register → attest.
     /// Throws `PayabliTTPError.devicePendingActivation` if the backend returns
     /// `status == "pending"` (PRD FR-11F.1).

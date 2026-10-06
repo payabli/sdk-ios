@@ -85,6 +85,14 @@ final class PayabliSessionTests: XCTestCase {
         XCTAssertEqual(installed.total, 64)
     }
 
+    func testTheObjCReaderAnswersTheInstalledSessionsDeviceId() async throws {
+        XCTAssertNil(PayabliSessionObjC.deviceId, "nothing is installed yet")
+
+        let session = try await PayabliSession.initialize(config: makeConfig())
+
+        XCTAssertEqual(PayabliSessionObjC.deviceId, session.deviceId)
+    }
+
     func testASecondProviderDoesNotReplaceTheFirst() async throws {
         let session = try await PayabliSession.initialize(config: makeConfig(tokenProvider: { "first" }))
         try await PayabliSession.initialize(config: makeConfig(tokenProvider: { "second" }))

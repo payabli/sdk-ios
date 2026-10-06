@@ -120,10 +120,6 @@ namespace Payabli.TapToPay
         [NullAllowed] NSError error
     );
 
-    // `deviceId` is null when the SDK holds no usable id for this device on the
-    // session's paypoint; call Initialize, which enrolls it or reports why not.
-    public delegate void PayabliTTPDeviceIdCompletion([NullAllowed] string deviceId);
-
     public delegate void PayabliTTPEventHandler(
         PayabliTTPEventCode code,
         NSDictionary payload
@@ -294,9 +290,6 @@ namespace Payabli.TapToPay
 
         [Export("areTermsAcceptedWithCompletion:")]
         void AreTermsAccepted(PayabliTTPTermsCompletion completion);
-
-        [Export("deviceIdWithCompletion:")]
-        void DeviceId(PayabliTTPDeviceIdCompletion completion);
 
         [Export("presentTermsWithCompletion:")]
         void PresentTerms(PayabliTTPCompletion completion);

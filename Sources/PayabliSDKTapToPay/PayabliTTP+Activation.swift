@@ -14,7 +14,7 @@ public extension PayabliTTP {
     /// so the caller can immediately re-run `initialize()` for a fresh cold
     /// attestation — `.sessionExpired` is also emitted in that sub-case.
     func activateDevice(activationCode: String) async throws {
-        guard sessionState == .pendingActivation else {
+        guard case .pendingActivation = sessionState else {
             throw PayabliTTPError.invalidState(
                 current: sessionState,
                 attempted: "activateDevice"
@@ -38,7 +38,7 @@ public extension PayabliTTP {
                 multicaster.emit(.activationFailed(error: ErrorSummary.of(err)))
                 throw err
             }
-            sessionManager.markError(err)
+            markError(err)
             syncPublished()
             multicaster.emit(.activationFailed(error: ErrorSummary.of(err)))
             throw err
@@ -48,7 +48,7 @@ public extension PayabliTTP {
             let mapped = PayabliTTPError.activationFailed(reason: error.localizedDescription)
             // Marked before it is emitted or thrown: the state a screen reads and
             // the error a caller catches are the same failure.
-            sessionManager.markError(mapped)
+            markError(mapped)
             syncPublished()
             multicaster.emit(.activationFailed(error: ErrorSummary.of(mapped)))
             throw mapped
@@ -73,27 +73,6 @@ public extension PayabliTTP {
             } catch {
                 completion(error.toPayabliNSError())
             }
-        }
-    }
-
-    /// The id Payabli assigned this device on the session's paypoint, whether pending activation or
-    /// active. `nil` when the SDK holds no usable id for it, for any reason; call `initialize()`, which
-    /// enrolls the device or throws why it could not.
-    func deviceId() async -> String? {
-        do {
-            return try await attestation.usableDeviceId(for: entryPoint)
-        } catch {
-            logger.info("[attest] the stored binding could not be read")
-            return nil
-        }
-    }
-
-    /// `@objc` companion to `deviceId()`, answering the same way.
-    @objc func deviceId(
-        completion: @escaping (String?) -> Void
-    ) {
-        Task { @MainActor in
-            completion(await self.deviceId())
         }
     }
 }

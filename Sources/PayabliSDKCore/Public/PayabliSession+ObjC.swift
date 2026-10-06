@@ -11,6 +11,11 @@ public final class PayabliSessionObjC: NSObject {
         fatalError("unavailable")
     }
 
+    /// The installed session's `deviceId`, and also `nil` before `initialize` has run.
+    @objc public static var deviceId: String? {
+        PayabliSession.current?.deviceId
+    }
+
     /// The bridged form of `PayabliSession.initialize(config:)`.
     ///
     /// `tokenHandler` receives a `(token, error) -> Void` callback the host calls exactly once, with

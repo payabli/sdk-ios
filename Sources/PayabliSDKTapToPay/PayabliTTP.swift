@@ -111,6 +111,11 @@ public final class PayabliTTP: NSObject, ObservableObject {
         sessionState.failureReason.map { NSNumber(value: $0.rawValue) }
     }
 
+    /// The id the device is activated under, or `nil` when no activation is owed.
+    @objc public var activationId: String? {
+        sessionState.activationId
+    }
+
     // MARK: - Init
 
     /// `package`: it takes the provider and the attestation service, so a host reaching

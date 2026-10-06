@@ -46,9 +46,9 @@ final class SessionManager: ObservableObject {
 
     /// Lands a failure where the map says it lands. A failure that leaves the
     /// session where it was moves nothing but `lastError`.
-    func markError(_ error: Error) {
+    func markError(_ error: Error, registration: StoredRegistration) {
         lastError = error
-        guard let landing = PayabliTTPSessionState.landing(for: error) else { return }
+        guard let landing = PayabliTTPSessionState.landing(for: error, registration: registration) else { return }
         sessionState = landing
         isReady = (landing == .ready)
     }

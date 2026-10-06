@@ -24,9 +24,6 @@ RCT_EXTERN_METHOD(areTermsAccepted:(RCTPromiseResolveBlock)resolve
 RCT_EXTERN_METHOD(presentTerms:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject)
 
-RCT_EXTERN_METHOD(deviceId:(RCTPromiseResolveBlock)resolve
-                  rejecter:(RCTPromiseRejectBlock)reject)
-
 RCT_EXTERN_METHOD(getSessionState:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject)
 
