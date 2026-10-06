@@ -71,8 +71,9 @@ public final class PayabliSDKModule: RCTEventEmitter {
     private var pendingRefresh: CheckedContinuation<String, Error>?
     private let refreshQueue = DispatchQueue(label: "com.payabli.sdk.rn.refresh")
 
-    /// The module React Native is running now. The session outlives a JS reload, so its token
-    /// provider asks for this rather than holding the module that configured it.
+    /// The module whose configure last succeeded. The session outlives a JS reload, so its token
+    /// provider asks for this rather than holding the module that configured it, and a module
+    /// that never configures, or is refused, takes no token requests from the one that did.
     private weak static var liveModule: PayabliSDKModule?
     private static let liveModuleLock = NSLock()
 
@@ -80,8 +81,7 @@ public final class PayabliSDKModule: RCTEventEmitter {
         liveModuleLock.withLock { liveModule }
     }
 
-    override public init() {
-        super.init()
+    private func becomeLive() {
         Self.liveModuleLock.withLock { Self.liveModule = self }
     }
 
@@ -155,6 +155,7 @@ public final class PayabliSDKModule: RCTEventEmitter {
             self.eventToken = nil
             self.ttp = ttp
             self.subscribeEvents(on: ttp)
+            self.becomeLive()
             resolve(nil)
         }
     }
@@ -384,6 +385,7 @@ public final class PayabliSDKModule: RCTEventEmitter {
                 self.payIn = PayabliPayIn(
                     session: try await PayabliSession.initialize(config: config)
                 )
+                self.becomeLive()
                 resolve(nil)
             } catch {
                 reject("INVALID_CONFIGURATION", error.localizedDescription, error)
