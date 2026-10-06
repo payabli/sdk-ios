@@ -50,19 +50,25 @@ public final class PayabliPayInObjC: NSObject {
     private let component: PayabliPayIn
 
     /// Builds the session internally, because an Objective-C caller cannot hold a Swift-only
-    /// `PayabliSession`. Throws whatever `PayabliConfig.init` rejects, which is an empty entry point.
+    /// `PayabliSession`. Throws whatever `PayabliConfig.init` rejects, which is an empty entry point,
+    /// with its catalog number as the code.
     @objc public init(
         tokenHandler: @escaping (@escaping (String?, NSError?) -> Void) -> Void,
         entryPoint: String,
         environment: PayabliEnvironment
     ) throws {
         let tokenProvider = bridgedTokenProvider(errorDomain: payInObjCErrorDomain, tokenHandler)
-        let config = try PayabliConfig(
-            entryPoint: entryPoint,
-            environment: environment,
+        let config: PayabliConfig
+        do {
+            config = try PayabliConfig(
+                entryPoint: entryPoint,
+                environment: environment,
 
-            tokenProvider: tokenProvider
-        )
+                tokenProvider: tokenProvider
+            )
+        } catch {
+            throw error.toPayabliPayInNSError()
+        }
         component = PayabliPayIn(session: PayabliSession(config: config))
         super.init()
     }

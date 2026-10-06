@@ -8,6 +8,17 @@ private let mainActorCompletionTimeout: TimeInterval = 10
 
 @MainActor
 final class PaymentMethodObjCBridgeTests: XCTestCase {
+    func testARefusedConfigurationThrowsTheCatalogNumber() {
+        XCTAssertThrowsError(
+            try PayabliPayInObjC(tokenHandler: { completion in completion("token", nil) }, entryPoint: " ", environment: .sandbox)
+        ) { error in
+            let nsError = error as NSError
+            XCTAssertEqual(nsError.domain, "com.payabli.payIn")
+            XCTAssertEqual(nsError.code, PayabliErrorType.invalidConfiguration.number)
+            XCTAssertEqual(nsError.userInfo["PayabliErrorType"] as? String, PayabliErrorType.invalidConfiguration.rawValue)
+        }
+    }
+
     func testAddBankAccountRejectsInvalidHolderType() throws {
         let component = try PayabliPayInObjC(
             tokenHandler: { completion in
