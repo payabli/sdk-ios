@@ -50,13 +50,20 @@ final class KeychainOnDeviceTests: XCTestCase {
     }
 
     /// An item written with no access group lands in the app's own, whose prefix with the bundle
-    /// identifier is the App ID the app passes to Tap to Pay.
+    /// identifier is the App ID the signing profile names. A Simulator build embeds no profile, so
+    /// there only the shape is checked.
     func testAStoredItemsAccessGroupGivesTheAppsAppId() throws {
         try storage.set("v", forKey: "sample_key")
         let group = try storage.accessGroup(forKey: "sample_key")
         let derived = AppIdentifier.derive(accessGroup: group)
-        print("access group \(group ?? "nil"), derived \(derived ?? "nil"), passed \(Secrets.appId)")
-        XCTAssertEqual(derived, Secrets.appId)
+        let bundleId = try XCTUnwrap(Bundle.main.bundleIdentifier)
+        if let prefix = TapToPayPreflight.resolvedAppIdPrefix {
+            XCTAssertEqual(derived, "\(prefix).\(bundleId)")
+        } else {
+            let appId = try XCTUnwrap(derived)
+            XCTAssertTrue(appId.hasSuffix(".\(bundleId)"), appId)
+            XCTAssertEqual(appId.dropLast(bundleId.count + 1).count, 10, appId)
+        }
     }
 
     /// `ThisDeviceOnly` because a binding names a Secure Enclave key no backup

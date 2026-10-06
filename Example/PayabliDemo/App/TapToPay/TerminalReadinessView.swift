@@ -10,8 +10,6 @@ import SwiftUI
 /// The checks behind it stay mutually independent — see `TapToPayPreflight` —
 /// which is the property that makes a single rolled-up verdict trustworthy.
 struct TerminalReadinessView: View {
-    let configuredAppId: String
-
     /// Computed on appearance, not per body evaluation: each run does a `uname`,
     /// hits `DCAppAttestService`, and reads the provisioning profile.
     ///
@@ -40,6 +38,12 @@ struct TerminalReadinessView: View {
                 Button("Re-check") { refresh() }
                     .font(.footnote)
             }
+
+            Text(TapToPayPreflight.appIdToRegister.map { "App ID to register: \($0)" }
+                ?? "App ID to register: no embedded profile, so it can't be read here.")
+                .font(.caption)
+                .foregroundColor(.payabliOnSurfaceVariant)
+                .textSelection(.enabled)
 
             if readiness == nil {
                 Text("Reading the host, App Attest, the reader and the provisioning profile.")
@@ -93,7 +97,7 @@ struct TerminalReadinessView: View {
     }
 
     private func refresh() {
-        checks = TapToPayPreflight.checks(configuredAppId: configuredAppId)
+        checks = TapToPayPreflight.checks()
     }
 
     private func symbol(for status: TapToPayPreflight.Check.Status) -> String {

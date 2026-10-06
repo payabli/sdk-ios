@@ -45,8 +45,9 @@ development builds and `production` for builds you distribute.
 
 ### Register your app as an authorized app
 
-The authorized app entry for iOS is your app's **app ID**, your Apple Team ID and bundle ID joined by a dot:
-`<TEAM_ID>.<BUNDLE_ID>`, for example `TEAM123456.com.example.checkout`. Register it once per paypoint,
+The authorized app entry for iOS is your app's **app ID**, its App ID prefix and bundle ID joined by a dot:
+`<APP_ID_PREFIX>.<BUNDLE_ID>`, for example `TEAM123456.com.example.checkout`. The App ID prefix is your
+Team ID for most apps; an older App ID can have a different one, shown in the Apple Developer portal. Register it once per paypoint,
 in the Payabli portal under **Pay In > Devices > Device management**, **⋯ > Authorized apps**, or from your
 backend:
 
@@ -61,6 +62,8 @@ curl -X POST "https://api-sandbox.payabli.com/api/v2/paypoint/{entryPoint}/apps"
   the bearer token.
 - `friendlyName` is optional. Calling it again with the same values is safe.
 - Register each bundle ID you ship, including debug and white-label builds.
+- The SDK reads the app ID from the signed app and sends it when the device attests, so your code never
+  passes it.
 
 An app that isn't an authorized app is refused when the device attests, with an HTTP 403. `initialize()`
 throws a `PayabliGenericError` whose `type` is `.permissionDenied`, not `attestationFailed`, and
@@ -73,16 +76,17 @@ nothing to activate. Register the app, then initialize again.
 import PayabliSDKCore
 import PayabliSDKTapToPay
 
-let ttp = try PayabliTTP(
-    tokenProvider: { try await fetchPayabliAccessToken() },
+let session = try await PayabliSession.initialize(config: PayabliConfig(
     entryPoint: "your-entry-point",
-    appId: "TEAM123456.com.example.checkout",
-    environment: .sandbox
-)
+    environment: .sandbox,
+    tokenProvider: { try await fetchPayabliAccessToken() }
+))
+let ttp = try await PayabliTTP.create()
 ```
 
-- `PayabliTTP` builds its own session from these values. It is an `ObservableObject`: bind `sessionState`
-  and `isReady` in SwiftUI.
+- Start the session once, before `create()`. `create()` throws when no session has been started.
+- Card-not-present payments run on the same session: pass `session` to `PayabliPayIn`.
+- `PayabliTTP` is an `ObservableObject`: bind `sessionState` and `isReady` in SwiftUI.
 - **One paypoint per session.** A `PayabliTTP` serves the entry point it was created with.
 
 ## Take a payment

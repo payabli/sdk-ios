@@ -64,17 +64,19 @@ Core public types are prefixed with `PayabliPayIn`.
 
 ## Authentication Rules
 
-Every operation runs on a session, which holds the credential and the transport that sends it:
+Every operation runs on the one session the process starts, which holds the credential and the
+transport that sends it. Start it once with `initialize`, which is `async throws`:
 
 ```swift
-let component = PayabliPayIn(
-    session: PayabliSession(config: try PayabliConfig(
-        entryPoint: entryPoint,
-        environment: .sandbox,
-        tokenProvider: { try await backend.fetchPayInAccessToken() }
-    ))
-)
+let session = try await PayabliSession.initialize(config: try PayabliConfig(
+    entryPoint: entryPoint,
+    environment: .sandbox,
+    tokenProvider: { try await backend.fetchPayInAccessToken() }
+))
+let component = PayabliPayIn(session: session)
 ```
+
+Never construct a `PayabliSession` directly; its initializer is not public.
 
 Never generate capture or authorize code that manually adds a `requestToken`
 header, or that passes a token to the component. The session's holder calls
@@ -159,7 +161,8 @@ Public state:
 
 Configuration methods:
 
-- `configure(config:)`
+- `configure(config:)`: keeps the installed session when `config` matches it. A different
+  configuration is not applied, and later submissions fail with `invalidConfiguration`.
 - `configure(config:theme:)`; theme is accepted for component uniformity.
 - `configure(operation:requestConfiguration:)`
 - `configure(requestConfiguration:)`
