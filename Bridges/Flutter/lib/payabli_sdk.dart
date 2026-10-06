@@ -3,19 +3,19 @@ import 'dart:async';
 import 'package:flutter/services.dart';
 
 const MethodChannel _payabliMethodChannel = MethodChannel(
-  'com.payabli.sdk/taptopay',
+  'com.payabli.sdk',
 );
 const EventChannel _payabliEventChannel = EventChannel(
-  'com.payabli.sdk/taptopay/events',
+  'com.payabli.sdk/events',
 );
 
 /// Dart API for the Payabli iOS SDK — Tap to Pay on iPhone surface.
 ///
 /// Communicates with the native iOS SDK via two channels declared in
 /// `Bridges/Flutter/PayabliSDKPlugin.swift`:
-///   - `com.payabli.sdk/taptopay` (`MethodChannel`): RPC for configure /
-///     initialize / charge / activateDevice / getSessionState.
-///   - `com.payabli.sdk/taptopay/events` (`EventChannel`): one-way stream of
+///   - `com.payabli.sdk` (`MethodChannel`): RPC for every call, Tap to Pay,
+///     payment flow and session alike.
+///   - `com.payabli.sdk/events` (`EventChannel`): one-way stream of
 ///     [PayabliTTPEvent]s mirroring `PayabliTTPEvent.code` + `payload`.
 ///
 /// ## Authentication
