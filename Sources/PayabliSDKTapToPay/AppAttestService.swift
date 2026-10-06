@@ -93,22 +93,12 @@ package final class AppAttestService: DeviceAttestationService, @unchecked Senda
     /// `false`: `false` runs the cold sequence and registers a second device for a
     /// paypoint that is already enrolled. Raises too when the key check cannot answer.
     package func isAttested(for entry: String) async throws -> Bool {
-        guard let binding = try binding(for: entry) else {
-            return false
-        }
-        do {
-            return try await keyIsStillHeld(binding)
-        } catch let failure as TapToPayError {
-            // The probe suspends: a check that could not answer about a binding replaced meanwhile
-            // says nothing about the one held now.
-            let current = try self.binding(for: entry)
-            if current == binding {
-                throw failure
-            }
-            guard let current else {
+        // The entry point's turn, so no attestation replaces the binding while its key is being checked.
+        try await Self.attestations.takingTurns(entry) {
+            guard let binding = try self.binding(for: entry) else {
                 return false
             }
-            return try await keyIsStillHeld(current)
+            return try await self.keyIsStillHeld(binding)
         }
     }
 

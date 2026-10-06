@@ -112,27 +112,6 @@ final class AppAttestKeyCheckTests: XCTestCase {
         XCTAssertEqual(try sut.binding(for: "myEntry")?.deviceId, "dev")
     }
 
-    /// The probe suspends, so another attempt can replace the binding meanwhile. An answer about the
-    /// replaced key says nothing about the one held now, which is asked instead.
-    func testACheckThatCannotTellAboutAReplacedBindingAsksAboutTheCurrentOne() async throws {
-        let storage = InMemorySecureStorage()
-        try AttestFixture.seedBinding(entry: "myEntry", deviceId: "dev_old", keyId: "old_key", in: storage)
-        let (sut, attestor, _) = try AttestFixture.makeService(storage: storage)
-        attestor.generateAssertionError = NSError(domain: AppAttestService.deviceCheckErrorDomain, code: 0)
-        attestor.beforeGenerateAssertion = {
-            if attestor.generateAssertionCalls == 0 {
-                try? sut.remember(AttestedDevice(entry: "myEntry", deviceId: "dev_new", keyId: "new_key"))
-            } else {
-                attestor.generateAssertionError = nil
-            }
-        }
-
-        let attested = try await sut.isAttested(for: "myEntry")
-
-        XCTAssertTrue(attested, "the replaced key's answer stopped a binding whose key signs")
-        XCTAssertEqual(try sut.binding(for: "myEntry")?.deviceId, "dev_new")
-    }
-
     func testAPhoneWithoutAppAttestCannotBeSetUp() async throws {
         let (sut, attestor, _) = try AttestFixture.makeService(storage: InMemorySecureStorage())
         attestor.isSupported = false

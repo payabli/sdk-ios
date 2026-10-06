@@ -292,6 +292,42 @@ final class AttestationTurnsTests: XCTestCase {
 
     /// Different entry points are what the bindings exist for, so they never wait
     /// for each other.
+    /// The warm check takes the same turn: one asked while an attestation is running waits for it, and
+    /// answers about the binding that attestation wrote rather than the empty store it found first.
+    func testAWarmCheckWaitsForAnAttestationOfTheSameEntryPoint() async throws {
+        StubURLProtocol.handler = { request in
+            switch request.url!.path {
+            case "/api/v2/device/taptopay/challenge":
+                return AttestFixture.ok(request, ["challengeId": "c_1", "challenge": "Y2hhbGxlbmdl"])
+            case "/api/v2/device/taptopay/register":
+                return AttestFixture.ok(request, ["deviceId": "dev_1"])
+            default:
+                return AttestFixture.ok(request, ["ok": true])
+            }
+        }
+
+        let storage = InMemorySecureStorage()
+        let (holder, holdingAttestor, _) = try AttestFixture.makeService(storage: storage)
+        let (checker, _, _) = try AttestFixture.makeService(storage: storage)
+
+        let held = AsyncGate()
+        let reached = AsyncGate()
+        holdingAttestor.beforeGenerateKey = {
+            reached.open()
+            await held.wait()
+        }
+
+        async let holdersResult = holder.attest(entry: "myEntry")
+        await reached.wait()
+
+        let check = Task { try await checker.isAttested(for: "myEntry") }
+        held.open()
+
+        let attested = try await check.value
+        _ = try await holdersResult
+        XCTAssertTrue(attested, "the check read the store before the attestation it overlapped wrote to it")
+    }
+
     /// One entry point held open, and the other has to get all the way through
     /// while it is held.
     ///
