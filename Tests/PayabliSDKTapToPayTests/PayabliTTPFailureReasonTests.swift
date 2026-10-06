@@ -94,6 +94,24 @@ final class PayabliTTPFailureReasonTests: XCTestCase {
         )
     }
 
+    func testAKeyNobodyCanVouchForLandsOnDeviceKeyUnavailable() {
+        let error = TapToPayError(type: .deviceKeyUnavailable, reason: "x", detail: nil)
+
+        XCTAssertEqual(
+            PayabliTTPSessionState.landing(for: error),
+            .failed(reason: .deviceKeyUnavailable)
+        )
+    }
+
+    func testADeviceThatCannotBeSetUpLandsOnDeviceIneligible() {
+        let error = TapToPayError(type: .deviceSetupUnsupported, reason: "x", detail: nil)
+
+        XCTAssertEqual(
+            PayabliTTPSessionState.landing(for: error),
+            .failed(reason: .deviceIneligible)
+        )
+    }
+
     /// A status nothing has been seen producing has no agreed meaning, so it
     /// lands where being wrong costs a retry rather than a bug report.
     func testAStatusNoRouteHasProducedIsTreatedAsTransient() {
