@@ -117,7 +117,7 @@ final class PayabliTTPTests: XCTestCase {
         do {
             try await ttp.initialize()
             XCTFail("expected eligibility failure")
-        } catch let error as TapToPayError where error.type == .readerUnavailable {
+        } catch let error as TapToPayError where error.type == .unknown {
             XCTAssertEqual(error.detail, "no entitlement")
             XCTAssertEqual(ttp.sessionState.code, .failed)
         } catch {
@@ -396,9 +396,9 @@ final class PayabliTTPTests: XCTestCase {
         XCTAssertFalse(text.contains("dev_old"), "a handle captured during initialize() was sent")
     }
 
-    /// The event names the wrapper and the thrown error its catalog entry; the
-    /// state carries the remedy for the failure underneath it.
-    func testConfigFailureThrowsTheWrapperAndLandsTheRemedyOfWhatFailed() async throws {
+    /// The event, the thrown error and the state all name the failure as it
+    /// arrived, so a service that may answer later reads as one.
+    func testConfigFailureThrowsWhatFailedAndLandsItsRemedy() async throws {
         let (ttp, _, _) = try makeTTP()
         StubURLProtocol.handler = { request in
             (HTTPURLResponse(
@@ -432,8 +432,8 @@ final class PayabliTTPTests: XCTestCase {
         let raised = try XCTUnwrap(thrown, "initialize() returned instead of failing")
         let marked = try XCTUnwrap(ttp.sessionManager.lastError, "the session recorded no error")
 
-        XCTAssertEqual(reported, "UNKNOWN")
-        XCTAssertEqual((raised as? TapToPayError)?.type, .unknown, "got \(raised)")
+        XCTAssertEqual(reported, "SERVER_ERROR")
+        XCTAssertEqual((raised as? TapToPayError)?.type, .serverError, "got \(raised)")
         XCTAssertFalse(
             marked is PayabliTTPError,
             "the state is classified from the failure as it arrived, not from the wrapper"
@@ -457,7 +457,7 @@ final class PayabliTTPTests: XCTestCase {
             try await ttp.initialize()
             XCTFail("expected the config phase to fail")
         } catch {
-            XCTAssertEqual((error as? TapToPayError)?.type, .unknown, "got \(error)")
+            XCTAssertEqual((error as? TapToPayError)?.type, .validation, "got \(error)")
         }
 
         // The same bytes get the same answer, so a retry is not the remedy. A 500
@@ -497,13 +497,13 @@ final class PayabliTTPTests: XCTestCase {
         }
         let reported = try await value(of: collector, named: "configFailed")
 
-        XCTAssertEqual(reported, "UNKNOWN")
+        XCTAssertEqual(reported, "VALIDATION_ERROR")
         XCTAssertFalse(reported.contains(serversWords), reported)
 
         // The other half of the split: what the event withholds, the caller gets.
         let raised = try XCTUnwrap(thrown)
         let host = try XCTUnwrap(raised as? TapToPayError, "got \(raised)")
-        XCTAssertTrue(host.detail?.contains(serversWords) == true, String(describing: host.detail))
+        XCTAssertTrue(host.localizedDescription.contains(serversWords), host.localizedDescription)
     }
 
     /// The 401 branch does four things and had a test for none of them: it clears
@@ -548,10 +548,10 @@ final class PayabliTTPTests: XCTestCase {
 
         XCTAssertFalse(attestation.isAlreadyAttested, "a refused handle must not be sent again")
         // A refused binding and a refused bearer are both worth another call,
-        // which is the remedy the 401 underneath the wrapper carries.
+        // which is the remedy the 401 carries.
         XCTAssertEqual(ttp.sessionState, .failed(reason: .serviceUnavailable))
-        XCTAssertEqual(reported, "UNKNOWN")
-        XCTAssertTrue(raised.localizedDescription.contains("401"), raised.localizedDescription)
+        XCTAssertEqual(reported, "TOKEN_EXPIRED")
+        XCTAssertEqual((raised as? TapToPayError)?.type, .tokenExpired, "got \(raised)")
         // The drop is the config call's to make, so the reason claims nothing about
         // it. Claiming it here is what told a caller the binding was gone when it
         // was not.

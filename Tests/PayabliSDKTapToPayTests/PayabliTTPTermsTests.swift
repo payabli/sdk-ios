@@ -92,7 +92,7 @@ final class PayabliTTPTermsTests: XCTestCase {
             _ = try await ttp.areTermsAccepted()
             XCTFail("expected the provider's failure to surface")
         } catch let error as TapToPayError {
-            XCTAssertEqual(error.type, .readerUnavailable)
+            XCTAssertEqual(error.type, .unknown)
         }
     }
 
@@ -245,7 +245,7 @@ final class PayabliTTPTermsTests: XCTestCase {
             try await ttp.presentTerms()
             XCTFail("expected the failure to reach the caller")
         } catch let error as TapToPayError {
-            XCTAssertEqual(error.type, .readerUnavailable)
+            XCTAssertEqual(error.type, .unknown)
         }
     }
 

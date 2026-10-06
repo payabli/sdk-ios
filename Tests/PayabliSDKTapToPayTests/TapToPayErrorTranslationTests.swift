@@ -27,6 +27,15 @@ final class TapToPayErrorTranslationTests: XCTestCase {
         XCTAssertEqual(host.detail, "card moved away")
     }
 
+    func testADismissedSheetIsACancellationByThePerson() throws {
+        let prefix = FiservCardReader.cancellationReasonPrefix
+        XCTAssertEqual(try translated(PayabliTTPError.nfcFailed(reason: "\(prefix) dismissed")).type, .userCancelled)
+        XCTAssertEqual(
+            try translated(PayabliTTPError.readerSetupFailed(reason: "\(prefix) dismissed")).type,
+            .userCancelled
+        )
+    }
+
     func testAnEmptyReasonIsNeverOfferedAsTheDetail() throws {
         XCTAssertNil(try translated(PayabliTTPError.attestationFailed(reason: "")).detail)
         XCTAssertNil(try translated(PayabliTTPError.nfcFailed(reason: "  \n")).detail)
@@ -59,6 +68,7 @@ final class TapToPayErrorTranslationTests: XCTestCase {
         XCTAssertEqual(host.type, .rateLimited)
         XCTAssertEqual(host.retryAfter, 30)
         XCTAssertEqual((host as PayabliRetryAfter).retryAfter, 30)
+        XCTAssertEqual(host.toPayabliNSError().userInfo["retryAfter"] as? TimeInterval, 30)
     }
 
     // MARK: - What passes through
@@ -180,9 +190,9 @@ final class TapToPayErrorTranslationTests: XCTestCase {
         case .attestationRevoked: return .deviceSetupRequired
         case .attestationFailed: return .unknown
         case .configFailed: return .unknown
-        case .readerSetupFailed: return .readerUnavailable
+        case .readerSetupFailed: return .unknown
         case .nfcFailed: return .tapNotCompleted
-        case .initiateFailed: return .paymentNotOpened
+        case .initiateFailed: return .unknown
         case .updateFailed: return .paymentNotClosed
         case .tokenExpired: return .tokenExpired
         case .activationFailed: return .unknown

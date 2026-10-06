@@ -214,14 +214,12 @@ extension PayabliTTP {
 
     /// Pre: session is in `.fetchingConfig`. Error handling:
     ///   - backend says pending → `.pendingActivation`
-    ///   - 401, either a refused binding or a refused bearer → rewrap as
-    ///     `.configFailed`, relaying the reason. Dropping a binding is the config
-    ///     call's, which knows which of the two it is holding
-    ///   - anything else → rewrapped as `.configFailed` so the domain and code
-    ///     stay what the bridges read, keeping the parsed reason
+    ///   - a core error, a 401 included, is thrown as it arrived, so its code
+    ///     reaches the host. Dropping a binding on a 401 is the config call's,
+    ///     which knows which handle it presented
+    ///   - anything else → wrapped as `.configFailed`, keeping the parsed reason
     ///
-    /// The state is classified from the failure as it arrived, not from the
-    /// wrapper: the error names which phase failed, the state names the remedy.
+    /// The state is classified from the failure as it arrived.
     private func runFetchConfigPhase() async throws -> TTPConfig {
         do {
             return try await configClient.fetchConfig(entry: entryPoint)
@@ -231,27 +229,16 @@ extension PayabliTTP {
                 throw failure
             }
             throw PayabliTTPError.devicePendingActivation
-        } catch let err as PayabliGenericError where err.type == .tokenExpired {
-            // Two failures arrive as `.tokenExpired` here: the service refusing the
-            // binding the request presented, and the transport refusing the bearer
-            // after its retry. The first is dropped by the config call, which knows
-            // which handle it presented; the second is about a token and drops
-            // nothing. The reason is relayed either way, so it names which happened
-            // instead of this layer claiming an outcome for both.
-            let failure = PayabliTTPError.configFailed(reason: "Config rejected (401): \(err.reason)")
-            markError(err)
-            syncPublished()
-            multicaster.emit(.configFailed(error: TapToPayErrorTranslation.eventName(of: failure)))
-            throw failure
         } catch {
-            // Wrapped, so a host receives every configuration failure under the
-            // `configFailed` case's catalog entry.
-            //
-            // The reason is the error's own parsed description, so the fields the
-            // service named still reach the merchant. `String(describing:)` renders
-            // every stored property instead, the page token among them.
-            let failure = error as? PayabliTTPError
-                ?? PayabliTTPError.configFailed(reason: error.localizedDescription)
+            // A core error keeps its own code and the wait the service asked for.
+            // Anything else is wrapped with its parsed description, so the fields
+            // the service named still reach the merchant. `String(describing:)`
+            // renders every stored property instead, the page token among them.
+            let failure: Error = if error is PayabliTTPError || error is any PayabliError {
+                error
+            } else {
+                PayabliTTPError.configFailed(reason: error.localizedDescription)
+            }
             // Marked as it arrived, so a permission this paypoint has not
             // granted still reaches `.pendingActivation` and a service that was
             // briefly away still reads as one to try again.

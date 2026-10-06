@@ -28,14 +28,13 @@ final class TapToPayErrorEdgeTests: XCTestCase {
             ("presentTerms", { try await $0.presentTerms() })
         ]
         for (name, call) in calls {
-            let ttp = try makeTTP(failingWith: PayabliTTPError.readerSetupFailed(reason: "no reader"))
+            let ttp = try makeTTP(failingWith: .termsNotAccepted)
             do {
                 try await call(ttp)
                 XCTFail("\(name) succeeded")
             } catch let error as TapToPayError {
-                XCTAssertEqual(error.type, .readerUnavailable, name)
-                XCTAssertEqual(error.reason, PayabliErrorType.readerUnavailable.message, name)
-                XCTAssertEqual(error.detail, "no reader", name)
+                XCTAssertEqual(error.type, .termsNotAccepted, name)
+                XCTAssertEqual(error.reason, PayabliErrorType.termsNotAccepted.message, name)
             } catch {
                 XCTFail("\(name) handed a host \(type(of: error))")
             }
@@ -73,14 +72,14 @@ final class TapToPayErrorEdgeTests: XCTestCase {
             ("presentTerms", { ttp, done in ttp.presentTerms(completion: done) })
         ]
         for (name, call) in calls {
-            let ttp = try makeTTP(failingWith: PayabliTTPError.readerSetupFailed(reason: "no reader"))
+            let ttp = try makeTTP(failingWith: .termsNotAccepted)
             let completed = expectation(description: name)
             call(ttp) { error in
                 XCTAssertEqual(error?.domain, "com.payabli.ttp", name)
-                XCTAssertEqual(error?.code, PayabliErrorType.readerUnavailable.number, name)
+                XCTAssertEqual(error?.code, PayabliErrorType.termsNotAccepted.number, name)
                 XCTAssertEqual(
                     error?.userInfo["PayabliErrorType"] as? String,
-                    PayabliErrorType.readerUnavailable.rawValue,
+                    PayabliErrorType.termsNotAccepted.rawValue,
                     name
                 )
                 completed.fulfill()

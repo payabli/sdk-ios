@@ -202,10 +202,10 @@ order.paymentTransId = result.paymentTransId // store it; don't log it
 
 ## Outcomes and errors
 
-Every failure is a `TapToPayError`, apart from a task cancellation before the transaction opens, which
-is rethrown as `CancellationError`. Cancelling the task running `charge` after the transaction has opened
-doesn't end it silently: it throws a `TapToPayError` carrying `paymentTransId` and `capture`. Follow
-`capture` as for any other error.
+Every failure is a `TapToPayError`, apart from a cancellation, which can end the call as
+`CancellationError`. Cancelling the task running `charge` after the transaction has opened doesn't end it
+silently: it throws a `TapToPayError` carrying `paymentTransId` and `capture`. Follow `capture` as for any
+other error.
 
 A `TapToPayError` carries the catalog entry for its cause:
 
@@ -214,7 +214,8 @@ A `TapToPayError` carries the catalog entry for its cause:
 - `type` names the cause, for a case your app handles on its own, such as `.devicePendingActivation`.
 - `code` is the catalog number Payabli support reads. Give it to them with the failure.
 - `message` is fixed text. `detail` holds the service's or the reader's own words, when there are any.
-- `retryAfter` is the wait the service asked for before trying again, when it asked for one.
+- `retryAfter` is the wait the service asked for before trying again, when it asked for one and the
+  failure carries it.
 
 It also carries `capture` and `paymentTransId`:
 

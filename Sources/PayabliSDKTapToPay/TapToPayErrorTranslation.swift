@@ -4,8 +4,7 @@ import PayabliSDKCore
 /// The one table that decides the catalog entry a host receives for a card-present failure.
 ///
 /// Every public card-present call passes its failure through ``hostError(for:)``, so a host catches
-/// ``TapToPayError`` and nothing else. Cancellation is the exception, and reaches the caller as
-/// `CancellationError`.
+/// ``TapToPayError`` and nothing else. A `CancellationError` passes through unchanged.
 enum TapToPayErrorTranslation {
     static func hostError(for error: Error) -> Error {
         switch error {
@@ -59,14 +58,13 @@ enum TapToPayErrorTranslation {
             return .devicePendingActivation
         case .attestationRevoked:
             return .deviceSetupRequired
-        case .attestationFailed, .configFailed, .activationFailed:
+        case let .readerSetupFailed(reason, _) where isCancellation(reason),
+             let .nfcFailed(reason, _) where isCancellation(reason):
+            return .userCancelled
+        case .attestationFailed, .configFailed, .activationFailed, .readerSetupFailed, .initiateFailed:
             return .unknown
-        case .readerSetupFailed:
-            return .readerUnavailable
         case .nfcFailed:
             return .tapNotCompleted
-        case .initiateFailed:
-            return .paymentNotOpened
         case .updateFailed:
             return .paymentNotClosed
         case .tokenExpired:
@@ -85,6 +83,11 @@ enum TapToPayErrorTranslation {
     }
 
     // swiftlint:enable cyclomatic_complexity
+
+    /// A person dismissed the platform's sheet. The reader marks it at the start of the case's reason.
+    private static func isCancellation(_ reason: String) -> Bool {
+        reason.hasPrefix(FiservCardReader.cancellationReasonPrefix)
+    }
 
     /// The service's or the reader's own words, which a host shows beside the fixed message.
     private static func serviceText(of error: PayabliTTPError) -> String? {

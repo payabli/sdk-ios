@@ -51,6 +51,9 @@ extension TapToPayError: CustomNSError {
         if let paymentTransId {
             info["paymentTransId"] = paymentTransId
         }
+        if let retryAfter {
+            info["retryAfter"] = retryAfter
+        }
         return info
     }
 }

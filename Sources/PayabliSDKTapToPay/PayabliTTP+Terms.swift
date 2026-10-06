@@ -20,9 +20,9 @@ public extension PayabliTTP {
     /// No charge can be taken until this answers `true`.
     ///
     /// - Returns: `true` when the merchant has accepted.
-    /// - Throws: ``TapToPayError`` with ``PayabliErrorType/readerUnavailable``
-    ///   when there is no reader to ask — which is a different answer from
-    ///   `false`, and a caller showing a terms screen should tell them apart.
+    /// - Throws: ``TapToPayError`` when there is no reader to ask — which is a
+    ///   different answer from `false`, and a caller showing a terms screen
+    ///   should tell them apart.
     func areTermsAccepted() async throws -> Bool {
         try await reportingToHost { try await provider.areTermsAccepted() }
     }
@@ -78,9 +78,8 @@ public extension PayabliTTP {
     /// There is no separate call for re-presenting them after acceptance lapses.
     /// This is that call too.
     ///
-    /// - Throws: ``TapToPayError`` with ``PayabliErrorType/readerUnavailable``
-    ///   when there is no reader to present from. `initialize()` is what builds
-    ///   one.
+    /// - Throws: ``TapToPayError`` when there is no reader to present from.
+    ///   `initialize()` is what builds one.
     func presentTerms() async throws {
         try await reportingToHost { try await provider.presentTerms() }
     }
