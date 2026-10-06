@@ -172,6 +172,35 @@ final class PayabliTTPActivationIdTests: XCTestCase {
         XCTAssertEqual(ttp.sessionState, .idle)
     }
 
+    /// Spending a code and building a session move the same state, so a build waits for an activation
+    /// in progress rather than replacing the registration under it.
+    func testAnInitializeWaitsForAnActivationInProgress() async throws {
+        let (ttp, attestation) = try makeTTP()
+        attestation.pendingRegistration = "dev_e"
+        _ = try? await ttp.initialize()
+        attestation.pendingRegistration = nil
+        let gate = ActivationGate()
+        attestation.beforeActivate = { await gate.hold() }
+
+        let activation = Task { try await ttp.activateDevice(activationCode: "123456") }
+        await gate.waitUntilHeld()
+        let build = Task { try? await ttp.initialize() }
+        for _ in 0 ..< 20 {
+            await Task.yield()
+        }
+
+        XCTAssertEqual(
+            ttp.sessionState,
+            .pendingActivation(activationId: "dev_e"),
+            "initialize ran inside an activation"
+        )
+
+        await gate.release()
+        try await activation.value
+        _ = await build.value
+        XCTAssertEqual(attestation.activateCalls, 1)
+    }
+
     func testTheObjCReaderAnswersOnlyWhileActivationIsOwed() async throws {
         let (ttp, attestation) = try makeTTP()
         XCTAssertNil(ttp.activationId)
@@ -184,5 +213,32 @@ final class PayabliTTPActivationIdTests: XCTestCase {
         try await ttp.activateDevice(activationCode: "ABC123")
 
         XCTAssertNil(ttp.activationId)
+    }
+}
+
+/// Holds an activation open until a test releases it.
+private actor ActivationGate {
+    private var held = false
+    private var heldWaiters: [CheckedContinuation<Void, Never>] = []
+    private var releaseWaiter: CheckedContinuation<Void, Never>?
+    private var released = false
+
+    func hold() async {
+        held = true
+        heldWaiters.forEach { $0.resume() }
+        heldWaiters = []
+        guard !released else { return }
+        await withCheckedContinuation { releaseWaiter = $0 }
+    }
+
+    func waitUntilHeld() async {
+        guard !held else { return }
+        await withCheckedContinuation { heldWaiters.append($0) }
+    }
+
+    func release() {
+        released = true
+        releaseWaiter?.resume()
+        releaseWaiter = nil
     }
 }

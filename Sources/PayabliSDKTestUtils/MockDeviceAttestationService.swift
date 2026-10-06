@@ -192,7 +192,16 @@ package final class MockDeviceAttestationService: DeviceAttestationService, @unc
         )
     }
 
+    /// Awaited at the start of `activateDevice`, so a test can hold an activation open.
+    package var beforeActivate: (@Sendable () async -> Void)? {
+        get { lock.withLock { storedBeforeActivate } }
+        set { lock.withLock { storedBeforeActivate = newValue } }
+    }
+
+    private var storedBeforeActivate: (@Sendable () async -> Void)?
+
     package func activateDevice(activationCode: String, entry: String, activationId: String) async throws {
+        await beforeActivate?()
         let result: Result<Void, Error> = lock.withLock {
             storedActivateCalls += 1
             guard (storedBindings[entry] ?? storedBindings[Self.anyEntry]) == activationId else {

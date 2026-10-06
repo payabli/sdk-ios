@@ -11,6 +11,7 @@ import Foundation
 enum SessionSetupKind {
     case initialize
     case reinitialize
+    case activate
 }
 
 @MainActor

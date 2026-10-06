@@ -18,15 +18,16 @@ extension PayabliTTP {
         try await runSessionSetup(.initialize) { try await self.runInitialize() }
     }
 
-    /// Serialises the two entry points that build a session.
+    /// Serialises the entry points that build a session and the one that spends an activation code
+    /// against it.
     ///
-    /// Both reset or advance the same state and both configure and prepare the
-    /// same provider, so overlapping them lets one finish against the other's
-    /// session and report success on transitions that were rejected. A caller of
-    /// the same kind joins the operation in flight; a caller of the other kind
-    /// waits for it and then runs its own, which keeps their meanings distinct:
+    /// All of them move the same state, and the build ones configure and prepare the same provider,
+    /// so overlapping them lets one finish against another's session and report success on
+    /// transitions that were rejected. A code spent while a build replaces the registration is spent
+    /// against the wrong one. A caller of the same kind joins the operation in flight; a caller of
+    /// another kind waits for it and then runs its own, which keeps their meanings distinct:
     /// re-initializing skips attestation, initializing does not.
-    private func runSessionSetup(
+    func runSessionSetup(
         _ kind: SessionSetupKind,
         _ work: @escaping @MainActor () async throws -> Void
     ) async throws {

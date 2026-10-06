@@ -14,6 +14,10 @@ public extension PayabliTTP {
     /// so the caller can immediately re-run `initialize()` for a fresh cold
     /// attestation — `.sessionExpired` is also emitted in that sub-case.
     func activateDevice(activationCode: String) async throws {
+        try await runSessionSetup(.activate) { try await self.runActivateDevice(activationCode: activationCode) }
+    }
+
+    private func runActivateDevice(activationCode: String) async throws {
         guard case let .pendingActivation(activationId) = sessionState else {
             throw PayabliTTPError.invalidState(
                 current: sessionState,
