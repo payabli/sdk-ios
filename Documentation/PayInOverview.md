@@ -70,16 +70,16 @@ The default is `.storePaymentMethod`.
 
 ## Authentication Model
 
-Every operation runs on a session, which holds the credential and asks for one when it needs it:
+Every operation runs on the one session the app starts, which holds the credential and asks for one
+when it needs it:
 
 ```swift
-let paymentFlow = PayabliPayIn(
-    session: PayabliSession(config: try PayabliConfig(
-        entryPoint: entryPoint,
-        environment: .sandbox,
-        tokenProvider: { try await backend.fetchPayInAccessToken() }
-    ))
-)
+let session = try await PayabliSession.initialize(config: try PayabliConfig(
+    entryPoint: entryPoint,
+    environment: .sandbox,
+    tokenProvider: { try await backend.fetchPayInAccessToken() }
+))
+let paymentFlow = PayabliPayIn(session: session)
 ```
 
 The host app should fetch short-lived Payabli access tokens from its own

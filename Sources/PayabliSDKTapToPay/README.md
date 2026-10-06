@@ -61,6 +61,8 @@ curl -X POST "https://api-sandbox.payabli.com/api/v2/paypoint/{entryPoint}/apps"
   the bearer token.
 - `friendlyName` is optional. Calling it again with the same values is safe.
 - Register each bundle ID you ship, including debug and white-label builds.
+- The SDK reads the app ID from the signed app and sends it when the device attests, so your code never
+  passes it.
 
 An app that isn't an authorized app is refused when the device attests, with an HTTP 403. `initialize()`
 throws a `PayabliGenericError` whose `type` is `.permissionDenied`, not `attestationFailed`, and
@@ -74,16 +76,17 @@ straight after setup may be running an app that isn't registered.
 import PayabliSDKCore
 import PayabliSDKTapToPay
 
-let ttp = try PayabliTTP(
-    tokenProvider: { try await fetchPayabliAccessToken() },
+try await PayabliSession.initialize(config: PayabliConfig(
     entryPoint: "your-entry-point",
-    appId: "TEAM123456.com.example.checkout",
-    environment: .sandbox
-)
+    environment: .sandbox,
+    tokenProvider: { try await fetchPayabliAccessToken() }
+))
+let ttp = try await PayabliTTP.create()
 ```
 
-- `PayabliTTP` builds its own session from these values. It is an `ObservableObject`: bind `sessionState`
-  and `isReady` in SwiftUI.
+- Start the session once, before `create()`; card-not-present payments run on the same session.
+  `create()` throws when no session has been started.
+- `PayabliTTP` is an `ObservableObject`: bind `sessionState` and `isReady` in SwiftUI.
 - **One paypoint per session.** A `PayabliTTP` serves the entry point it was created with.
 
 ## Take a payment

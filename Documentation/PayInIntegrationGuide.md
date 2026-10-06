@@ -24,14 +24,14 @@ import PayabliSDKPayIn
 
 ## 2. Provide A Mobile Access Token
 
-The session expects an async token provider:
+Start the session once, with an async token provider. Every component below runs on it:
 
 ```swift
-let config = try PayabliConfig(
+let session = try await PayabliSession.initialize(config: try PayabliConfig(
     entryPoint: entryPoint,
     environment: .sandbox,
     tokenProvider: { try await backend.fetchPayInAccessToken() }
-)
+))
 ```
 
 Recommended production pattern:
@@ -92,7 +92,7 @@ final class StorePaymentMethodViewModel: ObservableObject {
 
     let paymentFlow: PayabliPayIn
 
-    // The session is built by the caller, which is where a rejected configuration can be handled.
+    // The caller passes the session `initialize` returned, which is where a refused configuration is handled.
     init(session: PayabliSession) {
         paymentFlow = PayabliPayIn(
             session: session,
@@ -191,11 +191,7 @@ Create a component in capture mode with request configuration:
 
 ```swift
 let paymentFlow = PayabliPayIn(
-    session: PayabliSession(config: try PayabliConfig(
-        entryPoint: entryPoint,
-        environment: .sandbox,
-        tokenProvider: { try await backend.fetchPayInAccessToken() }
-    )),
+    session: session,
     operation: .capture,
     requestConfiguration: PayabliPayInRequestConfiguration(
         paymentDetails: PayabliPayInPaymentDetails(
@@ -280,11 +276,7 @@ Create a component in authorize mode:
 
 ```swift
 let paymentFlow = PayabliPayIn(
-    session: PayabliSession(config: try PayabliConfig(
-        entryPoint: entryPoint,
-        environment: .sandbox,
-        tokenProvider: { try await backend.fetchPayInAccessToken() }
-    )),
+    session: session,
     operation: .authorize,
     requestConfiguration: PayabliPayInRequestConfiguration(
         paymentDetails: PayabliPayInPaymentDetails(
@@ -879,11 +871,7 @@ Diagnostics are disabled by default:
 
 ```swift
 let paymentFlow = PayabliPayIn(
-    session: PayabliSession(config: try PayabliConfig(
-        entryPoint: entryPoint,
-        environment: .sandbox,
-        tokenProvider: { try await backend.fetchPayInAccessToken() }
-    )),
+    session: session,
     diagnostics: .disabled
 )
 ```
