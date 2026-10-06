@@ -250,7 +250,7 @@ private struct OwnerFrame<Content: View>: View {
 }
 
 #Preview {
-    WithDemoSession { session in
+    WithDemoSession { session, _ in
         SimpleCaptureView(
             captureFlow: PayInSessions.preview(session: session, capturing: true),
             saveFlow: PayInSessions.preview(session: session)

@@ -46,8 +46,8 @@ final class AttestationTurnsTests: XCTestCase {
         let (first, firstAttestor, _) = try AttestFixture.makeService(storage: storage)
         let (second, secondAttestor, _) = try AttestFixture.makeService(storage: storage)
 
-        async let a = first.attest(entry: "myEntry", appId: "TEAM.bundle.id")
-        async let b = second.attest(entry: "myEntry", appId: "TEAM.bundle.id")
+        async let a = first.attest(entry: "myEntry")
+        async let b = second.attest(entry: "myEntry")
         let results = try await [a, b]
 
         XCTAssertEqual(results[0].deviceId, results[1].deviceId, "the two callers hold different devices")
@@ -98,8 +98,8 @@ final class AttestationTurnsTests: XCTestCase {
 
         // Sequential, so the second is never inside the gate with the first. Its
         // caller decided to attest before the first had written anything.
-        let a = try await first.attest(entry: "myEntry", appId: "TEAM.bundle.id")
-        let b = try await second.attest(entry: "myEntry", appId: "TEAM.bundle.id")
+        let a = try await first.attest(entry: "myEntry")
+        let b = try await second.attest(entry: "myEntry")
 
         XCTAssertEqual(a.deviceId, b.deviceId, "the second attempt registered its own device")
         XCTAssertEqual(
@@ -144,7 +144,7 @@ final class AttestationTurnsTests: XCTestCase {
             userInfo: nil
         )
 
-        let result = try await sut.attest(entry: "myEntry", appId: "TEAM.bundle.id")
+        let result = try await sut.attest(entry: "myEntry")
 
         XCTAssertEqual(result.deviceId, "dev_fresh", "a binding naming a key this device lost was answered from")
         XCTAssertEqual(attestor.generateKeyCalls, 1)
@@ -175,11 +175,11 @@ final class AttestationTurnsTests: XCTestCase {
             await held.wait()
         }
 
-        async let holdersResult = holder.attest(entry: "myEntry", appId: "TEAM.bundle.id")
+        async let holdersResult = holder.attest(entry: "myEntry")
         await reached.wait()
 
         let released = expectation(description: "the cancelled caller returned")
-        let queued = Task { try await waiter.attest(entry: "myEntry", appId: "TEAM.bundle.id") }
+        let queued = Task { try await waiter.attest(entry: "myEntry") }
         Task {
             _ = try? await queued.value
             released.fulfill()
@@ -221,10 +221,10 @@ final class AttestationTurnsTests: XCTestCase {
             await held.wait()
         }
 
-        async let holdersResult = holder.attest(entry: "myEntry", appId: "TEAM.bundle.id")
+        async let holdersResult = holder.attest(entry: "myEntry")
         await reached.wait()
 
-        let queued = Task { try await waiter.attest(entry: "myEntry", appId: "TEAM.bundle.id") }
+        let queued = Task { try await waiter.attest(entry: "myEntry") }
         queued.cancel()
 
         held.open()
@@ -278,8 +278,8 @@ final class AttestationTurnsTests: XCTestCase {
         let (first, _, _) = try AttestFixture.makeService(storage: firstStorage)
         let (second, _, _) = try AttestFixture.makeService(storage: secondStorage)
 
-        async let a = first.attest(entry: "myEntry", appId: "TEAM.bundle.id")
-        async let b = second.attest(entry: "myEntry", appId: "TEAM.bundle.id")
+        async let a = first.attest(entry: "myEntry")
+        async let b = second.attest(entry: "myEntry")
         let results = try await [a, b]
 
         XCTAssertEqual(deviceIds.values.count, 2, "one service was handed the other's device")
@@ -323,7 +323,7 @@ final class AttestationTurnsTests: XCTestCase {
             await held.wait()
         }
 
-        async let holdersResult = holder.attest(entry: "entryA", appId: "TEAM.bundle.id")
+        async let holdersResult = holder.attest(entry: "entryA")
 
         // Held for certain before the other one starts, so this is not a race the
         // test happens to win.
@@ -337,7 +337,7 @@ final class AttestationTurnsTests: XCTestCase {
         // below drains both callers.
         let finished = expectation(description: "entryB completed while entryA was held")
         let othersAttestation = Task {
-            let result = try await other.attest(entry: "entryB", appId: "TEAM.bundle.id")
+            let result = try await other.attest(entry: "entryB")
             finished.fulfill()
             return result
         }

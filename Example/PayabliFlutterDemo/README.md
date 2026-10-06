@@ -50,7 +50,6 @@ Add to `ios/Runner/Runner.entitlements` (create if missing):
 You also need to:
 - Enable **Tap to Pay on iPhone** capability in your Apple Developer
   account for the bundle identifier.
-- Set `Secrets.appId` in `lib/main.dart` to `<TEAM_ID>.<BUNDLE_ID>`.
 
 ### Hardware requirement
 

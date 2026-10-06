@@ -7,8 +7,8 @@ import SwiftUI
 struct PayabliDemoQAApp: App {
     var body: some Scene {
         WindowGroup {
-            WithDemoSession { session in
-                DemoTabs(session: session)
+            WithDemoSession { session, terminal in
+                DemoTabs(session: session, terminal: terminal)
             }
         }
     }
@@ -20,7 +20,7 @@ struct DemoTabs: View {
 
     @StateObject private var paymentCapture: PayInFlowHandle
 
-    @StateObject private var terminal = TapToPaySessions.terminal()
+    @StateObject private var terminal: TapToPayTerminal
 
     @StateObject private var simpleCapture: PayInFlowHandle
 
@@ -41,7 +41,8 @@ struct DemoTabs: View {
     /// read it. In memory only.
     @StateObject private var demoCustomer = DemoCustomerSetting()
 
-    init(session: PayabliSession) {
+    init(session: PayabliSession, terminal: TapToPayTerminal) {
+        _terminal = StateObject(wrappedValue: terminal)
         _paymentMethod = StateObject(wrappedValue: PayInSessions.storedMethod(session: session))
         _paymentCapture = StateObject(wrappedValue: PayInSessions.capture(session: session))
         _simpleCapture = StateObject(wrappedValue: PayInSessions.capture(session: session))
@@ -86,7 +87,7 @@ struct DemoTabs: View {
 }
 
 #Preview {
-    WithDemoSession { session in
+    WithDemoSession { session, terminal in
         TabView {
             PaymentMethodQAView(paymentFlow: PayInSessions.preview(session: session))
                 .tabItem {
@@ -109,7 +110,7 @@ struct DemoTabs: View {
             // The terminal is constructed but never initialized here, so the preview
             // makes no network call and touches neither App Attest nor the reader.
             // Pre-flight still renders, and reports the Simulator honestly.
-            PaymentTapToPayQAView(terminal: TapToPaySessions.preview())
+            PaymentTapToPayQAView(terminal: terminal)
                 .tabItem {
                     Label("TapToPay", systemImage: "wave.3.right")
                 }
@@ -149,17 +150,21 @@ enum DemoSession {
     }
 }
 
-/// Shows `content` once the session has started, and a spinner until then.
+/// Shows `content` once the session has started and the terminal is built on it, and a
+/// spinner until then.
 struct WithDemoSession<Content: View>: View {
-    @ViewBuilder let content: (PayabliSession) -> Content
-    @State private var session: PayabliSession?
+    @ViewBuilder let content: (PayabliSession, TapToPayTerminal) -> Content
+    @State private var started: (session: PayabliSession, terminal: TapToPayTerminal)?
 
     var body: some View {
-        if let session {
-            content(session)
+        if let started {
+            content(started.session, started.terminal)
         } else {
             ProgressView()
-                .task { session = await DemoSession.start() }
+                .task {
+                    let session = await DemoSession.start()
+                    started = (session, await TapToPaySessions.terminal())
+                }
         }
     }
 }

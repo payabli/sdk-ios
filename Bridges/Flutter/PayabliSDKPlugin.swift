@@ -119,13 +119,12 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
     private func handleConfigure(_ arguments: Any?, result: @escaping FlutterResult) {
         guard let args = arguments as? [String: Any],
               let entryPoint = args["entryPoint"] as? String,
-              let appId = args["appId"] as? String,
               let envRaw = args["environment"] as? Int,
               let environment = PayabliEnvironment(rawValue: envRaw)
         else {
             result(FlutterError(
                 code: "INVALID_ARGS",
-                message: "Missing entryPoint/appId/environment",
+                message: "Missing entryPoint/environment",
                 details: nil
             ))
             return
@@ -143,7 +142,7 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
                     environment: environment,
                     tokenProvider: Self.sessionTokenProvider
                 ))
-                ttp = try PayabliTTP(appId: appId)
+                ttp = try await PayabliTTP.create()
             } catch {
                 result(FlutterError(
                     code: "INVALID_CONFIGURATION",

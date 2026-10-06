@@ -45,14 +45,12 @@ class PayabliTTP {
   static Future<void> configure({
     required Future<String> Function() tokenProvider,
     required String entryPoint,
-    required String appId,
     PayabliEnvironment environment = PayabliEnvironment.sandbox,
   }) async {
     _payabliMethodChannel.setMethodCallHandler(_handleNativeCallback);
 
     await _payabliMethodChannel.invokeMethod<void>('configure', {
       'entryPoint': entryPoint,
-      'appId': appId,
       'environment': environment.index,
     });
     _tokenRefresh = tokenProvider;

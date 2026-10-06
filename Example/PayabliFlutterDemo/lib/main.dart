@@ -94,7 +94,6 @@ class _HomeScreenState extends State<HomeScreen> {
       await PayabliTTP.configure(
         tokenProvider: Secrets.fetchAccessToken,
         entryPoint: Secrets.entryPoint,
-        appId: Secrets.appId,
         environment: PayabliEnvironment.sandbox,
       );
       await PayabliPayIn.configure(
@@ -506,7 +505,6 @@ class _HomeScreenState extends State<HomeScreen> {
 /// your backend — never embed clientSecret in the app binary.
 class Secrets {
   static const String entryPoint = '<YOUR_ENTRY_POINT>';
-  static const String appId = '<TEAM_ID>.<BUNDLE_ID>';
 
   static const String _tokenEndpoint =
       'https://your-backend.example.com/payabli/token';

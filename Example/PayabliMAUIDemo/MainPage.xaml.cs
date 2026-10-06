@@ -71,13 +71,25 @@ public partial class MainPage : ContentPage
     /// </summary>
     private void BuildFacades()
     {
+        PayabliTTP.Create((ttp, ttpError) =>
+        {
+            MainThread.BeginInvokeOnMainThread(() =>
+            {
+                if (ttp is null)
+                {
+                    ResultLabel.Text = $"✗ Configure failed: {ttpError?.LocalizedDescription}";
+                    return;
+                }
+                BuildFacades(ttp);
+            });
+        });
+    }
+
+    private void BuildFacades(PayabliTTP ttp)
+    {
         try
         {
-            _ttp = new PayabliTTP(appId: Secrets.AppId, error: out var ttpError);
-            if (ttpError is not null)
-            {
-                throw new System.Exception(ttpError.LocalizedDescription);
-            }
+            _ttp = ttp;
             _payIn = PayabliPayInObjC.Create(out var payInError);
             if (payInError is not null)
             {
@@ -288,6 +300,5 @@ public partial class MainPage : ContentPage
 internal static class Secrets
 {
     public const string EntryPoint = "<YOUR_ENTRY_POINT>";
-    public const string AppId = "<TEAM_ID>.<BUNDLE_ID>";
     public const string PlaceholderAccessToken = "placeholder-token";
 }

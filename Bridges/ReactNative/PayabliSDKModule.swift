@@ -16,8 +16,7 @@ import UIKit
 /// ## Protocol
 ///
 /// Methods (resolver/rejecter pattern, all `@objc`):
-///   - `configure(config, resolver, rejecter)` — entryPoint,
-///     appId, environment.
+///   - `configure(config, resolver, rejecter)` — entryPoint, environment.
 ///   - `initialize(resolver, rejecter)`
 ///   - `charge(params, resolver, rejecter)` — amount, type, serviceFee,
 ///     customer, order. Resolves with `{paymentTransId}`.
@@ -126,11 +125,10 @@ public final class PayabliSDKModule: RCTEventEmitter {
         rejecter reject: @escaping RCTPromiseRejectBlock
     ) {
         guard let entryPoint = config["entryPoint"] as? String,
-              let appId = config["appId"] as? String,
               let envRaw = config["environment"] as? Int,
               let environment = PayabliEnvironment(rawValue: envRaw)
         else {
-            reject("INVALID_ARGS", "Missing entryPoint/appId/environment", nil)
+            reject("INVALID_ARGS", "Missing entryPoint/environment", nil)
             return
         }
 
@@ -146,7 +144,7 @@ public final class PayabliSDKModule: RCTEventEmitter {
                     environment: environment,
                     tokenProvider: Self.sessionTokenProvider
                 ))
-                ttp = try PayabliTTP(appId: appId)
+                ttp = try await PayabliTTP.create()
             } catch {
                 reject("INVALID_CONFIGURATION", error.localizedDescription, error)
                 return

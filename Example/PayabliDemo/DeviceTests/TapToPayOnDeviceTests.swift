@@ -36,7 +36,6 @@ final class TapToPayOnDeviceTests: XCTestCase {
         let session = PayabliSession(config: try LiveEnvironment.config(for: named))
         return PayabliTTP(
             session: session,
-            appId: Secrets.appId,
             provider: FiservCardReader(),
             attestation: AppAttestService(
                 transport: session.transport,

@@ -9,8 +9,11 @@ final class PayabliTTPInstalledSessionTests: XCTestCase {
         super.tearDown()
     }
 
-    func testConstructingBeforeASessionIsInstalledThrowsNotInitialized() {
-        XCTAssertThrowsError(try PayabliTTP(appId: "TEAM.app")) { error in
+    func testCreatingBeforeASessionIsInstalledThrowsNotInitialized() async {
+        do {
+            _ = try await PayabliTTP.create()
+            XCTFail("a facade was created with no session installed")
+        } catch {
             guard case .notInitialized = error as? PayabliTTPError else {
                 return XCTFail("expected notInitialized, got \(error)")
             }
@@ -24,7 +27,7 @@ final class PayabliTTPInstalledSessionTests: XCTestCase {
             tokenProvider: { "tok" }
         ))
 
-        let ttp = try PayabliTTP(appId: "TEAM.app")
+        let ttp = try await PayabliTTP.create()
 
         XCTAssertTrue(ttp.session === installed)
     }

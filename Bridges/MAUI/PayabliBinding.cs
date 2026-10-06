@@ -104,6 +104,8 @@ namespace Payabli.TapToPay
 
     public delegate void PayabliTTPCompletion([NullAllowed] NSError error);
 
+    public delegate void PayabliTTPCreateCompletion([NullAllowed] PayabliTTP ttp, [NullAllowed] NSError error);
+
     public delegate void PayabliTTPChargeCompletion(
         [NullAllowed] PayabliTTPTransactionResultObjC result,
         [NullAllowed] NSError error
@@ -263,10 +265,11 @@ namespace Payabli.TapToPay
     [DisableDefaultCtor]
     public interface PayabliTTP
     {
-        // Runs on the session PayabliSessionObjC.Initialize installed. Carries `error:` because the
-        // Swift initialiser throws when no session is installed.
-        [Export("initWithAppId:error:")]
-        IntPtr Constructor(string appId, out NSError error);
+        // Runs on the session PayabliSessionObjC.Initialize installed. The completion receives
+        // an error instead of a facade when no session is installed.
+        [Static]
+        [Export("createWithCompletionHandler:")]
+        void Create(PayabliTTPCreateCompletion completionHandler);
 
         // Lifecycle (all @MainActor — completion fires on main thread).
 

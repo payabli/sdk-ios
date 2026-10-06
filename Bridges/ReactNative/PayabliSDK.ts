@@ -168,7 +168,6 @@ export interface PayabliTTPEvent {
 
 export interface PayabliTTPConfig {
     entryPoint: string;
-    appId: string;
     environment?: PayabliEnvironment;
     tokenProvider: () => Promise<string>;
 }
@@ -230,7 +229,6 @@ export interface PayabliPayInStoredPaymentMethod {
 interface NativePayabliSDKModule {
     configure(config: {
         entryPoint: string;
-        appId: string;
         environment: number;
     }): Promise<void>;
 
@@ -307,7 +305,6 @@ export async function configure(config: PayabliTTPConfig): Promise<void> {
 
     await module.configure({
         entryPoint: config.entryPoint,
-        appId: config.appId,
         environment: config.environment ?? PayabliEnvironment.Sandbox,
     });
     sessionTokenProvider = config.tokenProvider;

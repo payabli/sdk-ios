@@ -13,7 +13,7 @@ import PayabliSDKCore
 ///     environment: .sandbox,
 ///     tokenProvider: { try await myBackend.payabliToken() }
 /// ))
-/// let ttp = try PayabliTTP(appId: "TEAM.bundle.id")
+/// let ttp = try await PayabliTTP.create()
 /// try await ttp.initialize()
 /// let result = try await ttp.charge(
 ///     type: .sale,
@@ -42,7 +42,6 @@ public final class PayabliTTP: NSObject, ObservableObject {
     // MARK: - Dependencies
 
     let entryPoint: String
-    let appId: String
     let environment: PayabliEnvironment
 
     let provider: TapToPayProvider
@@ -115,16 +114,14 @@ public final class PayabliTTP: NSObject, ObservableObject {
     // MARK: - Init
 
     /// `package`: it takes the provider and the attestation service, so a host reaching
-    /// it could substitute either. A host uses the `appId:` init below instead.
+    /// it could substitute either. A host uses `create()` below instead.
     package init(
         session: PayabliSession,
-        appId: String,
         provider: TapToPayProvider,
         attestation: DeviceAttestationService,
         retryPolicy: RetryPolicy = .default
     ) {
         self.entryPoint = session.config.entryPoint
-        self.appId = appId
         self.environment = session.config.environment
         self.provider = provider
         self.attestation = attestation
@@ -143,21 +140,18 @@ public final class PayabliTTP: NSObject, ObservableObject {
         /// Builds the card-present facade on the session `PayabliSession.initialize(config:)`
         /// installed, with the default card reader and App Attest backed by the Keychain.
         ///
-        /// `appId` is the App Attest identifier, `TEAM.bundle.id`. Throws `notInitialized` when no
-        /// session is installed.
-        @objc public convenience init(appId: String) throws {
+        /// Throws `notInitialized` when no session is installed.
+        @objc public static func create() async throws -> PayabliTTP {
             guard let payabliSession = PayabliSession.current else {
                 throw PayabliTTPError.notInitialized
             }
-            let storage: SecureStorage = KeychainStorage()
             let attestation = AppAttestService(
                 transport: payabliSession.transport,
                 attestor: RealAppAttestor(),
-                storage: storage
+                storage: KeychainStorage()
             )
-            self.init(
+            return PayabliTTP(
                 session: payabliSession,
-                appId: appId,
                 provider: FiservCardReader(),
                 attestation: attestation
             )

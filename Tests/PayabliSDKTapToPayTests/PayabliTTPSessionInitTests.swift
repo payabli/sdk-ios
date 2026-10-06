@@ -16,13 +16,11 @@ final class PayabliTTPSessionInitTests: XCTestCase {
 
         let ttp1 = PayabliTTP(
             session: session,
-            appId: "T.app",
             provider: MockTapToPayProvider(),
             attestation: MockDeviceAttestationService()
         )
         let ttp2 = PayabliTTP(
             session: session,
-            appId: "T.app",
             provider: MockTapToPayProvider(),
             attestation: MockDeviceAttestationService()
         )

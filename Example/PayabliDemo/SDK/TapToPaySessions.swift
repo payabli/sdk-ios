@@ -3,28 +3,15 @@ import PayabliSDKTapToPay
 
 /// Where this app's card reader is built.
 enum TapToPaySessions {
-    /// The terminal the app runs on a device.
-    ///
-    /// Built after `DemoSession` has started, so it runs on the session the card-not-present flows share.
+    /// The terminal the app runs on, built after `DemoSession` has started, so it runs on the
+    /// session the card-not-present flows share. A canvas preview gets one too, which it never
+    /// initializes, so it makes no network call and touches neither App Attest nor the reader.
     @MainActor
-    static func terminal() -> TapToPayTerminal {
+    static func terminal() async -> TapToPayTerminal {
         do {
-            return TapToPayTerminal(try PayabliTTP(appId: Secrets.appId))
+            return TapToPayTerminal(try await PayabliTTP.create())
         } catch {
             preconditionFailure("The terminal could not be built: \(error)")
-        }
-    }
-
-    /// A terminal for a canvas preview. Constructed and never initialized, so it
-    /// makes no network call and touches neither App Attest nor the reader.
-    @MainActor
-    static func preview() -> TapToPayTerminal {
-        do {
-            return TapToPayTerminal(
-                try PayabliTTP(appId: "PREVIEW0000.\(Bundle.main.bundleIdentifier ?? "preview")")
-            )
-        } catch {
-            preconditionFailure("The preview terminal's own constants are not usable: \(error)")
         }
     }
 }

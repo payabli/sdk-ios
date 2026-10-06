@@ -37,7 +37,7 @@ final class OneSessionAcrossCapabilitiesTests: XCTestCase {
             tokenProvider: tokenProvider
         ))
         let payIn = PayabliPayIn(session: session)
-        let ttp = try PayabliTTP(appId: "TEAM.app")
+        let ttp = try await PayabliTTP.create()
         return (payIn, ttp)
     }
 }

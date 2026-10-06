@@ -189,7 +189,7 @@ struct PaymentMethodQAView: View {
 }
 
 #Preview {
-    WithDemoSession { session in
+    WithDemoSession { session, _ in
         PaymentMethodQAView(paymentFlow: PayInSessions.preview(session: session))
             .environmentObject(TokenProbeResults.inert())
     }
