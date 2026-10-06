@@ -211,6 +211,13 @@ func fetchPayabliAccessToken() async throws -> String {
   use fails with `PayabliErrorType.tokenProviderFailed`.
 - Return a token. Don't make SDK calls from inside the provider.
 
+### Device identity
+
+`PayabliSession.deviceId` is this device's identity, the same for every capability and stable for the
+install. It is `nil` while the device's secure storage can't be read, such as before the first unlock
+after a restart. From Objective-C, read `PayabliSessionObjC.deviceId`, which is also `nil` before the
+session is initialized.
+
 ## Take a payment
 
 ### Card-not-present
