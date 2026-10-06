@@ -1,4 +1,4 @@
-@testable import PayabliSDKTapToPay
+@testable import PayabliSDKCore
 import PayabliSDKTestUtils
 import Security
 import XCTest
@@ -67,7 +67,7 @@ final class InstallIdentifierTests: XCTestCase {
         let storage = InMemorySecureStorage()
         let before = try InstallIdentifier.hardwareId(storage: storage, bundleIdentifier: bundleA)
 
-        try storage.remove(forKey: PayabliKeychainKey.installId)
+        try storage.remove(forKey: InstallIdentifier.storageKey)
         let after = try InstallIdentifier.hardwareId(storage: storage, bundleIdentifier: bundleA)
 
         XCTAssertNotEqual(before, after)
@@ -109,7 +109,7 @@ final class InstallIdentifierTests: XCTestCase {
         let storage = InMemorySecureStorage()
         let sent = try InstallIdentifier.hardwareId(storage: storage, bundleIdentifier: bundleA)
 
-        let stored = try XCTUnwrap(storage.string(forKey: PayabliKeychainKey.installId))
+        let stored = try XCTUnwrap(storage.string(forKey: InstallIdentifier.storageKey))
         XCTAssertNotEqual(sent, stored)
         XCTAssertFalse(sent.contains(stored))
         XCTAssertFalse(sent.lowercased().contains(stored.lowercased()))
@@ -152,5 +152,60 @@ final class InstallIdentifierTests: XCTestCase {
         XCTAssertThrowsError(
             try InstallIdentifier.hardwareId(storage: storage, bundleIdentifier: bundleA)
         )
+    }
+
+    /// The value is pinned, because a change to any input registers every install as a new device.
+    func testTheDerivationIsPinned() throws {
+        let storage = InMemorySecureStorage()
+        try storage.set("0F3A6B2C-1D4E-4F5A-8B9C-0D1E2F3A4B5C", forKey: InstallIdentifier.storageKey)
+
+        let value = try InstallIdentifier.hardwareId(storage: storage, bundleIdentifier: bundleA)
+
+        XCTAssertEqual(value, "d87dad7c73309e94774a426b80e14c35")
+    }
+}
+
+/// What a Keychain keeps when the install that wrote it is gone.
+///
+/// Held separately from the store so a test can build a second store over it, which
+/// is what a reinstall is: the app's own objects are new, the Keychain is not.
+final class DurableBacking: @unchecked Sendable {
+    private let lock = NSLock()
+    private var items: [String: String] = [:]
+
+    func value(forKey key: String) -> String? {
+        lock.lock()
+        defer { lock.unlock() }
+        return items[key]
+    }
+
+    func set(_ value: String, forKey key: String) {
+        lock.lock()
+        defer { lock.unlock() }
+        items[key] = value
+    }
+
+    func remove(forKey key: String) {
+        lock.lock()
+        defer { lock.unlock() }
+        items.removeValue(forKey: key)
+    }
+}
+
+/// A store holding nothing of its own, so building a new one models an install
+/// that reads a Keychain it did not write.
+struct KeychainStandIn: SecureStorage {
+    let backing: DurableBacking
+
+    func string(forKey key: String) throws -> String? {
+        backing.value(forKey: key)
+    }
+
+    func set(_ value: String, forKey key: String) throws {
+        backing.set(value, forKey: key)
+    }
+
+    func remove(forKey key: String) throws {
+        backing.remove(forKey: key)
     }
 }

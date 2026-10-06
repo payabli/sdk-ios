@@ -130,51 +130,6 @@ extension URLRequest {
     }
 }
 
-/// What a Keychain keeps when the install that wrote it is gone.
-///
-/// Held separately from the store so a test can build a second store over it, which
-/// is what a reinstall is: the app's own objects are new, the Keychain is not.
-final class DurableBacking: @unchecked Sendable {
-    private let lock = NSLock()
-    private var items: [String: String] = [:]
-
-    func value(forKey key: String) -> String? {
-        lock.lock()
-        defer { lock.unlock() }
-        return items[key]
-    }
-
-    func set(_ value: String, forKey key: String) {
-        lock.lock()
-        defer { lock.unlock() }
-        items[key] = value
-    }
-
-    func remove(forKey key: String) {
-        lock.lock()
-        defer { lock.unlock() }
-        items.removeValue(forKey: key)
-    }
-}
-
-/// A store holding nothing of its own, so building a new one models an install
-/// that reads a Keychain it did not write.
-struct KeychainStandIn: SecureStorage {
-    let backing: DurableBacking
-
-    func string(forKey key: String) throws -> String? {
-        backing.value(forKey: key)
-    }
-
-    func set(_ value: String, forKey key: String) throws {
-        backing.set(value, forKey: key)
-    }
-
-    func remove(forKey key: String) throws {
-        backing.remove(forKey: key)
-    }
-}
-
 /// Thread-safe box so a stub handler can record what it saw, in order.
 final class PathsBox: @unchecked Sendable {
     private let lock = NSLock()

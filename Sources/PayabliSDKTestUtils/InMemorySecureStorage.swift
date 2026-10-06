@@ -1,4 +1,5 @@
 import Foundation
+import PayabliSDKCore
 import PayabliSDKTapToPay
 
 /// In-memory `SecureStorage` implementation for tests.

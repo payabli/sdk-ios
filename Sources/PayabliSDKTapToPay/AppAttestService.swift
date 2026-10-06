@@ -48,13 +48,14 @@ package final class AppAttestService: DeviceAttestationService, @unchecked Senda
     package convenience init(
         transport: any PayabliTransport,
         attestor: AppAttestor,
-        storage: KeychainStorage
+        storage: KeychainStorage,
+        deviceIdentity: DeviceIdentity
     ) {
         self.init(
             transport: transport,
             attestor: attestor,
             storage: storage,
-            hardwareIdProvider: { try InstallIdentifier.hardwareId(storage: storage) },
+            hardwareIdProvider: { try deviceIdentity.value() },
             appIdProvider: {
                 AppIdentifier.derive(accessGroup: try storage.accessGroup(forKey: PayabliKeychainKey.installId))
             },
