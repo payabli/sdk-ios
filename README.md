@@ -321,11 +321,13 @@ The SDK is written in Swift, and the card-not-present form is a SwiftUI view.
 - **Objective-C.** Start the session with `PayabliSessionObjC`'s
   `initializeWithTokenHandler:entryPoint:environment:telemetryEnabled:completionHandler:`. `PayabliTTP` has
   an `@objc` companion, taking a completion handler, for every `async` method, and is built with
-  `createWithCompletionHandler:`. Its errors bridge
-  to `NSError` in the `com.payabli.ttp` domain: `userInfo["capture"]` holds the `PayabliTTPCapture` raw
-  value (`0` not charged, `1` unknown, `2` charged), and `userInfo["paymentTransId"]` is absent when there
-  is no transaction ID. For card-not-present, Objective-C uses `PayabliPayInObjC`, built with
+  `createWithCompletionHandler:`. For card-not-present, Objective-C uses `PayabliPayInObjC`, built with
   `createAndReturnError:` on the same session, which offers `addCard` and `addBankAccount`.
+- **Objective-C errors.** An SDK error reaches Objective-C as an `NSError` whose `code` is its catalog
+  number, with the type's name in `userInfo["PayabliErrorType"]`. Tap to Pay errors are in the
+  `com.payabli.ttp` domain, where `userInfo["capture"]` holds the `PayabliTTPCapture` raw value (`0` not
+  charged, `1` unknown, `2` charged) and `userInfo["paymentTransId"]` is absent when there is no
+  transaction ID. Card-not-present errors are in the `com.payabli.payIn` domain.
 - **Flutter, .NET MAUI and React Native.** Wrappers are in [`Bridges/`](Bridges/README.md), which lists the
   status of each.
 
