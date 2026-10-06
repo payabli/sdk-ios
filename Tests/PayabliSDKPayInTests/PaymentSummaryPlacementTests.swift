@@ -42,8 +42,31 @@ final class PaymentSummaryPlacementTests: XCTestCase {
     func testWithNoSummarySectionOneIsAppendedAfterTheInputs() {
         let drawn = place([card, customer], details(12.34, fee: 0.5))
 
-        XCTAssertEqual(drawn.map(\.section.title), ["Card", "Customer", "Payment Information"])
+        XCTAssertEqual(drawn.map(\.title), ["Card", "Customer", "Payment"])
         XCTAssertEqual(drawn.map(\.isSummary), [false, false, true])
+    }
+
+    // MARK: - The heading drawn
+
+    func testASummaryWithNoTitleDrawsTheDefault() {
+        let drawn = place([card, summary([.amount], title: nil)], details(12.34))
+
+        XCTAssertNil(drawn.last?.section.title)
+        XCTAssertEqual(drawn.last?.title, "Payment")
+    }
+
+    func testASummaryTitleIsDrawnAsGiven() {
+        let drawn = place([card, summary([.amount])], details(12.34))
+
+        XCTAssertEqual(drawn.last?.title, "Due today")
+    }
+
+    func testAnInputsSectionWithNoTitleDrawsNone() {
+        let untitled = PayabliPayInFieldSection(fields: [.cardholderName, .cardNumber, .cardExpiration, .cardCvv, .cardZip])
+        let drawn = place([untitled], details(12.34))
+
+        XCTAssertEqual(drawn.map(\.isSummary), [false, true])
+        XCTAssertNil(drawn.first?.title)
     }
 
     func testTheHostSummaryKeepsItsPlaceItsTitleAndItsOrder() {

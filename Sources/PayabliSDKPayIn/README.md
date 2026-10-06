@@ -207,8 +207,9 @@ PayabliPayInFieldSection(
 )
 ```
 
-Capture and authorize forms add a **Payment Information** section with the amount and fee. A form storing
-a payment method leaves it out.
+Capture and authorize forms add a summary section with the amount and fee. A form storing a payment method
+leaves it out. A summary section with no title is headed "Payment"; an inputs section with no title has no
+heading.
 
 ### Styling
 

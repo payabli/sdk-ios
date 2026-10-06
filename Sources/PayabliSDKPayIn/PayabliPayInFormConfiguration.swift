@@ -486,7 +486,7 @@ public struct PayabliPayInFormConfiguration: Sendable {
     ) -> [PayabliPayInFieldSection] {
         [
             PayabliPayInFieldSection(fields: cardFieldOrder),
-            PayabliPayInFieldSection(title: "Payment Information", fields: paymentDetailFields, style: .summary)
+            PayabliPayInFieldSection(fields: paymentDetailFields, style: .summary)
         ]
     }
 
@@ -495,7 +495,7 @@ public struct PayabliPayInFormConfiguration: Sendable {
     ) -> [PayabliPayInFieldSection] {
         [
             PayabliPayInFieldSection(fields: visibleBankFields(from: bankFieldOrder)),
-            PayabliPayInFieldSection(title: "Payment Information", fields: paymentDetailFields, style: .summary)
+            PayabliPayInFieldSection(fields: paymentDetailFields, style: .summary)
         ]
     }
 
@@ -563,7 +563,7 @@ public struct PayabliPayInFormConfiguration: Sendable {
                section.style == .summary || section.fields.contains { paymentDetailFields.contains($0) }
            }) == false
         {
-            sections.append(PayabliPayInFieldSection(title: "Payment Information", fields: [field], style: .summary))
+            sections.append(PayabliPayInFieldSection(fields: [field], style: .summary))
             return
         }
 

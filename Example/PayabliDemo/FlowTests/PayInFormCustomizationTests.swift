@@ -13,7 +13,6 @@ final class PayInFormCustomizationTests: XCTestCase {
         XCTAssertEqual(preset.methods, .cardAndBank)
         XCTAssertEqual(preset.startOn, .card)
         XCTAssertFalse(preset.showsCustomerSection)
-        XCTAssertTrue(preset.titlesAmountSummary)
         XCTAssertTrue(preset.groupsCardNumber)
         XCTAssertTrue(preset.masksAccountNumber)
         XCTAssertFalse(preset.labelsInsideFields)
