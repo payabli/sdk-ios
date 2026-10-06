@@ -13,6 +13,7 @@ final class TelemetryEndpointTransportTests: XCTestCase {
         let service = PayabliService(
             environment: .sandbox,
             readToken: { "telemetry-token" },
+            client: .none,
             session: StubURLProtocol.makeSession()
         )
         let subject = TelemetryEndpointTransport(transport: service)
@@ -40,6 +41,7 @@ final class TelemetryEndpointTransportTests: XCTestCase {
         let service = PayabliService(
             environment: .sandbox,
             readToken: { "telemetry-token" },
+            client: .none,
             session: StubURLProtocol.makeSession()
         )
 
@@ -57,6 +59,7 @@ final class TelemetryEndpointTransportTests: XCTestCase {
         let service = PayabliService(
             environment: .sandbox,
             readToken: { "telemetry-token" },
+            client: .none,
             session: StubURLProtocol.makeSession()
         )
 
@@ -76,6 +79,7 @@ final class TelemetryEndpointTransportTests: XCTestCase {
         let service = PayabliService(
             environment: .sandbox,
             readToken: { throw NoToken() },
+            client: .none,
             session: StubURLProtocol.makeSession()
         )
 

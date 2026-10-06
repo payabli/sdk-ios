@@ -14,6 +14,7 @@ final class PayabliTransportTests: XCTestCase {
         let service = PayabliService(
             environment: .sandbox,
             readToken: { "tok-from-read" },
+            client: .none,
             session: StubURLProtocol.makeSession()
         )
 
@@ -33,6 +34,7 @@ final class PayabliTransportTests: XCTestCase {
         let service = PayabliService(
             environment: .sandbox,
             readToken: { "tok-\(await minted.increment())" },
+            client: .none,
             session: StubURLProtocol.makeSession()
         )
 
@@ -57,6 +59,7 @@ final class PayabliTransportTests: XCTestCase {
         let service = PayabliService(
             environment: .sandbox,
             readToken: { throw NoToken() },
+            client: .none,
             session: StubURLProtocol.makeSession()
         )
 
@@ -80,6 +83,7 @@ final class PayabliTransportTests: XCTestCase {
         let service = PayabliService(
             environment: .sandbox,
             readToken: { "tok" },
+            client: .none,
             session: StubURLProtocol.makeSession()
         )
 

@@ -16,6 +16,7 @@ final class PayabliServiceTests: XCTestCase {
         PayabliService(
             environment: .sandbox,
             readToken: { testToken },
+            client: .none,
             session: StubURLProtocol.makeSession()
         )
     }

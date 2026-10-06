@@ -5,9 +5,11 @@ enum RequestDecorationFactory {
     /// Steps that contribute a header or a body field come first. A step that signs over what they
     /// emit goes last.
     static func chain(
-        readToken: @escaping @Sendable () async throws -> String
+        readToken: @escaping @Sendable () async throws -> String,
+        client: ClientFacts
     ) -> [any PayabliRequestDecoration] {
         [
+            ClientHeaderDecoration(facts: client),
             BearerDecoration(readToken: readToken),
             JSONBodyDecoration()
         ]
