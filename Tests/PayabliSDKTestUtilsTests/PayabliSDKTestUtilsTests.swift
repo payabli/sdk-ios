@@ -55,7 +55,7 @@ final class PayabliSDKTestUtilsTests: XCTestCase {
         let attestation = MockDeviceAttestationService()
         attestation.attestResult = .success(AttestationResult(keyId: "issuedKey", deviceId: "issuedDevice"))
 
-        _ = try await attestation.attest(entry: "entryA", appId: "appId")
+        _ = try await attestation.attest(entry: "entryA")
 
         let headers = try await attestation.generateAssertion(for: "entryA")
         XCTAssertEqual(headers.deviceId, "issuedDevice")

@@ -54,7 +54,6 @@ final class PayabliTTPTests: XCTestCase {
         )
         let ttp = PayabliTTP(
             config: config,
-            appId: "appid",
             provider: provider,
             attestation: attestation,
             retryPolicy: retry,

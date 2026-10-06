@@ -31,10 +31,46 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
     private var eventToken: PayabliTTPEventToken?
     private var payIn: PayabliPayIn?
 
+    /// The plugin whose configure last succeeded. The session outlives an engine, so its token
+    /// provider asks this rather than holding the channel of the plugin that configured it, and an
+    /// engine that never configures, or is refused, takes no token requests from the one that did.
+    private weak static var livePlugin: PayabliSDKPlugin?
+    private static let livePluginLock = NSLock()
+
     init(methodChannel: FlutterMethodChannel, eventChannel: FlutterEventChannel) {
         self.methodChannel = methodChannel
         self.eventChannel = eventChannel
         super.init()
+    }
+
+    private func becomeLive() {
+        Self.livePluginLock.withLock { Self.livePlugin = self }
+    }
+
+    /// The session's only token source, whichever configure started it: the process has one session
+    /// and it takes one provider, so both capabilities ask Dart over the one `refreshToken` call.
+    private static let sessionTokenProvider: PayabliTokenRefresh = { @Sendable in
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<String, Error>) in
+            Task { @MainActor in
+                guard let channel = PayabliSDKPlugin.livePluginLock.withLock({ PayabliSDKPlugin.livePlugin?.methodChannel }) else {
+                    continuation.resume(throwing: PayabliGenericError(
+                        type: .tokenExpired,
+                        reason: "No Flutter engine is running the plugin"
+                    ))
+                    return
+                }
+                channel.invokeMethod("refreshToken", arguments: nil) { value in
+                    if let token = value as? String {
+                        continuation.resume(returning: token)
+                    } else {
+                        continuation.resume(throwing: PayabliGenericError(
+                            type: .tokenExpired,
+                            reason: "Dart side did not return a refreshed token"
+                        ))
+                    }
+                }
+            }
+        }
     }
 
     public static func register(with registrar: FlutterPluginRegistrar) {
@@ -87,34 +123,15 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
     private func handleConfigure(_ arguments: Any?, result: @escaping FlutterResult) {
         guard let args = arguments as? [String: Any],
               let entryPoint = args["entryPoint"] as? String,
-              let appId = args["appId"] as? String,
               let envRaw = args["environment"] as? Int,
               let environment = PayabliEnvironment(rawValue: envRaw)
         else {
             result(FlutterError(
                 code: "INVALID_ARGS",
-                message: "Missing entryPoint/appId/environment",
+                message: "Missing entryPoint/environment",
                 details: nil
             ))
             return
-        }
-
-        let methodChannel = self.methodChannel
-        let tokenProvider: PayabliTokenRefresh = { @Sendable [methodChannel] in
-            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<String, Error>) in
-                Task { @MainActor in
-                    methodChannel.invokeMethod("refreshToken", arguments: nil) { value in
-                        if let token = value as? String {
-                            continuation.resume(returning: token)
-                        } else {
-                            continuation.resume(throwing: PayabliGenericError(
-                                type: .tokenExpired,
-                                reason: "Dart side did not return a refreshed token"
-                            ))
-                        }
-                    }
-                }
-            }
         }
 
         Task { @MainActor in
@@ -124,12 +141,12 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
             // the previous facade and its event subscription exactly as they were.
             let ttp: PayabliTTP
             do {
-                ttp = try PayabliTTP(
-                    tokenProvider: tokenProvider,
+                try await PayabliSession.initialize(config: PayabliConfig(
                     entryPoint: entryPoint,
-                    appId: appId,
-                    environment: environment
-                )
+                    environment: environment,
+                    tokenProvider: Self.sessionTokenProvider
+                ))
+                ttp = try await PayabliTTP.create()
             } catch {
                 result(FlutterError(
                     code: "INVALID_CONFIGURATION",
@@ -144,6 +161,7 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
             self.eventToken = nil
             self.ttp = ttp
             self.subscribeEvents(on: ttp)
+            self.becomeLive()
             result(nil)
         }
     }
@@ -366,35 +384,17 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
             return
         }
 
-        let methodChannel = self.methodChannel
-        let tokenProvider: PayabliTokenRefresh = { @Sendable [methodChannel] in
-            try await withCheckedThrowingContinuation { continuation in
-                Task { @MainActor in
-                    methodChannel.invokeMethod("accessToken", arguments: nil) { value in
-                        if let token = value as? String {
-                            continuation.resume(returning: token)
-                        } else {
-                            continuation.resume(throwing: PayabliGenericError(
-                                type: .missingToken,
-                                reason: "Dart side did not return a PayIn payment flow access token"
-                            ))
-                        }
-                    }
-                }
-            }
-        }
-
         Task { @MainActor in
             do {
                 let config = try PayabliConfig(
                     entryPoint: entryPoint,
                     environment: environment,
-
-                    tokenProvider: tokenProvider
+                    tokenProvider: Self.sessionTokenProvider
                 )
                 self.payIn = PayabliPayIn(
-                    session: PayabliSession(config: config)
+                    session: try await PayabliSession.initialize(config: config)
                 )
+                self.becomeLive()
                 result(nil)
             } catch {
                 result(FlutterError(

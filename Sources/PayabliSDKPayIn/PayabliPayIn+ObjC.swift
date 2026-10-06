@@ -47,24 +47,24 @@ public final class PayabliPayInStoredPaymentMethodObjC: NSObject {
 @MainActor
 @objc(PayabliPayInObjC)
 public final class PayabliPayInObjC: NSObject {
-    private let component: PayabliPayIn
+    let component: PayabliPayIn
 
-    /// Builds the session internally, because an Objective-C caller cannot hold a Swift-only
-    /// `PayabliSession`. Throws whatever `PayabliConfig.init` rejects, which is an empty entry point.
-    @objc public init(
-        tokenHandler: @escaping (@escaping (String?, NSError?) -> Void) -> Void,
-        entryPoint: String,
-        environment: PayabliEnvironment
-    ) throws {
-        let tokenProvider = bridgedTokenProvider(errorDomain: payInObjCErrorDomain, tokenHandler)
-        let config = try PayabliConfig(
-            entryPoint: entryPoint,
-            environment: environment,
+    @available(*, unavailable)
+    override private init() {
+        fatalError("unavailable")
+    }
 
-            tokenProvider: tokenProvider
-        )
-        component = PayabliPayIn(session: PayabliSession(config: config))
+    private init(component: PayabliPayIn) {
+        self.component = component
         super.init()
+    }
+
+    /// Builds the facade on the installed session. Throws `invalidConfiguration` when none is installed.
+    @objc public static func create() throws -> PayabliPayInObjC {
+        guard let session = PayabliSession.current else {
+            throw PayabliGenericError(type: .invalidConfiguration, reason: "no session is initialized")
+        }
+        return PayabliPayInObjC(component: PayabliPayIn(session: session))
     }
 
     // swiftlint:disable:next function_parameter_count

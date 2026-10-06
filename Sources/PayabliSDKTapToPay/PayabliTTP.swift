@@ -8,11 +8,12 @@ import PayabliSDKCore
 /// See PRD §19.1.
 ///
 /// ```swift
-/// let ttp = try PayabliTTP(
-///     tokenProvider: { try await myBackend.payabliToken() },
+/// try await PayabliSession.initialize(config: PayabliConfig(
 ///     entryPoint: "myEntry",
-///     appId: "TEAM.bundle.id", environment: .sandbox
-/// )
+///     environment: .sandbox,
+///     tokenProvider: { try await myBackend.payabliToken() }
+/// ))
+/// let ttp = try await PayabliTTP.create()
 /// try await ttp.initialize()
 /// let result = try await ttp.charge(
 ///     type: .sale,
@@ -41,7 +42,6 @@ public final class PayabliTTP: NSObject, ObservableObject {
     // MARK: - Dependencies
 
     let entryPoint: String
-    let appId: String
     let environment: PayabliEnvironment
 
     let provider: TapToPayProvider
@@ -113,20 +113,15 @@ public final class PayabliTTP: NSObject, ObservableObject {
 
     // MARK: - Init
 
-    /// Designated init. Shares one credential holder and one transport across every
-    /// component facade constructed with the same `PayabliSession`.
-    ///
     /// `package`: it takes the provider and the attestation service, so a host reaching
-    /// it could substitute either. A host uses the `tokenProvider:` init below instead.
+    /// it could substitute either. A host uses `create()` below instead.
     package init(
         session: PayabliSession,
-        appId: String,
         provider: TapToPayProvider,
         attestation: DeviceAttestationService,
         retryPolicy: RetryPolicy = .default
     ) {
         self.entryPoint = session.config.entryPoint
-        self.appId = appId
         self.environment = session.config.environment
         self.provider = provider
         self.attestation = attestation
@@ -141,92 +136,24 @@ public final class PayabliTTP: NSObject, ObservableObject {
         super.init()
     }
 
-    /// Convenience init that wraps a `PayabliConfig` in a fresh
-    /// `PayabliSession`. Use the `session:` init when you need to share auth
-    /// across multiple component facades on the same config.
-    package convenience init(
-        config: PayabliConfig,
-        appId: String,
-        provider: TapToPayProvider,
-        attestation: DeviceAttestationService,
-        retryPolicy: RetryPolicy = .default,
-        session: URLSession? = nil
-    ) {
-        let payabliSession = PayabliSession(config: config, urlSession: session)
-        self.init(
-            session: payabliSession,
-            appId: appId,
-            provider: provider,
-            attestation: attestation,
-            retryPolicy: retryPolicy
-        )
-    }
-
     #if canImport(DeviceCheck)
-        /// PRD §19.1 convenience init. Wires the default `FiservCardReader`
-        /// provider and a real `AppAttestService` with Keychain-backed storage.
+        /// Builds the card-present facade on the session `PayabliSession.initialize(config:)`
+        /// installed, with the default card reader and App Attest backed by the Keychain.
         ///
-        /// The host supplies a `tokenProvider` that asks its own backend for a token. The SDK
-        /// calls it before the first request and again after a rejection (see `PayabliConfig`).
-        ///
-        /// Only available where Apple's `DeviceCheck` framework is importable.
-        /// The package minimum of iOS 16.7, set by PayabliCardReaderCore and
-        /// ProximityReader, is well above `DCAppAttestService`'s own floor of
-        /// iOS 14, so no extra `@available` gate is needed.
-        /// Throws whatever `PayabliConfig.init` rejects, which is an empty entry point.
-        public convenience init(
-            tokenProvider: @escaping PayabliTokenRefresh,
-            entryPoint: String,
-            appId: String,
-            environment: PayabliEnvironment
-        ) throws {
-            let config = try PayabliConfig(
-                entryPoint: entryPoint,
-                environment: environment,
-
-                tokenProvider: tokenProvider
-            )
-            let payabliSession = PayabliSession(config: config)
-            let storage: SecureStorage = KeychainStorage()
+        /// Throws `notInitialized` when no session is installed.
+        @objc public static func create() async throws -> PayabliTTP {
+            guard let payabliSession = PayabliSession.current else {
+                throw PayabliTTPError.notInitialized
+            }
             let attestation = AppAttestService(
                 transport: payabliSession.transport,
                 attestor: RealAppAttestor(),
-                storage: storage
+                storage: KeychainStorage()
             )
-            self.init(
+            return PayabliTTP(
                 session: payabliSession,
-                appId: appId,
                 provider: FiservCardReader(),
                 attestation: attestation
-            )
-        }
-    #endif
-
-    #if canImport(DeviceCheck)
-        /// `@objc`-friendly convenience init for ObjC / MAUI / sharpie consumers
-        /// that can't represent the Swift `PayabliTokenRefresh` (`@Sendable ()
-        /// async throws -> String`) closure.
-        ///
-        /// The token source is exposed here as a completion-style block:
-        /// `tokenHandler` receives a `(token, error) -> Void` callback that the host invokes
-        /// exactly once with either an access token or an `NSError` — the SDK bridges that to the
-        /// underlying async closure internally. It is called before the first request and again
-        /// after a rejection.
-        ///
-        /// All other parameters mirror the Swift convenience init exactly. A
-        /// Swift caller that needs an `async throws` token provider uses the
-        /// Swift-only convenience init above.
-        @objc public convenience init(
-            tokenHandler: @escaping (@escaping (String?, NSError?) -> Void) -> Void,
-            entryPoint: String,
-            appId: String,
-            environment: PayabliEnvironment
-        ) throws {
-            try self.init(
-                tokenProvider: bridgedTokenProvider(errorDomain: PayabliTTPError.errorDomain, tokenHandler),
-                entryPoint: entryPoint,
-                appId: appId,
-                environment: environment
             )
         }
     #endif

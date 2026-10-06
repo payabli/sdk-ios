@@ -311,7 +311,7 @@ final class PaymentMethodFormConfigurationTests: XCTestCase {
     }
 
     @MainActor
-    func testPaymentMethodLegacyConfigureWithThemeRoutesToCurrentConfigure() throws {
+    func testPaymentMethodLegacyConfigureWithThemeRoutesToCurrentConfigure() async throws {
         let component = flowOnSession(
             token: "access-token",
             entryPoint: "old-entry",
@@ -323,6 +323,8 @@ final class PaymentMethodFormConfigurationTests: XCTestCase {
 
             tokenProvider: { "access-token" }
         )
+        try await PayabliSession.initialize(config: config)
+        defer { PayabliSession.resetForTesting() }
 
         component.configure(config: config, theme: .default)
 

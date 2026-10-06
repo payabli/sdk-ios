@@ -15,7 +15,6 @@ final class PayabliTTPDeviceIdTests: XCTestCase {
         )
         let ttp = PayabliTTP(
             config: config,
-            appId: "appid",
             provider: MockTapToPayProvider(),
             attestation: attestation,
             retryPolicy: RetryPolicy(maxAttempts: 1, baseDelay: 0, maxDelay: 0, multiplier: 1, maxJitter: 0),

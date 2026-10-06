@@ -19,9 +19,8 @@ import PayabliSDKCore
 ///   the partner to drive the pending-device → active-device transition
 ///   (PRD §9.7). The SDK does not request the code itself.
 ///
-/// `entry` and `appId` are supplied per call by the facade (`PayabliTTP`)
-/// to match the `DeviceAttestationService` protocol — they are never
-/// cached on this service.
+/// `entry` is supplied per call by the facade (`PayabliTTP`) to match the
+/// `DeviceAttestationService` protocol, and is never cached on this service.
 ///
 /// Companion files (same folder, PRD §7.2):
 ///   - `AppAttestService+Attest.swift`     — attestation + assertions
@@ -36,22 +35,29 @@ package final class AppAttestService: DeviceAttestationService, @unchecked Senda
     let bindingStore: AttestedDeviceStore
     let logger = PayabliLogger(category: .taptopay)
 
-    // Injected so tests on macOS can substitute deterministic values. The hardware
-    // identifier reads and may write the store, so it raises.
+    /// Injected so tests on macOS can substitute deterministic values. The hardware
+    /// identifier reads and may write the store, so it raises.
     let hardwareIdProvider: @Sendable () throws -> String
+    /// The App ID `/attest` is sent, `nil` when it cannot be read.
+    let appIdProvider: @Sendable () throws -> String?
     let modelProvider: @Sendable () -> String
     let osVersionProvider: @Sendable () -> String
 
+    /// The App ID is read from the access group of the install identifier's item, which
+    /// `/register` has written before `/attest` needs it.
     package convenience init(
         transport: any PayabliTransport,
         attestor: AppAttestor,
-        storage: SecureStorage
+        storage: KeychainStorage
     ) {
         self.init(
             transport: transport,
             attestor: attestor,
             storage: storage,
             hardwareIdProvider: { try InstallIdentifier.hardwareId(storage: storage) },
+            appIdProvider: {
+                AppIdentifier.derive(accessGroup: try storage.accessGroup(forKey: PayabliKeychainKey.installId))
+            },
             modelProvider: AppAttestService.defaultModel,
             osVersionProvider: AppAttestService.defaultOSVersion
         )
@@ -62,6 +68,7 @@ package final class AppAttestService: DeviceAttestationService, @unchecked Senda
         attestor: AppAttestor,
         storage: SecureStorage,
         hardwareIdProvider: @Sendable @escaping () throws -> String,
+        appIdProvider: @Sendable @escaping () throws -> String?,
         modelProvider: @Sendable @escaping () -> String,
         osVersionProvider: @Sendable @escaping () -> String
     ) {
@@ -70,6 +77,7 @@ package final class AppAttestService: DeviceAttestationService, @unchecked Senda
         self.storage = storage
         bindingStore = AttestedDeviceStore(storage: storage)
         self.hardwareIdProvider = hardwareIdProvider
+        self.appIdProvider = appIdProvider
         self.modelProvider = modelProvider
         self.osVersionProvider = osVersionProvider
     }
@@ -227,6 +235,14 @@ package final class AppAttestService: DeviceAttestationService, @unchecked Senda
     /// Keychain and mints into it, so it fails the same way the binding reads do.
     func hardwareId() throws -> String {
         try reportingStorageFailure { try hardwareIdProvider() }
+    }
+
+    /// The App ID `/attest` is sent. Raises rather than sending a blank one.
+    func appId() throws -> String {
+        guard let appId = try reportingStorageFailure({ try appIdProvider() }) else {
+            throw PayabliTTPError.attestationFailed(reason: "The App ID could not be read from the Keychain")
+        }
+        return appId
     }
 
     func forgetPendingKey(for entry: String) throws {

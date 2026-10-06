@@ -174,7 +174,6 @@ final class PayabliTTPReaderEventTests: XCTestCase {
         let provider = MockTapToPayProvider()
         let ttp = PayabliTTP(
             config: try PayabliConfig(entryPoint: "e", environment: .sandbox, tokenProvider: { "seed_token" }),
-            appId: "appid",
             provider: provider,
             attestation: MockDeviceAttestationService(),
             retryPolicy: RetryPolicy(maxAttempts: 1, baseDelay: 0, maxDelay: 0, multiplier: 1, maxJitter: 0),

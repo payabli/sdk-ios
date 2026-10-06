@@ -96,6 +96,52 @@ final class AttestationWireTests: XCTestCase {
     /// what reaches the wire. A change sending the stored seed instead of the digest,
     /// or putting `deviceName` back, leaves every one of them green while breaking
     /// both things this branch claims about that request.
+    func testTheAttestBodyCarriesTheAppIdTheServiceDerived() async throws {
+        let bodies = BodyBox()
+        StubURLProtocol.handler = { request in
+            if request.url!.path == "/api/v2/device/taptopay/attest" {
+                bodies.append(request.payabliTestBody)
+            }
+            if request.url!.path == "/api/v2/device/taptopay/challenge" {
+                return AttestFixture.ok(request, ["challengeId": "c_1", "challenge": "Y2hhbGxlbmdl"])
+            }
+            return AttestFixture.ok(request, ["deviceId": "dev_1"])
+        }
+        let (sut, _, _) = try AttestFixture.makeService(appIdProvider: { "ABCDE12345.com.acme.checkout" })
+
+        _ = try await sut.attest(entry: "myEntry")
+
+        let body = try XCTUnwrap(bodies.values.first)
+        let sent = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: try XCTUnwrap(body)) as? [String: Any]
+        )
+        XCTAssertEqual(sent["appId"] as? String, "ABCDE12345.com.acme.checkout")
+    }
+
+    /// Refused before the key is spent, so the next attempt can still use it.
+    func testAnAppIdThatCannotBeReadSendsNoAttestation() async throws {
+        let attests = BodyBox()
+        StubURLProtocol.handler = { request in
+            if request.url!.path == "/api/v2/device/taptopay/attest" {
+                attests.append(request.payabliTestBody)
+            }
+            if request.url!.path == "/api/v2/device/taptopay/challenge" {
+                return AttestFixture.ok(request, ["challengeId": "c_1", "challenge": "Y2hhbGxlbmdl"])
+            }
+            return AttestFixture.ok(request, ["deviceId": "dev_1"])
+        }
+        let (sut, attestor, _) = try AttestFixture.makeService(appIdProvider: { nil })
+
+        do {
+            _ = try await sut.attest(entry: "myEntry")
+            XCTFail("an attestation without an App ID was sent")
+        } catch PayabliTTPError.attestationFailed {
+            // Expected.
+        }
+        XCTAssertTrue(attests.values.isEmpty, "/attest was called without an App ID")
+        XCTAssertEqual(attestor.attestKeyCalls, 0, "the key was spent without an App ID")
+    }
+
     func testTheRegisterBodyCarriesTheDigestAndNoDeviceName() async throws {
         let bodies = BodyBox()
         StubURLProtocol.handler = { request in
@@ -116,7 +162,7 @@ final class AttestationWireTests: XCTestCase {
             hardwareIdProvider: { try InstallIdentifier.hardwareId(storage: storage, bundleIdentifier: "com.acme.checkout") }
         )
 
-        _ = try await sut.attest(entry: "myEntry", appId: "TEAM.bundle.id")
+        _ = try await sut.attest(entry: "myEntry")
 
         let body = try XCTUnwrap(bodies.values.first)
         let sent = try XCTUnwrap(

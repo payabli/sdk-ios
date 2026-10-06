@@ -64,7 +64,7 @@ final class AppAttestServiceTests: XCTestCase {
         let (sut, attestor, _) = try AttestFixture.makeService(storage: storage)
 
         try await assertAttested(sut, "myEntry", false)
-        let result = try await sut.attest(entry: "myEntry", appId: "TEAM.bundle.id")
+        let result = try await sut.attest(entry: "myEntry")
 
         XCTAssertEqual(result.deviceId, "dev_1")
         XCTAssertEqual(result.keyId, "mock_keyId")
@@ -113,7 +113,7 @@ final class AppAttestServiceTests: XCTestCase {
         let storage = InMemorySecureStorage()
         let (sut, attestor, _) = try AttestFixture.makeService(storage: storage)
         do {
-            _ = try await sut.attest(entry: "myEntry", appId: "x")
+            _ = try await sut.attest(entry: "myEntry")
             XCTFail("expected throw")
         } catch PayabliTTPError.devicePendingActivation {
             // Pending must still surface, BUT only after the full attestation
@@ -162,7 +162,7 @@ final class AppAttestServiceTests: XCTestCase {
         attestor.attestKeyError = NSError(domain: AppAttestService.deviceCheckErrorDomain, code: 2)
 
         do {
-            _ = try await sut.attest(entry: "myEntry", appId: "x")
+            _ = try await sut.attest(entry: "myEntry")
             XCTFail("expected throw")
         } catch {
             // expected
@@ -213,7 +213,7 @@ final class AppAttestServiceTests: XCTestCase {
 
         // Attempt 1 fails at /register (after the key was generated + cached).
         do {
-            _ = try await sut.attest(entry: "myEntry", appId: "x")
+            _ = try await sut.attest(entry: "myEntry")
             XCTFail("expected first attempt to throw")
         } catch {
             // expected
@@ -227,7 +227,7 @@ final class AppAttestServiceTests: XCTestCase {
         )
 
         // Attempt 2 succeeds and must REUSE the pending key — no new generateKey.
-        let result = try await sut.attest(entry: "myEntry", appId: "x")
+        let result = try await sut.attest(entry: "myEntry")
         XCTAssertEqual(result.keyId, "mock_keyId")
         XCTAssertEqual(attestor.generateKeyCalls, 1, "the pending key should be reused, not regenerated")
         XCTAssertEqual(attestor.attestKeyCalls, 1)
@@ -280,7 +280,7 @@ final class AppAttestServiceTests: XCTestCase {
             }
         }
 
-        let result = try await sut.attest(entry: "myEntry", appId: "TEAM.bundle.id")
+        let result = try await sut.attest(entry: "myEntry")
 
         XCTAssertEqual(result.keyId, "already_minted")
         XCTAssertEqual(attestor.generateKeyCalls, 0, "a retry minted a second key")
@@ -739,7 +739,7 @@ final class AppAttestServiceTests: XCTestCase {
         storage.refusesWrites = true
 
         do {
-            _ = try await sut.attest(entry: "myEntry", appId: "TEAM.bundle.id")
+            _ = try await sut.attest(entry: "myEntry")
             XCTFail("attestation spent the key while its pending record was still readable")
         } catch {}
 
@@ -761,7 +761,7 @@ final class AppAttestServiceTests: XCTestCase {
         })
 
         do {
-            _ = try await sut.attest(entry: "myEntry", appId: "TEAM.bundle.id")
+            _ = try await sut.attest(entry: "myEntry")
             XCTFail("the attempt continued with an identifier that could not be produced")
         } catch is PayabliTTPError {
             // The domain the bridges map.

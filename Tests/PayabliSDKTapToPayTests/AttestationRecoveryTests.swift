@@ -52,7 +52,7 @@ final class AttestationRecoveryTests: XCTestCase {
 
         let attested = try await sut.isAttested(for: "myEntry")
         XCTAssertFalse(attested)
-        _ = try await sut.attest(entry: "myEntry", appId: "TEAM.bundle.id")
+        _ = try await sut.attest(entry: "myEntry")
 
         XCTAssertEqual(registers.values.count, 1)
         XCTAssertEqual(try sentHardwareId(registers.values.first ?? nil), before)
@@ -81,7 +81,6 @@ final class AttestationRecoveryTests: XCTestCase {
         let (attestation, _, _) = try AttestFixture.makeService(storage: storage)
         let ttp = try PayabliTTP(
             config: PayabliConfig(entryPoint: "e", environment: .sandbox, tokenProvider: { "seed" }),
-            appId: "TEAM.bundle.id",
             provider: MockTapToPayProvider(),
             attestation: attestation,
             retryPolicy: RetryPolicy(maxAttempts: 1, baseDelay: 0, maxDelay: 0, multiplier: 1, maxJitter: 0),

@@ -14,7 +14,8 @@ enum AttestFixture {
     /// A service whose network is stubbed and whose platform values are fixed.
     static func makeService(
         storage: SecureStorage = InMemorySecureStorage(),
-        hardwareIdProvider: @Sendable @escaping () throws -> String = { "fixed-hw-id" }
+        hardwareIdProvider: @Sendable @escaping () throws -> String = { "fixed-hw-id" },
+        appIdProvider: @Sendable @escaping () throws -> String? = { "TEAM.bundle.id" }
     ) throws -> (AppAttestService, MockAppAttestor, PayabliAuth) {
         let urlSession = StubURLProtocol.makeSession()
         let config = try PayabliConfig(
@@ -42,6 +43,7 @@ enum AttestFixture {
             attestor: attestor,
             storage: storage,
             hardwareIdProvider: hardwareIdProvider,
+            appIdProvider: appIdProvider,
             modelProvider: { "iPhone15,2" },
             osVersionProvider: { "17.0" }
         )

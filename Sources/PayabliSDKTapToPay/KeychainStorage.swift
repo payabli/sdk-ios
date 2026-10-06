@@ -62,6 +62,24 @@ package struct KeychainStorage: SecureStorage, Sendable {
         return item as? Data
     }
 
+    /// The access group the item was written to, `nil` when the item is not there.
+    func accessGroup(forKey key: String) throws -> String? {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: key,
+            kSecReturnAttributes as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne
+        ]
+        var item: AnyObject?
+        let status = SecItemCopyMatching(query as CFDictionary, &item)
+        if Self.isMissing(status) {
+            return nil
+        }
+        try Self.check(status)
+        return (item as? [String: Any])?[kSecAttrAccessGroup as String] as? String
+    }
+
     /// The only status that means nothing is stored, so the only one a read answers
     /// `nil` for.
     static func isMissing(_ status: OSStatus) -> Bool {

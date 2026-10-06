@@ -1,3 +1,4 @@
+@testable import PayabliDemo
 @testable import PayabliSDKTapToPay
 import Security
 import XCTest
@@ -46,6 +47,16 @@ final class KeychainOnDeviceTests: XCTestCase {
         try storage.set("v", forKey: "sample_key")
         try storage.remove(forKey: "sample_key")
         XCTAssertNil(try storage.string(forKey: "sample_key"))
+    }
+
+    /// An item written with no access group lands in the app's own, whose prefix with the bundle
+    /// identifier is the App ID the app passes to Tap to Pay.
+    func testAStoredItemsAccessGroupGivesTheAppsAppId() throws {
+        try storage.set("v", forKey: "sample_key")
+        let group = try storage.accessGroup(forKey: "sample_key")
+        let derived = AppIdentifier.derive(accessGroup: group)
+        print("access group \(group ?? "nil"), derived \(derived ?? "nil"), passed \(Secrets.appId)")
+        XCTAssertEqual(derived, Secrets.appId)
     }
 
     /// `ThisDeviceOnly` because a binding names a Secure Enclave key no backup

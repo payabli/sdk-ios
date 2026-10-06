@@ -70,7 +70,7 @@ package protocol DeviceAttestationService: AnyObject, Sendable {
     /// Runs the first-run attestation flow: challenge → register → attest.
     /// Throws `PayabliTTPError.devicePendingActivation` if the backend returns
     /// `status == "pending"` (PRD FR-11F.1).
-    func attest(entry: String, appId: String) async throws -> AttestationResult
+    func attest(entry: String) async throws -> AttestationResult
 
     /// Produces fresh `AssertionHeaders` (signed over a current timestamp) for the
     /// next protected request, naming the handle this device holds for `entry`.
