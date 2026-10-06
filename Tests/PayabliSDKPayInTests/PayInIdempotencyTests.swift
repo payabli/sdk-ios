@@ -422,6 +422,21 @@ final class PayInIdempotencyTests: XCTestCase {
         XCTAssertNil(PayInFixture.interruption(failure), "the request was refused, not attempted")
     }
 
+    /// Raised before anything is sent, so no payment was attempted and no key is reported.
+    func testAMissingSessionReportsNoKey() async {
+        let transport = RecordingIdempotencyTransport(
+            failure: PayabliGenericError(type: .sessionNotInitialized, reason: "no session is initialized")
+        )
+        let flow = PayInFixture.makeFlow(transport: transport, key: "reserved-9")
+
+        let failure = await PayInFixture.failure(from: {
+            _ = try await flow.capture(PayInFixture.request(idempotencyKey: nil))
+        })
+
+        XCTAssertEqual((failure as? any PayabliError)?.type, .sessionNotInitialized)
+        XCTAssertNil(PayInFixture.interruption(failure), "nothing was sent")
+    }
+
     /// A refused credential never reached the operation, so no payment was attempted and no key is
     /// reported. Each of these arrives carrying a message, which is the shape that reaches the body
     /// decoder rather than the status mapping, and the classification has to be the same either way.
