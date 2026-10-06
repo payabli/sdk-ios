@@ -484,7 +484,7 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
                 let method = try await component.addPaymentMethod(payInInput, options: options)
                 result(Self.storedPaymentMethodMap(method))
             } catch {
-                result((error as NSError).toFlutterError(defaultCode: "PAYIN_FAILED"))
+                result(error.toFlutterError(defaultCode: "PAYIN_FAILED"))
             }
         }
     }
@@ -632,17 +632,26 @@ private final class EventSinkBox {
     }
 }
 
-// MARK: - NSError → FlutterError
+// MARK: - Error → FlutterError
 
-private extension NSError {
+private extension Error {
     func toFlutterError(defaultCode: String) -> FlutterError {
-        let code: String = {
-            if domain == "com.payabli.ttp" {
-                return "TTP_\(self.code)"
-            }
-            return defaultCode
-        }()
-        let message = userInfo[NSLocalizedDescriptionKey] as? String ?? localizedDescription
-        return FlutterError(code: code, message: message, details: nil)
+        let nsError = self as NSError
+        let message = nsError.userInfo[NSLocalizedDescriptionKey] as? String ?? nsError.localizedDescription
+        return FlutterError(code: bridgeCode(default: defaultCode), message: message, details: nil)
+    }
+
+    /// The catalog number for a Payabli error, `TTP_<n>` for a `PayabliTTPError`, and `fallback`
+    /// for anything else. A card-present call hands over the `NSError` its completion built, which
+    /// carries the number as its code beside the `PayabliErrorType` key.
+    func bridgeCode(default fallback: String) -> String {
+        if let payabliError = self as? any PayabliError {
+            return String(payabliError.code)
+        }
+        let nsError = self as NSError
+        guard nsError.domain == PayabliTTPError.errorDomain else {
+            return fallback
+        }
+        return nsError.userInfo["PayabliErrorType"] == nil ? "TTP_\(nsError.code)" : String(nsError.code)
     }
 }

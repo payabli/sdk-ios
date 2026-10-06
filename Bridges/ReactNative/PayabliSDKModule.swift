@@ -166,7 +166,7 @@ public final class PayabliSDKModule: RCTEventEmitter {
             }
             ttp.initialize { error in
                 if let error {
-                    reject(error.rnCode(default: "INIT_FAILED"), error.rnMessage, error)
+                    reject(error.bridgeCode(default: "INIT_FAILED"), error.rnMessage, error)
                 } else {
                     resolve(nil)
                 }
@@ -220,7 +220,7 @@ public final class PayabliSDKModule: RCTEventEmitter {
                 if let result {
                     resolve(["paymentTransId": result.paymentTransId])
                 } else if let error {
-                    reject(error.rnCode(default: "CHARGE_FAILED"), error.rnMessage, error)
+                    reject(error.bridgeCode(default: "CHARGE_FAILED"), error.rnMessage, error)
                 } else {
                     reject("CHARGE_FAILED", "Charge returned neither result nor error", nil)
                 }
@@ -242,7 +242,7 @@ public final class PayabliSDKModule: RCTEventEmitter {
             }
             ttp.activateDevice(activationCode: activationCode as String) { error in
                 if let error {
-                    reject(error.rnCode(default: "ACTIVATION_FAILED"), error.rnMessage, error)
+                    reject(error.bridgeCode(default: "ACTIVATION_FAILED"), error.rnMessage, error)
                 } else {
                     resolve(nil)
                 }
@@ -267,7 +267,7 @@ public final class PayabliSDKModule: RCTEventEmitter {
             }
             ttp.areTermsAccepted { accepted, error in
                 if let error {
-                    reject(error.rnCode(default: "TERMS_CHECK_FAILED"), error.rnMessage, error)
+                    reject(error.bridgeCode(default: "TERMS_CHECK_FAILED"), error.rnMessage, error)
                 } else {
                     resolve(accepted)
                 }
@@ -291,7 +291,7 @@ public final class PayabliSDKModule: RCTEventEmitter {
             }
             ttp.presentTerms { error in
                 if let error {
-                    reject(error.rnCode(default: "TERMS_PRESENT_FAILED"), error.rnMessage, error)
+                    reject(error.bridgeCode(default: "TERMS_PRESENT_FAILED"), error.rnMessage, error)
                 } else {
                     resolve(nil)
                 }
@@ -512,7 +512,7 @@ public final class PayabliSDKModule: RCTEventEmitter {
                 resolve(Self.storedPaymentMethodMap(result))
             } catch {
                 let nsError = error as NSError
-                reject(nsError.rnCode(default: "PAYIN_FAILED"), nsError.rnMessage, nsError)
+                reject(error.bridgeCode(default: "PAYIN_FAILED"), nsError.rnMessage, nsError)
             }
         }
     }
@@ -620,16 +620,25 @@ public final class PayabliSDKModule: RCTEventEmitter {
     }
 }
 
-// MARK: - NSError → RN error code/message
+// MARK: - Error → RN error code/message
+
+private extension Error {
+    /// The catalog number for a Payabli error, `TTP_<n>` for a `PayabliTTPError`, and `fallback`
+    /// for anything else. A card-present call hands over the `NSError` its completion built, which
+    /// carries the number as its code beside the `PayabliErrorType` key.
+    func bridgeCode(default fallback: String) -> String {
+        if let payabliError = self as? any PayabliError {
+            return String(payabliError.code)
+        }
+        let nsError = self as NSError
+        guard nsError.domain == PayabliTTPError.errorDomain else {
+            return fallback
+        }
+        return nsError.userInfo["PayabliErrorType"] == nil ? "TTP_\(nsError.code)" : String(nsError.code)
+    }
+}
 
 private extension NSError {
-    func rnCode(default fallback: String) -> String {
-        if domain == "com.payabli.ttp" {
-            return "TTP_\(self.code)"
-        }
-        return fallback
-    }
-
     var rnMessage: String {
         userInfo[NSLocalizedDescriptionKey] as? String ?? localizedDescription
     }
