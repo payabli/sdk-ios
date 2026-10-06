@@ -64,6 +64,28 @@ final class PayabliTTPActivationIdTests: XCTestCase {
         XCTAssertEqual(ttp.sessionState, .pendingActivation(activationId: "dev_e"))
     }
 
+    /// A 403 is about the registration the request presented. One replaced while the request was in
+    /// flight gets no id it was not answered for.
+    func testAPendingAnswerAboutAReplacedRegistrationHandsOverNoId() async throws {
+        let (ttp, attestation) = try makeTTP()
+        attestation.bindings = ["e": "dev_old"]
+        StubURLProtocol.handler = { request in
+            attestation.bindings = ["e": "dev_new"]
+            return try Self.respond(403)(request)
+        }
+
+        do {
+            try await ttp.initialize()
+            XCTFail("expected a failure")
+        } catch PayabliTTPError.configFailed {
+        } catch {
+            XCTFail("wrong error: \(error)")
+        }
+
+        XCTAssertEqual(ttp.sessionState, .failed(reason: .serviceUnavailable))
+        XCTAssertNil(ttp.activationId)
+    }
+
     func testInitializingAgainLandsOnTheSameId() async throws {
         let (ttp, attestation) = try makeTTP()
         attestation.pendingRegistration = "dev_e"

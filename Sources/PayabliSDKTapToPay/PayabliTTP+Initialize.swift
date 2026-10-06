@@ -225,8 +225,8 @@ extension PayabliTTP {
     private func runFetchConfigPhase() async throws -> TTPConfig {
         do {
             return try await configClient.fetchConfig(entry: entryPoint)
-        } catch PayabliTTPError.devicePendingActivation {
-            if let failure = landPendingActivation() {
+        } catch let pending as ConfigPendingActivation {
+            if let failure = landPendingActivation(answeredFor: pending.presentedDeviceId) {
                 multicaster.emit(.configFailed(error: ErrorSummary.of(failure)))
                 throw failure
             }
@@ -321,14 +321,24 @@ extension PayabliTTP {
     /// Lands the service's pending answer against the stored registration, which registration
     /// writes before the service reports the device pending. `nil` when pending activation was
     /// landed; otherwise the failure the session landed on, for the caller to throw.
-    private func landPendingActivation() -> Error? {
+    ///
+    /// An answer about a registration the store no longer holds is stale: it says nothing about the
+    /// one held now, so the session asks for another `initialize`.
+    private func landPendingActivation(answeredFor presented: String? = nil) -> Error? {
         let failure: Error
         switch storedRegistration() {
-        case let .held(activationId):
+        case let .held(activationId) where presented == nil || presented == activationId:
             _ = sessionManager.transition(to: .pendingActivation(activationId: activationId))
             syncPublished()
             multicaster.emit(.devicePendingActivation)
             return nil
+        case .held:
+            let stale = PayabliTTPError.configFailed(
+                reason: "The registration changed while the configuration was fetched; initialize again"
+            )
+            _ = sessionManager.transition(to: .failed(reason: .serviceUnavailable))
+            syncPublished()
+            return stale
         case .none:
             failure = PayabliTTPError.configFailed(reason: "The device is pending activation, and no registration is stored for it")
         case .unreadable:

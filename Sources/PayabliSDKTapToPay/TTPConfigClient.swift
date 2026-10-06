@@ -68,7 +68,7 @@ final class TTPConfigClient: Sendable {
 
         try mapPayabliHTTPError(response: response) { code in
             if code == 403 {
-                return PayabliTTPError.devicePendingActivation
+                return ConfigPendingActivation(presentedDeviceId: headers.deviceId)
             }
             return nil
         }
@@ -90,7 +90,7 @@ final class TTPConfigClient: Sendable {
                 throw PayabliGenericError(type: .tokenExpired, reason: reason)
             }
             if code == 403 {
-                throw PayabliTTPError.devicePendingActivation
+                throw ConfigPendingActivation(presentedDeviceId: headers.deviceId)
             }
             throw PayabliTTPError.configFailed(reason: reason)
         }
@@ -149,4 +149,10 @@ final class TTPConfigClient: Sendable {
             return false
         }
     }
+}
+
+/// The service holds the registration a config request presented pending activation. The answer is
+/// about that registration, so it carries its id.
+struct ConfigPendingActivation: Error {
+    let presentedDeviceId: String
 }
