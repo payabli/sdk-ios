@@ -19,13 +19,13 @@ extension AppAttestService {
     /// already being attested waits for that attempt to end and then runs its own,
     /// which reads the store first. Different entry points never wait for each
     /// other.
-    package func attest(entry: String, appId: String) async throws -> AttestationResult {
+    package func attest(entry: String) async throws -> AttestationResult {
         try await Self.attestations.takingTurns(entry) {
-            try await self.runAttest(entry: entry, appId: appId)
+            try await self.runAttest(entry: entry)
         }
     }
 
-    private func runAttest(entry: String, appId: String) async throws -> AttestationResult {
+    private func runAttest(entry: String) async throws -> AttestationResult {
         // Read inside the gate: the caller's warm check ran outside it, and an
         // attempt that finished in between leaves a binding this one would
         // otherwise register a second device to replace. Answering from the binding
@@ -70,6 +70,9 @@ extension AppAttestService {
             osVersion: osVersionProvider(),
             platform: Self.platform
         ))
+        // Read once `/register` has written the item it comes from, and before the key is
+        // spent: a key is attested once, and one spent on a request that cannot be sent is lost.
+        let appId = try appId()
         let isPending = register.status?.lowercased() == "pending"
         if isPending {
             logger.info("Device registered in pending state — completing attestation before prompting for activation code")

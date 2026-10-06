@@ -192,7 +192,7 @@ extension PayabliTTP {
             syncPublished()
             multicaster.emit(.attestationStarted)
 
-            _ = try await attestation.attest(entry: entryPoint, appId: appId)
+            _ = try await attestation.attest(entry: entryPoint)
             multicaster.emit(.attestationCompleted)
             _ = sessionManager.transition(to: .fetchingConfig)
             syncPublished()

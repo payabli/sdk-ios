@@ -50,7 +50,6 @@ Add to `ios/Runner/Runner.entitlements` (create if missing):
 You also need to:
 - Enable **Tap to Pay on iPhone** capability in your Apple Developer
   account for the bundle identifier.
-- Set `Secrets.appId` in `lib/main.dart` to `<TEAM_ID>.<BUNDLE_ID>`.
 
 ### Hardware requirement
 
@@ -70,9 +69,10 @@ the form requires a valid Bearer access token from your backend for
   SDK asks the callback for the first one as well as for a replacement,
   so minting stays end-to-end in your code.
 - `PayabliPayIn.configure()` sets up the native
-  `PayabliPayIn` component and wires the Dart-side
-  `accessTokenProvider` callback to the native `accessToken`
-  MethodChannel callback. Keep private Payabli credentials on your backend.
+  `PayabliPayIn` component on the same session. Its `tokenProvider`
+  answers the same `refreshToken` callback, because the SDK runs one
+  session with one token source. Keep private Payabli credentials on
+  your backend.
 - Lifecycle events arrive via `PayabliTTP.events()` — a broadcast
   `Stream<PayabliTTPEvent>` backed by the EventChannel. Each event
   carries a `code` (typed `PayabliTTPEventCode` enum) and a `payload`

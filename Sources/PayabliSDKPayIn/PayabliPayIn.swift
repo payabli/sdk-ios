@@ -45,7 +45,7 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
     @Published public private(set) var operation: PayabliPayInOperation
     @Published public private(set) var requestConfiguration: PayabliPayInRequestConfiguration?
 
-    private var session: PayabliSession?
+    private(set) var session: PayabliSession?
     private let injectedTransport: (any PayabliTransport)?
     private let diagnostics: PayabliPayInDiagnostics
     private var client: PayInPaymentFlowClient
@@ -114,20 +114,27 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
         super.init()
     }
 
-    /// Points the flow at a different merchant or host.
+    /// Points the flow at a configuration, which has to be the one the installed session runs on.
     ///
-    /// A configuration carries a token provider, so this builds the session it describes rather than
-    /// reusing the one the flow was made with, which was for a different entry point.
+    /// The process has one session, so a different configuration, or none installed, is not applied:
+    /// the flow keeps its entry point and environment, and every submission after it fails with
+    /// `invalidConfiguration`.
     public func configure(config: PayabliConfig) {
-        entryPoint = config.entryPoint
-        environment = config.environment
         let transport: any PayabliTransport
         if let injectedTransport {
+            entryPoint = config.entryPoint
+            environment = config.environment
             transport = injectedTransport
+        } else if let installed = PayabliSession.current, installed.matches(config) {
+            entryPoint = config.entryPoint
+            environment = config.environment
+            session = installed
+            transport = installed.transport
         } else {
-            let rebuilt = PayabliSession(config: config)
-            session = rebuilt
-            transport = rebuilt.transport
+            transport = RefusedTransport(refusal: PayabliGenericError(
+                type: .invalidConfiguration,
+                reason: "the configuration is not the one the session was initialized with"
+            ))
         }
         client = PayInPaymentFlowClient(
             transport: transport,

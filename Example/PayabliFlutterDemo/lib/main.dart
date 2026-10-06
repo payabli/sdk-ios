@@ -94,11 +94,10 @@ class _HomeScreenState extends State<HomeScreen> {
       await PayabliTTP.configure(
         tokenProvider: Secrets.fetchAccessToken,
         entryPoint: Secrets.entryPoint,
-        appId: Secrets.appId,
         environment: PayabliEnvironment.sandbox,
       );
       await PayabliPayIn.configure(
-        accessTokenProvider: Secrets.fetchPayInAccessToken,
+        tokenProvider: Secrets.fetchAccessToken,
         entryPoint: Secrets.entryPoint,
         environment: PayabliEnvironment.sandbox,
       );
@@ -506,7 +505,6 @@ class _HomeScreenState extends State<HomeScreen> {
 /// your backend — never embed clientSecret in the app binary.
 class Secrets {
   static const String entryPoint = '<YOUR_ENTRY_POINT>';
-  static const String appId = '<TEAM_ID>.<BUNDLE_ID>';
 
   static const String _tokenEndpoint =
       'https://your-backend.example.com/payabli/token';
@@ -515,9 +513,6 @@ class Secrets {
   /// below returns a placeholder so the app boots without network access
   /// — initialize() will fail with a clear error if the token is invalid.
   static Future<String> fetchAccessToken() async => 'placeholder-token';
-
-  static Future<String> fetchPayInAccessToken() async =>
-      'placeholder-payin-access-token';
 
   static String get tokenEndpoint => _tokenEndpoint;
 }

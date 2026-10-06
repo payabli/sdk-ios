@@ -1,18 +1,30 @@
 import Foundation
 import os
+import PayabliSDKCore
 import SwiftUI
 
 @main
 struct PayabliDemoQAApp: App {
-    @StateObject private var paymentMethod = PayInSessions.storedMethod()
+    var body: some Scene {
+        WindowGroup {
+            WithDemoSession { session, terminal in
+                DemoTabs(session: session, terminal: terminal)
+            }
+        }
+    }
+}
 
-    @StateObject private var paymentCapture = PayInSessions.capture()
+/// The app's tabs, built once the session has started.
+struct DemoTabs: View {
+    @StateObject private var paymentMethod: PayInFlowHandle
 
-    @StateObject private var terminal = TapToPaySessions.terminal()
+    @StateObject private var paymentCapture: PayInFlowHandle
 
-    @StateObject private var simpleCapture = PayInSessions.capture()
+    @StateObject private var terminal: TapToPayTerminal
 
-    @StateObject private var simpleSave = PayInSessions.storedMethod()
+    @StateObject private var simpleCapture: PayInFlowHandle
+
+    @StateObject private var simpleSave: PayInFlowHandle
 
     @AppStorage(ConfigurationQAView.showsSimpleCaptureKey) private var showsSimpleCapture = false
 
@@ -29,78 +41,130 @@ struct PayabliDemoQAApp: App {
     /// read it. In memory only.
     @StateObject private var demoCustomer = DemoCustomerSetting()
 
-    var body: some Scene {
-        WindowGroup {
-            TabView {
-                PaymentMethodQAView(paymentFlow: paymentMethod)
-                    .tabItem {
-                        Label("Save", systemImage: "creditcard")
-                    }
+    init(session: PayabliSession, terminal: TapToPayTerminal) {
+        _terminal = StateObject(wrappedValue: terminal)
+        _paymentMethod = StateObject(wrappedValue: PayInSessions.storedMethod(session: session))
+        _paymentCapture = StateObject(wrappedValue: PayInSessions.capture(session: session))
+        _simpleCapture = StateObject(wrappedValue: PayInSessions.capture(session: session))
+        _simpleSave = StateObject(wrappedValue: PayInSessions.storedMethod(session: session))
+    }
 
-                PaymentCaptureQAView(paymentFlow: paymentCapture)
-                    .tabItem {
-                        Label("Capture", systemImage: "dollarsign.circle")
-                    }
-
-                if showsSimpleCapture {
-                    SimpleCaptureView(captureFlow: simpleCapture, saveFlow: simpleSave)
-                        .tabItem {
-                            Label("S-Capture", systemImage: "dollarsign.circle")
-                        }
+    var body: some View {
+        TabView {
+            PaymentMethodQAView(paymentFlow: paymentMethod)
+                .tabItem {
+                    Label("Save", systemImage: "creditcard")
                 }
 
-                PaymentTapToPayQAView(terminal: terminal)
-                    .tabItem {
-                        Label("TapToPay", systemImage: "wave.3.right")
-                    }
+            PaymentCaptureQAView(paymentFlow: paymentCapture)
+                .tabItem {
+                    Label("Capture", systemImage: "dollarsign.circle")
+                }
 
-                ConfigurationQAView()
+            if showsSimpleCapture {
+                SimpleCaptureView(captureFlow: simpleCapture, saveFlow: simpleSave)
                     .tabItem {
-                        Label("Config", systemImage: "gearshape")
+                        Label("S-Capture", systemImage: "dollarsign.circle")
                     }
             }
-            // The app-wide tint. The palette lives in one Swift file rather than an
-            // asset catalogue, so it is set here instead of by an AccentColor asset.
-            .tint(.payabliPrimary)
-            .environmentObject(tokenProbes)
-            .environmentObject(demoCustomer)
+
+            PaymentTapToPayQAView(terminal: terminal)
+                .tabItem {
+                    Label("TapToPay", systemImage: "wave.3.right")
+                }
+
+            ConfigurationQAView()
+                .tabItem {
+                    Label("Config", systemImage: "gearshape")
+                }
         }
+        // The app-wide tint. The palette lives in one Swift file rather than an
+        // asset catalogue, so it is set here instead of by an AccentColor asset.
+        .tint(.payabliPrimary)
+        .environmentObject(tokenProbes)
+        .environmentObject(demoCustomer)
     }
 }
 
 #Preview {
-    TabView {
-        PaymentMethodQAView(paymentFlow: PayInSessions.preview())
+    WithDemoSession { session, terminal in
+        TabView {
+            PaymentMethodQAView(paymentFlow: PayInSessions.preview(session: session))
+                .tabItem {
+                    Label("Save", systemImage: "creditcard")
+                }
+
+            PaymentCaptureQAView(paymentFlow: PayInSessions.preview(session: session, capturing: true))
+                .tabItem {
+                    Label("Capture", systemImage: "dollarsign.circle")
+                }
+
+            SimpleCaptureView(
+                captureFlow: PayInSessions.preview(session: session, capturing: true),
+                saveFlow: PayInSessions.preview(session: session)
+            )
             .tabItem {
-                Label("Save", systemImage: "creditcard")
+                Label("S-Capture", systemImage: "dollarsign.circle")
             }
 
-        PaymentCaptureQAView(paymentFlow: PayInSessions.preview(capturing: true))
-            .tabItem {
-                Label("Capture", systemImage: "dollarsign.circle")
-            }
+            // The terminal is constructed but never initialized here, so the preview
+            // makes no network call and touches neither App Attest nor the reader.
+            // Pre-flight still renders, and reports the Simulator honestly.
+            PaymentTapToPayQAView(terminal: terminal)
+                .tabItem {
+                    Label("TapToPay", systemImage: "wave.3.right")
+                }
 
-        SimpleCaptureView(
-            captureFlow: PayInSessions.preview(capturing: true),
-            saveFlow: PayInSessions.preview()
-        )
-        .tabItem {
-            Label("S-Capture", systemImage: "dollarsign.circle")
+            ConfigurationQAView()
+                .tabItem {
+                    Label("Config", systemImage: "gearshape")
+                }
         }
-
-        // The terminal is constructed but never initialized here, so the preview
-        // makes no network call and touches neither App Attest nor the reader.
-        // Pre-flight still renders, and reports the Simulator honestly.
-        PaymentTapToPayQAView(terminal: TapToPaySessions.preview())
-            .tabItem {
-                Label("TapToPay", systemImage: "wave.3.right")
-            }
-
-        ConfigurationQAView()
-            .tabItem {
-                Label("Config", systemImage: "gearshape")
-            }
+        .environmentObject(TokenProbeResults.inert())
+        .environmentObject(DemoCustomerSetting())
     }
-    .environmentObject(TokenProbeResults.inert())
-    .environmentObject(DemoCustomerSetting())
+}
+
+/// The one session this app runs on, started before any flow or terminal is built.
+///
+/// Each token function in `Secrets` stays its own setting for the probes on the Config tab. The
+/// session takes one provider, because the process has one session for every capability.
+enum DemoSession {
+    /// Idempotent: a second call with the same values returns the session already started.
+    ///
+    /// The entry point is a constant here, so this app treats a rejection as a build it should not
+    /// ship. A host reading one from its own backend catches instead, and shows the payer something.
+    ///
+    /// A canvas preview gets a session no merchant answers to, so a preview cannot reach a backend.
+    static func start() async -> PayabliSession {
+        let isPreview = ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1"
+        do {
+            return try await PayabliSession.initialize(config: PayabliConfig(
+                entryPoint: isPreview ? "preview-entry" : DemoConfiguration.entryPoint,
+                environment: DemoConfiguration.environment.sdkEnvironment,
+                tokenProvider: isPreview ? { "preview-token" } : { try await Secrets.fetchAccessToken() }
+            ))
+        } catch {
+            preconditionFailure("The session could not start: \(error)")
+        }
+    }
+}
+
+/// Shows `content` once the session has started and the terminal is built on it, and a
+/// spinner until then.
+struct WithDemoSession<Content: View>: View {
+    @ViewBuilder let content: (PayabliSession, TapToPayTerminal) -> Content
+    @State private var started: (session: PayabliSession, terminal: TapToPayTerminal)?
+
+    var body: some View {
+        if let started {
+            content(started.session, started.terminal)
+        } else {
+            ProgressView()
+                .task {
+                    let session = await DemoSession.start()
+                    started = (session, await TapToPaySessions.terminal())
+                }
+        }
+    }
 }

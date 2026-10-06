@@ -7,35 +7,11 @@ import PayabliSDKPayIn
 /// The app holds the handles these return and never the flow inside them.
 @MainActor
 enum PayInSessions {
-    /// A session for one operation's token endpoint.
-    ///
-    /// The initialiser rejects an empty entry point, which is a constant here, so this app treats a
-    /// rejection as a build it should not ship. A host reading one from its own backend catches
-    /// instead, and shows the payer something.
-    private static func session(
-        entryPoint: String,
-        tokenProvider: @escaping PayabliTokenRefresh
-    ) -> PayabliSession {
-        do {
-            return PayabliSession(config: try PayabliConfig(
-                entryPoint: entryPoint,
-                environment: DemoConfiguration.environment.sdkEnvironment,
-
-                tokenProvider: tokenProvider
-            ))
-        } catch {
-            preconditionFailure("The entry point is not usable: \(error)")
-        }
-    }
-
     /// Storing an instrument for later.
-    static func storedMethod() -> PayInFlowHandle {
+    static func storedMethod(session: PayabliSession) -> PayInFlowHandle {
         PayInFlowHandle(
             PayabliPayIn(
-                session: session(
-                    entryPoint: DemoConfiguration.entryPoint,
-                    tokenProvider: { try await Secrets.fetchPaymentMethodAccessToken() }
-                ),
+                session: session,
                 diagnostics: .qaLogging(
                     enabled: Secrets.paymentMethodDiagnosticsEnabled,
                     store: .paymentMethod
@@ -49,13 +25,10 @@ enum PayInSessions {
     /// The customer switch that governs the launch request does not exist yet at
     /// this point, and its own default is the same answer, so the launch request
     /// states it rather than reading it.
-    static func capture() -> PayInFlowHandle {
+    static func capture(session: PayabliSession) -> PayInFlowHandle {
         PayInFlowHandle(
             PayabliPayIn(
-                session: session(
-                    entryPoint: DemoConfiguration.entryPoint,
-                    tokenProvider: { try await Secrets.fetchPaymentCaptureAccessToken() }
-                ),
+                session: session,
                 diagnostics: .qaLogging(
                     enabled: Secrets.paymentCaptureDiagnosticsEnabled,
                     store: .paymentCapture
@@ -67,13 +40,10 @@ enum PayInSessions {
     }
 
     /// A flow for a canvas preview, which makes no network call.
-    static func preview(capturing: Bool = false) -> PayInFlowHandle {
+    static func preview(session: PayabliSession, capturing: Bool = false) -> PayInFlowHandle {
         PayInFlowHandle(
             PayabliPayIn(
-                session: session(
-                    entryPoint: "preview-entry",
-                    tokenProvider: { "preview-token" }
-                ),
+                session: session,
                 operation: capturing ? .capture : .storePaymentMethod,
                 requestConfiguration: capturing
                     ? PayabliPayInRequestConfiguration(

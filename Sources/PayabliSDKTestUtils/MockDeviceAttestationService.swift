@@ -140,7 +140,7 @@ package final class MockDeviceAttestationService: DeviceAttestationService, @unc
 
     package init() {}
 
-    package func attest(entry: String, appId: String) async throws -> AttestationResult {
+    package func attest(entry: String) async throws -> AttestationResult {
         let result: Result<AttestationResult, Error> = lock.withLock {
             storedAttestCalls += 1
             return storedAttestResult

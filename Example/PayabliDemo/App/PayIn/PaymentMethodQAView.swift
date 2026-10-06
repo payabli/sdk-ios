@@ -189,6 +189,8 @@ struct PaymentMethodQAView: View {
 }
 
 #Preview {
-    PaymentMethodQAView(paymentFlow: PayInSessions.preview())
-        .environmentObject(TokenProbeResults.inert())
+    WithDemoSession { session, _ in
+        PaymentMethodQAView(paymentFlow: PayInSessions.preview(session: session))
+            .environmentObject(TokenProbeResults.inert())
+    }
 }

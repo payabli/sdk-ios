@@ -44,7 +44,6 @@ struct PaymentTapToPayQAView: View {
                 VStack(alignment: .leading, spacing: 20) {
                     QAContextLine()
                     TerminalReadinessView(configuredAppId: Secrets.appId)
-                    configurationProgressSection
                     stepsSection
                     recoverySection
                     eventLogSection
@@ -150,6 +149,8 @@ struct PaymentTapToPayQAView: View {
                     stepOutcome(activationMessage)
                 }
             }
+
+            configurationProgressSection
 
             StepRow(index: 4, step: steps.charge) {
                 VStack(alignment: .leading, spacing: 8) {

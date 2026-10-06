@@ -454,7 +454,6 @@ final class TTPUpdateRetryTests: XCTestCase {
         )
         let ttp = PayabliTTP(
             config: config,
-            appId: "appid",
             provider: provider,
             attestation: MockDeviceAttestationService(),
             // Three attempts with no wait: the schedule is the retry suite's subject, the count is this
