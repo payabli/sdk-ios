@@ -200,7 +200,6 @@ enum TapToPayPreflight {
 
     static func checks() -> [Check] {
         let environment = runtimeEnvironment
-        let bundleId = Bundle.main.bundleIdentifier ?? "<unknown>"
 
         var results: [Check] = []
 
