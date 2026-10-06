@@ -25,6 +25,13 @@ final class PayabliErrorCatalogTests: XCTestCase {
         (.unknown, "UNKNOWN", 1017, .outcomeUnknown, "An unexpected error occurred."),
         (.sdkInternalError, "SDK_INTERNAL_ERROR", 1018, .internal, "The SDK failed before the request was sent."),
         (
+            .sessionNotInitialized,
+            "SESSION_NOT_INITIALIZED",
+            1019,
+            .invalidRequest,
+            "The session has not been initialized."
+        ),
+        (
             .deviceKeyUnavailable,
             "DEVICE_KEY_UNAVAILABLE",
             3001,
