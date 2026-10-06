@@ -259,6 +259,7 @@ From Objective-C, these errors arrive as `NSError`. See
 | `.serviceUnavailable` | The service or the reader wasn't available. Try again later. |
 | `.deviceIneligible` | This iPhone or iOS version can't take Tap to Pay payments, or the card reader refused it. If an iPhone that meets the requirements lands here, contact Payabli before replacing it. |
 | `.sdkInternalError` | Report it to Payabli. |
+| `.deviceKeyUnavailable` | The iPhone's key facility failed, so the SDK can't tell whether this device's key still works. Initialize again; if it keeps failing, the problem is the device's. |
 
 ### Events
 

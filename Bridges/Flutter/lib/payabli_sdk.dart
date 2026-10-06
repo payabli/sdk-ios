@@ -411,6 +411,7 @@ enum PayabliTTPFailureReason {
   serviceUnavailable,
   deviceIneligible,
   sdkInternalError,
+  deviceKeyUnavailable,
 }
 
 enum PayabliTTPSessionState {
