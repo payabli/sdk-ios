@@ -94,8 +94,14 @@ final class ClientHeaderWireTests: XCTestCase {
 
         _ = try await session.transport.perform(PayabliRequest(method: .get, path: "/api/v2/ping"))
 
-        let header = try XCTUnwrap(stub.requests.first?.value(forHTTPHeaderField: ClientHeader.name))
-        XCTAssertTrue(header.hasPrefix(#"sdk-version="\#(PayabliCore.version)", platform=ios, "#), header)
-        XCTAssertTrue(header.hasSuffix(#", device-id="0123456789abcdef0123456789abcdef""#), header)
+        let expected = ClientHeader.value(of: ClientFacts(
+            sdkVersion: PayabliCore.version,
+            osVersion: DeviceModel.osVersion(),
+            hardware: DeviceModel.hardware(),
+            deviceId: { "0123456789abcdef0123456789abcdef" }
+        ))
+        XCTAssertEqual(stub.requests.first?.value(forHTTPHeaderField: ClientHeader.name), expected)
+        XCTAssertTrue(expected.contains("os-version="), expected)
+        XCTAssertTrue(expected.contains("hardware="), expected)
     }
 }
