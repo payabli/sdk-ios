@@ -29,7 +29,7 @@ final class PayabliErrorCatalogTests: XCTestCase {
             "DEVICE_KEY_UNAVAILABLE",
             3001,
             .retryLater,
-            "This device's secure storage could not be read."
+            "This device's secure storage is unavailable."
         ),
         (.deviceSetupUnsupported, "DEVICE_SETUP_UNSUPPORTED", 3002, .device, "This device cannot be set up for card-present payments."),
         (

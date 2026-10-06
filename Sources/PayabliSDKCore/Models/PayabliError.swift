@@ -196,7 +196,7 @@ public extension PayabliErrorType {
         case .validation: "The request was refused as invalid."
         case .unknown: "An unexpected error occurred."
         case .sdkInternalError: "The SDK failed before the request was sent."
-        case .deviceKeyUnavailable: "This device's secure storage could not be read."
+        case .deviceKeyUnavailable: "This device's secure storage is unavailable."
         case .deviceSetupUnsupported: "This device cannot be set up for card-present payments."
         case .deviceServicesOutdated: "Google Play on this device must be installed, updated or signed in."
         case .devicePendingActivation: "This device is waiting for its activation code."
