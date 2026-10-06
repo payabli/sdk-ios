@@ -207,6 +207,26 @@ final class PayabliTTPTests: XCTestCase {
         XCTAssertEqual(reported, "configFailed")
     }
 
+    /// A pending answer whose stored registration cannot be read reports the storage failure on the
+    /// event stream, not a pending device.
+    func testPendingWithAnUnreadableStoreEmitsTheStorageFailure() async throws {
+        let (ttp, _, attestation) = try makeTTP()
+        attestation.pendingRegistration = "dev"
+        attestation.registrationReadFailure = PayabliTTPError.attestationFailed(reason: "unreadable")
+        let collector = collect(from: ttp.events()) { event in
+            switch event {
+            case let .attestationFailed(error): return error
+            case .devicePendingActivation: return "devicePendingActivation"
+            default: return nil
+            }
+        }
+
+        _ = try? await ttp.initialize()
+
+        let reported = try await value(of: collector, named: "attestationFailed")
+        XCTAssertEqual(reported, "DEVICE_KEY_UNAVAILABLE")
+    }
+
     /// An `initialize()` that fails in the attestation phase says so on the event
     /// stream, which was silent before, and says it without repeating the reason.
     func testAttestationFailureEmitsAnEventNamingThePhase() async throws {
