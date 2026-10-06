@@ -1,26 +1,11 @@
 import CryptoKit
 import Foundation
 
-/// This device's identity: what `PayabliSession.deviceId` answers, and the value `/register`
-/// is given as `hardwareId` to recognize this install across registrations.
+/// This device's identity: what `PayabliSession.deviceId` answers and `/register` receives as `hardwareId`.
 ///
-/// It has to be the same on every call, stable across an uninstall and reinstall,
-/// and different per app: two apps from one developer on one handset are two
-/// devices, and nothing else sent alongside this tells them apart. The platform's
-/// vendor identifier is one value for every app from the same vendor.
-///
-/// So it is a digest of three things:
-///
-/// - a UUID minted once and kept in the Keychain, which is what survives a
-///   reinstall, since Keychain items outlive the app's container;
-/// - the bundle identifier, which makes it per app and keeps the answer independent
-///   of which Keychain access group the UUID lands in;
-/// - the SDK's own identifier, so a second SDK reading the same UUID cannot compute
-///   the same value.
-///
-/// The digest is sent, never the UUID, truncated to 128 bits. A blank is returned
-/// when there is nothing to build from: a value invented per call is not an
-/// identifier.
+/// Half a SHA-256 over a Keychain UUID, the bundle identifier and the SDK identifier. The UUID is kept
+/// in the Keychain because it survives a reinstall, which `identifierForVendor` does not. Changing any
+/// input registers every install as a new device. Blank when there is nothing to build from.
 package enum InstallIdentifier {
     static let sdkIdentifier = "com.payabli.sdk"
 
