@@ -29,7 +29,7 @@ final class PayabliErrorCatalogTests: XCTestCase {
             "DEVICE_KEY_UNAVAILABLE",
             3001,
             .retryLater,
-            "The device's key facility could not confirm this device's key."
+            "This device's secure storage could not be read."
         ),
         (.deviceSetupUnsupported, "DEVICE_SETUP_UNSUPPORTED", 3002, .device, "This device cannot be set up for card-present payments."),
         (
@@ -96,7 +96,8 @@ final class PayabliErrorCatalogTests: XCTestCase {
         (.deviceNotPending, "DEVICE_NOT_PENDING", 3028, .invalidRequest, "This device is not waiting for activation."),
         (.terminalNotReady, "TERMINAL_NOT_READY", 3029, .invalidRequest, "The terminal is not ready for this call."),
         (.tooManyOpenCharges, "TOO_MANY_OPEN_CHARGES", 3030, .invalidRequest, "Too many charges are waiting to be resolved."),
-        (.paymentNotHeld, "PAYMENT_NOT_HELD", 3031, .invalidRequest, "No captured payment is held under that identifier.")
+        (.paymentNotHeld, "PAYMENT_NOT_HELD", 3031, .invalidRequest, "No captured payment is held under that identifier."),
+        (.deviceIdentityUnavailable, "DEVICE_IDENTITY_UNAVAILABLE", 3033, .device, "This device cannot be identified.")
     ]
 
     func testEveryTypeCarriesItsPublishedNameNumberCategoryAndMessage() {
