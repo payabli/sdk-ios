@@ -182,8 +182,7 @@ actor PayabliAuth {
         }
     }
 
-    /// The ceiling on one call to the host's `tokenProvider`. Matches Android's
-    /// `DEFAULT_PROVIDER_TIMEOUT_MILLIS` in `PayabliAuth.kt`.
+    /// The ceiling on one call to the host's `tokenProvider`.
     private static let providerTimeout: TimeInterval = 30
 
     /// Distinguishes a provider that never returned from anything it threw, so `mint(replacing:)` can

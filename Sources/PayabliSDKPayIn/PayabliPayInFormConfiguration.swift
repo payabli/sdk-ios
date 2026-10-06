@@ -154,7 +154,8 @@ public struct PayabliPayInLabels: Sendable {
         submitButton?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty
     }
 
-    /// Blank as Kotlin's `isBlank` reads it, so a label falls back on both platforms for the same text.
+    /// Blank when every scalar is a space, line or paragraph separator, or a control in U+0009–U+000D or
+    /// U+001C–U+001F.
     static func isBlank(_ text: String) -> Bool {
         text.unicodeScalars.allSatisfy { scalar in
             switch scalar.properties.generalCategory {
