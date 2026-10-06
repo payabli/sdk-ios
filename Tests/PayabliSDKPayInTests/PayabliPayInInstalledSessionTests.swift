@@ -93,6 +93,7 @@ final class PayabliPayInInstalledSessionTests: XCTestCase {
             XCTFail("a blank entry point was accepted")
         } catch {
             assertCatalogError(error, domain: "com.payabli.session")
+            XCTAssertEqual((error as NSError).localizedDescription, "Invalid configuration: entryPoint is blank.")
         }
     }
 

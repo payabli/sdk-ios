@@ -11,7 +11,7 @@ package extension Error {
             domain: domain,
             code: payabliError.code,
             userInfo: [
-                NSLocalizedDescriptionKey: payabliError.reason,
+                NSLocalizedDescriptionKey: payabliError.errorDescription ?? payabliError.reason,
                 "PayabliErrorType": payabliError.type.rawValue
             ]
         )
