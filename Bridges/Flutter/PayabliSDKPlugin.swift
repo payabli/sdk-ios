@@ -101,10 +101,10 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
             handleActivateDevice(call.arguments, result: result)
         case "areTermsAccepted":
             handleAreTermsAccepted(result: result)
-        case "deviceId":
-            handleDeviceId(result: result)
         case "presentTerms":
             handlePresentTerms(result: result)
+        case "sessionDeviceId":
+            handleSessionDeviceId(result: result)
         case "getSessionState":
             handleGetSessionState(result: result)
         case "configurePayIn":
@@ -333,25 +333,13 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
         }
     }
 
-    // MARK: - deviceId
+    // MARK: - getSessionState
 
-    private func handleDeviceId(result: @escaping FlutterResult) {
+    private func handleSessionDeviceId(result: @escaping FlutterResult) {
         Task { @MainActor in
-            guard let ttp else {
-                result(FlutterError(
-                    code: "NOT_CONFIGURED",
-                    message: "Call configure() before deviceId()",
-                    details: nil
-                ))
-                return
-            }
-            ttp.deviceId { deviceId in
-                result(deviceId)
-            }
+            result(PayabliSessionObjC.deviceId)
         }
     }
-
-    // MARK: - getSessionState
 
     private func handleGetSessionState(result: @escaping FlutterResult) {
         Task { @MainActor in
@@ -359,7 +347,8 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
             result([
                 "code": state.code.rawValue,
                 "readerConfigurationPercent": state.readerConfigurationPercent as Any,
-                "failureReason": state.failureReason?.rawValue as Any
+                "failureReason": state.failureReason?.rawValue as Any,
+                "activationId": state.activationId as Any
             ])
         }
     }

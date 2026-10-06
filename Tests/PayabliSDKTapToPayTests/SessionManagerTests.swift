@@ -44,7 +44,7 @@ final class SessionManagerTests: XCTestCase {
     func testPendingActivationPath() {
         let sm = SessionManager()
         _ = sm.transition(to: .attestingDevice)
-        XCTAssertTrue(sm.transition(to: .pendingActivation))
+        XCTAssertTrue(sm.transition(to: .pendingActivation(activationId: "dev")))
         XCTAssertTrue(sm.transition(to: .idle))
     }
 
@@ -87,7 +87,7 @@ final class SessionManagerTests: XCTestCase {
     func testEveryStateCanStartOver() {
         let states: [PayabliTTPSessionState] = [
             .idle, .attestingDevice, .fetchingConfig, .initializingReader(percent: nil),
-            .ready, .sessionExpired, .reinitializing, .pendingActivation,
+            .ready, .sessionExpired, .reinitializing, .pendingActivation(activationId: "dev"),
             .failed(reason: .sdkInternalError)
         ]
         for state in states {
@@ -101,7 +101,7 @@ final class SessionManagerTests: XCTestCase {
     func testResetClearsTheLastError() {
         struct DummyError: Error {}
         let sm = SessionManager()
-        sm.markError(DummyError())
+        sm.markError(DummyError(), registration: .none)
         sm.reset()
         XCTAssertEqual(sm.sessionState, .idle)
         XCTAssertFalse(sm.isReady)
@@ -112,7 +112,7 @@ final class SessionManagerTests: XCTestCase {
         struct DummyError: Error {}
         let sm = SessionManager()
         _ = sm.transition(to: .attestingDevice)
-        sm.markError(DummyError())
+        sm.markError(DummyError(), registration: .none)
         XCTAssertEqual(sm.sessionState, .failed(reason: .sdkInternalError))
         XCTAssertFalse(sm.isReady)
         XCTAssertNotNil(sm.lastError)

@@ -14,16 +14,16 @@ extension PayabliTTPSessionState {
     ///
     /// The map is one map for both platforms and mirrors the sibling's, so a
     /// merchant meeting one condition is sent to the same repair on either.
-    static func landing(for error: Error) -> PayabliTTPSessionState? {
+    static func landing(for error: Error, registration: StoredRegistration) -> PayabliTTPSessionState? {
         guard let ttpError = error as? PayabliTTPError else {
-            return landingByType(error)
+            return landingByType(error, registration: registration)
         }
 
         switch ttpError {
         case .devicePendingActivation:
             // Not a failure. The device owes an activation code and the host's
             // next move is to collect one.
-            return .pendingActivation
+            return pendingActivation(registration)
 
         case .termsNotAccepted:
             // Not a failure either, and it has a state of its own.
@@ -59,7 +59,7 @@ extension PayabliTTPSessionState {
     }
 
     /// A failure that carries a catalog type, landed by that type.
-    private static func landingByType(_ error: Error) -> PayabliTTPSessionState {
+    private static func landingByType(_ error: Error, registration: StoredRegistration) -> PayabliTTPSessionState {
         guard let payabliError = error as? any PayabliError else {
             return .failed(reason: .sdkInternalError)
         }
@@ -67,7 +67,7 @@ extension PayabliTTPSessionState {
         case .permissionDenied:
             // The remedy offered is an activation code. A refusal that code does
             // not repair needs a classification this map is not given.
-            return .pendingActivation
+            return pendingActivation(registration)
 
         case .invalidConfiguration:
             return .failed(reason: .configurationRejected)
@@ -91,4 +91,21 @@ extension PayabliTTPSessionState {
             return .failed(reason: .serviceUnavailable)
         }
     }
+
+    private static func pendingActivation(_ registration: StoredRegistration) -> PayabliTTPSessionState {
+        switch registration {
+        case let .held(activationId):
+            return .pendingActivation(activationId: activationId)
+        case .none:
+            return .failed(reason: .configurationRejected)
+        case .unreadable:
+            return .failed(reason: .deviceKeyUnavailable)
+        }
+    }
+}
+
+enum StoredRegistration: Equatable {
+    case held(activationId: String)
+    case none
+    case unreadable
 }

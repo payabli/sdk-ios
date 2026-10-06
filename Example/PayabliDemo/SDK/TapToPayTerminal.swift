@@ -75,9 +75,9 @@ final class TapToPayTerminal: ObservableObject {
         try await run { try await terminal.activateDevice(activationCode: code) }
     }
 
-    /// The id a backend sends with the paypoint to issue this device's activation code.
-    func deviceId() async -> String? {
-        await terminal.deviceId()
+    /// The id a backend sends with the paypoint to issue this device's activation code, while one is owed.
+    var activationId: String? {
+        terminal.activationId
     }
 
     /// Asks the platform to present its terms so the merchant can accept them.

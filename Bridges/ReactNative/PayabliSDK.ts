@@ -150,6 +150,9 @@ export interface PayabliTTPSessionSnapshot {
     readerConfigurationPercent: number | null;
     /// `null` unless the session failed, for the same reason.
     failureReason: PayabliTTPFailureReason | null;
+    /// The id the activation route's `deviceId` field takes. `null` unless an
+    /// activation is owed.
+    activationId: string | null;
 }
 
 /// Mirrors `PayabliTTPFailureReason`.
@@ -159,6 +162,7 @@ export enum PayabliTTPFailureReason {
     ServiceUnavailable = 2,
     DeviceIneligible = 3,
     SdkInternalError = 4,
+    DeviceKeyUnavailable = 5,
 }
 
 export interface PayabliTTPEvent {
@@ -251,10 +255,11 @@ interface NativePayabliSDKModule {
 
     areTermsAccepted(): Promise<boolean>;
 
-    deviceId(): Promise<string | null>;
     presentTerms(): Promise<void>;
 
     getSessionState(): Promise<PayabliTTPSessionSnapshot>;
+
+    sessionDeviceId(): Promise<string | null>;
 
     resolveTokenRefresh(token: string): void;
 
@@ -363,16 +368,6 @@ export function presentTerms(): Promise<void> {
     return requireNativeModule().presentTerms();
 }
 
-/**
- * The id Payabli assigned this device on the session's paypoint, whether
- * pending activation or active. `null` when the SDK holds no usable id for it,
- * for any reason; call `initialize()`, which enrolls the device or rejects with
- * why it could not.
- */
-export function deviceId(): Promise<string | null> {
-    return requireNativeModule().deviceId();
-}
-
 export async function getSessionState(): Promise<PayabliTTPSessionSnapshot> {
     return requireNativeModule().getSessionState();
 }
@@ -395,7 +390,6 @@ export const PayabliTTP = {
     activateDevice,
     areTermsAccepted,
     presentTerms,
-    deviceId,
     getSessionState,
     addEventListener,
 };
@@ -431,6 +425,20 @@ export const PayabliPayIn = {
     configure: configurePayIn,
     addCard,
     addBankAccount,
+};
+
+// MARK: - Session
+
+/** The one session every capability runs on. */
+export const PayabliSession = {
+    /**
+     * This device's identity, the same for every capability and stable for the
+     * install. `null` before a configure has succeeded, and while the device's
+     * secure storage can't be read.
+     */
+    deviceId(): Promise<string | null> {
+        return requireNativeModule().sessionDeviceId();
+    },
 };
 
 export default PayabliTTP;

@@ -2,7 +2,7 @@ import Foundation
 
 /// The session lifecycle for Tap to Pay (PRD §17).
 ///
-/// A Swift enum rather than an `@objc` one, because two cases carry a value an
+/// A Swift enum rather than an `@objc` one, because some cases carry a value an
 /// `Int`-backed enum cannot hold. ``PayabliTTPSessionStateCode`` is the
 /// projection the bridges read.
 public enum PayabliTTPSessionState: Sendable, Equatable {
@@ -21,7 +21,10 @@ public enum PayabliTTPSessionState: Sendable, Equatable {
     case ready
     case sessionExpired
     case reinitializing
-    case pendingActivation
+
+    /// The device is registered and owes its activation code, and `activationId` is the id the
+    /// activation routes take. It is handed over on this state and nowhere else.
+    case pendingActivation(activationId: String)
 
     /// The session failed, and `reason` says what a host can do about it.
     case failed(reason: PayabliTTPFailureReason)
@@ -78,6 +81,12 @@ public extension PayabliTTPSessionState {
     var failureReason: PayabliTTPFailureReason? {
         guard case let .failed(reason) = self else { return nil }
         return reason
+    }
+
+    /// The id the device is activated under, or `nil` when no activation is owed.
+    var activationId: String? {
+        guard case let .pendingActivation(activationId) = self else { return nil }
+        return activationId
     }
 }
 

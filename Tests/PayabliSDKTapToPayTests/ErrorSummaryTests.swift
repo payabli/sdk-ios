@@ -89,7 +89,7 @@ final class ErrorSummaryTests: XCTestCase {
             (.ready, "ready"),
             (.sessionExpired, "sessionExpired"),
             (.reinitializing, "reinitializing"),
-            (.pendingActivation, "pendingActivation"),
+            (.pendingActivation(activationId: "dev"), "pendingActivation"),
             (.pendingTerms, "pendingTerms"),
             (.failed(reason: .sdkInternalError), "failed")
         ]
