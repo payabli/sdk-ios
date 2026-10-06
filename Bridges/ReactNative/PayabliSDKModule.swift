@@ -140,7 +140,7 @@ public final class PayabliSDKModule: RCTEventEmitter {
                     environment: environment
                 )
             } catch {
-                reject("INVALID_CONFIGURATION", error.localizedDescription, error)
+                reject(error.bridgeCode(default: "INVALID_CONFIGURATION"), error.localizedDescription, error)
                 return
             }
 
@@ -406,7 +406,7 @@ public final class PayabliSDKModule: RCTEventEmitter {
                 )
                 resolve(nil)
             } catch {
-                reject("INVALID_CONFIGURATION", error.localizedDescription, error)
+                reject(error.bridgeCode(default: "INVALID_CONFIGURATION"), error.localizedDescription, error)
             }
         }
     }
