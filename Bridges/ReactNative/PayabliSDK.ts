@@ -154,7 +154,7 @@ export interface PayabliTTPSessionSnapshot {
 
 /// Mirrors `PayabliTTPFailureReason`.
 export enum PayabliTTPFailureReason {
-    AttestationRequired = 0,
+    DeviceSetupRequired = 0,
     ConfigurationRejected = 1,
     ServiceUnavailable = 2,
     DeviceIneligible = 3,

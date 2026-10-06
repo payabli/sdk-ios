@@ -7,7 +7,7 @@ final class TokenStorageClientCoverageTests: XCTestCase {
     func testDiagnosticsLogFailureWithRelativeURLAndRedactedHeaders() async throws {
         let sink = CoverageDiagnosticSink()
         let transport = CoverageFailingTransport(error: PayabliGenericError(
-            code: .networkError,
+            type: .networkError,
             reason: "Offline"
         ))
         let client = PayInPaymentFlowTokenStorageClient(
@@ -32,7 +32,7 @@ final class TokenStorageClientCoverageTests: XCTestCase {
             )
             XCTFail("Expected transport error")
         } catch let error as PayabliGenericError {
-            XCTAssertEqual(error.code, .networkError)
+            XCTAssertEqual(error.type, .networkError)
         } catch {
             XCTFail("Wrong error: \(error)")
         }
@@ -55,7 +55,7 @@ final class TokenStorageClientCoverageTests: XCTestCase {
     func testDiagnosticsRedactsPANLikeValuesFromFailureMessages() async throws {
         let sink = CoverageDiagnosticSink()
         let transport = CoverageFailingTransport(error: PayabliGenericError(
-            code: .networkError,
+            type: .networkError,
             reason: "Gateway echoed 4111 1111 1111 1111",
             detail: "Retry without card 4111111111111111."
         ))
@@ -77,7 +77,7 @@ final class TokenStorageClientCoverageTests: XCTestCase {
             )
             XCTFail("Expected transport error")
         } catch let error as PayabliGenericError {
-            XCTAssertEqual(error.code, .networkError)
+            XCTAssertEqual(error.type, .networkError)
         } catch {
             XCTFail("Wrong error: \(error)")
         }
@@ -117,7 +117,7 @@ final class TokenStorageClientCoverageTests: XCTestCase {
             )
             XCTFail("Expected decoding error")
         } catch let error as PayabliGenericError {
-            XCTAssertEqual(error.code, .decodingError)
+            XCTAssertEqual(error.type, .decodingError)
         } catch {
             XCTFail("Wrong error: \(error)")
         }
@@ -147,7 +147,7 @@ final class TokenStorageClientCoverageTests: XCTestCase {
             )
             XCTFail("Expected decoding error")
         } catch let error as PayabliGenericError {
-            XCTAssertEqual(error.code, .decodingError)
+            XCTAssertEqual(error.type, .decodingError)
         } catch {
             XCTFail("Wrong error: \(error)")
         }
@@ -269,7 +269,7 @@ final class TokenStorageClientCoverageTests: XCTestCase {
             ))
             XCTFail("Expected missing token error")
         } catch let error as PayabliGenericError {
-            XCTAssertEqual(error.code, .tokenProviderFailed)
+            XCTAssertEqual(error.type, .tokenProviderFailed)
         } catch {
             XCTFail("Wrong error: \(error)")
         }
@@ -347,7 +347,7 @@ private actor CoverageMockTransport: PayabliTransport {
         _ request: PayabliRequest,
         decoding: T.Type
     ) async throws -> PayabliV2Envelope<T> {
-        throw PayabliGenericError(code: .unknown, reason: "performV2 is not used")
+        throw PayabliGenericError(type: .unknown, reason: "performV2 is not used")
     }
 }
 
@@ -368,7 +368,7 @@ private actor CoverageFailingTransport: PayabliTransport {
         _ request: PayabliRequest,
         decoding: T.Type
     ) async throws -> PayabliV2Envelope<T> {
-        throw PayabliGenericError(code: .unknown, reason: "performV2 is not used")
+        throw PayabliGenericError(type: .unknown, reason: "performV2 is not used")
     }
 }
 

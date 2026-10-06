@@ -54,14 +54,14 @@ package struct RetryPolicy: Sendable {
     /// Membership says the failure could be worth another attempt, never that the call may be repeated.
     /// A server error is reached by a request that may already have been executed, so whether a repeat is
     /// safe belongs to the operation, and the call site is what decides to run under this at all.
-    package static let retryableCodes: Set<PayabliErrorCode> = [
+    package static let retryableCodes: Set<PayabliErrorType> = [
         .networkError,
         .serverError,
         .rateLimited
     ]
 
     package static let retryableByCode: @Sendable (any PayabliError) -> Bool = { error in
-        guard retryableCodes.contains(error.code) else { return false }
+        guard retryableCodes.contains(error.type) else { return false }
 
         // A status the HTTP grammar has no room for is read as a server fault, which is what RFC 9110
         // Section 15 asks of a client. Reading it that way is not licence to send the request again:

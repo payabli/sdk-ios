@@ -63,7 +63,7 @@ curl -X POST "https://api-sandbox.payabli.com/api/v2/paypoint/{entryPoint}/apps"
 - Register each bundle ID you ship, including debug and white-label builds.
 
 An app that isn't an authorized app is refused when the device attests, with an HTTP 403. `initialize()`
-throws a `PayabliGenericError` whose `code` is `.permissionDenied`, not `attestationFailed`, and
+throws a `PayabliGenericError` whose `type` is `.permissionDenied`, not `attestationFailed`, and
 `sessionState` is `.pendingActivation`, the same state as a phone that needs a code. An activation code
 doesn't clear it: register the app, then initialize again. So a phone that lands on `.pendingActivation`
 straight after setup may be running an app that isn't registered.
@@ -138,7 +138,7 @@ A phone takes Tap to Pay payments for a paypoint only after it is activated with
 Until the phone is activated, `initialize()` throws `PayabliTTPError.devicePendingActivation` and
 `sessionState` is `.pendingActivation`. An app that isn't an authorized app, or credentials without `tools_init`
 or `pos_create`, land in the same state, so check both before issuing a code. Credentials without
-`inboundpayments_create` reach `.ready`, and `charge` then throws a core `PayabliError` whose `code` is
+`inboundpayments_create` reach `.ready`, and `charge` then throws a core `PayabliError` whose `type` is
 `.permissionDenied`, before the card is read.
 
 1. Issue a code for the phone, from your backend or from the Payabli portal. The code is valid for 30
@@ -227,7 +227,7 @@ Every `PayabliTTPError` carries `capture` and `paymentTransId`:
 
 Device attestation and opening a transaction can also throw a core `PayabliError` from `PayabliSDKCore`,
 for example `PayabliGenericError` or `PayabliPaymentError`. It carries no `capture`: `charge` throws one
-only before the card is read, so nothing was charged. Catch `any PayabliError` and branch on its `code`;
+only before the card is read, so nothing was charged. Catch `any PayabliError` and branch on its `type`;
 `.tokenProviderFailed` means your token provider failed.
 
 From Objective-C, these errors arrive as `NSError`. See
@@ -255,7 +255,7 @@ From Objective-C, these errors arrive as `NSError`. See
 | `failureReason` | What to do |
 |---|---|
 | `.configurationRejected` | The paypoint, the device or its setup is missing something. Retrying won't help; contact Payabli. A token, network or service failure while fetching the configuration lands on `.serviceUnavailable` instead. |
-| `.attestationRequired` | The device's attestation was refused or revoked. Check the entitlements, then initialize again. |
+| `.deviceSetupRequired` | This device must be set up again: its setup was refused or revoked. Check the entitlements, then initialize again. |
 | `.serviceUnavailable` | The service or the reader wasn't available. Try again later. |
 | `.deviceIneligible` | This iPhone or iOS version can't take Tap to Pay payments, or the card reader refused it. If an iPhone that meets the requirements lands here, contact Payabli before replacing it. |
 | `.sdkInternalError` | Report it to Payabli. |

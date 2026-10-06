@@ -24,7 +24,7 @@ final class PayInFailureTests: XCTestCase {
 
     func testABareConflictOnACaptureNamesTheKey() {
         let failure = PayInFailure(
-            BareReason(reason: "Conflict (409)", code: .conflict),
+            BareReason(reason: "Conflict (409)", type: .conflict),
             operation: .capture
         )
 
@@ -45,7 +45,7 @@ final class PayInFailureTests: XCTestCase {
 
     func testABareConflictOnAReversalSaysWhatTheServiceSaid() {
         let failure = PayInFailure(
-            BareReason(reason: "Conflict (409)", code: .conflict),
+            BareReason(reason: "Conflict (409)", type: .conflict),
             operation: .void
         )
 
@@ -83,7 +83,7 @@ final class PayInFailureTests: XCTestCase {
     }
 
     private static let interruptedReversal = PayabliPayInError.submissionInterrupted(
-        code: .networkError,
+        type: .networkError,
         causeType: "PayabliSDKCore.PayabliGenericError"
     )
 
@@ -93,7 +93,7 @@ final class PayInFailureTests: XCTestCase {
     /// body names the flow's own error type instead. Nothing here reads it — the adapter branches on the
     /// code — and both values are pinned where they are derived, in the SDK's own idempotency cases.
     private static let interruptedConflict = PayabliPayInError.submissionInterrupted(
-        code: .conflict,
+        type: .conflict,
         causeType: "PayabliSDKCore.PayabliGenericError"
     )
 
@@ -106,7 +106,7 @@ final class PayInFailureTests: XCTestCase {
 
     func testABareConflictOnAStoredMethodSaysWhatTheServiceSaid() {
         let failure = PayInFailure(
-            BareReason(reason: "Conflict (409)", code: .conflict),
+            BareReason(reason: "Conflict (409)", type: .conflict),
             operation: .storedMethod
         )
 
@@ -181,7 +181,7 @@ private struct ActionableDecline: PayabliError {
         "Declined"
     }
 
-    var code: PayabliErrorCode {
+    var type: PayabliErrorType {
         .unknown
     }
 
@@ -198,7 +198,7 @@ private struct ActionableDecline: PayabliError {
 /// which is what an empty body becomes.
 private struct BareReason: PayabliError {
     let reason: String
-    var code: PayabliErrorCode = .unknown
+    var type: PayabliErrorType = .unknown
 
     var detail: String? {
         nil

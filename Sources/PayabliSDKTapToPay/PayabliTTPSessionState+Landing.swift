@@ -32,7 +32,7 @@ extension PayabliTTPSessionState {
         case .attestationRevoked, .attestationFailed:
             // Discarding the device's identity needs a positive match, and both
             // of these name the attestation.
-            return .failed(reason: .attestationRequired)
+            return .failed(reason: .deviceSetupRequired)
 
         case .configFailed:
             return .failed(reason: .configurationRejected)
@@ -63,7 +63,7 @@ extension PayabliTTPSessionState {
         guard let payabliError = error as? any PayabliError else {
             return .failed(reason: .sdkInternalError)
         }
-        switch payabliError.code {
+        switch payabliError.type {
         case .permissionDenied:
             // The remedy offered is an activation code. A refusal that code does
             // not repair needs a classification this map is not given.

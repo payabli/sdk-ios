@@ -108,7 +108,7 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
                             continuation.resume(returning: token)
                         } else {
                             continuation.resume(throwing: PayabliGenericError(
-                                code: .tokenExpired,
+                                type: .tokenExpired,
                                 reason: "Dart side did not return a refreshed token"
                             ))
                         }
@@ -375,7 +375,7 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
                             continuation.resume(returning: token)
                         } else {
                             continuation.resume(throwing: PayabliGenericError(
-                                code: .missingToken,
+                                type: .missingToken,
                                 reason: "Dart side did not return a PayIn payment flow access token"
                             ))
                         }

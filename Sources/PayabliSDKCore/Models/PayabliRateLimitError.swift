@@ -8,7 +8,7 @@ import Foundation
 public struct PayabliRateLimitError: PayabliError, PayabliRetryAfter {
     public let retryAfter: TimeInterval?
 
-    public var code: PayabliErrorCode {
+    public var type: PayabliErrorType {
         .rateLimited
     }
 

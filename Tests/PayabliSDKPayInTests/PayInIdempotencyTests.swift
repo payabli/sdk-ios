@@ -112,7 +112,7 @@ final class PayInIdempotencyTests: XCTestCase {
 
     func testAnInterruptedVoidLeavesTheOutcomeOpen() async {
         let transport = RecordingIdempotencyTransport(
-            failure: PayabliGenericError(code: .networkError, reason: "Network request failed")
+            failure: PayabliGenericError(type: .networkError, reason: "Network request failed")
         )
         let flow = PayInFixture.makeFlow(transport: transport, key: "reserved-5")
 
@@ -123,7 +123,7 @@ final class PayInIdempotencyTests: XCTestCase {
         guard let interrupted = PayInFixture.interruption(failure) else {
             return XCTFail("expected submissionInterrupted, got \(failure)")
         }
-        XCTAssertEqual(interrupted.code, .networkError)
+        XCTAssertEqual(interrupted.type, .networkError)
         XCTAssertEqual(transport.sentKeys, ["reserved-5"], "the key still went out")
     }
 
@@ -186,7 +186,7 @@ final class PayInIdempotencyTests: XCTestCase {
     /// reaches the wire trimmed rather than as it was given.
     func testACallersKeyIsSentTrimmedRatherThanAsGiven() async {
         let transport = RecordingIdempotencyTransport(
-            failure: PayabliGenericError(code: .networkError, reason: "Network request failed")
+            failure: PayabliGenericError(type: .networkError, reason: "Network request failed")
         )
         let flow = PayInFixture.makeFlow(transport: transport, key: "unused")
 
@@ -204,7 +204,7 @@ final class PayInIdempotencyTests: XCTestCase {
     /// per submission and never handing it out, so there is nothing for a caller to carry.
     func testANetworkFailureLeavesTheOutcomeOpen() async {
         let transport = RecordingIdempotencyTransport(
-            failure: PayabliGenericError(code: .networkError, reason: "Network request failed")
+            failure: PayabliGenericError(type: .networkError, reason: "Network request failed")
         )
         let flow = PayInFixture.makeFlow(transport: transport, key: "reserved-9")
 
@@ -215,7 +215,7 @@ final class PayInIdempotencyTests: XCTestCase {
         guard let interrupted = PayInFixture.interruption(failure) else {
             return XCTFail("expected submissionInterrupted, got \(failure)")
         }
-        XCTAssertEqual(interrupted.code, .networkError)
+        XCTAssertEqual(interrupted.type, .networkError)
         // The failing type and none of its message: that message can name a host or quote a body.
         XCTAssertEqual(interrupted.causeType, "PayabliSDKCore.PayabliGenericError")
         XCTAssertEqual(transport.sentKeys, ["reserved-9"], "the key still went out")
@@ -239,7 +239,7 @@ final class PayInIdempotencyTests: XCTestCase {
             return XCTFail("expected submissionInterrupted, got \(failure)")
         }
         XCTAssertEqual(transport.sentKeys.last, "reserved-9")
-        XCTAssertEqual(interrupted.code, .serverError)
+        XCTAssertEqual(interrupted.type, .serverError)
     }
 
     /// The same status with an empty body, which the status mapping answers rather than the decoder.
@@ -257,7 +257,7 @@ final class PayInIdempotencyTests: XCTestCase {
             return XCTFail("expected submissionInterrupted, got \(failure)")
         }
         XCTAssertEqual(transport.sentKeys.last, "reserved-9")
-        XCTAssertEqual(interrupted.code, .serverError)
+        XCTAssertEqual(interrupted.type, .serverError)
     }
 
     /// A cancellation is classified as leaving the outcome open, which is what this pins.
@@ -270,7 +270,7 @@ final class PayInIdempotencyTests: XCTestCase {
     /// rather than decided here.
     func testACancellationReportsTheKey() async {
         let transport = RecordingIdempotencyTransport(
-            failure: PayabliGenericError(code: .userCancelled, reason: "Cancelled")
+            failure: PayabliGenericError(type: .userCancelled, reason: "Cancelled")
         )
         let flow = PayInFixture.makeFlow(transport: transport, key: "reserved-9")
 
@@ -282,7 +282,7 @@ final class PayInIdempotencyTests: XCTestCase {
             return XCTFail("expected submissionInterrupted, got \(failure)")
         }
         XCTAssertEqual(transport.sentKeys.last, "reserved-9")
-        XCTAssertEqual(interrupted.code, .userCancelled)
+        XCTAssertEqual(interrupted.type, .userCancelled)
     }
 
     /// An answer the SDK cannot read is the case the key exists for: the payment may well have been
@@ -299,7 +299,7 @@ final class PayInIdempotencyTests: XCTestCase {
             return XCTFail("expected submissionInterrupted, got \(failure)")
         }
         XCTAssertEqual(transport.sentKeys.last, "reserved-9")
-        XCTAssertEqual(interrupted.code, .decodingError)
+        XCTAssertEqual(interrupted.type, .decodingError)
     }
 
     /// A decline is an answer, so the outcome is known and a retry is a new payment. It arrives on a
@@ -316,7 +316,7 @@ final class PayInIdempotencyTests: XCTestCase {
         guard case .transactionFailed = failure as? PayabliPayInError else {
             return XCTFail("expected transactionFailed, got \(failure)")
         }
-        XCTAssertEqual((failure as? any PayabliError)?.code, .paymentDeclined)
+        XCTAssertEqual((failure as? any PayabliError)?.type, .paymentDeclined)
         XCTAssertNil(PayInFixture.interruption(failure), "a refusal settles the outcome")
     }
 
@@ -337,7 +337,7 @@ final class PayInIdempotencyTests: XCTestCase {
             return XCTFail("expected submissionInterrupted, got \(failure)")
         }
         XCTAssertEqual(transport.sentKeys.last, "reserved-9")
-        XCTAssertEqual(interrupted.code, .serverError)
+        XCTAssertEqual(interrupted.type, .serverError)
     }
 
     /// A repeat the service recognised says the key was seen and nothing about what the attempt it
@@ -357,7 +357,7 @@ final class PayInIdempotencyTests: XCTestCase {
         guard let interrupted = PayInFixture.interruption(failure) else {
             return XCTFail("expected submissionInterrupted, got \(failure)")
         }
-        XCTAssertEqual(interrupted.code, .conflict)
+        XCTAssertEqual(interrupted.type, .conflict)
         // A decoded body reaches the wrap as the flow's own error, so that is the type named here.
         XCTAssertEqual(interrupted.causeType, "PayabliSDKPayIn.PayabliPayInError")
     }
@@ -375,7 +375,7 @@ final class PayInIdempotencyTests: XCTestCase {
         guard let interrupted = PayInFixture.interruption(failure) else {
             return XCTFail("expected submissionInterrupted, got \(failure)")
         }
-        XCTAssertEqual(interrupted.code, .conflict)
+        XCTAssertEqual(interrupted.type, .conflict)
         XCTAssertEqual(interrupted.causeType, "PayabliSDKCore.PayabliGenericError")
     }
 
@@ -388,7 +388,7 @@ final class PayInIdempotencyTests: XCTestCase {
             _ = try await flow.capture(PayInFixture.request(idempotencyKey: nil))
         })
 
-        XCTAssertEqual((failure as? any PayabliError)?.code, .paymentDeclined)
+        XCTAssertEqual((failure as? any PayabliError)?.type, .paymentDeclined)
         XCTAssertNil(PayInFixture.interruption(failure), "a decline is an answer, whatever its body")
     }
 
@@ -402,7 +402,7 @@ final class PayInIdempotencyTests: XCTestCase {
             _ = try await flow.capture(PayInFixture.request(idempotencyKey: nil))
         })
 
-        XCTAssertEqual((failure as? any PayabliError)?.code, .rateLimited)
+        XCTAssertEqual((failure as? any PayabliError)?.type, .rateLimited)
         XCTAssertNil(PayInFixture.interruption(failure), "the request was refused, not attempted")
     }
 
@@ -410,7 +410,7 @@ final class PayInIdempotencyTests: XCTestCase {
     /// reported. Each of these arrives carrying a message, which is the shape that reaches the body
     /// decoder rather than the status mapping, and the classification has to be the same either way.
     func testARefusedCredentialReportsNoKeyWhateverItsBody() async {
-        let expected: [Int: PayabliErrorCode] = [
+        let expected: [Int: PayabliErrorType] = [
             401: .tokenExpired,
             403: .permissionDenied,
             410: .sessionBurned
@@ -428,7 +428,7 @@ final class PayInIdempotencyTests: XCTestCase {
             })
 
             XCTAssertEqual(
-                (failure as? any PayabliError)?.code,
+                (failure as? any PayabliError)?.type,
                 code,
                 "a \(status) carrying a message must classify as it does with none"
             )
@@ -445,7 +445,7 @@ final class PayInIdempotencyTests: XCTestCase {
     /// wrapping to mean. An unknown store is settled by reading the entry point's stored methods back.
     func testAStoreFailureIsNotWrappedAsAnOpenOutcome() async {
         let transport = RecordingIdempotencyTransport(
-            failure: PayabliGenericError(code: .networkError, reason: "Network request failed")
+            failure: PayabliGenericError(type: .networkError, reason: "Network request failed")
         )
         let flow = PayInFixture.makeFlow(transport: transport, key: "reserved-9")
 

@@ -18,7 +18,7 @@ final class PayabliTTPFailureReasonTests: XCTestCase {
         ] {
             XCTAssertEqual(
                 PayabliTTPSessionState.landing(for: error),
-                .failed(reason: .attestationRequired),
+                .failed(reason: .deviceSetupRequired),
                 "\(error)"
             )
         }
@@ -97,7 +97,7 @@ final class PayabliTTPFailureReasonTests: XCTestCase {
     /// A status nothing has been seen producing has no agreed meaning, so it
     /// lands where being wrong costs a retry rather than a bug report.
     func testAStatusNoRouteHasProducedIsTreatedAsTransient() {
-        let burned = PayabliGenericError(code: .sessionBurned, reason: "Gone (410)")
+        let burned = PayabliGenericError(type: .sessionBurned, reason: "Gone (410)")
 
         XCTAssertEqual(
             PayabliTTPSessionState.landing(for: burned),
@@ -118,8 +118,8 @@ final class PayabliTTPFailureReasonTests: XCTestCase {
             (.invalidState(current: .ready, attempted: "x"), .failed(reason: .sdkInternalError)),
             (.notReady(current: .idle), .failed(reason: .sdkInternalError)),
             (.devicePendingActivation, .pendingActivation),
-            (.attestationRevoked(reason: "x"), .failed(reason: .attestationRequired)),
-            (.attestationFailed(reason: "x"), .failed(reason: .attestationRequired)),
+            (.attestationRevoked(reason: "x"), .failed(reason: .deviceSetupRequired)),
+            (.attestationFailed(reason: "x"), .failed(reason: .deviceSetupRequired)),
             (.configFailed(reason: "x"), .failed(reason: .configurationRejected)),
             (.readerSetupFailed(reason: "x"), .failed(reason: .serviceUnavailable)),
             (.nfcFailed(reason: "x"), nil),
@@ -170,7 +170,7 @@ final class PayabliTTPFailureReasonTests: XCTestCase {
     /// The published vocabulary, each member at a fixed integer.
     func testThePublishedVocabularyKeepsItsIntegers() {
         XCTAssertEqual(PayabliTTPFailureReason.allCases.count, 6)
-        XCTAssertEqual(PayabliTTPFailureReason.attestationRequired.rawValue, 0)
+        XCTAssertEqual(PayabliTTPFailureReason.deviceSetupRequired.rawValue, 0)
         XCTAssertEqual(PayabliTTPFailureReason.configurationRejected.rawValue, 1)
         XCTAssertEqual(PayabliTTPFailureReason.serviceUnavailable.rawValue, 2)
         XCTAssertEqual(PayabliTTPFailureReason.deviceIneligible.rawValue, 3)
@@ -185,7 +185,7 @@ final class PayabliTTPFailureReasonTests: XCTestCase {
     func testATransportPermissionRefusalAsksForAnActivation() {
         XCTAssertEqual(
             PayabliTTPSessionState.landing(
-                for: PayabliGenericError(code: .permissionDenied, reason: "Forbidden (403)")
+                for: PayabliGenericError(type: .permissionDenied, reason: "Forbidden (403)")
             ),
             .pendingActivation
         )

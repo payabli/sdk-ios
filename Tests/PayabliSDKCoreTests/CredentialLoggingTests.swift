@@ -91,7 +91,7 @@ final class CredentialLoggingTests: XCTestCase {
             _ = try await stack.transport.perform(ping())
             XCTFail("a second 401 is terminal")
         } catch let error as PayabliGenericError {
-            XCTAssertEqual(error.code, .tokenExpired)
+            XCTAssertEqual(error.type, .tokenExpired)
         }
 
         assertLogged("recovery exhausted", in: sinks.network, category: .network)
@@ -131,7 +131,7 @@ final class CredentialLoggingTests: XCTestCase {
             _ = try await stack.transport.perform(ping())
             XCTFail("a 401 with no provider is terminal")
         } catch let error as PayabliGenericError {
-            XCTAssertEqual(error.code, .tokenProviderFailed)
+            XCTAssertEqual(error.type, .tokenProviderFailed)
         }
 
         XCTAssertEqual(stub.count, 1, "nothing to refresh with, so nothing is replayed")

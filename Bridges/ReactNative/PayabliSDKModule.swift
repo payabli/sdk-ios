@@ -100,7 +100,7 @@ public final class PayabliSDKModule: RCTEventEmitter {
             try await withCheckedThrowingContinuation { continuation in
                 guard let self else {
                     continuation.resume(throwing: PayabliGenericError(
-                        code: .tokenExpired,
+                        type: .tokenExpired,
                         reason: "Native module deallocated"
                     ))
                     return
@@ -118,7 +118,7 @@ public final class PayabliSDKModule: RCTEventEmitter {
                         // Best effort: RN offers no multi-await semantics, so a
                         // second caller arriving during a refresh gets an error.
                         continuation.resume(throwing: PayabliGenericError(
-                            code: .tokenExpired,
+                            type: .tokenExpired,
                             reason: "A token refresh is already in flight"
                         ))
                     }
@@ -346,7 +346,7 @@ public final class PayabliSDKModule: RCTEventEmitter {
     @objc public func rejectTokenRefresh(_ reason: NSString) {
         refreshQueue.sync {
             self.pendingRefresh?.resume(throwing: PayabliGenericError(
-                code: .tokenExpired,
+                type: .tokenExpired,
                 reason: reason as String
             ))
             self.pendingRefresh = nil
@@ -372,7 +372,7 @@ public final class PayabliSDKModule: RCTEventEmitter {
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<String, Error>) in
                 guard let self else {
                     continuation.resume(throwing: PayabliGenericError(
-                        code: .missingToken,
+                        type: .missingToken,
                         reason: "Native module deallocated"
                     ))
                     return
@@ -385,7 +385,7 @@ public final class PayabliSDKModule: RCTEventEmitter {
                         }
                     } else {
                         continuation.resume(throwing: PayabliGenericError(
-                            code: .missingToken,
+                            type: .missingToken,
                             reason: "A PayIn access token request is already in flight"
                         ))
                     }
@@ -492,7 +492,7 @@ public final class PayabliSDKModule: RCTEventEmitter {
     @objc public func rejectPayInAccessToken(_ reason: NSString) {
         payInAccessTokenQueue.sync {
             self.pendingPayInAccessToken?.resume(throwing: PayabliGenericError(
-                code: .missingToken,
+                type: .missingToken,
                 reason: reason as String
             ))
             self.pendingPayInAccessToken = nil

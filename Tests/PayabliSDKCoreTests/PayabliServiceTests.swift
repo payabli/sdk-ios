@@ -91,7 +91,7 @@ final class PayabliServiceTests: XCTestCase {
             XCTFail("Expected error")
         } catch let PayabliPaymentError.validation(err) {
             XCTAssertEqual(err.title, "One or more validation errors occurred.")
-            XCTAssertEqual(err.type, "https://tools.ietf.org/html/rfc9110#section-15.5.1")
+            XCTAssertEqual(err.problemType, "https://tools.ietf.org/html/rfc9110#section-15.5.1")
             XCTAssertEqual(err.errors?["Entry"]?.first?.message, "The Entry field is required.")
             XCTAssertNil(err.errors?["Entry"]?.first?.suggestion)
         } catch {
@@ -200,7 +200,7 @@ final class PayabliServiceTests: XCTestCase {
             _ = try await service().performV2(request, decoding: FakeData.self)
             XCTFail("Expected error")
         } catch let PayabliPaymentError.validation(err) {
-            XCTAssertEqual(err.code, .validation)
+            XCTAssertEqual(err.type, .validation)
             XCTAssertNil(err.title)
             XCTAssertNil(err.errors)
         } catch {
@@ -220,7 +220,7 @@ final class PayabliServiceTests: XCTestCase {
             _ = try await service().performV2(request, decoding: FakeData.self)
             XCTFail("Expected error")
         } catch let err as PayabliGenericError {
-            XCTAssertEqual(err.code, .tokenExpired)
+            XCTAssertEqual(err.type, .tokenExpired)
         } catch {
             XCTFail("Wrong error: \(error)")
         }
@@ -314,7 +314,7 @@ final class PayabliServiceTests: XCTestCase {
     func testMaps500ToServerError() async throws {
         StubURLProtocol.handler = { request in
             let json = """
-            {"title":"Internal Server Error","status":500,"detail":"Boom","instance":"/x"}
+            {"type":"https://tools.ietf.org/html/rfc9110#section-15.6.1","title":"Internal Server Error","status":500,"detail":"Boom","instance":"/x"}
             """
             let response = HTTPURLResponse(url: request.url!, statusCode: 500, httpVersion: nil, headerFields: nil)!
             return (response, Data(json.utf8))
@@ -326,6 +326,8 @@ final class PayabliServiceTests: XCTestCase {
             XCTFail("Expected error")
         } catch let PayabliPaymentError.server(err) {
             XCTAssertEqual(err.status, 500)
+            XCTAssertEqual(err.problemType, "https://tools.ietf.org/html/rfc9110#section-15.6.1")
+            XCTAssertEqual(err.type, .serverError)
         } catch {
             XCTFail("Wrong error: \(error)")
         }

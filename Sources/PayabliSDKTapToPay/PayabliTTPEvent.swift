@@ -362,11 +362,14 @@ extension Error {
     /// Bridges any `Error` to an `NSError` for the `@objc` callback companions. A Payabli
     /// taxonomy is discoverable in the `"com.payabli.ttp"` domain: `PayabliTTPError` through its
     /// stable per-case `code`, a core `PayabliError` (an attestation-time provider failure, for
-    /// one) through `userInfo["PayabliErrorCode"]` on domain-code `-3`. Everything else falls
+    /// one) through `userInfo["PayabliErrorType"]` on domain-code `-3`. Everything else falls
     /// through Swift's default bridging.
     func toPayabliNSError() -> NSError {
         if let ttpError = self as? PayabliTTPError {
             return ttpError as NSError
+        }
+        if let tapToPayError = self as? TapToPayError {
+            return tapToPayError as NSError
         }
         if let payabliError = self as? any PayabliError {
             return NSError(
@@ -374,7 +377,7 @@ extension Error {
                 code: -3,
                 userInfo: [
                     NSLocalizedDescriptionKey: payabliError.reason,
-                    "PayabliErrorCode": payabliError.code.rawValue
+                    "PayabliErrorType": payabliError.type.rawValue
                 ]
             )
         }

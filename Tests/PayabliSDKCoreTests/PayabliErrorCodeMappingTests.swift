@@ -17,9 +17,9 @@ final class PayabliErrorCodeMappingTests: XCTestCase {
 
         let err = try JSONDecoder().decode(PayabliValidationError.self, from: json)
         XCTAssertEqual(
-            err.code,
+            err.type,
             .validation,
-            "PayabliValidationError.code must be .validation, not .decodingError"
+            "PayabliValidationError.type must be .validation, not .decodingError"
         )
         XCTAssertEqual(err.rawCode, "E0001")
         XCTAssertEqual(err.title, "Bad Request")

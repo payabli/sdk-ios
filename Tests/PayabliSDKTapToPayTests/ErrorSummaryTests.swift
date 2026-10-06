@@ -100,11 +100,11 @@ final class ErrorSummaryTests: XCTestCase {
     }
 
     func testATypedServiceErrorReducesToItsCode() {
-        let error = PayabliGenericError(code: .tokenExpired, reason: "The signature key was not found")
+        let error = PayabliGenericError(type: .tokenExpired, reason: "The signature key was not found")
 
         let summary = ErrorSummary.of(error)
 
-        XCTAssertEqual(summary, PayabliErrorCode.tokenExpired.rawValue)
+        XCTAssertEqual(summary, PayabliErrorType.tokenExpired.rawValue)
         XCTAssertFalse(summary.contains("signature key"), summary)
     }
 
@@ -192,7 +192,7 @@ final class ErrorSummaryTests: XCTestCase {
 
         let summary = ErrorSummary.of(PayabliPaymentError.validation(validation))
 
-        XCTAssertEqual(summary, PayabliErrorCode.validation.rawValue)
+        XCTAssertEqual(summary, PayabliErrorType.validation.rawValue)
         XCTAssertFalse(summary.contains("another merchant"), summary)
     }
 

@@ -64,7 +64,7 @@ final class AuthenticatedTransportTests: XCTestCase {
 
         let failure = await failure(from: { _ = try await transport.perform(self.ping()) })
 
-        XCTAssertEqual((failure as? PayabliGenericError)?.code, .tokenExpired)
+        XCTAssertEqual((failure as? PayabliGenericError)?.type, .tokenExpired)
         XCTAssertEqual(stub.count, 2, "no third attempt")
     }
 
@@ -238,7 +238,7 @@ final class AuthenticatedTransportTests: XCTestCase {
                 let response = try await stack.value!.perform(request)
                 nested.set("\(response.statusCode)")
             } catch let error as PayabliGenericError {
-                nested.set(error.code.rawValue)
+                nested.set(error.type.rawValue)
             }
             return "refreshed-token"
         })
@@ -248,7 +248,7 @@ final class AuthenticatedTransportTests: XCTestCase {
             do {
                 return "\(try await stack.value!.perform(request).statusCode)"
             } catch let error as PayabliGenericError {
-                return error.code.rawValue
+                return error.type.rawValue
             } catch {
                 return "\(error)"
             }
@@ -264,7 +264,7 @@ final class AuthenticatedTransportTests: XCTestCase {
         // being replaced, so it is refused twice and reports the credential.
         XCTAssertEqual(
             nested.value,
-            PayabliErrorCode.tokenExpired.rawValue,
+            PayabliErrorType.tokenExpired.rawValue,
             "traffic was \(stub.sentTokens)"
         )
         let refreshes = await providerCalls.count
@@ -305,7 +305,7 @@ final class AuthenticatedTransportTests: XCTestCase {
             _ = try await transport.performV2(self.ping(), decoding: TransactionPayload.self)
         })
 
-        XCTAssertEqual((failure as? PayabliGenericError)?.code, .tokenExpired)
+        XCTAssertEqual((failure as? PayabliGenericError)?.type, .tokenExpired)
     }
 
     // MARK: - Terminal and pass-through cases
@@ -320,7 +320,7 @@ final class AuthenticatedTransportTests: XCTestCase {
 
         let failure = await failure(from: { _ = try await transport.perform(self.ping()) })
 
-        XCTAssertEqual((failure as? PayabliGenericError)?.code, .tokenProviderFailed)
+        XCTAssertEqual((failure as? PayabliGenericError)?.type, .tokenProviderFailed)
         XCTAssertEqual(stub.count, 1, "nothing to refresh with, so nothing is replayed")
     }
 
@@ -337,7 +337,7 @@ final class AuthenticatedTransportTests: XCTestCase {
 
         let failure = await failure(from: { _ = try await transport.perform(self.ping()) })
 
-        XCTAssertEqual((failure as? PayabliGenericError)?.code, .tokenProviderFailed)
+        XCTAssertEqual((failure as? PayabliGenericError)?.type, .tokenProviderFailed)
         XCTAssertEqual(stub.count, 1)
         XCTAssertFalse("\(failure)".contains(sentinel), "the host's own message is not ours to relay")
         XCTAssertFalse(
@@ -419,7 +419,7 @@ final class AuthenticatedTransportTests: XCTestCase {
         do {
             try await block()
             XCTFail("expected a failure, got a success", file: file, line: line)
-            return PayabliGenericError(code: .unknown, reason: "no failure")
+            return PayabliGenericError(type: .unknown, reason: "no failure")
         } catch {
             return error
         }

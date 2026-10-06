@@ -47,7 +47,7 @@ import PayabliSDKPayIn
 ```
 
 `PayabliSDKPayIn` does not re-export Core, and `PayabliError`,
-`PayabliErrorCode` and `PayabliEnvironment` live there.
+`PayabliErrorType` and `PayabliEnvironment` live there.
 
 Swift package product:
 

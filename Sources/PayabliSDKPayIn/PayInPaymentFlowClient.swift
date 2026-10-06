@@ -222,16 +222,24 @@ final class PayInPaymentFlowClient: Sendable {
     /// Decided on the code alone: this client publishes no key on any route, so a rule that never asks
     /// whose key was sent is one it can state exactly.
     private static func leavesOutcomeUnknown(_ failure: any Error) -> Bool {
-        guard let code = (failure as? any PayabliError)?.code else {
+        guard let code = (failure as? any PayabliError)?.type else {
             // Not this SDK's error at all, so nothing classified it and nothing can say it settled.
             return true
         }
         switch code {
-        case .networkError, .decodingError, .userCancelled, .serverError, .unknown, .conflict:
+        case .networkError, .decodingError, .userCancelled, .serverError, .unknown, .conflict, .tapNotCompleted,
+             .paymentOutcomeUnknown, .paymentNotClosed:
             return true
         case .paymentDeclined, .rateLimited, .missingToken, .tokenExpired,
              .tokenMalformed, .tokenProviderFailed, .invalidSignature, .permissionDenied,
-             .sessionBurned, .invalidConfiguration, .validation:
+             .sessionBurned, .invalidConfiguration, .validation,
+             .deviceKeyUnavailable, .deviceSetupUnsupported, .sdkInternalError, .deviceServicesOutdated,
+             .devicePendingActivation, .deviceSetupRequired, .deviceSetupRefused, .deviceSetupUnavailable,
+             .deviceSetupNotConfigured, .entryPointRefused, .readerCredentialsUnusable, .deviceOSUnsupported,
+             .deviceHardwareUnsupported, .termsNotAccepted, .cardPresentNotEnabled, .readerDeviceRefused,
+             .readerUnavailable, .readerSessionExpired, .paymentNotOpened, .cardDeclined, .activationCodeMalformed,
+             .activationCodeIncorrect, .activationCodeExpired, .activationAttemptsExhausted, .activationCodeNotIssued,
+             .deviceNotPending, .terminalNotReady, .tooManyOpenCharges, .paymentNotHeld:
             return false
         }
     }
@@ -248,7 +256,7 @@ final class PayInPaymentFlowClient: Sendable {
             // was sent, so the outcome is known and there is no key to report.
             guard carriesKey, Self.leavesOutcomeUnknown(error) else { throw error }
             throw PayabliPayInError.submissionInterrupted(
-                code: (error as? any PayabliError)?.code ?? .unknown,
+                type: (error as? any PayabliError)?.type ?? .unknown,
                 // One definition of what is kept from a failure, reused rather than restated.
                 causeType: RedactedCause(error).originalType
             )
@@ -298,7 +306,7 @@ final class PayInPaymentFlowClient: Sendable {
 
         try mapPayabliHTTPError(response: response)
         throw PayabliGenericError(
-            code: .decodingError,
+            type: .decodingError,
             reason: "Failed to decode payment capture response"
         )
     }

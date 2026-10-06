@@ -37,7 +37,7 @@ final class AuthRecoveryPolicyTests: XCTestCase {
     }
 
     func testAnExhaustedRecoveryIsTokenExpired() {
-        XCTAssertEqual(policy.exhausted().code, .tokenExpired)
+        XCTAssertEqual(policy.exhausted().type, .tokenExpired)
     }
 
     func testAnExhaustedRecoveryCarriesNoServerText() {
@@ -49,7 +49,7 @@ final class AuthRecoveryPolicyTests: XCTestCase {
     /// The invariant that keeps the two layers from fighting. Without it a settled credential failure
     /// reads as transient to the retry layer above, which then spends the whole policy on refresh cycles.
     func testTokenExpiredIsExcludedFromTheRetryableSetSoTheTwoPoliciesDoNotOverlap() {
-        XCTAssertFalse(RetryPolicy.retryableCodes.contains(DefaultAuthRecoveryPolicy().exhausted().code))
+        XCTAssertFalse(RetryPolicy.retryableCodes.contains(DefaultAuthRecoveryPolicy().exhausted().type))
     }
 
     /// A widened policy changes what refreshes. It must not change what the exhausted failure says, which
@@ -62,6 +62,6 @@ final class AuthRecoveryPolicyTests: XCTestCase {
         }
         let widened = Widened()
         XCTAssertTrue(widened.isCredentialRejection(response(419)))
-        XCTAssertEqual(widened.exhausted().code, .tokenExpired)
+        XCTAssertEqual(widened.exhausted().type, .tokenExpired)
     }
 }

@@ -50,9 +50,9 @@ final class PaymentMethodCoverageExpansionTests: XCTestCase {
 
         XCTAssertEqual(fallbackFailure.reason, "Unable to save payment method.")
         XCTAssertNil(PayabliPayInTokenStorageError.missingAccessToken.detail)
-        XCTAssertEqual(PayabliPayInTokenStorageError.missingAccessToken.code, .missingToken)
+        XCTAssertEqual(PayabliPayInTokenStorageError.missingAccessToken.type, .missingToken)
         XCTAssertEqual(PayabliPayInTokenStorageError.missingAccessToken.reason, "Missing access token")
-        XCTAssertEqual(PayabliPayInTokenStorageError.saveFailed(detailedFailure).code, .unknown)
+        XCTAssertEqual(PayabliPayInTokenStorageError.saveFailed(detailedFailure).type, .unknown)
         XCTAssertEqual(PayabliPayInTokenStorageError.saveFailed(detailedFailure).reason, "Gateway declined")
         XCTAssertEqual(PayabliPayInTokenStorageError.saveFailed(detailedFailure).detail, "Use another account.")
 
@@ -640,6 +640,6 @@ private actor CoverageTransport: PayabliTransport {
         _ request: PayabliRequest,
         decoding: T.Type
     ) async throws -> PayabliV2Envelope<T> {
-        throw PayabliGenericError(code: .unknown, reason: "performV2 is not used")
+        throw PayabliGenericError(type: .unknown, reason: "performV2 is not used")
     }
 }

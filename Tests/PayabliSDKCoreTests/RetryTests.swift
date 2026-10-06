@@ -78,7 +78,7 @@ final class RetryTests: XCTestCase {
         let clock = FakeRetryClock()
 
         _ = try? await Retry.run(policy: .test(maxAttempts: 2), logger: logger(RecordingLogSink()), clock: clock) { _ in
-            throw TestHintedFailure(code: .rateLimited, retryAfter: 5)
+            throw TestHintedFailure(type: .rateLimited, retryAfter: 5)
         }
 
         XCTAssertEqual(clock.waits, [5], "the server's 5s wins over the policy's 1s")
@@ -99,7 +99,7 @@ final class RetryTests: XCTestCase {
                 logger: logger(RecordingLogSink()),
                 clock: clock
             ) { _ in
-                throw TestHintedFailure(code: .rateLimited, retryAfter: hint)
+                throw TestHintedFailure(type: .rateLimited, retryAfter: hint)
             }
 
             XCTAssertEqual(clock.waits, [1], "a hint of \(hint) leaves the computed backoff in place")
@@ -114,11 +114,11 @@ final class RetryTests: XCTestCase {
         do {
             _ = try await Retry.run(policy: .test(), logger: logger(sink), clock: clock) { _ in
                 _ = await counter.next()
-                throw TestHintedFailure(code: .rateLimited, retryAfter: 3600)
+                throw TestHintedFailure(type: .rateLimited, retryAfter: 3600)
             }
             XCTFail("expected the retry to stop")
         } catch let error as TestHintedFailure {
-            XCTAssertEqual(error.code, .rateLimited, "the server's own refusal, not a synthesised one")
+            XCTAssertEqual(error.type, .rateLimited, "the server's own refusal, not a synthesised one")
         } catch {
             XCTFail("expected the underlying refusal, got \(error)")
         }
@@ -144,7 +144,7 @@ final class RetryTests: XCTestCase {
     /// Iterates the whole vocabulary, so a code added later is proved un-retryable rather than assumed to
     /// be, and a widening of the set has to be a deliberate edit to the case below.
     func testEveryNonRetryableCodeStopsOnTheFirstAttempt() async {
-        let nonRetryable = PayabliErrorCode.allCases.filter { !RetryPolicy.retryableCodes.contains($0) }
+        let nonRetryable = PayabliErrorType.allCases.filter { !RetryPolicy.retryableCodes.contains($0) }
         XCTAssertFalse(nonRetryable.isEmpty)
 
         for code in nonRetryable {
@@ -173,7 +173,7 @@ final class RetryTests: XCTestCase {
             try mapPayabliHTTPError(response: response)
             XCTFail("expected a 408 to map to an error")
         } catch let error as PayabliGenericError {
-            XCTAssertEqual(error.code, .networkError)
+            XCTAssertEqual(error.type, .networkError)
             XCTAssertTrue(RetryPolicy.retryableByCode(error))
         }
     }
@@ -199,7 +199,7 @@ final class RetryTests: XCTestCase {
                 multiplier: 1,
                 maxJitter: 0,
                 jitter: .none,
-                isRetryable: { $0.code == .paymentDeclined }
+                isRetryable: { $0.type == .paymentDeclined }
             ),
             logger: logger(RecordingLogSink()),
             clock: FakeRetryClock()
@@ -367,7 +367,7 @@ final class RetryTests: XCTestCase {
             _ = try await run.value
             XCTFail("expected the budget to cut the attempt off")
         } catch let error as PayabliGenericError {
-            XCTAssertEqual(error.code, .networkError)
+            XCTAssertEqual(error.type, .networkError)
             // The reason is asserted too: `.networkError` is also what a refused connection produces, so
             // the code alone would pass against an unrelated network failure.
             XCTAssertEqual(error.reason, "Operation exceeded its total timeout")
@@ -401,7 +401,7 @@ final class RetryTests: XCTestCase {
                 clock: clock
             ) { _ in
                 _ = await counter.next()
-                throw TestHintedFailure(code: .rateLimited, retryAfter: 0)
+                throw TestHintedFailure(type: .rateLimited, retryAfter: 0)
             }
         }
         holder.hold(task)
@@ -553,7 +553,7 @@ final class RetryTests: XCTestCase {
         } catch is CancellationError {
             // The only acceptable outcome.
         } catch let error as PayabliGenericError {
-            XCTFail("cancellation was reported as \(error.code.rawValue): \(error.reason)")
+            XCTFail("cancellation was reported as \(error.type.rawValue): \(error.reason)")
         }
 
         XCTAssertLessThanOrEqual(stub.count, 1, "a cancelled request is not sent again")

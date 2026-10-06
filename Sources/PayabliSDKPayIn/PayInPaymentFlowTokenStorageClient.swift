@@ -123,7 +123,7 @@ final class PayInPaymentFlowTokenStorageClient: Sendable {
             throw error
         } catch {
             throw PayabliGenericError(
-                code: .decodingError,
+                type: .decodingError,
                 reason: "Failed to decode payment method response",
                 underlying: error
             )

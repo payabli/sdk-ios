@@ -137,7 +137,7 @@ final class RetryPolicyTests: XCTestCase {
                 )
                 XCTFail("\(status) has to map to an error")
             } catch let error as any PayabliError {
-                XCTAssertEqual(error.code, .serverError, "\(status) is still a server fault")
+                XCTAssertEqual(error.type, .serverError, "\(status) is still a server fault")
                 XCTAssertFalse(RetryPolicy.retryableByCode(error), "\(status) is not repeated")
             }
         }

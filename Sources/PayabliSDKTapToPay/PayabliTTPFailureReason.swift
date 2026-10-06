@@ -13,7 +13,7 @@ public enum PayabliTTPFailureReason: Int, Sendable, CaseIterable {
     /// must be built from the top.
     ///
     /// A repair does not attest, so it cannot restore this.
-    case attestationRequired = 0
+    case deviceSetupRequired = 0
 
     /// The paypoint, the device or its gateway is not set up for card-present
     /// work. Someone changes the account; repeating the call will not.

@@ -21,7 +21,7 @@ enum SessionTierValidator {
         let actual = detectedTier(from: config)
         guard actual.rawValue >= required.rawValue else {
             throw PayabliGenericError(
-                code: .permissionDenied,
+                type: .permissionDenied,
                 reason: "Session tier mismatch",
                 detail: "\(component.componentId) requires tier \(required.rawValue); session is tier \(actual.rawValue)."
             )
@@ -31,12 +31,6 @@ enum SessionTierValidator {
     /// Best-effort tier detection. Defaults to Tier 1 when nothing indicates
     /// a higher tier (v2.0 JWT adoption will flesh this out — §16.7).
     static func detectedTier(from config: PayabliConfig) -> PayabliSessionTier {
-        // If the config has no sessionToken we're on the client-credentials
-        // (access-token) path — treat as Tier 1 per §16.1.
-        // If sessionToken is set, attempt to decode JWT claims for the tier.
-        // We don't cryptographically verify the signature — that's the API's job.
-        // If the token isn't a JWT (or can't be decoded), fall back to Tier 1.
-        // Phase 2+ will strengthen this (§16.7).
         .tier1Transactional
     }
 }

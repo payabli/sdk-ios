@@ -208,7 +208,7 @@ final class RetryAfterHeaderTests: XCTestCase {
             try mapPayabliHTTPError(response: response)
             XCTFail("a 403 has to map to an error")
         } catch let error as PayabliGenericError {
-            XCTAssertEqual(error.code, .permissionDenied)
+            XCTAssertEqual(error.type, .permissionDenied)
             XCTAssertNil(error as? any PayabliRetryAfter, "a 403 carries no hint")
         }
     }

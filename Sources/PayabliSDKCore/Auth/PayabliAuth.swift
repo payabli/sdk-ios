@@ -56,7 +56,7 @@ actor PayabliAuth {
             // await the call this caller is inside.
             logger.error("The token provider requested a token before returning its first one")
             throw PayabliGenericError(
-                code: .tokenProviderFailed,
+                type: .tokenProviderFailed,
                 reason: "Access token unavailable",
                 detail: "The tokenProvider made a request that needs the token it was asked to supply."
             )
@@ -100,7 +100,7 @@ actor PayabliAuth {
             guard let held = currentToken else {
                 logger.error("The token provider requested a token before returning its first one")
                 throw PayabliGenericError(
-                    code: .tokenProviderFailed,
+                    type: .tokenProviderFailed,
                     reason: "Access token unavailable",
                     detail: "The tokenProvider made a request that needs the token it was asked to supply."
                 )
@@ -144,7 +144,7 @@ actor PayabliAuth {
                 // from a rejected credential or a thrown error, which is the whole point of the bound.
                 logger.error("The token provider did not return within the deadline")
                 throw PayabliGenericError(
-                    code: .tokenProviderFailed,
+                    type: .tokenProviderFailed,
                     reason: "Token request failed",
                     detail: "The tokenProvider did not return within \(Int(Self.providerTimeout)) seconds."
                 )
@@ -156,7 +156,7 @@ actor PayabliAuth {
                 // name reaches a caller through `underlying` via `RedactedCause`.
                 logger.error("The token provider failed")
                 throw PayabliGenericError(
-                    code: .tokenProviderFailed,
+                    type: .tokenProviderFailed,
                     reason: "Token request failed",
                     detail: "The tokenProvider threw an error.",
                     underlying: RedactedCause(error)
@@ -300,21 +300,21 @@ actor PayabliAuth {
     private static func check(_ fresh: String, replacing rejectedToken: String?) throws {
         guard !fresh.isBlank else {
             throw PayabliGenericError(
-                code: .tokenProviderFailed,
+                type: .tokenProviderFailed,
                 reason: "Token request failed",
                 detail: "The tokenProvider returned a blank token."
             )
         }
         guard fresh.isHeaderSafe else {
             throw PayabliGenericError(
-                code: .tokenProviderFailed,
+                type: .tokenProviderFailed,
                 reason: "Token request failed",
                 detail: "The tokenProvider returned a token that cannot be an HTTP header value."
             )
         }
         guard fresh != rejectedToken else {
             throw PayabliGenericError(
-                code: .tokenProviderFailed,
+                type: .tokenProviderFailed,
                 reason: "Token request failed",
                 detail: "The tokenProvider returned the token the server rejected."
             )

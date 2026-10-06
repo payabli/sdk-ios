@@ -451,7 +451,7 @@ private actor ReseedTransport: PayabliTransport {
         _ request: PayabliRequest,
         decoding _: T.Type
     ) async throws -> PayabliV2Envelope<T> {
-        throw PayabliGenericError(code: .unknown, reason: "performV2 is not used")
+        throw PayabliGenericError(type: .unknown, reason: "performV2 is not used")
     }
 }
 

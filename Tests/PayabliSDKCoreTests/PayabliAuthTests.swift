@@ -60,7 +60,7 @@ final class PayabliAuthTests: XCTestCase {
                 _ = try await auth.currentAccessToken()
                 XCTFail("expected throw for \(blank.debugDescription)")
             } catch let err as PayabliGenericError {
-                XCTAssertEqual(err.code, .tokenProviderFailed, blank.debugDescription)
+                XCTAssertEqual(err.type, .tokenProviderFailed, blank.debugDescription)
             }
             let held = await auth.heldToken()
             XCTAssertNil(held, blank.debugDescription)
@@ -76,7 +76,7 @@ final class PayabliAuthTests: XCTestCase {
                 _ = try await auth.currentAccessToken()
                 XCTFail("expected throw for \(unusable.debugDescription)")
             } catch let err as PayabliGenericError {
-                XCTAssertEqual(err.code, .tokenProviderFailed, unusable.debugDescription)
+                XCTAssertEqual(err.type, .tokenProviderFailed, unusable.debugDescription)
             }
             let held = await auth.heldToken()
             XCTAssertNil(held, unusable.debugDescription)
@@ -93,7 +93,7 @@ final class PayabliAuthTests: XCTestCase {
             do {
                 nested.set(try await holder.value!.currentAccessToken())
             } catch let err as PayabliGenericError {
-                nested.set("threw:" + err.code.rawValue)
+                nested.set("threw:" + err.type.rawValue)
             }
             return "first_from_partner"
         }))
@@ -109,7 +109,7 @@ final class PayabliAuthTests: XCTestCase {
         XCTAssertEqual(outcome, "first_from_partner")
         XCTAssertEqual(
             nested.value,
-            "threw:" + PayabliErrorCode.tokenProviderFailed.rawValue,
+            "threw:" + PayabliErrorType.tokenProviderFailed.rawValue,
             "a nested read on the cold path has no token to receive"
         )
     }
@@ -431,8 +431,8 @@ final class PayabliAuthTests: XCTestCase {
             _ = try await auth.invalidateAndRefresh(rejectedToken: "old")
             XCTFail("expected throw")
         } catch let err as PayabliGenericError {
-            XCTAssertEqual(err.code, .tokenProviderFailed)
-            // The KDoc on ``PayabliErrorCode/tokenProviderFailed`` promises that ``detail``
+            XCTAssertEqual(err.type, .tokenProviderFailed)
+            // The KDoc on ``PayabliErrorType/tokenProviderFailed`` promises that ``detail``
             // names the specific failure. A thrown provider error can carry request data, so
             // the string is a static sentence and the type name reaches the caller through
             // ``underlying`` instead.
@@ -484,7 +484,7 @@ final class PayabliAuthTests: XCTestCase {
             _ = try await auth.invalidateAndRefresh(rejectedToken: "old")
             XCTFail("expected throw")
         } catch let err as PayabliGenericError {
-            XCTAssertEqual(err.code, .tokenProviderFailed)
+            XCTAssertEqual(err.type, .tokenProviderFailed)
         }
 
         let calls = await counter.count
@@ -506,7 +506,7 @@ final class PayabliAuthTests: XCTestCase {
                 _ = try await auth.invalidateAndRefresh(rejectedToken: "old")
                 XCTFail("expected throw for \(blank.debugDescription)")
             } catch let err as PayabliGenericError {
-                XCTAssertEqual(err.code, .tokenProviderFailed, blank.debugDescription)
+                XCTAssertEqual(err.type, .tokenProviderFailed, blank.debugDescription)
             }
 
             let current = try await auth.currentAccessToken()
@@ -583,7 +583,7 @@ final class PayabliAuthTests: XCTestCase {
             _ = try await auth.invalidateAndRefresh(rejectedToken: "old")
             XCTFail("expected throw")
         } catch let err as PayabliGenericError {
-            XCTAssertEqual(err.code, .tokenProviderFailed)
+            XCTAssertEqual(err.type, .tokenProviderFailed)
         }
 
         let current = try await auth.currentAccessToken()
@@ -611,7 +611,7 @@ final class PayabliAuthTests: XCTestCase {
             _ = try await auth.invalidateAndRefresh(rejectedToken: "old")
             XCTFail("expected throw")
         } catch let err as PayabliGenericError {
-            XCTAssertEqual(err.code, .tokenProviderFailed)
+            XCTAssertEqual(err.type, .tokenProviderFailed)
             let rendered = "\(err) \(err.localizedDescription) \(String(describing: err.underlying))"
             XCTAssertFalse(
                 rendered.contains("SHOULD_NOT_LEAVE_THE_PROVIDER"),

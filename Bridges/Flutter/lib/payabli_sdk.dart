@@ -418,7 +418,7 @@ class PayabliTTPSessionSnapshot {
 
 /// Mirrors `PayabliTTPFailureReason`.
 enum PayabliTTPFailureReason {
-  attestationRequired,
+  deviceSetupRequired,
   configurationRejected,
   serviceUnavailable,
   deviceIneligible,
