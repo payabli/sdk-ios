@@ -17,6 +17,21 @@ final class DeviceIdentityTests: XCTestCase {
         XCTAssertEqual(reads.count, 1)
     }
 
+    func testConcurrentFirstReadsReadTheStoreOnce() {
+        let reads = ReadCount()
+        let identity = DeviceIdentity {
+            reads.increment()
+            Thread.sleep(forTimeInterval: 0.01)
+            return "5f9125ec0ed0e7e2052aa6a6e3130778"
+        }
+
+        DispatchQueue.concurrentPerform(iterations: 16) { _ in
+            _ = try? identity.value()
+        }
+
+        XCTAssertEqual(reads.count, 1)
+    }
+
     /// Before the first unlock the store refuses, and after it the same reader answers.
     func testAStoreThatRefusedIsAskedAgain() throws {
         let storage = InMemorySecureStorage()

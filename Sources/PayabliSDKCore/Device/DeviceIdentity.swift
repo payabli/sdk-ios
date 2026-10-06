@@ -10,13 +10,15 @@ package final class DeviceIdentity: @unchecked Sendable {
     }
 
     package func value() throws -> String {
-        if let held = lock.withLock({ held }) {
-            return held
+        try lock.withLock {
+            if let held {
+                return held
+            }
+            let value = try read()
+            if !value.isEmpty {
+                held = value
+            }
+            return value
         }
-        let value = try read()
-        if !value.isEmpty {
-            lock.withLock { held = value }
-        }
-        return value
     }
 }
