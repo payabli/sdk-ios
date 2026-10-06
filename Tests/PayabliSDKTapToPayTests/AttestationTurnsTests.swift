@@ -290,8 +290,6 @@ final class AttestationTurnsTests: XCTestCase {
         XCTAssertEqual(try second.binding(for: "myEntry")?.deviceId, results[1].deviceId)
     }
 
-    /// Different entry points are what the bindings exist for, so they never wait
-    /// for each other.
     /// The warm check takes the same turn: one asked while an attestation is running waits for it, and
     /// answers about the binding that attestation wrote rather than the empty store it found first.
     func testAWarmCheckWaitsForAnAttestationOfTheSameEntryPoint() async throws {
@@ -328,6 +326,8 @@ final class AttestationTurnsTests: XCTestCase {
         XCTAssertTrue(attested, "the check read the store before the attestation it overlapped wrote to it")
     }
 
+    /// Different entry points are what the bindings exist for, so they never wait
+    /// for each other.
     /// One entry point held open, and the other has to get all the way through
     /// while it is held.
     ///
