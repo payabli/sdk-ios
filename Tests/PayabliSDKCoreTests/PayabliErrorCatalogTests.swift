@@ -113,6 +113,11 @@ final class PayabliErrorCatalogTests: XCTestCase {
         XCTAssertEqual(Set(table.map(\.0)), Set(PayabliErrorType.allCases))
     }
 
+    /// 3032 was retired before publication, and a retired number is never reused.
+    func testNoTypeTakesTheRetiredNumber() {
+        XCTAssertFalse(PayabliErrorType.allCases.contains { $0.number == 3032 })
+    }
+
     func testNoTwoCodesShareANumber() {
         let numbers = PayabliErrorType.allCases.map(\.number)
         XCTAssertEqual(Set(numbers).count, numbers.count)
