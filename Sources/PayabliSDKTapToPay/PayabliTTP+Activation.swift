@@ -35,8 +35,6 @@ public extension PayabliTTP {
             syncPublished()
             multicaster.emit(.activationCompleted)
         } catch is ActivationRegistrationChanged {
-            // The code was issued for a registration this device no longer holds. Nothing was sent,
-            // and the next `initialize()` hands over the id the device holds now.
             let failure = PayabliTTPError.activationFailed(
                 reason: "The registration changed since its activation ID was read; initialize again"
             )

@@ -151,8 +151,6 @@ final class TTPConfigClient: Sendable {
     }
 }
 
-/// The service holds the registration a config request presented pending activation. The answer is
-/// about that registration, so it carries its id.
 struct ConfigPendingActivation: Error {
     let presentedDeviceId: String
 }

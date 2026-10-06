@@ -55,8 +55,6 @@ package final class MockDeviceAttestationService: DeviceAttestationService, @unc
 
     private var storedReadFailure: Error?
 
-    /// Raised by `cachedDeviceId` alone while it is set, so a test can reach a stored registration
-    /// that cannot be read after attestation has run.
     package var registrationReadFailure: Error? {
         get { lock.withLock { storedRegistrationReadFailure } }
         set { lock.withLock { storedRegistrationReadFailure = newValue } }
@@ -114,8 +112,6 @@ package final class MockDeviceAttestationService: DeviceAttestationService, @unc
         set { lock.withLock { storedAttestResult = newValue } }
     }
 
-    /// When set, `attest` registers the device under this id and then reports it pending, as the
-    /// service does for a device that still owes its activation code.
     package var pendingRegistration: String? {
         get { lock.withLock { storedPendingRegistration } }
         set { lock.withLock { storedPendingRegistration = newValue } }
@@ -192,7 +188,6 @@ package final class MockDeviceAttestationService: DeviceAttestationService, @unc
         )
     }
 
-    /// Awaited at the start of `activateDevice`, so a test can hold an activation open.
     package var beforeActivate: (@Sendable () async -> Void)? {
         get { lock.withLock { storedBeforeActivate } }
         set { lock.withLock { storedBeforeActivate = newValue } }

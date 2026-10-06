@@ -18,15 +18,8 @@ extension PayabliTTP {
         try await runSessionSetup(.initialize) { try await self.runInitialize() }
     }
 
-    /// Serialises the entry points that build a session and the one that spends an activation code
-    /// against it.
-    ///
-    /// All of them move the same state, and the build ones configure and prepare the same provider,
-    /// so overlapping them lets one finish against another's session and report success on
-    /// transitions that were rejected. A code spent while a build replaces the registration is spent
-    /// against the wrong one. A caller of the same kind joins the operation in flight; a caller of
-    /// another kind waits for it and then runs its own, which keeps their meanings distinct:
-    /// re-initializing skips attestation, initializing does not.
+    /// Serialises the operations that move the session's state. A caller of the same kind joins the one
+    /// in flight; a caller of another kind waits for it and then runs its own.
     func runSessionSetup(
         _ kind: SessionSetupKind,
         _ work: @escaping @MainActor () async throws -> Void
@@ -319,13 +312,6 @@ extension PayabliTTP {
 
     // MARK: - Shared transitions
 
-    /// Lands the service's pending answer against the stored registration, which registration
-    /// writes before the service reports the device pending. `nil` when pending activation was
-    /// landed; otherwise the failure the session landed on, for the caller to throw.
-    ///
-    /// An answer about a registration the store no longer holds, replaced or removed while the request
-    /// was in flight, is stale: it says nothing about the store now, so the session asks for another
-    /// `initialize`.
     private func landPendingActivation(answeredFor presented: String? = nil) -> Error? {
         let failure: Error
         switch storedRegistration() {
@@ -355,7 +341,6 @@ extension PayabliTTP {
         return failure
     }
 
-    /// Lands `error` against this entry point's registration.
     func markError(_ error: Error) {
         sessionManager.markError(error, registration: storedRegistration())
     }

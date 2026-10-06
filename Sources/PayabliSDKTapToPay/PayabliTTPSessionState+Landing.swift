@@ -14,10 +14,6 @@ extension PayabliTTPSessionState {
     ///
     /// The map is one map for both platforms and mirrors the sibling's, so a
     /// merchant meeting one condition is sent to the same repair on either.
-    ///
-    /// Pending activation is landed only for a device that is registered. With no registration
-    /// there is no device to activate, and the refusal is the paypoint's configuration; with one
-    /// that cannot be read, the remedy is the device's secure storage.
     static func landing(for error: Error, registration: StoredRegistration) -> PayabliTTPSessionState? {
         guard let ttpError = error as? PayabliTTPError else {
             return landingByType(error, registration: registration)
@@ -108,7 +104,6 @@ extension PayabliTTPSessionState {
     }
 }
 
-/// What this entry point's stored registration answered when a failure was landed.
 enum StoredRegistration: Equatable {
     case held(activationId: String)
     case none

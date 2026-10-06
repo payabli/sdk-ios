@@ -75,9 +75,6 @@ package protocol DeviceAttestationService: AnyObject, Sendable {
     /// by the partner (e.g. from their admin dashboard). The SDK does not
     /// request the code itself — the partner is responsible for delivering it
     /// to the device user. PRD §9.7.
-    ///
-    /// The code was issued for `activationId`, so a binding that names another registration by the
-    /// time the request is signed raises `ActivationRegistrationChanged` and sends nothing.
     func activateDevice(activationCode: String, entry: String, activationId: String) async throws
 
     /// Drops this entry point's binding unconditionally, so the next `initialize()`
@@ -107,7 +104,6 @@ package protocol DeviceAttestationService: AnyObject, Sendable {
     func forgetRefusedBinding(entry: String, deviceId: String, keyId: String) throws -> Bool
 }
 
-/// The registration an activation code was issued for is no longer the one this device holds.
 package struct ActivationRegistrationChanged: Error {
     package init() {}
 }
