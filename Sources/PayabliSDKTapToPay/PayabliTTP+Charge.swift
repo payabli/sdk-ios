@@ -317,7 +317,7 @@ extension PayabliTTPCustomerData {
     /// `.private` redacts a value in a shared log and still delivers it to a
     /// local stream and to a sysdiagnose, so a cardholder name has no privacy
     /// level it may be logged at. The same holds for the contact and address
-    /// fields beside it, which the Android core also emits redacted.
+    /// fields beside it.
     var redactedFieldSummary: String {
         let fields: [(String, String?)] = [
             ("firstName", firstName),

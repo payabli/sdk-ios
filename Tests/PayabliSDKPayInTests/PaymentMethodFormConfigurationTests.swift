@@ -39,8 +39,9 @@ final class PaymentMethodFormConfigurationTests: XCTestCase {
         XCTAssertEqual(configuration.errorMessagePlacement, .top)
     }
 
-    func testPaymentMethodLabelsDefaultSubmitButtonText() {
-        XCTAssertEqual(PayabliPayInLabels().submitButton, "Add Payment Method")
+    func testTheFormTitleAndButtonWordingAreUnsetByDefault() {
+        XCTAssertNil(PayabliPayInLabels().title)
+        XCTAssertNil(PayabliPayInLabels().submitButton)
     }
 
     func testPaymentMethodLabelsUsePostalCodeCopy() {

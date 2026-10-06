@@ -2,8 +2,8 @@
 import XCTest
 
 final class PaymentFormLabelTextTests: XCTestCase {
-    /// The Android SDK's default label text, field for field.
-    private static let sharedLabelText: [PayabliPayInField: String] = [
+    /// The default label text, field for field.
+    private static let defaultLabelText: [PayabliPayInField: String] = [
         .cardholderName: "Name on card",
         .cardNumber: "Card number",
         .cardExpiration: "Expiration",
@@ -31,7 +31,7 @@ final class PaymentFormLabelTextTests: XCTestCase {
         let labels = PayabliPayInLabels()
 
         for field in PayabliPayInField.allCases {
-            XCTAssertEqual(labels.label(for: field), Self.sharedLabelText[field], field.rawValue)
+            XCTAssertEqual(labels.label(for: field), Self.defaultLabelText[field], field.rawValue)
         }
     }
 
@@ -53,7 +53,7 @@ final class PaymentFormLabelTextTests: XCTestCase {
         XCTAssertEqual(labels.label(for: .surchargeFee), "Extra")
     }
 
-    func testBlankIsReadAsTheAndroidSDKReadsIt() {
+    func testBlankIsSeparatorsAndWhitespaceControlsOnly() {
         for blank in ["", " ", "\t\n", "\u{1C}", "\u{1F}", "\u{00A0}", "\u{2028}", "\u{3000}"] {
             XCTAssertTrue(PayabliPayInLabels.isBlank(blank), blank.unicodeScalars.map { String($0.value, radix: 16) }.joined())
         }
@@ -66,5 +66,19 @@ final class PaymentFormLabelTextTests: XCTestCase {
         let labels = PayabliPayInLabels(fieldLabels: [.cardNumber: " Card # "])
 
         XCTAssertEqual(labels.label(for: .cardNumber), " Card # ")
+    }
+
+    func testAnAbsentOrBlankTitleDrawsNoHeading() {
+        for title in [nil, "", "   ", "\u{3000}"] {
+            XCTAssertNil(PayabliPayInLabels(title: title).drawnTitle, String(describing: title))
+        }
+        XCTAssertEqual(PayabliPayInLabels(title: " Checkout ").drawnTitle, "Checkout")
+    }
+
+    func testAnAbsentOrBlankButtonWordingIsNotTheHosts() {
+        for wording in [nil, "", "\t\n"] {
+            XCTAssertNil(PayabliPayInLabels(submitButton: wording).hostSubmitButton, String(describing: wording))
+        }
+        XCTAssertEqual(PayabliPayInLabels(submitButton: " Pay now ").hostSubmitButton, "Pay now")
     }
 }

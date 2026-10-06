@@ -128,8 +128,7 @@ outside it imports an SDK module, so the answer to "how do I call this thing" is
 one directory rather than a search through the screens. Keeping it that way is a
 placement rule this app follows, not something a build step checks: a new call
 into the SDK belongs in `SDK/`, and a screen that needs an answer from it gets
-one of this app's own types. The Android sample follows the same rule in
-`example/src/main/java/com/payabli/example/app/sdk/`.
+one of this app's own types.
 
 The screens hold this app's own types. A form's result reaches a screen as
 `PayInOutcome`, a failure as `PayInFailure`, and the reader's state as
@@ -138,8 +137,7 @@ The screens hold this app's own types. A form's result reaches a screen as
 The environment works the same way and is worth calling out, because it is the one
 an integrator changes first. This app owns `DemoEnvironment` and decides which one
 runs; `SDK/PayabliEnvironmentMapping.swift` says what the SDK calls it, and nothing
-above holds an SDK environment to point a session somewhere. The Android sample
-splits it the same way, mapping in `sdk/DemoEnvironment.kt`.
+above holds an SDK environment to point a session somewhere.
 
 ### The Config tab
 

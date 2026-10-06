@@ -49,9 +49,9 @@ private extension PayabliPayInHiddenValues {
 private extension PayabliPayInLabels {
     var payabliViewModelSignature: String {
         [
-            "title:\(title)",
+            "title:\(title ?? "")",
             "subtitle:\(subtitle ?? "")",
-            "submit:\(submitButton)",
+            "submit:\(submitButton ?? "")",
             "labels:\(fieldLabels.payabliViewModelSignature)",
             "placeholders:\(fieldPlaceholders.payabliViewModelSignature)",
             "total:\(total ?? "")"
