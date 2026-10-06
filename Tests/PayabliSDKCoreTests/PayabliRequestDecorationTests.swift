@@ -27,13 +27,14 @@ final class PayabliRequestDecorationTests: XCTestCase {
     }
 
     func testTheFactoryPutsContributorsInTheOrderTheChainDependsOn() {
-        let chain = RequestDecorationFactory.chain(readToken: { "tok" })
+        let chain = RequestDecorationFactory.chain(readToken: { "tok" }, client: .none)
 
         // A step that signs over what the others emit has to come after them, so the position of what
         // exists today is part of the contract.
-        XCTAssertEqual(chain.count, 2)
-        XCTAssertTrue(chain[0] is BearerDecoration)
-        XCTAssertTrue(chain[1] is JSONBodyDecoration)
+        XCTAssertEqual(chain.count, 3)
+        XCTAssertTrue(chain[0] is ClientHeaderDecoration)
+        XCTAssertTrue(chain[1] is BearerDecoration)
+        XCTAssertTrue(chain[2] is JSONBodyDecoration)
     }
 
     // MARK: - Who wins a header

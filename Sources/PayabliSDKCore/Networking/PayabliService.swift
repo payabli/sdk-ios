@@ -25,11 +25,12 @@ package final class PayabliService: PayabliTransport, Sendable {
     convenience init(
         environment: PayabliEnvironment,
         readToken: @escaping @Sendable () async throws -> String,
+        client: ClientFacts,
         session: URLSession? = nil
     ) {
         self.init(
             environment: environment,
-            decorations: RequestDecorationFactory.chain(readToken: readToken),
+            decorations: RequestDecorationFactory.chain(readToken: readToken, client: client),
             session: session,
             logger: PayabliLogger(category: .network)
         )
@@ -55,12 +56,13 @@ package final class PayabliService: PayabliTransport, Sendable {
     static func makeWithChain(
         environment: PayabliEnvironment,
         readToken: @escaping @Sendable () async throws -> String,
+        client: ClientFacts = .none,
         session: URLSession? = nil,
         logger: PayabliLogger
     ) -> PayabliService {
         PayabliService(
             environment: environment,
-            decorations: RequestDecorationFactory.chain(readToken: readToken),
+            decorations: RequestDecorationFactory.chain(readToken: readToken, client: client),
             session: session,
             logger: logger
         )

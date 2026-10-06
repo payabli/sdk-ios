@@ -52,6 +52,12 @@ public final class PayabliSession: @unchecked Sendable {
         let service = PayabliService(
             environment: config.environment,
             readToken: { try await auth.currentAccessToken() },
+            client: ClientFacts(
+                sdkVersion: PayabliCore.version,
+                osVersion: DeviceModel.osVersion(),
+                hardware: DeviceModel.hardware(),
+                deviceId: { try? deviceIdentity.value() }
+            ),
             session: urlSession
         )
         self.transport = AuthenticatedTransport(

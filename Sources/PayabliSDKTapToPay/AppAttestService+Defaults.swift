@@ -1,10 +1,6 @@
 import Foundation
 import PayabliSDKCore
 
-#if canImport(UIKit)
-    import UIKit
-#endif
-
 // MARK: - Default hardware identifier providers
 
 //
@@ -21,12 +17,6 @@ extension AppAttestService {
     }
 
     static var defaultOSVersion: @Sendable () -> String {
-        {
-            #if canImport(UIKit)
-                return UIDevice.current.systemVersion
-            #else
-                return ProcessInfo.processInfo.operatingSystemVersionString
-            #endif
-        }
+        { DeviceModel.osVersion() }
     }
 }
