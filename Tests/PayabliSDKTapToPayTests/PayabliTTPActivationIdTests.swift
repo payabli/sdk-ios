@@ -152,6 +152,26 @@ final class PayabliTTPActivationIdTests: XCTestCase {
         XCTAssertEqual(ttp.sessionState, .failed(reason: .deviceKeyUnavailable))
     }
 
+    /// The host read one id and its code was issued for it. A registration replaced since gets
+    /// nothing sent, and the session asks for another `initialize`.
+    func testACodeForAReplacedRegistrationIsNotSent() async throws {
+        let (ttp, attestation) = try makeTTP()
+        attestation.pendingRegistration = "dev_e"
+        _ = try? await ttp.initialize()
+        attestation.pendingRegistration = nil
+        attestation.bindings = ["e": "dev_new"]
+
+        do {
+            try await ttp.activateDevice(activationCode: "123456")
+            XCTFail("expected a failure")
+        } catch PayabliTTPError.activationFailed {
+        } catch {
+            XCTFail("wrong error: \(error)")
+        }
+
+        XCTAssertEqual(ttp.sessionState, .idle)
+    }
+
     func testTheObjCReaderAnswersOnlyWhileActivationIsOwed() async throws {
         let (ttp, attestation) = try makeTTP()
         XCTAssertNil(ttp.activationId)

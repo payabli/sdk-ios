@@ -4,11 +4,14 @@ import PayabliSDKCore
 // MARK: - Device activation (PRD §9.7)
 
 package extension AppAttestService {
-    func activateDevice(activationCode: String, entry: String) async throws {
+    func activateDevice(activationCode: String, entry: String, activationId: String) async throws {
         // Read only to refuse a paypoint that holds no binding. The handle sent is
         // the assertion's, below.
-        guard try cachedDeviceId(for: entry) != nil else {
+        guard let held = try cachedDeviceId(for: entry) else {
             throw PayabliTTPError.attestationFailed(reason: "Missing deviceId — run initialize() before activateDevice")
+        }
+        guard held == activationId else {
+            throw ActivationRegistrationChanged()
         }
 
         // Rotate the nonce before `/activate` verifies the assertion. The
@@ -17,6 +20,9 @@ package extension AppAttestService {
         _ = try await postChallenge(entry: entry)
 
         let assertion = try await generateAssertion(for: entry)
+        guard assertion.deviceId == activationId else {
+            throw ActivationRegistrationChanged()
+        }
 
         // The assertion's handle, so the body and the headers come from one
         // binding. Read separately they can name two devices.

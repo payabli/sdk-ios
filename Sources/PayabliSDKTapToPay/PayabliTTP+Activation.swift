@@ -14,7 +14,7 @@ public extension PayabliTTP {
     /// so the caller can immediately re-run `initialize()` for a fresh cold
     /// attestation — `.sessionExpired` is also emitted in that sub-case.
     func activateDevice(activationCode: String) async throws {
-        guard case .pendingActivation = sessionState else {
+        guard case let .pendingActivation(activationId) = sessionState else {
             throw PayabliTTPError.invalidState(
                 current: sessionState,
                 attempted: "activateDevice"
@@ -22,10 +22,24 @@ public extension PayabliTTP {
         }
         multicaster.emit(.activationStarted)
         do {
-            try await attestation.activateDevice(activationCode: activationCode, entry: entryPoint)
+            try await attestation.activateDevice(
+                activationCode: activationCode,
+                entry: entryPoint,
+                activationId: activationId
+            )
             _ = sessionManager.transition(to: .idle)
             syncPublished()
             multicaster.emit(.activationCompleted)
+        } catch is ActivationRegistrationChanged {
+            // The code was issued for a registration this device no longer holds. Nothing was sent,
+            // and the next `initialize()` hands over the id the device holds now.
+            let failure = PayabliTTPError.activationFailed(
+                reason: "The registration changed since its activation ID was read; initialize again"
+            )
+            _ = sessionManager.transition(to: .idle)
+            syncPublished()
+            multicaster.emit(.activationFailed(error: ErrorSummary.of(failure)))
+            throw failure
         } catch let err as PayabliTTPError {
             // The attestation service already cleared local cache for the
             // revoked case. Reset the session to `.idle` (not `.error`) so

@@ -14,14 +14,9 @@ final class AttestationWireTests: XCTestCase {
         super.tearDown()
     }
 
-    /// Activation sends the handle the assertion was signed for.
-    ///
-    /// The binding is read before the challenge and the assertion reloads it after
-    /// two suspensions, so an attestation landing in between leaves the body naming
-    /// one device and the headers signing for another. Read separately they can
-    /// disagree, and a request whose body and signature describe different devices
-    /// is refused for a reason neither of them names.
-    func testActivationSendsTheHandleTheAssertionWasSignedFor() async throws {
+    /// A code is issued for one registration. One enrolled while the nonce is rotated is signed for
+    /// by the assertion, so the activation is refused before anything is sent.
+    func testAnActivationForARegistrationReplacedMidCallSendsNothing() async throws {
         let storage = InMemorySecureStorage()
         try AttestFixture.seedBinding(entry: "myEntry", deviceId: "dev_old", keyId: "old_key", in: storage)
 
@@ -43,17 +38,34 @@ final class AttestationWireTests: XCTestCase {
 
         let (sut, _, _) = try AttestFixture.makeService(storage: storage)
 
-        try await sut.activateDevice(activationCode: "123456", entry: "myEntry")
+        do {
+            try await sut.activateDevice(activationCode: "123456", entry: "myEntry", activationId: "dev_old")
+            XCTFail("an activation for a replaced registration was sent")
+        } catch is ActivationRegistrationChanged {}
+
+        XCTAssertTrue(bodies.values.isEmpty, "the code issued for dev_old was sent for dev_new")
+    }
+
+    /// A code is sent with the handle the assertion was signed for.
+    func testActivationSendsTheHandleTheCodeWasIssuedFor() async throws {
+        let storage = InMemorySecureStorage()
+        try AttestFixture.seedBinding(entry: "myEntry", deviceId: "dev_old", keyId: "old_key", in: storage)
+        let bodies = BodyBox()
+        StubURLProtocol.handler = { request in
+            if request.url!.path == "/api/v2/device/taptopay/activate" {
+                bodies.append(request.payabliTestBody)
+            }
+            return AttestFixture.ok(request, ["challengeId": "c_1", "challenge": "Y2hhbGxlbmdl"])
+        }
+        let (sut, _, _) = try AttestFixture.makeService(storage: storage)
+
+        try await sut.activateDevice(activationCode: "123456", entry: "myEntry", activationId: "dev_old")
 
         let body = try XCTUnwrap(bodies.values.first)
         let sent = try XCTUnwrap(
             JSONSerialization.jsonObject(with: try XCTUnwrap(body)) as? [String: Any]
         )
-        XCTAssertEqual(
-            sent["deviceId"] as? String,
-            "dev_new",
-            "the body named the device read before the assertion, which signed for another"
-        )
+        XCTAssertEqual(sent["deviceId"] as? String, "dev_old")
     }
 
     /// A 401 answering one binding does not take a binding enrolled since.
@@ -79,7 +91,7 @@ final class AttestationWireTests: XCTestCase {
         let (sut, _, _) = try AttestFixture.makeService(storage: storage)
 
         do {
-            try await sut.activateDevice(activationCode: "123456", entry: "myEntry")
+            try await sut.activateDevice(activationCode: "123456", entry: "myEntry", activationId: "dev_old")
             XCTFail("a refused activation reported success")
         } catch {}
 

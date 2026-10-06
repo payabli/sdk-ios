@@ -192,9 +192,12 @@ package final class MockDeviceAttestationService: DeviceAttestationService, @unc
         )
     }
 
-    package func activateDevice(activationCode: String, entry: String) async throws {
+    package func activateDevice(activationCode: String, entry: String, activationId: String) async throws {
         let result: Result<Void, Error> = lock.withLock {
             storedActivateCalls += 1
+            guard (storedBindings[entry] ?? storedBindings[Self.anyEntry]) == activationId else {
+                return .failure(ActivationRegistrationChanged())
+            }
             return storedActivationResult
         }
         if case let .failure(err) = result {
