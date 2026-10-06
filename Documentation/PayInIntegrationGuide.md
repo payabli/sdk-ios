@@ -422,7 +422,8 @@ let configuration = PayabliPayInFormConfiguration(
         PayabliPayInFieldSection(
             title: "Payment Information",
             fields: [.amount, .serviceFee],
-            inputVerticalSpacing: 6
+            inputVerticalSpacing: 6,
+            style: .summary
         )
     ],
     bankSections: [
@@ -438,7 +439,8 @@ let configuration = PayabliPayInFormConfiguration(
         ),
         PayabliPayInFieldSection(
             title: "Payment Information",
-            fields: [.amount, .serviceFee]
+            fields: [.amount, .serviceFee],
+            style: .summary
         )
     ],
     hiddenValues: PayabliPayInHiddenValues(
