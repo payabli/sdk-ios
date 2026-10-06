@@ -136,6 +136,23 @@ final class PayabliTTPErrorNSErrorTests: XCTestCase {
 
     // MARK: - toPayabliNSError() helper
 
+    @MainActor
+    func testARefusedConfigurationThrowsTheCatalogNumberToAnObjCCaller() {
+        XCTAssertThrowsError(
+            try PayabliTTP(
+                tokenHandler: { completion in completion("token", nil) },
+                entryPoint: " ",
+                appId: "app",
+                environment: .sandbox
+            )
+        ) { error in
+            let nsError = error as NSError
+            XCTAssertEqual(nsError.domain, "com.payabli.ttp")
+            XCTAssertEqual(nsError.code, PayabliErrorType.invalidConfiguration.number)
+            XCTAssertEqual(nsError.userInfo["PayabliErrorType"] as? String, PayabliErrorType.invalidConfiguration.rawValue)
+        }
+    }
+
     func testToPayabliNSErrorPreservesPayabliErrorDomain() {
         let err: Error = PayabliTTPError.tokenExpired
         let nsError = err.toPayabliNSError()
