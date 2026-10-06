@@ -10,8 +10,6 @@ import SwiftUI
 /// The checks behind it stay mutually independent — see `TapToPayPreflight` —
 /// which is the property that makes a single rolled-up verdict trustworthy.
 struct TerminalReadinessView: View {
-    let configuredAppId: String
-
     /// Computed on appearance, not per body evaluation: each run does a `uname`,
     /// hits `DCAppAttestService`, and reads the provisioning profile.
     ///
@@ -93,7 +91,7 @@ struct TerminalReadinessView: View {
     }
 
     private func refresh() {
-        checks = TapToPayPreflight.checks(configuredAppId: configuredAppId)
+        checks = TapToPayPreflight.checks()
     }
 
     private func symbol(for status: TapToPayPreflight.Check.Status) -> String {

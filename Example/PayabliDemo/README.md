@@ -29,9 +29,8 @@ end to end against sandbox.
 2. Copy `App/Configuration/Secrets.swift.sample` to `Secrets.swift` beside it and
    fill in your sandbox
    credentials. `Secrets.swift` is gitignored.
-3. Set `DEVELOPMENT_TEAM` on the target, and set `Secrets.appId` to
-   `<TEAM_ID>.com.payabli.example.app`. The Tap to Pay tab flags a
-   mismatch on screen rather than letting App Attest reject it later.
+3. Set `DEVELOPMENT_TEAM` on the target. The Tap to Pay tab shows the App ID
+   to register as an authorized app, `<TEAM_ID>.com.payabli.example.app`.
 
 ```bash
 xcodebuild build -project PayabliDemo.xcodeproj -scheme PayabliDemo \
@@ -51,8 +50,7 @@ host app target's entitlements file:
 You also need to:
 - Enable **Tap to Pay on iPhone** capability in your Apple Developer
   account for the bundle identifier.
-- Set `Secrets.appId` to `<TEAM_ID>.<BUNDLE_ID>` so attestation can
-  verify the binary.
+- Register `<TEAM_ID>.<BUNDLE_ID>` as an authorized app on your paypoint.
 
 ### Hardware requirement
 
@@ -144,7 +142,7 @@ splits it the same way, mapping in `sdk/DemoEnvironment.kt`.
 
 ### The Config tab
 
-Read-only. The SDK captures `entryPoint`, `environment` and `appId` at launch,
+Read-only. The SDK captures `entryPoint` and `environment` at launch,
 so an editable field would show a value it never received. Edit `Secrets.swift`
 and relaunch.
 
@@ -179,7 +177,7 @@ or reads a secret.
 | App Attest availability | `DCAppAttestService.shared.isSupported` | entitlement, token |
 | Reader hardware | `PaymentCardReader.isSupported` | team, token |
 | Tap to Pay entitlement | `embedded.mobileprovision` → `Entitlements` | token, `Secrets` |
-| App ID correctness | profile Team ID vs `Secrets.appId` vs bundle ID | token |
+| App ID to register | profile Team ID and bundle ID | token |
 
 Two traps this exists to avoid. **The Simulator answers
 `PaymentCardReader.isSupported == true`**, so that flag alone reads as ready on a

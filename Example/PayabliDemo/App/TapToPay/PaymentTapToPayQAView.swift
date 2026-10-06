@@ -43,7 +43,7 @@ struct PaymentTapToPayQAView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
                     QAContextLine()
-                    TerminalReadinessView(configuredAppId: Secrets.appId)
+                    TerminalReadinessView()
                     stepsSection
                     recoverySection
                     eventLogSection

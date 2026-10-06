@@ -191,7 +191,7 @@ enum TapToPayPreflight {
 
     // MARK: - Assembled report
 
-    static func checks(configuredAppId: String) -> [Check] {
+    static func checks() -> [Check] {
         let environment = runtimeEnvironment
         let bundleId = Bundle.main.bundleIdentifier ?? "<unknown>"
 
@@ -290,53 +290,23 @@ enum TapToPayPreflight {
             )
         }
 
-        // 5. App ID, compared against the signing identity rather than against itself.
-        results.append(appIdCheck(configuredAppId: configuredAppId, bundleId: bundleId))
+        // 5. The App ID to register as an authorized app, read from the signing identity.
+        results.append(appIdCheck(bundleId: bundleId))
 
         return results
     }
 
-    private static func appIdCheck(configuredAppId: String, bundleId: String) -> Check {
-        guard !configuredAppId.hasPrefix("ABCDE12345") else {
-            return Check(
-                title: "App ID is the sample placeholder",
-                detail: "Set Secrets.appId to <TeamID>.\(bundleId).",
-                status: .fail
-            )
-        }
-
-        guard configuredAppId.hasSuffix(".\(bundleId)") else {
-            return Check(
-                title: "App ID does not match this bundle",
-                detail: "Secrets.appId is \(configuredAppId) but this app is \(bundleId). "
-                    + "App Attest rejects the mismatch.",
-                status: .fail
-            )
-        }
-
+    private static func appIdCheck(bundleId: String) -> Check {
         guard let team = resolvedTeamIdentifier else {
-            // Simulator, or an unsigned build: the suffix is all that is checkable.
             return Check(
-                title: "App ID matches this bundle",
-                detail: "Team ID cannot be verified without an embedded profile; only the bundle "
-                    + "suffix was checked.",
+                title: "App ID cannot be read here",
+                detail: "No embedded profile, so the team prefix is unknown. Check it on a device build.",
                 status: .warn
             )
         }
-
-        let expected = "\(team).\(bundleId)"
-        guard configuredAppId == expected else {
-            return Check(
-                title: "App ID team prefix is wrong",
-                detail: "This binary is signed by team \(team), so Secrets.appId should be "
-                    + "\(expected).",
-                status: .fail
-            )
-        }
-
         return Check(
-            title: "App ID matches the signing identity",
-            detail: "\(expected), verified against the embedded profile.",
+            title: "App ID to register",
+            detail: "\(team).\(bundleId) is the authorized app this build attests as.",
             status: .pass
         )
     }
