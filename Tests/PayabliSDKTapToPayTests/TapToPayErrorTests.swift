@@ -16,11 +16,11 @@ final class TapToPayErrorTests: XCTestCase {
     }
 
     func testABridgedCallerReadsTheCatalogNumberAsTheErrorCode() {
-        let error = TapToPayError(type: .attestationNotSupported, reason: "r", detail: nil) as NSError
+        let error = TapToPayError(type: .deviceSetupUnsupported, reason: "r", detail: nil) as NSError
 
         XCTAssertEqual(error.domain, TapToPayError.errorDomain)
         XCTAssertEqual(error.code, 3002)
-        XCTAssertEqual(error.userInfo["PayabliErrorType"] as? String, "ATTESTATION_NOT_SUPPORTED")
+        XCTAssertEqual(error.userInfo["PayabliErrorType"] as? String, "DEVICE_SETUP_UNSUPPORTED")
     }
 
     func testAFailureOutsideAPaymentMovedNoMoney() {

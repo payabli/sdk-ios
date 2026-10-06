@@ -54,13 +54,13 @@ public enum PayabliErrorType: String, Sendable, CaseIterable {
 
     // Card-present.
     case deviceKeyUnavailable = "DEVICE_KEY_UNAVAILABLE"
-    case attestationNotSupported = "ATTESTATION_NOT_SUPPORTED"
-    case attestationServicesOutdated = "ATTESTATION_SERVICES_OUTDATED"
+    case deviceSetupUnsupported = "DEVICE_SETUP_UNSUPPORTED"
+    case deviceServicesOutdated = "DEVICE_SERVICES_OUTDATED"
     case devicePendingActivation = "DEVICE_PENDING_ACTIVATION"
-    case attestationRequired = "ATTESTATION_REQUIRED"
-    case attestationRefused = "ATTESTATION_REFUSED"
-    case attestationUnavailable = "ATTESTATION_UNAVAILABLE"
-    case attestationNotConfigured = "ATTESTATION_NOT_CONFIGURED"
+    case deviceSetupRequired = "DEVICE_SETUP_REQUIRED"
+    case deviceSetupRefused = "DEVICE_SETUP_REFUSED"
+    case deviceSetupUnavailable = "DEVICE_SETUP_UNAVAILABLE"
+    case deviceSetupNotConfigured = "DEVICE_SETUP_NOT_CONFIGURED"
     case entryPointRefused = "ENTRY_POINT_REFUSED"
     case readerCredentialsUnusable = "READER_CREDENTIALS_UNUSABLE"
     case deviceOSUnsupported = "DEVICE_OS_UNSUPPORTED"
@@ -140,13 +140,13 @@ public extension PayabliErrorType {
         case .unknown: 1017
         case .sdkInternalError: 1018
         case .deviceKeyUnavailable: 3001
-        case .attestationNotSupported: 3002
-        case .attestationServicesOutdated: 3003
+        case .deviceSetupUnsupported: 3002
+        case .deviceServicesOutdated: 3003
         case .devicePendingActivation: 3004
-        case .attestationRequired: 3005
-        case .attestationRefused: 3006
-        case .attestationUnavailable: 3007
-        case .attestationNotConfigured: 3008
+        case .deviceSetupRequired: 3005
+        case .deviceSetupRefused: 3006
+        case .deviceSetupUnavailable: 3007
+        case .deviceSetupNotConfigured: 3008
         case .entryPointRefused: 3009
         case .readerCredentialsUnusable: 3010
         case .deviceOSUnsupported: 3011
@@ -195,13 +195,13 @@ public extension PayabliErrorType {
         case .unknown: "An unexpected error occurred."
         case .sdkInternalError: "The SDK failed before the request was sent."
         case .deviceKeyUnavailable: "The device's key facility could not confirm this device's key."
-        case .attestationNotSupported: "This device does not support app attestation."
-        case .attestationServicesOutdated: "This device's attestation services must be installed or updated."
+        case .deviceSetupUnsupported: "This device cannot be set up for card-present payments."
+        case .deviceServicesOutdated: "Google Play on this device must be installed, updated or signed in."
         case .devicePendingActivation: "This device is waiting for its activation code."
-        case .attestationRequired: "This device must be attested again."
-        case .attestationRefused: "This device's attestation was refused."
-        case .attestationUnavailable: "Attestation is temporarily unavailable."
-        case .attestationNotConfigured: "Attestation is not configured for this app or environment."
+        case .deviceSetupRequired: "This device must be set up again."
+        case .deviceSetupRefused: "This device was refused during setup."
+        case .deviceSetupUnavailable: "Device setup is temporarily unavailable."
+        case .deviceSetupNotConfigured: "Device setup is not configured for this app or environment."
         case .entryPointRefused: "The entry point is not available for this request."
         case .readerCredentialsUnusable: "The card reader's configuration is incomplete."
         case .deviceOSUnsupported: "This device's operating system version cannot take contactless payments."
@@ -231,10 +231,10 @@ public extension PayabliErrorType {
     var category: PayabliErrorCategory {
         switch self {
         case .missingToken, .tokenExpired, .tokenMalformed, .tokenProviderFailed, .invalidSignature, .sessionBurned,
-             .attestationRequired:
+             .deviceSetupRequired:
             .credential
-        case .permissionDenied, .invalidConfiguration, .attestationServicesOutdated, .devicePendingActivation,
-             .attestationNotConfigured, .entryPointRefused, .readerCredentialsUnusable, .termsNotAccepted,
+        case .permissionDenied, .invalidConfiguration, .deviceServicesOutdated, .devicePendingActivation,
+             .deviceSetupNotConfigured, .entryPointRefused, .readerCredentialsUnusable, .termsNotAccepted,
              .cardPresentNotEnabled, .activationCodeExpired, .activationAttemptsExhausted, .activationCodeNotIssued:
             .configuration
         case .paymentDeclined, .paymentNotOpened, .cardDeclined:
@@ -242,12 +242,12 @@ public extension PayabliErrorType {
         case .serverError, .networkError, .decodingError, .userCancelled, .unknown, .conflict, .tapNotCompleted,
              .paymentOutcomeUnknown, .paymentNotClosed:
             .outcomeUnknown
-        case .rateLimited, .deviceKeyUnavailable, .attestationUnavailable, .readerUnavailable, .readerSessionExpired:
+        case .rateLimited, .deviceKeyUnavailable, .deviceSetupUnavailable, .readerUnavailable, .readerSessionExpired:
             .retryLater
         case .validation, .activationCodeMalformed, .activationCodeIncorrect, .deviceNotPending, .terminalNotReady,
              .tooManyOpenCharges, .paymentNotHeld:
             .invalidRequest
-        case .attestationNotSupported, .attestationRefused, .deviceOSUnsupported, .deviceHardwareUnsupported,
+        case .deviceSetupUnsupported, .deviceSetupRefused, .deviceOSUnsupported, .deviceHardwareUnsupported,
              .readerDeviceRefused:
             .device
         case .sdkInternalError:

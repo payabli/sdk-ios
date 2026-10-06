@@ -31,24 +31,24 @@ final class PayabliErrorCatalogTests: XCTestCase {
             .retryLater,
             "The device's key facility could not confirm this device's key."
         ),
-        (.attestationNotSupported, "ATTESTATION_NOT_SUPPORTED", 3002, .device, "This device does not support app attestation."),
+        (.deviceSetupUnsupported, "DEVICE_SETUP_UNSUPPORTED", 3002, .device, "This device cannot be set up for card-present payments."),
         (
-            .attestationServicesOutdated,
-            "ATTESTATION_SERVICES_OUTDATED",
+            .deviceServicesOutdated,
+            "DEVICE_SERVICES_OUTDATED",
             3003,
             .configuration,
-            "This device's attestation services must be installed or updated."
+            "Google Play on this device must be installed, updated or signed in."
         ),
         (.devicePendingActivation, "DEVICE_PENDING_ACTIVATION", 3004, .configuration, "This device is waiting for its activation code."),
-        (.attestationRequired, "ATTESTATION_REQUIRED", 3005, .credential, "This device must be attested again."),
-        (.attestationRefused, "ATTESTATION_REFUSED", 3006, .device, "This device's attestation was refused."),
-        (.attestationUnavailable, "ATTESTATION_UNAVAILABLE", 3007, .retryLater, "Attestation is temporarily unavailable."),
+        (.deviceSetupRequired, "DEVICE_SETUP_REQUIRED", 3005, .credential, "This device must be set up again."),
+        (.deviceSetupRefused, "DEVICE_SETUP_REFUSED", 3006, .device, "This device was refused during setup."),
+        (.deviceSetupUnavailable, "DEVICE_SETUP_UNAVAILABLE", 3007, .retryLater, "Device setup is temporarily unavailable."),
         (
-            .attestationNotConfigured,
-            "ATTESTATION_NOT_CONFIGURED",
+            .deviceSetupNotConfigured,
+            "DEVICE_SETUP_NOT_CONFIGURED",
             3008,
             .configuration,
-            "Attestation is not configured for this app or environment."
+            "Device setup is not configured for this app or environment."
         ),
         (.entryPointRefused, "ENTRY_POINT_REFUSED", 3009, .configuration, "The entry point is not available for this request."),
         (.readerCredentialsUnusable, "READER_CREDENTIALS_UNUSABLE", 3010, .configuration, "The card reader's configuration is incomplete."),
