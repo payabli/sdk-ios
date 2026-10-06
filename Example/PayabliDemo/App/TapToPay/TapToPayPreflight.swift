@@ -147,9 +147,16 @@ enum TapToPayPreflight {
         return entitlements["com.apple.developer.proximity-reader.payment.acceptance"] as? Bool ?? false
     }
 
-    /// The Team ID this binary is actually signed with, read from the profile
-    /// rather than from `Secrets`. That is what lets the App ID check below
-    /// compare the configured value against reality instead of against itself.
+    /// The prefix of the profile's `application-identifier`, which is the prefix the SDK attests with.
+    /// It is the Team ID for most apps and can differ from it for an older App ID.
+    static var resolvedAppIdPrefix: String? {
+        guard let applicationIdentifier = provisioningEntitlements?["application-identifier"] as? String,
+              let prefix = applicationIdentifier.split(separator: ".").first
+        else { return nil }
+        return String(prefix)
+    }
+
+    /// The Team ID this binary is signed with, read from the profile.
     static var resolvedTeamIdentifier: String? {
         guard let entitlements = provisioningEntitlements else { return nil }
         if let team = entitlements["com.apple.developer.team-identifier"] as? String {
@@ -191,9 +198,8 @@ enum TapToPayPreflight {
 
     // MARK: - Assembled report
 
-    static func checks(configuredAppId: String) -> [Check] {
+    static func checks() -> [Check] {
         let environment = runtimeEnvironment
-        let bundleId = Bundle.main.bundleIdentifier ?? "<unknown>"
 
         var results: [Check] = []
 
@@ -290,54 +296,12 @@ enum TapToPayPreflight {
             )
         }
 
-        // 5. App ID, compared against the signing identity rather than against itself.
-        results.append(appIdCheck(configuredAppId: configuredAppId, bundleId: bundleId))
-
         return results
     }
 
-    private static func appIdCheck(configuredAppId: String, bundleId: String) -> Check {
-        guard !configuredAppId.hasPrefix("ABCDE12345") else {
-            return Check(
-                title: "App ID is the sample placeholder",
-                detail: "Set Secrets.appId to <TeamID>.\(bundleId).",
-                status: .fail
-            )
-        }
-
-        guard configuredAppId.hasSuffix(".\(bundleId)") else {
-            return Check(
-                title: "App ID does not match this bundle",
-                detail: "Secrets.appId is \(configuredAppId) but this app is \(bundleId). "
-                    + "App Attest rejects the mismatch.",
-                status: .fail
-            )
-        }
-
-        guard let team = resolvedTeamIdentifier else {
-            // Simulator, or an unsigned build: the suffix is all that is checkable.
-            return Check(
-                title: "App ID matches this bundle",
-                detail: "Team ID cannot be verified without an embedded profile; only the bundle "
-                    + "suffix was checked.",
-                status: .warn
-            )
-        }
-
-        let expected = "\(team).\(bundleId)"
-        guard configuredAppId == expected else {
-            return Check(
-                title: "App ID team prefix is wrong",
-                detail: "This binary is signed by team \(team), so Secrets.appId should be "
-                    + "\(expected).",
-                status: .fail
-            )
-        }
-
-        return Check(
-            title: "App ID matches the signing identity",
-            detail: "\(expected), verified against the embedded profile.",
-            status: .pass
-        )
+    /// The authorized app this build attests as, or `nil` without an embedded profile.
+    static var appIdToRegister: String? {
+        guard let prefix = resolvedAppIdPrefix, let bundleId = Bundle.main.bundleIdentifier else { return nil }
+        return "\(prefix).\(bundleId)"
     }
 }

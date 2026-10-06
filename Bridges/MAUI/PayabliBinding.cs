@@ -120,10 +120,6 @@ namespace Payabli.TapToPay
         [NullAllowed] NSError error
     );
 
-    // `deviceId` is null when the SDK holds no usable id for this device on the
-    // session's paypoint; call Initialize, which enrolls it or reports why not.
-    public delegate void PayabliTTPDeviceIdCompletion([NullAllowed] string deviceId);
-
     public delegate void PayabliTTPEventHandler(
         PayabliTTPEventCode code,
         NSDictionary payload
@@ -257,6 +253,12 @@ namespace Payabli.TapToPay
             bool telemetryEnabled,
             PayabliSessionCompletion completionHandler
         );
+
+        // This device's identity, null before Initialize and while the device's secure storage
+        // cannot be read.
+        [Static, NullAllowed]
+        [Export("deviceId")]
+        string DeviceId { get; }
     }
 
     // MARK: - PayabliTTP (façade)
@@ -295,9 +297,6 @@ namespace Payabli.TapToPay
         [Export("areTermsAcceptedWithCompletion:")]
         void AreTermsAccepted(PayabliTTPTermsCompletion completion);
 
-        [Export("deviceIdWithCompletion:")]
-        void DeviceId(PayabliTTPDeviceIdCompletion completion);
-
         [Export("presentTermsWithCompletion:")]
         void PresentTerms(PayabliTTPCompletion completion);
 
@@ -310,6 +309,8 @@ namespace Payabli.TapToPay
         [NullAllowed, Export("readerConfigurationPercent")] NSNumber ReaderConfigurationPercent { get; }
 
         [NullAllowed, Export("failureReason")] NSNumber FailureReason { get; }
+
+        [NullAllowed, Export("activationId")] string ActivationId { get; }
         [Export("isReady")] bool IsReady { get; }
 
         // Event subscription. The returned token's Cancel() tears down the

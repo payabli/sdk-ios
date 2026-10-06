@@ -165,20 +165,6 @@ class PayabliTTP {
     }
   }
 
-  // MARK: - deviceId
-
-  /// The id Payabli assigned this device on the session's paypoint, whether
-  /// pending activation or active. `null` when the SDK holds no usable id for
-  /// it, for any reason; call [initialize], which enrolls the device or throws
-  /// why it could not.
-  static Future<String?> deviceId() async {
-    try {
-      return await _payabliMethodChannel.invokeMethod<String>('deviceId');
-    } on PlatformException catch (e) {
-      throw PayabliTTPException._fromPlatform(e);
-    }
-  }
-
   // MARK: - getSessionState
 
   /// Polls the session state and what its case carries.
@@ -196,6 +182,7 @@ class PayabliTTP {
       failureReason: reason == null
           ? null
           : PayabliTTPFailureReason.values[reason],
+      activationId: raw?['activationId'] as String?,
     );
   }
 
@@ -244,6 +231,18 @@ class PayabliTTP {
 
 /// Mirrors `PayabliEnvironment` raw values.
 enum PayabliEnvironment { local, qa, sandbox, production }
+
+/// The one session every capability runs on.
+class PayabliSession {
+  PayabliSession._();
+
+  /// This device's identity, the same for every capability and stable for the
+  /// install. `null` before a configure has succeeded, and while the device's
+  /// secure storage can't be read.
+  static Future<String?> deviceId() async {
+    return _payabliMethodChannel.invokeMethod<String>('sessionDeviceId');
+  }
+}
 
 /// Dart API for the Payabli card and bank account payment flow surface.
 ///
@@ -397,11 +396,16 @@ class PayabliTTPSessionSnapshot {
     required this.code,
     this.readerConfigurationPercent,
     this.failureReason,
+    this.activationId,
   });
 
   final PayabliTTPSessionState code;
   final int? readerConfigurationPercent;
   final PayabliTTPFailureReason? failureReason;
+
+  /// The id the activation route's `deviceId` field takes, or `null` when no
+  /// activation is owed.
+  final String? activationId;
 }
 
 /// Mirrors `PayabliTTPFailureReason`.

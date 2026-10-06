@@ -48,7 +48,6 @@ struct ConfigurationQAView: View {
                 value: DemoConfiguration.entryPoint,
                 problem: DemoConfiguration.entryPointProblem
             )
-            QADetailRow(label: "App ID", value: Secrets.appId)
             QADetailRow(
                 label: "Environment",
                 value: "\(DemoConfiguration.environment.label) · "
@@ -132,7 +131,7 @@ struct ConfigurationQAView: View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Card present")
                 .font(.title3.weight(.semibold))
-            TerminalReadinessView(configuredAppId: Secrets.appId)
+            TerminalReadinessView()
 
             Toggle("Send a demo customer", isOn: $demoCustomer.suppliesDemoCustomer)
                 .font(.subheadline)

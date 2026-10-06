@@ -34,14 +34,19 @@ OAuth2 credentials with a permission for each operation you use:
 
 ## Set up
 
-`PayabliPayIn` runs on a `PayabliSession` built from your configuration. It is `@MainActor`.
+`PayabliPayIn` runs on the session `PayabliSession.initialize` returned. It is `@MainActor`.
 
 ```swift
 import PayabliSDKCore
 import PayabliSDKPayIn
 
+let session = try await PayabliSession.initialize(config: PayabliConfig(
+    entryPoint: "your-entry-point",
+    environment: .sandbox,
+    tokenProvider: { try await fetchPayabliAccessToken() }
+))
 let payIn = PayabliPayIn(
-    session: PayabliSession(config: config),
+    session: session,
     operation: .capture,
     requestConfiguration: PayabliPayInRequestConfiguration(
         paymentDetails: PayabliPayInPaymentDetails(totalAmount: 12.34),

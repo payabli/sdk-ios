@@ -45,8 +45,9 @@ development builds and `production` for builds you distribute.
 
 ### Register your app as an authorized app
 
-The authorized app entry for iOS is your app's **app ID**, your Apple Team ID and bundle ID joined by a dot:
-`<TEAM_ID>.<BUNDLE_ID>`, for example `TEAM123456.com.example.checkout`. Register it once per paypoint,
+The authorized app entry for iOS is your app's **app ID**, its App ID prefix and bundle ID joined by a dot:
+`<APP_ID_PREFIX>.<BUNDLE_ID>`, for example `TEAM123456.com.example.checkout`. The App ID prefix is your
+Team ID for most apps; an older App ID can have a different one, shown in the Apple Developer portal. Register it once per paypoint,
 in the Payabli portal under **Pay In > Devices > Device management**, **⋯ > Authorized apps**, or from your
 backend:
 
@@ -61,12 +62,13 @@ curl -X POST "https://api-sandbox.payabli.com/api/v2/paypoint/{entryPoint}/apps"
   the bearer token.
 - `friendlyName` is optional. Calling it again with the same values is safe.
 - Register each bundle ID you ship, including debug and white-label builds.
+- The SDK reads the app ID from the signed app and sends it when the device attests, so your code never
+  passes it.
 
 An app that isn't an authorized app is refused when the device attests, with an HTTP 403. `initialize()`
 throws a `PayabliGenericError` whose `type` is `.permissionDenied`, not `attestationFailed`, and
-`sessionState` is `.pendingActivation`, the same state as a phone that needs a code. An activation code
-doesn't clear it: register the app, then initialize again. So a phone that lands on `.pendingActivation`
-straight after setup may be running an app that isn't registered.
+`sessionState` is `.failed(reason: .configurationRejected)`: the phone was never registered, so there is
+nothing to activate. Register the app, then initialize again.
 
 ## Set up
 
@@ -74,16 +76,17 @@ straight after setup may be running an app that isn't registered.
 import PayabliSDKCore
 import PayabliSDKTapToPay
 
-let ttp = try PayabliTTP(
-    tokenProvider: { try await fetchPayabliAccessToken() },
+let session = try await PayabliSession.initialize(config: PayabliConfig(
     entryPoint: "your-entry-point",
-    appId: "TEAM123456.com.example.checkout",
-    environment: .sandbox
-)
+    environment: .sandbox,
+    tokenProvider: { try await fetchPayabliAccessToken() }
+))
+let ttp = try await PayabliTTP.create()
 ```
 
-- `PayabliTTP` builds its own session from these values. It is an `ObservableObject`: bind `sessionState`
-  and `isReady` in SwiftUI.
+- Start the session once, before `create()`. `create()` throws when no session has been started.
+- Card-not-present payments run on the same session: pass `session` to `PayabliPayIn`.
+- `PayabliTTP` is an `ObservableObject`: bind `sessionState` and `isReady` in SwiftUI.
 - **One paypoint per session.** A `PayabliTTP` serves the entry point it was created with.
 
 ## Take a payment
@@ -136,8 +139,9 @@ A phone takes Tap to Pay payments for a paypoint only after it is activated with
 - A reinstall, a restore to a new phone, or a new phone needs a new code.
 
 Until the phone is activated, `initialize()` throws `PayabliTTPError.devicePendingActivation` and
-`sessionState` is `.pendingActivation`. An app that isn't an authorized app, or credentials without `tools_init`
-or `pos_create`, land in the same state, so check both before issuing a code. Credentials without
+`sessionState` is `.pendingActivation(activationId:)`. An app that isn't an authorized app, or credentials
+without `tools_init` or `pos_create`, land on `.failed(reason: .configurationRejected)` on a phone that
+hasn't registered yet. Credentials without
 `inboundpayments_create` reach `.ready`, and `charge` then throws a core `PayabliError` whose `type` is
 `.permissionDenied`, before the card is read.
 
@@ -146,16 +150,17 @@ or `pos_create`, land in the same state, so check both before issuing a code. Cr
 
    - **From your backend:** call
      [Generate Tap to Pay activation code](https://docs.payabli.com/developers/api-reference/device/activation-challenge)
-     with the paypoint's entry point and the phone's device ID. Read the device ID with `deviceId()`
-     once `sessionState` is `.pendingActivation`, and send it to your backend:
+     with the paypoint's entry point and the phone's activation ID in the request's `deviceId` field.
+     The activation ID is on the pending state, and only there:
 
      ```swift
-     guard let deviceId = await ttp.deviceId() else {
-         // The SDK holds no usable ID for this phone. Initializing enrolls it again.
-         try await ttp.initialize()
-         return
+     if case let .pendingActivation(activationId) = ttp.sessionState {
+         // Send activationId to your backend.
      }
      ```
+
+     From Objective-C, read `ttp.activationId`, which is `nil` unless an activation is owed. An app that
+     lost the ID initializes again and lands on the same one.
 
    - **From the portal:** under **Pay In > Devices > Device management**, choose
      **⋯ > Generate activation code**.
@@ -221,9 +226,12 @@ Every `PayabliTTPError` carries `capture` and `paymentTransId`:
 | `configFailed(reason:)` | Fetching the device's configuration failed. `reason` says why: a setup gap on the paypoint or device, or a token, network or service failure. |
 | `readerSetupFailed(reason:paymentTransId:)` | The reader couldn't be prepared. |
 | `readerOSVersionNotSupported(paymentTransId:capture:)` | The iOS version doesn't support Tap to Pay. |
-| `invalidState(current:attempted:)`, `notReady(current:)`, `notInitialized` | The call was made in the wrong session state. |
+| `invalidState(current:attempted:)`, `notReady(current:)` | The call was made in the wrong session state. |
 | `tokenExpired`, `networkError(reason:)` | The token or the network failed. Retry later. |
 | `activationFailed(reason:)` | The activation code was refused. |
+
+`PayabliTTP.create()` throws a `TapToPayError` whose `type` is `.sessionNotInitialized` (1019) when no session
+has been started: call `PayabliSession.initialize` first.
 
 Device attestation and opening a transaction can also throw a core `PayabliError` from `PayabliSDKCore`,
 for example `PayabliGenericError` or `PayabliPaymentError`. It carries no `capture`: `charge` throws one
@@ -244,7 +252,7 @@ From Objective-C, these errors arrive as `NSError`. See
 | `.idle` | Not started, or activated and waiting for `initialize()`. |
 | `.attestingDevice`, `.fetchingConfig`, `.initializingReader(percent:)` | `initialize()` is running. |
 | `.ready` | Ready to charge. |
-| `.pendingActivation` | The phone needs an activation code, the app isn't one of the paypoint's authorized apps, or the credentials lack `tools_init` or `pos_create`. |
+| `.pendingActivation(activationId:)` | The phone needs an activation code. `activationId` is what the activation route's `deviceId` field takes. |
 | `.pendingTerms` | The merchant hasn't accepted Apple's terms. |
 | `.sessionExpired` | The session needs refreshing. The next `charge` refreshes it. |
 | `.reinitializing` | The session is being refreshed. |
@@ -259,7 +267,7 @@ From Objective-C, these errors arrive as `NSError`. See
 | `.serviceUnavailable` | The service or the reader wasn't available. Try again later. |
 | `.deviceIneligible` | This iPhone or iOS version can't take Tap to Pay payments, or the card reader refused it. If an iPhone that meets the requirements lands here, contact Payabli before replacing it. |
 | `.sdkInternalError` | Report it to Payabli. |
-| `.deviceKeyUnavailable` | The iPhone's key facility failed, so the SDK can't tell whether this device's key still works. Initialize again; if it keeps failing, the problem is the device's. |
+| `.deviceKeyUnavailable` | This device's secure storage is unavailable, for example before the first unlock after a restart. Initialize again; if it persists, the device is the cause. |
 
 ### Events
 

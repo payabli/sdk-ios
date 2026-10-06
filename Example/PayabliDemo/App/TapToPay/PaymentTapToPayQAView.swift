@@ -43,7 +43,7 @@ struct PaymentTapToPayQAView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
                     QAContextLine()
-                    TerminalReadinessView(configuredAppId: Secrets.appId)
+                    TerminalReadinessView()
                     stepsSection
                     recoverySection
                     eventLogSection
@@ -221,7 +221,7 @@ struct PaymentTapToPayQAView: View {
     private var activationSheet: some View {
         NavigationStack {
             Form {
-                ActivationDeviceIdSection(terminal: terminal)
+                ActivationIdSection(activationId: terminal.activationId)
 
                 Section("Activation code") {
                     TextField("6 digits", text: $activationCode)
@@ -641,24 +641,18 @@ struct TapToPayQAEventEntry: Identifiable {
 }
 
 /// The id a backend sends with the paypoint to issue this device's activation code.
-private struct ActivationDeviceIdSection: View {
-    let terminal: TapToPayTerminal
-    /// `nil` until the read returns; the inner `nil` is the SDK holding no usable id.
-    @State private var read: String??
+private struct ActivationIdSection: View {
+    let activationId: String?
 
     var body: some View {
-        Section("Device ID") {
-            switch read {
-            case .none:
-                ProgressView()
-            case .some(.none):
-                Text("None held.")
-            case let .some(.some(deviceId)):
-                Text(deviceId)
+        Section("Activation ID") {
+            if let activationId {
+                Text(activationId)
                     .font(.footnote.monospaced())
                     .textSelection(.enabled)
+            } else {
+                Text("No activation is owed.")
             }
         }
-        .task { read = .some(await terminal.deviceId()) }
     }
 }

@@ -24,15 +24,15 @@ RCT_EXTERN_METHOD(areTermsAccepted:(RCTPromiseResolveBlock)resolve
 RCT_EXTERN_METHOD(presentTerms:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject)
 
-RCT_EXTERN_METHOD(deviceId:(RCTPromiseResolveBlock)resolve
-                  rejecter:(RCTPromiseRejectBlock)reject)
-
 RCT_EXTERN_METHOD(getSessionState:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject)
 
 RCT_EXTERN_METHOD(resolveTokenRefresh:(NSString *)token)
 
 RCT_EXTERN_METHOD(rejectTokenRefresh:(NSString *)reason)
+
+RCT_EXTERN_METHOD(sessionDeviceId:(RCTPromiseResolveBlock)resolve
+                  rejecter:(RCTPromiseRejectBlock)reject)
 
 RCT_EXTERN_METHOD(configurePayIn:(NSDictionary *)config
                   resolver:(RCTPromiseResolveBlock)resolve

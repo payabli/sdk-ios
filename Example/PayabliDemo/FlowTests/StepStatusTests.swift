@@ -63,7 +63,7 @@ let everyTapToPaySession: [PayabliTTPSessionState] = [
     .ready,
     .sessionExpired,
     .reinitializing,
-    .pendingActivation,
+    .pendingActivation(activationId: "dev"),
     .failed(reason: .sdkInternalError),
     .pendingTerms
 ]

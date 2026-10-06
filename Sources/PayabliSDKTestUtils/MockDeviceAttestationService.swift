@@ -55,6 +55,13 @@ package final class MockDeviceAttestationService: DeviceAttestationService, @unc
 
     private var storedReadFailure: Error?
 
+    package var registrationReadFailure: Error? {
+        get { lock.withLock { storedRegistrationReadFailure } }
+        set { lock.withLock { storedRegistrationReadFailure = newValue } }
+    }
+
+    private var storedRegistrationReadFailure: Error?
+
     package func isAttested(for entry: String) async throws -> Bool {
         try lock.withLock {
             if let storedReadFailure {
@@ -74,6 +81,9 @@ package final class MockDeviceAttestationService: DeviceAttestationService, @unc
             if let storedReadFailure {
                 throw storedReadFailure
             }
+            if let storedRegistrationReadFailure {
+                throw storedRegistrationReadFailure
+            }
             return storedBindings[entry] ?? storedBindings[Self.anyEntry]
         }
     }
@@ -85,21 +95,6 @@ package final class MockDeviceAttestationService: DeviceAttestationService, @unc
     }
 
     private var storedHeldKeyIsGone = false
-
-    /// A key that is gone drops the binding that names it, as the real check does.
-    /// One turn of the lock, so a write from another task cannot land between the
-    /// read and the drop.
-    package func usableDeviceId(for entry: String) async throws -> String? {
-        try lock.withLock {
-            if let storedReadFailure {
-                throw storedReadFailure
-            }
-            guard let deviceId = storedBindings[entry] ?? storedBindings[Self.anyEntry] else { return nil }
-            guard storedHeldKeyIsGone else { return deviceId }
-            dropBinding(for: entry)
-            return nil
-        }
-    }
 
     /// Called with the lock held. The key goes with the binding that named it.
     private func dropBinding(for entry: String) {
@@ -116,6 +111,13 @@ package final class MockDeviceAttestationService: DeviceAttestationService, @unc
         get { lock.withLock { storedAttestResult } }
         set { lock.withLock { storedAttestResult = newValue } }
     }
+
+    package var pendingRegistration: String? {
+        get { lock.withLock { storedPendingRegistration } }
+        set { lock.withLock { storedPendingRegistration = newValue } }
+    }
+
+    private var storedPendingRegistration: String?
 
     private var storedActivationResult: Result<Void, Error> = .success(())
     package var activationResult: Result<Void, Error> {
@@ -143,6 +145,11 @@ package final class MockDeviceAttestationService: DeviceAttestationService, @unc
     package func attest(entry: String) async throws -> AttestationResult {
         let result: Result<AttestationResult, Error> = lock.withLock {
             storedAttestCalls += 1
+            if let storedPendingRegistration {
+                storedBindings[entry] = storedPendingRegistration
+                storedKeys[entry] = Self.defaultKeyId
+                return .failure(PayabliTTPError.devicePendingActivation)
+            }
             return storedAttestResult
         }
         switch result {
@@ -181,9 +188,20 @@ package final class MockDeviceAttestationService: DeviceAttestationService, @unc
         )
     }
 
-    package func activateDevice(activationCode: String, entry: String) async throws {
+    package var beforeActivate: (@Sendable () async -> Void)? {
+        get { lock.withLock { storedBeforeActivate } }
+        set { lock.withLock { storedBeforeActivate = newValue } }
+    }
+
+    private var storedBeforeActivate: (@Sendable () async -> Void)?
+
+    package func activateDevice(activationCode: String, entry: String, activationId: String) async throws {
+        await beforeActivate?()
         let result: Result<Void, Error> = lock.withLock {
             storedActivateCalls += 1
+            guard (storedBindings[entry] ?? storedBindings[Self.anyEntry]) == activationId else {
+                return .failure(ActivationRegistrationChanged())
+            }
             return storedActivationResult
         }
         if case let .failure(err) = result {

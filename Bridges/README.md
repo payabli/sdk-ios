@@ -34,6 +34,11 @@ into the bridge APIs.
 Each bridge runs one session with one token callback: `configure` and `configurePayIn` both take a
 `tokenProvider`, and when a host calls both, the callback from the later successful call answers every token request.
 
+The device's identity is on the session, not on either capability: `PayabliSession.deviceId()` in Flutter and
+React Native, and `PayabliSessionObjC.DeviceId` in .NET MAUI. It is `null` before a configure has succeeded and
+while the device's secure storage can't be read. A Tap to Pay activation reads `activationId` from the session
+state instead.
+
 For payment flow-specific bridge setup, access-token handling, and sample
 stored card/bank account calls, see
 [`Documentation/PayInIntegrationGuide.md`](../Documentation/PayInIntegrationGuide.md).

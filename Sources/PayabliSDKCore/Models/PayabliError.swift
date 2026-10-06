@@ -51,6 +51,7 @@ public enum PayabliErrorType: String, Sendable, CaseIterable {
     case validation = "VALIDATION_ERROR"
     case unknown = "UNKNOWN"
     case sdkInternalError = "SDK_INTERNAL_ERROR"
+    case sessionNotInitialized = "SESSION_NOT_INITIALIZED"
 
     // Card-present.
     case deviceKeyUnavailable = "DEVICE_KEY_UNAVAILABLE"
@@ -140,6 +141,7 @@ public extension PayabliErrorType {
         case .validation: 1016
         case .unknown: 1017
         case .sdkInternalError: 1018
+        case .sessionNotInitialized: 1019
         case .deviceKeyUnavailable: 3001
         case .deviceSetupUnsupported: 3002
         case .deviceServicesOutdated: 3003
@@ -196,6 +198,7 @@ public extension PayabliErrorType {
         case .validation: "The request was refused as invalid."
         case .unknown: "An unexpected error occurred."
         case .sdkInternalError: "The SDK failed before the request was sent."
+        case .sessionNotInitialized: "The session has not been initialized."
         case .deviceKeyUnavailable: "This device's secure storage is unavailable."
         case .deviceSetupUnsupported: "This device cannot be set up for card-present payments."
         case .deviceServicesOutdated: "Google Play on this device must be installed, updated or signed in."
@@ -247,7 +250,7 @@ public extension PayabliErrorType {
             .outcomeUnknown
         case .rateLimited, .deviceKeyUnavailable, .deviceSetupUnavailable, .readerUnavailable, .readerSessionExpired:
             .retryLater
-        case .validation, .activationCodeMalformed, .activationCodeIncorrect, .deviceNotPending, .terminalNotReady,
+        case .validation, .sessionNotInitialized, .activationCodeMalformed, .activationCodeIncorrect, .deviceNotPending, .terminalNotReady,
              .tooManyOpenCharges, .paymentNotHeld:
             .invalidRequest
         case .deviceSetupUnsupported, .deviceSetupRefused, .deviceOSUnsupported, .deviceHardwareUnsupported,

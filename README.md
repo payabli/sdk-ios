@@ -21,10 +21,10 @@ token in memory while the session runs.
 
 1. **Your backend** exchanges your Payabli client ID and client secret for a short-lived access token,
    through a token endpoint you build.
-2. **Your app** gives the SDK your entry point, the environment and a token provider that calls that
-   endpoint.
-3. **With that configuration**, your app takes a payment card-not-present with `PayabliPayIn`, or
-   card-present with `PayabliTTP`.
+2. **Your app** starts one session with your entry point, the environment and a token provider that calls
+   that endpoint.
+3. **On that session**, your app takes a payment card-not-present with `PayabliPayIn`, or card-present
+   with `PayabliTTP`.
 4. **Every charge ends in an outcome** your app acts on: charged, not charged, or unknown and to be
    reconciled.
 
@@ -169,17 +169,17 @@ authenticates no caller, so run it only on your own machine.
 
 ### Configure the SDK
 
-Both ways to pay take your entry point, the environment and a token provider. `PayabliPayIn` takes them as
-a `PayabliConfig`; `PayabliTTP` takes them directly, with your app ID.
+Start the session once, before you build either way to pay. It takes your entry point, the environment and
+a token provider, and both ways to pay run on it.
 
 ```swift
 import PayabliSDKCore
 
-let config = try PayabliConfig(
+let session = try await PayabliSession.initialize(config: PayabliConfig(
     entryPoint: "your-entry-point",
     environment: .sandbox,
     tokenProvider: { try await fetchPayabliAccessToken() }
-)
+))
 ```
 
 | Environment | API host |
@@ -188,6 +188,8 @@ let config = try PayabliConfig(
 | `.production` | `https://api.payabli.com` |
 
 - `PayabliConfig` throws when the entry point is blank.
+- Calling `initialize` again with the same entry point, environment and telemetry setting returns the same
+  session. A different one throws `invalidConfiguration`, and the session already running stays in place.
 
 The token provider is an `async throws` function that returns a new access token from your token
 endpoint:
@@ -211,12 +213,18 @@ func fetchPayabliAccessToken() async throws -> String {
   use fails with `PayabliErrorType.tokenProviderFailed`.
 - Return a token. Don't make SDK calls from inside the provider.
 
+### Device identity
+
+`PayabliSession.deviceId` is this device's identity, the same for every capability and stable for the
+install. It is `nil` while the device's secure storage can't be read, such as before the first unlock
+after a restart. From Objective-C, read `PayabliSessionObjC.deviceId`, which is also `nil` before the
+session is initialized.
+
 ## Take a payment
 
 ### Card-not-present
 
-`PayabliPayIn` runs on a `PayabliSession` built from your configuration. Show its form, or call it from
-your own UI:
+`PayabliPayIn` runs on the session `initialize` returned. Show its form, or call it from your own UI:
 
 ```swift
 import PayabliSDKCore
@@ -224,7 +232,7 @@ import PayabliSDKPayIn
 import SwiftUI
 
 let payIn = PayabliPayIn(
-    session: PayabliSession(config: config),
+    session: session,
     operation: .capture,
     requestConfiguration: PayabliPayInRequestConfiguration(
         paymentDetails: PayabliPayInPaymentDetails(totalAmount: 12.34),
@@ -250,18 +258,13 @@ charging a saved method, authorizing and capturing, voiding, and the form's conf
 
 ### Tap to Pay
 
-`PayabliTTP` builds its own session from your entry point and app ID. After the one-time setup in the
+`PayabliTTP` runs on the session you started. After the one-time setup in the
 [Tap to Pay guide](Sources/PayabliSDKTapToPay/README.md), a payment takes three calls:
 
 ```swift
 import PayabliSDKTapToPay
 
-let ttp = try PayabliTTP(
-    tokenProvider: { try await fetchPayabliAccessToken() },
-    entryPoint: "your-entry-point",
-    appId: "TEAM123456.com.example.checkout",
-    environment: .sandbox
-)
+let ttp = try await PayabliTTP.create()
 try await ttp.initialize()
 let result = try await ttp.charge(
     type: .sale,
@@ -322,12 +325,17 @@ and [Tap to Pay](Sources/PayabliSDKTapToPay/README.md#outcomes-and-errors).
 
 The SDK is written in Swift, and the card-not-present form is a SwiftUI view.
 
-- **Objective-C.** `PayabliTTP` has an `@objc` companion, taking a completion handler, for every `async`
-  method. Construct it with `initWithTokenHandler:entryPoint:appId:environment:error:`. Its errors bridge
-  to `NSError` in the `com.payabli.ttp` domain: `userInfo["capture"]` holds the `PayabliTTPCapture` raw
-  value (`0` not charged, `1` unknown, `2` charged), and `userInfo["paymentTransId"]` is absent when there
-  is no transaction ID. For card-not-present, Objective-C uses `PayabliPayInObjC`, built with
-  `initWithTokenHandler:entryPoint:environment:error:`, which offers `addCard` and `addBankAccount`.
+- **Objective-C.** Start the session with `PayabliSessionObjC`'s
+  `initializeWithTokenHandler:entryPoint:environment:telemetryEnabled:completionHandler:`. `PayabliTTP` has
+  an `@objc` companion, taking a completion handler, for every `async` method, and is built with
+  `createWithCompletionHandler:`. For card-not-present, Objective-C uses `PayabliPayInObjC`, built with
+  `createAndReturnError:` on the same session, which offers `addCard` and `addBankAccount`.
+- **Objective-C errors.** An SDK error reaches Objective-C as an `NSError` whose `code` is its catalog
+  number, with the type's name in `userInfo["PayabliErrorType"]`. Tap to Pay errors are in the
+  `com.payabli.ttp` domain, where `userInfo["capture"]` holds the `PayabliTTPCapture` raw value (`0` not
+  charged, `1` unknown, `2` charged) and `userInfo["paymentTransId"]` is absent when there is no
+  transaction ID. Card-not-present errors are in the `com.payabli.payIn` domain, and errors from
+  `PayabliSessionObjC`'s initializer are in `com.payabli.session`.
 - **Flutter, .NET MAUI and React Native.** Wrappers are in [`Bridges/`](Bridges/README.md), which lists the
   status of each.
 

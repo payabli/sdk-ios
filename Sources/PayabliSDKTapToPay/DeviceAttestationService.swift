@@ -62,13 +62,6 @@ package protocol DeviceAttestationService: AnyObject, Sendable {
     /// `nil` when it holds no binding.
     func cachedDeviceId(for entry: String) throws -> String?
 
-    /// The `deviceId` this entry point was registered under, or `nil` when it holds no
-    /// binding or the key that binding names is gone. A key check that cannot answer
-    /// keeps the binding, so its id is returned.
-    ///
-    /// Raises when the store could not be read.
-    func usableDeviceId(for entry: String) async throws -> String?
-
     /// Runs the first-run attestation flow: challenge → register → attest.
     /// Throws `PayabliTTPError.devicePendingActivation` if the backend returns
     /// `status == "pending"` (PRD FR-11F.1).
@@ -83,7 +76,7 @@ package protocol DeviceAttestationService: AnyObject, Sendable {
     /// by the partner (e.g. from their admin dashboard). The SDK does not
     /// request the code itself — the partner is responsible for delivering it
     /// to the device user. PRD §9.7.
-    func activateDevice(activationCode: String, entry: String) async throws
+    func activateDevice(activationCode: String, entry: String, activationId: String) async throws
 
     /// Drops this entry point's binding unconditionally, so the next `initialize()`
     /// for it runs the cold sequence. Every other entry point's binding is left
@@ -110,4 +103,8 @@ package protocol DeviceAttestationService: AnyObject, Sendable {
     /// Answers whether it dropped anything, and raises when the store refuses.
     @discardableResult
     func forgetRefusedBinding(entry: String, deviceId: String, keyId: String) throws -> Bool
+}
+
+package struct ActivationRegistrationChanged: Error {
+    package init() {}
 }

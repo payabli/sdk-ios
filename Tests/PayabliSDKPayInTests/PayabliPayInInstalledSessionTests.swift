@@ -46,9 +46,9 @@ final class PayabliPayInInstalledSessionTests: XCTestCase {
         XCTAssertTrue(bridged.component.session === installed)
     }
 
-    func testObjectiveCFacadeBeforeASessionIsInstalledThrows() {
+    func testObjectiveCFacadeBeforeASessionIsInstalledThrowsSessionNotInitialized() {
         XCTAssertThrowsError(try PayabliPayInObjC.create()) { error in
-            assertCatalogError(error, domain: "com.payabli.payIn")
+            assertCatalogError(error, domain: "com.payabli.payIn", type: .sessionNotInitialized)
         }
     }
 
@@ -98,13 +98,19 @@ final class PayabliPayInInstalledSessionTests: XCTestCase {
     }
 
     /// What an Objective-C caller reads: the domain, the catalog number as the code, and the wire name.
-    private func assertCatalogError(_ error: Error, domain: String, file: StaticString = #filePath, line: UInt = #line) {
+    private func assertCatalogError(
+        _ error: Error,
+        domain: String,
+        type: PayabliErrorType = .invalidConfiguration,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
         let nsError = error as NSError
         XCTAssertEqual(nsError.domain, domain, file: file, line: line)
-        XCTAssertEqual(nsError.code, PayabliErrorType.invalidConfiguration.number, file: file, line: line)
+        XCTAssertEqual(nsError.code, type.number, file: file, line: line)
         XCTAssertEqual(
             nsError.userInfo["PayabliErrorType"] as? String,
-            PayabliErrorType.invalidConfiguration.rawValue,
+            type.rawValue,
             file: file,
             line: line
         )

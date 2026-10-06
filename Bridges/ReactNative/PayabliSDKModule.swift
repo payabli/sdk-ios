@@ -24,8 +24,8 @@ import UIKit
 ///   - `areTermsAccepted(resolver, rejecter)` — resolves a bool. Rejects
 ///     rather than resolving `false` when the reader cannot answer, whether
 ///     none is prepared or the platform raised.
-///   - `deviceId(resolver, rejecter)` — resolves the id, or `null` when the SDK
-///     holds no usable one.
+///   - `sessionDeviceId(resolver, rejecter)` — resolves the session's device
+///     id, or `null`.
 ///   - `getSessionState(resolver, rejecter)` — resolves the int raw value
 ///     of the current `PayabliTTPSessionState`.
 ///   - `resolveTokenRefresh(token)` / `rejectTokenRefresh(reason)` —
@@ -306,26 +306,17 @@ public final class PayabliSDKModule: RCTEventEmitter {
         }
     }
 
-    // MARK: - deviceId
+    // MARK: - getSessionState
 
-    /// Resolves the id, or `null` when the SDK holds no usable one. Never rejects
-    /// once configured. `NSNull`, because a nil reaches JavaScript as `undefined`.
-    @objc public func deviceId(
+    /// Resolves the session's device id, or `NSNull`, because a nil reaches JavaScript as `undefined`.
+    @objc public func sessionDeviceId(
         _ resolve: @escaping RCTPromiseResolveBlock,
         rejecter reject: @escaping RCTPromiseRejectBlock
     ) {
         Task { @MainActor in
-            guard let ttp else {
-                reject("NOT_CONFIGURED", "Call configure() before deviceId()", nil)
-                return
-            }
-            ttp.deviceId { deviceId in
-                resolve(deviceId ?? NSNull())
-            }
+            resolve(PayabliSessionObjC.deviceId ?? NSNull())
         }
     }
-
-    // MARK: - getSessionState
 
     @objc public func getSessionState(
         _ resolve: @escaping RCTPromiseResolveBlock,
@@ -336,7 +327,8 @@ public final class PayabliSDKModule: RCTEventEmitter {
             resolve([
                 "code": state.code.rawValue,
                 "readerConfigurationPercent": state.readerConfigurationPercent as Any,
-                "failureReason": state.failureReason?.rawValue as Any
+                "failureReason": state.failureReason?.rawValue as Any,
+                "activationId": state.activationId as Any
             ])
         }
     }

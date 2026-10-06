@@ -99,21 +99,6 @@ package final class AppAttestService: DeviceAttestationService, @unchecked Senda
         return try await keyIsStillHeld(binding)
     }
 
-    /// The probe suspends, so the binding is read again after it: an id read before
-    /// the probe names a device the store may no longer hold. A check that cannot
-    /// answer keeps the binding, so its id is still the device's.
-    package func usableDeviceId(for entry: String) async throws -> String? {
-        guard let binding = try binding(for: entry) else {
-            return nil
-        }
-        do {
-            guard try await keyIsStillHeld(binding) else {
-                return nil
-            }
-        } catch is TapToPayError {}
-        return try self.binding(for: entry) == binding ? binding.deviceId : nil
-    }
-
     /// Whether the platform will still sign with this binding's key.
     ///
     /// Signs over a fixed hash that is sent nowhere: the answer is whether the call
