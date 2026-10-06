@@ -77,7 +77,7 @@ straight after setup may be running an app that isn't registered.
 import PayabliSDKCore
 import PayabliSDKTapToPay
 
-try await PayabliSession.initialize(config: PayabliConfig(
+let session = try await PayabliSession.initialize(config: PayabliConfig(
     entryPoint: "your-entry-point",
     environment: .sandbox,
     tokenProvider: { try await fetchPayabliAccessToken() }
@@ -85,8 +85,8 @@ try await PayabliSession.initialize(config: PayabliConfig(
 let ttp = try await PayabliTTP.create()
 ```
 
-- Start the session once, before `create()`; card-not-present payments run on the same session.
-  `create()` throws when no session has been started.
+- Start the session once, before `create()`. `create()` throws when no session has been started.
+- Card-not-present payments run on the same session: pass `session` to `PayabliPayIn`.
 - `PayabliTTP` is an `ObservableObject`: bind `sessionState` and `isReady` in SwiftUI.
 - **One paypoint per session.** A `PayabliTTP` serves the entry point it was created with.
 
