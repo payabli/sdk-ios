@@ -4,7 +4,8 @@ import Security
 /// Lightweight wrapper over the iOS Keychain for storing non-secret identity
 /// tokens (PRD NFR-5E, §22.1).
 ///
-/// Used by `AppAttestService` to hold the device's bindings across app launches.
+/// Holds the install identifier the session derives the device's identity from, and
+/// the card-present module's bindings across app launches.
 /// **Must not** be used for true secrets (`clientSecret`, access tokens, Fiserv
 /// credentials) — those live in RAM only (NFR-5D).
 ///
@@ -24,11 +25,11 @@ package struct KeychainStorage: SecureStorage, Sendable {
 
     private let service: String
 
-    /// Opening the store corrects what an older version of the SDK wrote, since
-    /// nothing else will: see `migrateAccessibility(forKeys:)`.
-    package init(service: String = KeychainStorage.service) {
+    /// Opening the store corrects what an older version of the SDK wrote under `keys`,
+    /// since nothing else will: see `migrateAccessibility(forKeys:)`.
+    package init(service: String = KeychainStorage.service, migrating keys: [String]) {
         self.service = service
-        migrateAccessibility(forKeys: PayabliKeychainKey.all)
+        migrateAccessibility(forKeys: keys)
     }
 
     // MARK: - Read
@@ -45,7 +46,7 @@ package struct KeychainStorage: SecureStorage, Sendable {
     /// rest can pass: `errSecInteractionNotAllowed` is what a read gets before the
     /// first unlock after a boot, and answering `nil` there reports an enrolled
     /// device as a new one.
-    func data(forKey key: String) throws -> Data? {
+    package func data(forKey key: String) throws -> Data? {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
@@ -63,7 +64,7 @@ package struct KeychainStorage: SecureStorage, Sendable {
     }
 
     /// The access group the item was written to, `nil` when the item is not there.
-    func accessGroup(forKey key: String) throws -> String? {
+    package func accessGroup(forKey key: String) throws -> String? {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
@@ -82,7 +83,7 @@ package struct KeychainStorage: SecureStorage, Sendable {
 
     /// The only status that means nothing is stored, so the only one a read answers
     /// `nil` for.
-    static func isMissing(_ status: OSStatus) -> Bool {
+    package static func isMissing(_ status: OSStatus) -> Bool {
         status == errSecItemNotFound
     }
 
@@ -103,14 +104,14 @@ package struct KeychainStorage: SecureStorage, Sendable {
 
     /// What both write paths carry, built once so neither can be given a
     /// different attribute from the other.
-    static func writeAttributes(_ data: Data) -> [String: Any] {
+    package static func writeAttributes(_ data: Data) -> [String: Any] {
         [
             kSecValueData as String: data,
             kSecAttrAccessible as String: accessibility
         ]
     }
 
-    func set(_ data: Data, forKey key: String) throws {
+    package func set(_ data: Data, forKey key: String) throws {
         let baseQuery: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
@@ -141,7 +142,7 @@ package struct KeychainStorage: SecureStorage, Sendable {
     ///
     /// Runs whenever the store is opened, since a locked Keychain makes any single
     /// attempt a no-op and an item it cannot reach waits for the next one.
-    func migrateAccessibility(forKeys keys: [String]) {
+    package func migrateAccessibility(forKeys keys: [String]) {
         for key in keys {
             let query: [String: Any] = [
                 kSecClass as String: kSecClassGenericPassword,
@@ -167,7 +168,7 @@ package struct KeychainStorage: SecureStorage, Sendable {
         try Self.check(SecItemDelete(query as CFDictionary))
     }
 
-    func removeAll() throws {
+    package func removeAll() throws {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service
@@ -175,46 +176,8 @@ package struct KeychainStorage: SecureStorage, Sendable {
         try Self.check(SecItemDelete(query as CFDictionary))
     }
 
-    static func check(_ status: OSStatus) throws {
+    package static func check(_ status: OSStatus) throws {
         guard status != errSecSuccess, status != errSecItemNotFound else { return }
         throw KeychainError.underlying(status)
     }
-}
-
-// MARK: - Storage keys used by the SDK (§22.1)
-
-package enum PayabliKeychainKey {
-    /// Holds a freshly generated App Attest key that has not yet completed
-    /// attestation. Kept separate from the binding so a pre-attest retry can
-    /// reuse the same Secure Enclave key without the warm path reading it as an
-    /// enrolled device.
-    package static let pendingKeyId = Stored.pendingKeyId.rawValue
-
-    /// Every binding this device holds, as one item. Replaces `keyId` and
-    /// `deviceId`, which recorded no paypoint and were two writes with a window
-    /// between them.
-    package static let deviceBindings = Stored.deviceBindings.rawValue
-
-    /// The UUID this install was first seen with, which the value `/register`
-    /// receives is derived from. It outlives every binding: an install that lost it
-    /// registers as a new device. See `InstallIdentifier`.
-    package static let installId = Stored.installId.rawValue
-
-    /// The keys themselves. The constants above are the names callers use, and a
-    /// key added here joins `all` by being a case, so a sweep cannot miss one.
-    enum Stored: String, CaseIterable {
-        case deviceBindings = "com.payabli.ttp.deviceBindings"
-        case pendingKeyId = "com.payabli.ttp.pendingKeyId"
-        case installId = "com.payabli.ttp.installId"
-    }
-
-    /// What an install from before the bindings item may still be carrying. Read
-    /// by nothing: the paypoint each belongs to was never recorded, so neither can
-    /// be adopted, and they are removed the first time the store is opened.
-    static let superseded = [
-        "com.payabli.ttp.keyId",
-        "com.payabli.ttp.deviceId"
-    ]
-
-    static let all = Stored.allCases.map(\.rawValue)
 }

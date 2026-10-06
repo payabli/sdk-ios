@@ -1,4 +1,5 @@
 @testable import PayabliDemo
+@testable import PayabliSDKCore
 @testable import PayabliSDKTapToPay
 import Security
 import XCTest
@@ -12,14 +13,14 @@ import XCTest
 /// answers here are the platform's. Nothing in this file skips.
 final class KeychainOnDeviceTests: XCTestCase {
     private var service = ""
-    private var storage = KeychainStorage()
+    private var storage = KeychainStorage(migrating: PayabliKeychainKey.all)
 
     override func setUp() {
         super.setUp()
         // Its own service per test, so one test's leftovers cannot answer another's
         // read, and a failure leaves nothing behind for the next run.
         service = "com.payabli.devicetests.\(UUID().uuidString)"
-        storage = KeychainStorage(service: service)
+        storage = KeychainStorage(service: service, migrating: PayabliKeychainKey.all)
     }
 
     override func tearDown() {
@@ -92,7 +93,7 @@ final class KeychainOnDeviceTests: XCTestCase {
             "the item under test was not written the old way"
         )
 
-        _ = KeychainStorage(service: service)
+        _ = KeychainStorage(service: service, migrating: PayabliKeychainKey.all)
 
         XCTAssertEqual(
             try accessibility(ofKey: PayabliKeychainKey.installId),
@@ -125,7 +126,7 @@ final class KeychainOnDeviceTests: XCTestCase {
     /// Asserted over every key rather than one, since a key absent from that list would not be swept and
     /// so would not show the regression.
     func testOpeningTheStoreWritesNothingForAKeyThatHasNoItem() throws {
-        _ = KeychainStorage(service: service)
+        _ = KeychainStorage(service: service, migrating: PayabliKeychainKey.all)
 
         for key in PayabliKeychainKey.all {
             XCTAssertNil(try storage.string(forKey: key), key)
@@ -140,7 +141,7 @@ final class KeychainOnDeviceTests: XCTestCase {
             forKey: PayabliKeychainKey.installId,
             accessible: kSecAttrAccessibleWhenUnlocked
         )
-        let reopened = KeychainStorage(service: service)
+        let reopened = KeychainStorage(service: service, migrating: PayabliKeychainKey.all)
         XCTAssertEqual(try reopened.string(forKey: PayabliKeychainKey.installId), "kept")
     }
 

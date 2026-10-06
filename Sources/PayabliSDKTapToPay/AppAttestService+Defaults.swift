@@ -1,4 +1,5 @@
 import Foundation
+import PayabliSDKCore
 
 #if canImport(UIKit)
     import UIKit
@@ -16,21 +17,7 @@ extension AppAttestService {
     /// model name, which `model` already carries, and an app holding the
     /// user-assigned-device-name entitlement gets the name its owner typed.
     static var defaultModel: @Sendable () -> String {
-        { model() }
-    }
-
-    /// Read over the field's own bytes, up to the first zero. `utsname.machine`
-    /// is 256 of them, and neither a pointer rebound with a claimed capacity of
-    /// one nor a C-string scan stays inside them.
-    static func model() -> String {
-        var sysinfo = utsname()
-        uname(&sysinfo)
-        return withUnsafeBytes(of: &sysinfo.machine) { raw in
-            // Failable, so bytes that are not UTF-8 are blank. Registration
-            // refuses a blank; a replacement character is a model the service
-            // reads as a different device.
-            String(bytes: raw.prefix { $0 != 0 }, encoding: .utf8) ?? ""
-        }
+        { DeviceModel.hardware() }
     }
 
     static var defaultOSVersion: @Sendable () -> String {

@@ -25,8 +25,11 @@ public final class PayabliSession: @unchecked Sendable {
     /// This device's identity, the same for every capability and stable for the install. `nil` while
     /// the device's secure store cannot be read, such as before the first unlock after a restart.
     public var deviceId: String? {
-        nil
+        guard let value = try? deviceIdentity.value(), !value.isEmpty else { return nil }
+        return value
     }
+
+    package let deviceIdentity: DeviceIdentity
 
     private let identity: ConfigIdentity
 
@@ -34,8 +37,15 @@ public final class PayabliSession: @unchecked Sendable {
     private static let lock = NSLock()
     private static var installed: PayabliSession?
 
-    init(config: PayabliConfig, urlSession: URLSession? = nil) {
+    init(
+        config: PayabliConfig,
+        urlSession: URLSession? = nil,
+        deviceIdentity: DeviceIdentity = DeviceIdentity {
+            try InstallIdentifier.hardwareId(storage: KeychainStorage(migrating: [InstallIdentifier.storageKey]))
+        }
+    ) {
         self.config = config
+        self.deviceIdentity = deviceIdentity
         identity = ConfigIdentity(config)
         let auth = PayabliAuth(config: config)
         self.auth = auth

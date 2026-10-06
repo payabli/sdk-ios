@@ -1,3 +1,4 @@
+@testable import PayabliSDKCore
 @testable import PayabliSDKTapToPay
 import Security
 import XCTest
@@ -15,12 +16,12 @@ final class InstallIdentifierOnDeviceTests: XCTestCase {
     /// checks below delete the stored value, and doing that to the SDK's own item
     /// would change the identity of the install the cycle is measuring.
     private var scratch = ""
-    private var storage = KeychainStorage()
+    private var storage = KeychainStorage(migrating: PayabliKeychainKey.all)
 
     override func setUp() {
         super.setUp()
         scratch = "com.payabli.devicetests.\(UUID().uuidString)"
-        storage = KeychainStorage(service: scratch)
+        storage = KeychainStorage(service: scratch, migrating: PayabliKeychainKey.all)
     }
 
     override func tearDown() {
@@ -29,6 +30,19 @@ final class InstallIdentifierOnDeviceTests: XCTestCase {
             kSecAttrService as String: scratch
         ] as CFDictionary)
         super.tearDown()
+    }
+
+    /// The session's identity is the one registration sends, read from the SDK's own item.
+    func testTheSessionAnswersTheIdentityRegistrationSends() throws {
+        let session = try PayabliSession(
+            config: PayabliConfig(entryPoint: "devicetests", environment: .sandbox, tokenProvider: { "t" })
+        )
+        let sent = try InstallIdentifier.hardwareId(
+            storage: KeychainStorage(migrating: [InstallIdentifier.storageKey])
+        )
+
+        XCTAssertEqual(sent.count, 32)
+        XCTAssertEqual(session.deviceId, sent)
     }
 
     func testTheSameAnswerOnEveryCall() throws {
@@ -71,7 +85,7 @@ final class InstallIdentifierOnDeviceTests: XCTestCase {
     /// run prints does: this one is stable per install, and Xcode and CI retain what
     /// a test writes.
     func testReportTheIdentifierForAnInstallCycle() throws {
-        let id = try InstallIdentifier.hardwareId(storage: KeychainStorage())
+        let id = try InstallIdentifier.hardwareId(storage: KeychainStorage(migrating: PayabliKeychainKey.all))
         XCTAssertFalse(id.isEmpty, "nothing was built from")
         LiveEnvironment.reportIdentifier("HARDWARE_ID", id, env: "install-cycle")
     }

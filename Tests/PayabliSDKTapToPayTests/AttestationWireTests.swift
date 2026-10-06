@@ -192,11 +192,14 @@ final class AttestationWireTests: XCTestCase {
             return AttestFixture.ok(request, ["ok": true])
         }
 
-        // The real provider, so this covers the wiring rather than a stand-in.
+        // Read through the session's identity, as registration does in production.
         let storage = InMemorySecureStorage()
+        let identity = DeviceIdentity {
+            try InstallIdentifier.hardwareId(storage: storage, bundleIdentifier: "com.acme.checkout")
+        }
         let (sut, _, _) = try AttestFixture.makeService(
             storage: storage,
-            hardwareIdProvider: { try InstallIdentifier.hardwareId(storage: storage, bundleIdentifier: "com.acme.checkout") }
+            hardwareIdProvider: { try identity.value() }
         )
 
         _ = try await sut.attest(entry: "myEntry")
@@ -215,8 +218,8 @@ final class AttestationWireTests: XCTestCase {
         XCTAssertTrue(hardwareId.allSatisfy(\.isHexDigit))
         XCTAssertEqual(
             hardwareId,
-            try InstallIdentifier.hardwareId(storage: storage, bundleIdentifier: "com.acme.checkout"),
-            "what was sent is not what the identifier produces for this install"
+            try identity.value(),
+            "what was sent is not the device's identity"
         )
     }
 }

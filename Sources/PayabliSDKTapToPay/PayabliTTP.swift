@@ -153,7 +153,8 @@ public final class PayabliTTP: NSObject, ObservableObject {
             let attestation = AppAttestService(
                 transport: payabliSession.transport,
                 attestor: RealAppAttestor(),
-                storage: KeychainStorage()
+                storage: KeychainStorage(migrating: PayabliKeychainKey.all),
+                deviceIdentity: payabliSession.deviceIdentity
             )
             return PayabliTTP(
                 session: payabliSession,

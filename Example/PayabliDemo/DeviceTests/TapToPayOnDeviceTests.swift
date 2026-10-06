@@ -40,16 +40,19 @@ final class TapToPayOnDeviceTests: XCTestCase {
             attestation: AppAttestService(
                 transport: session.transport,
                 attestor: RealAppAttestor(),
-                storage: KeychainStorage()
+                storage: KeychainStorage(migrating: PayabliKeychainKey.all),
+                deviceIdentity: session.deviceIdentity
             )
         )
     }
 
     private func attestation() throws -> AppAttestService {
-        AppAttestService(
-            transport: PayabliSession(config: try LiveEnvironment.config(for: named)).transport,
+        let session = PayabliSession(config: try LiveEnvironment.config(for: named))
+        return AppAttestService(
+            transport: session.transport,
             attestor: RealAppAttestor(),
-            storage: KeychainStorage()
+            storage: KeychainStorage(migrating: PayabliKeychainKey.all),
+            deviceIdentity: session.deviceIdentity
         )
     }
 
@@ -197,7 +200,7 @@ final class TapToPayOnDeviceTests: XCTestCase {
         let held = try await enrolledDevice().handle
 
         let stored = try XCTUnwrap(
-            try KeychainStorage().string(forKey: PayabliKeychainKey.deviceBindings),
+            try KeychainStorage(migrating: PayabliKeychainKey.all).string(forKey: PayabliKeychainKey.deviceBindings),
             "reaching ready stored no bindings item"
         )
         XCTAssertTrue(stored.contains(named.entry), "the stored binding does not name this paypoint")
@@ -267,7 +270,7 @@ final class TapToPayOnDeviceTests: XCTestCase {
     /// The value registration identifies this install by is the digest, is the same
     /// on every call, and is not the stored UUID.
     func testTheRegistrationIdentifierIsTheDigest() throws {
-        let storage = KeychainStorage()
+        let storage = KeychainStorage(migrating: PayabliKeychainKey.all)
         let first = try InstallIdentifier.hardwareId(storage: storage)
         let second = try InstallIdentifier.hardwareId(storage: storage)
 

@@ -1,3 +1,4 @@
+import PayabliSDKCore
 @testable import PayabliSDKTapToPay
 import PayabliSDKTestUtils
 import Security
@@ -58,7 +59,7 @@ final class SecureStorageTests: XCTestCase {
         #if os(macOS) && !targetEnvironment(simulator)
             throw XCTSkip("Keychain services require a running keychaind; covered by device QA (§12.3).")
         #else
-            let storage = KeychainStorage(service: "com.payabli.tests.\(UUID().uuidString)")
+            let storage = KeychainStorage(service: "com.payabli.tests.\(UUID().uuidString)", migrating: PayabliKeychainKey.all)
             defer { try? storage.removeAll() }
 
             do {
@@ -122,7 +123,7 @@ final class SecureStorageTests: XCTestCase {
     /// directly is what makes the two distinguishable.
     func testAReadReportsWhatTheKeychainAnswered() throws {
         let service = "com.payabli.tests.\(UUID().uuidString)"
-        let storage = KeychainStorage(service: service)
+        let storage = KeychainStorage(service: service, migrating: PayabliKeychainKey.all)
 
         var probe: AnyObject?
         let status = SecItemCopyMatching([
@@ -171,7 +172,7 @@ final class SecureStorageTests: XCTestCase {
             throw XCTSkip("Keychain services require a running keychaind; covered by device QA (§12.3).")
         #else
             let service = "com.payabli.tests.\(UUID().uuidString)"
-            let storage = KeychainStorage(service: service)
+            let storage = KeychainStorage(service: service, migrating: PayabliKeychainKey.all)
             defer { try? storage.removeAll() }
 
             do {
@@ -218,7 +219,7 @@ final class SecureStorageTests: XCTestCase {
             legacy[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlock
             try skipIfHostHasNoKeychain(SecItemAdd(legacy as CFDictionary, nil), whileDoing: "seeding a legacy item")
 
-            try KeychainStorage(service: service).set("after", forKey: "sample_key")
+            try KeychainStorage(service: service, migrating: PayabliKeychainKey.all).set("after", forKey: "sample_key")
 
             var item: CFTypeRef?
             var query = base
@@ -245,7 +246,7 @@ final class SecureStorageTests: XCTestCase {
         for name in names {
             XCTAssertTrue(PayabliKeychainKey.all.contains(name), name)
         }
-        XCTAssertEqual(PayabliKeychainKey.all.count, PayabliKeychainKey.Stored.allCases.count)
+        XCTAssertEqual(PayabliKeychainKey.all.count, PayabliKeychainKey.Stored.allCases.count + 1)
     }
 
     /// Skips on the same terms as the round trip above.
@@ -267,7 +268,7 @@ final class SecureStorageTests: XCTestCase {
             try skipIfHostHasNoKeychain(SecItemAdd(legacy as CFDictionary, nil), whileDoing: "seeding a legacy item")
 
             // Opening the store is what runs the sweep.
-            let storage = KeychainStorage(service: service)
+            let storage = KeychainStorage(service: service, migrating: PayabliKeychainKey.all)
 
             var item: CFTypeRef?
             var query = base
@@ -297,7 +298,7 @@ final class SecureStorageTests: XCTestCase {
         #if os(macOS) && !targetEnvironment(simulator)
             throw XCTSkip("Keychain services require a running keychaind; covered by device QA (§12.3).")
         #else
-            let storage = KeychainStorage(service: "com.payabli.tests.\(UUID().uuidString)")
+            let storage = KeychainStorage(service: "com.payabli.tests.\(UUID().uuidString)", migrating: PayabliKeychainKey.all)
             defer { try? storage.removeAll() }
 
             for key in PayabliKeychainKey.all {

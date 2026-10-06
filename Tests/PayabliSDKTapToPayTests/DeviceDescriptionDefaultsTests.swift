@@ -1,3 +1,4 @@
+import PayabliSDKCore
 @testable import PayabliSDKTapToPay
 import XCTest
 
