@@ -131,11 +131,7 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
                     environment: environment
                 )
             } catch {
-                result(FlutterError(
-                    code: "INVALID_CONFIGURATION",
-                    message: error.localizedDescription,
-                    details: nil
-                ))
+                result(error.toFlutterError(defaultCode: "INVALID_CONFIGURATION"))
                 return
             }
 
@@ -397,11 +393,7 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
                 )
                 result(nil)
             } catch {
-                result(FlutterError(
-                    code: "INVALID_CONFIGURATION",
-                    message: error.localizedDescription,
-                    details: nil
-                ))
+                result(error.toFlutterError(defaultCode: "INVALID_CONFIGURATION"))
             }
         }
     }
