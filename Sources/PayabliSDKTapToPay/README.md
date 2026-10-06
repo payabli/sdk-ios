@@ -226,9 +226,12 @@ Every `PayabliTTPError` carries `capture` and `paymentTransId`:
 | `configFailed(reason:)` | Fetching the device's configuration failed. `reason` says why: a setup gap on the paypoint or device, or a token, network or service failure. |
 | `readerSetupFailed(reason:paymentTransId:)` | The reader couldn't be prepared. |
 | `readerOSVersionNotSupported(paymentTransId:capture:)` | The iOS version doesn't support Tap to Pay. |
-| `invalidState(current:attempted:)`, `notReady(current:)`, `notInitialized` | The call was made in the wrong session state. |
+| `invalidState(current:attempted:)`, `notReady(current:)` | The call was made in the wrong session state. |
 | `tokenExpired`, `networkError(reason:)` | The token or the network failed. Retry later. |
 | `activationFailed(reason:)` | The activation code was refused. |
+
+`PayabliTTP.create()` throws a `TapToPayError` whose `type` is `.sessionNotInitialized` (1019) when no session
+has been started: call `PayabliSession.initialize` first.
 
 Device attestation and opening a transaction can also throw a core `PayabliError` from `PayabliSDKCore`,
 for example `PayabliGenericError` or `PayabliPaymentError`. It carries no `capture`: `charge` throws one
