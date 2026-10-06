@@ -4,7 +4,15 @@ import PayabliSDKCore
 // MARK: - Device activation (PRD §9.7)
 
 package extension AppAttestService {
+    /// Takes the entry point's turn, as attestation does, so no enrollment replaces the
+    /// registration while its code is being spent.
     func activateDevice(activationCode: String, entry: String, activationId: String) async throws {
+        try await Self.attestations.takingTurns(entry) {
+            try await self.runActivate(activationCode: activationCode, entry: entry, activationId: activationId)
+        }
+    }
+
+    private func runActivate(activationCode: String, entry: String, activationId: String) async throws {
         // Read only to refuse a paypoint that holds no binding. The handle sent is
         // the assertion's, below.
         guard let held = try cachedDeviceId(for: entry) else {
@@ -20,7 +28,9 @@ package extension AppAttestService {
         _ = try await postChallenge(entry: entry)
 
         let assertion = try await generateAssertion(for: entry)
-        guard assertion.deviceId == activationId else {
+        // Read again once signed: a refusal elsewhere can drop the binding while the platform signs,
+        // and the turn does not cover that.
+        guard assertion.deviceId == activationId, try cachedDeviceId(for: entry) == activationId else {
             throw ActivationRegistrationChanged()
         }
 

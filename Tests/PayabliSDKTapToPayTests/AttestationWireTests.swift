@@ -46,6 +46,31 @@ final class AttestationWireTests: XCTestCase {
         XCTAssertTrue(bodies.values.isEmpty, "the code issued for dev_old was sent for dev_new")
     }
 
+    /// The platform signs after the binding is read, so one replaced while it signs is caught by the
+    /// read that follows, and the code is not sent.
+    func testAnActivationForARegistrationReplacedWhileSigningSendsNothing() async throws {
+        let storage = InMemorySecureStorage()
+        try AttestFixture.seedBinding(entry: "myEntry", deviceId: "dev_old", keyId: "old_key", in: storage)
+        let bodies = BodyBox()
+        StubURLProtocol.handler = { request in
+            if request.url!.path == "/api/v2/device/taptopay/activate" {
+                bodies.append(request.payabliTestBody)
+            }
+            return AttestFixture.ok(request, ["challengeId": "c_1", "challenge": "Y2hhbGxlbmdl"])
+        }
+        let (sut, attestor, _) = try AttestFixture.makeService(storage: storage)
+        attestor.beforeGenerateAssertion = {
+            try? AttestFixture.seedBinding(entry: "myEntry", deviceId: "dev_new", keyId: "new_key", in: storage)
+        }
+
+        do {
+            try await sut.activateDevice(activationCode: "123456", entry: "myEntry", activationId: "dev_old")
+            XCTFail("an activation for a registration replaced while signing was sent")
+        } catch is ActivationRegistrationChanged {}
+
+        XCTAssertTrue(bodies.values.isEmpty)
+    }
+
     /// A code is sent with the handle the assertion was signed for.
     func testActivationSendsTheHandleTheCodeWasIssuedFor() async throws {
         let storage = InMemorySecureStorage()
