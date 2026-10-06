@@ -322,8 +322,9 @@ extension PayabliTTP {
     /// writes before the service reports the device pending. `nil` when pending activation was
     /// landed; otherwise the failure the session landed on, for the caller to throw.
     ///
-    /// An answer about a registration the store no longer holds is stale: it says nothing about the
-    /// one held now, so the session asks for another `initialize`.
+    /// An answer about a registration the store no longer holds, replaced or removed while the request
+    /// was in flight, is stale: it says nothing about the store now, so the session asks for another
+    /// `initialize`.
     private func landPendingActivation(answeredFor presented: String? = nil) -> Error? {
         let failure: Error
         switch storedRegistration() {
@@ -332,7 +333,7 @@ extension PayabliTTP {
             syncPublished()
             multicaster.emit(.devicePendingActivation)
             return nil
-        case .held:
+        case .held, .none where presented != nil:
             let stale = PayabliTTPError.configFailed(
                 reason: "The registration changed while the configuration was fetched; initialize again"
             )

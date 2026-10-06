@@ -86,6 +86,27 @@ final class PayabliTTPActivationIdTests: XCTestCase {
         XCTAssertNil(ttp.activationId)
     }
 
+    /// Removed rather than replaced: the request had a registration, so this is not a paypoint that
+    /// never registered.
+    func testAPendingAnswerAboutARemovedRegistrationAsksForAnotherInitialize() async throws {
+        let (ttp, attestation) = try makeTTP()
+        attestation.bindings = ["e": "dev_old"]
+        StubURLProtocol.handler = { request in
+            attestation.bindings = [:]
+            return try Self.respond(403)(request)
+        }
+
+        do {
+            try await ttp.initialize()
+            XCTFail("expected a failure")
+        } catch PayabliTTPError.configFailed {
+        } catch {
+            XCTFail("wrong error: \(error)")
+        }
+
+        XCTAssertEqual(ttp.sessionState, .failed(reason: .serviceUnavailable))
+    }
+
     func testInitializingAgainLandsOnTheSameId() async throws {
         let (ttp, attestation) = try makeTTP()
         attestation.pendingRegistration = "dev_e"
