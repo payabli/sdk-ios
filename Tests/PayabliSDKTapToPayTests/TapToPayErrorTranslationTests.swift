@@ -9,7 +9,7 @@ final class TapToPayErrorTranslationTests: XCTestCase {
 
     func testEveryCaseReachesAHostUnderItsCatalogCode() {
         for error in Self.allSamples {
-            let host = TapToPayErrorTranslation.hostError(for: error, raisedBy: .initialize)
+            let host = TapToPayErrorTranslation.hostError(for: error)
             guard let host = host as? TapToPayError else {
                 XCTFail("\(error) reached a host as \(type(of: host))")
                 continue
@@ -19,18 +19,12 @@ final class TapToPayErrorTranslationTests: XCTestCase {
         }
     }
 
-    func testAnOutOfOrderCallIsAnInvalidRequestOnAChargeAndANotPendingDeviceOnActivation() {
-        let error = PayabliTTPError.invalidState(current: .ready, attempted: "x")
-        XCTAssertEqual(TapToPayErrorTranslation.catalogType(of: error, raisedBy: .charge), .validation)
-        XCTAssertEqual(TapToPayErrorTranslation.catalogType(of: error, raisedBy: .activateDevice), .deviceNotPending)
-    }
-
     // MARK: - Reason and detail
 
     func testACardPresentCaseCarriesItsCodesTextAsTheReasonAndItsOwnWordsAsTheDetail() throws {
-        let host = try translated(PayabliTTPError.configFailed(reason: "entry point is disabled"))
-        XCTAssertEqual(host.reason, PayabliErrorType.entryPointRefused.message)
-        XCTAssertEqual(host.detail, "entry point is disabled")
+        let host = try translated(PayabliTTPError.nfcFailed(reason: "card moved away"))
+        XCTAssertEqual(host.reason, PayabliErrorType.tapNotCompleted.message)
+        XCTAssertEqual(host.detail, "card moved away")
     }
 
     func testAnEmptyReasonIsNeverOfferedAsTheDetail() throws {
@@ -51,6 +45,20 @@ final class TapToPayErrorTranslationTests: XCTestCase {
         XCTAssertEqual(host.detail, "provider threw")
         XCTAssertEqual(host.capture, .notCharged)
         XCTAssertNil(host.paymentTransId)
+        XCTAssertNil(host.retryAfter)
+    }
+
+    func testATransportFailureKeepsTheWaitTheServiceAskedFor() throws {
+        struct Throttled: PayabliError, PayabliRetryAfter {
+            let type = PayabliErrorType.rateLimited
+            let reason = "Too many requests"
+            let detail: String? = nil
+            let retryAfter: TimeInterval? = 30
+        }
+        let host = try translated(Throttled())
+        XCTAssertEqual(host.type, .rateLimited)
+        XCTAssertEqual(host.retryAfter, 30)
+        XCTAssertEqual((host as PayabliRetryAfter).retryAfter, 30)
     }
 
     // MARK: - What passes through
@@ -68,7 +76,7 @@ final class TapToPayErrorTranslationTests: XCTestCase {
     }
 
     func testCancellationStaysACancellation() {
-        let host = TapToPayErrorTranslation.hostError(for: CancellationError(), raisedBy: .charge)
+        let host = TapToPayErrorTranslation.hostError(for: CancellationError())
         XCTAssertTrue(host is CancellationError, "got \(host)")
     }
 
@@ -124,6 +132,17 @@ final class TapToPayErrorTranslationTests: XCTestCase {
         XCTAssertNil(PayabliTTPError.initiateFailed(reason: "x").paymentTransId)
     }
 
+    // MARK: - What an event carries
+
+    func testAnEventCarriesTheWireNameOfTheErrorAHostReceives() {
+        XCTAssertEqual(TapToPayErrorTranslation.eventName(of: PayabliTTPError.nfcFailed(reason: "x")), "TAP_NOT_COMPLETED")
+        XCTAssertEqual(TapToPayErrorTranslation.eventName(of: PayabliTTPError.configFailed(reason: "x")), "UNKNOWN")
+        XCTAssertEqual(
+            TapToPayErrorTranslation.eventName(of: PayabliGenericError(type: .rateLimited, reason: "slow down")),
+            "RATE_LIMITED"
+        )
+    }
+
     // MARK: - The NSError an Objective-C caller receives
 
     func testAnObjectiveCCallerReceivesTheCatalogNumberCaptureAndPayment() throws {
@@ -144,7 +163,7 @@ final class TapToPayErrorTranslationTests: XCTestCase {
     // MARK: - Fixtures
 
     private func translated(_ error: Error, file: StaticString = #filePath, line: UInt = #line) throws -> TapToPayError {
-        let host = TapToPayErrorTranslation.hostError(for: error, raisedBy: .initialize)
+        let host = TapToPayErrorTranslation.hostError(for: error)
         return try XCTUnwrap(host as? TapToPayError, "got \(type(of: host))", file: file, line: line)
     }
 
@@ -159,14 +178,14 @@ final class TapToPayErrorTranslationTests: XCTestCase {
         case .notReady: return .terminalNotReady
         case .devicePendingActivation: return .devicePendingActivation
         case .attestationRevoked: return .deviceSetupRequired
-        case .attestationFailed: return .deviceSetupRefused
-        case .configFailed: return .entryPointRefused
+        case .attestationFailed: return .unknown
+        case .configFailed: return .unknown
         case .readerSetupFailed: return .readerUnavailable
         case .nfcFailed: return .tapNotCompleted
         case .initiateFailed: return .paymentNotOpened
         case .updateFailed: return .paymentNotClosed
         case .tokenExpired: return .tokenExpired
-        case .activationFailed: return .activationCodeIncorrect
+        case .activationFailed: return .unknown
         case .networkError: return .networkError
         case .termsNotAccepted: return .termsNotAccepted
         case .readerOSVersionNotSupported: return .deviceOSUnsupported

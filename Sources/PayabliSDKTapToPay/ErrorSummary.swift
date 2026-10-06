@@ -1,8 +1,7 @@
 import Foundation
 import PayabliSDKCore
 
-/// What may be said about an error outside the call that raised it: in a log, or
-/// in an event payload a host app forwards to its own telemetry.
+/// What may be said about an error in a log, outside the call that raised it.
 ///
 /// A `PayabliError`'s `reason` and `detail` are the service's own words and can
 /// quote what was submitted, so they go to the caller and to the screen and stop
@@ -56,9 +55,9 @@ enum ErrorSummary {
     /// and `activationFailed` carry `String(describing:)` of whatever was caught.
     /// The reason still reaches the caller and the screen, on the error itself.
     ///
-    /// Written out case by case rather than reflected over, because this string
-    /// reaches host apps and a reflected one is whatever the compiler renders
-    /// today. Its complexity is therefore one branch per error case, and the
+    /// Written out case by case rather than reflected over, because a log is
+    /// searched by this string and a reflected one is whatever the compiler
+    /// renders today. Its complexity is therefore one branch per error case, and the
     /// compiler requires every one of them, which is why the rule is suppressed
     /// around it rather than the switch being split across two functions.
     static func of(_ error: PayabliTTPError) -> String {

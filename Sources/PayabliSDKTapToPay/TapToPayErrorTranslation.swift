@@ -3,28 +3,18 @@ import PayabliSDKCore
 
 /// The one table that decides the catalog entry a host receives for a card-present failure.
 ///
-/// Every public card-present call passes its failure through ``hostError(for:raisedBy:)``, so a host
-/// catches ``TapToPayError`` and nothing else. Cancellation is the exception, and reaches the caller as
+/// Every public card-present call passes its failure through ``hostError(for:)``, so a host catches
+/// ``TapToPayError`` and nothing else. Cancellation is the exception, and reaches the caller as
 /// `CancellationError`.
 enum TapToPayErrorTranslation {
-    /// The public call a failure surfaced from. One internal case can mean different causes depending on
-    /// the call that met it.
-    enum Call {
-        case initialize
-        case reinitialize
-        case charge
-        case activateDevice
-        case terms
-    }
-
-    static func hostError(for error: Error, raisedBy call: Call) -> Error {
+    static func hostError(for error: Error) -> Error {
         switch error {
         case is CancellationError:
             return error
         case let error as TapToPayError:
             return error
         case let error as PayabliTTPError:
-            let type = catalogType(of: error, raisedBy: call)
+            let type = catalogType(of: error)
             return TapToPayError(
                 type: type,
                 reason: type.message,
@@ -33,31 +23,44 @@ enum TapToPayErrorTranslation {
                 capture: error.capture
             )
         case let error as any PayabliError:
-            return TapToPayError(type: error.type, reason: error.reason, detail: error.detail)
+            return TapToPayError(
+                type: error.type,
+                reason: error.reason,
+                detail: error.detail,
+                retryAfter: (error as? PayabliRetryAfter)?.retryAfter
+            )
         default:
             return TapToPayError(type: .unknown, reason: PayabliErrorType.unknown.message, detail: nil)
         }
     }
 
+    /// The catalog wire name of the error a host receives for `error`, which is what a card-present event
+    /// carries.
+    static func eventName(of error: Error) -> String {
+        guard let hostError = hostError(for: error) as? TapToPayError else {
+            return ErrorSummary.of(error)
+        }
+        return hostError.type.rawValue
+    }
+
     // swiftlint:disable cyclomatic_complexity
 
-    /// One branch per case, with no `default`, so a case added without an entry stops this compiling.
-    static func catalogType(of error: PayabliTTPError, raisedBy call: Call) -> PayabliErrorType {
+    /// One branch per case, with no `default`, so a case added without an entry stops this compiling. A
+    /// case collecting causes that do not share a code reports `unknown`.
+    static func catalogType(of error: PayabliTTPError) -> PayabliErrorType {
         switch error {
         case .notInitialized:
             return .sessionNotInitialized
         case .invalidState:
-            return call == .activateDevice ? .deviceNotPending : .validation
+            return .validation
         case .notReady:
             return .terminalNotReady
         case .devicePendingActivation:
             return .devicePendingActivation
         case .attestationRevoked:
             return .deviceSetupRequired
-        case .attestationFailed:
-            return .deviceSetupRefused
-        case .configFailed:
-            return .entryPointRefused
+        case .attestationFailed, .configFailed, .activationFailed:
+            return .unknown
         case .readerSetupFailed:
             return .readerUnavailable
         case .nfcFailed:
@@ -68,8 +71,6 @@ enum TapToPayErrorTranslation {
             return .paymentNotClosed
         case .tokenExpired:
             return .tokenExpired
-        case .activationFailed:
-            return .activationCodeIncorrect
         case .networkError:
             return .networkError
         case .termsNotAccepted:
@@ -109,14 +110,11 @@ enum TapToPayErrorTranslation {
 
 extension PayabliTTP {
     /// Runs one public call, handing a host its failure as ``TapToPayError``.
-    func reportingToHost<Result>(
-        _ call: TapToPayErrorTranslation.Call,
-        _ work: () async throws -> Result
-    ) async throws -> Result {
+    func reportingToHost<Result>(_ work: () async throws -> Result) async throws -> Result {
         do {
             return try await work()
         } catch {
-            throw TapToPayErrorTranslation.hostError(for: error, raisedBy: call)
+            throw TapToPayErrorTranslation.hostError(for: error)
         }
     }
 }

@@ -15,7 +15,7 @@ extension PayabliTTP {
     ///   3. Hand credentials to the provider (NFR-5D — runtime only).
     ///   4. Prepare reader, transition to `.ready`.
     public func initialize() async throws {
-        try await reportingToHost(.initialize) {
+        try await reportingToHost {
             try await runSessionSetup(.initialize) { try await self.runInitialize() }
         }
     }
@@ -107,7 +107,7 @@ extension PayabliTTP {
     /// `initialize()`. NFR-5D forbids providers from caching credentials
     /// across sessions, so every refresh re-fetches `/config`.
     public func reinitializeIfNeeded() async throws {
-        try await reportingToHost(.reinitialize) { try await reinitialize() }
+        try await reportingToHost { try await reinitialize() }
     }
 
     func reinitialize() async throws {
@@ -198,14 +198,14 @@ extension PayabliTTP {
             syncPublished()
         } catch PayabliTTPError.devicePendingActivation {
             if let failure = landPendingActivation() {
-                multicaster.emit(.attestationFailed(error: ErrorSummary.of(failure)))
+                multicaster.emit(.attestationFailed(error: TapToPayErrorTranslation.eventName(of: failure)))
                 throw failure
             }
             throw PayabliTTPError.devicePendingActivation
         } catch {
             markError(error)
             syncPublished()
-            multicaster.emit(.attestationFailed(error: ErrorSummary.of(error)))
+            multicaster.emit(.attestationFailed(error: TapToPayErrorTranslation.eventName(of: error)))
             throw error
         }
     }
@@ -227,7 +227,7 @@ extension PayabliTTP {
             return try await configClient.fetchConfig(entry: entryPoint)
         } catch let pending as ConfigPendingActivation {
             if let failure = landPendingActivation(answeredFor: pending.presentedDeviceId) {
-                multicaster.emit(.configFailed(error: ErrorSummary.of(failure)))
+                multicaster.emit(.configFailed(error: TapToPayErrorTranslation.eventName(of: failure)))
                 throw failure
             }
             throw PayabliTTPError.devicePendingActivation
@@ -241,7 +241,7 @@ extension PayabliTTP {
             let failure = PayabliTTPError.configFailed(reason: "Config rejected (401): \(err.reason)")
             markError(err)
             syncPublished()
-            multicaster.emit(.configFailed(error: ErrorSummary.of(failure)))
+            multicaster.emit(.configFailed(error: TapToPayErrorTranslation.eventName(of: failure)))
             throw failure
         } catch {
             // Wrapped, so a host receives every configuration failure under the
@@ -257,7 +257,7 @@ extension PayabliTTP {
             // briefly away still reads as one to try again.
             markError(error)
             syncPublished()
-            multicaster.emit(.configFailed(error: ErrorSummary.of(failure)))
+            multicaster.emit(.configFailed(error: TapToPayErrorTranslation.eventName(of: failure)))
             throw failure
         }
     }

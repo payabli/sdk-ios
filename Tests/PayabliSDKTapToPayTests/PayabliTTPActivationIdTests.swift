@@ -77,7 +77,7 @@ final class PayabliTTPActivationIdTests: XCTestCase {
         do {
             try await ttp.initialize()
             XCTFail("expected a failure")
-        } catch let error as TapToPayError where error.type == .entryPointRefused {
+        } catch let error as TapToPayError where error.type == .unknown {
         } catch {
             XCTFail("wrong error: \(error)")
         }
@@ -99,7 +99,7 @@ final class PayabliTTPActivationIdTests: XCTestCase {
         do {
             try await ttp.initialize()
             XCTFail("expected a failure")
-        } catch let error as TapToPayError where error.type == .entryPointRefused {
+        } catch let error as TapToPayError where error.type == .unknown {
         } catch {
             XCTFail("wrong error: \(error)")
         }
@@ -165,7 +165,7 @@ final class PayabliTTPActivationIdTests: XCTestCase {
         do {
             try await ttp.activateDevice(activationCode: "123456")
             XCTFail("expected a failure")
-        } catch let error as TapToPayError where error.type == .activationCodeIncorrect {
+        } catch let error as TapToPayError where error.type == .unknown {
         } catch {
             XCTFail("wrong error: \(error)")
         }

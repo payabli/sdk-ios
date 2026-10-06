@@ -14,17 +14,14 @@ public extension PayabliTTP {
     /// so the caller can immediately re-run `initialize()` for a fresh cold
     /// attestation — `.sessionExpired` is also emitted in that sub-case.
     func activateDevice(activationCode: String) async throws {
-        try await reportingToHost(.activateDevice) {
+        try await reportingToHost {
             try await runSessionSetup(.activate) { try await self.runActivateDevice(activationCode: activationCode) }
         }
     }
 
     private func runActivateDevice(activationCode: String) async throws {
         guard case let .pendingActivation(activationId) = sessionState else {
-            throw PayabliTTPError.invalidState(
-                current: sessionState,
-                attempted: "activateDevice"
-            )
+            throw TapToPayError(type: .deviceNotPending, reason: PayabliErrorType.deviceNotPending.message, detail: nil)
         }
         multicaster.emit(.activationStarted)
         do {
@@ -42,7 +39,7 @@ public extension PayabliTTP {
             )
             _ = sessionManager.transition(to: .idle)
             syncPublished()
-            multicaster.emit(.activationFailed(error: ErrorSummary.of(failure)))
+            multicaster.emit(.activationFailed(error: TapToPayErrorTranslation.eventName(of: failure)))
             throw failure
         } catch let err as PayabliTTPError {
             // The attestation service already cleared local cache for the
@@ -53,12 +50,12 @@ public extension PayabliTTP {
                 _ = sessionManager.transition(to: .idle)
                 syncPublished()
                 multicaster.emit(.sessionExpired)
-                multicaster.emit(.activationFailed(error: ErrorSummary.of(err)))
+                multicaster.emit(.activationFailed(error: TapToPayErrorTranslation.eventName(of: err)))
                 throw err
             }
             markError(err)
             syncPublished()
-            multicaster.emit(.activationFailed(error: ErrorSummary.of(err)))
+            multicaster.emit(.activationFailed(error: TapToPayErrorTranslation.eventName(of: err)))
             throw err
         } catch {
             // The reason is what the caller and the screen get, so it is the
@@ -68,7 +65,7 @@ public extension PayabliTTP {
             // the error a caller catches are the same failure.
             markError(mapped)
             syncPublished()
-            multicaster.emit(.activationFailed(error: ErrorSummary.of(mapped)))
+            multicaster.emit(.activationFailed(error: TapToPayErrorTranslation.eventName(of: mapped)))
             throw mapped
         }
     }

@@ -24,7 +24,7 @@ public extension PayabliTTP {
     ///   when there is no reader to ask — which is a different answer from
     ///   `false`, and a caller showing a terms screen should tell them apart.
     func areTermsAccepted() async throws -> Bool {
-        try await reportingToHost(.terms) { try await provider.areTermsAccepted() }
+        try await reportingToHost { try await provider.areTermsAccepted() }
     }
 
     /// `@objc` companion to `areTermsAccepted()` for ObjC / MAUI / Flutter / RN
@@ -82,7 +82,7 @@ public extension PayabliTTP {
     ///   when there is no reader to present from. `initialize()` is what builds
     ///   one.
     func presentTerms() async throws {
-        try await reportingToHost(.terms) { try await provider.presentTerms() }
+        try await reportingToHost { try await provider.presentTerms() }
     }
 
     /// `@objc` companion to `presentTerms()` for ObjC / MAUI / Flutter / RN

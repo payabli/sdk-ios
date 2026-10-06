@@ -268,11 +268,9 @@ final class TTPUpdateRetryTests: XCTestCase {
         let summary = await collector.value
         deadline.cancel()
 
-        // The processor's own code as well as the kind: the stub's body carries `A01`, and it survives
-        // the decode into the event. Wrapping first reduced all of this to `updateFailed`.
         XCTAssertEqual(
             try XCTUnwrap(summary, "no updateFailed event arrived"),
-            "decline(A01)",
+            "PAYMENT_DECLINED",
             "a decline reaches telemetry as a decline, not as updateFailed"
         )
     }

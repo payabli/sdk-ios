@@ -214,6 +214,7 @@ A `TapToPayError` carries the catalog entry for its cause:
 - `type` names the cause, for a case your app handles on its own, such as `.devicePendingActivation`.
 - `code` is the catalog number Payabli support reads. Give it to them with the failure.
 - `message` is fixed text. `detail` holds the service's or the reader's own words, when there are any.
+- `retryAfter` is the wait the service asked for before trying again, when it asked for one.
 
 It also carries `capture` and `paymentTransId`:
 
