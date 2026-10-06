@@ -143,7 +143,7 @@ public final class PayabliTTP: NSObject, ObservableObject {
         /// Throws `sessionNotInitialized` when no session is installed.
         @objc public static func create() async throws -> PayabliTTP {
             guard let payabliSession = PayabliSession.current else {
-                throw PayabliGenericError(type: .sessionNotInitialized, reason: "no session is initialized")
+                throw TapToPayError(type: .sessionNotInitialized, reason: "no session is initialized", detail: nil)
             }
             let attestation = AppAttestService(
                 transport: payabliSession.transport,
