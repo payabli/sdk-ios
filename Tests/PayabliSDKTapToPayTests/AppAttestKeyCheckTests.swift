@@ -96,6 +96,23 @@ final class AppAttestKeyCheckTests: XCTestCase {
         XCTAssertNotNil(try sut.binding(for: "myEntry"))
     }
 
+    /// The check inside `attest` runs again after waiting its turn, and stops on the same answer rather
+    /// than registering a second device for a paypoint already enrolled.
+    func testAttestStopsWhenTheHeldKeyCannotBeChecked() async throws {
+        let storage = InMemorySecureStorage()
+        try AttestFixture.seedBinding(entry: "myEntry", deviceId: "dev", keyId: "key", in: storage)
+        let (sut, attestor, _) = try AttestFixture.makeService(storage: storage)
+        attestor.generateAssertionError = NSError(domain: AppAttestService.deviceCheckErrorDomain, code: 0)
+        do {
+            _ = try await sut.attest(entry: "myEntry")
+            XCTFail("attest proceeded past a key check that could not tell")
+        } catch {
+            XCTAssertEqual((error as? TapToPayError)?.type, .deviceKeyUnavailable, "\(error)")
+        }
+        XCTAssertEqual(attestor.generateKeyCalls, 0, "a second enrolment was started")
+        XCTAssertEqual(try sut.binding(for: "myEntry")?.deviceId, "dev")
+    }
+
     func testAPhoneWithoutAppAttestCannotBeSetUp() async throws {
         let (sut, attestor, _) = try AttestFixture.makeService(storage: InMemorySecureStorage())
         attestor.isSupported = false

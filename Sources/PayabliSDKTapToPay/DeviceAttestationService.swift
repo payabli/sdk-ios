@@ -54,15 +54,17 @@ package protocol DeviceAttestationService: AnyObject, Sendable {
     ///
     /// Raises when the store could not be read, which is a third answer: `false`
     /// runs the cold sequence and registers a second device for a paypoint that is
-    /// already enrolled.
+    /// already enrolled. Raises too when the key check cannot answer, and the
+    /// binding is kept.
     func isAttested(for entry: String) async throws -> Bool
 
     /// The backend-assigned `deviceId` this entry point was registered under, or
     /// `nil` when it holds no binding.
     func cachedDeviceId(for entry: String) throws -> String?
 
-    /// The `deviceId` this entry point was registered under while the key its binding
-    /// names still signs, or `nil` when it holds no binding or that key is gone.
+    /// The `deviceId` this entry point was registered under, or `nil` when it holds no
+    /// binding or the key that binding names is gone. A key check that cannot answer
+    /// keeps the binding, so its id is returned.
     ///
     /// Raises when the store could not be read.
     func usableDeviceId(for entry: String) async throws -> String?
