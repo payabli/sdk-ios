@@ -39,6 +39,12 @@ struct TerminalReadinessView: View {
                     .font(.footnote)
             }
 
+            Text(TapToPayPreflight.appIdToRegister.map { "App ID to register: \($0)" }
+                ?? "App ID to register: no embedded profile, so it can't be read here.")
+                .font(.caption)
+                .foregroundColor(.payabliOnSurfaceVariant)
+                .textSelection(.enabled)
+
             if readiness == nil {
                 Text("Reading the host, App Attest, the reader and the provisioning profile.")
                     .font(.caption)

@@ -297,24 +297,12 @@ enum TapToPayPreflight {
             )
         }
 
-        // 5. The App ID to register as an authorized app, read from the signing identity.
-        results.append(appIdCheck(bundleId: bundleId))
-
         return results
     }
 
-    private static func appIdCheck(bundleId: String) -> Check {
-        guard let prefix = resolvedAppIdPrefix else {
-            return Check(
-                title: "App ID cannot be read here",
-                detail: "No embedded profile, so the App ID prefix is unknown. Check it on a device build.",
-                status: .warn
-            )
-        }
-        return Check(
-            title: "App ID to register",
-            detail: "\(prefix).\(bundleId) is the authorized app this build attests as.",
-            status: .pass
-        )
+    /// The authorized app this build attests as, or `nil` without an embedded profile.
+    static var appIdToRegister: String? {
+        guard let prefix = resolvedAppIdPrefix, let bundleId = Bundle.main.bundleIdentifier else { return nil }
+        return "\(prefix).\(bundleId)"
     }
 }

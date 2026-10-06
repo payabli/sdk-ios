@@ -178,7 +178,6 @@ or reads a secret.
 | App Attest availability | `DCAppAttestService.shared.isSupported` | entitlement, token |
 | Reader hardware | `PaymentCardReader.isSupported` | team, token |
 | Tap to Pay entitlement | `embedded.mobileprovision` → `Entitlements` | token, `Secrets` |
-| App ID to register | profile `application-identifier` prefix and bundle ID | token |
 
 Two traps this exists to avoid. **The Simulator answers
 `PaymentCardReader.isSupported == true`**, so that flag alone reads as ready on a
@@ -186,6 +185,10 @@ host that can neither attest nor read a card; the report cross-references it
 against host kind and downgrades it to a warning. And a **missing embedded
 profile is reported as "unknowable", never as "entitlement absent"** — a
 Simulator build has no profile, so treating that as a failure would be wrong.
+
+Below the verdict, the view shows the App ID to register as an authorized app: the
+profile's `application-identifier` prefix and the bundle ID. A Simulator build has no
+profile, so it says the value can't be read there.
 
 The provisioning profile is parsed once per process, not per SwiftUI body
 evaluation, and the checks are recomputed on appearance or via **Re-check**.
