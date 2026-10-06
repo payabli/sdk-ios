@@ -343,7 +343,8 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
             result([
                 "code": state.code.rawValue,
                 "readerConfigurationPercent": state.readerConfigurationPercent as Any,
-                "failureReason": state.failureReason?.rawValue as Any
+                "failureReason": state.failureReason?.rawValue as Any,
+                "activationId": state.activationId as Any
             ])
         }
     }

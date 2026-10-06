@@ -150,6 +150,9 @@ export interface PayabliTTPSessionSnapshot {
     readerConfigurationPercent: number | null;
     /// `null` unless the session failed, for the same reason.
     failureReason: PayabliTTPFailureReason | null;
+    /// The id the activation route's `deviceId` field takes. `null` unless an
+    /// activation is owed.
+    activationId: string | null;
 }
 
 /// Mirrors `PayabliTTPFailureReason`.

@@ -303,6 +303,8 @@ namespace Payabli.TapToPay
         [NullAllowed, Export("readerConfigurationPercent")] NSNumber ReaderConfigurationPercent { get; }
 
         [NullAllowed, Export("failureReason")] NSNumber FailureReason { get; }
+
+        [NullAllowed, Export("activationId")] string ActivationId { get; }
         [Export("isReady")] bool IsReady { get; }
 
         // Event subscription. The returned token's Cancel() tears down the

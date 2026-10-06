@@ -315,7 +315,8 @@ public final class PayabliSDKModule: RCTEventEmitter {
             resolve([
                 "code": state.code.rawValue,
                 "readerConfigurationPercent": state.readerConfigurationPercent as Any,
-                "failureReason": state.failureReason?.rawValue as Any
+                "failureReason": state.failureReason?.rawValue as Any,
+                "activationId": state.activationId as Any
             ])
         }
     }

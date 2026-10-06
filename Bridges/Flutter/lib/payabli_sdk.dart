@@ -182,6 +182,7 @@ class PayabliTTP {
       failureReason: reason == null
           ? null
           : PayabliTTPFailureReason.values[reason],
+      activationId: raw?['activationId'] as String?,
     );
   }
 
@@ -383,11 +384,16 @@ class PayabliTTPSessionSnapshot {
     required this.code,
     this.readerConfigurationPercent,
     this.failureReason,
+    this.activationId,
   });
 
   final PayabliTTPSessionState code;
   final int? readerConfigurationPercent;
   final PayabliTTPFailureReason? failureReason;
+
+  /// The id the activation route's `deviceId` field takes, or `null` when no
+  /// activation is owed.
+  final String? activationId;
 }
 
 /// Mirrors `PayabliTTPFailureReason`.
