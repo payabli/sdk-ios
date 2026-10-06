@@ -20,10 +20,9 @@ final class AppAttestKeyCheckTests: XCTestCase {
 
     // MARK: - Whether the key is still there
 
-    /// The check the sibling SDK makes by comparing thumbprints. App Attest hands
-    /// back an opaque identifier, so the key is asked instead: a platform that
-    /// will not sign with it says the binding names a key this device no longer
-    /// holds, whatever the reason.
+    /// App Attest hands back an opaque identifier, so the key is asked instead: a
+    /// platform that will not sign with it says the binding names a key this device
+    /// no longer holds, whatever the reason.
     func testABindingWhoseKeyIsGoneIsNotAnEnrolment() async throws {
         // 2 is what a key that no longer exists reports, measured on a device
         // after a reinstall; 3 is the code the platform documents for a key it
