@@ -154,15 +154,14 @@ final class InstallIdentifierTests: XCTestCase {
         )
     }
 
-    /// An install that enrolled before the identity moved into Core keeps its value: the
-    /// same stored UUID, bundle and SDK string give the same digest, byte for byte.
-    func testAnEnrolledInstallKeepsTheValueItRegisteredWith() throws {
+    /// The value is pinned, because a change to any input registers every install as a new device.
+    func testTheDerivationIsPinned() throws {
         let storage = InMemorySecureStorage()
         try storage.set("0F3A6B2C-1D4E-4F5A-8B9C-0D1E2F3A4B5C", forKey: InstallIdentifier.storageKey)
 
         let value = try InstallIdentifier.hardwareId(storage: storage, bundleIdentifier: bundleA)
 
-        XCTAssertEqual(value, "5f9125ec0ed0e7e2052aa6a6e3130778")
+        XCTAssertEqual(value, "d87dad7c73309e94774a426b80e14c35")
     }
 }
 

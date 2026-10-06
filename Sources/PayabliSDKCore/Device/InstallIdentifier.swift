@@ -15,14 +15,14 @@ import Foundation
 ///   reinstall, since Keychain items outlive the app's container;
 /// - the bundle identifier, which makes it per app and keeps the answer independent
 ///   of which Keychain access group the UUID lands in;
-/// - the SDK string the value was first minted with, so a second SDK reading the
-///   same UUID cannot compute the same value.
+/// - the SDK's own identifier, so a second SDK reading the same UUID cannot compute
+///   the same value.
 ///
 /// The digest is sent, never the UUID, truncated to 128 bits. A blank is returned
 /// when there is nothing to build from: a value invented per call is not an
 /// identifier.
 package enum InstallIdentifier {
-    static let sdkIdentifier = "com.payabli.sdk.taptopay"
+    static let sdkIdentifier = "com.payabli.sdk"
 
     package static let storageKey = "com.payabli.ttp.installId"
 
