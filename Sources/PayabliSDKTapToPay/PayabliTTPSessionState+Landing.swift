@@ -16,7 +16,7 @@ extension PayabliTTPSessionState {
     /// merchant meeting one condition is sent to the same repair on either.
     static func landing(for error: Error) -> PayabliTTPSessionState? {
         guard let ttpError = error as? PayabliTTPError else {
-            return landingForTransport(error)
+            return landingByType(error)
         }
 
         switch ttpError {
@@ -58,8 +58,8 @@ extension PayabliTTPSessionState {
         }
     }
 
-    /// A transport failure, landed by its code.
-    private static func landingForTransport(_ error: Error) -> PayabliTTPSessionState {
+    /// A failure that carries a catalog type, landed by that type.
+    private static func landingByType(_ error: Error) -> PayabliTTPSessionState {
         guard let payabliError = error as? any PayabliError else {
             return .failed(reason: .sdkInternalError)
         }
@@ -71,6 +71,12 @@ extension PayabliTTPSessionState {
 
         case .invalidConfiguration:
             return .failed(reason: .configurationRejected)
+
+        case .deviceKeyUnavailable:
+            return .failed(reason: .deviceKeyUnavailable)
+
+        case .deviceSetupUnsupported:
+            return .failed(reason: .deviceIneligible)
 
         case .decodingError, .validation:
             // Both are the two sides disagreeing about the contract. A 400 is
