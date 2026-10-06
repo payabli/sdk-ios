@@ -76,14 +76,20 @@ final class PayabliTTPActivationIdTests: XCTestCase {
         XCTAssertEqual(ttp.sessionState, .pendingActivation(activationId: "dev_e"))
     }
 
-    /// With nothing registered there is no device to activate, so the refusal is the paypoint's.
+    /// With nothing registered there is no device to activate, so the remedy is the paypoint's. The
+    /// error still names the refusal that happened.
     func testARefusalBeforeAnyRegistrationIsNotPendingActivation() async throws {
         let (ttp, attestation) = try makeTTP()
         attestation.attestResult = .failure(
             PayabliGenericError(type: .permissionDenied, reason: "Forbidden (403)")
         )
 
-        _ = try? await ttp.initialize()
+        do {
+            try await ttp.initialize()
+            XCTFail("expected the refusal")
+        } catch let error as PayabliGenericError {
+            XCTAssertEqual(error.type, .permissionDenied)
+        }
 
         XCTAssertEqual(ttp.sessionState, .failed(reason: .configurationRejected))
     }
