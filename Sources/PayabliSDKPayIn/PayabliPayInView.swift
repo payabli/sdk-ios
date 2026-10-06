@@ -888,8 +888,11 @@ extension PayabliPayInView {
     }
 
     var submitButtonText: String {
-        PayInSubmitWording(viewModel.component.operation)
-            .text(hostWording: configuration.labels.hostSubmitButton, isSubmitting: viewModel.isSubmitting)
+        PayInSubmitWording.text(
+            showing: viewModel.component.operation,
+            submitting: viewModel.submittingOperation,
+            hostWording: configuration.labels.hostSubmitButton
+        )
     }
 
     var submitButtonBackgroundColor: Color {

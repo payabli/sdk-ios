@@ -19,8 +19,16 @@ struct PayInSubmitWording {
         }
     }
 
-    /// The host's wording replaces the idle text only. While a submission runs the button reads the busy text.
-    func text(hostWording: String?, isSubmitting: Bool) -> String {
-        isSubmitting ? busy : hostWording ?? idle
+    /// The host's wording replaces the idle text only. While a submission runs the button reads the busy text of
+    /// the operation being sent, even if the form has since been given another.
+    static func text(
+        showing operation: PayabliPayInOperation,
+        submitting: PayabliPayInOperation?,
+        hostWording: String?
+    ) -> String {
+        if let submitting {
+            return Self(submitting).busy
+        }
+        return hostWording ?? Self(operation).idle
     }
 }

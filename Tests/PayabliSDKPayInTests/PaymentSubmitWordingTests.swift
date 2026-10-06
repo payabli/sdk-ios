@@ -19,24 +19,37 @@ final class PaymentSubmitWordingTests: XCTestCase {
     func testWithNoHostWordingTheButtonReadsTheOperation() {
         for operation in PayabliPayInOperation.allCases {
             let wording = PayInSubmitWording(operation)
-            XCTAssertEqual(wording.text(hostWording: nil, isSubmitting: false), wording.idle, operation.rawValue)
-            XCTAssertEqual(wording.text(hostWording: nil, isSubmitting: true), wording.busy, operation.rawValue)
+            XCTAssertEqual(
+                PayInSubmitWording.text(showing: operation, submitting: nil, hostWording: nil),
+                wording.idle,
+                operation.rawValue
+            )
+            XCTAssertEqual(
+                PayInSubmitWording.text(showing: operation, submitting: operation, hostWording: nil),
+                wording.busy,
+                operation.rawValue
+            )
         }
     }
 
     func testHostWordingReplacesTheIdleTextOnly() {
-        let wording = PayInSubmitWording(.capture)
-
-        XCTAssertEqual(wording.text(hostWording: "Pay now", isSubmitting: false), "Pay now")
-        XCTAssertEqual(wording.text(hostWording: "Pay now", isSubmitting: true), "Paying…")
+        XCTAssertEqual(PayInSubmitWording.text(showing: .capture, submitting: nil, hostWording: "Pay now"), "Pay now")
+        XCTAssertEqual(PayInSubmitWording.text(showing: .capture, submitting: .capture, hostWording: "Pay now"), "Paying…")
     }
 
     func testBlankHostWordingReadsTheOperation() {
         let labels = PayabliPayInLabels(submitButton: "  ")
 
         XCTAssertEqual(
-            PayInSubmitWording(.storePaymentMethod).text(hostWording: labels.hostSubmitButton, isSubmitting: false),
+            PayInSubmitWording.text(showing: .storePaymentMethod, submitting: nil, hostWording: labels.hostSubmitButton),
             "Save"
+        )
+    }
+
+    func testTheBusyTextIsTheSubmittedOperationsNotTheOneShown() {
+        XCTAssertEqual(
+            PayInSubmitWording.text(showing: .storePaymentMethod, submitting: .capture, hostWording: nil),
+            "Paying…"
         )
     }
 }
