@@ -47,7 +47,9 @@ final class PayabliPayInInstalledSessionTests: XCTestCase {
     }
 
     func testObjectiveCFacadeBeforeASessionIsInstalledThrows() {
-        XCTAssertThrowsError(try PayabliPayInObjC.create())
+        XCTAssertThrowsError(try PayabliPayInObjC.create()) { error in
+            assertCatalogError(error, domain: "com.payabli.payIn")
+        }
     }
 
     func testObjectiveCEntryPointInstallsTheSessionSwiftReads() async throws {
@@ -76,8 +78,35 @@ final class PayabliPayInInstalledSessionTests: XCTestCase {
             )
             XCTFail("a different configuration was accepted")
         } catch {
-            XCTAssertEqual((error as? PayabliGenericError)?.type, .invalidConfiguration)
+            assertCatalogError(error, domain: "com.payabli.session")
         }
+    }
+
+    func testObjectiveCEntryPointRefusesABlankEntryPoint() async {
+        do {
+            try await PayabliSessionObjC.initialize(
+                tokenHandler: { completion in completion("tok", nil) },
+                entryPoint: " ",
+                environment: .sandbox,
+                telemetryEnabled: true
+            )
+            XCTFail("a blank entry point was accepted")
+        } catch {
+            assertCatalogError(error, domain: "com.payabli.session")
+        }
+    }
+
+    /// What an Objective-C caller reads: the domain, the catalog number as the code, and the wire name.
+    private func assertCatalogError(_ error: Error, domain: String, file: StaticString = #filePath, line: UInt = #line) {
+        let nsError = error as NSError
+        XCTAssertEqual(nsError.domain, domain, file: file, line: line)
+        XCTAssertEqual(nsError.code, PayabliErrorType.invalidConfiguration.number, file: file, line: line)
+        XCTAssertEqual(
+            nsError.userInfo["PayabliErrorType"] as? String,
+            PayabliErrorType.invalidConfiguration.rawValue,
+            file: file,
+            line: line
+        )
     }
 
     private func makeConfig(entryPoint: String) throws -> PayabliConfig {

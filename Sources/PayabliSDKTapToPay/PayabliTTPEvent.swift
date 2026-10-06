@@ -371,16 +371,6 @@ extension Error {
         if let tapToPayError = self as? TapToPayError {
             return tapToPayError as NSError
         }
-        if let payabliError = self as? any PayabliError {
-            return NSError(
-                domain: PayabliTTPError.errorDomain,
-                code: payabliError.code,
-                userInfo: [
-                    NSLocalizedDescriptionKey: payabliError.reason,
-                    "PayabliErrorType": payabliError.type.rawValue
-                ]
-            )
-        }
-        return self as NSError
+        return payabliNSError(domain: PayabliTTPError.errorDomain)
     }
 }

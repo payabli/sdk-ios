@@ -63,6 +63,7 @@ public final class PayabliPayInObjC: NSObject {
     @objc public static func create() throws -> PayabliPayInObjC {
         guard let session = PayabliSession.current else {
             throw PayabliGenericError(type: .invalidConfiguration, reason: "no session is initialized")
+                .toPayabliPayInNSError()
         }
         return PayabliPayInObjC(component: PayabliPayIn(session: session))
     }
@@ -183,16 +184,6 @@ public final class PayabliPayInObjC: NSObject {
 
 private extension Error {
     func toPayabliPayInNSError() -> NSError {
-        if let payInError = self as? any PayabliError {
-            return NSError(
-                domain: payInObjCErrorDomain,
-                code: payInError.code,
-                userInfo: [
-                    NSLocalizedDescriptionKey: payInError.reason,
-                    "PayabliErrorType": payInError.type.rawValue
-                ]
-            )
-        }
-        return self as NSError
+        payabliNSError(domain: payInObjCErrorDomain)
     }
 }
