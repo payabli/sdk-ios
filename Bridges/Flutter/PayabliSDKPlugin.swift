@@ -9,9 +9,9 @@ import UIKit
 /// `Sources/PayabliSDKTapToPay/PayabliTTP+*.swift`.
 ///
 /// Two channels:
-///   - `com.payabli.sdk/taptopay` (`MethodChannel`): request/response RPC for
-///     `configure`, `initialize`, `charge`, `activateDevice`, `getSessionState`.
-///   - `com.payabli.sdk/taptopay/events` (`EventChannel`): one-way stream of
+///   - `com.payabli.sdk` (`MethodChannel`): request/response RPC for every call,
+///     Tap to Pay, payment flow and session alike.
+///   - `com.payabli.sdk/events` (`EventChannel`): one-way stream of
 ///     lifecycle events (`PayabliTTPEvent`) flattened to
 ///     `{"code": Int, "payload": [String: Any]}` per event.
 ///
@@ -20,8 +20,8 @@ import UIKit
 /// SDK needs to refresh, it invokes the `refreshToken` channel call back on
 /// the Dart side, which delegates to the partner backend.
 public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
-    public static let methodChannelName = "com.payabli.sdk/taptopay"
-    public static let eventChannelName = "com.payabli.sdk/taptopay/events"
+    public static let methodChannelName = "com.payabli.sdk"
+    public static let eventChannelName = "com.payabli.sdk/events"
 
     private let methodChannel: FlutterMethodChannel
     private let eventChannel: FlutterEventChannel
