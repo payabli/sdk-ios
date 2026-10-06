@@ -233,13 +233,14 @@ final class PayInPaymentFlowClient: Sendable {
         case .paymentDeclined, .rateLimited, .missingToken, .tokenExpired,
              .tokenMalformed, .tokenProviderFailed, .invalidSignature, .permissionDenied,
              .sessionBurned, .invalidConfiguration, .validation,
-             .deviceKeyUnavailable, .deviceSetupUnsupported, .sdkInternalError, .deviceServicesOutdated,
+             .deviceKeyUnavailable, .deviceSetupUnsupported, .sdkInternalError, .sessionNotInitialized,
+             .deviceServicesOutdated,
              .devicePendingActivation, .deviceSetupRequired, .deviceSetupRefused, .deviceSetupUnavailable,
              .deviceSetupNotConfigured, .entryPointRefused, .readerCredentialsUnusable, .deviceOSUnsupported,
              .deviceHardwareUnsupported, .termsNotAccepted, .cardPresentNotEnabled, .readerDeviceRefused,
              .readerUnavailable, .readerSessionExpired, .paymentNotOpened, .cardDeclined, .activationCodeMalformed,
              .activationCodeIncorrect, .activationCodeExpired, .activationAttemptsExhausted, .activationCodeNotIssued,
-             .deviceNotPending, .terminalNotReady, .tooManyOpenCharges, .paymentNotHeld:
+             .deviceNotPending, .terminalNotReady, .tooManyOpenCharges, .paymentNotHeld, .deviceIdentityUnavailable:
             return false
         }
     }

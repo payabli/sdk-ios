@@ -25,6 +25,13 @@ final class PayabliErrorCatalogTests: XCTestCase {
         (.unknown, "UNKNOWN", 1017, .outcomeUnknown, "An unexpected error occurred."),
         (.sdkInternalError, "SDK_INTERNAL_ERROR", 1018, .internal, "The SDK failed before the request was sent."),
         (
+            .sessionNotInitialized,
+            "SESSION_NOT_INITIALIZED",
+            1019,
+            .invalidRequest,
+            "The session has not been initialized."
+        ),
+        (
             .deviceKeyUnavailable,
             "DEVICE_KEY_UNAVAILABLE",
             3001,
@@ -96,7 +103,8 @@ final class PayabliErrorCatalogTests: XCTestCase {
         (.deviceNotPending, "DEVICE_NOT_PENDING", 3028, .invalidRequest, "This device is not waiting for activation."),
         (.terminalNotReady, "TERMINAL_NOT_READY", 3029, .invalidRequest, "The terminal is not ready for this call."),
         (.tooManyOpenCharges, "TOO_MANY_OPEN_CHARGES", 3030, .invalidRequest, "Too many charges are waiting to be resolved."),
-        (.paymentNotHeld, "PAYMENT_NOT_HELD", 3031, .invalidRequest, "No captured payment is held under that identifier.")
+        (.paymentNotHeld, "PAYMENT_NOT_HELD", 3031, .invalidRequest, "No captured payment is held under that identifier."),
+        (.deviceIdentityUnavailable, "DEVICE_IDENTITY_UNAVAILABLE", 3033, .device, "This device cannot be identified.")
     ]
 
     func testEveryTypeCarriesItsPublishedNameNumberCategoryAndMessage() {
@@ -110,6 +118,11 @@ final class PayabliErrorCatalogTests: XCTestCase {
 
     func testTheTableCoversEveryType() {
         XCTAssertEqual(Set(table.map(\.0)), Set(PayabliErrorType.allCases))
+    }
+
+    /// 3032 was retired before publication, and a retired number is never reused.
+    func testNoTypeTakesTheRetiredNumber() {
+        XCTAssertFalse(PayabliErrorType.allCases.contains { $0.number == 3032 })
     }
 
     func testNoTwoCodesShareANumber() {

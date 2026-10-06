@@ -46,8 +46,10 @@ final class PayabliPayInInstalledSessionTests: XCTestCase {
         XCTAssertTrue(bridged.component.session === installed)
     }
 
-    func testObjectiveCFacadeBeforeASessionIsInstalledThrows() {
-        XCTAssertThrowsError(try PayabliPayInObjC.create())
+    func testObjectiveCFacadeBeforeASessionIsInstalledThrowsSessionNotInitialized() {
+        XCTAssertThrowsError(try PayabliPayInObjC.create()) { error in
+            assertCatalogError(error, domain: "com.payabli.payIn", type: .sessionNotInitialized)
+        }
     }
 
     func testObjectiveCEntryPointInstallsTheSessionSwiftReads() async throws {
@@ -76,8 +78,42 @@ final class PayabliPayInInstalledSessionTests: XCTestCase {
             )
             XCTFail("a different configuration was accepted")
         } catch {
-            XCTAssertEqual((error as? PayabliGenericError)?.type, .invalidConfiguration)
+            assertCatalogError(error, domain: "com.payabli.session")
         }
+    }
+
+    func testObjectiveCEntryPointRefusesABlankEntryPoint() async {
+        do {
+            try await PayabliSessionObjC.initialize(
+                tokenHandler: { completion in completion("tok", nil) },
+                entryPoint: " ",
+                environment: .sandbox,
+                telemetryEnabled: true
+            )
+            XCTFail("a blank entry point was accepted")
+        } catch {
+            assertCatalogError(error, domain: "com.payabli.session")
+            XCTAssertEqual((error as NSError).localizedDescription, "Invalid configuration: entryPoint is blank.")
+        }
+    }
+
+    /// What an Objective-C caller reads: the domain, the catalog number as the code, and the wire name.
+    private func assertCatalogError(
+        _ error: Error,
+        domain: String,
+        type: PayabliErrorType = .invalidConfiguration,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        let nsError = error as NSError
+        XCTAssertEqual(nsError.domain, domain, file: file, line: line)
+        XCTAssertEqual(nsError.code, type.number, file: file, line: line)
+        XCTAssertEqual(
+            nsError.userInfo["PayabliErrorType"] as? String,
+            type.rawValue,
+            file: file,
+            line: line
+        )
     }
 
     private func makeConfig(entryPoint: String) throws -> PayabliConfig {

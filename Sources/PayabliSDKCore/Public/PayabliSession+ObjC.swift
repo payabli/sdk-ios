@@ -4,6 +4,8 @@ import Foundation
 ///
 /// It installs the same session `PayabliSession.initialize(config:)` does, so a host bridging both
 /// languages runs one session whichever starts it.
+private let sessionErrorDomain = "com.payabli.session"
+
 @objc(PayabliSessionObjC)
 public final class PayabliSessionObjC: NSObject {
     @available(*, unavailable)
@@ -26,12 +28,16 @@ public final class PayabliSessionObjC: NSObject {
         environment: PayabliEnvironment,
         telemetryEnabled: Bool
     ) async throws {
-        let config = try PayabliConfig(
-            entryPoint: entryPoint,
-            environment: environment,
-            tokenProvider: bridgedTokenProvider(errorDomain: "com.payabli.session", tokenHandler),
-            telemetryEnabled: telemetryEnabled
-        )
-        try await PayabliSession.initialize(config: config)
+        do {
+            let config = try PayabliConfig(
+                entryPoint: entryPoint,
+                environment: environment,
+                tokenProvider: bridgedTokenProvider(errorDomain: sessionErrorDomain, tokenHandler),
+                telemetryEnabled: telemetryEnabled
+            )
+            try await PayabliSession.initialize(config: config)
+        } catch {
+            throw error.payabliNSError(domain: sessionErrorDomain)
+        }
     }
 }

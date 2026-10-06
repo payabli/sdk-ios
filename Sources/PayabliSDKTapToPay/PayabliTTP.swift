@@ -145,10 +145,10 @@ public final class PayabliTTP: NSObject, ObservableObject {
         /// Builds the card-present facade on the session `PayabliSession.initialize(config:)`
         /// installed, with the default card reader and App Attest backed by the Keychain.
         ///
-        /// Throws `notInitialized` when no session is installed.
+        /// Throws `sessionNotInitialized` when no session is installed.
         @objc public static func create() async throws -> PayabliTTP {
             guard let payabliSession = PayabliSession.current else {
-                throw PayabliTTPError.notInitialized
+                throw TapToPayError(type: .sessionNotInitialized, reason: "no session is initialized", detail: nil)
             }
             let attestation = AppAttestService(
                 transport: payabliSession.transport,
