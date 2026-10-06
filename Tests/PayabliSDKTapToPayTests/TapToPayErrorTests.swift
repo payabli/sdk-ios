@@ -10,7 +10,7 @@ final class TapToPayErrorTests: XCTestCase {
         XCTAssertEqual(payabli?.type, .deviceKeyUnavailable)
         XCTAssertEqual(payabli?.code, 3001)
         XCTAssertEqual(payabli?.category, .retryLater)
-        XCTAssertEqual(payabli?.message, "The device's key facility could not confirm this device's key.")
+        XCTAssertEqual(payabli?.message, "This device's secure storage is unavailable.")
         XCTAssertEqual(payabli?.reason, "r")
         XCTAssertEqual(payabli?.detail, "d")
     }

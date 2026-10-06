@@ -84,6 +84,7 @@ public enum PayabliErrorType: String, Sendable, CaseIterable {
     case terminalNotReady = "TERMINAL_NOT_READY"
     case tooManyOpenCharges = "TOO_MANY_OPEN_CHARGES"
     case paymentNotHeld = "PAYMENT_NOT_HELD"
+    case deviceIdentityUnavailable = "DEVICE_IDENTITY_UNAVAILABLE"
 }
 
 /// What a host does about a failure. Each ``PayabliErrorType`` belongs to one.
@@ -170,6 +171,7 @@ public extension PayabliErrorType {
         case .terminalNotReady: 3029
         case .tooManyOpenCharges: 3030
         case .paymentNotHeld: 3031
+        case .deviceIdentityUnavailable: 3033
         }
     }
 
@@ -194,7 +196,7 @@ public extension PayabliErrorType {
         case .validation: "The request was refused as invalid."
         case .unknown: "An unexpected error occurred."
         case .sdkInternalError: "The SDK failed before the request was sent."
-        case .deviceKeyUnavailable: "The device's key facility could not confirm this device's key."
+        case .deviceKeyUnavailable: "This device's secure storage is unavailable."
         case .deviceSetupUnsupported: "This device cannot be set up for card-present payments."
         case .deviceServicesOutdated: "Google Play on this device must be installed, updated or signed in."
         case .devicePendingActivation: "This device is waiting for its activation code."
@@ -225,6 +227,7 @@ public extension PayabliErrorType {
         case .terminalNotReady: "The terminal is not ready for this call."
         case .tooManyOpenCharges: "Too many charges are waiting to be resolved."
         case .paymentNotHeld: "No captured payment is held under that identifier."
+        case .deviceIdentityUnavailable: "This device cannot be identified."
         }
     }
 
@@ -248,7 +251,7 @@ public extension PayabliErrorType {
              .tooManyOpenCharges, .paymentNotHeld:
             .invalidRequest
         case .deviceSetupUnsupported, .deviceSetupRefused, .deviceOSUnsupported, .deviceHardwareUnsupported,
-             .readerDeviceRefused:
+             .readerDeviceRefused, .deviceIdentityUnavailable:
             .device
         case .sdkInternalError:
             .internal
