@@ -77,6 +77,34 @@ final class TTPUpdateRetryTests: XCTestCase {
         )
     }
 
+    /// Once the reader was asked for a card, a failure claiming nothing was sent may have been preceded by a
+    /// sale, so the caller is told the outcome is unconfirmed and which payment to look up.
+    func testAReadFailureClaimingNothingWasSentIsAnUnconfirmedOutcome() async throws {
+        Self.updateResponses.script([200])
+        let ttp = try await makeReadyTTP(
+            readFailure: TapToPayError(type: .sdkInternalError, reason: "SDK failure", detail: nil)
+        )
+
+        let failure = await chargeFailure(ttp)
+
+        XCTAssertEqual(failure?.type, .paymentOutcomeUnknown)
+        XCTAssertEqual(failure?.paymentTransId, Self.paymentTransId)
+        XCTAssertEqual(failure?.capture, .unknown)
+    }
+
+    /// A close the service refused with a wait reaches the caller with that wait, so a host retrying the
+    /// close knows when.
+    func testAFailedCloseCarriesTheWaitTheServiceAskedFor() async throws {
+        Self.updateResponses.scriptWithHint([429], retryAfter: "3600")
+        let ttp = try await makeReadyTTP()
+
+        let failure = await chargeFailure(ttp)
+
+        XCTAssertEqual(failure?.type, .paymentNotClosed)
+        XCTAssertEqual(failure?.retryAfter, 3600)
+        XCTAssertEqual(failure?.paymentTransId, Self.paymentTransId)
+    }
+
     /// A decline is authoritative, so repeating it only spends the merchant's time. It reaches the caller
     /// as a failed update, and the reason is the mapped one rather than a bare status.
     func testADeclinedUpdateIsNotRetriedAndReportsWhy() async throws {
@@ -440,12 +468,14 @@ final class TTPUpdateRetryTests: XCTestCase {
 
     static let updateResponses = ScriptedUpdates()
 
-    private func makeReadyTTP(outcome: CardReadOutcome = .approved) async throws -> PayabliTTP {
+    private func makeReadyTTP(
+        outcome: CardReadOutcome = .approved,
+        readFailure: Error? = nil
+    ) async throws -> PayabliTTP {
         StubURLProtocol.handler = Self.stubHandler
         let provider = MockTapToPayProvider()
-        provider.readingResult = .success(
-            CardReadResult(provider: "mock", encryptedPayload: Data(), outcome: outcome)
-        )
+        provider.readingResult = readFailure.map { .failure($0) }
+            ?? .success(CardReadResult(provider: "mock", encryptedPayload: Data(), outcome: outcome))
         let config = try PayabliConfig(
             entryPoint: "e",
             environment: .sandbox,

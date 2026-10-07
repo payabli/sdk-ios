@@ -19,7 +19,8 @@ enum TapToPayErrorTranslation {
                 reason: type.message,
                 detail: serviceText(of: error),
                 paymentTransId: error.paymentTransId,
-                capture: error.capture
+                capture: error.capture,
+                retryAfter: retryAfter(of: error)
             )
         case let error as any PayabliError:
             return TapToPayError(
@@ -31,6 +32,24 @@ enum TapToPayErrorTranslation {
         default:
             return TapToPayError(type: .unknown, reason: PayabliErrorType.unknown.message, detail: nil)
         }
+    }
+
+    /// What a charge's failure reaches a host as. Once the reader has been asked for a card, a code saying
+    /// nothing was sent becomes `paymentOutcomeUnknown`, because the sale may already be taken, and a failure
+    /// that names no payment takes the charge's.
+    static func hostError(for error: Error, chargeOf paymentTransId: String?, askedForCard: Bool) -> Error {
+        guard let failure = hostError(for: error) as? TapToPayError else { return error }
+        let claimsNothingWasSent = failure.type == .validation || failure.type == .sdkInternalError
+        let type = askedForCard && claimsNothingWasSent ? PayabliErrorType.paymentOutcomeUnknown : failure.type
+        let namesNoPayment = failure.paymentTransId == nil
+        return TapToPayError(
+            type: type,
+            reason: type == failure.type ? failure.reason : type.message,
+            detail: failure.detail,
+            paymentTransId: failure.paymentTransId ?? paymentTransId,
+            capture: namesNoPayment && askedForCard ? .unknown : failure.capture,
+            retryAfter: failure.retryAfter
+        )
     }
 
     /// The catalog wire name `error` reaches a host under, which is what a card-present event carries.
@@ -94,6 +113,12 @@ enum TapToPayErrorTranslation {
         return error.detail
     }
 
+    /// The wait a failed close was given, which is the only case that carries one.
+    private static func retryAfter(of error: PayabliTTPError) -> TimeInterval? {
+        guard case let .updateFailed(_, _, _, retryAfter) = error else { return nil }
+        return retryAfter
+    }
+
     /// A person dismissed the platform's sheet. The reader marks it at the start of the case's reason.
     private static func isCancellation(_ reason: String) -> Bool {
         reason.hasPrefix(FiservCardReader.cancellationReasonPrefix)
@@ -110,7 +135,7 @@ enum TapToPayErrorTranslation {
              let .networkError(reason),
              let .readerSetupFailed(reason, _),
              let .nfcFailed(reason, _),
-             let .updateFailed(reason, _, _):
+             let .updateFailed(reason, _, _, _):
             reason
         case .notInitialized, .invalidState, .notReady, .devicePendingActivation, .tokenExpired,
              .termsNotAccepted, .readerOSVersionNotSupported, .cardDeclined, .outcomeUnknown:
@@ -119,6 +144,13 @@ enum TapToPayErrorTranslation {
         guard let text, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
         return text
     }
+}
+
+/// How far a charge got, which decides what its failure tells a host.
+@MainActor
+final class ChargeProgress {
+    var paymentTransId: String?
+    var askedForCard = false
 }
 
 extension PayabliTTP {

@@ -70,7 +70,7 @@ package enum PayabliTTPError: Error, Sendable {
     case readerSetupFailed(reason: String, paymentTransId: String? = nil)
     case nfcFailed(reason: String, paymentTransId: String? = nil)
     case initiateFailed(reason: String)
-    case updateFailed(reason: String, paymentTransId: String, capture: PayabliTTPCapture)
+    case updateFailed(reason: String, paymentTransId: String, capture: PayabliTTPCapture, retryAfter: TimeInterval? = nil)
     case tokenExpired
     case activationFailed(reason: String)
     case networkError(reason: String)
@@ -98,7 +98,7 @@ package extension PayabliTTPError {
         case .nfcFailed, .outcomeUnknown:
             // Raised once the reader was asked for a card, and the processor may take the sale before it answers.
             return .unknown
-        case let .updateFailed(_, _, capture),
+        case let .updateFailed(_, _, capture, _),
              let .readerOSVersionNotSupported(_, capture):
             return capture
         case .notInitialized, .invalidState, .notReady, .devicePendingActivation, .attestationRevoked,
@@ -115,7 +115,7 @@ package extension PayabliTTPError {
              let .readerSetupFailed(_, paymentTransId),
              let .readerOSVersionNotSupported(paymentTransId, _):
             return paymentTransId
-        case let .updateFailed(_, paymentTransId, _),
+        case let .updateFailed(_, paymentTransId, _, _),
              let .cardDeclined(paymentTransId),
              let .outcomeUnknown(paymentTransId):
             return paymentTransId
@@ -291,7 +291,7 @@ extension PayabliTTPError: LocalizedError {
             return "The payment outcome is not known"
         case let .nfcFailed(reason, _),
              let .readerSetupFailed(reason, _),
-             let .updateFailed(reason, _, _):
+             let .updateFailed(reason, _, _, _):
             return reason
         case let .attestationRevoked(reason),
              let .attestationFailed(reason),

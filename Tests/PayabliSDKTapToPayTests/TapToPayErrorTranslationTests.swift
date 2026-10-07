@@ -85,6 +85,94 @@ final class TapToPayErrorTranslationTests: XCTestCase {
         XCTAssertTrue(host.localizedDescription.contains("zip: must be five digits"), host.localizedDescription)
     }
 
+    // MARK: - A charge
+
+    func testOnceTheCardWasAskedForACodeSayingNothingWasSentIsAnUnconfirmedOutcome() throws {
+        for refused in [PayabliErrorType.validation, .sdkInternalError] {
+            let host = try XCTUnwrap(
+                TapToPayErrorTranslation.hostError(
+                    for: PayabliGenericError(type: refused, reason: "refused", detail: "the service's words"),
+                    chargeOf: "TXN-9",
+                    askedForCard: true
+                ) as? TapToPayError
+            )
+            XCTAssertEqual(host.type, .paymentOutcomeUnknown, "\(refused)")
+            XCTAssertEqual(host.reason, PayabliErrorType.paymentOutcomeUnknown.message, "\(refused)")
+            XCTAssertEqual(host.detail, "the service's words", "\(refused)")
+            XCTAssertEqual(host.paymentTransId, "TXN-9")
+            XCTAssertEqual(host.capture, .unknown)
+        }
+    }
+
+    func testBeforeTheCardWasAskedForAFailureKeepsItsCodeAndChargedNothing() throws {
+        let host = try XCTUnwrap(
+            TapToPayErrorTranslation.hostError(
+                for: PayabliGenericError(type: .validation, reason: "refused"),
+                chargeOf: "TXN-9",
+                askedForCard: false
+            ) as? TapToPayError
+        )
+        XCTAssertEqual(host.type, .validation)
+        XCTAssertEqual(host.reason, "refused")
+        XCTAssertEqual(host.paymentTransId, "TXN-9")
+        XCTAssertEqual(host.capture, .notCharged)
+    }
+
+    func testAFailureNamingItsOwnPaymentKeepsItsOwnCapture() throws {
+        let host = try XCTUnwrap(
+            TapToPayErrorTranslation.hostError(
+                for: PayabliTTPError.cardDeclined(paymentTransId: "TXN-1"),
+                chargeOf: "TXN-9",
+                askedForCard: true
+            ) as? TapToPayError
+        )
+        XCTAssertEqual(host.type, .cardDeclined)
+        XCTAssertEqual(host.paymentTransId, "TXN-1")
+        XCTAssertEqual(host.capture, .notCharged)
+    }
+
+    func testACancelledChargeStaysACancellation() {
+        let host = TapToPayErrorTranslation.hostError(for: CancellationError(), chargeOf: "TXN-9", askedForCard: true)
+        XCTAssertTrue(host is CancellationError, "got \(host)")
+    }
+
+    // MARK: - Codes
+
+    func testARejectedCredentialAndARefusedReaderAreToldApartByTheirCode() throws {
+        let credential = try translated(PayabliTTPError.tokenExpired)
+        let reader = try translated(PayabliTTPError.readerOSVersionNotSupported())
+        XCTAssertNotEqual(credential.code, reader.code)
+        XCTAssertEqual(credential.category, .credential)
+        XCTAssertEqual(reader.category, .device)
+    }
+
+    /// Every card-present code is produced by some cause on this platform, or is named here with the reason it
+    /// is not.
+    func testEveryCardPresentCodeThisPlatformCanProduceHasACause() {
+        let fromTheTable = Set(Self.allSamples.map { Self.expectedType(of: $0) })
+            .union([.userCancelled, .paymentOutcomeUnknown])
+        let fromActivation: Set<PayabliErrorType> = [
+            .activationCodeIncorrect, .activationCodeExpired, .activationAttemptsExhausted,
+            .activationCodeNotIssued, .deviceNotPending, .deviceSetupRequired, .entryPointRefused
+        ]
+        let raisedDirectly: Set<PayabliErrorType> = [.deviceKeyUnavailable, .deviceSetupUnsupported, .deviceNotPending]
+        let notProducedYet: Set<PayabliErrorType> = [
+            .deviceServicesOutdated, // a Google Play cause, which this platform has no counterpart for
+            .deviceSetupRefused, .deviceSetupUnavailable, .deviceSetupNotConfigured, .readerCredentialsUnusable,
+            .deviceHardwareUnsupported, .cardPresentNotEnabled, .readerDeviceRefused, .readerSessionExpired,
+            .activationCodeMalformed, .deviceIdentityUnavailable, .readerUnavailable, .paymentNotOpened,
+            // carried by coarse cases until they are classified
+            .tooManyOpenCharges, .paymentNotHeld // no held charge and no close call on this platform yet
+        ]
+        let produced = fromTheTable.union(fromActivation).union(raisedDirectly)
+        for type in PayabliErrorType.allCases where (3001 ... 3999).contains(type.number) {
+            XCTAssertTrue(
+                produced.contains(type) != notProducedYet.contains(type),
+                "\(type) is either produced and listed as not, or neither"
+            )
+        }
+    }
+
     // MARK: - What passes through
 
     func testATapToPayErrorPassesThroughUnchanged() throws {

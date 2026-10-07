@@ -7,7 +7,7 @@ import PayabliSDKCore
 /// sees the failure reason without re-reading logs.
 private enum TTPUpdateOutcome {
     case succeeded
-    case failed(reason: String)
+    case failed(reason: String, retryAfter: TimeInterval?)
 
     /// The caller cancelled. Separate from `failed`, because no `updateFailed` event is emitted for it,
     /// and the best-effort notify after a reader failure ignores it either way.
@@ -32,13 +32,21 @@ extension PayabliTTP {
         invoice: PayabliTTPInvoiceData = PayabliTTPInvoiceData(),
         orderDescription: String? = nil
     ) async throws -> TransactionResult {
-        try await reportingToHost {
-            try await runCharge(
+        let progress = ChargeProgress()
+        do {
+            return try await runCharge(
                 type: type,
                 paymentDetails: paymentDetails,
                 customer: customer,
                 invoice: invoice,
-                orderDescription: orderDescription
+                orderDescription: orderDescription,
+                progress: progress
+            )
+        } catch {
+            throw TapToPayErrorTranslation.hostError(
+                for: error,
+                chargeOf: progress.paymentTransId,
+                askedForCard: progress.askedForCard
             )
         }
     }
@@ -48,7 +56,8 @@ extension PayabliTTP {
         paymentDetails: PayabliTTPPaymentDetails,
         customer: PayabliTTPCustomerData,
         invoice: PayabliTTPInvoiceData,
-        orderDescription: String?
+        orderDescription: String?,
+        progress: ChargeProgress
     ) async throws -> TransactionResult {
         guard type == .sale else {
             throw PayabliTTPError.invalidState(current: sessionState, attempted: "charge(non-sale)")
@@ -86,6 +95,7 @@ extension PayabliTTP {
 
         // Step 1 — backend mints the paymentTransId.
         let paymentTransId = try await runInitiate(context: context)
+        progress.paymentTransId = paymentTransId
         multicaster.emit(.chargeInitiated(paymentTransId: paymentTransId))
 
         // Step 2 — NFC tap.
@@ -100,6 +110,9 @@ extension PayabliTTP {
         )
         let readResult: CardReadResult
         let generation = readerSessionGeneration
+        // Set before the reader is asked, not after it answers: the processor can take the sale before the
+        // answer arrives.
+        progress.askedForCard = true
         do {
             readResult = try await provider.startReading(readRequest)
             multicaster.emit(.nfcCompleted)
@@ -158,8 +171,10 @@ extension PayabliTTP {
             return TransactionResult(paymentTransId: paymentTransId)
         case .succeeded:
             throw PayabliTTPError.outcomeUnknown(paymentTransId: paymentTransId)
-        case let .failed(reason):
-            throw PayabliTTPError.updateFailed(reason: reason, paymentTransId: paymentTransId, capture: capture)
+        case let .failed(reason, retryAfter):
+            throw PayabliTTPError.updateFailed(
+                reason: reason, paymentTransId: paymentTransId, capture: capture, retryAfter: retryAfter
+            )
         case .cancelled:
             // The card was read, so a caller who cancelled is still told what the tap did.
             throw PayabliTTPError.updateFailed(
@@ -216,20 +231,24 @@ extension PayabliTTP {
 
     // MARK: - Charge helpers
 
-    /// The case the reader raised, with the payment it opened. A failure with no case of its own that can
+    /// The case the reader raised, with the payment it opened. A failure the reader already classified is
+    /// kept, and the charge adds its payment at the edge. Any other failure with no case of its own that can
     /// carry the payment is reported as `nfcFailed`.
-    private func readFailure(_ error: Error, paymentTransId: String) -> PayabliTTPError {
+    private func readFailure(_ error: Error, paymentTransId: String) -> Error {
+        if let classified = error as? TapToPayError {
+            return classified
+        }
         switch error as? PayabliTTPError {
         case let .nfcFailed(reason, _):
-            return .nfcFailed(reason: reason, paymentTransId: paymentTransId)
+            return PayabliTTPError.nfcFailed(reason: reason, paymentTransId: paymentTransId)
         case let .readerSetupFailed(reason, _):
-            return .readerSetupFailed(reason: reason, paymentTransId: paymentTransId)
+            return PayabliTTPError.readerSetupFailed(reason: reason, paymentTransId: paymentTransId)
         case .readerOSVersionNotSupported:
-            return .readerOSVersionNotSupported(paymentTransId: paymentTransId, capture: .unknown)
+            return PayabliTTPError.readerOSVersionNotSupported(paymentTransId: paymentTransId, capture: .unknown)
         case let .some(ttpError):
-            return .nfcFailed(reason: ttpError.localizedDescription, paymentTransId: paymentTransId)
+            return PayabliTTPError.nfcFailed(reason: ttpError.localizedDescription, paymentTransId: paymentTransId)
         case .none:
-            return .nfcFailed(reason: String(describing: error), paymentTransId: paymentTransId)
+            return PayabliTTPError.nfcFailed(reason: String(describing: error), paymentTransId: paymentTransId)
         }
     }
 
@@ -303,7 +322,7 @@ extension PayabliTTP {
             )
             // The caller still gets this surface's vocabulary, so the outcome reads the same whatever
             // layer underneath produced the failure.
-            return .failed(reason: error.localizedDescription)
+            return .failed(reason: error.localizedDescription, retryAfter: (error as? PayabliRetryAfter)?.retryAfter)
         }
     }
 
