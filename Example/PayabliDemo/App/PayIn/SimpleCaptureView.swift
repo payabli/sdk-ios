@@ -15,9 +15,7 @@ struct SimpleCaptureView: View {
     @State private var operation: PayInOperation = .capture
     /// Off by default, and not kept between launches.
     @State private var offersAuthorize = false
-    /// The amount each charging flow's attempt was drawn for, so a flow is given a new attempt, and a new key, only
-    /// when the amount it would send has changed.
-    @State private var attemptAmounts: [PayInOperation: Double] = [:]
+    @State private var attempts = PayInAttempts()
     @State private var amountText = AmountEntry.text(for: 10)
     @State private var resultText = ""
 
@@ -237,22 +235,17 @@ struct SimpleCaptureView: View {
 
     // MARK: - Actions
 
-    /// Each amount is a new attempt with its own key, on the flow on screen. A flow whose attempt already has this
-    /// amount keeps it, and its key, so switching operations never drops a key another attempt may still need.
-    /// Not while a submission is in flight, which the handle refuses.
+    /// The amount on screen, applied to the flow on screen. Not while a submission is in flight, which the handle
+    /// refuses.
     private func applyAmount() {
-        guard charges, let amount = enteredAmount, attemptAmounts[operation] != amount else { return }
-        startNewAttempt(amount: amount, for: operation)
-    }
-
-    private func startNewAttempt(amount: Double, for operation: PayInOperation) {
-        if flow(for: operation).startNewAttempt(
-            suppliesCustomer: demoCustomer.suppliesPayInCustomer,
+        guard charges, let amount = enteredAmount else { return }
+        attempts.apply(
             amount: amount,
+            to: flow(for: operation),
+            for: operation,
+            suppliesCustomer: demoCustomer.suppliesPayInCustomer,
             source: PayInFormCustomization.source
-        ) {
-            attemptAmounts[operation] = amount
-        }
+        )
     }
 
     /// The customer choice reaches each charging flow's attempt and leaves its amount and key as they were.
@@ -270,7 +263,13 @@ struct SimpleCaptureView: View {
             resultText = "\(verb): \(outcome.code), \(outcome.transaction?.paymentTransId ?? "-")"
             // The next submit is a payment of its own.
             if let amount = enteredAmount {
-                startNewAttempt(amount: amount, for: operation)
+                attempts.paymentCompleted(
+                    amount: amount,
+                    on: flow(for: operation),
+                    for: operation,
+                    suppliesCustomer: demoCustomer.suppliesPayInCustomer,
+                    source: PayInFormCustomization.source
+                )
             }
         }
     }

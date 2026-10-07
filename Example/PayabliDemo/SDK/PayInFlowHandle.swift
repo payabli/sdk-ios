@@ -95,3 +95,49 @@ final class PayInFlowHandle: ObservableObject {
         )
     }
 }
+
+/// When each charging flow on a screen that offers several operations draws a new attempt.
+///
+/// Every flow keeps its own key. A flow is given a new attempt, and so a new key, only when the
+/// amount it would send has changed or its last payment went through. Switching operations, and a
+/// failure whose outcome is unknown, leave each flow's attempt and key where they were.
+@MainActor
+struct PayInAttempts {
+    private var amounts: [PayInOperation: Double] = [:]
+
+    /// The amount entered, applied to the flow on screen. Starts a new attempt only when it is not
+    /// the amount that flow's attempt already carries.
+    mutating func apply(
+        amount: Double,
+        to flow: PayInFlowHandle,
+        for operation: PayInOperation,
+        suppliesCustomer: Bool,
+        source: String
+    ) {
+        guard amounts[operation] != amount else { return }
+        start(amount: amount, on: flow, for: operation, suppliesCustomer: suppliesCustomer, source: source)
+    }
+
+    /// A payment on `operation` went through, so that flow's next submit is a payment of its own.
+    mutating func paymentCompleted(
+        amount: Double,
+        on flow: PayInFlowHandle,
+        for operation: PayInOperation,
+        suppliesCustomer: Bool,
+        source: String
+    ) {
+        start(amount: amount, on: flow, for: operation, suppliesCustomer: suppliesCustomer, source: source)
+    }
+
+    private mutating func start(
+        amount: Double,
+        on flow: PayInFlowHandle,
+        for operation: PayInOperation,
+        suppliesCustomer: Bool,
+        source: String
+    ) {
+        if flow.startNewAttempt(suppliesCustomer: suppliesCustomer, amount: amount, source: source) {
+            amounts[operation] = amount
+        }
+    }
+}

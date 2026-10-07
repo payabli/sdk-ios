@@ -79,9 +79,54 @@ final class PayInFlowHandleTests: XCTestCase {
         XCTAssertNotNil(handle.requestCustomerNumber, "the customer never reached the request")
     }
 
+    // MARK: - Several operations on one screen
+
+    func testAChangedAmountGivesOnlyTheFlowOnScreenANewKey() throws {
+        let (capture, authorize) = try (makeHandle(), makeHandle(.authorize))
+        var attempts = PayInAttempts()
+        attempts.apply(amount: 10, to: capture, for: .capture, suppliesCustomer: true, source: "test")
+        attempts.apply(amount: 10, to: authorize, for: .authorize, suppliesCustomer: true, source: "test")
+        let captureKey = capture.requestKey
+        let authorizeKey = authorize.requestKey
+
+        attempts.apply(amount: 12, to: capture, for: .capture, suppliesCustomer: true, source: "test")
+
+        XCTAssertNotEqual(capture.requestKey, captureKey, "the flow on screen kept its key for a new amount")
+        XCTAssertEqual(capture.requestTotal, 12)
+        XCTAssertEqual(authorize.requestKey, authorizeKey, "a flow off screen was given a new key")
+        XCTAssertEqual(authorize.requestTotal, 10)
+    }
+
+    /// Coming back to an operation, and a failure whose outcome is unknown, both reapply the amount on screen. The
+    /// attempt and its key stay, so a retry is read as a repeat of the payment that may have gone through.
+    func testTheSameAmountKeepsTheFlowsKey() throws {
+        let capture = try makeHandle()
+        var attempts = PayInAttempts()
+        attempts.apply(amount: 10, to: capture, for: .capture, suppliesCustomer: true, source: "test")
+        let key = capture.requestKey
+
+        attempts.apply(amount: 10, to: capture, for: .capture, suppliesCustomer: true, source: "test")
+
+        XCTAssertEqual(capture.requestKey, key, "reapplying the amount replaced the key")
+    }
+
+    func testACompletedPaymentGivesItsOwnFlowANewKey() throws {
+        let (capture, authorize) = try (makeHandle(), makeHandle(.authorize))
+        var attempts = PayInAttempts()
+        attempts.apply(amount: 10, to: capture, for: .capture, suppliesCustomer: true, source: "test")
+        attempts.apply(amount: 10, to: authorize, for: .authorize, suppliesCustomer: true, source: "test")
+        let captureKey = capture.requestKey
+        let authorizeKey = authorize.requestKey
+
+        attempts.paymentCompleted(amount: 10, on: capture, for: .capture, suppliesCustomer: true, source: "test")
+
+        XCTAssertNotEqual(capture.requestKey, captureKey, "a completed payment left its key for the next one")
+        XCTAssertEqual(authorize.requestKey, authorizeKey, "another flow's key changed with the completion")
+    }
+
     // MARK: -
 
-    private func makeHandle() throws -> PayInFlowHandle {
+    private func makeHandle(_ operation: PayabliPayInOperation = .capture) throws -> PayInFlowHandle {
         PayInFlowHandle(
             PayabliPayIn(
                 session: PayabliSession(config: try PayabliConfig(
@@ -90,7 +135,7 @@ final class PayInFlowHandleTests: XCTestCase {
 
                     tokenProvider: { "test-token" }
                 )),
-                operation: .capture
+                operation: operation
             )
         )
     }
