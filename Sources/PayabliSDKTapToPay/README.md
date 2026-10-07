@@ -143,7 +143,7 @@ Until the phone is activated, `initialize()` throws a `TapToPayError` whose `typ
 `sessionState` is `.pendingActivation(activationId:)`. An app that isn't an authorized app, or credentials
 without `tools_init` or `pos_create`, land on `.failed(reason: .configurationRejected)` on a phone that
 hasn't registered yet. Credentials without
-`inboundpayments_create` reach `.ready`, and `charge` then throws a core `PayabliError` whose `type` is
+`inboundpayments_create` reach `.ready`, and `charge` then throws a `TapToPayError` whose `type` is
 `.permissionDenied`, before the card is read.
 
 1. Issue a code for the phone, from your backend or from the Payabli portal. The code is valid for 30
