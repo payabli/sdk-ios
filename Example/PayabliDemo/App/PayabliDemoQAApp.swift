@@ -26,6 +26,8 @@ struct DemoTabs: View {
 
     @StateObject private var simpleSave: PayInFlowHandle
 
+    @StateObject private var simpleAuthorize: PayInFlowHandle
+
     @AppStorage(ConfigurationQAView.showsSimpleCaptureKey) private var showsSimpleCapture = false
 
     /// One owner for the token probes, so a tab that has finished its backend
@@ -47,6 +49,7 @@ struct DemoTabs: View {
         _paymentCapture = StateObject(wrappedValue: PayInSessions.capture(session: session))
         _simpleCapture = StateObject(wrappedValue: PayInSessions.capture(session: session))
         _simpleSave = StateObject(wrappedValue: PayInSessions.storedMethod(session: session))
+        _simpleAuthorize = StateObject(wrappedValue: PayInSessions.authorize(session: session))
     }
 
     var body: some View {
@@ -62,7 +65,7 @@ struct DemoTabs: View {
                 }
 
             if showsSimpleCapture {
-                SimpleCaptureView(captureFlow: simpleCapture, saveFlow: simpleSave)
+                SimpleCaptureView(captureFlow: simpleCapture, authorizeFlow: simpleAuthorize, saveFlow: simpleSave)
                     .tabItem {
                         Label("S-Capture", systemImage: "dollarsign.circle")
                     }
@@ -101,6 +104,7 @@ struct DemoTabs: View {
 
             SimpleCaptureView(
                 captureFlow: PayInSessions.preview(session: session, capturing: true),
+                authorizeFlow: PayInSessions.preview(session: session, capturing: true),
                 saveFlow: PayInSessions.preview(session: session)
             )
             .tabItem {

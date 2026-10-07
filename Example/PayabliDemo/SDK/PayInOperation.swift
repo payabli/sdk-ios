@@ -9,6 +9,9 @@ enum PayInOperation {
     /// Take a payment now, under a key that makes a resubmission a retry.
     case capture
 
+    /// Hold an amount on a card to capture later, under a key the same way.
+    case authorize
+
     /// Reverse a payment already taken. The SDK mints the key and never shows it.
     case void
 
@@ -21,7 +24,7 @@ enum PayInOperation {
         switch self {
         case .storedMethod, .void:
             false
-        case .capture:
+        case .capture, .authorize:
             true
         }
     }

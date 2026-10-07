@@ -27,7 +27,7 @@ final class PayInFormCustomizationTests: XCTestCase {
     }
 
     func testTheDefaultPresetHandsTheFormItsOwnWording() {
-        let configuration = PayInFormCustomization(preset: .sdkDefault).configuration(capturing: true)
+        let configuration = PayInFormCustomization(preset: .sdkDefault).configuration(for: .capture)
         let sdkDefault = PayabliPayInFormConfiguration()
 
         XCTAssertEqual(configuration.allowedMethods, [.card, .bankAccount])
@@ -47,11 +47,11 @@ final class PayInFormCustomizationTests: XCTestCase {
 
     func testTheBrandPreset() {
         let customization = PayInFormCustomization(preset: .brand)
-        let configuration = customization.configuration(capturing: true)
+        let configuration = customization.configuration(for: .capture)
 
         XCTAssertEqual(customization.activePreset, .brand)
         XCTAssertEqual(customization.look, .brand)
-        XCTAssertEqual(customization.configuration(capturing: false).labels.submitButton, "Save for later")
+        XCTAssertEqual(customization.configuration(for: .storedMethod).labels.submitButton, "Save for later")
         XCTAssertEqual(configuration.labelLayout, .placeholder)
         XCTAssertEqual(configuration.labels.title, "Acme Checkout")
         XCTAssertEqual(configuration.labels.subtitle, "Secure payment, powered by Payabli")
@@ -68,7 +68,7 @@ final class PayInFormCustomizationTests: XCTestCase {
 
     func testTheMinimalPreset() {
         let customization = PayInFormCustomization(preset: .minimal)
-        let configuration = customization.configuration(capturing: true)
+        let configuration = customization.configuration(for: .capture)
 
         XCTAssertEqual(customization.activePreset, .minimal)
         XCTAssertEqual(customization.look, .compact)
@@ -94,11 +94,11 @@ final class PayInFormCustomizationTests: XCTestCase {
         var customization = PayInFormCustomization()
         customization.startOn = .bankAccount
 
-        XCTAssertEqual(customization.configuration(capturing: true).defaultMethod, .bankAccount)
+        XCTAssertEqual(customization.configuration(for: .capture).defaultMethod, .bankAccount)
 
         customization.methods = .cardOnly
 
-        XCTAssertEqual(customization.configuration(capturing: true).defaultMethod, .card)
+        XCTAssertEqual(customization.configuration(for: .capture).defaultMethod, .card)
     }
 
     func testEachSettingReachesTheFormOnItsOwn() {
@@ -112,7 +112,7 @@ final class PayInFormCustomizationTests: XCTestCase {
         customization.errorMessagePlacement = .aboveSubmitButton
         customization.inputSizing = .large
 
-        let configuration = customization.configuration(capturing: false)
+        let configuration = customization.configuration(for: .storedMethod)
 
         XCTAssertEqual(configuration.allowedMethods, [.bankAccount])
         XCTAssertEqual(configuration.labelLayout, .placeholder)
@@ -129,23 +129,42 @@ final class PayInFormCustomizationTests: XCTestCase {
         customization.showsCustomerSection = true
 
         XCTAssertEqual(
-            customization.configuration(capturing: true).cardSections.map(\.fields.first),
+            customization.configuration(for: .capture).cardSections.map(\.fields.first),
             [.cardholderName, .firstName, .amount]
         )
 
         customization.customerSectionFirst = true
 
         XCTAssertEqual(
-            customization.configuration(capturing: true).cardSections.map(\.fields.first),
+            customization.configuration(for: .capture).cardSections.map(\.fields.first),
             [.firstName, .cardholderName, .amount]
         )
     }
 
     func testACaptureAndASaveNameTheSameSource() {
         let capture = PayInRequests.freshCapture(suppliesCustomer: false, source: PayInFormCustomization.source)
-        let save = PayInFormCustomization().configuration(capturing: false)
+        let save = PayInFormCustomization().configuration(for: .storedMethod)
 
         XCTAssertEqual(capture.source, PayInFormCustomization.source)
         XCTAssertEqual(save.options.source, PayInFormCustomization.source)
+    }
+
+    func testAnAuthorizationOffersTheCardAlone() {
+        var customization = PayInFormCustomization()
+        customization.methods = .bankOnly
+        customization.startOn = .bankAccount
+
+        let configuration = customization.configuration(for: .authorize)
+
+        XCTAssertEqual(configuration.allowedMethods, [.card])
+        XCTAssertEqual(configuration.defaultMethod, .card)
+        XCTAssertNil(configuration.hiddenValues.customerData)
+    }
+
+    func testAnAuthorizationsCustomWordingPlacesAHold() {
+        let customization = PayInFormCustomization(preset: .brand)
+
+        XCTAssertEqual(customization.configuration(for: .authorize).labels.submitButton, "Place hold")
+        XCTAssertNil(PayInFormCustomization().configuration(for: .authorize).labels.submitButton)
     }
 }

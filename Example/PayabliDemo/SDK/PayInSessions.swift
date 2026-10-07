@@ -39,6 +39,21 @@ enum PayInSessions {
         )
     }
 
+    /// Holding an amount on a card to capture later. Takes the amount, the fee and the key as a capture does.
+    static func authorize(session: PayabliSession) -> PayInFlowHandle {
+        PayInFlowHandle(
+            PayabliPayIn(
+                session: session,
+                diagnostics: .qaLogging(
+                    enabled: Secrets.paymentCaptureDiagnosticsEnabled,
+                    store: .paymentCapture
+                ),
+                operation: .authorize,
+                requestConfiguration: PayInRequests.freshCapture(suppliesCustomer: true)
+            )
+        )
+    }
+
     /// A flow for a canvas preview, which makes no network call.
     static func preview(session: PayabliSession, capturing: Bool = false) -> PayInFlowHandle {
         PayInFlowHandle(

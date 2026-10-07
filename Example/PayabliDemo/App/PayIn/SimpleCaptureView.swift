@@ -1,17 +1,23 @@
 import PayabliSDKPayIn
 import SwiftUI
 
-/// One screen that captures or tokenizes, with the form's customization in reach: pick a preset
+/// One screen that captures, authorizes or tokenizes, with the form's customization in reach: pick a preset
 /// from the menu, then change any single setting on top of it.
 ///
 /// The two frames mark who draws what: the solid one is this app, the dashed one is the SDK.
 struct SimpleCaptureView: View {
     @ObservedObject var captureFlow: PayInFlowHandle
+    @ObservedObject var authorizeFlow: PayInFlowHandle
     @ObservedObject var saveFlow: PayInFlowHandle
 
     @EnvironmentObject private var demoCustomer: DemoCustomerSetting
     @State private var customization = PayInFormCustomization()
-    @State private var capturing = true
+    @State private var operation: PayInOperation = .capture
+    /// Off by default, and not kept between launches.
+    @State private var offersAuthorize = false
+    /// The amount each charging flow's attempt was drawn for, so a flow is given a new attempt, and a new key, only
+    /// when the amount it would send has changed.
+    @State private var attemptAmounts: [PayInOperation: Double] = [:]
     @State private var amountText = AmountEntry.text(for: 10)
     @State private var resultText = ""
 
@@ -23,18 +29,18 @@ struct SimpleCaptureView: View {
                         appControls
                     }
 
-                    // A capture needs an amount, so without a valid one there is no form to submit.
-                    if !capturing || enteredAmount != nil {
+                    // A capture or an authorization needs an amount, so without a valid one there is no form to submit.
+                    if !charges || enteredAmount != nil {
                         OwnerFrame(title: "Payabli SDK", dashed: true) {
                             PaymentFormHost(
-                                flow: capturing ? captureFlow : saveFlow,
+                                flow: flow(for: operation),
                                 form: form,
                                 onCompleted: handleCompleted,
                                 onFailed: handleFailed
                             )
                             // The form keeps part of its configuration from when it was built, so each
                             // change of setting or of flow builds a new one.
-                            .id(FormIdentity(capturing: capturing, customization: customization))
+                            .id(FormIdentity(operation: operation, customization: customization))
                         }
                     }
 
@@ -58,17 +64,19 @@ struct SimpleCaptureView: View {
         }
         .onAppear(perform: applyAmount)
         .onChange(of: amountText) { _ in applyAmount() }
+        .onChange(of: operation) { _ in applyAmount() }
     }
 
     private var appControls: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Picker("Operation", selection: $capturing) {
-                Text("Capture").tag(true)
-                Text("Tokenize").tag(false)
+            Picker("Operation", selection: $operation) {
+                ForEach(offeredOperations, id: \.self) { operation in
+                    Text(Self.name(of: operation)).tag(operation)
+                }
             }
             .pickerStyle(.segmented)
 
-            if capturing {
+            if charges {
                 HStack {
                     Text("Amount")
                     Spacer()
@@ -78,7 +86,7 @@ struct SimpleCaptureView: View {
                         .frame(maxWidth: 120)
                         .textFieldStyle(.roundedBorder)
                         // The attempt in flight keeps its amount, so the field does too.
-                        .disabled(captureFlow.isSubmitting)
+                        .disabled(flow(for: operation).isSubmitting)
                         .accessibilityIdentifier("simpleCapture.amount")
                 }
                 if enteredAmount == nil {
@@ -95,10 +103,37 @@ struct SimpleCaptureView: View {
         AmountEntry.amount(from: amountText)
     }
 
+    private var charges: Bool {
+        operation != .storedMethod
+    }
+
+    /// Authorize while the setting is on, and while it is the operation on screen, so turning the setting off does
+    /// not take the screen away from an attempt it has not settled.
+    private var offeredOperations: [PayInOperation] {
+        let authorize: [PayInOperation] = offersAuthorize || operation == .authorize ? [.authorize] : []
+        return [.capture] + authorize + [.storedMethod]
+    }
+
+    private static func name(of operation: PayInOperation) -> String {
+        switch operation {
+        case .capture, .void: "Capture"
+        case .authorize: "Authorize"
+        case .storedMethod: "Tokenize"
+        }
+    }
+
+    private func flow(for operation: PayInOperation) -> PayInFlowHandle {
+        switch operation {
+        case .capture, .void: captureFlow
+        case .authorize: authorizeFlow
+        case .storedMethod: saveFlow
+        }
+    }
+
     private var form: PayInFormSetup {
         PayInFormSetup(
-            operation: capturing ? .capture : .storedMethod,
-            configuration: customization.configuration(capturing: capturing),
+            operation: operation,
+            configuration: customization.configuration(for: operation),
             style: customization.style
         )
     }
@@ -107,6 +142,10 @@ struct SimpleCaptureView: View {
 
     private var settingsMenu: some View {
         Menu {
+            Section("Operations") {
+                Toggle("Offer Authorize", isOn: $offersAuthorize)
+            }
+
             Section("Presets") {
                 ForEach(PayInFormCustomization.Preset.allCases) { preset in
                     Button {
@@ -190,15 +229,22 @@ struct SimpleCaptureView: View {
 
     // MARK: - Actions
 
-    /// Each amount is a new attempt with its own key. Not while a submission is in flight, which the
-    /// handle refuses.
+    /// Each amount is a new attempt with its own key, on the flow on screen. A flow whose attempt already has this
+    /// amount keeps it, and its key, so switching operations never drops a key another attempt may still need.
+    /// Not while a submission is in flight, which the handle refuses.
     private func applyAmount() {
-        guard let amount = enteredAmount else { return }
-        _ = captureFlow.startNewAttempt(
+        guard charges, let amount = enteredAmount, attemptAmounts[operation] != amount else { return }
+        startNewAttempt(amount: amount)
+    }
+
+    private func startNewAttempt(amount: Double) {
+        if flow(for: operation).startNewAttempt(
             suppliesCustomer: demoCustomer.suppliesPayInCustomer,
             amount: amount,
             source: PayInFormCustomization.source
-        )
+        ) {
+            attemptAmounts[operation] = amount
+        }
     }
 
     private func handleCompleted(_ outcome: PayInOutcome) {
@@ -206,9 +252,12 @@ struct SimpleCaptureView: View {
             // Never the stored-method id: it charges the card again, and tests keep screenshots of this text.
             resultText = "Saved: \(method.responseText)"
         } else {
-            resultText = "Captured: \(outcome.code), \(outcome.transaction?.paymentTransId ?? "-")"
+            let verb = operation == .authorize ? "Authorized" : "Captured"
+            resultText = "\(verb): \(outcome.code), \(outcome.transaction?.paymentTransId ?? "-")"
             // The next submit is a payment of its own.
-            applyAmount()
+            if let amount = enteredAmount {
+                startNewAttempt(amount: amount)
+            }
         }
     }
 
@@ -219,7 +268,7 @@ struct SimpleCaptureView: View {
 }
 
 private struct FormIdentity: Hashable {
-    let capturing: Bool
+    let operation: PayInOperation
     let customization: PayInFormCustomization
 }
 
@@ -252,6 +301,7 @@ private struct OwnerFrame<Content: View>: View {
     WithDemoSession { session, _ in
         SimpleCaptureView(
             captureFlow: PayInSessions.preview(session: session, capturing: true),
+            authorizeFlow: PayInSessions.preview(session: session, capturing: true),
             saveFlow: PayInSessions.preview(session: session)
         )
         .environmentObject(DemoCustomerSetting())
