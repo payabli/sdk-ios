@@ -118,12 +118,12 @@ final class PaymentSummarySectionTests: XCTestCase {
         XCTAssertEqual(drawn.last?.rows.map(\.field), [.amount, .serviceFee, .surchargeFee])
     }
 
-    func testALaterSummaryClaimsNoRow() {
+    func testAnEarlierSummaryClaimsNoRow() {
         let configuration = PayabliPayInFormConfiguration(
             allowedMethods: [.card],
             cardSections: [
                 PayabliPayInFieldSection(fields: [.cardholderName, .cardNumber, .cardExpiration, .cardCvv, .cardZip]),
-                PayabliPayInFieldSection(title: "Due today", fields: [], style: .summary),
+                PayabliPayInFieldSection(title: "Due today", fields: [.amount], style: .summary),
                 PayabliPayInFieldSection(title: "Fees", fields: [.serviceFee], style: .summary)
             ]
         )
@@ -134,11 +134,11 @@ final class PaymentSummarySectionTests: XCTestCase {
             showsBaseAmount: true
         )
 
-        XCTAssertEqual(drawn.last?.section.title, "Due today")
-        XCTAssertEqual(drawn.last?.rows.map(\.field), [.amount, .serviceFee, .surchargeFee])
+        XCTAssertEqual(drawn.filter(\.isSummary).map(\.title), ["Fees"])
+        XCTAssertEqual(drawn.last?.rows.map(\.field), [.serviceFee, .amount, .surchargeFee])
     }
 
-    func testALaterSummarySharingTheFirstOnesTitleClaimsNoRow() {
+    func testAnEarlierSummarySharingTheLastOnesTitleClaimsNoRow() {
         let configuration = PayabliPayInFormConfiguration(
             allowedMethods: [.card],
             cardSections: [
@@ -154,7 +154,56 @@ final class PaymentSummarySectionTests: XCTestCase {
             showsBaseAmount: true
         )
 
-        XCTAssertEqual(drawn.last?.rows.map(\.field), [.amount, .serviceFee, .surchargeFee])
+        XCTAssertEqual(drawn.last?.rows.map(\.field), [.serviceFee, .amount, .surchargeFee])
+    }
+
+    func testAHostSummaryAppendedToTheDefaultSectionsIsTheOneDrawn() {
+        let hostSummary = PayabliPayInFieldSection(
+            title: "Due today",
+            fields: [.surchargeFee, .serviceFee, .amount],
+            style: .summary
+        )
+        let defaults = PayabliPayInFormConfiguration(allowedMethods: [.card]).cardSections
+        let configuration = PayabliPayInFormConfiguration(allowedMethods: [.card], cardSections: defaults + [hostSummary])
+        let drawn = PayInSummaryPlacement.place(
+            configuration.cardSections,
+            paymentDetails: PayabliPayInPaymentDetails(totalAmount: 12.34, serviceFee: 0.5, surchargeFee: 0.31),
+            summary: configuration.paymentSummary,
+            showsBaseAmount: true
+        )
+
+        XCTAssertEqual(drawn.filter(\.isSummary).map(\.title), ["Due today"])
+        XCTAssertEqual(drawn.last?.isSummary, true)
+        XCTAssertEqual(drawn.last?.rows.map(\.field), [.surchargeFee, .serviceFee, .amount])
+        XCTAssertEqual(configuration.cardSections.last?.fields, [.surchargeFee, .serviceFee, .amount])
+    }
+
+    func testAnInputFieldListedInAnEarlierSummaryIsStillMovedToTheInputs() {
+        let configuration = PayabliPayInFormConfiguration(
+            allowedMethods: [.card],
+            cardSections: [
+                PayabliPayInFieldSection(fields: [.cardholderName, .cardNumber, .cardExpiration, .cardCvv, .cardZip]),
+                PayabliPayInFieldSection(fields: [.amount, .billingEmail], style: .summary),
+                PayabliPayInFieldSection(title: "Due today", fields: [], style: .summary)
+            ]
+        )
+
+        let holding = configuration.cardSections.filter { $0.fields.contains(.billingEmail) }
+        XCTAssertEqual(holding.map(\.style), [.inputs])
+    }
+
+    func testAMoneyFieldTheHostLeftOutIsAddedToTheLastSummary() {
+        let configuration = PayabliPayInFormConfiguration(
+            allowedMethods: [.card],
+            cardSections: [
+                PayabliPayInFieldSection(fields: [.cardholderName, .cardNumber, .cardExpiration, .cardCvv, .cardZip]),
+                PayabliPayInFieldSection(fields: [], style: .summary),
+                PayabliPayInFieldSection(title: "Due today", fields: [.serviceFee], style: .summary)
+            ]
+        )
+
+        XCTAssertEqual(configuration.cardSections.last?.fields, [.serviceFee, .amount, .surchargeFee])
+        XCTAssertEqual(configuration.cardSections.filter { $0.style == .summary }.first?.fields, [])
     }
 
     func testAHostSummaryKeepsItsStyleThroughNormalization() {

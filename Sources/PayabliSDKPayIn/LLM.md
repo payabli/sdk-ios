@@ -440,7 +440,7 @@ All `PayabliPayInField` values:
 | `inputVerticalSpacing` | Vertical spacing between fields in this section. Overrides global layout spacing. |
 | `inputHorizontalSpacing` | Horizontal spacing for paired fields in this section. Overrides global paired spacing. |
 | `fieldVerticalSpacings` | Per-field spacing after a field. Use for tight card rows or extra breathing room. |
-| `style` | `.inputs` by default. `.summary` marks where the operation's amounts are drawn, and under what title. |
+| `style` | `.inputs` by default. `.summary` marks where the operation's amounts are drawn, and under what title. Of several, the last listed is drawn. |
 
 Example section setup:
 
@@ -550,7 +550,7 @@ but must still send a value.
 Capture and authorize hosted forms display read-only payment summary rows before
 submit: Fee and Surcharge when sent as something other than zero, Amount (the total
 less the fee) beside either one unless `showsBaseAmount` is false, and Total
-whenever it is not zero. The first `.summary` section places and titles them;
+whenever it is not zero. The last `.summary` section listed places and titles them;
 without one, a summary is added after the inputs. Rows are vertical. Labels are left aligned; values are right aligned.
 Relabel a money row through `PayabliPayInLabels.fieldLabels`, and the Total label
 through `PayabliPayInLabels.total`.

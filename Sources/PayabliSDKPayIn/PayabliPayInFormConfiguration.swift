@@ -34,7 +34,7 @@ public enum PayabliPayInSectionStyle: Sendable, Equatable {
     case inputs
 
     /// Where the operation's amounts are drawn, and under what title. A form with amounts to show and no
-    /// summary gets one.
+    /// summary gets one; of several, the last listed is drawn.
     case summary
 }
 
@@ -514,11 +514,11 @@ public struct PayabliPayInFormConfiguration: Sendable {
         // With a summary, every money field is its row: none stays among the inputs, so the summary's own
         // listing and then the standard order decide where each row goes.
         let hasSummary = sourceSections.contains { $0.style == .summary }
-        // Only the first summary is drawn, so a later one claims no row.
-        let firstSummary = sourceSections.firstIndex { $0.style == .summary }
+        // Only the last summary is drawn, so an earlier one claims no row.
+        let drawnSummary = PayInSummaryPlacement.drawnSummaryIndex(in: sourceSections)
         var output = sourceSections.enumerated().compactMap { index, section -> PayabliPayInFieldSection? in
             let visibleFields = section.fields.filter { field in
-                if section.style == .summary, index != firstSummary, paymentDetailFields.contains(field) {
+                if section.style == .summary, index != drawnSummary, paymentDetailFields.contains(field) {
                     return false
                 }
                 guard !hiddenFields.contains(field) else { return false }
@@ -531,7 +531,7 @@ public struct PayabliPayInFormConfiguration: Sendable {
                 }
                 return seenFields.insert(field).inserted
             }
-            // A summary with no fields of its own is kept: it still places and titles the amounts.
+            // A summary with no fields of its own is kept: the last one listed still places and titles the amounts.
             guard !visibleFields.isEmpty || section.style == .summary else { return nil }
             return section.replacingFields(visibleFields)
         }
@@ -568,7 +568,7 @@ public struct PayabliPayInFormConfiguration: Sendable {
         }
 
         if paymentDetailFields.contains(field) {
-            let targetIndex = sections.firstIndex { $0.style == .summary }
+            let targetIndex = PayInSummaryPlacement.drawnSummaryIndex(in: sections)
                 ?? sections.lastIndex { section in section.fields.contains { paymentDetailFields.contains($0) } }
                 ?? sections.index(before: sections.endIndex)
             let section = sections[targetIndex]

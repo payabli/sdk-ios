@@ -24,12 +24,17 @@ struct PayInDrawnSection {
 enum PayInSummaryPlacement {
     static let amountFields: [PayabliPayInField] = [.amount, .serviceFee, .surchargeFee]
 
+    /// The summary section that is drawn: the last one listed. An earlier one draws nothing.
+    static func drawnSummaryIndex(in sections: [PayabliPayInFieldSection]) -> Int? {
+        sections.lastIndex { $0.style == .summary }
+    }
+
     /// `sections` with every amount that has a figure placed in one summary.
     ///
     /// A host's summary decides where the rows go and what the section is called, never which figures appear:
     /// they follow the order it lists them, then any it left out. A money field listed in an inputs section is
-    /// drawn in the summary instead. With no summary section one is appended after the inputs, and with no
-    /// figure to show no summary is drawn.
+    /// drawn in the summary instead. Of several summary sections only the last is drawn. With no summary section
+    /// one is appended after the inputs, and with no figure to show no summary is drawn.
     static func place(
         _ sections: [PayabliPayInFieldSection],
         paymentDetails: PayabliPayInPaymentDetails?,
@@ -52,7 +57,7 @@ enum PayInSummaryPlacement {
         let total = configuration.totalRowAmount(paymentDetails: paymentDetails)
         guard total != nil || !figures.isEmpty else { return inputs }
 
-        let at = sections.firstIndex { $0.style == .summary }
+        let at = drawnSummaryIndex(in: sections)
         let summary = at.map { sections[$0] }
             ?? PayabliPayInFieldSection(fields: amountFields, style: .summary)
         let order = (summary.fields.filter(amountFields.contains) + amountFields).uniqued()
