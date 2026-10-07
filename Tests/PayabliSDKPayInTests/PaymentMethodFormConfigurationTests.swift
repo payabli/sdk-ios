@@ -106,7 +106,7 @@ final class PaymentMethodFormConfigurationTests: XCTestCase {
         XCTAssertEqual(configuration.cardSections.map(\.title), [
             "Card Information",
             "Customer Information",
-            "Payment Information"
+            nil
         ])
         XCTAssertEqual(configuration.cardFieldOrder, [
             .cardholderName,
@@ -171,7 +171,7 @@ final class PaymentMethodFormConfigurationTests: XCTestCase {
             .accountNumber,
             .accountType
         ])
-        XCTAssertEqual(configuration.bankSections[1].title, "Payment Information")
+        XCTAssertNil(configuration.bankSections[1].title)
         XCTAssertEqual(configuration.bankSections[1].fields, [.amount, .serviceFee, .surchargeFee])
     }
 

@@ -26,7 +26,7 @@ final class PaymentSummarySectionTests: XCTestCase {
         let bothMethods: [[PayabliPayInFieldSection]] = [configuration.cardSections, configuration.bankSections]
         for sections in bothMethods {
             XCTAssertEqual(sections.map(\.style), [.inputs, .summary])
-            XCTAssertEqual(sections.last?.title, "Payment Information")
+            XCTAssertNil(sections.last?.title)
         }
     }
 
@@ -39,7 +39,7 @@ final class PaymentSummarySectionTests: XCTestCase {
         )
 
         XCTAssertEqual(configuration.cardSections.map(\.style), [.inputs, .summary])
-        XCTAssertEqual(configuration.cardSections.last?.title, "Payment Information")
+        XCTAssertNil(configuration.cardSections.last?.title)
     }
 
     func testARequiredInputFieldIsAppendedToAnInputsSectionNotTheSummary() {

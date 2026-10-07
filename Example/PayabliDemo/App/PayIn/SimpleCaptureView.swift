@@ -156,7 +156,6 @@ struct SimpleCaptureView: View {
                 Toggle("Customer section first", isOn: $customization.customerSectionFirst)
                     .disabled(!customization.showsCustomerSection)
                 Toggle("Require a customer number", isOn: $customization.requiresCustomerNumber)
-                Toggle("Summary heading", isOn: $customization.titlesAmountSummary)
             }
 
             Section("Formatting") {

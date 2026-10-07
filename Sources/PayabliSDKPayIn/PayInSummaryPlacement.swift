@@ -14,6 +14,11 @@ struct PayInDrawnSection {
     var isSummary: Bool {
         section.style == .summary
     }
+
+    /// The heading drawn over the section. A summary without a title of its own reads "Payment".
+    var title: String? {
+        section.title ?? (isSummary ? "Payment" : nil)
+    }
 }
 
 enum PayInSummaryPlacement {
@@ -49,7 +54,7 @@ enum PayInSummaryPlacement {
 
         let at = sections.firstIndex { $0.style == .summary }
         let summary = at.map { sections[$0] }
-            ?? PayabliPayInFieldSection(title: "Payment Information", fields: amountFields, style: .summary)
+            ?? PayabliPayInFieldSection(fields: amountFields, style: .summary)
         let order = (summary.fields.filter(amountFields.contains) + amountFields).uniqued()
         let rows = order.compactMap { field in figures[field].map { PayInDrawnSection.Row(field: field, amount: $0) } }
         let drawn = PayInDrawnSection(section: summary.replacingFields(order), rows: rows, total: total)

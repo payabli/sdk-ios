@@ -375,8 +375,8 @@ public struct PayabliPayInView: View {
         let summary = configuration.paymentSummary
         let currency = component.requestConfiguration?.paymentDetails.currency
 
-        return VStack(alignment: .leading, spacing: drawn.section.title == nil ? 0 : resolvedStyle.layout.sectionTitleSpacing) {
-            if let title = drawn.section.title {
+        return VStack(alignment: .leading, spacing: drawn.title == nil ? 0 : resolvedStyle.layout.sectionTitleSpacing) {
+            if let title = drawn.title {
                 let titleStyle = drawn.section.titleStyle ?? resolvedStyle.sectionTitle
 
                 Text(title)

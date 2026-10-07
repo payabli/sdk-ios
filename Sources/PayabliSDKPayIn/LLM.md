@@ -388,8 +388,8 @@ display.
 | `defaultMethod` | `.card` | Initial selected method when it is included in `allowedMethods`. |
 | `cardFieldOrder` | cardholder, number, expiration, CVV, postal code | Legacy flat field order for card. Used when custom sections are not supplied. |
 | `bankFieldOrder` | holder, routing, account, account type, holder type | Legacy flat field order for the bank account. `secCode` is hidden from the form. |
-| `cardSections` | card fields plus Payment Information | Section grouping for card UI. Section titles are configurable. |
-| `bankSections` | bank account fields plus Payment Information | Section grouping for the bank account form. Section titles are configurable. |
+| `cardSections` | card fields, then an untitled summary | Section grouping for card UI. Section titles are configurable; an untitled summary is headed "Payment". |
+| `bankSections` | bank account fields, then an untitled summary | Section grouping for the bank account form. Section titles are configurable; an untitled summary is headed "Payment". |
 | `hiddenValues` | defaults with `secCode = .web` | Values included in submissions without rendering editable fields. |
 | `options` | empty options | Token-storage options for hosted store-payment-method submissions. |
 | `labels` | default labels | Form title, subtitle, submit text, field labels, and placeholders. |
