@@ -93,6 +93,33 @@ final class AttestationWireTests: XCTestCase {
         XCTAssertEqual(sent["deviceId"] as? String, "dev_old")
     }
 
+    /// A refusal the service words reaches the caller under its catalog entry, with the service's words.
+    func testAnActivationRefusalIsClassifiedByTheServicesWords() async throws {
+        let storage = InMemorySecureStorage()
+        try AttestFixture.seedBinding(entry: "myEntry", deviceId: "dev_1", keyId: "key_1", in: storage)
+        let refusal =
+            #"{"isSuccess":false,"responseText":"Invalid activation code.","responseData":{"resultCode":400,"resultText":"Invalid activation code."}}"#
+        StubURLProtocol.handler = { request in
+            if request.url!.path == "/api/v2/device/taptopay/activate" {
+                return (
+                    HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
+                    Data(refusal.utf8)
+                )
+            }
+            return AttestFixture.ok(request, ["challengeId": "c_1", "challenge": "Y2hhbGxlbmdl"])
+        }
+        let (sut, _, _) = try AttestFixture.makeService(storage: storage)
+
+        do {
+            try await sut.activateDevice(activationCode: "123456", entry: "myEntry", activationId: "dev_1")
+            XCTFail("a refused activation reported success")
+        } catch let error as TapToPayError {
+            XCTAssertEqual(error.type, .activationCodeIncorrect)
+            XCTAssertEqual(error.detail, "Invalid activation code.")
+        }
+        XCTAssertEqual(try sut.binding(for: "myEntry")?.deviceId, "dev_1", "a wrong code drops nothing")
+    }
+
     /// A 401 answering one binding does not take a binding enrolled since.
     func testAnActivationRefusalLeavesABindingEnrolledSince() async throws {
         let storage = InMemorySecureStorage()

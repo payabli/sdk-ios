@@ -53,13 +53,13 @@ package extension AppAttestService {
                         // Revoked either way, and the caller is told which. A
                         // binding left behind is presented again on the next warm
                         // check.
-                        return .attestationRevoked(
+                        return PayabliTTPError.attestationRevoked(
                             reason: "\(reason) — the stored binding could not be dropped"
                         )
                     }
-                    return .attestationRevoked(reason: reason)
+                    return PayabliTTPError.attestationRevoked(reason: reason)
                 }
-                return .activationFailed(reason: reason)
+                return ActivationRefusals.hostError(resultCode: code, reason: reason)
             }
         )
     }

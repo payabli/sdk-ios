@@ -40,8 +40,8 @@ extension AppAttestService {
         body: some Encodable,
         label: String,
         assertion: AssertionHeaders? = nil,
-        makeDeclineError: @escaping (_ code: Int?, _ reason: String) -> PayabliTTPError = { _, reason in
-            .attestationFailed(reason: reason)
+        makeDeclineError: @escaping (_ code: Int?, _ reason: String) -> any Error = { _, reason in
+            PayabliTTPError.attestationFailed(reason: reason)
         }
     ) async throws -> Payload {
         let response = try await performAuthenticatedPOST(
@@ -76,8 +76,8 @@ extension AppAttestService {
         body: some Encodable,
         label: String,
         assertion: AssertionHeaders? = nil,
-        makeDeclineError: @escaping (_ code: Int?, _ reason: String) -> PayabliTTPError = { _, reason in
-            .attestationFailed(reason: reason)
+        makeDeclineError: @escaping (_ code: Int?, _ reason: String) -> any Error = { _, reason in
+            PayabliTTPError.attestationFailed(reason: reason)
         }
     ) async throws {
         _ = try await performAuthenticatedPOST(
@@ -104,7 +104,7 @@ extension AppAttestService {
         body: some Encodable,
         label: String,
         assertion: AssertionHeaders?,
-        makeDeclineError: (_ code: Int?, _ reason: String) -> PayabliTTPError
+        makeDeclineError: (_ code: Int?, _ reason: String) -> any Error
     ) async throws -> PayabliResponse {
         var headers: [String: String] = [:]
         if let assertion {
