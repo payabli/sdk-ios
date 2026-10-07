@@ -450,7 +450,8 @@ final class TapToPayOnDeviceTests: XCTestCase {
             try await ttp.presentTerms()
             XCTFail("presenting without a prepared reader has to say so")
         } catch let error as TapToPayError {
-            XCTAssertEqual(error.type, .readerUnavailable)
+            XCTAssertEqual(error.type, .unknown)
+            XCTAssertEqual(error.detail, "Reader not prepared")
         }
     }
 }
