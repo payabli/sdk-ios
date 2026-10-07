@@ -54,6 +54,15 @@ final class TapToPayErrorEdgeTests: XCTestCase {
     func testACancelledActivationStaysACancellation() async throws {
         let (ttp, attestation) = try await makePendingTTP()
         attestation.activationResult = .failure(CancellationError())
+        let stream = ttp.events()
+        let reported = Task<String?, Never> {
+            for await event in stream {
+                if case let .activationFailed(error) = event {
+                    return error
+                }
+            }
+            return nil
+        }
 
         do {
             try await ttp.activateDevice(activationCode: "ABC123")
@@ -62,6 +71,14 @@ final class TapToPayErrorEdgeTests: XCTestCase {
         } catch {
             XCTFail("wrong error: \(error)")
         }
+
+        let deadline = Task {
+            guard (try? await Task.sleep(nanoseconds: 2_000_000_000)) != nil else { return }
+            reported.cancel()
+        }
+        let name = await reported.value
+        deadline.cancel()
+        XCTAssertEqual(name, "USER_CANCELLED")
     }
 
     func testAnActivationRefusedByTheTransportKeepsItsCode() async throws {

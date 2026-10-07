@@ -165,6 +165,7 @@ final class TapToPayErrorTranslationTests: XCTestCase {
             TapToPayErrorTranslation.eventName(of: PayabliGenericError(type: .rateLimited, reason: "slow down")),
             "RATE_LIMITED"
         )
+        XCTAssertEqual(TapToPayErrorTranslation.eventName(of: CancellationError()), "USER_CANCELLED")
     }
 
     // MARK: - The NSError an Objective-C caller receives
