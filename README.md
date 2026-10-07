@@ -285,7 +285,7 @@ retry.
 | Outcome | Card-not-present | Tap to Pay | Retry? |
 |---|---|---|---|
 | **Charged** | The call returns a result | `charge` returns a `TransactionResult` | No |
-| **Not charged** | `PayabliPayInError.transactionFailed`, for example a decline | a `TapToPayError` whose `capture` is `.notCharged` | Yes |
+| **Not charged** | `PayabliPayInError.transactionFailed`, for example a decline | a `TapToPayError` whose `capture` is `.notCharged`, or a `CancellationError`, which `charge` throws only before the card is read | Yes |
 | **Unknown** | `PayabliPayInError.submissionInterrupted` | an error whose `capture` is `.unknown` | Not until you've checked |
 | **Charged, not confirmed** | — | an error whose `capture` is `.charged` | No. Reconcile the payment |
 
