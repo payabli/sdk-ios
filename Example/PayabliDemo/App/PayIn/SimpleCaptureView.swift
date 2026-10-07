@@ -35,7 +35,9 @@ struct SimpleCaptureView: View {
                             PaymentFormHost(
                                 flow: flow(for: operation),
                                 form: form,
-                                onCompleted: handleCompleted,
+                                // Each form reports for the operation it was built for, which a completion that
+                                // lands after the picker has moved still names.
+                                onCompleted: { [operation] outcome in handleCompleted(outcome, for: operation) },
                                 onFailed: handleFailed
                             )
                             // The form keeps part of its configuration from when it was built, so each
@@ -62,7 +64,11 @@ struct SimpleCaptureView: View {
                 }
             }
         }
-        .onAppear(perform: applyAmount)
+        .onAppear {
+            applyCustomer(demoCustomer.suppliesPayInCustomer)
+            applyAmount()
+        }
+        .onChange(of: demoCustomer.suppliesPayInCustomer, perform: applyCustomer)
         .onChange(of: amountText) { _ in applyAmount() }
         .onChange(of: operation) { _ in applyAmount() }
     }
@@ -75,6 +81,8 @@ struct SimpleCaptureView: View {
                 }
             }
             .pickerStyle(.segmented)
+            // A submission finishes on the operation it started on, so the screen stays there until it does.
+            .disabled(flow(for: operation).isSubmitting)
 
             if charges {
                 HStack {
@@ -107,8 +115,8 @@ struct SimpleCaptureView: View {
         operation != .storedMethod
     }
 
-    /// Authorize while the setting is on, and while it is the operation on screen, so turning the setting off does
-    /// not take the screen away from an attempt it has not settled.
+    /// Authorize while the setting is on, and while it is the operation on screen, so turning the setting off never
+    /// moves the screen off an authorization. Its flow keeps its attempt and key either way.
     private var offeredOperations: [PayInOperation] {
         let authorize: [PayInOperation] = offersAuthorize || operation == .authorize ? [.authorize] : []
         return [.capture] + authorize + [.storedMethod]
@@ -234,10 +242,10 @@ struct SimpleCaptureView: View {
     /// Not while a submission is in flight, which the handle refuses.
     private func applyAmount() {
         guard charges, let amount = enteredAmount, attemptAmounts[operation] != amount else { return }
-        startNewAttempt(amount: amount)
+        startNewAttempt(amount: amount, for: operation)
     }
 
-    private func startNewAttempt(amount: Double) {
+    private func startNewAttempt(amount: Double, for operation: PayInOperation) {
         if flow(for: operation).startNewAttempt(
             suppliesCustomer: demoCustomer.suppliesPayInCustomer,
             amount: amount,
@@ -247,7 +255,13 @@ struct SimpleCaptureView: View {
         }
     }
 
-    private func handleCompleted(_ outcome: PayInOutcome) {
+    /// The customer choice reaches each charging flow's attempt and leaves its amount and key as they were.
+    private func applyCustomer(_ supplies: Bool) {
+        captureFlow.applyCustomerChange(suppliesCustomer: supplies)
+        authorizeFlow.applyCustomerChange(suppliesCustomer: supplies)
+    }
+
+    private func handleCompleted(_ outcome: PayInOutcome, for operation: PayInOperation) {
         if let method = outcome.storedMethod {
             // Never the stored-method id: it charges the card again, and tests keep screenshots of this text.
             resultText = "Saved: \(method.responseText)"
@@ -256,7 +270,7 @@ struct SimpleCaptureView: View {
             resultText = "\(verb): \(outcome.code), \(outcome.transaction?.paymentTransId ?? "-")"
             // The next submit is a payment of its own.
             if let amount = enteredAmount {
-                startNewAttempt(amount: amount)
+                startNewAttempt(amount: amount, for: operation)
             }
         }
     }
@@ -300,8 +314,8 @@ private struct OwnerFrame<Content: View>: View {
 #Preview {
     WithDemoSession { session, _ in
         SimpleCaptureView(
-            captureFlow: PayInSessions.preview(session: session, capturing: true),
-            authorizeFlow: PayInSessions.preview(session: session, capturing: true),
+            captureFlow: PayInSessions.preview(session: session, operation: .capture),
+            authorizeFlow: PayInSessions.preview(session: session, operation: .authorize),
             saveFlow: PayInSessions.preview(session: session)
         )
         .environmentObject(DemoCustomerSetting())

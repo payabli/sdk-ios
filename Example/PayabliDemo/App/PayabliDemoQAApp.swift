@@ -97,14 +97,14 @@ struct DemoTabs: View {
                     Label("Save", systemImage: "creditcard")
                 }
 
-            PaymentCaptureQAView(paymentFlow: PayInSessions.preview(session: session, capturing: true))
+            PaymentCaptureQAView(paymentFlow: PayInSessions.preview(session: session, operation: .capture))
                 .tabItem {
                     Label("Capture", systemImage: "dollarsign.circle")
                 }
 
             SimpleCaptureView(
-                captureFlow: PayInSessions.preview(session: session, capturing: true),
-                authorizeFlow: PayInSessions.preview(session: session, capturing: true),
+                captureFlow: PayInSessions.preview(session: session, operation: .capture),
+                authorizeFlow: PayInSessions.preview(session: session, operation: .authorize),
                 saveFlow: PayInSessions.preview(session: session)
             )
             .tabItem {

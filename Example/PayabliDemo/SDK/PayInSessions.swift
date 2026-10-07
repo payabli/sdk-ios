@@ -55,12 +55,15 @@ enum PayInSessions {
     }
 
     /// A flow for a canvas preview, which makes no network call.
-    static func preview(session: PayabliSession, capturing: Bool = false) -> PayInFlowHandle {
+    static func preview(
+        session: PayabliSession,
+        operation: PayabliPayInOperation = .storePaymentMethod
+    ) -> PayInFlowHandle {
         PayInFlowHandle(
             PayabliPayIn(
                 session: session,
-                operation: capturing ? .capture : .storePaymentMethod,
-                requestConfiguration: capturing
+                operation: operation,
+                requestConfiguration: operation != .storePaymentMethod
                     ? PayabliPayInRequestConfiguration(
                         paymentDetails: PayabliPayInPaymentDetails(
                             totalAmount: 1,
