@@ -175,6 +175,31 @@ final class AttestationWireTests: XCTestCase {
         }
     }
 
+    /// A status no refusal is sent with keeps the transport's own classification.
+    func testADeclinedActivationKeepsPaymentDeclined() async throws {
+        let storage = InMemorySecureStorage()
+        try AttestFixture.seedBinding(entry: "myEntry", deviceId: "dev_1", keyId: "key_1", in: storage)
+        let declined = #"{"isSuccess":false,"responseText":"Declined","responseData":{"resultCode":402,"resultText":"Declined"}}"#
+        StubURLProtocol.handler = { request in
+            if request.url!.path == "/api/v2/device/taptopay/activate" {
+                return (
+                    HTTPURLResponse(url: request.url!, statusCode: 402, httpVersion: "HTTP/1.1", headerFields: nil)!,
+                    Data(declined.utf8)
+                )
+            }
+            return AttestFixture.ok(request, ["challengeId": "c_1", "challenge": "Y2hhbGxlbmdl"])
+        }
+        let (sut, _, _) = try AttestFixture.makeService(storage: storage)
+
+        do {
+            try await sut.activateDevice(activationCode: "123456", entry: "myEntry", activationId: "dev_1")
+            XCTFail("a declined activation reported success")
+        } catch {
+            XCTAssertFalse(error is TapToPayError, "a decline was read as a refusal: \(error)")
+            XCTAssertEqual((error as? any PayabliError)?.type, .paymentDeclined, "got \(error)")
+        }
+    }
+
     /// A 401 answering one binding does not take a binding enrolled since.
     func testAnActivationRefusalLeavesABindingEnrolledSince() async throws {
         let storage = InMemorySecureStorage()

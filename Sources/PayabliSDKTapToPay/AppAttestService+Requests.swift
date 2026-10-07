@@ -72,7 +72,7 @@ extension AppAttestService {
     /// Authenticated POST for endpoints that do not return a `responseData`
     /// body (only an `isSuccess` acknowledgement).
     ///
-    /// `readsRefusalBeforeStatus` hands a 4xx carrying a refusal envelope to `makeDeclineError`, for a route
+    /// `readsRefusalBeforeStatus` hands a 400, 403 or 404 carrying a refusal envelope to `makeDeclineError`, for a route
     /// whose refusals are told apart by their text rather than by their status.
     func postAttestationRequestExpectingNoBody(
         path: String,
@@ -143,8 +143,9 @@ extension AppAttestService {
 
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
-        // A rate limit is the transport's to answer, with the wait the service asked for.
-        if readsRefusalBeforeStatus, (400 ..< 500).contains(response.statusCode), response.statusCode != 429,
+        // Only the statuses a refusal is sent with. Every other status keeps the transport's own
+        // classification, a rate limit's wait among them.
+        if readsRefusalBeforeStatus, [400, 403, 404].contains(response.statusCode),
            let (code, reason) = PayabliEnvelope.declineOutcome(from: response.body, decoder: decoder)
         {
             logger.error("[\(label)] refused (code=\(code.map(String.init) ?? "nil"))")
