@@ -265,7 +265,7 @@ public extension PayabliErrorType {
 /// Root error type for PayabliSDK.
 ///
 /// All SDK-originated errors conform to `PayabliError`. Components may extend
-/// this with domain-specific error types (e.g. `PayabliTTPError`).
+/// this with domain-specific error types (e.g. `TapToPayError`).
 ///
 /// See PRD §8 and §20.2.
 public protocol PayabliError: LocalizedError, Sendable {

@@ -15,7 +15,9 @@ extension PayabliTTP {
     ///   3. Hand credentials to the provider (NFR-5D — runtime only).
     ///   4. Prepare reader, transition to `.ready`.
     public func initialize() async throws {
-        try await runSessionSetup(.initialize) { try await self.runInitialize() }
+        try await reportingToHost {
+            try await runSessionSetup(.initialize) { try await self.runInitialize() }
+        }
     }
 
     /// Serialises the operations that move the session's state. A caller of the same kind joins the one
@@ -83,7 +85,7 @@ extension PayabliTTP {
     /// `@objc` companion to `initialize()` for ObjC / MAUI / Flutter / RN
     /// consumers. Bridges the `async throws` Swift method to a callback-based
     /// signature: `completion(nil)` on success, `completion(NSError)` on
-    /// failure (domain `"com.payabli.ttp"` for typed `PayabliTTPError`s).
+    /// failure, a ``TapToPayError`` with its catalog number as the code.
     ///
     /// The completion handler is always invoked on the main thread because
     /// the entire `PayabliTTP` surface is `@MainActor`.
@@ -105,6 +107,10 @@ extension PayabliTTP {
     /// `initialize()`. NFR-5D forbids providers from caching credentials
     /// across sessions, so every refresh re-fetches `/config`.
     public func reinitializeIfNeeded() async throws {
+        try await reportingToHost { try await reinitialize() }
+    }
+
+    func reinitialize() async throws {
         try await runSessionSetup(.reinitialize) { try await self.runReinitializeIfNeeded() }
     }
 
@@ -192,14 +198,14 @@ extension PayabliTTP {
             syncPublished()
         } catch PayabliTTPError.devicePendingActivation {
             if let failure = landPendingActivation() {
-                multicaster.emit(.attestationFailed(error: ErrorSummary.of(failure)))
+                multicaster.emit(.attestationFailed(error: TapToPayErrorTranslation.eventName(of: failure)))
                 throw failure
             }
             throw PayabliTTPError.devicePendingActivation
         } catch {
             markError(error)
             syncPublished()
-            multicaster.emit(.attestationFailed(error: ErrorSummary.of(error)))
+            multicaster.emit(.attestationFailed(error: TapToPayErrorTranslation.eventName(of: error)))
             throw error
         }
     }
@@ -208,52 +214,37 @@ extension PayabliTTP {
 
     /// Pre: session is in `.fetchingConfig`. Error handling:
     ///   - backend says pending → `.pendingActivation`
-    ///   - 401, either a refused binding or a refused bearer → rewrap as
-    ///     `.configFailed`, relaying the reason. Dropping a binding is the config
-    ///     call's, which knows which of the two it is holding
-    ///   - anything else → rewrapped as `.configFailed` so the domain and code
-    ///     stay what the bridges read, keeping the parsed reason
+    ///   - a core error, a 401 included, is thrown as it arrived, so its code
+    ///     reaches the host. Dropping a binding on a 401 is the config call's,
+    ///     which knows which handle it presented
+    ///   - anything else → wrapped as `.configFailed`, keeping the parsed reason
     ///
-    /// The state is classified from the failure as it arrived, not from the
-    /// wrapper: the error names which phase failed, the state names the remedy.
+    /// The state is classified from the failure as it arrived.
     private func runFetchConfigPhase() async throws -> TTPConfig {
         do {
             return try await configClient.fetchConfig(entry: entryPoint)
         } catch let pending as ConfigPendingActivation {
             if let failure = landPendingActivation(answeredFor: pending.presentedDeviceId) {
-                multicaster.emit(.configFailed(error: ErrorSummary.of(failure)))
+                multicaster.emit(.configFailed(error: TapToPayErrorTranslation.eventName(of: failure)))
                 throw failure
             }
             throw PayabliTTPError.devicePendingActivation
-        } catch let err as PayabliGenericError where err.type == .tokenExpired {
-            // Two failures arrive as `.tokenExpired` here: the service refusing the
-            // binding the request presented, and the transport refusing the bearer
-            // after its retry. The first is dropped by the config call, which knows
-            // which handle it presented; the second is about a token and drops
-            // nothing. The reason is relayed either way, so it names which happened
-            // instead of this layer claiming an outcome for both.
-            let failure = PayabliTTPError.configFailed(reason: "Config rejected (401): \(err.reason)")
-            markError(err)
-            syncPublished()
-            multicaster.emit(.configFailed(error: ErrorSummary.of(failure)))
-            throw failure
         } catch {
-            // Wrapped, because the domain and code are a contract: `configFailed`
-            // bridges as `com.payabli.ttp` code 6, and the Flutter plugin reads
-            // `TTP_6` from it. An error thrown as it arrived carries another
-            // domain, and every bridge reports it as a bare initialize failure.
-            //
-            // The reason is the error's own parsed description, so the fields the
-            // service named still reach the merchant. `String(describing:)` renders
-            // every stored property instead, the page token among them.
-            let failure = error as? PayabliTTPError
-                ?? PayabliTTPError.configFailed(reason: error.localizedDescription)
+            // A core error keeps its own code and the wait the service asked for, and a cancellation stays one.
+            // Anything else is wrapped with its parsed description, so the fields
+            // the service named still reach the merchant. `String(describing:)`
+            // renders every stored property instead, the page token among them.
+            let failure: Error = if error is PayabliTTPError || error is any PayabliError || error is CancellationError {
+                error
+            } else {
+                PayabliTTPError.configFailed(reason: error.localizedDescription)
+            }
             // Marked as it arrived, so a permission this paypoint has not
             // granted still reaches `.pendingActivation` and a service that was
             // briefly away still reads as one to try again.
             markError(error)
             syncPublished()
-            multicaster.emit(.configFailed(error: ErrorSummary.of(failure)))
+            multicaster.emit(.configFailed(error: TapToPayErrorTranslation.eventName(of: failure)))
             throw failure
         }
     }

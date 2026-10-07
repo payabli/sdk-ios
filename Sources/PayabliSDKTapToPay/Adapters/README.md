@@ -99,10 +99,11 @@ matches where in the pipeline the failure happened:
 | NFC tap failed, processor rejected the charge, user cancelled | `.nfcFailed(reason:)` |
 | Called `startReading` before `prepareReader` | `.readerSetupFailed(reason: "Reader not prepared")` |
 
-**User cancellation** should be encoded inside `.nfcFailed` with the
+**User cancellation** is encoded inside `.nfcFailed` with the
 `cancellationReasonPrefix` constant from `FiservCardReader+Errors.swift`
-(`"cancelled:"`) so hosts can distinguish it by substring. If you add a new
-adapter, expose the same prefix constant for consistency.
+(`"cancelled:"`). The prefix is internal to the SDK: the public edge reads it and
+hands a host `TapToPayError` with type `.userCancelled`, so a host reads the type
+and never the text. A new adapter marks a cancel with the same prefix.
 
 **Decide from the platform's type, not from its description.** A description is
 localized and the platform does not promise its wording, so a substring test on

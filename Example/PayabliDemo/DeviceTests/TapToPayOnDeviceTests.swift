@@ -72,7 +72,7 @@ final class TapToPayOnDeviceTests: XCTestCase {
         let ttp = try makeTTP()
         do {
             try await ttp.initialize()
-        } catch PayabliTTPError.devicePendingActivation {
+        } catch let error as TapToPayError where error.type == .devicePendingActivation {
             let code = ProcessInfo.processInfo.environment["PAYABLI_ACTIVATION_CODE"] ?? ""
             guard !code.isEmpty else {
                 throw XCTSkip(
@@ -82,13 +82,11 @@ final class TapToPayOnDeviceTests: XCTestCase {
             }
             do {
                 try await ttp.activateDevice(activationCode: code)
-            } catch let error as PayabliTTPError {
+            } catch let error as TapToPayError {
                 // A code is minted for one handle. A device that registered again
                 // since holds a different one, and no code for it can be obtained
                 // from in here, so this is the run's state rather than a defect.
-                guard case let .activationFailed(reason) = error,
-                      reason.localizedCaseInsensitiveContains("no active challenge")
-                else {
+                guard error.detail?.localizedCaseInsensitiveContains("no active challenge") == true else {
                     throw error
                 }
                 throw XCTSkip(
@@ -133,7 +131,7 @@ final class TapToPayOnDeviceTests: XCTestCase {
         } catch is ArmingTimedOut {
             XCTFail("the reader did not finish arming within the time allowed")
             return
-        } catch PayabliTTPError.devicePendingActivation {
+        } catch let error as TapToPayError where error.type == .devicePendingActivation {
             throw XCTSkip("this device is pending activation on \(named.entry)")
         }
 
@@ -451,10 +449,9 @@ final class TapToPayOnDeviceTests: XCTestCase {
         do {
             try await ttp.presentTerms()
             XCTFail("presenting without a prepared reader has to say so")
-        } catch let error as PayabliTTPError {
-            guard case .readerSetupFailed = error else {
-                return XCTFail("expected readerSetupFailed, got \(error)")
-            }
+        } catch let error as TapToPayError {
+            XCTAssertEqual(error.type, .unknown)
+            XCTAssertEqual(error.detail, "Reader not prepared")
         }
     }
 }

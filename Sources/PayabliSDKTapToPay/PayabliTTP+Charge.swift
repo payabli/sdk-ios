@@ -32,11 +32,29 @@ extension PayabliTTP {
         invoice: PayabliTTPInvoiceData = PayabliTTPInvoiceData(),
         orderDescription: String? = nil
     ) async throws -> TransactionResult {
+        try await reportingToHost {
+            try await runCharge(
+                type: type,
+                paymentDetails: paymentDetails,
+                customer: customer,
+                invoice: invoice,
+                orderDescription: orderDescription
+            )
+        }
+    }
+
+    private func runCharge(
+        type: PayabliTTPPaymentType,
+        paymentDetails: PayabliTTPPaymentDetails,
+        customer: PayabliTTPCustomerData,
+        invoice: PayabliTTPInvoiceData,
+        orderDescription: String?
+    ) async throws -> TransactionResult {
         guard type == .sale else {
             throw PayabliTTPError.invalidState(current: sessionState, attempted: "charge(non-sale)")
         }
 
-        try await reinitializeIfNeeded()
+        try await reinitialize()
 
         guard sessionState == .ready else {
             throw PayabliTTPError.notReady(current: sessionState)
@@ -86,7 +104,8 @@ extension PayabliTTP {
             readResult = try await provider.startReading(readRequest)
             multicaster.emit(.nfcCompleted)
         } catch {
-            multicaster.emit(.nfcFailed(error: ErrorSummary.of(error)))
+            let failure = readFailure(error, paymentTransId: paymentTransId)
+            multicaster.emit(.nfcFailed(error: TapToPayErrorTranslation.eventName(of: failure)))
 
             // A dead reader session is repaired only by re-initializing, and
             // `reinitializeIfNeeded()` does nothing while the state says `.ready`.
@@ -109,7 +128,7 @@ extension PayabliTTP {
                 paymentTransId: paymentTransId,
                 payload: .nfcFailure(description: String(describing: error))
             )
-            throw readFailure(error, paymentTransId: paymentTransId)
+            throw failure
         }
 
         return try await runSuccessUpdate(paymentTransId: paymentTransId, readResult: readResult)
@@ -163,9 +182,9 @@ extension PayabliTTP {
     ///
     /// On success the completion is invoked with a non-nil
     /// `PayabliTTPTransactionResultObjC` and `nil` error. On failure the
-    /// completion receives a nil result and an `NSError` (domain
-    /// `"com.payabli.ttp"` for typed `PayabliTTPError`s). The completion is
-    /// always invoked on the main thread.
+    /// completion receives a nil result and an `NSError`, a ``TapToPayError``
+    /// with its catalog number as the code. The completion is always invoked
+    /// on the main thread.
     @objc public func charge(
         type: Int,
         paymentDetails: PayabliTTPPaymentDetailsObjC,
@@ -276,11 +295,11 @@ extension PayabliTTP {
             // update failed. What the caller is told depends on what the tap did.
             return .cancelled
         } catch {
-            // The event summarizes what actually failed, not this surface's wrapper for it: a rate limit,
+            // The event names what actually failed, not this surface's wrapper for it: a rate limit,
             // a server fault, a decline and a transport failure all reduce to `updateFailed` once wrapped,
             // and a host forwarding this to telemetry cannot then tell an outage from a refused card.
             multicaster.emit(
-                .updateFailed(paymentTransId: paymentTransId, error: ErrorSummary.of(error))
+                .updateFailed(paymentTransId: paymentTransId, error: TapToPayErrorTranslation.eventName(of: error))
             )
             // The caller still gets this surface's vocabulary, so the outcome reads the same whatever
             // layer underneath produced the failure.

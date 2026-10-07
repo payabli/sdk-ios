@@ -8,8 +8,8 @@ import PayabliSDKCore
 // MARK: - Card reader error mapping
 
 extension FiservCardReader {
-    /// Prefix inside `.nfcFailed(reason:)` that marks a user-cancel, so hosts
-    /// can distinguish it from a hard failure by substring.
+    /// Prefix inside a case's reason that marks a person dismissing the sheet. The
+    /// public edge reads it to report `USER_CANCELLED`.
     static let cancellationReasonPrefix = "cancelled:"
 
     #if canImport(PayabliCardReaderCore)

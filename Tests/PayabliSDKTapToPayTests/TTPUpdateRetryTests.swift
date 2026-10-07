@@ -86,8 +86,9 @@ final class TTPUpdateRetryTests: XCTestCase {
         do {
             _ = try await charge(ttp)
             XCTFail("a declined update should reach the caller")
-        } catch let PayabliTTPError.updateFailed(reason, _, _) {
-            XCTAssertTrue(reason.contains("declined"), "got \(reason)")
+        } catch let error as TapToPayError {
+            XCTAssertEqual(error.type, .paymentNotClosed)
+            XCTAssertTrue(error.detail?.contains("declined") == true, "got \(String(describing: error.detail))")
         }
 
         XCTAssertEqual(Self.updateResponses.sends, 1, "a decline is not worth a second attempt")
@@ -115,7 +116,7 @@ final class TTPUpdateRetryTests: XCTestCase {
         task.cancel()
 
         let failure = await chargeFailure(of: task)
-        guard case .updateFailed = failure else {
+        guard failure?.type == .paymentNotClosed else {
             return XCTFail("expected the close to be reported, got \(String(describing: failure))")
         }
         XCTAssertEqual(failure?.capture, .charged)
@@ -131,7 +132,7 @@ final class TTPUpdateRetryTests: XCTestCase {
         task.cancel()
 
         let failure = await chargeFailure(of: task)
-        XCTAssertEqual(failure?.errorCode, PayabliTTPError.cardDeclined(paymentTransId: "").errorCode)
+        XCTAssertEqual(failure?.type, .cardDeclined)
         XCTAssertEqual(failure?.capture, .notCharged)
         XCTAssertEqual(failure?.paymentTransId, Self.paymentTransId)
     }
@@ -145,7 +146,7 @@ final class TTPUpdateRetryTests: XCTestCase {
         task.cancel()
 
         let failure = await chargeFailure(of: task)
-        guard case .updateFailed = failure else {
+        guard failure?.type == .paymentNotClosed else {
             return XCTFail("expected the close to be reported, got \(String(describing: failure))")
         }
         XCTAssertEqual(failure?.capture, .unknown)
@@ -160,7 +161,7 @@ final class TTPUpdateRetryTests: XCTestCase {
 
         let failure = await chargeFailure(ttp)
 
-        XCTAssertEqual(failure?.errorCode, PayabliTTPError.cardDeclined(paymentTransId: "").errorCode)
+        XCTAssertEqual(failure?.type, .cardDeclined)
         XCTAssertEqual(failure?.paymentTransId, Self.paymentTransId)
         XCTAssertEqual(failure?.capture, .notCharged)
         XCTAssertEqual(Self.updateResponses.sends, 1, "a refusal is still closed")
@@ -198,7 +199,7 @@ final class TTPUpdateRetryTests: XCTestCase {
 
         let failure = await chargeFailure(ttp)
 
-        XCTAssertEqual(failure?.errorCode, PayabliTTPError.cardDeclined(paymentTransId: "").errorCode)
+        XCTAssertEqual(failure?.type, .cardDeclined)
         XCTAssertEqual(failure?.capture, .notCharged)
     }
 
@@ -208,7 +209,7 @@ final class TTPUpdateRetryTests: XCTestCase {
 
         let failure = await chargeFailure(ttp)
 
-        XCTAssertEqual(failure?.errorCode, PayabliTTPError.outcomeUnknown(paymentTransId: "").errorCode)
+        XCTAssertEqual(failure?.type, .paymentOutcomeUnknown)
         XCTAssertEqual(failure?.paymentTransId, Self.paymentTransId)
         XCTAssertEqual(failure?.capture, .unknown)
         XCTAssertEqual(Self.updateResponses.sends, 1, "an unknown outcome is closed too")
@@ -220,7 +221,7 @@ final class TTPUpdateRetryTests: XCTestCase {
 
         let failure = await chargeFailure(ttp)
 
-        guard case .updateFailed = failure else {
+        guard failure?.type == .paymentNotClosed else {
             return XCTFail("expected the close to be reported, got \(String(describing: failure))")
         }
         XCTAssertEqual(failure?.capture, .unknown)
@@ -232,7 +233,7 @@ final class TTPUpdateRetryTests: XCTestCase {
 
         let failure = await chargeFailure(ttp)
 
-        guard case .updateFailed = failure else {
+        guard failure?.type == .paymentNotClosed else {
             return XCTFail("expected the close to be reported, got \(String(describing: failure))")
         }
         XCTAssertEqual(failure?.capture, .charged)
@@ -267,11 +268,9 @@ final class TTPUpdateRetryTests: XCTestCase {
         let summary = await collector.value
         deadline.cancel()
 
-        // The processor's own code as well as the kind: the stub's body carries `A01`, and it survives
-        // the decode into the event. Wrapping first reduced all of this to `updateFailed`.
         XCTAssertEqual(
             try XCTUnwrap(summary, "no updateFailed event arrived"),
-            "decline(A01)",
+            "PAYMENT_DECLINED",
             "a decline reaches telemetry as a decline, not as updateFailed"
         )
     }
@@ -480,18 +479,18 @@ final class TTPUpdateRetryTests: XCTestCase {
         )
     }
 
-    private func chargeFailure(_ ttp: PayabliTTP) async -> PayabliTTPError? {
+    private func chargeFailure(_ ttp: PayabliTTP) async -> TapToPayError? {
         await chargeFailure(of: Task { try await charge(ttp) })
     }
 
-    private func chargeFailure(of task: Task<TransactionResult, Error>) async -> PayabliTTPError? {
+    private func chargeFailure(of task: Task<TransactionResult, Error>) async -> TapToPayError? {
         do {
             _ = try await task.value
             XCTFail("expected the charge to fail")
-        } catch let failure as PayabliTTPError {
+        } catch let failure as TapToPayError {
             return failure
         } catch {
-            XCTFail("expected a PayabliTTPError, got \(error)")
+            XCTFail("expected a TapToPayError, got \(error)")
         }
         return nil
     }

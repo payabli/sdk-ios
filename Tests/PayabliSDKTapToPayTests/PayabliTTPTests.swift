@@ -104,7 +104,7 @@ final class PayabliTTPTests: XCTestCase {
         do {
             try await ttp.initialize()
             XCTFail("expected pending activation")
-        } catch PayabliTTPError.devicePendingActivation {
+        } catch let error as TapToPayError where error.type == .devicePendingActivation {
             XCTAssertEqual(ttp.sessionState, .pendingActivation(activationId: "dev"))
         } catch {
             XCTFail("wrong error: \(error)")
@@ -117,7 +117,7 @@ final class PayabliTTPTests: XCTestCase {
         do {
             try await ttp.initialize()
             XCTFail("expected eligibility failure")
-        } catch PayabliTTPError.readerSetupFailed {
+        } catch let error as TapToPayError where error.type == .unknown && error.detail == "no entitlement" {
             XCTAssertEqual(ttp.sessionState.code, .failed)
         } catch {
             XCTFail("wrong error: \(error)")
@@ -140,7 +140,7 @@ final class PayabliTTPTests: XCTestCase {
         do {
             try await ttp.activateDevice(activationCode: "X")
             XCTFail("expected invalid state")
-        } catch PayabliTTPError.invalidState {
+        } catch let error as TapToPayError where error.type == .deviceNotPending {
             // ok
         } catch {
             XCTFail("wrong error: \(error)")
@@ -211,14 +211,16 @@ final class PayabliTTPTests: XCTestCase {
         do {
             try await ttp.initialize()
             XCTFail("expected a failure")
-        } catch PayabliTTPError.configFailed {
+        } catch let error as TapToPayError
+            where error.type == .unknown && error.detail?.contains("no registration is stored") == true
+        {
         } catch {
             XCTFail("wrong error: \(error)")
         }
 
         XCTAssertEqual(ttp.sessionState, .failed(reason: .configurationRejected))
         let reported = try await value(of: collector, named: "attestationFailed")
-        XCTAssertEqual(reported, "configFailed")
+        XCTAssertEqual(reported, "UNKNOWN")
     }
 
     /// A pending answer whose stored registration cannot be read reports the storage failure on the
@@ -243,7 +245,7 @@ final class PayabliTTPTests: XCTestCase {
 
     /// An `initialize()` that fails in the attestation phase says so on the event
     /// stream, which was silent before, and says it without repeating the reason.
-    func testAttestationFailureEmitsAnEventNamingThePhase() async throws {
+    func testAttestationFailureEmitsAnEventNamingItsCatalogEntry() async throws {
         let (ttp, _, attestation) = try makeTTP()
         attestation.attestResult = .failure(PayabliTTPError.attestationFailed(reason: "key unusable"))
         let stream = ttp.events()
@@ -258,9 +260,9 @@ final class PayabliTTPTests: XCTestCase {
         _ = try? await ttp.initialize()
         let reported = try await value(of: collector, named: "attestationFailed")
 
-        // The phase, not the sentence: a reason on this case is the SDK's words on
-        // one path and the service's on another, so none of them travel.
-        XCTAssertEqual(reported, "attestationFailed")
+        // The catalog name, not the sentence: a reason on this case is the SDK's
+        // words on one path and the service's on another, so none of them travel.
+        XCTAssertEqual(reported, "UNKNOWN")
         XCTAssertFalse(reported.contains("key unusable"), reported)
         XCTAssertEqual(ttp.sessionState.code, .failed)
     }
@@ -284,7 +286,7 @@ final class PayabliTTPTests: XCTestCase {
         _ = try? await ttp.initialize()
         let reported = try await value(of: collector, named: "attestationFailed")
 
-        XCTAssertEqual(reported, "attestationFailed")
+        XCTAssertEqual(reported, "UNKNOWN")
         XCTAssertEqual(ttp.sessionState.code, .failed, "the caller saw a failure and the published state did not")
     }
 
@@ -395,9 +397,9 @@ final class PayabliTTPTests: XCTestCase {
         XCTAssertFalse(text.contains("dev_old"), "a handle captured during initialize() was sent")
     }
 
-    /// The event and the thrown error carry the wrapper; the state carries the
-    /// remedy for the failure underneath it.
-    func testConfigFailureThrowsTheWrapperAndLandsTheRemedyOfWhatFailed() async throws {
+    /// The event, the thrown error and the state all name the failure as it
+    /// arrived, so a service that may answer later reads as one.
+    func testConfigFailureThrowsWhatFailedAndLandsItsRemedy() async throws {
         let (ttp, _, _) = try makeTTP()
         StubURLProtocol.handler = { request in
             (HTTPURLResponse(
@@ -431,8 +433,8 @@ final class PayabliTTPTests: XCTestCase {
         let raised = try XCTUnwrap(thrown, "initialize() returned instead of failing")
         let marked = try XCTUnwrap(ttp.sessionManager.lastError, "the session recorded no error")
 
-        XCTAssertEqual(reported, ErrorSummary.of(raised), "the event must summarise what was thrown")
-        XCTAssertTrue(raised is PayabliTTPError, "the bridges read the domain of this type")
+        XCTAssertEqual(reported, "SERVER_ERROR")
+        XCTAssertEqual((raised as? TapToPayError)?.type, .serverError, "got \(raised)")
         XCTAssertFalse(
             marked is PayabliTTPError,
             "the state is classified from the failure as it arrived, not from the wrapper"
@@ -456,7 +458,7 @@ final class PayabliTTPTests: XCTestCase {
             try await ttp.initialize()
             XCTFail("expected the config phase to fail")
         } catch {
-            XCTAssertTrue(error is PayabliTTPError, "the bridges read the domain of this type")
+            XCTAssertEqual((error as? TapToPayError)?.type, .validation, "got \(error)")
         }
 
         // The same bytes get the same answer, so a retry is not the remedy. A 500
@@ -496,13 +498,13 @@ final class PayabliTTPTests: XCTestCase {
         }
         let reported = try await value(of: collector, named: "configFailed")
 
-        XCTAssertEqual(reported, "configFailed")
+        XCTAssertEqual(reported, "VALIDATION_ERROR")
         XCTAssertFalse(reported.contains(serversWords), reported)
 
         // The other half of the split: what the event withholds, the caller gets.
         let raised = try XCTUnwrap(thrown)
-        XCTAssertTrue(raised.localizedDescription.contains(serversWords), raised.localizedDescription)
-        XCTAssertTrue(raised is PayabliTTPError, "the bridges read the domain of this type")
+        let host = try XCTUnwrap(raised as? TapToPayError, "got \(raised)")
+        XCTAssertTrue(host.localizedDescription.contains(serversWords), host.localizedDescription)
     }
 
     /// The 401 branch does four things and had a test for none of them: it clears
@@ -547,10 +549,10 @@ final class PayabliTTPTests: XCTestCase {
 
         XCTAssertFalse(attestation.isAlreadyAttested, "a refused handle must not be sent again")
         // A refused binding and a refused bearer are both worth another call,
-        // which is the remedy the 401 underneath the wrapper carries.
+        // which is the remedy the 401 carries.
         XCTAssertEqual(ttp.sessionState, .failed(reason: .serviceUnavailable))
-        XCTAssertEqual(reported, "configFailed")
-        XCTAssertTrue(raised.localizedDescription.contains("401"), raised.localizedDescription)
+        XCTAssertEqual(reported, "TOKEN_EXPIRED")
+        XCTAssertEqual((raised as? TapToPayError)?.type, .tokenExpired, "got \(raised)")
         // The drop is the config call's to make, so the reason claims nothing about
         // it. Claiming it here is what told a caller the binding was gone when it
         // was not.
@@ -563,7 +565,7 @@ final class PayabliTTPTests: XCTestCase {
 
     /// The rule reaches the events that predate it. An activation failure's reason
     /// can be the service's own, since the decline body is where it comes from.
-    func testActivationFailureEventNamesTheCaseWithoutItsReason() async throws {
+    func testActivationFailureEventNamesItsCatalogEntryWithoutItsReason() async throws {
         let (ttp, _, attestation) = try makeTTP()
         let serversWords = "Device belongs to another merchant"
         attestation.pendingRegistration = "dev"
@@ -583,7 +585,7 @@ final class PayabliTTPTests: XCTestCase {
         _ = try? await ttp.activateDevice(activationCode: "ABC123")
         let reported = try await value(of: collector, named: "activationFailed")
 
-        XCTAssertEqual(reported, "activationFailed")
+        XCTAssertEqual(reported, "UNKNOWN")
         XCTAssertFalse(reported.contains(serversWords), reported)
     }
 

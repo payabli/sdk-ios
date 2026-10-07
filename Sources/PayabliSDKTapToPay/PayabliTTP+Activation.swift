@@ -14,15 +14,14 @@ public extension PayabliTTP {
     /// so the caller can immediately re-run `initialize()` for a fresh cold
     /// attestation — `.sessionExpired` is also emitted in that sub-case.
     func activateDevice(activationCode: String) async throws {
-        try await runSessionSetup(.activate) { try await self.runActivateDevice(activationCode: activationCode) }
+        try await reportingToHost {
+            try await runSessionSetup(.activate) { try await self.runActivateDevice(activationCode: activationCode) }
+        }
     }
 
     private func runActivateDevice(activationCode: String) async throws {
         guard case let .pendingActivation(activationId) = sessionState else {
-            throw PayabliTTPError.invalidState(
-                current: sessionState,
-                attempted: "activateDevice"
-            )
+            throw TapToPayError(type: .deviceNotPending, reason: PayabliErrorType.deviceNotPending.message, detail: nil)
         }
         multicaster.emit(.activationStarted)
         do {
@@ -40,7 +39,7 @@ public extension PayabliTTP {
             )
             _ = sessionManager.transition(to: .idle)
             syncPublished()
-            multicaster.emit(.activationFailed(error: ErrorSummary.of(failure)))
+            multicaster.emit(.activationFailed(error: TapToPayErrorTranslation.eventName(of: failure)))
             throw failure
         } catch let err as PayabliTTPError {
             // The attestation service already cleared local cache for the
@@ -51,30 +50,32 @@ public extension PayabliTTP {
                 _ = sessionManager.transition(to: .idle)
                 syncPublished()
                 multicaster.emit(.sessionExpired)
-                multicaster.emit(.activationFailed(error: ErrorSummary.of(err)))
+                multicaster.emit(.activationFailed(error: TapToPayErrorTranslation.eventName(of: err)))
                 throw err
             }
             markError(err)
             syncPublished()
-            multicaster.emit(.activationFailed(error: ErrorSummary.of(err)))
+            multicaster.emit(.activationFailed(error: TapToPayErrorTranslation.eventName(of: err)))
             throw err
         } catch {
-            // The reason is what the caller and the screen get, so it is the
-            // error's parsed description rather than a rendering of its fields.
+            // The reason is the error's parsed description rather than a rendering
+            // of its fields.
             let mapped = PayabliTTPError.activationFailed(reason: error.localizedDescription)
-            // Marked before it is emitted or thrown: the state a screen reads and
-            // the error a caller catches are the same failure.
+            // The state is marked from the activation's failure. A core error or a
+            // cancellation is thrown as it arrived, so its code and its wait reach
+            // the caller.
+            let failure: Error = error is any PayabliError || error is CancellationError ? error : mapped
             markError(mapped)
             syncPublished()
-            multicaster.emit(.activationFailed(error: ErrorSummary.of(mapped)))
-            throw mapped
+            multicaster.emit(.activationFailed(error: TapToPayErrorTranslation.eventName(of: failure)))
+            throw failure
         }
     }
 
     /// `@objc` companion to `activateDevice(activationCode:)` for ObjC /
     /// MAUI / Flutter / RN consumers. `completion(nil)` on success,
-    /// `completion(NSError)` on failure (domain `"com.payabli.ttp"` for
-    /// typed `PayabliTTPError`s).
+    /// `completion(NSError)` on failure, a ``TapToPayError`` with its catalog
+    /// number as the code.
     ///
     /// The completion handler is always invoked on the main thread because
     /// the entire `PayabliTTP` surface is `@MainActor`.

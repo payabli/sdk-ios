@@ -5,26 +5,29 @@ import PayabliSDKCore
 /// ``PayabliErrorType/category`` says what to do about it.
 ///
 /// `paymentTransId` and `capture` describe the payment a failure belongs to, and say no money moved
-/// for one that belongs to none.
-public struct TapToPayError: PayabliError {
+/// for one that belongs to none. `retryAfter` is the wait the service asked for, when it asked for one.
+public struct TapToPayError: PayabliError, PayabliRetryAfter {
     public let type: PayabliErrorType
     public let reason: String
     public let detail: String?
     public let paymentTransId: String?
     public let capture: PayabliTTPCapture
+    public let retryAfter: TimeInterval?
 
     package init(
         type: PayabliErrorType,
         reason: String,
         detail: String?,
         paymentTransId: String? = nil,
-        capture: PayabliTTPCapture = .notCharged
+        capture: PayabliTTPCapture = .notCharged,
+        retryAfter: TimeInterval? = nil
     ) {
         self.type = type
         self.reason = reason
         self.detail = detail
         self.paymentTransId = paymentTransId
         self.capture = capture
+        self.retryAfter = retryAfter
     }
 }
 
@@ -47,6 +50,9 @@ extension TapToPayError: CustomNSError {
         ]
         if let paymentTransId {
             info["paymentTransId"] = paymentTransId
+        }
+        if let retryAfter {
+            info["retryAfter"] = retryAfter
         }
         return info
     }
