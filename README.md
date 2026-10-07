@@ -285,7 +285,7 @@ retry.
 | Outcome | Card-not-present | Tap to Pay | Retry? |
 |---|---|---|---|
 | **Charged** | The call returns a result | `charge` returns a `TransactionResult` | No |
-| **Not charged** | `PayabliPayInError.transactionFailed`, for example a decline | an error whose `capture` is `.notCharged`, or a core `PayabliError`, which `charge` throws only before the card is read | Yes |
+| **Not charged** | `PayabliPayInError.transactionFailed`, for example a decline | a `TapToPayError` whose `capture` is `.notCharged` | Yes |
 | **Unknown** | `PayabliPayInError.submissionInterrupted` | an error whose `capture` is `.unknown` | Not until you've checked |
 | **Charged, not confirmed** | — | an error whose `capture` is `.charged` | No. Reconcile the payment |
 
@@ -333,8 +333,8 @@ The SDK is written in Swift, and the card-not-present form is a SwiftUI view.
 - **Objective-C errors.** An SDK error reaches Objective-C as an `NSError` whose `code` is its catalog
   number, with the type's name in `userInfo["PayabliErrorType"]`. Tap to Pay errors are in the
   `com.payabli.ttp` domain, where `userInfo["capture"]` holds the `PayabliTTPCapture` raw value (`0` not
-  charged, `1` unknown, `2` charged) and `userInfo["paymentTransId"]` is absent when there is no
-  transaction ID. Card-not-present errors are in the `com.payabli.payIn` domain, and errors from
+  charged, `1` unknown, `2` charged), `userInfo["paymentTransId"]` is absent when there is no
+  transaction ID, and `userInfo["retryAfter"]` holds the wait in seconds when the service asked for one. Card-not-present errors are in the `com.payabli.payIn` domain, and errors from
   `PayabliSessionObjC`'s initializer are in `com.payabli.session`.
 - **Flutter, .NET MAUI and React Native.** Wrappers are in [`Bridges/`](Bridges/README.md), which lists the
   status of each.
