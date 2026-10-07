@@ -600,7 +600,8 @@ class PayabliTTPInvoiceData {
 ///     SDK raised.
 ///   - `"INIT_FAILED"`, `"CHARGE_FAILED"`, `"ACTIVATION_FAILED"`,
 ///     `"INVALID_ARGS"`, `"NOT_CONFIGURED"`, `"NO_TOKEN_PROVIDER"` for
-///     bridge-level failures.
+///     bridge-level failures, and for a cancelled call, which has no catalog
+///     number.
 class PayabliTTPException implements Exception {
   const PayabliTTPException({required this.code, required this.message});
 
