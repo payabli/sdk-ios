@@ -151,6 +151,21 @@ final class FormCustomizationLiveUITests: XCTestCase {
         expectResult(prefix: "Captured:")
     }
 
+    func testAuthorizingUnderTheBrandPreset() {
+        app.buttons["simpleCapture.menu"].tap()
+        let offer = app.buttons["Offer Authorize"]
+        XCTAssertTrue(offer.waitForExistence(timeout: 5), "the menu has no Offer Authorize setting")
+        offer.tap()
+        if app.buttons["Offer Authorize"].exists {
+            app.swipeDown()
+        }
+        let authorize = app.buttons["Authorize"]
+        XCTAssertTrue(authorize.waitForExistence(timeout: 5), "Authorize is not offered once switched on")
+        authorize.tap()
+        fillAndSubmit("Place hold")
+        expectResult(prefix: "Authorized:")
+    }
+
     func testTokenizingUnderTheBrandPreset() {
         app.buttons["Tokenize"].tap()
         fillAndSubmit("Save for later")
