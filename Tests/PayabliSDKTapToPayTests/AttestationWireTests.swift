@@ -147,6 +147,34 @@ final class AttestationWireTests: XCTestCase {
         }
     }
 
+    /// A rate limit keeps the transport's own error and the wait the service asked for.
+    func testARateLimitedActivationKeepsItsWait() async throws {
+        let storage = InMemorySecureStorage()
+        try AttestFixture.seedBinding(entry: "myEntry", deviceId: "dev_1", keyId: "key_1", in: storage)
+        let limited = #"{"isSuccess":false,"responseText":"Declined","responseData":{"resultCode":429,"resultText":"Too many requests"}}"#
+        StubURLProtocol.handler = { request in
+            if request.url!.path == "/api/v2/device/taptopay/activate" {
+                return (
+                    HTTPURLResponse(
+                        url: request.url!, statusCode: 429, httpVersion: "HTTP/1.1", headerFields: ["Retry-After": "120"]
+                    )!,
+                    Data(limited.utf8)
+                )
+            }
+            return AttestFixture.ok(request, ["challengeId": "c_1", "challenge": "Y2hhbGxlbmdl"])
+        }
+        let (sut, _, _) = try AttestFixture.makeService(storage: storage)
+
+        do {
+            try await sut.activateDevice(activationCode: "123456", entry: "myEntry", activationId: "dev_1")
+            XCTFail("a rate-limited activation reported success")
+        } catch {
+            XCTAssertFalse(error is TapToPayError, "a rate limit was read as a refusal: \(error)")
+            XCTAssertEqual((error as? any PayabliError)?.type, .rateLimited, "got \(error)")
+            XCTAssertEqual((error as? any PayabliRetryAfter)?.retryAfter, 120)
+        }
+    }
+
     /// A 401 answering one binding does not take a binding enrolled since.
     func testAnActivationRefusalLeavesABindingEnrolledSince() async throws {
         let storage = InMemorySecureStorage()

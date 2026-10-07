@@ -143,7 +143,8 @@ extension AppAttestService {
 
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
-        if readsRefusalBeforeStatus, (400 ..< 500).contains(response.statusCode),
+        // A rate limit is the transport's to answer, with the wait the service asked for.
+        if readsRefusalBeforeStatus, (400 ..< 500).contains(response.statusCode), response.statusCode != 429,
            let (code, reason) = PayabliEnvelope.declineOutcome(from: response.body, decoder: decoder)
         {
             logger.error("[\(label)] refused (code=\(code.map(String.init) ?? "nil"))")
