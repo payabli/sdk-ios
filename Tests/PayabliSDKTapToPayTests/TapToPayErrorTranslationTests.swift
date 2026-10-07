@@ -151,10 +151,9 @@ final class TapToPayErrorTranslationTests: XCTestCase {
     func testEveryCardPresentCodeThisPlatformCanProduceHasACause() {
         let fromTheTable = Set(Self.allSamples.map { Self.expectedType(of: $0) })
             .union([.userCancelled, .paymentOutcomeUnknown])
-        let fromActivation: Set<PayabliErrorType> = [
-            .activationCodeIncorrect, .activationCodeExpired, .activationAttemptsExhausted,
-            .activationCodeNotIssued, .deviceNotPending, .deviceSetupRequired, .entryPointRefused
-        ]
+        let fromActivation = Set(
+            ActivationRefusalsTests.serviceRefusals.map { ActivationRefusals.catalogType(resultCode: $0.0, reason: $0.1) }
+        )
         let raisedDirectly: Set<PayabliErrorType> = [.deviceKeyUnavailable, .deviceSetupUnsupported, .deviceNotPending]
         let notProducedYet: Set<PayabliErrorType> = [
             .deviceServicesOutdated, // a Google Play cause, which this platform has no counterpart for

@@ -7,8 +7,8 @@ import PayabliSDKCore
 /// apart by text there is one file to rewrite. Every comparison is exact, or a prefix where the service appends
 /// detail, and a refusal matching nothing reports `unknown`, which tells a host nothing it would act on wrongly.
 ///
-/// A 401 is not classified here: the activation drops the binding it presented for every 401, which makes
-/// setting the device up again the remedy whatever the text says.
+/// A 401 never reaches this table: the transport answers it as an expired token. A 5xx keeps the service's
+/// own error, and the wait it asked for.
 enum ActivationRefusals {
     static func hostError(resultCode: Int?, reason: String) -> TapToPayError {
         let type = catalogType(resultCode: resultCode, reason: reason)
@@ -21,10 +21,10 @@ enum ActivationRefusals {
             return badRequestType(reason: reason)
         case 403 where reason == entryPointUnusable:
             return .entryPointRefused
+        case 403 where reason == notPending:
+            return .deviceNotPending
         case 404 where reason == deviceNotFound:
             return .deviceSetupRequired
-        case 404 where reason.hasPrefix(paypointNotFoundPrefix):
-            return .entryPointRefused
         case let .some(code) where code >= 500:
             return .serverError
         default:
@@ -42,8 +42,6 @@ enum ActivationRefusals {
             return .activationAttemptsExhausted
         case noChallenge, storedCodeInvalid:
             return .activationCodeNotIssued
-        case notPending:
-            return .deviceNotPending
         case _ where reason.hasPrefix(assertionFailedPrefix):
             return .deviceSetupRequired
         case _ where malformedRequest.contains(reason):
@@ -58,10 +56,9 @@ enum ActivationRefusals {
     private static let tooManyAttempts = "Too many failed activation attempts. Request a new challenge."
     private static let noChallenge = "No active challenge for this device."
     private static let storedCodeInvalid = "Stored activation code is invalid."
-    private static let notPending = "Device is not pending activation."
+    private static let notPending = "Device is not in a state that allows this operation."
     private static let assertionFailedPrefix = "Assertion verification failed: "
     private static let deviceNotFound = "Device not found."
-    private static let paypointNotFoundPrefix = "Paypoint '"
     private static let entryPointUnusable = "Entry point is not available for this request."
 
     /// The fixed body and header complaints, each one a request this SDK built wrong.
@@ -71,6 +68,7 @@ enum ActivationRefusals {
         "activationCode is required in the request body.",
         "X-App-Assertion header is required.",
         "X-App-KeyId header is required.",
-        "X-Assertion-Timestamp header is required."
+        "X-Assertion-Timestamp header is required.",
+        "X-App-Assertion is not valid base64."
     ]
 }

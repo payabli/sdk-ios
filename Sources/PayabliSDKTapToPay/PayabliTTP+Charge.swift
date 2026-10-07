@@ -118,7 +118,7 @@ extension PayabliTTP {
             multicaster.emit(.nfcCompleted)
         } catch {
             let failure = readFailure(error, paymentTransId: paymentTransId)
-            multicaster.emit(.nfcFailed(error: TapToPayErrorTranslation.eventName(of: failure)))
+            multicaster.emit(.nfcFailed(error: readFailureEventName(failure, paymentTransId: paymentTransId)))
 
             // A dead reader session is repaired only by re-initializing, and
             // `reinitializeIfNeeded()` does nothing while the state says `.ready`.
@@ -230,6 +230,12 @@ extension PayabliTTP {
     }
 
     // MARK: - Charge helpers
+
+    /// What the caller of a charge whose read failed is told, once the reader was asked for a card.
+    private func readFailureEventName(_ failure: Error, paymentTransId: String) -> String {
+        let reported = TapToPayErrorTranslation.hostError(for: failure, chargeOf: paymentTransId, askedForCard: true)
+        return TapToPayErrorTranslation.eventName(of: reported)
+    }
 
     /// The case the reader raised, with the payment it opened. A failure the reader already classified is
     /// kept, and the charge adds its payment at the edge. Any other failure with no case of its own that can

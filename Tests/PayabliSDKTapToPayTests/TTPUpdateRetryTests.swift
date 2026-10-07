@@ -84,12 +84,28 @@ final class TTPUpdateRetryTests: XCTestCase {
         let ttp = try await makeReadyTTP(
             readFailure: TapToPayError(type: .sdkInternalError, reason: "SDK failure", detail: nil)
         )
+        let stream = ttp.events()
+        let reported = Task<String?, Never> {
+            for await event in stream {
+                if case let .nfcFailed(error) = event {
+                    return error
+                }
+            }
+            return nil
+        }
 
         let failure = await chargeFailure(ttp)
 
         XCTAssertEqual(failure?.type, .paymentOutcomeUnknown)
         XCTAssertEqual(failure?.paymentTransId, Self.paymentTransId)
         XCTAssertEqual(failure?.capture, .unknown)
+        let deadline = Task {
+            guard (try? await Task.sleep(nanoseconds: 2_000_000_000)) != nil else { return }
+            reported.cancel()
+        }
+        let name = await reported.value
+        deadline.cancel()
+        XCTAssertEqual(name, "PAYMENT_OUTCOME_UNKNOWN", "the event names what the caller is told")
     }
 
     /// A close the service refused with a wait reaches the caller with that wait, so a host retrying the

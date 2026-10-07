@@ -101,8 +101,9 @@ final class AttestationWireTests: XCTestCase {
             #"{"isSuccess":false,"responseText":"Invalid activation code.","responseData":{"resultCode":400,"resultText":"Invalid activation code."}}"#
         StubURLProtocol.handler = { request in
             if request.url!.path == "/api/v2/device/taptopay/activate" {
+                // The service answers a refusal with its result code as the HTTP status.
                 return (
-                    HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
+                    HTTPURLResponse(url: request.url!, statusCode: 400, httpVersion: "HTTP/1.1", headerFields: nil)!,
                     Data(refusal.utf8)
                 )
             }
@@ -118,6 +119,32 @@ final class AttestationWireTests: XCTestCase {
             XCTAssertEqual(error.detail, "Invalid activation code.")
         }
         XCTAssertEqual(try sut.binding(for: "myEntry")?.deviceId, "dev_1", "a wrong code drops nothing")
+    }
+
+    /// A service failure keeps the service's own error and its wait, rather than reading as a refusal.
+    func testAnActivationTheServiceFailedKeepsItsOwnError() async throws {
+        let storage = InMemorySecureStorage()
+        try AttestFixture.seedBinding(entry: "myEntry", deviceId: "dev_1", keyId: "key_1", in: storage)
+        let failure =
+            #"{"isSuccess":false,"responseText":"Declined","responseData":{"resultCode":503,"resultText":"Internal server error."}}"#
+        StubURLProtocol.handler = { request in
+            if request.url!.path == "/api/v2/device/taptopay/activate" {
+                return (
+                    HTTPURLResponse(url: request.url!, statusCode: 503, httpVersion: "HTTP/1.1", headerFields: nil)!,
+                    Data(failure.utf8)
+                )
+            }
+            return AttestFixture.ok(request, ["challengeId": "c_1", "challenge": "Y2hhbGxlbmdl"])
+        }
+        let (sut, _, _) = try AttestFixture.makeService(storage: storage)
+
+        do {
+            try await sut.activateDevice(activationCode: "123456", entry: "myEntry", activationId: "dev_1")
+            XCTFail("a failed activation reported success")
+        } catch {
+            XCTAssertFalse(error is TapToPayError, "a service failure was read as a refusal: \(error)")
+            XCTAssertEqual((error as? any PayabliError)?.type, .serverError, "got \(error)")
+        }
     }
 
     /// A 401 answering one binding does not take a binding enrolled since.
