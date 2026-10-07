@@ -263,6 +263,50 @@ final class PayabliPayInTests: XCTestCase {
         XCTAssertEqual(requests.count, 1)
     }
 
+    func testTheOperationInFlightKeepsItsBusyTextWhenTheFormIsGivenAnother() async throws {
+        let transport = BlockingFacadeTransport(responseBody: Self.formCaptureResponse)
+        let component = PayabliPayIn(
+            entryPoint: "entry",
+            environment: .sandbox,
+            transport: transport,
+            operation: .capture,
+            requestConfiguration: PayabliPayInRequestConfiguration(
+                paymentDetails: PayabliPayInPaymentDetails(totalAmount: 30, currency: "USD")
+            )
+        )
+        let viewModel = PayabliPayInViewModel(
+            component: component,
+            configuration: PayabliPayInFormConfiguration(allowedMethods: [.card], defaultMethod: .card)
+        )
+        viewModel.cardholderName = "Jane Doe"
+        viewModel.cardNumber = "4111111111111111"
+        viewModel.cardExpiration = "02/27"
+        viewModel.cardCvv = "999"
+        viewModel.cardZip = "12345"
+        viewModel.firstName = "Jane"
+        viewModel.billingEmail = "jane@example.com"
+        XCTAssertTrue(viewModel.canSubmit)
+        XCTAssertNil(viewModel.submittingOperation)
+
+        let submission = Task { try await viewModel.submit() }
+        await transport.waitForFirstRequest()
+        component.configure(operation: .storePaymentMethod)
+
+        XCTAssertEqual(viewModel.submittingOperation, .capture)
+        XCTAssertEqual(
+            PayInSubmitWording.text(
+                showing: component.operation,
+                submitting: viewModel.submittingOperation,
+                hostWording: nil
+            ),
+            "Paying…"
+        )
+
+        await transport.resume()
+        _ = try await submission.value
+        XCTAssertNil(viewModel.submittingOperation)
+    }
+
     func testFormViewModelSubmitsConfiguredCaptureRequest() async throws {
         let transport = FacadeTransport(responseBody: Self.formCaptureResponse)
         let component = PayabliPayIn(

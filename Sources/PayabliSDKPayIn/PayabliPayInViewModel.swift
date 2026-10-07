@@ -82,6 +82,8 @@ final class PayabliPayInViewModel: ObservableObject {
     }
 
     @Published private(set) var isSubmitting = false
+    /// The operation the submission in flight is sending, or nil when none is.
+    @Published private(set) var submittingOperation: PayabliPayInOperation?
     @Published private(set) var errorMessage: String?
     /// The fields the last refusal named, until the payer edits one or its box leaves the screen.
     @Published var rejectedFields: Set<PayabliPayInField> = []
@@ -276,7 +278,11 @@ final class PayabliPayInViewModel: ObservableObject {
             throw error
         }
         isSubmitting = true
-        defer { isSubmitting = false }
+        submittingOperation = component.operation
+        defer {
+            isSubmitting = false
+            submittingOperation = nil
+        }
         let submittedFlow = component
 
         // Refused before anything else, and without clearing what the payer typed: only the host can change it.
