@@ -103,20 +103,23 @@ struct PayInFormCustomization: Hashable {
 
     // MARK: - What the SDK is handed
 
-    func configuration(capturing: Bool) -> PayabliPayInFormConfiguration {
-        PayabliPayInFormConfiguration(
-            allowedMethods: allowedMethods,
-            defaultMethod: methods == .cardAndBank ? startOn : allowedMethods[0],
+    func configuration(for operation: PayInOperation) -> PayabliPayInFormConfiguration {
+        // An authorization holds funds on a card and nothing else.
+        let methods = operation == .authorize ? [.card] : allowedMethods
+        let charges = operation != .storedMethod
+        return PayabliPayInFormConfiguration(
+            allowedMethods: methods,
+            defaultMethod: methods.count > 1 ? startOn : methods[0],
             cardSections: sections(paymentFields: Self.cardFields, sectionTitle: "Your card"),
             bankSections: sections(paymentFields: bankFields, sectionTitle: "Your bank"),
             hiddenValues: PayabliPayInHiddenValues(
                 accountHolderType: fixesHolderType ? .personal : nil,
-                methodDescription: QAIdentity.current.note(capturing ? "simple-capture" : "simple-save"),
-                // A capture names its customer on the request instead.
-                customerData: capturing ? nil : PayInDemoCustomer.customerData
+                methodDescription: QAIdentity.current.note(Self.note(for: operation)),
+                // A capture or an authorization names its customer on the request instead.
+                customerData: charges ? nil : PayInDemoCustomer.customerData
             ),
             options: PayabliPayInOptions(forceCustomerCreation: true, source: Self.source),
-            labels: labels(capturing: capturing),
+            labels: labels(for: operation),
             labelLayout: labelsInsideFields ? .placeholder : .external,
             showsFieldLabels: !hidesLabels,
             formatting: PayabliPayInFormatting(
@@ -255,7 +258,7 @@ struct PayInFormCustomization: Hashable {
         return entry + [summary]
     }
 
-    private func labels(capturing: Bool) -> PayabliPayInLabels {
+    private func labels(for operation: PayInOperation) -> PayabliPayInLabels {
         let fieldLabels = usesCustomWording
             ? PayabliPayInLabels.defaultFieldLabels.merging(Self.brandFieldLabels) { _, brand in brand }
             : PayabliPayInLabels.defaultFieldLabels
@@ -268,10 +271,26 @@ struct PayInFormCustomization: Hashable {
         return PayabliPayInLabels(
             title: "Acme Checkout",
             subtitle: "Secure payment, powered by Payabli",
-            submitButton: capturing ? "Pay now" : "Save for later",
+            submitButton: Self.customSubmitWording(for: operation),
             fieldLabels: fieldLabels,
             fieldPlaceholders: placeholders
         )
+    }
+
+    private static func note(for operation: PayInOperation) -> String {
+        switch operation {
+        case .capture, .void: "simple-capture"
+        case .authorize: "simple-authorize"
+        case .storedMethod: "simple-save"
+        }
+    }
+
+    private static func customSubmitWording(for operation: PayInOperation) -> String {
+        switch operation {
+        case .capture, .void: "Pay now"
+        case .authorize: "Place hold"
+        case .storedMethod: "Save for later"
+        }
     }
 
     private static let brandFieldLabels: [PayabliPayInField: String] = [

@@ -9,19 +9,22 @@ enum PayInOperation {
     /// Take a payment now, under a key that makes a resubmission a retry.
     case capture
 
+    /// Hold an amount on a card to capture later, under a key the same way.
+    case authorize
+
     /// Reverse a payment already taken. The SDK mints the key and never shows it.
     case void
 
     /// Whether the same key can reach the service twice, which is what makes a conflict a repeat.
     ///
-    /// Only the form-driven capture can: its key rides on the request configuration and stays put
-    /// until a new attempt is drawn, so submitting again sends the one the service already holds. A
-    /// reversal takes no key and the SDK mints a fresh one per call, so it can never send a repeat.
+    /// Only a form-driven capture or authorization can: its key rides on the request configuration and
+    /// stays put until a new attempt is drawn, so submitting again sends the one the service already
+    /// holds. A reversal takes no key and the SDK mints a fresh one per call, so it can never send a repeat.
     var canRepeatUnderOneKey: Bool {
         switch self {
         case .storedMethod, .void:
             false
-        case .capture:
+        case .capture, .authorize:
             true
         }
     }

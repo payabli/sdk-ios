@@ -43,6 +43,32 @@ final class FormCustomizationUITests: XCTestCase {
         attachScreenshot("brand-tokenize")
     }
 
+    func testAuthorizeIsOfferedOnceSwitchedOn() {
+        let app = launch(showingSimpleCapture: true)
+        let tab = app.tabBars.buttons["S-Capture"]
+        XCTAssertTrue(tab.waitForExistence(timeout: 10), "the S-Capture tab is not shown")
+        tab.tap()
+        XCTAssertTrue(app.textFields["payabli.payIn.field.cardNumber"].waitForExistence(timeout: 10))
+        XCTAssertFalse(app.buttons["Authorize"].exists, "Authorize is offered before the setting is on")
+
+        app.buttons["simpleCapture.menu"].tap()
+        let offer = app.buttons["Offer Authorize"]
+        XCTAssertTrue(offer.waitForExistence(timeout: 5), "the menu has no Offer Authorize setting")
+        offer.tap()
+        if app.buttons["Offer Authorize"].exists {
+            app.swipeDown()
+        }
+
+        let authorize = app.buttons["Authorize"]
+        XCTAssertTrue(authorize.waitForExistence(timeout: 5), "Authorize is not offered once switched on")
+        authorize.tap()
+        XCTAssertTrue(app.textFields["payabli.payIn.field.cardNumber"].waitForExistence(timeout: 10))
+        XCTAssertFalse(app.buttons["Bank account"].exists, "an authorization offers a bank account")
+        app.swipeUp()
+        app.swipeUp()
+        attachScreenshot("default-authorize")
+    }
+
     func testAnInvalidAmountTakesTheFormAway() {
         let app = launch(showingSimpleCapture: true)
         let tab = app.tabBars.buttons["S-Capture"]
@@ -123,6 +149,21 @@ final class FormCustomizationLiveUITests: XCTestCase {
     func testCapturingUnderTheBrandPreset() {
         fillAndSubmit("Pay now")
         expectResult(prefix: "Captured:")
+    }
+
+    func testAuthorizingUnderTheBrandPreset() {
+        app.buttons["simpleCapture.menu"].tap()
+        let offer = app.buttons["Offer Authorize"]
+        XCTAssertTrue(offer.waitForExistence(timeout: 5), "the menu has no Offer Authorize setting")
+        offer.tap()
+        if app.buttons["Offer Authorize"].exists {
+            app.swipeDown()
+        }
+        let authorize = app.buttons["Authorize"]
+        XCTAssertTrue(authorize.waitForExistence(timeout: 5), "Authorize is not offered once switched on")
+        authorize.tap()
+        fillAndSubmit("Place hold")
+        expectResult(prefix: "Authorized:")
     }
 
     func testTokenizingUnderTheBrandPreset() {
