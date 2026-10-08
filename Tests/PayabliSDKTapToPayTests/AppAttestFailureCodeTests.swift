@@ -1,6 +1,7 @@
 @testable import PayabliSDKCore
 @testable import PayabliSDKTapToPay
 import PayabliSDKTestUtils
+import Security
 import XCTest
 
 /// The catalog code each way of failing to set the device up reaches a caller with. The code decides
