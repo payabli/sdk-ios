@@ -82,8 +82,8 @@ final class PayabliTTPChargingTests: XCTestCase {
         XCTAssertEqual(seen.states, [opening, waiting, closing, .ready])
     }
 
-    /// A read that finds the reader session spent ends the charge expired, and nothing after it moves the
-    /// state back.
+    /// A read that finds the reader session spent closes the payment, then expires the session, and nothing
+    /// after it moves the state back.
     func testADeadReaderEndsTheChargeExpired() async throws {
         let (ttp, _) = try await makeReadyTTP(
             readFailure: PayabliTTPError.nfcFailed(reason: "Charges: readerSessionExpired")
@@ -92,7 +92,7 @@ final class PayabliTTPChargingTests: XCTestCase {
 
         _ = await chargeFailure(ttp)
 
-        XCTAssertEqual(seen.states, [opening, waiting, .sessionExpired])
+        XCTAssertEqual(seen.states, [opening, waiting, closing, .sessionExpired])
         XCTAssertEqual(ttp.sessionState, .sessionExpired)
     }
 

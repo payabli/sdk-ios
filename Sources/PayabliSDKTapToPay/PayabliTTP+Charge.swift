@@ -115,20 +115,6 @@ extension PayabliTTP {
         } catch {
             let failure = readFailure(error, paymentTransId: paymentTransId)
 
-            // A dead reader session is repaired only by re-initializing, and
-            // `reinitializeIfNeeded()` does nothing while the state says `.ready`.
-            //
-            // Only if the reader that failed is still the current one.
-            // `startReading` suspends, so an `initialize()` in that window can
-            // prepare a replacement and return to `.ready`, and expiring then
-            // would kill a healthy session over a dead one's failure.
-            if generation == readerSessionGeneration,
-               readerFailureInvalidatesSession(error),
-               sessionManager.transition(to: .sessionExpired)
-            {
-                syncPublished()
-            }
-
             // Best-effort backend notify so the transaction isn't left dangling.
             // Its outcome does not change what the caller is told.
             recordChargeActivity(.closing, for: charge)
@@ -136,6 +122,15 @@ extension PayabliTTP {
                 paymentTransId: paymentTransId,
                 payload: .nfcFailure(description: String(describing: error))
             )
+
+            // Expired after the close, so `closing` is published first. Only while the reader that failed is
+            // still the current one: an `initialize()` during the read can have replaced it.
+            if generation == readerSessionGeneration,
+               readerFailureInvalidatesSession(error),
+               sessionManager.transition(to: .sessionExpired)
+            {
+                syncPublished()
+            }
             throw failure
         }
 
