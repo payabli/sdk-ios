@@ -149,6 +149,38 @@ final class PayabliTTPChargingTests: XCTestCase {
         XCTAssertEqual(ttp.sessionState, .ready)
     }
 
+    func testAPromptFromAReplacedReaderIsDropped() async throws {
+        let (ttp, provider) = try await makeReadyTTP()
+        let during = Snapshot()
+        provider.whileReading = { [weak ttp] in
+            guard let ttp, let current = ttp.preparedReader else { return }
+            ttp.handleReaderEvent(.cardDetected, from: current - 1)
+            during.state = ttp.sessionState
+        }
+
+        _ = try await charge(ttp)
+
+        XCTAssertEqual(during.state, waiting)
+    }
+
+    func testReinitializingDuringATapLeavesTheChargeAlone() async throws {
+        let (ttp, provider) = try await makeReadyTTP()
+        let during = Snapshot()
+        provider.whileReading = { [weak ttp] in
+            do {
+                try await ttp?.reinitializeIfNeeded()
+            } catch {
+                during.refusal = (error as? TapToPayError)?.type
+            }
+            during.state = ttp?.sessionState
+        }
+
+        _ = try await charge(ttp)
+
+        XCTAssertNil(during.refusal)
+        XCTAssertEqual(during.state, waiting)
+    }
+
     func testTheReadersPromptsReportOnTheState() async throws {
         let (ttp, provider) = try await makeReadyTTP()
         provider.whileReading = { [weak provider] in

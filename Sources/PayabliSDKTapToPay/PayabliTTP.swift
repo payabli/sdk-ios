@@ -70,6 +70,10 @@ public final class PayabliTTP: NSObject, ObservableObject {
     /// match that.
     var activeConfiguration: Int?
 
+    /// The configuration whose reader came up last, or `nil` before one has. A
+    /// prompt from any other reader is dropped.
+    var preparedReader: Int?
+
     /// Names each configuration, so an ended one can be told from a new one.
     var nextConfigurationID = 0
 

@@ -182,6 +182,27 @@ final class SessionManagerTests: XCTestCase {
         }
     }
 
+    /// A charge that outlived a rebuilt session leaves the charge running now alone.
+    func testAnEndedChargeLeavesTheNextChargeAlone() throws {
+        let sm = SessionManager()
+        for state in [PayabliTTPSessionState.attestingDevice, .fetchingConfig, .initializingReader(percent: nil), .ready] {
+            sm.transition(to: state)
+        }
+        let first = try XCTUnwrap(sm.beginCharge())
+        for state in [PayabliTTPSessionState.idle, .attestingDevice, .fetchingConfig, .initializingReader(percent: nil), .ready] {
+            sm.transition(to: state)
+        }
+        let second = try XCTUnwrap(sm.beginCharge())
+
+        sm.recordChargeActivity(.closing, for: first)
+        sm.endCharge(first)
+
+        XCTAssertNotEqual(first, second)
+        XCTAssertEqual(sm.sessionState, .charging(activity: .opening))
+        XCTAssertFalse(sm.isReady)
+        XCTAssertNil(sm.beginCharge(), "a third charge was let in while the second held the reader")
+    }
+
     func testTheSessionIsNotReadyDuringACharge() {
         let sm = SessionManager()
         for state in [PayabliTTPSessionState.attestingDevice, .fetchingConfig, .initializingReader(percent: nil), .ready] {

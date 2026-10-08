@@ -308,10 +308,11 @@ final class TapToPayOnDeviceTests: XCTestCase {
     /// A whole charge, with a person tapping a card when the reader asks for one. Every state the session
     /// publishes is recorded, so the run shows the activities the reader raised on this device.
     ///
-    /// Runs only when `PAYABLI_TAP_BY_HAND` is set, because nothing unattended can present a card.
+    /// Runs only when the test host has `PAYABLI_TAP_BY_HAND=1`, passed as `TEST_RUNNER_PAYABLI_TAP_BY_HAND=1`,
+    /// because nothing unattended can present a card.
     func testAChargeTappedByHandWalksItsActivities() async throws {
         guard ProcessInfo.processInfo.environment["PAYABLI_TAP_BY_HAND"] == "1" else {
-            throw XCTSkip("set PAYABLI_TAP_BY_HAND=1 and tap a card when the reader asks")
+            throw XCTSkip("set TEST_RUNNER_PAYABLI_TAP_BY_HAND=1 and tap a card when the reader asks")
         }
         let (ttp, _) = try await enrolledDevice()
         var seen: [PayabliTTPSessionState] = []
@@ -330,10 +331,7 @@ final class TapToPayOnDeviceTests: XCTestCase {
         } catch {
             outcome = (error as? TapToPayError)?.type.rawValue ?? "\(type(of: error))"
         }
-        // The publisher delivers on the next turn of the main actor.
-        await Task.yield()
-
-        let names = seen.map { $0.chargeActivity.map { "charging(\($0))" } ?? "\($0.code)" }
+        let names = seen.map { "\($0)" }
         LiveEnvironment.report("PAYABLI_TAP_BY_HAND env=\(named.name) outcome=\(outcome) states=\(names)")
         XCTAssertEqual(seen.dropFirst().first, .charging(activity: .opening), "\(names)")
         XCTAssertTrue(seen.contains(.charging(activity: .waitingForCard)), "\(names)")

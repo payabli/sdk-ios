@@ -8,7 +8,8 @@ extension PayabliTTP {
     ///
     /// Progress reaches the state only for the configuration that installed this
     /// handler, so a percentage raised by one that has ended is dropped. A prompt
-    /// raised while no charge holds the reader is dropped too.
+    /// reaches it only from the reader now prepared, and only while a charge holds
+    /// the session.
     func handleReaderEvent(_ event: TapToPayReaderEvent, from configuration: Int) {
         if case let .configurationProgress(percent) = event {
             guard configuration == activeConfiguration else { return }
@@ -16,8 +17,11 @@ extension PayabliTTP {
             syncPublished()
             return
         }
-        guard let activity = Self.chargeActivity(for: event) else { return }
-        recordChargeActivity(activity)
+        guard configuration == preparedReader,
+              let charge = sessionManager.runningCharge,
+              let activity = Self.chargeActivity(for: event)
+        else { return }
+        recordChargeActivity(activity, for: charge)
     }
 
     /// The activity a reader prompt reports, or `nil` for an event that reaches a

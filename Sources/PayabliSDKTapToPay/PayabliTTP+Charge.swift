@@ -64,8 +64,8 @@ extension PayabliTTP {
 
         try await reinitialize()
 
-        try enterCharge()
-        defer { leaveCharge() }
+        let charge = try enterCharge()
+        defer { leaveCharge(charge) }
 
         // Match the trim/blank-to-nil semantics that `PayabliTTPCustomerData`
         // and `PayabliTTPInvoiceData` apply to their string fields, so a
@@ -109,7 +109,7 @@ extension PayabliTTP {
         // Set before the reader is asked, not after it answers: the processor can take the sale before the
         // answer arrives.
         progress.askedForCard = true
-        recordChargeActivity(.waitingForCard)
+        recordChargeActivity(.waitingForCard, for: charge)
         do {
             readResult = try await provider.startReading(readRequest)
         } catch {
@@ -131,7 +131,7 @@ extension PayabliTTP {
 
             // Best-effort backend notify so the transaction isn't left dangling.
             // Its outcome does not change what the caller is told.
-            recordChargeActivity(.closing)
+            recordChargeActivity(.closing, for: charge)
             _ = await tryUpdate(
                 paymentTransId: paymentTransId,
                 payload: .nfcFailure(description: String(describing: error))
@@ -139,6 +139,7 @@ extension PayabliTTP {
             throw failure
         }
 
+        recordChargeActivity(.closing, for: charge)
         return try await runSuccessUpdate(paymentTransId: paymentTransId, readResult: readResult)
     }
 
@@ -148,7 +149,6 @@ extension PayabliTTP {
         paymentTransId: String,
         readResult: CardReadResult
     ) async throws -> TransactionResult {
-        recordChargeActivity(.closing)
         let update = await tryUpdate(paymentTransId: paymentTransId, payload: .success(readResult))
 
         let capture: PayabliTTPCapture
@@ -226,21 +226,22 @@ extension PayabliTTP {
 
     // MARK: - Charge helpers
 
-    /// Holds the reader for this charge, or throws when the session is not ready.
-    private func enterCharge() throws {
-        guard sessionManager.beginCharge() else {
+    /// Holds the reader for a new charge and names it, or throws when the session is not ready.
+    private func enterCharge() throws -> Int {
+        guard let charge = sessionManager.beginCharge() else {
             throw PayabliTTPError.notReady(current: sessionState)
         }
         syncPublished()
+        return charge
     }
 
-    private func leaveCharge() {
-        sessionManager.endCharge()
+    private func leaveCharge(_ charge: Int) {
+        sessionManager.endCharge(charge)
         syncPublished()
     }
 
-    func recordChargeActivity(_ activity: TapToPayChargeActivity) {
-        sessionManager.recordChargeActivity(activity)
+    func recordChargeActivity(_ activity: TapToPayChargeActivity, for charge: Int) {
+        sessionManager.recordChargeActivity(activity, for: charge)
         syncPublished()
     }
 
