@@ -176,10 +176,11 @@ public final class PayabliTTP: NSObject, ObservableObject {
     /// Re-publishes `sessionState` / `isReady` from `sessionManager`.
     /// Called from every extension after a session transition.
     func syncPublished() {
-        let changed = sessionState != sessionManager.sessionState
+        if isReady != sessionManager.isReady {
+            isReady = sessionManager.isReady
+        }
+        guard sessionState != sessionManager.sessionState else { return }
         sessionState = sessionManager.sessionState
-        isReady = sessionManager.isReady
-        guard changed else { return }
         sessionStateObservations.removeAll { $0.isCancelled }
         for observation in sessionStateObservations {
             observation.notify()
@@ -199,6 +200,7 @@ public final class PayabliTTP: NSObject, ObservableObject {
         _ handler: @escaping () -> Void
     ) -> TapToPaySessionStateObservation {
         let observation = TapToPaySessionStateObservation(handler: handler)
+        sessionStateObservations.removeAll { $0.isCancelled }
         sessionStateObservations.append(observation)
         return observation
     }

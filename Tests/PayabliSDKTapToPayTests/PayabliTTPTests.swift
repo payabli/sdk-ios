@@ -1,3 +1,4 @@
+import Combine
 import PayabliSDKCore
 @testable import PayabliSDKTapToPay
 import PayabliSDKTestUtils
@@ -490,6 +491,32 @@ final class PayabliTTPTests: XCTestCase {
 
         XCTAssertEqual(ttp.chargeActivity, NSNumber(value: TapToPayChargeActivity.waitingForCard.rawValue))
         XCTAssertEqual(ttp.sessionStateCode, .charging)
+    }
+
+    func testACancelledObservationIsReleasedWhenTheNextIsAdded() throws {
+        let (ttp, _, _) = try makeTTP()
+        weak var released: TapToPaySessionStateObservation?
+        do {
+            let observation = ttp.addSessionStateObserver {}
+            released = observation
+            observation.cancel()
+        }
+
+        _ = ttp.addSessionStateObserver {}
+
+        XCTAssertNil(released)
+    }
+
+    func testAnUnchangedStateIsNotPublishedAgain() async throws {
+        let (ttp, _, _) = try makeTTP()
+        try await ttp.initialize()
+        var published = 0
+        let watcher = ttp.$sessionState.dropFirst().sink { _ in published += 1 }
+
+        ttp.syncPublished()
+        watcher.cancel()
+
+        XCTAssertEqual(published, 0)
     }
 
     func testACancelledObserverIsNotCalledAgain() async throws {
