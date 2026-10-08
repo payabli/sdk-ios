@@ -57,40 +57,20 @@ export enum PayabliTTPSessionState {
     PendingActivation = 7,
     Failed = 8,
     PendingTerms = 9,
+    Charging = 10,
 }
 
-export enum PayabliTTPEventCode {
-    AttestationStarted = 0,
-    AttestationCompleted = 1,
-    ConfigReceived = 2,
-    ReaderInitializing = 3,
-    ReaderReady = 4,
-    ChargeInitiated = 5,
-    NfcStarted = 6,
-    NfcCompleted = 7,
-    NfcFailed = 8,
-    UpdateCompleted = 9,
-    UpdateFailed = 10,
-    SessionExpired = 11,
-    ReinitializeStarted = 12,
-    ReinitializeCompleted = 13,
-    DevicePendingActivation = 14,
-    ActivationStarted = 15,
-    ActivationCompleted = 16,
-    ActivationFailed = 17,
-    AttestationFailed = 18,
-    ConfigFailed = 19,
-    TermsRequired = 20,
-    // 21 was ReaderConfigurationProgressChanged. Progress is a payload on the
-    // session state now. Retired rather than reused: consumers resolve this
-    // package from source against main and have had 21 since it merged.
-    ReaderNotReady = 22,
-    CardDetected = 23,
-    CardRemovalRequested = 24,
-    CardReadRetryRequested = 25,
-    PinEntryRequested = 26,
-    PinEntryCompleted = 27,
-    ReaderPromptDismissed = 28,
+/// Mirrors `TapToPayChargeActivity`: what a running charge is doing.
+export enum TapToPayChargeActivity {
+    Opening = 0,
+    WaitingForCard = 1,
+    Closing = 2,
+    CardDetected = 3,
+    CardRemovalRequested = 4,
+    CardReadRetryRequested = 5,
+    PinEntryRequested = 6,
+    PinEntryCompleted = 7,
+    ReaderPromptDismissed = 8,
 }
 
 export type PayabliPayInAccountType = "Checking" | "Savings";
@@ -148,6 +128,8 @@ export interface PayabliTTPSessionSnapshot {
     /// side sends every field and an absent Swift optional arrives as `null`,
     /// so narrowing on the property being there answers `true` for both.
     readerConfigurationPercent: number | null;
+    /// `null` unless a charge is running.
+    chargeActivity: TapToPayChargeActivity | null;
     /// `null` unless the session failed, for the same reason.
     failureReason: PayabliTTPFailureReason | null;
     /// The id the activation route's `deviceId` field takes. `null` unless an
@@ -163,11 +145,6 @@ export enum PayabliTTPFailureReason {
     DeviceIneligible = 3,
     SdkInternalError = 4,
     DeviceKeyUnavailable = 5,
-}
-
-export interface PayabliTTPEvent {
-    code: PayabliTTPEventCode;
-    payload: { paymentTransId?: string; error?: string };
 }
 
 export interface PayabliTTPConfig {
@@ -372,15 +349,14 @@ export async function getSessionState(): Promise<PayabliTTPSessionSnapshot> {
     return requireNativeModule().getSessionState();
 }
 
-export function addEventListener(
-    handler: (event: PayabliTTPEvent) => void
+/**
+ * Calls `handler` with the new snapshot after every change of the session state,
+ * including a move from one charge activity to another. Call `remove()` on the result to stop.
+ */
+export function addSessionStateListener(
+    handler: (snapshot: PayabliTTPSessionSnapshot) => void
 ): EmitterSubscription {
-    return requireEmitter().addListener("TTPEvent", (raw: { code: number; payload?: PayabliTTPEvent["payload"] }) => {
-        handler({
-            code: raw.code as PayabliTTPEventCode,
-            payload: raw.payload || {},
-        });
-    });
+    return requireEmitter().addListener("TTPSessionState", handler);
 }
 
 export const PayabliTTP = {
@@ -391,7 +367,7 @@ export const PayabliTTP = {
     areTermsAccepted,
     presentTerms,
     getSessionState,
-    addEventListener,
+    addSessionStateListener,
 };
 
 // MARK: - PayIn payment flow public API

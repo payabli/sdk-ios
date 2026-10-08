@@ -160,54 +160,11 @@ final class PayabliTTPTests: XCTestCase {
         }
     }
 
-    /// How long an event has to arrive before the test says it never did. Long
-    /// enough that a loaded machine is not the reason, short enough that the
-    /// failure is read rather than waited out.
-    private static let eventWait: UInt64 = 2_000_000_000
-
-    /// Starts reading the stream for the first event `match` accepts.
-    ///
-    /// Bounded, because an event that never arrives would otherwise leave the
-    /// reader awaiting forever, and a missing event has to fail a test rather
-    /// than hang it.
-    private func collect(
-        from stream: AsyncStream<PayabliTTPEvent>,
-        match: @escaping @Sendable (PayabliTTPEvent) -> String?
-    ) -> Task<String?, Never> {
-        Task {
-            for await event in stream {
-                if let found = match(event) {
-                    return found
-                }
-            }
-            return nil
-        }
-    }
-
-    private func value(of collector: Task<String?, Never>, named name: String) async throws -> String {
-        let deadline = Task {
-            // A cancelled sleep throws, and swallowing that would cancel the
-            // collector after it had already answered.
-            guard (try? await Task.sleep(nanoseconds: Self.eventWait)) != nil else { return }
-            collector.cancel()
-        }
-        let found = await collector.value
-        deadline.cancel()
-        return try XCTUnwrap(found, "no \(name) event arrived")
-    }
-
-    /// The service says pending and nothing is stored: what is thrown, where the session lands
-    /// and what is emitted all name the paypoint's configuration.
+    /// The service says pending and nothing is stored: what is thrown and where the session lands
+    /// both name the paypoint's configuration.
     func testPendingWithNothingStoredThrowsWhatTheSessionLandsOn() async throws {
         let (ttp, _, attestation) = try makeTTP()
         attestation.attestResult = .failure(PayabliTTPError.devicePendingActivation)
-        let collector = collect(from: ttp.events()) { event in
-            if case let .attestationFailed(error) = event {
-                return error
-            }
-            return nil
-        }
-
         do {
             try await ttp.initialize()
             XCTFail("expected a failure")
@@ -219,74 +176,42 @@ final class PayabliTTPTests: XCTestCase {
         }
 
         XCTAssertEqual(ttp.sessionState, .failed(reason: .configurationRejected))
-        let reported = try await value(of: collector, named: "attestationFailed")
-        XCTAssertEqual(reported, "UNKNOWN")
     }
 
-    /// A pending answer whose stored registration cannot be read reports the storage failure on the
-    /// event stream, not a pending device.
-    func testPendingWithAnUnreadableStoreEmitsTheStorageFailure() async throws {
+    /// A pending answer whose stored registration cannot be read lands on the storage failure, not a
+    /// pending device.
+    func testPendingWithAnUnreadableStoreLandsOnTheStorageFailure() async throws {
         let (ttp, _, attestation) = try makeTTP()
         attestation.pendingRegistration = "dev"
         attestation.registrationReadFailure = PayabliTTPError.attestationFailed(reason: "unreadable")
-        let collector = collect(from: ttp.events()) { event in
-            switch event {
-            case let .attestationFailed(error): return error
-            case .devicePendingActivation: return "devicePendingActivation"
-            default: return nil
-            }
-        }
-
         _ = try? await ttp.initialize()
 
-        let reported = try await value(of: collector, named: "attestationFailed")
-        XCTAssertEqual(reported, "DEVICE_KEY_UNAVAILABLE")
+        XCTAssertEqual(ttp.sessionState, .failed(reason: .deviceKeyUnavailable))
     }
 
-    /// An `initialize()` that fails in the attestation phase says so on the event
-    /// stream, which was silent before, and says it without repeating the reason.
-    func testAttestationFailureEmitsAnEventNamingItsCatalogEntry() async throws {
+    /// An `initialize()` that fails in the attestation phase throws its catalog entry and fails the session.
+    func testAttestationFailureThrowsItsCatalogEntryAndFailsTheSession() async throws {
         let (ttp, _, attestation) = try makeTTP()
         attestation.attestResult = .failure(PayabliTTPError.attestationFailed(reason: "key unusable"))
-        let stream = ttp.events()
 
-        let collector = collect(from: stream) { event in
-            if case let .attestationFailed(error) = event {
-                return error
-            }
-            return nil
+        do {
+            try await ttp.initialize()
+            XCTFail("expected the attestation phase to fail")
+        } catch {
+            XCTAssertEqual((error as? TapToPayError)?.type, .unknown, "got \(error)")
         }
 
-        _ = try? await ttp.initialize()
-        let reported = try await value(of: collector, named: "attestationFailed")
-
-        // The catalog name, not the sentence: a reason on this case is the SDK's
-        // words on one path and the service's on another, so none of them travel.
-        XCTAssertEqual(reported, "UNKNOWN")
-        XCTAssertFalse(reported.contains("key unusable"), reported)
         XCTAssertEqual(ttp.sessionState.code, .failed)
     }
 
-    /// A warm-path read that fails is reported through all three channels, not just
-    /// the thrown one. Read outside the phase's own handling it threw out of
-    /// `initialize()` while the published state stayed where `reset()` left it, so a
-    /// host observing `state` saw an idle session and a caller saw a failure.
-    func testAWarmReadFailureMarksTheStateAndEmitsTheEvent() async throws {
+    /// A warm-path read that fails is reported on the state as well as thrown, so a host observing the
+    /// state and the caller see the same failure.
+    func testAWarmReadFailureMarksTheState() async throws {
         let (ttp, _, attestation) = try makeTTP()
         attestation.readFailure = PayabliTTPError.attestationFailed(reason: "unreadable")
-        let stream = ttp.events()
-
-        let collector = collect(from: stream) { event in
-            if case let .attestationFailed(error) = event {
-                return error
-            }
-            return nil
-        }
 
         _ = try? await ttp.initialize()
-        let reported = try await value(of: collector, named: "attestationFailed")
 
-        XCTAssertEqual(reported, "UNKNOWN")
         XCTAssertEqual(ttp.sessionState.code, .failed, "the caller saw a failure and the published state did not")
     }
 
@@ -397,8 +322,8 @@ final class PayabliTTPTests: XCTestCase {
         XCTAssertFalse(text.contains("dev_old"), "a handle captured during initialize() was sent")
     }
 
-    /// The event, the thrown error and the state all name the failure as it
-    /// arrived, so a service that may answer later reads as one.
+    /// The thrown error and the state both name the failure as it arrived, so a
+    /// service that may answer later reads as one.
     func testConfigFailureThrowsWhatFailedAndLandsItsRemedy() async throws {
         let (ttp, _, _) = try makeTTP()
         StubURLProtocol.handler = { request in
@@ -409,14 +334,6 @@ final class PayabliTTPTests: XCTestCase {
                 headerFields: ["Content-Type": "application/json"]
             )!, Data("{\"title\":\"Server error\"}".utf8))
         }
-        let stream = ttp.events()
-
-        let collector = collect(from: stream) { event in
-            if case let .configFailed(error) = event {
-                return error
-            }
-            return nil
-        }
 
         var thrown: Error?
         do {
@@ -425,7 +342,6 @@ final class PayabliTTPTests: XCTestCase {
         } catch {
             thrown = error
         }
-        let reported = try await value(of: collector, named: "configFailed")
 
         // The whole state rather than its code, which is what pins the remedy a
         // host is actually given. A 500 is a service that may answer later.
@@ -433,7 +349,6 @@ final class PayabliTTPTests: XCTestCase {
         let raised = try XCTUnwrap(thrown, "initialize() returned instead of failing")
         let marked = try XCTUnwrap(ttp.sessionManager.lastError, "the session recorded no error")
 
-        XCTAssertEqual(reported, "SERVER_ERROR")
         XCTAssertEqual((raised as? TapToPayError)?.type, .serverError, "got \(raised)")
         XCTAssertFalse(
             marked is PayabliTTPError,
@@ -466,10 +381,8 @@ final class PayabliTTPTests: XCTestCase {
         XCTAssertEqual(ttp.sessionState, .failed(reason: .sdkInternalError))
     }
 
-    /// An event payload is forwarded to whatever logging a host app has, so the
-    /// service's own wording must not ride along in one. The caller still gets it,
-    /// through the thrown error.
-    func testConfigFailureEventCarriesTheCodeRatherThanTheServersWords() async throws {
+    /// The caller is given the service's own wording through the thrown error.
+    func testConfigFailureGivesTheCallerTheServersWords() async throws {
         let (ttp, _, _) = try makeTTP()
         let serversWords = "Card number belongs to another merchant"
         StubURLProtocol.handler = { request in
@@ -480,14 +393,6 @@ final class PayabliTTPTests: XCTestCase {
                 headerFields: ["Content-Type": "application/json"]
             )!, Data(#"{"title":"\#(serversWords)","status":400}"#.utf8))
         }
-        let stream = ttp.events()
-
-        let collector = collect(from: stream) { event in
-            if case let .configFailed(error) = event {
-                return error
-            }
-            return nil
-        }
 
         var thrown: Error?
         do {
@@ -496,19 +401,13 @@ final class PayabliTTPTests: XCTestCase {
         } catch {
             thrown = error
         }
-        let reported = try await value(of: collector, named: "configFailed")
 
-        XCTAssertEqual(reported, "VALIDATION_ERROR")
-        XCTAssertFalse(reported.contains(serversWords), reported)
-
-        // The other half of the split: what the event withholds, the caller gets.
         let raised = try XCTUnwrap(thrown)
         let host = try XCTUnwrap(raised as? TapToPayError, "got \(raised)")
         XCTAssertTrue(host.localizedDescription.contains(serversWords), host.localizedDescription)
     }
 
-    /// The 401 branch does four things and had a test for none of them: it clears
-    /// the attestation cache, marks, emits and throws. A missing clear leaves the
+    /// The 401 branch clears the attestation cache, marks the state and throws. A missing clear leaves the
     /// next call re-sending a handle the service has already refused.
     func testConfigRejectionClearsTheAttestationCacheAndReportsItOnce() async throws {
         let (ttp, _, attestation) = try makeTTP()
@@ -527,14 +426,6 @@ final class PayabliTTPTests: XCTestCase {
                 )
             )
         }
-        let stream = ttp.events()
-
-        let collector = collect(from: stream) { event in
-            if case let .configFailed(error) = event {
-                return error
-            }
-            return nil
-        }
 
         var thrown: Error?
         do {
@@ -543,7 +434,6 @@ final class PayabliTTPTests: XCTestCase {
         } catch {
             thrown = error
         }
-        let reported = try await value(of: collector, named: "configFailed")
         let raised = try XCTUnwrap(thrown)
         let marked = try XCTUnwrap(ttp.sessionManager.lastError)
 
@@ -551,7 +441,6 @@ final class PayabliTTPTests: XCTestCase {
         // A refused binding and a refused bearer are both worth another call,
         // which is the remedy the 401 carries.
         XCTAssertEqual(ttp.sessionState, .failed(reason: .serviceUnavailable))
-        XCTAssertEqual(reported, "TOKEN_EXPIRED")
         XCTAssertEqual((raised as? TapToPayError)?.type, .tokenExpired, "got \(raised)")
         // The drop is the config call's to make, so the reason claims nothing about
         // it. Claiming it here is what told a caller the binding was gone when it
@@ -563,57 +452,27 @@ final class PayabliTTPTests: XCTestCase {
         XCTAssertFalse(marked is PayabliTTPError, "the state is classified from the 401 itself")
     }
 
-    /// The rule reaches the events that predate it. An activation failure's reason
-    /// can be the service's own, since the decline body is where it comes from.
-    func testActivationFailureEventNamesItsCatalogEntryWithoutItsReason() async throws {
-        let (ttp, _, attestation) = try makeTTP()
-        let serversWords = "Device belongs to another merchant"
-        attestation.pendingRegistration = "dev"
-        _ = try? await ttp.initialize()
-        attestation.activationResult = .failure(
-            PayabliTTPError.activationFailed(reason: serversWords)
-        )
-        let stream = ttp.events()
-
-        let collector = collect(from: stream) { event in
-            if case let .activationFailed(error) = event {
-                return error
-            }
-            return nil
-        }
-
-        _ = try? await ttp.activateDevice(activationCode: "ABC123")
-        let reported = try await value(of: collector, named: "activationFailed")
-
-        XCTAssertEqual(reported, "UNKNOWN")
-        XCTAssertFalse(reported.contains(serversWords), reported)
-    }
-
-    func testEventsStreamDeliversLifecycle() async throws {
+    /// An Objective-C host is told about every state `initialize()` passes through, and reads each one.
+    func testInitializeWalksTheSessionStatesAnObserverReads() async throws {
         let (ttp, _, _) = try makeTTP()
-        let stream = ttp.events()
-
-        let collector = Task {
-            var events: [String] = []
-            for await event in stream {
-                switch event {
-                case .attestationStarted: events.append("att-start")
-                case .attestationCompleted: events.append("att-done")
-                case .readerInitializing: events.append("rdy-init")
-                case .readerReady: events.append("rdy-ready")
-                    return events
-                default: break
-                }
-            }
-            return events
-        }
+        var seen: [PayabliTTPSessionStateCode] = []
+        let observation = ttp.addSessionStateObserver { seen.append(ttp.sessionStateCode) }
 
         try await ttp.initialize()
-        let received = await collector.value
+        observation.cancel()
 
-        XCTAssertTrue(received.contains("att-start"))
-        XCTAssertTrue(received.contains("att-done"))
-        XCTAssertTrue(received.contains("rdy-init"))
-        XCTAssertTrue(received.contains("rdy-ready"))
+        XCTAssertEqual(seen, [.attestingDevice, .fetchingConfig, .initializingReader, .ready])
+    }
+
+    func testACancelledObserverIsNotCalledAgain() async throws {
+        let (ttp, _, _) = try makeTTP()
+        var calls = 0
+        let observation = ttp.addSessionStateObserver { calls += 1 }
+        observation.cancel()
+        observation.cancel()
+
+        try await ttp.initialize()
+
+        XCTAssertEqual(calls, 0)
     }
 }

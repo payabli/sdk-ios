@@ -1,6 +1,6 @@
 # PayabliMauiDemo
 
-Minimal .NET MAUI demo wrapping Tap to Pay and payment flow through the
+Minimal .NET MAUI example integration wrapping Tap to Pay and payment flow through the
 .NET iOS binding library in `Bridges/MAUI/`.
 
 ## What it covers
@@ -10,8 +10,9 @@ Minimal .NET MAUI demo wrapping Tap to Pay and payment flow through the
 - **Charge** — full sale via `PayabliTTP.Charge(...)` with NFC tap.
 - **Activate device** — pending-device activation with an out-of-band
   code.
-- **Live event log** — every `PayabliTTPEvent` from `AddEventListener`
-  rendered into a scrollable label.
+- **Session state log** — `AddSessionStateObserver` writes
+  `SessionState`, and `ChargeActivity` while a charge runs, into a
+  scrollable label on every change.
 - **Session badge** — current `PayabliTTPSessionState` shown in the
   page header.
 - **Card and bank account payment flow** — sample forms calling

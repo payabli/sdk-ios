@@ -15,9 +15,9 @@ import {
   PayabliEnvironment,
   PayabliPayIn,
   PayabliTTP,
-  PayabliTTPEventCode,
   PayabliTTPSessionState,
-  type PayabliTTPEvent,
+  TapToPayChargeActivity,
+  type PayabliTTPSessionSnapshot,
 } from "payabli-sdk-react-native";
 
 const Secrets = {
@@ -41,13 +41,14 @@ export default function App() {
   const [isWorking, setIsWorking] = useState(false);
   const [result, setResult] = useState("Not configured");
   const [payInResult, setPayInResult] = useState("No PayIn result yet");
-  const [events, setEvents] = useState<string[]>([]);
+  const [stateLog, setStateLog] = useState<string[]>([]);
 
   useEffect(() => {
     let subscription: EmitterSubscription | undefined;
     try {
-      subscription = PayabliTTP.addEventListener((event) => {
-        setEvents((current) => [eventLabel(event), ...current].slice(0, 20));
+      subscription = PayabliTTP.addSessionStateListener((snapshot) => {
+        setSessionState(snapshot.code);
+        setStateLog((current) => [snapshotLabel(snapshot), ...current].slice(0, 20));
       });
     } catch (error) {
       setResult(errorMessage(error));
@@ -227,13 +228,13 @@ export default function App() {
           <Text style={styles.resultText}>{payInResult}</Text>
         </Section>
 
-        <Section title="Events">
-          {events.length === 0 ? (
-            <Text style={styles.mutedText}>No events yet</Text>
+        <Section title="Session state">
+          {stateLog.length === 0 ? (
+            <Text style={styles.mutedText}>No state changes yet</Text>
           ) : (
-            events.map((event, index) => (
-              <Text key={`${event}-${index}`} style={styles.eventText}>
-                {event}
+            stateLog.map((entry, index) => (
+              <Text key={`${entry}-${index}`} style={styles.logText}>
+                {entry}
               </Text>
             ))
           )}
@@ -299,16 +300,22 @@ function sessionStateLabel(state: PayabliTTPSessionState): string {
       return "pending";
     case PayabliTTPSessionState.Failed:
       return "failed";
+    case PayabliTTPSessionState.PendingTerms:
+      return "terms";
+    case PayabliTTPSessionState.Charging:
+      return "charging";
     case PayabliTTPSessionState.Idle:
     default:
       return "idle";
   }
 }
 
-function eventLabel(event: PayabliTTPEvent): string {
-  const name = PayabliTTPEventCode[event.code] ?? `event-${event.code}`;
-  const payload = Object.keys(event.payload).length > 0 ? ` ${JSON.stringify(event.payload)}` : "";
-  return `${name}${payload}`;
+function snapshotLabel(snapshot: PayabliTTPSessionSnapshot): string {
+  const name = PayabliTTPSessionState[snapshot.code] ?? `state-${snapshot.code}`;
+  if (snapshot.chargeActivity === null) {
+    return name;
+  }
+  return `${name}: ${TapToPayChargeActivity[snapshot.chargeActivity] ?? snapshot.chargeActivity}`;
 }
 
 function storedResultText(result: { storedMethodId?: string; responseText: string; resultText?: string }): string {
@@ -418,7 +425,7 @@ const styles = StyleSheet.create({
     color: "#697586",
     fontSize: 14,
   },
-  eventText: {
+  logText: {
     color: "#384252",
     fontSize: 13,
     lineHeight: 18,

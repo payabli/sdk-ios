@@ -18,8 +18,7 @@ import Foundation
 ///      future provider that needs it.
 ///   3. `PATCH /api/v2/MoneyIn/update/{id}` — the backend persists the customer
 ///      from the initiate step, so update bodies only carry the provider
-///      response verbatim. Customer data is still available in the SDK
-///      transaction context for any host-app observers listening on `events()`.
+///      response verbatim.
 ///
 /// All fields are optional; an empty instance is equivalent to "no customer
 /// provided" and the backend will accept it as an anonymous payor.

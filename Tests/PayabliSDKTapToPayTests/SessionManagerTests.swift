@@ -88,7 +88,7 @@ final class SessionManagerTests: XCTestCase {
         let states: [PayabliTTPSessionState] = [
             .idle, .attestingDevice, .fetchingConfig, .initializingReader(percent: nil),
             .ready, .sessionExpired, .reinitializing, .pendingActivation(activationId: "dev"),
-            .failed(reason: .sdkInternalError)
+            .failed(reason: .sdkInternalError), .pendingTerms, .charging(activity: .waitingForCard)
         ]
         for state in states {
             XCTAssertTrue(
@@ -130,5 +130,64 @@ final class SessionManagerTests: XCTestCase {
     func testPendingTermsDoesNotReachReadyDirectly() {
         XCTAssertFalse(SessionManager.isValidTransition(from: .pendingTerms, to: .ready))
         XCTAssertFalse(SessionManager.isValidTransition(from: .ready, to: .pendingTerms))
+    }
+
+    // MARK: - Charging
+
+    func testAChargeStartsFromReadyByOpening() {
+        for activity in TapToPayChargeActivity.allCases {
+            XCTAssertEqual(
+                SessionManager.isValidTransition(from: .ready, to: .charging(activity: activity)),
+                activity == .opening,
+                "ready -> \(activity)"
+            )
+        }
+    }
+
+    func testOnlyReadyStartsACharge() {
+        let others: [PayabliTTPSessionState] = [
+            .idle, .attestingDevice, .fetchingConfig, .initializingReader(percent: nil), .sessionExpired,
+            .reinitializing, .pendingActivation(activationId: "dev"), .failed(reason: .sdkInternalError), .pendingTerms
+        ]
+        for state in others {
+            XCTAssertFalse(SessionManager.isValidTransition(from: state, to: .charging(activity: .opening)), "\(state)")
+        }
+    }
+
+    /// Opening leads to the wait, the wait and the reader's prompts lead to each other and to closing, and
+    /// closing leads to no other activity.
+    func testAChargeMovesForwardThroughItsActivities() {
+        for from in TapToPayChargeActivity.allCases {
+            for to in TapToPayChargeActivity.allCases {
+                let expected: Bool = switch from {
+                case .opening: to == .opening || to == .waitingForCard
+                case .closing: to == .closing
+                default: to != .opening
+                }
+                XCTAssertEqual(
+                    SessionManager.isValidTransition(from: .charging(activity: from), to: .charging(activity: to)),
+                    expected,
+                    "\(from) -> \(to)"
+                )
+            }
+        }
+    }
+
+    func testEveryActivityCanEndTheCharge() {
+        for activity in TapToPayChargeActivity.allCases {
+            let charging = PayabliTTPSessionState.charging(activity: activity)
+            XCTAssertTrue(SessionManager.isValidTransition(from: charging, to: .ready), "\(activity)")
+            XCTAssertTrue(SessionManager.isValidTransition(from: charging, to: .sessionExpired), "\(activity)")
+            XCTAssertFalse(SessionManager.isValidTransition(from: charging, to: .fetchingConfig), "\(activity)")
+        }
+    }
+
+    func testTheSessionIsNotReadyWhileACharges() {
+        let sm = SessionManager()
+        for state in [PayabliTTPSessionState.attestingDevice, .fetchingConfig, .initializingReader(percent: nil), .ready] {
+            sm.transition(to: state)
+        }
+        XCTAssertTrue(sm.transition(to: .charging(activity: .opening)))
+        XCTAssertFalse(sm.isReady)
     }
 }

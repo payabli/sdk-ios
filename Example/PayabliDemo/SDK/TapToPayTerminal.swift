@@ -93,19 +93,6 @@ final class TapToPayTerminal: ObservableObject {
         try await run { try await terminal.areTermsAccepted() }
     }
 
-    /// Listens for the reader's own events, already named and flattened.
-    func addEventListener(
-        _ onEvent: @escaping (TapToPayEvent) -> Void
-    ) -> TapToPayEventSubscription {
-        let token = terminal.addEventListener { code, payload in
-            let detail = payload.count == 0
-                ? ""
-                : payload.map { "\($0.key): \($0.value)" }.sorted().joined(separator: ", ")
-            onEvent(TapToPayEvent(label: TapToPayEvent.name(for: code), detail: detail))
-        }
-        return TapToPayEventSubscription(token)
-    }
-
     // MARK: -
 
     /// One place where a failure becomes this app's own, so no caller sees a
@@ -140,75 +127,5 @@ struct TapToPayFailure: LocalizedError {
     init(_ error: Error) {
         message = error.localizedDescription
         isAttestationRevoked = (error as? TapToPayError)?.type == .deviceSetupRequired
-    }
-}
-
-/// One line of the reader's event log.
-struct TapToPayEvent {
-    let label: String
-    let detail: String
-
-    /// `PayabliTTPEventCode` is an `@objc Int` enum, so `String(describing:)`
-    /// renders `PayabliTTPEventCode(rawValue: 0)` rather than the case name.
-    ///
-    /// A table rather than a switch. The switch it replaced ended in
-    /// `@unknown default`, which reports a new event as a warning the build does
-    /// not fail on, and that is how one reached review here unnamed.
-    ///
-    /// Nothing guards the table yet. The flow-test target compiles a curated list
-    /// of these files and this one is not on it, so the check belongs with a
-    /// change to that target rather than with this line.
-    static func name(for code: PayabliTTPEventCode) -> String {
-        names[code] ?? "event(\(code.rawValue))"
-    }
-
-    /// Every event the SDK publishes, by its code.
-    static let names: [PayabliTTPEventCode: String] = [
-        .attestationStarted: "attestationStarted",
-        .attestationCompleted: "attestationCompleted",
-        .configReceived: "configReceived",
-        .readerInitializing: "readerInitializing",
-        .readerReady: "readerReady",
-        .chargeInitiated: "chargeInitiated",
-        .nfcStarted: "nfcStarted",
-        .nfcCompleted: "nfcCompleted",
-        .nfcFailed: "nfcFailed",
-        .updateCompleted: "updateCompleted",
-        .updateFailed: "updateFailed",
-        .sessionExpired: "sessionExpired",
-        .reinitializeStarted: "reinitializeStarted",
-        .reinitializeCompleted: "reinitializeCompleted",
-        .devicePendingActivation: "devicePendingActivation",
-        .activationStarted: "activationStarted",
-        .activationCompleted: "activationCompleted",
-        .activationFailed: "activationFailed",
-        .attestationFailed: "attestationFailed",
-        .configFailed: "configFailed",
-        .termsRequired: "termsRequired",
-        .readerNotReady: "readerNotReady",
-        .cardDetected: "cardDetected",
-        .cardRemovalRequested: "cardRemovalRequested",
-        .cardReadRetryRequested: "cardReadRetryRequested",
-        .pinEntryRequested: "pinEntryRequested",
-        .pinEntryCompleted: "pinEntryCompleted",
-        .readerPromptDismissed: "readerPromptDismissed"
-    ]
-}
-
-/// A listener's own tear-down.
-///
-/// It owns both the subscription and its cancellation, because a detached task
-/// over the event stream would leak across view appearances: SwiftUI gives no
-/// handle to cancel one.
-final class TapToPayEventSubscription {
-    private var token: PayabliTTPEventToken?
-
-    init(_ token: PayabliTTPEventToken) {
-        self.token = token
-    }
-
-    func cancel() {
-        token?.cancel()
-        token = nil
     }
 }

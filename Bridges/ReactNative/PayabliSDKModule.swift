@@ -10,8 +10,8 @@ import UIKit
 
 /// React Native Native Module bridging the bilingual `@objc` surface of
 /// `PayabliSDKTapToPay` and `PayabliSDKPayIn` to JavaScript.
-/// Inherits `RCTEventEmitter`, which pushes lifecycle events to JS without
-/// polling.
+/// Inherits `RCTEventEmitter`, which pushes session state changes to JS
+/// without polling.
 ///
 /// ## Protocol
 ///
@@ -26,8 +26,9 @@ import UIKit
 ///     none is prepared or the platform raised.
 ///   - `sessionDeviceId(resolver, rejecter)` — resolves the session's device
 ///     id, or `null`.
-///   - `getSessionState(resolver, rejecter)` — resolves the int raw value
-///     of the current `PayabliTTPSessionState`.
+///   - `getSessionState(resolver, rejecter)` — resolves the session state
+///     snapshot: `code`, `readerConfigurationPercent`, `chargeActivity`,
+///     `failureReason` and `activationId`.
 ///   - `resolveTokenRefresh(token)` / `rejectTokenRefresh(reason)` —
 ///     responses to the `TTPTokenRefreshRequested` event.
 ///   - `configurePayIn(config, resolver, rejecter)` — entryPoint,
@@ -36,7 +37,8 @@ import UIKit
 ///   - `addBankAccount(params, resolver, rejecter)`
 ///
 /// Events (RCTEventEmitter):
-///   - `TTPEvent`: `{code: Int, payload: {...}}` per `PayabliTTPEvent`.
+///   - `TTPSessionState`: the snapshot `getSessionState` resolves, sent after
+///     every change of the session state.
 ///   - `TTPTokenRefreshRequested`: signals JS to fetch a fresh token from
 ///     its own backend; resolve via `resolveTokenRefresh:`. The one session
 ///     asks through this event for card-present and card-not-present alike.
@@ -58,7 +60,7 @@ public final class PayabliSDKModule: RCTEventEmitter {
 
     @objc override public func supportedEvents() -> [String]! {
         [
-            "TTPEvent",
+            "TTPSessionState",
             "TTPTokenRefreshRequested"
         ]
     }
@@ -66,7 +68,7 @@ public final class PayabliSDKModule: RCTEventEmitter {
     // MARK: - State
 
     private var ttp: PayabliTTP?
-    private var eventToken: PayabliTTPEventToken?
+    private var stateObservation: TapToPaySessionStateObservation?
     private var payIn: PayabliPayIn?
     private var pendingRefresh: CheckedContinuation<String, Error>?
     private let refreshQueue = DispatchQueue(label: "com.payabli.sdk.rn.refresh")
@@ -136,7 +138,7 @@ public final class PayabliSDKModule: RCTEventEmitter {
             // Constructed before anything is torn down: the initialiser rejects an
             // access token that cannot be sent as a header and an empty entry point,
             // both of which arrive from the JS side. A configure() that fails leaves
-            // the previous facade and its event subscription exactly as they were.
+            // the previous facade and its state observation exactly as they were.
             let ttp: PayabliTTP
             do {
                 try await PayabliSession.initialize(config: PayabliConfig(
@@ -150,11 +152,11 @@ public final class PayabliSDKModule: RCTEventEmitter {
                 return
             }
 
-            // Only now is the previous subscription dropped, so it does not leak.
-            self.eventToken?.cancel()
-            self.eventToken = nil
+            // Only now is the previous observation dropped, so it does not leak.
+            self.stateObservation?.cancel()
+            self.stateObservation = nil
             self.ttp = ttp
-            self.subscribeEvents(on: ttp)
+            self.observeSessionState(on: ttp)
             self.becomeLive()
             resolve(nil)
         }
@@ -323,14 +325,19 @@ public final class PayabliSDKModule: RCTEventEmitter {
         rejecter reject: @escaping RCTPromiseRejectBlock
     ) {
         Task { @MainActor in
-            let state = self.ttp?.sessionState ?? .idle
-            resolve([
-                "code": state.code.rawValue,
-                "readerConfigurationPercent": state.readerConfigurationPercent as Any,
-                "failureReason": state.failureReason?.rawValue as Any,
-                "activationId": state.activationId as Any
-            ])
+            resolve(Self.sessionSnapshot(self.ttp?.sessionState ?? .idle))
         }
+    }
+
+    /// Every key is always present, so an absent Swift optional reaches JS as `null`.
+    private static func sessionSnapshot(_ state: PayabliTTPSessionState) -> [String: Any] {
+        [
+            "code": state.code.rawValue,
+            "readerConfigurationPercent": state.readerConfigurationPercent as Any,
+            "chargeActivity": state.chargeActivity?.rawValue as Any,
+            "failureReason": state.failureReason?.rawValue as Any,
+            "activationId": state.activationId as Any
+        ]
     }
 
     // MARK: - Token refresh response
@@ -474,16 +481,16 @@ public final class PayabliSDKModule: RCTEventEmitter {
         }
     }
 
-    // MARK: - Event subscription
+    // MARK: - Session state observation
 
     @MainActor
-    private func subscribeEvents(on ttp: PayabliTTP) {
-        eventToken = ttp.addEventListener { [weak self] code, payload in
-            let safePayload = (payload as? [String: Any]) ?? [:]
-            self?.sendEvent(withName: "TTPEvent", body: [
-                "code": code.rawValue,
-                "payload": safePayload
-            ])
+    private func observeSessionState(on ttp: PayabliTTP) {
+        stateObservation = ttp.addSessionStateObserver { [weak self, weak ttp] in
+            // The SDK calls this on the main thread with the new state already in place.
+            MainActor.assumeIsolated {
+                guard let self, let ttp else { return }
+                self.sendEvent(withName: "TTPSessionState", body: Self.sessionSnapshot(ttp.sessionState))
+            }
         }
     }
 

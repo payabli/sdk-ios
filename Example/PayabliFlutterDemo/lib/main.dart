@@ -57,8 +57,8 @@ class _HomeScreenState extends State<HomeScreen> {
   PayabliTTPSessionState _state = PayabliTTPSessionState.idle;
   String _lastResult = '';
   String _payInResult = '';
-  final List<PayabliTTPEvent> _eventLog = [];
-  StreamSubscription<PayabliTTPEvent>? _eventSub;
+  final List<PayabliTTPSessionSnapshot> _stateLog = [];
+  StreamSubscription<PayabliTTPSessionSnapshot>? _stateSub;
   bool _configured = false;
   bool _isWorking = false;
   bool _isSubmittingPayIn = false;
@@ -71,7 +71,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   void dispose() {
-    _eventSub?.cancel();
+    _stateSub?.cancel();
     _amountController.dispose();
     _activationController.dispose();
     _cardNumberController.dispose();
@@ -101,7 +101,7 @@ class _HomeScreenState extends State<HomeScreen> {
         entryPoint: Secrets.entryPoint,
         environment: PayabliEnvironment.sandbox,
       );
-      _eventSub = PayabliTTP.events().listen(_onEvent);
+      _stateSub = PayabliTTP.sessionStates().listen(_onSessionState);
       setState(() => _configured = true);
     } catch (e) {
       setState(() => _lastResult = 'Configure failed: $e');
@@ -155,10 +155,11 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  void _onEvent(PayabliTTPEvent event) {
+  void _onSessionState(PayabliTTPSessionSnapshot snapshot) {
     setState(() {
-      _eventLog.insert(0, event);
-      if (_eventLog.length > 100) _eventLog.removeLast();
+      _state = snapshot.code;
+      _stateLog.insert(0, snapshot);
+      if (_stateLog.length > 100) _stateLog.removeLast();
     });
   }
 
@@ -322,27 +323,18 @@ class _HomeScreenState extends State<HomeScreen> {
           _section(
               'Last result', [Text(_lastResult.isEmpty ? '—' : _lastResult)]),
           const SizedBox(height: 16),
-          _section('Event log', [
-            if (_eventLog.isEmpty)
-              const Text('No events yet', style: TextStyle(color: Colors.grey))
+          _section('Session state log', [
+            if (_stateLog.isEmpty)
+              const Text('No changes yet', style: TextStyle(color: Colors.grey))
             else
-              ..._eventLog.map(
-                (e) => Padding(
+              ..._stateLog.map(
+                (s) => Padding(
                   padding: const EdgeInsets.symmetric(vertical: 4),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        e.code.name,
-                        style: const TextStyle(fontWeight: FontWeight.w600),
-                      ),
-                      if (e.payload.isNotEmpty)
-                        Text(
-                          e.payload.toString(),
-                          style:
-                              const TextStyle(fontSize: 12, color: Colors.grey),
-                        ),
-                    ],
+                  child: Text(
+                    s.chargeActivity == null
+                        ? s.code.name
+                        : '${s.code.name} · ${s.chargeActivity!.name}',
+                    style: const TextStyle(fontWeight: FontWeight.w600),
                   ),
                 ),
               ),

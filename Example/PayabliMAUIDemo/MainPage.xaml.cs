@@ -8,13 +8,13 @@ namespace PayabliMauiDemo;
 ///   - Initialize() — cold/warm App Attest + reader prepare.
 ///   - Charge(amount) — full sale pipeline (initiate → NFC tap → update).
 ///   - ActivateDevice(code) — pending-device activation.
-///   - addEventListener — live lifecycle event log.
+///   - AddSessionStateObserver — live session state log.
 /// </summary>
 public partial class MainPage : ContentPage
 {
     private PayabliTTP? _ttp;
     private PayabliPayInObjC? _payIn;
-    private PayabliTTPEventToken? _eventToken;
+    private TapToPaySessionStateObservation? _stateObservation;
     private bool _isWorking;
     private bool _isSubmittingPayIn;
 
@@ -96,13 +96,13 @@ public partial class MainPage : ContentPage
                 throw new System.Exception(payInError.LocalizedDescription);
             }
 
-            _eventToken = _ttp.AddEventListener((code, payload) =>
+            _stateObservation = ttp.AddSessionStateObserver(() =>
             {
-                MainThread.BeginInvokeOnMainThread(() =>
-                {
-                    var summary = payload.Count > 0 ? $" {payload}" : "";
-                    EventLog.Text = $"{code}{summary}\n{EventLog.Text}";
-                });
+                var activity = ttp.ChargeActivity is { } raw
+                    ? $" · {(TapToPayChargeActivity)raw.Int64Value}"
+                    : "";
+                StateLog.Text = $"{ttp.SessionState}{activity}\n{StateLog.Text}";
+                UpdateSessionBadge();
             });
 
             UpdateSessionBadge();
@@ -255,6 +255,8 @@ public partial class MainPage : ContentPage
             PayabliTTPSessionState.Reinitializing => "reinit",
             PayabliTTPSessionState.PendingActivation => "pending",
             PayabliTTPSessionState.Failed => "failed",
+            PayabliTTPSessionState.PendingTerms => "terms",
+            PayabliTTPSessionState.Charging => "charging",
             _ => "?",
         };
     }
@@ -288,7 +290,7 @@ public partial class MainPage : ContentPage
 
     protected override void OnDisappearing()
     {
-        _eventToken?.Cancel();
+        _stateObservation?.Cancel();
         base.OnDisappearing();
     }
 }

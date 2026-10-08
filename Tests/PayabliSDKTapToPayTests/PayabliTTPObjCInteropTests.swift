@@ -100,19 +100,6 @@ final class PayabliTTPObjCInteropTests: XCTestCase {
         XCTAssertEqual(objc.paymentTransId, "TXN-12345")
     }
 
-    // MARK: - PayabliTTPEventToken
-
-    func testEventTokenCancelIsIdempotent() {
-        let token = PayabliTTPEventToken(task: Task<Void, Never> {
-            try? await Task.sleep(nanoseconds: UInt64.max)
-        })
-
-        token.cancel()
-        token.cancel() // must not crash
-
-        XCTAssertTrue(token.task.isCancelled)
-    }
-
     // MARK: - PayabliTTPPaymentDetails
 
     func testPaymentDetailsSwiftDefaults() {

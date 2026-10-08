@@ -207,6 +207,6 @@ source tree, and the facade holds its provider directly.
 
 - `../TapToPayProvider.swift` — protocol
 - `../../Models/TapToPayCardRead.swift` — `CardReadRequest` / `CardReadResult`
-- `../PayabliTTPEvent.swift` — `PayabliTTPError` cases
+- `../PayabliTTPError.swift` — `PayabliTTPError` cases
 - `FiservCardReader.swift` + `FiservCardReader+Errors.swift` — reference implementation
 - PRD §7.2 (directory layout), FR-11A (provider abstraction), FR-11B (Fiserv), NFR-5D (runtime-only credentials)

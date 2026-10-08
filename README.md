@@ -316,7 +316,7 @@ and [Tap to Pay](Sources/PayabliSDKTapToPay/README.md#outcomes-and-errors).
 | Guide | Covers |
 |---|---|
 | [Card-not-present](Sources/PayabliSDKPayIn/README.md) | The form, the direct API, stored methods, authorize and capture, void, configuration and styling |
-| [Tap to Pay](Sources/PayabliSDKTapToPay/README.md) | Entitlements, authorized apps, activation, Apple's terms, states, events and errors |
+| [Tap to Pay](Sources/PayabliSDKTapToPay/README.md) | Entitlements, authorized apps, activation, Apple's terms, states and errors |
 | [`Documentation/PayInIntegrationGuide.md`](Documentation/PayInIntegrationGuide.md) and [`PayInOverview.md`](Documentation/PayInOverview.md) | Every card-not-present configuration and styling option |
 | [Sample app](Example/PayabliDemo/) | Running both ways to pay against your sandbox paypoint |
 | [Payabli developer documentation](https://docs.payabli.com/guides/mobile-components-overview) | The API, OAuth, test accounts and the portal |

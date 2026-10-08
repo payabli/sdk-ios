@@ -52,43 +52,7 @@ namespace Payabli.TapToPay
         PendingActivation = 7,
         Failed = 8,
         PendingTerms = 9,
-    }
-
-    // MARK: - PayabliTTPEventCode
-
-    [Native]
-    public enum PayabliTTPEventCode : long
-    {
-        AttestationStarted = 0,
-        AttestationCompleted = 1,
-        ConfigReceived = 2,
-        ReaderInitializing = 3,
-        ReaderReady = 4,
-        ChargeInitiated = 5,
-        NfcStarted = 6,
-        NfcCompleted = 7,
-        NfcFailed = 8,
-        UpdateCompleted = 9,
-        UpdateFailed = 10,
-        SessionExpired = 11,
-        ReinitializeStarted = 12,
-        ReinitializeCompleted = 13,
-        DevicePendingActivation = 14,
-        ActivationStarted = 15,
-        ActivationCompleted = 16,
-        ActivationFailed = 17,
-        AttestationFailed = 18,
-        ConfigFailed = 19,
-        TermsRequired = 20,
-        // 21 retired: progress is a payload on the session state. Not reused,
-        // because consumers resolve this package from source against main.
-        ReaderNotReady = 22,
-        CardDetected = 23,
-        CardRemovalRequested = 24,
-        CardReadRetryRequested = 25,
-        PinEntryRequested = 26,
-        PinEntryCompleted = 27,
-        ReaderPromptDismissed = 28,
+        Charging = 10,
     }
 
     // MARK: - Completion delegates
@@ -120,10 +84,7 @@ namespace Payabli.TapToPay
         [NullAllowed] NSError error
     );
 
-    public delegate void PayabliTTPEventHandler(
-        PayabliTTPEventCode code,
-        NSDictionary payload
-    );
+    public delegate void TapToPaySessionStateHandler();
 
     public delegate void PayabliPayInCompletion(
         [NullAllowed] PayabliPayInStoredPaymentMethodObjC result,
@@ -225,11 +186,11 @@ namespace Payabli.TapToPay
         [Export("paymentTransId")] string PaymentTransId { get; }
     }
 
-    // MARK: - PayabliTTPEventToken (returned by addEventListener)
+    // MARK: - TapToPaySessionStateObservation (returned by addSessionStateObserver)
 
     [BaseType(typeof(NSObject))]
     [DisableDefaultCtor]
-    public interface PayabliTTPEventToken
+    public interface TapToPaySessionStateObservation
     {
         [Export("cancel")] void Cancel();
     }
@@ -310,15 +271,16 @@ namespace Payabli.TapToPay
 
         [NullAllowed, Export("failureReason")] NSNumber FailureReason { get; }
 
+        // A TapToPayChargeActivity raw value, null when no charge runs.
+        [NullAllowed, Export("chargeActivity")] NSNumber ChargeActivity { get; }
+
         [NullAllowed, Export("activationId")] string ActivationId { get; }
         [Export("isReady")] bool IsReady { get; }
 
-        // Event subscription. The returned token's Cancel() tears down the
-        // underlying Task so the handler stops receiving events. The handler
-        // is always invoked on the main thread.
-
-        [Export("addEventListenerWithHandler:")]
-        PayabliTTPEventToken AddEventListener(PayabliTTPEventHandler handler);
+        // Called on the main thread after every session state change; read the state from this
+        // facade. Cancel() on the returned observation stops the calls.
+        [Export("addSessionStateObserver:")]
+        TapToPaySessionStateObservation AddSessionStateObserver(TapToPaySessionStateHandler handler);
     }
 
     // MARK: - PayIn Payment Flow

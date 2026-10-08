@@ -43,7 +43,7 @@ final class StepStatusTests: XCTestCase {
         )
         // The list below is a literal, so an appended state leaves both sides of
         // that count unchanged. The next raw value is what forces it to move.
-        XCTAssertNil(PayabliTTPSessionStateCode(rawValue: 10))
+        XCTAssertNil(PayabliTTPSessionStateCode(rawValue: 11))
         for status in everyTapToPayStatus {
             if case let .unrecognised(raw) = status {
                 XCTFail("the app does not name the SDK state with raw value \(raw)")
@@ -65,7 +65,8 @@ let everyTapToPaySession: [PayabliTTPSessionState] = [
     .reinitializing,
     .pendingActivation(activationId: "dev"),
     .failed(reason: .sdkInternalError),
-    .pendingTerms
+    .pendingTerms,
+    .charging(activity: .opening)
 ]
 
 /// The same states as this app names them.

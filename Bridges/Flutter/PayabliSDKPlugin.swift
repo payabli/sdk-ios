@@ -11,9 +11,9 @@ import UIKit
 /// Two channels:
 ///   - `com.payabli.sdk` (`MethodChannel`): request/response RPC for every call,
 ///     Tap to Pay, payment flow and session alike.
-///   - `com.payabli.sdk/events` (`EventChannel`): one-way stream of
-///     lifecycle events (`PayabliTTPEvent`) flattened to
-///     `{"code": Int, "payload": [String: Any]}` per event.
+///   - `com.payabli.sdk/events` (`EventChannel`): one-way stream of session
+///     state snapshots, the same map `getSessionState` returns, sent after
+///     every change of `PayabliTTP.sessionState`.
 ///
 /// **Authentication model:** the Dart side fetches the access token from its
 /// own backend and passes it in via the `configure` channel call. When the
@@ -28,7 +28,7 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
     private let eventSink = EventSinkBox()
 
     private var ttp: PayabliTTP?
-    private var eventToken: PayabliTTPEventToken?
+    private var sessionStateObservation: TapToPaySessionStateObservation?
     private var payIn: PayabliPayIn?
 
     /// The plugin whose configure last succeeded. The session outlives an engine, so its token
@@ -138,7 +138,7 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
             // Constructed before anything is torn down: the initialiser rejects an
             // access token that cannot be sent as a header and an empty entry point,
             // both of which arrive from the Dart side. A configure() that fails leaves
-            // the previous facade and its event subscription exactly as they were.
+            // the previous facade and its state observation exactly as they were.
             let ttp: PayabliTTP
             do {
                 try await PayabliSession.initialize(config: PayabliConfig(
@@ -152,11 +152,11 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
                 return
             }
 
-            // Only now is the previous subscription dropped, so it does not leak.
-            self.eventToken?.cancel()
-            self.eventToken = nil
+            // Only now is the previous observation dropped, so it does not leak.
+            self.sessionStateObservation?.cancel()
+            self.sessionStateObservation = nil
             self.ttp = ttp
-            self.subscribeEvents(on: ttp)
+            self.observeSessionState(on: ttp)
             self.becomeLive()
             result(nil)
         }
@@ -343,14 +343,18 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
 
     private func handleGetSessionState(result: @escaping FlutterResult) {
         Task { @MainActor in
-            let state = self.ttp?.sessionState ?? .idle
-            result([
-                "code": state.code.rawValue,
-                "readerConfigurationPercent": state.readerConfigurationPercent as Any,
-                "failureReason": state.failureReason?.rawValue as Any,
-                "activationId": state.activationId as Any
-            ])
+            result(Self.sessionSnapshot(self.ttp?.sessionState ?? .idle))
         }
+    }
+
+    private static func sessionSnapshot(_ state: PayabliTTPSessionState) -> [String: Any] {
+        [
+            "code": state.code.rawValue,
+            "readerConfigurationPercent": state.readerConfigurationPercent as Any,
+            "failureReason": state.failureReason?.rawValue as Any,
+            "activationId": state.activationId as Any,
+            "chargeActivity": state.chargeActivity?.rawValue as Any
+        ]
     }
 
     // MARK: - PayIn payment flow
@@ -480,20 +484,17 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
         )
     }
 
-    // MARK: - Event subscription
+    // MARK: - Session state observation
 
     @MainActor
-    private func subscribeEvents(on ttp: PayabliTTP) {
+    private func observeSessionState(on ttp: PayabliTTP) {
         let sinkBox = self.eventSink
-        eventToken = ttp.addEventListener { code, payload in
-            // payload is `[String: Any]`; force-cast keys for the Flutter
-            // wire format. All known PayabliTTPEvent payloads use `String`
-            // values.
-            let safePayload = (payload as? [String: Any]) ?? [:]
-            sinkBox.send([
-                "code": code.rawValue,
-                "payload": safePayload
-            ])
+        sessionStateObservation = ttp.addSessionStateObserver { [weak ttp] in
+            // The SDK calls observers on the main thread.
+            MainActor.assumeIsolated {
+                guard let ttp else { return }
+                sinkBox.send(Self.sessionSnapshot(ttp.sessionState))
+            }
         }
     }
 
@@ -591,7 +592,7 @@ extension PayabliSDKPlugin: FlutterStreamHandler {
 
 /// Thread-safe holder for the current `FlutterEventSink`. Allows the plugin
 /// to attach/detach sinks (Flutter cancels the stream when the Dart listener
-/// goes away) without dropping incoming SDK events.
+/// goes away) without dropping incoming session state snapshots.
 private final class EventSinkBox {
     private var sink: FlutterEventSink?
     private let queue = DispatchQueue(label: "com.payabli.sdk.flutter.eventsink")

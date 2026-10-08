@@ -16,7 +16,7 @@ const EventChannel _payabliEventChannel = EventChannel(
 ///   - `com.payabli.sdk` (`MethodChannel`): RPC for every call, Tap to Pay,
 ///     payment flow and session alike.
 ///   - `com.payabli.sdk/events` (`EventChannel`): one-way stream of
-///     [PayabliTTPEvent]s mirroring `PayabliTTPEvent.code` + `payload`.
+///     [PayabliTTPSessionSnapshot]s, one after every change of the session state.
 ///
 /// ## Authentication
 ///
@@ -36,7 +36,7 @@ class PayabliTTP {
   PayabliTTP._();
 
   static Future<String> Function()? _tokenRefresh;
-  static Stream<PayabliTTPEvent>? _eventsStream;
+  static Stream<PayabliTTPSessionSnapshot>? _sessionStatesStream;
 
   // MARK: - configure
 
@@ -172,30 +172,19 @@ class PayabliTTP {
     final raw = await _payabliMethodChannel.invokeMethod<Map<dynamic, dynamic>>(
       'getSessionState',
     );
-    final code = (raw?['code'] as int?) ?? 0;
-    final reason = raw?['failureReason'] as int?;
-    return PayabliTTPSessionSnapshot(
-      code: code < PayabliTTPSessionState.values.length
-          ? PayabliTTPSessionState.values[code]
-          : PayabliTTPSessionState.idle,
-      readerConfigurationPercent: raw?['readerConfigurationPercent'] as int?,
-      failureReason: reason == null
-          ? null
-          : PayabliTTPFailureReason.values[reason],
-      activationId: raw?['activationId'] as String?,
-    );
+    return _decodeSnapshot(raw);
   }
 
-  // MARK: - events
+  // MARK: - sessionStates
 
-  /// Returns the broadcast stream of lifecycle events. Multiple listeners
-  /// each see all subsequent events.
-  static Stream<PayabliTTPEvent> events() {
-    _eventsStream ??= _payabliEventChannel
+  /// Broadcast stream of the session state, sent after every change, including
+  /// a move from one [TapToPayChargeActivity] to another while charging.
+  static Stream<PayabliTTPSessionSnapshot> sessionStates() {
+    _sessionStatesStream ??= _payabliEventChannel
         .receiveBroadcastStream()
-        .map(_decodeEvent)
+        .map(_decodeSnapshot)
         .asBroadcastStream();
-    return _eventsStream!;
+    return _sessionStatesStream!;
   }
 
   // MARK: - Internals
@@ -214,17 +203,26 @@ class PayabliTTP {
     return null;
   }
 
-  static PayabliTTPEvent _decodeEvent(dynamic raw) {
-    final map = (raw as Map?)?.cast<String, dynamic>() ?? const {};
-    final codeRaw = (map['code'] as int?) ?? 0;
-    final payload =
-        (map['payload'] as Map?)?.cast<String, dynamic>() ?? const {};
-    final known = codeRaw >= 0 && codeRaw < PayabliTTPEventCode.unknown.index;
-    return PayabliTTPEvent(
-      code: known
-          ? PayabliTTPEventCode.values[codeRaw]
-          : PayabliTTPEventCode.unknown,
-      payload: payload,
+  static PayabliTTPSessionSnapshot _decodeSnapshot(dynamic raw) {
+    final map = raw as Map?;
+    final code = (map?['code'] as int?) ?? 0;
+    final reason = map?['failureReason'] as int?;
+    final activity = map?['chargeActivity'] as int?;
+    return PayabliTTPSessionSnapshot(
+      code: code >= 0 && code < PayabliTTPSessionState.values.length
+          ? PayabliTTPSessionState.values[code]
+          : PayabliTTPSessionState.idle,
+      readerConfigurationPercent: map?['readerConfigurationPercent'] as int?,
+      failureReason: reason == null
+          ? null
+          : PayabliTTPFailureReason.values[reason],
+      activationId: map?['activationId'] as String?,
+      chargeActivity:
+          activity != null &&
+              activity >= 0 &&
+              activity < TapToPayChargeActivity.values.length
+          ? TapToPayChargeActivity.values[activity]
+          : null,
     );
   }
 }
@@ -397,6 +395,7 @@ class PayabliTTPSessionSnapshot {
     this.readerConfigurationPercent,
     this.failureReason,
     this.activationId,
+    this.chargeActivity,
   });
 
   final PayabliTTPSessionState code;
@@ -406,6 +405,10 @@ class PayabliTTPSessionSnapshot {
   /// The id the activation route's `deviceId` field takes, or `null` when no
   /// activation is owed.
   final String? activationId;
+
+  /// What the running charge is doing, or `null` outside
+  /// [PayabliTTPSessionState.charging].
+  final TapToPayChargeActivity? chargeActivity;
 }
 
 /// Mirrors `PayabliTTPFailureReason`.
@@ -429,62 +432,20 @@ enum PayabliTTPSessionState {
   pendingActivation,
   failed,
   pendingTerms,
+  charging,
 }
 
-/// Mirrors `PayabliTTPEventCode` (raw indices match the @objc Int enum).
-enum PayabliTTPEventCode {
-  attestationStarted,
-  attestationCompleted,
-  configReceived,
-  readerInitializing,
-  readerReady,
-  chargeInitiated,
-  nfcStarted,
-  nfcCompleted,
-  nfcFailed,
-  updateCompleted,
-  updateFailed,
-  sessionExpired,
-  reinitializeStarted,
-  reinitializeCompleted,
-  devicePendingActivation,
-  activationStarted,
-  activationCompleted,
-  activationFailed,
-  attestationFailed,
-  configFailed,
-  termsRequired,
-  // 21 was readerConfigurationProgressChanged. Progress is a payload on the
-  // session state now. This list is read by index, and the value is retired
-  // rather than reused: consumers resolve from source against main.
-  readerConfigurationProgressRetired,
-  readerNotReady,
+/// Mirrors `TapToPayChargeActivity` (raw indices match the native Int enum).
+enum TapToPayChargeActivity {
+  opening,
+  waitingForCard,
+  closing,
   cardDetected,
   cardRemovalRequested,
   cardReadRetryRequested,
   pinEntryRequested,
   pinEntryCompleted,
   readerPromptDismissed,
-
-  /// A code this mirror has not been taught yet. The SDK appends cases, and a
-  /// bridge that indexes blindly turns a newer SDK into a crash.
-  unknown,
-}
-
-/// One lifecycle event emitted by [PayabliTTP.events]. Use [code] for
-/// pattern matching and [payload] for the case-specific data (see
-/// `PayabliTTPEvent.payload` in the native module for the schema).
-class PayabliTTPEvent {
-  const PayabliTTPEvent({required this.code, required this.payload});
-
-  final PayabliTTPEventCode code;
-  final Map<String, dynamic> payload;
-
-  String? get paymentTransId => payload['paymentTransId'] as String?;
-  String? get error => payload['error'] as String?;
-
-  @override
-  String toString() => 'PayabliTTPEvent($code, $payload)';
 }
 
 /// Customer information forwarded to the charge pipeline. Mirrors

@@ -3,9 +3,8 @@ import PayabliSDKCore
 
 /// Tap to Pay on iPhone facade.
 ///
-/// Exposes the session lifecycle, one-call `initialize()` / `charge()`,
-/// device activation, pending-update sync, and event stream multicasting.
-/// See PRD §19.1.
+/// Exposes the session lifecycle, one-call `initialize()` / `charge()` and
+/// device activation. See PRD §19.1.
 ///
 /// ```swift
 /// try await PayabliSession.initialize(config: PayabliConfig(
@@ -33,9 +32,9 @@ import PayabliSDKCore
 /// MAUI/Xamarin (via sharpie-generated bindings), Flutter, and React Native.
 /// Each Swift `async throws` method has a callback-based `@objc` companion
 /// in the same file — see the `+Initialize`, `+Charge`, and `+Activation`
-/// extensions. Existing Swift consumers continue to use the unchanged
-/// `async throws` API, `AsyncStream<PayabliTTPEvent>` events, and value-type
-/// `struct`s. See `README.md` for the bilingual contract.
+/// extensions. Swift consumers use the `async throws` API, the published
+/// ``sessionState`` and value-type `struct`s. See `README.md` for the
+/// bilingual contract.
 @objc(PayabliTTP)
 @MainActor
 public final class PayabliTTP: NSObject, ObservableObject {
@@ -46,7 +45,6 @@ public final class PayabliTTP: NSObject, ObservableObject {
 
     let provider: TapToPayProvider
     let attestation: DeviceAttestationService
-    let multicaster = TTPEventMulticaster()
     let retryPolicy: RetryPolicy
     let logger = PayabliLogger(category: .taptopay)
 
@@ -65,7 +63,7 @@ public final class PayabliTTP: NSObject, ObservableObject {
 
     /// The configuration currently running, or `nil` when none is. A reader's
     /// event handler outlives the configuration that installed it, so progress
-    /// is announced only while its own configuration is still this one.
+    /// is recorded only while its own configuration is still this one.
     ///
     /// Separate from `readerSessionGeneration`, which bumps only when a reader
     /// comes up: a percentage raised after a configuration failed would still
@@ -83,6 +81,9 @@ public final class PayabliTTP: NSObject, ObservableObject {
     /// Identifies a setup so it only clears the slot while it is still the
     /// current one.
     var nextSessionSetupID = 0
+
+    /// Told every time ``sessionState`` changes.
+    private var sessionStateObservations: [TapToPaySessionStateObservation] = []
 
     // MARK: - Published state
 
@@ -104,6 +105,12 @@ public final class PayabliTTP: NSObject, ObservableObject {
     /// is running. `NSNumber` because ObjC has no optional `Int`.
     @objc public var readerConfigurationPercent: NSNumber? {
         sessionState.readerConfigurationPercent.map(NSNumber.init(value:))
+    }
+
+    /// What the running charge is doing, as a ``TapToPayChargeActivity`` raw
+    /// value, or `nil` when no charge is running.
+    @objc public var chargeActivity: NSNumber? {
+        sessionState.chargeActivity.map { NSNumber(value: $0.rawValue) }
     }
 
     /// Why the session failed, or `nil` when it has not.
@@ -164,67 +171,69 @@ public final class PayabliTTP: NSObject, ObservableObject {
         }
     #endif
 
-    // MARK: - Events
-
-    /// Returns a fresh event stream. Multiple callers each receive all
-    /// subsequent events (PRD §19.1 multicasting).
-    public nonisolated func events() -> AsyncStream<PayabliTTPEvent> {
-        multicaster.stream()
-    }
-
     // MARK: - Shared helpers (extensions)
 
     /// Re-publishes `sessionState` / `isReady` from `sessionManager`.
     /// Called from every extension after a session transition.
     func syncPublished() {
+        let changed = sessionState != sessionManager.sessionState
         sessionState = sessionManager.sessionState
         isReady = sessionManager.isReady
+        guard changed else { return }
+        sessionStateObservations.removeAll { $0.isCancelled }
+        for observation in sessionStateObservations {
+            observation.notify()
+        }
     }
 
-    // MARK: - ObjC event listener
+    // MARK: - ObjC state observation
 
-    /// Subscribes a callback to the `events()` stream — the ObjC / MAUI
-    /// counterpart to iterating `for await event in ttp.events()` in Swift.
+    /// Calls `handler` on the main thread after every change to ``sessionState``,
+    /// including a move from one ``TapToPayChargeActivity`` to another. The
+    /// handler carries nothing: it reads ``sessionStateCode`` and the payload
+    /// accessors, which already hold the new state when it runs.
     ///
-    /// The handler is invoked on the main thread (the entire `PayabliTTP`
-    /// surface is `@MainActor`). Each event is delivered as a
-    /// `(PayabliTTPEventCode, NSDictionary)` pair: `code` identifies the
-    /// case, and the dictionary carries the case's associated values
-    /// (`paymentTransId`, `error`) — empty for cases without payload. See
-    /// `PayabliTTPEvent.payload` for the per-case schema.
-    ///
-    /// The returned `PayabliTTPEventToken` owns the underlying `Task`. Call
-    /// `cancel()` to stop receiving events; otherwise the listener lives
-    /// for the lifetime of the `PayabliTTP` instance.
-    @objc public func addEventListener(
-        handler: @escaping (PayabliTTPEventCode, NSDictionary) -> Void
-    ) -> PayabliTTPEventToken {
-        let stream = self.events()
-        let task = Task { @MainActor in
-            for await event in stream {
-                handler(event.code, event.payload as NSDictionary)
-            }
-        }
-        return PayabliTTPEventToken(task: task)
+    /// Observing lasts until ``TapToPaySessionStateObservation/cancel()`` or for
+    /// the lifetime of this instance.
+    @objc public func addSessionStateObserver(
+        _ handler: @escaping () -> Void
+    ) -> TapToPaySessionStateObservation {
+        let observation = TapToPaySessionStateObservation(handler: handler)
+        sessionStateObservations.append(observation)
+        return observation
     }
 }
 
-// MARK: - ObjC event token
+// MARK: - ObjC state observation handle
 
-/// Opaque handle returned by `PayabliTTP.addEventListener(handler:)`. Holds
-/// the underlying `Task` that drains the `AsyncStream<PayabliTTPEvent>` and
-/// dispatches to the ObjC callback. Call `cancel()` to tear it down.
-@objc(PayabliTTPEventToken)
-public final class PayabliTTPEventToken: NSObject {
-    let task: Task<Void, Never>
+/// Returned by ``PayabliTTP/addSessionStateObserver(_:)``.
+@objc(TapToPaySessionStateObservation)
+public final class TapToPaySessionStateObservation: NSObject, @unchecked Sendable {
+    private let lock = NSLock()
+    private var handler: (() -> Void)?
 
-    init(task: Task<Void, Never>) {
-        self.task = task
+    init(handler: @escaping () -> Void) {
+        self.handler = handler
         super.init()
     }
 
-    /// Cancels the underlying task. Idempotent.
+    /// Stops the handler being called. Safe from any thread, and idempotent.
     @objc public func cancel() {
-        task.cancel()
+        lock.lock()
+        handler = nil
+        lock.unlock()
+    }
+
+    var isCancelled: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return handler == nil
+    }
+
+    func notify() {
+        lock.lock()
+        let handler = self.handler
+        lock.unlock()
+        handler?()
     }
 }

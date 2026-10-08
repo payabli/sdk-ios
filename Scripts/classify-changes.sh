@@ -149,7 +149,7 @@ trap 'rm -rf "$WORK"' EXIT
 #
 # Searching changed lines for the word `public` finds a minority of the surface.
 # An enum's cases carry the enum's visibility and name it nowhere, so all of
-# `PayabliTTPEvent` is invisible to that search; so is `activateDevice`, a member
+# `PayabliTTPFailureReason` is invisible to that search; so is `activateDevice`, a member
 # of a `public extension` that needs no keyword of its own. Swift's default
 # differs by container, so the container is what gets tracked:
 #

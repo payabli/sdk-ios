@@ -4,9 +4,8 @@ import Foundation
 ///
 /// An adapter converts its platform's event stream into this, so nothing above
 /// the adapter speaks a vendor's vocabulary. A platform case with no member
-/// here is dropped rather than added: the facade already announces the start,
-/// the completion and the failure of a read, and a second announcement of one
-/// of those would reach a host twice.
+/// here is dropped: the start, the completion and the failure of a read reach
+/// a host through the charge itself.
 package enum TapToPayReaderEvent: Sendable, Equatable {
     /// How far a reader configuration has got, as a percentage.
     ///
