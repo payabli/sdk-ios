@@ -1,6 +1,7 @@
 import CryptoKit
 import Foundation
 import PayabliSDKCore
+import Security
 
 // MARK: - AppAttestService
 
@@ -198,9 +199,10 @@ package final class AppAttestService: DeviceAttestationService, @unchecked Senda
     /// Runs a store operation and reports a failure as this SDK's own error.
     ///
     /// A `KeychainError` carries another domain the ObjC, MAUI, Flutter and React
-    /// Native bridges all report as a bare failure. A Keychain status is storage that
-    /// did not answer, which every read and write meets before the first unlock after
-    /// a boot; anything else the store raises is this SDK's own.
+    /// Native bridges all report as a bare failure, so a status is reported by what
+    /// repairs it: a missing entitlement is the app's configuration, an invalid
+    /// parameter is this SDK's own query, and any other status is storage that did not
+    /// answer, as every read and write meets before the first unlock after a boot.
     private func reportingStorageFailure<T>(_ work: () throws -> T) throws -> T {
         do {
             return try work()
@@ -209,11 +211,7 @@ package final class AppAttestService: DeviceAttestationService, @unchecked Senda
         } catch let error as TapToPayError {
             throw error
         } catch let KeychainStorage.KeychainError.underlying(status) {
-            throw TapToPayError(
-                type: .deviceKeyUnavailable,
-                reason: "The device's secure storage did not answer",
-                detail: "OSStatus \(status)"
-            )
+            throw Self.storageError(status: status)
         } catch {
             throw TapToPayError(
                 type: .sdkInternalError,
@@ -253,6 +251,29 @@ package final class AppAttestService: DeviceAttestationService, @unchecked Senda
     ///
     /// Raises rather than sending a blank one, which is what an app with no bundle
     /// identifier produces.
+    private static func storageError(status: OSStatus) -> TapToPayError {
+        switch status {
+        case errSecMissingEntitlement:
+            TapToPayError(
+                type: .deviceSetupNotConfigured,
+                reason: "The app lacks the entitlement its Keychain items need",
+                detail: "OSStatus \(status)"
+            )
+        case errSecParam:
+            TapToPayError(
+                type: .sdkInternalError,
+                reason: "The SDK asked the Keychain with an invalid parameter",
+                detail: "OSStatus \(status)"
+            )
+        default:
+            TapToPayError(
+                type: .deviceKeyUnavailable,
+                reason: "The device's secure storage did not answer",
+                detail: "OSStatus \(status)"
+            )
+        }
+    }
+
     func hardwareId() throws -> String {
         let hardwareId = try reportingStorageFailure { try hardwareIdProvider() }
         guard !hardwareId.isEmpty else {

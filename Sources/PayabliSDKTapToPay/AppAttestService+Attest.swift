@@ -210,8 +210,9 @@ extension AppAttestService {
         }
     }
 
-    /// Runs one App Attest call made while setting the device up. A refusal that is not a
-    /// `deviceSetupError` is this SDK's own: the key was minted or attested as App Attest asks.
+    /// Runs one App Attest call made while setting the device up. Any other DeviceCheck refusal
+    /// discards the key, as Apple asks, and the pending key is already gone, so setting up again
+    /// makes a new one. A refusal from outside DeviceCheck is this SDK's own.
     func settingUp<Value>(_ call: String, _ work: () async throws -> Value) async throws -> Value {
         do {
             return try await work()
@@ -225,7 +226,7 @@ extension AppAttestService {
             }
             let nsError = error as NSError
             throw TapToPayError(
-                type: .sdkInternalError,
+                type: nsError.domain == Self.deviceCheckErrorDomain ? .deviceSetupRequired : .sdkInternalError,
                 reason: "App Attest refused \(call)",
                 detail: "\(nsError.domain) \(nsError.code)"
             )

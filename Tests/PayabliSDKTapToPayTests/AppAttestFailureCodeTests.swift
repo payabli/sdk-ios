@@ -18,7 +18,9 @@ final class AppAttestFailureCodeTests: XCTestCase {
         let cases: [(Error, PayabliErrorType)] = [
             (deviceCheck(1), .deviceSetupUnsupported),
             (deviceCheck(4), .deviceSetupUnavailable),
-            (deviceCheck(0), .sdkInternalError),
+            (deviceCheck(0), .deviceSetupRequired),
+            (deviceCheck(2), .deviceSetupRequired),
+            (deviceCheck(3), .deviceSetupRequired),
             (NSError(domain: NSOSStatusErrorDomain, code: -1), .sdkInternalError)
         ]
         for (failure, expected) in cases {
@@ -34,7 +36,10 @@ final class AppAttestFailureCodeTests: XCTestCase {
         let cases: [(Error, PayabliErrorType)] = [
             (deviceCheck(1), .deviceSetupUnsupported),
             (deviceCheck(4), .deviceSetupUnavailable),
-            (deviceCheck(3), .sdkInternalError)
+            (deviceCheck(0), .deviceSetupRequired),
+            (deviceCheck(2), .deviceSetupRequired),
+            (deviceCheck(3), .deviceSetupRequired),
+            (NSError(domain: NSOSStatusErrorDomain, code: -1), .sdkInternalError)
         ]
         for (failure, expected) in cases {
             stubChallengeAndRegister()
@@ -80,6 +85,26 @@ final class AppAttestFailureCodeTests: XCTestCase {
         storage.refusesWrites = false
         XCTAssertEqual(try sut.binding(for: "held")?.deviceId, "d0", "the refused write changed the store")
         XCTAssertNil(try sut.binding(for: "e"), "the refused write was kept")
+    }
+
+    /// A Keychain status is reported by what repairs it: a missing entitlement is the app's
+    /// configuration, an invalid parameter is this SDK's own query, and the rest is storage that did
+    /// not answer.
+    func testAKeychainStatusIsReportedByWhatRepairsIt() throws {
+        let cases: [(OSStatus, PayabliErrorType)] = [
+            (errSecInteractionNotAllowed, .deviceKeyUnavailable),
+            (errSecMissingEntitlement, .deviceSetupNotConfigured),
+            (errSecParam, .sdkInternalError)
+        ]
+        for (status, expected) in cases {
+            let storage = InMemorySecureStorage()
+            storage.readFailure = KeychainStorage.KeychainError.underlying(status)
+            let (sut, _, _) = try AttestFixture.makeService(storage: storage)
+
+            XCTAssertThrowsError(try sut.binding(for: "myEntry")) { error in
+                XCTAssertEqual((error as? TapToPayError)?.type, expected, "status \(status): \(error)")
+            }
+        }
     }
 
     /// A store failure the Keychain did not report is this SDK's own.
