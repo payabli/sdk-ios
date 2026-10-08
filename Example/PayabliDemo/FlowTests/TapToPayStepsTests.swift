@@ -456,10 +456,18 @@ final class TapToPayStepsTests: XCTestCase {
         XCTAssertEqual(sequence.nextAction, .enterActivationCode)
     }
 
+    func testADeviceThatMustBeSetUpAgainIsOfferedAFreshAttestation() {
+        // The session lands `.error`, and only a cold attestation repairs it.
+        let sequence = TapToPaySteps.forCharging(
+            tokenCheck: .reachable, session: .error, activation: .deviceSetupRequired
+        )
+        XCTAssertEqual(sequence.recovery, .sessionErrored)
+        XCTAssertEqual(sequence.nextAction, .reattest)
+    }
+
     func testARecordedActivationFailureStaysQuietUntilTheSequenceReachesActivation() {
         // Stale here: the terminal is starting, so the outcome describes a
-        // session that is gone. `.idle` is not stale and is covered separately —
-        // it is the state a revoked attestation leaves behind.
+        // session that is gone.
         let sequence = TapToPaySteps.forCharging(
             tokenCheck: .reachable, session: .attestingDevice, activation: .activationFailed
         )
