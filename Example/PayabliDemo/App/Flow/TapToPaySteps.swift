@@ -262,6 +262,9 @@ enum TapToPaySteps {
         // reason and the retry are rendered. Expiry is not activation's
         // doing, so a stale outcome does not move it.
         case .error: return outcome == .activationFailed ? .done : .failed
+        // Nothing the setup does repairs it, so the step reports the reason and is
+        // retried from its own row once someone has changed what it names.
+        case .refused: return .failed
         case .sessionExpired: return .failed
         // A recorded activation failure at `.idle` is one whose session was
         // reset rather than marked, and re-attesting from scratch is this

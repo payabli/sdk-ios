@@ -1,3 +1,4 @@
+import PayabliSDKTapToPay
 import XCTest
 
 /// The Tap to Pay sequence, over every combination it can be asked for.
@@ -454,6 +455,24 @@ final class TapToPayStepsTests: XCTestCase {
         // The session is still the one state `activateDevice` accepts, so the
         // reason comes with another go rather than a dead end.
         XCTAssertEqual(sequence.nextAction, .enterActivationCode)
+    }
+
+    /// A reason no setup repairs is shown with a retry of the enable step, never the full setup, which
+    /// would drop a binding the device still holds.
+    func testASessionRefusedForGoodIsNotOfferedTheFullSetup() {
+        for reason in [PayabliTTPFailureReason.deviceIneligible, .configurationRejected, .sdkInternalError] {
+            let session = TapToPaySessionStatus(.failed(reason: reason))
+            XCTAssertEqual(session, .refused, "\(reason)")
+            for outcome in [TapToPayActivationOutcome.none, .activationFailed] {
+                let sequence = TapToPaySteps.forCharging(tokenCheck: .reachable, session: session, activation: outcome)
+                XCTAssertNil(sequence.recovery, "\(reason) \(outcome)")
+                XCTAssertEqual(sequence.enable.status, .failed, "\(reason) \(outcome)")
+                XCTAssertEqual(sequence.nextAction, .enableTerminal, "\(reason) \(outcome)")
+            }
+        }
+        for reason in [PayabliTTPFailureReason.deviceSetupRequired, .serviceUnavailable, .deviceKeyUnavailable] {
+            XCTAssertEqual(TapToPaySessionStatus(.failed(reason: reason)), .error, "\(reason)")
+        }
     }
 
     func testADeviceThatMustBeSetUpAgainIsOfferedAFreshAttestation() {
