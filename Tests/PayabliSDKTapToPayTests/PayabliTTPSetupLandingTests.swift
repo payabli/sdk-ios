@@ -77,6 +77,30 @@ final class PayabliTTPSetupLandingTests: XCTestCase {
         }
     }
 
+    /// A setup failure met while activating, outside the signature, lands by its code as well: a
+    /// store that cannot be read is not repaired by an activation code.
+    func testASetupFailureWhileActivatingLandsByItsCode() async throws {
+        let cases: [(PayabliErrorType, PayabliTTPSessionState)] = [
+            (.deviceKeyUnavailable, .failed(reason: .deviceKeyUnavailable)),
+            (.deviceSetupNotConfigured, .failed(reason: .configurationRejected)),
+            (.sdkInternalError, .failed(reason: .sdkInternalError))
+        ]
+        for (type, expected) in cases {
+            let (ttp, _, attestation) = try makeTTP()
+            attestation.pendingRegistration = "dev_e"
+            _ = try? await ttp.initialize()
+            attestation.activationResult = .failure(TapToPayError(type: type, reason: "x", detail: nil))
+
+            do {
+                try await ttp.activateDevice(activationCode: "123456")
+                XCTFail("activation succeeded past \(type)")
+            } catch {
+                XCTAssertEqual((error as? TapToPayError)?.type, type, "\(type): \(error)")
+            }
+            XCTAssertEqual(ttp.sessionState, expected, "\(type)")
+        }
+    }
+
     /// A withdrawn setup is asked again, which is safe.
     func testAWithdrawnSetupLandsOnIdle() async throws {
         let (ttp, _, attestation) = try makeTTP()
