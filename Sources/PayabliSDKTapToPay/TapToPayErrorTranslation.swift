@@ -12,6 +12,8 @@ enum TapToPayErrorTranslation {
             return error
         case let error as TapToPayError:
             return error
+        case let refusal as ActivationRefusal:
+            return refusal.hostError
         case let error as PayabliTTPError:
             let type = catalogType(of: error)
             return TapToPayError(
