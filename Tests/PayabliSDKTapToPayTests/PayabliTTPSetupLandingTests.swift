@@ -47,6 +47,30 @@ final class PayabliTTPSetupLandingTests: XCTestCase {
         XCTAssertEqual(ttp.sessionState, .idle)
     }
 
+    /// A device the service no longer recognises during activation is set up again, the same answer
+    /// `initialize` gives.
+    func testActivationRefusedForASetupThatEndedLandsOnDeviceSetupRequired() async throws {
+        let failures: [Error] = [
+            PayabliTTPError.attestationRevoked(reason: "x"),
+            ActivationRegistrationChanged()
+        ]
+        for failure in failures {
+            let (ttp, _, attestation) = try makeTTP()
+            attestation.pendingRegistration = "dev_e"
+            _ = try? await ttp.initialize()
+            XCTAssertEqual(ttp.sessionState, .pendingActivation(activationId: "dev_e"), "\(failure)")
+            attestation.activationResult = .failure(failure)
+
+            do {
+                try await ttp.activateDevice(activationCode: "123456")
+                XCTFail("activation succeeded past \(failure)")
+            } catch {
+                XCTAssertEqual((error as? TapToPayError)?.type, .deviceSetupRequired, "\(failure): \(error)")
+            }
+            XCTAssertEqual(ttp.sessionState, .failed(reason: .deviceSetupRequired), "\(failure)")
+        }
+    }
+
     private func makeTTP() throws -> (PayabliTTP, MockTapToPayProvider, MockDeviceAttestationService) {
         let config = try PayabliConfig(entryPoint: "e", environment: .sandbox, tokenProvider: { "seed_token" })
         let provider = MockTapToPayProvider()

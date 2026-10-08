@@ -158,7 +158,7 @@ final class PayabliTTPActivationIdTests: XCTestCase {
     }
 
     /// The host read one id and its code was issued for it. A registration replaced since gets
-    /// nothing sent, and the session asks for another `initialize`.
+    /// nothing sent, and the device is set up again.
     func testACodeForAReplacedRegistrationIsNotSent() async throws {
         let (ttp, attestation) = try makeTTP()
         attestation.pendingRegistration = "dev_e"
@@ -169,14 +169,12 @@ final class PayabliTTPActivationIdTests: XCTestCase {
         do {
             try await ttp.activateDevice(activationCode: "123456")
             XCTFail("expected a failure")
-        } catch let error as TapToPayError
-            where error.type == .unknown && error.detail?.contains("registration changed") == true
-        {
+        } catch let error as TapToPayError where error.type == .deviceSetupRequired {
         } catch {
             XCTFail("wrong error: \(error)")
         }
 
-        XCTAssertEqual(ttp.sessionState, .idle)
+        XCTAssertEqual(ttp.sessionState, .failed(reason: .deviceSetupRequired))
     }
 
     /// Spending a code and building a session move the same state, so a build waits for an activation
