@@ -33,6 +33,21 @@ final class PayabliTTPSetupLandingTests: XCTestCase {
         }
     }
 
+    /// A key check that cannot reach Apple's attestation service stops, keeping the binding, and the
+    /// same call may work later.
+    func testAKeyCheckThatCannotReachAppleLandsOnServiceUnavailable() async throws {
+        let (ttp, _, attestation) = try makeTTP()
+        attestation.readFailure = TapToPayError(type: .deviceSetupUnavailable, reason: "x", detail: nil)
+
+        do {
+            try await ttp.initialize()
+            XCTFail("initialize proceeded past a key check that could not reach Apple")
+        } catch {
+            XCTAssertEqual((error as? TapToPayError)?.type, .deviceSetupUnavailable, "\(error)")
+        }
+        XCTAssertEqual(ttp.sessionState, .failed(reason: .serviceUnavailable))
+    }
+
     /// A withdrawn setup is asked again, which is safe.
     func testAWithdrawnSetupLandsOnIdle() async throws {
         let (ttp, _, attestation) = try makeTTP()

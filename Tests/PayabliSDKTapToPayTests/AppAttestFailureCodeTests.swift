@@ -70,12 +70,16 @@ final class AppAttestFailureCodeTests: XCTestCase {
     /// once the phone is unlocked, so it is reported as storage that a retry can reach.
     func testAKeychainThatDoesNotAnswerAWriteIsSecureStorageUnavailable() throws {
         let storage = WriteRefusingStorage()
-        storage.refusesWrites = true
         let (sut, _, _) = try AttestFixture.makeService(storage: storage)
+        try sut.remember(AttestedDevice(entry: "held", deviceId: "d0", keyId: "k0"))
+        storage.refusesWrites = true
 
         XCTAssertThrowsError(try sut.remember(AttestedDevice(entry: "e", deviceId: "d", keyId: "k"))) { error in
             XCTAssertEqual((error as? TapToPayError)?.type, .deviceKeyUnavailable, "\(error)")
         }
+        storage.refusesWrites = false
+        XCTAssertEqual(try sut.binding(for: "held")?.deviceId, "d0", "the refused write changed the store")
+        XCTAssertNil(try sut.binding(for: "e"), "the refused write was kept")
     }
 
     /// A store failure the Keychain did not report is this SDK's own.
@@ -116,6 +120,27 @@ final class AppAttestFailureCodeTests: XCTestCase {
         let (sut, _, _) = try AttestFixture.makeService()
 
         await assertAttestThrows(sut, .decodingError)
+    }
+
+    func testARegistrationResponseThatCannotBeReadIsADecodingError() async throws {
+        let bodies: [Data] = [
+            Data("not json".utf8),
+            AttestFixture.envelope(responseData: ["status": "active"])
+        ]
+        for body in bodies {
+            StubURLProtocol.handler = { request in
+                if request.url!.path == "/api/v2/device/taptopay/challenge" {
+                    return AttestFixture.ok(request, ["challengeId": "c_1", "challenge": "Y2hhbGxlbmdl"])
+                }
+                return (
+                    HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
+                    body
+                )
+            }
+            let (sut, _, _) = try AttestFixture.makeService()
+
+            await assertAttestThrows(sut, .decodingError, String(bytes: body, encoding: .utf8) ?? "")
+        }
     }
 
     // MARK: - A device that cannot be identified
