@@ -182,7 +182,7 @@ final class SessionManagerTests: XCTestCase {
         }
     }
 
-    func testTheSessionIsNotReadyWhileACharges() {
+    func testTheSessionIsNotReadyDuringACharge() {
         let sm = SessionManager()
         for state in [PayabliTTPSessionState.attestingDevice, .fetchingConfig, .initializingReader(percent: nil), .ready] {
             sm.transition(to: state)
