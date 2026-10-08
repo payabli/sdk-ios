@@ -66,7 +66,10 @@ package extension AppAttestService {
                     do {
                         try self.forgetRefused(unknown)
                     } catch {
+                        // Setting the device up again needs the binding gone, so a binding that stays is the
+                        // failure the caller has to hear.
                         self.logger.error("[activate] the binding the service does not know could not be dropped")
+                        return error
                     }
                 }
                 return ActivationRefusals.hostError(resultCode: code, reason: reason)

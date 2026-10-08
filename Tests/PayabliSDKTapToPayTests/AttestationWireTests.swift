@@ -217,6 +217,25 @@ final class AttestationWireTests: XCTestCase {
         XCTAssertNil(try sut.binding(for: "myEntry"), "a binding the service does not know was kept")
     }
 
+    /// A binding that could not be dropped is the failure reported, since setting the device up again would
+    /// present it once more.
+    func testAnUnknownDeviceWhoseBindingCannotBeDroppedReportsTheStorageFailure() async throws {
+        let storage = InMemorySecureStorage()
+        try AttestFixture.seedBinding(entry: "myEntry", deviceId: "dev_1", keyId: "key_1", in: storage)
+        refuseActivation(status: 404, reason: "Device not found.")
+        let (sut, _, _) = try AttestFixture.makeService(storage: storage)
+        storage.removeFailure = NSError(domain: NSOSStatusErrorDomain, code: -25308)
+
+        do {
+            try await sut.activateDevice(activationCode: "123456", entry: "myEntry", activationId: "dev_1")
+            XCTFail("a refused activation reported success")
+        } catch {
+            XCTAssertNotEqual((error as? TapToPayError)?.type, .deviceSetupRequired, "got \(error)")
+        }
+        storage.removeFailure = nil
+        XCTAssertEqual(try sut.binding(for: "myEntry")?.deviceId, "dev_1")
+    }
+
     /// A rejected proof of possession keeps the binding, since the device the service knows is still this one.
     func testAnActivationWhoseAssertionIsRejectedKeepsItsBinding() async throws {
         let storage = InMemorySecureStorage()
