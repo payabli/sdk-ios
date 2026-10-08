@@ -89,10 +89,18 @@ final class PaymentSummaryPlacementTests: XCTestCase {
         XCTAssertEqual(drawn.last?.rows.map(\.field), [.amount, .serviceFee])
     }
 
-    func testASecondSummarySectionIsNotDrawn() {
+    func testOnlyTheLastSummarySectionIsDrawn() {
         let drawn = place([card, summary([.amount]), summary([.serviceFee], title: "Fees")], details(12.34, fee: 0.5))
 
+        XCTAssertEqual(drawn.map(\.section.title), ["Card", "Fees"])
+        XCTAssertEqual(drawn.last?.rows.map(\.field), [.serviceFee, .amount])
+    }
+
+    func testAnEarlierSummaryBeforeTheInputsDrawsNothingThere() {
+        let drawn = place([summary([.amount], title: "Up front"), card, summary([])], details(12.34, fee: 0.5))
+
         XCTAssertEqual(drawn.map(\.section.title), ["Card", "Due today"])
+        XCTAssertEqual(drawn.filter(\.isSummary).count, 1)
     }
 
     func testAMoneyFieldListedAmongTheInputsIsDrawnInTheSummary() {
