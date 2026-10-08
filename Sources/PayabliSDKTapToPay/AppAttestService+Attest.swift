@@ -146,6 +146,10 @@ extension AppAttestService {
                 deviceId: deviceId,
                 timestamp: timestamp
             )
+        } catch let error as TapToPayError {
+            throw error
+        } catch let error as CancellationError {
+            throw error
         } catch {
             // Clear only when the key itself is rejected, so the next
             // `initialize()` runs a cold attestation.
@@ -157,13 +161,21 @@ extension AppAttestService {
                     // suspends, and one finishing in that window leaves a
                     // binding this answer is not about.
                     forgetIfUnchanged(binding)
-                } else {
-                    logger.error(
-                        "generateAssertion failed with DeviceCheck error (code \(nsError.code)) — binding kept"
+                    throw TapToPayError(
+                        type: .deviceSetupRequired,
+                        reason: "This device no longer holds the key its setup was made with",
+                        detail: "\(nsError.domain) \(nsError.code)"
                     )
                 }
+                logger.error(
+                    "generateAssertion failed with DeviceCheck error (code \(nsError.code)) — binding kept"
+                )
             }
-            throw Self.deviceSetupError(for: error) ?? error
+            throw Self.deviceSetupError(for: error) ?? TapToPayError(
+                type: .sdkInternalError,
+                reason: "App Attest refused to sign the request",
+                detail: "\(nsError.domain) \(nsError.code)"
+            )
         }
     }
 

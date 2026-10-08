@@ -373,23 +373,25 @@ final class AppAttestServiceTests: XCTestCase {
     /// unusable (never attested, or the App Attest environment changed). The
     /// service must clear the cache so the next `initialize()` re-attests.
     func testGenerateAssertionClearsTheBindingOnAnInvalidKey() async throws {
-        let storage = InMemorySecureStorage()
-        try AttestFixture.seedBinding(entry: "myEntry", deviceId: "cached_deviceId", keyId: "cached_keyId", in: storage)
+        for code in [2, 3] {
+            let storage = InMemorySecureStorage()
+            try AttestFixture.seedBinding(entry: "myEntry", deviceId: "cached_deviceId", keyId: "cached_keyId", in: storage)
 
-        let (sut, attestor, _) = try AttestFixture.makeService(storage: storage)
-        attestor.generateAssertionError = NSError(
-            domain: AppAttestService.deviceCheckErrorDomain,
-            code: 3
-        )
+            let (sut, attestor, _) = try AttestFixture.makeService(storage: storage)
+            attestor.generateAssertionError = NSError(
+                domain: AppAttestService.deviceCheckErrorDomain,
+                code: code
+            )
 
-        do {
-            _ = try await sut.generateAssertion(for: "myEntry")
-            XCTFail("expected throw")
-        } catch {
-            XCTAssertEqual((error as NSError).domain, AppAttestService.deviceCheckErrorDomain)
+            do {
+                _ = try await sut.generateAssertion(for: "myEntry")
+                XCTFail("expected throw for code \(code)")
+            } catch {
+                XCTAssertEqual((error as? TapToPayError)?.type, .deviceSetupRequired, "code \(code): \(error)")
+            }
+
+            try await assertAttested(sut, "myEntry", false, "a rejected key has to be re-attested, code \(code)")
         }
-
-        try await assertAttested(sut, "myEntry", false, "a rejected key has to be re-attested")
     }
 
     /// Every other DeviceCheck error keeps the binding. `DCErrorServerUnavailable`
@@ -412,7 +414,7 @@ final class AppAttestServiceTests: XCTestCase {
                 switch code {
                 case 1: XCTAssertEqual((error as? TapToPayError)?.type, .deviceSetupUnsupported, "\(error)")
                 case 4: XCTAssertEqual((error as? TapToPayError)?.type, .deviceSetupUnavailable, "\(error)")
-                default: XCTAssertEqual((error as NSError).code, code)
+                default: XCTAssertEqual((error as? TapToPayError)?.type, .sdkInternalError, "\(error)")
                 }
             }
 
@@ -433,7 +435,7 @@ final class AppAttestServiceTests: XCTestCase {
             _ = try await sut.generateAssertion(for: "myEntry")
             XCTFail("expected throw")
         } catch {
-            // expected
+            XCTAssertEqual((error as? TapToPayError)?.type, .sdkInternalError, "\(error)")
         }
 
         XCTAssertNotNil(try sut.binding(for: "myEntry"), "non-DeviceCheck failures must not clear attestation state")

@@ -101,6 +101,30 @@ final class PayabliTTPSetupLandingTests: XCTestCase {
         }
     }
 
+    /// A request whose assertion cannot be produced lands by its code: a key lost after the check
+    /// passed is set up again, not reported as an SDK defect.
+    func testAConfigurationRequestThatCannotBeSignedLandsByItsCode() async throws {
+        let cases: [(PayabliErrorType, PayabliTTPSessionState)] = [
+            (.deviceSetupRequired, .failed(reason: .deviceSetupRequired)),
+            (.deviceSetupUnsupported, .failed(reason: .deviceIneligible)),
+            (.deviceSetupUnavailable, .failed(reason: .serviceUnavailable)),
+            (.sdkInternalError, .failed(reason: .sdkInternalError))
+        ]
+        for (type, expected) in cases {
+            let (ttp, _, attestation) = try makeTTP()
+            attestation.bindings = ["e": "dev_e"]
+            attestation.assertionFailure = TapToPayError(type: type, reason: "x", detail: nil)
+
+            do {
+                try await ttp.initialize()
+                XCTFail("initialize proceeded past \(type)")
+            } catch {
+                XCTAssertEqual((error as? TapToPayError)?.type, type, "\(type): \(error)")
+            }
+            XCTAssertEqual(ttp.sessionState, expected, "\(type)")
+        }
+    }
+
     /// A withdrawn setup is asked again, which is safe.
     func testAWithdrawnSetupLandsOnIdle() async throws {
         let (ttp, _, attestation) = try makeTTP()
