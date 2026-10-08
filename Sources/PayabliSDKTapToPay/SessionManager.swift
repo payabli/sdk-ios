@@ -62,6 +62,26 @@ final class SessionManager: ObservableObject {
         sessionState = .initializingReader(percent: percent)
     }
 
+    /// Enters a charge. The ready check and the entry are one write, so a second
+    /// charge is refused while one holds the reader.
+    func beginCharge() -> Bool {
+        guard sessionState == .ready else { return false }
+        return transition(to: .charging(activity: .opening))
+    }
+
+    /// Dropped unless a charge holds the session.
+    func recordChargeActivity(_ activity: TapToPayChargeActivity) {
+        guard case .charging = sessionState else { return }
+        transition(to: .charging(activity: activity))
+    }
+
+    /// Returns to ready only while a charge still holds the session, so a move
+    /// made during the charge, by it or by another caller, is kept.
+    func endCharge() {
+        guard case .charging = sessionState else { return }
+        transition(to: .ready)
+    }
+
     /// Returns the session to its starting point. Internal: a host reaches this
     /// only through `initialize()`, never as an operation of its own.
     func reset() {

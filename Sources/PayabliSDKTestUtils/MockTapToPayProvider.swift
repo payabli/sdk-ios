@@ -171,10 +171,21 @@ package final class MockTapToPayProvider: TapToPayProvider, @unchecked Sendable 
         }
     }
 
+    /// Runs while a read is in progress, before it answers: what a payer, the
+    /// reader or another caller does during a tap.
+    private var _whileReading: (@MainActor @Sendable () async -> Void)?
+    package var whileReading: (@MainActor @Sendable () async -> Void)? {
+        get { lock.withLock { _whileReading } }
+        set { lock.withLock { _whileReading = newValue } }
+    }
+
     package func startReading(_ request: CardReadRequest) async throws -> CardReadResult {
         let result: Result<CardReadResult, Error> = lock.withLock {
             _startReadingCalls += 1
             return _readingResult
+        }
+        if let whileReading {
+            await whileReading()
         }
         switch result {
         case let .success(value): return value

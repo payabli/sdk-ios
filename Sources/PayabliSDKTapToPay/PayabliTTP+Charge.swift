@@ -64,9 +64,8 @@ extension PayabliTTP {
 
         try await reinitialize()
 
-        guard sessionState == .ready else {
-            throw PayabliTTPError.notReady(current: sessionState)
-        }
+        try enterCharge()
+        defer { leaveCharge() }
 
         // Match the trim/blank-to-nil semantics that `PayabliTTPCustomerData`
         // and `PayabliTTPInvoiceData` apply to their string fields, so a
@@ -110,6 +109,7 @@ extension PayabliTTP {
         // Set before the reader is asked, not after it answers: the processor can take the sale before the
         // answer arrives.
         progress.askedForCard = true
+        recordChargeActivity(.waitingForCard)
         do {
             readResult = try await provider.startReading(readRequest)
         } catch {
@@ -131,6 +131,7 @@ extension PayabliTTP {
 
             // Best-effort backend notify so the transaction isn't left dangling.
             // Its outcome does not change what the caller is told.
+            recordChargeActivity(.closing)
             _ = await tryUpdate(
                 paymentTransId: paymentTransId,
                 payload: .nfcFailure(description: String(describing: error))
@@ -147,6 +148,7 @@ extension PayabliTTP {
         paymentTransId: String,
         readResult: CardReadResult
     ) async throws -> TransactionResult {
+        recordChargeActivity(.closing)
         let update = await tryUpdate(paymentTransId: paymentTransId, payload: .success(readResult))
 
         let capture: PayabliTTPCapture
@@ -223,6 +225,24 @@ extension PayabliTTP {
     }
 
     // MARK: - Charge helpers
+
+    /// Holds the reader for this charge, or throws when the session is not ready.
+    private func enterCharge() throws {
+        guard sessionManager.beginCharge() else {
+            throw PayabliTTPError.notReady(current: sessionState)
+        }
+        syncPublished()
+    }
+
+    private func leaveCharge() {
+        sessionManager.endCharge()
+        syncPublished()
+    }
+
+    func recordChargeActivity(_ activity: TapToPayChargeActivity) {
+        sessionManager.recordChargeActivity(activity)
+        syncPublished()
+    }
 
     /// The case the reader raised, with the payment it opened. A failure the reader already classified is
     /// kept, and the charge adds its payment at the edge. Any other failure with no case of its own that can
