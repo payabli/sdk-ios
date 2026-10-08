@@ -209,7 +209,9 @@ public final class PayabliTTP: NSObject, ObservableObject {
 /// Returned by ``PayabliTTP/addSessionStateObserver(_:)``.
 @objc(TapToPaySessionStateObservation)
 public final class TapToPaySessionStateObservation: NSObject, @unchecked Sendable {
-    private let lock = NSLock()
+    /// Recursive, and held while the handler runs: `cancel()` returns only once no call is in progress,
+    /// and a handler may cancel its own observation.
+    private let lock = NSRecursiveLock()
     private var handler: (() -> Void)?
 
     init(handler: @escaping () -> Void) {
@@ -232,8 +234,7 @@ public final class TapToPaySessionStateObservation: NSObject, @unchecked Sendabl
 
     func notify() {
         lock.lock()
-        let handler = self.handler
-        lock.unlock()
+        defer { lock.unlock() }
         handler?()
     }
 }

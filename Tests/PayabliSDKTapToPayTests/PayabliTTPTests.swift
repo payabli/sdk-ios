@@ -464,6 +464,20 @@ final class PayabliTTPTests: XCTestCase {
         XCTAssertEqual(seen, [.attestingDevice, .fetchingConfig, .initializingReader, .ready])
     }
 
+    func testAnObserverCanCancelItselfFromItsHandler() async throws {
+        let (ttp, _, _) = try makeTTP()
+        var calls = 0
+        var observation: TapToPaySessionStateObservation?
+        observation = ttp.addSessionStateObserver {
+            calls += 1
+            observation?.cancel()
+        }
+
+        try await ttp.initialize()
+
+        XCTAssertEqual(calls, 1)
+    }
+
     func testACancelledObserverIsNotCalledAgain() async throws {
         let (ttp, _, _) = try makeTTP()
         var calls = 0

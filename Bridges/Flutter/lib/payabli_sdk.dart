@@ -213,9 +213,12 @@ class PayabliTTP {
           ? PayabliTTPSessionState.values[code]
           : PayabliTTPSessionState.idle,
       readerConfigurationPercent: map?['readerConfigurationPercent'] as int?,
-      failureReason: reason == null
-          ? null
-          : PayabliTTPFailureReason.values[reason],
+      failureReason:
+          reason != null &&
+              reason >= 0 &&
+              reason < PayabliTTPFailureReason.values.length
+          ? PayabliTTPFailureReason.values[reason]
+          : null,
       activationId: map?['activationId'] as String?,
       chargeActivity:
           activity != null &&
