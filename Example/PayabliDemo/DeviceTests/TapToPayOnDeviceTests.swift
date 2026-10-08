@@ -6,9 +6,8 @@ import XCTest
 
 /// What this branch changed, exercised against a live paypoint on real hardware.
 ///
-/// Everything up to the tap. `charge()` needs a card held to the phone, so the read
-/// is abandoned once the charge is waiting for a card. The one test that goes past
-/// the tap runs only when a person is there to make it.
+/// Everything up to the tap: the read is abandoned once the charge waits for a card,
+/// except in the one test a person taps.
 ///
 /// Each test establishes what it needs and assumes nothing about what ran before
 /// it. XCTest runs methods in name order by default and does not have to: a run can
@@ -305,11 +304,8 @@ final class TapToPayOnDeviceTests: XCTestCase {
         )
     }
 
-    /// A whole charge, with a person tapping a card when the reader asks for one. Every state the session
-    /// publishes is recorded, so the run shows the activities the reader raised on this device.
-    ///
-    /// Runs only when the test host has `PAYABLI_TAP_BY_HAND=1`, passed as `TEST_RUNNER_PAYABLI_TAP_BY_HAND=1`,
-    /// because nothing unattended can present a card.
+    /// A whole charge a person taps, recording every state the session publishes.
+    /// Runs only with `TEST_RUNNER_PAYABLI_TAP_BY_HAND=1`: nothing unattended can present a card.
     func testAChargeTappedByHandWalksItsActivities() async throws {
         guard ProcessInfo.processInfo.environment["PAYABLI_TAP_BY_HAND"] == "1" else {
             throw XCTSkip("set TEST_RUNNER_PAYABLI_TAP_BY_HAND=1 and tap a card when the reader asks")

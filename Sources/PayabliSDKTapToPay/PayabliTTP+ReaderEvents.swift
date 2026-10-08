@@ -3,13 +3,8 @@ import Foundation
 // MARK: - Reader events
 
 extension PayabliTTP {
-    /// Records configuration progress, and a prompt the reader raises during a
-    /// charge, on the state each belongs to.
-    ///
-    /// Progress reaches the state only for the configuration that installed this
-    /// handler, so a percentage raised by one that has ended is dropped. A prompt
-    /// reaches it only from the reader now prepared, and only while a charge holds
-    /// the session.
+    /// Progress counts only from the configuration still running, and a prompt only
+    /// from the reader now prepared while a charge holds the session.
     func handleReaderEvent(_ event: TapToPayReaderEvent, from configuration: Int) {
         if case let .configurationProgress(percent) = event {
             guard configuration == activeConfiguration else { return }
