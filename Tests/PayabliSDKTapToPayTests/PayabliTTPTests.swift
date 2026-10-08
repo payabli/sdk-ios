@@ -478,6 +478,20 @@ final class PayabliTTPTests: XCTestCase {
         XCTAssertEqual(calls, 1)
     }
 
+    func testAnObjectiveCHostReadsTheChargeActivityAsItsRawValue() async throws {
+        let (ttp, _, _) = try makeTTP()
+        try await ttp.initialize()
+        XCTAssertNil(ttp.chargeActivity)
+
+        ttp.sessionManager.transition(to: .charging(activity: .opening))
+        ttp.syncPublished()
+        ttp.sessionManager.transition(to: .charging(activity: .waitingForCard))
+        ttp.syncPublished()
+
+        XCTAssertEqual(ttp.chargeActivity, NSNumber(value: TapToPayChargeActivity.waitingForCard.rawValue))
+        XCTAssertEqual(ttp.sessionStateCode, .charging)
+    }
+
     func testACancelledObserverIsNotCalledAgain() async throws {
         let (ttp, _, _) = try makeTTP()
         var calls = 0
