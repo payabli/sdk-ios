@@ -40,8 +40,8 @@ extension AppAttestService {
         body: some Encodable,
         label: String,
         assertion: AssertionHeaders? = nil,
-        makeDeclineError: @escaping (_ code: Int?, _ reason: String) -> PayabliTTPError = { _, reason in
-            .attestationFailed(reason: reason)
+        makeDeclineError: @escaping (_ code: Int?, _ reason: String) -> any Error = { _, reason in
+            PayabliTTPError.attestationFailed(reason: reason)
         }
     ) async throws -> Payload {
         let response = try await performAuthenticatedPOST(
@@ -71,13 +71,17 @@ extension AppAttestService {
 
     /// Authenticated POST for endpoints that do not return a `responseData`
     /// body (only an `isSuccess` acknowledgement).
+    ///
+    /// `readsRefusalBeforeStatus` hands a 400, 403 or 404 carrying a refusal envelope to `makeDeclineError`, for a route
+    /// whose refusals are told apart by their text rather than by their status.
     func postAttestationRequestExpectingNoBody(
         path: String,
         body: some Encodable,
         label: String,
         assertion: AssertionHeaders? = nil,
-        makeDeclineError: @escaping (_ code: Int?, _ reason: String) -> PayabliTTPError = { _, reason in
-            .attestationFailed(reason: reason)
+        readsRefusalBeforeStatus: Bool = false,
+        makeDeclineError: @escaping (_ code: Int?, _ reason: String) -> any Error = { _, reason in
+            PayabliTTPError.attestationFailed(reason: reason)
         }
     ) async throws {
         _ = try await performAuthenticatedPOST(
@@ -85,6 +89,7 @@ extension AppAttestService {
             body: body,
             label: label,
             assertion: assertion,
+            readsRefusalBeforeStatus: readsRefusalBeforeStatus,
             makeDeclineError: makeDeclineError
         )
     }
@@ -104,7 +109,8 @@ extension AppAttestService {
         body: some Encodable,
         label: String,
         assertion: AssertionHeaders?,
-        makeDeclineError: (_ code: Int?, _ reason: String) -> PayabliTTPError
+        readsRefusalBeforeStatus: Bool = false,
+        makeDeclineError: (_ code: Int?, _ reason: String) -> any Error
     ) async throws -> PayabliResponse {
         var headers: [String: String] = [:]
         if let assertion {
@@ -135,6 +141,17 @@ extension AppAttestService {
 
         logger.info("[\(label)] ← [\(response.statusCode)] bytes=\(response.body.count)")
 
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        // Only the statuses a refusal is sent with. Every other status keeps the transport's own
+        // classification, a rate limit's wait among them.
+        if readsRefusalBeforeStatus, [400, 403, 404].contains(response.statusCode),
+           let (code, reason) = PayabliEnvelope.declineOutcome(from: response.body, decoder: decoder)
+        {
+            logger.error("[\(label)] refused (code=\(code.map(String.init) ?? "nil"))")
+            throw makeDeclineError(code ?? response.statusCode, reason)
+        }
+
         do {
             try mapPayabliHTTPError(response: response)
         } catch {
@@ -142,8 +159,6 @@ extension AppAttestService {
             throw error
         }
 
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
         if let (code, reason) = PayabliEnvelope.declineOutcome(from: response.body, decoder: decoder) {
             // The reason is the service's `resultText`, which can quote what was
             // sent. The code says which decline this was.

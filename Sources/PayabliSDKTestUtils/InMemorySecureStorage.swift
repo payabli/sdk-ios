@@ -10,6 +10,7 @@ package final class InMemorySecureStorage: SecureStorage, @unchecked Sendable {
     private let lock = NSLock()
     private var store: [String: String] = [:]
     private var storedReadFailure: Error?
+    private var storedRemoveFailure: Error?
 
     package init() {}
 
@@ -27,6 +28,20 @@ package final class InMemorySecureStorage: SecureStorage, @unchecked Sendable {
             lock.lock()
             defer { lock.unlock() }
             storedReadFailure = newValue
+        }
+    }
+
+    /// Raised by every removal while it is set, which leaves the value in place.
+    package var removeFailure: Error? {
+        get {
+            lock.lock()
+            defer { lock.unlock() }
+            return storedRemoveFailure
+        }
+        set {
+            lock.lock()
+            defer { lock.unlock() }
+            storedRemoveFailure = newValue
         }
     }
 
@@ -48,6 +63,9 @@ package final class InMemorySecureStorage: SecureStorage, @unchecked Sendable {
     package func remove(forKey key: String) throws {
         lock.lock()
         defer { lock.unlock() }
+        if let storedRemoveFailure {
+            throw storedRemoveFailure
+        }
         store.removeValue(forKey: key)
     }
 }

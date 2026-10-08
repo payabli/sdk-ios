@@ -35,6 +35,7 @@ package extension AppAttestService {
             body: ActivateRequest(entry: entry, deviceId: assertion.deviceId, activationCode: activationCode),
             label: "activate",
             assertion: assertion,
+            readsRefusalBeforeStatus: true,
             makeDeclineError: { code, reason in
                 // A 401 here means this keyId has no attestation on record, so
                 // the binding names a key that buys nothing. Drop it and let the
@@ -53,13 +54,25 @@ package extension AppAttestService {
                         // Revoked either way, and the caller is told which. A
                         // binding left behind is presented again on the next warm
                         // check.
-                        return .attestationRevoked(
+                        return PayabliTTPError.attestationRevoked(
                             reason: "\(reason) — the stored binding could not be dropped"
                         )
                     }
-                    return .attestationRevoked(reason: reason)
+                    return PayabliTTPError.attestationRevoked(reason: reason)
                 }
-                return .activationFailed(reason: reason)
+                if ActivationRefusals.discardsBinding(resultCode: code, reason: reason) {
+                    // The binding this assertion named, not whatever is held now.
+                    let unknown = AttestedDevice(entry: entry, deviceId: assertion.deviceId, keyId: assertion.keyId)
+                    do {
+                        try self.forgetRefused(unknown)
+                    } catch {
+                        // Setting the device up again needs the binding gone, so a binding that stays is the
+                        // failure the caller has to hear.
+                        self.logger.error("[activate] the binding the service does not know could not be dropped")
+                        return error
+                    }
+                }
+                return ActivationRefusals.hostError(resultCode: code, reason: reason)
             }
         )
     }
