@@ -15,6 +15,10 @@ extension PayabliTTPSessionState {
     /// The map is one map for both platforms and mirrors the sibling's, so a
     /// merchant meeting one condition is sent to the same repair on either.
     static func landing(for error: Error, registration: StoredRegistration) -> PayabliTTPSessionState? {
+        if let refusal = error as? ActivationRefusal {
+            // Most refusals are about the code, and the device still owes one.
+            return refusal.movesSession ? landingByType(refusal.hostError, registration: registration) : nil
+        }
         if error is CancellationError {
             // A withdrawn setup is asked again, which is safe.
             return .idle
@@ -84,6 +88,9 @@ extension PayabliTTPSessionState {
 
         case .deviceSetupUnsupported, .deviceIdentityUnavailable:
             return .failed(reason: .deviceIneligible)
+
+        case .entryPointRefused:
+            return .failed(reason: .configurationRejected)
 
         case .deviceSetupUnavailable:
             return .failed(reason: .serviceUnavailable)

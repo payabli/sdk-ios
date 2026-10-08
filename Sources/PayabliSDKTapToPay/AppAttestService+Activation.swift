@@ -72,7 +72,7 @@ package extension AppAttestService {
                         return error
                     }
                 }
-                return ActivationRefusals.hostError(resultCode: code, reason: reason)
+                return ActivationRefusals.refusal(resultCode: code, reason: reason)
             }
         )
     }

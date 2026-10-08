@@ -43,6 +43,11 @@ public extension PayabliTTP {
             syncPublished()
             multicaster.emit(.activationFailed(error: TapToPayErrorTranslation.eventName(of: failure)))
             throw failure
+        } catch let refusal as ActivationRefusal {
+            markError(refusal)
+            syncPublished()
+            multicaster.emit(.activationFailed(error: TapToPayErrorTranslation.eventName(of: refusal.hostError)))
+            throw refusal.hostError
         } catch let err as PayabliTTPError {
             // The attestation service already cleared local cache for the
             // revoked case, so the next `initialize()` attests cold.

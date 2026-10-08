@@ -114,7 +114,8 @@ final class AttestationWireTests: XCTestCase {
         do {
             try await sut.activateDevice(activationCode: "123456", entry: "myEntry", activationId: "dev_1")
             XCTFail("a refused activation reported success")
-        } catch let error as TapToPayError {
+        } catch let refusal as ActivationRefusal {
+            let error = refusal.hostError
             XCTAssertEqual(error.type, .activationCodeIncorrect)
             XCTAssertEqual(error.detail, "Invalid activation code.")
         }
@@ -142,7 +143,7 @@ final class AttestationWireTests: XCTestCase {
             try await sut.activateDevice(activationCode: "123456", entry: "myEntry", activationId: "dev_1")
             XCTFail("a failed activation reported success")
         } catch {
-            XCTAssertFalse(error is TapToPayError, "a service failure was read as a refusal: \(error)")
+            XCTAssertFalse(error is ActivationRefusal, "a service failure was read as a refusal: \(error)")
             XCTAssertEqual((error as? any PayabliError)?.type, .serverError, "got \(error)")
         }
     }
@@ -169,7 +170,7 @@ final class AttestationWireTests: XCTestCase {
             try await sut.activateDevice(activationCode: "123456", entry: "myEntry", activationId: "dev_1")
             XCTFail("a rate-limited activation reported success")
         } catch {
-            XCTAssertFalse(error is TapToPayError, "a rate limit was read as a refusal: \(error)")
+            XCTAssertFalse(error is ActivationRefusal, "a rate limit was read as a refusal: \(error)")
             XCTAssertEqual((error as? any PayabliError)?.type, .rateLimited, "got \(error)")
             XCTAssertEqual((error as? any PayabliRetryAfter)?.retryAfter, 120)
         }
@@ -195,7 +196,7 @@ final class AttestationWireTests: XCTestCase {
             try await sut.activateDevice(activationCode: "123456", entry: "myEntry", activationId: "dev_1")
             XCTFail("a declined activation reported success")
         } catch {
-            XCTAssertFalse(error is TapToPayError, "a decline was read as a refusal: \(error)")
+            XCTAssertFalse(error is ActivationRefusal, "a decline was read as a refusal: \(error)")
             XCTAssertEqual((error as? any PayabliError)?.type, .paymentDeclined, "got \(error)")
         }
     }
@@ -211,7 +212,8 @@ final class AttestationWireTests: XCTestCase {
         do {
             try await sut.activateDevice(activationCode: "123456", entry: "myEntry", activationId: "dev_1")
             XCTFail("a refused activation reported success")
-        } catch let error as TapToPayError {
+        } catch let refusal as ActivationRefusal {
+            let error = refusal.hostError
             XCTAssertEqual(error.type, .deviceSetupRequired)
         }
         XCTAssertNil(try sut.binding(for: "myEntry"), "a binding the service does not know was kept")
@@ -230,7 +232,7 @@ final class AttestationWireTests: XCTestCase {
             try await sut.activateDevice(activationCode: "123456", entry: "myEntry", activationId: "dev_1")
             XCTFail("a refused activation reported success")
         } catch {
-            XCTAssertNotEqual((error as? TapToPayError)?.type, .deviceSetupRequired, "got \(error)")
+            XCTAssertFalse(error is ActivationRefusal, "the caller was told to set up again: \(error)")
         }
         storage.removeFailure = nil
         XCTAssertEqual(try sut.binding(for: "myEntry")?.deviceId, "dev_1")
@@ -246,7 +248,8 @@ final class AttestationWireTests: XCTestCase {
         do {
             try await sut.activateDevice(activationCode: "123456", entry: "myEntry", activationId: "dev_1")
             XCTFail("a refused activation reported success")
-        } catch let error as TapToPayError {
+        } catch let refusal as ActivationRefusal {
+            let error = refusal.hostError
             XCTAssertEqual(error.type, .deviceSetupRequired)
         }
         XCTAssertEqual(try sut.binding(for: "myEntry")?.deviceId, "dev_1")

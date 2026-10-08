@@ -176,8 +176,9 @@ stage_framework() {
 
 # Refuses a framework an integrator could not import or run: no public
 # interface, a non-public one, a missing resource bundle, a load of a Payabli
-# framework the zip does not ship, or a capability that carries its own copy
-# of a shared module instead of loading it.
+# framework the zip does not ship, a capability that carries its own copy
+# of a shared module instead of loading it, or the card reader, or a load of
+# the framework that holds it, anywhere but the card-present framework.
 check_framework() {
     local framework="$1" module="$2"
     local interfaces
@@ -215,6 +216,25 @@ check_framework() {
             fi
         done
     done
+    if [[ "$module" != "PayabliSDKTapToPay" ]]; then
+        local loads symbols
+        if ! loads="$(otool -L "$framework/$module")" || ! symbols="$(nm -gU "$framework/$module")"; then
+            echo "error: ${framework} could not be read for the card reader" >&2
+            exit 1
+        fi
+        if grep -q '/ProximityReader.framework/' <<<"$loads"; then
+            echo "error: ${framework} links ProximityReader, which only PayabliSDKTapToPay may" >&2
+            exit 1
+        fi
+        if grep -q '@rpath/PayabliSDKTapToPay.framework/' <<<"$loads"; then
+            echo "error: ${framework} loads PayabliSDKTapToPay, and the card reader with it" >&2
+            exit 1
+        fi
+        if grep -q 'PayabliCardReaderCore' <<<"$symbols"; then
+            echo "error: ${framework} carries the card reader, which only PayabliSDKTapToPay may" >&2
+            exit 1
+        fi
+    fi
 }
 
 device_products="$(build_client "$DEVICE_DESTINATION" "device")"
