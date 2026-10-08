@@ -60,6 +60,15 @@ package extension AppAttestService {
                     }
                     return PayabliTTPError.attestationRevoked(reason: reason)
                 }
+                if ActivationRefusals.discardsBinding(resultCode: code, reason: reason) {
+                    // The binding this assertion named, not whatever is held now.
+                    let unknown = AttestedDevice(entry: entry, deviceId: assertion.deviceId, keyId: assertion.keyId)
+                    do {
+                        try self.forgetRefused(unknown)
+                    } catch {
+                        self.logger.error("[activate] the binding the service does not know could not be dropped")
+                    }
+                }
                 return ActivationRefusals.hostError(resultCode: code, reason: reason)
             }
         )

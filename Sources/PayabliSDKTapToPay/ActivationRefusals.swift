@@ -15,6 +15,12 @@ enum ActivationRefusals {
         return TapToPayError(type: type, reason: type.message, detail: reason.isEmpty ? nil : reason)
     }
 
+    /// Whether the refusal says the service holds no record of the device, so the binding presented names
+    /// nothing and setting the device up again needs it gone. A rejected assertion keeps it.
+    static func discardsBinding(resultCode: Int?, reason: String) -> Bool {
+        resultCode == 404 && reason == deviceNotFound
+    }
+
     static func catalogType(resultCode: Int?, reason: String) -> PayabliErrorType {
         switch resultCode {
         case 400:

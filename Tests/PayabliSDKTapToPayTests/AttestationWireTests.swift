@@ -200,6 +200,53 @@ final class AttestationWireTests: XCTestCase {
         }
     }
 
+    /// The service holding no record of the device drops the binding presented, so the next `initialize()`
+    /// sets the device up again rather than presenting it a second time.
+    func testAnActivationForADeviceTheServiceDoesNotKnowDropsItsBinding() async throws {
+        let storage = InMemorySecureStorage()
+        try AttestFixture.seedBinding(entry: "myEntry", deviceId: "dev_1", keyId: "key_1", in: storage)
+        refuseActivation(status: 404, reason: "Device not found.")
+        let (sut, _, _) = try AttestFixture.makeService(storage: storage)
+
+        do {
+            try await sut.activateDevice(activationCode: "123456", entry: "myEntry", activationId: "dev_1")
+            XCTFail("a refused activation reported success")
+        } catch let error as TapToPayError {
+            XCTAssertEqual(error.type, .deviceSetupRequired)
+        }
+        XCTAssertNil(try sut.binding(for: "myEntry"), "a binding the service does not know was kept")
+    }
+
+    /// A rejected proof of possession keeps the binding, since the device the service knows is still this one.
+    func testAnActivationWhoseAssertionIsRejectedKeepsItsBinding() async throws {
+        let storage = InMemorySecureStorage()
+        try AttestFixture.seedBinding(entry: "myEntry", deviceId: "dev_1", keyId: "key_1", in: storage)
+        refuseActivation(status: 400, reason: "Assertion verification failed: bad signature")
+        let (sut, _, _) = try AttestFixture.makeService(storage: storage)
+
+        do {
+            try await sut.activateDevice(activationCode: "123456", entry: "myEntry", activationId: "dev_1")
+            XCTFail("a refused activation reported success")
+        } catch let error as TapToPayError {
+            XCTAssertEqual(error.type, .deviceSetupRequired)
+        }
+        XCTAssertEqual(try sut.binding(for: "myEntry")?.deviceId, "dev_1")
+    }
+
+    /// Answers `/activate` with a refusal the way the service does: its code as the HTTP status.
+    private func refuseActivation(status: Int, reason: String) {
+        let body = #"{"isSuccess":false,"responseText":"Declined","responseData":{"resultCode":\#(status),"resultText":"\#(reason)"}}"#
+        StubURLProtocol.handler = { request in
+            if request.url!.path == "/api/v2/device/taptopay/activate" {
+                return (
+                    HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: "HTTP/1.1", headerFields: nil)!,
+                    Data(body.utf8)
+                )
+            }
+            return AttestFixture.ok(request, ["challengeId": "c_1", "challenge": "Y2hhbGxlbmdl"])
+        }
+    }
+
     /// A 401 answering one binding does not take a binding enrolled since.
     func testAnActivationRefusalLeavesABindingEnrolledSince() async throws {
         let storage = InMemorySecureStorage()
