@@ -409,7 +409,11 @@ final class AppAttestServiceTests: XCTestCase {
                 _ = try await sut.generateAssertion(for: "myEntry")
                 XCTFail("expected throw for code \(code)")
             } catch {
-                XCTAssertEqual((error as NSError).code, code)
+                switch code {
+                case 1: XCTAssertEqual((error as? TapToPayError)?.type, .deviceSetupUnsupported, "\(error)")
+                case 4: XCTAssertEqual((error as? TapToPayError)?.type, .deviceSetupUnavailable, "\(error)")
+                default: XCTAssertEqual((error as NSError).code, code)
+                }
             }
 
             XCTAssertNotNil(try sut.binding(for: "myEntry"), "code \(code) is not a reason to re-attest")

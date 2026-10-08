@@ -158,7 +158,7 @@ final class PayabliTTPFailureReasonTests: XCTestCase {
         )
     }
 
-    /// A shared setup whose owner withdrew sent nothing, so asking again is safe.
+    /// A withdrawn setup is asked again, which is safe.
     func testAWithdrawnSetupLandsOnIdle() {
         XCTAssertEqual(
             PayabliTTPSessionState.landing(for: CancellationError(), registration: .held(activationId: "dev")),

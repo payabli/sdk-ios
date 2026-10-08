@@ -95,6 +95,18 @@ final class AppAttestKeyCheckTests: XCTestCase {
         XCTAssertNotNil(try sut.binding(for: "myEntry"))
     }
 
+    /// App Attest answering with neither a value nor an error is this SDK's defect, not storage that
+    /// did not answer.
+    func testAKeyCheckThatGetsNoAnswerIsAnSDKDefect() async throws {
+        let storage = InMemorySecureStorage()
+        try AttestFixture.seedBinding(entry: "myEntry", deviceId: "dev", keyId: "key", in: storage)
+        let (sut, attestor, _) = try AttestFixture.makeService(storage: storage)
+        attestor.generateAssertionError = TapToPayError(type: .sdkInternalError, reason: "x", detail: nil)
+
+        await assertKeyCheckThrows(sut, .sdkInternalError)
+        XCTAssertNotNil(try sut.binding(for: "myEntry"))
+    }
+
     /// A phone that cannot produce an assertion at all is not a key that went away.
     func testAPhoneThatCannotSignStopsAsUnsupportedAndKeepsTheBinding() async throws {
         let storage = InMemorySecureStorage()

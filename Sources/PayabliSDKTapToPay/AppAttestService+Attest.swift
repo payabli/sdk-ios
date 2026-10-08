@@ -163,7 +163,7 @@ extension AppAttestService {
                     )
                 }
             }
-            throw error
+            throw Self.deviceSetupError(for: error) ?? error
         }
     }
 

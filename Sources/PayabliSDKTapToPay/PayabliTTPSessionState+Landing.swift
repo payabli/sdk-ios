@@ -16,7 +16,7 @@ extension PayabliTTPSessionState {
     /// merchant meeting one condition is sent to the same repair on either.
     static func landing(for error: Error, registration: StoredRegistration) -> PayabliTTPSessionState? {
         if error is CancellationError {
-            // A shared setup whose owner withdrew sent nothing, so asking again is safe.
+            // A withdrawn setup is asked again, which is safe.
             return .idle
         }
         guard let ttpError = error as? PayabliTTPError else {

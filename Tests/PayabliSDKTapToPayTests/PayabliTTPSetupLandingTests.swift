@@ -33,7 +33,7 @@ final class PayabliTTPSetupLandingTests: XCTestCase {
         }
     }
 
-    /// A setup whose owner withdrew sent nothing, so asking again is safe.
+    /// A withdrawn setup is asked again, which is safe.
     func testAWithdrawnSetupLandsOnIdle() async throws {
         let (ttp, _, attestation) = try makeTTP()
         attestation.attestResult = .failure(CancellationError())

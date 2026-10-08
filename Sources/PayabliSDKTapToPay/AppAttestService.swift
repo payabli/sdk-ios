@@ -117,6 +117,8 @@ package final class AppAttestService: DeviceAttestationService, @unchecked Senda
                 clientDataHash: Self.keyProbeHash
             )
             return true
+        } catch let error as TapToPayError {
+            throw error
         } catch {
             if let setupError = Self.deviceSetupError(for: error) {
                 logger.info("[attest] the key could not be checked; keeping the binding")
