@@ -217,8 +217,8 @@ final class AttestationWireTests: XCTestCase {
         XCTAssertNil(try sut.binding(for: "myEntry"), "a binding the service does not know was kept")
     }
 
-    /// A binding that could not be dropped is the failure reported, since setting the device up again would
-    /// present it once more.
+    /// A binding that could not be dropped is the failure reported, since the next setup would present the
+    /// same unknown device.
     func testAnUnknownDeviceWhoseBindingCannotBeDroppedReportsTheStorageFailure() async throws {
         let storage = InMemorySecureStorage()
         try AttestFixture.seedBinding(entry: "myEntry", deviceId: "dev_1", keyId: "key_1", in: storage)
