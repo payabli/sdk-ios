@@ -184,6 +184,9 @@ No person handles the code.
    [Generate Tap to Pay activation code](https://docs.payabli.com/developers/api-reference/device/activation-challenge)
    with the paypoint's entry point and the activation ID in the request's `deviceId` field, and returns the
    code.
+
+   Anyone who can call this route can set up a phone to take payments for your paypoint, so it has to
+   authenticate the caller and check that they may take payments, the way your token endpoint does.
 3. Activate, then initialize again.
 
 The activation ID is read from this phone's own state, never looked up as the latest pending device on the
