@@ -10,6 +10,13 @@ import PayabliSDKCore
 /// A 401 never reaches this table: the transport answers it as an expired token. A 5xx keeps the service's
 /// own error, and the wait it asked for.
 enum ActivationRefusals {
+    static func refusal(resultCode: Int?, reason: String) -> ActivationRefusal {
+        ActivationRefusal(
+            hostError: hostError(resultCode: resultCode, reason: reason),
+            movesSession: movesSession(resultCode: resultCode, reason: reason)
+        )
+    }
+
     static func hostError(resultCode: Int?, reason: String) -> TapToPayError {
         let type = catalogType(resultCode: resultCode, reason: reason)
         return TapToPayError(type: type, reason: type.message, detail: reason.isEmpty ? nil : reason)
@@ -19,6 +26,12 @@ enum ActivationRefusals {
     /// nothing and setting the device up again needs it gone. A rejected assertion keeps it.
     static func discardsBinding(resultCode: Int?, reason: String) -> Bool {
         resultCode == 404 && reason == deviceNotFound
+    }
+
+    /// Whether the refusal says something about the session as well as the call: the device is unknown, or the
+    /// entry point cannot be used. Every other refusal leaves the session waiting for its code.
+    static func movesSession(resultCode: Int?, reason: String) -> Bool {
+        discardsBinding(resultCode: resultCode, reason: reason) || (resultCode == 403 && reason == entryPointUnusable)
     }
 
     static func catalogType(resultCode: Int?, reason: String) -> PayabliErrorType {
@@ -77,4 +90,11 @@ enum ActivationRefusals {
         "X-Assertion-Timestamp header is required.",
         "X-App-Assertion is not valid base64."
     ]
+}
+
+/// An `/activate` refusal, classified. A host receives `hostError`; `movesSession` says whether the session
+/// lands by it or stays where it is.
+struct ActivationRefusal: Error {
+    let hostError: TapToPayError
+    let movesSession: Bool
 }

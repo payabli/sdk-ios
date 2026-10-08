@@ -93,6 +93,49 @@ final class TapToPayErrorEdgeTests: XCTestCase {
         }
     }
 
+    // MARK: - Where an activation refusal lands
+
+    func testAnActivationForAnUnknownDeviceLandsOnSettingItUpAgain() async throws {
+        let session = try await landingAfterRefusal(status: 404, reason: "Device not found.")
+        XCTAssertEqual(session.error, .deviceSetupRequired)
+        XCTAssertEqual(session.state, .failed(reason: .deviceSetupRequired))
+    }
+
+    func testAnActivationWithAnUnusableEntryPointLandsOnItsConfiguration() async throws {
+        let session = try await landingAfterRefusal(status: 403, reason: "Entry point is not available for this request.")
+        XCTAssertEqual(session.error, .entryPointRefused)
+        XCTAssertEqual(session.state, .failed(reason: .configurationRejected))
+    }
+
+    func testAnActivationWhoseAssertionIsRejectedLeavesTheSessionPending() async throws {
+        let session = try await landingAfterRefusal(status: 400, reason: "Assertion verification failed: bad signature")
+        XCTAssertEqual(session.error, .deviceSetupRequired)
+        XCTAssertEqual(session.state, .pendingActivation(activationId: "dev"))
+    }
+
+    func testAWrongActivationCodeLeavesTheSessionPending() async throws {
+        let session = try await landingAfterRefusal(status: 400, reason: "Invalid activation code.")
+        XCTAssertEqual(session.error, .activationCodeIncorrect)
+        XCTAssertEqual(session.state, .pendingActivation(activationId: "dev"))
+    }
+
+    /// Activates a pending device against a refusal, and answers what the caller was told and where the
+    /// session landed.
+    private func landingAfterRefusal(
+        status: Int,
+        reason: String
+    ) async throws -> (error: PayabliErrorType?, state: PayabliTTPSessionState) {
+        let (ttp, attestation) = try await makePendingTTP()
+        attestation.activationResult = .failure(ActivationRefusals.refusal(resultCode: status, reason: reason))
+        do {
+            try await ttp.activateDevice(activationCode: "123456")
+            XCTFail("a refused activation reported success")
+        } catch {
+            return ((error as? TapToPayError)?.type, ttp.sessionState)
+        }
+        return (nil, ttp.sessionState)
+    }
+
     // MARK: - Objective-C
 
     func testEveryObjectiveCCompanionCompletesWithTheCatalogNumber() async throws {
