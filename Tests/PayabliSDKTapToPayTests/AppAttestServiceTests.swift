@@ -609,6 +609,9 @@ final class AppAttestServiceTests: XCTestCase {
         } catch {
             XCTFail("the Keychain's own error crossed the SDK boundary: \(error)")
         }
+
+        storage.readFailure = nil
+        XCTAssertEqual(try sut.binding(for: "myEntry")?.deviceId, "dev", "a refused read changed the store")
     }
 
     // MARK: - The pending slot and the key it names
