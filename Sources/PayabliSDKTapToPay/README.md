@@ -256,7 +256,7 @@ From Objective-C, these errors arrive as `NSError`. See
 | `.idle` | Not started, or activated and waiting for `initialize()`. |
 | `.attestingDevice`, `.fetchingConfig`, `.initializingReader(percent:)` | `initialize()` is running. |
 | `.ready` | Ready to charge. |
-| `.charging(activity:)` | `charge` is running, and `isReady` is `false` until it ends. It ends at `.ready`, at `.sessionExpired` when the reader session was spent, or at `.failed(reason: .deviceSetupRequired)` when the device's registration is gone. `activity` is `.opening`, `.waitingForCard` or `.closing`, or a prompt the reader raised during the tap: `.cardDetected`, `.cardRemovalRequested`, `.cardReadRetryRequested`, `.pinEntryRequested`, `.pinEntryCompleted` or `.readerPromptDismissed`. The outcome is what `charge` returns or throws. |
+| `.charging(activity:)` | `charge` is running, and `isReady` is `false` until it ends, unless `initialize()` is called during it and rebuilds the session. It ends at `.ready`, at `.sessionExpired` when the reader session was spent, or at `.failed(reason: .deviceSetupRequired)` when the device's registration is gone. `activity` is `.opening`, `.waitingForCard` or `.closing`, or a prompt the reader raised during the tap: `.cardDetected`, `.cardRemovalRequested`, `.cardReadRetryRequested`, `.pinEntryRequested`, `.pinEntryCompleted` or `.readerPromptDismissed`. The outcome is what `charge` returns or throws. |
 | `.pendingActivation(activationId:)` | The phone needs an activation code. `activationId` is what the activation route's `deviceId` field takes. |
 | `.pendingTerms` | The merchant hasn't accepted Apple's terms. |
 | `.sessionExpired` | The session needs refreshing. The next `charge` refreshes it. |
