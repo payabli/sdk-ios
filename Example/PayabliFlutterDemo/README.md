@@ -10,8 +10,8 @@ MethodChannel + EventChannel bridge in `Bridges/Flutter/`.
 - **Charge** — full sale via `PayabliTTP.charge(paymentDetails:)` with NFC tap.
 - **Activate device** — pending-device activation with an out-of-band
   code.
-- **Live event log** — every `PayabliTTPEvent` from the EventChannel
-  rendered into a list.
+- **Session state log** — every `PayabliTTPSessionSnapshot` from
+  `PayabliTTP.sessionStates()`, with the charge activity while charging.
 - **Session badge** — current `PayabliTTPSessionState` color-coded in
   the app bar.
 - **Card and bank account payment flow** — sample Flutter forms calling
@@ -73,9 +73,10 @@ the form requires a valid Bearer access token from your backend for
   answers the same `refreshToken` callback, because the SDK runs one
   session with one token source. Keep private Payabli credentials on
   your backend.
-- Lifecycle events arrive via `PayabliTTP.events()` — a broadcast
-  `Stream<PayabliTTPEvent>` backed by the EventChannel. Each event
-  carries a `code` (typed `PayabliTTPEventCode` enum) and a `payload`
-  map (per-case schema documented in the bridge source).
+- Session state changes arrive via `PayabliTTP.sessionStates()`, a
+  broadcast `Stream<PayabliTTPSessionSnapshot>` backed by the
+  EventChannel. Each snapshot is what `PayabliTTP.getSessionState()`
+  returns: the `code`, plus `chargeActivity` while the state is
+  `charging`. The bridge is an example to adapt, not a published package.
 - Errors thrown by the SDK surface as `PayabliTTPException`. Its code is
   the catalog number of the `TapToPayError` the SDK raised, such as `3001`.

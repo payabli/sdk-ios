@@ -34,8 +34,10 @@ into the bridge APIs.
 Each bridge runs one session with one token callback: `configure` and `configurePayIn` both take a
 `tokenProvider`, and when a host calls both, the callback from the later successful call answers every token request.
 
-The Flutter plugin talks to the native SDK over two channels. `com.payabli.sdk` carries every call, Tap to
-Pay, payment flow and session alike. `com.payabli.sdk/events` carries Tap to Pay's lifecycle events only.
+The example Flutter plugin talks to the native SDK over two channels. `com.payabli.sdk` carries every call,
+Tap to Pay, payment flow and session alike. `com.payabli.sdk/events` carries the Tap to Pay session state,
+the same snapshot `getSessionState` returns, after every change; Dart reads it as
+`PayabliTTP.sessionStates()`.
 
 The device's identity is on the session, not on either capability: `PayabliSession.deviceId()` in Flutter and
 React Native, and `PayabliSessionObjC.DeviceId` in .NET MAUI. It is `null` before a configure has succeeded and

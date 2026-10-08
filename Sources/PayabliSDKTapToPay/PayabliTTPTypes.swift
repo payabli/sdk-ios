@@ -33,6 +33,11 @@ public enum PayabliTTPSessionState: Sendable, Equatable {
     /// the host presents them. Resolved the way `pendingActivation` is: the host acts, then initializes
     /// again.
     case pendingTerms
+
+    /// A charge holds the reader, and `activity` says what it is doing. Entered
+    /// when a charge starts and left when it ends; the outcome is what the charge
+    /// returns or throws.
+    case charging(activity: TapToPayChargeActivity)
 }
 
 /// ``PayabliTTPSessionState`` without its payloads, for ObjC, MAUI, React
@@ -51,6 +56,7 @@ public enum PayabliTTPSessionState: Sendable, Equatable {
     case pendingActivation = 7
     case failed = 8
     case pendingTerms = 9
+    case charging = 10
 }
 
 public extension PayabliTTPSessionState {
@@ -67,6 +73,7 @@ public extension PayabliTTPSessionState {
         case .pendingActivation: return .pendingActivation
         case .failed: return .failed
         case .pendingTerms: return .pendingTerms
+        case .charging: return .charging
         }
     }
 
@@ -75,6 +82,12 @@ public extension PayabliTTPSessionState {
     var readerConfigurationPercent: Int? {
         guard case let .initializingReader(percent) = self else { return nil }
         return percent
+    }
+
+    /// What the running charge is doing, or `nil` when no charge is running.
+    var chargeActivity: TapToPayChargeActivity? {
+        guard case let .charging(activity) = self else { return nil }
+        return activity
     }
 
     /// Why the session failed, or `nil` when it has not.

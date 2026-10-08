@@ -93,7 +93,7 @@ enum TapToPaySteps {
         // request. `.attestingDevice` is set before that request, and `.error` is
         // where a failing token provider lands.
         let sessionProvesBackend = switch session {
-        case .fetchingConfig, .initializingReader, .ready, .pendingActivation, .pendingTerms, .reinitializing:
+        case .fetchingConfig, .initializingReader, .ready, .charging, .pendingActivation, .pendingTerms, .reinitializing:
             true
         default:
             false
@@ -124,7 +124,7 @@ enum TapToPaySteps {
             if outcome == .succeeded {
                 return .done
             }
-            if session == .ready {
+            if session == .ready || session == .charging {
                 return .notNeeded
             }
             // What is left is `.pendingActivation`, or the `.error` the step
@@ -248,7 +248,7 @@ enum TapToPaySteps {
     ) -> StepStatus {
         guard token.isFinished else { return .blocked }
         switch session {
-        case .ready: return .done
+        case .ready, .charging: return .done
         case .attestingDevice, .fetchingConfig, .initializingReader, .reinitializing: return .inProgress
         // Activation is a separate step, so reaching it means this one
         // finished — unless the enable that follows a successful activation

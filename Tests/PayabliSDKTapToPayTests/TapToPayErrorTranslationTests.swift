@@ -246,18 +246,6 @@ final class TapToPayErrorTranslationTests: XCTestCase {
         XCTAssertNil(PayabliTTPError.initiateFailed(reason: "x").paymentTransId)
     }
 
-    // MARK: - What an event carries
-
-    func testAnEventCarriesTheWireNameOfTheErrorAHostReceives() {
-        XCTAssertEqual(TapToPayErrorTranslation.eventName(of: PayabliTTPError.nfcFailed(reason: "x")), "TAP_NOT_COMPLETED")
-        XCTAssertEqual(TapToPayErrorTranslation.eventName(of: PayabliTTPError.configFailed(reason: "x")), "UNKNOWN")
-        XCTAssertEqual(
-            TapToPayErrorTranslation.eventName(of: PayabliGenericError(type: .rateLimited, reason: "slow down")),
-            "RATE_LIMITED"
-        )
-        XCTAssertEqual(TapToPayErrorTranslation.eventName(of: CancellationError()), "USER_CANCELLED")
-    }
-
     // MARK: - The NSError an Objective-C caller receives
 
     func testAnObjectiveCCallerReceivesTheCatalogNumberCaptureAndPayment() throws {

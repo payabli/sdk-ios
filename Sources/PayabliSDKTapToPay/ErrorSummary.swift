@@ -116,6 +116,7 @@ enum ErrorSummary {
         case .pendingActivation: return "pendingActivation"
         case .pendingTerms: return "pendingTerms"
         case .failed: return "failed"
+        case .charging: return "charging"
         }
     }
 }

@@ -4,22 +4,17 @@ import Foundation
 
 /// Customer information associated with a Tap to Pay charge.
 ///
-/// The same struct flows transparently across all four stages of the charge
-/// pipeline — the host app provides it once to `PayabliTTP.charge(...)` and the
-/// SDK threads it through:
+/// The host app passes it to `PayabliTTP.charge(...)`, and the SDK carries it:
 ///
 ///   1. `POST /api/v2/MoneyIn/initiate` — serialised as `customerData.firstName
 ///      / lastName / customerNumber` (PRD §8.2 "Initiate request").
 ///   2. Provider `startReading(_:)` — forwarded via `CardReadRequest.customer`
-///      so adapters that can pass a cardholder name to their processor SDK
-///      (e.g. `BillingDetails`) receive it. Fiserv's atomic
-///      `charges(amount:)` call does not accept a billing address, so the
-///      Fiserv adapter only logs it — but the data is still available to any
-///      future provider that needs it.
-///   3. `PATCH /api/v2/MoneyIn/update/{id}` — the backend persists the customer
-///      from the initiate step, so update bodies only carry the provider
-///      response verbatim. Customer data is still available in the SDK
-///      transaction context for any host-app observers listening on `events()`.
+///      for an adapter whose processor takes a cardholder name. Fiserv's
+///      `charges(amount:)` call takes no billing address, so the Fiserv
+///      adapter does not send one.
+///   3. `PATCH /api/v2/MoneyIn/update/{id}` — the backend keeps the customer
+///      from the initiate step, so update bodies carry only the provider
+///      response verbatim.
 ///
 /// All fields are optional; an empty instance is equivalent to "no customer
 /// provided" and the backend will accept it as an anonymous payor.
@@ -178,9 +173,8 @@ public struct PayabliTTPPaymentDetails: Sendable, Equatable {
 /// Invoice information associated with a Tap to Pay charge. Mirrors the
 /// wire-level `invoiceData` object the backend `/initiate` endpoint expects.
 ///
-/// The struct deliberately exposes only `invoiceNumber` — additional invoice
-/// metadata (line items, totals, due dates) is not part of the
-/// `GetPaidRequestPayload` contract.
+/// Only `invoiceNumber`: the `GetPaidRequestPayload` contract carries no other
+/// invoice metadata.
 public struct PayabliTTPInvoiceData: Sendable, Equatable {
     public let invoiceNumber: String?
 

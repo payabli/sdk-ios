@@ -9,8 +9,7 @@ private enum TTPUpdateOutcome {
     case succeeded
     case failed(reason: String, retryAfter: TimeInterval?)
 
-    /// The caller cancelled. Separate from `failed`, because no `updateFailed` event is emitted for it,
-    /// and the best-effort notify after a reader failure ignores it either way.
+    /// The caller cancelled. The best-effort notify after a reader failure ignores it.
     case cancelled
 }
 
@@ -96,10 +95,8 @@ extension PayabliTTP {
         // Step 1 — backend mints the paymentTransId.
         let paymentTransId = try await runInitiate(context: context)
         progress.paymentTransId = paymentTransId
-        multicaster.emit(.chargeInitiated(paymentTransId: paymentTransId))
 
         // Step 2 — NFC tap.
-        multicaster.emit(.nfcStarted)
         let readRequest = CardReadRequest(
             amount: context.paymentDetails.amount,
             merchantTransactionId: paymentTransId,
@@ -115,10 +112,8 @@ extension PayabliTTP {
         progress.askedForCard = true
         do {
             readResult = try await provider.startReading(readRequest)
-            multicaster.emit(.nfcCompleted)
         } catch {
             let failure = readFailure(error, paymentTransId: paymentTransId)
-            multicaster.emit(.nfcFailed(error: readFailureEventName(failure, paymentTransId: paymentTransId)))
 
             // A dead reader session is repaired only by re-initializing, and
             // `reinitializeIfNeeded()` does nothing while the state says `.ready`.
@@ -132,7 +127,6 @@ extension PayabliTTP {
                sessionManager.transition(to: .sessionExpired)
             {
                 syncPublished()
-                multicaster.emit(.sessionExpired)
             }
 
             // Best-effort backend notify so the transaction isn't left dangling.
@@ -167,7 +161,6 @@ extension PayabliTTP {
 
         switch update {
         case .succeeded where capture == .charged:
-            multicaster.emit(.updateCompleted(paymentTransId: paymentTransId))
             return TransactionResult(paymentTransId: paymentTransId)
         case .succeeded:
             throw PayabliTTPError.outcomeUnknown(paymentTransId: paymentTransId)
@@ -230,12 +223,6 @@ extension PayabliTTP {
     }
 
     // MARK: - Charge helpers
-
-    /// What the caller of a charge whose read failed is told, once the reader was asked for a card.
-    private func readFailureEventName(_ failure: Error, paymentTransId: String) -> String {
-        let reported = TapToPayErrorTranslation.hostError(for: failure, chargeOf: paymentTransId, askedForCard: true)
-        return TapToPayErrorTranslation.eventName(of: reported)
-    }
 
     /// The case the reader raised, with the payment it opened. A failure the reader already classified is
     /// kept, and the charge adds its payment at the edge. Any other failure with no case of its own that can
@@ -316,16 +303,10 @@ extension PayabliTTP {
             }
             return .succeeded
         } catch is CancellationError {
-            // Nothing below retries a cancelled request any more, and the event stream is not told the
-            // update failed. What the caller is told depends on what the tap did.
+            // Nothing below retries a cancelled request any more. What the caller is told depends on what
+            // the tap did.
             return .cancelled
         } catch {
-            // The event names what actually failed, not this surface's wrapper for it: a rate limit,
-            // a server fault, a decline and a transport failure all reduce to `updateFailed` once wrapped,
-            // and a host forwarding this to telemetry cannot then tell an outage from a refused card.
-            multicaster.emit(
-                .updateFailed(paymentTransId: paymentTransId, error: TapToPayErrorTranslation.eventName(of: error))
-            )
             // The caller still gets this surface's vocabulary, so the outcome reads the same whatever
             // layer underneath produced the failure.
             return .failed(reason: error.localizedDescription, retryAfter: (error as? PayabliRetryAfter)?.retryAfter)

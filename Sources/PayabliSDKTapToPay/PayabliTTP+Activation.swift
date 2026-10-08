@@ -8,11 +8,9 @@ public extension PayabliTTP {
     /// Activate a pending device using an activation code supplied by the
     /// partner out-of-band (e.g. an admin dashboard).
     ///
-    /// Emits `.activationStarted` on entry, `.activationCompleted` on success,
-    /// or `.activationFailed(error:)` on any failure path. A revoked attestation
-    /// or a registration replaced since its activation ID was read lands
-    /// `.failed(reason: .deviceSetupRequired)`, and `initialize()` sets the device
-    /// up again; `.sessionExpired` is also emitted for a revoked attestation.
+    /// On success the session returns to `.idle` so the caller runs `initialize()`
+    /// again. A device that has to be set up again lands
+    /// `.failed(reason: .deviceSetupRequired)`, and `initialize()` sets it up.
     func activateDevice(activationCode: String) async throws {
         try await reportingToHost {
             try await runSessionSetup(.activate) { try await self.runActivateDevice(activationCode: activationCode) }
@@ -23,7 +21,6 @@ public extension PayabliTTP {
         guard case let .pendingActivation(activationId) = sessionState else {
             throw TapToPayError(type: .deviceNotPending, reason: PayabliErrorType.deviceNotPending.message, detail: nil)
         }
-        multicaster.emit(.activationStarted)
         do {
             try await attestation.activateDevice(
                 activationCode: activationCode,
@@ -32,7 +29,6 @@ public extension PayabliTTP {
             )
             _ = sessionManager.transition(to: .idle)
             syncPublished()
-            multicaster.emit(.activationCompleted)
         } catch is ActivationRegistrationChanged {
             let failure = TapToPayError(
                 type: .deviceSetupRequired,
@@ -41,17 +37,14 @@ public extension PayabliTTP {
             )
             markError(failure)
             syncPublished()
-            multicaster.emit(.activationFailed(error: TapToPayErrorTranslation.eventName(of: failure)))
             throw failure
         } catch let signing as ActivationSigningFailed {
             markError(signing.hostError)
             syncPublished()
-            multicaster.emit(.activationFailed(error: TapToPayErrorTranslation.eventName(of: signing.hostError)))
             throw signing.hostError
         } catch let refusal as ActivationRefusal {
             markError(refusal)
             syncPublished()
-            multicaster.emit(.activationFailed(error: TapToPayErrorTranslation.eventName(of: refusal.hostError)))
             throw refusal.hostError
         } catch let err as PayabliTTPError {
             // The attestation service already cleared local cache for the
@@ -59,13 +52,10 @@ public extension PayabliTTP {
             if case .attestationRevoked = err {
                 markError(err)
                 syncPublished()
-                multicaster.emit(.sessionExpired)
-                multicaster.emit(.activationFailed(error: TapToPayErrorTranslation.eventName(of: err)))
                 throw err
             }
             markError(err)
             syncPublished()
-            multicaster.emit(.activationFailed(error: TapToPayErrorTranslation.eventName(of: err)))
             throw err
         } catch {
             // The reason is the error's parsed description rather than a rendering
@@ -78,7 +68,6 @@ public extension PayabliTTP {
             let failure: Error = error is any PayabliError || error is CancellationError ? error : mapped
             markError(error is TapToPayError ? error : mapped)
             syncPublished()
-            multicaster.emit(.activationFailed(error: TapToPayErrorTranslation.eventName(of: failure)))
             throw failure
         }
     }

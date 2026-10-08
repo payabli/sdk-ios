@@ -84,28 +84,12 @@ final class TTPUpdateRetryTests: XCTestCase {
         let ttp = try await makeReadyTTP(
             readFailure: TapToPayError(type: .sdkInternalError, reason: "SDK failure", detail: nil)
         )
-        let stream = ttp.events()
-        let reported = Task<String?, Never> {
-            for await event in stream {
-                if case let .nfcFailed(error) = event {
-                    return error
-                }
-            }
-            return nil
-        }
 
         let failure = await chargeFailure(ttp)
 
         XCTAssertEqual(failure?.type, .paymentOutcomeUnknown)
         XCTAssertEqual(failure?.paymentTransId, Self.paymentTransId)
         XCTAssertEqual(failure?.capture, .unknown)
-        let deadline = Task {
-            guard (try? await Task.sleep(nanoseconds: 2_000_000_000)) != nil else { return }
-            reported.cancel()
-        }
-        let name = await reported.value
-        deadline.cancel()
-        XCTAssertEqual(name, "PAYMENT_OUTCOME_UNKNOWN", "the event names what the caller is told")
     }
 
     /// A close the service refused with a wait reaches the caller with that wait, so a host retrying the
@@ -211,32 +195,6 @@ final class TTPUpdateRetryTests: XCTestCase {
         XCTAssertEqual(Self.updateResponses.sends, 1, "a refusal is still closed")
     }
 
-    /// `updateCompleted` has only ever meant the charge went through, so a refusal must not emit it.
-    func testARefusedCardEmitsNoCompletedUpdate() async throws {
-        Self.updateResponses.script([200])
-        let ttp = try await makeReadyTTP(outcome: .declined)
-
-        let stream = ttp.events()
-        let collector = Task<Bool, Never> {
-            for await event in stream {
-                if case .updateCompleted = event {
-                    return true
-                }
-            }
-            return false
-        }
-
-        _ = await chargeFailure(ttp)
-
-        let deadline = Task {
-            guard (try? await Task.sleep(nanoseconds: 500_000_000)) != nil else { return }
-            collector.cancel()
-        }
-        let completed = await collector.value
-        deadline.cancel()
-        XCTAssertFalse(completed, "a refused card was announced as a completed update")
-    }
-
     func testARefusedCardWhoseCloseFailsIsStillReportedAsRefused() async throws {
         Self.updateResponses.script([400])
         let ttp = try await makeReadyTTP(outcome: .declined)
@@ -282,41 +240,6 @@ final class TTPUpdateRetryTests: XCTestCase {
         }
         XCTAssertEqual(failure?.capture, .charged)
         XCTAssertEqual(failure?.paymentTransId, Self.paymentTransId)
-    }
-
-    /// The event names what failed, not the wrapper. Once wrapped, a rate limit, a server fault, a
-    /// decline and a transport failure all reduce to `updateFailed`, and a host forwarding this to
-    /// telemetry cannot tell an outage from a refused card.
-    func testTheUpdateFailedEventNamesTheUnderlyingFailure() async throws {
-        Self.updateResponses.script([402])
-        let ttp = try await makeReadyTTP()
-
-        let stream = ttp.events()
-        let collector = Task<String?, Never> {
-            for await event in stream {
-                if case let .updateFailed(_, error) = event {
-                    return error
-                }
-            }
-            return nil
-        }
-
-        _ = try? await charge(ttp)
-
-        // Bounded, because the regression this case exists to catch is the event not being emitted, and an
-        // unbounded read of the stream would hang the suite rather than report it.
-        let deadline = Task {
-            guard (try? await Task.sleep(nanoseconds: 2_000_000_000)) != nil else { return }
-            collector.cancel()
-        }
-        let summary = await collector.value
-        deadline.cancel()
-
-        XCTAssertEqual(
-            try XCTUnwrap(summary, "no updateFailed event arrived"),
-            "PAYMENT_DECLINED",
-            "a decline reaches telemetry as a decline, not as updateFailed"
-        )
     }
 
     // MARK: - Fixture

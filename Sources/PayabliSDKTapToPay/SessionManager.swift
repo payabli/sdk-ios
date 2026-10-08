@@ -75,6 +75,16 @@ final class SessionManager: ObservableObject {
         from current: PayabliTTPSessionState,
         to target: PayabliTTPSessionState
     ) -> Bool {
+        if case let .charging(activity) = current {
+            return chargeMayMove(from: activity, to: target)
+        }
+        return isValidSessionTransition(from: current, to: target)
+    }
+
+    private static func isValidSessionTransition(
+        from current: PayabliTTPSessionState,
+        to target: PayabliTTPSessionState
+    ) -> Bool {
         // Identity (re-entering same state) is allowed but not counted.
         if current == target {
             return true
@@ -107,7 +117,8 @@ final class SessionManager: ObservableObject {
             return true
 
         case (.ready, .sessionExpired),
-             (.ready, .failed):
+             (.ready, .failed),
+             (.ready, .charging(.opening)):
             return true
 
         case (.sessionExpired, .reinitializing):
@@ -128,6 +139,33 @@ final class SessionManager: ObservableObject {
             return true
 
         default:
+            return false
+        }
+    }
+
+    /// A charge ends back at ready whatever it ended in, or expired when the
+    /// read found the reader session spent, and starting over is always reachable.
+    private static func chargeMayMove(from activity: TapToPayChargeActivity, to target: PayabliTTPSessionState) -> Bool {
+        switch target {
+        case .idle, .ready, .sessionExpired:
+            return true
+        case let .charging(next):
+            return next == activity || advances(activity, next)
+        default:
+            return false
+        }
+    }
+
+    /// A charge opens, waits for a card, then closes. While it waits, the
+    /// reader's prompts follow each other in whatever order the payer causes.
+    private static func advances(_ from: TapToPayChargeActivity, _ to: TapToPayChargeActivity) -> Bool {
+        switch from {
+        case .opening:
+            return to == .waitingForCard
+        case .waitingForCard, .cardDetected, .cardRemovalRequested, .cardReadRetryRequested,
+             .pinEntryRequested, .pinEntryCompleted, .readerPromptDismissed:
+            return to != .opening
+        case .closing:
             return false
         }
     }

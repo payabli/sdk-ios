@@ -258,30 +258,30 @@ From Objective-C, these errors arrive as `NSError`. See
 | `.sdkInternalError` | Report it to Payabli. |
 | `.deviceKeyUnavailable` | This device's secure storage is unavailable, for example before the first unlock after a restart. Initialize again; if it persists, the device is the cause. |
 
-### Events
+### Watching the session
 
-`events()` returns an `AsyncStream<PayabliTTPEvent>` for progress UI. Don't log whole events:
-`.chargeInitiated` and others carry the transaction ID. Each stream receives the
-events emitted after it opens, and nothing emitted before. Open it before you call `initialize()` or
-`charge`, and read it in its own task, since the `for await` loop runs until the stream ends:
+`PayabliTTP` is an `ObservableObject`, so a SwiftUI view reads `sessionState` and redraws when it changes:
 
 ```swift
-let events = ttp.events()          // open the stream first
-eventTask = Task {                  // keep the task, and cancel it when your screen goes away
-    for await event in events {
-        switch event {
-        case .chargeInitiated(let paymentTransId): pendingTransId = paymentTransId
-        case .readerReady: showReady()
-        case .cardDetected: showReading()
-        default: break
+struct TerminalView: View {
+    @ObservedObject var ttp: PayabliTTP
+
+    var body: some View {
+        switch ttp.sessionState {
+        case .ready: Button("Charge") { Task { await charge() } }
+        case .initializingReader(let percent): ProgressView(value: Double(percent ?? 0), total: 100)
+        default: ProgressView()
         }
     }
 }
-try await ttp.initialize()
 ```
 
-`.chargeInitiated` carries the transaction ID before the card is read. Keep it, so you can reconcile a
-charge whose outcome is unknown. A stream opened after the charge started misses it.
+How a call ended is what it returns or throws. A failure raised after the payment was opened carries its
+`paymentTransId`.
+
+From Objective-C, `addSessionStateObserver(_:)` calls a block on the main thread after every change. The
+block carries nothing: read `sessionStateCode` and the accessors beside it, then call `cancel()` on the
+returned observation when your screen goes away.
 
 ## Go live
 

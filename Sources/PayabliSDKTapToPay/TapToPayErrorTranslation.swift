@@ -54,15 +54,6 @@ enum TapToPayErrorTranslation {
         )
     }
 
-    /// The catalog wire name `error` reaches a host under, which is what a card-present event carries.
-    /// A cancellation reaches a host as itself and has no entry, so its event reads `USER_CANCELLED`.
-    static func eventName(of error: Error) -> String {
-        guard let hostError = hostError(for: error) as? TapToPayError else {
-            return PayabliErrorType.userCancelled.rawValue
-        }
-        return hostError.type.rawValue
-    }
-
     // swiftlint:disable cyclomatic_complexity
 
     /// One branch per case, with no `default`, so a case added without an entry stops this compiling. A

@@ -14,8 +14,8 @@ end to end against sandbox.
   via `try await ttp.charge(type:paymentDetails:)`.
 - **Activate device** — pending-device activation with an out-of-band
   code via `ttp.activateDevice(activationCode:)`.
-- **Live event log** — every `PayabliTTPEvent` from the multicaster
-  rendered into a list, including the per-case payload.
+- **State log** — every session state the terminal moves through,
+  newest first.
 - **Session badge** — the navigation bar shows where the reader has got to,
   color-coded, as `TapToPaySessionStatus`: the SDK's states in this app's
   own words.

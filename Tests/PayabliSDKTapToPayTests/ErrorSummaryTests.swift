@@ -91,7 +91,8 @@ final class ErrorSummaryTests: XCTestCase {
             (.reinitializing, "reinitializing"),
             (.pendingActivation(activationId: "dev"), "pendingActivation"),
             (.pendingTerms, "pendingTerms"),
-            (.failed(reason: .sdkInternalError), "failed")
+            (.failed(reason: .sdkInternalError), "failed"),
+            (.charging(activity: .waitingForCard), "charging")
         ]
 
         for (state, name) in expected {
