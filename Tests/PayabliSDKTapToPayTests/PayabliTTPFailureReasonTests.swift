@@ -183,6 +183,28 @@ final class PayabliTTPFailureReasonTests: XCTestCase {
         XCTAssertEqual(PayabliTTPSessionStateCode.pendingActivation.rawValue, 7)
         XCTAssertEqual(PayabliTTPSessionStateCode.failed.rawValue, 8)
         XCTAssertEqual(PayabliTTPSessionStateCode.pendingTerms.rawValue, 9)
+        XCTAssertEqual(PayabliTTPSessionStateCode.charging.rawValue, 10)
+        XCTAssertNil(PayabliTTPSessionStateCode(rawValue: 11))
+    }
+
+    /// The activities a bridge reads by integer, each at a fixed value.
+    func testTheChargeActivitiesKeepTheirIntegers() {
+        let expected: [TapToPayChargeActivity] = [
+            .opening, .waitingForCard, .closing, .cardDetected, .cardRemovalRequested,
+            .cardReadRetryRequested, .pinEntryRequested, .pinEntryCompleted, .readerPromptDismissed
+        ]
+        XCTAssertEqual(TapToPayChargeActivity.allCases, expected)
+        for (index, activity) in expected.enumerated() {
+            XCTAssertEqual(activity.rawValue, index, "\(activity)")
+        }
+    }
+
+    func testTheChargingStateCarriesItsActivity() {
+        let state = PayabliTTPSessionState.charging(activity: .pinEntryRequested)
+
+        XCTAssertEqual(state.code, .charging)
+        XCTAssertEqual(state.chargeActivity, .pinEntryRequested)
+        XCTAssertNil(PayabliTTPSessionState.ready.chargeActivity)
     }
 
     /// The published vocabulary, each member at a fixed integer.

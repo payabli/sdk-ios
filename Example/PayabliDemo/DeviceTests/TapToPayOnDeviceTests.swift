@@ -351,17 +351,14 @@ final class TapToPayOnDeviceTests: XCTestCase {
     ) async throws -> (result: XCTWaiter.Result, reported: String) {
         let (ttp, _) = try await enrolledDevice()
 
-        let stream = ttp.events()
         let reachedTheTap = expectation(description: "the charge reached the tap")
+        reachedTheTap.assertForOverFulfill = false
         let seen = OutcomeBox()
 
-        let collector = Task {
-            for await event in stream {
-                if case .chargeInitiated = event {
-                    seen.recordInitiated()
-                    reachedTheTap.fulfill()
-                    return
-                }
+        let watcher = ttp.$sessionState.sink { state in
+            if state == .charging(activity: .waitingForCard) {
+                seen.recordInitiated()
+                reachedTheTap.fulfill()
             }
         }
 
@@ -387,7 +384,7 @@ final class TapToPayOnDeviceTests: XCTestCase {
         // is what closes it, and the facade offers no public way to reach it.
         await ttp.provider.cancelReading()
         charging.cancel()
-        collector.cancel()
+        watcher.cancel()
         _ = await charging.value
 
         // Names what was asserted, not only what the charge last threw: this test
@@ -475,7 +472,7 @@ private final class OutcomeBox: @unchecked Sendable {
         return "reachedTheTap=\(initiated ? "yes" : "no") terminal=\(terminal ?? "none")"
     }
 
-    /// Called on `chargeInitiated`, the last event before the reader waits for a card.
+    /// Called when the charge starts waiting for a card.
     func recordInitiated() {
         lock.lock()
         defer { lock.unlock() }

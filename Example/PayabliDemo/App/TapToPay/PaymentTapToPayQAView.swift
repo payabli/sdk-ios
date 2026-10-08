@@ -22,8 +22,7 @@ struct PaymentTapToPayQAView: View {
     @State private var termsMessage = ""
     @State private var activationMessage = ""
     @State private var chargeMessage = ""
-    @State private var eventLog: [TapToPayQAEventEntry] = []
-    @State private var eventToken: TapToPayEventSubscription?
+    @State private var stateLog: [TapToPayQAStateEntry] = []
     @State private var isActivationPresented = false
     @State private var isActivationHelpPresented = false
     @State private var activationOutcome = TapToPayActivationOutcome.none
@@ -32,7 +31,7 @@ struct PaymentTapToPayQAView: View {
 
     /// The two numeric-keypad fields. A decimal or number pad has no return key,
     /// so the screen has to offer the dismissal itself; without one the keyboard
-    /// covers the tab bar and the event log, and nothing on screen gets it back.
+    /// covers the tab bar and the state log, and nothing on screen gets it back.
     private enum Field: Hashable {
         case amount
         case activationCode
@@ -46,7 +45,7 @@ struct PaymentTapToPayQAView: View {
                     TerminalReadinessView()
                     stepsSection
                     recoverySection
-                    eventLogSection
+                    stateLogSection
                 }
                 .padding(16)
             }
@@ -57,11 +56,7 @@ struct PaymentTapToPayQAView: View {
             // here and never appeared, leaving the number pad with no way out.
             .safeAreaInset(edge: .bottom) { keyboardDismissBar }
             .sheet(isPresented: $isActivationPresented) { activationSheet }
-            .onAppear(perform: subscribeToEvents)
-            .onDisappear {
-                eventToken?.cancel()
-                eventToken = nil
-            }
+            .onChange(of: terminal.status, perform: logState)
         }
     }
 
@@ -338,37 +333,30 @@ struct PaymentTapToPayQAView: View {
 
     // MARK: - Output
 
-    private var eventLogSection: some View {
+    private var stateLogSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text("Event log")
+                Text("State log")
                     .font(.headline)
                 Spacer()
-                Button("Clear", role: .destructive) { eventLog.removeAll() }
+                Button("Clear", role: .destructive) { stateLog.removeAll() }
                     .font(.footnote)
                     .frame(minWidth: 44, minHeight: 44)
-                    .disabled(eventLog.isEmpty)
+                    .disabled(stateLog.isEmpty)
             }
 
-            if eventLog.isEmpty {
-                Text("No events yet")
+            if stateLog.isEmpty {
+                Text("No state changes yet")
                     .font(.footnote)
                     .foregroundColor(.payabliOnSurfaceVariant)
             } else {
-                ForEach(eventLog) { entry in
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(entry.label)
-                            .font(.caption.monospaced().bold())
-                        if !entry.detail.isEmpty {
-                            Text(entry.detail)
-                                .font(.caption.monospaced())
-                                .foregroundColor(.payabliOnSurfaceVariant)
-                        }
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(10)
-                    .background(Color.payabliSurfaceContainerHigh)
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                ForEach(stateLog) { entry in
+                    Text(entry.label)
+                        .font(.caption.monospaced().bold())
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(10)
+                        .background(Color.payabliSurfaceContainerHigh)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
                 }
             }
         }
@@ -600,23 +588,12 @@ struct PaymentTapToPayQAView: View {
         }
     }
 
-    // MARK: - Events
+    // MARK: - State log
 
-    private func subscribeToEvents() {
-        guard eventToken == nil else { return }
-        // The token owns both the subscription and its tear-down (cancelled in
-        // onDisappear). A detached Task over events() would leak across view
-        // appearances, since SwiftUI gives no handle to cancel it.
-        eventToken = terminal.addEventListener { event in
-            DispatchQueue.main.async {
-                eventLog.insert(
-                    TapToPayQAEventEntry(label: event.label, detail: event.detail),
-                    at: 0
-                )
-                if eventLog.count > 100 {
-                    eventLog.removeLast(eventLog.count - 100)
-                }
-            }
+    private func logState(_ status: TapToPaySessionStatus) {
+        stateLog.insert(TapToPayQAStateEntry(label: status.label), at: 0)
+        if stateLog.count > 100 {
+            stateLog.removeLast(stateLog.count - 100)
         }
     }
 
@@ -634,10 +611,9 @@ struct PaymentTapToPayQAView: View {
 
 // MARK: - Models
 
-struct TapToPayQAEventEntry: Identifiable {
+struct TapToPayQAStateEntry: Identifiable {
     let id = UUID()
     let label: String
-    let detail: String
 }
 
 /// The id a backend sends with the paypoint to issue this device's activation code.

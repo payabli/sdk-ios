@@ -157,33 +157,6 @@ final class PayabliTTPTermsTests: XCTestCase {
         XCTAssertEqual(ttp.sessionState, .pendingTerms)
     }
 
-    /// A host that watches events rather than state is told the same thing.
-    func testInitializeEmitsTermsRequired() async throws {
-        let (ttp, provider) = try makeTTP()
-        provider.prepareReaderResult = .failure(PayabliTTPError.termsNotAccepted)
-
-        let stream = ttp.events()
-        let collector = Task { () -> Bool in
-            for await event in stream where event.code == .termsRequired {
-                return true
-            }
-            return false
-        }
-
-        _ = try? await ttp.initialize()
-
-        // Bounded, because the regression this case exists to catch is the event not being emitted, and
-        // an unbounded read of the stream would hang the suite rather than report it.
-        let deadline = Task {
-            guard (try? await Task.sleep(nanoseconds: 2_000_000_000)) != nil else { return }
-            collector.cancel()
-        }
-        let emitted = await collector.value
-        deadline.cancel()
-
-        XCTAssertTrue(emitted, "a host watching events is told what the session is waiting on")
-    }
-
     /// Any other setup failure is still an error, so the terms path did not widen what it catches.
     func testAnOrdinarySetupFailureIsStillAnError() async throws {
         let (ttp, provider) = try makeTTP()

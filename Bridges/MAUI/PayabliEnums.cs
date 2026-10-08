@@ -16,6 +16,20 @@ namespace Payabli.TapToPay
     }
 
     [Native]
+    public enum TapToPayChargeActivity : long
+    {
+        Opening = 0,
+        WaitingForCard = 1,
+        Closing = 2,
+        CardDetected = 3,
+        CardRemovalRequested = 4,
+        CardReadRetryRequested = 5,
+        PinEntryRequested = 6,
+        PinEntryCompleted = 7,
+        ReaderPromptDismissed = 8,
+    }
+
+    [Native]
     public enum PayabliEnvironment : long
     {
         Local = 0,
@@ -43,40 +57,6 @@ namespace Payabli.TapToPay
         PendingActivation = 7,
         Failed = 8,
         PendingTerms = 9,
-    }
-
-    [Native]
-    public enum PayabliTTPEventCode : long
-    {
-        AttestationStarted = 0,
-        AttestationCompleted = 1,
-        ConfigReceived = 2,
-        ReaderInitializing = 3,
-        ReaderReady = 4,
-        ChargeInitiated = 5,
-        NfcStarted = 6,
-        NfcCompleted = 7,
-        NfcFailed = 8,
-        UpdateCompleted = 9,
-        UpdateFailed = 10,
-        SessionExpired = 11,
-        ReinitializeStarted = 12,
-        ReinitializeCompleted = 13,
-        DevicePendingActivation = 14,
-        ActivationStarted = 15,
-        ActivationCompleted = 16,
-        ActivationFailed = 17,
-        AttestationFailed = 18,
-        ConfigFailed = 19,
-        TermsRequired = 20,
-        // 21 retired: progress is a payload on the session state. Not reused,
-        // because consumers resolve this package from source against main.
-        ReaderNotReady = 22,
-        CardDetected = 23,
-        CardRemovalRequested = 24,
-        CardReadRetryRequested = 25,
-        PinEntryRequested = 26,
-        PinEntryCompleted = 27,
-        ReaderPromptDismissed = 28,
+        Charging = 10,
     }
 }

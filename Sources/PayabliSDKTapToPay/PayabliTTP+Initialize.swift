@@ -70,7 +70,6 @@ extension PayabliTTP {
 
         // 2. Fetch /config.
         let config = try await runFetchConfigPhase()
-        multicaster.emit(.configReceived)
 
         // 3. Configure provider.
         try runConfigurePhase(credentials: config.providerCredentials)
@@ -79,7 +78,6 @@ extension PayabliTTP {
         try await runPrepareReaderPhase()
         _ = sessionManager.transition(to: .ready)
         syncPublished()
-        multicaster.emit(.readerReady)
     }
 
     /// `@objc` companion to `initialize()` for ObjC / MAUI / Flutter / RN
@@ -124,7 +122,6 @@ extension PayabliTTP {
             throw PayabliTTPError.notReady(current: sessionState)
         }
 
-        multicaster.emit(.reinitializeStarted)
         _ = sessionManager.transition(to: .reinitializing)
         syncPublished()
         _ = sessionManager.transition(to: .fetchingConfig)
@@ -132,7 +129,6 @@ extension PayabliTTP {
 
         // 2. Fresh /config (credentials never survive between sessions).
         let config = try await runFetchConfigPhase()
-        multicaster.emit(.configReceived)
 
         // 3. Re-configure provider.
         try runConfigurePhase(credentials: config.providerCredentials)
@@ -141,7 +137,6 @@ extension PayabliTTP {
         try await runPrepareReaderPhase()
         _ = sessionManager.transition(to: .ready)
         syncPublished()
-        multicaster.emit(.reinitializeCompleted)
     }
 
     /// `@objc` companion to `reinitializeIfNeeded()`. Same callback contract
@@ -180,7 +175,7 @@ extension PayabliTTP {
         do {
             // Inside the handling below, because reading the binding can fail and a
             // failure that skipped it would throw out of `initialize()` while the
-            // published state stayed where `reset()` left it, and emit nothing. The
+            // published state stayed where `reset()` left it. The
             // caller and the observable state would then describe different things.
             if try await attestation.isAttested(for: entryPoint) {
                 _ = sessionManager.transition(to: .fetchingConfig)
@@ -190,22 +185,18 @@ extension PayabliTTP {
 
             _ = sessionManager.transition(to: .attestingDevice)
             syncPublished()
-            multicaster.emit(.attestationStarted)
 
             _ = try await attestation.attest(entry: entryPoint)
-            multicaster.emit(.attestationCompleted)
             _ = sessionManager.transition(to: .fetchingConfig)
             syncPublished()
         } catch PayabliTTPError.devicePendingActivation {
             if let failure = landPendingActivation() {
-                multicaster.emit(.attestationFailed(error: TapToPayErrorTranslation.eventName(of: failure)))
                 throw failure
             }
             throw PayabliTTPError.devicePendingActivation
         } catch {
             markError(error)
             syncPublished()
-            multicaster.emit(.attestationFailed(error: TapToPayErrorTranslation.eventName(of: error)))
             throw error
         }
     }
@@ -225,7 +216,6 @@ extension PayabliTTP {
             return try await configClient.fetchConfig(entry: entryPoint)
         } catch let pending as ConfigPendingActivation {
             if let failure = landPendingActivation(answeredFor: pending.presentedDeviceId) {
-                multicaster.emit(.configFailed(error: TapToPayErrorTranslation.eventName(of: failure)))
                 throw failure
             }
             throw PayabliTTPError.devicePendingActivation
@@ -244,7 +234,6 @@ extension PayabliTTP {
             // briefly away still reads as one to try again.
             markError(error)
             syncPublished()
-            multicaster.emit(.configFailed(error: TapToPayErrorTranslation.eventName(of: failure)))
             throw failure
         }
     }
@@ -269,7 +258,7 @@ extension PayabliTTP {
     private func runPrepareReaderPhase() async throws {
         // Progress belongs to one configuration. The handler below carries which
         // one it is, and this releases the claim when the configuration ends, so
-        // a percentage raised afterwards is dropped rather than announced.
+        // a percentage raised afterwards is dropped.
         nextConfigurationID += 1
         let configuration = nextConfigurationID
         activeConfiguration = configuration
@@ -281,7 +270,6 @@ extension PayabliTTP {
 
         _ = sessionManager.transition(to: .initializingReader(percent: nil))
         syncPublished()
-        multicaster.emit(.readerInitializing)
         do {
             try await provider.prepareReader { [weak self] event in
                 self?.handleReaderEvent(event, from: configuration)
@@ -309,7 +297,6 @@ extension PayabliTTP {
         case let .held(activationId) where presented == nil || presented == activationId:
             _ = sessionManager.transition(to: .pendingActivation(activationId: activationId))
             syncPublished()
-            multicaster.emit(.devicePendingActivation)
             return nil
         case .held, .none where presented != nil:
             let stale = PayabliTTPError.configFailed(
@@ -347,6 +334,5 @@ extension PayabliTTP {
     private func markPendingTerms() {
         _ = sessionManager.transition(to: .pendingTerms)
         syncPublished()
-        multicaster.emit(.termsRequired)
     }
 }

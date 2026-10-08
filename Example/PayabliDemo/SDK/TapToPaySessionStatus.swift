@@ -14,6 +14,7 @@ enum TapToPaySessionStatus {
     case reinitializing
     case pendingActivation
     case pendingTerms
+    case charging
     case error
     case unrecognised(Int)
 
@@ -29,6 +30,7 @@ enum TapToPaySessionStatus {
         case .reinitializing: return "reinit"
         case .pendingActivation: return "pending"
         case .pendingTerms: return "terms"
+        case .charging: return "charging"
         case .error: return "error"
         case let .unrecognised(raw): return "state(\(raw))"
         }
@@ -74,6 +76,7 @@ extension TapToPaySessionStatus {
         case .pendingActivation: self = .pendingActivation
         case .pendingTerms: self = .pendingTerms
         case .failed: self = .error
+        case .charging: self = .charging
         // The SDK ships as a resilient binary framework, so a host built against
         // this version can be handed a case added by a later one.
         @unknown default: self = .unrecognised(state.code.rawValue)

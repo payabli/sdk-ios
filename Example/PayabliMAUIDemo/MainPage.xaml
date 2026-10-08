@@ -58,11 +58,11 @@
                 <Label x:Name="ResultLabel" Text="—" FontSize="14" />
             </Frame>
 
-            <!-- Event log -->
-            <Label Text="Event log" FontAttributes="Bold" FontSize="12" TextColor="Gray" />
+            <!-- Session state log -->
+            <Label Text="Session state log" FontAttributes="Bold" FontSize="12" TextColor="Gray" />
             <Frame Padding="12" HeightRequest="240">
                 <ScrollView>
-                    <Label x:Name="EventLog" Text="No events yet" FontSize="12" TextColor="Gray" />
+                    <Label x:Name="StateLog" Text="No state changes yet" FontSize="12" TextColor="Gray" />
                 </ScrollView>
             </Frame>
 
