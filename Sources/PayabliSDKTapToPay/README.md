@@ -66,8 +66,8 @@ curl -X POST "https://api-sandbox.payabli.com/api/v2/paypoint/{entryPoint}/apps"
   passes it.
 
 An app that isn't an authorized app is refused when the device attests, with an HTTP 403. `initialize()`
-throws a `PayabliGenericError` whose `type` is `.permissionDenied`, not `attestationFailed`, and
-`sessionState` is `.failed(reason: .configurationRejected)`. Register the app, then initialize again.
+throws a `TapToPayError` whose `type` is `.permissionDenied`, and `sessionState` is
+`.failed(reason: .configurationRejected)`. Register the app, then initialize again.
 
 ## Set up
 
