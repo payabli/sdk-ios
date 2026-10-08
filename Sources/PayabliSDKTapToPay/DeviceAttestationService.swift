@@ -108,3 +108,13 @@ package protocol DeviceAttestationService: AnyObject, Sendable {
 package struct ActivationRegistrationChanged: Error {
     package init() {}
 }
+
+/// The assertion that signs `/activate` could not be produced, so nothing was sent. It lands by
+/// `hostError`'s code, because no activation code repairs a device that cannot sign.
+package struct ActivationSigningFailed: Error {
+    package let hostError: TapToPayError
+
+    package init(hostError: TapToPayError) {
+        self.hostError = hostError
+    }
+}

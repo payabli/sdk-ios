@@ -43,6 +43,11 @@ public extension PayabliTTP {
             syncPublished()
             multicaster.emit(.activationFailed(error: TapToPayErrorTranslation.eventName(of: failure)))
             throw failure
+        } catch let signing as ActivationSigningFailed {
+            markError(signing.hostError)
+            syncPublished()
+            multicaster.emit(.activationFailed(error: TapToPayErrorTranslation.eventName(of: signing.hostError)))
+            throw signing.hostError
         } catch let refusal as ActivationRefusal {
             markError(refusal)
             syncPublished()

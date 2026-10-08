@@ -48,6 +48,35 @@ final class PayabliTTPSetupLandingTests: XCTestCase {
         XCTAssertEqual(ttp.sessionState, .failed(reason: .serviceUnavailable))
     }
 
+    /// An activation that could not be signed lands by its cause, as `initialize` does, because no
+    /// activation code repairs a device that cannot sign.
+    func testAnActivationThatCannotBeSignedLandsByItsCause() async throws {
+        let cases: [(PayabliErrorType, PayabliTTPSessionState)] = [
+            (.deviceKeyUnavailable, .failed(reason: .deviceKeyUnavailable)),
+            (.deviceSetupNotConfigured, .failed(reason: .configurationRejected)),
+            (.deviceSetupUnsupported, .failed(reason: .deviceIneligible)),
+            (.deviceSetupUnavailable, .failed(reason: .serviceUnavailable)),
+            (.deviceSetupRequired, .failed(reason: .deviceSetupRequired)),
+            (.sdkInternalError, .failed(reason: .sdkInternalError))
+        ]
+        for (type, expected) in cases {
+            let (ttp, _, attestation) = try makeTTP()
+            attestation.pendingRegistration = "dev_e"
+            _ = try? await ttp.initialize()
+            attestation.activationResult = .failure(
+                ActivationSigningFailed(hostError: TapToPayError(type: type, reason: "x", detail: nil))
+            )
+
+            do {
+                try await ttp.activateDevice(activationCode: "123456")
+                XCTFail("activation succeeded past \(type)")
+            } catch {
+                XCTAssertEqual((error as? TapToPayError)?.type, type, "\(type): \(error)")
+            }
+            XCTAssertEqual(ttp.sessionState, expected, "\(type)")
+        }
+    }
+
     /// A withdrawn setup is asked again, which is safe.
     func testAWithdrawnSetupLandsOnIdle() async throws {
         let (ttp, _, attestation) = try makeTTP()

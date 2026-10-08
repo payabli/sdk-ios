@@ -23,7 +23,7 @@ package extension AppAttestService {
         // fresh timestamp rather than the challenge.
         _ = try await postChallenge(entry: entry)
 
-        let assertion = try await generateAssertion(for: entry)
+        let assertion = try await signingActivation(entry: entry)
         guard assertion.deviceId == activationId, try cachedDeviceId(for: entry) == activationId else {
             throw ActivationRegistrationChanged()
         }
@@ -75,5 +75,34 @@ package extension AppAttestService {
                 return ActivationRefusals.refusal(resultCode: code, reason: reason)
             }
         )
+    }
+
+    /// The assertion `/activate` is signed with, or a failure that says nothing was sent.
+    ///
+    /// The binding is already dropped for a key the platform no longer holds, so that refusal is a
+    /// setup that has ended.
+    private func signingActivation(entry: String) async throws -> AssertionHeaders {
+        do {
+            return try await generateAssertion(for: entry)
+        } catch let error as CancellationError {
+            throw error
+        } catch let error as TapToPayError {
+            throw ActivationSigningFailed(hostError: error)
+        } catch PayabliTTPError.attestationFailed {
+            throw ActivationSigningFailed(hostError: TapToPayError(
+                type: .deviceSetupRequired,
+                reason: "No device binding is held to sign the activation with",
+                detail: nil
+            ))
+        } catch {
+            let nsError = error as NSError
+            let keyIsGone = nsError.domain == Self.deviceCheckErrorDomain
+                && Self.deviceCheckUnusableKeyCodes.contains(nsError.code)
+            throw ActivationSigningFailed(hostError: TapToPayError(
+                type: keyIsGone ? .deviceSetupRequired : .sdkInternalError,
+                reason: "The activation could not be signed",
+                detail: "\(nsError.domain) \(nsError.code)"
+            ))
+        }
     }
 }

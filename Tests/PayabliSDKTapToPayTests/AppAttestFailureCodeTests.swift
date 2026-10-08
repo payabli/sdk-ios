@@ -107,6 +107,42 @@ final class AppAttestFailureCodeTests: XCTestCase {
         }
     }
 
+    // MARK: - The assertion that signs an activation
+
+    /// An activation whose assertion cannot be produced sends nothing, and reports the failure by
+    /// what repairs it.
+    func testAnActivationThatCannotBeSignedSendsNothingAndIsReportedByItsCause() async throws {
+        let cases: [(Error, PayabliErrorType)] = [
+            (deviceCheck(1), .deviceSetupUnsupported),
+            (deviceCheck(4), .deviceSetupUnavailable),
+            (deviceCheck(2), .deviceSetupRequired),
+            (deviceCheck(3), .deviceSetupRequired),
+            (deviceCheck(0), .sdkInternalError),
+            (NSError(domain: NSOSStatusErrorDomain, code: -1), .sdkInternalError)
+        ]
+        for (failure, expected) in cases {
+            let paths = PathsBox()
+            StubURLProtocol.handler = { request in
+                paths.append(request.url!.path)
+                return AttestFixture.ok(request, ["challengeId": "c_1", "challenge": "Y2hhbGxlbmdl"])
+            }
+            let storage = InMemorySecureStorage()
+            try AttestFixture.seedBinding(entry: "myEntry", deviceId: "dev", keyId: "key", in: storage)
+            let (sut, attestor, _) = try AttestFixture.makeService(storage: storage)
+            attestor.generateAssertionError = failure
+
+            do {
+                try await sut.activateDevice(activationCode: "123456", entry: "myEntry", activationId: "dev")
+                XCTFail("the activation was sent unsigned. \(failure)")
+            } catch let signing as ActivationSigningFailed {
+                XCTAssertEqual(signing.hostError.type, expected, "\(failure)")
+            } catch {
+                XCTFail("\(failure) reached the caller as \(error)")
+            }
+            XCTAssertFalse(paths.values.contains("/api/v2/device/taptopay/activate"), "\(failure): \(paths.values)")
+        }
+    }
+
     /// A store failure the Keychain did not report is this SDK's own.
     func testAStoreFailureTheKeychainDidNotReportIsAnSDKDefect() throws {
         let (sut, _, _) = try AttestFixture.makeService(storage: UnreadableStorage())
