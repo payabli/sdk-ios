@@ -570,7 +570,7 @@ final class AppAttestServiceTests: XCTestCase {
 
         storage.refusesWrites = true
         XCTAssertThrowsError(try sut.clearCache(for: "myEntry")) { error in
-            XCTAssertTrue(error is PayabliTTPError, "the Keychain's own error crossed the boundary: \(error)")
+            XCTAssertEqual((error as? TapToPayError)?.type, .deviceKeyUnavailable, "\(error)")
         }
 
         storage.refusesWrites = false
@@ -586,7 +586,8 @@ final class AppAttestServiceTests: XCTestCase {
     /// A store that could not be read reports this SDK's own error, not the
     /// Keychain's. The domain and the code are what the ObjC, MAUI, Flutter and
     /// React Native bridges map, so an error thrown as it arrived reaches every
-    /// bridge as a bare failure with nothing naming the cause.
+    /// bridge as a bare failure with nothing naming the cause. A Keychain that
+    /// does not answer is storage a retry can reach.
     func testAStorageFailureIsReportedAsThisSDKsOwnError() async throws {
         let storage = InMemorySecureStorage()
         try AttestFixture.seedBinding(entry: "myEntry", deviceId: "dev", keyId: "key", in: storage)
@@ -597,11 +598,8 @@ final class AppAttestServiceTests: XCTestCase {
         do {
             _ = try await sut.isAttested(for: "myEntry")
             XCTFail("a store that could not be read answered that the device is not enrolled")
-        } catch let error as PayabliTTPError {
-            guard case let .attestationFailed(reason) = error else {
-                return XCTFail("unexpected case: \(error)")
-            }
-            XCTAssertFalse(reason.isEmpty)
+        } catch let error as TapToPayError {
+            XCTAssertEqual(error.type, .deviceKeyUnavailable)
         } catch {
             XCTFail("the Keychain's own error crossed the SDK boundary: \(error)")
         }
@@ -662,8 +660,8 @@ final class AppAttestServiceTests: XCTestCase {
         do {
             _ = try await sut.attest(entry: "myEntry")
             XCTFail("the attempt continued with an identifier that could not be produced")
-        } catch is PayabliTTPError {
-            // The domain the bridges map.
+        } catch let error as TapToPayError {
+            XCTAssertEqual(error.type, .deviceKeyUnavailable)
         } catch {
             XCTFail("the Keychain's own error crossed the SDK boundary: \(error)")
         }

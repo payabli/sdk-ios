@@ -15,6 +15,10 @@ extension PayabliTTPSessionState {
     /// The map is one map for both platforms and mirrors the sibling's, so a
     /// merchant meeting one condition is sent to the same repair on either.
     static func landing(for error: Error, registration: StoredRegistration) -> PayabliTTPSessionState? {
+        if error is CancellationError {
+            // A shared setup whose owner withdrew sent nothing, so asking again is safe.
+            return .idle
+        }
         guard let ttpError = error as? PayabliTTPError else {
             return landingByType(error, registration: registration)
         }
@@ -69,14 +73,23 @@ extension PayabliTTPSessionState {
             // not repair needs a classification this map is not given.
             return pendingActivation(registration)
 
-        case .invalidConfiguration:
+        case .invalidConfiguration, .deviceSetupNotConfigured:
             return .failed(reason: .configurationRejected)
 
         case .deviceKeyUnavailable:
             return .failed(reason: .deviceKeyUnavailable)
 
-        case .deviceSetupUnsupported:
+        case .deviceSetupRequired:
+            return .failed(reason: .deviceSetupRequired)
+
+        case .deviceSetupUnsupported, .deviceIdentityUnavailable:
             return .failed(reason: .deviceIneligible)
+
+        case .deviceSetupUnavailable:
+            return .failed(reason: .serviceUnavailable)
+
+        case .sdkInternalError:
+            return .failed(reason: .sdkInternalError)
 
         case .decodingError, .validation:
             // Both are the two sides disagreeing about the contract. A 400 is

@@ -345,8 +345,8 @@ final class AttestationWireTests: XCTestCase {
         do {
             _ = try await sut.attest(entry: "myEntry")
             XCTFail("an attestation without an App ID was sent")
-        } catch PayabliTTPError.attestationFailed {
-            // Expected.
+        } catch {
+            XCTAssertEqual((error as? TapToPayError)?.type, .deviceSetupNotConfigured, "\(error)")
         }
         XCTAssertTrue(attests.values.isEmpty, "/attest was called without an App ID")
         XCTAssertEqual(attestor.attestKeyCalls, 0, "the key was spent without an App ID")

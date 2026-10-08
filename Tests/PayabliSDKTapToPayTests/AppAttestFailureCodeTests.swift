@@ -1,0 +1,185 @@
+@testable import PayabliSDKCore
+@testable import PayabliSDKTapToPay
+import PayabliSDKTestUtils
+import XCTest
+
+/// The catalog code each way of failing to set the device up reaches a caller with. The code decides
+/// where the session lands, so a cause carried under the wrong one sends a host to a remedy that
+/// cannot repair it.
+final class AppAttestFailureCodeTests: XCTestCase {
+    override func tearDown() {
+        StubURLProtocol.handler = nil
+        super.tearDown()
+    }
+
+    // MARK: - App Attest refusing a key
+
+    func testAKeyTheDeviceCannotMintIsReportedByWhatTheRefusalMeans() async throws {
+        let cases: [(Error, PayabliErrorType)] = [
+            (deviceCheck(1), .deviceSetupUnsupported),
+            (deviceCheck(4), .deviceSetupUnavailable),
+            (deviceCheck(0), .sdkInternalError),
+            (NSError(domain: NSOSStatusErrorDomain, code: -1), .sdkInternalError)
+        ]
+        for (failure, expected) in cases {
+            stubChallengeAndRegister()
+            let (sut, attestor, _) = try AttestFixture.makeService()
+            attestor.generateKeyError = failure
+
+            await assertAttestThrows(sut, expected, "\(failure)")
+        }
+    }
+
+    func testAKeyTheDeviceCannotAttestIsReportedByWhatTheRefusalMeans() async throws {
+        let cases: [(Error, PayabliErrorType)] = [
+            (deviceCheck(1), .deviceSetupUnsupported),
+            (deviceCheck(4), .deviceSetupUnavailable),
+            (deviceCheck(3), .sdkInternalError)
+        ]
+        for (failure, expected) in cases {
+            stubChallengeAndRegister()
+            let (sut, attestor, _) = try AttestFixture.makeService()
+            attestor.attestKeyError = failure
+
+            await assertAttestThrows(sut, expected, "\(failure)")
+        }
+    }
+
+    /// App Attest answering with neither a value nor an error breaks its own contract, so retrying
+    /// or setting up again cannot help.
+    func testAnAnswerWithNeitherAValueNorAnErrorIsAnSDKDefect() {
+        let result: Result<String, Error> = RealAppAttestor.completion(nil, nil, call: "generateKey")
+
+        XCTAssertThrowsError(try result.get()) { error in
+            XCTAssertEqual((error as? TapToPayError)?.type, .sdkInternalError, "\(error)")
+        }
+    }
+
+    func testAnAnswerWithAnErrorIsPassedOnAsItArrived() {
+        let result: Result<String, Error> = RealAppAttestor.completion("key", deviceCheck(4), call: "generateKey")
+
+        XCTAssertThrowsError(try result.get()) { error in
+            XCTAssertEqual((error as NSError).code, 4)
+            XCTAssertEqual((error as NSError).domain, AppAttestService.deviceCheckErrorDomain)
+        }
+    }
+
+    // MARK: - Secure storage
+
+    /// The Keychain refuses every read and write before the first unlock after a boot, and answers
+    /// once the phone is unlocked, so it is reported as storage that a retry can reach.
+    func testAKeychainThatDoesNotAnswerAWriteIsSecureStorageUnavailable() throws {
+        let storage = WriteRefusingStorage()
+        storage.refusesWrites = true
+        let (sut, _, _) = try AttestFixture.makeService(storage: storage)
+
+        XCTAssertThrowsError(try sut.remember(AttestedDevice(entry: "e", deviceId: "d", keyId: "k"))) { error in
+            XCTAssertEqual((error as? TapToPayError)?.type, .deviceKeyUnavailable, "\(error)")
+        }
+    }
+
+    /// A store failure the Keychain did not report is this SDK's own.
+    func testAStoreFailureTheKeychainDidNotReportIsAnSDKDefect() throws {
+        let (sut, _, _) = try AttestFixture.makeService(storage: UnreadableStorage())
+
+        XCTAssertThrowsError(try sut.remember(AttestedDevice(entry: "e", deviceId: "d", keyId: "k"))) { error in
+            XCTAssertEqual((error as? TapToPayError)?.type, .sdkInternalError, "\(error)")
+        }
+    }
+
+    // MARK: - A response that cannot be read
+
+    func testAChallengeResponseThatCannotBeDecodedIsADecodingError() async throws {
+        StubURLProtocol.handler = { request in
+            (
+                HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
+                Data("not json".utf8)
+            )
+        }
+        let (sut, _, _) = try AttestFixture.makeService()
+
+        await assertAttestThrows(sut, .decodingError)
+    }
+
+    func testAChallengeResponseWithNoPayloadIsADecodingError() async throws {
+        StubURLProtocol.handler = { request in
+            let body = try! JSONSerialization.data(withJSONObject: [
+                "responseCode": 1,
+                "isSuccess": true,
+                "responseText": "OK"
+            ])
+            return (
+                HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
+                body
+            )
+        }
+        let (sut, _, _) = try AttestFixture.makeService()
+
+        await assertAttestThrows(sut, .decodingError)
+    }
+
+    // MARK: - A device that cannot be identified
+
+    /// With no bundle identifier there is no install identity, and `/register` answers a blank one
+    /// with a refusal, so nothing is sent.
+    func testAnInstallWithNoIdentityIsRefusedBeforeRegistering() async throws {
+        let paths = PathsBox()
+        StubURLProtocol.handler = { request in
+            paths.append(request.url!.path)
+            if request.url!.path == "/api/v2/device/taptopay/challenge" {
+                return AttestFixture.ok(request, ["challengeId": "c_1", "challenge": "Y2hhbGxlbmdl"])
+            }
+            return AttestFixture.ok(request, ["deviceId": "dev_1"])
+        }
+        let (sut, _, _) = try AttestFixture.makeService(hardwareIdProvider: { "" })
+
+        await assertAttestThrows(sut, .deviceIdentityUnavailable)
+        XCTAssertFalse(paths.values.contains("/api/v2/device/taptopay/register"), "\(paths.values)")
+    }
+
+    // MARK: - Helpers
+
+    private func deviceCheck(_ code: Int) -> NSError {
+        NSError(domain: AppAttestService.deviceCheckErrorDomain, code: code)
+    }
+
+    private func stubChallengeAndRegister() {
+        StubURLProtocol.handler = { request in
+            if request.url!.path == "/api/v2/device/taptopay/challenge" {
+                return AttestFixture.ok(request, ["challengeId": "c_1", "challenge": "Y2hhbGxlbmdl"])
+            }
+            return AttestFixture.ok(request, ["deviceId": "dev_1"])
+        }
+    }
+
+    private func assertAttestThrows(
+        _ sut: AppAttestService,
+        _ type: PayabliErrorType,
+        _ message: String = "",
+        line: UInt = #line
+    ) async {
+        do {
+            _ = try await sut.attest(entry: "myEntry")
+            XCTFail("the attempt proceeded. \(message)", line: line)
+        } catch {
+            XCTAssertEqual((error as? TapToPayError)?.type, type, "\(error) \(message)", line: line)
+        }
+    }
+}
+
+/// A store whose reads fail with an error the Keychain did not raise.
+private struct UnreadableStorage: SecureStorage {
+    struct Unreadable: Error {}
+
+    func string(forKey _: String) throws -> String? {
+        throw Unreadable()
+    }
+
+    func set(_: String, forKey _: String) throws {
+        throw Unreadable()
+    }
+
+    func remove(forKey _: String) throws {
+        throw Unreadable()
+    }
+}

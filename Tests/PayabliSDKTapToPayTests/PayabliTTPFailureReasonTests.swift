@@ -112,6 +112,60 @@ final class PayabliTTPFailureReasonTests: XCTestCase {
         )
     }
 
+    func testAnSDKDefectLandsOnSDKInternalErrorNotTheTransportDefault() {
+        let error = TapToPayError(type: .sdkInternalError, reason: "x", detail: nil)
+
+        XCTAssertEqual(
+            PayabliTTPSessionState.landing(for: error, registration: .held(activationId: "dev")),
+            .failed(reason: .sdkInternalError)
+        )
+    }
+
+    func testAnUnreachableAttestationServiceLandsOnServiceUnavailable() {
+        let error = TapToPayError(type: .deviceSetupUnavailable, reason: "x", detail: nil)
+
+        XCTAssertEqual(
+            PayabliTTPSessionState.landing(for: error, registration: .held(activationId: "dev")),
+            .failed(reason: .serviceUnavailable)
+        )
+    }
+
+    func testADeviceThatCannotBeIdentifiedLandsOnDeviceIneligible() {
+        let error = TapToPayError(type: .deviceIdentityUnavailable, reason: "x", detail: nil)
+
+        XCTAssertEqual(
+            PayabliTTPSessionState.landing(for: error, registration: .held(activationId: "dev")),
+            .failed(reason: .deviceIneligible)
+        )
+    }
+
+    /// An App ID that cannot be read is the app's configuration, which someone changes.
+    func testAnAppNotConfiguredForSetupLandsOnConfigurationRejected() {
+        let error = TapToPayError(type: .deviceSetupNotConfigured, reason: "x", detail: nil)
+
+        XCTAssertEqual(
+            PayabliTTPSessionState.landing(for: error, registration: .held(activationId: "dev")),
+            .failed(reason: .configurationRejected)
+        )
+    }
+
+    func testALostDeviceSetupLandsOnDeviceSetupRequired() {
+        let error = TapToPayError(type: .deviceSetupRequired, reason: "x", detail: nil)
+
+        XCTAssertEqual(
+            PayabliTTPSessionState.landing(for: error, registration: .held(activationId: "dev")),
+            .failed(reason: .deviceSetupRequired)
+        )
+    }
+
+    /// A shared setup whose owner withdrew sent nothing, so asking again is safe.
+    func testAWithdrawnSetupLandsOnIdle() {
+        XCTAssertEqual(
+            PayabliTTPSessionState.landing(for: CancellationError(), registration: .held(activationId: "dev")),
+            .idle
+        )
+    }
+
     /// A status nothing has been seen producing has no agreed meaning, so it
     /// lands where being wrong costs a retry rather than a bug report.
     func testAStatusNoRouteHasProducedIsTreatedAsTransient() {

@@ -70,7 +70,6 @@ final class AppAttestKeyCheckTests: XCTestCase {
     func testAKeyCheckThatCannotTellStopsAndKeepsTheBinding() async throws {
         let failures = [
             NSError(domain: AppAttestService.deviceCheckErrorDomain, code: 0),
-            NSError(domain: AppAttestService.deviceCheckErrorDomain, code: 4),
             NSError(domain: NSOSStatusErrorDomain, code: -1)
         ]
         for failure in failures {
@@ -82,6 +81,18 @@ final class AppAttestKeyCheckTests: XCTestCase {
             await assertKeyCheckThrows(sut, .deviceKeyUnavailable, "\(failure.domain) \(failure.code)")
             XCTAssertNotNil(try sut.binding(for: "myEntry"), "\(failure.domain) \(failure.code)")
         }
+    }
+
+    /// Apple's attestation service out of reach says nothing about the key, which is retried later
+    /// with the same binding.
+    func testAKeyCheckThatCannotReachAppleStopsAsUnavailableAndKeepsTheBinding() async throws {
+        let storage = InMemorySecureStorage()
+        try AttestFixture.seedBinding(entry: "myEntry", deviceId: "dev", keyId: "key", in: storage)
+        let (sut, attestor, _) = try AttestFixture.makeService(storage: storage)
+        attestor.generateAssertionError = NSError(domain: AppAttestService.deviceCheckErrorDomain, code: 4)
+
+        await assertKeyCheckThrows(sut, .deviceSetupUnavailable)
+        XCTAssertNotNil(try sut.binding(for: "myEntry"))
     }
 
     /// A phone that cannot produce an assertion at all is not a key that went away.

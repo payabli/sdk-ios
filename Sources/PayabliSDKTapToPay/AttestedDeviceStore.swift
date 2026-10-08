@@ -157,7 +157,7 @@ final class AttestedDeviceStore {
         guard let data = try? JSONEncoder().encode(pending),
               let raw = String(bytes: data, encoding: .utf8)
         else {
-            throw PayabliTTPError.attestationFailed(reason: "The pending key could not be encoded")
+            throw TapToPayError(type: .sdkInternalError, reason: "The pending key could not be encoded", detail: nil)
         }
         try storage.set(raw, forKey: PayabliKeychainKey.pendingKeyId)
     }
@@ -191,7 +191,7 @@ final class AttestedDeviceStore {
         guard let data = try? JSONEncoder().encode(bindings),
               let raw = String(bytes: data, encoding: .utf8)
         else {
-            throw PayabliTTPError.attestationFailed(reason: "The device binding could not be encoded")
+            throw TapToPayError(type: .sdkInternalError, reason: "The device binding could not be encoded", detail: nil)
         }
         try storage.set(raw, forKey: PayabliKeychainKey.deviceBindings)
     }

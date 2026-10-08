@@ -58,14 +58,14 @@ extension AppAttestService {
         do {
             let success = try decoder.decode(PayabliEnvelope.Success<Payload>.self, from: response.body)
             guard let payload = success.responseData else {
-                throw PayabliTTPError.attestationFailed(reason: "\(label) missing responseData")
+                throw TapToPayError(type: .decodingError, reason: "\(label) missing responseData", detail: nil)
             }
             return payload
-        } catch let error as PayabliTTPError {
+        } catch let error as TapToPayError {
             throw error
         } catch {
             logger.error("[\(label)] payload decode failed: \(error.localizedDescription)")
-            throw PayabliTTPError.attestationFailed(reason: "Failed to decode \(label) response")
+            throw TapToPayError(type: .decodingError, reason: "Failed to decode \(label) response", detail: nil)
         }
     }
 

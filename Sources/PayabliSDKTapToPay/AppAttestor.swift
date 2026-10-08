@@ -1,4 +1,5 @@
 import Foundation
+import PayabliSDKCore
 
 #if canImport(DeviceCheck)
     import DeviceCheck
@@ -112,17 +113,7 @@ package protocol AppAttestor: Sendable {
         package func generateKey() async throws -> AppAttestKeyId {
             try await withCheckedThrowingContinuation { continuation in
                 DCAppAttestService.shared.generateKey { keyId, error in
-                    if let error {
-                        continuation.resume(throwing: error)
-                        return
-                    }
-                    guard let keyId else {
-                        continuation.resume(throwing: PayabliTTPError.attestationFailed(
-                            reason: "generateKey returned nil"
-                        ))
-                        return
-                    }
-                    continuation.resume(returning: AppAttestKeyId(keyId))
+                    continuation.resume(with: Self.completion(keyId, error, call: "generateKey").map(AppAttestKeyId.init))
                 }
             }
         }
@@ -130,17 +121,7 @@ package protocol AppAttestor: Sendable {
         package func attestKey(_ keyId: AppAttestKeyId, clientDataHash: ClientDataHash) async throws -> AttestationObject {
             try await withCheckedThrowingContinuation { continuation in
                 DCAppAttestService.shared.attestKey(keyId.rawValue, clientDataHash: clientDataHash.rawValue) { attestation, error in
-                    if let error {
-                        continuation.resume(throwing: error)
-                        return
-                    }
-                    guard let attestation else {
-                        continuation.resume(throwing: PayabliTTPError.attestationFailed(
-                            reason: "attestKey returned nil"
-                        ))
-                        return
-                    }
-                    continuation.resume(returning: AttestationObject(attestation))
+                    continuation.resume(with: Self.completion(attestation, error, call: "attestKey").map(AttestationObject.init))
                 }
             }
         }
@@ -148,19 +129,21 @@ package protocol AppAttestor: Sendable {
         package func generateAssertion(_ keyId: AppAttestKeyId, clientDataHash: ClientDataHash) async throws -> AppAttestAssertion {
             try await withCheckedThrowingContinuation { continuation in
                 DCAppAttestService.shared.generateAssertion(keyId.rawValue, clientDataHash: clientDataHash.rawValue) { assertion, error in
-                    if let error {
-                        continuation.resume(throwing: error)
-                        return
-                    }
-                    guard let assertion else {
-                        continuation.resume(throwing: PayabliTTPError.attestationFailed(
-                            reason: "generateAssertion returned nil"
-                        ))
-                        return
-                    }
-                    continuation.resume(returning: AppAttestAssertion(assertion))
+                    continuation.resume(with: Self.completion(assertion, error, call: "generateAssertion").map(AppAttestAssertion.init))
                 }
             }
+        }
+
+        /// What one App Attest completion handler answered. Its error is passed on as it arrived, for
+        /// the caller to classify; an answer with neither breaks the handler's contract.
+        static func completion<Value>(_ value: Value?, _ error: Error?, call: String) -> Result<Value, Error> {
+            if let error {
+                return .failure(error)
+            }
+            guard let value else {
+                return .failure(TapToPayError(type: .sdkInternalError, reason: "\(call) returned nil", detail: nil))
+            }
+            return .success(value)
         }
     }
 #endif
