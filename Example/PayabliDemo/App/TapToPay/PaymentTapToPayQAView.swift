@@ -556,13 +556,13 @@ struct PaymentTapToPayQAView: View {
             do {
                 try await terminal.activate(code: code)
             } catch let failure as TapToPayFailure {
-                // A revoked attestation resets the session to idle, and the way
-                // out is a fresh cold attestation. The reason goes to the step
+                // A device that has to be set up again needs a fresh cold
+                // attestation, not another code. The reason goes to the step
                 // that offers it.
-                if failure.isAttestationRevoked {
-                    activationOutcome = .attestationRevoked
+                if failure.isDeviceSetupRequired {
+                    activationOutcome = .deviceSetupRequired
                     enableMessage = "✗ \(failure.message)"
-                    activationMessage = "✗ Attestation revoked — re-enable the terminal, see step 2."
+                    activationMessage = "✗ This device must be set up again — re-enable the terminal, see step 2."
                 } else {
                     activationOutcome = .activationFailed
                     activationMessage = "✗ \(failure.message)"

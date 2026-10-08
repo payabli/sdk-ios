@@ -16,7 +16,7 @@ final class TapToPayStepsTests: XCTestCase {
     private let everyCombination: [Combination] = {
         let checks: [TokenCheck] = [.notRun, .checking, .reachable, .unreachable]
         let outcomes: [TapToPayActivationOutcome] =
-            [.none, .activationFailed, .attestationRevoked, .enableFailed, .succeeded]
+            [.none, .activationFailed, .deviceSetupRequired, .enableFailed, .succeeded]
         return checks.flatMap { check in
             everyTapToPayStatus.flatMap { session in
                 outcomes.map { Combination(tokenCheck: check, session: session, outcome: $0) }
@@ -263,12 +263,8 @@ final class TapToPayStepsTests: XCTestCase {
     }
 
     func testAFailedActivationIsOfferedTheFullSetup() {
-        // `.activationFailed` does not establish that `/activate` reached the
-        // backend. `generateAssertion` clears the cached key and device on a
-        // DeviceCheck error and throws before the request is sent, and that error
-        // is not a reader failure, so it arrives here indistinguishable from a
-        // decline. Only a 401 from `/activate` is reported as
-        // `.attestationRevoked`.
+        // A refused activation leaves the session `.error`, and recovery runs the
+        // setup that works whether or not the identity survived.
         let sequence = TapToPaySteps.forCharging(
             tokenCheck: .reachable, session: .error, activation: .activationFailed
         )
@@ -324,11 +320,10 @@ final class TapToPayStepsTests: XCTestCase {
         }
     }
 
-    func testARevokedAttestationIsTheEnableStepsFailure() {
-        // `activateDevice` resets to `.idle` for a revoked attestation and marks
-        // an error for every other refusal, so this is the one activation
-        // failure whose remedy is a fresh cold attestation.
-        for outcome in [TapToPayActivationOutcome.attestationRevoked, .activationFailed] {
+    func testAnActivationFailureAtIdleIsTheEnableStepsFailure() {
+        // An activation failure recorded while the session reads `.idle` was
+        // reset rather than marked, so its remedy is a fresh cold attestation.
+        for outcome in [TapToPayActivationOutcome.deviceSetupRequired, .activationFailed] {
             let sequence = TapToPaySteps.forCharging(
                 tokenCheck: .reachable, session: .idle, activation: outcome
             )
