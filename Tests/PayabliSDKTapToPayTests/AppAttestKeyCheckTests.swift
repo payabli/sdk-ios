@@ -107,6 +107,22 @@ final class AppAttestKeyCheckTests: XCTestCase {
         XCTAssertNotNil(try sut.binding(for: "myEntry"))
     }
 
+    /// A caller that withdrew while the key was checked gets its cancellation, and the binding stays.
+    func testAKeyCheckThatIsCancelledStaysACancellationAndKeepsTheBinding() async throws {
+        let storage = InMemorySecureStorage()
+        try AttestFixture.seedBinding(entry: "myEntry", deviceId: "dev", keyId: "key", in: storage)
+        let (sut, attestor, _) = try AttestFixture.makeService(storage: storage)
+        attestor.generateAssertionError = CancellationError()
+
+        do {
+            _ = try await sut.isAttested(for: "myEntry")
+            XCTFail("the key check proceeded past a cancellation")
+        } catch {
+            XCTAssertTrue(error is CancellationError, "\(error)")
+        }
+        XCTAssertNotNil(try sut.binding(for: "myEntry"))
+    }
+
     /// A phone that cannot produce an assertion at all is not a key that went away.
     func testAPhoneThatCannotSignStopsAsUnsupportedAndKeepsTheBinding() async throws {
         let storage = InMemorySecureStorage()

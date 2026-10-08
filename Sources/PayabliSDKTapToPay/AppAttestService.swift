@@ -120,6 +120,8 @@ package final class AppAttestService: DeviceAttestationService, @unchecked Senda
             return true
         } catch let error as TapToPayError {
             throw error
+        } catch let error as CancellationError {
+            throw error
         } catch {
             if let setupError = Self.deviceSetupError(for: error) {
                 logger.info("[attest] the key could not be checked; keeping the binding")
