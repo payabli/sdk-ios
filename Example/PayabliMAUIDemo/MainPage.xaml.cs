@@ -96,12 +96,14 @@ public partial class MainPage : ContentPage
                 throw new System.Exception(payInError.LocalizedDescription);
             }
 
+            _stateObservation?.Cancel();
             _stateObservation = ttp.AddSessionStateObserver(() =>
             {
-                var activity = ttp.ChargeActivity is { } raw
+                if (_ttp is not { } current) return;
+                var activity = current.ChargeActivity is { } raw
                     ? $" · {(TapToPayChargeActivity)raw.Int64Value}"
                     : "";
-                StateLog.Text = $"{ttp.SessionState}{activity}\n{StateLog.Text}";
+                StateLog.Text = $"{current.SessionState}{activity}\n{StateLog.Text}";
                 UpdateSessionBadge();
             });
 
