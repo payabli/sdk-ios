@@ -4,17 +4,9 @@ import Combine
 @testable import PayabliSDKTapToPay
 import XCTest
 
-/// What this branch changed, exercised against a live paypoint on real hardware.
-///
-/// Everything up to the tap: the read is abandoned once the charge waits for a card,
-/// except in the one test a person taps.
-///
-/// Each test establishes what it needs and assumes nothing about what ran before
-/// it. XCTest runs methods in name order by default and does not have to: a run can
-/// select one method or reorder them, and a test that reads what its neighbour
-/// wrote then passes or fails on that choice rather than on the code.
-///
-/// These register a device against the paypoint the run names, which is a write.
+/// Card-present against a live paypoint on real hardware, up to the tap except in the one test a person
+/// taps. Each test sets up what it needs, since a run may select or reorder methods. These register a
+/// device against the paypoint the run names, which is a write.
 @MainActor
 final class TapToPayOnDeviceTests: XCTestCase {
     // Set in setUp, read by every test: the XCTest shape for a fixture that cannot
