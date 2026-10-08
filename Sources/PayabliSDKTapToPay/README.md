@@ -277,8 +277,8 @@ struct TerminalView: View {
 }
 ```
 
-How a call ended is what it returns or throws. A charge whose outcome is unknown throws a `TapToPayError`
-carrying the payment's `paymentTransId`, so you can look it up.
+How a call ended is what it returns or throws. A failure raised after the payment was opened carries its
+`paymentTransId`.
 
 From Objective-C, `addSessionStateObserver(_:)` calls a block on the main thread after every change. The
 block carries nothing: read `sessionStateCode` and the accessors beside it, then call `cancel()` on the
