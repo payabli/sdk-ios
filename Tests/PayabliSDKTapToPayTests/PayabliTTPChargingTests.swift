@@ -96,6 +96,24 @@ final class PayabliTTPChargingTests: XCTestCase {
         XCTAssertEqual(ttp.sessionState, .sessionExpired)
     }
 
+    /// A ready session whose stored device record is gone sends nothing and lands where setting the
+    /// device up again repairs it, so a retry is not sent back to the same line.
+    func testALostDeviceRecordFailsTheSessionAndSendsNothing() async throws {
+        let (ttp, provider, attestation) = try await makeReadyTTPWithAttestation()
+        attestation.cachedDeviceId = nil
+        let seen = record(ttp)
+
+        let failure = await chargeFailure(ttp)
+
+        XCTAssertEqual(failure?.type, .deviceSetupRequired)
+        XCTAssertEqual(failure?.capture, .notCharged)
+        XCTAssertNil(failure?.paymentTransId)
+        XCTAssertEqual(seen.states, [opening, .failed(reason: .deviceSetupRequired)])
+        XCTAssertFalse(ttp.isReady)
+        XCTAssertEqual(provider.startReadingCalls, 0)
+        XCTAssertEqual(Self.responses.initiateCalls, 0)
+    }
+
     // MARK: - While the reader waits
 
     func testTheSessionIsNotReadyWhileTheReaderWaits() async throws {
@@ -251,6 +269,15 @@ final class PayabliTTPChargingTests: XCTestCase {
         private let lock = NSLock()
         private var initiate = 200
         private var update = 200
+        private var initiates = 0
+
+        var initiateCalls: Int {
+            lock.withLock { initiates }
+        }
+
+        func countInitiate() {
+            lock.withLock { initiates += 1 }
+        }
 
         var initiateStatus: Int {
             get { lock.withLock { initiate } }
@@ -266,6 +293,7 @@ final class PayabliTTPChargingTests: XCTestCase {
             lock.withLock {
                 initiate = 200
                 update = 200
+                initiates = 0
             }
         }
     }
@@ -274,20 +302,29 @@ final class PayabliTTPChargingTests: XCTestCase {
         outcome: CardReadOutcome = .approved,
         readFailure: Error? = nil
     ) async throws -> (PayabliTTP, MockTapToPayProvider) {
+        let (ttp, provider, _) = try await makeReadyTTPWithAttestation(outcome: outcome, readFailure: readFailure)
+        return (ttp, provider)
+    }
+
+    private func makeReadyTTPWithAttestation(
+        outcome: CardReadOutcome = .approved,
+        readFailure: Error? = nil
+    ) async throws -> (PayabliTTP, MockTapToPayProvider, MockDeviceAttestationService) {
         StubURLProtocol.handler = Self.stubHandler
         let provider = MockTapToPayProvider()
         provider.readingResult = readFailure.map { .failure($0) }
             ?? .success(CardReadResult(provider: "mock", encryptedPayload: Data(), outcome: outcome))
+        let attestation = MockDeviceAttestationService()
         let ttp = PayabliTTP(
             config: try PayabliConfig(entryPoint: "e", environment: .sandbox, tokenProvider: { "seed_token" }),
             provider: provider,
-            attestation: MockDeviceAttestationService(),
+            attestation: attestation,
             retryPolicy: RetryPolicy(maxAttempts: 1, baseDelay: 0, maxDelay: 0, multiplier: 1, maxJitter: 0),
             session: StubURLProtocol.makeSession()
         )
         try await ttp.initialize()
         XCTAssertEqual(ttp.sessionState, .ready, "the fixture itself is broken if this fails")
-        return (ttp, provider)
+        return (ttp, provider, attestation)
     }
 
     private func charge(_ ttp: PayabliTTP) async throws -> TransactionResult {
@@ -311,6 +348,7 @@ final class PayabliTTPChargingTests: XCTestCase {
         var status = 200
         let body: [String: Any]
         if path.contains("/MoneyIn/initiate") {
+            PayabliTTPChargingTests.responses.countInitiate()
             status = PayabliTTPChargingTests.responses.initiateStatus
             body = ["code": "A01", "data": ["paymentTransId": PayabliTTPChargingTests.paymentTransId]]
         } else if path.contains("/MoneyIn/update/") {

@@ -82,6 +82,14 @@ final class SessionManager: ObservableObject {
         transition(to: .charging(activity: activity))
     }
 
+    /// Ends `charge` on `failed(reason)`, only while it still holds the session.
+    func failCharge(_ reason: PayabliTTPFailureReason, for charge: Int) {
+        guard charge == runningCharge, case .charging = sessionState else { return }
+        runningCharge = nil
+        sessionState = .failed(reason: reason)
+        isReady = false
+    }
+
     /// Returns to ready only while `charge` still holds the session, so a move
     /// made during the charge, by it or by another caller, is kept.
     func endCharge(_ charge: Int) {

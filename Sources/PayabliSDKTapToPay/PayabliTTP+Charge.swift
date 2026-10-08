@@ -92,7 +92,7 @@ extension PayabliTTP {
         )
 
         // Step 1 — backend mints the paymentTransId.
-        let paymentTransId = try await runInitiate(context: context)
+        let paymentTransId = try await runInitiate(context: context, charge: charge)
         progress.paymentTransId = paymentTransId
 
         // Step 2 — NFC tap.
@@ -269,12 +269,17 @@ extension PayabliTTP {
     /// `POST /MoneyIn/initiate`. Fails loudly if `deviceId` is missing —
     /// otherwise any later `PATCH /update/{id}` would 400 on a non-existent
     /// transaction.
-    private func runInitiate(context: TTPTransactionContext) async throws -> String {
+    private func runInitiate(context: TTPTransactionContext, charge: Int) async throws -> String {
         // Read at the point of use: the binding can be replaced between calls, and
         // a copy taken earlier names a device this request cannot sign for.
         guard let deviceId = try attestation.cachedDeviceId(for: entryPoint) else {
-            throw PayabliTTPError.initiateFailed(
-                reason: "Missing deviceId — run initialize() before charge()"
+            // Lands failed: ending ready would send every retry back to this line.
+            sessionManager.failCharge(.deviceSetupRequired, for: charge)
+            syncPublished()
+            throw TapToPayError(
+                type: .deviceSetupRequired,
+                reason: "This device has no stored registration; initialize again",
+                detail: nil
             )
         }
         return try await transactionClient.initiate(
