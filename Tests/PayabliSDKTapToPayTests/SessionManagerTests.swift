@@ -182,7 +182,7 @@ final class SessionManagerTests: XCTestCase {
         }
     }
 
-    /// A charge that outlived a rebuilt session leaves the charge running now alone.
+    /// A charge that outlived a rebuilt session leaves the new charge alone.
     func testAnEndedChargeLeavesTheNextChargeAlone() throws {
         let sm = SessionManager()
         for state in [PayabliTTPSessionState.attestingDevice, .fetchingConfig, .initializingReader(percent: nil), .ready] {
