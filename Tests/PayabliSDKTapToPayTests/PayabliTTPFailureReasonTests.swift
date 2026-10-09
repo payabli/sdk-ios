@@ -112,6 +112,60 @@ final class PayabliTTPFailureReasonTests: XCTestCase {
         )
     }
 
+    func testAnSDKDefectLandsOnSDKInternalErrorNotTheTransportDefault() {
+        let error = TapToPayError(type: .sdkInternalError, reason: "x", detail: nil)
+
+        XCTAssertEqual(
+            PayabliTTPSessionState.landing(for: error, registration: .held(activationId: "dev")),
+            .failed(reason: .sdkInternalError)
+        )
+    }
+
+    func testAnUnreachableAttestationServiceLandsOnServiceUnavailable() {
+        let error = TapToPayError(type: .deviceSetupUnavailable, reason: "x", detail: nil)
+
+        XCTAssertEqual(
+            PayabliTTPSessionState.landing(for: error, registration: .held(activationId: "dev")),
+            .failed(reason: .serviceUnavailable)
+        )
+    }
+
+    func testADeviceThatCannotBeIdentifiedLandsOnDeviceIneligible() {
+        let error = TapToPayError(type: .deviceIdentityUnavailable, reason: "x", detail: nil)
+
+        XCTAssertEqual(
+            PayabliTTPSessionState.landing(for: error, registration: .held(activationId: "dev")),
+            .failed(reason: .deviceIneligible)
+        )
+    }
+
+    /// An App ID that cannot be read is the app's configuration, which someone changes.
+    func testAnAppNotConfiguredForSetupLandsOnConfigurationRejected() {
+        let error = TapToPayError(type: .deviceSetupNotConfigured, reason: "x", detail: nil)
+
+        XCTAssertEqual(
+            PayabliTTPSessionState.landing(for: error, registration: .held(activationId: "dev")),
+            .failed(reason: .configurationRejected)
+        )
+    }
+
+    func testALostDeviceSetupLandsOnDeviceSetupRequired() {
+        let error = TapToPayError(type: .deviceSetupRequired, reason: "x", detail: nil)
+
+        XCTAssertEqual(
+            PayabliTTPSessionState.landing(for: error, registration: .held(activationId: "dev")),
+            .failed(reason: .deviceSetupRequired)
+        )
+    }
+
+    /// A withdrawn setup is asked again, which is safe.
+    func testAWithdrawnSetupLandsOnIdle() {
+        XCTAssertEqual(
+            PayabliTTPSessionState.landing(for: CancellationError(), registration: .held(activationId: "dev")),
+            .idle
+        )
+    }
+
     /// A status nothing has been seen producing has no agreed meaning, so it
     /// lands where being wrong costs a retry rather than a bug report.
     func testAStatusNoRouteHasProducedIsTreatedAsTransient() {
@@ -154,6 +208,34 @@ final class PayabliTTPFailureReasonTests: XCTestCase {
 
         for (error, expected) in map {
             XCTAssertEqual(PayabliTTPSessionState.landing(for: error, registration: .held(activationId: "dev")), expected, "\(error)")
+        }
+    }
+
+    /// Every code with a landing of its own lands there, and the map is here rather than a count of it.
+    func testEveryCodeWithItsOwnLandingLandsThere() {
+        let map: [(PayabliErrorType, PayabliTTPSessionState)] = [
+            (.permissionDenied, .pendingActivation(activationId: "dev")),
+            (.invalidConfiguration, .failed(reason: .configurationRejected)),
+            (.deviceSetupNotConfigured, .failed(reason: .configurationRejected)),
+            (.entryPointRefused, .failed(reason: .configurationRejected)),
+            (.deviceKeyUnavailable, .failed(reason: .deviceKeyUnavailable)),
+            (.deviceSetupRequired, .failed(reason: .deviceSetupRequired)),
+            (.deviceSetupUnsupported, .failed(reason: .deviceIneligible)),
+            (.deviceIdentityUnavailable, .failed(reason: .deviceIneligible)),
+            (.deviceSetupUnavailable, .failed(reason: .serviceUnavailable)),
+            (.sdkInternalError, .failed(reason: .sdkInternalError)),
+            (.decodingError, .failed(reason: .sdkInternalError)),
+            (.validation, .failed(reason: .sdkInternalError)),
+            (.sessionBurned, .failed(reason: .serviceUnavailable))
+        ]
+
+        for (type, expected) in map {
+            let error = TapToPayError(type: type, reason: "x", detail: nil)
+            XCTAssertEqual(
+                PayabliTTPSessionState.landing(for: error, registration: .held(activationId: "dev")),
+                expected,
+                "\(type)"
+            )
         }
     }
 

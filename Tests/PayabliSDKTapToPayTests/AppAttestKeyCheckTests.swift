@@ -70,7 +70,6 @@ final class AppAttestKeyCheckTests: XCTestCase {
     func testAKeyCheckThatCannotTellStopsAndKeepsTheBinding() async throws {
         let failures = [
             NSError(domain: AppAttestService.deviceCheckErrorDomain, code: 0),
-            NSError(domain: AppAttestService.deviceCheckErrorDomain, code: 4),
             NSError(domain: NSOSStatusErrorDomain, code: -1)
         ]
         for failure in failures {
@@ -82,6 +81,46 @@ final class AppAttestKeyCheckTests: XCTestCase {
             await assertKeyCheckThrows(sut, .deviceKeyUnavailable, "\(failure.domain) \(failure.code)")
             XCTAssertNotNil(try sut.binding(for: "myEntry"), "\(failure.domain) \(failure.code)")
         }
+    }
+
+    /// Apple's attestation service out of reach says nothing about the key, which is retried later
+    /// with the same binding.
+    func testAKeyCheckThatCannotReachAppleStopsAsUnavailableAndKeepsTheBinding() async throws {
+        let storage = InMemorySecureStorage()
+        try AttestFixture.seedBinding(entry: "myEntry", deviceId: "dev", keyId: "key", in: storage)
+        let (sut, attestor, _) = try AttestFixture.makeService(storage: storage)
+        attestor.generateAssertionError = NSError(domain: AppAttestService.deviceCheckErrorDomain, code: 4)
+
+        await assertKeyCheckThrows(sut, .deviceSetupUnavailable)
+        XCTAssertNotNil(try sut.binding(for: "myEntry"))
+    }
+
+    /// App Attest answering with neither a value nor an error is this SDK's defect, not storage that
+    /// did not answer.
+    func testAKeyCheckThatGetsNoAnswerIsAnSDKDefect() async throws {
+        let storage = InMemorySecureStorage()
+        try AttestFixture.seedBinding(entry: "myEntry", deviceId: "dev", keyId: "key", in: storage)
+        let (sut, attestor, _) = try AttestFixture.makeService(storage: storage)
+        attestor.generateAssertionError = TapToPayError(type: .sdkInternalError, reason: "x", detail: nil)
+
+        await assertKeyCheckThrows(sut, .sdkInternalError)
+        XCTAssertNotNil(try sut.binding(for: "myEntry"))
+    }
+
+    /// A caller that withdrew while the key was checked gets its cancellation, and the binding stays.
+    func testAKeyCheckThatIsCancelledStaysACancellationAndKeepsTheBinding() async throws {
+        let storage = InMemorySecureStorage()
+        try AttestFixture.seedBinding(entry: "myEntry", deviceId: "dev", keyId: "key", in: storage)
+        let (sut, attestor, _) = try AttestFixture.makeService(storage: storage)
+        attestor.generateAssertionError = CancellationError()
+
+        do {
+            _ = try await sut.isAttested(for: "myEntry")
+            XCTFail("the key check proceeded past a cancellation")
+        } catch {
+            XCTAssertTrue(error is CancellationError, "\(error)")
+        }
+        XCTAssertNotNil(try sut.binding(for: "myEntry"))
     }
 
     /// A phone that cannot produce an assertion at all is not a key that went away.

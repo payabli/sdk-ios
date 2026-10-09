@@ -1,6 +1,7 @@
 import CryptoKit
 import Foundation
 import PayabliSDKCore
+import Security
 
 // MARK: - AppAttestService
 
@@ -103,13 +104,9 @@ package final class AppAttestService: DeviceAttestationService, @unchecked Senda
         }
     }
 
-    /// Whether the platform will still sign with this binding's key.
-    ///
-    /// Signs over a fixed hash that is sent nowhere: the answer is whether the call
-    /// throws. Only `deviceCheckUnusableKeyCodes` mean the key cannot be used, and
-    /// drop the binding. `featureUnsupported` raises `deviceSetupUnsupported`, and
-    /// any other failure raises `deviceKeyUnavailable`; both keep the binding,
-    /// because re-enrolling costs an enrolment for a key that may still work.
+    /// Whether the platform will still sign with this binding's key, by signing a hash sent nowhere.
+    /// Only `deviceCheckUnusableKeyCodes` drop the binding: re-enrolling costs an enrolment for a key
+    /// that may still work, so every other failure keeps it and raises.
     func keyIsStillHeld(_ binding: AttestedDevice) async throws -> Bool {
         do {
             _ = try await attestor.generateAssertion(
@@ -117,17 +114,17 @@ package final class AppAttestService: DeviceAttestationService, @unchecked Senda
                 clientDataHash: Self.keyProbeHash
             )
             return true
+        } catch let error as TapToPayError {
+            throw error
+        } catch let error as CancellationError {
+            throw error
         } catch {
+            if let setupError = Self.deviceSetupError(for: error) {
+                logger.info("[attest] the key could not be checked; keeping the binding")
+                throw setupError
+            }
             let nsError = error as NSError
             let isDeviceCheck = nsError.domain == Self.deviceCheckErrorDomain
-            if isDeviceCheck, nsError.code == Self.deviceCheckFeatureUnsupportedCode {
-                logger.info("[attest] this device cannot check its key; keeping the binding")
-                throw TapToPayError(
-                    type: .deviceSetupUnsupported,
-                    reason: "App Attest is not supported on this device",
-                    detail: nil
-                )
-            }
             guard isDeviceCheck, Self.deviceCheckUnusableKeyCodes.contains(nsError.code) else {
                 logger.info("[attest] the key could not be checked; keeping the binding")
                 throw TapToPayError(
@@ -199,17 +196,25 @@ package final class AppAttestService: DeviceAttestationService, @unchecked Senda
 
     /// Runs a store operation and reports a failure as this SDK's own error.
     ///
-    /// Everything crossing this protocol is a `PayabliTTPError`: the domain and the
-    /// code are what the ObjC, MAUI, Flutter and React Native bridges map, and a
-    /// `KeychainError` carries another domain they all report as a bare failure.
+    /// A `KeychainError` carries another domain the ObjC, MAUI, Flutter and React
+    /// Native bridges all report as a bare failure, so a status is reported by what
+    /// repairs it: a missing entitlement is the app's configuration, an invalid
+    /// parameter is this SDK's own query, and any other status is storage that did not
+    /// answer, as every read and write meets before the first unlock after a boot.
     private func reportingStorageFailure<T>(_ work: () throws -> T) throws -> T {
         do {
             return try work()
         } catch let error as PayabliTTPError {
             throw error
+        } catch let error as TapToPayError {
+            throw error
+        } catch let KeychainStorage.KeychainError.underlying(status) {
+            throw Self.storageError(status: status)
         } catch {
-            throw PayabliTTPError.attestationFailed(
-                reason: "The stored device binding could not be read or written"
+            throw TapToPayError(
+                type: .sdkInternalError,
+                reason: "The stored device binding could not be read or written",
+                detail: nil
             )
         }
     }
@@ -237,18 +242,52 @@ package final class AppAttestService: DeviceAttestationService, @unchecked Senda
         try reportingStorageFailure { try bindingStore.remember(record) }
     }
 
-    /// The value registration identifies this install by.
-    ///
-    /// Wrapped like every other store access: the default provider reads the
-    /// Keychain and mints into it, so it fails the same way the binding reads do.
-    func hardwareId() throws -> String {
-        try reportingStorageFailure { try hardwareIdProvider() }
+    private static func storageError(status: OSStatus) -> TapToPayError {
+        switch status {
+        case errSecMissingEntitlement:
+            TapToPayError(
+                type: .deviceSetupNotConfigured,
+                reason: "The app lacks the entitlement its Keychain items need",
+                detail: "OSStatus \(status)"
+            )
+        case errSecParam:
+            TapToPayError(
+                type: .sdkInternalError,
+                reason: "The SDK asked the Keychain with an invalid parameter",
+                detail: "OSStatus \(status)"
+            )
+        default:
+            TapToPayError(
+                type: .deviceKeyUnavailable,
+                reason: "The device's secure storage did not answer",
+                detail: "OSStatus \(status)"
+            )
+        }
     }
 
-    /// The App ID `/attest` is sent. Raises rather than sending a blank one.
+    /// The value registration identifies this install by. Raises rather than sending a blank one,
+    /// which is what an app with no bundle identifier produces.
+    func hardwareId() throws -> String {
+        let hardwareId = try reportingStorageFailure { try hardwareIdProvider() }
+        guard !hardwareId.isEmpty else {
+            throw TapToPayError(
+                type: .deviceIdentityUnavailable,
+                reason: "The app's bundle identifier could not be read",
+                detail: nil
+            )
+        }
+        return hardwareId
+    }
+
+    /// The App ID `/attest` is sent. Raises rather than sending a blank one: with no
+    /// Keychain access group to read it from, the app is not configured for App Attest.
     func appId() throws -> String {
         guard let appId = try reportingStorageFailure({ try appIdProvider() }) else {
-            throw PayabliTTPError.attestationFailed(reason: "The App ID could not be read from the Keychain")
+            throw TapToPayError(
+                type: .deviceSetupNotConfigured,
+                reason: "The App ID could not be read from the Keychain",
+                detail: nil
+            )
         }
         return appId
     }

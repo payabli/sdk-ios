@@ -373,23 +373,25 @@ final class AppAttestServiceTests: XCTestCase {
     /// unusable (never attested, or the App Attest environment changed). The
     /// service must clear the cache so the next `initialize()` re-attests.
     func testGenerateAssertionClearsTheBindingOnAnInvalidKey() async throws {
-        let storage = InMemorySecureStorage()
-        try AttestFixture.seedBinding(entry: "myEntry", deviceId: "cached_deviceId", keyId: "cached_keyId", in: storage)
+        for code in [2, 3] {
+            let storage = InMemorySecureStorage()
+            try AttestFixture.seedBinding(entry: "myEntry", deviceId: "cached_deviceId", keyId: "cached_keyId", in: storage)
 
-        let (sut, attestor, _) = try AttestFixture.makeService(storage: storage)
-        attestor.generateAssertionError = NSError(
-            domain: AppAttestService.deviceCheckErrorDomain,
-            code: 3
-        )
+            let (sut, attestor, _) = try AttestFixture.makeService(storage: storage)
+            attestor.generateAssertionError = NSError(
+                domain: AppAttestService.deviceCheckErrorDomain,
+                code: code
+            )
 
-        do {
-            _ = try await sut.generateAssertion(for: "myEntry")
-            XCTFail("expected throw")
-        } catch {
-            XCTAssertEqual((error as NSError).domain, AppAttestService.deviceCheckErrorDomain)
+            do {
+                _ = try await sut.generateAssertion(for: "myEntry")
+                XCTFail("expected throw for code \(code)")
+            } catch {
+                XCTAssertEqual((error as? TapToPayError)?.type, .deviceSetupRequired, "code \(code): \(error)")
+            }
+
+            try await assertAttested(sut, "myEntry", false, "a rejected key has to be re-attested, code \(code)")
         }
-
-        try await assertAttested(sut, "myEntry", false, "a rejected key has to be re-attested")
     }
 
     /// Every other DeviceCheck error keeps the binding. `DCErrorServerUnavailable`
@@ -409,7 +411,11 @@ final class AppAttestServiceTests: XCTestCase {
                 _ = try await sut.generateAssertion(for: "myEntry")
                 XCTFail("expected throw for code \(code)")
             } catch {
-                XCTAssertEqual((error as NSError).code, code)
+                switch code {
+                case 1: XCTAssertEqual((error as? TapToPayError)?.type, .deviceSetupUnsupported, "\(error)")
+                case 4: XCTAssertEqual((error as? TapToPayError)?.type, .deviceSetupUnavailable, "\(error)")
+                default: XCTAssertEqual((error as? TapToPayError)?.type, .sdkInternalError, "\(error)")
+                }
             }
 
             XCTAssertNotNil(try sut.binding(for: "myEntry"), "code \(code) is not a reason to re-attest")
@@ -429,7 +435,7 @@ final class AppAttestServiceTests: XCTestCase {
             _ = try await sut.generateAssertion(for: "myEntry")
             XCTFail("expected throw")
         } catch {
-            // expected
+            XCTAssertEqual((error as? TapToPayError)?.type, .sdkInternalError, "\(error)")
         }
 
         XCTAssertNotNil(try sut.binding(for: "myEntry"), "non-DeviceCheck failures must not clear attestation state")
@@ -570,7 +576,7 @@ final class AppAttestServiceTests: XCTestCase {
 
         storage.refusesWrites = true
         XCTAssertThrowsError(try sut.clearCache(for: "myEntry")) { error in
-            XCTAssertTrue(error is PayabliTTPError, "the Keychain's own error crossed the boundary: \(error)")
+            XCTAssertEqual((error as? TapToPayError)?.type, .deviceKeyUnavailable, "\(error)")
         }
 
         storage.refusesWrites = false
@@ -586,7 +592,8 @@ final class AppAttestServiceTests: XCTestCase {
     /// A store that could not be read reports this SDK's own error, not the
     /// Keychain's. The domain and the code are what the ObjC, MAUI, Flutter and
     /// React Native bridges map, so an error thrown as it arrived reaches every
-    /// bridge as a bare failure with nothing naming the cause.
+    /// bridge as a bare failure with nothing naming the cause. A Keychain that
+    /// does not answer is storage a retry can reach.
     func testAStorageFailureIsReportedAsThisSDKsOwnError() async throws {
         let storage = InMemorySecureStorage()
         try AttestFixture.seedBinding(entry: "myEntry", deviceId: "dev", keyId: "key", in: storage)
@@ -597,14 +604,14 @@ final class AppAttestServiceTests: XCTestCase {
         do {
             _ = try await sut.isAttested(for: "myEntry")
             XCTFail("a store that could not be read answered that the device is not enrolled")
-        } catch let error as PayabliTTPError {
-            guard case let .attestationFailed(reason) = error else {
-                return XCTFail("unexpected case: \(error)")
-            }
-            XCTAssertFalse(reason.isEmpty)
+        } catch let error as TapToPayError {
+            XCTAssertEqual(error.type, .deviceKeyUnavailable)
         } catch {
             XCTFail("the Keychain's own error crossed the SDK boundary: \(error)")
         }
+
+        storage.readFailure = nil
+        XCTAssertEqual(try sut.binding(for: "myEntry")?.deviceId, "dev", "a refused read changed the store")
     }
 
     // MARK: - The pending slot and the key it names
@@ -662,8 +669,8 @@ final class AppAttestServiceTests: XCTestCase {
         do {
             _ = try await sut.attest(entry: "myEntry")
             XCTFail("the attempt continued with an identifier that could not be produced")
-        } catch is PayabliTTPError {
-            // The domain the bridges map.
+        } catch let error as TapToPayError {
+            XCTAssertEqual(error.type, .deviceKeyUnavailable)
         } catch {
             XCTFail("the Keychain's own error crossed the SDK boundary: \(error)")
         }

@@ -83,4 +83,4 @@ let everyChargeActivity: [TapToPayChargeActivity] = TapToPayChargeActivity.allCa
 /// as `unrecognised` and fails the assertion beside it rather than reaching a
 /// screen as `state(9)`.
 let everyTapToPayStatus: [TapToPaySessionStatus] =
-    everyTapToPaySession.map(TapToPaySessionStatus.init)
+    everyTapToPaySession.map(TapToPaySessionStatus.init) + [TapToPaySessionStatus(.failed(reason: .deviceSetupRequired))]

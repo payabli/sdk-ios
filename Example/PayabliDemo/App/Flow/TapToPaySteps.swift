@@ -2,14 +2,14 @@
 /// Which half of the activation step happened.
 ///
 /// Activation is two SDK calls. `sessionState` cannot tell them apart: both land
-/// in `.error`, except a revoked attestation, which lands in `.idle`.
+/// in `.error`, or `.refused` for a reason no setup repairs.
 enum TapToPayActivationOutcome {
     case none
     case activationFailed
-    /// The attestation behind the activation was revoked. `activateDevice`
-    /// resets the session to `.idle` for this case alone, and the way out is a
-    /// fresh cold attestation, which is the enable step's job.
-    case attestationRevoked
+    /// The device has to be set up again: its attestation was revoked, its
+    /// registration was replaced, or its key is gone. The way out is a fresh
+    /// cold attestation, which is the enable step's job.
+    case deviceSetupRequired
     case enableFailed
     case succeeded
 }
@@ -54,16 +54,9 @@ struct TapToPayFlowSteps {
 enum TapToPayRecovery {
     /// The session expired holding its attested identity.
     case sessionExpired
-    /// The session errored. Some of the paths here clear the attested identity
-    /// and the rest keep it, and which one ran is not knowable from the outside,
-    /// so recovery runs the setup that works for both.
-    ///
-    /// A failed activation is one of them. `.activationFailed` does not
-    /// establish that `/activate` reached the backend: `generateAssertion`
-    /// clears the cached key and device on a DeviceCheck error and throws before
-    /// the request is sent, and that error is not a reader failure, so it
-    /// arrives as a plain `.activationFailed` with the identity already gone.
-    /// Only a 401 from `/activate` itself is reported as `.attestationRevoked`.
+    /// The session errored. Some paths clear the attested identity and some keep it,
+    /// and which ran is not knowable from outside, so recovery runs the setup that
+    /// works for both.
     case sessionErrored
 }
 
@@ -275,12 +268,15 @@ enum TapToPaySteps {
         // reason and the retry are rendered. Expiry is not activation's
         // doing, so a stale outcome does not move it.
         case .error: return outcome == .activationFailed ? .done : .failed
+        // Nothing the setup does repairs it, so the step reports the reason and is
+        // retried from its own row once someone has changed what it names.
+        case .refused: return .failed
         case .sessionExpired: return .failed
-        // A recorded activation failure at `.idle` is a revoked attestation:
-        // it is the one failure `activateDevice` resets rather than marks,
-        // and re-attesting from scratch is this step's own action.
+        // The SDK marks every activation failure rather than resetting to `.idle`,
+        // so this holds only for a session reset by other means; re-attesting is
+        // still this step's own action.
         case .idle:
-            return outcome == .attestationRevoked || outcome == .activationFailed
+            return outcome == .deviceSetupRequired || outcome == .activationFailed
                 ? .failed
                 : .current
         // The reader is up and holding the token the sheet needs; what is

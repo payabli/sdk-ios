@@ -19,6 +19,10 @@ extension PayabliTTPSessionState {
             // Most refusals are about the code, and the device still owes one.
             return refusal.movesSession ? landingByType(refusal.hostError, registration: registration) : nil
         }
+        if error is CancellationError {
+            // A withdrawn setup is asked again, which is safe.
+            return .idle
+        }
         guard let ttpError = error as? PayabliTTPError else {
             return landingByType(error, registration: registration)
         }
@@ -73,20 +77,26 @@ extension PayabliTTPSessionState {
             // not repair needs a classification this map is not given.
             return pendingActivation(registration)
 
-        case .invalidConfiguration:
+        case .invalidConfiguration, .deviceSetupNotConfigured:
             return .failed(reason: .configurationRejected)
 
         case .deviceKeyUnavailable:
             return .failed(reason: .deviceKeyUnavailable)
 
-        case .deviceSetupUnsupported:
-            return .failed(reason: .deviceIneligible)
-
         case .deviceSetupRequired:
             return .failed(reason: .deviceSetupRequired)
 
+        case .deviceSetupUnsupported, .deviceIdentityUnavailable:
+            return .failed(reason: .deviceIneligible)
+
         case .entryPointRefused:
             return .failed(reason: .configurationRejected)
+
+        case .deviceSetupUnavailable:
+            return .failed(reason: .serviceUnavailable)
+
+        case .sdkInternalError:
+            return .failed(reason: .sdkInternalError)
 
         case .decodingError, .validation:
             // Both are the two sides disagreeing about the contract. A 400 is

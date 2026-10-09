@@ -61,7 +61,7 @@ extension AppAttestService {
         if let pending = try pendingKey(for: entry) {
             keyId = AppAttestKeyId(pending)
         } else {
-            keyId = try await attestor.generateKey()
+            keyId = try await settingUp("generateKey") { try await attestor.generateKey() }
             try rememberPendingKey(keyId.rawValue, for: entry)
         }
 
@@ -83,7 +83,7 @@ extension AppAttestService {
         }
 
         guard let challengeData = Data(base64Encoded: challenge.challenge) ?? challenge.challenge.data(using: .utf8) else {
-            throw PayabliTTPError.attestationFailed(reason: "Could not decode challenge")
+            throw TapToPayError(type: .decodingError, reason: "The challenge could not be decoded", detail: nil)
         }
 
         // 4. Attest the key. `attestKey` is single-use per key, so drop the
@@ -95,7 +95,9 @@ extension AppAttestService {
         //    a surviving record is one the next attempt reuses and is refused for.
         try forgetPendingKey(for: entry)
         let clientDataHash = ClientDataHash(Data(SHA256.hash(data: challengeData)))
-        let attestation = try await attestor.attestKey(keyId, clientDataHash: clientDataHash)
+        let attestation = try await settingUp("attestKey") {
+            try await attestor.attestKey(keyId, clientDataHash: clientDataHash)
+        }
 
         // 5. POST /attest — required for both Active and Pending devices; it
         //    creates the `DeviceAttestations` row that `/activate` verifies.
@@ -144,6 +146,10 @@ extension AppAttestService {
                 deviceId: deviceId,
                 timestamp: timestamp
             )
+        } catch let error as TapToPayError {
+            throw error
+        } catch let error as CancellationError {
+            throw error
         } catch {
             // Clear only when the key itself is rejected, so the next
             // `initialize()` runs a cold attestation.
@@ -155,13 +161,21 @@ extension AppAttestService {
                     // suspends, and one finishing in that window leaves a
                     // binding this answer is not about.
                     forgetIfUnchanged(binding)
-                } else {
-                    logger.error(
-                        "generateAssertion failed with DeviceCheck error (code \(nsError.code)) — binding kept"
+                    throw TapToPayError(
+                        type: .deviceSetupRequired,
+                        reason: "This device no longer holds the key its setup was made with",
+                        detail: "\(nsError.domain) \(nsError.code)"
                     )
                 }
+                logger.error(
+                    "generateAssertion failed with DeviceCheck error (code \(nsError.code)) — binding kept"
+                )
             }
-            throw error
+            throw Self.deviceSetupError(for: error) ?? TapToPayError(
+                type: .sdkInternalError,
+                reason: "App Attest refused to sign the request",
+                detail: "\(nsError.domain) \(nsError.code)"
+            )
         }
     }
 
@@ -180,6 +194,56 @@ extension AppAttestService {
 
     /// `DCErrorFeatureUnsupported`: this device cannot use App Attest at all.
     static let deviceCheckFeatureUnsupportedCode = 1
+
+    /// `DCErrorServerUnavailable`: Apple's App Attest service could not be reached.
+    static let deviceCheckServerUnavailableCode = 4
+
+    /// The DeviceCheck failures that mean the same thing from every App Attest call: a device that
+    /// cannot use App Attest, and Apple's service out of reach. `nil` for the rest, which each
+    /// caller reports for its own call.
+    static func deviceSetupError(for error: Error) -> TapToPayError? {
+        let nsError = error as NSError
+        guard nsError.domain == deviceCheckErrorDomain else { return nil }
+        switch nsError.code {
+        case deviceCheckFeatureUnsupportedCode:
+            return TapToPayError(
+                type: .deviceSetupUnsupported,
+                reason: "App Attest is not supported on this device",
+                detail: nil
+            )
+        case deviceCheckServerUnavailableCode:
+            return TapToPayError(
+                type: .deviceSetupUnavailable,
+                reason: "Apple's App Attest service could not be reached",
+                detail: nil
+            )
+        default:
+            return nil
+        }
+    }
+
+    /// Runs one App Attest call made while setting the device up. Any other DeviceCheck refusal
+    /// discards the key, as Apple asks, and the pending key is already gone, so setting up again
+    /// makes a new one. A refusal from outside DeviceCheck is this SDK's own.
+    func settingUp<Value>(_ call: String, _ work: () async throws -> Value) async throws -> Value {
+        do {
+            return try await work()
+        } catch let error as TapToPayError {
+            throw error
+        } catch let error as CancellationError {
+            throw error
+        } catch {
+            if let setupError = Self.deviceSetupError(for: error) {
+                throw setupError
+            }
+            let nsError = error as NSError
+            throw TapToPayError(
+                type: nsError.domain == Self.deviceCheckErrorDomain ? .deviceSetupRequired : .sdkInternalError,
+                reason: "App Attest refused \(call)",
+                detail: "\(nsError.domain) \(nsError.code)"
+            )
+        }
+    }
 
     static let platform = "Ios"
 

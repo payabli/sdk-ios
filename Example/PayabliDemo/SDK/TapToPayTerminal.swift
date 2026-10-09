@@ -101,7 +101,7 @@ final class TapToPayTerminal: ObservableObject {
         do {
             return try await body()
         } catch {
-            throw TapToPayFailure(error)
+            throw TapToPayFailure(error, session: TapToPaySessionStatus(terminal.sessionState))
         }
     }
 }
@@ -119,13 +119,17 @@ struct TapToPayFailure: LocalizedError {
         message
     }
 
-    /// Whether the binding this device held has been revoked. A revoked
-    /// attestation resets the session to idle, and the way out is a fresh cold
-    /// attestation rather than another activation code.
-    let isAttestationRevoked: Bool
+    /// Whether this device has to be set up again: its attestation was revoked,
+    /// its registration was replaced, or its key is gone. The way out is a fresh
+    /// cold attestation rather than another activation code.
+    let isDeviceSetupRequired: Bool
 
-    init(_ error: Error) {
+    /// Whether the session landed on a reason no setup repairs, which the enable step reports.
+    let isRefused: Bool
+
+    init(_ error: Error, session: TapToPaySessionStatus) {
         message = error.localizedDescription
-        isAttestationRevoked = (error as? TapToPayError)?.type == .deviceSetupRequired
+        isDeviceSetupRequired = (error as? TapToPayError)?.type == .deviceSetupRequired
+        isRefused = session == .refused
     }
 }

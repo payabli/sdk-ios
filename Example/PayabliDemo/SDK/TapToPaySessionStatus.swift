@@ -16,6 +16,9 @@ enum TapToPaySessionStatus {
     case pendingTerms
     case charging(TapToPayChargeStep)
     case error
+    /// Failed for a reason no setup repairs: the phone, the configuration or the SDK
+    /// has to change, so the screen shows why instead of offering a recovery.
+    case refused
     case unrecognised(Int)
 
     /// The short form a status chip shows.
@@ -32,6 +35,7 @@ enum TapToPaySessionStatus {
         case .pendingTerms: return "terms"
         case let .charging(step): return step.label
         case .error: return "error"
+        case .refused: return "refused"
         case let .unrecognised(raw): return "state(\(raw))"
         }
     }
@@ -41,7 +45,7 @@ enum TapToPaySessionStatus {
     var severity: TapToPayStatusSeverity {
         switch self {
         case .ready: return .ready
-        case .error, .sessionExpired: return .failed
+        case .error, .refused, .sessionExpired: return .failed
         case .pendingActivation, .pendingTerms: return .waiting
         default: return .working
         }
@@ -112,11 +116,19 @@ extension TapToPaySessionStatus {
         case .reinitializing: self = .reinitializing
         case .pendingActivation: self = .pendingActivation
         case .pendingTerms: self = .pendingTerms
-        case .failed: self = .error
+        case let .failed(reason): self = Self.refusing(reason) ? .refused : .error
         case let .charging(activity): self = .charging(TapToPayChargeStep(activity))
         // The SDK ships as a resilient binary framework, so a host built against
         // this version can be handed a case added by a later one.
         @unknown default: self = .unrecognised(state.code.rawValue)
+        }
+    }
+
+    private static func refusing(_ reason: PayabliTTPFailureReason) -> Bool {
+        switch reason {
+        case .deviceIneligible, .configurationRejected, .sdkInternalError: true
+        case .deviceSetupRequired, .serviceUnavailable, .deviceKeyUnavailable: false
+        @unknown default: false
         }
     }
 }

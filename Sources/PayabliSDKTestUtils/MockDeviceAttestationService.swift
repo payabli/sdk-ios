@@ -55,6 +55,15 @@ package final class MockDeviceAttestationService: DeviceAttestationService, @unc
 
     private var storedReadFailure: Error?
 
+    /// Raised by `generateAssertion(for:)` while it is set, so a test can drive a request whose
+    /// assertion cannot be produced.
+    package var assertionFailure: Error? {
+        get { lock.withLock { storedAssertionFailure } }
+        set { lock.withLock { storedAssertionFailure = newValue } }
+    }
+
+    private var storedAssertionFailure: Error?
+
     package var registrationReadFailure: Error? {
         get { lock.withLock { storedRegistrationReadFailure } }
         set { lock.withLock { storedRegistrationReadFailure = newValue } }
@@ -178,6 +187,9 @@ package final class MockDeviceAttestationService: DeviceAttestationService, @unc
         }
         guard let held else {
             throw PayabliTTPError.attestationFailed(reason: "Missing attestation state")
+        }
+        if let failure = assertionFailure {
+            throw failure
         }
         let (deviceId, keyId) = held
         return AssertionHeaders(

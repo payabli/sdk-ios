@@ -154,12 +154,15 @@ final class TapToPayErrorTranslationTests: XCTestCase {
         let fromActivation = Set(
             ActivationRefusalsTests.serviceRefusals.map { ActivationRefusals.catalogType(resultCode: $0.0, reason: $0.1) }
         )
-        let raisedDirectly: Set<PayabliErrorType> = [.deviceKeyUnavailable, .deviceSetupUnsupported, .deviceNotPending]
+        let raisedDirectly: Set<PayabliErrorType> = [
+            .deviceKeyUnavailable, .deviceSetupUnsupported, .deviceNotPending, .deviceSetupUnavailable,
+            .deviceSetupNotConfigured, .deviceIdentityUnavailable
+        ]
         let notProducedYet: Set<PayabliErrorType> = [
             .deviceServicesOutdated, // a Google Play cause, which this platform has no counterpart for
-            .deviceSetupRefused, .deviceSetupUnavailable, .deviceSetupNotConfigured, .readerCredentialsUnusable,
+            .deviceSetupRefused, .readerCredentialsUnusable,
             .deviceHardwareUnsupported, .cardPresentNotEnabled, .readerDeviceRefused, .readerSessionExpired,
-            .activationCodeMalformed, .deviceIdentityUnavailable, .readerUnavailable, .paymentNotOpened,
+            .activationCodeMalformed, .readerUnavailable, .paymentNotOpened,
             // carried by coarse cases until they are classified
             .tooManyOpenCharges, .paymentNotHeld // no held charge and no close call on this platform yet
         ]

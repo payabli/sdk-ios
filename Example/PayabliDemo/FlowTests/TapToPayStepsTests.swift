@@ -1,3 +1,4 @@
+import PayabliSDKTapToPay
 import XCTest
 
 /// The Tap to Pay sequence, over every combination it can be asked for.
@@ -16,7 +17,7 @@ final class TapToPayStepsTests: XCTestCase {
     private let everyCombination: [Combination] = {
         let checks: [TokenCheck] = [.notRun, .checking, .reachable, .unreachable]
         let outcomes: [TapToPayActivationOutcome] =
-            [.none, .activationFailed, .attestationRevoked, .enableFailed, .succeeded]
+            [.none, .activationFailed, .deviceSetupRequired, .enableFailed, .succeeded]
         return checks.flatMap { check in
             everyTapToPayStatus.flatMap { session in
                 outcomes.map { Combination(tokenCheck: check, session: session, outcome: $0) }
@@ -263,12 +264,8 @@ final class TapToPayStepsTests: XCTestCase {
     }
 
     func testAFailedActivationIsOfferedTheFullSetup() {
-        // `.activationFailed` does not establish that `/activate` reached the
-        // backend. `generateAssertion` clears the cached key and device on a
-        // DeviceCheck error and throws before the request is sent, and that error
-        // is not a reader failure, so it arrives here indistinguishable from a
-        // decline. Only a 401 from `/activate` is reported as
-        // `.attestationRevoked`.
+        // A refused activation leaves the session `.error`, and recovery runs the
+        // setup that works whether or not the identity survived.
         let sequence = TapToPaySteps.forCharging(
             tokenCheck: .reachable, session: .error, activation: .activationFailed
         )
@@ -324,11 +321,10 @@ final class TapToPayStepsTests: XCTestCase {
         }
     }
 
-    func testARevokedAttestationIsTheEnableStepsFailure() {
-        // `activateDevice` resets to `.idle` for a revoked attestation and marks
-        // an error for every other refusal, so this is the one activation
-        // failure whose remedy is a fresh cold attestation.
-        for outcome in [TapToPayActivationOutcome.attestationRevoked, .activationFailed] {
+    func testAnActivationFailureAtIdleIsTheEnableStepsFailure() {
+        // The SDK no longer resets to `.idle` on an activation failure; a session
+        // that reads `.idle` anyway is sent back to the enable step.
+        for outcome in [TapToPayActivationOutcome.deviceSetupRequired, .activationFailed] {
             let sequence = TapToPaySteps.forCharging(
                 tokenCheck: .reachable, session: .idle, activation: outcome
             )
@@ -461,10 +457,36 @@ final class TapToPayStepsTests: XCTestCase {
         XCTAssertEqual(sequence.nextAction, .enterActivationCode)
     }
 
+    /// A reason no setup repairs is shown with a retry of the enable step, never a recovery that
+    /// suggests setting up again repairs it.
+    func testASessionRefusedForGoodIsNotOfferedTheFullSetup() {
+        for reason in [PayabliTTPFailureReason.deviceIneligible, .configurationRejected, .sdkInternalError] {
+            let session = TapToPaySessionStatus(.failed(reason: reason))
+            XCTAssertEqual(session, .refused, "\(reason)")
+            for outcome in [TapToPayActivationOutcome.none, .activationFailed] {
+                let sequence = TapToPaySteps.forCharging(tokenCheck: .reachable, session: session, activation: outcome)
+                XCTAssertNil(sequence.recovery, "\(reason) \(outcome)")
+                XCTAssertEqual(sequence.enable.status, .failed, "\(reason) \(outcome)")
+                XCTAssertEqual(sequence.nextAction, .enableTerminal, "\(reason) \(outcome)")
+            }
+        }
+        for reason in [PayabliTTPFailureReason.deviceSetupRequired, .serviceUnavailable, .deviceKeyUnavailable] {
+            XCTAssertEqual(TapToPaySessionStatus(.failed(reason: reason)), .error, "\(reason)")
+        }
+    }
+
+    func testADeviceThatMustBeSetUpAgainIsOfferedAFreshAttestation() {
+        // The session lands `.error`, and only a cold attestation repairs it.
+        let sequence = TapToPaySteps.forCharging(
+            tokenCheck: .reachable, session: .error, activation: .deviceSetupRequired
+        )
+        XCTAssertEqual(sequence.recovery, .sessionErrored)
+        XCTAssertEqual(sequence.nextAction, .reattest)
+    }
+
     func testARecordedActivationFailureStaysQuietUntilTheSequenceReachesActivation() {
         // Stale here: the terminal is starting, so the outcome describes a
-        // session that is gone. `.idle` is not stale and is covered separately —
-        // it is the state a revoked attestation leaves behind.
+        // session that is gone.
         let sequence = TapToPaySteps.forCharging(
             tokenCheck: .reachable, session: .attestingDevice, activation: .activationFailed
         )
