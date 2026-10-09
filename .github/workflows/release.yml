@@ -103,9 +103,17 @@ jobs:
             exit 1
           fi
 
-      # A version below the newest release would be published after it.
+      # A version below the newest release would be published after it. The lines are release-newer.sh's,
+      # carried here because the commit checked out may predate that file.
       - name: Check the version is not below the newest release
-        run: .github/scripts/release-newer.sh "$VERSION"
+        run: |
+          release='^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'
+          tags="$(git for-each-ref --format='%(refname:strip=2)' refs/tags)"
+          newest="$(printf '%s\n' "$tags" | { grep -E "$release" || true; } | sort -V | tail -n 1)"
+          if [ -n "$newest" ] && [ "$(printf '%s\n%s\n' "$newest" "$VERSION" | sort -V | tail -n 1)" != "$VERSION" ]; then
+            echo "::error::the newest release is $newest, and $VERSION is lower"
+            exit 1
+          fi
 
   # The suite, on its own so a failed test is re-run without rebuilding the XCFrameworks.
   test:

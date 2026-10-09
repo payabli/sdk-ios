@@ -6,8 +6,9 @@
 #
 # Reads the tags of the repository it runs in. A release tag is <major>.<minor>.<patch> and nothing else, so a
 # tag of any other shape is not compared. The newest release's own version passes, because whether that tag is
-# this release resumed is the existing-tag check's to decide. The publish job runs the same comparison
-# again, from the lines below, so they change together.
+# this release resumed is the existing-tag check's to decide. The release workflow carries the lines below in
+# its check and publish jobs rather than running this file, since the commit it checks out may predate it, and
+# the workflow checks fail when the copies differ.
 
 set -euo pipefail
 

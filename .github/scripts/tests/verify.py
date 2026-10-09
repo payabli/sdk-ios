@@ -1331,11 +1331,18 @@ def test_workflows() -> None:
     test_at, tag_at = first("xcodebuild test"), first("gh release create")
     check("W15 the release asks the gate for its version and tests before it tags",
           -1 not in (gate_at, test_at, tag_at) and gate_at < tag_at and test_at < tag_at, (gate_at, test_at, tag_at))
-    newer_at = first('release-newer.sh "$VERSION"')
-    newer_runs = [run.strip() for run in check_runs if "release-newer.sh" in run]
-    check("W15t a version below the newest release is refused in the check job, after the version is read",
-          newer_at != -1 and gate_at < newer_at < test_at
-          and newer_runs == ['.github/scripts/release-newer.sh "$VERSION"'], (gate_at, newer_at, test_at, newer_runs))
+    # The commit checked out may predate release-newer.sh, so the workflow carries its lines rather than
+    # running it, and the check job's step is exactly those lines and the refusal.
+    newer_script = (REPO_ROOT / ".github" / "scripts" / "release-newer.sh").read_text().splitlines()
+    ordering = [line.strip() for line in newer_script
+                if line.strip().startswith(("release=", "tags=", "newest=", 'if [ -n "$newest" ]'))]
+    refusal = [*ordering, 'echo "::error::the newest release is $newest, and $VERSION is lower"', "exit 1", "fi"]
+    newer_at = next((index for index, run in enumerate(runs)
+                     if [line.strip() for line in run.splitlines() if line.strip()] == refusal), -1)
+    check("W15t a version below the newest release is refused in the check job with the script's lines, after "
+          "the version is read",
+          len(ordering) == 4 and newer_at != -1 and runs[newer_at] in check_runs and gate_at < newer_at < test_at
+          and not any(".github/scripts/release-newer.sh" in run for run in runs), (gate_at, newer_at, test_at))
 
     # The release ships the commit its dispatch names, so a merge landing between the decision and the click
     # is not released. Both jobs check the name with one pattern, the publish job as data.
@@ -1430,9 +1437,6 @@ def test_workflows() -> None:
           (test_job.get("needs"), build_job.get("needs"), retention))
     # "Re-run failed jobs" does not re-run the check job, so the job that tags reads the tags again: a release
     # cut since the check would otherwise be overtaken by this one. The same lines as the script, as data.
-    newer_script = (REPO_ROOT / ".github" / "scripts" / "release-newer.sh").read_text().splitlines()
-    ordering = [line.strip() for line in newer_script
-                if line.strip().startswith(("release=", "tags=", "newest=", 'if [ -n "$newest" ]'))]
     recheck_at = next((index for index, run in enumerate(publish_runs)
                        if all(line in [part.strip() for part in run.splitlines()] for line in ordering)), -1)
     publish_tag_at = next((index for index, run in enumerate(publish_runs) if "gh release create" in run), -1)

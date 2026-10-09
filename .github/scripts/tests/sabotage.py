@@ -613,11 +613,6 @@ MUTATIONS = [
         RELEASE_YML, "head_sha=$COMMIT&branch=main&event=push&", "head_sha=$COMMIT&", "W15h", "workflows",
     ),
     Mutation(
-        "the release no longer refuses a version below the newest release",
-        RELEASE_YML, '      - name: Check the version is not below the newest release\n        run: .github/scripts/release-newer.sh "$VERSION"\n\n',
-        "", "W15t", "workflows",
-    ),
-    Mutation(
         "a version below the newest release passes the ordering check",
         NEWER, 'if [ -n "$newest" ] && [ "$(printf', 'if false && [ "$(printf', "R9d", "release",
     ),
@@ -649,16 +644,29 @@ MUTATIONS = [
         "R9q", "release",
     ),
     Mutation(
-        "the job that tags no longer looks for a release cut since the check",
-        RELEASE_YML,
-        "          newest=\"$(printf '%s\\n' \"$tags\" | { grep -E \"$release\" || true; } | sort -V | tail -n 1)\"\n"
-        "          if [ -n \"$newest\" ]",
-        "          newest=\"\"\n          if [ -n \"$newest\" ]", "W15v", "workflows",
+        'the release no longer refuses a version below the newest release',
+        RELEASE_YML, '      # A version below the newest release would be published after it. The lines are release-newer.sh\'s,\n      # carried here because the commit checked out may predate that file.\n      - name: Check the version is not below the newest release\n        run: |\n          release=\'^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$\'\n          tags="$(git for-each-ref --format=\'%(refname:strip=2)\' refs/tags)"\n          newest="$(printf \'%s\\n\' "$tags" | { grep -E "$release" || true; } | sort -V | tail -n 1)"\n          if [ -n "$newest" ] && [ "$(printf \'%s\\n%s\\n\' "$newest" "$VERSION" | sort -V | tail -n 1)" != "$VERSION" ]; then\n            echo "::error::the newest release is $newest, and $VERSION is lower"\n            exit 1\n          fi\n',
+        '', 'W15t', "workflows",
     ),
     Mutation(
-        "the ordering check is allowed to fail",
-        RELEASE_YML, 'run: .github/scripts/release-newer.sh "$VERSION"\n',
-        'run: .github/scripts/release-newer.sh "$VERSION" || true\n', "W15t", "workflows",
+        'the check job runs a script the commit it checked out may not have',
+        RELEASE_YML, '      # A version below the newest release would be published after it. The lines are release-newer.sh\'s,\n      # carried here because the commit checked out may predate that file.\n      - name: Check the version is not below the newest release\n        run: |\n          release=\'^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$\'\n          tags="$(git for-each-ref --format=\'%(refname:strip=2)\' refs/tags)"\n          newest="$(printf \'%s\\n\' "$tags" | { grep -E "$release" || true; } | sort -V | tail -n 1)"\n          if [ -n "$newest" ] && [ "$(printf \'%s\\n%s\\n\' "$newest" "$VERSION" | sort -V | tail -n 1)" != "$VERSION" ]; then\n            echo "::error::the newest release is $newest, and $VERSION is lower"\n            exit 1\n          fi\n',
+        '      - name: Check the version is not below the newest release\n        run: .github/scripts/release-newer.sh "$VERSION"\n', 'W15t', "workflows",
+    ),
+    Mutation(
+        'the ordering check is allowed to pass without comparing',
+        RELEASE_YML, '      - name: Check the version is not below the newest release\n        run: |\n',
+        '      - name: Check the version is not below the newest release\n        run: |\n          exit 0\n', 'W15t', "workflows",
+    ),
+    Mutation(
+        "the check job's comparison drifts from the script's",
+        RELEASE_YML, '      # A version below the newest release would be published after it. The lines are release-newer.sh\'s,\n      # carried here because the commit checked out may predate that file.\n      - name: Check the version is not below the newest release\n        run: |\n          release=\'^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$\'\n          tags="$(git for-each-ref --format=\'%(refname:strip=2)\' refs/tags)"\n          newest="$(printf \'%s\\n\' "$tags" | { grep -E "$release" || true; } | sort -V | tail -n 1)"\n          if [ -n "$newest" ] && [ "$(printf \'%s\\n%s\\n\' "$newest" "$VERSION" | sort -V | tail -n 1)" != "$VERSION" ]; then\n            echo "::error::the newest release is $newest, and $VERSION is lower"\n            exit 1\n          fi\n',
+        '      # A version below the newest release would be published after it. The lines are release-newer.sh\'s,\n      # carried here because the commit checked out may predate that file.\n      - name: Check the version is not below the newest release\n        run: |\n          release=\'^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$\'\n          tags="$(git for-each-ref --format=\'%(refname:strip=2)\' refs/tags)"\n          newest="$(printf \'%s\\n\' "$tags" | { grep -E "$release" || true; } | sort | tail -n 1)"\n          if [ -n "$newest" ] && [ "$(printf \'%s\\n%s\\n\' "$newest" "$VERSION" | sort -V | tail -n 1)" != "$VERSION" ]; then\n            echo "::error::the newest release is $newest, and $VERSION is lower"\n            exit 1\n          fi\n', 'W15t', "workflows",
+    ),
+    Mutation(
+        'the job that tags no longer looks for a release cut since the check',
+        RELEASE_YML, '          # here. The same lines as release-newer.sh.\n          release=\'^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$\'\n          tags="$(git for-each-ref --format=\'%(refname:strip=2)\' refs/tags)"\n          newest="$(printf \'%s\\n\' "$tags" | { grep -E "$release" || true; } | sort -V | tail -n 1)"\n',
+        '          # here. The same lines as release-newer.sh.\n          newest=""\n', 'W15v', "workflows",
     ),
     Mutation(
         "the ordering check is switched off by a condition",
