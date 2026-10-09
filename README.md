@@ -33,7 +33,7 @@ token in memory while the session runs.
 | Term | Meaning |
 |---|---|
 | **Paypoint** | A merchant account in Payabli. Payments are made to a paypoint. |
-| **Entry point** | The identifier of the paypoint the SDK takes payments for, for example `acmePay`. Payabli generates it. In the Payabli portal, it's the **Entry Name** column under **Portfolio > Paypoints**, and the List paypoints endpoint returns it as `EntryName`. Use the paypoint's entry point, not your organization's. Your organization's credentials work for every paypoint under it, and each session names one paypoint. An entry point exists in one environment. |
+| **Entry point** | The identifier of the paypoint the SDK takes payments for, for example `acmePay`. Payabli generates it. In the Payabli portal, it's the **Entry Name** column under **Portfolio > Paypoints**, and the List paypoints endpoint returns it as `EntryName`. Use the paypoint's entry point, not your organization's. Your organization's credentials work for every paypoint under it. An entry point exists in one environment. |
 | **Token endpoint** | A route on your own backend that exchanges your Payabli client ID and client secret for a short-lived access token and returns the token to your app. |
 | **Authorized apps** | The apps a paypoint accepts Tap to Pay requests from. The Payabli portal lists them under **Authorized apps**. |
 
