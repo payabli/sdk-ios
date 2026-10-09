@@ -16,9 +16,9 @@ public enum PayabliPayInSummaryRows {
     /// The figure a money row shows, at the two places it is sent, or nil when the form draws no row for it.
     ///
     /// Amount is the total amount less the service fee, and has a figure only while a fee or a surcharge sits
-    /// beside it. Every row is nil while submit would refuse the payment.
+    /// beside it. Every row is nil while submit would refuse the payment details.
     public static func rowAmount(for field: PayabliPayInField, paymentDetails: PayabliPayInPaymentDetails?) -> Decimal? {
-        guard let paymentDetails, isSubmittable(paymentDetails) else { return nil }
+        guard let paymentDetails, areValid(paymentDetails) else { return nil }
         let fee = PayInAmount.shown(paymentDetails.serviceFee)
         let surcharge = PayInAmount.shown(paymentDetails.surchargeFee)
         switch field {
@@ -38,9 +38,9 @@ public enum PayabliPayInSummaryRows {
     }
 
     /// What the service charges, the total amount plus any surcharge, or nil when that is nothing or when submit
-    /// would refuse the payment.
+    /// would refuse the payment details.
     public static func totalRowAmount(paymentDetails: PayabliPayInPaymentDetails?) -> Decimal? {
-        guard let paymentDetails, isSubmittable(paymentDetails),
+        guard let paymentDetails, areValid(paymentDetails),
               let charge = PayInAmount.shown(paymentDetails.totalAmount)
         else { return nil }
         let total = charge + (PayInAmount.shown(paymentDetails.surchargeFee) ?? 0)
@@ -73,7 +73,7 @@ public enum PayabliPayInSummaryRows {
         return formatter.string(from: NSDecimalNumber(decimal: sent)) ?? "\(sent)"
     }
 
-    private static func isSubmittable(_ paymentDetails: PayabliPayInPaymentDetails) -> Bool {
+    private static func areValid(_ paymentDetails: PayabliPayInPaymentDetails) -> Bool {
         (try? paymentDetails.validate()) != nil
     }
 
