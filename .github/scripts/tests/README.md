@@ -55,9 +55,10 @@ gate reads the declaration as it is written without moving when the version is b
 
 **Workflow checks (`W*`)** parse the workflows and assert what the files have to be:
 which triggers the nightly may carry, that exactly one job names the Slack token, how the liveness owner is
-decided, that every suite continues on error and is bounded, that the gate reads every outcome, and that
-this harness runs on every file it makes claims about. Each of those was true of how the files were
-written, which is not the same as being enforced.
+decided, that every suite continues on error and is bounded, that the gate reads every outcome, that a
+release builds, tags and publishes only the commit on main its dispatch names, and that this harness runs on
+every file it makes claims about. Each of those was true of how the files were written, which is not the
+same as being enforced.
 
 Set `NIGHTLY_ONLY` to `collector`, `poster`, `workflows`, `helper` or `release` to run one family. The default,
 `both`, runs all of them.

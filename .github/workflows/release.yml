@@ -1,9 +1,9 @@
 name: Release
 
 # A consumer resolves this package by git tag, so the tag is the publication. This one cuts
-# `PayabliCore.version` from main, after the suite passes, on the commit that was tested, and gives it a
-# GitHub Release carrying the XCFrameworks for integrators who do not use SwiftPM. Only a release is ever
-# tagged.
+# `PayabliCore.version` from the commit on main that the dispatch names, after the suite passes on it, and
+# gives it a GitHub Release carrying the XCFrameworks for integrators who do not use SwiftPM. Only a release
+# is ever tagged.
 #
 # Two jobs. `build` runs the repository's tests and build with a read-only token and no secret. `publish`
 # runs on a fresh runner in the `release` environment, executes no file from the checkout, and is the only
@@ -12,6 +12,11 @@ name: Release
 on:
   workflow_dispatch:
     inputs:
+      # The commit that ships, so a merge landing between the decision and the dispatch is not released.
+      commit:
+        description: "Full 40-character SHA of the commit on main to release"
+        required: true
+        type: string
       release_notes:
         description: "Release notes (markdown)"
         required: false
@@ -30,25 +35,46 @@ jobs:
       actions: read
     outputs:
       version: ${{ steps.version.outputs.version }}
+      commit: ${{ inputs.commit }}
+    env:
+      COMMIT: ${{ inputs.commit }}
 
     steps:
-      # Nothing is published from a commit whose CI has not passed, and a run still in progress has not.
-      - name: Require a passing CI run on this commit
-        env:
-          GH_TOKEN: ${{ github.token }}
+      # A full SHA and nothing shorter, so the commit approved is not a prefix that resolves to another.
+      - name: Check the commit is named in full
         run: |
-          state="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?head_sha=$GITHUB_SHA&per_page=1" \
-            --jq '.workflow_runs[0] // empty | "\(.status) \(.conclusion)"')"
-          if [ "$state" != "completed success" ]; then
-            echo "::error::CI on $GITHUB_SHA is '${state:-not run}', not a completed success"
+          if [[ ! "$COMMIT" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::a release names the full 40-character commit SHA, not '$COMMIT'"
             exit 1
           fi
 
+      # Nothing is published from a commit whose CI on main has not passed, and a run still in progress has
+      # not.
+      - name: Require a passing CI run on main for this commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          state="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?head_sha=$COMMIT&branch=main&event=push&per_page=1" \
+            --jq '.workflow_runs[0] // empty | "\(.status) \(.conclusion)"')"
+          if [ "$state" != "completed success" ]; then
+            echo "::error::CI on main for $COMMIT is '${state:-not run}', not a completed success. Re-run it, then dispatch again."
+            exit 1
+          fi
+
+      # All of history, so the check below can see main.
       - name: Checkout
         uses: actions/checkout@v4
         with:
+          ref: ${{ inputs.commit }}
           fetch-depth: 0
           persist-credentials: false
+
+      - name: Check the commit is on main
+        run: |
+          if [ "$(git merge-base "$COMMIT" origin/main)" != "$COMMIT" ]; then
+            echo "::error::$COMMIT is not on main"
+            exit 1
+          fi
 
       - name: Check the version
         id: version
@@ -57,13 +83,21 @@ jobs:
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "tagging $VERSION"
+          # On the run's page, so the approver sees what the approval releases.
+          {
+            echo "Releasing \`$VERSION\` from \`$COMMIT\`:"
+            echo
+            echo "> $(git log -1 --format=%s "$COMMIT")"
+            echo
+            echo "The workflow runs from \`$GITHUB_SHA\` on main."
+          } >> "$GITHUB_STEP_SUMMARY"
 
       # A tag on this commit is a run that failed after pushing it, and is resumed.
       - name: Check an existing tag names this commit
         run: |
           tagged="$(git rev-parse -q --verify "refs/tags/$VERSION^{commit}" || true)"
-          if [ -n "$tagged" ] && [ "$tagged" != "$GITHUB_SHA" ]; then
-            echo "::error::tag $VERSION already names $tagged, not $GITHUB_SHA"
+          if [ -n "$tagged" ] && [ "$tagged" != "$COMMIT" ]; then
+            echo "::error::tag $VERSION already names $tagged, not $COMMIT"
             exit 1
           fi
 
@@ -125,6 +159,7 @@ jobs:
       # Through the environment, so the text is never parsed as shell.
       RELEASE_NOTES: ${{ inputs.release_notes }}
       BUILT_VERSION: ${{ needs.build.outputs.version }}
+      COMMIT: ${{ needs.build.outputs.commit }}
 
     steps:
       - name: Check the release key is provisioned
@@ -139,13 +174,18 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
+          ref: ${{ needs.build.outputs.commit }}
           fetch-depth: 0
           persist-credentials: false
 
-      # The version is the build job's version step output, set before any test or build step ran. It is
-      # checked here as data, since no file from the checkout runs where the key is.
+      # The version is the build job's version step output, set before any test or build step ran. It and
+      # the commit are checked here as data, since no file from the checkout runs where the key is.
       - name: Check the version
         run: |
+          if [[ ! "$COMMIT" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::the build reported '$COMMIT', which is not a full commit SHA"
+            exit 1
+          fi
           if ! [[ "$BUILT_VERSION" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
             echo "::error::the build reported '$BUILT_VERSION', which is not <major>.<minor>.<patch>"
             exit 1
@@ -156,8 +196,8 @@ jobs:
           fi
           VERSION="$BUILT_VERSION"
           tagged="$(git rev-parse -q --verify "refs/tags/$VERSION^{commit}" || true)"
-          if [ -n "$tagged" ] && [ "$tagged" != "$GITHUB_SHA" ]; then
-            echo "::error::tag $VERSION already names $tagged, not $GITHUB_SHA"
+          if [ -n "$tagged" ] && [ "$tagged" != "$COMMIT" ]; then
+            echo "::error::tag $VERSION already names $tagged, not $COMMIT"
             exit 1
           fi
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
@@ -185,9 +225,9 @@ jobs:
             fi
             echo "## Changes since ${previous:-the first commit}"
             if [ -n "$previous" ]; then
-              git log -n 50 --pretty=format:"- %s" "$previous..$GITHUB_SHA"
+              git log -n 50 --pretty=format:"- %s" "$previous..$COMMIT"
             else
-              git log -n 50 --pretty=format:"- %s" "$GITHUB_SHA"
+              git log -n 50 --pretty=format:"- %s" "$COMMIT"
             fi
           } > release-notes.md
           bundle="build/release/payabli-ios-sdk-$VERSION.zip"
@@ -205,10 +245,10 @@ jobs:
           fi
           case "$existing" in
             "")
-              gh release create "$VERSION" --draft --target "$GITHUB_SHA" \
+              gh release create "$VERSION" --draft --target "$COMMIT" \
                 --title "Payabli iOS SDK $VERSION" --notes-file release-notes.md "${assets[@]}"
               ;;
-            "true $GITHUB_SHA")
+            "true $COMMIT")
               gh release upload "$VERSION" --clobber "${assets[@]}"
               ;;
             "false "*)
@@ -216,7 +256,7 @@ jobs:
               exit 1
               ;;
             *)
-              echo "::error::draft $VERSION targets '${existing#* }', not $GITHUB_SHA; delete it"
+              echo "::error::draft $VERSION targets '${existing#* }', not $COMMIT; delete it"
               exit 1
               ;;
           esac
@@ -232,7 +272,7 @@ jobs:
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           if [ -z "$TAGGED" ]; then
-            git tag -a "$VERSION" -m "Payabli iOS SDK $VERSION" "$GITHUB_SHA"
+            git tag -a "$VERSION" -m "Payabli iOS SDK $VERSION" "$COMMIT"
             GIT_SSH_COMMAND="ssh -i $key -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$hosts" \
               git push "git@github.com:$GITHUB_REPOSITORY.git" "refs/tags/$VERSION"
           fi
