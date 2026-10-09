@@ -8,11 +8,9 @@ final class PaymentSummarySectionTests: XCTestCase {
     }
 
     func testTheTotalRowTakesTheHostLabelOrTotal() {
-        let summary = PayabliPayInPaymentSummaryConfiguration()
-
-        XCTAssertEqual(summary.totalLabelText(labels: PayabliPayInLabels()), "Total")
-        XCTAssertEqual(summary.totalLabelText(labels: PayabliPayInLabels(total: "  ")), "Total")
-        XCTAssertEqual(summary.totalLabelText(labels: PayabliPayInLabels(total: "Amount due")), "Amount due")
+        XCTAssertEqual(PayabliPayInSummaryRows.totalLabelText(labels: PayabliPayInLabels()), "Total")
+        XCTAssertEqual(PayabliPayInSummaryRows.totalLabelText(labels: PayabliPayInLabels(total: "  ")), "Total")
+        XCTAssertEqual(PayabliPayInSummaryRows.totalLabelText(labels: PayabliPayInLabels(total: "Amount due")), "Amount due")
     }
 
     func testASectionTakesInputUnlessMarkedAsTheSummary() {
@@ -93,7 +91,6 @@ final class PaymentSummarySectionTests: XCTestCase {
         let drawn = PayInSummaryPlacement.place(
             configuration.cardSections,
             paymentDetails: PayabliPayInPaymentDetails(totalAmount: 12.34, serviceFee: 0.5, currency: "USD"),
-            summary: configuration.paymentSummary,
             showsBaseAmount: true
         )
 
@@ -111,7 +108,6 @@ final class PaymentSummarySectionTests: XCTestCase {
         let drawn = PayInSummaryPlacement.place(
             configuration.cardSections,
             paymentDetails: PayabliPayInPaymentDetails(totalAmount: 12.34, serviceFee: 0.5, surchargeFee: 0.31),
-            summary: configuration.paymentSummary,
             showsBaseAmount: true
         )
 
@@ -130,7 +126,6 @@ final class PaymentSummarySectionTests: XCTestCase {
         let drawn = PayInSummaryPlacement.place(
             configuration.cardSections,
             paymentDetails: PayabliPayInPaymentDetails(totalAmount: 12.34, serviceFee: 0.5, surchargeFee: 0.31),
-            summary: configuration.paymentSummary,
             showsBaseAmount: true
         )
 
@@ -150,7 +145,6 @@ final class PaymentSummarySectionTests: XCTestCase {
         let drawn = PayInSummaryPlacement.place(
             configuration.cardSections,
             paymentDetails: PayabliPayInPaymentDetails(totalAmount: 12.34, serviceFee: 0.5, surchargeFee: 0.31),
-            summary: configuration.paymentSummary,
             showsBaseAmount: true
         )
 
@@ -168,7 +162,6 @@ final class PaymentSummarySectionTests: XCTestCase {
         let drawn = PayInSummaryPlacement.place(
             configuration.cardSections,
             paymentDetails: PayabliPayInPaymentDetails(totalAmount: 12.34, serviceFee: 0.5, surchargeFee: 0.31),
-            summary: configuration.paymentSummary,
             showsBaseAmount: true
         )
 

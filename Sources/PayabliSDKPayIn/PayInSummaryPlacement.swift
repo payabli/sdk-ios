@@ -38,7 +38,6 @@ enum PayInSummaryPlacement {
     static func place(
         _ sections: [PayabliPayInFieldSection],
         paymentDetails: PayabliPayInPaymentDetails?,
-        summary configuration: PayabliPayInPaymentSummaryConfiguration,
         showsBaseAmount: Bool
     ) -> [PayInDrawnSection] {
         let inputs = sections.compactMap { section -> PayInDrawnSection? in
@@ -52,9 +51,9 @@ enum PayInSummaryPlacement {
             if field == .amount, !showsBaseAmount {
                 return
             }
-            result[field] = configuration.rowAmount(for: field, paymentDetails: paymentDetails)
+            result[field] = PayabliPayInSummaryRows.rowAmount(for: field, paymentDetails: paymentDetails)
         }
-        let total = configuration.totalRowAmount(paymentDetails: paymentDetails)
+        let total = PayabliPayInSummaryRows.totalRowAmount(paymentDetails: paymentDetails)
         guard total != nil || !figures.isEmpty else { return inputs }
 
         let at = drawnSummaryIndex(in: sections)

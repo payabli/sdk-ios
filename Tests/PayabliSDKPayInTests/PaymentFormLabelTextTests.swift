@@ -36,13 +36,12 @@ final class PaymentFormLabelTextTests: XCTestCase {
     }
 
     func testEverySummaryRowIsLabelledWithTheBareLabel() {
-        let summary = PayabliPayInPaymentSummaryConfiguration()
         let labels = PayabliPayInLabels()
 
-        XCTAssertEqual(summary.labelText(for: .amount, labels: labels), "Amount")
-        XCTAssertEqual(summary.labelText(for: .serviceFee, labels: labels), "Fee")
-        XCTAssertEqual(summary.labelText(for: .surchargeFee, labels: labels), "Surcharge")
-        XCTAssertEqual(summary.totalLabelText(labels: labels), "Total")
+        XCTAssertEqual(PayabliPayInSummaryRows.labelText(for: .amount, labels: labels), "Amount")
+        XCTAssertEqual(PayabliPayInSummaryRows.labelText(for: .serviceFee, labels: labels), "Fee")
+        XCTAssertEqual(PayabliPayInSummaryRows.labelText(for: .surchargeFee, labels: labels), "Surcharge")
+        XCTAssertEqual(PayabliPayInSummaryRows.totalLabelText(labels: labels), "Total")
     }
 
     func testABlankHostLabelFallsBackToTheDefault() {
