@@ -359,7 +359,7 @@ Fill in `Secrets.swift`, then start the token server as its
 The SDK sends no error or usage reports to Payabli. `PayabliConfig` accepts `telemetryEnabled`, which
 changes nothing.
 
-Every request the SDK sends carries an `X-Pyb-Client` header with the SDK version, the platform, the OS
+Every request the SDK sends to Payabli carries an `X-Pyb-Client` header with the SDK version, the platform, the OS
 version, the device model, the locale and, when there is one, the device ID described under
 [Device identity](#device-identity). It can't be turned off.
 
