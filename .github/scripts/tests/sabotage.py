@@ -669,6 +669,11 @@ MUTATIONS = [
         '          # here. The same lines as release-newer.sh.\n          newest=""\n', 'W15v', "workflows",
     ),
     Mutation(
+        'the job that tags finds a lower version and publishes it anyway',
+        RELEASE_YML, '            echo "::error::the newest release is $newest, and $VERSION is lower"\n            exit 1\n          fi\n          echo "VERSION=$VERSION" >> "$GITHUB_ENV"\n',
+        '            echo "::error::the newest release is $newest, and $VERSION is lower"\n          fi\n          echo "VERSION=$VERSION" >> "$GITHUB_ENV"\n', 'W15v', "workflows",
+    ),
+    Mutation(
         "the ordering check is switched off by a condition",
         RELEASE_YML, "      - name: Check the version is not below the newest release\n",
         "      - name: Check the version is not below the newest release\n        if: false\n", "W15p", "workflows",

@@ -1437,8 +1437,12 @@ def test_workflows() -> None:
           (test_job.get("needs"), build_job.get("needs"), retention))
     # "Re-run failed jobs" does not re-run the check job, so the job that tags reads the tags again: a release
     # cut since the check would otherwise be overtaken by this one. The same lines as the script, as data.
-    recheck_at = next((index for index, run in enumerate(publish_runs)
-                       if all(line in [part.strip() for part in run.splitlines()] for line in ordering)), -1)
+    def holds_refusal(run: str) -> bool:
+        lines = [line.strip() for line in run.splitlines() if line.strip()]
+        return any(lines[at:at + len(refusal)] == refusal for at in range(len(lines)))
+
+    # The whole refusal, unbroken, so the re-check still stops a release rather than only computing.
+    recheck_at = next((index for index, run in enumerate(publish_runs) if holds_refusal(run)), -1)
     publish_tag_at = next((index for index, run in enumerate(publish_runs) if "gh release create" in run), -1)
     check("W15v the job that tags checks the version against the newest release again, with the script's lines",
           len(ordering) == 4 and recheck_at != -1 and recheck_at < publish_tag_at, (ordering, recheck_at, publish_tag_at))
