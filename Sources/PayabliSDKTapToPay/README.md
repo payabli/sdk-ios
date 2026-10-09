@@ -238,7 +238,6 @@ These Tap to Pay causes are ones your app handles, with their codes:
 
 | `type` | `code` | `category` | `message` |
 |---|---|---|---|
-| `.activationCodeMalformed` | 3023 | `.invalidRequest` | The activation code must be six digits. |
 | `.activationCodeIncorrect` | 3024 | `.invalidRequest` | The activation code is incorrect. |
 | `.activationCodeExpired` | 3025 | `.configuration` | The activation code has expired. |
 | `.activationAttemptsExhausted` | 3026 | `.configuration` | Too many incorrect activation codes were entered. |
