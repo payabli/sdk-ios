@@ -155,10 +155,8 @@ final class PaymentSummaryPlacementTests: XCTestCase {
         XCTAssertNil(drawn?.total)
     }
 
-    func testAnAmountThatCannotBeSentDrawsNoRowRatherThanFailingTheForm() {
-        let drawn = place([card], details(12.34, fee: .infinity)).last
-
-        XCTAssertEqual(drawn?.rows, [])
-        XCTAssertEqual(drawn?.total, amount("12.34"))
+    func testAFigureThatCannotBeSentDrawsNoSummaryRatherThanFailingTheForm() {
+        XCTAssertEqual(place([card, summary([.amount])], details(12.34, fee: .infinity)).map(\.isSummary), [false])
+        XCTAssertEqual(place([card], details(12.34, surcharge: 1e40)).map(\.isSummary), [false])
     }
 }
