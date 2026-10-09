@@ -14,7 +14,7 @@ enum TapToPaySessionStatus {
     case reinitializing
     case pendingActivation
     case pendingTerms
-    case charging
+    case charging(TapToPayChargeStep)
     case error
     /// Failed for a reason no setup repairs: the phone, the configuration or the SDK
     /// has to change, so the screen shows why rather than offering the full setup.
@@ -33,7 +33,7 @@ enum TapToPaySessionStatus {
         case .reinitializing: return "reinit"
         case .pendingActivation: return "pending"
         case .pendingTerms: return "terms"
-        case .charging: return "charging"
+        case let .charging(step): return step.label
         case .error: return "error"
         case .refused: return "refused"
         case let .unrecognised(raw): return "state(\(raw))"
@@ -54,6 +54,43 @@ enum TapToPaySessionStatus {
     /// Whether the reader can take a tap.
     var acceptsTap: Bool {
         self == .ready
+    }
+
+    /// Whether a charge holds the reader.
+    var isCharging: Bool {
+        if case .charging = self {
+            return true
+        }
+        return false
+    }
+}
+
+/// What a running charge is doing, in this app's own words.
+enum TapToPayChargeStep: Equatable {
+    case opening
+    case waitingForCard
+    case closing
+    case cardDetected
+    case removeCard
+    case tryAgain
+    case enterPIN
+    case pinEntered
+    case promptDismissed
+    case unrecognised(Int)
+
+    var label: String {
+        switch self {
+        case .opening: return "Opening payment"
+        case .waitingForCard: return "Tap a card"
+        case .closing: return "Closing payment"
+        case .cardDetected: return "Reading card"
+        case .removeCard: return "Remove the card"
+        case .tryAgain: return "Tap the card again"
+        case .enterPIN: return "Enter the PIN"
+        case .pinEntered: return "PIN entered"
+        case .promptDismissed: return "Prompt closed"
+        case let .unrecognised(raw): return "charging(\(raw))"
+        }
     }
 }
 
@@ -80,7 +117,7 @@ extension TapToPaySessionStatus {
         case .pendingActivation: self = .pendingActivation
         case .pendingTerms: self = .pendingTerms
         case let .failed(reason): self = Self.refusing(reason) ? .refused : .error
-        case .charging: self = .charging
+        case let .charging(activity): self = .charging(TapToPayChargeStep(activity))
         // The SDK ships as a resilient binary framework, so a host built against
         // this version can be handed a case added by a later one.
         @unknown default: self = .unrecognised(state.code.rawValue)
@@ -92,6 +129,23 @@ extension TapToPaySessionStatus {
         case .deviceIneligible, .configurationRejected, .sdkInternalError: true
         case .deviceSetupRequired, .serviceUnavailable, .deviceKeyUnavailable: false
         @unknown default: false
+        }
+    }
+}
+
+extension TapToPayChargeStep {
+    init(_ activity: TapToPayChargeActivity) {
+        switch activity {
+        case .opening: self = .opening
+        case .waitingForCard: self = .waitingForCard
+        case .closing: self = .closing
+        case .cardDetected: self = .cardDetected
+        case .cardRemovalRequested: self = .removeCard
+        case .cardReadRetryRequested: self = .tryAgain
+        case .pinEntryRequested: self = .enterPIN
+        case .pinEntryCompleted: self = .pinEntered
+        case .readerPromptDismissed: self = .promptDismissed
+        @unknown default: self = .unrecognised(activity.rawValue)
         }
     }
 }

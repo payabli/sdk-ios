@@ -255,6 +255,7 @@ From Objective-C, these errors arrive as `NSError`. See
 | `.idle` | Not started, or activated and waiting for `initialize()`. |
 | `.attestingDevice`, `.fetchingConfig`, `.initializingReader(percent:)` | `initialize()` is running. |
 | `.ready` | Ready to charge. |
+| `.charging(activity:)` | `charge` is running, and `isReady` is `false` until it ends, unless `initialize()` is called during it and rebuilds the session. It ends at `.ready`, at `.sessionExpired` when the reader session was spent, or at `.failed(reason: .deviceSetupRequired)` when the device's registration is gone. `activity` is `.opening`, `.waitingForCard` or `.closing`, or a prompt the reader raised during the tap: `.cardDetected`, `.cardRemovalRequested`, `.cardReadRetryRequested`, `.pinEntryRequested`, `.pinEntryCompleted` or `.readerPromptDismissed`. The outcome is what `charge` returns or throws. |
 | `.pendingActivation(activationId:)` | The phone needs an activation code. `activationId` is what the activation route's `deviceId` field takes. |
 | `.pendingTerms` | The merchant hasn't accepted Apple's terms. |
 | `.sessionExpired` | The session needs refreshing. The next `charge` refreshes it. |
@@ -283,6 +284,8 @@ struct TerminalView: View {
     var body: some View {
         switch ttp.sessionState {
         case .ready: Button("Charge") { Task { await charge() } }
+        case .charging(.waitingForCard): Text("Hold a card near the top of the iPhone")
+        case .charging(.cardRemovalRequested): Text("Remove the card")
         case .initializingReader(let percent): ProgressView(value: Double(percent ?? 0), total: 100)
         default: ProgressView()
         }
@@ -294,7 +297,7 @@ How a call ended is what it returns or throws. A failure raised after the paymen
 `paymentTransId`.
 
 From Objective-C, `addSessionStateObserver(_:)` calls a block on the main thread after every change. The
-block carries nothing: read `sessionStateCode` and the accessors beside it, then call `cancel()` on the
+block carries nothing: read `sessionStateCode` and the accessors beside it, such as `chargeActivity`, then call `cancel()` on the
 returned observation when your screen goes away.
 
 ## Go live

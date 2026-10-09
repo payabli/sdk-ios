@@ -4,18 +4,9 @@ import Combine
 @testable import PayabliSDKTapToPay
 import XCTest
 
-/// What this branch changed, exercised against a live paypoint on real hardware.
-///
-/// Everything up to the tap. `charge()` needs a card held to the phone, so the read
-/// is abandoned once the backend has minted a `paymentTransId`, which is the last
-/// thing that happens before the reader waits for a card.
-///
-/// Each test establishes what it needs and assumes nothing about what ran before
-/// it. XCTest runs methods in name order by default and does not have to: a run can
-/// select one method or reorder them, and a test that reads what its neighbour
-/// wrote then passes or fails on that choice rather than on the code.
-///
-/// These register a device against the paypoint the run names, which is a write.
+/// Card-present against a live paypoint on real hardware, up to the tap except in the one test a person
+/// taps. Each test sets up what it needs, since a run may select or reorder methods. These register a
+/// device against the paypoint the run names, which is a write.
 @MainActor
 final class TapToPayOnDeviceTests: XCTestCase {
     // Set in setUp, read by every test: the XCTest shape for a fixture that cannot
@@ -305,6 +296,38 @@ final class TapToPayOnDeviceTests: XCTestCase {
         )
     }
 
+    /// A whole charge a person taps, recording every state the session publishes.
+    /// Runs only with `TEST_RUNNER_PAYABLI_TAP_BY_HAND=1`: nothing unattended can present a card.
+    func testAChargeTappedByHandWalksItsActivities() async throws {
+        guard ProcessInfo.processInfo.environment["PAYABLI_TAP_BY_HAND"] == "1" else {
+            throw XCTSkip("set TEST_RUNNER_PAYABLI_TAP_BY_HAND=1 and tap a card when the reader asks")
+        }
+        let (ttp, _) = try await enrolledDevice()
+        var seen: [PayabliTTPSessionState] = []
+        let watcher = ttp.$sessionState.removeDuplicates().sink { seen.append($0) }
+        defer { watcher.cancel() }
+        LiveEnvironment.report("PAYABLI_TAP_BY_HAND tap a card on the iPhone now")
+
+        var outcome = "approved"
+        do {
+            _ = try await ttp.charge(
+                type: .sale,
+                paymentDetails: PayabliTTPPaymentDetails(amount: 1.00),
+                customer: TapToPayDemoCustomer.customerData,
+                orderDescription: "device tests"
+            )
+        } catch {
+            outcome = (error as? TapToPayError)?.type.rawValue ?? "\(type(of: error))"
+        }
+        let names = seen.map { "\($0)" }
+        LiveEnvironment.report("PAYABLI_TAP_BY_HAND env=\(named.name) outcome=\(outcome) states=\(names)")
+        XCTAssertEqual(seen.dropFirst().first, .charging(activity: .opening), "\(names)")
+        XCTAssertTrue(seen.contains(.charging(activity: .waitingForCard)), "\(names)")
+        XCTAssertTrue(seen.contains(.charging(activity: .closing)), "\(names)")
+        XCTAssertEqual(ttp.sessionState, .ready, "\(names)")
+        XCTAssertTrue(ttp.isReady)
+    }
+
     /// The same, with no customer. A paypoint that matches on an identifier refuses
     /// this at the initiate, before any card is presented.
     func testAChargeWithNoCustomerIsRefusedBeforeTheTap() async throws {
@@ -314,8 +337,7 @@ final class TapToPayOnDeviceTests: XCTestCase {
         )
     }
 
-    /// Drives `charge()` and returns once the backend has minted a
-    /// `paymentTransId`, which is the last thing before the reader waits for a card.
+    /// Drives `charge()` and returns once the charge is waiting for a card.
     private func assertChargeReachesTheTap(
         customer: PayabliTTPCustomerData,
         label: String

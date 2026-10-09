@@ -62,6 +62,43 @@ final class SessionManager: ObservableObject {
         sessionState = .initializingReader(percent: percent)
     }
 
+    /// The charge holding the session, or `nil` when none does.
+    private(set) var runningCharge: Int?
+    private var nextCharge = 0
+
+    /// Enters a charge and names it, or answers `nil` when the session is not
+    /// ready. The ready check and the entry are one write, so a second charge is
+    /// refused while one holds the reader.
+    func beginCharge() -> Int? {
+        guard sessionState == .ready, transition(to: .charging(activity: .opening)) else { return nil }
+        nextCharge += 1
+        runningCharge = nextCharge
+        return nextCharge
+    }
+
+    /// Dropped unless `charge` still holds the session.
+    func recordChargeActivity(_ activity: TapToPayChargeActivity, for charge: Int) {
+        guard charge == runningCharge, case .charging = sessionState else { return }
+        transition(to: .charging(activity: activity))
+    }
+
+    /// Ends `charge` on `failed(reason)`, only while it still holds the session.
+    func failCharge(_ reason: PayabliTTPFailureReason, for charge: Int) {
+        guard charge == runningCharge, case .charging = sessionState else { return }
+        runningCharge = nil
+        sessionState = .failed(reason: reason)
+        isReady = false
+    }
+
+    /// Returns to ready only while `charge` still holds the session, so a move
+    /// made during the charge, by it or by another caller, is kept.
+    func endCharge(_ charge: Int) {
+        guard charge == runningCharge else { return }
+        runningCharge = nil
+        guard case .charging = sessionState else { return }
+        transition(to: .ready)
+    }
+
     /// Returns the session to its starting point. Internal: a host reaches this
     /// only through `initialize()`, never as an operation of its own.
     func reset() {

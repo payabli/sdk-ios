@@ -124,7 +124,7 @@ enum TapToPaySteps {
             if outcome == .succeeded {
                 return .done
             }
-            if session == .ready || session == .charging {
+            if session == .ready || session.isCharging {
                 return .notNeeded
             }
             // What is left is `.pendingActivation`, or the `.error` the step
@@ -133,10 +133,7 @@ enum TapToPaySteps {
         }()
 
         // From the step before.
-        let charge: StepStatus = {
-            guard activation.isFinished else { return .blocked }
-            return session == .ready ? .current : .blocked
-        }()
+        let charge = chargeStatus(activation: activation, session: session)
 
         // Ordered like the steps, and for the same reason: the first thing that
         // wants attention is the only thing offered. Re-initialize sits behind
@@ -235,6 +232,15 @@ enum TapToPaySteps {
         }
         guard activation.isFinished else { return nil }
         return charge == .current ? .charge : nil
+    }
+
+    private static func chargeStatus(activation: StepStatus, session: TapToPaySessionStatus) -> StepStatus {
+        guard activation.isFinished else { return .blocked }
+        switch session {
+        case .ready: return .current
+        case .charging: return .inProgress
+        default: return .blocked
+        }
     }
 
     /// What the enable step offers, which is the one step that reads the session

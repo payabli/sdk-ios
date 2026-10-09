@@ -49,6 +49,11 @@ final class StepStatusTests: XCTestCase {
                 XCTFail("the app does not name the SDK state with raw value \(raw)")
             }
         }
+        for activity in everyChargeActivity {
+            if case let .unrecognised(raw) = TapToPayChargeStep(activity) {
+                XCTFail("the app does not name the charge activity with raw value \(raw)")
+            }
+        }
     }
 }
 
@@ -68,6 +73,9 @@ let everyTapToPaySession: [PayabliTTPSessionState] = [
     .pendingTerms,
     .charging(activity: .opening)
 ]
+
+/// Every charge activity, by raw value, so one the SDK adds and this app does not name fails here.
+let everyChargeActivity: [TapToPayChargeActivity] = TapToPayChargeActivity.allCases
 
 /// The same states as this app names them.
 ///

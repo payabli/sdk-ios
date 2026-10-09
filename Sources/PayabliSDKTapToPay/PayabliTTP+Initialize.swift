@@ -100,7 +100,7 @@ extension PayabliTTP {
 
     /// Session refresh for host/bridge re-entry.
     ///
-    /// No-op when already `.ready`. For non-terminal transient states
+    /// No-op when already `.ready` or while a charge runs. For non-terminal transient states
     /// (`.sessionExpired`, `.idle`, `.error`) re-runs steps 2–4 of
     /// `initialize()`. NFR-5D forbids providers from caching credentials
     /// across sessions, so every refresh re-fetches `/config`.
@@ -114,7 +114,7 @@ extension PayabliTTP {
 
     private func runReinitializeIfNeeded() async throws {
         switch sessionState {
-        case .ready:
+        case .ready, .charging:
             return
         case .sessionExpired, .idle, .failed:
             break
@@ -275,6 +275,7 @@ extension PayabliTTP {
                 self?.handleReaderEvent(event, from: configuration)
             }
             readerSessionGeneration += 1
+            preparedReader = configuration
         } catch PayabliTTPError.termsNotAccepted {
             // Not an error state: the session is waiting on a person, the way it waits on one in
             // `pendingActivation`. The host presents the terms and initializes again, and the reader
