@@ -296,7 +296,7 @@ When the outcome is unknown, look the transaction up from your backend with
 before you charge again. `TapToPayError` carries the `paymentTransId` to look up when there is one;
 `PayabliPayInError.submissionInterrupted` carries none. When there isn't one, find the transaction in the
 Payabli portal before you charge again. On card-not-present, setting `orderId` on each request lets you find it
-by your own reference. After `captureAuthorizedTransaction(_:)`, look up the transaction ID you passed.
+by your own reference. After `captureAuthorizedTransaction(_:)` or `voidTransaction(_:)`, look up the transaction ID you passed.
 
 Each guide lists its errors in full: [card-not-present](Sources/PayabliSDKPayIn/README.md#outcomes-and-errors)
 and [Tap to Pay](Sources/PayabliSDKTapToPay/README.md#outcomes-and-errors).
