@@ -1356,13 +1356,16 @@ def test_workflows() -> None:
     step_commits = [step.get("name") for step in release_steps if "COMMIT" in (step.get("env") or {})]
     moves = [line.strip() for run in runs for line in run.splitlines()
              if re.search(r"\bgit (checkout|switch|reset)\b", line)]
+    # All of history: the on-main check reads origin/main, and the resume checks and the notes read the tags.
+    depths = [(step.get("with") or {}).get("fetch-depth") for step in release_checkouts]
     check("W15q every job checks out and acts on the named commit",
           len(release_checkouts) == 2 and all(ref in named for ref in checkout_refs)
+          and depths == [0, 0]
           and (build_job.get("outputs") or {}).get("commit") == "${{ inputs.commit }}"
           and (build_job.get("env") or {}).get("COMMIT") == "${{ inputs.commit }}"
           and (publish_job.get("env") or {}).get("COMMIT") == "${{ needs.build.outputs.commit }}"
           and not step_commits and not moves,
-          (checkout_refs, build_job.get("env"), publish_job.get("env"), step_commits, moves))
+          (checkout_refs, depths, build_job.get("env"), publish_job.get("env"), step_commits, moves))
     # The approval page shows the run, not the commit, so the run's summary is where the approver reads it.
     summary_run = next((run for run in build_runs if "$GITHUB_STEP_SUMMARY" in run), "")
     check("W15r the run summary names the commit and its subject line for the approver",

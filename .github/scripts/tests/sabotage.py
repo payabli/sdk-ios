@@ -634,6 +634,16 @@ MUTATIONS = [
         "W15p", "workflows",
     ),
     Mutation(
+        "the publish job checks out the commit without the tags or history its checks read",
+        RELEASE_YML, "          ref: ${{ needs.build.outputs.commit }}\n          fetch-depth: 0\n",
+        "          ref: ${{ needs.build.outputs.commit }}\n", "W15q", "workflows",
+    ),
+    Mutation(
+        "the build job checks out the commit without main to compare it to",
+        RELEASE_YML, "          ref: ${{ inputs.commit }}\n          fetch-depth: 0\n",
+        "          ref: ${{ inputs.commit }}\n", "W15q", "workflows",
+    ),
+    Mutation(
         "the publish job checks out main's head instead of the named commit",
         RELEASE_YML, "          ref: ${{ needs.build.outputs.commit }}\n", "", "W15q", "workflows",
     ),
