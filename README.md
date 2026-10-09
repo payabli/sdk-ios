@@ -215,8 +215,8 @@ func fetchPayabliAccessToken() async throws -> String {
 
 ### Device identity
 
-`PayabliSession.deviceId` is this device's identity, the same for every capability and stable for the
-install. It is `nil` while the device's secure storage can't be read, such as before the first unlock
+`PayabliSession.deviceId` is this device's identity, the same for every capability. It is stable across
+reinstalls; a device wipe or a restore without a keychain backup gives it a new one. It is `nil` while the device's secure storage can't be read, such as before the first unlock
 after a restart. From Objective-C, read `PayabliSessionObjC.deviceId`, which is also `nil` before the
 session is initialized.
 
