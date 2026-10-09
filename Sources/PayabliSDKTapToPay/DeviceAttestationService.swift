@@ -109,7 +109,7 @@ package struct ActivationRegistrationChanged: Error {
     package init() {}
 }
 
-/// The assertion that signs `/activate` could not be produced, so nothing was sent. It lands by
+/// The assertion that signs `/activate` could not be produced, so `/activate` was not sent. It lands by
 /// `hostError`'s code, because no activation code repairs a device that cannot sign.
 package struct ActivationSigningFailed: Error {
     package let hostError: TapToPayError

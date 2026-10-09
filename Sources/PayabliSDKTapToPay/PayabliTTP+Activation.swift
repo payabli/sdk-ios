@@ -47,13 +47,6 @@ public extension PayabliTTP {
             syncPublished()
             throw refusal.hostError
         } catch let err as PayabliTTPError {
-            // The attestation service already cleared local cache for the
-            // revoked case, so the next `initialize()` attests cold.
-            if case .attestationRevoked = err {
-                markError(err)
-                syncPublished()
-                throw err
-            }
             markError(err)
             syncPublished()
             throw err

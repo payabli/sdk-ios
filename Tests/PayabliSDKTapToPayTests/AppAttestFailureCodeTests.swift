@@ -110,9 +110,9 @@ final class AppAttestFailureCodeTests: XCTestCase {
 
     // MARK: - The assertion that signs an activation
 
-    /// An activation whose assertion cannot be produced sends nothing, and reports the failure by
-    /// what repairs it.
-    func testAnActivationThatCannotBeSignedSendsNothingAndIsReportedByItsCause() async throws {
+    /// An activation whose assertion cannot be produced does not send `/activate`, and reports the
+    /// failure by what repairs it.
+    func testAnActivationThatCannotBeSignedIsNotSentAndIsReportedByItsCause() async throws {
         let cases: [(Error, PayabliErrorType)] = [
             (deviceCheck(1), .deviceSetupUnsupported),
             (deviceCheck(4), .deviceSetupUnavailable),

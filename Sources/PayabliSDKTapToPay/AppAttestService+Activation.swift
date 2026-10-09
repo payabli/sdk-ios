@@ -77,7 +77,7 @@ package extension AppAttestService {
         )
     }
 
-    /// The assertion `/activate` is signed with, or a failure that says nothing was sent.
+    /// The assertion `/activate` is signed with, or a failure that says `/activate` was not sent.
     ///
     /// The binding is already dropped for a key the platform no longer holds, so that refusal is a
     /// setup that has ended.
@@ -96,10 +96,8 @@ package extension AppAttestService {
             ))
         } catch {
             let nsError = error as NSError
-            let keyIsGone = nsError.domain == Self.deviceCheckErrorDomain
-                && Self.deviceCheckUnusableKeyCodes.contains(nsError.code)
             throw ActivationSigningFailed(hostError: TapToPayError(
-                type: keyIsGone ? .deviceSetupRequired : .sdkInternalError,
+                type: .sdkInternalError,
                 reason: "The activation could not be signed",
                 detail: "\(nsError.domain) \(nsError.code)"
             ))

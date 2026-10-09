@@ -104,13 +104,9 @@ package final class AppAttestService: DeviceAttestationService, @unchecked Senda
         }
     }
 
-    /// Whether the platform will still sign with this binding's key.
-    ///
-    /// Signs over a fixed hash that is sent nowhere: the answer is whether the call
-    /// throws. Only `deviceCheckUnusableKeyCodes` mean the key cannot be used, and
-    /// drop the binding. A `deviceSetupError` raises as itself, and any other failure
-    /// raises `deviceKeyUnavailable`; both keep the binding, because re-enrolling
-    /// costs an enrolment for a key that may still work.
+    /// Whether the platform will still sign with this binding's key, by signing a hash sent nowhere.
+    /// Only `deviceCheckUnusableKeyCodes` drop the binding: re-enrolling costs an enrolment for a key
+    /// that may still work, so every other failure keeps it and raises.
     func keyIsStillHeld(_ binding: AttestedDevice) async throws -> Bool {
         do {
             _ = try await attestor.generateAssertion(
@@ -246,13 +242,6 @@ package final class AppAttestService: DeviceAttestationService, @unchecked Senda
         try reportingStorageFailure { try bindingStore.remember(record) }
     }
 
-    /// The value registration identifies this install by.
-    ///
-    /// Wrapped like every other store access: the default provider reads the
-    /// Keychain and mints into it, so it fails the same way the binding reads do.
-    ///
-    /// Raises rather than sending a blank one, which is what an app with no bundle
-    /// identifier produces.
     private static func storageError(status: OSStatus) -> TapToPayError {
         switch status {
         case errSecMissingEntitlement:
@@ -276,6 +265,8 @@ package final class AppAttestService: DeviceAttestationService, @unchecked Senda
         }
     }
 
+    /// The value registration identifies this install by. Raises rather than sending a blank one,
+    /// which is what an app with no bundle identifier produces.
     func hardwareId() throws -> String {
         let hardwareId = try reportingStorageFailure { try hardwareIdProvider() }
         guard !hardwareId.isEmpty else {
