@@ -224,10 +224,12 @@ other error.
 A `TapToPayError` carries the catalog entry for its cause:
 
 - `category` says what to do, such as `.credential` (call `initialize()` again) or `.outcomeUnknown`
-  (find the transaction before repeating the call).
+  (find the transaction before repeating the call). Choose your remedy from `category`.
 - `type` names the cause, for a case your app handles on its own, such as `.devicePendingActivation`.
 - `code` is the catalog number Payabli support reads. Give it to them with the failure.
-- `message` is fixed text. `detail` holds the service's or the reader's own words, when there are any.
+- `message` is fixed text, safe to show and to log. `reason` is a short summary and `detail` a longer
+  explanation, from the service, the reader or the SDK, when there is one. Show them, but don't log them: the
+  service's text can repeat what the request carried.
 - `retryAfter` is the wait the service asked for before trying again, when it asked for one and the
   failure carries it.
 
