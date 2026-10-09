@@ -86,7 +86,6 @@ let ttp = try await PayabliTTP.create()
 - Start the session once, before `create()`. `create()` throws when no session has been started.
 - Card-not-present payments run on the same session: pass `session` to `PayabliPayIn`.
 - `PayabliTTP` is an `ObservableObject`: bind `sessionState` and `isReady` in SwiftUI.
-- **One paypoint per session.** A `PayabliTTP` serves the entry point it was created with.
 
 ## Take a payment
 
@@ -108,8 +107,7 @@ phone takes longer than later ones.
 ### Accept Apple's terms
 
 A merchant accepts Apple's Tap to Pay terms **once per merchant**, not once per phone. Until they do,
-`initialize()` stops at `.pendingTerms`, emits `.termsRequired` and throws a `TapToPayError` whose
-`type` is `.termsNotAccepted`.
+`initialize()` stops at `.pendingTerms` and throws a `TapToPayError` whose `type` is `.termsNotAccepted`.
 
 Present the terms from a screen where someone with the authority to accept is present, then initialize
 again:
@@ -140,8 +138,8 @@ A phone takes Tap to Pay payments for a paypoint only after it is activated with
 Until the phone is activated, `initialize()` throws a `TapToPayError` whose `type` is
 `.devicePendingActivation`, and
 `sessionState` is `.pendingActivation(activationId:)`. An app that isn't an authorized app, or credentials
-without `tools_init` or `pos_create`, land on `.failed(reason: .configurationRejected)` on a phone that
-hasn't registered yet. Credentials without
+without `tools_init` or `pos_create`, land on `.failed(reason: .configurationRejected)` on a phone with
+no setup stored for the paypoint from an earlier run. Credentials without
 `inboundpayments_create` reach `.ready`, and `charge` then throws a `TapToPayError` whose `type` is
 `.permissionDenied`, before the card is read.
 

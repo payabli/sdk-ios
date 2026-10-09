@@ -1,12 +1,13 @@
 # Cross-platform bridges
 
-Source for the three non-native-iOS integrations.
+Examples of integrating the SDK from Flutter, .NET MAUI and React Native. Use them as a starting point for your
+own integration. They're examples rather than separate products.
 
-| Platform         | Files                                                        | Status (v1.0)                                                                           |
+| Technology       | Files                                                        | What it shows                                                                           |
 | ---------------- | ------------------------------------------------------------ | --------------------------------------------------------------------------------------- |
-| **Flutter**      | `Flutter/PayabliSDKPlugin.swift`, `Flutter/payabli_sdk.dart` | MethodChannel plugin ready for Tap to Pay and payment flow; example app scaffold at `Example/PayabliFlutterDemo/`. |
-| **.NET MAUI**    | `MAUI/PayabliBinding.cs`                                     | .NET 10 iOS binding library skeleton for Tap to Pay and payment flow. Regenerate via `sharpie bind` against the XCFrameworks. |
-| **React Native** | `ReactNative/PayabliSDKModule.swift`, `ReactNative/PayabliSDKModuleBridge.m`, `ReactNative/PayabliSDK.ts` | Native Module wrapper for Tap to Pay and stored card/bank account PayIn payment flow; Expo example app at `Example/PayabliReactNativeDemo/`. |
+| **Flutter**      | `Flutter/PayabliSDKPlugin.swift`, `Flutter/payabli_sdk.dart` | A MethodChannel plugin for Tap to Pay and the payment flow, with an example app at `Example/PayabliFlutterDemo/`. |
+| **.NET MAUI**    | `MAUI/PayabliBinding.cs`                                     | A .NET 10 iOS binding library for Tap to Pay and the payment flow. Regenerate it with `sharpie bind` against the XCFrameworks. |
+| **React Native** | `ReactNative/PayabliSDKModule.swift`, `ReactNative/PayabliSDKModuleBridge.m`, `ReactNative/PayabliSDK.ts` | A Native Module for Tap to Pay and the stored card and bank account payment flow, with an Expo example app at `Example/PayabliReactNativeDemo/`. |
 
 These files are **not** compiled as part of the Swift package build — they're consumed by their respective host toolchains (Flutter's Xcode project, a .NET MAUI binding project, an RN host app).
 
