@@ -336,8 +336,8 @@ The SDK is written in Swift, and the card-not-present form is a SwiftUI view.
   charged, `1` unknown, `2` charged), `userInfo["paymentTransId"]` is absent when there is no
   transaction ID, and `userInfo["retryAfter"]` holds the wait in seconds when the service asked for one. Card-not-present errors are in the `com.payabli.payIn` domain, and errors from
   `PayabliSessionObjC`'s initializer are in `com.payabli.session`.
-- **Flutter, .NET MAUI and React Native.** Wrappers are in [`Bridges/`](Bridges/README.md), which lists the
-  status of each.
+- **Flutter, .NET MAUI and React Native.** [`Bridges/`](Bridges/README.md) has an example integration for each.
+  Use them as a starting point for your own integration.
 
 ## Sample app and testing
 
@@ -358,6 +358,10 @@ Fill in `Secrets.swift`, then start the token server as its
 
 The SDK sends no error or usage reports to Payabli. `PayabliConfig` accepts `telemetryEnabled`, which
 changes nothing.
+
+Every request the SDK sends carries an `X-Pyb-Client` header with the SDK version, the platform, the OS
+version, the device model, the locale and, when there is one, the device ID described under
+[Device identity](#device-identity). It can't be turned off.
 
 ## Versioning and support
 

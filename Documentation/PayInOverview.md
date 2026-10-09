@@ -321,11 +321,10 @@ let diagnostics = PayabliPayInDiagnostics.enabled { entry in
 
 ## Bridge Scope
 
-Flutter, React Native, and .NET MAUI bridge files currently expose stored card
-and bank account payment-method creation. Native Swift apps should call
-`PayabliSDKPayIn` directly for capture, authorize, and
-capture-authorized transaction flows until those request models are promoted
-into the bridge APIs.
+The Flutter, React Native and .NET MAUI bridges in `Bridges/` are examples of integrating the SDK from each
+technology. Use them as a starting point for your own integration. They show stored card and bank account
+payment-method creation. Capture, authorize and capture-authorized transaction flows are called from Swift with
+`PayabliSDKPayIn`.
 
 ## Reference Docs
 
