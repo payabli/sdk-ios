@@ -17,7 +17,7 @@ enum TapToPaySessionStatus {
     case charging(TapToPayChargeStep)
     case error
     /// Failed for a reason no setup repairs: the phone, the configuration or the SDK
-    /// has to change, so the screen shows why rather than offering the full setup.
+    /// has to change, so the screen shows why instead of offering a recovery.
     case refused
     case unrecognised(Int)
 

@@ -101,7 +101,7 @@ final class TapToPayTerminal: ObservableObject {
         do {
             return try await body()
         } catch {
-            throw TapToPayFailure(error)
+            throw TapToPayFailure(error, session: TapToPaySessionStatus(terminal.sessionState))
         }
     }
 }
@@ -124,8 +124,12 @@ struct TapToPayFailure: LocalizedError {
     /// cold attestation rather than another activation code.
     let isDeviceSetupRequired: Bool
 
-    init(_ error: Error) {
+    /// Whether the session landed on a reason no setup repairs, which the enable step reports.
+    let isRefused: Bool
+
+    init(_ error: Error, session: TapToPaySessionStatus) {
         message = error.localizedDescription
         isDeviceSetupRequired = (error as? TapToPayError)?.type == .deviceSetupRequired
+        isRefused = session == .refused
     }
 }

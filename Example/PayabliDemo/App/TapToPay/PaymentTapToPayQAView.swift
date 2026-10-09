@@ -554,6 +554,11 @@ struct PaymentTapToPayQAView: View {
                 } else {
                     activationOutcome = .activationFailed
                     activationMessage = "✗ \(failure.message)"
+                    // A refused session fails the enable step and blocks this one, so
+                    // the reason has to be on the row that shows it.
+                    if failure.isRefused {
+                        enableMessage = "✗ \(failure.message)"
+                    }
                 }
                 return
             }

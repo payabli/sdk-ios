@@ -2,7 +2,7 @@
 /// Which half of the activation step happened.
 ///
 /// Activation is two SDK calls. `sessionState` cannot tell them apart: both land
-/// in `.error`.
+/// in `.error`, or `.refused` for a reason no setup repairs.
 enum TapToPayActivationOutcome {
     case none
     case activationFailed
@@ -272,9 +272,9 @@ enum TapToPaySteps {
         // retried from its own row once someone has changed what it names.
         case .refused: return .failed
         case .sessionExpired: return .failed
-        // A recorded activation failure at `.idle` is one whose session was
-        // reset rather than marked, and re-attesting from scratch is this
-        // step's own action.
+        // The SDK marks every activation failure rather than resetting to `.idle`,
+        // so this holds only for a session reset by other means; re-attesting is
+        // still this step's own action.
         case .idle:
             return outcome == .deviceSetupRequired || outcome == .activationFailed
                 ? .failed

@@ -322,8 +322,8 @@ final class TapToPayStepsTests: XCTestCase {
     }
 
     func testAnActivationFailureAtIdleIsTheEnableStepsFailure() {
-        // An activation failure recorded while the session reads `.idle` was
-        // reset rather than marked, so its remedy is a fresh cold attestation.
+        // The SDK no longer resets to `.idle` on an activation failure; a session
+        // that reads `.idle` anyway is sent back to the enable step.
         for outcome in [TapToPayActivationOutcome.deviceSetupRequired, .activationFailed] {
             let sequence = TapToPaySteps.forCharging(
                 tokenCheck: .reachable, session: .idle, activation: outcome
@@ -457,8 +457,8 @@ final class TapToPayStepsTests: XCTestCase {
         XCTAssertEqual(sequence.nextAction, .enterActivationCode)
     }
 
-    /// A reason no setup repairs is shown with a retry of the enable step, never the full setup, which
-    /// would drop a binding the device still holds.
+    /// A reason no setup repairs is shown with a retry of the enable step, never a recovery that
+    /// suggests setting up again repairs it.
     func testASessionRefusedForGoodIsNotOfferedTheFullSetup() {
         for reason in [PayabliTTPFailureReason.deviceIneligible, .configurationRejected, .sdkInternalError] {
             let session = TapToPaySessionStatus(.failed(reason: reason))
