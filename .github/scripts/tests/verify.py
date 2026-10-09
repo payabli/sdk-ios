@@ -1317,9 +1317,10 @@ def test_workflows() -> None:
     build_job, publish_job = release_jobs.get("build") or {}, release_jobs.get("publish") or {}
     build_runs = [str(step.get("run", "")) for step in build_job.get("steps") or []]
     publish_runs = [str(step.get("run", "")) for step in publish_job.get("steps") or []]
-    ci_run = build_runs[0] if build_runs else ""
-    check("W15h the release starts only once CI on the commit has completed with success",
-          "actions/workflows/ci.yml/runs?head_sha=$GITHUB_SHA" in ci_run and '!= "completed success"' in ci_run
+    ci_run = next((run for run in build_runs if "actions/workflows/ci.yml/runs" in run), "")
+    check("W15h the release starts only once CI on main for the named commit has completed with success",
+          "actions/workflows/ci.yml/runs?head_sha=$COMMIT&branch=main&event=push" in ci_run
+          and '!= "completed success"' in ci_run
           and re.search(r"\bexit [1-9]", ci_run) is not None
           and (build_job.get("permissions") or {}).get("actions") == "read", ci_run[:160])
 
@@ -1327,13 +1328,50 @@ def test_workflows() -> None:
     test_at, tag_at = first("xcodebuild test"), first("gh release create")
     check("W15 the release asks the gate for its version and tests before it tags",
           -1 not in (gate_at, test_at, tag_at) and gate_at < tag_at and test_at < tag_at, (gate_at, test_at, tag_at))
+
+    # The release names the commit it ships rather than taking main's head at the moment of the dispatch,
+    # so a merge landing between the decision and the click is not what gets released. Both jobs check
+    # the name with one pattern, the publish job as data.
+    triggers = release.get("on", release.get(True)) or {}
+    commit_input = ((triggers.get("workflow_dispatch") or {}).get("inputs") or {}).get("commit") or {}
+    sha_check = r'\[\[ ! "\$COMMIT" =~ (\S+) \]\]'
+    build_sha = re.search(sha_check, build_runs[0]) if build_runs else None
+    publish_sha = next((m for run in publish_runs for m in [re.search(sha_check, run)] if m), None)
+    check("W15o the dispatch names the commit in full, checked first and checked again where the key is",
+          commit_input.get("required") is True
+          and build_sha is not None and build_sha.group(1) == "^[0-9a-f]{40}$"
+          and re.search(r"\bexit [1-9]", build_runs[0]) is not None
+          and publish_sha is not None and publish_sha.group(1) == build_sha.group(1),
+          (commit_input, build_sha and build_sha.group(1), publish_sha and publish_sha.group(1)))
+    on_main_at = next((index for index, run in enumerate(runs)
+                       if 'git merge-base "$COMMIT" origin/main' in run and '!= "$COMMIT"' in run
+                       and re.search(r"\bexit [1-9]", run)), -1)
+    check("W15p a commit that is not on main is refused before its version is read",
+          on_main_at != -1 and on_main_at < gate_at, (on_main_at, gate_at))
+    named = {"${{ inputs.commit }}", "${{ needs.build.outputs.commit }}"}
+    release_checkouts = [step for step in release_steps if str(step.get("uses", "")).startswith("actions/checkout")]
+    checkout_refs = [(step.get("with") or {}).get("ref") for step in release_checkouts]
+    check("W15q every job checks out and acts on the named commit",
+          len(release_checkouts) == 2 and all(ref in named for ref in checkout_refs)
+          and (build_job.get("outputs") or {}).get("commit") == "${{ inputs.commit }}"
+          and (build_job.get("env") or {}).get("COMMIT") == "${{ inputs.commit }}"
+          and (publish_job.get("env") or {}).get("COMMIT") == "${{ needs.build.outputs.commit }}",
+          (checkout_refs, build_job.get("env"), publish_job.get("env")))
+    # The approval page shows the run, not the commit, so the run's summary is where the approver reads it.
+    summary_run = next((run for run in build_runs if "$GITHUB_STEP_SUMMARY" in run), "")
+    check("W15r the run summary names the commit and its subject line for the approver",
+          "$COMMIT" in summary_run and 'git log -1 --format=%s "$COMMIT"' in summary_run, summary_run[:160])
+    # The run's own commit is main's head at the click. It may be shown, never acted on.
+    acted = [line.strip() for run in runs for line in run.splitlines()
+             if "GITHUB_SHA" in line and not line.strip().startswith("echo ")]
+    check("W15s nothing tags, targets, compares or logs the run's own commit", not acted, acted)
     check("W15b no input is interpolated into a script body",
           not any("inputs." in run for run in runs), [run[:80] for run in runs if "inputs." in run])
     tag_run = runs[tag_at] if tag_at != -1 else ""
     # On the command that creates the tag, not anywhere in the step: the notes name the same commit.
     check("W15c the release tags the commit that was tested",
-          re.search(r'gh release create "\$VERSION" --draft --target "\$GITHUB_SHA"', tag_run) is not None
-          and re.search(r'git tag -a "\$VERSION" -m "[^"]*" "\$GITHUB_SHA"', tag_run) is not None, tag_run[:200])
+          re.search(r'gh release create "\$VERSION" --draft --target "\$COMMIT"', tag_run) is not None
+          and re.search(r'git tag -a "\$VERSION" -m "[^"]*" "\$COMMIT"', tag_run) is not None, tag_run[:200])
     check("W15i only the publish job runs in the release environment, and the build job cannot write",
           publish_job.get("environment") == "release" and "environment" not in build_job
           and (build_job.get("permissions") or {}).get("contents") == "read",
@@ -1380,13 +1418,13 @@ def test_workflows() -> None:
     # A run that failed part way is resumed rather than blocked by what it left: a draft on this commit is
     # reused, a tag on this commit is not pushed twice, and a published release or a tag elsewhere is refused.
     check("W15n a failed release resumes, and refuses what it cannot resume",
-          'gh release upload "$VERSION" --clobber' in tag_run and '"true $GITHUB_SHA")' in tag_run
+          'gh release upload "$VERSION" --clobber' in tag_run and '"true $COMMIT")' in tag_run
           and re.search(r'"false "\*\)\s*\n\s*echo "::error::release \$VERSION is already published"\s*\n\s*exit 1',
                         tag_run) is not None
           and 'if [ -z "$TAGGED" ]; then' in tag_run
-          and any('[ "$tagged" != "$GITHUB_SHA" ]' in run and "exit 1" in run for run in publish_runs),
+          and any('[ "$tagged" != "$COMMIT" ]' in run and "exit 1" in run for run in build_runs)
+          and any('[ "$tagged" != "$COMMIT" ]' in run and "exit 1" in run for run in publish_runs),
           tag_run[:120])
-    triggers = release.get("on", release.get(True)) or {}
     check("W15e the release runs only when dispatched", set(triggers) == {"workflow_dispatch"}, sorted(triggers))
 
     # Only a release is ever tagged: a public tag reaches every clone and every range resolution.

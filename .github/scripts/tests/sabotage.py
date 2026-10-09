@@ -548,7 +548,7 @@ MUTATIONS = [
         "a tag on another commit is taken for this release",
         RELEASE_YML,
         '          VERSION="$BUILT_VERSION"\n          tagged="$(git rev-parse -q --verify "refs/tags/$VERSION^{commit}" || true)"\n'
-        '          if [ -n "$tagged" ] && [ "$tagged" != "$GITHUB_SHA" ]; then',
+        '          if [ -n "$tagged" ] && [ "$tagged" != "$COMMIT" ]; then',
         '          VERSION="$BUILT_VERSION"\n          tagged="$(git rev-parse -q --verify "refs/tags/$VERSION^{commit}" || true)"\n'
         '          if false; then',
         "W15n", "workflows",
@@ -602,13 +602,52 @@ MUTATIONS = [
     ),
     Mutation(
         "the release leaves the push credential where the tested code can read it",
-        RELEASE_YML, "          persist-credentials: false\n\n      - name: Check the version\n        id: version\n",
-        "          persist-credentials: true\n\n      - name: Check the version\n        id: version\n",
+        RELEASE_YML, "          persist-credentials: false\n\n      - name: Check the commit is on main\n",
+        "          persist-credentials: true\n\n      - name: Check the commit is on main\n",
         "W15f", "workflows",
     ),
     Mutation(
+        "a CI run on a branch other than main counts for the release",
+        RELEASE_YML, "head_sha=$COMMIT&branch=main&event=push&", "head_sha=$COMMIT&", "W15h", "workflows",
+    ),
+    Mutation(
+        "the release takes main's head when no commit is named",
+        RELEASE_YML, "        required: true\n        type: string\n", "        required: false\n        type: string\n",
+        "W15o", "workflows",
+    ),
+    Mutation(
+        "a short SHA is accepted as the commit to release",
+        RELEASE_YML, 'if [[ ! "$COMMIT" =~ ^[0-9a-f]{40}$ ]]; then\n            echo "::error::a release names',
+        'if [[ ! "$COMMIT" =~ ^[0-9a-f]{7,40}$ ]]; then\n            echo "::error::a release names',
+        "W15o", "workflows",
+    ),
+    Mutation(
+        "the publish job takes whatever commit the build reported",
+        RELEASE_YML,
+        '          if [[ ! "$COMMIT" =~ ^[0-9a-f]{40}$ ]]; then\n            echo "::error::the build reported',
+        '          if false; then\n            echo "::error::the build reported',
+        "W15o", "workflows",
+    ),
+    Mutation(
+        "a commit that is not on main is released",
+        RELEASE_YML, 'if [ "$(git merge-base "$COMMIT" origin/main)" != "$COMMIT" ]; then', "if false; then",
+        "W15p", "workflows",
+    ),
+    Mutation(
+        "the publish job checks out main's head instead of the named commit",
+        RELEASE_YML, "          ref: ${{ needs.build.outputs.commit }}\n", "", "W15q", "workflows",
+    ),
+    Mutation(
+        "the approver is not shown which commit the approval releases",
+        RELEASE_YML, '            echo "> $(git log -1 --format=%s "$COMMIT")"\n', "", "W15r", "workflows",
+    ),
+    Mutation(
+        "the release notes are read up to main's head",
+        RELEASE_YML, '"$previous..$COMMIT"', '"$previous..$GITHUB_SHA"', "W15s", "workflows",
+    ),
+    Mutation(
         "the release's tag falls back to the default branch's head",
-        RELEASE_YML, 'gh release create "$VERSION" --draft --target "$GITHUB_SHA"',
+        RELEASE_YML, 'gh release create "$VERSION" --draft --target "$COMMIT"',
         'gh release create "$VERSION" --draft', "W15c", "workflows",
     ),
     Mutation(
