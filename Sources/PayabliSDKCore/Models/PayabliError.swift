@@ -1,6 +1,6 @@
 import Foundation
 
-/// Platform-aligned error codes from PRD §8 "Error Codes".
+/// Platform-aligned error codes.
 public enum PayabliErrorType: String, Sendable, CaseIterable {
     case missingToken = "MISSING_TOKEN"
     case tokenExpired = "TOKEN_EXPIRED"
@@ -266,8 +266,6 @@ public extension PayabliErrorType {
 ///
 /// All SDK-originated errors conform to `PayabliError`. Components may extend
 /// this with domain-specific error types (e.g. `TapToPayError`).
-///
-/// See PRD §8 and §20.2.
 public protocol PayabliError: LocalizedError, Sendable {
     /// The catalog entry. A host switches on it.
     var type: PayabliErrorType { get }
@@ -350,7 +348,7 @@ public struct PayabliFieldError: Decodable, Sendable {
     }
 }
 
-/// HTTP 400 validation error (RFC 7807). See PRD §8.1.1 "Validation Error".
+/// HTTP 400 validation error (RFC 7807).
 public struct PayabliValidationError: PayabliError, Decodable {
     public let problemType: String?
     public let title: String?
@@ -377,8 +375,7 @@ public struct PayabliValidationError: PayabliError, Decodable {
     /// what this must not carry.
     ///
     /// For display. A message is server text and can echo request data, so it
-    /// belongs in front of a person rather than in a log, which is the rule the
-    /// sibling platform states on its own error root.
+    /// belongs in front of a person rather than in a log.
     public var errorDescription: String? {
         var parts = [reason]
         if let detail, !detail.isEmpty, detail != reason {
@@ -426,7 +423,7 @@ public struct PayabliValidationError: PayabliError, Decodable {
     }
 }
 
-/// HTTP 500 server error. See PRD §8.1.1 "Server Error".
+/// HTTP 500 server error.
 public struct PayabliServerError: PayabliError, Decodable, PayabliRetryAfter {
     public let problemType: String?
     public let title: String?
@@ -506,7 +503,7 @@ public struct PayabliServerError: PayabliError, Decodable, PayabliRetryAfter {
     }
 }
 
-/// HTTP 402 declined payment. See PRD §8.1.1 "Declined Response".
+/// HTTP 402 declined payment.
 public struct PayabliDeclineError: PayabliError, Decodable {
     /// The processor decline code, for example `D0329`. `nil` when the body carried none.
     public let rawCode: String?

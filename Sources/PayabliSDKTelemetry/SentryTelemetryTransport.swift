@@ -4,9 +4,9 @@ import PayabliSDKCore
 /// Bridge protocol the host app implements against its own Sentry `SentryHub`
 /// to receive breadcrumbs + captured events from the SDK.
 ///
-/// This indirection keeps `sentry-cocoa` out of the SDK's SPM graph (PRD
-/// NFR-8, NFR-26). The host app that wants SDK telemetry in Sentry creates a
-/// separate `SentryHub` (per NFR-22) and routes calls from this bridge into it.
+/// This indirection keeps `sentry-cocoa` out of the SDK's SPM graph. The host app
+/// that wants SDK telemetry in Sentry creates a separate `SentryHub` and routes
+/// calls from this bridge into it.
 ///
 /// Example host adapter (host app has `import Sentry`):
 ///
@@ -33,7 +33,7 @@ public protocol PayabliSentryBridge: Sendable {
 }
 
 /// Routes telemetry events to a host-supplied Sentry bridge.
-/// Failures are swallowed (NFR-19).
+/// Failures are swallowed.
 public final class SentryTelemetryTransport: TelemetryTransport, @unchecked Sendable {
     private let bridge: PayabliSentryBridge
 

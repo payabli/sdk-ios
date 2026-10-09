@@ -1,10 +1,7 @@
 import Foundation
 
-/// Abstraction over a key/value store for non-secret identity tokens (§22.1).
-///
-/// Production uses `KeychainStorage` (iOS Keychain). Tests inject
-/// `InMemorySecureStorage` from `PayabliSDKTestUtils`. The SDK depends only
-/// on this protocol so it remains unit-testable without Keychain access.
+/// Key/value store for non-secret identity tokens. Production uses `KeychainStorage`; tests inject
+/// `InMemorySecureStorage` from `PayabliSDKTestUtils`, so the SDK is unit-testable without Keychain access.
 package protocol SecureStorage: Sendable {
     /// The value stored under `key`, or `nil` when nothing is stored under it now.
     ///

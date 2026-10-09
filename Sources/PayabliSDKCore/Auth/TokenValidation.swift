@@ -7,8 +7,7 @@ package extension String {
     /// True when this holds no credential: empty, or nothing but whitespace.
     ///
     /// Whitespace passes `isHeaderSafe`, space being printable ASCII, so a token of
-    /// spaces would reach the wire as `Authorization: Bearer` and carry nothing. The
-    /// sibling platform draws the same line with `isBlank`.
+    /// spaces would reach the wire as `Authorization: Bearer` and carry nothing.
     var isBlank: Bool {
         allSatisfy(\.isWhitespace)
     }

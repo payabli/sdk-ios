@@ -4,7 +4,7 @@ import Foundation
 ///
 /// Passed to each component's `configure(config:)` entry point. One
 /// `PayabliConfig` can be reused across components — they share the underlying
-/// auth session (PRD §28.8).
+/// auth session.
 ///
 /// ## Authentication model
 ///
@@ -22,7 +22,7 @@ import Foundation
 /// the first request, so a second way to supply the same value would only be a second thing to
 /// keep correct.
 ///
-/// ## Security notes (PRD NFR-5A..C)
+/// ## Security notes
 ///
 /// - The SDK never logs, never persists, and never transmits the access token
 ///   anywhere other than as the `Authorization: Bearer <token>` HTTP header.
@@ -38,13 +38,12 @@ public struct PayabliConfig: Sendable {
     let tokenProvider: PayabliTokenRefresh
 
     /// Partner integration point — the platform's `entryName` concept.
-    /// See PRD §5.3 FR-6A.7.
     public let entryPoint: String
 
     /// API environment. Determines all base URLs.
     public let environment: PayabliEnvironment
 
-    /// Whether to emit telemetry events. Defaults to `true` (opt-out per NFR-18).
+    /// Whether to emit telemetry events. Defaults to `true` (opt-out).
     public let telemetryEnabled: Bool
 
     /// Throws `PayabliGenericError(.invalidConfiguration)` when the entry point is empty.

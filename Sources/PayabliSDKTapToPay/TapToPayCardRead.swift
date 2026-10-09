@@ -1,6 +1,6 @@
 import Foundation
 
-// MARK: - Card read request / result (PRD §7.2 Models — FR-11A.2, FR-11A.3)
+// MARK: - Card read request / result
 
 /// Parameters the facade hands to the provider for an NFC charge. Atomic
 /// providers (Fiserv) forward the merchant IDs to their processor SDK so the
@@ -37,7 +37,7 @@ package struct CardReadRequest: Sendable {
     }
 }
 
-/// Provider-agnostic encrypted card-read result (PRD FR-11A.3).
+/// Provider-agnostic encrypted card-read result.
 package struct CardReadResult: Sendable {
     /// Provider identifier — see `TapToPayProvider.providerId`.
     package let provider: String

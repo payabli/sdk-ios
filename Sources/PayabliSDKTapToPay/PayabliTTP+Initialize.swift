@@ -1,18 +1,18 @@
 import Foundation
 import PayabliSDKCore
 
-// MARK: - Initialize & reinitialize (PRD §19.1)
+// MARK: - Initialize & reinitialize
 
 @MainActor
 extension PayabliTTP {
     // MARK: - Public entrypoints
 
     /// One-call startup:
-    ///   0. Eligibility gate (FR-11J.2).
+    ///   0. Eligibility gate.
     ///   1. Attestation — cold path runs `/challenge` → `/register` → `/attest`;
     ///      warm path re-uses the keychain-cached `deviceId`.
     ///   2. `GET /config/{entry}` (attestation-gated).
-    ///   3. Hand credentials to the provider (NFR-5D — runtime only).
+    ///   3. Hand credentials to the provider, which holds them at runtime only.
     ///   4. Prepare reader, transition to `.ready`.
     public func initialize() async throws {
         try await reportingToHost {
@@ -102,8 +102,8 @@ extension PayabliTTP {
     ///
     /// No-op when already `.ready` or while a charge runs. For non-terminal transient states
     /// (`.sessionExpired`, `.idle`, `.error`) re-runs steps 2–4 of
-    /// `initialize()`. NFR-5D forbids providers from caching credentials
-    /// across sessions, so every refresh re-fetches `/config`.
+    /// `initialize()`. Providers don't cache credentials across sessions, so every refresh
+    /// re-fetches `/config`.
     public func reinitializeIfNeeded() async throws {
         try await reportingToHost { try await reinitialize() }
     }

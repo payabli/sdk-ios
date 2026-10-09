@@ -1,7 +1,7 @@
 # Tap to Pay on iPhone
 
 `PayabliSDKTapToPay` lets your app take a contactless card, phone or watch payment on an iPhone, with no
-external reader. This guide is part of the [Payabli iOS SDK](../../README.md); set up the SDK there first.
+external reader. This guide is part of the [Payabli iOS SDK](../../README.md); set up the SDK and its session there first.
 
 > [!IMPORTANT]
 > **Notice:** This SDK is in beta. Its public interface can change in ways that aren't backward compatible. See
@@ -101,8 +101,8 @@ do {
 }
 ```
 
-`initialize()` attests the device, fetches its configuration and prepares the reader. The first run on a
-phone takes longer than later ones.
+`initialize()` attests the device, fetches its configuration and prepares the reader. It is safe to call
+again while no charge is running. The first run on a phone takes longer than later ones.
 
 ### Accept Apple's terms
 
@@ -134,6 +134,8 @@ A phone takes Tap to Pay payments for a paypoint only after it is activated with
 
 - Activation is **per phone and per paypoint**. It isn't per user.
 - A reinstall, a restore to a new phone, or a new phone needs a new code.
+- One install can hold activations for up to four paypoints. Setting up a fifth drops the one used least
+  recently, which then needs to be set up again the next time it's used.
 
 Until the phone is activated, `initialize()` throws a `TapToPayError` whose `type` is
 `.devicePendingActivation`, and
@@ -191,8 +193,7 @@ paypoint, so another phone enrolling on the same paypoint can't change it.
 
 ### Charge
 
-When `isReady` is `true`, or `sessionState` is `.sessionExpired`, which `charge` refreshes before it reads
-the card:
+When `sessionState` is `.ready`, or `.sessionExpired`, which `charge` refreshes before it reads the card:
 
 ```swift
 let result = try await ttp.charge(
@@ -223,13 +224,27 @@ other error.
 
 A `TapToPayError` carries the catalog entry for its cause:
 
-- `category` says what to do, such as `.credential` (call `initialize()` again) or `.outcomeUnknown`
-  (find the transaction before repeating the call).
+- `category` says what to do, such as `.credential` (your token provider is asked again on the next call; when
+  the state shows the session or the device setup has ended, initialize again) or `.outcomeUnknown` (the call
+  may have taken effect: check before repeating it). Choose your remedy from `category`.
 - `type` names the cause, for a case your app handles on its own, such as `.devicePendingActivation`.
 - `code` is the catalog number Payabli support reads. Give it to them with the failure.
-- `message` is fixed text. `detail` holds the service's or the reader's own words, when there are any.
+- `message` is fixed text, safe to show and to log. `reason` is a short summary and `detail` a longer
+  explanation, from the service, the reader or the SDK, when there is one. Show them, but don't log them: the
+  service's text can repeat what the request carried.
 - `retryAfter` is the wait the service asked for before trying again, when it asked for one and the
   failure carries it.
+
+These Tap to Pay causes are ones your app handles, with their codes:
+
+| `type` | `code` | `category` | `message` |
+|---|---|---|---|
+| `.activationCodeIncorrect` | 3024 | `.invalidRequest` | The activation code is incorrect. |
+| `.activationCodeExpired` | 3025 | `.configuration` | The activation code has expired. |
+| `.activationAttemptsExhausted` | 3026 | `.configuration` | Too many incorrect activation codes were entered. |
+| `.activationCodeNotIssued` | 3027 | `.configuration` | No activation code has been issued for this device. |
+| `.deviceNotPending` | 3028 | `.invalidRequest` | This device is not waiting for activation. |
+| `.terminalNotReady` | 3029 | `.invalidRequest` | The terminal is not ready for this call. |
 
 It also carries `capture` and `paymentTransId`:
 
@@ -272,7 +287,7 @@ From Objective-C, these errors arrive as `NSError`. See
 | `.serviceUnavailable` | The service, Apple's attestation service or the reader wasn't available. Try again later. |
 | `.deviceIneligible` | This iPhone or iOS version can't take Tap to Pay payments, the card reader refused it, or the app has no bundle identifier. If an iPhone that meets the requirements lands here, contact Payabli before replacing it. |
 | `.sdkInternalError` | Report it to Payabli. |
-| `.deviceKeyUnavailable` | This device's secure storage is unavailable, for example before the first unlock after a restart. Initialize again; if it persists, the device is the cause. |
+| `.deviceKeyUnavailable` | This device's secure storage is unavailable, for example before the first unlock after a restart. Initialize again. If it keeps failing, the phone is the cause. |
 
 ### Watching the session
 

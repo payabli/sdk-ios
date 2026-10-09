@@ -7,12 +7,12 @@ public protocol TelemetryTransport: Sendable {
     func send(_ batch: [TelemetryEvent]) async
 }
 
-/// Batched, best-effort, opt-out telemetry client (PRD §24).
+/// Batched, best-effort, opt-out telemetry client.
 ///
-/// - **Opt-out:** disabled when `PayabliConfig.telemetryEnabled == false` (NFR-18).
-/// - **Best-effort:** transport failures never propagate to callers (NFR-19).
-/// - **Batched:** flushes every 30s or when 20 events accumulate (NFR-21).
-/// - **Zero PII:** caller is responsible for not passing PAN/CVV/tokens (NFR-20).
+/// - **Opt-out:** disabled when `PayabliConfig.telemetryEnabled == false`.
+/// - **Best-effort:** transport failures never propagate to callers.
+/// - **Batched:** flushes every 30s or when 20 events accumulate.
+/// - **Zero PII:** caller is responsible for not passing PAN/CVV/tokens.
 public actor TelemetryClient {
     public struct Configuration: Sendable {
         public let flushInterval: TimeInterval
@@ -56,8 +56,7 @@ public actor TelemetryClient {
         self.sessionId = sessionId
     }
 
-    /// Hash a raw device identifier (SHA-256) before storing. Never log the raw
-    /// value (NFR-20).
+    /// Hash a raw device identifier (SHA-256) before storing. Never log the raw value.
     public func setDeviceId(_ rawId: String) {
         let digest = SHA256.hash(data: Data(rawId.utf8))
         deviceIdHash = digest.map { String(format: "%02x", $0) }.joined()

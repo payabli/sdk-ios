@@ -207,21 +207,9 @@ actor PayabliAuth {
         }
     }
 
-    /// Races `provider` against `clock`'s deadline and answers with whichever finishes first.
-    ///
-    /// Races through a continuation rather than a `TaskGroup`: a task group cannot leave its own scope
-    /// until every child it started has finished, cancelled or not, and cancellation is only
-    /// cooperative. A provider suspended on an ordinary continuation with no cancellation handling of
-    /// its own — a forgotten completion, the very failure this bound exists to catch — never notices
-    /// `cancel()` and never finishes, so racing it inside a task group would still hang this call on
-    /// exit. This returns the instant either side decides instead; the loser keeps running unawaited,
-    /// and `decided` keeps it from resuming a continuation nobody is waiting on anymore.
-    ///
-    /// **The bound is still only as tight as `provider` is cancellable — for what happens *after* this
-    /// call returns.** A provider that never finishes now runs on unseen rather than hanging this
-    /// call; that closes the hang, not the leak. A provider blocking a thread outside a suspension
-    /// point is unaffected either way, which is the documented limit both platforms share and neither
-    /// closes.
+    /// Races `provider` against `clock`'s deadline through a continuation, not a `TaskGroup`, which would wait
+    /// on a provider that ignores cancellation. The loser runs on unawaited; `decided` stops it resuming.
+    /// A provider blocking a thread outside a suspension point isn't bounded by this.
     private static func racedMint(
         holder: PayabliAuth,
         mintID: UUID,

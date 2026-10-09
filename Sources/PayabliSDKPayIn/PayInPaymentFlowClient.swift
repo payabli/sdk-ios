@@ -89,7 +89,7 @@ final class PayInPaymentFlowClient: Sendable {
         }
         // `.` and `..` are unreserved, so the encoder passes them through as themselves and the
         // identifier names a route rather than a transaction. Refused here because whether a value is
-        // usable is the caller's question rather than the encoder's, and this matches the sibling.
+        // usable is the caller's question rather than the encoder's.
         guard transId != ".", transId != ".." else {
             throw PayabliPayInError.invalidInput("Transaction ID is required.")
         }

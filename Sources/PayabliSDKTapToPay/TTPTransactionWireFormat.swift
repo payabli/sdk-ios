@@ -1,6 +1,6 @@
 import Foundation
 
-// MARK: - Initiate request (PRD §8.2 "Initiate request")
+// MARK: - Initiate request
 
 struct InitiatePaymentDetails: Encodable {
     let totalAmount: Decimal
@@ -123,7 +123,7 @@ struct InitiateData: Decodable, Sendable {
     let paymentTransId: String
 }
 
-// MARK: - Update request (PRD §8.2 "Update request (success/NFC failure)")
+// MARK: - Update request (success/NFC failure)
 
 /// Typed payload for `PATCH /api/v2/MoneyIn/update/{paymentTransId}`.
 /// Keeps the two shapes the backend accepts (success vs NFC failure) in one

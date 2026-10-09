@@ -1,17 +1,7 @@
 import Foundation
 
-/// Validates that a session token's tier/permissions match what a component
-/// requires (PRD §28.7).
-///
-/// v1.0 only implements a best-effort check:
-/// - If `PayabliConfig.sessionToken` is nil (pre-minted access token path),
-///   the tier is unknown and the validator treats it as Tier 1 (conservative).
-/// - If `sessionToken` is a JWT, the validator decodes the payload (without
-///   verifying the signature — the API validates it server-side) and inspects
-///   the `tier` claim (PRD §16.4).
-///
-/// Components pass in their static requirements; a mismatch throws
-/// `PayabliGenericError(.permissionDenied)`.
+/// Checks the session's tier against a component's static requirement, throwing
+/// `PayabliGenericError(.permissionDenied)` on a mismatch. Every session is detected as Tier 1.
 enum SessionTierValidator {
     static func validate(
         component: any PayabliComponent.Type,
@@ -28,8 +18,7 @@ enum SessionTierValidator {
         }
     }
 
-    /// Best-effort tier detection. Defaults to Tier 1 when nothing indicates
-    /// a higher tier (v2.0 JWT adoption will flesh this out — §16.7).
+    /// Always Tier 1: nothing in the configuration carries a tier.
     static func detectedTier(from config: PayabliConfig) -> PayabliSessionTier {
         .tier1Transactional
     }

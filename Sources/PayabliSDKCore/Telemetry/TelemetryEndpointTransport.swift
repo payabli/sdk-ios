@@ -1,13 +1,8 @@
 import Foundation
 
-/// Best-effort transport that posts telemetry batches to the Payabli telemetry endpoint
-/// (PRD §24.1, NFR-17, NFR-19).
-///
-/// Sends through the SDK's own request path, so a batch carries the credential and the same timeouts
-/// as every other route.
-///
-/// Failures are swallowed — telemetry never blocks or degrades a payment. It does not retry; the next
-/// batch is attempted on the next flush tick (§24.2).
+/// Best-effort transport posting telemetry batches through the SDK's own request path, with the same
+/// credential and timeouts as every other route. Failures are swallowed so telemetry never blocks or
+/// degrades a payment; nothing is retried, and the next batch goes on the next flush tick.
 package actor TelemetryEndpointTransport: TelemetryTransport {
     package static let defaultPath = "/api/v2/telemetry/sdk"
 
@@ -34,7 +29,7 @@ package actor TelemetryEndpointTransport: TelemetryTransport {
                 PayabliRequest.json(method: .post, path: path, jsonBody: batch)
             )
         } catch {
-            // NFR-19: best-effort — swallow.
+            // Best-effort: a failed send is swallowed.
             logger.warning("Telemetry batch send failed (best-effort)")
         }
     }

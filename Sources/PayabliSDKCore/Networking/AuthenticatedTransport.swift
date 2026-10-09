@@ -111,10 +111,7 @@ struct AuthenticatedTransport: PayabliTransport {
 
 /// RFC 9110 Section 9.2.2: "Of the request methods defined by this specification, PUT, DELETE, and safe
 /// request methods are idempotent", with Section 9.2.1 naming GET, HEAD, OPTIONS and TRACE as safe.
-///
-/// So POST and PATCH are excluded, PATCH despite looking like a sibling of PUT. Private to this file
-/// because one call site needs it, and a property on the shared method type would owe a disposition on
-/// the other platform for no gain.
+/// So POST and PATCH are excluded.
 private extension HTTPMethod {
     var isIdempotent: Bool {
         switch self {

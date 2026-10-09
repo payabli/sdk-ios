@@ -1,11 +1,7 @@
 import Foundation
 
-/// The session tier a component operates under.
-///
-/// Mirrors the Embedded Components V2 platform auth model (PRD §16.3, §28.7).
-/// In v1.0 the SDK only implements the client-credentials flow, which maps to
-/// `tier1Transactional` semantics. Tier 2 is reserved for future components
-/// (Reporting, Onboarding).
+/// The session tier a component operates under. The SDK implements only the client-credentials flow,
+/// which maps to `tier1Transactional`; Tier 2 is reserved for Reporting and Onboarding.
 @objc package enum PayabliSessionTier: Int, Sendable {
     /// Short-lived, single-transaction. Token burns on successful submission.
     /// Used by PayIn and Payout.
