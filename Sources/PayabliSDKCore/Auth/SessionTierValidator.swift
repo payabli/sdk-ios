@@ -1,8 +1,7 @@
 import Foundation
 
 /// Checks the session's tier against a component's static requirement, throwing
-/// `PayabliGenericError(.permissionDenied)` on a mismatch. A nil `sessionToken` counts as Tier 1; a JWT's
-/// `tier` claim is read without verifying the signature, which the API validates server-side.
+/// `PayabliGenericError(.permissionDenied)` on a mismatch. Every session is detected as Tier 1.
 enum SessionTierValidator {
     static func validate(
         component: any PayabliComponent.Type,
@@ -19,8 +18,7 @@ enum SessionTierValidator {
         }
     }
 
-    /// Best-effort tier detection. Defaults to Tier 1 when nothing indicates
-    /// a higher tier.
+    /// Always Tier 1: nothing in the configuration carries a tier.
     static func detectedTier(from config: PayabliConfig) -> PayabliSessionTier {
         .tier1Transactional
     }
