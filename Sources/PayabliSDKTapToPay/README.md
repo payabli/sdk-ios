@@ -134,7 +134,7 @@ A phone takes Tap to Pay payments for a paypoint only after it is activated with
 
 - Activation is **per phone and per paypoint**. It isn't per user.
 - A reinstall, a restore to a new phone, or a new phone needs a new code.
-- One install can hold activations for up to four paypoints. Activating a fifth drops the one used least
+- One install can hold activations for up to four paypoints. Setting up a fifth drops the one used least
   recently, which then needs to be set up again the next time it's used.
 
 Until the phone is activated, `initialize()` throws a `TapToPayError` whose `type` is
