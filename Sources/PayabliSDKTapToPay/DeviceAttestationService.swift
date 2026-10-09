@@ -11,7 +11,7 @@ package struct AttestationResult: Sendable {
     }
 }
 
-/// A per-request integrity assertion (PRD §18.2).
+/// A per-request integrity assertion.
 package struct AssertionHeaders: Sendable {
     package let assertion: String
     package let keyId: String
@@ -35,27 +35,13 @@ package struct AssertionHeaders: Sendable {
     }
 }
 
-/// Device attestation abstraction (PRD §18).
-///
-/// Real-world implementations wrap `DCAppAttestService` (iOS 14+) plus the
-/// Payabli backend attestation endpoints. Tests use a mock that short-circuits
-/// to deterministic IDs.
-///
-/// The real `DCAppAttestService` integration lives in Phase 6 / production —
-/// this protocol isolates it so the rest of the TTP flow is unit-testable
-/// without iOS entitlements or network access.
+/// Device attestation abstraction. Production wraps `DCAppAttestService` (iOS 14+) and the backend
+/// attestation endpoints; tests substitute a mock returning deterministic IDs, so the TTP flow is
+/// unit-testable without iOS entitlements or network access.
 package protocol DeviceAttestationService: AnyObject, Sendable {
-    /// Whether this device holds a binding for this entry point, which picks the
-    /// warm or cold path during `initialize()` (PRD §18.3). A handle issued under
-    /// another entry point is not this device's enrolment here.
-    ///
-    /// Asynchronous because answering it means asking the platform whether the key
-    /// the binding names is still held.
-    ///
-    /// Raises when the store could not be read, which is a third answer: `false`
-    /// runs the cold sequence and registers a second device for a paypoint that is
-    /// already enrolled. Raises too when the key check cannot answer, and the
-    /// binding is kept.
+    /// Whether this device holds a binding for `entry` whose key the platform still holds, picking the warm or
+    /// cold path in `initialize()`. Raises, keeping the binding, when the store or the key check cannot answer:
+    /// `false` there registers a second device for an enrolled paypoint.
     func isAttested(for entry: String) async throws -> Bool
 
     /// The backend-assigned `deviceId` this entry point was registered under, or
@@ -64,18 +50,15 @@ package protocol DeviceAttestationService: AnyObject, Sendable {
 
     /// Runs the first-run attestation flow: challenge → register → attest.
     /// Throws `PayabliTTPError.devicePendingActivation` if the backend returns
-    /// `status == "pending"` (PRD FR-11F.1).
+    /// `status == "pending"`.
     func attest(entry: String) async throws -> AttestationResult
 
     /// Produces fresh `AssertionHeaders` (signed over a current timestamp) for the
     /// next protected request, naming the handle this device holds for `entry`.
-    /// PRD §18.2.
     func generateAssertion(for entry: String) async throws -> AssertionHeaders
 
-    /// Activates a pending device with an activation code issued out-of-band
-    /// by the partner (e.g. from their admin dashboard). The SDK does not
-    /// request the code itself — the partner is responsible for delivering it
-    /// to the device user. PRD §9.7.
+    /// Activates a pending device with an activation code issued out-of-band by the partner (e.g. from
+    /// their admin dashboard), who delivers it to the device user. The SDK does not request the code itself.
     func activateDevice(activationCode: String, entry: String, activationId: String) async throws
 
     /// Drops this entry point's binding unconditionally, so the next `initialize()`

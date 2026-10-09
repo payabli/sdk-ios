@@ -1,16 +1,16 @@
 import Foundation
 import PayabliSDKCore
 
-/// Optional telemetry module (PRD §24.4, §24.6, NFR-26).
+/// Optional telemetry module.
 ///
 /// Provides production-grade transports for `TelemetryClient`:
-/// - `SentryTelemetryTransport` — mirrors batched events to a **separate**
+/// - `SentryTelemetryTransport` — forwards batched events to a **separate**
 ///   Sentry hub so it doesn't clash with the host app's own Sentry integration.
 /// - `PostHogTelemetryTransport` — product analytics; session recording is
-///   permanently disabled (NFR-24).
+///   permanently disabled.
 ///
 /// The core module has no dependency on `sentry-cocoa` or
-/// `posthog-ios` (NFR-26). They live here, behind an optional SPM product
+/// `posthog-ios`. They live here, behind an optional SPM product
 /// and CocoaPods subspec.
 public enum PayabliSDKTelemetry {
     public static var version: String {

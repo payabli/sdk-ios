@@ -5,30 +5,9 @@ import Security
 
 // MARK: - AppAttestService
 
-/// Production `DeviceAttestationService` (PRD §18).
-///
-/// Bridges Apple's `DCAppAttestService` with the Payabli backend so a TTP
-/// session can prove it runs on a genuine, unmodified iOS app:
-///
-/// - First-run flow (`attest`): challenge → register → generate key →
-///   attest key → post attestation. Records the paypoint's binding in the
-///   Keychain (PRD §22.1).
-/// - Warm path: when this paypoint holds a binding whose key the platform will
-///   still sign with, `attest` is skipped and per-request assertions are
-///   produced by `generateAssertion()` (PRD §18.2).
-/// - Activation (`activateDevice`) consumes an out-of-band code supplied by
-///   the partner to drive the pending-device → active-device transition
-///   (PRD §9.7). The SDK does not request the code itself.
-///
-/// `entry` is supplied per call by the facade (`PayabliTTP`) to match the
-/// `DeviceAttestationService` protocol, and is never cached on this service.
-///
-/// Companion files (same folder, PRD §7.2):
-///   - `AppAttestService+Attest.swift`     — attestation + assertions
-///   - `AppAttestService+Activation.swift` — `/activate` endpoint
-///   - `AppAttestService+Requests.swift`   — shared envelope plumbing
-///   - `AppAttestService+Defaults.swift`   — hardware-identifier providers
-///   - `AppAttestWireFormat.swift`         — request/response DTOs
+/// Production `DeviceAttestationService` over `DCAppAttestService`. `attest` registers a new key and stores the
+/// paypoint's binding in the Keychain; with a still-usable binding it is skipped and `generateAssertion()` signs.
+/// `activateDevice` takes a partner-supplied out-of-band code; `entry` comes per call and is never cached.
 package final class AppAttestService: DeviceAttestationService, @unchecked Sendable {
     let transport: any PayabliTransport
     let attestor: AppAttestor

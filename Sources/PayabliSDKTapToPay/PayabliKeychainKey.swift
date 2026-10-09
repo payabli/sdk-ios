@@ -1,6 +1,6 @@
 import PayabliSDKCore
 
-// MARK: - Storage keys used by the SDK (§22.1)
+// MARK: - Storage keys used by the SDK
 
 package enum PayabliKeychainKey {
     /// Holds a freshly generated App Attest key that has not yet completed

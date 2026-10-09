@@ -1,7 +1,7 @@
 import Foundation
 import PayabliSDKCore
 
-// MARK: - Device activation (PRD §9.7)
+// MARK: - Device activation
 
 package extension AppAttestService {
     func activateDevice(activationCode: String, entry: String, activationId: String) async throws {

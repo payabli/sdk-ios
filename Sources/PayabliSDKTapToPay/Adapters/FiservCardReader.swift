@@ -5,18 +5,9 @@ import PayabliSDKCore
     import ProximityReader
 #endif
 
-/// Card-reader adapter for `TapToPayProvider` (PRD FR-11B), backed by the
-/// vendored `PayabliCardReaderCore` module.
-///
-/// `charges(amount:)` is atomic (NFC read + charge in one call), so
-/// `startReading` returns the full processor response as
-/// `providerResponseJSON` for the facade to forward verbatim.
-///
-/// Credentials come from `/config` (FR-11B.3), live in RAM only (NFR-5D),
-/// and are dropped from `self` as soon as `buildReader` hands them to the
-/// card-reader SDK. Retries require a fresh `/config` fetch.
-///
-/// Error mapping: see `FiservCardReader+Errors.swift`.
+/// `TapToPayProvider` adapter over the vendored `PayabliCardReaderCore`. `charges(amount:)` reads and charges
+/// in one call, so `startReading` returns the processor response as `providerResponseJSON`, forwarded verbatim.
+/// `/config` credentials live in RAM only, dropped once `buildReader` hands them over; a retry refetches them.
 package final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
     package static var providerId: String {
         "fiserv"

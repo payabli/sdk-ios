@@ -4,16 +4,9 @@ import PayabliSDKCore
 // MARK: - Where a failure lands
 
 extension PayabliTTPSessionState {
-    /// The state a failure leaves the session in, or `nil` when it leaves the
-    /// session where it was.
-    ///
-    /// A landing is a remedy: two failures a host repairs identically land in
-    /// one place, and one whose remedy is unknown lands on
-    /// ``PayabliTTPFailureReason/serviceUnavailable``, where being wrong costs a
-    /// retry rather than a bug report and a host that stops trying.
-    ///
-    /// The map is one map for both platforms and mirrors the sibling's, so a
-    /// merchant meeting one condition is sent to the same repair on either.
+    /// The state a failure leaves the session in, or `nil` when it leaves the session where it was. Failures
+    /// a host repairs identically land together; one whose remedy is unknown lands on
+    /// ``PayabliTTPFailureReason/serviceUnavailable``, where being wrong costs a retry rather than a bug report.
     static func landing(for error: Error, registration: StoredRegistration) -> PayabliTTPSessionState? {
         if let refusal = error as? ActivationRefusal {
             // Most refusals are about the code, and the device still owes one.

@@ -2,7 +2,7 @@ import CryptoKit
 import Foundation
 import PayabliSDKCore
 
-// MARK: - Attestation flow (PRD §18.1) & per-request assertions (PRD §18.2)
+// MARK: - Attestation flow & per-request assertions
 
 extension AppAttestService {
     /// Apple's DeviceCheck / App Attest error domain (`DCError`). Bridged as a

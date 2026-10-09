@@ -1,6 +1,6 @@
 import Foundation
 
-// MARK: - Backend wire types (PRD §8.2)
+// MARK: - Backend wire types
 
 //
 // Endpoint-specific DTOs for the attestation family. Generic envelope

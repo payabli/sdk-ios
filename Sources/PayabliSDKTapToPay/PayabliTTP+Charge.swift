@@ -1,7 +1,7 @@
 import Foundation
 import PayabliSDKCore
 
-// MARK: - Charge pipeline (PRD §19.1, FR-11D)
+// MARK: - Charge pipeline
 
 /// Result of a `PATCH /MoneyIn/update/{id}` attempt — typed so the caller
 /// sees the failure reason without re-reading logs.

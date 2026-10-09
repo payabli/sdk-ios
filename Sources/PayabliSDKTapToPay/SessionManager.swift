@@ -1,11 +1,6 @@
 import Combine
 import Foundation
 
-/// Manages the TTP session lifecycle (PRD §17).
-///
-/// State transitions are enforced internally. Host apps observe state via
-/// `@Published sessionState`. All transitions occur on `@MainActor` for safe
-/// SwiftUI observation (§17.4).
 /// Which entry point is building the session, so the two can be told apart when
 /// one is already running.
 enum SessionSetupKind {
@@ -14,6 +9,8 @@ enum SessionSetupKind {
     case activate
 }
 
+/// Manages the TTP session lifecycle. Transitions are enforced internally and occur on `@MainActor`, so host
+/// apps observe `@Published sessionState` safely from SwiftUI.
 @MainActor
 final class SessionManager: ObservableObject {
     @Published private(set) var sessionState: PayabliTTPSessionState = .idle
@@ -106,7 +103,7 @@ final class SessionManager: ObservableObject {
         lastError = nil
     }
 
-    // MARK: - Transition matrix (PRD §17.2)
+    // MARK: - Transition matrix
 
     static func isValidTransition(
         from current: PayabliTTPSessionState,

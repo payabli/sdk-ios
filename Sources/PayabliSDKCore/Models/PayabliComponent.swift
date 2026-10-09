@@ -1,13 +1,8 @@
 import Foundation
 
-/// Protocol all PayabliSDK components must conform to.
-///
-/// Enables uniform lifecycle management across PayIn, Payout, Reporting, and
-/// Onboarding components. See PRD §28.3.
-///
-/// Configuration methods are `@MainActor` because components own SwiftUI /
-/// `ObservableObject` state. The static requirements are `nonisolated` since
-/// they are compile-time constants.
+/// Protocol every PayabliSDK component (PayIn, Payout, Reporting, Onboarding) conforms to.
+/// Configuration methods are `@MainActor` because components own SwiftUI / `ObservableObject` state;
+/// the static requirements are `nonisolated` because they are compile-time constants.
 @MainActor
 package protocol PayabliComponent: AnyObject {
     /// Unique identifier for this component (e.g. `"payin"`, `"payout"`).

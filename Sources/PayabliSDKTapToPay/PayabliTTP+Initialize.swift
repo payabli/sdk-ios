@@ -1,7 +1,7 @@
 import Foundation
 import PayabliSDKCore
 
-// MARK: - Initialize & reinitialize (PRD §19.1)
+// MARK: - Initialize & reinitialize
 
 @MainActor
 extension PayabliTTP {

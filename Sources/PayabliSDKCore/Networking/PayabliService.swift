@@ -14,7 +14,7 @@ package final class PayabliService: PayabliTransport, Sendable {
     private let logger: PayabliLogger
     private let decorations: [any PayabliRequestDecoration]
 
-    /// Default per-request timeout (PRD NFR-6 — 10 seconds for tokenization calls).
+    /// Default per-request timeout, in seconds; tokenization calls are bounded by it.
     package static let defaultRequestTimeout: TimeInterval = 10
 
     /// The only way to build a transport outside this module.

@@ -1,17 +1,9 @@
 import Foundation
 import Security
 
-/// Lightweight wrapper over the iOS Keychain for storing non-secret identity
-/// tokens (PRD NFR-5E, §22.1).
-///
-/// Holds the install identifier the session derives the device's identity from, and
-/// the card-present module's bindings across app launches.
-/// **Must not** be used for true secrets (`clientSecret`, access tokens, Fiserv
-/// credentials) — those live in RAM only (NFR-5D).
-///
-/// Items are stored as `kSecClassGenericPassword` with the SDK's bundle-level
-/// service identifier so they're namespaced away from the host app's own
-/// Keychain entries.
+/// Keychain wrapper for non-secret identity values: the install identifier and the card-present bindings,
+/// stored as `kSecClassGenericPassword` under the SDK's own service, apart from the host app's entries.
+/// **Must not** hold secrets (`clientSecret`, access tokens, Fiserv credentials), which live in RAM only.
 package struct KeychainStorage: SecureStorage, Sendable {
     package static let service = "com.payabli.sdk"
 

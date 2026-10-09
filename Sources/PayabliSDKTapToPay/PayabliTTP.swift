@@ -4,7 +4,7 @@ import PayabliSDKCore
 /// Tap to Pay on iPhone facade.
 ///
 /// Exposes the session lifecycle, one-call `initialize()` / `charge()` and
-/// device activation. See PRD §19.1.
+/// device activation.
 ///
 /// ```swift
 /// try await PayabliSession.initialize(config: PayabliConfig(
@@ -20,11 +20,11 @@ import PayabliSDKCore
 /// )
 /// ```
 ///
-/// The façade is split across companion files (same folder, PRD §7.2) to keep
+/// The façade is split across companion files (same folder) to keep
 /// each concern focused:
 ///   - `PayabliTTP+Initialize.swift` — startup & session refresh
-///   - `PayabliTTP+Activation.swift` — pending-device activation (PRD §9.7)
-///   - `PayabliTTP+Charge.swift`     — 3-step sale pipeline (PRD §19.1)
+///   - `PayabliTTP+Activation.swift` — pending-device activation
+///   - `PayabliTTP+Charge.swift`     — 3-step sale pipeline
 ///
 /// ## ObjC interop
 ///

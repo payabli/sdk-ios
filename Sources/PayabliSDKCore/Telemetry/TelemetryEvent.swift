@@ -1,8 +1,8 @@
 import Foundation
 
-/// Envelope for a single telemetry event (PRD §24.3).
+/// Envelope for a single telemetry event.
 ///
-/// Schema-versioned for forward compatibility. **Contains no PII** (NFR-20).
+/// Schema-versioned for forward compatibility. **Contains no PII**.
 public struct TelemetryEvent: Encodable, Sendable {
     public static let schemaVersion = 1
 
@@ -38,7 +38,7 @@ public struct TelemetryEvent: Encodable, Sendable {
     }
 }
 
-/// Catalog of event names emitted by the SDK (PRD §24.3).
+/// Catalog of event names emitted by the SDK.
 public enum TelemetryEventName {
     // Tokenization
     public static let tokenizationStarted = "tokenization.started"

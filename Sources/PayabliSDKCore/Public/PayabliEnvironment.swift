@@ -3,7 +3,6 @@ import Foundation
 /// The Payabli API environment used by the SDK.
 ///
 /// Determines all API base URLs. Set at initialization via `PayabliConfig`.
-/// See PRD §8.2 for base URLs.
 @objc public enum PayabliEnvironment: Int, Sendable {
     #if DEBUG
         /// Developer-only environment pointing at a local tunnel. Available only

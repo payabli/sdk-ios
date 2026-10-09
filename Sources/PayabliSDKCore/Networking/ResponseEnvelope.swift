@@ -85,22 +85,9 @@ package enum PayabliEnvelope {
 
 // MARK: - MoneyIn v2 envelope
 
-/// v2 response envelope used by MoneyIn APIs.
-///
-/// ```json
-/// {
-///   "code": "A...",
-///   "reason": "...",
-///   "explanation": "...",
-///   "action": "...",
-///   "data": { ... }
-/// }
-/// ```
-///
-/// See PRD §8.2 "v2 envelope". Success: `code.hasPrefix("A")`.
-///
-/// An envelope-level `token` field is not read: every authenticated request reuses the
-/// access token held by `PayabliAuth`.
+/// v2 response envelope used by MoneyIn APIs: `code`, `reason`, `explanation`, `action` and `data`.
+/// Success is `code.hasPrefix("A")`. An envelope-level `token` field is not read: every authenticated
+/// request reuses the access token held by `PayabliAuth`.
 package struct PayabliV2Envelope<Data: Decodable>: Decodable {
     package let code: String
     package let reason: String?

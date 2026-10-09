@@ -7,12 +7,12 @@ public protocol TelemetryTransport: Sendable {
     func send(_ batch: [TelemetryEvent]) async
 }
 
-/// Batched, best-effort, opt-out telemetry client (PRD §24).
+/// Batched, best-effort, opt-out telemetry client.
 ///
-/// - **Opt-out:** disabled when `PayabliConfig.telemetryEnabled == false` (NFR-18).
-/// - **Best-effort:** transport failures never propagate to callers (NFR-19).
-/// - **Batched:** flushes every 30s or when 20 events accumulate (NFR-21).
-/// - **Zero PII:** caller is responsible for not passing PAN/CVV/tokens (NFR-20).
+/// - **Opt-out:** disabled when `PayabliConfig.telemetryEnabled == false`.
+/// - **Best-effort:** transport failures never propagate to callers.
+/// - **Batched:** flushes every 30s or when 20 events accumulate.
+/// - **Zero PII:** caller is responsible for not passing PAN/CVV/tokens.
 public actor TelemetryClient {
     public struct Configuration: Sendable {
         public let flushInterval: TimeInterval

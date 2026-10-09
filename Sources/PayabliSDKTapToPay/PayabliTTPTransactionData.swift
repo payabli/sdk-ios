@@ -7,7 +7,7 @@ import Foundation
 /// The host app passes it to `PayabliTTP.charge(...)`, and the SDK carries it:
 ///
 ///   1. `POST /api/v2/MoneyIn/initiate` — serialised as `customerData.firstName
-///      / lastName / customerNumber` (PRD §8.2 "Initiate request").
+///      / lastName / customerNumber`.
 ///   2. Provider `startReading(_:)` — forwarded via `CardReadRequest.customer`
 ///      for an adapter whose processor takes a cardholder name. Fiserv's
 ///      `charges(amount:)` call takes no billing address, so the Fiserv

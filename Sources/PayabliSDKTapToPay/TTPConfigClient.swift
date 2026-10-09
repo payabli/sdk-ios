@@ -1,22 +1,15 @@
 import Foundation
 import PayabliSDKCore
 
-/// Provider-agnostic shape of the runtime config returned by
-/// `GET /api/v2/device/taptopay/config/{entry}`.
-///
-/// The PRD leaves the exact shape flexible because it contains processor-specific
-/// credentials (Fiserv in v1.0), so it arrives as a loose dictionary that the
-/// concrete provider adapter interprets. See FR-11B.3, NFR-5D.
+/// Provider-agnostic runtime config from `GET /api/v2/device/taptopay/config/{entry}`. It carries
+/// processor-specific credentials (Fiserv), so it is a loose dictionary the provider adapter interprets.
 struct TTPConfig: Sendable {
     let providerCredentials: [String: String]
 }
 
-/// Client for the attestation-protected config endpoint (PRD §8.2).
-///
-/// Requires `X-App-Assertion`, `X-App-KeyId`, `X-Device-Id`, `X-Assertion-Timestamp`.
-/// Bearer-auth injection and HTTP 401 refresh-and-retry are delegated to the
-/// `PayabliTransport` passed at init — callers should supply `session.transport`.
-/// Attestation headers are component-specific and are added inline.
+/// Client for the attestation-protected config endpoint; adds the `X-App-*`, `X-Device-Id` and
+/// `X-Assertion-Timestamp` headers inline. Bearer auth and HTTP 401 refresh-and-retry come from the
+/// `PayabliTransport` passed at init, which should be `session.transport`.
 final class TTPConfigClient: Sendable {
     private let transport: any PayabliTransport
     private let attestation: DeviceAttestationService
@@ -30,23 +23,9 @@ final class TTPConfigClient: Sendable {
         self.attestation = attestation
     }
 
-    /// Fetches the TTP config for the given `entry`.
-    ///
-    /// Two failures reach a caller as `PayabliGenericError(.tokenExpired)`, and they
-    /// ask for different things (PRD §18.4):
-    ///
-    /// - **The service refused the binding**, as a 401 in the envelope of a 200. The
-    ///   binding is dropped here, where the handle the assertion was signed for is
-    ///   known, and the next `initialize()` enrols. A caller does nothing.
-    /// - **The transport refused the bearer**, as an HTTP 401 surviving its refresh
-    ///   and retry. Nothing is dropped: an expired access token says nothing about
-    ///   the device, and clearing on it retires an enrolled device. A caller obtains
-    ///   a token.
-    ///
-    /// The reason names which happened.
-    ///
-    /// The SDK flattens `credentials` into `TTPConfig.providerCredentials`
-    /// for the TapToPayProvider to consume.
+    /// Fetches the TTP config for `entry`. A 401 inside a 200 envelope drops the binding so the next
+    /// `initialize()` enrols; an HTTP 401 surviving refresh drops nothing. Both throw
+    /// `PayabliGenericError(.tokenExpired)`, whose reason names which happened.
     func fetchConfig(entry: String) async throws -> TTPConfig {
         let headers = try await assertionHeaders(entry: entry)
 

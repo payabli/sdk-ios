@@ -73,29 +73,9 @@ public enum PayabliPayInError: PayabliError, Equatable {
         }
     }
 
-    /// What a failure the service described amounts to.
-    ///
-    /// The service's own response code decides before the status does, because a money-moving route
-    /// answers `200` and puts the outcome in the body. A `D` is the payment being refused; anything
-    /// else there is the service reporting a problem it could not process, which leaves the outcome
-    /// open where a refusal settles it. The sibling separates the two the same way and for the same
-    /// reason, a caller acting on them differently.
-    ///
-    /// A status decides for the error envelope a non-2xx carries, which is the shape with no response
-    /// code of its own. The envelope's own status is read before the transport's, because the older
-    /// shape answers `200` and states the real one in the body, and taking the transport's there would
-    /// read a refusal the service had already made as an outcome nobody knows.
-    ///
-    /// The status is put to ``mapPayabliHTTPError`` rather than classified again here. That mapping is
-    /// the one place a status becomes a classification, and a second copy of it drifts: it is answering
-    /// the same question, so it has to give the same answer, including for a status added to it later.
-    /// The body passed is empty because only the code is wanted, and every branch of that mapping falls
-    /// back to a value whose code is fixed.
-    ///
-    /// The sibling needs no equivalent. Its money-in client puts the response to the shared mapper
-    /// before it reads the body, so a non-2xx never reaches an in-body classification there. Here the
-    /// body is preferred for the merchant-facing text it carries, and that preference is what leaves a
-    /// status to classify at all.
+    /// What a described failure amounts to. A `D` response code is a refusal and decides first, since a
+    /// money-moving route answers `200` with the outcome in the body; otherwise the envelope's status, then
+    /// the transport's, goes to ``mapPayabliHTTPError``, the one place a status becomes a classification.
     private static func classification(
         of failure: PayabliPayInFailure
     ) -> PayabliErrorType {
