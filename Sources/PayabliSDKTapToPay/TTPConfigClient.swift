@@ -24,8 +24,8 @@ final class TTPConfigClient: Sendable {
     }
 
     /// Fetches the TTP config for `entry`. A 401 inside a 200 envelope drops the binding so the next
-    /// `initialize()` enrols; an HTTP 401 surviving refresh drops nothing. Both throw
-    /// `PayabliGenericError(.tokenExpired)`, whose reason names which happened.
+    /// `initialize()` enrols. An HTTP 401 surviving refresh drops nothing: clearing on it retires an enrolled
+    /// device. Both throw `PayabliGenericError(.tokenExpired)`, whose reason names which happened.
     func fetchConfig(entry: String) async throws -> TTPConfig {
         let headers = try await assertionHeaders(entry: entry)
 
