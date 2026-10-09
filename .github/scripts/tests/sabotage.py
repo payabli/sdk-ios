@@ -44,6 +44,7 @@ COPIED = (
     ".github/workflows/nightly-report.yml",
     ".github/hardware-only-tests.txt",
     ".github/scripts/release-version.sh",
+    ".github/scripts/release-newer.sh",
     "Sources/PayabliSDKCore/PayabliSDKCore.swift",
 )
 
@@ -57,6 +58,7 @@ SLACK = ".github/scripts/nightly_slack.py"
 NIGHTLY = ".github/workflows/nightly.yml"
 SCRIPTS_YML = ".github/workflows/scripts.yml"
 GATE = ".github/scripts/release-version.sh"
+NEWER = ".github/scripts/release-newer.sh"
 VERSION_SOURCE = "Sources/PayabliSDKCore/PayabliSDKCore.swift"
 
 
@@ -611,6 +613,92 @@ MUTATIONS = [
         RELEASE_YML, "head_sha=$COMMIT&branch=main&event=push&", "head_sha=$COMMIT&", "W15h", "workflows",
     ),
     Mutation(
+        "a version below the newest release passes the ordering check",
+        NEWER, 'if [ -n "$newest" ] && [ "$(printf', 'if false && [ "$(printf', "R9d", "release",
+    ),
+    Mutation(
+        "the newest release's own version is refused",
+        NEWER, '| sort -V | tail -n 1)" != "$VERSION" ]; then', '| sort -V | tail -n 1)" = "x" ] || true; then',
+        "R9c", "release",
+    ),
+    Mutation(
+        "a tag that is not a release is compared",
+        NEWER, '{ grep -E "$release" || true; }', "cat", "R9i", "release",
+    ),
+    Mutation(
+        "a failure to list the tags reads as no releases",
+        NEWER, "tags=\"$(git for-each-ref --format='%(refname:strip=2)' refs/tags)\"",
+        "tags=\"$(git for-each-ref --format='%(refname:strip=2)' refs/tags || true)\"", "R9j", "release",
+    ),
+    Mutation(
+        "the newest release is taken from text order",
+        NEWER, '{ grep -E "$release" || true; } | sort -V |', '{ grep -E "$release" || true; } | sort |', "R9n", "release",
+    ),
+    Mutation(
+        "the version is compared as text",
+        NEWER, '"$newest" "$VERSION" | sort -V |', '"$newest" "$VERSION" | sort |', "R9e", "release",
+    ),
+    Mutation(
+        "the tags are read through the command a formatting setting changes",
+        NEWER, "tags=\"$(git for-each-ref --format='%(refname:strip=2)' refs/tags)\"", 'tags="$(git tag --list)"',
+        "R9q", "release",
+    ),
+    Mutation(
+        'the release no longer refuses a version below the newest release',
+        RELEASE_YML, '      # A version below the newest release would be published after it. The lines are release-newer.sh\'s,\n      # carried here because the commit checked out may predate that file.\n      - name: Check the version is not below the newest release\n        run: |\n          release=\'^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$\'\n          tags="$(git for-each-ref --format=\'%(refname:strip=2)\' refs/tags)"\n          newest="$(printf \'%s\\n\' "$tags" | { grep -E "$release" || true; } | sort -V | tail -n 1)"\n          if [ -n "$newest" ] && [ "$(printf \'%s\\n%s\\n\' "$newest" "$VERSION" | sort -V | tail -n 1)" != "$VERSION" ]; then\n            echo "::error::the newest release is $newest, and $VERSION is lower"\n            exit 1\n          fi\n',
+        '', 'W15t', "workflows",
+    ),
+    Mutation(
+        'the check job runs a script the commit it checked out may not have',
+        RELEASE_YML, '      # A version below the newest release would be published after it. The lines are release-newer.sh\'s,\n      # carried here because the commit checked out may predate that file.\n      - name: Check the version is not below the newest release\n        run: |\n          release=\'^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$\'\n          tags="$(git for-each-ref --format=\'%(refname:strip=2)\' refs/tags)"\n          newest="$(printf \'%s\\n\' "$tags" | { grep -E "$release" || true; } | sort -V | tail -n 1)"\n          if [ -n "$newest" ] && [ "$(printf \'%s\\n%s\\n\' "$newest" "$VERSION" | sort -V | tail -n 1)" != "$VERSION" ]; then\n            echo "::error::the newest release is $newest, and $VERSION is lower"\n            exit 1\n          fi\n',
+        '      - name: Check the version is not below the newest release\n        run: .github/scripts/release-newer.sh "$VERSION"\n', 'W15t', "workflows",
+    ),
+    Mutation(
+        'the ordering check is allowed to pass without comparing',
+        RELEASE_YML, '      - name: Check the version is not below the newest release\n        run: |\n',
+        '      - name: Check the version is not below the newest release\n        run: |\n          exit 0\n', 'W15t', "workflows",
+    ),
+    Mutation(
+        "the check job's comparison drifts from the script's",
+        RELEASE_YML, '      # A version below the newest release would be published after it. The lines are release-newer.sh\'s,\n      # carried here because the commit checked out may predate that file.\n      - name: Check the version is not below the newest release\n        run: |\n          release=\'^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$\'\n          tags="$(git for-each-ref --format=\'%(refname:strip=2)\' refs/tags)"\n          newest="$(printf \'%s\\n\' "$tags" | { grep -E "$release" || true; } | sort -V | tail -n 1)"\n          if [ -n "$newest" ] && [ "$(printf \'%s\\n%s\\n\' "$newest" "$VERSION" | sort -V | tail -n 1)" != "$VERSION" ]; then\n            echo "::error::the newest release is $newest, and $VERSION is lower"\n            exit 1\n          fi\n',
+        '      # A version below the newest release would be published after it. The lines are release-newer.sh\'s,\n      # carried here because the commit checked out may predate that file.\n      - name: Check the version is not below the newest release\n        run: |\n          release=\'^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$\'\n          tags="$(git for-each-ref --format=\'%(refname:strip=2)\' refs/tags)"\n          newest="$(printf \'%s\\n\' "$tags" | { grep -E "$release" || true; } | sort | tail -n 1)"\n          if [ -n "$newest" ] && [ "$(printf \'%s\\n%s\\n\' "$newest" "$VERSION" | sort -V | tail -n 1)" != "$VERSION" ]; then\n            echo "::error::the newest release is $newest, and $VERSION is lower"\n            exit 1\n          fi\n', 'W15t', "workflows",
+    ),
+    Mutation(
+        'the job that tags no longer looks for a release cut since the check',
+        RELEASE_YML, '          # here. The same lines as release-newer.sh.\n          release=\'^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$\'\n          tags="$(git for-each-ref --format=\'%(refname:strip=2)\' refs/tags)"\n          newest="$(printf \'%s\\n\' "$tags" | { grep -E "$release" || true; } | sort -V | tail -n 1)"\n',
+        '          # here. The same lines as release-newer.sh.\n          newest=""\n', 'W15v', "workflows",
+    ),
+    Mutation(
+        'the job that tags finds a lower version and publishes it anyway',
+        RELEASE_YML, '            echo "::error::the newest release is $newest, and $VERSION is lower"\n            exit 1\n          fi\n          echo "VERSION=$VERSION" >> "$GITHUB_ENV"\n',
+        '            echo "::error::the newest release is $newest, and $VERSION is lower"\n          fi\n          echo "VERSION=$VERSION" >> "$GITHUB_ENV"\n', 'W15v', "workflows",
+    ),
+    Mutation(
+        "the ordering check is switched off by a condition",
+        RELEASE_YML, "      - name: Check the version is not below the newest release\n",
+        "      - name: Check the version is not below the newest release\n        if: false\n", "W15p", "workflows",
+    ),
+    Mutation(
+        "the release publishes whatever the suite did",
+        RELEASE_YML, "    needs: [check, test, build]\n    runs-on: ubuntu-latest\n",
+        "    needs: [check, test, build]\n    if: always()\n    runs-on: ubuntu-latest\n", "W15p", "workflows",
+    ),
+    Mutation(
+        "a failed suite is reported as passing to the jobs after it",
+        RELEASE_YML, "    name: Test the release\n    needs: check\n",
+        "    name: Test the release\n    needs: check\n    continue-on-error: true\n", "W15p", "workflows",
+    ),
+    Mutation(
+        "a re-run of the build cannot replace the files it uploaded",
+        RELEASE_YML, "          retention-days: 90\n          overwrite: true\n", "          retention-days: 90\n",
+        "W15u", "workflows",
+    ),
+    Mutation(
+        "a tag with a leading zero is read as a release",
+        NEWER, "release='^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$'",
+        "release='^([0-9]+)\\.([0-9]+)\\.([0-9]+)$'", "R9m", "release",
+    ),
+    Mutation(
         "the release takes main's head when no commit is named",
         RELEASE_YML, "        required: true\n        type: string\n", "        required: false\n        type: string\n",
         "W15o", "workflows",
@@ -635,8 +723,8 @@ MUTATIONS = [
     ),
     Mutation(
         "the publish job checks out the commit without the tags or history its checks read",
-        RELEASE_YML, "          ref: ${{ needs.build.outputs.commit }}\n          fetch-depth: 0\n",
-        "          ref: ${{ needs.build.outputs.commit }}\n", "W15q", "workflows",
+        RELEASE_YML, "          ref: ${{ needs.check.outputs.commit }}\n          fetch-depth: 0\n",
+        "          ref: ${{ needs.check.outputs.commit }}\n", "W15q", "workflows",
     ),
     Mutation(
         "the build job checks out the commit without main to compare it to",
@@ -645,7 +733,8 @@ MUTATIONS = [
     ),
     Mutation(
         "the publish job checks out main's head instead of the named commit",
-        RELEASE_YML, "          ref: ${{ needs.build.outputs.commit }}\n", "", "W15q", "workflows",
+        RELEASE_YML, "          ref: ${{ needs.check.outputs.commit }}\n          fetch-depth: 0\n",
+        "          fetch-depth: 0\n", "W15q", "workflows",
     ),
     Mutation(
         "the approver is not shown which commit the approval releases",
@@ -666,9 +755,10 @@ MUTATIONS = [
         "W15q", "workflows",
     ),
     Mutation(
-        "the build tests and packages main's head after checking the named commit",
-        RELEASE_YML, "      - uses: ./.github/actions/ios-toolchain\n",
-        "      - name: Move to main\n        run: git checkout -q origin/main\n\n      - uses: ./.github/actions/ios-toolchain\n",
+        "the suite tests main's head after checking out the named commit",
+        RELEASE_YML, "      - uses: ./.github/actions/ios-toolchain\n\n      - name: Install xcpretty\n",
+        "      - name: Move to main\n        run: git checkout -q origin/main\n\n"
+        "      - uses: ./.github/actions/ios-toolchain\n\n      - name: Install xcpretty\n",
         "W15q", "workflows",
     ),
     Mutation(
@@ -678,15 +768,49 @@ MUTATIONS = [
     ),
     Mutation(
         "a command hides behind an echo and acts on main's head",
-        RELEASE_YML, '            echo "::error::tag $VERSION already names $tagged, not $COMMIT"\n            exit 1\n          fi\n\n      - uses:',
+        RELEASE_YML, '            echo "::error::tag $VERSION already names $tagged, not $COMMIT"\n            exit 1\n          fi\n\n      # A version below',
         '            echo "::error::tag $VERSION already names $tagged, not $COMMIT"\n            exit 1\n          fi\n'
-        '          echo ok; git rev-parse "$GITHUB_SHA"\n\n      - uses:',
+        '          echo ok; git rev-parse "$GITHUB_SHA"\n\n      # A version below',
         "W15s", "workflows",
     ),
     Mutation(
         "the tag names main's head through an expression",
-        RELEASE_YML, "      COMMIT: ${{ needs.build.outputs.commit }}\n", "      COMMIT: ${{ github.sha }}\n",
+        RELEASE_YML, "      COMMIT: ${{ needs.check.outputs.commit }}\n", "      COMMIT: ${{ github.sha }}\n",
         "W15s", "workflows",
+    ),
+    Mutation(
+        "the XCFrameworks wait for the suite, so a re-run of the suite rebuilds them",
+        RELEASE_YML, "    name: Build the release\n    needs: check\n", "    name: Build the release\n    needs: [check, test]\n",
+        "W15u", "workflows",
+    ),
+    Mutation(
+        "the built files expire before a re-run of the suite can publish them",
+        RELEASE_YML, "          retention-days: 90\n", "          retention-days: 1\n", "W15u", "workflows",
+    ),
+    Mutation(
+        "the suite job builds the XCFrameworks as well",
+        RELEASE_YML, "            | xcpretty && exit ${PIPESTATUS[0]}\n\n",
+        "            | xcpretty && exit ${PIPESTATUS[0]}\n\n      - name: Build here too\n"
+        "        run: ./Scripts/build_release_frameworks.sh\n\n", "W15u", "workflows",
+    ),
+    Mutation(
+        "the release publishes without waiting for the suite",
+        RELEASE_YML, "    needs: [check, test, build]\n", "    needs: [check, build]\n", "W15l", "workflows",
+    ),
+    Mutation(
+        "the suite job checks out main's head",
+        RELEASE_YML, "    name: Test the release\n    needs: check\n    runs-on: macos-15\n    permissions:\n"
+        "      contents: read\n\n    steps:\n      - name: Checkout\n        uses: actions/checkout@v4\n"
+        "        with:\n          ref: ${{ needs.check.outputs.commit }}\n",
+        "    name: Test the release\n    needs: check\n    runs-on: macos-15\n    permissions:\n"
+        "      contents: read\n\n    steps:\n      - name: Checkout\n        uses: actions/checkout@v4\n"
+        "        with:\n", "W15q", "workflows",
+    ),
+    Mutation(
+        "the suite job can write to the repository",
+        RELEASE_YML, "    name: Test the release\n    needs: check\n    runs-on: macos-15\n    permissions:\n      contents: read\n",
+        "    name: Test the release\n    needs: check\n    runs-on: macos-15\n    permissions:\n      contents: write\n",
+        "W15i", "workflows",
     ),
     Mutation(
         "the release's tag falls back to the default branch's head",

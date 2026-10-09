@@ -5,9 +5,10 @@ name: Release
 # gives it a GitHub Release carrying the XCFrameworks for integrators who do not use SwiftPM. Only a release
 # is ever tagged.
 #
-# Two jobs. `build` runs the repository's tests and build with a read-only token and no secret. `publish`
-# runs on a fresh runner in the `release` environment, executes no file from the checkout, and is the only
-# job that can read the deploy key.
+# Four jobs. `check` reads the named commit and its version. `test` and `build` then run beside each other,
+# each with a read-only token and no secret, so "Re-run failed jobs" repeats a failed suite without rebuilding
+# the XCFrameworks. `publish` runs on a fresh runner in the `release` environment, executes no file from the
+# checkout, and is the only job that can read the deploy key.
 
 on:
   workflow_dispatch:
@@ -27,9 +28,10 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  build:
-    name: Build and test the release
-    runs-on: macos-15
+  # Reads the commit and the version, and holds nothing that can tag or publish.
+  check:
+    name: Check the commit can be released
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       actions: read
@@ -101,6 +103,33 @@ jobs:
             exit 1
           fi
 
+      # A version below the newest release would be published after it. The lines are release-newer.sh's,
+      # carried here because the commit checked out may predate that file.
+      - name: Check the version is not below the newest release
+        run: |
+          release='^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'
+          tags="$(git for-each-ref --format='%(refname:strip=2)' refs/tags)"
+          newest="$(printf '%s\n' "$tags" | { grep -E "$release" || true; } | sort -V | tail -n 1)"
+          if [ -n "$newest" ] && [ "$(printf '%s\n%s\n' "$newest" "$VERSION" | sort -V | tail -n 1)" != "$VERSION" ]; then
+            echo "::error::the newest release is $newest, and $VERSION is lower"
+            exit 1
+          fi
+
+  # The suite, on its own so a failed test is re-run without rebuilding the XCFrameworks.
+  test:
+    name: Test the release
+    needs: check
+    runs-on: macos-15
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.check.outputs.commit }}
+          persist-credentials: false
+
       - uses: ./.github/actions/ios-toolchain
 
       - name: Install xcpretty
@@ -109,8 +138,8 @@ jobs:
       - name: Test
         run: |
           # The same hardware-only exclusions every other workflow that tests this scheme applies, from
-          # the same file. This job tests and then tags, so without them a release is cut off a run that
-          # reported standing skips.
+          # the same file. The release tags what this job tested, so without them a release is cut off a
+          # run that reported standing skips.
           # The status is checked before the output is parsed. `read` succeeds on a here-string
           # whatever the command substitution inside it returned, so the failure would be dropped and
           # the array left empty: the step would then run the hardware-only tests with no exclusions
@@ -130,24 +159,47 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             | xcpretty && exit ${PIPESTATUS[0]}
 
+  # The XCFrameworks, beside the suite rather than after it. Publish uploads what this job built, so a re-run
+  # of the suite alone leaves them as they are.
+  build:
+    name: Build the release
+    needs: check
+    runs-on: macos-15
+    permissions:
+      contents: read
+    env:
+      VERSION: ${{ needs.check.outputs.version }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.check.outputs.commit }}
+          persist-credentials: false
+
+      - uses: ./.github/actions/ios-toolchain
+
       - name: Build the XCFrameworks
         timeout-minutes: 45
         run: ./Scripts/build_release_frameworks.sh
 
+      # Kept past the 30 days in which GitHub allows a run to be re-run, so a re-run of the suite still finds
+      # these files to publish. Replaced when this job itself is re-run, since an artifact name is written once.
       - name: Hand the release files to the publish job
         uses: actions/upload-artifact@v4
         with:
           name: release-files
           path: |
-            build/release/payabli-ios-sdk-${{ steps.version.outputs.version }}.zip
+            build/release/payabli-ios-sdk-${{ needs.check.outputs.version }}.zip
             build/release/checksums.txt
             build/release/THIRD_PARTY_LICENSES.txt
           if-no-files-found: error
-          retention-days: 1
+          retention-days: 90
+          overwrite: true
 
   publish:
     name: Publish a release
-    needs: build
+    needs: [check, test, build]
     runs-on: ubuntu-latest
     # Its required reviewers are who may release, it deploys from main only, and it holds the one key the
     # tag ruleset lets create a tag.
@@ -158,8 +210,8 @@ jobs:
     env:
       # Through the environment, so the text is never parsed as shell.
       RELEASE_NOTES: ${{ inputs.release_notes }}
-      BUILT_VERSION: ${{ needs.build.outputs.version }}
-      COMMIT: ${{ needs.build.outputs.commit }}
+      BUILT_VERSION: ${{ needs.check.outputs.version }}
+      COMMIT: ${{ needs.check.outputs.commit }}
 
     steps:
       - name: Check the release key is provisioned
@@ -174,12 +226,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: ${{ needs.build.outputs.commit }}
+          ref: ${{ needs.check.outputs.commit }}
           fetch-depth: 0
           persist-credentials: false
 
-      # The version is the build job's version step output, set before any test or build step ran. It and
-      # the commit are checked here as data, since no file from the checkout runs where the key is.
+      # The version is the check job's output, set before any test or build ran. It and the commit are
+      # checked here as data, since no file from the checkout runs where the key is.
       - name: Check the version
         run: |
           if [[ ! "$COMMIT" =~ ^[0-9a-f]{40}$ ]]; then
@@ -198,6 +250,15 @@ jobs:
           tagged="$(git rev-parse -q --verify "refs/tags/$VERSION^{commit}" || true)"
           if [ -n "$tagged" ] && [ "$tagged" != "$COMMIT" ]; then
             echo "::error::tag $VERSION already names $tagged, not $COMMIT"
+            exit 1
+          fi
+          # "Re-run failed jobs" does not re-run the check job, so a release cut since it ran is looked for
+          # here. The same lines as release-newer.sh.
+          release='^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'
+          tags="$(git for-each-ref --format='%(refname:strip=2)' refs/tags)"
+          newest="$(printf '%s\n' "$tags" | { grep -E "$release" || true; } | sort -V | tail -n 1)"
+          if [ -n "$newest" ] && [ "$(printf '%s\n%s\n' "$newest" "$VERSION" | sort -V | tail -n 1)" != "$VERSION" ]; then
+            echo "::error::the newest release is $newest, and $VERSION is lower"
             exit 1
           fi
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
