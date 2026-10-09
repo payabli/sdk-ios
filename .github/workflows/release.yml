@@ -175,7 +175,8 @@ jobs:
         timeout-minutes: 45
         run: ./Scripts/build_release_frameworks.sh
 
-      # Kept for as long as GitHub allows, so a suite re-run days later still publishes these files.
+      # Kept past the 30 days in which GitHub allows a run to be re-run, so a re-run of the suite still finds
+      # these files to publish. Replaced when this job itself is re-run, since an artifact name is written once.
       - name: Hand the release files to the publish job
         uses: actions/upload-artifact@v4
         with:
@@ -186,6 +187,7 @@ jobs:
             build/release/THIRD_PARTY_LICENSES.txt
           if-no-files-found: error
           retention-days: 90
+          overwrite: true
 
   publish:
     name: Publish a release
@@ -240,6 +242,15 @@ jobs:
           tagged="$(git rev-parse -q --verify "refs/tags/$VERSION^{commit}" || true)"
           if [ -n "$tagged" ] && [ "$tagged" != "$COMMIT" ]; then
             echo "::error::tag $VERSION already names $tagged, not $COMMIT"
+            exit 1
+          fi
+          # "Re-run failed jobs" does not re-run the check job, so a release cut since it ran is looked for
+          # here. The same lines as release-newer.sh.
+          release='^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'
+          tags="$(git for-each-ref --format='%(refname:strip=2)' refs/tags)"
+          newest="$(printf '%s\n' "$tags" | { grep -E "$release" || true; } | sort -V | tail -n 1)"
+          if [ -n "$newest" ] && [ "$(printf '%s\n%s\n' "$newest" "$VERSION" | sort -V | tail -n 1)" != "$VERSION" ]; then
+            echo "::error::the newest release is $newest, and $VERSION is lower"
             exit 1
           fi
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"

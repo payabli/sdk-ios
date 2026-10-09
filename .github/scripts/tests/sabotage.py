@@ -619,32 +619,71 @@ MUTATIONS = [
     ),
     Mutation(
         "a version below the newest release passes the ordering check",
-        NEWER, 'if [ -n "$newest" ] && lower "$version" "$newest"; then', "if false; then", "R9d", "release",
+        NEWER, 'if [ -n "$newest" ] && [ "$(printf', 'if false && [ "$(printf', "R9d", "release",
     ),
     Mutation(
         "the newest release's own version is refused",
-        NEWER, "a3 < b3", "a3 <= b3", "R9c", "release",
-    ),
-    Mutation(
-        "a lower minor version passes when its patch is higher",
-        NEWER, "(a2 < b2 ||", "(a2 > b2 ||", "R9f", "release",
+        NEWER, '| sort -V | tail -n 1)" != "$VERSION" ]; then', '| sort -V | tail -n 1)" = "x" ] || true; then',
+        "R9c", "release",
     ),
     Mutation(
         "a tag that is not a release is compared",
-        NEWER, '    [[ "$tag" =~ $release ]] || continue\n', "", "R9i", "release",
+        NEWER, '{ grep -E "$release" || true; }', "cat", "R9i", "release",
+    ),
+    Mutation(
+        "a failure to list the tags reads as no releases",
+        NEWER, "tags=\"$(git for-each-ref --format='%(refname:strip=2)' refs/tags)\"",
+        "tags=\"$(git for-each-ref --format='%(refname:strip=2)' refs/tags || true)\"", "R9j", "release",
+    ),
+    Mutation(
+        "the newest release is taken from text order",
+        NEWER, '{ grep -E "$release" || true; } | sort -V |', '{ grep -E "$release" || true; } | sort |', "R9n", "release",
+    ),
+    Mutation(
+        "the version is compared as text",
+        NEWER, '"$newest" "$VERSION" | sort -V |', '"$newest" "$VERSION" | sort |', "R9e", "release",
+    ),
+    Mutation(
+        "the tags are read through the command a formatting setting changes",
+        NEWER, "tags=\"$(git for-each-ref --format='%(refname:strip=2)' refs/tags)\"", 'tags="$(git tag --list)"',
+        "R9q", "release",
+    ),
+    Mutation(
+        "the job that tags no longer looks for a release cut since the check",
+        RELEASE_YML,
+        "          newest=\"$(printf '%s\\n' \"$tags\" | { grep -E \"$release\" || true; } | sort -V | tail -n 1)\"\n"
+        "          if [ -n \"$newest\" ]",
+        "          newest=\"\"\n          if [ -n \"$newest\" ]", "W15v", "workflows",
+    ),
+    Mutation(
+        "the ordering check is allowed to fail",
+        RELEASE_YML, 'run: .github/scripts/release-newer.sh "$VERSION"\n',
+        'run: .github/scripts/release-newer.sh "$VERSION" || true\n', "W15t", "workflows",
+    ),
+    Mutation(
+        "the ordering check is switched off by a condition",
+        RELEASE_YML, "      - name: Check the version is not below the newest release\n",
+        "      - name: Check the version is not below the newest release\n        if: false\n", "W15p", "workflows",
+    ),
+    Mutation(
+        "the release publishes whatever the suite did",
+        RELEASE_YML, "    needs: [check, test, build]\n    runs-on: ubuntu-latest\n",
+        "    needs: [check, test, build]\n    if: always()\n    runs-on: ubuntu-latest\n", "W15p", "workflows",
+    ),
+    Mutation(
+        "a failed suite is reported as passing to the jobs after it",
+        RELEASE_YML, "    name: Test the release\n    needs: check\n",
+        "    name: Test the release\n    needs: check\n    continue-on-error: true\n", "W15p", "workflows",
+    ),
+    Mutation(
+        "a re-run of the build cannot replace the files it uploaded",
+        RELEASE_YML, "          retention-days: 90\n          overwrite: true\n", "          retention-days: 90\n",
+        "W15u", "workflows",
     ),
     Mutation(
         "a tag with a leading zero is read as a release",
         NEWER, "release='^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$'",
         "release='^([0-9]+)\\.([0-9]+)\\.([0-9]+)$'", "R9m", "release",
-    ),
-    Mutation(
-        "a failure to list the tags reads as no releases",
-        NEWER, 'tags="$(git tag --list)"', 'tags="$(git tag --list || true)"', "R9j", "release",
-    ),
-    Mutation(
-        "the ordering check takes its newest release from the first tag listed",
-        NEWER, '    if [ -z "$newest" ] || lower "$newest" "$tag"; then', '    if [ -z "$newest" ]; then', "R9d", "release",
     ),
     Mutation(
         "the release takes main's head when no commit is named",

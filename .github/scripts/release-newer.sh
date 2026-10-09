@@ -6,7 +6,8 @@
 #
 # Reads the tags of the repository it runs in. A release tag is <major>.<minor>.<patch> and nothing else, so a
 # tag of any other shape is not compared. The newest release's own version passes, because whether that tag is
-# this release resumed is the existing-tag check's to decide.
+# this release resumed is the existing-tag check's to decide. The publish job runs the same comparison
+# again, from the lines below, so they change together.
 
 set -euo pipefail
 
@@ -15,34 +16,20 @@ if [ "$#" -ne 1 ]; then
     exit 2
 fi
 
-version="$1"
+VERSION="$1"
 release='^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'
-if ! [[ "$version" =~ $release ]]; then
-    echo "error: '$version' is not <major>.<minor>.<patch>" >&2
+if ! [[ "$VERSION" =~ $release ]]; then
+    echo "error: '$VERSION' is not <major>.<minor>.<patch>" >&2
     exit 1
 fi
 
-# True when the first version is lower than the second. Components carry no leading zero, so each compares
-# as a number.
-lower() {
-    local a1 a2 a3 b1 b2 b3
-    IFS=. read -r a1 a2 a3 <<< "$1"
-    IFS=. read -r b1 b2 b3 <<< "$2"
-    (( a1 < b1 || (a1 == b1 && (a2 < b2 || (a2 == b2 && a3 < b3))) ))
-}
-
-# Read before the loop, so a failure to list the tags stops the script rather than reading as no releases.
-tags="$(git tag --list)"
-newest=""
-while IFS= read -r tag; do
-    [[ "$tag" =~ $release ]] || continue
-    if [ -z "$newest" ] || lower "$newest" "$tag"; then
-        newest="$tag"
-    fi
-done <<< "$tags"
-
-if [ -n "$newest" ] && lower "$version" "$newest"; then
-    echo "error: the newest release is $newest, and $version is lower" >&2
+# for-each-ref rather than `git tag`, whose output a formatting setting can change. Read on its own, so a
+# failure to list the tags stops the script rather than reading as no releases. `sort -V` compares each
+# component as a number of any length.
+tags="$(git for-each-ref --format='%(refname:strip=2)' refs/tags)"
+newest="$(printf '%s\n' "$tags" | { grep -E "$release" || true; } | sort -V | tail -n 1)"
+if [ -n "$newest" ] && [ "$(printf '%s\n%s\n' "$newest" "$VERSION" | sort -V | tail -n 1)" != "$VERSION" ]; then
+    echo "error: the newest release is $newest, and $VERSION is lower" >&2
     exit 1
 fi
 echo "newest release: ${newest:-none}"

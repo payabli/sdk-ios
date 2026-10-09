@@ -1332,8 +1332,10 @@ def test_workflows() -> None:
     check("W15 the release asks the gate for its version and tests before it tags",
           -1 not in (gate_at, test_at, tag_at) and gate_at < tag_at and test_at < tag_at, (gate_at, test_at, tag_at))
     newer_at = first('release-newer.sh "$VERSION"')
-    check("W15t a version below the newest release is refused after the version is read and before any test",
-          newer_at != -1 and gate_at < newer_at < test_at, (gate_at, newer_at, test_at))
+    newer_runs = [run.strip() for run in check_runs if "release-newer.sh" in run]
+    check("W15t a version below the newest release is refused in the check job, after the version is read",
+          newer_at != -1 and gate_at < newer_at < test_at
+          and newer_runs == ['.github/scripts/release-newer.sh "$VERSION"'], (gate_at, newer_at, test_at, newer_runs))
 
     # The release ships the commit its dispatch names, so a merge landing between the decision and the click
     # is not released. Both jobs check the name with one pattern, the publish job as data.
@@ -1351,9 +1353,11 @@ def test_workflows() -> None:
     on_main_at = next((index for index, run in enumerate(runs)
                        if 'git merge-base "$COMMIT" origin/main' in run and '!= "$COMMIT"' in run
                        and re.search(r"\bexit [1-9]", run)), -1)
-    continuing = [step.get("name") for step in release_steps if "continue-on-error" in step]
-    check("W15p a commit that is not on main is refused before its version is read, and no step continues "
-          "past a failure",
+    # A job or step that continues past a failure, or runs on a condition, can carry a release past a refusal.
+    continuing = [str(item.get("name")) for item in [*release_steps, *(release.get("jobs") or {}).values()]
+                  if "continue-on-error" in item or "if" in item]
+    check("W15p a commit that is not on main is refused before its version is read, and nothing runs past a "
+          "failure or on a condition",
           on_main_at != -1 and on_main_at < gate_at and not continuing, (on_main_at, gate_at, continuing))
     # Each job checks out once: the check job the input, every later job the commit the check job passed on.
     checkouts_by_job = {name: [step for step in (job.get("steps") or [])
@@ -1422,8 +1426,18 @@ def test_workflows() -> None:
           and not any("build_release_frameworks.sh" in run for run in test_runs)
           and any("build_release_frameworks.sh" in run for run in build_runs)
           and not any("xcodebuild test" in run for run in build_runs)
-          and retention >= 30,
+          and retention >= 30 and ((uploads or [{}])[0].get("with") or {}).get("overwrite") is True,
           (test_job.get("needs"), build_job.get("needs"), retention))
+    # "Re-run failed jobs" does not re-run the check job, so the job that tags reads the tags again: a release
+    # cut since the check would otherwise be overtaken by this one. The same lines as the script, as data.
+    newer_script = (REPO_ROOT / ".github" / "scripts" / "release-newer.sh").read_text().splitlines()
+    ordering = [line.strip() for line in newer_script
+                if line.strip().startswith(("release=", "tags=", "newest=", 'if [ -n "$newest" ]'))]
+    recheck_at = next((index for index, run in enumerate(publish_runs)
+                       if all(line in [part.strip() for part in run.splitlines()] for line in ordering)), -1)
+    publish_tag_at = next((index for index, run in enumerate(publish_runs) if "gh release create" in run), -1)
+    check("W15v the job that tags checks the version against the newest release again, with the script's lines",
+          len(ordering) == 4 and recheck_at != -1 and recheck_at < publish_tag_at, (ordering, recheck_at, publish_tag_at))
     # The publish job checks the reported version as data with the gate's own pattern, so the two cannot
     # accept different versions without this failing.
     gate_pattern = re.search(r'\[\[ "\$declared" =~ (\S+) \]\]', GATE_SCRIPT.read_text())
@@ -1569,7 +1583,8 @@ def run_gate(args: list[str], tmp: Path, *, declarations: list[str] | None = Non
     return result.returncode, result.stdout, result.stderr
 
 
-def run_newer(args: list[str], tmp: Path, tags: list[str] | None) -> tuple[int, str, str]:
+def run_newer(args: list[str], tmp: Path, tags: list[str] | None,
+              config: dict[str, str] | None = None) -> tuple[int, str, str]:
     """Run the real ordering check in a synthetic repository holding `tags`, or outside any repository."""
     root = tmp / "newer"
     if root.exists():
@@ -1588,7 +1603,10 @@ def run_newer(args: list[str], tmp: Path, tags: list[str] | None) -> tuple[int, 
         result = subprocess.run(
             [str(REPO_ROOT / ".github" / "scripts" / "release-newer.sh"), *args],
             cwd=root, capture_output=True, text=True, timeout=60, check=False,
-            env={**os.environ, "GIT_CEILING_DIRECTORIES": str(tmp)},
+            env={**isolated, "GIT_CEILING_DIRECTORIES": str(tmp), "GIT_CONFIG_COUNT": str(len(config or {})),
+                 **{f"GIT_CONFIG_{kind}_{index}": value
+                    for index, (key, val) in enumerate((config or {}).items())
+                    for kind, value in (("KEY", key), ("VALUE", val))}},
         )
     except OSError as error:
         # Reported as a result, so a missing or unrunnable script fails each check rather than ending the run.
@@ -1674,6 +1692,12 @@ def test_release() -> None:
             ("R9h a lower major version is refused whatever follows it", ["2.0.0"], "1.99.99", False),
             ("R9i a tag that is not a release is not compared", ["9.0.0-rc1", "v9.0.0", "nightly"], "1.0.0", True),
             ("R9m a tag with a leading zero is not a release", ["010.0.0"], "1.0.0", True),
+            ("R9n the newest release is found whatever order the tags are listed in", ["1.9.0", "1.10.0"], "1.9.5",
+             False),
+            ("R9o a component too large for shell arithmetic still compares",
+             ["1.2.0", "9223372036854775808.0.0"], "2.0.0", False),
+            ("R9p a version too large for shell arithmetic is above every smaller release",
+             ["1.2.0"], "9223372036854775808.0.0", True),
         ):
             code, out, err = run_newer([version], root, tags)
             if accepted:
@@ -1681,6 +1705,11 @@ def test_release() -> None:
             else:
                 check(label, code == 1 and max(tags, key=lambda t: [int(p) for p in t.split(".")]) in err,
                       (code, out, err[:200]))
+
+        # A developer's formatting and sorting settings change what `git tag` prints, never what is read.
+        code, out, err = run_newer(["1.0.0"], root, ["1.2.0", "1.3.0", "1.4.0"],
+                                   {"column.ui": "always", "tag.sort": "version:refname"})
+        check("R9q no git setting hides a release", code == 1 and "1.4.0" in err, (code, out, err[:200]))
 
         code, out, err = run_newer(["0.1.0"], root, None)
         check("R9j outside a repository it refuses rather than finding no releases", code != 0, (code, out, err[:200]))
