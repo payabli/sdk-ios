@@ -1,6 +1,6 @@
 import Foundation
 
-/// Protocol every PayabliSDK component (PayIn, Payout, Reporting, Onboarding) conforms to.
+/// What a PayabliSDK component conforms to; `PayabliPayIn` is one.
 /// Configuration methods are `@MainActor` because components own SwiftUI / `ObservableObject` state;
 /// the static requirements are `nonisolated` because they are compile-time constants.
 @MainActor
