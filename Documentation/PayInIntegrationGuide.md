@@ -923,11 +923,10 @@ technology. Use them as a starting point for your own integration. They show sto
 payment-method creation. Capture, authorize, capture-authorized and void transaction flows are called from
 Swift with `PayabliSDKPayIn`.
 
-The `@objc` bridge covers `addCard` and `addBankAccount` only. `voidTransaction(_:)` is
-not bridged, which matches capture, authorize and `captureAuthorizedTransaction`
-rather than being an omission.
+The `@objc` interface covers `addCard` and `addBankAccount` only. Capture, authorize,
+`captureAuthorizedTransaction(_:)` and `voidTransaction(_:)` are called from Swift.
 
-The React Native Expo QA app is under `Example/PayabliReactNativeDemo`.
+The React Native example app is under `Example/PayabliReactNativeDemo`.
 
 ## 18. Testing
 

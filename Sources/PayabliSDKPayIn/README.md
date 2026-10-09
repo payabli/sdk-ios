@@ -1,7 +1,7 @@
 # Card-not-present payments on iOS
 
 Take a card or bank account payment that the payer enters, in the SDK's SwiftUI form or in your own UI.
-This guide is part of the [Payabli iOS SDK](../../README.md); set up the SDK there first.
+This guide is part of the [Payabli iOS SDK](../../README.md); set up the SDK and its session there first.
 
 > [!IMPORTANT]
 > **Notice:** This SDK is in beta. Its public interface can change in ways that aren't backward compatible. See
@@ -142,8 +142,9 @@ A returned result means what the call did, which depends on the call:
 | `captureAuthorizedTransaction(_:)` | The held amount was charged | The hold wasn't captured |
 | `voidTransaction(_:)` | The transaction was voided | The void was refused. It doesn't mean the original payment wasn't charged |
 
-For a charge, the outcomes are the ones in the root README's
-[Handle the outcome](../../README.md#handle-the-outcome):
+The outcomes are the ones in the root README's [Handle the outcome](../../README.md#handle-the-outcome). For
+`authorize(_:)`, `captureAuthorizedTransaction(_:)` and `voidTransaction(_:)`, read "charged" as "held",
+"captured" or "voided":
 
 | Result | Outcome | What to do |
 |---|---|---|

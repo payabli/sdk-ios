@@ -1,7 +1,7 @@
 # Payabli iOS SDK
 
 The Payabli iOS SDK lets your iPhone app take payments through Payabli. Set it up once, and take a payment
-either way: **card-not-present**, with card or bank account details entered in the SDK's SwiftUI form or
+either way on the same session: **card-not-present**, with card or bank account details entered in the SDK's SwiftUI form or
 in your own UI, or **Tap to Pay on iPhone**, with a contactless card, phone or watch tapped on the iPhone.
 
 Your app never holds your Payabli client ID or client secret. It supplies a function that fetches a
@@ -83,7 +83,7 @@ them.
 
 ### Configure your app
 
-Card-not-present needs no app configuration. Tap to Pay needs two entitlements, in the
+Card-not-present needs no app configuration. Tap to Pay needs entitlements, listed in the
 [Tap to Pay guide](Sources/PayabliSDKTapToPay/README.md#before-you-start).
 
 ## Set up the SDK
@@ -189,7 +189,8 @@ let session = try await PayabliSession.initialize(config: PayabliConfig(
 
 - `PayabliConfig` throws when the entry point is blank.
 - Calling `initialize` again with the same entry point, environment and telemetry setting returns the same
-  session. A different one throws `invalidConfiguration`, and the session already running stays in place.
+  session, which keeps its original token provider. A different one throws `invalidConfiguration`, and the
+  session already running stays in place.
 
 The token provider is an `async throws` function that returns a new access token from your token
 endpoint:
@@ -207,7 +208,8 @@ func fetchPayabliAccessToken() async throws -> String {
 }
 ```
 
-- The SDK calls the provider before its first request, and again when a token is rejected.
+- The SDK calls the provider before its first request, and again when a token is rejected. Return a newly
+  minted token each time, not a cached one.
 - Concurrent callers share one call.
 - Each call has 30 seconds to return. A call that takes longer, throws, or returns a token the SDK can't
   use fails with `PayabliErrorType.tokenProviderFailed`.
@@ -258,8 +260,8 @@ charging a saved method, authorizing and capturing, voiding, and the form's conf
 
 ### Tap to Pay
 
-`PayabliTTP` runs on the session you started. After the one-time setup in the
-[Tap to Pay guide](Sources/PayabliSDKTapToPay/README.md), a payment takes three calls:
+`PayabliTTP` runs on the same session. After the one-time setup in the
+[Tap to Pay guide](Sources/PayabliSDKTapToPay/README.md), a payment takes these calls:
 
 ```swift
 import PayabliSDKTapToPay
@@ -291,11 +293,10 @@ retry.
 
 When the outcome is unknown, look the transaction up from your backend with
 [`GET /api/MoneyIn/details/{transId}`](https://docs.payabli.com/developers/api-reference/moneyin/get-details-for-a-processed-transaction)
-before you charge again. `PayabliPayInError.submissionInterrupted` carries no transaction ID, so set
-`orderId` on each request and find the transaction by it in the Payabli portal. After
-`captureAuthorizedTransaction(_:)`, look up the transaction ID you passed. When a Tap to Pay error
-carries no transaction ID, find the transaction in the portal. Store the transaction ID with your order
-every time you get one.
+before you charge again. `TapToPayError` carries the `paymentTransId` to look up when there is one;
+`PayabliPayInError.submissionInterrupted` carries none. When there isn't one, find the transaction in the
+Payabli portal before you charge again. On card-not-present, setting `orderId` on each request lets you find it
+by your own reference. After `captureAuthorizedTransaction(_:)`, look up the transaction ID you passed.
 
 Each guide lists its errors in full: [card-not-present](Sources/PayabliSDKPayIn/README.md#outcomes-and-errors)
 and [Tap to Pay](Sources/PayabliSDKTapToPay/README.md#outcomes-and-errors).
@@ -304,7 +305,7 @@ and [Tap to Pay](Sources/PayabliSDKTapToPay/README.md#outcomes-and-errors).
 
 - A **production** entry point, and production OAuth2 credentials with the permissions in
   [Prepare your Payabli account](#prepare-your-payabli-account).
-- `.production` as the environment.
+- `.production` in `PayabliConfig`.
 - Your token endpoint deployed and authenticating its callers.
 - The checklists for what you use: [card-not-present](Sources/PayabliSDKPayIn/README.md#go-live) and
   [Tap to Pay](Sources/PayabliSDKTapToPay/README.md#go-live).
@@ -382,5 +383,5 @@ version, the device model, the locale and, when there is one, the device ID desc
 
 ## License
 
-Commercial. See [LICENSE](LICENSE). The bundled card reader engine is MIT-licensed; attribution is in
+Commercial. See [LICENSE](LICENSE). Third-party components and their licenses are listed in
 [`THIRD_PARTY_LICENSES.txt`](THIRD_PARTY_LICENSES.txt).
