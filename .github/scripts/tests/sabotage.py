@@ -671,8 +671,8 @@ MUTATIONS = [
     ),
     Mutation(
         "the publish job checks out the commit without the tags or history its checks read",
-        RELEASE_YML, "          ref: ${{ needs.build.outputs.commit }}\n          fetch-depth: 0\n",
-        "          ref: ${{ needs.build.outputs.commit }}\n", "W15q", "workflows",
+        RELEASE_YML, "          ref: ${{ needs.check.outputs.commit }}\n          fetch-depth: 0\n",
+        "          ref: ${{ needs.check.outputs.commit }}\n", "W15q", "workflows",
     ),
     Mutation(
         "the build job checks out the commit without main to compare it to",
@@ -681,7 +681,8 @@ MUTATIONS = [
     ),
     Mutation(
         "the publish job checks out main's head instead of the named commit",
-        RELEASE_YML, "          ref: ${{ needs.build.outputs.commit }}\n", "", "W15q", "workflows",
+        RELEASE_YML, "          ref: ${{ needs.check.outputs.commit }}\n          fetch-depth: 0\n",
+        "          fetch-depth: 0\n", "W15q", "workflows",
     ),
     Mutation(
         "the approver is not shown which commit the approval releases",
@@ -702,9 +703,10 @@ MUTATIONS = [
         "W15q", "workflows",
     ),
     Mutation(
-        "the build tests and packages main's head after checking the named commit",
-        RELEASE_YML, "      - uses: ./.github/actions/ios-toolchain\n",
-        "      - name: Move to main\n        run: git checkout -q origin/main\n\n      - uses: ./.github/actions/ios-toolchain\n",
+        "the suite tests main's head after checking out the named commit",
+        RELEASE_YML, "      - uses: ./.github/actions/ios-toolchain\n\n      - name: Install xcpretty\n",
+        "      - name: Move to main\n        run: git checkout -q origin/main\n\n"
+        "      - uses: ./.github/actions/ios-toolchain\n\n      - name: Install xcpretty\n",
         "W15q", "workflows",
     ),
     Mutation(
@@ -721,8 +723,42 @@ MUTATIONS = [
     ),
     Mutation(
         "the tag names main's head through an expression",
-        RELEASE_YML, "      COMMIT: ${{ needs.build.outputs.commit }}\n", "      COMMIT: ${{ github.sha }}\n",
+        RELEASE_YML, "      COMMIT: ${{ needs.check.outputs.commit }}\n", "      COMMIT: ${{ github.sha }}\n",
         "W15s", "workflows",
+    ),
+    Mutation(
+        "the XCFrameworks wait for the suite, so a re-run of the suite rebuilds them",
+        RELEASE_YML, "    name: Build the release\n    needs: check\n", "    name: Build the release\n    needs: [check, test]\n",
+        "W15u", "workflows",
+    ),
+    Mutation(
+        "the built files expire before a re-run of the suite can publish them",
+        RELEASE_YML, "          retention-days: 90\n", "          retention-days: 1\n", "W15u", "workflows",
+    ),
+    Mutation(
+        "the suite job builds the XCFrameworks as well",
+        RELEASE_YML, "            | xcpretty && exit ${PIPESTATUS[0]}\n\n",
+        "            | xcpretty && exit ${PIPESTATUS[0]}\n\n      - name: Build here too\n"
+        "        run: ./Scripts/build_release_frameworks.sh\n\n", "W15u", "workflows",
+    ),
+    Mutation(
+        "the release publishes without waiting for the suite",
+        RELEASE_YML, "    needs: [check, test, build]\n", "    needs: [check, build]\n", "W15l", "workflows",
+    ),
+    Mutation(
+        "the suite job checks out main's head",
+        RELEASE_YML, "    name: Test the release\n    needs: check\n    runs-on: macos-15\n    permissions:\n"
+        "      contents: read\n\n    steps:\n      - name: Checkout\n        uses: actions/checkout@v4\n"
+        "        with:\n          ref: ${{ needs.check.outputs.commit }}\n",
+        "    name: Test the release\n    needs: check\n    runs-on: macos-15\n    permissions:\n"
+        "      contents: read\n\n    steps:\n      - name: Checkout\n        uses: actions/checkout@v4\n"
+        "        with:\n", "W15q", "workflows",
+    ),
+    Mutation(
+        "the suite job can write to the repository",
+        RELEASE_YML, "    name: Test the release\n    needs: check\n    runs-on: macos-15\n    permissions:\n      contents: read\n",
+        "    name: Test the release\n    needs: check\n    runs-on: macos-15\n    permissions:\n      contents: write\n",
+        "W15i", "workflows",
     ),
     Mutation(
         "the release's tag falls back to the default branch's head",

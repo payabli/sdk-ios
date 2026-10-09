@@ -1314,15 +1314,18 @@ def test_workflows() -> None:
         return next((index for index, run in enumerate(runs) if needle in run), -1)
 
     release_jobs = release.get("jobs") or {}
+    check_job, test_job = release_jobs.get("check") or {}, release_jobs.get("test") or {}
     build_job, publish_job = release_jobs.get("build") or {}, release_jobs.get("publish") or {}
+    check_runs = [str(step.get("run", "")) for step in check_job.get("steps") or []]
+    test_runs = [str(step.get("run", "")) for step in test_job.get("steps") or []]
     build_runs = [str(step.get("run", "")) for step in build_job.get("steps") or []]
     publish_runs = [str(step.get("run", "")) for step in publish_job.get("steps") or []]
-    ci_run = next((run for run in build_runs if "actions/workflows/ci.yml/runs" in run), "")
+    ci_run = next((run for run in check_runs if "actions/workflows/ci.yml/runs" in run), "")
     check("W15h the release starts only once CI on main for the named commit has completed with success",
           "actions/workflows/ci.yml/runs?head_sha=$COMMIT&branch=main&event=push" in ci_run
           and '!= "completed success"' in ci_run
           and re.search(r"\bexit [1-9]", ci_run) is not None
-          and (build_job.get("permissions") or {}).get("actions") == "read", ci_run[:160])
+          and (check_job.get("permissions") or {}).get("actions") == "read", ci_run[:160])
 
     gate_at = first("release-version.sh ")
     test_at, tag_at = first("xcodebuild test"), first("gh release create")
@@ -1337,12 +1340,12 @@ def test_workflows() -> None:
     triggers = release.get("on", release.get(True)) or {}
     commit_input = ((triggers.get("workflow_dispatch") or {}).get("inputs") or {}).get("commit") or {}
     sha_check = r'\[\[ ! "\$COMMIT" =~ (\S+) \]\]'
-    build_sha = re.search(sha_check, build_runs[0]) if build_runs else None
+    build_sha = re.search(sha_check, check_runs[0]) if check_runs else None
     publish_sha = next((m for run in publish_runs for m in [re.search(sha_check, run)] if m), None)
     check("W15o the dispatch names the commit in full, checked first and checked again where the key is",
           commit_input.get("required") is True
           and build_sha is not None and build_sha.group(1) == "^[0-9a-f]{40}$"
-          and re.search(r"\bexit [1-9]", build_runs[0]) is not None
+          and re.search(r"\bexit [1-9]", check_runs[0]) is not None
           and publish_sha is not None and publish_sha.group(1) == build_sha.group(1),
           (commit_input, build_sha and build_sha.group(1), publish_sha and publish_sha.group(1)))
     on_main_at = next((index for index, run in enumerate(runs)
@@ -1352,25 +1355,30 @@ def test_workflows() -> None:
     check("W15p a commit that is not on main is refused before its version is read, and no step continues "
           "past a failure",
           on_main_at != -1 and on_main_at < gate_at and not continuing, (on_main_at, gate_at, continuing))
-    named = {"${{ inputs.commit }}", "${{ needs.build.outputs.commit }}"}
-    release_checkouts = [step for step in release_steps if str(step.get("uses", "")).startswith("actions/checkout")]
-    checkout_refs = [(step.get("with") or {}).get("ref") for step in release_checkouts]
+    # Each job checks out once: the check job the input, every later job the commit the check job passed on.
+    checkouts_by_job = {name: [step for step in (job.get("steps") or [])
+                               if str(step.get("uses", "")).startswith("actions/checkout")]
+                        for name, job in release_jobs.items()}
+    checkout_refs = {name: [(step.get("with") or {}).get("ref") for step in steps]
+                     for name, steps in checkouts_by_job.items()}
+    expected_refs = {"check": ["${{ inputs.commit }}"], "test": ["${{ needs.check.outputs.commit }}"],
+                     "build": ["${{ needs.check.outputs.commit }}"], "publish": ["${{ needs.check.outputs.commit }}"]}
     # Set once per job, and the tree is never moved off it afterwards.
     step_commits = [step.get("name") for step in release_steps if "COMMIT" in (step.get("env") or {})]
     moves = [line.strip() for run in runs for line in run.splitlines()
              if re.search(r"\bgit (checkout|switch|reset)\b", line)]
     # All of history: the on-main check reads origin/main, and the resume checks and the notes read the tags.
-    depths = [(step.get("with") or {}).get("fetch-depth") for step in release_checkouts]
+    depths = [((checkouts_by_job.get(name) or [{}])[0].get("with") or {}).get("fetch-depth")
+              for name in ("check", "publish")]
     check("W15q every job checks out and acts on the named commit",
-          len(release_checkouts) == 2 and all(ref in named for ref in checkout_refs)
-          and depths == [0, 0]
-          and (build_job.get("outputs") or {}).get("commit") == "${{ inputs.commit }}"
-          and (build_job.get("env") or {}).get("COMMIT") == "${{ inputs.commit }}"
-          and (publish_job.get("env") or {}).get("COMMIT") == "${{ needs.build.outputs.commit }}"
+          checkout_refs == expected_refs and depths == [0, 0]
+          and (check_job.get("outputs") or {}).get("commit") == "${{ inputs.commit }}"
+          and (check_job.get("env") or {}).get("COMMIT") == "${{ inputs.commit }}"
+          and (publish_job.get("env") or {}).get("COMMIT") == "${{ needs.check.outputs.commit }}"
           and not step_commits and not moves,
-          (checkout_refs, depths, build_job.get("env"), publish_job.get("env"), step_commits, moves))
+          (checkout_refs, depths, check_job.get("env"), publish_job.get("env"), step_commits, moves))
     # The approval page shows the run, not the commit, so the run's summary is where the approver reads it.
-    summary_run = next((run for run in build_runs if "$GITHUB_STEP_SUMMARY" in run), "")
+    summary_run = next((run for run in check_runs if "$GITHUB_STEP_SUMMARY" in run), "")
     check("W15r the run summary names the commit and its subject line for the approver",
           'echo "Releasing \\`$VERSION\\` from \\`$COMMIT\\`:"' in summary_run
           and 'git log -1 --format=%s "$COMMIT"' in summary_run, summary_run[:160])
@@ -1386,19 +1394,36 @@ def test_workflows() -> None:
     check("W15c the release tags the commit that was tested",
           re.search(r'gh release create "\$VERSION" --draft --target "\$COMMIT"', tag_run) is not None
           and re.search(r'git tag -a "\$VERSION" -m "[^"]*" "\$COMMIT"', tag_run) is not None, tag_run[:200])
-    check("W15i only the publish job runs in the release environment, and the build job cannot write",
-          publish_job.get("environment") == "release" and "environment" not in build_job
-          and (build_job.get("permissions") or {}).get("contents") == "read",
-          (build_job.get("environment"), publish_job.get("environment"), build_job.get("permissions")))
+    before_publish = {"check": check_job, "test": test_job, "build": build_job}
+    check("W15i only the publish job runs in the release environment, and no job before it can write",
+          publish_job.get("environment") == "release"
+          and all(job and "environment" not in job and (job.get("permissions") or {}).get("contents") == "read"
+                  for job in before_publish.values()),
+          {name: (job.get("environment"), job.get("permissions")) for name, job in before_publish.items()})
     # The deploy key is readable only by a job that runs none of the repository's build: code the tests or
     # the build ran could otherwise put its own git, gh or ssh ahead on PATH and be handed the key.
     publish_text = yaml.safe_dump(publish_job)
-    build_text = yaml.safe_dump(build_job)
+    before_text = yaml.safe_dump(before_publish)
     runs_build = [needle for needle in ("xcodebuild", "build_release_frameworks.sh", "ios-toolchain",
                                         "hardware-only-skips.sh", "Scripts/", ".github/scripts/", "./")
                   if needle in publish_text]
-    check("W15l the job holding the deploy key needs the build and runs none of it",
-          publish_job.get("needs") == "build" and not runs_build and "secrets." not in build_text, runs_build)
+    check("W15l the job holding the deploy key needs every other job and runs none of their work",
+          publish_job.get("needs") == ["check", "test", "build"] and not runs_build
+          and "secrets." not in before_text, (publish_job.get("needs"), runs_build))
+    # A job's size is its retry size: "Re-run failed jobs" repeats only the failed job and what needs it, so a
+    # failed test is re-run without rebuilding the XCFrameworks, and publish uploads the ones already built.
+    uploads = [step for step in build_job.get("steps") or []
+               if str(step.get("uses", "")).startswith("actions/upload-artifact")]
+    retention = int(((uploads or [{}])[0].get("with") or {}).get("retention-days") or 0)
+    check("W15u the suite and the XCFrameworks are separate jobs that each need only the check, and the built "
+          "files outlast a later re-run of the suite",
+          test_job.get("needs") == "check" and build_job.get("needs") == "check"
+          and any("xcodebuild test" in run for run in test_runs)
+          and not any("build_release_frameworks.sh" in run for run in test_runs)
+          and any("build_release_frameworks.sh" in run for run in build_runs)
+          and not any("xcodebuild test" in run for run in build_runs)
+          and retention >= 30,
+          (test_job.get("needs"), build_job.get("needs"), retention))
     # The publish job checks the reported version as data with the gate's own pattern, so the two cannot
     # accept different versions without this failing.
     gate_pattern = re.search(r'\[\[ "\$declared" =~ (\S+) \]\]', GATE_SCRIPT.read_text())
@@ -1436,7 +1461,7 @@ def test_workflows() -> None:
           and re.search(r'"false "\*\)\s*\n\s*echo "::error::release \$VERSION is already published"\s*\n\s*exit 1',
                         tag_run) is not None
           and 'if [ -z "$TAGGED" ]; then' in tag_run
-          and any('[ "$tagged" != "$COMMIT" ]' in run and "exit 1" in run for run in build_runs)
+          and any('[ "$tagged" != "$COMMIT" ]' in run and "exit 1" in run for run in check_runs)
           and any('[ "$tagged" != "$COMMIT" ]' in run and "exit 1" in run for run in publish_runs),
           tag_run[:120])
     check("W15e the release runs only when dispatched", set(triggers) == {"workflow_dispatch"}, sorted(triggers))
