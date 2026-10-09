@@ -13,7 +13,7 @@ These files aren't compiled as part of the Swift package build. Each is built by
 Flutter Xcode project, a .NET MAUI binding project, or a React Native host app.
 
 The Flutter, .NET MAUI and React Native examples create stored card and bank account payment methods. For
-capture, authorize and capture-authorized flows, use `PayabliSDKPayIn` from Swift.
+capture, authorize, capture-authorized and void flows, use `PayabliSDKPayIn` from Swift.
 
 Each bridge runs one session with one token callback: `configure` and `configurePayIn` both take a
 `tokenProvider`, and when a host calls both, the callback from the later successful call answers every token request.
