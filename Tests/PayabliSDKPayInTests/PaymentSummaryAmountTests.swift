@@ -42,6 +42,32 @@ final class PaymentSummaryAmountTests: XCTestCase {
         }
     }
 
+    // MARK: - A figure that cannot be sent empties every reader
+
+    private let unsendable = 1e40
+
+    func testTheAmountIsEmptyWhenAnotherFigureCannotBeSent() {
+        let surcharged = details(12.34, fee: 0.5, surcharge: unsendable)
+
+        XCTAssertNil(PayabliPayInSummaryRows.rowAmount(for: .amount, paymentDetails: surcharged))
+    }
+
+    func testTheFeeIsEmptyWhenAnotherFigureCannotBeSent() {
+        let surcharged = details(12.34, fee: 0.5, surcharge: unsendable)
+
+        XCTAssertNil(PayabliPayInSummaryRows.rowAmount(for: .serviceFee, paymentDetails: surcharged))
+    }
+
+    func testTheSurchargeIsEmptyWhenAnotherFigureCannotBeSent() {
+        let charged = details(unsendable, fee: 0.5, surcharge: 0.31)
+
+        XCTAssertNil(PayabliPayInSummaryRows.rowAmount(for: .surchargeFee, paymentDetails: charged))
+    }
+
+    func testTheTotalIsEmptyWhenTheSurchargeCannotBeSent() {
+        XCTAssertNil(PayabliPayInSummaryRows.totalRowAmount(paymentDetails: details(12.34, surcharge: unsendable)))
+    }
+
     func testANegativeFigureThatIsSentHasARow() {
         XCTAssertEqual(
             PayabliPayInSummaryRows.rowAmount(for: .surchargeFee, paymentDetails: details(12.34, surcharge: -0.31)),
