@@ -12,8 +12,7 @@ name: Release
 on:
   workflow_dispatch:
     inputs:
-      # Named rather than taken from main's head, so a merge landing between the decision and the dispatch
-      # is not what gets released.
+      # The commit that ships, so a merge landing between the decision and the dispatch is not released.
       commit:
         description: "Full 40-character SHA of the commit on main to release"
         required: true
@@ -58,7 +57,7 @@ jobs:
           state="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?head_sha=$COMMIT&branch=main&event=push&per_page=1" \
             --jq '.workflow_runs[0] // empty | "\(.status) \(.conclusion)"')"
           if [ "$state" != "completed success" ]; then
-            echo "::error::CI on main for $COMMIT is '${state:-not run}', not a completed success"
+            echo "::error::CI on main for $COMMIT is '${state:-not run}', not a completed success. Re-run it, then dispatch again."
             exit 1
           fi
 

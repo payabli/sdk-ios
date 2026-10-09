@@ -646,6 +646,35 @@ MUTATIONS = [
         RELEASE_YML, '"$previous..$COMMIT"', '"$previous..$GITHUB_SHA"', "W15s", "workflows",
     ),
     Mutation(
+        "one step queries CI for main's head through its own environment",
+        RELEASE_YML, "      - name: Require a passing CI run on main for this commit\n        env:\n",
+        "      - name: Require a passing CI run on main for this commit\n        env:\n          COMMIT: ${{ github.sha }}\n",
+        "W15q", "workflows",
+    ),
+    Mutation(
+        "the build tests and packages main's head after checking the named commit",
+        RELEASE_YML, "      - uses: ./.github/actions/ios-toolchain\n",
+        "      - name: Move to main\n        run: git checkout -q origin/main\n\n      - uses: ./.github/actions/ios-toolchain\n",
+        "W15q", "workflows",
+    ),
+    Mutation(
+        "a commit that is not on main only warns",
+        RELEASE_YML, "      - name: Check the commit is on main\n",
+        "      - name: Check the commit is on main\n        continue-on-error: true\n", "W15p", "workflows",
+    ),
+    Mutation(
+        "a command hides behind an echo and acts on main's head",
+        RELEASE_YML, '            echo "::error::tag $VERSION already names $tagged, not $COMMIT"\n            exit 1\n          fi\n\n      - uses:',
+        '            echo "::error::tag $VERSION already names $tagged, not $COMMIT"\n            exit 1\n          fi\n'
+        '          echo ok; git rev-parse "$GITHUB_SHA"\n\n      - uses:',
+        "W15s", "workflows",
+    ),
+    Mutation(
+        "the tag names main's head through an expression",
+        RELEASE_YML, "      COMMIT: ${{ needs.build.outputs.commit }}\n", "      COMMIT: ${{ github.sha }}\n",
+        "W15s", "workflows",
+    ),
+    Mutation(
         "the release's tag falls back to the default branch's head",
         RELEASE_YML, 'gh release create "$VERSION" --draft --target "$COMMIT"',
         'gh release create "$VERSION" --draft', "W15c", "workflows",

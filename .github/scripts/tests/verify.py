@@ -1329,9 +1329,8 @@ def test_workflows() -> None:
     check("W15 the release asks the gate for its version and tests before it tags",
           -1 not in (gate_at, test_at, tag_at) and gate_at < tag_at and test_at < tag_at, (gate_at, test_at, tag_at))
 
-    # The release names the commit it ships rather than taking main's head at the moment of the dispatch,
-    # so a merge landing between the decision and the click is not what gets released. Both jobs check
-    # the name with one pattern, the publish job as data.
+    # The release ships the commit its dispatch names, so a merge landing between the decision and the click
+    # is not released. Both jobs check the name with one pattern, the publish job as data.
     triggers = release.get("on", release.get(True)) or {}
     commit_input = ((triggers.get("workflow_dispatch") or {}).get("inputs") or {}).get("commit") or {}
     sha_check = r'\[\[ ! "\$COMMIT" =~ (\S+) \]\]'
@@ -1346,25 +1345,33 @@ def test_workflows() -> None:
     on_main_at = next((index for index, run in enumerate(runs)
                        if 'git merge-base "$COMMIT" origin/main' in run and '!= "$COMMIT"' in run
                        and re.search(r"\bexit [1-9]", run)), -1)
-    check("W15p a commit that is not on main is refused before its version is read",
-          on_main_at != -1 and on_main_at < gate_at, (on_main_at, gate_at))
+    continuing = [step.get("name") for step in release_steps if "continue-on-error" in step]
+    check("W15p a commit that is not on main is refused before its version is read, and no step continues "
+          "past a failure",
+          on_main_at != -1 and on_main_at < gate_at and not continuing, (on_main_at, gate_at, continuing))
     named = {"${{ inputs.commit }}", "${{ needs.build.outputs.commit }}"}
     release_checkouts = [step for step in release_steps if str(step.get("uses", "")).startswith("actions/checkout")]
     checkout_refs = [(step.get("with") or {}).get("ref") for step in release_checkouts]
+    # Set once per job, and the tree is never moved off it afterwards.
+    step_commits = [step.get("name") for step in release_steps if "COMMIT" in (step.get("env") or {})]
+    moves = [line.strip() for run in runs for line in run.splitlines()
+             if re.search(r"\bgit (checkout|switch|reset)\b", line)]
     check("W15q every job checks out and acts on the named commit",
           len(release_checkouts) == 2 and all(ref in named for ref in checkout_refs)
           and (build_job.get("outputs") or {}).get("commit") == "${{ inputs.commit }}"
           and (build_job.get("env") or {}).get("COMMIT") == "${{ inputs.commit }}"
-          and (publish_job.get("env") or {}).get("COMMIT") == "${{ needs.build.outputs.commit }}",
-          (checkout_refs, build_job.get("env"), publish_job.get("env")))
+          and (publish_job.get("env") or {}).get("COMMIT") == "${{ needs.build.outputs.commit }}"
+          and not step_commits and not moves,
+          (checkout_refs, build_job.get("env"), publish_job.get("env"), step_commits, moves))
     # The approval page shows the run, not the commit, so the run's summary is where the approver reads it.
     summary_run = next((run for run in build_runs if "$GITHUB_STEP_SUMMARY" in run), "")
     check("W15r the run summary names the commit and its subject line for the approver",
           "$COMMIT" in summary_run and 'git log -1 --format=%s "$COMMIT"' in summary_run, summary_run[:160])
-    # The run's own commit is main's head at the click. It may be shown, never acted on.
-    acted = [line.strip() for run in runs for line in run.splitlines()
-             if "GITHUB_SHA" in line and not line.strip().startswith("echo ")]
-    check("W15s nothing tags, targets, compares or logs the run's own commit", not acted, acted)
+    # The run's own commit is main's head at the click. The summary shows it, and nothing else names it.
+    own = [line.strip() for line in RELEASE_WORKFLOW.read_text().splitlines()
+           if re.search(r"GITHUB_SHA|github\.sha", line)]
+    check("W15s only the run summary names the run's own commit",
+          own == ['echo "The workflow runs from \\`$GITHUB_SHA\\` on main."'], own)
     check("W15b no input is interpolated into a script body",
           not any("inputs." in run for run in runs), [run[:80] for run in runs if "inputs." in run])
     tag_run = runs[tag_at] if tag_at != -1 else ""
