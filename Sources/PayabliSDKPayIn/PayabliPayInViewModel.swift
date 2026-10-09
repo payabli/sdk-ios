@@ -401,7 +401,7 @@ final class PayabliPayInViewModel: ObservableObject {
     }
 
     func paymentSummaryLabelText(for field: PayabliPayInField) -> String {
-        configuration.paymentSummary.labelText(
+        PayabliPayInSummaryRows.labelText(
             for: field,
             labels: configuration.labels
         )

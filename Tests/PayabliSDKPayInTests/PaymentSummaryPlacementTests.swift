@@ -28,7 +28,6 @@ final class PaymentSummaryPlacementTests: XCTestCase {
         PayInSummaryPlacement.place(
             sections,
             paymentDetails: paymentDetails,
-            summary: PayabliPayInPaymentSummaryConfiguration(),
             showsBaseAmount: showsBaseAmount
         )
     }

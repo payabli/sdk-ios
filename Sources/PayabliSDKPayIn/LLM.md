@@ -554,7 +554,7 @@ whenever it is not zero. The last `.summary` section listed places and titles th
 without one, a summary is added after the inputs. Rows are vertical. Labels are left aligned; values are right aligned.
 Relabel a money row through `PayabliPayInLabels.fieldLabels`, and the Total label
 through `PayabliPayInLabels.total`.
-A host that draws its own summary reads each row from the configuration. `labelText(for:labels:)` and `totalLabelText(labels:)` give the labels.
+A host that draws its own summary reads each row from `PayabliPayInSummaryRows`. `labelText(for:labels:)` and `totalLabelText(labels:)` give the labels.
 `rowAmount(for:paymentDetails:)` and `totalRowAmount(paymentDetails:)` give the figures as
 `Decimal?`, where nil means the form draws no row. Amount is the total amount less the service
 fee, and Total is the total amount plus any surcharge. `formattedAmount(_:currency:)` writes a

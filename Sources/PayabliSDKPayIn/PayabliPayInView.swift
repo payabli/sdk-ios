@@ -164,7 +164,6 @@ public struct PayabliPayInView: View {
         return PayInSummaryPlacement.place(
             sections,
             paymentDetails: charges ? component.requestConfiguration?.paymentDetails : nil,
-            summary: configuration.paymentSummary,
             showsBaseAmount: configuration.showsBaseAmount
         )
     }
@@ -389,16 +388,16 @@ public struct PayabliPayInView: View {
             VStack(alignment: .leading, spacing: summary.rowSpacing) {
                 ForEach(drawn.rows, id: \.field) { row in
                     summaryRow(
-                        label: summary.labelText(for: row.field, labels: configuration.labels),
-                        value: summary.formattedAmount(row.amount, currency: currency),
+                        label: PayabliPayInSummaryRows.labelText(for: row.field, labels: configuration.labels),
+                        value: PayabliPayInSummaryRows.formattedAmount(row.amount, currency: currency),
                         identifier: fieldIdentifier(row.field)
                     )
                 }
 
                 if let total = drawn.total {
                     summaryRow(
-                        label: summary.totalLabelText(labels: configuration.labels),
-                        value: summary.formattedAmount(total, currency: currency),
+                        label: PayabliPayInSummaryRows.totalLabelText(labels: configuration.labels),
+                        value: PayabliPayInSummaryRows.formattedAmount(total, currency: currency),
                         identifier: PayabliPayInAccessibility.totalIdentifier
                     )
                 }
