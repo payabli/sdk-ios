@@ -652,6 +652,10 @@ MUTATIONS = [
         RELEASE_YML, '            echo "> $(git log -1 --format=%s "$COMMIT")"\n', "", "W15r", "workflows",
     ),
     Mutation(
+        "the approver is shown the subject line and not the commit",
+        RELEASE_YML, '            echo "Releasing \\`$VERSION\\` from \\`$COMMIT\\`:"\n', "", "W15r", "workflows",
+    ),
+    Mutation(
         "the release notes are read up to main's head",
         RELEASE_YML, '"$previous..$COMMIT"', '"$previous..$GITHUB_SHA"', "W15s", "workflows",
     ),

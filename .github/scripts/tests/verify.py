@@ -1369,7 +1369,8 @@ def test_workflows() -> None:
     # The approval page shows the run, not the commit, so the run's summary is where the approver reads it.
     summary_run = next((run for run in build_runs if "$GITHUB_STEP_SUMMARY" in run), "")
     check("W15r the run summary names the commit and its subject line for the approver",
-          "$COMMIT" in summary_run and 'git log -1 --format=%s "$COMMIT"' in summary_run, summary_run[:160])
+          'echo "Releasing \\`$VERSION\\` from \\`$COMMIT\\`:"' in summary_run
+          and 'git log -1 --format=%s "$COMMIT"' in summary_run, summary_run[:160])
     # The run's own commit is main's head at the click. The summary shows it, and nothing else names it.
     own = [line.strip() for line in RELEASE_WORKFLOW.read_text().splitlines()
            if re.search(r"GITHUB_SHA|github\.sha", line)]
