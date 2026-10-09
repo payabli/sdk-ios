@@ -64,9 +64,8 @@ extension PayabliTTP {
 
         try await reinitialize()
 
-        guard sessionState == .ready else {
-            throw PayabliTTPError.notReady(current: sessionState)
-        }
+        let charge = try enterCharge()
+        defer { leaveCharge(charge) }
 
         // Match the trim/blank-to-nil semantics that `PayabliTTPCustomerData`
         // and `PayabliTTPInvoiceData` apply to their string fields, so a
@@ -93,7 +92,7 @@ extension PayabliTTP {
         )
 
         // Step 1 — backend mints the paymentTransId.
-        let paymentTransId = try await runInitiate(context: context)
+        let paymentTransId = try await runInitiate(context: context, charge: charge)
         progress.paymentTransId = paymentTransId
 
         // Step 2 — NFC tap.
@@ -110,34 +109,32 @@ extension PayabliTTP {
         // Set before the reader is asked, not after it answers: the processor can take the sale before the
         // answer arrives.
         progress.askedForCard = true
+        recordChargeActivity(.waitingForCard, for: charge)
         do {
             readResult = try await provider.startReading(readRequest)
         } catch {
             let failure = readFailure(error, paymentTransId: paymentTransId)
 
-            // A dead reader session is repaired only by re-initializing, and
-            // `reinitializeIfNeeded()` does nothing while the state says `.ready`.
-            //
-            // Only if the reader that failed is still the current one.
-            // `startReading` suspends, so an `initialize()` in that window can
-            // prepare a replacement and return to `.ready`, and expiring then
-            // would kill a healthy session over a dead one's failure.
+            // Best-effort backend notify so the transaction isn't left dangling.
+            // Its outcome does not change what the caller is told.
+            recordChargeActivity(.closing, for: charge)
+            _ = await tryUpdate(
+                paymentTransId: paymentTransId,
+                payload: .nfcFailure(description: String(describing: error))
+            )
+
+            // Expired after the close, so `closing` is published first. Only while the reader that failed is
+            // still the current one: an `initialize()` during the read can have replaced it.
             if generation == readerSessionGeneration,
                readerFailureInvalidatesSession(error),
                sessionManager.transition(to: .sessionExpired)
             {
                 syncPublished()
             }
-
-            // Best-effort backend notify so the transaction isn't left dangling.
-            // Its outcome does not change what the caller is told.
-            _ = await tryUpdate(
-                paymentTransId: paymentTransId,
-                payload: .nfcFailure(description: String(describing: error))
-            )
             throw failure
         }
 
+        recordChargeActivity(.closing, for: charge)
         return try await runSuccessUpdate(paymentTransId: paymentTransId, readResult: readResult)
     }
 
@@ -224,6 +221,25 @@ extension PayabliTTP {
 
     // MARK: - Charge helpers
 
+    /// Holds the reader for a new charge and names it, or throws when the session is not ready.
+    private func enterCharge() throws -> Int {
+        guard let charge = sessionManager.beginCharge() else {
+            throw PayabliTTPError.notReady(current: sessionState)
+        }
+        syncPublished()
+        return charge
+    }
+
+    private func leaveCharge(_ charge: Int) {
+        sessionManager.endCharge(charge)
+        syncPublished()
+    }
+
+    func recordChargeActivity(_ activity: TapToPayChargeActivity, for charge: Int) {
+        sessionManager.recordChargeActivity(activity, for: charge)
+        syncPublished()
+    }
+
     /// The case the reader raised, with the payment it opened. A failure the reader already classified is
     /// kept, and the charge adds its payment at the edge. Any other failure with no case of its own that can
     /// carry the payment is reported as `nfcFailed`.
@@ -248,12 +264,17 @@ extension PayabliTTP {
     /// `POST /MoneyIn/initiate`. Fails loudly if `deviceId` is missing —
     /// otherwise any later `PATCH /update/{id}` would 400 on a non-existent
     /// transaction.
-    private func runInitiate(context: TTPTransactionContext) async throws -> String {
+    private func runInitiate(context: TTPTransactionContext, charge: Int) async throws -> String {
         // Read at the point of use: the binding can be replaced between calls, and
         // a copy taken earlier names a device this request cannot sign for.
         guard let deviceId = try attestation.cachedDeviceId(for: entryPoint) else {
-            throw PayabliTTPError.initiateFailed(
-                reason: "Missing deviceId — run initialize() before charge()"
+            // Lands failed: ending ready would send every retry back to this line.
+            sessionManager.failCharge(.deviceSetupRequired, for: charge)
+            syncPublished()
+            throw TapToPayError(
+                type: .deviceSetupRequired,
+                reason: "This device has no stored registration; initialize again",
+                detail: nil
             )
         }
         return try await transactionClient.initiate(
