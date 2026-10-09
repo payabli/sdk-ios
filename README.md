@@ -362,7 +362,7 @@ changes nothing.
 
 Every request the SDK sends to Payabli carries an `X-Pyb-Client` header with the SDK version, the platform, the OS
 version, the device model, the locale and the device ID described under [Device identity](#device-identity).
-A value that's blank or isn't printable ASCII is left out. The header can't be turned off.
+A value that's missing, blank or isn't printable ASCII is left out. The header can't be turned off.
 
 ## Versioning and support
 
