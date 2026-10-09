@@ -266,10 +266,10 @@ From Objective-C, these errors arrive as `NSError`. See
 
 | `failureReason` | What to do |
 |---|---|
-| `.configurationRejected` | The paypoint, the device or its setup is missing something. Retrying won't help; contact Payabli. A token, network or service failure while fetching the configuration lands on `.serviceUnavailable` instead. |
-| `.deviceSetupRequired` | This device must be set up again: its setup was refused or revoked. Check the entitlements, then initialize again. |
-| `.serviceUnavailable` | The service or the reader wasn't available. Try again later. |
-| `.deviceIneligible` | This iPhone or iOS version can't take Tap to Pay payments, or the card reader refused it. If an iPhone that meets the requirements lands here, contact Payabli before replacing it. |
+| `.configurationRejected` | The paypoint, the app, the device or its setup is missing something, such as the app's Keychain entitlement. Retrying won't help; contact Payabli. A token, network or service failure while fetching the configuration lands on `.serviceUnavailable` instead. |
+| `.deviceSetupRequired` | This device must be set up again: its setup was refused or revoked, its registration was replaced, or its key is gone. Check the entitlements, then initialize again. |
+| `.serviceUnavailable` | The service, Apple's attestation service or the reader wasn't available. Try again later. |
+| `.deviceIneligible` | This iPhone or iOS version can't take Tap to Pay payments, the card reader refused it, or the app has no bundle identifier. If an iPhone that meets the requirements lands here, contact Payabli before replacing it. |
 | `.sdkInternalError` | Report it to Payabli. |
 | `.deviceKeyUnavailable` | This device's secure storage is unavailable, for example before the first unlock after a restart. Initialize again; if it persists, the device is the cause. |
 
