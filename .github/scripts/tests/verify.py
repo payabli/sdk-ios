@@ -1328,6 +1328,9 @@ def test_workflows() -> None:
     test_at, tag_at = first("xcodebuild test"), first("gh release create")
     check("W15 the release asks the gate for its version and tests before it tags",
           -1 not in (gate_at, test_at, tag_at) and gate_at < tag_at and test_at < tag_at, (gate_at, test_at, tag_at))
+    newer_at = first('release-newer.sh "$VERSION"')
+    check("W15t a version below the newest release is refused after the version is read and before any test",
+          newer_at != -1 and gate_at < newer_at < test_at, (gate_at, newer_at, test_at))
 
     # The release ships the commit its dispatch names, so a merge landing between the decision and the click
     # is not released. Both jobs check the name with one pattern, the publish job as data.
@@ -1541,6 +1544,33 @@ def run_gate(args: list[str], tmp: Path, *, declarations: list[str] | None = Non
     return result.returncode, result.stdout, result.stderr
 
 
+def run_newer(args: list[str], tmp: Path, tags: list[str] | None) -> tuple[int, str, str]:
+    """Run the real ordering check in a synthetic repository holding `tags`, or outside any repository."""
+    root = tmp / "newer"
+    if root.exists():
+        shutil.rmtree(root)
+    root.mkdir()
+    # No global or system configuration, so a developer's signing or tagging settings cannot change the fixture.
+    isolated = {**os.environ, "GIT_CONFIG_GLOBAL": os.devnull, "GIT_CONFIG_NOSYSTEM": "1",
+                "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t", "GIT_COMMITTER_NAME": "t",
+                "GIT_COMMITTER_EMAIL": "t@t"}
+    if tags is not None:
+        commands = [["init", "-q"], ["commit", "-q", "--allow-empty", "-m", "one"]]
+        commands += [["tag", "-a", tag, "-m", tag] for tag in tags]
+        for command in commands:
+            subprocess.run(["git", *command], cwd=root, check=True, capture_output=True, timeout=60, env=isolated)
+    try:
+        result = subprocess.run(
+            [str(REPO_ROOT / ".github" / "scripts" / "release-newer.sh"), *args],
+            cwd=root, capture_output=True, text=True, timeout=60, check=False,
+            env={**os.environ, "GIT_CEILING_DIRECTORIES": str(tmp)},
+        )
+    except OSError as error:
+        # Reported as a result, so a missing or unrunnable script fails each check rather than ending the run.
+        return 127, "", str(error)
+    return result.returncode, result.stdout, result.stderr
+
+
 def test_release() -> None:
     main_ref = "refs/heads/main"
     branch_ref = "refs/heads/feature/something"
@@ -1605,6 +1635,35 @@ def test_release() -> None:
         code, out, err = run_gate([main_ref], root, root=REPO_ROOT)
         check("R8 the gate reads the version the real source declares",
               code == 0 and re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+\n", out) is not None, (code, out, err[:200]))
+
+        # A version lower than the newest release would be published after it, so it is refused. Equal
+        # passes, because the existing-tag check decides whether that tag is this release resumed.
+        for label, tags, version, accepted in (
+            ("R9 a first release is accepted", [], "0.1.0", True),
+            ("R9b a version above the newest release is accepted", ["0.1.0", "0.2.0"], "0.2.1", True),
+            ("R9c the newest release's own version is accepted", ["0.1.0", "0.2.0"], "0.2.0", True),
+            ("R9d a version below the newest release is refused", ["1.1.0", "1.2.0"], "1.1.5", False),
+            ("R9e components compare as numbers, not text", ["1.9.0"], "1.10.0", True),
+            ("R9f a lower minor version is refused whatever its patch", ["1.10.0"], "1.9.9", False),
+            ("R9g a lower patch version is refused", ["1.2.3"], "1.2.2", False),
+            ("R9h a lower major version is refused whatever follows it", ["2.0.0"], "1.99.99", False),
+            ("R9i a tag that is not a release is not compared", ["9.0.0-rc1", "v9.0.0", "nightly"], "1.0.0", True),
+            ("R9m a tag with a leading zero is not a release", ["010.0.0"], "1.0.0", True),
+        ):
+            code, out, err = run_newer([version], root, tags)
+            if accepted:
+                check(label, code == 0, (code, out, err[:200]))
+            else:
+                check(label, code == 1 and max(tags, key=lambda t: [int(p) for p in t.split(".")]) in err,
+                      (code, out, err[:200]))
+
+        code, out, err = run_newer(["0.1.0"], root, None)
+        check("R9j outside a repository it refuses rather than finding no releases", code != 0, (code, out, err[:200]))
+        code, out, err = run_newer(["1.2"], root, [])
+        check("R9k a version that is not major.minor.patch is refused",
+              code == 1 and "not <major>.<minor>.<patch>" in err, (code, out, err[:200]))
+        code, out, _ = run_newer([], root, [])
+        check("R9l no argument exits 2", code == 2, (code, out))
 
 def main() -> int:
     if ONLY not in HALVES:

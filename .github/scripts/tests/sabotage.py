@@ -44,6 +44,7 @@ COPIED = (
     ".github/workflows/nightly-report.yml",
     ".github/hardware-only-tests.txt",
     ".github/scripts/release-version.sh",
+    ".github/scripts/release-newer.sh",
     "Sources/PayabliSDKCore/PayabliSDKCore.swift",
 )
 
@@ -57,6 +58,7 @@ SLACK = ".github/scripts/nightly_slack.py"
 NIGHTLY = ".github/workflows/nightly.yml"
 SCRIPTS_YML = ".github/workflows/scripts.yml"
 GATE = ".github/scripts/release-version.sh"
+NEWER = ".github/scripts/release-newer.sh"
 VERSION_SOURCE = "Sources/PayabliSDKCore/PayabliSDKCore.swift"
 
 
@@ -611,6 +613,40 @@ MUTATIONS = [
         RELEASE_YML, "head_sha=$COMMIT&branch=main&event=push&", "head_sha=$COMMIT&", "W15h", "workflows",
     ),
     Mutation(
+        "the release no longer refuses a version below the newest release",
+        RELEASE_YML, '      - name: Check the version is not below the newest release\n        run: .github/scripts/release-newer.sh "$VERSION"\n\n',
+        "", "W15t", "workflows",
+    ),
+    Mutation(
+        "a version below the newest release passes the ordering check",
+        NEWER, 'if [ -n "$newest" ] && lower "$version" "$newest"; then', "if false; then", "R9d", "release",
+    ),
+    Mutation(
+        "the newest release's own version is refused",
+        NEWER, "a3 < b3", "a3 <= b3", "R9c", "release",
+    ),
+    Mutation(
+        "a lower minor version passes when its patch is higher",
+        NEWER, "(a2 < b2 ||", "(a2 > b2 ||", "R9f", "release",
+    ),
+    Mutation(
+        "a tag that is not a release is compared",
+        NEWER, '    [[ "$tag" =~ $release ]] || continue\n', "", "R9i", "release",
+    ),
+    Mutation(
+        "a tag with a leading zero is read as a release",
+        NEWER, "release='^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$'",
+        "release='^([0-9]+)\\.([0-9]+)\\.([0-9]+)$'", "R9m", "release",
+    ),
+    Mutation(
+        "a failure to list the tags reads as no releases",
+        NEWER, 'tags="$(git tag --list)"', 'tags="$(git tag --list || true)"', "R9j", "release",
+    ),
+    Mutation(
+        "the ordering check takes its newest release from the first tag listed",
+        NEWER, '    if [ -z "$newest" ] || lower "$newest" "$tag"; then', '    if [ -z "$newest" ]; then', "R9d", "release",
+    ),
+    Mutation(
         "the release takes main's head when no commit is named",
         RELEASE_YML, "        required: true\n        type: string\n", "        required: false\n        type: string\n",
         "W15o", "workflows",
@@ -678,9 +714,9 @@ MUTATIONS = [
     ),
     Mutation(
         "a command hides behind an echo and acts on main's head",
-        RELEASE_YML, '            echo "::error::tag $VERSION already names $tagged, not $COMMIT"\n            exit 1\n          fi\n\n      - uses:',
+        RELEASE_YML, '            echo "::error::tag $VERSION already names $tagged, not $COMMIT"\n            exit 1\n          fi\n\n      # A version below',
         '            echo "::error::tag $VERSION already names $tagged, not $COMMIT"\n            exit 1\n          fi\n'
-        '          echo ok; git rev-parse "$GITHUB_SHA"\n\n      - uses:',
+        '          echo ok; git rev-parse "$GITHUB_SHA"\n\n      # A version below',
         "W15s", "workflows",
     ),
     Mutation(

@@ -51,7 +51,9 @@ gone: the set changes, and a number written here is wrong by the next round.
 against this tree. `release.yml` tags only what it prints, and a tag is what a consumer
 resolves the package by, so a wrong answer publishes a version that cannot be withdrawn from anyone who
 already resolved it. The run against this tree asserts only the shape of what it prints, so it proves the
-gate reads the declaration as it is written without moving when the version is bumped.
+gate reads the declaration as it is written without moving when the version is bumped. They also run
+`release-newer.sh` in synthetic repositories holding release tags, because a version below the newest
+release would be published after it.
 
 **Workflow checks (`W*`)** parse the workflows and assert what the files have to be:
 which triggers the nightly may carry, that exactly one job names the Slack token, how the liveness owner is

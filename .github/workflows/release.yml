@@ -101,6 +101,10 @@ jobs:
             exit 1
           fi
 
+      # A version below the newest release would be published after it.
+      - name: Check the version is not below the newest release
+        run: .github/scripts/release-newer.sh "$VERSION"
+
       - uses: ./.github/actions/ios-toolchain
 
       - name: Install xcpretty
