@@ -556,8 +556,8 @@ Relabel a money row through `PayabliPayInLabels.fieldLabels`, and the Total labe
 through `PayabliPayInLabels.total`.
 A host that draws its own summary reads each row from `PayabliPayInSummaryRows`. `labelText(for:labels:)` and `totalLabelText(labels:)` give the labels.
 `rowAmount(for:paymentDetails:)` and `totalRowAmount(paymentDetails:)` give the figures as
-`Decimal?`, where nil means the form draws no row. When any figure on the payment cannot be
-sent, every figure is nil and the form draws no summary. Amount is the total amount less the service
+`Decimal?`, where nil means the form draws no row. When submit would refuse the payment, every
+figure is nil and the form draws no summary. Amount is the total amount less the service
 fee, and Total is the total amount plus any surcharge. `formattedAmount(_:currency:)` writes a
 figure the way the form does.
 

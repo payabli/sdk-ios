@@ -16,9 +16,9 @@ public enum PayabliPayInSummaryRows {
     /// The figure a money row shows, at the two places it is sent, or nil when the form draws no row for it.
     ///
     /// Amount is the total amount less the service fee, and has a figure only while a fee or a surcharge sits
-    /// beside it. Every row is nil while any figure on the payment cannot be sent.
+    /// beside it. Every row is nil while submit would refuse the payment.
     public static func rowAmount(for field: PayabliPayInField, paymentDetails: PayabliPayInPaymentDetails?) -> Decimal? {
-        guard let paymentDetails, isSendable(paymentDetails) else { return nil }
+        guard let paymentDetails, isSubmittable(paymentDetails) else { return nil }
         let fee = PayInAmount.shown(paymentDetails.serviceFee)
         let surcharge = PayInAmount.shown(paymentDetails.surchargeFee)
         switch field {
@@ -37,10 +37,10 @@ public enum PayabliPayInSummaryRows {
         }
     }
 
-    /// What the service charges, the total amount plus any surcharge, or nil when that is nothing or when any
-    /// figure on the payment cannot be sent.
+    /// What the service charges, the total amount plus any surcharge, or nil when that is nothing or when submit
+    /// would refuse the payment.
     public static func totalRowAmount(paymentDetails: PayabliPayInPaymentDetails?) -> Decimal? {
-        guard let paymentDetails, isSendable(paymentDetails),
+        guard let paymentDetails, isSubmittable(paymentDetails),
               let charge = PayInAmount.shown(paymentDetails.totalAmount)
         else { return nil }
         let total = charge + (PayInAmount.shown(paymentDetails.surchargeFee) ?? 0)
@@ -73,10 +73,8 @@ public enum PayabliPayInSummaryRows {
         return formatter.string(from: NSDecimalNumber(decimal: sent)) ?? "\(sent)"
     }
 
-    private static func isSendable(_ paymentDetails: PayabliPayInPaymentDetails) -> Bool {
-        [paymentDetails.totalAmount, paymentDetails.serviceFee, paymentDetails.surchargeFee]
-            .compactMap { $0 }
-            .allSatisfy { PayInAmount.sendable($0) != nil }
+    private static func isSubmittable(_ paymentDetails: PayabliPayInPaymentDetails) -> Bool {
+        (try? paymentDetails.validate()) != nil
     }
 
     private static let isoCurrencyCodes = Set(Locale.Currency.isoCurrencies.map(\.identifier))

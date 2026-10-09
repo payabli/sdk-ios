@@ -68,6 +68,37 @@ final class PaymentSummaryAmountTests: XCTestCase {
         XCTAssertNil(PayabliPayInSummaryRows.totalRowAmount(paymentDetails: details(12.34, surcharge: unsendable)))
     }
 
+    // MARK: - A payment submit refuses empties every reader
+
+    private func assertEveryFigureIsEmpty(
+        _ paymentDetails: PayabliPayInPaymentDetails,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        for field in [PayabliPayInField.amount, .serviceFee, .surchargeFee] {
+            XCTAssertNil(
+                PayabliPayInSummaryRows.rowAmount(for: field, paymentDetails: paymentDetails),
+                "\(field)",
+                file: file,
+                line: line
+            )
+        }
+        XCTAssertNil(PayabliPayInSummaryRows.totalRowAmount(paymentDetails: paymentDetails), file: file, line: line)
+    }
+
+    func testANegativeServiceFeeEmptiesEveryFigure() {
+        assertEveryFigureIsEmpty(details(12.34, fee: -0.5, surcharge: 0.31))
+    }
+
+    func testATotalOfZeroOrLessEmptiesEveryFigure() {
+        assertEveryFigureIsEmpty(details(-5, fee: 0.5, surcharge: 1))
+        assertEveryFigureIsEmpty(details(0, fee: 0.5, surcharge: 1))
+    }
+
+    func testATotalSentAsZeroEmptiesEveryFigure() {
+        assertEveryFigureIsEmpty(details(0.001, fee: 0.5, surcharge: 0.31))
+    }
+
     func testANegativeFigureThatIsSentHasARow() {
         XCTAssertEqual(
             PayabliPayInSummaryRows.rowAmount(for: .surchargeFee, paymentDetails: details(12.34, surcharge: -0.31)),
