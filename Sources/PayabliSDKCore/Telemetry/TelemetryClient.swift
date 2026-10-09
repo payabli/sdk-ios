@@ -56,8 +56,7 @@ public actor TelemetryClient {
         self.sessionId = sessionId
     }
 
-    /// Hash a raw device identifier (SHA-256) before storing. Never log the raw
-    /// value (NFR-20).
+    /// Hash a raw device identifier (SHA-256) before storing. Never log the raw value.
     public func setDeviceId(_ rawId: String) {
         let digest = SHA256.hash(data: Data(rawId.utf8))
         deviceIdHash = digest.map { String(format: "%02x", $0) }.joined()

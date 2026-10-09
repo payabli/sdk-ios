@@ -5,8 +5,8 @@ import PayabliSDKCore
 /// instance to receive SDK telemetry events.
 ///
 /// Same motivation as `PayabliSentryBridge` — keeps `posthog-ios` out of the
-/// SDK's SPM graph (NFR-26). The host app constructs a `PostHogSDK` with
-/// `sessionReplay = false` (NFR-24) and forwards capture calls into it.
+/// SDK's SPM graph. The host app constructs a `PostHogSDK` with
+/// `sessionReplay = false` and forwards capture calls into it.
 ///
 /// ```swift
 /// struct HostPostHogBridge: PayabliPostHogBridge {

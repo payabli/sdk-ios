@@ -176,7 +176,7 @@ package final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
             let newReader: ReaderSetup = try injected.map { try $0(creds) }
                 ?? buildReader(credentials: creds)
 
-            // Credentials now live inside `newReader`, so this copy is dropped (NFR-5D).
+            // Credentials now live inside `newReader`, so this copy is dropped: they're held at runtime only.
             lock.withLock {
                 preparedReader = newReader
                 credentials = nil

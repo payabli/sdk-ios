@@ -29,7 +29,7 @@ package actor TelemetryEndpointTransport: TelemetryTransport {
                 PayabliRequest.json(method: .post, path: path, jsonBody: batch)
             )
         } catch {
-            // NFR-19: best-effort — swallow.
+            // Best-effort: a failed send is swallowed.
             logger.warning("Telemetry batch send failed (best-effort)")
         }
     }

@@ -33,7 +33,7 @@ public protocol PayabliSentryBridge: Sendable {
 }
 
 /// Routes telemetry events to a host-supplied Sentry bridge.
-/// Failures are swallowed (NFR-19).
+/// Failures are swallowed.
 public final class SentryTelemetryTransport: TelemetryTransport, @unchecked Sendable {
     private let bridge: PayabliSentryBridge
 

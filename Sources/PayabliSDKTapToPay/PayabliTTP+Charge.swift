@@ -15,7 +15,7 @@ private enum TTPUpdateOutcome {
 
 @MainActor
 extension PayabliTTP {
-    /// Charge a transaction. v1.0 supports `.sale` only (FR-11D.1).
+    /// Charge a transaction. `.sale` is the only type.
     ///
     /// Threads the `paymentDetails` / `customer` / `invoice` / `orderDescription`
     /// snapshot through the 3-step flow:
@@ -287,10 +287,8 @@ extension PayabliTTP {
         )
     }
 
-    /// Runs `PATCH /update/{paymentTransId}` with retry. Bearer auth and
-    /// 401 refresh-and-retry are delegated to `session.transport`
-    /// (FR-11D.5). Returns a typed outcome so callers don't have to guess
-    /// at `Bool` semantics.
+    /// Runs `PATCH /update/{paymentTransId}` with retry; bearer auth and 401 refresh-and-retry are
+    /// `session.transport`'s. Returns a typed outcome rather than a `Bool`.
     private func tryUpdate(
         paymentTransId: String,
         payload: TTPUpdatePayload
