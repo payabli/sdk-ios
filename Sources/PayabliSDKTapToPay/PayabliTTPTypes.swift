@@ -1,6 +1,6 @@
 import Foundation
 
-/// The session lifecycle for Tap to Pay (PRD §17).
+/// The session lifecycle for Tap to Pay.
 ///
 /// A Swift enum rather than an `@objc` one, because some cases carry a value an
 /// `Int`-backed enum cannot hold. ``PayabliTTPSessionStateCode`` is the
@@ -103,7 +103,7 @@ public extension PayabliTTPSessionState {
     }
 }
 
-/// TTP transaction type. v1.0 supports `.sale` only (PRD FR-11D.1).
+/// The transaction type. `.sale` is the only one.
 @objc public enum PayabliTTPPaymentType: Int, Sendable {
     case sale = 0
 }
