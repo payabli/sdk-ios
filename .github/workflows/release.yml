@@ -132,6 +132,8 @@ jobs:
           persist-credentials: false
 
       - uses: ./.github/actions/ios-toolchain
+        with:
+          xcode: default
 
       - name: Install xcpretty
         run: gem install xcpretty --no-document
@@ -165,7 +167,7 @@ jobs:
   build:
     name: Build the release
     needs: check
-    # The XCFramework build needs the Xcode this image ships; the test job runs
+    # The XCFramework build needs this image's default Xcode; the test job runs
     # on the same image so a release is gated on the Xcode it builds with.
     runs-on: xcode-27
     permissions:
@@ -181,6 +183,8 @@ jobs:
           persist-credentials: false
 
       - uses: ./.github/actions/ios-toolchain
+        with:
+          xcode: default
 
       - name: Build the XCFrameworks
         timeout-minutes: 45

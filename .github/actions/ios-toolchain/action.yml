@@ -2,18 +2,34 @@ name: iOS toolchain
 description: Selects Xcode and a simulator, and resolves the package graph.
 
 # The test jobs run in parallel and each needs the same four steps. A composite
-# action keeps the Xcode selection and the simulator lookup written once, so the
-# jobs cannot drift onto different runtimes and disagree about a failure.
+# action keeps the Xcode selection and the simulator lookup written once, so
+# the jobs cannot drift onto different runtimes and disagree about a failure.
+#
+# `newest` selects the newest Xcode by name, which on an image that carries a
+# beta names the beta. `default` selects the image's default Xcode, its newest
+# release one, and a job that builds what the repository ships takes it.
+
+inputs:
+  xcode:
+    description: "newest by name, or default for the image's default Xcode"
+    required: false
+    default: "newest"
 
 runs:
   using: composite
   steps:
-    - name: Select latest Xcode
+    - name: Select Xcode
       shell: bash
+      env:
+        XCODE: ${{ inputs.xcode }}
       run: |
-        XCODE=$(ls /Applications | grep -E '^Xcode_[0-9]' | sort -V | tail -1)
-        sudo xcode-select -s "/Applications/$XCODE/Contents/Developer"
-        echo "Using $XCODE"
+        if [ "$XCODE" = "default" ]; then
+          selected="Xcode.app"
+        else
+          selected="$(ls /Applications | grep -E '^Xcode_[0-9]' | sort -V | tail -1)"
+        fi
+        sudo xcode-select -s "/Applications/$selected/Contents/Developer"
+        echo "Using $selected"
         xcodebuild -version
         swift --version
 

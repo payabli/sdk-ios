@@ -45,7 +45,7 @@ env:
 jobs:
   nightly:
     name: Suites and builds
-    # The release XCFramework build below needs the Xcode this image ships, and
+    # The release XCFramework build below needs this image's default Xcode, and
     # the suites share the job that builds it.
     runs-on: xcode-27
     # A backstop above the sum of the step bounds below, not a bound on the expected run. If it sits near
@@ -65,6 +65,8 @@ jobs:
           persist-credentials: false
 
       - uses: ./.github/actions/ios-toolchain
+        with:
+          xcode: default
 
       # Every suite and build below carries `continue-on-error: true` and an id. One red step must not hide
       # the rest, and the gate at the end reads all of them. `continue-on-error` is what makes that work:
