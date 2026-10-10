@@ -120,7 +120,7 @@ jobs:
     needs: check
     # The same image as the build job, so the release is tested on the Xcode it
     # builds its XCFrameworks with.
-    runs-on: macos-26
+    runs-on: xcode-27
     permissions:
       contents: read
 
@@ -167,7 +167,7 @@ jobs:
     needs: check
     # The XCFramework build needs the Xcode this image ships; the test job runs
     # on the same image so a release is gated on the Xcode it builds with.
-    runs-on: macos-26
+    runs-on: xcode-27
     permissions:
       contents: read
     env:

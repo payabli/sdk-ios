@@ -47,7 +47,7 @@ jobs:
     name: Suites and builds
     # The release XCFramework build below needs the Xcode this image ships, and
     # the suites share the job that builds it.
-    runs-on: macos-26
+    runs-on: xcode-27
     # A backstop above the sum of the step bounds below, not a bound on the expected run. If it sits near
     # that sum, steps running near their own limits let the job time out first, which takes the collect step
     # and the suite gate with it. Raise it whenever a step bound goes up.
