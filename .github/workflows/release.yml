@@ -19,9 +19,8 @@ on:
         required: true
         type: string
       release_notes:
-        description: "Release notes (markdown)"
-        required: false
-        default: ""
+        description: "Release notes (markdown), published as the release body"
+        required: true
 
 concurrency:
   group: release
@@ -119,7 +118,9 @@ jobs:
   test:
     name: Test the release
     needs: check
-    runs-on: macos-15
+    # The same image as the build job, so the release is tested on the Xcode it
+    # builds its XCFrameworks with.
+    runs-on: macos-26
     permissions:
       contents: read
 
@@ -164,7 +165,9 @@ jobs:
   build:
     name: Build the release
     needs: check
-    runs-on: macos-15
+    # The XCFramework build needs the Xcode this image ships; the test job runs
+    # on the same image so a release is gated on the Xcode it builds with.
+    runs-on: macos-26
     permissions:
       contents: read
     env:
@@ -279,18 +282,13 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           RELEASE_DEPLOY_KEY: ${{ secrets.RELEASE_DEPLOY_KEY }}
         run: |
-          previous="$(git tag --list '[0-9]*' --sort=-version:refname | grep -vx -- "$VERSION" | head -n 1 || true)"
-          {
-            if [ -n "$RELEASE_NOTES" ]; then
-              printf '%s\n\n' "$RELEASE_NOTES"
-            fi
-            echo "## Changes since ${previous:-the first commit}"
-            if [ -n "$previous" ]; then
-              git log -n 50 --pretty=format:"- %s" "$previous..$COMMIT"
-            else
-              git log -n 50 --pretty=format:"- %s" "$COMMIT"
-            fi
-          } > release-notes.md
+          # Notes are written for the release, because commit subjects carry
+          # tracker references no release page should name.
+          if [ -z "$RELEASE_NOTES" ]; then
+            echo "::error::release_notes is empty, and a release is published with notes written for it"
+            exit 1
+          fi
+          printf '%s\n' "$RELEASE_NOTES" > release-notes.md
           bundle="build/release/payabli-ios-sdk-$VERSION.zip"
           if [ ! -f "$bundle" ]; then
             echo "::error::no $bundle"
