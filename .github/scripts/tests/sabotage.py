@@ -773,6 +773,15 @@ MUTATIONS = [
         "W15w", "workflows",
     ),
     Mutation(
+        "a resumed draft publishes the notes it was created with",
+        RELEASE_YML,
+        '              # The draft carries the notes this run wrote, whichever attempt created it.\n'
+        '              gh release edit "$VERSION" --notes-file release-notes.md\n'
+        '              gh release upload "$VERSION" --clobber "${assets[@]}"\n',
+        '              gh release upload "$VERSION" --clobber "${assets[@]}"\n',
+        "W15w", "workflows",
+    ),
+    Mutation(
         "one step queries CI for main's head through its own environment",
         RELEASE_YML, "      - name: Require a passing CI run on main for this commit\n        env:\n",
         "      - name: Require a passing CI run on main for this commit\n        env:\n          COMMIT: ${{ github.sha }}\n",

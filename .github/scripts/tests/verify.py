@@ -1415,6 +1415,7 @@ def test_workflows() -> None:
     check("W15w the release notes are the dispatch input, and an empty one is refused",
           any(notes_lines[at:at + len(notes_refusal)] == notes_refusal for at in range(len(notes_lines)))
           and '--notes-file release-notes.md' in tag_run
+          and 'gh release edit "$VERSION" --notes-file release-notes.md' in tag_run
           and notes_input.get("required") is True
           and not any('git log' in run for run in publish_runs),
           tag_run[:200])

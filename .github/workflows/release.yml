@@ -316,6 +316,8 @@ jobs:
                 --title "Payabli iOS SDK $VERSION" --notes-file release-notes.md "${assets[@]}"
               ;;
             "true $COMMIT")
+              # The draft carries the notes this run wrote, whichever attempt created it.
+              gh release edit "$VERSION" --notes-file release-notes.md
               gh release upload "$VERSION" --clobber "${assets[@]}"
               ;;
             "false "*)
