@@ -23,11 +23,14 @@ runs:
       env:
         XCODE: ${{ inputs.xcode }}
       run: |
-        if [ "$XCODE" = "default" ]; then
-          selected="Xcode.app"
-        else
-          selected="$(ls /Applications | grep -E '^Xcode_[0-9]' | sort -V | tail -1)"
-        fi
+        case "$XCODE" in
+          default) selected="Xcode.app" ;;
+          newest) selected="$(ls /Applications | grep -E '^Xcode_[0-9]' | sort -V | tail -1)" ;;
+          *)
+            echo "::error::the xcode input is '$XCODE'; it names newest or default"
+            exit 1
+            ;;
+        esac
         sudo xcode-select -s "/Applications/$selected/Contents/Developer"
         echo "Using $selected"
         xcodebuild -version
