@@ -1378,7 +1378,7 @@ def test_workflows() -> None:
     step_commits = [step.get("name") for step in release_steps if "COMMIT" in (step.get("env") or {})]
     moves = [line.strip() for run in runs for line in run.splitlines()
              if re.search(r"\bgit (checkout|switch|reset)\b", line)]
-    # All of history: the on-main check reads origin/main, and the resume checks and the notes read the tags.
+    # All of history: the on-main check reads origin/main, and the resume checks read the tags.
     depths = [((checkouts_by_job.get(name) or [{}])[0].get("with") or {}).get("fetch-depth")
               for name in ("check", "publish")]
     check("W15q every job checks out and acts on the named commit",
@@ -1401,7 +1401,25 @@ def test_workflows() -> None:
     check("W15b no input is interpolated into a script body",
           not any("inputs." in run for run in runs), [run[:80] for run in runs if "inputs." in run])
     tag_run = runs[tag_at] if tag_at != -1 else ""
-    # On the command that creates the tag, not anywhere in the step: the notes name the same commit.
+    # The release page is public, so its body is the dispatch input and nothing else: no commit
+    # subject reaches it, and an empty input refuses the run.
+    notes_refusal = [
+        'if [ -z "$RELEASE_NOTES" ]; then',
+        'echo "::error::release_notes is empty, and a release is published with notes written for it"',
+        'exit 1',
+        'fi',
+        "printf '%s\\n' \"$RELEASE_NOTES\" > release-notes.md",
+    ]
+    notes_lines = [line.strip() for line in tag_run.splitlines() if line.strip()]
+    notes_input = ((triggers.get("workflow_dispatch") or {}).get("inputs") or {}).get("release_notes") or {}
+    check("W15w the release notes are the dispatch input, and an empty one is refused",
+          any(notes_lines[at:at + len(notes_refusal)] == notes_refusal for at in range(len(notes_lines)))
+          and '--notes-file release-notes.md' in tag_run
+          and notes_input.get("required") is True
+          and not any('git log' in run for run in publish_runs),
+          tag_run[:200])
+    # On the command that creates the tag, not anywhere in the step: the release targets the commit
+    # the suite tested.
     check("W15c the release tags the commit that was tested",
           re.search(r'gh release create "\$VERSION" --draft --target "\$COMMIT"', tag_run) is not None
           and re.search(r'git tag -a "\$VERSION" -m "[^"]*" "\$COMMIT"', tag_run) is not None, tag_run[:200])
