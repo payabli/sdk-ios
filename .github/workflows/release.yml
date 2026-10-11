@@ -131,7 +131,9 @@ jobs:
           ref: ${{ needs.check.outputs.commit }}
           persist-credentials: false
 
-      - uses: ./.github/actions/ios-toolchain
+      # The running commit, so the target checkout's older action copy is not
+      # the one this job runs.
+      - uses: $/.github/actions/ios-toolchain
         with:
           xcode: default
 
@@ -182,7 +184,9 @@ jobs:
           ref: ${{ needs.check.outputs.commit }}
           persist-credentials: false
 
-      - uses: ./.github/actions/ios-toolchain
+      # The running commit, so the target checkout's older action copy is not
+      # the one this job runs.
+      - uses: $/.github/actions/ios-toolchain
         with:
           xcode: default
 
