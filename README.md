@@ -49,18 +49,19 @@ token in memory while the session runs.
 
 ### Add the SDK
 
-Add the package with Swift Package Manager from version `0.1.0`. In Xcode, choose
+Add the package with Swift Package Manager at the latest version. In Xcode, choose
 **File > Add Package Dependencies**, enter the repository URL, and choose the **Up to Next Major Version**
-rule from `0.1.0`:
+rule, which starts at the latest version:
 
 ```text
 https://github.com/payabli/sdk-ios.git
 ```
 
-Or declare it in `Package.swift`:
+Or declare it in `Package.swift`, with the latest version from the
+[Releases](https://github.com/payabli/sdk-ios/releases) page:
 
 ```swift
-.package(url: "https://github.com/payabli/sdk-ios.git", from: "0.1.0")
+.package(url: "https://github.com/payabli/sdk-ios.git", from: "<latest version>")
 ```
 
 To build changes that aren't released yet, track the `main` branch instead, with Xcode's **Branch** rule
@@ -367,11 +368,11 @@ A value that's missing, blank or isn't printable ASCII is left out. The header c
 > **Notice:** The Payabli iOS SDK is in beta. Until a stable version is released, expect changes to the public
 > interface that aren't backward compatible, and read the release notes before you update.
 
-- **The current version is `0.1.0`.** Depend on it as [Installation](#installation) describes. Each
-  version and its notes are on the [Releases](https://github.com/payabli/sdk-ios/releases) page.
+- **Depend on the latest version** as [Installation](#installation) describes. Each version and its
+  notes are on the [Releases](https://github.com/payabli/sdk-ios/releases) page.
 - **`main` holds changes that aren't released yet, and changes without notice.** A build that tracks
   `main` takes whatever is there when the package resolves.
-- **When a stable version is released,** this section gives the version to depend on.
+- **When a stable version is released,** this section says so.
 
 ## Support
 
