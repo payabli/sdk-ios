@@ -782,6 +782,13 @@ MUTATIONS = [
         "W15w", "workflows",
     ),
     Mutation(
+        "the release notes are bound to a literal the workflow writes",
+        RELEASE_YML,
+        "      RELEASE_NOTES: ${{ inputs.release_notes }}\n",
+        "      RELEASE_NOTES: placeholder notes\n",
+        "W15w", "workflows",
+    ),
+    Mutation(
         "one step queries CI for main's head through its own environment",
         RELEASE_YML, "      - name: Require a passing CI run on main for this commit\n        env:\n",
         "      - name: Require a passing CI run on main for this commit\n        env:\n          COMMIT: ${{ github.sha }}\n",

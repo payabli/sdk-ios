@@ -1416,6 +1416,7 @@ def test_workflows() -> None:
           any(notes_lines[at:at + len(notes_refusal)] == notes_refusal for at in range(len(notes_lines)))
           and '--notes-file release-notes.md' in tag_run
           and 'gh release edit "$VERSION" --notes-file release-notes.md' in tag_run
+          and (publish_job.get("env") or {}).get("RELEASE_NOTES") == "${{ inputs.release_notes }}"
           and notes_input.get("required") is True
           and not any('git log' in run for run in publish_runs),
           tag_run[:200])
