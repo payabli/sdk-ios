@@ -745,8 +745,55 @@ MUTATIONS = [
         RELEASE_YML, '            echo "Releasing \\`$VERSION\\` from \\`$COMMIT\\`:"\n', "", "W15r", "workflows",
     ),
     Mutation(
-        "the release notes are read up to main's head",
-        RELEASE_YML, '"$previous..$COMMIT"', '"$previous..$GITHUB_SHA"', "W15s", "workflows",
+        "an optional release-notes input is accepted",
+        RELEASE_YML,
+        '      release_notes:\n        description: "Release notes (markdown), published as the release body"\n'
+        '        required: true\n',
+        '      release_notes:\n        description: "Release notes (markdown), published as the release body"\n'
+        '        required: false\n',
+        "W15w", "workflows",
+    ),
+    Mutation(
+        "an empty release-notes input publishes an empty release",
+        RELEASE_YML,
+        '          if [ -z "${RELEASE_NOTES//[[:space:]]/}" ]; then\n'
+        '            echo "::error::release_notes is blank, and a release is published with notes written for it"\n'
+        '            exit 1\n          fi\n',
+        '          if [ -z "${RELEASE_NOTES//[[:space:]]/}" ]; then\n'
+        '            echo "::error::release_notes is blank, and a release is published with notes written for it"\n'
+        '          fi\n',
+        "W15w", "workflows",
+    ),
+    Mutation(
+        "a whitespace-only release-notes input publishes a blank release",
+        RELEASE_YML,
+        '          if [ -z "${RELEASE_NOTES//[[:space:]]/}" ]; then\n',
+        '          if [ -z "$RELEASE_NOTES" ]; then\n',
+        "W15w", "workflows",
+    ),
+    Mutation(
+        "the release notes carry the commit subjects",
+        RELEASE_YML,
+        '          printf \'%s\\n\' "$RELEASE_NOTES" > release-notes.md\n',
+        '          printf \'%s\\n\' "$RELEASE_NOTES" > release-notes.md\n'
+        '            git log -n 50 --pretty=format:"- %s" >> release-notes.md\n',
+        "W15w", "workflows",
+    ),
+    Mutation(
+        "a resumed draft publishes the notes it was created with",
+        RELEASE_YML,
+        '              # The draft carries the notes this run wrote, whichever attempt created it.\n'
+        '              gh release edit "$VERSION" --notes-file release-notes.md\n'
+        '              gh release upload "$VERSION" --clobber "${assets[@]}"\n',
+        '              gh release upload "$VERSION" --clobber "${assets[@]}"\n',
+        "W15w", "workflows",
+    ),
+    Mutation(
+        "the release notes are bound to a literal the workflow writes",
+        RELEASE_YML,
+        "      RELEASE_NOTES: ${{ inputs.release_notes }}\n",
+        "      RELEASE_NOTES: placeholder notes\n",
+        "W15w", "workflows",
     ),
     Mutation(
         "one step queries CI for main's head through its own environment",
@@ -756,9 +803,9 @@ MUTATIONS = [
     ),
     Mutation(
         "the suite tests main's head after checking out the named commit",
-        RELEASE_YML, "      - uses: ./.github/actions/ios-toolchain\n\n      - name: Install xcpretty\n",
+        RELEASE_YML, "      - uses: $/.github/actions/ios-toolchain\n        with:\n          xcode: default\n\n      - name: Install xcpretty\n",
         "      - name: Move to main\n        run: git checkout -q origin/main\n\n"
-        "      - uses: ./.github/actions/ios-toolchain\n\n      - name: Install xcpretty\n",
+        "      - uses: $/.github/actions/ios-toolchain\n        with:\n          xcode: default\n\n      - name: Install xcpretty\n",
         "W15q", "workflows",
     ),
     Mutation(
@@ -799,17 +846,21 @@ MUTATIONS = [
     ),
     Mutation(
         "the suite job checks out main's head",
-        RELEASE_YML, "    name: Test the release\n    needs: check\n    runs-on: macos-15\n    permissions:\n"
+        RELEASE_YML, "    name: Test the release\n    needs: check\n    # The same image as the build job, so the release is tested on the Xcode it\n"
+        "    # builds its XCFrameworks with.\n    runs-on: xcode-27\n    permissions:\n"
         "      contents: read\n\n    steps:\n      - name: Checkout\n        uses: actions/checkout@v4\n"
         "        with:\n          ref: ${{ needs.check.outputs.commit }}\n",
-        "    name: Test the release\n    needs: check\n    runs-on: macos-15\n    permissions:\n"
+        "    name: Test the release\n    needs: check\n    # The same image as the build job, so the release is tested on the Xcode it\n"
+        "    # builds its XCFrameworks with.\n    runs-on: xcode-27\n    permissions:\n"
         "      contents: read\n\n    steps:\n      - name: Checkout\n        uses: actions/checkout@v4\n"
         "        with:\n", "W15q", "workflows",
     ),
     Mutation(
         "the suite job can write to the repository",
-        RELEASE_YML, "    name: Test the release\n    needs: check\n    runs-on: macos-15\n    permissions:\n      contents: read\n",
-        "    name: Test the release\n    needs: check\n    runs-on: macos-15\n    permissions:\n      contents: write\n",
+        RELEASE_YML, "    name: Test the release\n    needs: check\n    # The same image as the build job, so the release is tested on the Xcode it\n"
+        "    # builds its XCFrameworks with.\n    runs-on: xcode-27\n    permissions:\n      contents: read\n",
+        "    name: Test the release\n    needs: check\n    # The same image as the build job, so the release is tested on the Xcode it\n"
+        "    # builds its XCFrameworks with.\n    runs-on: xcode-27\n    permissions:\n      contents: write\n",
         "W15i", "workflows",
     ),
     Mutation(
