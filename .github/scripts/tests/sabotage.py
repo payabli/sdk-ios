@@ -756,12 +756,19 @@ MUTATIONS = [
     Mutation(
         "an empty release-notes input publishes an empty release",
         RELEASE_YML,
-        '          if [ -z "$RELEASE_NOTES" ]; then\n'
-        '            echo "::error::release_notes is empty, and a release is published with notes written for it"\n'
+        '          if [ -z "${RELEASE_NOTES//[[:space:]]/}" ]; then\n'
+        '            echo "::error::release_notes is blank, and a release is published with notes written for it"\n'
         '            exit 1\n          fi\n',
-        '          if [ -z "$RELEASE_NOTES" ]; then\n'
-        '            echo "::error::release_notes is empty, and a release is published with notes written for it"\n'
+        '          if [ -z "${RELEASE_NOTES//[[:space:]]/}" ]; then\n'
+        '            echo "::error::release_notes is blank, and a release is published with notes written for it"\n'
         '          fi\n',
+        "W15w", "workflows",
+    ),
+    Mutation(
+        "a whitespace-only release-notes input publishes a blank release",
+        RELEASE_YML,
+        '          if [ -z "${RELEASE_NOTES//[[:space:]]/}" ]; then\n',
+        '          if [ -z "$RELEASE_NOTES" ]; then\n',
         "W15w", "workflows",
     ),
     Mutation(

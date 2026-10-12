@@ -1402,17 +1402,17 @@ def test_workflows() -> None:
           not any("inputs." in run for run in runs), [run[:80] for run in runs if "inputs." in run])
     tag_run = runs[tag_at] if tag_at != -1 else ""
     # The release page is public, so its body is the dispatch input and nothing else: no commit
-    # subject reaches it, and an empty input refuses the run.
+    # subject reaches it, and an input that is empty or only whitespace refuses the run.
     notes_refusal = [
-        'if [ -z "$RELEASE_NOTES" ]; then',
-        'echo "::error::release_notes is empty, and a release is published with notes written for it"',
+        'if [ -z "${RELEASE_NOTES//[[:space:]]/}" ]; then',
+        'echo "::error::release_notes is blank, and a release is published with notes written for it"',
         'exit 1',
         'fi',
         "printf '%s\\n' \"$RELEASE_NOTES\" > release-notes.md",
     ]
     notes_lines = [line.strip() for line in tag_run.splitlines() if line.strip()]
     notes_input = ((triggers.get("workflow_dispatch") or {}).get("inputs") or {}).get("release_notes") or {}
-    check("W15w the release notes are the dispatch input, and an empty one is refused",
+    check("W15w the release notes are the dispatch input, and a blank one is refused",
           any(notes_lines[at:at + len(notes_refusal)] == notes_refusal for at in range(len(notes_lines)))
           and '--notes-file release-notes.md' in tag_run
           and 'gh release edit "$VERSION" --notes-file release-notes.md' in tag_run

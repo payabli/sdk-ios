@@ -292,8 +292,8 @@ jobs:
         run: |
           # Notes are written for the release, because commit subjects carry
           # tracker references no release page should name.
-          if [ -z "$RELEASE_NOTES" ]; then
-            echo "::error::release_notes is empty, and a release is published with notes written for it"
+          if [ -z "${RELEASE_NOTES//[[:space:]]/}" ]; then
+            echo "::error::release_notes is blank, and a release is published with notes written for it"
             exit 1
           fi
           printf '%s\n' "$RELEASE_NOTES" > release-notes.md
