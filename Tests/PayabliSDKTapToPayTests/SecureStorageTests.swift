@@ -43,17 +43,17 @@ final class SecureStorageTests: XCTestCase {
             XCTFail("\(what) failed with OSStatus \(status)")
             return
         }
-        throw XCTSkip("no Keychain in this test host (OSStatus \(status)); covered by device QA.")
+        throw XCTSkip("no Keychain in this test host (OSStatus \(status)); covered on the device tier.")
     }
 
     // MARK: - KeychainStorage
 
-    /// A Keychain answers only where the host carries a
-    /// `keychain-access-groups` entitlement; a tool-hosted bundle has none, so
-    /// these tests skip. The round trip itself is covered on the device tier.
+    /// A Keychain answers only inside an app host: a tool-hosted test bundle
+    /// has no app identity to derive an access group from, so these tests skip
+    /// where the store cannot answer. The round trip runs on the device tier.
     func testKeychainRoundTripIfAvailable() throws {
         #if os(macOS) && !targetEnvironment(simulator)
-            throw XCTSkip("Keychain services require a running keychaind; covered by device QA.")
+            throw XCTSkip("Keychain services require a running keychaind; covered on the device tier.")
         #else
             let storage = KeychainStorage(service: "com.payabli.tests.\(UUID().uuidString)", migrating: PayabliKeychainKey.all)
             defer { try? storage.removeAll() }
@@ -165,7 +165,7 @@ final class SecureStorageTests: XCTestCase {
     /// Skips on the same terms as the round trip above.
     func testKeychainItemsAreWrittenForThisDeviceOnlyIfAvailable() throws {
         #if os(macOS) && !targetEnvironment(simulator)
-            throw XCTSkip("Keychain services require a running keychaind; covered by device QA.")
+            throw XCTSkip("Keychain services require a running keychaind; covered on the device tier.")
         #else
             let service = "com.payabli.tests.\(UUID().uuidString)"
             let storage = KeychainStorage(service: service, migrating: PayabliKeychainKey.all)
@@ -200,7 +200,7 @@ final class SecureStorageTests: XCTestCase {
     /// path rather than the add path the test above covers.
     func testRewritingALegacyItemStopsItTravellingIfAvailable() throws {
         #if os(macOS) && !targetEnvironment(simulator)
-            throw XCTSkip("Keychain services require a running keychaind; covered by device QA.")
+            throw XCTSkip("Keychain services require a running keychaind; covered on the device tier.")
         #else
             let service = "com.payabli.tests.\(UUID().uuidString)"
             let base: [String: Any] = [
@@ -248,7 +248,7 @@ final class SecureStorageTests: XCTestCase {
     /// Skips on the same terms as the round trip above.
     func testTheSweepRewritesAStoredItemAndKeepsItsValueIfAvailable() throws {
         #if os(macOS) && !targetEnvironment(simulator)
-            throw XCTSkip("Keychain services require a running keychaind; covered by device QA.")
+            throw XCTSkip("Keychain services require a running keychaind; covered on the device tier.")
         #else
             let service = "com.payabli.tests.\(UUID().uuidString)"
             let base: [String: Any] = [
@@ -292,7 +292,7 @@ final class SecureStorageTests: XCTestCase {
     /// the skip this asserts nothing is stored on a host that cannot say.
     func testTheSweepStoresNothingForAKeyThatHasNoItemIfAvailable() throws {
         #if os(macOS) && !targetEnvironment(simulator)
-            throw XCTSkip("Keychain services require a running keychaind; covered by device QA.")
+            throw XCTSkip("Keychain services require a running keychaind; covered on the device tier.")
         #else
             let storage = KeychainStorage(service: "com.payabli.tests.\(UUID().uuidString)", migrating: PayabliKeychainKey.all)
             defer { try? storage.removeAll() }
