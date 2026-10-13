@@ -36,7 +36,7 @@ enum LiveEnvironment {
 
         let requested = ProcessInfo.processInfo.environment["PAYABLI_ENV"]
         guard let requested, !requested.isEmpty else {
-            throw XCTSkip("no PAYABLI_ENV; set TEST_RUNNER_PAYABLI_ENV to qa or sandbox")
+            throw XCTSkip("no PAYABLI_ENV; set TEST_RUNNER_PAYABLI_ENV to one of \(DemoEnvironment.labels)")
         }
         // The demo's own environment, which is what the lookup and the app are
         // keyed on. Production is refused: these tests move money.

@@ -131,7 +131,7 @@ final class FormCustomizationLiveUITests: XCTestCase {
         continueAfterFailure = false
         let environment = ProcessInfo.processInfo.environment
         app.launchArguments = [
-            "-PayabliEnvironment", environment["PAYABLI_QA_ENVIRONMENT"] ?? "qa",
+            "-PayabliEnvironment", environment["PAYABLI_QA_ENVIRONMENT"] ?? "sandbox",
             "-showsSimpleCapture", "YES"
         ]
         if let tokenHost = environment["PAYABLI_QA_TOKEN_HOST"], !tokenHost.isEmpty {

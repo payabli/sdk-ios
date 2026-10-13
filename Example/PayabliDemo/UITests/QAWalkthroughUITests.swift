@@ -359,7 +359,7 @@ final class QAWalkthroughUITests: XCTestCase {
     /// Overridable so one build can be walked against either paypoint, since the entry point follows the
     /// environment and neither is compiled into the request.
     private var environment: String {
-        ProcessInfo.processInfo.environment["PAYABLI_QA_ENVIRONMENT"] ?? "qa"
+        ProcessInfo.processInfo.environment["PAYABLI_QA_ENVIRONMENT"] ?? "sandbox"
     }
 
     /// The token server to mint from, which follows the environment rather than the build: one runs per
