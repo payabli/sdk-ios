@@ -421,6 +421,13 @@ MUTATIONS = [
         "W16c", "workflows",
     ),
     Mutation(
+        "a module the release ships without a record passes",
+        RELEASE_YML,
+        "records $(echo $recorded)\"\n            exit 1\n",
+        "records $(echo $recorded)\"\n",
+        "W16c", "workflows",
+    ),
+    Mutation(
         "the release's interface check is allowed to fail",
         RELEASE_YML,
         "      - name: Check the shipped interface matches API/\n",

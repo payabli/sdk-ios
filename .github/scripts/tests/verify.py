@@ -1533,6 +1533,7 @@ def test_workflows() -> None:
     built_at = next((index for index, run in enumerate(build_step_runs) if "build_release_frameworks.sh" in run), -1)
     compared_at = next((index for index, run in enumerate(build_step_runs)
                         if "dump-public-interface.sh" in run and "--products build/release/" in run
+                        and re.search(r'if \[ "\$shipped" != "\$recorded" \]; then\n\s*echo [^\n]*\n\s*exit [1-9]', run)
                         and re.search(r'if ! diff -ru API [^\n]*; then\n\s*echo [^\n]*\n\s*exit [1-9]', run)), -1)
     uploaded_at = next((index for index, step in enumerate(build_steps)
                         if "upload-artifact" in str(step.get("uses", ""))), -1)

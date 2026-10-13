@@ -194,16 +194,20 @@ jobs:
         timeout-minutes: 45
         run: ./Scripts/build_release_frameworks.sh
 
-      # The interface this release ships must be the one API/ records, so nothing reaches an integrator that
-      # no reviewed pull request recorded. Read from the build above, not rebuilt: the private interface each
-      # module's compile wrote, which the release script strips from the frameworks. A mismatch fails this job,
-      # and the publish job needs it. A refusal is repaired, by fixing the tool or regenerating API/ in a
-      # reviewed pull request, never bypassed.
+      # Every module this release ships has a record in API/, and its interface matches it. Read from the build
+      # above: each module's private interface, which the release script strips from the frameworks. A mismatch
+      # fails this job, which publish needs; the repair is a reviewed pull request that regenerates API/.
       - name: Check the shipped interface matches API/
         run: |
           set -euo pipefail
           if [ ! -x Scripts/dump-public-interface.sh ] || [ ! -d API ]; then
             echo "::error::this commit has no recorded interface, so what it ships cannot be checked"
+            exit 1
+          fi
+          shipped="$(cd build/release/xcframeworks && ls -d -- *.xcframework | sed 's/\.xcframework$//' | sort)"
+          recorded="$(cd API && ls -- *.swiftinterface | sed 's/\.swiftinterface$//' | sort)"
+          if [ "$shipped" != "$recorded" ]; then
+            echo "::error::the release ships $(echo $shipped) and API/ records $(echo $recorded)"
             exit 1
           fi
           ./Scripts/dump-public-interface.sh \
