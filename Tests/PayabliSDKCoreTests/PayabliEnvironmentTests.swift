@@ -2,7 +2,7 @@
 import XCTest
 
 final class PayabliEnvironmentTests: XCTestCase {
-    func testBaseURLsMatchPRD() {
+    func testEachEnvironmentHasItsOwnBaseURL() {
         // swiftlint:disable force_unwrapping
         XCTAssertEqual(
             PayabliEnvironment.sandbox.baseURL,
