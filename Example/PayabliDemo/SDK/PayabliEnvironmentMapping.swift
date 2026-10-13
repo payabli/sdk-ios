@@ -15,6 +15,11 @@ extension DemoEnvironment {
     /// The one run when nothing chose another. Sandbox, as the environment an
     /// integrator can reach.
     static let fallback = sandbox
+
+    /// Whether this one reaches production's host, whatever a build named it.
+    var pointsAtProduction: Bool {
+        host == DemoEnvironment.production.host
+    }
 }
 
 /// Which SDK this build links, for the Config tab.

@@ -6,12 +6,11 @@ import XCTest
 final class DemoEnvironmentTests: XCTestCase {
     private let committed = PayabliEnvironment.entries.map(DemoEnvironment.init)
 
-    func testAnEnvironmentShowsWhatTheSDKCallsItAndWhereItPoints() {
-        for environment in PayabliEnvironment.entries {
-            let shown = DemoEnvironment(environment)
-            XCTAssertEqual(shown.label, environment.name)
-            XCTAssertEqual(shown.baseURL, environment.baseURL)
-        }
+    func testProductionIsKnownByItsHostWhateverItIsNamed() throws {
+        let renamed = try DemoEnvironment(label: "live", baseURL: XCTUnwrap(URL(string: "https://api.payabli.com")))
+        XCTAssertTrue(renamed.pointsAtProduction)
+        XCTAssertTrue(DemoEnvironment.production.pointsAtProduction)
+        XCTAssertFalse(DemoEnvironment.sandbox.pointsAtProduction)
     }
 
     func testALabelNamesItsEnvironmentWhateverItsCase() {

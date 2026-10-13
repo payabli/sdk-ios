@@ -182,15 +182,29 @@ stage_framework() {
     echo "$framework"
 }
 
-# Every `PayabliEnvironment` static a module interface declares other than the
-# two committed ones, space separated, or nothing. `entries` is an array and
-# does not match. Newer compilers qualify a type with `::`, older ones with `.`.
+# Every static or class member a module interface declares on
+# `PayabliEnvironment` or an extension of it, other than `sandbox`,
+# `production` and `entries`: space separated, or nothing. Fails when there is
+# no interface to read. Newer compilers qualify a type with `::`, older ones
+# with `.`.
 environments_beyond_committed() {
-    local swiftmodule="$1"
-    { grep -hoE 'static (var|let) [A-Za-z0-9_`]+: PayabliSDKCore(::|\.)PayabliEnvironment( |$)' \
-        "$swiftmodule"/*.swiftinterface || true; } |
-        awk '{ gsub(/[:`]/, "", $3); if ($3 != "sandbox" && $3 != "production") print $3 }' |
-        sort -u | paste -sd ' ' -
+    local swiftmodule="$1" interfaces
+    interfaces="$(find "$swiftmodule" -maxdepth 1 -name '*.swiftinterface')"
+    if [[ -z "$interfaces" ]]; then
+        echo "error: ${swiftmodule} has no module interface to read" >&2
+        return 1
+    fi
+    # shellcheck disable=SC2086 # one path per line, none holding a space
+    awk '
+        /^[^ ]/ && /(class PayabliEnvironment |extension PayabliSDKCore(::|\.)PayabliEnvironment )/ { inside = 1; next }
+        /^}/ { inside = 0 }
+        inside && match($0, /(static|class) (var|let|func|subscript) [A-Za-z0-9_`]+/) {
+            split(substr($0, RSTART, RLENGTH), word, " ")
+            name = word[3]
+            gsub(/`/, "", name)
+            if (name != "sandbox" && name != "production" && name != "entries") print name
+        }
+    ' $interfaces | sort -u | paste -sd ' ' -
 }
 
 # Refuses a framework an integrator could not import or run: no public
@@ -239,7 +253,7 @@ check_framework() {
     # The refusal at the top reads the source tree; this reads what ships.
     if [[ "$module" == "PayabliSDKCore" ]]; then
         local added
-        added="$(environments_beyond_committed "$framework/Modules/$module.swiftmodule")"
+        added="$(environments_beyond_committed "$framework/Modules/$module.swiftmodule")" || exit 1
         if [[ -n "$added" ]]; then
             echo "error: ${framework} offers environments beyond sandbox and production: ${added}" >&2
             exit 1
