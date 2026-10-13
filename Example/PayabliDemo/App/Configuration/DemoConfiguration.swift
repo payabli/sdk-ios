@@ -40,7 +40,7 @@ enum DemoConfiguration {
     }
 
     static let environmentSource: String = {
-        if argumentEnvironment() != nil {
+        if launchArgumentName() != nil {
             return "launch argument"
         }
         if rememberedEnvironment() != nil {
@@ -52,18 +52,23 @@ enum DemoConfiguration {
     private static let environmentDefaultsKey = "PayabliEnvironment"
 
     private static func resolvedEnvironment() -> DemoEnvironment {
-        if let fromArgument = argumentEnvironment() {
-            UserDefaults.standard.set(fromArgument.label, forKey: environmentDefaultsKey)
-            return fromArgument
+        if let name = launchArgumentName() {
+            guard let environment = DemoEnvironment.named(name) else {
+                fatalError("-PayabliEnvironment \(name) names no environment this build offers: \(DemoEnvironment.labels)")
+            }
+            UserDefaults.standard.set(environment.label, forKey: environmentDefaultsKey)
+            return environment
         }
         return rememberedEnvironment() ?? .fallback
     }
 
-    private static func argumentEnvironment() -> DemoEnvironment? {
+    /// The value the `-PayabliEnvironment` argument carries, or nil when the
+    /// process was launched without one.
+    private static func launchArgumentName() -> String? {
         let arguments = ProcessInfo.processInfo.arguments
         guard let index = arguments.firstIndex(of: "-PayabliEnvironment"),
               index + 1 < arguments.count else { return nil }
-        return DemoEnvironment.named(arguments[index + 1])
+        return arguments[index + 1]
     }
 
     private static func rememberedEnvironment() -> DemoEnvironment? {

@@ -95,7 +95,7 @@ final class FormCustomizationUITests: XCTestCase {
 
     private func launch(showingSimpleCapture: Bool) -> XCUIApplication {
         let app = XCUIApplication()
-        app.launchArguments = ["-PayabliEnvironment", "qa", "-showsSimpleCapture", showingSimpleCapture ? "YES" : "NO"]
+        app.launchArguments = ["-PayabliEnvironment", "sandbox", "-showsSimpleCapture", showingSimpleCapture ? "YES" : "NO"]
         app.launch()
         return app
     }

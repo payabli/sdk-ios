@@ -42,4 +42,8 @@ final class PayabliEnvironmentTests: XCTestCase {
         XCTAssertEqual(PayabliEnvironment.sandbox.name, "sandbox")
         XCTAssertEqual(PayabliEnvironment.production.name, "production")
     }
+
+    func testDescriptionNamesTheEnvironment() {
+        XCTAssertEqual(PayabliEnvironment.production.description, "production")
+    }
 }

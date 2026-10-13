@@ -16,6 +16,11 @@ import Foundation
     /// Base URL for this environment.
     public let baseURL: URL
 
+    /// The identifier, so a printed configuration names its environment.
+    override public var description: String {
+        name
+    }
+
     init(name: String, baseURL: URL) {
         self.name = name
         self.baseURL = baseURL
@@ -27,8 +32,8 @@ import Foundation
     }
 
     /// The environment an integrator verifies against.
-    public static let sandbox = PayabliEnvironment(name: "sandbox", baseURL: URL(string: "https://api-sandbox.payabli.com")!)
+    @objc public static let sandbox = PayabliEnvironment(name: "sandbox", baseURL: URL(string: "https://api-sandbox.payabli.com")!)
 
     /// The live environment.
-    public static let production = PayabliEnvironment(name: "production", baseURL: URL(string: "https://api.payabli.com")!)
+    @objc public static let production = PayabliEnvironment(name: "production", baseURL: URL(string: "https://api.payabli.com")!)
 }
