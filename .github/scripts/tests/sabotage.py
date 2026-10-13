@@ -42,6 +42,7 @@ COPIED = (
     ".github/workflows/ci.yml",
     ".github/workflows/release.yml",
     ".github/workflows/nightly-report.yml",
+    ".github/workflows/public-interface.yml",
     ".github/hardware-only-tests.txt",
     ".github/scripts/release-version.sh",
     ".github/scripts/release-newer.sh",
@@ -51,6 +52,7 @@ COPIED = (
 CI_YML = ".github/workflows/ci.yml"
 RELEASE_YML = ".github/workflows/release.yml"
 REPORT_YML = ".github/workflows/nightly-report.yml"
+INTERFACE_YML = ".github/workflows/public-interface.yml"
 HARDWARE_LIST = ".github/hardware-only-tests.txt"
 HELPER = ".github/scripts/hardware-only-skips.sh"
 REPORT = ".github/scripts/nightly_report.py"
@@ -399,6 +401,30 @@ MUTATIONS = [
         "      - '.github/workflows/**'\n      - '.github/workflows/nightly.yml'\n",
         "      - '.github/workflows/**'\n",
         "W11", "workflows",
+    ),
+    Mutation(
+        "the interface check starts running on main, where the release reads CI",
+        INTERFACE_YML, "on:\n  pull_request:\n", "on:\n  push:\n  pull_request:\n",
+        "W16", "workflows",
+    ),
+    Mutation(
+        "the interface check moves into ci.yml, so a failing check stops a release",
+        CI_YML, "          swiftformat --lint .\n",
+        "          swiftformat --lint .\n          ./Scripts/dump-public-interface.sh API\n",
+        "W16a", "workflows",
+    ),
+    Mutation(
+        "the records are not deleted first, so a dump that writes nothing passes",
+        INTERFACE_YML, "          rm API/*.swiftinterface\n", "", "W16b", "workflows",
+    ),
+    Mutation(
+        "a record removed from the repository passes",
+        INTERFACE_YML,
+        "          for file in API/*.swiftinterface; do\n"
+        "            git ls-files --error-unmatch \"$file\" > /dev/null\n"
+        "          done\n",
+        "",
+        "W16b", "workflows",
     ),
     Mutation(
         "the checkout goes shallow, so every failure names the same commit",

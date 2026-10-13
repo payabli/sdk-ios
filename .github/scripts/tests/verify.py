@@ -47,6 +47,7 @@ SCRIPTS_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "scripts.yml"
 CI_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "ci.yml"
 RELEASE_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "release.yml"
 REPORT_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "nightly-report.yml"
+INTERFACE_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "public-interface.yml"
 HARDWARE_LIST = REPO_ROOT / ".github" / "hardware-only-tests.txt"
 VERSION_SOURCE = "Sources/PayabliSDKCore/PayabliSDKCore.swift"
 GATE_SCRIPT = REPO_ROOT / ".github" / "scripts" / "release-version.sh"
@@ -1515,6 +1516,28 @@ def test_workflows() -> None:
         if path != RELEASE_WORKFLOW and re.search(r"git (tag|push)\b|gh release create", text):
             tagging.append(path.name)
     check("W15d no workflow but the release creates a tag", not tagging, tagging)
+
+    # The interface check can fail a pull request and must never stop a release. The release requires a
+    # passing ci.yml on main, so the check stays in its own workflow and never runs on main.
+    interface = yaml.safe_load(INTERFACE_WORKFLOW.read_text())
+    interface_triggers = interface.get("on", interface.get(True)) or {}
+    check("W16 the interface check runs on pull requests only",
+          set(interface_triggers) == {"pull_request"}, sorted(interface_triggers))
+    running = sorted(path.name for path in RELEASE_WORKFLOW.parent.iterdir()
+                     if path.suffix in WORKFLOW_SUFFIXES and path != INTERFACE_WORKFLOW
+                     and "dump-public-interface" in path.read_text())
+    check("W16a no workflow but its own runs the interface check", not running, running)
+    interface_steps = [step for job in (interface.get("jobs") or {}).values() for step in job.get("steps") or []]
+    compare = next((str(step.get("run", "")) for step in interface_steps
+                    if "dump-public-interface.sh API" in str(step.get("run", ""))), "")
+    removed_at, dumped_at = compare.find("rm API/*.swiftinterface"), compare.find("dump-public-interface.sh API")
+    check("W16b the records are deleted before the dump, must be tracked, and must match exactly",
+          -1 < removed_at < dumped_at
+          and "git ls-files --error-unmatch" in compare
+          and "git diff --exit-code -- API/" in compare
+          and not any(step.get("continue-on-error") for step in interface_steps)
+          and not any(job.get("continue-on-error") for job in (interface.get("jobs") or {}).values()),
+          compare[:160])
 
 
 # --------------------------------------------------------------------------------------------------
