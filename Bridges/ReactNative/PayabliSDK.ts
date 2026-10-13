@@ -36,10 +36,8 @@ function requireEmitter(): NativeEventEmitter {
 // MARK: - Public enums
 
 export enum PayabliEnvironment {
-    Local = 0,
-    QA = 1,
-    Sandbox = 2,
-    Production = 3,
+    Sandbox = "sandbox",
+    Production = "production",
 }
 
 export enum PayabliTTPPaymentType {
