@@ -48,13 +48,9 @@ final class SecureStorageTests: XCTestCase {
 
     // MARK: - KeychainStorage
 
-    /// Keychain is only available on real devices / simulators with an
-    /// unlocked default keychain. CI on macOS tools may not have one, and
-    /// GitHub-hosted iOS Simulator runners routinely reject Keychain APIs
-    /// with errSecMissingEntitlement (-34018) because the xctest host
-    /// bundle has no `keychain-access-groups` entitlement. These tests
-    /// skip gracefully when the store is unavailable — keychain
-    /// round-trip is covered by on-device QA.
+    /// A Keychain answers only where the host carries a
+    /// `keychain-access-groups` entitlement; a tool-hosted bundle has none, so
+    /// these tests skip. The round trip itself is covered on the device tier.
     func testKeychainRoundTripIfAvailable() throws {
         #if os(macOS) && !targetEnvironment(simulator)
             throw XCTSkip("Keychain services require a running keychaind; covered by device QA.")
