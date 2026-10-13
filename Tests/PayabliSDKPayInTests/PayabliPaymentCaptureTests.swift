@@ -368,7 +368,7 @@ final class PayabliPayInTests: XCTestCase {
         XCTAssertEqual(paymentMethod["cardnumber"] as? String, "4111111111111111")
     }
 
-    func testTheFormShowsWhyAnAmountWasRefusedAndSendsNothing() async throws {
+    func testAnAmountRefusalReachesTheCallerAndSendsNothing() async throws {
         let transport = FacadeTransport(responseBody: Self.formCaptureResponse)
         let component = PayabliPayIn(
             entryPoint: "entry",
@@ -394,8 +394,9 @@ final class PayabliPayInTests: XCTestCase {
         do {
             _ = try await viewModel.submit()
             XCTFail("a total sent as 0.00 is refused")
-        } catch {
-            XCTAssertEqual(viewModel.errorMessage, "Total amount must be greater than 0.")
+        } catch let PayabliPayInError.invalidInput(reason) {
+            XCTAssertEqual(reason, "Total amount must be greater than 0.")
+            XCTAssertTrue(viewModel.rejectedFields.isEmpty)
         }
         XCTAssertEqual(viewModel.cardNumber.filter(\.isNumber), "4111111111111111", "only the host can fix the amount")
         XCTAssertEqual(viewModel.cardCvv, "999")

@@ -399,7 +399,7 @@ display.
 | `formatting` | card spaces on, `/`, account number masking on | Input formatting behavior. |
 | `inputSizing` | 52pt high, 14pt padding | Default and per-field input size. Height is clamped to accessibility minimum. |
 | `cardBrandIconPlacement` | `.trailing` | `.leading`, `.trailing`, or `.hidden`. |
-| `errorMessagePlacement` | `.aboveSubmitButton` | `.top` or `.aboveSubmitButton`. |
+| `errorMessagePlacement` | `.aboveSubmitButton` | Has no effect. The form draws no form-level error message; failures reach `onError`. |
 | `requiredFields` | amount always required | Optional fields that should be required when visible. |
 | `paymentSummary` | amount/fee defaults | Read-only Amount and Fee rows for capture/authorize. |
 

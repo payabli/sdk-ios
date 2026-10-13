@@ -49,6 +49,8 @@ public enum PayabliPayInCardBrandIconPlacement: Sendable, Equatable {
     case hidden
 }
 
+/// Has no effect. The form draws no form-level error message: it marks the fields a refusal names,
+/// and every failure reaches the host through the thrown error.
 public enum PayabliPayInErrorMessagePlacement: Sendable, Equatable {
     case top
     case aboveSubmitButton
@@ -309,6 +311,7 @@ public struct PayabliPayInFormConfiguration: Sendable {
     public let formatting: PayabliPayInFormatting
     public let inputSizing: PayabliPayInInputSizing
     public let cardBrandIconPlacement: PayabliPayInCardBrandIconPlacement
+    /// Has no effect. See ``PayabliPayInErrorMessagePlacement``.
     public let errorMessagePlacement: PayabliPayInErrorMessagePlacement
     public let requiredFields: Set<PayabliPayInField>
     public let cardSections: [PayabliPayInFieldSection]

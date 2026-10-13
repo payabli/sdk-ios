@@ -84,7 +84,6 @@ final class PayabliPayInViewModel: ObservableObject {
     @Published private(set) var isSubmitting = false
     /// The operation the submission in flight is sending, or nil when none is.
     @Published private(set) var submittingOperation: PayabliPayInOperation?
-    @Published private(set) var errorMessage: String?
     /// The fields the last refusal named, until the payer edits one or its box leaves the screen.
     @Published var rejectedFields: Set<PayabliPayInField> = []
 
@@ -270,12 +269,9 @@ final class PayabliPayInViewModel: ObservableObject {
     }
 
     func submit() async throws -> PayabliPayInResult {
-        errorMessage = nil
         clearMarks()
         guard !isSubmitting else {
-            let error = PayabliPayInError.submissionInProgress
-            errorMessage = Self.message(for: error)
-            throw error
+            throw PayabliPayInError.submissionInProgress
         }
         isSubmitting = true
         submittingOperation = component.operation
@@ -287,12 +283,7 @@ final class PayabliPayInViewModel: ObservableObject {
 
         // Refused before anything else, and without clearing what the payer typed: only the host can change it.
         if component.operation != .storePaymentMethod, let details = component.requestConfiguration?.paymentDetails {
-            do {
-                try details.validate()
-            } catch {
-                errorMessage = Self.message(for: error)
-                throw error
-            }
+            try details.validate()
         }
 
         do {
@@ -324,7 +315,6 @@ final class PayabliPayInViewModel: ObservableObject {
             if component === submittedFlow {
                 rejectedFields = PayabliPayInRejectedFields.fields(in: error).intersection(activeFields)
             }
-            errorMessage = Self.message(for: error)
             throw error
         }
     }
@@ -484,19 +474,6 @@ final class PayabliPayInViewModel: ObservableObject {
         cardCvvStorage = ""
         achRoutingStorage = ""
         achAccountStorage = ""
-    }
-
-    private static func message(for error: Error) -> String {
-        let message: String = if let payabliError = error as? any PayabliError {
-            if let detail = payabliError.detail?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty, detail != payabliError.reason {
-                "\(payabliError.reason)\n\(detail)"
-            } else {
-                payabliError.reason
-            }
-        } else {
-            String(describing: error)
-        }
-        return PayabliPayInSensitiveDataRedactor.redact(message)
     }
 
     private static func passesLuhn(_ digits: String) -> Bool {

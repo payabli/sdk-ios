@@ -440,7 +440,7 @@ final class PaymentMethodFormConfigurationTests: XCTestCase {
     }
 
     @MainActor
-    func testViewModelUsesStringDescriptionForNonPayabliErrors() async {
+    func testViewModelRethrowsNonPayabliErrorsAndMarksNothing() async {
         let viewModel = PayabliPayInViewModel(
             component: PayabliPayIn(
                 entryPoint: "entry",
@@ -459,7 +459,7 @@ final class PaymentMethodFormConfigurationTests: XCTestCase {
             _ = try await viewModel.submit()
             XCTFail("Expected transport error")
         } catch PaymentMethodTestError.transportBoom {
-            XCTAssertEqual(viewModel.errorMessage, "transportBoom")
+            XCTAssertTrue(viewModel.rejectedFields.isEmpty)
         } catch {
             XCTFail("Wrong error: \(error)")
         }

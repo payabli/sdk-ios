@@ -717,7 +717,7 @@ final class TokenStorageClientTests: XCTestCase {
     }
 
     @MainActor
-    func testViewModelShowsPaymentMethodFailureActionAndKeepsEditableFields() async throws {
+    func testAStoreRefusalMarksNothingAndKeepsEditableFields() async throws {
         let transport = MockTransport(statusCode: 400, responseBody: """
         {
           "isSuccess": false,
@@ -748,7 +748,7 @@ final class TokenStorageClientTests: XCTestCase {
             XCTFail("Expected payment method failure")
         } catch let PayabliPayInTokenStorageError.saveFailed(failure) {
             XCTAssertEqual(failure.responseCode, 6000)
-            XCTAssertEqual(viewModel.errorMessage, "Invalid Card\nPlease check your card details and try again.")
+            XCTAssertTrue(viewModel.rejectedFields.isEmpty)
             XCTAssertEqual(viewModel.cardNumber, "")
             XCTAssertEqual(viewModel.cardExpiration, "")
             XCTAssertEqual(viewModel.cardholderName, "Jane Doe")
@@ -788,7 +788,7 @@ final class TokenStorageClientTests: XCTestCase {
             XCTFail("Expected payment method failure")
         } catch let PayabliPayInTokenStorageError.saveFailed(failure) {
             XCTAssertEqual(failure.responseText, "Server Error")
-            XCTAssertEqual(viewModel.errorMessage, "Unable to save payment method right now. Please try again.")
+            XCTAssertTrue(viewModel.rejectedFields.isEmpty)
             XCTAssertEqual(viewModel.accountHolder, "Jane Business")
             XCTAssertEqual(viewModel.routingNumber, "")
             XCTAssertEqual(viewModel.accountNumber, "")

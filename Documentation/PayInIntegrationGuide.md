@@ -496,7 +496,7 @@ let configuration = PayabliPayInFormConfiguration(
 | `formatting` | default formatting | Card spacing, expiration separator, account number masking. |
 | `inputSizing` | default input sizing | Default and per-field input sizes. |
 | `cardBrandIconPlacement` | `.trailing` | `.leading`, `.trailing`, or `.hidden`. |
-| `errorMessagePlacement` | `.aboveSubmitButton` | `.top` or `.aboveSubmitButton`. |
+| `errorMessagePlacement` | `.aboveSubmitButton` | Has no effect. The form draws no form-level error message; failures reach `onError`. |
 | `requiredFields` | `[]` | Optional visible fields to require. Amount is always required. |
 | `paymentSummary` | default summary | Read-only amount and fee text/styles. |
 
