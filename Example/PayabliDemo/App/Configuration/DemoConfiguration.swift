@@ -8,7 +8,7 @@ import Foundation
 enum DemoConfiguration {
     /// Which Payabli backend every SDK facade in this app talks to.
     ///
-    /// Pick it with the scheme: `PayabliDemo qa`, `PayabliDemo sandbox` and
+    /// Pick it with the scheme: `PayabliDemo sandbox` and
     /// `PayabliDemo production` each pass `-PayabliEnvironment`, and the plain
     /// `PayabliDemo` scheme passes nothing and runs whatever was chosen last.
     /// Sandbox until something chooses, as the environment an integrator can

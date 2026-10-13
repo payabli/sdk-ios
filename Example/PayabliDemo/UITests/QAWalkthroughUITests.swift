@@ -18,7 +18,7 @@ import XCTest
 ///   -destination 'id=<simulator udid>'
 /// ```
 ///
-/// The test scheme rather than an app scheme: `PayabliDemo qa` carries no test action, so `xcodebuild`
+/// The test scheme rather than an app scheme: `PayabliDemo sandbox` carries no test action, so `xcodebuild`
 /// refuses the invocation instead of running this bundle.
 ///
 /// The token server has to be up, and it is per environment: each one mints from its own credentials, so a

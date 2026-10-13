@@ -287,8 +287,8 @@ xcodebuild test -project Example/PayabliDemo/PayabliDemo.xcodeproj -scheme Payab
   -destination 'id=<simulator udid>'
 ```
 
-The test scheme, not an app scheme. `PayabliDemo qa` and its siblings carry no test action, so
-`xcodebuild` refuses the whole invocation with "Scheme PayabliDemo qa is not currently configured for the
+The test scheme, not an app scheme. `PayabliDemo sandbox` and its siblings carry no test action, so
+`xcodebuild` refuses the whole invocation with "Scheme PayabliDemo sandbox is not currently configured for the
 test action" rather than running anything. The environment the app would have taken from that scheme is
 passed in instead.
 
