@@ -15,10 +15,11 @@
 #
 # Usage:
 #   ./Scripts/dump-public-interface.sh API
-#   ./Scripts/dump-public-interface.sh --products <device-products-dir> <out-dir>
+#   ./Scripts/dump-public-interface.sh --products <products-dir> [--triple <triple>] <out-dir>
 #
 # With `--products`, nothing is built: the interfaces are read from a build
-# that already ran, which is how the release reads its own.
+# that already ran, which is how the release reads its own. `--triple` picks
+# the slice, and defaults to the device one, `arm64-apple-ios`.
 #
 # Environment:
 #   BUILD_CONFIG   optional. Defaults to `Release`.
@@ -26,12 +27,29 @@
 
 set -euo pipefail
 
+USAGE="usage: $0 [--products <products-dir>] [--triple <triple>] <output-directory>"
 PRODUCTS=""
-if [[ "${1:-}" == "--products" ]]; then
-    PRODUCTS="${2:?usage: $0 --products <device-products-dir> <output-directory>}"
+TRIPLE="arm64-apple-ios"
+while [[ "${1:-}" == --* ]]; do
+    case "$1" in
+        --products) PRODUCTS="${2:?$USAGE}" ;;
+        --triple) TRIPLE="${2:?$USAGE}" ;;
+        *) echo "$USAGE" >&2; exit 1 ;;
+    esac
     shift 2
+done
+OUT_DIR="${1:?$USAGE}"
+
+# Relative paths are the caller's, so they are resolved before the cd below.
+mkdir -p "$OUT_DIR"
+OUT_DIR="$(cd "$OUT_DIR" && pwd)"
+if [[ -n "$PRODUCTS" ]]; then
+    if [[ ! -d "$PRODUCTS" ]]; then
+        echo "error: no products directory at ${PRODUCTS}" >&2
+        exit 1
+    fi
+    PRODUCTS="$(cd "$PRODUCTS" && pwd)"
 fi
-OUT_DIR="${1:?usage: $0 [--products <device-products-dir>] <output-directory>}"
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$REPO_ROOT"
@@ -73,19 +91,13 @@ if [[ -z "$PRODUCTS" ]]; then
     PRODUCTS="$DERIVED_DATA/Build/Products/${BUILD_CONFIG}-iphoneos"
 fi
 
-if [[ ! -d "$PRODUCTS" ]]; then
-    echo "error: no products directory at ${PRODUCTS}" >&2
-    exit 1
-fi
-
-mkdir -p "$OUT_DIR"
 for module in "${MODULES[@]}"; do
     # A package build leaves the module beside its framework, and a framework
     # build can leave it inside, so both are searched and exactly one must exist.
-    found="$(find "$PRODUCTS" -path "*/$module.swiftmodule/arm64-apple-ios.private.swiftinterface")"
+    found="$(find "$PRODUCTS" -path "*/$module.swiftmodule/$TRIPLE.private.swiftinterface")"
     count="$(grep -c . <<<"$found" || true)"
     if [[ "$count" -ne 1 ]] || [[ ! -s "$found" ]]; then
-        echo "error: expected one interface for ${module} under ${PRODUCTS}, found ${count}" >&2
+        echo "error: expected one ${TRIPLE} interface for ${module} under ${PRODUCTS}, found ${count}" >&2
         exit 1
     fi
     grep -vE '^// swift-(compiler-version|module-flags-ignorable):' "$found" \

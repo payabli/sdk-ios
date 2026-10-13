@@ -217,6 +217,24 @@ jobs:
             echo "::error::the interface this release ships differs from API/; regenerate API/ in a reviewed pull request"
             exit 1
           fi
+          # Each simulator slice is held to the same record. Only its module flags differ, since they name its target.
+          sim=build/release/derived-sim/Build/Products/Release-iphonesimulator
+          triples="$(find "$sim" -path '*/PayabliSDKCore.swiftmodule/*-apple-ios-simulator.private.swiftinterface' \
+            -exec basename {} .private.swiftinterface \; | sort)"
+          if [ -z "$triples" ]; then
+            echo "::error::the simulator build wrote no interface to check"
+            exit 1
+          fi
+          for triple in $triples; do
+            ./Scripts/dump-public-interface.sh --products "$sim" --triple "$triple" "$RUNNER_TEMP/interface-$triple"
+            for record in API/*.swiftinterface; do
+              if ! diff -u <(grep -v '^// swift-module-flags:' "$record") \
+                  <(grep -v '^// swift-module-flags:' "$RUNNER_TEMP/interface-$triple/$(basename "$record")"); then
+                echo "::error::the $triple slice's interface differs from $record"
+                exit 1
+              fi
+            done
+          done
 
       # Kept past the 30 days in which GitHub allows a run to be re-run, so a re-run of the suite still finds
       # these files to publish. Replaced when this job itself is re-run, since an artifact name is written once.

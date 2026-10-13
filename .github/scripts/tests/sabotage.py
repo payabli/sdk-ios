@@ -428,6 +428,13 @@ MUTATIONS = [
         "W16c", "workflows",
     ),
     Mutation(
+        "a simulator slice that differs from the record passes",
+        RELEASE_YML,
+        "differs from $record\"\n                exit 1\n",
+        "differs from $record\"\n",
+        "W16c", "workflows",
+    ),
+    Mutation(
         "the release's interface check is allowed to fail",
         RELEASE_YML,
         "      - name: Check the shipped interface matches API/\n",
