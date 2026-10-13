@@ -63,10 +63,12 @@ final class PayInPaymentFlowTokenStorageClient: Sendable {
             baseURL: baseURL,
             durationMilliseconds: Date().timeIntervalSince(start) * 1000
         )
+        // The status first: a failed status is the core error for that status, so only a refusal
+        // answered on a success status is this surface's own.
+        try mapPayabliHTTPError(response: response)
         if let failure = decodePaymentMethodFailure(from: response) {
             throw PayabliPayInTokenStorageError.saveFailed(failure)
         }
-        try mapPayabliHTTPError(response: response)
         return try decodeStoredPaymentMethod(from: response, method: storedMethod)
     }
 
