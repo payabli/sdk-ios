@@ -6,20 +6,8 @@ import Foundation
 /// live there. Anything here is safe to commit and safe to show on the
 /// Configuration screen.
 enum DemoConfiguration {
-    /// Which Payabli backend every SDK facade in this app talks to.
-    ///
-    /// Pick it with the scheme: `PayabliDemo sandbox` and
-    /// `PayabliDemo production` each pass `-PayabliEnvironment`, and the plain
-    /// `PayabliDemo` scheme passes nothing and runs whatever was chosen last.
-    /// Sandbox until something chooses, as the environment an integrator can
-    /// reach.
-    ///
-    /// Remembered, because a launch argument reaches only the process it
-    /// launched: a Home-screen tap or a `devicectl` launch passes none, and
-    /// without the memory those would revert mid-test.
-    ///
-    /// Captured by the facades at launch, so the Config screen shows it
-    /// read-only.
+    /// Which Payabli backend every SDK facade in this app talks to. A scheme picks it, the plain scheme
+    /// runs what was last chosen, and an argument naming no offered environment is refused at launch.
     static let environment: DemoEnvironment = resolvedEnvironment()
 
     /// The paypoint for whichever environment is running, from
