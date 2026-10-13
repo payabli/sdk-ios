@@ -322,9 +322,10 @@ successful run of an opted-out tier looks like, so read the skip count rather th
 - **`ci.yml`** gates every pull request: lint, the SDK suite, `PayabliDemoFlowTests`, and a change report.
   `pr-reports.yml` holds anything needing a token and is read from the default branch, so a pull request
   cannot edit the jobs that hold one.
-- **`public-interface.yml`** compares each module's interface with `API/` on every pull request. It is
-  deliberately not in `ci.yml`: the release requires a passing `ci.yml` on main, and this check must not
-  be able to stop a release.
+- **`public-interface.yml`** compares each module's interface with `API/` on every pull request, and is
+  a required check. It is not in `ci.yml`. The release runs the same comparison against the build it is
+  about to publish, and refuses to publish on a mismatch; that is repaired by regenerating `API/` in a
+  reviewed pull request, never bypassed.
 - **`nightly.yml`** runs on a schedule and reports to Slack. It adds what the gate cannot reach: the sample
   app itself, which no pull request can build because `Secrets.swift` is gitignored and is a member of the
   app target; a device-slice compile; both live test bundles compiled but not run; and the release

@@ -414,6 +414,27 @@ MUTATIONS = [
         "W16a", "workflows",
     ),
     Mutation(
+        "the release reports an interface mismatch and publishes anyway",
+        RELEASE_YML,
+        "regenerate API/ in a reviewed pull request\"\n            exit 1\n",
+        "regenerate API/ in a reviewed pull request\"\n",
+        "W16c", "workflows",
+    ),
+    Mutation(
+        "the release's interface check is allowed to fail",
+        RELEASE_YML,
+        "      - name: Check the shipped interface matches API/\n",
+        "      - name: Check the shipped interface matches API/\n        continue-on-error: true\n",
+        "W16c", "workflows",
+    ),
+    Mutation(
+        "the release checks a fresh build rather than the one it publishes",
+        RELEASE_YML,
+        "            --products build/release/derived-device/Build/Products/Release-iphoneos \\\n",
+        "",
+        "W16c", "workflows",
+    ),
+    Mutation(
         "the records are not deleted first, so a dump that writes nothing passes",
         INTERFACE_YML, "          rm API/*.swiftinterface\n", "", "W16b", "workflows",
     ),

@@ -1517,16 +1517,32 @@ def test_workflows() -> None:
             tagging.append(path.name)
     check("W15d no workflow but the release creates a tag", not tagging, tagging)
 
-    # The interface check can fail a pull request and must never stop a release. The release requires a
-    # passing ci.yml on main, so the check stays in its own workflow and never runs on main.
+    # The interface is checked twice: on the pull request, in a workflow of its own, and by the release, against
+    # the build it is about to publish. Never in ci.yml, whose result on main the release reads, so a CI build
+    # is never what decides a release.
     interface = yaml.safe_load(INTERFACE_WORKFLOW.read_text())
     interface_triggers = interface.get("on", interface.get(True)) or {}
     check("W16 the interface check runs on pull requests only",
           set(interface_triggers) == {"pull_request"}, sorted(interface_triggers))
     running = sorted(path.name for path in RELEASE_WORKFLOW.parent.iterdir()
-                     if path.suffix in WORKFLOW_SUFFIXES and path != INTERFACE_WORKFLOW
+                     if path.suffix in WORKFLOW_SUFFIXES and path not in (INTERFACE_WORKFLOW, RELEASE_WORKFLOW)
                      and "dump-public-interface" in path.read_text())
-    check("W16a no workflow but its own runs the interface check", not running, running)
+    check("W16a no workflow but its own and the release runs the interface check", not running, running)
+    build_steps = build_job.get("steps") or []
+    build_step_runs = [str(step.get("run", "")) for step in build_steps]
+    built_at = next((index for index, run in enumerate(build_step_runs) if "build_release_frameworks.sh" in run), -1)
+    compared_at = next((index for index, run in enumerate(build_step_runs)
+                        if "dump-public-interface.sh" in run and "--products build/release/" in run
+                        and re.search(r'if ! diff -ru API [^\n]*; then\n\s*echo [^\n]*\n\s*exit [1-9]', run)), -1)
+    uploaded_at = next((index for index, step in enumerate(build_steps)
+                        if "upload-artifact" in str(step.get("uses", ""))), -1)
+    publish_needs = publish_job.get("needs") or []
+    check("W16c the release compares the interface of its own build with API/ before handing it to publish",
+          -1 < built_at < compared_at < uploaded_at
+          and not build_steps[compared_at].get("continue-on-error")
+          and not build_job.get("continue-on-error")
+          and "build" in ([publish_needs] if isinstance(publish_needs, str) else publish_needs),
+          (built_at, compared_at, uploaded_at, publish_needs))
     interface_steps = [step for job in (interface.get("jobs") or {}).values() for step in job.get("steps") or []]
     compare = next((str(step.get("run", "")) for step in interface_steps
                     if "dump-public-interface.sh API" in str(step.get("run", ""))), "")

@@ -4,9 +4,9 @@ name: Public interface
 # A declaration that becomes public, or stops being public, changes its module's interface, and the
 # generated file must match the checked-in one exactly.
 #
-# Its own workflow, not a job in `ci.yml`: the release requires a passing `ci.yml` run on main, and this
-# check must never be what stops a release. So it runs on pull requests only. A merged mismatch shows up on
-# the next pull request rather than on main.
+# Its own workflow, not a job in `ci.yml`, and on pull requests only. The release does not read this result:
+# it compares the interface of the build it is about to publish with API/ itself, in `release.yml`, so what
+# decides a release is the artifact that ships rather than a CI build of main.
 #
 # Not path-filtered, so it can be made a required check: a required check that never runs blocks a merge
 # rather than passing it.

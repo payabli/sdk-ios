@@ -194,6 +194,26 @@ jobs:
         timeout-minutes: 45
         run: ./Scripts/build_release_frameworks.sh
 
+      # The interface this release ships must be the one API/ records, so nothing reaches an integrator that
+      # no reviewed pull request recorded. Read from the build above, not rebuilt: the private interface each
+      # module's compile wrote, which the release script strips from the frameworks. A mismatch fails this job,
+      # and the publish job needs it. A refusal is repaired, by fixing the tool or regenerating API/ in a
+      # reviewed pull request, never bypassed.
+      - name: Check the shipped interface matches API/
+        run: |
+          set -euo pipefail
+          if [ ! -x Scripts/dump-public-interface.sh ] || [ ! -d API ]; then
+            echo "::error::this commit has no recorded interface, so what it ships cannot be checked"
+            exit 1
+          fi
+          ./Scripts/dump-public-interface.sh \
+            --products build/release/derived-device/Build/Products/Release-iphoneos \
+            "$RUNNER_TEMP/interface"
+          if ! diff -ru API "$RUNNER_TEMP/interface"; then
+            echo "::error::the interface this release ships differs from API/; regenerate API/ in a reviewed pull request"
+            exit 1
+          fi
+
       # Kept past the 30 days in which GitHub allows a run to be re-run, so a re-run of the suite still finds
       # these files to publish. Replaced when this job itself is re-run, since an artifact name is written once.
       - name: Hand the release files to the publish job
