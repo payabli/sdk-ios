@@ -121,10 +121,10 @@ jobs:
             -quiet \
             CODE_SIGNING_ALLOWED=NO
 
-      # The app target, which no pull request can build. `Secrets.swift` is gitignored and is a member of
-      # the app's Sources phase, so a clean checkout has no app to compile and `ci.yml` runs the flow tests
-      # through a host-free scheme for that reason. The tracked sample declares every member the app reads,
-      # so a placeholder copy compiles; nothing here runs the app or reaches a network.
+      # The app target, which no pull request can build. `Secrets.swift` and `ExtraEnvironments.swift` are
+      # gitignored members of the app's Sources phase, so a clean checkout has no app to compile and `ci.yml`
+      # runs the flow tests through a host-free scheme for that reason. Each tracked sample declares every
+      # member the app reads, so a placeholder copy compiles; nothing here runs the app or reaches a network.
       #
       # This step is also what makes the next one possible: both live test bundles are hosted by this app.
       - name: Build the sample app
@@ -135,6 +135,8 @@ jobs:
           set -euo pipefail
           cp Example/PayabliDemo/App/Configuration/Secrets.swift.sample \
              Example/PayabliDemo/App/Configuration/Secrets.swift
+          cp Example/PayabliDemo/SDK/ExtraEnvironments.swift.sample \
+             Example/PayabliDemo/SDK/ExtraEnvironments.swift
           xcodebuild build \
             -project Example/PayabliDemo/PayabliDemo.xcodeproj \
             -scheme PayabliDemo \

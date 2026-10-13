@@ -37,6 +37,11 @@ Example/PayabliDemo/Config.xcconfig
 .env
 .env.local
 
+# Environments a machine's build adds, generated per machine. Recursive, on the
+# lesson above: a move must not leave a generated file tracked.
+Sources/PayabliSDKCore/**/PayabliEnvironment+Extras.swift
+Example/PayabliDemo/**/ExtraEnvironments.swift
+
 # macOS
 .DS_Store
 .AppleDouble

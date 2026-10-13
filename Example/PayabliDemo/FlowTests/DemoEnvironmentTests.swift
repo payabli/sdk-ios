@@ -1,41 +1,31 @@
 import PayabliSDKCore
 import XCTest
 
-/// The demo names its own environments, so this app can show which service it
-/// points at without a screen holding an SDK type.
-///
-/// That leaves two lists of hosts. The SDK's is the one that decides where a
-/// request goes; this app's is what it shows a reader. A test bundle may name an
-/// SDK type, so this is where the two are held against each other.
+/// The app shows its own environment type and the SDK decides where a request
+/// goes, so a test bundle, which may name both, holds them against each other.
 final class DemoEnvironmentTests: XCTestCase {
-    func testEveryEnvironmentPointsWhereTheSDKPointsIt() {
-        for environment in DemoEnvironment.allCases {
-            XCTAssertEqual(
-                environment.baseURL,
-                environment.sdkEnvironment.baseURL,
-                "\(environment.label) shows a host the SDK does not use"
-            )
-        }
-    }
+    private let committed = PayabliEnvironment.entries.map(DemoEnvironment.init)
 
-    func testTheDemoKnowsEveryEnvironmentTheSDKOffers() {
-        let named = DemoEnvironment.allCases.map(\.sdkEnvironment)
-        XCTAssertEqual(Set(named).count, DemoEnvironment.allCases.count)
+    func testAnEnvironmentShowsWhatTheSDKCallsItAndWhereItPoints() {
         for environment in PayabliEnvironment.entries {
-            XCTAssertTrue(
-                named.contains(environment),
-                "the demo offers no environment for \(environment.name)"
-            )
+            let shown = DemoEnvironment(environment)
+            XCTAssertEqual(shown.label, environment.name)
+            XCTAssertEqual(shown.baseURL, environment.baseURL)
         }
     }
 
     func testALabelNamesItsEnvironmentWhateverItsCase() {
-        XCTAssertEqual(DemoEnvironment.named("  SANDBOX \n"), .sandbox)
-        XCTAssertEqual(DemoEnvironment.named("Production"), .production)
-        XCTAssertNil(DemoEnvironment.named("staging"))
+        XCTAssertEqual(DemoEnvironment.named("  SANDBOX \n", in: committed), .sandbox)
+        XCTAssertEqual(DemoEnvironment.named("Production", in: committed), .production)
+        XCTAssertNil(DemoEnvironment.named("staging", in: committed))
+    }
+
+    func testALabelOutsideTheOfferedListNamesNothing() {
+        XCTAssertNil(DemoEnvironment.named("production", in: [.sandbox]))
     }
 
     func testTheFallbackIsReachableByAnIntegrator() {
         XCTAssertEqual(DemoEnvironment.fallback, .sandbox)
+        XCTAssertTrue(committed.contains(DemoEnvironment.fallback))
     }
 }

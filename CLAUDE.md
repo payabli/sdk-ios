@@ -203,7 +203,8 @@ them, and the script refuses a build where that stops being true.
 - `Sources/PayabliSDKTapToPay/README.md` - the Tap to Pay integration guide
 - `Sources/PayabliSDKPayIn/README.md` - the card-not-present integration guide
 - `Tests/` - one XCTest target per module
-- `Example/PayabliDemo/` - sample app; needs `Secrets.swift`, copy `Secrets.swift.sample`
+- `Example/PayabliDemo/` - sample app; needs `Secrets.swift` and `SDK/ExtraEnvironments.swift`, each
+  copied from its `.sample`
 - `Bridges/` - Flutter, .NET MAUI and React Native wrappers. Not built by SPM; leave them alone during
   Core, PayIn or TapToPay work.
 

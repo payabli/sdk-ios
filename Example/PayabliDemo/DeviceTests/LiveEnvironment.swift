@@ -40,7 +40,7 @@ enum LiveEnvironment {
         }
         // The demo's own environment, which is what the lookup and the app are
         // keyed on. Production is refused: these tests move money.
-        guard let demoEnvironment = DemoEnvironment.named(requested),
+        guard let demoEnvironment = DemoEnvironment.named(requested, in: OfferedEnvironments.demo),
               demoEnvironment != .production
         else {
             XCTFail("PAYABLI_ENV=\(requested) names no environment this run can reach")

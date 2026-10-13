@@ -29,6 +29,8 @@ end to end against sandbox.
 2. Copy `App/Configuration/Secrets.swift.sample` to `Secrets.swift` beside it and
    fill in your sandbox
    credentials. `Secrets.swift` is gitignored.
+   Copy `SDK/ExtraEnvironments.swift.sample` to `ExtraEnvironments.swift` beside
+   it as it is: the app offers sandbox and production.
 3. Set `DEVELOPMENT_TEAM` on the target. The Tap to Pay tab shows the App ID
    to register as an authorized app, `<APP_ID_PREFIX>.com.payabli.example.app`.
 
@@ -96,12 +98,14 @@ PayabliDemo/
                   TapToPayTerminal.swift        owns the reader, hands screens answers
                   TapToPaySessionStatus.swift   the SDK's states, in this app's words
                   PayabliEnvironmentMapping.swift  the demo's environment, in the SDK's terms
+                  OfferedEnvironments.swift     the environments this build offers
+                  ExtraEnvironments.swift       what this machine's build adds (gitignored)
                   DemoCustomerData.swift        the stand-in customer each surface sends
                   PayInSharedConfiguration.swift  what both forms share
                   LoggableError.swift           what a log line may say about a failure
   App/            PayabliDemoQAApp.swift        @main + the tab shell
     Configuration/  ConfigurationQAView.swift   the Config tab
-                    DemoEnvironment.swift       the environments this app offers
+                    DemoEnvironment.swift       an environment, in this app's terms
                     DemoConfiguration.swift     which one runs, and the token host
                     EntryPointLookup.swift      which paypoint each one uses
                     Secrets.swift               credentials only (gitignored)

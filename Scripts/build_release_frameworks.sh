@@ -45,6 +45,14 @@ fi
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$REPO_ROOT"
 
+# A release carries only the committed environments. A file adding one is
+# gitignored, so nothing in the tracked tree shows it is here.
+extras="$(find Sources -name 'PayabliEnvironment+Extras.swift' -print -quit)"
+if [[ -n "$extras" ]]; then
+    echo "error: ${extras} adds environments a release must not carry; remove it and build again" >&2
+    exit 1
+fi
+
 BUILD_CONFIG="${BUILD_CONFIG:-Release}"
 DEVICE_DESTINATION="${DEVICE_DESTINATION:-generic/platform=iOS}"
 SIM_DESTINATION="${SIM_DESTINATION:-generic/platform=iOS Simulator}"
@@ -174,11 +182,23 @@ stage_framework() {
     echo "$framework"
 }
 
+# Every `PayabliEnvironment` static a module interface declares other than the
+# two committed ones, space separated, or nothing. `entries` is an array and
+# does not match. Newer compilers qualify a type with `::`, older ones with `.`.
+environments_beyond_committed() {
+    local swiftmodule="$1"
+    { grep -hoE 'static (var|let) [A-Za-z0-9_`]+: PayabliSDKCore(::|\.)PayabliEnvironment( |$)' \
+        "$swiftmodule"/*.swiftinterface || true; } |
+        awk '{ gsub(/[:`]/, "", $3); if ($3 != "sandbox" && $3 != "production") print $3 }' |
+        sort -u | paste -sd ' ' -
+}
+
 # Refuses a framework an integrator could not import or run: no public
 # interface, a non-public one, a missing resource bundle, a load of a Payabli
 # framework the zip does not ship, a capability that carries its own copy
 # of a shared module instead of loading it, or the card reader, or a load of
-# the framework that holds it, anywhere but the card-present framework.
+# the framework that holds it, anywhere but the card-present framework. Core
+# is also refused for an environment beyond the two committed ones.
 check_framework() {
     local framework="$1" module="$2"
     local interfaces
@@ -216,6 +236,15 @@ check_framework() {
             fi
         done
     done
+    # The refusal at the top reads the source tree; this reads what ships.
+    if [[ "$module" == "PayabliSDKCore" ]]; then
+        local added
+        added="$(environments_beyond_committed "$framework/Modules/$module.swiftmodule")"
+        if [[ -n "$added" ]]; then
+            echo "error: ${framework} offers environments beyond sandbox and production: ${added}" >&2
+            exit 1
+        fi
+    fi
     if [[ "$module" != "PayabliSDKTapToPay" ]]; then
         local loads symbols
         if ! loads="$(otool -L "$framework/$module")" || ! symbols="$(nm -gU "$framework/$module")"; then
