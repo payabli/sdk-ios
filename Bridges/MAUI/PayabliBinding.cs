@@ -18,15 +18,21 @@ using ObjCRuntime;
 
 namespace Payabli.TapToPay
 {
-    // MARK: - PayabliEnvironment (re-declared from PayabliSDKCore)
+    // MARK: - PayabliEnvironment (the closed set the SDK offers)
 
-    [Native]
-    public enum PayabliEnvironment : long
+    [BaseType(typeof(NSObject))]
+    [DisableDefaultCtor]
+    public interface PayabliEnvironment
     {
-        Local = 0,
-        QA = 1,
-        Sandbox = 2,
-        Production = 3,
+        // The two environments the SDK commits, exposed as class properties on
+        // the native side; nothing constructs one.
+        [Static]
+        [Export("sandbox")]
+        PayabliEnvironment Sandbox { get; }
+
+        [Static]
+        [Export("production")]
+        PayabliEnvironment Production { get; }
     }
 
     // MARK: - PayabliTTPPaymentType
