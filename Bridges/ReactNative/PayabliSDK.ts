@@ -208,7 +208,7 @@ export interface PayabliPayInStoredPaymentMethod {
 interface NativePayabliSDKModule {
     configure(config: {
         entryPoint: string;
-        environment: number;
+        environment: PayabliEnvironment;
     }): Promise<void>;
 
     initialize(): Promise<void>;
@@ -242,7 +242,7 @@ interface NativePayabliSDKModule {
 
     configurePayIn(config: {
         entryPoint: string;
-        environment: number;
+        environment: PayabliEnvironment;
     }): Promise<void>;
 
     addCard(params: PayabliPayInCardData): Promise<PayabliPayInStoredPaymentMethod>;
