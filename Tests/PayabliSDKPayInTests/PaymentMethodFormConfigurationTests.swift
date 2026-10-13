@@ -320,7 +320,7 @@ final class PaymentMethodFormConfigurationTests: XCTestCase {
         )
         let config = try PayabliConfig(
             entryPoint: "new-entry",
-            environment: .qa,
+            environment: .production,
 
             tokenProvider: { "access-token" }
         )
@@ -330,7 +330,7 @@ final class PaymentMethodFormConfigurationTests: XCTestCase {
         component.configure(config: config, theme: .default)
 
         XCTAssertEqual(component.entryPoint, "new-entry")
-        XCTAssertEqual(component.environment, .qa)
+        XCTAssertEqual(component.environment, .production)
     }
 
     @MainActor

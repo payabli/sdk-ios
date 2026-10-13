@@ -8,7 +8,6 @@ import PayabliSDKCore
 extension DemoEnvironment {
     var sdkEnvironment: PayabliEnvironment {
         switch self {
-        case .qa: return .qa
         case .sandbox: return .sandbox
         case .production: return .production
         }

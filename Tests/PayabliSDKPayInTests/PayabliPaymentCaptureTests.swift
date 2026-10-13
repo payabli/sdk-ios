@@ -93,7 +93,7 @@ final class PayabliPayInTests: XCTestCase {
 
         component.configure(config: try PayabliConfig(
             entryPoint: "new-entry",
-            environment: .qa,
+            environment: .production,
 
             tokenProvider: { "unused" }
         ))
@@ -104,7 +104,7 @@ final class PayabliPayInTests: XCTestCase {
         ))
 
         XCTAssertEqual(component.entryPoint, "new-entry")
-        XCTAssertEqual(component.environment, .qa)
+        XCTAssertEqual(component.environment, .production)
         let request = try await firstFacadeRequest(from: transport)
         let body = try parseFacadeBody(request)
         XCTAssertEqual(body["entryPoint"] as? String, "new-entry")
