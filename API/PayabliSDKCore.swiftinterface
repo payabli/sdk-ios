@@ -1,0 +1,370 @@
+// swift-interface-format-version: 1.0
+// swift-module-flags: -target arm64-apple-ios16.7 -enable-objc-interop -enable-library-evolution -language-mode 5 -O -enable-experimental-feature DebugDescriptionMacro -module-name PayabliSDKCore -package-name PayabliSDK
+import CoreGraphics
+import CryptoKit
+import Foundation
+import Foundation/*.Bundle*/
+import Foundation/*.ProcessInfo*/
+import Foundation/*.URL*/
+import Security
+import Swift
+import SwiftUI
+import UIKit
+import _Concurrency
+import _StringProcessing
+import _SwiftConcurrencyShims
+import os
+public enum PayabliErrorType : Swift::String, Swift::Sendable, Swift::CaseIterable {
+  case missingToken
+  case tokenExpired
+  case tokenMalformed
+  case tokenProviderFailed
+  case invalidSignature
+  case permissionDenied
+  case sessionBurned
+  case paymentDeclined
+  case serverError
+  case rateLimited
+  case conflict
+  case invalidConfiguration
+  case networkError
+  case decodingError
+  case userCancelled
+  case validation
+  case unknown
+  case sdkInternalError
+  case sessionNotInitialized
+  case deviceKeyUnavailable
+  case deviceSetupUnsupported
+  case deviceServicesOutdated
+  case devicePendingActivation
+  case deviceSetupRequired
+  case deviceSetupRefused
+  case deviceSetupUnavailable
+  case deviceSetupNotConfigured
+  case entryPointRefused
+  case readerCredentialsUnusable
+  case deviceOSUnsupported
+  case deviceHardwareUnsupported
+  case termsNotAccepted
+  case cardPresentNotEnabled
+  case readerDeviceRefused
+  case readerUnavailable
+  case readerSessionExpired
+  case tapNotCompleted
+  case paymentNotOpened
+  case cardDeclined
+  case paymentOutcomeUnknown
+  case paymentNotClosed
+  case activationCodeMalformed
+  case activationCodeIncorrect
+  case activationCodeExpired
+  case activationAttemptsExhausted
+  case activationCodeNotIssued
+  case deviceNotPending
+  case terminalNotReady
+  case tooManyOpenCharges
+  case paymentNotHeld
+  case deviceIdentityUnavailable
+  public init?(rawValue: Swift::String)
+  public typealias AllCases = [PayabliSDKCore::PayabliErrorType]
+  public typealias RawValue = Swift::String
+  nonisolated public static var allCases: [PayabliSDKCore::PayabliErrorType] {
+    get
+  }
+  public var rawValue: Swift::String {
+    get
+  }
+}
+public enum PayabliErrorCategory : Swift::String, Swift::Sendable, Swift::CaseIterable {
+  case credential
+  case retryLater
+  case outcomeUnknown
+  case configuration
+  case invalidRequest
+  case declined
+  case device
+  case `internal`
+  public init?(rawValue: Swift::String)
+  public typealias AllCases = [PayabliSDKCore::PayabliErrorCategory]
+  public typealias RawValue = Swift::String
+  nonisolated public static var allCases: [PayabliSDKCore::PayabliErrorCategory] {
+    get
+  }
+  public var rawValue: Swift::String {
+    get
+  }
+}
+extension PayabliSDKCore::PayabliErrorType {
+  public var number: Swift::Int {
+    get
+  }
+  public var message: Swift::String {
+    get
+  }
+  public var category: PayabliSDKCore::PayabliErrorCategory {
+    get
+  }
+}
+public protocol PayabliError : Foundation::LocalizedError {
+  var type: PayabliSDKCore::PayabliErrorType { get }
+  var reason: Swift::String { get }
+  var detail: Swift::String? { get }
+}
+extension PayabliSDKCore::PayabliError {
+  public var code: Swift::Int {
+    get
+  }
+  public var category: PayabliSDKCore::PayabliErrorCategory {
+    get
+  }
+  public var message: Swift::String {
+    get
+  }
+  public var errorDescription: Swift::String? {
+    get
+  }
+}
+public struct PayabliGenericError : PayabliSDKCore::PayabliError {
+  public let type: PayabliSDKCore::PayabliErrorType
+  public let reason: Swift::String
+  public let detail: Swift::String?
+  public let underlying: (any Swift::Error)?
+  public init(type: PayabliSDKCore::PayabliErrorType, reason: Swift::String, detail: Swift::String? = nil, underlying: (any Swift::Error)? = nil)
+}
+public struct PayabliFieldError : Swift::Decodable, Swift::Sendable {
+  public let message: Swift::String
+  public let suggestion: Swift::String?
+  public init(from decoder: any Swift::Decoder) throws
+}
+public struct PayabliValidationError : PayabliSDKCore::PayabliError, Swift::Decodable {
+  public let problemType: Swift::String?
+  public let title: Swift::String?
+  public let status: Swift::Int?
+  public let detail: Swift::String?
+  public let instance: Swift::String?
+  public let rawCode: Swift::String?
+  public let errors: [Swift::String : [PayabliSDKCore::PayabliFieldError]]?
+  public let token: Swift::String?
+  public var type: PayabliSDKCore::PayabliErrorType {
+    get
+  }
+  public var reason: Swift::String {
+    get
+  }
+  public var errorDescription: Swift::String? {
+    get
+  }
+  public init(from decoder: any Swift::Decoder) throws
+}
+public struct PayabliServerError : PayabliSDKCore::PayabliError, Swift::Decodable, PayabliSDKCore::PayabliRetryAfter {
+  public let problemType: Swift::String?
+  public let title: Swift::String?
+  public let status: Swift::Int?
+  public let detail: Swift::String?
+  public let instance: Swift::String?
+  public let httpStatus: Swift::Int?
+  public let retryAfter: Foundation::TimeInterval?
+  public var type: PayabliSDKCore::PayabliErrorType {
+    get
+  }
+  public var reason: Swift::String {
+    get
+  }
+  public init(from decoder: any Swift::Decoder) throws
+}
+public struct PayabliDeclineError : PayabliSDKCore::PayabliError, Swift::Decodable {
+  public let rawCode: Swift::String?
+  public let reason: Swift::String
+  public let explanation: Swift::String?
+  public let action: Swift::String?
+  public var type: PayabliSDKCore::PayabliErrorType {
+    get
+  }
+  public var detail: Swift::String? {
+    get
+  }
+  public var errorDescription: Swift::String? {
+    get
+  }
+  public init(from decoder: any Swift::Decoder) throws
+}
+public enum PayabliPaymentError : PayabliSDKCore::PayabliError, PayabliSDKCore::PayabliRetryAfter, Swift::Sendable {
+  case decline(PayabliSDKCore::PayabliDeclineError)
+  case validation(PayabliSDKCore::PayabliValidationError)
+  case server(PayabliSDKCore::PayabliServerError)
+  case generic(PayabliSDKCore::PayabliGenericError)
+  public var asPayabliError: any PayabliSDKCore::PayabliError {
+    get
+  }
+  public var type: PayabliSDKCore::PayabliErrorType {
+    get
+  }
+  public var reason: Swift::String {
+    get
+  }
+  public var detail: Swift::String? {
+    get
+  }
+  public var retryAfter: Foundation::TimeInterval? {
+    get
+  }
+  public var errorDescription: Swift::String? {
+    get
+  }
+}
+public struct PayabliRateLimitError : PayabliSDKCore::PayabliError, PayabliSDKCore::PayabliRetryAfter {
+  public let retryAfter: Foundation::TimeInterval?
+  public var type: PayabliSDKCore::PayabliErrorType {
+    get
+  }
+  public var reason: Swift::String {
+    get
+  }
+  public var detail: Swift::String? {
+    get
+  }
+  public init(retryAfter: Foundation::TimeInterval? = nil)
+}
+public protocol PayabliRetryAfter {
+  var retryAfter: Foundation::TimeInterval? { get }
+}
+public enum PayabliCore {
+  public static var version: Swift::String {
+    get
+  }
+}
+public struct PayabliConfig : Swift::Sendable {
+  public let entryPoint: Swift::String
+  public let environment: PayabliSDKCore::PayabliEnvironment
+  public let telemetryEnabled: Swift::Bool
+  public init(entryPoint: Swift::String, environment: PayabliSDKCore::PayabliEnvironment, tokenProvider: @escaping PayabliSDKCore::PayabliTokenRefresh, telemetryEnabled: Swift::Bool = true) throws
+}
+extension PayabliSDKCore::PayabliConfig : Swift::CustomStringConvertible {
+  public var description: Swift::String {
+    get
+  }
+}
+@objc public enum PayabliEnvironment : Swift::Int, Swift::Sendable {
+  case qa = 1
+  case sandbox = 2
+  case production = 3
+  public var baseURL: Foundation::URL {
+    get
+  }
+  public init?(rawValue: Swift::Int)
+  public typealias RawValue = Swift::Int
+  public var rawValue: Swift::Int {
+    get
+  }
+}
+@_inheritsConvenienceInitializers @_hasMissingDesignatedInitializers @objc(PayabliSessionObjC) final public class PayabliSessionObjC : ObjectiveC::NSObject {
+  @objc public static var deviceId: Swift::String? {
+    @objc get
+  }
+  @objc public static func initialize(tokenHandler: @escaping (@escaping (Swift::String?, Foundation::NSError?) -> Swift::Void) -> Swift::Void, entryPoint: Swift::String, environment: PayabliSDKCore::PayabliEnvironment, telemetryEnabled: Swift::Bool) async throws
+  @objc deinit
+}
+@_hasMissingDesignatedInitializers final public class PayabliSession : @unchecked Swift::Sendable {
+  final public var deviceId: Swift::String? {
+    get
+  }
+  @discardableResult
+  public static func initialize(config: PayabliSDKCore::PayabliConfig) async throws -> PayabliSDKCore::PayabliSession
+  @objc deinit
+}
+@objc final public class PayabliTheme : ObjectiveC::NSObject, Swift::Sendable {
+  final public let primaryColorHex: Swift::String
+  final public let cornerRadius: CoreFoundation::CGFloat
+  final public let fontName: Swift::String?
+  public init(primaryColorHex: Swift::String = "#10B981", cornerRadius: CoreFoundation::CGFloat = 8, fontName: Swift::String? = nil)
+  @objc public static let `default`: PayabliSDKCore::PayabliTheme
+  @objc deinit
+}
+extension PayabliSDKCore::PayabliTheme {
+  final public var primaryColor: SwiftUICore::Color {
+    get
+  }
+  final public var cornerShape: SwiftUICore::RoundedRectangle {
+    get
+  }
+}
+public typealias PayabliTokenRefresh = @Sendable () async throws -> Swift::String
+public protocol TelemetryTransport : Swift::Sendable {
+  func send(_ batch: [PayabliSDKCore::TelemetryEvent]) async
+}
+public actor TelemetryClient {
+  public struct Configuration : Swift::Sendable {
+    public let flushInterval: Foundation::TimeInterval
+    public let batchSize: Swift::Int
+    public let enabled: Swift::Bool
+    public let sdkVersion: Swift::String
+    public let entry: Swift::String
+    public let environment: Swift::String
+    public init(flushInterval: Foundation::TimeInterval = 30, batchSize: Swift::Int = 20, enabled: Swift::Bool = true, sdkVersion: Swift::String = PayabliCore.version, entry: Swift::String, environment: Swift::String)
+  }
+  final public let configuration: PayabliSDKCore::TelemetryClient.PayabliSDKCore::Configuration
+  final public let sessionId: Swift::String
+  public init(configuration: PayabliSDKCore::TelemetryClient.PayabliSDKCore::Configuration, transport: any PayabliSDKCore::TelemetryTransport, sessionId: Swift::String = UUID().uuidString)
+  public func setDeviceId(_ rawId: Swift::String)
+  public func emit(_ name: Swift::String, properties: [Swift::String : Swift::String] = [:]) async
+  public func flush() async
+  public var bufferedCount: Swift::Int {
+    get
+  }
+  @objc deinit
+  @_semantics("defaultActor") nonisolated final public var unownedExecutor: _Concurrency::UnownedSerialExecutor {
+    get
+  }
+}
+public struct TelemetryEvent : Swift::Encodable, Swift::Sendable {
+  public static let schemaVersion: Swift::Int
+  public let schemaVersion: Swift::Int
+  public let sdkVersion: Swift::String
+  public let timestamp: Foundation::Date
+  public let sessionId: Swift::String
+  public let deviceIdHash: Swift::String?
+  public let entry: Swift::String
+  public let environment: Swift::String
+  public let event: Swift::String
+  public let properties: [Swift::String : Swift::String]
+  public init(sdkVersion: Swift::String, sessionId: Swift::String, deviceIdHash: Swift::String?, entry: Swift::String, environment: Swift::String, event: Swift::String, properties: [Swift::String : Swift::String], timestamp: Foundation::Date = Date())
+  public func encode(to encoder: any Swift::Encoder) throws
+}
+public enum TelemetryEventName {
+  public static let tokenizationStarted: Swift::String
+  public static let tokenizationSucceeded: Swift::String
+  public static let tokenizationFailed: Swift::String
+  public static let tokenizationCancelled: Swift::String
+  public static let formPresented: Swift::String
+  public static let formValidationError: Swift::String
+  public static let ttpInitializeStarted: Swift::String
+  public static let ttpInitializeSucceeded: Swift::String
+  public static let ttpInitializeFailed: Swift::String
+  public static let ttpAttestationStarted: Swift::String
+  public static let ttpAttestationSucceeded: Swift::String
+  public static let ttpAttestationFailed: Swift::String
+  public static let ttpChargeStarted: Swift::String
+  public static let ttpChargeSucceeded: Swift::String
+  public static let ttpChargeFailed: Swift::String
+  public static let ttpNfcStarted: Swift::String
+  public static let ttpNfcSucceeded: Swift::String
+  public static let ttpNfcFailed: Swift::String
+  public static let ttpReinitializeStarted: Swift::String
+  public static let ttpReinitializeSucceeded: Swift::String
+  public static let ttpStateChanged: Swift::String
+  public static let sdkInitialized: Swift::String
+  public static let telemetryDisabled: Swift::String
+  public static let authTokenAcquired: Swift::String
+  public static let authTokenFailed: Swift::String
+  public static let authTokenRefreshed: Swift::String
+}
+extension PayabliSDKCore::PayabliErrorType : Swift::Equatable {}
+extension PayabliSDKCore::PayabliErrorType : Swift::Hashable {}
+extension PayabliSDKCore::PayabliErrorType : Swift::RawRepresentable {}
+extension PayabliSDKCore::PayabliErrorCategory : Swift::Equatable {}
+extension PayabliSDKCore::PayabliErrorCategory : Swift::Hashable {}
+extension PayabliSDKCore::PayabliErrorCategory : Swift::RawRepresentable {}
+extension PayabliSDKCore::PayabliEnvironment : Swift::Equatable {}
+extension PayabliSDKCore::PayabliEnvironment : Swift::Hashable {}
+extension PayabliSDKCore::PayabliEnvironment : Swift::RawRepresentable {}
