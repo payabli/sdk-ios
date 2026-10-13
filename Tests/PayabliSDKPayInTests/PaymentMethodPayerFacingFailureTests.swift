@@ -3,104 +3,103 @@ import Foundation
 @testable import PayabliSDKPayIn
 import XCTest
 
-/// A failure the payer cannot fix reaches the host through the thrown error and leaves the form
-/// drawing nothing about it.
+/// A failed submission shows the payer its category's message and never the error's own text, while the
+/// thrown error carries the real failure to the host.
 @MainActor
 final class PaymentMethodPayerFacingFailureTests: XCTestCase {
-    func testATokenProviderFailureReachesTheCallerAndDrawsNothing() async throws {
-        let viewModel = filledForm(on: flowWhoseTokenProviderThrows())
-
-        do {
-            _ = try await viewModel.submit()
-            XCTFail("a token provider that throws fails the submission")
-        } catch let error as PayabliGenericError {
-            XCTAssertEqual(error.type, .tokenProviderFailed)
-            let held = Self.storedValues(of: viewModel)
-            XCTAssertFalse(held.contains(error.reason), "the form holds the failure's text")
-            XCTAssertFalse(held.contains(error.detail ?? error.reason), "the form holds the failure's text")
-        }
-        XCTAssertEqual(DrawnForm(viewModel), DrawnForm.afterAFailureNamingNoField)
+    func testADeclineDrawsTheDeclinedMessage() async {
+        await assertDraws(
+            "The payment was declined. Try another payment method.",
+            on: flowOnTransport(MockPaymentCaptureTransport(statusCode: 402, responseBody: Self.declineBody)),
+            category: .declined
+        )
     }
 
-    func testADeclineANetworkFailureAndATokenFailureLookTheSameToThePayer() async {
-        let decline = flowOnTransport(MockPaymentCaptureTransport(statusCode: 402, responseBody: Self.declineBody))
-        let network = flowOnTransport(OfflineTransport())
-        let token = flowWhoseTokenProviderThrows()
+    func testARefusalForTooManyRequestsDrawsTheRetryMessage() async {
+        await assertDraws(
+            "The payment couldn't be completed. Please try again.",
+            on: flowOnTransport(RecordingIdempotencyTransport(body: Data(), status: 429)),
+            category: .retryLater
+        )
+    }
 
-        var drawn: [DrawnForm] = []
-        for flow in [decline, network, token] {
-            let viewModel = filledForm(on: flow)
-            _ = try? await viewModel.submit()
-            drawn.append(DrawnForm(viewModel))
-        }
+    func testANetworkFailureDrawsTheUnknownOutcomeMessage() async {
+        await assertDraws(
+            "This payment may have gone through. Check before paying again.",
+            on: flowOnTransport(RecordingIdempotencyTransport(failure: URLError(.notConnectedToInternet))),
+            category: .outcomeUnknown
+        )
+    }
 
-        XCTAssertEqual(drawn[0], DrawnForm.afterAFailureNamingNoField, "decline")
-        XCTAssertEqual(drawn[1], DrawnForm.afterAFailureNamingNoField, "network")
-        XCTAssertEqual(drawn[2], DrawnForm.afterAFailureNamingNoField, "token provider")
+    func testATokenProviderFailureDrawsTheDefaultMessage() async {
+        await assertDraws(
+            "The payment couldn't be completed.",
+            on: flowWhoseTokenProviderThrows(),
+            category: .credential
+        )
+    }
+
+    func testARefusalNamingAFieldOnScreenMarksItAndDrawsNoMessage() async {
+        let viewModel = filledForm(
+            on: flowOnTransport(MockPaymentCaptureTransport(
+                statusCode: 400,
+                responseBody: Self.refusal(naming: ["paymentMethod.cardnumber", "entryPoint"])
+            ))
+        )
+
+        _ = try? await viewModel.submit()
+
+        XCTAssertEqual(viewModel.rejectedFields, [.cardNumber])
+        XCTAssertNil(viewModel.errorMessage)
+    }
+
+    func testARefusalNamingOnlyFieldsOffScreenDrawsItsCategoryMessage() async {
+        let viewModel = filledForm(
+            on: flowOnTransport(MockPaymentCaptureTransport(
+                statusCode: 400,
+                responseBody: Self.refusal(naming: ["entryPoint", "paymentDetails.totalAmount"])
+            ))
+        )
+
+        _ = try? await viewModel.submit()
+
+        XCTAssertEqual(viewModel.rejectedFields, [])
+        XCTAssertEqual(viewModel.errorMessage, "The payment couldn't be completed.")
     }
 
     // MARK: - Fixtures
+
+    /// Submits a filled form on `flow`, and asserts the thrown error is the real failure, the form draws
+    /// `message`, and nothing the form holds carries the error's own text.
+    private func assertDraws(
+        _ message: String,
+        on flow: PayabliPayIn,
+        category: PayabliErrorCategory,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) async {
+        let viewModel = filledForm(on: flow)
+
+        do {
+            _ = try await viewModel.submit()
+            XCTFail("the submission fails", file: file, line: line)
+        } catch let error as any PayabliError {
+            XCTAssertEqual(error.category, category, file: file, line: line)
+            XCTAssertEqual(viewModel.errorMessage, message, file: file, line: line)
+            XCTAssertEqual(viewModel.rejectedFields, [], file: file, line: line)
+            let held = Self.storedValues(of: viewModel)
+            for text in [error.reason, error.detail].compactMap({ $0 }) where text != message {
+                XCTAssertFalse(held.contains(text), "the form holds \"\(text)\"", file: file, line: line)
+            }
+        } catch {
+            XCTFail("Wrong error: \(error)", file: file, line: line)
+        }
+    }
 
     /// Every stored property of the form's model, rendered, so an assertion can sweep it for text the
     /// form must not hold.
     private static func storedValues(of viewModel: PayabliPayInViewModel) -> String {
         Mirror(reflecting: viewModel).children.map { String(describing: $0.value) }.joined(separator: "\n")
-    }
-
-    /// Everything the form draws once a submission has failed.
-    private struct DrawnForm: Equatable {
-        let rejectedFields: Set<PayabliPayInField>
-        let cardholderName: String
-        let cardNumber: String
-        let cardExpiration: String
-        let cardCvv: String
-        let cardZip: String
-        let canSubmit: Bool
-        let isSubmitting: Bool
-
-        @MainActor
-        init(_ viewModel: PayabliPayInViewModel) {
-            rejectedFields = viewModel.rejectedFields
-            cardholderName = viewModel.cardholderName
-            cardNumber = viewModel.cardNumber
-            cardExpiration = viewModel.cardExpiration
-            cardCvv = viewModel.cardCvv
-            cardZip = viewModel.cardZip
-            canSubmit = viewModel.canSubmit
-            isSubmitting = viewModel.isSubmitting
-        }
-
-        private init(
-            rejectedFields: Set<PayabliPayInField>,
-            cardholderName: String,
-            cardNumber: String,
-            cardExpiration: String,
-            cardCvv: String,
-            cardZip: String,
-            canSubmit: Bool,
-            isSubmitting: Bool
-        ) {
-            self.rejectedFields = rejectedFields
-            self.cardholderName = cardholderName
-            self.cardNumber = cardNumber
-            self.cardExpiration = cardExpiration
-            self.cardCvv = cardCvv
-            self.cardZip = cardZip
-            self.canSubmit = canSubmit
-            self.isSubmitting = isSubmitting
-        }
-
-        /// No field marked, the card's secrets cleared, and the payer's name and postal code kept.
-        static let afterAFailureNamingNoField = DrawnForm(
-            rejectedFields: [],
-            cardholderName: "Jane Doe",
-            cardNumber: "",
-            cardExpiration: "",
-            cardCvv: "",
-            cardZip: "33139",
-            canSubmit: false,
-            isSubmitting: false
-        )
     }
 
     private func filledForm(on component: PayabliPayIn) -> PayabliPayInViewModel {
@@ -155,17 +154,22 @@ final class PaymentMethodPayerFacingFailureTests: XCTestCase {
       "token": null
     }
     """
-}
 
-private actor OfflineTransport: PayabliTransport {
-    func perform(_: PayabliRequest) async throws -> PayabliResponse {
-        throw URLError(.notConnectedToInternet)
-    }
-
-    func performV2<T: Decodable & Sendable>(
-        _: PayabliRequest,
-        decoding _: T.Type
-    ) async throws -> PayabliV2Envelope<T> {
-        throw URLError(.notConnectedToInternet)
+    private static func refusal(naming parameters: [String]) -> String {
+        let errors = parameters
+            .map { #""\#($0)":[{"message":"Not a valid value.","suggestion":"Check the value."}]"# }
+            .joined(separator: ",")
+        return """
+        {
+          "type": "about:blank",
+          "title": "Bad Request",
+          "status": 400,
+          "detail": "Invalid parameter",
+          "instance": "/api/v2/MoneyIn/getpaid",
+          "code": "E7002",
+          "errors": {\(errors)},
+          "token": null
+        }
+        """
     }
 }

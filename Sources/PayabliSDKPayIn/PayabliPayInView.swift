@@ -8,6 +8,7 @@ public struct PayabliPayInView: View {
     @StateObject var viewModel: PayabliPayInViewModel
     @State var isExpirationPickerPresented = false
     @FocusState var focusedField: PayabliPayInField?
+    @AccessibilityFocusState var isErrorAccessibilityFocused: Bool
     @Environment(\.payabliPayInStyle) var environmentStyle
     @Environment(\.dynamicTypeSize) var dynamicTypeSize
 
@@ -44,6 +45,10 @@ public struct PayabliPayInView: View {
         VStack(alignment: .leading, spacing: resolvedStyle.layout.contentSpacing) {
             header
 
+            if configuration.errorMessagePlacement == .top {
+                errorMessageView
+            }
+
             if viewModel.availableMethods.count > 1 {
                 methodSelector
             }
@@ -56,6 +61,10 @@ public struct PayabliPayInView: View {
                         fieldSection(drawn.section)
                     }
                 }
+            }
+
+            if configuration.errorMessagePlacement == .aboveSubmitButton {
+                errorMessageView
             }
 
             submitButton
@@ -87,6 +96,9 @@ public struct PayabliPayInView: View {
         .onReceive(component.$requestConfiguration) { _ in
             syncViewModelConfiguration()
         }
+        .onChange(of: viewModel.errorMessage) { message in
+            announceErrorMessage(message)
+        }
         .onChange(of: viewModel.rejectedFields) { [marked = viewModel.rejectedFields] rejected in
             announceRejectedFields(rejected.subtracting(marked))
         }
@@ -95,6 +107,14 @@ public struct PayabliPayInView: View {
                 field: .cardNumber,
                 message: message
             )
+        }
+    }
+
+    @ViewBuilder
+    var errorMessageView: some View {
+        if let errorMessage = viewModel.errorMessage {
+            errorText(errorMessage)
+                .accessibilityFocused($isErrorAccessibilityFocused)
         }
     }
 
@@ -878,6 +898,15 @@ extension PayabliPayInView {
         resolvedStyle.submitButton.backgroundColor ?? resolvedStyle.accentColor
     }
 
+    func errorText(_ message: String) -> some View {
+        Text(message)
+            .font(resolvedStyle.error.font)
+            .foregroundStyle(resolvedStyle.error.color)
+            .fixedSize(horizontal: false, vertical: true)
+            .accessibilityLabel("Payment error")
+            .accessibilityValue(message)
+    }
+
     func fieldErrorText(
         _ message: String,
         for field: PayabliPayInField
@@ -995,6 +1024,12 @@ extension PayabliPayInView {
 
     func expirationWheelMonthLabel(_ month: Int) -> String {
         String(format: "%02d", month)
+    }
+
+    func announceErrorMessage(_ message: String?) {
+        guard let message else { return }
+        UIAccessibility.post(notification: .announcement, argument: message)
+        isErrorAccessibilityFocused = true
     }
 
     /// Announces the fields a refusal has just marked, in the order the form draws them.

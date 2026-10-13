@@ -84,6 +84,7 @@ final class PayabliPayInViewModel: ObservableObject {
     @Published private(set) var isSubmitting = false
     /// The operation the submission in flight is sending, or nil when none is.
     @Published private(set) var submittingOperation: PayabliPayInOperation?
+    @Published private(set) var errorMessage: String?
     /// The fields the last refusal named, until the payer edits one or its box leaves the screen.
     @Published var rejectedFields: Set<PayabliPayInField> = []
 
@@ -269,9 +270,12 @@ final class PayabliPayInViewModel: ObservableObject {
     }
 
     func submit() async throws -> PayabliPayInResult {
+        errorMessage = nil
         clearMarks()
         guard !isSubmitting else {
-            throw PayabliPayInError.submissionInProgress
+            let error = PayabliPayInError.submissionInProgress
+            errorMessage = PayabliPayInFailureMessage.text(for: error)
+            throw error
         }
         isSubmitting = true
         submittingOperation = component.operation
@@ -283,7 +287,12 @@ final class PayabliPayInViewModel: ObservableObject {
 
         // Refused before anything else, and without clearing what the payer typed: only the host can change it.
         if component.operation != .storePaymentMethod, let details = component.requestConfiguration?.paymentDetails {
-            try details.validate()
+            do {
+                try details.validate()
+            } catch {
+                errorMessage = PayabliPayInFailureMessage.text(for: error)
+                throw error
+            }
         }
 
         do {
@@ -315,6 +324,8 @@ final class PayabliPayInViewModel: ObservableObject {
             if component === submittedFlow {
                 rejectedFields = PayabliPayInRejectedFields.fields(in: error).intersection(activeFields)
             }
+            // A marked field is the whole answer; a failure that marks none on screen shows its message.
+            errorMessage = rejectedFields.isEmpty ? PayabliPayInFailureMessage.text(for: error) : nil
             throw error
         }
     }
