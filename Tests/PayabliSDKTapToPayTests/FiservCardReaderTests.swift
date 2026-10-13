@@ -59,7 +59,7 @@ final class FiservCardReaderTests: XCTestCase {
         }
     #endif
 
-    /// Eligibility is platform/hardware-only (PRD FR-11J.2) and is called before
+    /// Eligibility is platform/hardware-only and is called before
     /// `/config` delivers credentials — so a fresh reader on a supported device
     /// must report `success`.
     func testEligibilityIsPlatformOnly() async {

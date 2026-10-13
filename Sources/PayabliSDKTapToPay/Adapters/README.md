@@ -5,7 +5,7 @@ wraps a specific processor SDK (Fiserv today, other tomorrow)
 and exposes it through the processor-agnostic contract that `PayabliTTP`
 consumes.
 
-Folder layout is fixed by PRD §7.2. Every adapter and its companion files
+Folder layout is fixed. Every adapter and its companion files
 live here; no sub-folders.
 
 ---
@@ -17,7 +17,7 @@ order shown below, except `areTermsAccepted()` and `presentTerms()`, which a hos
 
 | Method | When the facade calls it | Adapter must do |
 |---|---|---|
-| `static var providerId: String` | `CardReadResult.provider` | Return a stable identifier (`"fiserv"`, `"visa"`, ...). Goes into the API payload `provider` field so the backend routes decryption correctly (FR-11J.3). |
+| `static var providerId: String` | `CardReadResult.provider` | Return a stable identifier (`"fiserv"`, `"visa"`, ...). Goes into the API payload `provider` field so the backend routes decryption correctly. |
 | `checkEligibility() async` | Before any UI, before `/config` is fetched | Validate platform, OS version, hardware (e.g. `PaymentCardReader.isSupported`). **Must not require credentials.** |
 | `configure(credentials: [String:String]) throws` | After `/config` returns `providerCredentials` | Validate required keys, map to a typed struct, stash it in `self`. Throw `PayabliTTPError.readerSetupFailed(reason:)` on missing / malformed input. |
 | `prepareReader(onReaderEvent:) async throws` | Right after `configure(...)` | Build the processor SDK's reader, request session token, initialize session. **Never present the platform's terms here**: a merchant who has not accepted is reported by throwing `PayabliTTPError.termsNotAccepted` without clearing reader state, and presenting is `presentTerms()`'s job when a host asks. **Drop `self.credentials` as soon as the SDK has its own copy.** Hand every reader event to `onReaderEvent`; section 4.5 carries the rules. |
@@ -61,7 +61,7 @@ the API, so only put string-safe audit info there.
 
 ---
 
-## 3. Credentials policy (NFR-5D)
+## 3. Credentials policy
 
 **Hard rule:** credentials never touch disk, Keychain, UserDefaults, or any
 persistence. RAM only.
@@ -209,4 +209,3 @@ source tree, and the facade holds its provider directly.
 - `../../Models/TapToPayCardRead.swift` — `CardReadRequest` / `CardReadResult`
 - `../PayabliTTPError.swift` — `PayabliTTPError` cases
 - `FiservCardReader.swift` + `FiservCardReader+Errors.swift` — reference implementation
-- PRD §7.2 (directory layout), FR-11A (provider abstraction), FR-11B (Fiserv), NFR-5D (runtime-only credentials)
