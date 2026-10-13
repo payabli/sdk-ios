@@ -70,7 +70,7 @@ line_length:
   ignores_function_declarations: true
 
 # Facade classes (PayabliPayIn) and turn-key SwiftUI forms (CardFormView,
-# ACHFormView) run long by design per PRD §7.2. Raise the warning bar above
+# ACHFormView) run long by design. Raise the warning bar above
 # their current footprint so reviewers still get yelled at on further growth.
 file_length:
   warning: 800

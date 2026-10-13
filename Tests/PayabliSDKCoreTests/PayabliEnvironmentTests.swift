@@ -2,7 +2,7 @@ import PayabliSDKCore
 import XCTest
 
 final class PayabliEnvironmentTests: XCTestCase {
-    func testBaseURLsMatchPRD() {
+    func testEachEnvironmentHasItsOwnBaseURL() {
         #if DEBUG
             XCTAssertEqual(PayabliEnvironment.local.baseURL.absoluteString, "https://wallets-test.ngrok.app")
         #endif

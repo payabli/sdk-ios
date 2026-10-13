@@ -9,7 +9,7 @@ final class SessionManagerTests: XCTestCase {
         XCTAssertFalse(sm.isReady)
     }
 
-    // MARK: - Valid transitions (PRD §17.2)
+    // MARK: - Valid transitions
 
     func testColdPathTransitions() {
         let sm = SessionManager()
