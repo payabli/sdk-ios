@@ -28,7 +28,7 @@ final class PayabliEnvironmentTests: XCTestCase {
 
     func testEqualFieldsAreNotOneEnvironment() {
         // Equality is identity: a second value with an equal name and origin
-        // stays a second environment, so two of them are never one entry.
+        // stays a second environment.
         // swiftlint:disable force_unwrapping
         let twin = PayabliEnvironment(
             name: "sandbox",
