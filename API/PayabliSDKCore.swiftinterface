@@ -245,18 +245,18 @@ extension PayabliSDKCore::PayabliConfig : Swift::CustomStringConvertible {
     get
   }
 }
-@objc public enum PayabliEnvironment : Swift::Int, Swift::Sendable {
-  case qa = 1
-  case sandbox = 2
-  case production = 3
-  public var baseURL: Foundation::URL {
+@_hasMissingDesignatedInitializers @objc final public class PayabliEnvironment : ObjectiveC::NSObject, Swift::Sendable {
+  final public let name: Swift::String
+  final public let baseURL: Foundation::URL
+  @objc override final public var description: Swift::String {
+    @objc get
+  }
+  public static var entries: [PayabliSDKCore::PayabliEnvironment] {
     get
   }
-  public init?(rawValue: Swift::Int)
-  public typealias RawValue = Swift::Int
-  public var rawValue: Swift::Int {
-    get
-  }
+  @objc public static let sandbox: PayabliSDKCore::PayabliEnvironment
+  @objc public static let production: PayabliSDKCore::PayabliEnvironment
+  @objc deinit
 }
 @_inheritsConvenienceInitializers @_hasMissingDesignatedInitializers @objc(PayabliSessionObjC) final public class PayabliSessionObjC : ObjectiveC::NSObject {
   @objc public static var deviceId: Swift::String? {
@@ -365,6 +365,3 @@ extension PayabliSDKCore::PayabliErrorType : Swift::RawRepresentable {}
 extension PayabliSDKCore::PayabliErrorCategory : Swift::Equatable {}
 extension PayabliSDKCore::PayabliErrorCategory : Swift::Hashable {}
 extension PayabliSDKCore::PayabliErrorCategory : Swift::RawRepresentable {}
-extension PayabliSDKCore::PayabliEnvironment : Swift::Equatable {}
-extension PayabliSDKCore::PayabliEnvironment : Swift::Hashable {}
-extension PayabliSDKCore::PayabliEnvironment : Swift::RawRepresentable {}
