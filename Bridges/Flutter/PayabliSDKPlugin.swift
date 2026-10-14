@@ -120,15 +120,20 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
 
     // MARK: - configure
 
+    /// The environment the channel names, among the ones the SDK offers.
+    private func environmentNamed(_ value: Any?) -> PayabliEnvironment? {
+        guard let name = value as? String else { return nil }
+        return PayabliEnvironment.entries.first { $0.name == name }
+    }
+
     private func handleConfigure(_ arguments: Any?, result: @escaping FlutterResult) {
         guard let args = arguments as? [String: Any],
               let entryPoint = args["entryPoint"] as? String,
-              let envRaw = args["environment"] as? Int,
-              let environment = PayabliEnvironment(rawValue: envRaw)
+              let environment = environmentNamed(args["environment"])
         else {
             result(FlutterError(
                 code: "INVALID_ARGS",
-                message: "Missing entryPoint/environment",
+                message: "Missing or unknown entryPoint/environment",
                 details: nil
             ))
             return
@@ -362,12 +367,11 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
     private func handleConfigurePayIn(_ arguments: Any?, result: @escaping FlutterResult) {
         guard let args = arguments as? [String: Any],
               let entryPoint = args["entryPoint"] as? String,
-              let envRaw = args["environment"] as? Int,
-              let environment = PayabliEnvironment(rawValue: envRaw)
+              let environment = environmentNamed(args["environment"])
         else {
             result(FlutterError(
                 code: "INVALID_ARGS",
-                message: "Missing entryPoint/environment",
+                message: "Missing or unknown entryPoint/environment",
                 details: nil
             ))
             return

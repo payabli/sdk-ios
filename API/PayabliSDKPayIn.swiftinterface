@@ -1,0 +1,995 @@
+// swift-interface-format-version: 1.0
+// swift-module-flags: -target arm64-apple-ios16.7 -enable-objc-interop -enable-library-evolution -language-mode 5 -O -enable-experimental-feature DebugDescriptionMacro -module-name PayabliSDKPayIn -package-name PayabliSDK
+import Combine
+import CoreGraphics
+import DeveloperToolsSupport
+import Foundation
+import Foundation/*.Bundle*/
+import Foundation/*.ProcessInfo*/
+import Foundation/*.URL*/
+import PayabliSDKCore
+import Swift
+import SwiftUI
+import UIKit
+import _Concurrency
+import _StringProcessing
+import _SwiftConcurrencyShims
+@_hasMissingDesignatedInitializers @objc(PayabliPayInStoredPaymentMethodObjC) final public class PayabliPayInStoredPaymentMethodObjC : ObjectiveC::NSObject {
+  @objc final public let storedMethodId: Swift::String?
+  @objc final public let method: Swift::String
+  @objc final public let methodReferenceId: Swift::String?
+  @objc final public let resultCode: Foundation::NSNumber?
+  @objc final public let resultText: Swift::String?
+  @objc final public let customerId: Foundation::NSNumber?
+  @objc final public let responseText: Swift::String
+  @objc final public let apiResponse: Foundation::NSDictionary
+  @objc deinit
+}
+@_inheritsConvenienceInitializers @_hasMissingDesignatedInitializers @_Concurrency::MainActor @objc(PayabliPayInObjC) final public class PayabliPayInObjC : ObjectiveC::NSObject {
+  @objc @_Concurrency::MainActor public static func create() throws -> PayabliSDKPayIn::PayabliPayInObjC
+  @objc @_Concurrency::MainActor final public func addCard(cardNumber: Swift::String, expiration: Swift::String, cardholderName: Swift::String, cvv: Swift::String, billingZip: Swift::String, createAnonymous: Swift::Bool, forceCustomerCreation: Swift::Bool, temporary: Swift::Bool, source: Swift::String?, completion: @escaping (PayabliSDKPayIn::PayabliPayInStoredPaymentMethodObjC?, Foundation::NSError?) -> Swift::Void)
+  @objc @_Concurrency::MainActor final public func addBankAccount(accountNumber: Swift::String, accountType: Swift::String, holderName: Swift::String, routingNumber: Swift::String, secCode: Swift::String?, holderType: Swift::String?, achValidation: Swift::Bool, createAnonymous: Swift::Bool, forceCustomerCreation: Swift::Bool, temporary: Swift::Bool, source: Swift::String?, completion: @escaping (PayabliSDKPayIn::PayabliPayInStoredPaymentMethodObjC?, Foundation::NSError?) -> Swift::Void)
+  @objc deinit
+}
+@objc @_hasMissingDesignatedInitializers @_Concurrency::MainActor final public class PayabliPayIn : ObjectiveC::NSObject, Foundation::ObservableObject {
+  @Combine::Published<Swift::Bool> @_projectedValueProperty($isSubmitting) @_Concurrency::MainActor final public var isSubmitting: Swift::Bool {
+    get
+  }
+  @_Concurrency::MainActor final public var $isSubmitting: Combine::Published<Swift::Bool>.Combine::Publisher {
+    get
+  }
+  @Combine::Published<PayabliSDKPayIn::PayabliPayInResult?> @_projectedValueProperty($lastResult) @_Concurrency::MainActor final public var lastResult: PayabliSDKPayIn::PayabliPayInResult? {
+    get
+  }
+  @_Concurrency::MainActor final public var $lastResult: Combine::Published<PayabliSDKPayIn::PayabliPayInResult?>.Combine::Publisher {
+    get
+  }
+  @_Concurrency::MainActor final public var lastStoredPaymentMethod: PayabliSDKPayIn::PayabliPayInStoredPaymentMethod? {
+    get
+  }
+  @_Concurrency::MainActor final public var entryPoint: Swift::String {
+    get
+  }
+  @_Concurrency::MainActor final public var environment: PayabliSDKCore::PayabliEnvironment {
+    get
+  }
+  @Combine::Published<PayabliSDKPayIn::PayabliPayInOperation> @_projectedValueProperty($operation) @_Concurrency::MainActor final public var operation: PayabliSDKPayIn::PayabliPayInOperation {
+    get
+  }
+  @_Concurrency::MainActor final public var $operation: Combine::Published<PayabliSDKPayIn::PayabliPayInOperation>.Combine::Publisher {
+    get
+  }
+  @Combine::Published<PayabliSDKPayIn::PayabliPayInRequestConfiguration?> @_projectedValueProperty($requestConfiguration) @_Concurrency::MainActor final public var requestConfiguration: PayabliSDKPayIn::PayabliPayInRequestConfiguration? {
+    get
+  }
+  @_Concurrency::MainActor final public var $requestConfiguration: Combine::Published<PayabliSDKPayIn::PayabliPayInRequestConfiguration?>.Combine::Publisher {
+    get
+  }
+  @_Concurrency::MainActor public init(session: PayabliSDKCore::PayabliSession, diagnostics: PayabliSDKPayIn::PayabliPayInDiagnostics = .disabled, operation: PayabliSDKPayIn::PayabliPayInOperation = .storePaymentMethod, requestConfiguration: PayabliSDKPayIn::PayabliPayInRequestConfiguration? = nil)
+  @_Concurrency::MainActor final public func configure(config: PayabliSDKCore::PayabliConfig)
+  @_Concurrency::MainActor final public func configure(config: PayabliSDKCore::PayabliConfig, theme _: PayabliSDKCore::PayabliTheme)
+  @_Concurrency::MainActor final public func configure(operation: PayabliSDKPayIn::PayabliPayInOperation, requestConfiguration: PayabliSDKPayIn::PayabliPayInRequestConfiguration? = nil)
+  @_Concurrency::MainActor final public func configure(requestConfiguration: PayabliSDKPayIn::PayabliPayInRequestConfiguration)
+  @_Concurrency::MainActor final public func submitConfigured(_ request: PayabliSDKPayIn::PayabliPayInRequest) async throws -> PayabliSDKPayIn::PayabliPayInResult
+  @_Concurrency::MainActor final public func submitConfigured(_ paymentMethod: PayabliSDKPayIn::PayabliPayInMethodInput, options: PayabliSDKPayIn::PayabliPayInTokenStorageOptions = PayabliPayInTokenStorageOptions()) async throws -> PayabliSDKPayIn::PayabliPayInResult
+  @_Concurrency::MainActor final public func addPaymentMethod(_ paymentMethod: PayabliSDKPayIn::PayabliPayInMethodInput, options: PayabliSDKPayIn::PayabliPayInTokenStorageOptions = PayabliPayInTokenStorageOptions()) async throws -> PayabliSDKPayIn::PayabliPayInStoredPaymentMethod
+  @_Concurrency::MainActor final public func addCard(_ card: PayabliSDKPayIn::PayabliPayInCardData, options: PayabliSDKPayIn::PayabliPayInTokenStorageOptions = PayabliPayInTokenStorageOptions()) async throws -> PayabliSDKPayIn::PayabliPayInStoredPaymentMethod
+  @_Concurrency::MainActor final public func addBankAccount(_ ach: PayabliSDKPayIn::PayabliPayInBankAccountData, options: PayabliSDKPayIn::PayabliPayInTokenStorageOptions = PayabliPayInTokenStorageOptions()) async throws -> PayabliSDKPayIn::PayabliPayInStoredPaymentMethod
+  @_Concurrency::MainActor final public func capture(_ request: PayabliSDKPayIn::PayabliPayInRequest) async throws -> PayabliSDKPayIn::PayabliPayInResult
+  @_Concurrency::MainActor final public func authorize(_ request: PayabliSDKPayIn::PayabliPayInRequest) async throws -> PayabliSDKPayIn::PayabliPayInResult
+  @_Concurrency::MainActor final public func captureAuthorizedTransaction(_ request: PayabliSDKPayIn::PayabliPayInAuthorizedRequest) async throws -> PayabliSDKPayIn::PayabliPayInResult
+  @_Concurrency::MainActor final public func voidTransaction(_ transId: Swift::String) async throws -> PayabliSDKPayIn::PayabliPayInResult
+  public typealias ObjectWillChangePublisher = Combine::ObservableObjectPublisher
+  @objc deinit
+}
+@_Concurrency::MainActor @preconcurrency public struct PayabliPayInCardBrandIcon : SwiftUICore::View {
+  @_Concurrency::MainActor @preconcurrency public init(brand: PayabliSDKPayIn::PayabliPayInCardBrand, borderColor: SwiftUICore::Color, emptyBackgroundColor: SwiftUICore::Color = Color(uiColor: .tertiarySystemBackground), fallbackIconColor: SwiftUICore::Color = Color(uiColor: .secondaryLabel))
+  @_Concurrency::MainActor @preconcurrency public var body: some SwiftUICore::View {
+    get
+  }
+  public typealias Body = @_opaqueReturnTypeOf("$s15PayabliSDKPayIn0a3PayC13CardBrandIconV4bodyQrvp", 0) __
+}
+public typealias PayabliPayInDiagnosticHandler = @Sendable (PayabliSDKPayIn::PayabliPayInDiagnosticEntry) -> Swift::Void
+public struct PayabliPayInDiagnostics : Swift::Sendable {
+  public let isEnabled: Swift::Bool
+  public let handler: PayabliSDKPayIn::PayabliPayInDiagnosticHandler?
+  public init(isEnabled: Swift::Bool = false, handler: PayabliSDKPayIn::PayabliPayInDiagnosticHandler? = nil)
+  public static let disabled: PayabliSDKPayIn::PayabliPayInDiagnostics
+  public static func enabled(handler: @escaping PayabliSDKPayIn::PayabliPayInDiagnosticHandler) -> PayabliSDKPayIn::PayabliPayInDiagnostics
+}
+public struct PayabliPayInDiagnosticEntry : Swift::Identifiable, Swift::Sendable {
+  public enum Phase : Swift::String, Swift::Sendable {
+    case request
+    case response
+    case failure
+    public init?(rawValue: Swift::String)
+    public typealias RawValue = Swift::String
+    public var rawValue: Swift::String {
+      get
+    }
+  }
+  public let id: Foundation::UUID
+  public let phase: PayabliSDKPayIn::PayabliPayInDiagnosticEntry.PayabliSDKPayIn::Phase
+  public let timestamp: Foundation::Date
+  public let method: Swift::String
+  public let url: Swift::String
+  public let statusCode: Swift::Int?
+  public let headers: [Swift::String : Swift::String]
+  public let body: Swift::String?
+  public let durationMilliseconds: Swift::Double?
+  public let errorDescription: Swift::String?
+  public init(id: Foundation::UUID = UUID(), phase: PayabliSDKPayIn::PayabliPayInDiagnosticEntry.PayabliSDKPayIn::Phase, timestamp: Foundation::Date = Date(), method: Swift::String, url: Swift::String, statusCode: Swift::Int? = nil, headers: [Swift::String : Swift::String] = [:], body: Swift::String? = nil, durationMilliseconds: Swift::Double? = nil, errorDescription: Swift::String? = nil)
+  public typealias ID = Foundation::UUID
+}
+public enum PayabliPayInError : PayabliSDKCore::PayabliError, Swift::Equatable {
+  case invalidInput(Swift::String)
+  case missingAccessToken
+  case submissionInProgress
+  case transactionFailed(PayabliSDKPayIn::PayabliPayInFailure)
+  case submissionInterrupted(type: PayabliSDKCore::PayabliErrorType, causeType: Swift::String)
+  public var type: PayabliSDKCore::PayabliErrorType {
+    get
+  }
+  public var reason: Swift::String {
+    get
+  }
+  public var detail: Swift::String? {
+    get
+  }
+  public static func == (a: PayabliSDKPayIn::PayabliPayInError, b: PayabliSDKPayIn::PayabliPayInError) -> Swift::Bool
+}
+public enum PayabliPayInField : Swift::String, Swift::CaseIterable, Swift::Identifiable, Swift::Sendable {
+  case cardholderName
+  case cardNumber
+  case cardExpiration
+  case cardCvv
+  case cardZip
+  case accountHolder
+  case routingNumber
+  case accountNumber
+  case accountType
+  case accountHolderType
+  case secCode
+  case deviceId
+  case methodDescription
+  case firstName
+  case lastName
+  case customerNumber
+  case billingEmail
+  case billingZip
+  case amount
+  case serviceFee
+  case surchargeFee
+  public var id: Swift::String {
+    get
+  }
+  public init?(rawValue: Swift::String)
+  public typealias AllCases = [PayabliSDKPayIn::PayabliPayInField]
+  public typealias ID = Swift::String
+  public typealias RawValue = Swift::String
+  nonisolated public static var allCases: [PayabliSDKPayIn::PayabliPayInField] {
+    get
+  }
+  public var rawValue: Swift::String {
+    get
+  }
+}
+public enum PayabliPayInSectionStyle : Swift::Sendable, Swift::Equatable {
+  case inputs
+  case summary
+  public static func == (a: PayabliSDKPayIn::PayabliPayInSectionStyle, b: PayabliSDKPayIn::PayabliPayInSectionStyle) -> Swift::Bool
+  public func hash(into hasher: inout Swift::Hasher)
+  public var hashValue: Swift::Int {
+    get
+  }
+}
+public enum PayabliPayInLabelLayout : Swift::Sendable {
+  case external
+  case placeholder
+  public static func == (a: PayabliSDKPayIn::PayabliPayInLabelLayout, b: PayabliSDKPayIn::PayabliPayInLabelLayout) -> Swift::Bool
+  public func hash(into hasher: inout Swift::Hasher)
+  public var hashValue: Swift::Int {
+    get
+  }
+}
+public enum PayabliPayInCardBrandIconPlacement : Swift::Sendable, Swift::Equatable {
+  case leading
+  case trailing
+  case hidden
+  public static func == (a: PayabliSDKPayIn::PayabliPayInCardBrandIconPlacement, b: PayabliSDKPayIn::PayabliPayInCardBrandIconPlacement) -> Swift::Bool
+  public func hash(into hasher: inout Swift::Hasher)
+  public var hashValue: Swift::Int {
+    get
+  }
+}
+public enum PayabliPayInErrorMessagePlacement : Swift::Sendable, Swift::Equatable {
+  case top
+  case aboveSubmitButton
+  public static func == (a: PayabliSDKPayIn::PayabliPayInErrorMessagePlacement, b: PayabliSDKPayIn::PayabliPayInErrorMessagePlacement) -> Swift::Bool
+  public func hash(into hasher: inout Swift::Hasher)
+  public var hashValue: Swift::Int {
+    get
+  }
+}
+public struct PayabliPayInFormatting : Swift::Sendable {
+  public let insertsCardNumberSpaces: Swift::Bool
+  public let expirationSeparator: Swift::String
+  public let masksAccountNumber: Swift::Bool
+  public init(insertsCardNumberSpaces: Swift::Bool = true, expirationSeparator: Swift::String = "/", masksAccountNumber: Swift::Bool = true)
+}
+public struct PayabliPayInHiddenValues : Swift::Sendable {
+  public let accountHolderType: PayabliSDKPayIn::PayabliPayInAccountHolderType?
+  public let secCode: PayabliSDKPayIn::PayabliPayInSecCode?
+  public let deviceId: Swift::String?
+  public let methodDescription: Swift::String?
+  public let customerData: PayabliSDKPayIn::PayabliPayInCustomerData?
+  public init(accountHolderType: PayabliSDKPayIn::PayabliPayInAccountHolderType? = nil, secCode: PayabliSDKPayIn::PayabliPayInSecCode? = .web, deviceId: Swift::String? = nil, methodDescription: Swift::String? = nil, customerData: PayabliSDKPayIn::PayabliPayInCustomerData? = nil)
+}
+public typealias PayabliPayInOptions = PayabliSDKPayIn::PayabliPayInTokenStorageOptions
+public struct PayabliPayInInputSize : Swift::Sendable, Swift::Equatable {
+  public let width: CoreFoundation::CGFloat?
+  public let height: CoreFoundation::CGFloat
+  public let horizontalPadding: CoreFoundation::CGFloat
+  public init(width: CoreFoundation::CGFloat? = nil, height: CoreFoundation::CGFloat = 52, horizontalPadding: CoreFoundation::CGFloat = 14)
+  public static func == (a: PayabliSDKPayIn::PayabliPayInInputSize, b: PayabliSDKPayIn::PayabliPayInInputSize) -> Swift::Bool
+}
+public struct PayabliPayInLabels : Swift::Sendable {
+  public let title: Swift::String?
+  public let subtitle: Swift::String?
+  public let submitButton: Swift::String?
+  public let fieldLabels: [PayabliSDKPayIn::PayabliPayInField : Swift::String]
+  public let fieldPlaceholders: [PayabliSDKPayIn::PayabliPayInField : Swift::String]
+  public let total: Swift::String?
+  public init(title: Swift::String? = nil, subtitle: Swift::String? = nil, submitButton: Swift::String? = nil, fieldLabels: [PayabliSDKPayIn::PayabliPayInField : Swift::String] = Self.defaultFieldLabels, fieldPlaceholders: [PayabliSDKPayIn::PayabliPayInField : Swift::String] = [:], total: Swift::String? = nil)
+  public func label(for field: PayabliSDKPayIn::PayabliPayInField) -> Swift::String
+  public func placeholder(for field: PayabliSDKPayIn::PayabliPayInField) -> Swift::String?
+  public static let defaultFieldLabels: [PayabliSDKPayIn::PayabliPayInField : Swift::String]
+}
+public struct PayabliPayInFieldSection : Swift::Identifiable, Swift::Sendable {
+  public let id: Swift::String
+  public let title: Swift::String?
+  public let titleStyle: PayabliSDKPayIn::PayabliPayInTextStyle?
+  public let fields: [PayabliSDKPayIn::PayabliPayInField]
+  public let inputVerticalSpacing: CoreFoundation::CGFloat?
+  public let inputHorizontalSpacing: CoreFoundation::CGFloat?
+  public let fieldVerticalSpacings: [PayabliSDKPayIn::PayabliPayInField : CoreFoundation::CGFloat]
+  public let style: PayabliSDKPayIn::PayabliPayInSectionStyle
+  public init(id: Swift::String? = nil, title: Swift::String? = nil, titleStyle: PayabliSDKPayIn::PayabliPayInTextStyle? = nil, fields: [PayabliSDKPayIn::PayabliPayInField], inputVerticalSpacing: CoreFoundation::CGFloat? = nil, inputHorizontalSpacing: CoreFoundation::CGFloat? = nil, fieldVerticalSpacings: [PayabliSDKPayIn::PayabliPayInField : CoreFoundation::CGFloat] = [:], style: PayabliSDKPayIn::PayabliPayInSectionStyle = .inputs)
+  public typealias ID = Swift::String
+}
+public struct PayabliPayInInputSizing : Swift::Sendable, Swift::Equatable {
+  public let defaultSize: PayabliSDKPayIn::PayabliPayInInputSize
+  public let fieldSizes: [PayabliSDKPayIn::PayabliPayInField : PayabliSDKPayIn::PayabliPayInInputSize]
+  public init(defaultSize: PayabliSDKPayIn::PayabliPayInInputSize = PayabliPayInInputSize(), fieldSizes: [PayabliSDKPayIn::PayabliPayInField : PayabliSDKPayIn::PayabliPayInInputSize] = [:])
+  public func size(for field: PayabliSDKPayIn::PayabliPayInField) -> PayabliSDKPayIn::PayabliPayInInputSize
+  public static func == (a: PayabliSDKPayIn::PayabliPayInInputSizing, b: PayabliSDKPayIn::PayabliPayInInputSizing) -> Swift::Bool
+}
+public struct PayabliPayInPaymentSummaryTextStyle : Swift::Sendable {
+  public let font: SwiftUICore::Font
+  public let color: SwiftUICore::Color
+  public init(font: SwiftUICore::Font = .body, color: SwiftUICore::Color = .primary)
+}
+public struct PayabliPayInPaymentSummaryConfiguration : Swift::Sendable {
+  public let labelStyle: PayabliSDKPayIn::PayabliPayInPaymentSummaryTextStyle
+  public let valueStyle: PayabliSDKPayIn::PayabliPayInPaymentSummaryTextStyle
+  public let rowSpacing: CoreFoundation::CGFloat
+  public init(labelStyle: PayabliSDKPayIn::PayabliPayInPaymentSummaryTextStyle = PayabliPayInPaymentSummaryTextStyle(
+            font: .subheadline,
+            color: .secondary
+        ), valueStyle: PayabliSDKPayIn::PayabliPayInPaymentSummaryTextStyle = PayabliPayInPaymentSummaryTextStyle(
+            font: .subheadline.weight(.semibold),
+            color: .primary
+        ), rowSpacing: CoreFoundation::CGFloat = 8)
+}
+public struct PayabliPayInFormConfiguration : Swift::Sendable {
+  public let allowedMethods: [PayabliSDKPayIn::PayabliPayInMethodType]
+  public let defaultMethod: PayabliSDKPayIn::PayabliPayInMethodType
+  public let cardFieldOrder: [PayabliSDKPayIn::PayabliPayInField]
+  public let bankFieldOrder: [PayabliSDKPayIn::PayabliPayInField]
+  public let hiddenValues: PayabliSDKPayIn::PayabliPayInHiddenValues
+  public let options: PayabliSDKPayIn::PayabliPayInOptions
+  public let labels: PayabliSDKPayIn::PayabliPayInLabels
+  public let labelLayout: PayabliSDKPayIn::PayabliPayInLabelLayout
+  public let showsFieldLabels: Swift::Bool
+  public let hiddenFieldLabels: Swift::Set<PayabliSDKPayIn::PayabliPayInField>
+  public let formatting: PayabliSDKPayIn::PayabliPayInFormatting
+  public let inputSizing: PayabliSDKPayIn::PayabliPayInInputSizing
+  public let cardBrandIconPlacement: PayabliSDKPayIn::PayabliPayInCardBrandIconPlacement
+  public let errorMessagePlacement: PayabliSDKPayIn::PayabliPayInErrorMessagePlacement
+  public let requiredFields: Swift::Set<PayabliSDKPayIn::PayabliPayInField>
+  public let cardSections: [PayabliSDKPayIn::PayabliPayInFieldSection]
+  public let bankSections: [PayabliSDKPayIn::PayabliPayInFieldSection]
+  public let paymentSummary: PayabliSDKPayIn::PayabliPayInPaymentSummaryConfiguration
+  public let showsBaseAmount: Swift::Bool
+  public init(allowedMethods: [PayabliSDKPayIn::PayabliPayInMethodType] = [.card, .bankAccount], defaultMethod: PayabliSDKPayIn::PayabliPayInMethodType = .card, cardFieldOrder: [PayabliSDKPayIn::PayabliPayInField] = Self.defaultCardFieldOrder, bankFieldOrder: [PayabliSDKPayIn::PayabliPayInField] = Self.defaultBankFieldOrder, cardSections: [PayabliSDKPayIn::PayabliPayInFieldSection]? = nil, bankSections: [PayabliSDKPayIn::PayabliPayInFieldSection]? = nil, hiddenValues: PayabliSDKPayIn::PayabliPayInHiddenValues = PayabliPayInHiddenValues(), options: PayabliSDKPayIn::PayabliPayInOptions = PayabliPayInOptions(), labels: PayabliSDKPayIn::PayabliPayInLabels = PayabliPayInLabels(), labelLayout: PayabliSDKPayIn::PayabliPayInLabelLayout = .external, showsFieldLabels: Swift::Bool? = nil, hiddenFieldLabels: Swift::Set<PayabliSDKPayIn::PayabliPayInField> = [], formatting: PayabliSDKPayIn::PayabliPayInFormatting = PayabliPayInFormatting(), inputSizing: PayabliSDKPayIn::PayabliPayInInputSizing = PayabliPayInInputSizing(), cardBrandIconPlacement: PayabliSDKPayIn::PayabliPayInCardBrandIconPlacement = .trailing, errorMessagePlacement: PayabliSDKPayIn::PayabliPayInErrorMessagePlacement = .aboveSubmitButton, requiredFields: Swift::Set<PayabliSDKPayIn::PayabliPayInField> = [], paymentSummary: PayabliSDKPayIn::PayabliPayInPaymentSummaryConfiguration = PayabliPayInPaymentSummaryConfiguration(), showsBaseAmount: Swift::Bool = true)
+  public static let defaultCardFieldOrder: [PayabliSDKPayIn::PayabliPayInField]
+  public static let defaultBankFieldOrder: [PayabliSDKPayIn::PayabliPayInField]
+}
+public enum PayabliPayInMethodType : Swift::String, Swift::CaseIterable, Swift::Identifiable, Swift::Sendable {
+  case card
+  case bankAccount
+  public var id: Swift::String {
+    get
+  }
+  public var displayName: Swift::String {
+    get
+  }
+  public init?(rawValue: Swift::String)
+  public typealias AllCases = [PayabliSDKPayIn::PayabliPayInMethodType]
+  public typealias ID = Swift::String
+  public typealias RawValue = Swift::String
+  nonisolated public static var allCases: [PayabliSDKPayIn::PayabliPayInMethodType] {
+    get
+  }
+  public var rawValue: Swift::String {
+    get
+  }
+}
+public enum PayabliPayInCardBrand : Swift::String, Swift::CaseIterable, Swift::Identifiable, Swift::Sendable, Swift::Equatable {
+  case unknown
+  case visa
+  case mastercard
+  case americanExpress
+  case discover
+  case dinersClub
+  case jcb
+  case unionPay
+  public var id: Swift::String {
+    get
+  }
+  public var displayName: Swift::String {
+    get
+  }
+  public static func detect(cardNumber: Swift::String) -> PayabliSDKPayIn::PayabliPayInCardBrand
+  public init?(rawValue: Swift::String)
+  public typealias AllCases = [PayabliSDKPayIn::PayabliPayInCardBrand]
+  public typealias ID = Swift::String
+  public typealias RawValue = Swift::String
+  nonisolated public static var allCases: [PayabliSDKPayIn::PayabliPayInCardBrand] {
+    get
+  }
+  public var rawValue: Swift::String {
+    get
+  }
+}
+public enum PayabliPayInAccountType : Swift::String, Swift::CaseIterable, Swift::Identifiable, Swift::Codable, Swift::Sendable {
+  case checking
+  case savings
+  public var id: Swift::String {
+    get
+  }
+  public init?(rawValue: Swift::String)
+  public typealias AllCases = [PayabliSDKPayIn::PayabliPayInAccountType]
+  public typealias ID = Swift::String
+  public typealias RawValue = Swift::String
+  nonisolated public static var allCases: [PayabliSDKPayIn::PayabliPayInAccountType] {
+    get
+  }
+  public var rawValue: Swift::String {
+    get
+  }
+}
+public enum PayabliPayInAccountHolderType : Swift::String, Swift::CaseIterable, Swift::Identifiable, Swift::Codable, Swift::Sendable {
+  case personal
+  case business
+  public var id: Swift::String {
+    get
+  }
+  public init?(rawValue: Swift::String)
+  public typealias AllCases = [PayabliSDKPayIn::PayabliPayInAccountHolderType]
+  public typealias ID = Swift::String
+  public typealias RawValue = Swift::String
+  nonisolated public static var allCases: [PayabliSDKPayIn::PayabliPayInAccountHolderType] {
+    get
+  }
+  public var rawValue: Swift::String {
+    get
+  }
+}
+public enum PayabliPayInSecCode : Swift::String, Swift::CaseIterable, Swift::Identifiable, Swift::Codable, Swift::Sendable {
+  case ppd
+  case web
+  case tel
+  case ccd
+  case boc
+  public var id: Swift::String {
+    get
+  }
+  public init?(rawValue: Swift::String)
+  public typealias AllCases = [PayabliSDKPayIn::PayabliPayInSecCode]
+  public typealias ID = Swift::String
+  public typealias RawValue = Swift::String
+  nonisolated public static var allCases: [PayabliSDKPayIn::PayabliPayInSecCode] {
+    get
+  }
+  public var rawValue: Swift::String {
+    get
+  }
+}
+public enum PayabliPayInTokenStorageError : PayabliSDKCore::PayabliError {
+  case invalidInput(Swift::String)
+  case missingAccessToken
+  case saveFailed(PayabliSDKPayIn::PayabliPayInSaveFailure)
+  public var type: PayabliSDKCore::PayabliErrorType {
+    get
+  }
+  public var reason: Swift::String {
+    get
+  }
+  public var detail: Swift::String? {
+    get
+  }
+}
+public struct PayabliPayInSaveFailure : Swift::Codable, Swift::Sendable, Swift::Equatable {
+  public let isSuccess: Swift::Bool?
+  public let responseText: Swift::String
+  public let responseCode: Swift::Int?
+  public let resultCode: Swift::Int?
+  public let resultText: Swift::String?
+  public let explanation: Swift::String?
+  public let todoAction: Swift::String?
+  public let httpStatusCode: Swift::Int?
+  public init(isSuccess: Swift::Bool? = nil, responseText: Swift::String, responseCode: Swift::Int? = nil, resultCode: Swift::Int? = nil, resultText: Swift::String? = nil, explanation: Swift::String? = nil, todoAction: Swift::String? = nil, httpStatusCode: Swift::Int? = nil)
+  public var reason: Swift::String {
+    get
+  }
+  public var detail: Swift::String? {
+    get
+  }
+  public static func == (a: PayabliSDKPayIn::PayabliPayInSaveFailure, b: PayabliSDKPayIn::PayabliPayInSaveFailure) -> Swift::Bool
+  public func encode(to encoder: any Swift::Encoder) throws
+  public init(from decoder: any Swift::Decoder) throws
+}
+public struct PayabliPayInCardData : Swift::Sendable {
+  public var cardNumber: Swift::String
+  public var expiration: Swift::String
+  public var cardholderName: Swift::String
+  public var cvv: Swift::String
+  public var billingZip: Swift::String
+  public init(cardNumber: Swift::String, expiration: Swift::String, cardholderName: Swift::String, cvv: Swift::String, billingZip: Swift::String)
+}
+public struct PayabliPayInBankAccountData : Swift::Sendable {
+  public var accountNumber: Swift::String
+  public var accountType: PayabliSDKPayIn::PayabliPayInAccountType
+  public var holderName: Swift::String
+  public var routingNumber: Swift::String
+  public var secCode: PayabliSDKPayIn::PayabliPayInSecCode?
+  public var holderType: PayabliSDKPayIn::PayabliPayInAccountHolderType?
+  public var device: Swift::String?
+  public init(accountNumber: Swift::String, accountType: PayabliSDKPayIn::PayabliPayInAccountType, holderName: Swift::String, routingNumber: Swift::String, secCode: PayabliSDKPayIn::PayabliPayInSecCode? = .web, holderType: PayabliSDKPayIn::PayabliPayInAccountHolderType? = nil, device: Swift::String? = nil)
+}
+public enum PayabliPayInMethodInput : Swift::Sendable {
+  case card(PayabliSDKPayIn::PayabliPayInCardData)
+  case bankAccount(PayabliSDKPayIn::PayabliPayInBankAccountData)
+  public var method: PayabliSDKPayIn::PayabliPayInMethodType {
+    get
+  }
+}
+public struct PayabliPayInCustomerData : Swift::Codable, Swift::Sendable {
+  public var additionalData: [Swift::String : Swift::String]?
+  public var billingAddress1: Swift::String?
+  public var billingAddress2: Swift::String?
+  public var billingCity: Swift::String?
+  public var billingCountry: Swift::String?
+  public var billingEmail: Swift::String?
+  public var billingPhone: Swift::String?
+  public var billingState: Swift::String?
+  public var billingZip: Swift::String?
+  public var company: Swift::String?
+  public var customerId: Swift::Int64?
+  public var customerNumber: Swift::String?
+  public var firstName: Swift::String?
+  public var identifierFields: [Swift::String]?
+  public var lastName: Swift::String?
+  public var shippingAddress1: Swift::String?
+  public var shippingAddress2: Swift::String?
+  public var shippingCity: Swift::String?
+  public var shippingCountry: Swift::String?
+  public var shippingState: Swift::String?
+  public var shippingZip: Swift::String?
+  public init(additionalData: [Swift::String : Swift::String]? = nil, billingAddress1: Swift::String? = nil, billingAddress2: Swift::String? = nil, billingCity: Swift::String? = nil, billingCountry: Swift::String? = nil, billingEmail: Swift::String? = nil, billingPhone: Swift::String? = nil, billingState: Swift::String? = nil, billingZip: Swift::String? = nil, company: Swift::String? = nil, customerId: Swift::Int64? = nil, customerNumber: Swift::String? = nil, firstName: Swift::String? = nil, identifierFields: [Swift::String]? = nil, lastName: Swift::String? = nil, shippingAddress1: Swift::String? = nil, shippingAddress2: Swift::String? = nil, shippingCity: Swift::String? = nil, shippingCountry: Swift::String? = nil, shippingState: Swift::String? = nil, shippingZip: Swift::String? = nil)
+  public func encode(to encoder: any Swift::Encoder) throws
+  public init(from decoder: any Swift::Decoder) throws
+}
+public struct PayabliPayInVendorData : Swift::Codable, Swift::Sendable {
+  public var vendorId: Swift::Int64?
+  public var vendorNumber: Swift::String?
+  public init(vendorId: Swift::Int64? = nil, vendorNumber: Swift::String? = nil)
+  public func encode(to encoder: any Swift::Encoder) throws
+  public init(from decoder: any Swift::Decoder) throws
+}
+public struct PayabliPayInTokenStorageOptions : Swift::Sendable {
+  public var achValidation: Swift::Bool?
+  public var createAnonymous: Swift::Bool?
+  public var forceCustomerCreation: Swift::Bool?
+  public var temporary: Swift::Bool?
+  public var customerData: PayabliSDKPayIn::PayabliPayInCustomerData?
+  public var vendorData: PayabliSDKPayIn::PayabliPayInVendorData?
+  public var fallbackAuth: Swift::Bool?
+  public var fallbackAuthAmount: Swift::Int?
+  public var methodDescription: Swift::String?
+  public var source: Swift::String?
+  public var subdomain: Swift::String?
+  public var validation: PayabliSDKPayIn::PayabliPayInValidation
+  public init(achValidation: Swift::Bool? = nil, createAnonymous: Swift::Bool? = nil, forceCustomerCreation: Swift::Bool? = nil, temporary: Swift::Bool? = nil, customerData: PayabliSDKPayIn::PayabliPayInCustomerData? = nil, vendorData: PayabliSDKPayIn::PayabliPayInVendorData? = nil, fallbackAuth: Swift::Bool? = nil, fallbackAuthAmount: Swift::Int? = nil, methodDescription: Swift::String? = nil, source: Swift::String? = nil, subdomain: Swift::String? = nil, validation: PayabliSDKPayIn::PayabliPayInValidation = .default)
+}
+public struct PayabliPayInTokenStorageAPIResponseData : Swift::Codable, Swift::Sendable, Swift::Equatable {
+  public let referenceId: Swift::String?
+  public let resultCode: Swift::Int?
+  public let resultText: Swift::String?
+  public let explanation: Swift::String?
+  public let todoAction: Swift::String?
+  public let customerId: Swift::Int64?
+  public let methodReferenceId: Swift::String?
+  public init(referenceId: Swift::String? = nil, resultCode: Swift::Int? = nil, resultText: Swift::String? = nil, explanation: Swift::String? = nil, todoAction: Swift::String? = nil, customerId: Swift::Int64? = nil, methodReferenceId: Swift::String? = nil)
+  public init(from decoder: any Swift::Decoder) throws
+  public static func == (a: PayabliSDKPayIn::PayabliPayInTokenStorageAPIResponseData, b: PayabliSDKPayIn::PayabliPayInTokenStorageAPIResponseData) -> Swift::Bool
+  public func encode(to encoder: any Swift::Encoder) throws
+}
+public struct PayabliPayInTokenStorageAPIResponse : Swift::Codable, Swift::Sendable, Swift::Equatable {
+  public let isSuccess: Swift::Bool?
+  public let responseText: Swift::String
+  public let responseCode: Swift::Int?
+  public let responseData: PayabliSDKPayIn::PayabliPayInTokenStorageAPIResponseData?
+  public init(isSuccess: Swift::Bool? = nil, responseText: Swift::String, responseCode: Swift::Int? = nil, responseData: PayabliSDKPayIn::PayabliPayInTokenStorageAPIResponseData? = nil)
+  public init(from decoder: any Swift::Decoder) throws
+  public func failure(httpStatusCode: Swift::Int? = nil) -> PayabliSDKPayIn::PayabliPayInSaveFailure
+  public static func == (a: PayabliSDKPayIn::PayabliPayInTokenStorageAPIResponse, b: PayabliSDKPayIn::PayabliPayInTokenStorageAPIResponse) -> Swift::Bool
+  public func encode(to encoder: any Swift::Encoder) throws
+}
+public struct PayabliPayInStoredPaymentMethod : Swift::Sendable, Swift::Equatable {
+  public let storedMethodId: Swift::String?
+  public let method: PayabliSDKPayIn::PayabliPayInStoredMethodType
+  public let methodReferenceId: Swift::String?
+  public let resultCode: Swift::Int?
+  public let resultText: Swift::String?
+  public let customerId: Swift::Int64?
+  public let responseText: Swift::String
+  public let apiResponse: PayabliSDKPayIn::PayabliPayInTokenStorageAPIResponse
+  public init(storedMethodId: Swift::String?, method: PayabliSDKPayIn::PayabliPayInStoredMethodType, methodReferenceId: Swift::String?, resultCode: Swift::Int?, resultText: Swift::String?, customerId: Swift::Int64?, responseText: Swift::String, apiResponse: PayabliSDKPayIn::PayabliPayInTokenStorageAPIResponse? = nil)
+  public static func == (a: PayabliSDKPayIn::PayabliPayInStoredPaymentMethod, b: PayabliSDKPayIn::PayabliPayInStoredPaymentMethod) -> Swift::Bool
+}
+extension PayabliSDKPayIn::PayabliPayInMethodInput : Swift::Encodable {
+  public func encode(to encoder: any Swift::Encoder) throws
+}
+extension PayabliSDKPayIn::PayabliPayInMethodInput {
+  public func validate(_ validation: PayabliSDKPayIn::PayabliPayInValidation = .default) throws
+}
+public enum PayabliPayInSheetDismissButton : Swift::Sendable, Swift::Equatable {
+  case close
+  case back
+  case hidden
+  public static func == (a: PayabliSDKPayIn::PayabliPayInSheetDismissButton, b: PayabliSDKPayIn::PayabliPayInSheetDismissButton) -> Swift::Bool
+  public func hash(into hasher: inout Swift::Hasher)
+  public var hashValue: Swift::Int {
+    get
+  }
+}
+public struct PayabliPayInSheetConfiguration {
+  public let title: Swift::String?
+  public let subtitle: Swift::String?
+  public let dismissButton: PayabliSDKPayIn::PayabliPayInSheetDismissButton
+  public let dismissesOnSuccess: Swift::Bool
+  public let detents: Swift::Set<SwiftUI::PresentationDetent>
+  public let dragIndicatorVisibility: SwiftUICore::Visibility
+  public let contentInsets: SwiftUICore::EdgeInsets
+  public let movesFormHeaderToSheetHeader: Swift::Bool
+  public let sizesToContentWhenPossible: Swift::Bool
+  public let expandsToLargeWhenContentDoesNotFit: Swift::Bool
+  public init(title: Swift::String? = nil, subtitle: Swift::String? = nil, dismissButton: PayabliSDKPayIn::PayabliPayInSheetDismissButton = .close, dismissesOnSuccess: Swift::Bool = true, detents: Swift::Set<SwiftUI::PresentationDetent> = [.medium, .large], dragIndicatorVisibility: SwiftUICore::Visibility = .visible, contentInsets: SwiftUICore::EdgeInsets = EdgeInsets(top: 20, leading: 20, bottom: 24, trailing: 20), movesFormHeaderToSheetHeader: Swift::Bool = true, sizesToContentWhenPossible: Swift::Bool = true, expandsToLargeWhenContentDoesNotFit: Swift::Bool = true)
+}
+extension SwiftUICore::View {
+  @_Concurrency::MainActor @preconcurrency public func payabliPayInSheet(isPresented: SwiftUICore::Binding<Swift::Bool>, component: PayabliSDKPayIn::PayabliPayIn, configuration: PayabliSDKPayIn::PayabliPayInFormConfiguration = PayabliPayInFormConfiguration(), sheetConfiguration: PayabliSDKPayIn::PayabliPayInSheetConfiguration = PayabliPayInSheetConfiguration(), style: PayabliSDKPayIn::PayabliPayInStyle? = nil, onCompleted: @escaping (PayabliSDKPayIn::PayabliPayInResult) -> Swift::Void, onError: @escaping (any Swift::Error) -> Swift::Void = { _ in }) -> some SwiftUICore::View
+  
+}
+public struct PayabliPayInTextStyle : Swift::Sendable {
+  public let font: SwiftUICore::Font
+  public let color: SwiftUICore::Color
+  public init(font: SwiftUICore::Font, color: SwiftUICore::Color)
+}
+public struct PayabliPayInInputStyle {
+  public let font: SwiftUICore::Font
+  public let uiFont: UIKit::UIFont?
+  public let textColor: SwiftUICore::Color
+  public let placeholderColor: SwiftUICore::Color
+  public let backgroundColor: SwiftUICore::Color
+  public let focusedBackgroundColor: SwiftUICore::Color?
+  public let borderColor: SwiftUICore::Color
+  public let focusedBorderColor: SwiftUICore::Color?
+  public let borderWidth: CoreFoundation::CGFloat
+  public let focusedBorderWidth: CoreFoundation::CGFloat
+  public let cornerRadius: CoreFoundation::CGFloat
+  public let pickerIconColor: SwiftUICore::Color
+  public init(font: SwiftUICore::Font = .body, uiFont: UIKit::UIFont? = nil, textColor: SwiftUICore::Color = .primary, placeholderColor: SwiftUICore::Color = Color(uiColor: .placeholderText), backgroundColor: SwiftUICore::Color = Color(uiColor: .secondarySystemBackground), focusedBackgroundColor: SwiftUICore::Color? = nil, borderColor: SwiftUICore::Color = Color(uiColor: .separator).opacity(0.45), focusedBorderColor: SwiftUICore::Color? = nil, borderWidth: CoreFoundation::CGFloat = 1, focusedBorderWidth: CoreFoundation::CGFloat = 1.5, cornerRadius: CoreFoundation::CGFloat = 8, pickerIconColor: SwiftUICore::Color = .secondary)
+}
+public struct PayabliPayInSubmitButtonStyle {
+  public let font: SwiftUICore::Font
+  public let backgroundColor: SwiftUICore::Color?
+  public let foregroundColor: SwiftUICore::Color
+  public let disabledBackgroundColor: SwiftUICore::Color
+  public let disabledForegroundColor: SwiftUICore::Color
+  public let cornerRadius: CoreFoundation::CGFloat
+  public let height: CoreFoundation::CGFloat
+  public let horizontalPadding: CoreFoundation::CGFloat
+  public init(font: SwiftUICore::Font = .body.weight(.semibold), backgroundColor: SwiftUICore::Color? = nil, foregroundColor: SwiftUICore::Color = .white, disabledBackgroundColor: SwiftUICore::Color = Color(uiColor: .systemGray5), disabledForegroundColor: SwiftUICore::Color = Color(uiColor: .secondaryLabel), cornerRadius: CoreFoundation::CGFloat = 8, height: CoreFoundation::CGFloat = 52, horizontalPadding: CoreFoundation::CGFloat = 16)
+}
+public struct PayabliPayInLayoutStyle {
+  public var contentSpacing: CoreFoundation::CGFloat {
+    get
+  }
+  public var headerSpacing: CoreFoundation::CGFloat {
+    get
+  }
+  public var fieldGroupSpacing: CoreFoundation::CGFloat {
+    get
+  }
+  public var pairedFieldSpacing: CoreFoundation::CGFloat {
+    get
+  }
+  public var labelSpacing: CoreFoundation::CGFloat {
+    get
+  }
+  public var sectionSpacing: CoreFoundation::CGFloat {
+    get
+  }
+  public var sectionTitleSpacing: CoreFoundation::CGFloat {
+    get
+  }
+  public var inputVerticalSpacing: CoreFoundation::CGFloat {
+    get
+    set
+  }
+  public var inputHorizontalSpacing: CoreFoundation::CGFloat {
+    get
+    set
+  }
+  public init(contentSpacing: CoreFoundation::CGFloat = 20, headerSpacing: CoreFoundation::CGFloat = 4, fieldGroupSpacing: CoreFoundation::CGFloat = 12, pairedFieldSpacing: CoreFoundation::CGFloat = 12, labelSpacing: CoreFoundation::CGFloat = 7, sectionSpacing: CoreFoundation::CGFloat = 18, sectionTitleSpacing: CoreFoundation::CGFloat = 10)
+}
+public struct PayabliPayInStyle {
+  public let accentColor: SwiftUICore::Color
+  public let title: PayabliSDKPayIn::PayabliPayInTextStyle
+  public let subtitle: PayabliSDKPayIn::PayabliPayInTextStyle
+  public let sectionTitle: PayabliSDKPayIn::PayabliPayInTextStyle
+  public let label: PayabliSDKPayIn::PayabliPayInTextStyle
+  public let input: PayabliSDKPayIn::PayabliPayInInputStyle
+  public let submitButton: PayabliSDKPayIn::PayabliPayInSubmitButtonStyle
+  public let error: PayabliSDKPayIn::PayabliPayInTextStyle
+  public let layout: PayabliSDKPayIn::PayabliPayInLayoutStyle
+  public init(accentColor: SwiftUICore::Color = .accentColor, title: PayabliSDKPayIn::PayabliPayInTextStyle = PayabliPayInTextStyle(
+            font: .title3.weight(.semibold),
+            color: .primary
+        ), subtitle: PayabliSDKPayIn::PayabliPayInTextStyle = PayabliPayInTextStyle(
+            font: .subheadline,
+            color: .secondary
+        ), sectionTitle: PayabliSDKPayIn::PayabliPayInTextStyle = PayabliPayInTextStyle(
+            font: .subheadline.weight(.semibold),
+            color: .primary
+        ), label: PayabliSDKPayIn::PayabliPayInTextStyle = PayabliPayInTextStyle(
+            font: .footnote.weight(.medium),
+            color: Color(uiColor: .secondaryLabel)
+        ), input: PayabliSDKPayIn::PayabliPayInInputStyle = PayabliPayInInputStyle(), submitButton: PayabliSDKPayIn::PayabliPayInSubmitButtonStyle = PayabliPayInSubmitButtonStyle(), error: PayabliSDKPayIn::PayabliPayInTextStyle = PayabliPayInTextStyle(
+            font: .footnote,
+            color: .red
+        ), layout: PayabliSDKPayIn::PayabliPayInLayoutStyle = PayabliPayInLayoutStyle())
+  public static let `default`: PayabliSDKPayIn::PayabliPayInStyle
+}
+extension SwiftUICore::EnvironmentValues {
+  public var payabliPayInStyle: PayabliSDKPayIn::PayabliPayInStyle {
+    get
+    set
+  }
+}
+extension SwiftUICore::View {
+  @_Concurrency::MainActor @preconcurrency public func payabliPayInStyle(_ style: PayabliSDKPayIn::PayabliPayInStyle) -> some SwiftUICore::View
+  
+}
+public enum PayabliPayInSummaryRows {
+  public static func labelText(for field: PayabliSDKPayIn::PayabliPayInField, labels: PayabliSDKPayIn::PayabliPayInLabels) -> Swift::String
+  public static func totalLabelText(labels: PayabliSDKPayIn::PayabliPayInLabels) -> Swift::String
+  public static func rowAmount(for field: PayabliSDKPayIn::PayabliPayInField, paymentDetails: PayabliSDKPayIn::PayabliPayInPaymentDetails?) -> Foundation::Decimal?
+  public static func totalRowAmount(paymentDetails: PayabliSDKPayIn::PayabliPayInPaymentDetails?) -> Foundation::Decimal?
+  public static func formattedAmount(_ amount: Foundation::Decimal, currency: Swift::String?) -> Swift::String
+}
+public enum PayabliPayInOperation : Swift::String, Swift::CaseIterable, Swift::Identifiable, Swift::Sendable, Swift::Equatable {
+  case storePaymentMethod
+  case capture
+  case authorize
+  public var id: Swift::String {
+    get
+  }
+  public init?(rawValue: Swift::String)
+  public typealias AllCases = [PayabliSDKPayIn::PayabliPayInOperation]
+  public typealias ID = Swift::String
+  public typealias RawValue = Swift::String
+  nonisolated public static var allCases: [PayabliSDKPayIn::PayabliPayInOperation] {
+    get
+  }
+  public var rawValue: Swift::String {
+    get
+  }
+}
+public enum PayabliPayInAuthorizationMethod : Swift::String, Swift::CaseIterable, Swift::Identifiable, Swift::Sendable, Swift::Equatable {
+  case card
+  public var id: Swift::String {
+    get
+  }
+  public init?(rawValue: Swift::String)
+  public typealias AllCases = [PayabliSDKPayIn::PayabliPayInAuthorizationMethod]
+  public typealias ID = Swift::String
+  public typealias RawValue = Swift::String
+  nonisolated public static var allCases: [PayabliSDKPayIn::PayabliPayInAuthorizationMethod] {
+    get
+  }
+  public var rawValue: Swift::String {
+    get
+  }
+}
+public enum PayabliPayInResultKind : Swift::String, Swift::Sendable, Swift::Equatable {
+  case storedPaymentMethod
+  case transaction
+  public init?(rawValue: Swift::String)
+  public typealias RawValue = Swift::String
+  public var rawValue: Swift::String {
+    get
+  }
+}
+public enum PayabliPayInStoredMethodType : Swift::String, Swift::CaseIterable, Swift::Identifiable, Swift::Codable, Swift::Sendable {
+  case card
+  case bankAccount
+  public var id: Swift::String {
+    get
+  }
+  public init?(rawValue: Swift::String)
+  public typealias AllCases = [PayabliSDKPayIn::PayabliPayInStoredMethodType]
+  public typealias ID = Swift::String
+  public typealias RawValue = Swift::String
+  nonisolated public static var allCases: [PayabliSDKPayIn::PayabliPayInStoredMethodType] {
+    get
+  }
+  public var rawValue: Swift::String {
+    get
+  }
+}
+public enum PayabliPayInPaymentMethod : Swift::Sendable {
+  case card(PayabliSDKPayIn::PayabliPayInPaymentMethod.PayabliSDKPayIn::Card)
+  case bankAccount(PayabliSDKPayIn::PayabliPayInPaymentMethod.PayabliSDKPayIn::BankAccount)
+  case stored(PayabliSDKPayIn::PayabliPayInPaymentMethod.PayabliSDKPayIn::Stored)
+  case cloudDevice(PayabliSDKPayIn::PayabliPayInPaymentMethod.PayabliSDKPayIn::CloudDevice)
+  case check(PayabliSDKPayIn::PayabliPayInPaymentMethod.PayabliSDKPayIn::Check)
+  case cash
+  public struct Card : Swift::Sendable {
+    public let data: PayabliSDKPayIn::PayabliPayInCardData
+    public let initiator: Swift::String?
+    public let saveIfSuccess: Swift::Bool?
+    public init(data: PayabliSDKPayIn::PayabliPayInCardData, initiator: Swift::String? = "payor", saveIfSuccess: Swift::Bool? = nil)
+  }
+  public struct BankAccount : Swift::Sendable {
+    public let data: PayabliSDKPayIn::PayabliPayInBankAccountData
+    public init(data: PayabliSDKPayIn::PayabliPayInBankAccountData)
+  }
+  public struct Stored : Swift::Sendable {
+    public let method: PayabliSDKPayIn::PayabliPayInStoredMethodType
+    public let storedMethodId: Swift::String
+    public init(method: PayabliSDKPayIn::PayabliPayInStoredMethodType, storedMethodId: Swift::String)
+  }
+  public struct CloudDevice : Swift::Sendable {
+    public let device: Swift::String
+    public let saveIfSuccess: Swift::Bool?
+    public init(device: Swift::String, saveIfSuccess: Swift::Bool? = nil)
+  }
+  public struct Check : Swift::Sendable {
+    public let holderName: Swift::String
+    public init(holderName: Swift::String)
+  }
+  public var method: Swift::String {
+    get
+  }
+}
+public struct PayabliPayInPaymentDetails : Swift::Codable, Swift::Sendable, Swift::Equatable {
+  public let totalAmount: Swift::Double
+  public let serviceFee: Swift::Double?
+  public let surchargeFee: Swift::Double?
+  public let currency: Swift::String?
+  public let checkNumber: Swift::String?
+  public let checkUniqueId: Swift::String?
+  public init(totalAmount: Swift::Double, serviceFee: Swift::Double? = nil, surchargeFee: Swift::Double? = nil, currency: Swift::String? = nil, checkNumber: Swift::String? = nil, checkUniqueId: Swift::String? = nil)
+  public static func == (a: PayabliSDKPayIn::PayabliPayInPaymentDetails, b: PayabliSDKPayIn::PayabliPayInPaymentDetails) -> Swift::Bool
+  public func encode(to encoder: any Swift::Encoder) throws
+  public init(from decoder: any Swift::Decoder) throws
+}
+public struct PayabliPayInRequest : Swift::Sendable {
+  public let paymentDetails: PayabliSDKPayIn::PayabliPayInPaymentDetails
+  public let paymentMethod: PayabliSDKPayIn::PayabliPayInPaymentMethod
+  public let accountId: Swift::String?
+  public let customerData: PayabliSDKPayIn::PayabliPayInCustomerData?
+  public let ipAddress: Swift::String?
+  public let orderDescription: Swift::String?
+  public let orderId: Swift::String?
+  public let source: Swift::String?
+  public let subdomain: Swift::String?
+  public let subscriptionId: Swift::Int64?
+  public let idempotencyKey: Swift::String?
+  public let achValidation: Swift::Bool?
+  public let forceCustomerCreation: Swift::Bool?
+  public let validation: PayabliSDKPayIn::PayabliPayInValidation
+  public init(paymentDetails: PayabliSDKPayIn::PayabliPayInPaymentDetails, paymentMethod: PayabliSDKPayIn::PayabliPayInPaymentMethod, accountId: Swift::String? = nil, customerData: PayabliSDKPayIn::PayabliPayInCustomerData? = nil, ipAddress: Swift::String? = nil, orderDescription: Swift::String? = nil, orderId: Swift::String? = nil, source: Swift::String? = nil, subdomain: Swift::String? = nil, subscriptionId: Swift::Int64? = nil, idempotencyKey: Swift::String? = nil, achValidation: Swift::Bool? = nil, forceCustomerCreation: Swift::Bool? = nil, validation: PayabliSDKPayIn::PayabliPayInValidation = .default)
+}
+public struct PayabliPayInRequestConfiguration : Swift::Sendable {
+  public let paymentDetails: PayabliSDKPayIn::PayabliPayInPaymentDetails
+  public let accountId: Swift::String?
+  public let customerData: PayabliSDKPayIn::PayabliPayInCustomerData?
+  public let ipAddress: Swift::String?
+  public let orderDescription: Swift::String?
+  public let orderId: Swift::String?
+  public let source: Swift::String?
+  public let subdomain: Swift::String?
+  public let subscriptionId: Swift::Int64?
+  public let idempotencyKey: Swift::String?
+  public let achValidation: Swift::Bool?
+  public let forceCustomerCreation: Swift::Bool?
+  public let validation: PayabliSDKPayIn::PayabliPayInValidation
+  public init(paymentDetails: PayabliSDKPayIn::PayabliPayInPaymentDetails, accountId: Swift::String? = nil, customerData: PayabliSDKPayIn::PayabliPayInCustomerData? = nil, ipAddress: Swift::String? = nil, orderDescription: Swift::String? = nil, orderId: Swift::String? = nil, source: Swift::String? = nil, subdomain: Swift::String? = nil, subscriptionId: Swift::Int64? = nil, idempotencyKey: Swift::String? = nil, achValidation: Swift::Bool? = nil, forceCustomerCreation: Swift::Bool? = nil, validation: PayabliSDKPayIn::PayabliPayInValidation = .default)
+  public func request(paymentMethod: PayabliSDKPayIn::PayabliPayInPaymentMethod, customerData formCustomerData: PayabliSDKPayIn::PayabliPayInCustomerData? = nil, orderDescription formOrderDescription: Swift::String? = nil) -> PayabliSDKPayIn::PayabliPayInRequest
+}
+public struct PayabliPayInAuthorizedRequest : Swift::Sendable {
+  public let transId: Swift::String
+  public let paymentDetails: PayabliSDKPayIn::PayabliPayInPaymentDetails
+  public let idempotencyKey: Swift::String?
+  public init(transId: Swift::String, paymentDetails: PayabliSDKPayIn::PayabliPayInPaymentDetails, idempotencyKey: Swift::String? = nil)
+}
+public struct PayabliPayInFailure : Swift::Codable, Swift::Sendable, Swift::Equatable {
+  public let code: Swift::String?
+  public let reason: Swift::String?
+  public let explanation: Swift::String?
+  public let action: Swift::String?
+  public let status: Swift::Int?
+  public let detail: Swift::String?
+  public let httpStatusCode: Swift::Int?
+  public init(code: Swift::String? = nil, reason: Swift::String? = nil, explanation: Swift::String? = nil, action: Swift::String? = nil, status: Swift::Int? = nil, detail: Swift::String? = nil, httpStatusCode: Swift::Int? = nil)
+  public var reasonText: Swift::String {
+    get
+  }
+  public var detailText: Swift::String? {
+    get
+  }
+  public static func == (a: PayabliSDKPayIn::PayabliPayInFailure, b: PayabliSDKPayIn::PayabliPayInFailure) -> Swift::Bool
+  public func encode(to encoder: any Swift::Encoder) throws
+  public init(from decoder: any Swift::Decoder) throws
+}
+public struct PayabliPayInResult : Swift::Sendable, Swift::Equatable {
+  public let kind: PayabliSDKPayIn::PayabliPayInResultKind
+  public let code: Swift::String
+  public let reason: Swift::String?
+  public let explanation: Swift::String?
+  public let action: Swift::String?
+  public let transaction: PayabliSDKPayIn::PayabliPayInTransaction?
+  public let storedPaymentMethod: PayabliSDKPayIn::PayabliPayInStoredPaymentMethod?
+  public let apiResponse: PayabliSDKPayIn::PayabliPayInAPIResponse?
+  public init(apiResponse: PayabliSDKPayIn::PayabliPayInAPIResponse)
+  public init(storedPaymentMethod: PayabliSDKPayIn::PayabliPayInStoredPaymentMethod)
+  public static func == (a: PayabliSDKPayIn::PayabliPayInResult, b: PayabliSDKPayIn::PayabliPayInResult) -> Swift::Bool
+}
+public struct PayabliPayInAPIResponse : Swift::Codable, Swift::Sendable, Swift::Equatable {
+  public let code: Swift::String
+  public let reason: Swift::String?
+  public let explanation: Swift::String?
+  public let action: Swift::String?
+  public let data: PayabliSDKPayIn::PayabliPayInTransaction?
+  public let token: Swift::String?
+  public init(code: Swift::String, reason: Swift::String? = nil, explanation: Swift::String? = nil, action: Swift::String? = nil, data: PayabliSDKPayIn::PayabliPayInTransaction? = nil, token: Swift::String? = nil)
+  public var isApproved: Swift::Bool {
+    get
+  }
+  public func failure(httpStatusCode: Swift::Int? = nil) -> PayabliSDKPayIn::PayabliPayInFailure
+  public static func == (a: PayabliSDKPayIn::PayabliPayInAPIResponse, b: PayabliSDKPayIn::PayabliPayInAPIResponse) -> Swift::Bool
+  public func encode(to encoder: any Swift::Encoder) throws
+  public init(from decoder: any Swift::Decoder) throws
+}
+public struct PayabliPayInTransaction : Swift::Codable, Swift::Sendable, Swift::Equatable {
+  public let paymentTransId: Swift::String?
+  public let gatewayTransId: Swift::String?
+  public let orderId: Swift::String?
+  public let method: Swift::String?
+  public let transStatus: Swift::Int?
+  public let paypointId: Swift::Int64?
+  public let totalAmount: Swift::Double?
+  public let netAmount: Swift::Double?
+  public let feeAmount: Swift::Double?
+  public let surchargeFee: Swift::Double?
+  public let settlementStatus: Swift::Int?
+  public let operation: Swift::String?
+  public let responseData: PayabliSDKPayIn::PayabliPayInResponseData?
+  public let source: Swift::String?
+  public let isValidatedACH: Swift::Bool?
+  public let transactionTime: Swift::String?
+  public let achSecCode: Swift::String?
+  public let achHolderType: Swift::String?
+  public let ipAddress: Swift::String?
+  public let walletType: Swift::String?
+  public init(paymentTransId: Swift::String? = nil, gatewayTransId: Swift::String? = nil, orderId: Swift::String? = nil, method: Swift::String? = nil, transStatus: Swift::Int? = nil, paypointId: Swift::Int64? = nil, totalAmount: Swift::Double? = nil, netAmount: Swift::Double? = nil, feeAmount: Swift::Double? = nil, surchargeFee: Swift::Double? = nil, settlementStatus: Swift::Int? = nil, operation: Swift::String? = nil, responseData: PayabliSDKPayIn::PayabliPayInResponseData? = nil, source: Swift::String? = nil, isValidatedACH: Swift::Bool? = nil, transactionTime: Swift::String? = nil, achSecCode: Swift::String? = nil, achHolderType: Swift::String? = nil, ipAddress: Swift::String? = nil, walletType: Swift::String? = nil)
+  public static func == (a: PayabliSDKPayIn::PayabliPayInTransaction, b: PayabliSDKPayIn::PayabliPayInTransaction) -> Swift::Bool
+  public func encode(to encoder: any Swift::Encoder) throws
+  public init(from decoder: any Swift::Decoder) throws
+}
+public struct PayabliPayInResponseData : Swift::Codable, Swift::Sendable, Swift::Equatable {
+  public let resultCode: Swift::String?
+  public let resultCodeText: Swift::String?
+  public let response: Swift::String?
+  public let responseText: Swift::String?
+  public let authCode: Swift::String?
+  public let transactionId: Swift::String?
+  public let avsResponse: Swift::String?
+  public let avsResponseText: Swift::String?
+  public let cvvResponse: Swift::String?
+  public let cvvResponseText: Swift::String?
+  public let orderId: Swift::String?
+  public let responseCode: Swift::String?
+  public let responseCodeText: Swift::String?
+  public let customerVaultId: Swift::String?
+  public let emvAuthResponseData: Swift::String?
+  public let type: Swift::String?
+  public init(resultCode: Swift::String? = nil, resultCodeText: Swift::String? = nil, response: Swift::String? = nil, responseText: Swift::String? = nil, authCode: Swift::String? = nil, transactionId: Swift::String? = nil, avsResponse: Swift::String? = nil, avsResponseText: Swift::String? = nil, cvvResponse: Swift::String? = nil, cvvResponseText: Swift::String? = nil, orderId: Swift::String? = nil, responseCode: Swift::String? = nil, responseCodeText: Swift::String? = nil, customerVaultId: Swift::String? = nil, emvAuthResponseData: Swift::String? = nil, type: Swift::String? = nil)
+  public static func == (a: PayabliSDKPayIn::PayabliPayInResponseData, b: PayabliSDKPayIn::PayabliPayInResponseData) -> Swift::Bool
+  public func encode(to encoder: any Swift::Encoder) throws
+  public init(from decoder: any Swift::Decoder) throws
+}
+extension PayabliSDKPayIn::PayabliPayInPaymentMethod : Swift::Encodable {
+  public func encode(to encoder: any Swift::Encoder) throws
+}
+public struct PayabliPayInValidation : Swift::Sendable {
+  public var requiresLuhnCheck: Swift::Bool
+  public var validatesRoutingNumberChecksum: Swift::Bool
+  public init(requiresLuhnCheck: Swift::Bool = true, validatesRoutingNumberChecksum: Swift::Bool = true)
+  public static let `default`: PayabliSDKPayIn::PayabliPayInValidation
+}
+@_Concurrency::MainActor @preconcurrency public struct PayabliPayInView : SwiftUICore::View {
+  @_Concurrency::MainActor public init(component: PayabliSDKPayIn::PayabliPayIn, configuration: PayabliSDKPayIn::PayabliPayInFormConfiguration = PayabliPayInFormConfiguration(), style: PayabliSDKPayIn::PayabliPayInStyle? = nil, onCompleted: @escaping (PayabliSDKPayIn::PayabliPayInResult) -> Swift::Void, onError: @escaping (any Swift::Error) -> Swift::Void = { _ in })
+  @_Concurrency::MainActor @preconcurrency public var body: some SwiftUICore::View {
+    get
+  }
+  public typealias Body = @_opaqueReturnTypeOf("$s15PayabliSDKPayIn0a3PayC4ViewV4bodyQrvp", 0) __
+}
+public enum PayabliPayInModule {
+  public static var version: Swift::String {
+    get
+  }
+}
+extension PayabliSDKPayIn::PayabliPayInObjC : Swift::Sendable {}
+extension PayabliSDKPayIn::PayabliPayIn : Swift::Sendable {}
+extension PayabliSDKPayIn::PayabliPayInCardBrandIcon : Swift::Sendable {}
+extension PayabliSDKPayIn::PayabliPayInDiagnosticEntry.PayabliSDKPayIn::Phase : Swift::Equatable {}
+extension PayabliSDKPayIn::PayabliPayInDiagnosticEntry.PayabliSDKPayIn::Phase : Swift::Hashable {}
+extension PayabliSDKPayIn::PayabliPayInDiagnosticEntry.PayabliSDKPayIn::Phase : Swift::RawRepresentable {}
+extension PayabliSDKPayIn::PayabliPayInField : Swift::Equatable {}
+extension PayabliSDKPayIn::PayabliPayInField : Swift::Hashable {}
+extension PayabliSDKPayIn::PayabliPayInField : Swift::RawRepresentable {}
+extension PayabliSDKPayIn::PayabliPayInSectionStyle : Swift::Hashable {}
+extension PayabliSDKPayIn::PayabliPayInLabelLayout : Swift::Equatable {}
+extension PayabliSDKPayIn::PayabliPayInLabelLayout : Swift::Hashable {}
+extension PayabliSDKPayIn::PayabliPayInCardBrandIconPlacement : Swift::Hashable {}
+extension PayabliSDKPayIn::PayabliPayInErrorMessagePlacement : Swift::Hashable {}
+extension PayabliSDKPayIn::PayabliPayInMethodType : Swift::Equatable {}
+extension PayabliSDKPayIn::PayabliPayInMethodType : Swift::Hashable {}
+extension PayabliSDKPayIn::PayabliPayInMethodType : Swift::RawRepresentable {}
+extension PayabliSDKPayIn::PayabliPayInCardBrand : Swift::Hashable {}
+extension PayabliSDKPayIn::PayabliPayInCardBrand : Swift::RawRepresentable {}
+extension PayabliSDKPayIn::PayabliPayInAccountType : Swift::Equatable {}
+extension PayabliSDKPayIn::PayabliPayInAccountType : Swift::Hashable {}
+extension PayabliSDKPayIn::PayabliPayInAccountType : Swift::RawRepresentable {}
+extension PayabliSDKPayIn::PayabliPayInAccountHolderType : Swift::Equatable {}
+extension PayabliSDKPayIn::PayabliPayInAccountHolderType : Swift::Hashable {}
+extension PayabliSDKPayIn::PayabliPayInAccountHolderType : Swift::RawRepresentable {}
+extension PayabliSDKPayIn::PayabliPayInSecCode : Swift::Equatable {}
+extension PayabliSDKPayIn::PayabliPayInSecCode : Swift::Hashable {}
+extension PayabliSDKPayIn::PayabliPayInSecCode : Swift::RawRepresentable {}
+extension PayabliSDKPayIn::PayabliPayInSheetDismissButton : Swift::Hashable {}
+extension PayabliSDKPayIn::PayabliPayInOperation : Swift::Hashable {}
+extension PayabliSDKPayIn::PayabliPayInOperation : Swift::RawRepresentable {}
+extension PayabliSDKPayIn::PayabliPayInAuthorizationMethod : Swift::Hashable {}
+extension PayabliSDKPayIn::PayabliPayInAuthorizationMethod : Swift::RawRepresentable {}
+extension PayabliSDKPayIn::PayabliPayInResultKind : Swift::Hashable {}
+extension PayabliSDKPayIn::PayabliPayInResultKind : Swift::RawRepresentable {}
+extension PayabliSDKPayIn::PayabliPayInStoredMethodType : Swift::Equatable {}
+extension PayabliSDKPayIn::PayabliPayInStoredMethodType : Swift::Hashable {}
+extension PayabliSDKPayIn::PayabliPayInStoredMethodType : Swift::RawRepresentable {}
+extension PayabliSDKPayIn::PayabliPayInView : Swift::Sendable {}

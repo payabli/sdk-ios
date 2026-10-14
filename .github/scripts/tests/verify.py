@@ -47,6 +47,7 @@ SCRIPTS_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "scripts.yml"
 CI_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "ci.yml"
 RELEASE_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "release.yml"
 REPORT_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "nightly-report.yml"
+INTERFACE_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "public-interface.yml"
 HARDWARE_LIST = REPO_ROOT / ".github" / "hardware-only-tests.txt"
 VERSION_SOURCE = "Sources/PayabliSDKCore/PayabliSDKCore.swift"
 GATE_SCRIPT = REPO_ROOT / ".github" / "scripts" / "release-version.sh"
@@ -1515,6 +1516,71 @@ def test_workflows() -> None:
         if path != RELEASE_WORKFLOW and re.search(r"git (tag|push)\b|gh release create", text):
             tagging.append(path.name)
     check("W15d no workflow but the release creates a tag", not tagging, tagging)
+
+    # The interface is checked twice: on the pull request, in a workflow of its own, and by the release, against
+    # the build it is about to publish. Never in ci.yml, whose result on main the release reads, so a CI build
+    # is never what decides a release.
+    interface = yaml.safe_load(INTERFACE_WORKFLOW.read_text())
+    interface_triggers = interface.get("on", interface.get(True)) or {}
+    check("W16 the interface check runs on pull requests only",
+          set(interface_triggers) == {"pull_request"}, sorted(interface_triggers))
+    running = sorted(path.name for path in RELEASE_WORKFLOW.parent.iterdir()
+                     if path.suffix in WORKFLOW_SUFFIXES and path not in (INTERFACE_WORKFLOW, RELEASE_WORKFLOW)
+                     and "dump-public-interface" in path.read_text())
+    check("W16a no workflow but its own and the release runs the interface check", not running, running)
+    build_steps = build_job.get("steps") or []
+    build_step_runs = [str(step.get("run", "")) for step in build_steps]
+    built_at = next((index for index, run in enumerate(build_step_runs) if "build_release_frameworks.sh" in run), -1)
+    compared_at = next((index for index, run in enumerate(build_step_runs)
+                        if "dump-public-interface.sh" in run and "--products build/release/" in run
+                        and re.search(r'if \[ "\$shipped" != "\$recorded" \]; then\n\s*echo [^\n]*\n\s*exit [1-9]', run)
+                        and re.search(r'--triple "\$triple"[\s\S]*slice\'s interface differs[^\n]*\n\s*exit [1-9]', run)
+                        and re.search(r'if ! diff -ru API [^\n]*; then\n\s*echo [^\n]*\n\s*exit [1-9]', run)), -1)
+    uploaded_at = next((index for index, step in enumerate(build_steps)
+                        if "upload-artifact" in str(step.get("uses", ""))), -1)
+    publish_needs = publish_job.get("needs") or []
+    check("W16c the release compares the interface of its own build with API/ before handing it to publish",
+          -1 < built_at < compared_at < uploaded_at
+          and not build_steps[compared_at].get("continue-on-error")
+          and not build_job.get("continue-on-error")
+          and "build" in ([publish_needs] if isinstance(publish_needs, str) else publish_needs),
+          (built_at, compared_at, uploaded_at, publish_needs))
+    # The step's own normalization, run over a device flag line and simulator ones: only the target's architecture
+    # and simulator suffix may be ignored.
+    compare_run = build_step_runs[compared_at] if compared_at > -1 else ""
+    untargeted = re.search(r"^\s*(untargeted\(\) \{.*\})$", compare_run, re.M)
+    flags = "// swift-module-flags: -target {} -enable-library-evolution -language-mode 5 -O -module-name M\n"
+    device = flags.format("arm64-apple-ios16.7")
+    def same_as_device(line: str) -> bool | None:
+        if untargeted is None or 'diff -u <(untargeted "$record")' not in compare_run:
+            return None
+        with tempfile.TemporaryDirectory() as tmp:
+            (Path(tmp) / "a").write_text(device + "public struct S {}\n")
+            (Path(tmp) / "b").write_text(line + "public struct S {}\n")
+            script = untargeted.group(1) + '\ndiff <(untargeted "$1") <(untargeted "$2") > /dev/null'
+            return subprocess.run(["bash", "-c", script, "_", f"{tmp}/a", f"{tmp}/b"],
+                                  timeout=30, check=False).returncode == 0
+    cases = {
+        flags.format("arm64-apple-ios16.7-simulator"): True,
+        flags.format("x86_64-apple-ios16.7-simulator"): True,
+        flags.format("arm64-apple-ios17.0-simulator"): False,
+        flags.format("arm64-apple-ios16.7-simulator").replace("-language-mode 5", "-language-mode 6"): False,
+        flags.format("arm64-apple-ios16.7-simulator").replace(" -enable-library-evolution", ""): False,
+    }
+    outcomes = {line.split(": ", 1)[1].strip(): same_as_device(line) for line in cases}
+    check("W16d a simulator slice is compared on every module flag but its target's architecture and suffix",
+          list(outcomes.values()) == list(cases.values()), outcomes)
+    interface_steps =[step for job in (interface.get("jobs") or {}).values() for step in job.get("steps") or []]
+    compare = next((str(step.get("run", "")) for step in interface_steps
+                    if "dump-public-interface.sh API" in str(step.get("run", ""))), "")
+    removed_at, dumped_at = compare.find("rm API/*.swiftinterface"), compare.find("dump-public-interface.sh API")
+    check("W16b the records are deleted before the dump, must be tracked, and must match exactly",
+          -1 < removed_at < dumped_at
+          and "git ls-files --error-unmatch" in compare
+          and "git diff --exit-code -- API/" in compare
+          and not any(step.get("continue-on-error") for step in interface_steps)
+          and not any(job.get("continue-on-error") for job in (interface.get("jobs") or {}).values()),
+          compare[:160])
 
 
 # --------------------------------------------------------------------------------------------------

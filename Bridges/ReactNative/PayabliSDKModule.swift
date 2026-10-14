@@ -121,16 +121,21 @@ public final class PayabliSDKModule: RCTEventEmitter {
 
     // MARK: - configure
 
+    /// The environment the channel names, among the ones the SDK offers.
+    private func environmentNamed(_ value: Any?) -> PayabliEnvironment? {
+        guard let name = value as? String else { return nil }
+        return PayabliEnvironment.entries.first { $0.name == name }
+    }
+
     @objc public func configure(
         _ config: NSDictionary,
         resolver resolve: @escaping RCTPromiseResolveBlock,
         rejecter reject: @escaping RCTPromiseRejectBlock
     ) {
         guard let entryPoint = config["entryPoint"] as? String,
-              let envRaw = config["environment"] as? Int,
-              let environment = PayabliEnvironment(rawValue: envRaw)
+              let environment = environmentNamed(config["environment"])
         else {
-            reject("INVALID_ARGS", "Missing entryPoint/environment", nil)
+            reject("INVALID_ARGS", "Missing or unknown entryPoint/environment", nil)
             return
         }
 
@@ -367,10 +372,9 @@ public final class PayabliSDKModule: RCTEventEmitter {
         rejecter reject: @escaping RCTPromiseRejectBlock
     ) {
         guard let entryPoint = config["entryPoint"] as? String,
-              let envRaw = config["environment"] as? Int,
-              let environment = PayabliEnvironment(rawValue: envRaw)
+              let environment = environmentNamed(config["environment"])
         else {
-            reject("INVALID_ARGS", "Missing entryPoint/environment", nil)
+            reject("INVALID_ARGS", "Missing or unknown entryPoint/environment", nil)
             return
         }
 

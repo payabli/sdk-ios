@@ -5,7 +5,6 @@ import Foundation
 /// This app's own, so a screen showing which service it points at holds no SDK
 /// type. The SDK group converts it in one place, where a session is built.
 enum DemoEnvironment: String, CaseIterable {
-    case qa
     case sandbox
     case production
 
@@ -17,7 +16,6 @@ enum DemoEnvironment: String, CaseIterable {
     var baseURL: URL {
         // swiftlint:disable force_unwrapping
         switch self {
-        case .qa: return URL(string: "https://api-qa.payabli.com")!
         case .sandbox: return URL(string: "https://api-sandbox.payabli.com")!
         case .production: return URL(string: "https://api.payabli.com")!
         }

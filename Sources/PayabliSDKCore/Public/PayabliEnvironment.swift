@@ -2,32 +2,38 @@ import Foundation
 
 /// The Payabli API environment used by the SDK.
 ///
-/// Determines all API base URLs. Set at initialization via `PayabliConfig`.
-@objc public enum PayabliEnvironment: Int, Sendable {
-    #if DEBUG
-        /// Developer-only environment pointing at a local tunnel. Available only
-        /// in DEBUG builds — never shipped in a release binary.
-        case local = 0
-    #endif
-    case qa = 1
-    case sandbox = 2
-    case production = 3
+/// Determines the base URL every request resolves against. Set at
+/// initialization via `PayabliConfig`.
+///
+/// `sandbox` and `production` are the whole of what the committed source
+/// offers. The initializer is module-internal, so no host code can construct
+/// an environment or repoint a committed origin. Instances are created once,
+/// so equality is identity.
+@objc public final class PayabliEnvironment: NSObject, Sendable {
+    /// The identifier, lowercase.
+    public let name: String
 
     /// Base URL for this environment.
-    public var baseURL: URL {
-        // swiftlint:disable force_unwrapping
-        switch self {
-        #if DEBUG
-            case .local:
-                return URL(string: "https://wallets-test.ngrok.app")!
-        #endif
-        case .qa:
-            return URL(string: "https://api-qa.payabli.com")!
-        case .sandbox:
-            return URL(string: "https://api-sandbox.payabli.com")!
-        case .production:
-            return URL(string: "https://api.payabli.com")!
-        }
-        // swiftlint:enable force_unwrapping
+    public let baseURL: URL
+
+    /// The identifier, so a printed configuration names its environment.
+    override public var description: String {
+        name
     }
+
+    init(name: String, baseURL: URL) {
+        self.name = name
+        self.baseURL = baseURL
+    }
+
+    /// The two committed environments, `sandbox` first.
+    public static var entries: [PayabliEnvironment] {
+        [sandbox, production]
+    }
+
+    /// The environment an integrator verifies against.
+    @objc public static let sandbox = PayabliEnvironment(name: "sandbox", baseURL: URL(string: "https://api-sandbox.payabli.com")!)
+
+    /// The live environment.
+    @objc public static let production = PayabliEnvironment(name: "production", baseURL: URL(string: "https://api.payabli.com")!)
 }

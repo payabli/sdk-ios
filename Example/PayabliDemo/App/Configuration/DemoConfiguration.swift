@@ -6,20 +6,8 @@ import Foundation
 /// live there. Anything here is safe to commit and safe to show on the
 /// Configuration screen.
 enum DemoConfiguration {
-    /// Which Payabli backend every SDK facade in this app talks to.
-    ///
-    /// Pick it with the scheme: `PayabliDemo qa`, `PayabliDemo sandbox` and
-    /// `PayabliDemo production` each pass `-PayabliEnvironment`, and the plain
-    /// `PayabliDemo` scheme passes nothing and runs whatever was chosen last.
-    /// Sandbox until something chooses, as the environment an integrator can
-    /// reach.
-    ///
-    /// Remembered, because a launch argument reaches only the process it
-    /// launched: a Home-screen tap or a `devicectl` launch passes none, and
-    /// without the memory those would revert mid-test.
-    ///
-    /// Captured by the facades at launch, so the Config screen shows it
-    /// read-only.
+    /// Which Payabli backend every SDK facade in this app talks to. A scheme picks it, the plain scheme
+    /// runs what was last chosen, and an argument naming no offered environment is refused at launch.
     static let environment: DemoEnvironment = resolvedEnvironment()
 
     /// The paypoint for whichever environment is running, from
@@ -40,7 +28,7 @@ enum DemoConfiguration {
     }
 
     static let environmentSource: String = {
-        if argumentEnvironment() != nil {
+        if launchArgumentName() != nil {
             return "launch argument"
         }
         if rememberedEnvironment() != nil {
@@ -52,18 +40,23 @@ enum DemoConfiguration {
     private static let environmentDefaultsKey = "PayabliEnvironment"
 
     private static func resolvedEnvironment() -> DemoEnvironment {
-        if let fromArgument = argumentEnvironment() {
-            UserDefaults.standard.set(fromArgument.label, forKey: environmentDefaultsKey)
-            return fromArgument
+        if let name = launchArgumentName() {
+            guard let environment = DemoEnvironment.named(name) else {
+                fatalError("-PayabliEnvironment \(name) names no environment this build offers: \(DemoEnvironment.labels)")
+            }
+            UserDefaults.standard.set(environment.label, forKey: environmentDefaultsKey)
+            return environment
         }
         return rememberedEnvironment() ?? .fallback
     }
 
-    private static func argumentEnvironment() -> DemoEnvironment? {
+    /// The value the `-PayabliEnvironment` argument carries, or nil when the
+    /// process was launched without one.
+    private static func launchArgumentName() -> String? {
         let arguments = ProcessInfo.processInfo.arguments
         guard let index = arguments.firstIndex(of: "-PayabliEnvironment"),
               index + 1 < arguments.count else { return nil }
-        return DemoEnvironment.named(arguments[index + 1])
+        return arguments[index + 1]
     }
 
     private static func rememberedEnvironment() -> DemoEnvironment? {

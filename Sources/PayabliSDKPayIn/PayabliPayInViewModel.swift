@@ -5,7 +5,12 @@ import SwiftUI
 @MainActor
 final class PayabliPayInViewModel: ObservableObject {
     @Published var selectedMethod: PayabliPayInMethodType {
-        didSet { dropMarksOffScreen() }
+        didSet {
+            if selectedMethod != oldValue {
+                dropValuesLeftBehind(by: oldValue)
+            }
+            dropMarksOffScreen()
+        }
     }
 
     @Published var cardholderNameStorage = "" {

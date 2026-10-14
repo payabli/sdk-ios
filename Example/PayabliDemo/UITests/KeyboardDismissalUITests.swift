@@ -18,7 +18,7 @@ final class KeyboardDismissalUITests: XCTestCase {
         try super.setUpWithError()
         continueAfterFailure = false
         app = XCUIApplication()
-        app.launchArguments = ["-PayabliEnvironment", "qa"]
+        app.launchArguments = ["-PayabliEnvironment", "sandbox"]
         app.launch()
         try openTheSaveForm()
     }

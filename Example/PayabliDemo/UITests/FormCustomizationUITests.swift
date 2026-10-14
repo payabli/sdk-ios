@@ -95,7 +95,7 @@ final class FormCustomizationUITests: XCTestCase {
 
     private func launch(showingSimpleCapture: Bool) -> XCUIApplication {
         let app = XCUIApplication()
-        app.launchArguments = ["-PayabliEnvironment", "qa", "-showsSimpleCapture", showingSimpleCapture ? "YES" : "NO"]
+        app.launchArguments = ["-PayabliEnvironment", "sandbox", "-showsSimpleCapture", showingSimpleCapture ? "YES" : "NO"]
         app.launch()
         return app
     }
@@ -131,7 +131,7 @@ final class FormCustomizationLiveUITests: XCTestCase {
         continueAfterFailure = false
         let environment = ProcessInfo.processInfo.environment
         app.launchArguments = [
-            "-PayabliEnvironment", environment["PAYABLI_QA_ENVIRONMENT"] ?? "qa",
+            "-PayabliEnvironment", environment["PAYABLI_QA_ENVIRONMENT"] ?? "sandbox",
             "-showsSimpleCapture", "YES"
         ]
         if let tokenHost = environment["PAYABLI_QA_TOKEN_HOST"], !tokenHost.isEmpty {

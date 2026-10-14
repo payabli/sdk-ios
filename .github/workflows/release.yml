@@ -194,6 +194,50 @@ jobs:
         timeout-minutes: 45
         run: ./Scripts/build_release_frameworks.sh
 
+      # Every module this release ships has a record in API/, and its interface matches it. Read from the build
+      # above: each module's private interface, which the release script strips from the frameworks. A mismatch
+      # fails this job, which publish needs; the repair is a reviewed pull request that regenerates API/.
+      - name: Check the shipped interface matches API/
+        run: |
+          set -euo pipefail
+          if [ ! -x Scripts/dump-public-interface.sh ] || [ ! -d API ]; then
+            echo "::error::this commit has no recorded interface, so what it ships cannot be checked"
+            exit 1
+          fi
+          shipped="$(cd build/release/xcframeworks && ls -d -- *.xcframework | sed 's/\.xcframework$//' | sort)"
+          recorded="$(cd API && ls -- *.swiftinterface | sed 's/\.swiftinterface$//' | sort)"
+          if [ "$shipped" != "$recorded" ]; then
+            echo "::error::the release ships $(echo $shipped) and API/ records $(echo $recorded)"
+            exit 1
+          fi
+          ./Scripts/dump-public-interface.sh \
+            --products build/release/derived-device/Build/Products/Release-iphoneos \
+            "$RUNNER_TEMP/interface"
+          if ! diff -ru API "$RUNNER_TEMP/interface"; then
+            echo "::error::the interface this release ships differs from API/; regenerate API/ in a reviewed pull request"
+            exit 1
+          fi
+          # Each simulator slice is held to the same record. Its target's architecture and simulator suffix are the
+          # only difference, so both sides drop them and every other module flag is compared.
+          untargeted() { sed -E '/^\/\/ swift-module-flags:/s/-target [a-z0-9_]+-apple-ios([0-9.]+)(-simulator)? /-target apple-ios\1 /' "$1"; }
+          sim=build/release/derived-sim/Build/Products/Release-iphonesimulator
+          triples="$(find "$sim" -path '*/PayabliSDKCore.swiftmodule/*-apple-ios-simulator.private.swiftinterface' \
+            -exec basename {} .private.swiftinterface \; | sort)"
+          if [ -z "$triples" ]; then
+            echo "::error::the simulator build wrote no interface to check"
+            exit 1
+          fi
+          for triple in $triples; do
+            ./Scripts/dump-public-interface.sh --products "$sim" --triple "$triple" "$RUNNER_TEMP/interface-$triple"
+            for record in API/*.swiftinterface; do
+              if ! diff -u <(untargeted "$record") \
+                  <(untargeted "$RUNNER_TEMP/interface-$triple/$(basename "$record")"); then
+                echo "::error::the $triple slice's interface differs from $record"
+                exit 1
+              fi
+            done
+          done
+
       # Kept past the 30 days in which GitHub allows a run to be re-run, so a re-run of the suite still finds
       # these files to publish. Replaced when this job itself is re-run, since an artifact name is written once.
       - name: Hand the release files to the publish job
