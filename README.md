@@ -50,8 +50,9 @@ token in memory while the session runs.
 ### Add the SDK
 
 Add the package with Swift Package Manager at the latest version. In Xcode, choose
-**File > Add Package Dependencies**, enter the repository URL, and choose the **Up to Next Major Version**
-rule, which starts at the latest version:
+**File > Add Package Dependencies**, enter the repository URL, and choose the **Up to Next Minor Version**
+rule, which starts at the latest version. Until 1.0, a minor version can change the public interface, and
+**Up to Next Major Version** would install one the next time the package resolves:
 
 ```text
 https://github.com/payabli/sdk-ios.git
@@ -61,7 +62,7 @@ Or declare it in `Package.swift`, with the latest version from the
 [Releases](https://github.com/payabli/sdk-ios/releases) page:
 
 ```swift
-.package(url: "https://github.com/payabli/sdk-ios.git", from: "<latest version>")
+.package(url: "https://github.com/payabli/sdk-ios.git", .upToNextMinor(from: "<latest version>"))
 ```
 
 To build changes that aren't released yet, track the `main` branch instead, with Xcode's **Branch** rule
