@@ -295,7 +295,7 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
     public func readTransaction(
         _ transId: String
     ) async throws -> PayabliPayInTransaction {
-        throw PayabliGenericError(type: .sdkInternalError, reason: "readTransaction is not available yet")
+        try await client.details(transId: transId)
     }
 
     /// The key this attempt sends: the caller's when it set one, otherwise a fresh one.

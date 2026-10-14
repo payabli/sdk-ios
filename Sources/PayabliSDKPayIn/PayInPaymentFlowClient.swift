@@ -104,6 +104,58 @@ final class PayInPaymentFlowClient: Sendable {
         return try await perform(payabliRequest, carriesKey: payabliRequest.headers["idempotencyKey"] != nil)
     }
 
+    /// Reads a transaction back by its identifier.
+    ///
+    /// Moves no money, so it sends no key and a failure arrives as itself, never as an unknown outcome.
+    ///
+    /// - Parameter transId: the transaction to read.
+    /// - Returns: the transaction, carrying only the fields ``TransactionDetailsRecord`` reads.
+    func details(transId: String) async throws -> PayabliPayInTransaction {
+        let transId = transId.payabliCaptureTrimmed
+        guard !transId.isEmpty, transId != ".", transId != ".." else {
+            throw PayabliPayInError.invalidInput("Transaction ID is required.")
+        }
+        let request = PayabliRequest(
+            method: .get,
+            path: "/api/MoneyIn/details/\(PercentEncoding.segment(transId))",
+            isCallerRefusal: { $0.statusCode == 401 && Self.legacyCode(of: $0) == Self.callerMayNotRead }
+        )
+        let response = try await send(request)
+        return try Self.decodeDetails(from: response, asked: transId)
+    }
+
+    /// The code a details refusal carries when the transaction is under a paypoint this caller may not read.
+    private static let callerMayNotRead = 9001
+    /// The code a details refusal carries when no transaction is visible under the identifier.
+    private static let noSuchTransaction = 7001
+
+    private static func decodeDetails(
+        from response: PayabliResponse,
+        asked transId: String
+    ) throws -> PayabliPayInTransaction {
+        switch (response.statusCode, legacyCode(of: response)) {
+        case (401, callerMayNotRead):
+            throw PayabliGenericError(type: .permissionDenied, reason: "This session may not read this transaction")
+        case (400, noSuchTransaction):
+            throw PayabliGenericError(type: .transactionNotFound, reason: "No transaction is visible under this ID")
+        default:
+            try mapPayabliHTTPError(response: response)
+        }
+        // The decoding error is not attached: it quotes the body it rejected.
+        guard let record = try? JSONDecoder().decode(TransactionDetailsRecord.self, from: response.body) else {
+            throw PayabliGenericError(type: .decodingError, reason: "Failed to decode the transaction")
+        }
+        guard record.paymentTransId == transId else {
+            throw PayabliGenericError(type: .decodingError, reason: "The answer names a different transaction")
+        }
+        return record.transaction
+    }
+
+    /// The numeric `responseCode` of the older envelope, or `nil` when the body carries none.
+    private static func legacyCode(of response: PayabliResponse) -> Int? {
+        try? JSONDecoder().decode(LegacyRefusal.self, from: response.body).responseCode
+    }
+
     private func performTransaction(
         path: String,
         entryPoint: String,
@@ -250,8 +302,11 @@ final class PayInPaymentFlowClient: Sendable {
         _ request: PayabliRequest,
         carriesKey: Bool = false
     ) async throws -> PayabliPayInResult {
+        var answer: PayabliResponse?
         do {
-            return try await send(request)
+            let response = try await send(request)
+            answer = response
+            return try decodeResult(from: response)
         } catch {
             // A credential that was never obtained arrives as `.tokenExpired` or
             // `.tokenProviderFailed`, both of which `leavesOutcomeUnknown` answers false for: nothing
@@ -261,12 +316,20 @@ final class PayInPaymentFlowClient: Sendable {
                 type: (error as? any PayabliError)?.type ?? .unknown,
                 // One definition of what is kept from a failure, reused rather than restated.
                 causeType: RedactedCause(error).originalType,
-                paymentTransId: nil
+                paymentTransId: Self.namedTransaction(by: error, in: answer)
             )
         }
     }
 
-    private func send(_ request: PayabliRequest) async throws -> PayabliPayInResult {
+    /// The transaction a failure named, where it named one: the `data.paymentTransId` of an answer the
+    /// service declined to approve. Nothing else from the answer is kept.
+    private static func namedTransaction(by failure: any Error, in answer: PayabliResponse?) -> String? {
+        guard case .transactionFailed = failure as? PayabliPayInError, let answer else { return nil }
+        let decoded = try? JSONDecoder().decode(PayabliPayInAPIResponse.self, from: answer.body)
+        return decoded?.data?.paymentTransId?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty
+    }
+
+    private func send(_ request: PayabliRequest) async throws -> PayabliResponse {
         diagnostics.logRequest(request, baseURL: baseURL)
         let start = Date()
         let response: PayabliResponse
@@ -287,7 +350,7 @@ final class PayInPaymentFlowClient: Sendable {
             baseURL: baseURL,
             durationMilliseconds: Date().timeIntervalSince(start) * 1000
         )
-        return try decodeResult(from: response)
+        return response
     }
 
     private func decodeResult(from response: PayabliResponse) throws -> PayabliPayInResult {
