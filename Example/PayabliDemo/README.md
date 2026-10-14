@@ -69,7 +69,9 @@ enum ExtraEnvironments {
 ```
 
 The name is lowercase, because the app matches `-PayabliEnvironment` and
-`PAYABLI_ENV` lowercased. `Scripts/build_release_frameworks.sh` and
+`PAYABLI_ENV` lowercased. Running against it also takes a row for it in
+`Secrets.entryPoints`, and, with the bundled token server, its API base URL in
+`PAYABLI_API_BASE_URL` and its host in `PAYABLI_ALLOWED_API_HOSTS`. `Scripts/build_release_frameworks.sh` and
 `Scripts/dump-public-interface.sh` both refuse to run while the Core file
 exists, so remove it before either.
 
