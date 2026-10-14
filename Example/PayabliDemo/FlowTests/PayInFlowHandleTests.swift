@@ -131,7 +131,7 @@ final class PayInFlowHandleTests: XCTestCase {
             PayabliPayIn(
                 session: PayabliSession(config: try PayabliConfig(
                     entryPoint: "test-entry",
-                    environment: DemoEnvironment.sandbox.sdkEnvironment,
+                    environment: .sandbox,
 
                     tokenProvider: { "test-token" }
                 )),

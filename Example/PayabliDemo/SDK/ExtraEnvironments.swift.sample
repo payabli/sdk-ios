@@ -1,0 +1,9 @@
+import PayabliSDKCore
+
+/// Copy this file to `ExtraEnvironments.swift`. `ExtraEnvironments.swift` is
+/// gitignored, and a build that adds no environment offers none beyond
+/// `PayabliEnvironment.entries`. The README's "Adding an environment" shows
+/// how to declare one in Core and list it here.
+enum ExtraEnvironments {
+    static let added: [PayabliEnvironment] = []
+}

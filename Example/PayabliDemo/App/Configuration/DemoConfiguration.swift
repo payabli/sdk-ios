@@ -41,8 +41,9 @@ enum DemoConfiguration {
 
     private static func resolvedEnvironment() -> DemoEnvironment {
         if let name = launchArgumentName() {
-            guard let environment = DemoEnvironment.named(name) else {
-                fatalError("-PayabliEnvironment \(name) names no environment this build offers: \(DemoEnvironment.labels)")
+            guard let environment = DemoEnvironment.named(name, in: OfferedEnvironments.demo) else {
+                let offered = DemoEnvironment.labels(of: OfferedEnvironments.demo)
+                fatalError("-PayabliEnvironment \(name) names no environment this build offers: \(offered)")
             }
             UserDefaults.standard.set(environment.label, forKey: environmentDefaultsKey)
             return environment
@@ -61,7 +62,7 @@ enum DemoConfiguration {
 
     private static func rememberedEnvironment() -> DemoEnvironment? {
         UserDefaults.standard.string(forKey: environmentDefaultsKey)
-            .flatMap(DemoEnvironment.named)
+            .flatMap { DemoEnvironment.named($0, in: OfferedEnvironments.demo) }
     }
 
     /// Resolves the bundled `LocalTokenServer` base URL at runtime.

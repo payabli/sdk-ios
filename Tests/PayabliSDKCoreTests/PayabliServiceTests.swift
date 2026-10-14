@@ -74,7 +74,7 @@ final class PayabliServiceTests: XCTestCase {
     }
 
     /// The body above is the object form. The platform's model validation sends a
-    /// map of string arrays instead, and both bodies below were captured from api-qa.
+    /// map of string arrays instead, and both bodies below were captured from the service.
     func testMaps400WithStringFieldErrorsToValidationError() async throws {
         StubURLProtocol.handler = { request in
             let json = """
@@ -100,7 +100,7 @@ final class PayabliServiceTests: XCTestCase {
         }
     }
 
-    /// The v2 MoneyIn 400 verbatim from api-qa, which sends the object form and a
+    /// The v2 MoneyIn 400 verbatim from the service, which sends the object form and a
     /// null `token`. Both endpoint families are live, so neither shape replaces the
     /// other: this one and the string form above come from the same SDK's calls.
     func testMaps400FromMoneyInDecodesObjectFormAndNullToken() async throws {
