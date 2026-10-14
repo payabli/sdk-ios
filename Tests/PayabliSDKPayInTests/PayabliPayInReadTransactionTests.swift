@@ -17,3 +17,27 @@ final class PayabliPayInReadTransactionTests: XCTestCase {
         XCTAssertEqual(transport.count, 0)
     }
 }
+
+final class PayabliPayInTransactionObjCTests: XCTestCase {
+    func testTheObjectiveCTransactionCarriesTheStatusByName() {
+        let transaction = PayabliPayInTransactionObjC(
+            PayabliPayInTransaction(paymentTransId: "trans-1", transStatus: 5, totalAmount: 1.10)
+        )
+
+        XCTAssertEqual(transaction.paymentTransId, "trans-1")
+        XCTAssertEqual(transaction.transStatus, 5)
+        XCTAssertEqual(transaction.status, "voided")
+        XCTAssertEqual(transaction.totalAmount, 1.10)
+    }
+
+    func testAnUnnamedStatusIsOtherAndKeepsItsNumber() {
+        let transaction = PayabliPayInTransactionObjC(PayabliPayInTransaction(transStatus: 99))
+
+        XCTAssertEqual(transaction.status, "other")
+        XCTAssertEqual(transaction.transStatus, 99)
+    }
+
+    func testNoStatusNumberIsNoStatus() {
+        XCTAssertNil(PayabliPayInTransactionObjC(PayabliPayInTransaction()).status)
+    }
+}
