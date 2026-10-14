@@ -9,6 +9,10 @@ final class DemoEnvironmentTests: XCTestCase {
     func testProductionIsKnownByItsHostWhateverItIsNamed() throws {
         let renamed = try DemoEnvironment(label: "live", baseURL: XCTUnwrap(URL(string: "https://api.payabli.com")))
         XCTAssertTrue(renamed.pointsAtProduction)
+        for spelling in ["https://API.PAYABLI.COM", "https://api.payabli.com."] {
+            let respelled = try DemoEnvironment(label: "live", baseURL: XCTUnwrap(URL(string: spelling)))
+            XCTAssertTrue(respelled.pointsAtProduction, spelling)
+        }
         XCTAssertTrue(DemoEnvironment.production.pointsAtProduction)
         XCTAssertFalse(DemoEnvironment.sandbox.pointsAtProduction)
     }

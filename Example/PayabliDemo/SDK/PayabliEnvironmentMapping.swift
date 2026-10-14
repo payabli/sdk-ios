@@ -16,9 +16,17 @@ extension DemoEnvironment {
     /// integrator can reach.
     static let fallback = sandbox
 
-    /// Whether this one reaches production's host, whatever a build named it.
+    /// Whether this one reaches production's host, whatever a build named it
+    /// and however it spelled the host.
     var pointsAtProduction: Bool {
-        host == DemoEnvironment.production.host
+        Self.resolved(host) == Self.resolved(DemoEnvironment.production.host)
+    }
+
+    /// A host as a resolver reads it: `URL.host` keeps the case and the
+    /// trailing dot it was given, and neither changes where a request goes.
+    private static func resolved(_ host: String?) -> String? {
+        guard let host = host?.lowercased() else { return nil }
+        return host.hasSuffix(".") ? String(host.dropLast()) : host
     }
 }
 
