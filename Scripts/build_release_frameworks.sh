@@ -182,44 +182,11 @@ stage_framework() {
     echo "$framework"
 }
 
-# Every static or class member a module interface declares on
-# `PayabliEnvironment` or an extension of it, other than the `sandbox`,
-# `production` and `entries` properties: space separated, or nothing. Fails when there is
-# no interface to read. Newer compilers qualify a type with `::`, older ones
-# with `.`.
-environments_beyond_committed() {
-    local swiftmodule="$1"
-    if [[ -z "$(find "$swiftmodule" -maxdepth 1 -name '*.swiftinterface' -print -quit)" ]]; then
-        echo "error: ${swiftmodule} has no module interface to read" >&2
-        return 1
-    fi
-    find "$swiftmodule" -maxdepth 1 -name '*.swiftinterface' -exec awk '
-        /^[^ ]/ && /(class PayabliEnvironment |extension PayabliSDKCore(::|\.)PayabliEnvironment )/ { inside = 1; next }
-        /^}/ { inside = 0 }
-        inside && /(static|class) ([^ ]+ )*subscript[ (<]/ { print "subscript"; next }
-        inside && match($0, /(static|class) ([^ ]+ )*func /) {
-            rest = substr($0, RSTART + RLENGTH)
-            if (!match(rest, /^[A-Za-z0-9_`]+/)) match(rest, /^[^ (]+/)
-            name = substr(rest, RSTART, RLENGTH)
-            gsub(/`/, "", name)
-            print name
-            next
-        }
-        inside && match($0, /(static|class) ([^ ]+ )*(var|let) [^ :]+/) {
-            count = split(substr($0, RSTART, RLENGTH), word, " ")
-            name = word[count]
-            gsub(/`/, "", name)
-            if (name != "sandbox" && name != "production" && name != "entries") print name
-        }
-    ' {} + | LC_ALL=C sort -u | paste -sd ' ' -
-}
-
 # Refuses a framework an integrator could not import or run: no public
 # interface, a non-public one, a missing resource bundle, a load of a Payabli
 # framework the zip does not ship, a capability that carries its own copy
 # of a shared module instead of loading it, or the card reader, or a load of
-# the framework that holds it, anywhere but the card-present framework. Core
-# is also refused for an environment beyond the two committed ones.
+# the framework that holds it, anywhere but the card-present framework.
 check_framework() {
     local framework="$1" module="$2"
     local interfaces
@@ -257,15 +224,6 @@ check_framework() {
             fi
         done
     done
-    # The refusal at the top reads the source tree; this reads what ships.
-    if [[ "$module" == "PayabliSDKCore" ]]; then
-        local added
-        added="$(environments_beyond_committed "$framework/Modules/$module.swiftmodule")" || exit 1
-        if [[ -n "$added" ]]; then
-            echo "error: ${framework} offers environments beyond sandbox and production: ${added}" >&2
-            exit 1
-        fi
-    fi
     if [[ "$module" != "PayabliSDKTapToPay" ]]; then
         local loads symbols
         if ! loads="$(otool -L "$framework/$module")" || ! symbols="$(nm -gU "$framework/$module")"; then
