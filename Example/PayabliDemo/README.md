@@ -30,7 +30,8 @@ end to end against sandbox.
    fill in your sandbox
    credentials. `Secrets.swift` is gitignored.
    Copy `SDK/ExtraEnvironments.swift.sample` to `ExtraEnvironments.swift` beside
-   it as it is: the app offers sandbox and production.
+   it as it is: the app offers sandbox and production. To offer another, see
+   [Adding an environment](#adding-an-environment).
 3. Set `DEVELOPMENT_TEAM` on the target. The Tap to Pay tab shows the App ID
    to register as an authorized app, `<APP_ID_PREFIX>.com.payabli.example.app`.
 
@@ -38,6 +39,39 @@ end to end against sandbox.
 xcodebuild build -project PayabliDemo.xcodeproj -scheme PayabliDemo \
   -destination 'platform=iOS Simulator,name=iPhone 17 Pro'
 ```
+
+### Adding an environment
+
+An environment beyond sandbox and production takes two gitignored files. The
+SDK keeps `PayabliEnvironment`'s initializer internal, so the first is a Core
+source file, `Sources/PayabliSDKCore/Public/PayabliEnvironment+Extras.swift`:
+
+```swift
+import Foundation
+
+public extension PayabliEnvironment {
+    @objc static var staging: PayabliEnvironment {
+        extraStaging
+    }
+}
+
+private let extraStaging = PayabliEnvironment(name: "staging", baseURL: URL(string: "https://<host>")!)
+```
+
+The second lists it for this app, in `SDK/ExtraEnvironments.swift`:
+
+```swift
+import PayabliSDKCore
+
+enum ExtraEnvironments {
+    static let added: [PayabliEnvironment] = [.staging]
+}
+```
+
+The name is lowercase, because the app matches `-PayabliEnvironment` and
+`PAYABLI_ENV` lowercased. `Scripts/build_release_frameworks.sh` and
+`Scripts/dump-public-interface.sh` both refuse to run while the Core file
+exists, so remove it before either.
 
 ### Required entitlements
 
