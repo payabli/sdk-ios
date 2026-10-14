@@ -205,7 +205,7 @@ environments_beyond_committed() {
             print name
             next
         }
-        inside && match($0, /(static|class) ([^ ]+ )*(var|let) [A-Za-z0-9_`]+/) {
+        inside && match($0, /(static|class) ([^ ]+ )*(var|let) [^ :]+/) {
             count = split(substr($0, RSTART, RLENGTH), word, " ")
             name = word[count]
             gsub(/`/, "", name)
