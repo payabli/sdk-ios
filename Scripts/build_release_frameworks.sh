@@ -188,14 +188,12 @@ stage_framework() {
 # no interface to read. Newer compilers qualify a type with `::`, older ones
 # with `.`.
 environments_beyond_committed() {
-    local swiftmodule="$1" interfaces
-    interfaces="$(find "$swiftmodule" -maxdepth 1 -name '*.swiftinterface')"
-    if [[ -z "$interfaces" ]]; then
+    local swiftmodule="$1"
+    if [[ -z "$(find "$swiftmodule" -maxdepth 1 -name '*.swiftinterface' -print -quit)" ]]; then
         echo "error: ${swiftmodule} has no module interface to read" >&2
         return 1
     fi
-    # shellcheck disable=SC2086 # one path per line, none holding a space
-    awk '
+    find "$swiftmodule" -maxdepth 1 -name '*.swiftinterface' -exec awk '
         /^[^ ]/ && /(class PayabliEnvironment |extension PayabliSDKCore(::|\.)PayabliEnvironment )/ { inside = 1; next }
         /^}/ { inside = 0 }
         inside && /(static|class) ([^ ]+ )*subscript[ (<]/ { print "subscript"; next }
@@ -213,7 +211,7 @@ environments_beyond_committed() {
             gsub(/`/, "", name)
             if (name != "sandbox" && name != "production" && name != "entries") print name
         }
-    ' $interfaces | sort -u | paste -sd ' ' -
+    ' {} + | sort -u | paste -sd ' ' -
 }
 
 # Refuses a framework an integrator could not import or run: no public
