@@ -712,7 +712,7 @@ public enum PayabliPayInTransactionStatus : Swift::Sendable, Swift::Hashable {
   case captured
   case declined
   case voided
-  case returned
+  case blocked
   case failed
   case other(Swift::Int)
   public static func == (a: PayabliSDKPayIn::PayabliPayInTransactionStatus, b: PayabliSDKPayIn::PayabliPayInTransactionStatus) -> Swift::Bool

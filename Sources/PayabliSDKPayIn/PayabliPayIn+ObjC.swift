@@ -52,7 +52,7 @@ public final class PayabliPayInTransactionObjC: NSObject {
     @objc public let orderId: String?
     @objc public let method: String?
     @objc public let transStatus: NSNumber?
-    /// `initiated`, `authorized`, `captured`, `declined`, `voided`, `returned`, `failed`, or `other` for a
+    /// `initiated`, `authorized`, `captured`, `declined`, `voided`, `blocked`, `failed`, or `other` for a
     /// status this SDK does not name, whose number is ``transStatus``. `nil` when `transStatus` is.
     @objc public let status: String?
     @objc public let paypointId: NSNumber?
@@ -83,7 +83,7 @@ public final class PayabliPayInTransactionObjC: NSObject {
         case .captured: "captured"
         case .declined: "declined"
         case .voided: "voided"
-        case .returned: "returned"
+        case .blocked: "blocked"
         case .failed: "failed"
         case .other: "other"
         }

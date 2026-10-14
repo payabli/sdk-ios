@@ -10,7 +10,7 @@ final class PayabliPayInTransactionStatusTests: XCTestCase {
             (2, .declined),
             (3, .declined),
             (5, .voided),
-            (-2, .returned),
+            (-2, .blocked),
             (-1, .failed),
             (0, .failed)
         ]
