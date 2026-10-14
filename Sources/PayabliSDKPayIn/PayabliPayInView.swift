@@ -869,10 +869,9 @@ extension PayabliPayInView {
             || viewModel.rejectedFields.contains(field)
     }
 
-    /// The mark's own text. A refusal announces nothing: the mark and the error chrome are what a
-    /// screen reader meets on navigation.
+    /// The mark's own text, which a screen reader hears once when the mark appears and again on the field.
     func rejectedMessage(for field: PayabliPayInField) -> String? {
-        viewModel.rejectedFields.contains(field) ? "That was not accepted" : nil
+        viewModel.rejectedFields.contains(field) ? PayabliPayInAccessibility.rejectedFieldMessage : nil
     }
 
     var submitAccessibilityHint: String {
@@ -1036,13 +1035,13 @@ extension PayabliPayInView {
     ///
     /// - Parameter newlyMarked: The fields marked by this refusal and not before it.
     func announceRejectedFields(_ newlyMarked: Set<PayabliPayInField>) {
-        let announced = viewModel.activeFields
-            .filter(newlyMarked.contains)
-            .compactMap { field in
-                rejectedMessage(for: field).map { "\(configuration.labels.label(for: field)): \($0)" }
-            }
-        guard !announced.isEmpty else { return }
-        UIAccessibility.post(notification: .announcement, argument: announced.joined(separator: ". "))
+        guard let announcement = PayabliPayInAccessibility.rejectedFieldsAnnouncement(
+            newlyMarked: newlyMarked,
+            drawnFields: viewModel.activeFields,
+            label: configuration.labels.label(for:),
+            message: PayabliPayInAccessibility.rejectedFieldMessage
+        ) else { return }
+        UIAccessibility.post(notification: .announcement, argument: announcement)
     }
 
     func announceFieldError(
