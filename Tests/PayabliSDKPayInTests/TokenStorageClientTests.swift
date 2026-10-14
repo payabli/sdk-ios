@@ -387,7 +387,7 @@ final class TokenStorageClientTests: XCTestCase {
         """)
         let client = PayInPaymentFlowTokenStorageClient(
             transport: transport,
-            baseURL: URL(string: "https://api-qa.payabli.com"),
+            baseURL: URL(string: "https://api-sandbox.payabli.com"),
             diagnostics: .enabled { sink.append($0) }
         )
 
@@ -416,7 +416,7 @@ final class TokenStorageClientTests: XCTestCase {
         XCTAssertEqual(entries.map(\.phase), [.request, .response])
 
         let request = try XCTUnwrap(entries.first)
-        XCTAssertTrue(request.url.contains("https://api-qa.payabli.com/api/TokenStorage/add"))
+        XCTAssertTrue(request.url.contains("https://api-sandbox.payabli.com/api/TokenStorage/add"))
         XCTAssertTrue(request.url.contains("createAnonymous=false"))
         XCTAssertTrue(request.url.contains("forceCustomerCreation=true"))
         XCTAssertTrue(request.url.contains("temporary=false"))

@@ -348,6 +348,7 @@ payments against your sandbox paypoint, with a bundled token server.
 git clone https://github.com/payabli/sdk-ios.git
 cd sdk-ios/Example/PayabliDemo
 cp App/Configuration/Secrets.swift.sample App/Configuration/Secrets.swift
+cp SDK/ExtraEnvironments.swift.sample SDK/ExtraEnvironments.swift
 ```
 
 Fill in `Secrets.swift`, then start the token server as its

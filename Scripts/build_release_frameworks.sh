@@ -45,6 +45,14 @@ fi
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$REPO_ROOT"
 
+# A release carries only the committed environments. A file adding one is
+# gitignored, so nothing in the tracked tree shows it is here.
+extras="$(find Sources -name 'PayabliEnvironment+Extras.swift' -print -quit)"
+if [[ -n "$extras" ]]; then
+    echo "error: ${extras} adds environments a release must not carry; remove it and build again" >&2
+    exit 1
+fi
+
 BUILD_CONFIG="${BUILD_CONFIG:-Release}"
 DEVICE_DESTINATION="${DEVICE_DESTINATION:-generic/platform=iOS}"
 SIM_DESTINATION="${SIM_DESTINATION:-generic/platform=iOS Simulator}"
