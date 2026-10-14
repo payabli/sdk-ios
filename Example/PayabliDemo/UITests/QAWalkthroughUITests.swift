@@ -1,35 +1,8 @@
 import XCTest
 
-/// The four card-not-present flows, driven through the form the sample actually shows, against a real environment.
-///
-/// These submit, so they need a reachable token server and a configured paypoint, and they send real requests.
-/// Android's counterpart is `QaWalkthroughTest` in `sdk-android`, gated the same way and asserting the same four
-/// outcomes; the point of driving the UI rather than the SDK is that several devices run it at once and each
-/// screen shows what it is doing.
-///
-/// What makes the resulting rows attributable is the prefill: it fills the form from `QAIdentity`, so no two
-/// devices submit the same customer.
-///
-/// Every test skips unless `PAYABLI_QA_LIVE` is `1`, so opening the scheme and pressing run charges nothing.
-///
-/// ```
-/// TEST_RUNNER_PAYABLI_QA_LIVE=1 TEST_RUNNER_PAYABLI_QA_ENVIRONMENT=qa \
-/// xcodebuild test -project Example/PayabliDemo/PayabliDemo.xcodeproj -scheme PayabliDemoUITests \
-///   -destination 'id=<simulator udid>'
-/// ```
-///
-/// The test scheme rather than an app scheme: `PayabliDemo qa` carries no test action, so `xcodebuild`
-/// refuses the invocation instead of running this bundle.
-///
-/// The token server has to be up, and it is per environment: each one mints from its own credentials, so a
-/// walk against one environment holding the other's token is refused. `PAYABLI_QA_TOKEN_HOST` names the one
-/// to use, as a bare host, `host:port`, or a URL. Left unset the app resolves its own, which is loopback on
-/// a simulator and the Mac over the local network on a device, at the port the app defaults to.
-///
-/// Both `PAYABLI_QA_ENVIRONMENT` and `PAYABLI_QA_TOKEN_HOST` reach the runner only through the
-/// `TEST_RUNNER_` prefix, which `xcodebuild` strips: `TEST_RUNNER_PAYABLI_QA_ENVIRONMENT=sandbox
-/// xcodebuild test ...`. Set plainly they reach `xcodebuild` and stop there, which looks exactly like a
-/// variable that had no effect.
+/// The four card-not-present flows, driven through the form the sample actually shows, against a real
+/// environment. Every test skips unless `PAYABLI_QA_LIVE` is `1`, because these submit real payments, and
+/// both live-run variables reach the runner only through the `TEST_RUNNER_` prefix that `xcodebuild` strips.
 final class QAWalkthroughUITests: XCTestCase {
     private var app: XCUIApplication!
 
@@ -359,7 +332,7 @@ final class QAWalkthroughUITests: XCTestCase {
     /// Overridable so one build can be walked against either paypoint, since the entry point follows the
     /// environment and neither is compiled into the request.
     private var environment: String {
-        ProcessInfo.processInfo.environment["PAYABLI_QA_ENVIRONMENT"] ?? "qa"
+        ProcessInfo.processInfo.environment["PAYABLI_QA_ENVIRONMENT"] ?? "sandbox"
     }
 
     /// The token server to mint from, which follows the environment rather than the build: one runs per

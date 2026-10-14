@@ -19,21 +19,19 @@ final class DemoEnvironmentTests: XCTestCase {
     }
 
     func testTheDemoKnowsEveryEnvironmentTheSDKOffers() {
-        // `PayabliEnvironment` carries a DEBUG-only `local` case this app does not
-        // offer, so the comparison is over the three an integrator picks between.
         let named = DemoEnvironment.allCases.map(\.sdkEnvironment)
         XCTAssertEqual(Set(named).count, DemoEnvironment.allCases.count)
-        for environment in [PayabliEnvironment.qa, .sandbox, .production] {
+        for environment in PayabliEnvironment.entries {
             XCTAssertTrue(
                 named.contains(environment),
-                "the demo offers no environment for \(environment)"
+                "the demo offers no environment for \(environment.name)"
             )
         }
     }
 
     func testALabelNamesItsEnvironmentWhateverItsCase() {
-        XCTAssertEqual(DemoEnvironment.named("  QA \n"), .qa)
-        XCTAssertEqual(DemoEnvironment.named("Sandbox"), .sandbox)
+        XCTAssertEqual(DemoEnvironment.named("  SANDBOX \n"), .sandbox)
+        XCTAssertEqual(DemoEnvironment.named("Production"), .production)
         XCTAssertNil(DemoEnvironment.named("staging"))
     }
 
