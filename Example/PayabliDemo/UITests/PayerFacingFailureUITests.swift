@@ -68,7 +68,7 @@ final class PayerFacingFailureLiveUITests: XCTestCase {
         let environment = ProcessInfo.processInfo.environment
         return FailingForm(
             test: self,
-            environment: environment["PAYABLI_QA_ENVIRONMENT"] ?? "qa",
+            environment: environment["PAYABLI_QA_ENVIRONMENT"] ?? "sandbox",
             tokenHost: environment["PAYABLI_QA_TOKEN_HOST"].flatMap { $0.isEmpty ? nil : $0 }
         )
     }
@@ -87,7 +87,7 @@ private struct FailingForm {
     let test: XCTestCase
     let app = XCUIApplication()
 
-    init(test: XCTestCase, environment: String = "qa", tokenHost: String?) {
+    init(test: XCTestCase, environment: String = "sandbox", tokenHost: String?) {
         self.test = test
         app.launchArguments = ["-PayabliEnvironment", environment, "-showsSimpleCapture", "YES"]
         if let tokenHost {
