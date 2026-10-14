@@ -30,15 +30,6 @@ namespace Payabli.TapToPay
     }
 
     [Native]
-    public enum PayabliEnvironment : long
-    {
-        Local = 0,
-        QA = 1,
-        Sandbox = 2,
-        Production = 3,
-    }
-
-    [Native]
     public enum PayabliTTPPaymentType : long
     {
         Sale = 0,

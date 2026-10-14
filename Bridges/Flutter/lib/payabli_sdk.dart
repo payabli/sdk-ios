@@ -51,7 +51,7 @@ class PayabliTTP {
 
     await _payabliMethodChannel.invokeMethod<void>('configure', {
       'entryPoint': entryPoint,
-      'environment': environment.index,
+      'environment': environment.name,
     });
     _tokenRefresh = tokenProvider;
   }
@@ -230,8 +230,8 @@ class PayabliTTP {
   }
 }
 
-/// Mirrors `PayabliEnvironment` raw values.
-enum PayabliEnvironment { local, qa, sandbox, production }
+/// The environments the native side offers, by the name it resolves.
+enum PayabliEnvironment { sandbox, production }
 
 /// The one session every capability runs on.
 class PayabliSession {
@@ -266,7 +266,7 @@ class PayabliPayIn {
 
     await _payabliMethodChannel.invokeMethod<void>(
       'configurePayIn',
-      {'entryPoint': entryPoint, 'environment': environment.index},
+      {'entryPoint': entryPoint, 'environment': environment.name},
     );
     PayabliTTP._tokenRefresh = tokenProvider;
   }

@@ -36,10 +36,8 @@ function requireEmitter(): NativeEventEmitter {
 // MARK: - Public enums
 
 export enum PayabliEnvironment {
-    Local = 0,
-    QA = 1,
-    Sandbox = 2,
-    Production = 3,
+    Sandbox = "sandbox",
+    Production = "production",
 }
 
 export enum PayabliTTPPaymentType {
@@ -210,7 +208,7 @@ export interface PayabliPayInStoredPaymentMethod {
 interface NativePayabliSDKModule {
     configure(config: {
         entryPoint: string;
-        environment: number;
+        environment: PayabliEnvironment;
     }): Promise<void>;
 
     initialize(): Promise<void>;
@@ -244,7 +242,7 @@ interface NativePayabliSDKModule {
 
     configurePayIn(config: {
         entryPoint: string;
-        environment: number;
+        environment: PayabliEnvironment;
     }): Promise<void>;
 
     addCard(params: PayabliPayInCardData): Promise<PayabliPayInStoredPaymentMethod>;

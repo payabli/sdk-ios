@@ -112,7 +112,7 @@ request rather than falling back.
 
 The app ships `.sandbox`, which is what an integrator can reach, so
 `.env.example` defaults to `api-sandbox`. Change them together. On the app side
-that is the scheme: pick **PayabliDemo qa**, **PayabliDemo sandbox** or
+that is the scheme: pick **PayabliDemo sandbox** or
 **PayabliDemo production** in Xcode's scheme selector. Each passes
 `-PayabliEnvironment`, and the entry point follows from `Secrets.entryPoints`,
 so choosing a scheme cannot leave one environment's paypoint pointed at
