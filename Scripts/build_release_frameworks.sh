@@ -183,8 +183,8 @@ stage_framework() {
 }
 
 # Every static or class member a module interface declares on
-# `PayabliEnvironment` or an extension of it, other than `sandbox`,
-# `production` and `entries`: space separated, or nothing. Fails when there is
+# `PayabliEnvironment` or an extension of it, other than the `sandbox`,
+# `production` and `entries` properties: space separated, or nothing. Fails when there is
 # no interface to read. Newer compilers qualify a type with `::`, older ones
 # with `.`.
 environments_beyond_committed() {
@@ -203,7 +203,7 @@ environments_beyond_committed() {
             split(substr($0, RSTART, RLENGTH), word, " ")
             name = word[3]
             gsub(/`/, "", name)
-            if (name != "sandbox" && name != "production" && name != "entries") print name
+            if (word[2] == "func" || (name != "sandbox" && name != "production" && name != "entries")) print name
         }
     ' $interfaces | sort -u | paste -sd ' ' -
 }
