@@ -20,7 +20,7 @@ final class PayabliPayInTransactionStatusTests: XCTestCase {
     }
 
     func testANumberWithNoRowKeepsTheNumber() {
-        for wire in [4, 6, 12, -3, -4, -6, -7, 99] {
+        for wire in [4, 6, 12, 99, -3, -4, -5, -6, -7, Int.max, Int.min] {
             XCTAssertEqual(PayabliPayInTransaction(transStatus: wire).status, .other(wire), "wire \(wire)")
         }
     }
