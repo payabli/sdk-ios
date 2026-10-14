@@ -211,7 +211,7 @@ environments_beyond_committed() {
             gsub(/`/, "", name)
             if (name != "sandbox" && name != "production" && name != "entries") print name
         }
-    ' {} + | sort -u | paste -sd ' ' -
+    ' {} + | LC_ALL=C sort -u | paste -sd ' ' -
 }
 
 # Refuses a framework an integrator could not import or run: no public
