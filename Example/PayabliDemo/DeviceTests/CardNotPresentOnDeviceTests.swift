@@ -294,6 +294,33 @@ final class CardNotPresentOnDeviceTests: XCTestCase {
     /// do about it is decided here rather than at each call site. A reversal that never answered
     /// is not one that did not happen: sending another would be a second reversal, because the
     /// SDK mints a key per call and the service has nothing to recognise the repeat by.
+    func testHACaptureReadsBackCapturedThenVoided() async throws {
+        let flow = try makeFlow()
+        let captured = try await flow.capture(request(with: try card()))
+        let transId = try XCTUnwrap(captured.transaction?.paymentTransId)
+
+        let before = try await flow.readTransaction(transId)
+        LiveEnvironment.report("PAYABLI_READ env=\(named.name) transId=\(transId) status=\(before.transStatus ?? -99)")
+        XCTAssertEqual(before.paymentTransId, transId)
+        XCTAssertEqual(before.status, .captured)
+
+        await reverse(transId, on: flow, whenLeftStanding: "the read-back capture was left standing")
+        let after = try await flow.readTransaction(transId)
+        LiveEnvironment.report("PAYABLI_READ env=\(named.name) transId=\(transId) status=\(after.transStatus ?? -99)")
+        XCTAssertEqual(after.status, .voided)
+    }
+
+    func testIAnUnknownTransactionIsNotFound() async throws {
+        let flow = try makeFlow()
+
+        do {
+            _ = try await flow.readTransaction("0-no-such-transaction")
+            XCTFail("expected TRANSACTION_NOT_FOUND")
+        } catch {
+            XCTAssertEqual((error as? any PayabliError)?.type, .transactionNotFound)
+        }
+    }
+
     private func reverse(
         _ transId: String,
         on flow: PayabliPayIn,
