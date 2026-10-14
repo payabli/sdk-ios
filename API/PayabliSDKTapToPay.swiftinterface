@@ -1,0 +1,311 @@
+// swift-interface-format-version: 1.0
+// swift-module-flags: -target arm64-apple-ios16.7 -enable-objc-interop -enable-library-evolution -language-mode 5 -O -enable-experimental-feature DebugDescriptionMacro -module-name PayabliSDKTapToPay -package-name PayabliSDK
+import Combine
+import CryptoKit
+import DeviceCheck
+import Foundation
+import PayabliSDKCore
+import ProximityReader
+import Security
+import Swift
+import _Concurrency
+import _StringProcessing
+import _SwiftConcurrencyShims
+public enum PayabliTapToPayModule {
+  public static var version: Swift::String {
+    get
+  }
+}
+@_Concurrency::MainActor extension PayabliSDKTapToPay::PayabliTTP {
+  @_Concurrency::MainActor final public func activateDevice(activationCode: Swift::String) async throws
+  @objc @_Concurrency::MainActor final public func activateDevice(activationCode: Swift::String, completion: @escaping (Foundation::NSError?) -> Swift::Void)
+}
+@_Concurrency::MainActor extension PayabliSDKTapToPay::PayabliTTP {
+  @_Concurrency::MainActor final public func charge(type: PayabliSDKTapToPay::PayabliTTPPaymentType, paymentDetails: PayabliSDKTapToPay::PayabliTTPPaymentDetails, customer: PayabliSDKTapToPay::PayabliTTPCustomerData = PayabliTTPCustomerData(), invoice: PayabliSDKTapToPay::PayabliTTPInvoiceData = PayabliTTPInvoiceData(), orderDescription: Swift::String? = nil) async throws -> PayabliSDKTapToPay::TransactionResult
+  @objc @_Concurrency::MainActor final public func charge(type: Swift::Int, paymentDetails: PayabliSDKTapToPay::PayabliTTPPaymentDetailsObjC, customer: PayabliSDKTapToPay::PayabliTTPCustomerDataObjC?, invoice: PayabliSDKTapToPay::PayabliTTPInvoiceDataObjC?, orderDescription: Swift::String?, completion: @escaping (PayabliSDKTapToPay::PayabliTTPTransactionResultObjC?, Foundation::NSError?) -> Swift::Void)
+}
+@_Concurrency::MainActor extension PayabliSDKTapToPay::PayabliTTP {
+  @_Concurrency::MainActor final public func initialize() async throws
+  @objc @_Concurrency::MainActor final public func initialize(completion: @escaping (Foundation::NSError?) -> Swift::Void)
+  @_Concurrency::MainActor final public func reinitializeIfNeeded() async throws
+  @objc @_Concurrency::MainActor final public func reinitializeIfNeeded(completion: @escaping (Foundation::NSError?) -> Swift::Void)
+}
+@_Concurrency::MainActor extension PayabliSDKTapToPay::PayabliTTP {
+  @_Concurrency::MainActor final public func areTermsAccepted() async throws -> Swift::Bool
+  @objc @_Concurrency::MainActor final public func areTermsAccepted(completion: @escaping (Swift::Bool, Foundation::NSError?) -> Swift::Void)
+  @_Concurrency::MainActor final public func presentTerms() async throws
+  @objc @_Concurrency::MainActor final public func presentTerms(completion: @escaping (Foundation::NSError?) -> Swift::Void)
+}
+@_hasMissingDesignatedInitializers @objc(PayabliTTP) @_Concurrency::MainActor final public class PayabliTTP : ObjectiveC::NSObject, Foundation::ObservableObject {
+  @Combine::Published<PayabliSDKTapToPay::PayabliTTPSessionState> @_projectedValueProperty($sessionState) @_Concurrency::MainActor final public var sessionState: PayabliSDKTapToPay::PayabliTTPSessionState {
+    get
+  }
+  @_Concurrency::MainActor final public var $sessionState: Combine::Published<PayabliSDKTapToPay::PayabliTTPSessionState>.Combine::Publisher {
+    get
+  }
+  @Combine::Published<Swift::Bool> @_projectedValueProperty($isReady) @_Concurrency::MainActor final public var isReady: Swift::Bool {
+    get
+  }
+  @_Concurrency::MainActor final public var $isReady: Combine::Published<Swift::Bool>.Combine::Publisher {
+    get
+  }
+  @objc @_Concurrency::MainActor final public var sessionStateCode: PayabliSDKTapToPay::PayabliTTPSessionStateCode {
+    @objc get
+  }
+  @objc @_Concurrency::MainActor final public var readerConfigurationPercent: Foundation::NSNumber? {
+    @objc get
+  }
+  @objc @_Concurrency::MainActor final public var chargeActivity: Foundation::NSNumber? {
+    @objc get
+  }
+  @objc @_Concurrency::MainActor final public var failureReason: Foundation::NSNumber? {
+    @objc get
+  }
+  @objc @_Concurrency::MainActor final public var activationId: Swift::String? {
+    @objc get
+  }
+  @objc @_Concurrency::MainActor public static func create() async throws -> PayabliSDKTapToPay::PayabliTTP
+  @objc @_Concurrency::MainActor final public func addSessionStateObserver(_ handler: @escaping () -> Swift::Void) -> PayabliSDKTapToPay::TapToPaySessionStateObservation
+  public typealias ObjectWillChangePublisher = Combine::ObservableObjectPublisher
+  @objc deinit
+}
+@_hasMissingDesignatedInitializers @objc(TapToPaySessionStateObservation) final public class TapToPaySessionStateObservation : ObjectiveC::NSObject, @unchecked Swift::Sendable {
+  @objc final public func cancel()
+  @objc deinit
+}
+public enum PayabliTTPCapture : Swift::Int, Swift::Sendable, Swift::CaseIterable {
+  case notCharged
+  case unknown
+  case charged
+  public init?(rawValue: Swift::Int)
+  public typealias AllCases = [PayabliSDKTapToPay::PayabliTTPCapture]
+  public typealias RawValue = Swift::Int
+  nonisolated public static var allCases: [PayabliSDKTapToPay::PayabliTTPCapture] {
+    get
+  }
+  public var rawValue: Swift::Int {
+    get
+  }
+}
+public enum PayabliTTPFailureReason : Swift::Int, Swift::Sendable, Swift::CaseIterable {
+  case deviceSetupRequired
+  case configurationRejected
+  case serviceUnavailable
+  case deviceIneligible
+  case sdkInternalError
+  case deviceKeyUnavailable
+  public init?(rawValue: Swift::Int)
+  public typealias AllCases = [PayabliSDKTapToPay::PayabliTTPFailureReason]
+  public typealias RawValue = Swift::Int
+  nonisolated public static var allCases: [PayabliSDKTapToPay::PayabliTTPFailureReason] {
+    get
+  }
+  public var rawValue: Swift::Int {
+    get
+  }
+}
+@objc(PayabliTTPCustomerDataObjC) final public class PayabliTTPCustomerDataObjC : ObjectiveC::NSObject {
+  @objc final public let firstName: Swift::String?
+  @objc final public let lastName: Swift::String?
+  @objc final public let customerNumber: Swift::String?
+  @objc final public let email: Swift::String?
+  @objc final public let phone: Swift::String?
+  @objc final public let customerId: Foundation::NSNumber?
+  @objc final public let company: Swift::String?
+  @objc final public let billingAddress1: Swift::String?
+  @objc final public let billingAddress2: Swift::String?
+  @objc final public let billingCity: Swift::String?
+  @objc final public let billingState: Swift::String?
+  @objc final public let billingZip: Swift::String?
+  @objc final public let billingCountry: Swift::String?
+  @objc final public let billingPhone: Swift::String?
+  @objc final public let billingEmail: Swift::String?
+  @objc final public let shippingAddress1: Swift::String?
+  @objc final public let shippingAddress2: Swift::String?
+  @objc final public let shippingCity: Swift::String?
+  @objc final public let shippingState: Swift::String?
+  @objc final public let shippingZip: Swift::String?
+  @objc final public let shippingCountry: Swift::String?
+  @objc public init(firstName: Swift::String?, lastName: Swift::String?, customerNumber: Swift::String?, email: Swift::String?, phone: Swift::String?, customerId: Foundation::NSNumber?, company: Swift::String?, billingAddress1: Swift::String?, billingAddress2: Swift::String?, billingCity: Swift::String?, billingState: Swift::String?, billingZip: Swift::String?, billingCountry: Swift::String?, billingPhone: Swift::String?, billingEmail: Swift::String?, shippingAddress1: Swift::String?, shippingAddress2: Swift::String?, shippingCity: Swift::String?, shippingState: Swift::String?, shippingZip: Swift::String?, shippingCountry: Swift::String?)
+  @objc deinit
+}
+@_hasMissingDesignatedInitializers @objc(PayabliTTPTransactionResultObjC) final public class PayabliTTPTransactionResultObjC : ObjectiveC::NSObject {
+  @objc final public let paymentTransId: Swift::String
+  @objc deinit
+}
+@objc(PayabliTTPPaymentDetailsObjC) final public class PayabliTTPPaymentDetailsObjC : ObjectiveC::NSObject {
+  @objc final public let amount: Foundation::NSDecimalNumber
+  @objc final public let serviceFee: Foundation::NSDecimalNumber
+  @objc final public let currency: Swift::String?
+  @objc final public let paymentDescription: Swift::String?
+  @objc public init(amount: Foundation::NSDecimalNumber, serviceFee: Foundation::NSDecimalNumber, currency: Swift::String?, paymentDescription: Swift::String?)
+  @objc deinit
+}
+@objc(PayabliTTPInvoiceDataObjC) final public class PayabliTTPInvoiceDataObjC : ObjectiveC::NSObject {
+  @objc final public let invoiceNumber: Swift::String?
+  @objc public init(invoiceNumber: Swift::String?)
+  @objc deinit
+}
+public struct PayabliTTPCustomerData : Swift::Sendable, Swift::Equatable {
+  public let firstName: Swift::String?
+  public let lastName: Swift::String?
+  public let customerNumber: Swift::String?
+  public let email: Swift::String?
+  public let phone: Swift::String?
+  public let customerId: Swift::Int?
+  public let company: Swift::String?
+  public let billingAddress1: Swift::String?
+  public let billingAddress2: Swift::String?
+  public let billingCity: Swift::String?
+  public let billingState: Swift::String?
+  public let billingZip: Swift::String?
+  public let billingCountry: Swift::String?
+  public let billingPhone: Swift::String?
+  public let billingEmail: Swift::String?
+  public let shippingAddress1: Swift::String?
+  public let shippingAddress2: Swift::String?
+  public let shippingCity: Swift::String?
+  public let shippingState: Swift::String?
+  public let shippingZip: Swift::String?
+  public let shippingCountry: Swift::String?
+  public init(firstName: Swift::String? = nil, lastName: Swift::String? = nil, customerNumber: Swift::String? = nil, email: Swift::String? = nil, phone: Swift::String? = nil, customerId: Swift::Int? = nil, company: Swift::String? = nil, billingAddress1: Swift::String? = nil, billingAddress2: Swift::String? = nil, billingCity: Swift::String? = nil, billingState: Swift::String? = nil, billingZip: Swift::String? = nil, billingCountry: Swift::String? = nil, billingPhone: Swift::String? = nil, billingEmail: Swift::String? = nil, shippingAddress1: Swift::String? = nil, shippingAddress2: Swift::String? = nil, shippingCity: Swift::String? = nil, shippingState: Swift::String? = nil, shippingZip: Swift::String? = nil, shippingCountry: Swift::String? = nil)
+  public var isEmpty: Swift::Bool {
+    get
+  }
+  public var fullName: Swift::String {
+    get
+  }
+  public static func == (a: PayabliSDKTapToPay::PayabliTTPCustomerData, b: PayabliSDKTapToPay::PayabliTTPCustomerData) -> Swift::Bool
+}
+public struct PayabliTTPPaymentDetails : Swift::Sendable, Swift::Equatable {
+  public let amount: Foundation::Decimal
+  public let serviceFee: Foundation::Decimal
+  public let currency: Swift::String?
+  public let paymentDescription: Swift::String?
+  public init(amount: Foundation::Decimal, serviceFee: Foundation::Decimal = 0, currency: Swift::String? = nil, paymentDescription: Swift::String? = nil)
+  public static func == (a: PayabliSDKTapToPay::PayabliTTPPaymentDetails, b: PayabliSDKTapToPay::PayabliTTPPaymentDetails) -> Swift::Bool
+}
+public struct PayabliTTPInvoiceData : Swift::Sendable, Swift::Equatable {
+  public let invoiceNumber: Swift::String?
+  public init(invoiceNumber: Swift::String? = nil)
+  public var isEmpty: Swift::Bool {
+    get
+  }
+  public static func == (a: PayabliSDKTapToPay::PayabliTTPInvoiceData, b: PayabliSDKTapToPay::PayabliTTPInvoiceData) -> Swift::Bool
+}
+public enum PayabliTTPSessionState : Swift::Sendable, Swift::Equatable {
+  case idle
+  case attestingDevice
+  case fetchingConfig
+  case initializingReader(percent: Swift::Int?)
+  case ready
+  case sessionExpired
+  case reinitializing
+  case pendingActivation(activationId: Swift::String)
+  case failed(reason: PayabliSDKTapToPay::PayabliTTPFailureReason)
+  case pendingTerms
+  case charging(activity: PayabliSDKTapToPay::TapToPayChargeActivity)
+  public static func == (a: PayabliSDKTapToPay::PayabliTTPSessionState, b: PayabliSDKTapToPay::PayabliTTPSessionState) -> Swift::Bool
+}
+@objc public enum PayabliTTPSessionStateCode : Swift::Int, Swift::Sendable {
+  case idle = 0
+  case attestingDevice = 1
+  case fetchingConfig = 2
+  case initializingReader = 3
+  case ready = 4
+  case sessionExpired = 5
+  case reinitializing = 6
+  case pendingActivation = 7
+  case failed = 8
+  case pendingTerms = 9
+  case charging = 10
+  public init?(rawValue: Swift::Int)
+  public typealias RawValue = Swift::Int
+  public var rawValue: Swift::Int {
+    get
+  }
+}
+extension PayabliSDKTapToPay::PayabliTTPSessionState {
+  public var code: PayabliSDKTapToPay::PayabliTTPSessionStateCode {
+    get
+  }
+  public var readerConfigurationPercent: Swift::Int? {
+    get
+  }
+  public var chargeActivity: PayabliSDKTapToPay::TapToPayChargeActivity? {
+    get
+  }
+  public var failureReason: PayabliSDKTapToPay::PayabliTTPFailureReason? {
+    get
+  }
+  public var activationId: Swift::String? {
+    get
+  }
+}
+@objc public enum PayabliTTPPaymentType : Swift::Int, Swift::Sendable {
+  case sale = 0
+  public init?(rawValue: Swift::Int)
+  public typealias RawValue = Swift::Int
+  public var rawValue: Swift::Int {
+    get
+  }
+}
+public struct TransactionResult : Swift::Sendable {
+  public let paymentTransId: Swift::String
+  public init(paymentTransId: Swift::String)
+}
+public enum TapToPayChargeActivity : Swift::Int, Swift::Sendable, Swift::CaseIterable {
+  case opening
+  case waitingForCard
+  case closing
+  case cardDetected
+  case cardRemovalRequested
+  case cardReadRetryRequested
+  case pinEntryRequested
+  case pinEntryCompleted
+  case readerPromptDismissed
+  public init?(rawValue: Swift::Int)
+  public typealias AllCases = [PayabliSDKTapToPay::TapToPayChargeActivity]
+  public typealias RawValue = Swift::Int
+  nonisolated public static var allCases: [PayabliSDKTapToPay::TapToPayChargeActivity] {
+    get
+  }
+  public var rawValue: Swift::Int {
+    get
+  }
+}
+public struct TapToPayError : PayabliSDKCore::PayabliError, PayabliSDKCore::PayabliRetryAfter {
+  public let type: PayabliSDKCore::PayabliErrorType
+  public let reason: Swift::String
+  public let detail: Swift::String?
+  public let paymentTransId: Swift::String?
+  public let capture: PayabliSDKTapToPay::PayabliTTPCapture
+  public let retryAfter: Foundation::TimeInterval?
+}
+extension PayabliSDKTapToPay::TapToPayError : Foundation::CustomNSError {
+  public static var errorDomain: Swift::String {
+    get
+  }
+  public var errorCode: Swift::Int {
+    get
+  }
+  public var errorUserInfo: [Swift::String : Any] {
+    get
+  }
+}
+extension PayabliSDKTapToPay::PayabliTTP : Swift::Sendable {}
+extension PayabliSDKTapToPay::PayabliTTPCapture : Swift::Equatable {}
+extension PayabliSDKTapToPay::PayabliTTPCapture : Swift::Hashable {}
+extension PayabliSDKTapToPay::PayabliTTPCapture : Swift::RawRepresentable {}
+extension PayabliSDKTapToPay::PayabliTTPFailureReason : Swift::Equatable {}
+extension PayabliSDKTapToPay::PayabliTTPFailureReason : Swift::Hashable {}
+extension PayabliSDKTapToPay::PayabliTTPFailureReason : Swift::RawRepresentable {}
+extension PayabliSDKTapToPay::PayabliTTPSessionStateCode : Swift::Equatable {}
+extension PayabliSDKTapToPay::PayabliTTPSessionStateCode : Swift::Hashable {}
+extension PayabliSDKTapToPay::PayabliTTPSessionStateCode : Swift::RawRepresentable {}
+extension PayabliSDKTapToPay::PayabliTTPPaymentType : Swift::Equatable {}
+extension PayabliSDKTapToPay::PayabliTTPPaymentType : Swift::Hashable {}
+extension PayabliSDKTapToPay::PayabliTTPPaymentType : Swift::RawRepresentable {}
+extension PayabliSDKTapToPay::TapToPayChargeActivity : Swift::Equatable {}
+extension PayabliSDKTapToPay::TapToPayChargeActivity : Swift::Hashable {}
+extension PayabliSDKTapToPay::TapToPayChargeActivity : Swift::RawRepresentable {}
