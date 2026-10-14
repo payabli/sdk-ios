@@ -1,6 +1,7 @@
 /// Where a transaction stands, read from ``PayabliPayInTransaction/transStatus``, which keeps the number.
 ///
-/// Each case names the status numbers it covers and whether the payment's outcome is known.
+/// Each case names the status numbers it covers and whether the payment's outcome is known. Where it is not,
+/// the status may still change, so read the transaction again before acting on it.
 public enum PayabliPayInTransactionStatus: Sendable, Hashable {
     /// 10. Outcome not known.
     case initiated
@@ -12,7 +13,7 @@ public enum PayabliPayInTransactionStatus: Sendable, Hashable {
     case declined
     /// 5. Outcome known: not paid.
     case voided
-    /// -2, refused by a risk rule before the processor. Outcome known: not paid, and no money moved.
+    /// -2. Outcome known: not paid, and no money moved.
     case blocked
     /// -1 and 0. Outcome not known.
     case failed
