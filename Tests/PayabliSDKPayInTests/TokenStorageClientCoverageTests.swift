@@ -214,6 +214,32 @@ final class TokenStorageClientCoverageTests: XCTestCase {
         XCTAssertEqual(result.resultCode, 1)
     }
 
+    func testA200ThatClaimsNothingIsARefusalRatherThanAStoredMethod() async throws {
+        let transport = CoverageMockTransport(responseBody: """
+        { "responseText": "Success" }
+        """)
+        let client = PayInPaymentFlowTokenStorageClient(transport: transport)
+
+        do {
+            _ = try await client.addMethod(
+                entryPoint: "entry",
+                paymentMethod: .card(PayabliPayInCardData(
+                    cardNumber: "4111111111111111",
+                    expiration: "02/28",
+                    cardholderName: "Jane Doe",
+                    cvv: "123",
+                    billingZip: "33139"
+                ))
+            )
+            XCTFail("Expected a refusal")
+        } catch let error as PayabliPayInTokenStorageError {
+            guard case .saveFailed = error else { return XCTFail("Wrong error: \(error)") }
+            XCTAssertEqual(error.type, .paymentDeclined)
+        } catch {
+            XCTFail("Wrong error: \(error)")
+        }
+    }
+
     func testUnapprovedResultCodeWithoutFailureFlagThrowsSaveFailure() async throws {
         let transport = CoverageMockTransport(responseBody: """
         {
