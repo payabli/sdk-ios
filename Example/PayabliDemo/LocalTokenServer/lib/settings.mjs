@@ -45,7 +45,7 @@ export const maxRequestBodyBytes = Number.parseInt(process.env.PAYABLI_MAX_REQUE
 
 export const allowedApiHosts = parseCsvSet(
   process.env.PAYABLI_ALLOWED_API_HOSTS ||
-    "api-sandbox.payabli.com,api-qa.payabli.com,api.payabli.com"
+    "api-sandbox.payabli.com,api.payabli.com"
 );
 export const allowInsecureUpstream = process.env.PAYABLI_ALLOW_INSECURE_UPSTREAM === "true";
 

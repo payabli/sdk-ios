@@ -1,16 +1,32 @@
 import PayabliSDKCore
 
-/// The SDK's name for the environment this demo is pointed at.
-///
-/// The one place the two meet. The app decides which environment it runs against
-/// and shows it; this says what the SDK calls it, so nothing above has to hold an
-/// SDK type to point a session somewhere.
+/// The one place the app's environment and the SDK's meet. Nothing above here
+/// holds an SDK type to point a session somewhere.
 extension DemoEnvironment {
-    var sdkEnvironment: PayabliEnvironment {
-        switch self {
-        case .sandbox: return .sandbox
-        case .production: return .production
-        }
+    /// The app's view of an SDK environment: its name and where it points.
+    init(_ environment: PayabliEnvironment) {
+        self.init(label: environment.name, baseURL: environment.baseURL)
+    }
+
+    static let sandbox = DemoEnvironment(PayabliEnvironment.sandbox)
+
+    static let production = DemoEnvironment(PayabliEnvironment.production)
+
+    /// The one run when nothing chose another. Sandbox, as the environment an
+    /// integrator can reach.
+    static let fallback = sandbox
+
+    /// Whether this one reaches production's host, whatever a build named it
+    /// and however it spelled the host.
+    var pointsAtProduction: Bool {
+        Self.resolved(host) == Self.resolved(DemoEnvironment.production.host)
+    }
+
+    /// A host as a resolver reads it: `URL.host` keeps the case and the
+    /// trailing dot it was given, and neither changes where a request goes.
+    private static func resolved(_ host: String?) -> String? {
+        guard let host = host?.lowercased() else { return nil }
+        return host.hasSuffix(".") ? String(host.dropLast()) : host
     }
 }
 

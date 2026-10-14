@@ -54,6 +54,14 @@ fi
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$REPO_ROOT"
 
+# The record holds only the committed environments. A file adding one is
+# gitignored, so nothing in the tracked tree shows it is here.
+extras="$(find Sources -name 'PayabliEnvironment+Extras.swift' -print -quit)"
+if [[ -n "$extras" ]]; then
+    echo "error: ${extras} adds environments the recorded interface must not carry; remove it and run again" >&2
+    exit 1
+fi
+
 BUILD_CONFIG="${BUILD_CONFIG:-Release}"
 DERIVED_DATA="${DERIVED_DATA:-$REPO_ROOT/build/public-interface/derived}"
 

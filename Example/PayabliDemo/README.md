@@ -29,6 +29,9 @@ end to end against sandbox.
 2. Copy `App/Configuration/Secrets.swift.sample` to `Secrets.swift` beside it and
    fill in your sandbox
    credentials. `Secrets.swift` is gitignored.
+   Copy `SDK/ExtraEnvironments.swift.sample` to `ExtraEnvironments.swift` beside
+   it as it is: the app offers sandbox and production. To offer another, see
+   [Adding an environment](#adding-an-environment).
 3. Set `DEVELOPMENT_TEAM` on the target. The Tap to Pay tab shows the App ID
    to register as an authorized app, `<APP_ID_PREFIX>.com.payabli.example.app`.
 
@@ -36,6 +39,41 @@ end to end against sandbox.
 xcodebuild build -project PayabliDemo.xcodeproj -scheme PayabliDemo \
   -destination 'platform=iOS Simulator,name=iPhone 17 Pro'
 ```
+
+### Adding an environment
+
+An environment beyond sandbox and production takes two gitignored files. The
+SDK keeps `PayabliEnvironment`'s initializer internal, so the first is a Core
+source file, `Sources/PayabliSDKCore/Public/PayabliEnvironment+Extras.swift`:
+
+```swift
+import Foundation
+
+public extension PayabliEnvironment {
+    @objc static var staging: PayabliEnvironment {
+        extraStaging
+    }
+}
+
+private let extraStaging = PayabliEnvironment(name: "staging", baseURL: URL(string: "https://<host>")!)
+```
+
+The second lists it for this app, in `SDK/ExtraEnvironments.swift`:
+
+```swift
+import PayabliSDKCore
+
+enum ExtraEnvironments {
+    static let added: [PayabliEnvironment] = [.staging]
+}
+```
+
+The name is lowercase, because the app matches `-PayabliEnvironment` and
+`PAYABLI_ENV` lowercased. Running against it also takes a row for it in
+`Secrets.entryPoints`, and, with the bundled token server, its API base URL in
+`PAYABLI_API_BASE_URL` and its host in `PAYABLI_ALLOWED_API_HOSTS`. `Scripts/build_release_frameworks.sh` and
+`Scripts/dump-public-interface.sh` both refuse to run while the Core file
+exists, so remove it before either.
 
 ### Required entitlements
 
@@ -96,12 +134,14 @@ PayabliDemo/
                   TapToPayTerminal.swift        owns the reader, hands screens answers
                   TapToPaySessionStatus.swift   the SDK's states, in this app's words
                   PayabliEnvironmentMapping.swift  the demo's environment, in the SDK's terms
+                  OfferedEnvironments.swift     the environments this build offers
+                  ExtraEnvironments.swift       what this machine's build adds (gitignored)
                   DemoCustomerData.swift        the stand-in customer each surface sends
                   PayInSharedConfiguration.swift  what both forms share
                   LoggableError.swift           what a log line may say about a failure
   App/            PayabliDemoQAApp.swift        @main + the tab shell
     Configuration/  ConfigurationQAView.swift   the Config tab
-                    DemoEnvironment.swift       the environments this app offers
+                    DemoEnvironment.swift       an environment, in this app's terms
                     DemoConfiguration.swift     which one runs, and the token host
                     EntryPointLookup.swift      which paypoint each one uses
                     Secrets.swift               credentials only (gitignored)
