@@ -34,6 +34,7 @@ public enum PayabliErrorType : Swift::String, Swift::Sendable, Swift::CaseIterab
   case unknown
   case sdkInternalError
   case sessionNotInitialized
+  case transactionNotFound
   case deviceKeyUnavailable
   case deviceSetupUnsupported
   case deviceServicesOutdated
