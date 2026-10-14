@@ -101,75 +101,96 @@ extension PayabliPayInViewModel {
     /// is written when nothing was held, so an update a payer has not typed into publishes once.
     /// Host-supplied hidden values are not payer-typed and are untouched.
     func dropValuesWithoutAField() {
-        let boxes = fieldsWithABox
-        dropCardValuesWithoutABox(boxes)
-        dropBankValuesWithoutABox(boxes)
-        dropCustomerValuesWithoutABox(boxes)
+        dropValues(for: Set(PayabliPayInField.allCases).subtracting(fieldsWithABox))
     }
 
-    private func dropCardValuesWithoutABox(_ boxes: Set<PayabliPayInField>) {
-        if !boxes.contains(.cardholderName), !cardholderNameStorage.isEmpty {
+    /// What the payer typed into a field only the method they left shows goes, because it is never
+    /// submitted with the method they moved to and is no longer on screen. A field both methods show
+    /// is kept.
+    ///
+    /// - Parameter previous: The method the payer moved away from.
+    func dropValuesLeftBehind(by previous: PayabliPayInMethodType) {
+        dropValues(for: Set(fields(of: previous)).subtracting(fields(of: selectedMethod)))
+    }
+
+    private func fields(of method: PayabliPayInMethodType) -> [PayabliPayInField] {
+        switch method {
+        case .card:
+            configuration.cardFieldOrder
+        case .bankAccount:
+            configuration.bankFieldOrder
+        }
+    }
+
+    private func dropValues(for dropped: Set<PayabliPayInField>) {
+        dropCardValues(dropped)
+        dropBankValues(dropped)
+        dropCustomerValues(dropped)
+    }
+
+    private func dropCardValues(_ dropped: Set<PayabliPayInField>) {
+        if dropped.contains(.cardholderName), !cardholderNameStorage.isEmpty {
             cardholderNameStorage = ""
         }
-        if !boxes.contains(.cardNumber), !cardNumberStorage.isEmpty {
+        if dropped.contains(.cardNumber), !cardNumberStorage.isEmpty {
             cardNumberStorage = ""
         }
-        if !boxes.contains(.cardExpiration),
+        if dropped.contains(.cardExpiration),
            !cardExpiration.isEmpty || cardExpirationMonth != nil || cardExpirationYear != nil
         {
             cardExpiration = ""
             cardExpirationMonth = nil
             cardExpirationYear = nil
         }
-        if !boxes.contains(.cardCvv), !cardCvvStorage.isEmpty {
+        if dropped.contains(.cardCvv), !cardCvvStorage.isEmpty {
             cardCvvStorage = ""
         }
-        if !boxes.contains(.cardZip), !cardZipStorage.isEmpty {
+        if dropped.contains(.cardZip), !cardZipStorage.isEmpty {
             cardZipStorage = ""
         }
     }
 
-    private func dropBankValuesWithoutABox(_ boxes: Set<PayabliPayInField>) {
-        if !boxes.contains(.accountHolder), !achHolderStorage.isEmpty {
+    private func dropBankValues(_ dropped: Set<PayabliPayInField>) {
+        if dropped.contains(.accountHolder), !achHolderStorage.isEmpty {
             achHolderStorage = ""
         }
-        if !boxes.contains(.routingNumber), !achRoutingStorage.isEmpty {
+        if dropped.contains(.routingNumber), !achRoutingStorage.isEmpty {
             achRoutingStorage = ""
         }
-        if !boxes.contains(.accountNumber), !achAccountStorage.isEmpty {
+        if dropped.contains(.accountNumber), !achAccountStorage.isEmpty {
             achAccountStorage = ""
         }
-        if !boxes.contains(.accountType), accountType != .checking {
+        if dropped.contains(.accountType), accountType != .checking {
             accountType = .checking
         }
-        if !boxes.contains(.accountHolderType), accountHolderType != .personal {
+        if dropped.contains(.accountHolderType), accountHolderType != .personal {
             accountHolderType = .personal
         }
-        if !boxes.contains(.secCode), secCode != .web {
+        if dropped.contains(.secCode), secCode != .web {
             secCode = .web
         }
-        if !boxes.contains(.deviceId), !deviceId.isEmpty {
+        if dropped.contains(.deviceId), !deviceId.isEmpty {
             deviceId = ""
         }
     }
 
-    private func dropCustomerValuesWithoutABox(_ boxes: Set<PayabliPayInField>) {
-        if !boxes.contains(.methodDescription), !methodDescription.isEmpty {
+    private func dropCustomerValues(_ dropped: Set<PayabliPayInField>) {
+        if dropped.contains(.methodDescription), !methodDescription.isEmpty {
             methodDescription = ""
         }
-        if !boxes.contains(.firstName), !firstName.isEmpty {
+        if dropped.contains(.firstName), !firstName.isEmpty {
             firstName = ""
         }
-        if !boxes.contains(.lastName), !lastName.isEmpty {
+        if dropped.contains(.lastName), !lastName.isEmpty {
             lastName = ""
         }
-        if !boxes.contains(.customerNumber), !customerNumber.isEmpty {
+        if dropped.contains(.customerNumber), !customerNumber.isEmpty {
             customerNumber = ""
         }
-        if !boxes.contains(.billingEmail), !billingEmail.isEmpty {
+        if dropped.contains(.billingEmail), !billingEmail.isEmpty {
             billingEmail = ""
         }
-        if !boxes.contains(.billingZip), !billingZipStorage.isEmpty {
+        if dropped.contains(.billingZip), !billingZipStorage.isEmpty {
             billingZipStorage = ""
         }
     }
