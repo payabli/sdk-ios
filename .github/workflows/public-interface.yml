@@ -1,0 +1,74 @@
+name: Public interface
+
+# Fails a pull request that changes what an integrator can reach without updating API/ in the same change.
+# A declaration that becomes public, or stops being public, changes its module's interface, and the
+# generated file must match the checked-in one exactly.
+#
+# Its own workflow, not a job in `ci.yml`, and on pull requests only. The release does not read this result:
+# `release.yml` compares the interface of the build it is about to publish with API/ itself.
+#
+# Not path-filtered, so it can be made a required check: a required check that never runs blocks a merge
+# rather than passing it.
+
+on:
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: public-interface-${{ github.ref }}
+  cancel-in-progress: true
+
+# Runs the pull request's own code, so it holds no token beyond reading the repository.
+permissions:
+  contents: read
+
+jobs:
+  interface:
+    name: Public interface
+    # The image and Xcode the release builds with, so the recorded interface is the one that ships.
+    runs-on: xcode-27
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: ./.github/actions/ios-toolchain
+        with:
+          xcode: default
+
+      # The records are deleted first, so a dump that writes nothing, or writes somewhere else, fails against
+      # the committed files rather than passing on them. The ls-files check catches a record removed from the
+      # repository, which the diff cannot see.
+      - name: Compare the interface
+        run: |
+          set -euo pipefail
+          rm API/*.swiftinterface
+          ./Scripts/dump-public-interface.sh API
+          for file in API/*.swiftinterface; do
+            git ls-files --error-unmatch "$file" > /dev/null
+          done
+          if ! git diff --exit-code -- API/ > interface.diff; then
+            {
+              echo "## The public interface changed"
+              echo
+              echo "Run \`./Scripts/dump-public-interface.sh API\` and commit the result with this change."
+              echo
+              echo '```diff'
+              cat interface.diff
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+            cat interface.diff
+            echo "::error::the public interface differs from API/; regenerate it and commit the result"
+            exit 1
+          fi
+
+      # The generated files, so an author on another Xcode can take the ones this image produced.
+      - name: Upload the generated interface
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: public-interface
+          path: API/

@@ -42,6 +42,7 @@ COPIED = (
     ".github/workflows/ci.yml",
     ".github/workflows/release.yml",
     ".github/workflows/nightly-report.yml",
+    ".github/workflows/public-interface.yml",
     ".github/hardware-only-tests.txt",
     ".github/scripts/release-version.sh",
     ".github/scripts/release-newer.sh",
@@ -51,6 +52,7 @@ COPIED = (
 CI_YML = ".github/workflows/ci.yml"
 RELEASE_YML = ".github/workflows/release.yml"
 REPORT_YML = ".github/workflows/nightly-report.yml"
+INTERFACE_YML = ".github/workflows/public-interface.yml"
 HARDWARE_LIST = ".github/hardware-only-tests.txt"
 HELPER = ".github/scripts/hardware-only-skips.sh"
 REPORT = ".github/scripts/nightly_report.py"
@@ -399,6 +401,80 @@ MUTATIONS = [
         "      - '.github/workflows/**'\n      - '.github/workflows/nightly.yml'\n",
         "      - '.github/workflows/**'\n",
         "W11", "workflows",
+    ),
+    Mutation(
+        "the interface check starts running on main, where the release reads CI",
+        INTERFACE_YML, "on:\n  pull_request:\n", "on:\n  push:\n  pull_request:\n",
+        "W16", "workflows",
+    ),
+    Mutation(
+        "the interface check moves into ci.yml, so a failing check stops a release",
+        CI_YML, "          swiftformat --lint .\n",
+        "          swiftformat --lint .\n          ./Scripts/dump-public-interface.sh API\n",
+        "W16a", "workflows",
+    ),
+    Mutation(
+        "the release reports an interface mismatch and publishes anyway",
+        RELEASE_YML,
+        "regenerate API/ in a reviewed pull request\"\n            exit 1\n",
+        "regenerate API/ in a reviewed pull request\"\n",
+        "W16c", "workflows",
+    ),
+    Mutation(
+        "a module the release ships without a record passes",
+        RELEASE_YML,
+        "records $(echo $recorded)\"\n            exit 1\n",
+        "records $(echo $recorded)\"\n",
+        "W16c", "workflows",
+    ),
+    Mutation(
+        "a simulator slice that differs from the record passes",
+        RELEASE_YML,
+        "differs from $record\"\n                exit 1\n",
+        "differs from $record\"\n",
+        "W16c", "workflows",
+    ),
+    Mutation(
+        "a simulator slice is compared without its module flags",
+        RELEASE_YML,
+        "untargeted() { sed -E '/^\\/\\/ swift-module-flags:/s/-target [a-z0-9_]+-apple-ios([0-9.]+)(-simulator)? "
+        "/-target apple-ios\\1 /' \"$1\"; }\n",
+        "untargeted() { grep -v '^// swift-module-flags:' \"$1\"; }\n",
+        "W16d", "workflows",
+    ),
+    Mutation(
+        "a simulator slice's deployment version is ignored",
+        RELEASE_YML,
+        "(-simulator)? /-target apple-ios\\1 /'",
+        "(-simulator)? /-target apple-ios /'",
+        "W16d", "workflows",
+    ),
+    Mutation(
+        "the release's interface check is allowed to fail",
+        RELEASE_YML,
+        "      - name: Check the shipped interface matches API/\n",
+        "      - name: Check the shipped interface matches API/\n        continue-on-error: true\n",
+        "W16c", "workflows",
+    ),
+    Mutation(
+        "the release checks a fresh build rather than the one it publishes",
+        RELEASE_YML,
+        "            --products build/release/derived-device/Build/Products/Release-iphoneos \\\n",
+        "",
+        "W16c", "workflows",
+    ),
+    Mutation(
+        "the records are not deleted first, so a dump that writes nothing passes",
+        INTERFACE_YML, "          rm API/*.swiftinterface\n", "", "W16b", "workflows",
+    ),
+    Mutation(
+        "a record removed from the repository passes",
+        INTERFACE_YML,
+        "          for file in API/*.swiftinterface; do\n"
+        "            git ls-files --error-unmatch \"$file\" > /dev/null\n"
+        "          done\n",
+        "",
+        "W16b", "workflows",
     ),
     Mutation(
         "the checkout goes shallow, so every failure names the same commit",
