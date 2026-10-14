@@ -44,7 +44,8 @@ public enum PayabliPayInError: PayabliError, Equatable {
     /// and an error's associated values are rendered wherever the chain is walked, a crash reporter
     /// included.
     ///
-    /// `paymentTransId` is `nil` for now.
+    /// `paymentTransId` is the transaction the answer named; pass it to ``PayabliPayIn/readTransaction(_:)``.
+    /// When `paymentTransId` is `nil`, no identifier came back, and there is nothing to read.
     case submissionInterrupted(type: PayabliErrorType, causeType: String, paymentTransId: String?)
 
     public var type: PayabliErrorType {
