@@ -459,7 +459,7 @@ final class PaymentMethodFormConfigurationTests: XCTestCase {
             _ = try await viewModel.submit()
             XCTFail("Expected transport error")
         } catch PaymentMethodTestError.transportBoom {
-            XCTAssertEqual(viewModel.errorMessage, "The payment couldn't be completed.")
+            XCTAssertEqual(viewModel.errorMessage, "The payment method couldn't be saved.")
         } catch {
             XCTFail("Wrong error: \(error)")
         }

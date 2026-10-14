@@ -406,10 +406,17 @@ public struct PayabliValidationError: PayabliError, Decodable {
 
     /// The empty error, for a 400 whose body will not decode at all.
     init() {
+        self.init(detail: nil)
+    }
+
+    /// The error for a route that refuses a request with prose alone and names no field.
+    ///
+    /// - Parameter detail: The route's own explanation of the refusal.
+    package init(detail: String?) {
         problemType = nil
         title = nil
         status = nil
-        detail = nil
+        self.detail = detail
         instance = nil
         rawCode = nil
         errors = nil

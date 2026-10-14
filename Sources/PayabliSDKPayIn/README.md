@@ -154,7 +154,7 @@ The outcomes are the ones in the root README's [Handle the outcome](../../README
 | A core `PayabliError` whose `type` is `.tokenProviderFailed` | Not charged; your token provider failed | Fix the token provider |
 | `PayabliPayInError.submissionInterrupted` | Unknown | After `capture(_:)` or `authorize(_:)`, find the transaction by `orderId` in the Payabli portal. After `captureAuthorizedTransaction(_:)` or `voidTransaction(_:)`, look up the transaction ID you passed. Then decide whether to call again |
 | A core `PayabliError`, such as a validation failure, a refused credential or a rate limit | On a charge, not charged; the service's answer | Branch on its `type` |
-| `PayabliPayInTokenStorageError` | The method wasn't saved | `invalidInput` was refused before sending; `saveFailed` is the service refusing it, typed `.paymentDeclined`. A failed status arrives as the core `PayabliError` for that status instead |
+| `PayabliPayInTokenStorageError` | The method wasn't saved | `invalidInput` was refused before sending; `saveFailed` is the service refusing it, typed `.paymentDeclined`. A failed status arrives as the core `PayabliError` for that status instead, and a 400 is `.validation` with the service's explanation in `detail` |
 | A core `PayabliError` from `addCard`, `addBankAccount` or `addPaymentMethod` whose `type` is `.networkError`, `.serverError` or `.decodingError` | Unknown: the method may have been saved | Read the stored methods back before saving again |
 
 Don't show `error.localizedDescription` to the payer or log it: it names what the service rejected and can

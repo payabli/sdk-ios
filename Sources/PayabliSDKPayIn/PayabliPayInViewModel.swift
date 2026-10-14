@@ -274,11 +274,13 @@ final class PayabliPayInViewModel: ObservableObject {
         clearMarks()
         guard !isSubmitting else {
             let error = PayabliPayInError.submissionInProgress
-            errorMessage = PayabliPayInFailureMessage.text(for: error)
+            errorMessage = PayabliPayInFailureMessage.text(for: error, operation: component.operation)
             throw error
         }
         isSubmitting = true
-        submittingOperation = component.operation
+        // The operation sent, which picks the message even if the form is given another while it runs.
+        let operation = component.operation
+        submittingOperation = operation
         defer {
             isSubmitting = false
             submittingOperation = nil
@@ -290,7 +292,7 @@ final class PayabliPayInViewModel: ObservableObject {
             do {
                 try details.validate()
             } catch {
-                errorMessage = PayabliPayInFailureMessage.text(for: error)
+                errorMessage = PayabliPayInFailureMessage.text(for: error, operation: operation)
                 throw error
             }
         }
@@ -325,7 +327,7 @@ final class PayabliPayInViewModel: ObservableObject {
                 rejectedFields = PayabliPayInRejectedFields.fields(in: error).intersection(activeFields)
             }
             // A marked field is the whole answer; a failure that marks none on screen shows its message.
-            errorMessage = rejectedFields.isEmpty ? PayabliPayInFailureMessage.text(for: error) : nil
+            errorMessage = rejectedFields.isEmpty ? PayabliPayInFailureMessage.text(for: error, operation: operation) : nil
             throw error
         }
     }
