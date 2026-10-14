@@ -198,12 +198,20 @@ environments_beyond_committed() {
     awk '
         /^[^ ]/ && /(class PayabliEnvironment |extension PayabliSDKCore(::|\.)PayabliEnvironment )/ { inside = 1; next }
         /^}/ { inside = 0 }
-        inside && /(static|class) subscript/ { print "subscript"; next }
-        inside && match($0, /(static|class) (var|let|func) [^ (:<]+/) {
-            split(substr($0, RSTART, RLENGTH), word, " ")
-            name = word[3]
+        inside && /(static|class) ([^ ]+ )*subscript[ (<]/ { print "subscript"; next }
+        inside && match($0, /(static|class) ([^ ]+ )*func /) {
+            rest = substr($0, RSTART + RLENGTH)
+            if (!match(rest, /^[A-Za-z0-9_`]+/)) match(rest, /^[^ (]+/)
+            name = substr(rest, RSTART, RLENGTH)
             gsub(/`/, "", name)
-            if (word[2] == "func" || (name != "sandbox" && name != "production" && name != "entries")) print name
+            print name
+            next
+        }
+        inside && match($0, /(static|class) ([^ ]+ )*(var|let) [A-Za-z0-9_`]+/) {
+            count = split(substr($0, RSTART, RLENGTH), word, " ")
+            name = word[count]
+            gsub(/`/, "", name)
+            if (name != "sandbox" && name != "production" && name != "entries") print name
         }
     ' $interfaces | sort -u | paste -sd ' ' -
 }
