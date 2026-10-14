@@ -307,6 +307,44 @@ final class PayabliPayInTests: XCTestCase {
         XCTAssertNil(viewModel.submittingOperation)
     }
 
+    func testAFailureInFlightDrawsTheMessageOfTheOperationItSent() async throws {
+        let transport = BlockingFacadeTransport(statusCode: 402, responseBody: """
+        {"code": "D0200", "reason": "Insufficient Funds", "explanation": "Declined.", "data": null, "token": null}
+        """)
+        let component = PayabliPayIn(
+            entryPoint: "entry",
+            environment: .sandbox,
+            transport: transport,
+            operation: .capture,
+            requestConfiguration: PayabliPayInRequestConfiguration(
+                paymentDetails: PayabliPayInPaymentDetails(totalAmount: 30, currency: "USD")
+            )
+        )
+        let viewModel = PayabliPayInViewModel(
+            component: component,
+            configuration: PayabliPayInFormConfiguration(allowedMethods: [.card], defaultMethod: .card)
+        )
+        viewModel.cardholderName = "Jane Doe"
+        viewModel.cardNumber = "4111111111111111"
+        viewModel.cardExpiration = "02/27"
+        viewModel.cardCvv = "999"
+        viewModel.cardZip = "12345"
+        viewModel.firstName = "Jane"
+        viewModel.billingEmail = "jane@example.com"
+
+        let submission = Task { try await viewModel.submit() }
+        await transport.waitForFirstRequest()
+        component.configure(operation: .storePaymentMethod)
+        await transport.resume()
+
+        do {
+            _ = try await submission.value
+            XCTFail("Expected the capture to be declined")
+        } catch {
+            XCTAssertEqual(viewModel.errorMessage, "The payment was declined. Try another payment method.")
+        }
+    }
+
     func testFormViewModelSubmitsConfiguredCaptureRequest() async throws {
         let transport = FacadeTransport(responseBody: Self.formCaptureResponse)
         let component = PayabliPayIn(
@@ -490,11 +528,13 @@ private actor FacadeTransport: PayabliTransport {
 
 private actor BlockingFacadeTransport: PayabliTransport {
     private(set) var requests: [PayabliRequest] = []
+    private let statusCode: Int
     private let responseBody: String
     private var requestContinuation: CheckedContinuation<Void, Never>?
     private var responseContinuation: CheckedContinuation<Void, Never>?
 
-    init(responseBody: String) {
+    init(statusCode: Int = 201, responseBody: String) {
+        self.statusCode = statusCode
         self.responseBody = responseBody
     }
 
@@ -519,7 +559,7 @@ private actor BlockingFacadeTransport: PayabliTransport {
             responseContinuation = continuation
         }
         return PayabliResponse(
-            statusCode: 201,
+            statusCode: statusCode,
             headers: [:],
             body: Data(responseBody.utf8)
         )
