@@ -198,7 +198,8 @@ environments_beyond_committed() {
     awk '
         /^[^ ]/ && /(class PayabliEnvironment |extension PayabliSDKCore(::|\.)PayabliEnvironment )/ { inside = 1; next }
         /^}/ { inside = 0 }
-        inside && match($0, /(static|class) (var|let|func|subscript) [A-Za-z0-9_`]+/) {
+        inside && /(static|class) subscript/ { print "subscript"; next }
+        inside && match($0, /(static|class) (var|let|func) [^ (:<]+/) {
             split(substr($0, RSTART, RLENGTH), word, " ")
             name = word[3]
             gsub(/`/, "", name)
