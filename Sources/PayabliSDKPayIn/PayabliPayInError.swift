@@ -43,7 +43,10 @@ public enum PayabliPayInError: PayabliError, Equatable {
     /// of its message, because that message can quote a response body or name a host's own endpoint,
     /// and an error's associated values are rendered wherever the chain is walked, a crash reporter
     /// included.
-    case submissionInterrupted(type: PayabliErrorType, causeType: String)
+    ///
+    /// `paymentTransId` is the transaction the service named in its answer, and `nil` when it named none.
+    /// Pass it to ``PayabliPayIn/readTransaction(_:)`` to learn what the payment did.
+    case submissionInterrupted(type: PayabliErrorType, causeType: String, paymentTransId: String?)
 
     public var type: PayabliErrorType {
         switch self {
@@ -53,7 +56,7 @@ public enum PayabliPayInError: PayabliError, Equatable {
             return .missingToken
         case let .transactionFailed(failure):
             return Self.classification(of: failure)
-        case let .submissionInterrupted(type, _):
+        case let .submissionInterrupted(type, _, _):
             return type
         }
     }
@@ -103,7 +106,7 @@ public enum PayabliPayInError: PayabliError, Equatable {
             return nil
         case let .transactionFailed(failure):
             return failure.detailText
-        case let .submissionInterrupted(_, causeType):
+        case let .submissionInterrupted(_, causeType, _):
             return causeType
         }
     }

@@ -471,6 +471,11 @@ public struct PayabliPayInTransaction: Codable, Sendable, Equatable {
     public let ipAddress: String?
     public let walletType: String?
 
+    /// Where the transaction stands, read from ``transStatus``, and `nil` when that is absent.
+    public var status: PayabliPayInTransactionStatus? {
+        transStatus.map(PayabliPayInTransactionStatus.init(wire:))
+    }
+
     public init(
         paymentTransId: String? = nil,
         gatewayTransId: String? = nil,

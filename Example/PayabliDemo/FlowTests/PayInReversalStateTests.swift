@@ -142,7 +142,8 @@ final class PayInReversalStateTests: XCTestCase {
         PayInFailure(
             PayabliPayInError.submissionInterrupted(
                 type: .networkError,
-                causeType: "PayabliSDKCore.PayabliGenericError"
+                causeType: "PayabliSDKCore.PayabliGenericError",
+                paymentTransId: nil
             ),
             operation: .void
         )

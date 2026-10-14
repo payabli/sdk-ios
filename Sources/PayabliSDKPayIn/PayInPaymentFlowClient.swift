@@ -259,7 +259,8 @@ final class PayInPaymentFlowClient: Sendable {
             throw PayabliPayInError.submissionInterrupted(
                 type: (error as? any PayabliError)?.type ?? .unknown,
                 // One definition of what is kept from a failure, reused rather than restated.
-                causeType: RedactedCause(error).originalType
+                causeType: RedactedCause(error).originalType,
+                paymentTransId: nil
             )
         }
     }
