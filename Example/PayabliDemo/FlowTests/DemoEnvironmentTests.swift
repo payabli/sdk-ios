@@ -1,4 +1,4 @@
-import PayabliSDKCore
+@testable import PayabliSDKCore
 import XCTest
 
 /// The app shows its own environment type and the SDK decides where a request
@@ -37,6 +37,12 @@ final class DemoEnvironmentTests: XCTestCase {
             let offered = try XCTUnwrap(DemoEnvironment.named(environment.name, in: OfferedEnvironments.demo))
             XCTAssertTrue(offered.sdkEnvironment === environment, environment.name)
         }
+    }
+
+    func testANameTwoOfferedEnvironmentsShareIsRefused() throws {
+        let impostor = try PayabliEnvironment(name: "SANDBOX", baseURL: XCTUnwrap(URL(string: "https://api-staging.payabli.com")))
+        XCTAssertEqual(OfferedEnvironments.repeatedNames(in: [.sandbox, .production, impostor]), ["sandbox"])
+        XCTAssertEqual(OfferedEnvironments.repeatedNames(in: OfferedEnvironments.sdk), [])
     }
 
     func testTheFallbackIsReachableByAnIntegrator() {
