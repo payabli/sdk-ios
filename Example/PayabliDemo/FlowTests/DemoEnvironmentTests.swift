@@ -23,6 +23,18 @@ final class DemoEnvironmentTests: XCTestCase {
         XCTAssertNil(DemoEnvironment.named("production", in: [.sandbox]))
     }
 
+    func testAnEnvironmentTheBuildAddedIsOfferedAfterTheCommittedOnes() {
+        XCTAssertEqual(OfferedEnvironments.demo.map(\.label), ["sandbox", "production", "staging"])
+        XCTAssertFalse(OfferedEnvironments.demo.contains { $0.label == "staging" && $0.pointsAtProduction })
+    }
+
+    func testAnOfferedEnvironmentNamesTheSDKEnvironmentItCameFrom() throws {
+        for environment in OfferedEnvironments.sdk {
+            let offered = try XCTUnwrap(DemoEnvironment.named(environment.name, in: OfferedEnvironments.demo))
+            XCTAssertTrue(offered.sdkEnvironment === environment, environment.name)
+        }
+    }
+
     func testTheFallbackIsReachableByAnIntegrator() {
         XCTAssertEqual(DemoEnvironment.fallback, .sandbox)
         XCTAssertTrue(committed.contains(DemoEnvironment.fallback))

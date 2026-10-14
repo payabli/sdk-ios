@@ -1,8 +1,8 @@
 import PayabliSDKCore
 
 /// The environments this build offers: the SDK's committed ones, then what this
-/// machine's build added. The app target's alone, because `ExtraEnvironments`
-/// is a gitignored file only that target lists.
+/// machine's build added. The app reads `ExtraEnvironments` from a gitignored
+/// file, and the flow tests supply their own.
 enum OfferedEnvironments {
     static let sdk: [PayabliEnvironment] = PayabliEnvironment.entries + ExtraEnvironments.added
 
