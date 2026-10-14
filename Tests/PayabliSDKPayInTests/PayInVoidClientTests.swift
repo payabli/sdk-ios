@@ -122,7 +122,7 @@ final class PayInVoidClientTests: XCTestCase {
       "data": {
         "paymentTransId": "3040-auth",
         "method": "card",
-        "transStatus": 3,
+        "transStatus": 5,
         "operation": "Void",
         "responseData": {
           "resultCode": "A0003",
