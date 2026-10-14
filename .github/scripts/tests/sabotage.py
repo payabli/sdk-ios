@@ -435,6 +435,21 @@ MUTATIONS = [
         "W16c", "workflows",
     ),
     Mutation(
+        "a simulator slice is compared without its module flags",
+        RELEASE_YML,
+        "untargeted() { sed -E '/^\\/\\/ swift-module-flags:/s/-target [a-z0-9_]+-apple-ios([0-9.]+)(-simulator)? "
+        "/-target apple-ios\\1 /' \"$1\"; }\n",
+        "untargeted() { grep -v '^// swift-module-flags:' \"$1\"; }\n",
+        "W16d", "workflows",
+    ),
+    Mutation(
+        "a simulator slice's deployment version is ignored",
+        RELEASE_YML,
+        "(-simulator)? /-target apple-ios\\1 /'",
+        "(-simulator)? /-target apple-ios /'",
+        "W16d", "workflows",
+    ),
+    Mutation(
         "the release's interface check is allowed to fail",
         RELEASE_YML,
         "      - name: Check the shipped interface matches API/\n",

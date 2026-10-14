@@ -1545,7 +1545,32 @@ def test_workflows() -> None:
           and not build_job.get("continue-on-error")
           and "build" in ([publish_needs] if isinstance(publish_needs, str) else publish_needs),
           (built_at, compared_at, uploaded_at, publish_needs))
-    interface_steps = [step for job in (interface.get("jobs") or {}).values() for step in job.get("steps") or []]
+    # The step's own normalization, run over a device flag line and simulator ones: only the target's architecture
+    # and simulator suffix may be ignored.
+    compare_run = build_step_runs[compared_at] if compared_at > -1 else ""
+    untargeted = re.search(r"^\s*(untargeted\(\) \{.*\})$", compare_run, re.M)
+    flags = "// swift-module-flags: -target {} -enable-library-evolution -language-mode 5 -O -module-name M\n"
+    device = flags.format("arm64-apple-ios16.7")
+    def same_as_device(line: str) -> bool | None:
+        if untargeted is None or 'diff -u <(untargeted "$record")' not in compare_run:
+            return None
+        with tempfile.TemporaryDirectory() as tmp:
+            (Path(tmp) / "a").write_text(device + "public struct S {}\n")
+            (Path(tmp) / "b").write_text(line + "public struct S {}\n")
+            script = untargeted.group(1) + '\ndiff <(untargeted "$1") <(untargeted "$2") > /dev/null'
+            return subprocess.run(["bash", "-c", script, "_", f"{tmp}/a", f"{tmp}/b"],
+                                  timeout=30, check=False).returncode == 0
+    cases = {
+        flags.format("arm64-apple-ios16.7-simulator"): True,
+        flags.format("x86_64-apple-ios16.7-simulator"): True,
+        flags.format("arm64-apple-ios17.0-simulator"): False,
+        flags.format("arm64-apple-ios16.7-simulator").replace("-language-mode 5", "-language-mode 6"): False,
+        flags.format("arm64-apple-ios16.7-simulator").replace(" -enable-library-evolution", ""): False,
+    }
+    outcomes = {line.split(": ", 1)[1].strip(): same_as_device(line) for line in cases}
+    check("W16d a simulator slice is compared on every module flag but its target's architecture and suffix",
+          list(outcomes.values()) == list(cases.values()), outcomes)
+    interface_steps =[step for job in (interface.get("jobs") or {}).values() for step in job.get("steps") or []]
     compare = next((str(step.get("run", "")) for step in interface_steps
                     if "dump-public-interface.sh API" in str(step.get("run", ""))), "")
     removed_at, dumped_at = compare.find("rm API/*.swiftinterface"), compare.find("dump-public-interface.sh API")
