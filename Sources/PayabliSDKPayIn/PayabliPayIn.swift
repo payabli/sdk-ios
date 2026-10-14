@@ -287,20 +287,11 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
         }
     }
 
-    /// Reads a transaction back by its identifier, to learn what a payment did.
+    /// Reads a transaction back by its identifier. Not available yet: throws `SDK_INTERNAL_ERROR` and sends
+    /// nothing.
     ///
-    /// Moves no money and sends no idempotency key, so it can run while a submission is in flight, and it
-    /// leaves ``lastResult`` alone. A failed read is never an unknown outcome: nothing was changed.
-    ///
-    /// The transaction carries the identifiers, the method, the amounts and ``PayabliPayInTransaction/status``.
-    /// Nothing else on ``PayabliPayInTransaction`` is filled on a read.
-    ///
-    /// A transaction under a paypoint this session may not read throws
-    /// ``PayabliSDKCore/PayabliErrorType/permissionDenied``.
-    ///
-    /// - Parameter transId: the transaction to read, as ``PayabliPayInTransaction/paymentTransId`` or
-    ///   ``PayabliPayInError/submissionInterrupted(type:causeType:paymentTransId:)`` reported it.
-    /// - Returns: the transaction's current state.
+    /// - Parameter transId: the transaction to read, as ``PayabliPayInTransaction/paymentTransId`` reported it.
+    /// - Returns: the transaction.
     public func readTransaction(
         _ transId: String
     ) async throws -> PayabliPayInTransaction {

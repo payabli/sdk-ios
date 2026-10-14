@@ -1,7 +1,7 @@
 /// Where a transaction stands, as the service recorded it.
 ///
-/// `captured`, `declined`, `voided` and `returned` are settled. `initiated` and `authorized` are not final,
-/// and neither is `failed`, which the service also records before the processor has answered.
+/// `captured`, `declined`, `voided` and `returned` are settled. `initiated`, `authorized` and `failed` are not
+/// final.
 public enum PayabliPayInTransactionStatus: Sendable, Hashable {
     case initiated
     case authorized
@@ -13,8 +13,7 @@ public enum PayabliPayInTransactionStatus: Sendable, Hashable {
     /// A status this SDK does not name, carrying the service's number for it.
     case other(Int)
 
-    /// Reads the service's status number. Each number is listed, so a value the service adds later is
-    /// ``other(_:)`` rather than a neighbour's name.
+    /// Reads the service's status number. Each number is listed, so an unlisted one is ``other(_:)``.
     init(wire: Int) {
         switch wire {
         case 10: self = .initiated
