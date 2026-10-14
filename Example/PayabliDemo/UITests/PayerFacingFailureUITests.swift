@@ -60,7 +60,7 @@ final class PayerFacingFailureLiveUITests: XCTestCase {
         form.fill(cardNumber: "4242424242424242", holder: "4111111111111111")
         form.submit("Pay")
 
-        form.expectMarkWithoutMessage()
+        form.expectMarkWithoutMessage(on: "Name on card")
         form.attachScreenshot("field-refusal")
     }
 
@@ -189,13 +189,14 @@ private struct FailingForm {
         }
     }
 
-    /// A field carries the refusal's mark and the form draws no message of its own.
-    func expectMarkWithoutMessage() {
+    /// The field labelled `label` carries the refusal's mark, and the form draws no message of its own.
+    func expectMarkWithoutMessage(on label: String) {
         let mark = fieldMark
         XCTAssertTrue(
             mark.waitForExistence(timeout: answers),
             "no field was marked within \(Int(answers))s. On screen: \(onScreen)"
         )
+        XCTAssertEqual(mark.label, "\(label) error", "the refusal marked a field other than the one it named")
         XCTAssertFalse(formMessage.exists, "a refusal that marks a field also drew a message")
     }
 
