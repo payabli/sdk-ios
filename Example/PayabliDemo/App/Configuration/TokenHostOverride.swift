@@ -15,7 +15,8 @@ enum TokenHostOverride {
         if raw.contains("://") {
             guard let parsed = URL(string: raw),
                   ["http", "https"].contains(parsed.scheme?.lowercased()),
-                  parsed.host?.isEmpty == false
+                  parsed.host?.isEmpty == false,
+                  parsed.port.map(validPorts.contains) ?? true
             else { return nil }
             return parsed
         }
