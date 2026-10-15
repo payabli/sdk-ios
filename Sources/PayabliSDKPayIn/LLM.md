@@ -187,10 +187,9 @@ PayabliPayInView(
         }
     },
     onError: { error in
-        // Show this: it names what the service rejected. Do not log it. The
-        // description carries the service's own wording, which can quote what was
-        // submitted; log `(error as? any PayabliError)?.code` instead.
-        message = error.localizedDescription
+        // The form has already shown the payer a message. Keep the code; don't show
+        // or log the description, which can quote what was submitted.
+        errorCode = (error as? any PayabliError)?.code
     }
 )
 ```
@@ -211,10 +210,9 @@ Sheet:
         outcome = result.code
     },
     onError: { error in
-        // Show this: it names what the service rejected. Do not log it. The
-        // description carries the service's own wording, which can quote what was
-        // submitted; log `(error as? any PayabliError)?.code` instead.
-        message = error.localizedDescription
+        // The form has already shown the payer a message. Keep the code; don't show
+        // or log the description, which can quote what was submitted.
+        errorCode = (error as? any PayabliError)?.code
     }
 )
 ```

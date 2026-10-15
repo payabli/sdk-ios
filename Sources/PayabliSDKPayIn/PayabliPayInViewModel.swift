@@ -279,11 +279,13 @@ final class PayabliPayInViewModel: ObservableObject {
         clearMarks()
         guard !isSubmitting else {
             let error = PayabliPayInError.submissionInProgress
-            errorMessage = Self.message(for: error)
+            errorMessage = PayabliPayInFailureMessage.text(for: error, operation: component.operation)
             throw error
         }
         isSubmitting = true
-        submittingOperation = component.operation
+        // The operation sent, which picks the message even if the form is given another while it runs.
+        let operation = component.operation
+        submittingOperation = operation
         defer {
             isSubmitting = false
             submittingOperation = nil
@@ -295,7 +297,7 @@ final class PayabliPayInViewModel: ObservableObject {
             do {
                 try details.validate()
             } catch {
-                errorMessage = Self.message(for: error)
+                errorMessage = PayabliPayInFailureMessage.text(for: error, operation: operation)
                 throw error
             }
         }
@@ -329,7 +331,8 @@ final class PayabliPayInViewModel: ObservableObject {
             if component === submittedFlow {
                 rejectedFields = PayabliPayInRejectedFields.fields(in: error).intersection(activeFields)
             }
-            errorMessage = Self.message(for: error)
+            // A marked field is the whole answer; a failure that marks none on screen shows its message.
+            errorMessage = rejectedFields.isEmpty ? PayabliPayInFailureMessage.text(for: error, operation: operation) : nil
             throw error
         }
     }
@@ -489,19 +492,6 @@ final class PayabliPayInViewModel: ObservableObject {
         cardCvvStorage = ""
         achRoutingStorage = ""
         achAccountStorage = ""
-    }
-
-    private static func message(for error: Error) -> String {
-        let message: String = if let payabliError = error as? any PayabliError {
-            if let detail = payabliError.detail?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty, detail != payabliError.reason {
-                "\(payabliError.reason)\n\(detail)"
-            } else {
-                payabliError.reason
-            }
-        } else {
-            String(describing: error)
-        }
-        return PayabliPayInSensitiveDataRedactor.redact(message)
     }
 
     private static func passesLuhn(_ digits: String) -> Bool {

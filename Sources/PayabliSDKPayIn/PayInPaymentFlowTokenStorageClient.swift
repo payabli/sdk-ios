@@ -63,10 +63,15 @@ final class PayInPaymentFlowTokenStorageClient: Sendable {
             baseURL: baseURL,
             durationMilliseconds: Date().timeIntervalSince(start) * 1000
         )
+        // The status first: a failed status is the core error for that status, so only a refusal
+        // answered on a success status is this surface's own. This route refuses a 400 with prose
+        // alone, which is kept as the validation error's detail.
+        try mapPayabliHTTPError(response: response) { status in
+            status == 400 ? PayabliPaymentError.validation(Self.badRequest(from: response)) : nil
+        }
         if let failure = decodePaymentMethodFailure(from: response) {
             throw PayabliPayInTokenStorageError.saveFailed(failure)
         }
-        try mapPayabliHTTPError(response: response)
         return try decodeStoredPaymentMethod(from: response, method: storedMethod)
     }
 
@@ -128,6 +133,15 @@ final class PayInPaymentFlowTokenStorageClient: Sendable {
                 underlying: error
             )
         }
+    }
+
+    /// The validation error for a refused request on this route.
+    ///
+    /// - Parameter response: A 400 from the route.
+    /// - Returns: The error carrying the route's `responseText` as its detail, or an empty one when the body has none.
+    private static func badRequest(from response: PayabliResponse) -> PayabliValidationError {
+        let decoded = try? JSONDecoder().decode(PayabliPayInTokenStorageAPIResponse.self, from: response.body)
+        return PayabliValidationError(detail: decoded?.responseText.trimmed.nilIfEmpty)
     }
 
     private func decodePaymentMethodFailure(from response: PayabliResponse) -> PayabliPayInSaveFailure? {

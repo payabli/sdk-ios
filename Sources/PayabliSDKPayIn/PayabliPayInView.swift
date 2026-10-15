@@ -99,6 +99,9 @@ public struct PayabliPayInView: View {
         .onChange(of: viewModel.errorMessage) { message in
             announceErrorMessage(message)
         }
+        .onChange(of: viewModel.rejectedFields) { [marked = viewModel.rejectedFields] rejected in
+            announceRejectedFields(rejected.subtracting(marked))
+        }
         .onChange(of: viewModel.cardNumberValidationMessage) { message in
             announceFieldError(
                 field: .cardNumber,
@@ -866,10 +869,9 @@ extension PayabliPayInView {
             || viewModel.rejectedFields.contains(field)
     }
 
-    /// The mark's own text. A refusal announces nothing: the mark and the error chrome are what a
-    /// screen reader meets on navigation.
+    /// The mark's own text, which a screen reader hears once when the mark appears and again on the field.
     func rejectedMessage(for field: PayabliPayInField) -> String? {
-        viewModel.rejectedFields.contains(field) ? "That was not accepted" : nil
+        viewModel.rejectedFields.contains(field) ? PayabliPayInAccessibility.rejectedFieldMessage : nil
     }
 
     var submitAccessibilityHint: String {
@@ -1027,6 +1029,19 @@ extension PayabliPayInView {
         guard let message else { return }
         UIAccessibility.post(notification: .announcement, argument: message)
         isErrorAccessibilityFocused = true
+    }
+
+    /// Announces the fields a refusal has just marked, in the order the form draws them.
+    ///
+    /// - Parameter newlyMarked: The fields marked by this refusal and not before it.
+    func announceRejectedFields(_ newlyMarked: Set<PayabliPayInField>) {
+        guard let announcement = PayabliPayInAccessibility.rejectedFieldsAnnouncement(
+            newlyMarked: newlyMarked,
+            drawnFields: viewModel.activeFields,
+            label: configuration.labels.label(for:),
+            message: PayabliPayInAccessibility.rejectedFieldMessage
+        ) else { return }
+        UIAccessibility.post(notification: .announcement, argument: announcement)
     }
 
     func announceFieldError(
