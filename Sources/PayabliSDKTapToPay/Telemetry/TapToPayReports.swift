@@ -4,6 +4,7 @@ import PayabliSDKCore
 /// What the card-present facade reports about its own lifecycle, through its session's client.
 ///
 /// Reports run one after another off the caller's path, so a slow send never delays the call that made it.
+/// Each is stamped when it is made, so one queued behind a slow send keeps the time it happened.
 @MainActor
 final class TapToPayReports {
     private let telemetry: TelemetryClient
@@ -14,13 +15,15 @@ final class TapToPayReports {
     }
 
     func initializeStarted() {
-        enqueue { await $0.emit(TelemetryEventName.ttpInitializeStarted) }
+        let now = Date()
+        enqueue { await $0.emit(TelemetryEventName.ttpInitializeStarted, occurredAt: now) }
     }
 
     /// - Parameter duration: how long the run took.
     func initializeSucceeded(after duration: Duration) {
+        let now = Date()
         let properties = ["duration_ms": Self.milliseconds(duration)]
-        enqueue { await $0.emit(TelemetryEventName.ttpInitializeSucceeded, properties: properties) }
+        enqueue { await $0.emit(TelemetryEventName.ttpInitializeSucceeded, properties: properties, occurredAt: now) }
     }
 
     /// Reports the number the host is told, never its text, and sends at once.
@@ -28,12 +31,13 @@ final class TapToPayReports {
     /// - Parameter failure: what the run threw, before it was translated for the host.
     /// - Parameter duration: how long the run took.
     func initializeFailed(_ failure: Error, after duration: Duration) {
+        let now = Date()
         var properties = ["outcome": "failed", "duration_ms": Self.milliseconds(duration)]
         if let told = TapToPayErrorTranslation.hostError(for: failure) as? TapToPayError {
             properties["error_number"] = String(told.code)
         }
         enqueue { telemetry in
-            await telemetry.emit(TelemetryEventName.ttpInitializeFailed, properties: properties)
+            await telemetry.emit(TelemetryEventName.ttpInitializeFailed, properties: properties, occurredAt: now)
             await telemetry.flush()
         }
     }
