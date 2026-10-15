@@ -48,6 +48,14 @@ final class PayabliErrorCatalogTests: XCTestCase {
                 + "Check that payment before trying again."
         ),
         (
+            .retryNotSamePayment,
+            "RETRY_NOT_SAME_PAYMENT",
+            1022,
+            .invalidRequest,
+            "This retry describes a different payment from the one still unresolved, so it was not sent. "
+                + "Check that payment first; to charge a different payment, send it as a new payment."
+        ),
+        (
             .deviceKeyUnavailable,
             "DEVICE_KEY_UNAVAILABLE",
             3001,

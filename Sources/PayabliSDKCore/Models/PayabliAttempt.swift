@@ -9,6 +9,7 @@ import Foundation
     /// A payment of its own, sent under a new key.
     case newPayment = 0
 
-    /// A repeat of the most recent attempt whose outcome is unknown, sent under that attempt's key.
+    /// A repeat of the most recent attempt whose outcome is unknown, sent under that attempt's key. It describes the
+    /// same payment, or it is refused before anything is sent.
     case retry = 1
 }
