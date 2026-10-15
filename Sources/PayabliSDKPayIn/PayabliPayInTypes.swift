@@ -201,6 +201,13 @@ public struct PayabliPayInRequestConfiguration: Sendable {
     public let subdomain: String?
     public let subscriptionId: Int64?
     public let idempotencyKey: String?
+
+    /// Whether this is a new payment or a retry of one whose outcome is unknown. A new payment unless set.
+    ///
+    /// A retry sends the key of the most recent attempt on this flow whose outcome is still unknown, so the
+    /// service refuses the repeat rather than taking the payment again. A new payment never sends that key and
+    /// never clears it. An ``idempotencyKey`` you set is sent whichever this is.
+    public let attempt: PayabliAttempt
     /// Whether to verify a bank account before debiting it. `true` adds the check to any the merchant's account
     /// already applies; it never turns one off. A failed check is a decline.
     public let achValidation: Bool?
@@ -220,6 +227,7 @@ public struct PayabliPayInRequestConfiguration: Sendable {
         subdomain: String? = nil,
         subscriptionId: Int64? = nil,
         idempotencyKey: String? = nil,
+        attempt: PayabliAttempt = .newPayment,
         achValidation: Bool? = nil,
         forceCustomerCreation: Bool? = nil,
         validation: PayabliPayInValidation = .default
@@ -234,6 +242,7 @@ public struct PayabliPayInRequestConfiguration: Sendable {
         self.subdomain = subdomain
         self.subscriptionId = subscriptionId
         self.idempotencyKey = idempotencyKey
+        self.attempt = attempt
         self.achValidation = achValidation
         self.forceCustomerCreation = forceCustomerCreation
         self.validation = validation
@@ -283,6 +292,7 @@ extension PayabliPayInRequestConfiguration {
             "subdomain:\(subdomain ?? "")",
             "subscriptionId:\(subscriptionId.map { "\($0)" } ?? "")",
             "idempotencyKey:\(idempotencyKey ?? "")",
+            "attempt:\(attempt.rawValue)",
             "achValidation:\(achValidation.map { "\($0)" } ?? "")",
             "forceCustomerCreation:\(forceCustomerCreation.map { "\($0)" } ?? "")",
             "validation:\(validation.payabliViewModelSignature)"
