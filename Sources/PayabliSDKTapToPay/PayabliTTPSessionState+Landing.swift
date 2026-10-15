@@ -35,7 +35,8 @@ extension PayabliTTPSessionState {
             // of these name the attestation.
             return .failed(reason: .deviceSetupRequired)
 
-        case .configFailed:
+        case .configFailed, .readerCredentialsUnusable:
+            // Someone changes the paypoint; repeating the call gets the same answer.
             return .failed(reason: .configurationRejected)
 
         case .readerOSVersionNotSupported:
@@ -70,7 +71,7 @@ extension PayabliTTPSessionState {
             // not repair needs a classification this map is not given.
             return pendingActivation(registration)
 
-        case .invalidConfiguration, .deviceSetupNotConfigured:
+        case .invalidConfiguration, .deviceSetupNotConfigured, .readerCredentialsUnusable:
             return .failed(reason: .configurationRejected)
 
         case .deviceKeyUnavailable:

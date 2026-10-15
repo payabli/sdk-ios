@@ -80,6 +80,8 @@ enum ErrorSummary {
             return "configFailed"
         case .readerSetupFailed:
             return "readerSetupFailed"
+        case .readerCredentialsUnusable:
+            return "readerCredentialsUnusable"
         case .nfcFailed:
             return "nfcFailed"
         case .activationFailed:

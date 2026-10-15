@@ -12,6 +12,8 @@ package enum PayabliTTPError: Error, Sendable {
     case attestationFailed(reason: String)
     case configFailed(reason: String)
     case readerSetupFailed(reason: String, paymentTransId: String? = nil)
+    /// A gateway credential the reader needs is blank. Carries no field name, so none can reach a host.
+    case readerCredentialsUnusable
     case nfcFailed(reason: String, paymentTransId: String? = nil)
     case initiateFailed(reason: String)
     case updateFailed(reason: String, paymentTransId: String, capture: PayabliTTPCapture, retryAfter: TimeInterval? = nil)
@@ -46,8 +48,8 @@ package extension PayabliTTPError {
              let .readerOSVersionNotSupported(_, capture):
             return capture
         case .notInitialized, .invalidState, .notReady, .devicePendingActivation, .attestationRevoked,
-             .attestationFailed, .configFailed, .readerSetupFailed, .initiateFailed, .tokenExpired,
-             .activationFailed, .networkError, .termsNotAccepted, .cardDeclined:
+             .attestationFailed, .configFailed, .readerSetupFailed, .readerCredentialsUnusable, .initiateFailed,
+             .tokenExpired, .activationFailed, .networkError, .termsNotAccepted, .cardDeclined:
             return .notCharged
         }
     }
@@ -64,8 +66,8 @@ package extension PayabliTTPError {
              let .outcomeUnknown(paymentTransId):
             return paymentTransId
         case .notInitialized, .invalidState, .notReady, .devicePendingActivation, .attestationRevoked,
-             .attestationFailed, .configFailed, .initiateFailed, .tokenExpired, .activationFailed,
-             .networkError, .termsNotAccepted:
+             .attestationFailed, .configFailed, .readerCredentialsUnusable, .initiateFailed, .tokenExpired,
+             .activationFailed, .networkError, .termsNotAccepted:
             return nil
         }
     }
@@ -88,6 +90,8 @@ extension PayabliTTPError: LocalizedError {
             return "Access token expired"
         case .termsNotAccepted:
             return "Contactless payment terms have not been accepted"
+        case .readerCredentialsUnusable:
+            return "The card reader's configuration is incomplete"
         case .readerOSVersionNotSupported:
             return "This OS version does not support contactless payments"
         case .cardDeclined:
