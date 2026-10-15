@@ -13,11 +13,13 @@ final class PayInStoredMethodClientTests: XCTestCase {
         _ = try await client.capture(
             entryPoint: "entry",
             request: PayabliPayInRequest(
-                paymentDetails: PayabliPayInPaymentDetails(totalAmount: 10),
                 paymentMethod: .stored(PayabliPayInPaymentMethod.Stored(
                     method: .card,
                     storedMethodId: "stored-card-1"
-                ))
+                )),
+                options: PayabliPayInRequestConfiguration(
+                    paymentDetails: PayabliPayInPaymentDetails(totalAmount: 10)
+                )
             ),
             idempotencyKey: "idem-1"
         )

@@ -27,11 +27,13 @@ final class PayabliPayInTests: XCTestCase {
         )
 
         let result = try await component.capture(PayabliPayInRequest(
-            paymentDetails: PayabliPayInPaymentDetails(totalAmount: 12.34),
             paymentMethod: .stored(PayabliPayInPaymentMethod.Stored(
                 method: .card,
                 storedMethodId: "stored-123"
-            ))
+            )),
+            options: PayabliPayInRequestConfiguration(
+                paymentDetails: PayabliPayInPaymentDetails(totalAmount: 12.34)
+            )
         ))
 
         XCTAssertFalse(component.isSubmitting)
@@ -66,8 +68,10 @@ final class PayabliPayInTests: XCTestCase {
         )
 
         let result = try await component.capture(PayabliPayInRequest(
-            paymentDetails: PayabliPayInPaymentDetails(totalAmount: 12.34),
-            paymentMethod: .cash
+            paymentMethod: .cash,
+            options: PayabliPayInRequestConfiguration(
+                paymentDetails: PayabliPayInPaymentDetails(totalAmount: 12.34)
+            )
         ))
 
         XCTAssertEqual(result.transaction?.surchargeFee, 0.30)
@@ -99,8 +103,10 @@ final class PayabliPayInTests: XCTestCase {
         ))
 
         _ = try await component.capture(PayabliPayInRequest(
-            paymentDetails: PayabliPayInPaymentDetails(totalAmount: 10),
-            paymentMethod: .cash
+            paymentMethod: .cash,
+            options: PayabliPayInRequestConfiguration(
+                paymentDetails: PayabliPayInPaymentDetails(totalAmount: 10)
+            )
         ))
 
         XCTAssertEqual(component.entryPoint, "new-entry")
@@ -238,8 +244,10 @@ final class PayabliPayInTests: XCTestCase {
             transport: transport
         )
         let request = PayabliPayInRequest(
-            paymentDetails: PayabliPayInPaymentDetails(totalAmount: 10),
-            paymentMethod: .cash
+            paymentMethod: .cash,
+            options: PayabliPayInRequestConfiguration(
+                paymentDetails: PayabliPayInPaymentDetails(totalAmount: 10)
+            )
         )
 
         let firstSubmission = Task {
@@ -498,6 +506,75 @@ final class PayabliPayInTests: XCTestCase {
       "token": null
     }
     """
+}
+
+/// A form submission and a direct call are built from the same options type.
+extension PayabliPayInTests {
+    func testAFormSubmissionAndADirectCaptureSendTheSameOptions() async throws {
+        let options = PayabliPayInRequestConfiguration(
+            paymentDetails: PayabliPayInPaymentDetails(totalAmount: 30, serviceFee: 1, currency: "USD"),
+            accountId: "account-1",
+            customerData: PayabliPayInCustomerData(customerNumber: "C-1"),
+            ipAddress: "10.0.0.1",
+            orderDescription: "Configured description",
+            orderId: "order-1",
+            source: "ios-options-test",
+            subdomain: "sub",
+            subscriptionId: 7,
+            idempotencyKey: "idem-options",
+            achValidation: true,
+            forceCustomerCreation: false
+        )
+
+        let formTransport = FacadeTransport(responseBody: Self.formCaptureResponse)
+        let formComponent = PayabliPayIn(
+            entryPoint: "entry",
+            environment: .sandbox,
+            transport: formTransport,
+            operation: .capture,
+            requestConfiguration: options
+        )
+        let viewModel = PayabliPayInViewModel(
+            component: formComponent,
+            configuration: PayabliPayInFormConfiguration(allowedMethods: [.card], defaultMethod: .card)
+        )
+        viewModel.cardholderName = "Jane Doe"
+        viewModel.cardNumber = "4111111111111111"
+        viewModel.cardExpiration = "02/27"
+        viewModel.cardCvv = "999"
+        viewModel.cardZip = "12345"
+        _ = try await viewModel.submit()
+
+        let directTransport = FacadeTransport(responseBody: Self.formCaptureResponse)
+        let directComponent = PayabliPayIn(
+            entryPoint: "entry",
+            environment: .sandbox,
+            transport: directTransport,
+            operation: .capture
+        )
+        _ = try await directComponent.capture(PayabliPayInRequest(
+            paymentMethod: .card(PayabliPayInPaymentMethod.Card(data: PayabliPayInCardData(
+                cardNumber: "4111111111111111",
+                expiration: "02/27",
+                cardholderName: "Jane Doe",
+                cvv: "999",
+                billingZip: "12345"
+            ))),
+            options: options
+        ))
+
+        let fromForm = try await firstFacadeRequest(from: formTransport)
+        let direct = try await firstFacadeRequest(from: directTransport)
+        XCTAssertEqual(fromForm.query, direct.query)
+        XCTAssertEqual(fromForm.headers["idempotencyKey"], direct.headers["idempotencyKey"])
+        var formBody = try parseFacadeBody(fromForm)
+        var directBody = try parseFacadeBody(direct)
+        formBody["paymentMethod"] = nil
+        directBody["paymentMethod"] = nil
+        XCTAssertEqual(formBody as NSDictionary, directBody as NSDictionary)
+        XCTAssertEqual(directBody["orderId"] as? String, "order-1")
+        XCTAssertEqual(directBody["subscriptionId"] as? Int, 7)
+    }
 }
 
 private actor FacadeTransport: PayabliTransport {

@@ -326,14 +326,16 @@ Direct request:
 
 ```swift
 let request = PayabliPayInRequest(
-    paymentDetails: PayabliPayInPaymentDetails(
-        totalAmount: 1.00,
-        serviceFee: 0.10,
-        currency: "USD"
-    ),
     paymentMethod: .card(PayabliPayInPaymentMethod.Card(data: cardData)),
-    orderDescription: "iOS checkout",
-    source: "ios-sdk"
+    options: PayabliPayInRequestConfiguration(
+        paymentDetails: PayabliPayInPaymentDetails(
+            totalAmount: 1.00,
+            serviceFee: 0.10,
+            currency: "USD"
+        ),
+        orderDescription: "iOS checkout",
+        source: "ios-sdk"
+    )
 )
 
 let captured = try await paymentFlow.capture(request)
@@ -354,8 +356,10 @@ Direct authorize:
 
 ```swift
 let authorized = try await paymentFlow.authorize(PayabliPayInRequest(
-    paymentDetails: PayabliPayInPaymentDetails(totalAmount: 1.00),
-    paymentMethod: .card(PayabliPayInPaymentMethod.Card(data: cardData))
+    paymentMethod: .card(PayabliPayInPaymentMethod.Card(data: cardData)),
+    options: PayabliPayInRequestConfiguration(
+        paymentDetails: PayabliPayInPaymentDetails(totalAmount: 1.00)
+    )
 ))
 ```
 

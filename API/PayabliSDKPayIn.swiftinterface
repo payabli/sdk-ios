@@ -829,21 +829,12 @@ public struct PayabliPayInPaymentDetails : Swift::Codable, Swift::Sendable, Swif
   public init(from decoder: any Swift::Decoder) throws
 }
 public struct PayabliPayInRequest : Swift::Sendable {
-  public let paymentDetails: PayabliSDKPayIn::PayabliPayInPaymentDetails
   public let paymentMethod: PayabliSDKPayIn::PayabliPayInPaymentMethod
-  public let accountId: Swift::String?
-  public let customerData: PayabliSDKPayIn::PayabliPayInCustomerData?
-  public let ipAddress: Swift::String?
-  public let orderDescription: Swift::String?
-  public let orderId: Swift::String?
-  public let source: Swift::String?
-  public let subdomain: Swift::String?
-  public let subscriptionId: Swift::Int64?
-  public let idempotencyKey: Swift::String?
-  public let achValidation: Swift::Bool?
-  public let forceCustomerCreation: Swift::Bool?
-  public let validation: PayabliSDKPayIn::PayabliPayInValidation
-  public init(paymentDetails: PayabliSDKPayIn::PayabliPayInPaymentDetails, paymentMethod: PayabliSDKPayIn::PayabliPayInPaymentMethod, accountId: Swift::String? = nil, customerData: PayabliSDKPayIn::PayabliPayInCustomerData? = nil, ipAddress: Swift::String? = nil, orderDescription: Swift::String? = nil, orderId: Swift::String? = nil, source: Swift::String? = nil, subdomain: Swift::String? = nil, subscriptionId: Swift::Int64? = nil, idempotencyKey: Swift::String? = nil, achValidation: Swift::Bool? = nil, forceCustomerCreation: Swift::Bool? = nil, validation: PayabliSDKPayIn::PayabliPayInValidation = .default)
+  public let options: PayabliSDKPayIn::PayabliPayInRequestConfiguration
+  public var paymentDetails: PayabliSDKPayIn::PayabliPayInPaymentDetails {
+    get
+  }
+  public init(paymentMethod: PayabliSDKPayIn::PayabliPayInPaymentMethod, options: PayabliSDKPayIn::PayabliPayInRequestConfiguration)
 }
 public struct PayabliPayInRequestConfiguration : Swift::Sendable {
   public let paymentDetails: PayabliSDKPayIn::PayabliPayInPaymentDetails

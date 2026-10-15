@@ -235,18 +235,20 @@ let cardData = PayabliPayInCardData(
 )
 
 let result = try await paymentFlow.capture(PayabliPayInRequest(
-    paymentDetails: PayabliPayInPaymentDetails(
-        totalAmount: 1.00,
-        serviceFee: 0.10,
-        currency: "USD"
-    ),
     paymentMethod: .card(PayabliPayInPaymentMethod.Card(
         data: cardData,
         initiator: "payor",
         saveIfSuccess: false
     )),
-    orderDescription: "iOS checkout",
-    source: "ios-sdk"
+    options: PayabliPayInRequestConfiguration(
+        paymentDetails: PayabliPayInPaymentDetails(
+            totalAmount: 1.00,
+            serviceFee: 0.10,
+            currency: "USD"
+        ),
+        orderDescription: "iOS checkout",
+        source: "ios-sdk"
+    )
 ))
 ```
 
@@ -257,13 +259,15 @@ let stored = try await paymentFlow.addCard(cardData)
 guard let storedMethodId = stored.storedMethodId else { return }
 
 let result = try await paymentFlow.capture(PayabliPayInRequest(
-    paymentDetails: PayabliPayInPaymentDetails(totalAmount: 25.00),
     paymentMethod: .stored(PayabliPayInPaymentMethod.Stored(
         method: stored.method,
         storedMethodId: storedMethodId
     )),
-    orderId: "ORDER-1001",
-    source: "ios-sdk"
+    options: PayabliPayInRequestConfiguration(
+        paymentDetails: PayabliPayInPaymentDetails(totalAmount: 25.00),
+        orderId: "ORDER-1001",
+        source: "ios-sdk"
+    )
 ))
 ```
 
@@ -306,14 +310,16 @@ Direct authorize:
 
 ```swift
 let result = try await paymentFlow.authorize(PayabliPayInRequest(
-    paymentDetails: PayabliPayInPaymentDetails(
-        totalAmount: 1.00,
-        serviceFee: 0.10,
-        currency: "USD"
-    ),
     paymentMethod: .card(PayabliPayInPaymentMethod.Card(data: cardData)),
-    orderDescription: "iOS authorization",
-    source: "ios-sdk"
+    options: PayabliPayInRequestConfiguration(
+        paymentDetails: PayabliPayInPaymentDetails(
+            totalAmount: 1.00,
+            serviceFee: 0.10,
+            currency: "USD"
+        ),
+        orderDescription: "iOS authorization",
+        source: "ios-sdk"
+    )
 ))
 ```
 

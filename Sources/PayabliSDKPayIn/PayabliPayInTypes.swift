@@ -164,52 +164,29 @@ extension PayabliPayInPaymentDetails {
     }
 }
 
+/// A transaction to capture or authorize: the payment method, and the options for everything else.
+///
+/// The options are the type a form is configured with, so a form submission and a direct call carry the
+/// same settings.
 public struct PayabliPayInRequest: Sendable {
-    public let paymentDetails: PayabliPayInPaymentDetails
     public let paymentMethod: PayabliPayInPaymentMethod
-    public let accountId: String?
-    public let customerData: PayabliPayInCustomerData?
-    public let ipAddress: String?
-    public let orderDescription: String?
-    public let orderId: String?
-    public let source: String?
-    public let subdomain: String?
-    public let subscriptionId: Int64?
-    public let idempotencyKey: String?
-    public let achValidation: Bool?
-    public let forceCustomerCreation: Bool?
-    public let validation: PayabliPayInValidation
+    public let options: PayabliPayInRequestConfiguration
 
+    /// The amounts to charge, as the options carry them.
+    public var paymentDetails: PayabliPayInPaymentDetails {
+        options.paymentDetails
+    }
+
+    /// Creates a request.
+    ///
+    /// - Parameter paymentMethod: the card, bank account or stored method to charge.
+    /// - Parameter options: the amounts, the customer and the other settings for this transaction.
     public init(
-        paymentDetails: PayabliPayInPaymentDetails,
         paymentMethod: PayabliPayInPaymentMethod,
-        accountId: String? = nil,
-        customerData: PayabliPayInCustomerData? = nil,
-        ipAddress: String? = nil,
-        orderDescription: String? = nil,
-        orderId: String? = nil,
-        source: String? = nil,
-        subdomain: String? = nil,
-        subscriptionId: Int64? = nil,
-        idempotencyKey: String? = nil,
-        achValidation: Bool? = nil,
-        forceCustomerCreation: Bool? = nil,
-        validation: PayabliPayInValidation = .default
+        options: PayabliPayInRequestConfiguration
     ) {
-        self.paymentDetails = paymentDetails
         self.paymentMethod = paymentMethod
-        self.accountId = accountId
-        self.customerData = customerData
-        self.ipAddress = ipAddress
-        self.orderDescription = orderDescription
-        self.orderId = orderId
-        self.source = source
-        self.subdomain = subdomain
-        self.subscriptionId = subscriptionId
-        self.idempotencyKey = idempotencyKey
-        self.achValidation = achValidation
-        self.forceCustomerCreation = forceCustomerCreation
-        self.validation = validation
+        self.options = options
     }
 }
 
@@ -258,26 +235,36 @@ public struct PayabliPayInRequestConfiguration: Sendable {
         self.validation = validation
     }
 
+    /// The request a form submits: this configuration with the method the payer entered.
+    ///
+    /// - Parameter paymentMethod: the method the payer entered.
+    /// - Parameter formCustomerData: what the form collected about the payer, merged over ``customerData``.
+    /// - Parameter formOrderDescription: the form's description, which replaces ``orderDescription`` when
+    ///   it is not blank.
+    /// - Returns: the request to capture or authorize.
     public func request(
         paymentMethod: PayabliPayInPaymentMethod,
         customerData formCustomerData: PayabliPayInCustomerData? = nil,
         orderDescription formOrderDescription: String? = nil
     ) -> PayabliPayInRequest {
         PayabliPayInRequest(
-            paymentDetails: paymentDetails,
             paymentMethod: paymentMethod,
-            accountId: accountId,
-            customerData: mergedCustomerData(formCustomerData),
-            ipAddress: ipAddress,
-            orderDescription: formOrderDescription?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty ?? orderDescription,
-            orderId: orderId,
-            source: source,
-            subdomain: subdomain,
-            subscriptionId: subscriptionId,
-            idempotencyKey: idempotencyKey,
-            achValidation: achValidation,
-            forceCustomerCreation: forceCustomerCreation,
-            validation: validation
+            options: PayabliPayInRequestConfiguration(
+                paymentDetails: paymentDetails,
+                accountId: accountId,
+                customerData: mergedCustomerData(formCustomerData),
+                ipAddress: ipAddress,
+                orderDescription: formOrderDescription?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty
+                    ?? orderDescription,
+                orderId: orderId,
+                source: source,
+                subdomain: subdomain,
+                subscriptionId: subscriptionId,
+                idempotencyKey: idempotencyKey,
+                achValidation: achValidation,
+                forceCustomerCreation: forceCustomerCreation,
+                validation: validation
+            )
         )
     }
 
