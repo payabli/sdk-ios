@@ -324,10 +324,10 @@ final class PayInPaymentFlowClient: Sendable {
     }
 
     /// The transaction a failure named, where it named one: the `data.paymentTransId` of an answer the
-    /// service declined to approve. Nothing else from the answer is kept.
+    /// service declined to approve. Only that field is decoded, so a malformed sibling field cannot lose it.
     private static func namedTransaction(by failure: any Error, in answer: PayabliResponse?) -> String? {
         guard case .transactionFailed = failure as? PayabliPayInError, let answer else { return nil }
-        let decoded = try? JSONDecoder().decode(PayabliPayInAPIResponse.self, from: answer.body)
+        let decoded = try? JSONDecoder().decode(NamedTransaction.self, from: answer.body)
         return decoded?.data?.paymentTransId?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty
     }
 
@@ -393,6 +393,15 @@ final class PayInPaymentFlowClient: Sendable {
 
         return envelope.failure(httpStatusCode: response.statusCode)
     }
+}
+
+/// The one field an unknown outcome keeps from the answer.
+private struct NamedTransaction: Decodable {
+    struct Payload: Decodable {
+        let paymentTransId: String?
+    }
+
+    let data: Payload?
 }
 
 private struct TransactionRequestBody: Encodable {
