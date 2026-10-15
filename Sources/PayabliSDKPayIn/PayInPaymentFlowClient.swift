@@ -286,8 +286,8 @@ final class PayInPaymentFlowClient: Sendable {
             return true
         }
         switch code {
-        case .networkError, .decodingError, .userCancelled, .serverError, .unknown, .conflict, .tapNotCompleted,
-             .paymentOutcomeUnknown, .paymentNotClosed:
+        case .networkError, .decodingError, .userCancelled, .serverError, .unknown, .conflict, .retryRefused,
+             .tapNotCompleted, .paymentOutcomeUnknown, .paymentNotClosed:
             return true
         case .paymentDeclined, .rateLimited, .missingToken, .tokenExpired,
              .tokenMalformed, .tokenProviderFailed, .invalidSignature, .permissionDenied,

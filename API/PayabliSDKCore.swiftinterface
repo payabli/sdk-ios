@@ -14,6 +14,19 @@ import _Concurrency
 import _StringProcessing
 import _SwiftConcurrencyShims
 import os
+@objc public enum PayabliAttempt : Swift::Int, Swift::Sendable, Swift::CaseIterable {
+  case newPayment = 0
+  case retry = 1
+  public init?(rawValue: Swift::Int)
+  public typealias AllCases = [PayabliSDKCore::PayabliAttempt]
+  public typealias RawValue = Swift::Int
+  nonisolated public static var allCases: [PayabliSDKCore::PayabliAttempt] {
+    get
+  }
+  public var rawValue: Swift::Int {
+    get
+  }
+}
 public enum PayabliErrorType : Swift::String, Swift::Sendable, Swift::CaseIterable {
   case missingToken
   case tokenExpired
@@ -35,6 +48,7 @@ public enum PayabliErrorType : Swift::String, Swift::Sendable, Swift::CaseIterab
   case sdkInternalError
   case sessionNotInitialized
   case transactionNotFound
+  case retryRefused
   case deviceKeyUnavailable
   case deviceSetupUnsupported
   case deviceServicesOutdated
@@ -360,6 +374,9 @@ public enum TelemetryEventName {
   public static let authTokenFailed: Swift::String
   public static let authTokenRefreshed: Swift::String
 }
+extension PayabliSDKCore::PayabliAttempt : Swift::Equatable {}
+extension PayabliSDKCore::PayabliAttempt : Swift::Hashable {}
+extension PayabliSDKCore::PayabliAttempt : Swift::RawRepresentable {}
 extension PayabliSDKCore::PayabliErrorType : Swift::Equatable {}
 extension PayabliSDKCore::PayabliErrorType : Swift::Hashable {}
 extension PayabliSDKCore::PayabliErrorType : Swift::RawRepresentable {}

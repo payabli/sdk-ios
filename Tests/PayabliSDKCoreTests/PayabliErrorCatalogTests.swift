@@ -40,6 +40,14 @@ final class PayabliErrorCatalogTests: XCTestCase {
                 + "so this is not proof no payment was made. Read again later rather than charging again."
         ),
         (
+            .retryRefused,
+            "RETRY_REFUSED",
+            1021,
+            .outcomeUnknown,
+            "An earlier attempt at this payment reached the service, so this retry was not sent on. "
+                + "Check that payment before trying again."
+        ),
+        (
             .deviceKeyUnavailable,
             "DEVICE_KEY_UNAVAILABLE",
             3001,

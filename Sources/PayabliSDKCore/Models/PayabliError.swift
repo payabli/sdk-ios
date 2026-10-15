@@ -55,6 +55,9 @@ public enum PayabliErrorType: String, Sendable, CaseIterable {
     /// No transaction is visible under this identifier yet. A transaction can take a short while to appear,
     /// so this is not proof no payment was made. Read again later rather than charging again.
     case transactionNotFound = "TRANSACTION_NOT_FOUND"
+    /// A retry was refused because an earlier attempt at the same payment reached the service. That attempt's
+    /// outcome is still unknown, so check the payment before trying again.
+    case retryRefused = "RETRY_REFUSED"
 
     // Card-present.
     case deviceKeyUnavailable = "DEVICE_KEY_UNAVAILABLE"
@@ -146,6 +149,7 @@ public extension PayabliErrorType {
         case .sdkInternalError: 1018
         case .sessionNotInitialized: 1019
         case .transactionNotFound: 1020
+        case .retryRefused: 1021
         case .deviceKeyUnavailable: 3001
         case .deviceSetupUnsupported: 3002
         case .deviceServicesOutdated: 3003
@@ -206,6 +210,9 @@ public extension PayabliErrorType {
         case .transactionNotFound:
             "No transaction is visible under this identifier yet. A transaction can take a short while to appear, "
                 + "so this is not proof no payment was made. Read again later rather than charging again."
+        case .retryRefused:
+            "An earlier attempt at this payment reached the service, so this retry was not sent on. "
+                + "Check that payment before trying again."
         case .deviceKeyUnavailable: "This device's secure storage is unavailable."
         case .deviceSetupUnsupported: "This device cannot be set up for card-present payments."
         case .deviceServicesOutdated: "Google Play on this device must be installed, updated or signed in."
@@ -252,8 +259,8 @@ public extension PayabliErrorType {
             .configuration
         case .paymentDeclined, .paymentNotOpened, .cardDeclined:
             .declined
-        case .serverError, .networkError, .decodingError, .userCancelled, .unknown, .conflict, .tapNotCompleted,
-             .paymentOutcomeUnknown, .paymentNotClosed:
+        case .serverError, .networkError, .decodingError, .userCancelled, .unknown, .conflict, .retryRefused,
+             .tapNotCompleted, .paymentOutcomeUnknown, .paymentNotClosed:
             .outcomeUnknown
         case .rateLimited, .deviceKeyUnavailable, .deviceSetupUnavailable, .readerUnavailable, .readerSessionExpired,
              .transactionNotFound:
