@@ -32,6 +32,10 @@ public final class PayabliSession: @unchecked Sendable {
 
     package let deviceIdentity: DeviceIdentity
 
+    /// This session's reporter. A capability takes it when it is built, so work started under this
+    /// session never reports under a later one.
+    package let telemetry: TelemetryClient
+
     private let identity: ConfigIdentity
 
     /// A process-wide lock, because the installed session is process-wide.
@@ -43,7 +47,8 @@ public final class PayabliSession: @unchecked Sendable {
         urlSession: URLSession? = nil,
         deviceIdentity: DeviceIdentity = DeviceIdentity {
             try InstallIdentifier.hardwareId(storage: KeychainStorage(migrating: [InstallIdentifier.storageKey]))
-        }
+        },
+        telemetryTransport: (any TelemetryTransport)? = nil
     ) {
         self.config = config
         self.deviceIdentity = deviceIdentity
@@ -65,6 +70,15 @@ public final class PayabliSession: @unchecked Sendable {
             base: service,
             auth: auth,
             logger: PayabliLogger(category: .network)
+        )
+        // The bare service, so a refused batch never reaches the recovery layer above.
+        telemetry = TelemetryClient(
+            configuration: TelemetryClient.Configuration(
+                enabled: config.telemetryEnabled,
+                entry: config.entryPoint,
+                environment: config.environment.name
+            ),
+            transport: telemetryTransport ?? TelemetryEndpointTransport(transport: service)
         )
     }
 
