@@ -123,6 +123,40 @@ final class PayInReversalStateTests: XCTestCase {
         XCTAssertEqual(state.reversed, other)
     }
 
+    func testAReadThatFindsTheUnresolvedReversalNotAppliedOffersItAgain() {
+        var state = PayInReversalState()
+        state.began()
+        state.failed(interrupted, for: payment, onScreen: payment)
+
+        state.readCaptured(payment, onScreen: payment)
+
+        XCTAssertTrue(state.offersReversal(of: payment), "a reversal the read showed did not take is still withheld")
+        XCTAssertEqual(state.unreconciled, [])
+        XCTAssertEqual(state.message, "", "the unknown-outcome notice outlived the read that answered it")
+    }
+
+    func testACapturedReadOfAnotherPaymentLeavesTheUnresolvedReversalWithheld() {
+        var state = PayInReversalState()
+        state.began()
+        state.failed(interrupted, for: payment, onScreen: payment)
+
+        state.readCaptured(other, onScreen: other)
+
+        XCTAssertFalse(state.offersReversal(of: payment))
+        XCTAssertEqual(state.unreconciled, [payment])
+    }
+
+    func testACapturedReadOfAnAnsweredReversalChangesNothing() {
+        var state = PayInReversalState()
+        state.began()
+        state.reversed(payment, saying: "Reversed", onScreen: payment)
+        let answered = state
+
+        state.readCaptured(payment, onScreen: payment)
+
+        XCTAssertEqual(state, answered)
+    }
+
     func testAReadOfAnAnsweredReversalKeepsWhatItSaid() {
         var state = PayInReversalState()
         state.began()
@@ -168,6 +202,26 @@ final class PayInReversalStateTests: XCTestCase {
 
         XCTAssertTrue(state.offersReversal(of: payment), "the service answered, so there is no doubt to hold")
         XCTAssertEqual(state.unreconciled, [])
+    }
+
+    func testAReversalCancelledInFlightIsWithheldUntilARead() {
+        let cancellations: [Error] = [
+            PayabliPayInError.submissionInterrupted(
+                type: .userCancelled,
+                causeType: "PayabliSDKCore.PayabliGenericError",
+                paymentTransId: nil
+            ),
+            CancellationError()
+        ]
+        for cancellation in cancellations {
+            var state = PayInReversalState()
+            state.began()
+
+            state.failed(PayInFailure(cancellation, operation: .void), for: payment, onScreen: payment)
+
+            XCTAssertFalse(state.offersReversal(of: payment), "\(cancellation)")
+            XCTAssertEqual(state.unreconciled, [payment], "\(cancellation)")
+        }
     }
 
     // MARK: - Fixtures

@@ -305,8 +305,11 @@ struct PaymentCaptureQAView: View {
             defer { isReading = false }
             do {
                 let transaction = try await paymentFlow.readTransaction(transId)
-                if transaction.status == .voided {
-                    reversal.readVoided(transId, onScreen: capturedResult?.reversibleTransId)
+                let onScreen = capturedResult?.reversibleTransId
+                switch transaction.status {
+                case .voided: reversal.readVoided(transId, onScreen: onScreen)
+                case .captured: reversal.readCaptured(transId, onScreen: onScreen)
+                default: break
                 }
                 let status = transaction.status.map { "\($0)" } ?? "-"
                 readMessage = "Status: \(status) (\(transaction.transStatus.map(String.init) ?? "-"))"

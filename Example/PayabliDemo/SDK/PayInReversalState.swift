@@ -69,6 +69,14 @@ struct PayInReversalState: Equatable {
         }
     }
 
+    /// A read reported the payment still captured, so a reversal that never answered did not take and
+    /// is offered again. Pressing it sends a new void. A payment with no open reversal is left alone.
+    mutating func readCaptured(_ transId: String, onScreen: String?) {
+        guard unreconciled.contains(transId) else { return }
+        unreconciled.removeAll { $0 == transId }
+        show("", for: transId, onScreen: onScreen)
+    }
+
     /// The payment leaves the screen, and what was said about reversing it leaves with it.
     ///
     /// What nobody can account for stays: it outlives the payment, because reading that transaction
