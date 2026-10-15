@@ -14,19 +14,24 @@ package struct PayabliRequest: Sendable {
     package let query: [URLQueryItem]
     package let headers: [String: String]
     package let body: Data?
+    /// Whether a refused answer refuses this caller rather than its credential. True means the answer is
+    /// returned as it arrived, with no refresh and no replay.
+    package let isCallerRefusal: @Sendable (PayabliResponse) -> Bool
 
     package init(
         method: HTTPMethod,
         path: String,
         query: [URLQueryItem] = [],
         headers: [String: String] = [:],
-        body: Data? = nil
+        body: Data? = nil,
+        isCallerRefusal: @escaping @Sendable (PayabliResponse) -> Bool = { _ in false }
     ) {
         self.method = method
         self.path = path
         self.query = query
         self.headers = headers
         self.body = body
+        self.isCallerRefusal = isCallerRefusal
     }
 
     /// Convenience for JSON POSTs with a `Content-Type: application/json` header.

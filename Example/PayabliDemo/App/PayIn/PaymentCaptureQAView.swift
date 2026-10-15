@@ -1,4 +1,6 @@
 import os
+import PayabliSDKCore
+import PayabliSDKPayIn
 import SwiftUI
 
 struct PaymentCaptureQAView: View {
@@ -14,6 +16,8 @@ struct PaymentCaptureQAView: View {
     @State private var isPaymentCaptureSheetPresented = false
     @State private var isPaymentCaptureResultViewPresented = false
     @State private var reversal = PayInReversalState()
+    @State private var isReading = false
+    @State private var readMessage = ""
 
     var body: some View {
         NavigationStack {
@@ -103,7 +107,7 @@ struct PaymentCaptureQAView: View {
                             // The flow refuses a new attempt while a reversal is on its way, and
                             // this says so rather than letting the press do nothing. It is refused
                             // from the moment one is decided on, which is before the flow knows.
-                            .disabled(reversal.isReversing || paymentFlow.isSubmitting)
+                            .disabled(reversal.isReversing || isReading || paymentFlow.isSubmitting)
 
                             // Only a payment that reported an identifier can be reversed, and
                             // only once: the service refuses the second attempt, and offering a
@@ -123,8 +127,26 @@ struct PaymentCaptureQAView: View {
                                 .disabled(
                                     !reversal.offersReversal(of: transId)
                                         || reversal.isReversing
+                                        || isReading
                                         || paymentFlow.isSubmitting
                                 )
+
+                                // A read and a reversal answer into the same panel, so one waits for
+                                // the other rather than the slower overwriting the faster.
+                                Button { readBack(transId) } label: {
+                                    Label("Check this transaction's status", systemImage: "magnifyingglass")
+                                        .frame(maxWidth: .infinity)
+                                }
+                                .buttonStyle(.bordered)
+                                .disabled(isReading || reversal.isReversing)
+
+                                if !readMessage.isEmpty {
+                                    Text(readMessage)
+                                        .font(.caption)
+                                        .foregroundColor(.payabliOnSurfaceVariant)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                        .textSelection(.enabled)
+                                }
 
                                 if !reversal.message.isEmpty {
                                     Text(reversal.message)
@@ -222,7 +244,7 @@ struct PaymentCaptureQAView: View {
         // A reversal this screen has decided to send but not yet sent is still a reversal. The
         // flow does not know about it yet, so its own refusal below cannot cover this, and drawing
         // an attempt through the gap discards the payment the request is already on its way about.
-        guard !reversal.isReversing else { return }
+        guard !reversal.isReversing, !isReading else { return }
 
         // The flow refuses while a submission is in flight, and this row keeps
         // offering the button through one. Clearing first would report an attempt
@@ -235,6 +257,7 @@ struct PaymentCaptureQAView: View {
         resultText = ""
         capturedResult = nil
         reversal.paymentReplaced()
+        readMessage = ""
     }
 
     /// Reverses the payment on screen.
@@ -247,8 +270,10 @@ struct PaymentCaptureQAView: View {
         // one: the gap between the two is a whole scheduled task, and a tap inside it would send a
         // second reversal under a second key, which the service has nothing to recognise as a
         // repeat.
-        guard !reversal.isReversing, !paymentFlow.isSubmitting else { return }
+        guard !reversal.isReversing, !isReading, !paymentFlow.isSubmitting else { return }
         reversal.began()
+        // The status read before the reversal no longer describes the payment.
+        readMessage = ""
         Task {
             let onScreen = capturedResult?.reversibleTransId
             do {
@@ -268,6 +293,28 @@ struct PaymentCaptureQAView: View {
                     for: transId,
                     onScreen: onScreen
                 )
+            }
+        }
+    }
+
+    /// Reads the payment on screen back and shows where it stands.
+    private func readBack(_ transId: String) {
+        guard !isReading, !reversal.isReversing else { return }
+        isReading = true
+        Task {
+            defer { isReading = false }
+            do {
+                let transaction = try await paymentFlow.readTransaction(transId)
+                let onScreen = capturedResult?.reversibleTransId
+                switch transaction.status {
+                case .voided: reversal.readVoided(transId, onScreen: onScreen)
+                case .captured: reversal.readCaptured(transId, onScreen: onScreen)
+                default: break
+                }
+                let status = transaction.status.map { "\($0)" } ?? "-"
+                readMessage = "Status: \(status) (\(transaction.transStatus.map(String.init) ?? "-"))"
+            } catch {
+                readMessage = "Read failed: \((error as? any PayabliError)?.type.rawValue ?? "UNKNOWN")"
             }
         }
     }

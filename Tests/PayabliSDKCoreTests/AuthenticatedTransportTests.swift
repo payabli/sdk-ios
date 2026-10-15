@@ -68,6 +68,75 @@ final class AuthenticatedTransportTests: XCTestCase {
         XCTAssertEqual(stub.count, 2, "no third attempt")
     }
 
+    func testA401TheRequestNamesAsARefusalOfTheCallerIsReturnedWithoutRefreshOrReplay() async throws {
+        let provider = Counter()
+        let stub = RecordingStub(status: Self.unauthorized)
+        stub.install()
+        defer { stub.uninstall() }
+
+        let auth = try makeTestAuth(tokenProvider: {
+            _ = await provider.increment()
+            return "refreshed-token"
+        })
+        let transport = makeAuthenticatedStack(auth: auth)
+        let request = PayabliRequest(
+            method: .get,
+            path: "/api/v2/ping",
+            isCallerRefusal: { $0.statusCode == Self.unauthorized }
+        )
+
+        let response = try await transport.perform(request)
+
+        XCTAssertEqual(response.statusCode, Self.unauthorized)
+        XCTAssertEqual(stub.count, 1, "no replay")
+        let refreshes = await provider.count
+        XCTAssertEqual(refreshes, 0, "no refresh")
+    }
+
+    func testARefusalOfTheCallerOnTheReplayIsReturnedAndNotReadAsAnExpiredToken() async throws {
+        let refusal = Data(#"{"responseCode": 9001}"#.utf8)
+        let stub = RecordingStub { request in
+            bearer(of: request) == "refreshed-token"
+                ? (Self.unauthorized, refusal)
+                : (Self.unauthorized, Data())
+        }
+        stub.install()
+        defer { stub.uninstall() }
+
+        let auth = try makeTestAuth(tokenProvider: { "refreshed-token" })
+        let transport = makeAuthenticatedStack(auth: auth)
+        let request = PayabliRequest(
+            method: .get,
+            path: "/api/v2/ping",
+            isCallerRefusal: { $0.statusCode == Self.unauthorized && $0.body == refusal }
+        )
+
+        let response = try await transport.perform(request)
+
+        XCTAssertEqual(response.statusCode, Self.unauthorized)
+        XCTAssertEqual(response.body, refusal)
+        XCTAssertEqual(stub.sentTokens, [testToken, "refreshed-token"])
+    }
+
+    func testA401TheRequestDoesNotNameAsARefusalOfTheCallerStillRecovers() async throws {
+        let stub = RecordingStub { request in
+            bearer(of: request) == "refreshed-token"
+                ? (Self.ok, Data())
+                : (Self.unauthorized, Data())
+        }
+        stub.install()
+        defer { stub.uninstall() }
+
+        let auth = try makeTestAuth(tokenProvider: { "refreshed-token" })
+        let transport = makeAuthenticatedStack(auth: auth)
+        let request = PayabliRequest(method: .get, path: "/api/v2/ping", isCallerRefusal: { _ in false })
+
+        let response = try await transport.perform(request)
+
+        XCTAssertEqual(response.statusCode, Self.ok)
+        XCTAssertEqual(stub.sentTokens, [testToken, "refreshed-token"])
+    }
+
     func testA401OnPostStillRefreshesAndReplays() async throws {
         let stub = RecordingStub { request in
             bearer(of: request) == "refreshed-token"

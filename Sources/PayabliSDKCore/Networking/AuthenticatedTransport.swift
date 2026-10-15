@@ -35,7 +35,9 @@ struct AuthenticatedTransport: PayabliTransport {
             try await base.perform(request)
         }
 
-        guard recovery.isCredentialRejection(firstAttempt) else { return firstAttempt }
+        guard recovery.isCredentialRejection(firstAttempt), !request.isCallerRefusal(firstAttempt) else {
+            return firstAttempt
+        }
 
         logger.info(
             "credential rejected: attempting recovery"
@@ -78,7 +80,7 @@ struct AuthenticatedTransport: PayabliTransport {
         let secondAttempt = try await SentToken.$current.withValue(replayed) {
             try await base.perform(request)
         }
-        if recovery.isCredentialRejection(secondAttempt) {
+        if recovery.isCredentialRejection(secondAttempt), !request.isCallerRefusal(secondAttempt) {
             logger.warning(
                 "recovery exhausted: the replay was refused too"
                     + " (\(request.method.rawValue) \(secondAttempt.statusCode))"

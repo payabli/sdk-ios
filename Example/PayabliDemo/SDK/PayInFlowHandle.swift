@@ -75,6 +75,11 @@ final class PayInFlowHandle: ObservableObject {
         PayInOutcome(try await flow.voidTransaction(transId))
     }
 
+    /// Reads a transaction back by its identifier.
+    func readTransaction(_ transId: String) async throws -> PayabliPayInTransaction {
+        try await flow.readTransaction(transId)
+    }
+
     /// Puts the customer the switch now names onto the attempt already on screen,
     /// leaving the amount, the order identifier and the key as they were.
     ///

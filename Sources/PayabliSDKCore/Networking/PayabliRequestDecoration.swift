@@ -54,7 +54,8 @@ extension PayabliRequest {
             path: path,
             query: query,
             headers: headers,
-            body: body
+            body: body,
+            isCallerRefusal: isCallerRefusal
         )
     }
 }
