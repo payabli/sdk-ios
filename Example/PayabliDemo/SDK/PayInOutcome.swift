@@ -243,7 +243,8 @@ extension PayInFailure {
         if case .submissionInterrupted = error as? PayabliPayInError {
             return true
         }
-        return false
+        // A request cancelled in flight may already have reached the service.
+        return error is CancellationError
     }
 
     private static func isDuplicateSubmission(_ error: Error) -> Bool {
