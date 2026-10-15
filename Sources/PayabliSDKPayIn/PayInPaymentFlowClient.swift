@@ -318,15 +318,15 @@ final class PayInPaymentFlowClient: Sendable {
                 type: (error as? any PayabliError)?.type ?? .unknown,
                 // One definition of what is kept from a failure, reused rather than restated.
                 causeType: RedactedCause(error).originalType,
-                paymentTransId: Self.namedTransaction(by: error, in: answer)
+                paymentTransId: Self.namedTransaction(in: answer)
             )
         }
     }
 
-    /// The transaction a failure named, where it named one: the `data.paymentTransId` of an answer the
-    /// service declined to approve. Only that field is decoded, so a malformed sibling field cannot lose it.
-    private static func namedTransaction(by failure: any Error, in answer: PayabliResponse?) -> String? {
-        guard case .transactionFailed = failure as? PayabliPayInError, let answer else { return nil }
+    /// The `data.paymentTransId` an answer that left the outcome open names, if any. Only that field is
+    /// decoded, so an answer that could not otherwise be read still names its transaction.
+    private static func namedTransaction(in answer: PayabliResponse?) -> String? {
+        guard let answer else { return nil }
         let decoded = try? JSONDecoder().decode(NamedTransaction.self, from: answer.body)
         return decoded?.data?.paymentTransId?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty
     }
