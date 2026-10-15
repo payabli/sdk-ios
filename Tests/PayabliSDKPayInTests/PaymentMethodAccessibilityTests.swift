@@ -78,6 +78,39 @@ final class PaymentMethodAccessibilityTests: XCTestCase {
         )
     }
 
+    func testARefusalAnnouncesTheFieldsItNewlyMarkedInTheOrderTheFormDrawsThem() {
+        let drawn: [PayabliPayInField] = [.cardholderName, .cardNumber, .cardExpiration, .cardCvv, .cardZip]
+        let label: (PayabliPayInField) -> String = { PayabliPayInLabels.defaultFieldLabels[$0] ?? $0.rawValue }
+        let message = PayabliPayInAccessibility.rejectedFieldMessage
+
+        XCTAssertEqual(
+            PayabliPayInAccessibility.rejectedFieldsAnnouncement(
+                newlyMarked: [.cardZip, .cardholderName, .firstName],
+                drawnFields: drawn,
+                label: label,
+                message: message
+            ),
+            "\(label(.cardholderName)): That was not accepted. \(label(.cardZip)): That was not accepted"
+        )
+        XCTAssertNil(
+            PayabliPayInAccessibility.rejectedFieldsAnnouncement(
+                newlyMarked: [.firstName],
+                drawnFields: drawn,
+                label: label,
+                message: message
+            ),
+            "a field the form does not draw is announced"
+        )
+        XCTAssertNil(
+            PayabliPayInAccessibility.rejectedFieldsAnnouncement(
+                newlyMarked: [],
+                drawnFields: drawn,
+                label: label,
+                message: message
+            )
+        )
+    }
+
     func testCardNumberHintIncludesDetectedBrandAndValidationError() {
         XCTAssertEqual(
             PayabliPayInAccessibility.cardNumberHint(
