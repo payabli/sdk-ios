@@ -99,6 +99,40 @@ final class PayInReversalStateTests: XCTestCase {
 
     // MARK: - A refusal that belongs to nobody
 
+    func testAReadThatFindsTheUnresolvedReversalAppliedSettlesIt() {
+        var state = PayInReversalState()
+        state.began()
+        state.failed(interrupted, for: payment, onScreen: payment)
+
+        state.readVoided(payment, onScreen: payment)
+
+        XCTAssertEqual(state.reversed, payment)
+        XCTAssertEqual(state.unreconciled, [], "a reversal the read confirmed is still reported as unknown")
+        XCTAssertEqual(state.message, "", "the unknown-outcome notice outlived the read that answered it")
+        XCTAssertFalse(state.offersReversal(of: payment))
+    }
+
+    func testAReadOfOnePaymentLeavesAnotherUnresolvedReversalOpen() {
+        var state = PayInReversalState()
+        state.began()
+        state.failed(interrupted, for: payment, onScreen: payment)
+
+        state.readVoided(other, onScreen: other)
+
+        XCTAssertEqual(state.unreconciled, [payment])
+        XCTAssertEqual(state.reversed, other)
+    }
+
+    func testAReadOfAnAnsweredReversalKeepsWhatItSaid() {
+        var state = PayInReversalState()
+        state.began()
+        state.reversed(payment, saying: "Reversed", onScreen: payment)
+
+        state.readVoided(payment, onScreen: payment)
+
+        XCTAssertEqual(state.message, "Reversed")
+    }
+
     func testARefusalForAnotherSubmissionChangesNothing() {
         var state = PayInReversalState()
         state.failed(interrupted, for: payment, onScreen: payment)

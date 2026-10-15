@@ -58,6 +58,17 @@ struct PayInReversalState: Equatable {
         show(failure.message, for: transId, onScreen: onScreen)
     }
 
+    /// A read reported the payment voided, which settles it as reversed, including a reversal that
+    /// never answered. The notice that reversal left is cleared, since the read has answered it.
+    mutating func readVoided(_ transId: String, onScreen: String?) {
+        let wasUnreconciled = unreconciled.contains(transId)
+        reversed = transId
+        unreconciled.removeAll { $0 == transId }
+        if wasUnreconciled {
+            show("", for: transId, onScreen: onScreen)
+        }
+    }
+
     /// The payment leaves the screen, and what was said about reversing it leaves with it.
     ///
     /// What nobody can account for stays: it outlives the payment, because reading that transaction
