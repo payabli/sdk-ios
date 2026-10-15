@@ -34,4 +34,16 @@ final class TokenHostOverrideTests: XCTestCase {
     func testAURLWithNoHostNamesNoHost() {
         XCTAssertNil(url("http://"))
     }
+
+    func testAPortOutsideTheValidRangeNamesNoHost() {
+        XCTAssertNil(url("mac.local:-1"))
+        XCTAssertNil(url("mac.local:0"))
+        XCTAssertNil(url("mac.local:65536"))
+        XCTAssertEqual(url("mac.local:65535"), "http://mac.local:65535")
+    }
+
+    func testASchemeOtherThanHTTPNamesNoHost() {
+        XCTAssertNil(url("ftp://mac.local"))
+        XCTAssertEqual(url("https://mac.local"), "https://mac.local")
+    }
 }
