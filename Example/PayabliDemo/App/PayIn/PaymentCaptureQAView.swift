@@ -272,6 +272,8 @@ struct PaymentCaptureQAView: View {
         // repeat.
         guard !reversal.isReversing, !isReading, !paymentFlow.isSubmitting else { return }
         reversal.began()
+        // The status read before the reversal no longer describes the payment.
+        readMessage = ""
         Task {
             let onScreen = capturedResult?.reversibleTransId
             do {
