@@ -105,6 +105,28 @@ final class TapToPayReportsTests: XCTestCase {
         XCTAssertEqual(events.filter { $0 == "ttp.initialize.failed" }.count, 1, "\(events)")
     }
 
+    func testAReportQueuedBehindASlowSendKeepsTheTimeItWasMade() async throws {
+        let transport = HeldTelemetryTransport()
+        let client = TelemetryClient(
+            configuration: .init(enabled: true, entry: "e", environment: "sandbox"),
+            transport: transport
+        )
+        let reports = TapToPayReports(telemetry: client)
+
+        reports.initializeFailed(PayabliTTPError.readerCredentialsUnusable, after: .milliseconds(5))
+        await transport.waitUntilHeld()
+        reports.initializeStarted()
+        let made = Date()
+        try await Task.sleep(for: .milliseconds(200))
+        await transport.release()
+        await reports.sent()
+        await client.flush()
+
+        let sent = await transport.sent
+        let started = try XCTUnwrap(sent.first { $0.event == "ttp.initialize.started" })
+        XCTAssertLessThanOrEqual(started.timestamp, made)
+    }
+
     // MARK: - Helpers
 
     /// Runs `initialize` to its failure and reads what reached the transport without flushing it, so the
@@ -185,5 +207,34 @@ final class TapToPayReportsTests: XCTestCase {
                 headerFields: ["Content-Type": "application/json"]
             )!, data)
         }
+    }
+}
+
+/// Holds the first batch until released, so a report can be queued behind a send still in flight.
+private actor HeldTelemetryTransport: TelemetryTransport {
+    private(set) var sent: [TelemetryEvent] = []
+    private var held: CheckedContinuation<Void, Never>?
+    private var heldWaiters: [CheckedContinuation<Void, Never>] = []
+    private var released = false
+
+    func send(_ batch: [TelemetryEvent]) async {
+        sent += batch
+        guard !released else { return }
+        await withCheckedContinuation { continuation in
+            held = continuation
+            heldWaiters.forEach { $0.resume() }
+            heldWaiters.removeAll()
+        }
+    }
+
+    func waitUntilHeld() async {
+        guard held == nil else { return }
+        await withCheckedContinuation { heldWaiters.append($0) }
+    }
+
+    func release() {
+        released = true
+        held?.resume()
+        held = nil
     }
 }

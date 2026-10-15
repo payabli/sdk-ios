@@ -64,6 +64,15 @@ public actor TelemetryClient {
 
     /// Enqueue an event. No-op when telemetry is disabled.
     public func emit(_ name: String, properties: [String: String] = [:]) async {
+        await emit(name, properties: properties, occurredAt: Date())
+    }
+
+    /// Enqueue an event stamped with when it happened rather than when it reached the client.
+    ///
+    /// - Parameter name: the event's catalog name.
+    /// - Parameter properties: the event's properties.
+    /// - Parameter occurredAt: when the reported thing happened.
+    package func emit(_ name: String, properties: [String: String] = [:], occurredAt: Date) async {
         guard configuration.enabled else { return }
         let event = TelemetryEvent(
             sdkVersion: configuration.sdkVersion,
@@ -72,7 +81,8 @@ public actor TelemetryClient {
             entry: configuration.entry,
             environment: configuration.environment,
             event: name,
-            properties: properties
+            properties: properties,
+            timestamp: occurredAt
         )
         buffer.append(event)
         if buffer.count >= configuration.batchSize {
