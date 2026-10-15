@@ -839,9 +839,13 @@ public struct PayabliPayInRequest : Swift::Sendable {
 public struct PayabliPayInRequestConfiguration : Swift::Sendable {
   public let paymentDetails: PayabliSDKPayIn::PayabliPayInPaymentDetails
   public let accountId: Swift::String?
-  public let customerData: PayabliSDKPayIn::PayabliPayInCustomerData?
+  public var customerData: PayabliSDKPayIn::PayabliPayInCustomerData? {
+    get
+  }
   public let ipAddress: Swift::String?
-  public let orderDescription: Swift::String?
+  public var orderDescription: Swift::String? {
+    get
+  }
   public let orderId: Swift::String?
   public let source: Swift::String?
   public let subdomain: Swift::String?

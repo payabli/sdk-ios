@@ -193,9 +193,9 @@ public struct PayabliPayInRequest: Sendable {
 public struct PayabliPayInRequestConfiguration: Sendable {
     public let paymentDetails: PayabliPayInPaymentDetails
     public let accountId: String?
-    public let customerData: PayabliPayInCustomerData?
+    public internal(set) var customerData: PayabliPayInCustomerData?
     public let ipAddress: String?
-    public let orderDescription: String?
+    public internal(set) var orderDescription: String?
     public let orderId: String?
     public let source: String?
     public let subdomain: String?
@@ -247,25 +247,12 @@ public struct PayabliPayInRequestConfiguration: Sendable {
         customerData formCustomerData: PayabliPayInCustomerData? = nil,
         orderDescription formOrderDescription: String? = nil
     ) -> PayabliPayInRequest {
-        PayabliPayInRequest(
-            paymentMethod: paymentMethod,
-            options: PayabliPayInRequestConfiguration(
-                paymentDetails: paymentDetails,
-                accountId: accountId,
-                customerData: mergedCustomerData(formCustomerData),
-                ipAddress: ipAddress,
-                orderDescription: formOrderDescription?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty
-                    ?? orderDescription,
-                orderId: orderId,
-                source: source,
-                subdomain: subdomain,
-                subscriptionId: subscriptionId,
-                idempotencyKey: idempotencyKey,
-                achValidation: achValidation,
-                forceCustomerCreation: forceCustomerCreation,
-                validation: validation
-            )
-        )
+        // A copy rather than a rebuild, so a setting added later reaches the request without being listed here.
+        var options = self
+        options.customerData = mergedCustomerData(formCustomerData)
+        options.orderDescription = formOrderDescription?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty
+            ?? orderDescription
+        return PayabliPayInRequest(paymentMethod: paymentMethod, options: options)
     }
 
     private func mergedCustomerData(
