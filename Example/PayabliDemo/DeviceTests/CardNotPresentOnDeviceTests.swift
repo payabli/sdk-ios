@@ -285,6 +285,42 @@ final class CardNotPresentOnDeviceTests: XCTestCase {
         await reverse(transId, on: flow, whenLeftStanding: "the transaction was left standing")
     }
 
+    // MARK: - Read back
+
+    func testHACaptureReadsBackCapturedThenVoided() async throws {
+        let flow = try makeFlow()
+        let captured = try await flow.capture(request(with: try card()))
+        let transId = try XCTUnwrap(captured.transaction?.paymentTransId)
+
+        // A read that fails still reverses the capture, so a failed run leaves nothing standing.
+        let before: PayabliPayInTransaction
+        do {
+            before = try await flow.readTransaction(transId)
+        } catch {
+            await reverse(transId, on: flow, whenLeftStanding: "the read-back capture was left standing")
+            throw error
+        }
+        LiveEnvironment.report("PAYABLI_READ env=\(named.name) transId=\(transId) status=\(before.transStatus ?? -99)")
+        XCTAssertEqual(before.paymentTransId, transId)
+        XCTAssertEqual(before.status, .captured)
+
+        await reverse(transId, on: flow, whenLeftStanding: "the read-back capture was left standing")
+        let after = try await flow.readTransaction(transId)
+        LiveEnvironment.report("PAYABLI_READ env=\(named.name) transId=\(transId) status=\(after.transStatus ?? -99)")
+        XCTAssertEqual(after.status, .voided)
+    }
+
+    func testIAnUnknownTransactionIsNotFound() async throws {
+        let flow = try makeFlow()
+
+        do {
+            _ = try await flow.readTransaction("0-no-such-transaction")
+            XCTFail("expected TRANSACTION_NOT_FOUND")
+        } catch {
+            XCTAssertEqual((error as? any PayabliError)?.type, .transactionNotFound)
+        }
+    }
+
     // MARK: - Void
 
     /// Reverses a transaction through the SDK's own member, which is what gives this
