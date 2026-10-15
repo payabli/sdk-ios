@@ -7,8 +7,9 @@ import XCTest
 /// host was told, sent at once and naming nothing a host's error text does.
 @MainActor
 final class TapToPayReportsTests: XCTestCase {
-    /// The keys the catalog declares for `ttp.initialize.failed`.
-    private static let failedKeys: Set<String> = ["outcome", "code", "duration_ms", "error_number"]
+    /// The keys `ttp.initialize.failed` may carry: the catalog row's, plus `error_number`, which the error
+    /// catalog rules onto every failure event with a code.
+    private static let failedKeys: Set<String> = ["outcome", "code", "duration_ms", "failure_type", "error_number"]
     private static let sentinel = "REASON-SENTINEL"
 
     override func setUp() {
