@@ -52,7 +52,7 @@ final class PaymentMethodCoverageExpansionTests: XCTestCase {
         XCTAssertNil(PayabliPayInTokenStorageError.missingAccessToken.detail)
         XCTAssertEqual(PayabliPayInTokenStorageError.missingAccessToken.type, .missingToken)
         XCTAssertEqual(PayabliPayInTokenStorageError.missingAccessToken.reason, "Missing access token")
-        XCTAssertEqual(PayabliPayInTokenStorageError.saveFailed(detailedFailure).type, .unknown)
+        XCTAssertEqual(PayabliPayInTokenStorageError.saveFailed(detailedFailure).type, .paymentDeclined)
         XCTAssertEqual(PayabliPayInTokenStorageError.saveFailed(detailedFailure).reason, "Gateway declined")
         XCTAssertEqual(PayabliPayInTokenStorageError.saveFailed(detailedFailure).detail, "Use another account.")
 

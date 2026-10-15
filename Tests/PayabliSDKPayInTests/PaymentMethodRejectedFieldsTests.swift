@@ -312,9 +312,9 @@ final class PaymentMethodRejectedFieldsTests: XCTestCase {
         XCTAssertEqual(viewModel.rejectedFields, [])
     }
 
-    /// A store failure keeps its own shape, so a refusal there marks nothing.
+    /// A store failure that names no field marks nothing.
     @MainActor
-    func testAStoreRefusalKeepsItsOwnShapeAndMarksNothing() async {
+    func testAStoreFailureNamingNoFieldMarksNothing() async {
         let viewModel = PayabliPayInViewModel(
             component: PayabliPayIn(
                 entryPoint: "entry",
@@ -331,7 +331,7 @@ final class PaymentMethodRejectedFieldsTests: XCTestCase {
         do {
             _ = try await viewModel.submit()
             XCTFail("a refusal must not read as a stored method")
-        } catch PayabliPayInTokenStorageError.saveFailed {
+        } catch PayabliPaymentError.validation {
         } catch {
             XCTFail("Wrong error: \(error)")
         }

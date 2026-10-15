@@ -106,4 +106,25 @@ enum PayabliPayInAccessibility {
         guard let message = message?.trimmed.nilIfEmpty else { return nil }
         return fieldErrorLabel(fieldLabel: fieldLabel, message: message)
     }
+
+    /// The text of a field's mark when the service refused what was entered in it.
+    static let rejectedFieldMessage = "That was not accepted"
+
+    /// What a screen reader hears when a refusal marks fields.
+    ///
+    /// - Parameters:
+    ///   - newlyMarked: The fields this refusal marked and the previous one did not.
+    ///   - drawnFields: The fields the form draws, in the order it draws them.
+    ///   - label: The label the form gives a field.
+    ///   - message: The mark's own text.
+    /// - Returns: One sentence per newly marked field the form draws, in its order, or `nil` when there is none.
+    static func rejectedFieldsAnnouncement(
+        newlyMarked: Set<PayabliPayInField>,
+        drawnFields: [PayabliPayInField],
+        label: (PayabliPayInField) -> String,
+        message: String
+    ) -> String? {
+        let announced = drawnFields.filter(newlyMarked.contains).map { "\(label($0)): \(message)" }
+        return announced.isEmpty ? nil : announced.joined(separator: ". ")
+    }
 }

@@ -152,7 +152,7 @@ public enum PayabliPayInTokenStorageError: PayabliError {
         case .missingAccessToken:
             return .missingToken
         case .saveFailed:
-            return .unknown
+            return .paymentDeclined
         }
     }
 

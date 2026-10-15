@@ -4,6 +4,32 @@ import Foundation
 import XCTest
 
 final class TokenStorageClientCoverageTests: XCTestCase {
+    func testAStoreBadRequestCarriesTheRoutesResponseTextInItsDetail() async throws {
+        let transport = CoverageMockTransport(statusCode: 400, responseBody: """
+        { "responseText": "Paypoint not found or inactive" }
+        """)
+        let client = PayInPaymentFlowTokenStorageClient(transport: transport)
+
+        do {
+            _ = try await client.addMethod(
+                entryPoint: "entry",
+                paymentMethod: .card(PayabliPayInCardData(
+                    cardNumber: "4111111111111111",
+                    expiration: "02/28",
+                    cardholderName: "Jane Doe",
+                    cvv: "123",
+                    billingZip: "33139"
+                ))
+            )
+            XCTFail("Expected a validation error")
+        } catch let PayabliPaymentError.validation(validation) {
+            XCTAssertEqual(validation.detail, "Paypoint not found or inactive")
+            XCTAssertNil(validation.errors, "the route names no field, so none is invented")
+        } catch {
+            XCTFail("Wrong error: \(error)")
+        }
+    }
+
     func testDiagnosticsLogFailureWithRelativeURLAndRedactedHeaders() async throws {
         let sink = CoverageDiagnosticSink()
         let transport = CoverageFailingTransport(error: PayabliGenericError(
@@ -186,6 +212,32 @@ final class TokenStorageClientCoverageTests: XCTestCase {
 
         XCTAssertEqual(result.storedMethodId, "stored-result-code")
         XCTAssertEqual(result.resultCode, 1)
+    }
+
+    func testA200ThatClaimsNothingIsARefusalRatherThanAStoredMethod() async throws {
+        let transport = CoverageMockTransport(responseBody: """
+        { "responseText": "Success" }
+        """)
+        let client = PayInPaymentFlowTokenStorageClient(transport: transport)
+
+        do {
+            _ = try await client.addMethod(
+                entryPoint: "entry",
+                paymentMethod: .card(PayabliPayInCardData(
+                    cardNumber: "4111111111111111",
+                    expiration: "02/28",
+                    cardholderName: "Jane Doe",
+                    cvv: "123",
+                    billingZip: "33139"
+                ))
+            )
+            XCTFail("Expected a refusal")
+        } catch let error as PayabliPayInTokenStorageError {
+            guard case .saveFailed = error else { return XCTFail("Wrong error: \(error)") }
+            XCTAssertEqual(error.type, .paymentDeclined)
+        } catch {
+            XCTFail("Wrong error: \(error)")
+        }
     }
 
     func testUnapprovedResultCodeWithoutFailureFlagThrowsSaveFailure() async throws {
