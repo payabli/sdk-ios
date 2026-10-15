@@ -166,8 +166,8 @@ extension PayabliPayInPaymentDetails {
 
 /// A transaction to capture or authorize: the payment method, and the options for everything else.
 ///
-/// The options are the type a form is configured with, so a form submission and a direct call carry the
-/// same settings.
+/// The options are the type a form is configured with. A form submits them with what the payer entered merged
+/// in, as ``PayabliPayInRequestConfiguration/request(paymentMethod:customerData:orderDescription:)`` describes.
 public struct PayabliPayInRequest: Sendable {
     public let paymentMethod: PayabliPayInPaymentMethod
     public let options: PayabliPayInRequestConfiguration

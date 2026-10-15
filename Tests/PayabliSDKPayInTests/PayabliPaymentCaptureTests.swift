@@ -508,9 +508,9 @@ final class PayabliPayInTests: XCTestCase {
     """
 }
 
-/// A form submission and a direct call are built from the same options type.
+/// A form submission and a direct call take the same options type.
 extension PayabliPayInTests {
-    func testAFormSubmissionAndADirectCaptureSendTheSameOptions() async throws {
+    func testAFormThePayerAddsNothingToSendsWhatADirectCaptureWithTheSameOptionsSends() async throws {
         let options = PayabliPayInRequestConfiguration(
             paymentDetails: PayabliPayInPaymentDetails(totalAmount: 30, serviceFee: 1, currency: "USD"),
             accountId: "account-1",
