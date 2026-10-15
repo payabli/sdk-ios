@@ -287,6 +287,17 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
         }
     }
 
+    /// Reads a transaction back by its identifier. Not available yet: throws `SDK_INTERNAL_ERROR` and sends
+    /// nothing.
+    ///
+    /// - Parameter transId: the transaction to read, as ``PayabliPayInTransaction/paymentTransId`` reported it.
+    /// - Returns: the transaction.
+    public func readTransaction(
+        _ transId: String
+    ) async throws -> PayabliPayInTransaction {
+        throw PayabliGenericError(type: .sdkInternalError, reason: "readTransaction is not available yet")
+    }
+
     /// The key this attempt sends: the caller's when it set one, otherwise a fresh one.
     ///
     /// A money-moving request always carries one. Left absent, the service recognises no repeat, so a

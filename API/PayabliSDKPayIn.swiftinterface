@@ -25,10 +25,25 @@ import _SwiftConcurrencyShims
   @objc final public let apiResponse: Foundation::NSDictionary
   @objc deinit
 }
+@_hasMissingDesignatedInitializers @objc(PayabliPayInTransactionObjC) final public class PayabliPayInTransactionObjC : ObjectiveC::NSObject {
+  @objc final public let paymentTransId: Swift::String?
+  @objc final public let gatewayTransId: Swift::String?
+  @objc final public let orderId: Swift::String?
+  @objc final public let method: Swift::String?
+  @objc final public let transStatus: Foundation::NSNumber?
+  @objc final public let status: Swift::String?
+  @objc final public let paypointId: Foundation::NSNumber?
+  @objc final public let totalAmount: Foundation::NSNumber?
+  @objc final public let netAmount: Foundation::NSNumber?
+  @objc final public let feeAmount: Foundation::NSNumber?
+  @objc final public let surchargeFee: Foundation::NSNumber?
+  @objc deinit
+}
 @_inheritsConvenienceInitializers @_hasMissingDesignatedInitializers @_Concurrency::MainActor @objc(PayabliPayInObjC) final public class PayabliPayInObjC : ObjectiveC::NSObject {
   @objc @_Concurrency::MainActor public static func create() throws -> PayabliSDKPayIn::PayabliPayInObjC
   @objc @_Concurrency::MainActor final public func addCard(cardNumber: Swift::String, expiration: Swift::String, cardholderName: Swift::String, cvv: Swift::String, billingZip: Swift::String, createAnonymous: Swift::Bool, forceCustomerCreation: Swift::Bool, temporary: Swift::Bool, source: Swift::String?, completion: @escaping (PayabliSDKPayIn::PayabliPayInStoredPaymentMethodObjC?, Foundation::NSError?) -> Swift::Void)
   @objc @_Concurrency::MainActor final public func addBankAccount(accountNumber: Swift::String, accountType: Swift::String, holderName: Swift::String, routingNumber: Swift::String, secCode: Swift::String?, holderType: Swift::String?, achValidation: Swift::Bool, createAnonymous: Swift::Bool, forceCustomerCreation: Swift::Bool, temporary: Swift::Bool, source: Swift::String?, completion: @escaping (PayabliSDKPayIn::PayabliPayInStoredPaymentMethodObjC?, Foundation::NSError?) -> Swift::Void)
+  @objc @_Concurrency::MainActor final public func readTransaction(transId: Swift::String, completion: @escaping (PayabliSDKPayIn::PayabliPayInTransactionObjC?, Foundation::NSError?) -> Swift::Void)
   @objc deinit
 }
 @objc @_hasMissingDesignatedInitializers @_Concurrency::MainActor final public class PayabliPayIn : ObjectiveC::NSObject, Foundation::ObservableObject {
@@ -79,6 +94,7 @@ import _SwiftConcurrencyShims
   @_Concurrency::MainActor final public func authorize(_ request: PayabliSDKPayIn::PayabliPayInRequest) async throws -> PayabliSDKPayIn::PayabliPayInResult
   @_Concurrency::MainActor final public func captureAuthorizedTransaction(_ request: PayabliSDKPayIn::PayabliPayInAuthorizedRequest) async throws -> PayabliSDKPayIn::PayabliPayInResult
   @_Concurrency::MainActor final public func voidTransaction(_ transId: Swift::String) async throws -> PayabliSDKPayIn::PayabliPayInResult
+  @_Concurrency::MainActor final public func readTransaction(_ transId: Swift::String) async throws -> PayabliSDKPayIn::PayabliPayInTransaction
   public typealias ObjectWillChangePublisher = Combine::ObservableObjectPublisher
   @objc deinit
 }
@@ -126,7 +142,7 @@ public enum PayabliPayInError : PayabliSDKCore::PayabliError, Swift::Equatable {
   case missingAccessToken
   case submissionInProgress
   case transactionFailed(PayabliSDKPayIn::PayabliPayInFailure)
-  case submissionInterrupted(type: PayabliSDKCore::PayabliErrorType, causeType: Swift::String)
+  case submissionInterrupted(type: PayabliSDKCore::PayabliErrorType, causeType: Swift::String, paymentTransId: Swift::String?)
   public var type: PayabliSDKCore::PayabliErrorType {
     get
   }
@@ -690,6 +706,21 @@ public enum PayabliPayInSummaryRows {
   public static func totalRowAmount(paymentDetails: PayabliSDKPayIn::PayabliPayInPaymentDetails?) -> Foundation::Decimal?
   public static func formattedAmount(_ amount: Foundation::Decimal, currency: Swift::String?) -> Swift::String
 }
+public enum PayabliPayInTransactionStatus : Swift::Sendable, Swift::Hashable {
+  case initiated
+  case authorized
+  case captured
+  case declined
+  case voided
+  case blocked
+  case failed
+  case other(Swift::Int)
+  public static func == (a: PayabliSDKPayIn::PayabliPayInTransactionStatus, b: PayabliSDKPayIn::PayabliPayInTransactionStatus) -> Swift::Bool
+  public func hash(into hasher: inout Swift::Hasher)
+  public var hashValue: Swift::Int {
+    get
+  }
+}
 public enum PayabliPayInOperation : Swift::String, Swift::CaseIterable, Swift::Identifiable, Swift::Sendable, Swift::Equatable {
   case storePaymentMethod
   case capture
@@ -906,6 +937,9 @@ public struct PayabliPayInTransaction : Swift::Codable, Swift::Sendable, Swift::
   public let achHolderType: Swift::String?
   public let ipAddress: Swift::String?
   public let walletType: Swift::String?
+  public var status: PayabliSDKPayIn::PayabliPayInTransactionStatus? {
+    get
+  }
   public init(paymentTransId: Swift::String? = nil, gatewayTransId: Swift::String? = nil, orderId: Swift::String? = nil, method: Swift::String? = nil, transStatus: Swift::Int? = nil, paypointId: Swift::Int64? = nil, totalAmount: Swift::Double? = nil, netAmount: Swift::Double? = nil, feeAmount: Swift::Double? = nil, surchargeFee: Swift::Double? = nil, settlementStatus: Swift::Int? = nil, operation: Swift::String? = nil, responseData: PayabliSDKPayIn::PayabliPayInResponseData? = nil, source: Swift::String? = nil, isValidatedACH: Swift::Bool? = nil, transactionTime: Swift::String? = nil, achSecCode: Swift::String? = nil, achHolderType: Swift::String? = nil, ipAddress: Swift::String? = nil, walletType: Swift::String? = nil)
   public static func == (a: PayabliSDKPayIn::PayabliPayInTransaction, b: PayabliSDKPayIn::PayabliPayInTransaction) -> Swift::Bool
   public func encode(to encoder: any Swift::Encoder) throws

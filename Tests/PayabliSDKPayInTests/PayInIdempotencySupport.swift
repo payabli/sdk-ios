@@ -17,7 +17,7 @@ enum PayInFixture {
         _ failure: any Error
     ) -> (type: PayabliErrorType, causeType: String)? {
         guard
-            case let .submissionInterrupted(type, causeType) =
+            case let .submissionInterrupted(type, causeType, _) =
             failure as? PayabliPayInError
         else {
             return nil

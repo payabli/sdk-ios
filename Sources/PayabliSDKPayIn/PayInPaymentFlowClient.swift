@@ -240,7 +240,8 @@ final class PayInPaymentFlowClient: Sendable {
              .deviceHardwareUnsupported, .termsNotAccepted, .cardPresentNotEnabled, .readerDeviceRefused,
              .readerUnavailable, .readerSessionExpired, .paymentNotOpened, .cardDeclined, .activationCodeMalformed,
              .activationCodeIncorrect, .activationCodeExpired, .activationAttemptsExhausted, .activationCodeNotIssued,
-             .deviceNotPending, .terminalNotReady, .tooManyOpenCharges, .paymentNotHeld, .deviceIdentityUnavailable:
+             .deviceNotPending, .terminalNotReady, .tooManyOpenCharges, .paymentNotHeld, .deviceIdentityUnavailable,
+             .transactionNotFound:
             return false
         }
     }
@@ -259,7 +260,8 @@ final class PayInPaymentFlowClient: Sendable {
             throw PayabliPayInError.submissionInterrupted(
                 type: (error as? any PayabliError)?.type ?? .unknown,
                 // One definition of what is kept from a failure, reused rather than restated.
-                causeType: RedactedCause(error).originalType
+                causeType: RedactedCause(error).originalType,
+                paymentTransId: nil
             )
         }
     }

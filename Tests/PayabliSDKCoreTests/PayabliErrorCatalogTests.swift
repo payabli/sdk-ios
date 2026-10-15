@@ -32,6 +32,14 @@ final class PayabliErrorCatalogTests: XCTestCase {
             "The session has not been initialized."
         ),
         (
+            .transactionNotFound,
+            "TRANSACTION_NOT_FOUND",
+            1020,
+            .retryLater,
+            "No transaction is visible under this identifier yet. A transaction can take a short while to appear, "
+                + "so this is not proof no payment was made. Read again later rather than charging again."
+        ),
+        (
             .deviceKeyUnavailable,
             "DEVICE_KEY_UNAVAILABLE",
             3001,

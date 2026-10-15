@@ -44,6 +44,52 @@ public final class PayabliPayInStoredPaymentMethodObjC: NSObject {
     }
 }
 
+/// A transaction read back, for an Objective-C caller. Each field is ``PayabliPayInTransaction``'s.
+@objc(PayabliPayInTransactionObjC)
+public final class PayabliPayInTransactionObjC: NSObject {
+    @objc public let paymentTransId: String?
+    @objc public let gatewayTransId: String?
+    @objc public let orderId: String?
+    @objc public let method: String?
+    @objc public let transStatus: NSNumber?
+    /// `initiated`, `authorized`, `captured`, `declined`, `voided`, `blocked`, `failed`, or `other` for a
+    /// status this SDK does not name, whose number is ``transStatus``. `nil` when `transStatus` is.
+    @objc public let status: String?
+    @objc public let paypointId: NSNumber?
+    @objc public let totalAmount: NSNumber?
+    @objc public let netAmount: NSNumber?
+    @objc public let feeAmount: NSNumber?
+    @objc public let surchargeFee: NSNumber?
+
+    init(_ transaction: PayabliPayInTransaction) {
+        paymentTransId = transaction.paymentTransId
+        gatewayTransId = transaction.gatewayTransId
+        orderId = transaction.orderId
+        method = transaction.method
+        transStatus = transaction.transStatus.map(NSNumber.init(value:))
+        status = transaction.status.map(Self.name(of:))
+        paypointId = transaction.paypointId.map(NSNumber.init(value:))
+        totalAmount = transaction.totalAmount.map(NSNumber.init(value:))
+        netAmount = transaction.netAmount.map(NSNumber.init(value:))
+        feeAmount = transaction.feeAmount.map(NSNumber.init(value:))
+        surchargeFee = transaction.surchargeFee.map(NSNumber.init(value:))
+        super.init()
+    }
+
+    private static func name(of status: PayabliPayInTransactionStatus) -> String {
+        switch status {
+        case .initiated: "initiated"
+        case .authorized: "authorized"
+        case .captured: "captured"
+        case .declined: "declined"
+        case .voided: "voided"
+        case .blocked: "blocked"
+        case .failed: "failed"
+        case .other: "other"
+        }
+    }
+}
+
 @MainActor
 @objc(PayabliPayInObjC)
 public final class PayabliPayInObjC: NSObject {
@@ -153,6 +199,25 @@ public final class PayabliPayInObjC: NSObject {
             source: source
         )
         addPaymentMethod(.bankAccount(ach), options: options, completion: completion)
+    }
+
+    /// Reads a transaction back by its identifier, as ``PayabliPayIn/readTransaction(_:)`` does.
+    ///
+    /// - Parameters:
+    ///   - transId: the transaction to read.
+    ///   - completion: the transaction, or the error the read failed with.
+    @objc public func readTransaction(
+        transId: String,
+        completion: @escaping (PayabliPayInTransactionObjC?, NSError?) -> Void
+    ) {
+        Task { @MainActor in
+            do {
+                let transaction = try await component.readTransaction(transId)
+                completion(PayabliPayInTransactionObjC(transaction), nil)
+            } catch {
+                completion(nil, error.toPayabliPayInNSError())
+            }
+        }
     }
 
     private func addPaymentMethod(

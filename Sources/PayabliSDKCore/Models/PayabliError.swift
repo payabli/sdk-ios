@@ -52,6 +52,9 @@ public enum PayabliErrorType: String, Sendable, CaseIterable {
     case unknown = "UNKNOWN"
     case sdkInternalError = "SDK_INTERNAL_ERROR"
     case sessionNotInitialized = "SESSION_NOT_INITIALIZED"
+    /// No transaction is visible under this identifier yet. A transaction can take a short while to appear,
+    /// so this is not proof no payment was made. Read again later rather than charging again.
+    case transactionNotFound = "TRANSACTION_NOT_FOUND"
 
     // Card-present.
     case deviceKeyUnavailable = "DEVICE_KEY_UNAVAILABLE"
@@ -142,6 +145,7 @@ public extension PayabliErrorType {
         case .unknown: 1017
         case .sdkInternalError: 1018
         case .sessionNotInitialized: 1019
+        case .transactionNotFound: 1020
         case .deviceKeyUnavailable: 3001
         case .deviceSetupUnsupported: 3002
         case .deviceServicesOutdated: 3003
@@ -199,6 +203,9 @@ public extension PayabliErrorType {
         case .unknown: "An unexpected error occurred."
         case .sdkInternalError: "The SDK failed before the request was sent."
         case .sessionNotInitialized: "The session has not been initialized."
+        case .transactionNotFound:
+            "No transaction is visible under this identifier yet. A transaction can take a short while to appear, "
+                + "so this is not proof no payment was made. Read again later rather than charging again."
         case .deviceKeyUnavailable: "This device's secure storage is unavailable."
         case .deviceSetupUnsupported: "This device cannot be set up for card-present payments."
         case .deviceServicesOutdated: "Google Play on this device must be installed, updated or signed in."
@@ -248,7 +255,8 @@ public extension PayabliErrorType {
         case .serverError, .networkError, .decodingError, .userCancelled, .unknown, .conflict, .tapNotCompleted,
              .paymentOutcomeUnknown, .paymentNotClosed:
             .outcomeUnknown
-        case .rateLimited, .deviceKeyUnavailable, .deviceSetupUnavailable, .readerUnavailable, .readerSessionExpired:
+        case .rateLimited, .deviceKeyUnavailable, .deviceSetupUnavailable, .readerUnavailable, .readerSessionExpired,
+             .transactionNotFound:
             .retryLater
         case .validation, .sessionNotInitialized, .activationCodeMalformed, .activationCodeIncorrect, .deviceNotPending, .terminalNotReady,
              .tooManyOpenCharges, .paymentNotHeld:

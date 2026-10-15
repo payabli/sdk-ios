@@ -84,7 +84,8 @@ final class PayInFailureTests: XCTestCase {
 
     private static let interruptedReversal = PayabliPayInError.submissionInterrupted(
         type: .networkError,
-        causeType: "PayabliSDKCore.PayabliGenericError"
+        causeType: "PayabliSDKCore.PayabliGenericError",
+        paymentTransId: nil
     )
 
     /// What the SDK hands over for a `409` on a money-in route. A reversal carries a key too, but mints a
@@ -94,7 +95,8 @@ final class PayInFailureTests: XCTestCase {
     /// code — and both values are pinned where they are derived, in the SDK's own idempotency cases.
     private static let interruptedConflict = PayabliPayInError.submissionInterrupted(
         type: .conflict,
-        causeType: "PayabliSDKCore.PayabliGenericError"
+        causeType: "PayabliSDKCore.PayabliGenericError",
+        paymentTransId: nil
     )
 
     func testATypedConflictOnAStoredMethodSaysWhatTheServiceSaid() {
