@@ -23,8 +23,9 @@ SWIFT_VERSION = 5.0
 
 // Simulator only. A runner is installed on a device like any other app, so it
 // must be signed there, and disabling signing for every SDK leaves the
-// walkthrough unable to run on hardware at all. A device build inherits the
-// app target's automatic signing.
+// walkthrough unable to run on hardware at all. A device build signs
+// automatically with the project's DEVELOPMENT_TEAM, as the app does.
+CODE_SIGN_STYLE = Automatic
 CODE_SIGNING_ALLOWED[sdk=iphonesimulator*] = NO
 CODE_SIGN_STYLE[sdk=iphonesimulator*] = Manual
 DEVELOPMENT_TEAM[sdk=iphonesimulator*] =

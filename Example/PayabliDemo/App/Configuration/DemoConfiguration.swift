@@ -114,7 +114,7 @@ enum DemoConfiguration {
         static var baseURL: URL {
             switch source {
             case let .override(raw):
-                return normalized(raw)
+                return TokenHostOverride.baseURL(from: raw, defaultPort: defaultPort) ?? loopback
             case .simulatorLoopback:
                 return url(host: "127.0.0.1", port: defaultPort)
             case .deviceLocalNetwork:
@@ -142,7 +142,10 @@ enum DemoConfiguration {
         /// a guess.
         static var explanation: String {
             switch source {
-            case .override:
+            case let .override(raw):
+                guard TokenHostOverride.baseURL(from: raw, defaultPort: defaultPort) != nil else {
+                    return "-\(overrideKey) \(raw) names no host, so the app uses \(loopback.absoluteString)"
+                }
                 return "overridden by -\(overrideKey)"
             case .simulatorLoopback:
                 return "Simulator, loopback to this Mac"
@@ -153,18 +156,8 @@ enum DemoConfiguration {
 
         // MARK: - Helpers
 
-        /// Accepts a bare host, `host:port`, or a full URL, so the override can
-        /// be pasted from whatever the person has to hand.
-        private static func normalized(_ raw: String) -> URL {
-            if raw.contains("://"), let parsed = URL(string: raw) {
-                return parsed
-            }
-            if let colon = raw.lastIndex(of: ":"),
-               let port = Int(raw[raw.index(after: colon)...])
-            {
-                return url(host: String(raw[raw.startIndex ..< colon]), port: port)
-            }
-            return url(host: raw, port: defaultPort)
+        private static var loopback: URL {
+            url(host: "127.0.0.1", port: defaultPort)
         }
 
         private static func url(host: String, port: Int) -> URL {
@@ -173,8 +166,7 @@ enum DemoConfiguration {
             components.host = host
             components.port = port
             guard let built = components.url else {
-                // `URLComponents` only fails here on a malformed host, which
-                // means a bad override; fall back rather than trapping in a demo.
+                // Only a malformed host fails here, and the demo then uses loopback.
                 return URL(string: "http://127.0.0.1:\(defaultPort)")!
             }
             return built
