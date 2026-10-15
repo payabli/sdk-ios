@@ -120,7 +120,9 @@ final class PayInPaymentFlowClient: Sendable {
             path: "/api/MoneyIn/details/\(PercentEncoding.segment(transId))",
             isCallerRefusal: { $0.statusCode == 401 && Self.legacyCode(of: $0) == Self.callerMayNotRead }
         )
-        let response = try await send(request)
+        // The record also carries the payer and the card holder, under names no redaction rule matches, so
+        // no part of it reaches a diagnostics entry.
+        let response = try await send(request, logsResponseBody: false)
         return try Self.decodeDetails(from: response, asked: transId)
     }
 
@@ -329,7 +331,7 @@ final class PayInPaymentFlowClient: Sendable {
         return decoded?.data?.paymentTransId?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty
     }
 
-    private func send(_ request: PayabliRequest) async throws -> PayabliResponse {
+    private func send(_ request: PayabliRequest, logsResponseBody: Bool = true) async throws -> PayabliResponse {
         diagnostics.logRequest(request, baseURL: baseURL)
         let start = Date()
         let response: PayabliResponse
@@ -348,7 +350,8 @@ final class PayInPaymentFlowClient: Sendable {
             response,
             request: request,
             baseURL: baseURL,
-            durationMilliseconds: Date().timeIntervalSince(start) * 1000
+            durationMilliseconds: Date().timeIntervalSince(start) * 1000,
+            includingBody: logsResponseBody
         )
         return response
     }

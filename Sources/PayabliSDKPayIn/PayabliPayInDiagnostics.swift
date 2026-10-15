@@ -79,11 +79,14 @@ extension PayabliPayInDiagnostics {
         ))
     }
 
+    /// - Parameter includingBody: `false` for an answer whose fields the redaction rules were not written
+    ///   for, so the entry carries its status and timing and no body.
     func logResponse(
         _ response: PayabliResponse,
         request: PayabliRequest,
         baseURL: URL?,
-        durationMilliseconds: Double
+        durationMilliseconds: Double,
+        includingBody: Bool = true
     ) {
         guard isEnabled, let handler else { return }
         handler(PayabliPayInDiagnosticEntry(
@@ -92,7 +95,7 @@ extension PayabliPayInDiagnostics {
             url: Self.urlString(for: request, baseURL: baseURL),
             statusCode: response.statusCode,
             headers: Self.redactedHeaders(response.headers, phase: .response),
-            body: Self.redactedBodyString(response.body, phase: .response),
+            body: includingBody ? Self.redactedBodyString(response.body, phase: .response) : nil,
             durationMilliseconds: durationMilliseconds
         ))
     }
