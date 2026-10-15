@@ -201,7 +201,11 @@ public struct PayabliPayInRequestConfiguration: Sendable {
     public let subdomain: String?
     public let subscriptionId: Int64?
     public let idempotencyKey: String?
+    /// Whether to verify a bank account before debiting it. `true` adds the check to any the merchant's account
+    /// already applies; it never turns one off. A failed check is a decline.
     public let achValidation: Bool?
+    /// What happens to a payer the service can't match to an existing customer: `true` creates a new customer record
+    /// on every such payment. It has no effect when the payer is identified.
     public let forceCustomerCreation: Bool?
     public let validation: PayabliPayInValidation
 

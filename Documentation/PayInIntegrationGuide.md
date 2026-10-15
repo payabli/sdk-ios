@@ -774,8 +774,8 @@ let sheetConfiguration = PayabliPayInSheetConfiguration(
 | `subdomain` | Optional subdomain. |
 | `subscriptionId` | Optional subscription ID. |
 | `idempotencyKey` | Optional idempotency key. |
-| `achValidation` | Optional ACH validation flag. |
-| `forceCustomerCreation` | Optional customer-creation flag. |
+| `achValidation` | Verifies a bank account before it is debited. `true` adds the check to any the merchant's account already applies, and never turns one off. A failed check is a decline. |
+| `forceCustomerCreation` | Applies only when the payer can't be matched to an existing customer: `true` creates a new customer record each time. No effect when the payer is identified. |
 | `validation` | Client-side validation options. |
 
 ### `PayabliPayInCustomerData`
