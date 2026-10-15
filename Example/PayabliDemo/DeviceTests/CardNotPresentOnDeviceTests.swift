@@ -285,15 +285,8 @@ final class CardNotPresentOnDeviceTests: XCTestCase {
         await reverse(transId, on: flow, whenLeftStanding: "the transaction was left standing")
     }
 
-    // MARK: - Void
+    // MARK: - Read back
 
-    /// Reverses a transaction through the SDK's own member, which is what gives this
-    /// path product coverage rather than coverage of a request the test wrote itself.
-    ///
-    /// The transaction id is reported either way, so one left standing can be found, and what to
-    /// do about it is decided here rather than at each call site. A reversal that never answered
-    /// is not one that did not happen: sending another would be a second reversal, because the
-    /// SDK mints a key per call and the service has nothing to recognise the repeat by.
     func testHACaptureReadsBackCapturedThenVoided() async throws {
         let flow = try makeFlow()
         let captured = try await flow.capture(request(with: try card()))
@@ -321,6 +314,15 @@ final class CardNotPresentOnDeviceTests: XCTestCase {
         }
     }
 
+    // MARK: - Void
+
+    /// Reverses a transaction through the SDK's own member, which is what gives this
+    /// path product coverage rather than coverage of a request the test wrote itself.
+    ///
+    /// The transaction id is reported either way, so one left standing can be found, and what to
+    /// do about it is decided here rather than at each call site. A reversal that never answered
+    /// is not one that did not happen: sending another would be a second reversal, because the
+    /// SDK mints a key per call and the service has nothing to recognise the repeat by.
     private func reverse(
         _ transId: String,
         on flow: PayabliPayIn,
