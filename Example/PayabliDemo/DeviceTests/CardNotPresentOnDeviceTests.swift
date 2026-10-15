@@ -292,7 +292,14 @@ final class CardNotPresentOnDeviceTests: XCTestCase {
         let captured = try await flow.capture(request(with: try card()))
         let transId = try XCTUnwrap(captured.transaction?.paymentTransId)
 
-        let before = try await flow.readTransaction(transId)
+        // A read that fails still reverses the capture, so a failed run leaves nothing standing.
+        let before: PayabliPayInTransaction
+        do {
+            before = try await flow.readTransaction(transId)
+        } catch {
+            await reverse(transId, on: flow, whenLeftStanding: "the read-back capture was left standing")
+            throw error
+        }
         LiveEnvironment.report("PAYABLI_READ env=\(named.name) transId=\(transId) status=\(before.transStatus ?? -99)")
         XCTAssertEqual(before.paymentTransId, transId)
         XCTAssertEqual(before.status, .captured)
