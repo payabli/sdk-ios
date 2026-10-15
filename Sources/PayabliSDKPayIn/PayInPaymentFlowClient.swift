@@ -137,9 +137,9 @@ final class PayInPaymentFlowClient: Sendable {
     ) throws -> PayabliPayInTransaction {
         switch (response.statusCode, legacyCode(of: response)) {
         case (401, callerMayNotRead):
-            throw PayabliGenericError(type: .permissionDenied, reason: "This session may not read this transaction")
+            throw catalogRefusal(.permissionDenied)
         case (400, noSuchTransaction):
-            throw PayabliGenericError(type: .transactionNotFound, reason: "No transaction is visible under this ID")
+            throw catalogRefusal(.transactionNotFound)
         default:
             try mapPayabliHTTPError(response: response)
         }
@@ -151,6 +151,11 @@ final class PayInPaymentFlowClient: Sendable {
             throw PayabliGenericError(type: .decodingError, reason: "The answer names a different transaction")
         }
         return record.transaction
+    }
+
+    /// A refusal whose reason is the catalog's own text for `type`, so every platform words it the same.
+    private static func catalogRefusal(_ type: PayabliErrorType) -> PayabliGenericError {
+        PayabliGenericError(type: type, reason: PayabliGenericError(type: type, reason: "").message)
     }
 
     /// The numeric `responseCode` of the older envelope, or `nil` when the body carries none.

@@ -98,6 +98,34 @@ final class PayInReadTransactionClientTests: XCTestCase {
         )
     }
 
+    func testACamelCaseRecordReadsTheSameTransaction() async throws {
+        let pascal = try await Self.read(Self.record())
+        let camel = try await Self.read(Self.camelCased(Self.record()))
+
+        XCTAssertEqual(camel, pascal)
+    }
+
+    func testAnAmountWrittenAsADecimalStringIsRead() async throws {
+        let quoted = Self.record().replacingOccurrences(of: "\"TotalAmount\": 1.10", with: "\"TotalAmount\": \"1.10\"")
+
+        let transaction = try await Self.read(quoted)
+
+        XCTAssertEqual(transaction.totalAmount, 1.10)
+    }
+
+    func testAnAmountStringThatIsNotADecimalMakesTheRecordUnreadable() async {
+        for text in ["abc", "", " 1.10", "0x10", "nan", "inf", "1e999"] {
+            let quoted = Self.record().replacingOccurrences(
+                of: "\"TotalAmount\": 1.10",
+                with: "\"TotalAmount\": \"\(text)\""
+            )
+
+            let error = await failure { _ = try await Self.read(quoted) }
+
+            XCTAssertEqual((error as? any PayabliError)?.type, .decodingError, "'\(text)'")
+        }
+    }
+
     func testARecordThatNamesNoTransactionOrAnotherIsUnreadable() async {
         for named in [nil, "", "  ", "202-xyz", "101-ABC"] as [String?] {
             let transport = MockPaymentCaptureTransport(statusCode: 200, responseBody: Self.record(id: named))
@@ -116,6 +144,7 @@ final class PayInReadTransactionClientTests: XCTestCase {
         let error = await failure { _ = try await client.details(transId: "101-abc") }
 
         XCTAssertEqual((error as? any PayabliError)?.type, .transactionNotFound)
+        XCTAssertEqual((error as? PayabliGenericError)?.reason, (error as? PayabliGenericError)?.message)
     }
 
     func testAnotherRefusalOnA400IsAValidationError() async {
@@ -134,6 +163,25 @@ final class PayInReadTransactionClientTests: XCTestCase {
         let error = await failure { _ = try await client.details(transId: "101-abc") }
 
         XCTAssertEqual((error as? any PayabliError)?.type, .permissionDenied)
+        XCTAssertEqual((error as? PayabliGenericError)?.reason, (error as? PayabliGenericError)?.message)
+    }
+
+    func testARefusalCodeIsReadInEitherCasing() async throws {
+        let transport = MockPaymentCaptureTransport(statusCode: 200, responseBody: Self.record())
+        let client = PayInPaymentFlowClient(transport: transport)
+        _ = try await client.details(transId: "101-abc")
+        let request = try await onlyRequest(from: transport)
+        XCTAssertTrue(request.isCallerRefusal(Self.response(401, Self.legacy(9001, key: "ResponseCode"))))
+
+        for (status, code, expected) in [(401, 9001, PayabliErrorType.permissionDenied), (400, 7001, .transactionNotFound)] {
+            let refused = MockPaymentCaptureTransport(
+                statusCode: status,
+                responseBody: Self.legacy(code, key: "ResponseCode")
+            )
+            let error = await failure { _ = try await PayInPaymentFlowClient(transport: refused).details(transId: "101-abc") }
+
+            XCTAssertEqual((error as? any PayabliError)?.type, expected, "\(code)")
+        }
     }
 
     func testAServerFailureArrivesAsItselfAndNotAsAnUnknownOutcome() async {
@@ -189,10 +237,24 @@ final class PayInReadTransactionClientTests: XCTestCase {
         """
     }
 
-    private static func legacy(_ code: Int) -> String {
+    private static func legacy(_ code: Int, key: String = "responseCode") -> String {
         """
-        {"responseCode": \(code), "isSuccess": false, "responseText": "Error", "responseData": {}}
+        {"\(key)": \(code), "isSuccess": false, "responseText": "Error", "responseData": {}}
         """
+    }
+
+    /// The record with each top-level key's first letter lowered.
+    private static func camelCased(_ record: String) -> String {
+        record.split(separator: "\n", omittingEmptySubsequences: false).map { line in
+            guard line.hasPrefix("  \""), !line.hasPrefix("   ") else { return String(line) }
+            let first = line.index(line.startIndex, offsetBy: 3)
+            return String(line[..<first]) + line[first].lowercased() + line[line.index(after: first)...]
+        }.joined(separator: "\n")
+    }
+
+    private static func read(_ body: String) async throws -> PayabliPayInTransaction {
+        let transport = MockPaymentCaptureTransport(statusCode: 200, responseBody: body)
+        return try await PayInPaymentFlowClient(transport: transport).details(transId: "101-abc")
     }
 
     private static func response(_ status: Int, _ body: String) -> PayabliResponse {
