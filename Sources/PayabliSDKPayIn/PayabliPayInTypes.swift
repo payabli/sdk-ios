@@ -204,9 +204,9 @@ public struct PayabliPayInRequestConfiguration: Sendable {
 
     /// Whether this is a new payment or a retry of one whose outcome is unknown. A new payment unless set.
     ///
-    /// A retry sends the key of the most recent attempt on this flow whose outcome is still unknown, so the
-    /// service refuses the repeat rather than taking the payment again. A new payment never sends that key and
-    /// never clears it. An ``idempotencyKey`` you set is sent whichever this is.
+    /// A retry sends the key of the most recent attempt on this flow whose outcome is still unknown, so a service
+    /// that still recognises the key refuses the repeat. A new payment never sends that key and never clears it.
+    /// An ``idempotencyKey`` you set is sent whichever this is.
     public let attempt: PayabliAttempt
     /// Whether to verify a bank account before debiting it. `true` adds the check to any the merchant's account
     /// already applies; it never turns one off. A failed check is a decline.
