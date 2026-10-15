@@ -166,7 +166,7 @@ enum DemoConfiguration {
             components.host = host
             components.port = port
             guard let built = components.url else {
-                // Only a malformed host fails here; fall back rather than trapping in a demo.
+                // Only a malformed host fails here, and the demo then uses loopback.
                 return URL(string: "http://127.0.0.1:\(defaultPort)")!
             }
             return built
