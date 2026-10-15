@@ -27,7 +27,8 @@ SWIFT_VERSION = 5.0
 
 // Simulator only, as the walkthrough does. A bundle hosted by the app is
 // installed on a device alongside it, so it must be signed there, and a device
-// build inherits the app target's automatic signing.
+// build signs automatically with the project's DEVELOPMENT_TEAM, the one value
+// every target inherits.
 CODE_SIGNING_ALLOWED[sdk=iphonesimulator*] = NO
 CODE_SIGN_STYLE[sdk=iphonesimulator*] = Manual
 DEVELOPMENT_TEAM[sdk=iphonesimulator*] =

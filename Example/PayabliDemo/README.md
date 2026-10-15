@@ -32,7 +32,8 @@ end to end against sandbox.
    Copy `SDK/ExtraEnvironments.swift.sample` to `ExtraEnvironments.swift` beside
    it as it is: the app offers sandbox and production. To offer another, see
    [Adding an environment](#adding-an-environment).
-3. Set `DEVELOPMENT_TEAM` on the target. The Tap to Pay tab shows the App ID
+3. Set `DEVELOPMENT_TEAM` on the project, not a target, so the app and both
+   device test targets sign with it. The Tap to Pay tab shows the App ID
    to register as an authorized app, `<APP_ID_PREFIX>.com.payabli.example.app`.
 
 ```bash
