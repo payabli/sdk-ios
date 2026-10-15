@@ -58,6 +58,8 @@ public enum PayabliErrorType: String, Sendable, CaseIterable {
     /// A retry was refused because an earlier attempt at the same payment reached the service. That attempt's
     /// outcome is still unknown, so check the payment before trying again.
     case retryRefused = "RETRY_REFUSED"
+    /// A retry described a different payment from the one whose outcome is unknown, so nothing was sent.
+    case retryNotSamePayment = "RETRY_NOT_SAME_PAYMENT"
 
     // Card-present.
     case deviceKeyUnavailable = "DEVICE_KEY_UNAVAILABLE"
@@ -150,6 +152,7 @@ public extension PayabliErrorType {
         case .sessionNotInitialized: 1019
         case .transactionNotFound: 1020
         case .retryRefused: 1021
+        case .retryNotSamePayment: 1022
         case .deviceKeyUnavailable: 3001
         case .deviceSetupUnsupported: 3002
         case .deviceServicesOutdated: 3003
@@ -213,6 +216,9 @@ public extension PayabliErrorType {
         case .retryRefused:
             "An earlier attempt at this payment reached the service, so this retry was not sent on. "
                 + "Check that payment before trying again."
+        case .retryNotSamePayment:
+            "This retry describes a different payment from the one still unresolved, so it was not sent. "
+                + "Check that payment first; to charge a different payment, send it as a new payment."
         case .deviceKeyUnavailable: "This device's secure storage is unavailable."
         case .deviceSetupUnsupported: "This device cannot be set up for card-present payments."
         case .deviceServicesOutdated: "Google Play on this device must be installed, updated or signed in."
@@ -266,7 +272,7 @@ public extension PayabliErrorType {
              .transactionNotFound:
             .retryLater
         case .validation, .sessionNotInitialized, .activationCodeMalformed, .activationCodeIncorrect, .deviceNotPending, .terminalNotReady,
-             .tooManyOpenCharges, .paymentNotHeld:
+             .tooManyOpenCharges, .paymentNotHeld, .retryNotSamePayment:
             .invalidRequest
         case .deviceSetupUnsupported, .deviceSetupRefused, .deviceOSUnsupported, .deviceHardwareUnsupported,
              .readerDeviceRefused, .deviceIdentityUnavailable:
