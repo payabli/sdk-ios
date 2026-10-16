@@ -36,7 +36,7 @@ extension PayabliTTPSessionState {
             return .failed(reason: .deviceSetupRequired)
 
         case .configFailed, .readerCredentialsUnusable:
-            // Someone changes the paypoint; repeating the call gets the same answer.
+            // Terminal: every retry gets the same answer until the paypoint's configuration is fixed.
             return .failed(reason: .configurationRejected)
 
         case .readerOSVersionNotSupported:

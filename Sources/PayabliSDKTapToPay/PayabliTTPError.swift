@@ -12,7 +12,7 @@ package enum PayabliTTPError: Error, Sendable {
     case attestationFailed(reason: String)
     case configFailed(reason: String)
     case readerSetupFailed(reason: String, paymentTransId: String? = nil)
-    /// A gateway credential the reader needs is blank. Carries no field name, so none can reach a host.
+    /// A gateway credential the reader needs is blank. Carries no field name.
     case readerCredentialsUnusable
     case nfcFailed(reason: String, paymentTransId: String? = nil)
     case initiateFailed(reason: String)

@@ -130,7 +130,6 @@ final class FiservCardReaderTests: XCTestCase {
                     try FiservCardReader().configure(credentials: raw)
                     XCTFail("\(key)=\(String(describing: value)) was accepted")
                 } catch PayabliTTPError.readerCredentialsUnusable {
-                    // The case carries nothing, so there is no field name to leak.
                 } catch {
                     XCTFail("\(key)=\(String(describing: value)): wrong error \(error)")
                 }

@@ -67,7 +67,7 @@ public actor TelemetryClient {
         await emit(name, properties: properties, occurredAt: Date())
     }
 
-    /// Enqueue an event stamped with when it happened rather than when it reached the client.
+    /// Enqueue an event stamped with when it happened.
     ///
     /// - Parameter name: the event's catalog name.
     /// - Parameter properties: the event's properties.

@@ -3,8 +3,7 @@ import PayabliSDKCore
 
 /// What the card-present facade reports about its own lifecycle, through its session's client.
 ///
-/// Reports run one after another off the caller's path, so a slow send never delays the call that made it.
-/// Each is stamped when it is made, so one queued behind a slow send keeps the time it happened.
+/// Reports run in order off the caller's path, each stamped with the time it is made.
 @MainActor
 final class TapToPayReports {
     private let telemetry: TelemetryClient

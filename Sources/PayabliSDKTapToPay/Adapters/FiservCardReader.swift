@@ -121,8 +121,8 @@ package final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
     /// Validates the `/config` `providerCredentials` dict and stores it as `Credentials`.
     ///
     /// - Parameter raw: the credentials the configuration route returned.
-    /// - Throws: `readerCredentialsUnusable` when a required key is absent, empty or whitespace. The key names
-    ///   are logged and never thrown, so none reaches a host.
+    /// - Throws: `readerCredentialsUnusable` when a required key is absent, empty or whitespace. The error names
+    ///   no key; the missing names go to the log.
     package func configure(credentials raw: [String: String]) throws {
         let missing = Self.requiredCredentialKeys.filter {
             raw[$0]?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty != false
