@@ -73,8 +73,10 @@ final class PayInAuthorizeClientTests: XCTestCase {
         try await PayInPaymentFlowClient(transport: transport).authorize(
             entryPoint: "entry",
             request: PayabliPayInRequest(
-                paymentDetails: PayabliPayInPaymentDetails(totalAmount: 10),
-                paymentMethod: method
+                paymentMethod: method,
+                options: PayabliPayInRequestConfiguration(
+                    paymentDetails: PayabliPayInPaymentDetails(totalAmount: 10)
+                )
             ),
             idempotencyKey: "idem-1"
         )
