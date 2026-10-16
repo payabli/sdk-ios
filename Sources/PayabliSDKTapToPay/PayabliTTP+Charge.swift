@@ -33,14 +33,16 @@ extension PayabliTTP {
     ) async throws -> TransactionResult {
         let progress = ChargeProgress()
         do {
-            return try await runCharge(
-                type: type,
-                paymentDetails: paymentDetails,
-                customer: customer,
-                invoice: invoice,
-                orderDescription: orderDescription,
-                progress: progress
-            )
+            return try await holdingSessionSetup {
+                try await runCharge(
+                    type: type,
+                    paymentDetails: paymentDetails,
+                    customer: customer,
+                    invoice: invoice,
+                    orderDescription: orderDescription,
+                    progress: progress
+                )
+            }
         } catch {
             throw TapToPayErrorTranslation.hostError(
                 for: error,
@@ -62,7 +64,9 @@ extension PayabliTTP {
             throw PayabliTTPError.invalidState(current: sessionState, attempted: "charge(non-sale)")
         }
 
-        try await reinitialize()
+        // The charge already holds the session, so its repair does not go through the gate, which would wait
+        // on the charge itself. It runs in a task of its own, so a cancelled charge does not stop it.
+        try await Task { @MainActor in try await self.runReinitializeIfNeeded() }.value
 
         let charge = try enterCharge()
         defer { leaveCharge(charge) }
@@ -124,7 +128,8 @@ extension PayabliTTP {
             )
 
             // Expired after the close, so `closing` is published first. Only while the reader that failed is
-            // still the current one: an `initialize()` during the read can have replaced it.
+            // still the current one. A setup call made during the charge waits for it, so nothing replaces
+            // the reader here, and the check stays as a backstop.
             if generation == readerSessionGeneration,
                readerFailureInvalidatesSession(error),
                sessionManager.transition(to: .sessionExpired)

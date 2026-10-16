@@ -150,21 +150,74 @@ final class PayabliTTPChargingTests: XCTestCase {
         XCTAssertEqual(ttp.sessionState, .ready)
     }
 
-    /// An `initialize()` during the tap rebuilds the session, and the charge ending afterwards leaves what
-    /// it built alone.
-    func testASessionRebuiltDuringTheTapIsKept() async throws {
+    /// An `initialize()` made while the reader waits for a card runs after the charge ends, never under it.
+    func testInitializeDuringATapWaitsForTheChargeToEnd() async throws {
         let (ttp, provider) = try await makeReadyTTP()
+        let during = Snapshot()
         provider.whileReading = { [weak ttp] in
-            try? await ttp?.initialize()
+            guard let ttp else { return }
+            during.call = Task { @MainActor in
+                try await ttp.initialize()
+                during.callReturned = true
+            }
+            await Self.letOtherWorkRun()
+            during.state = ttp.sessionState
+            during.callReturnedInRead = during.callReturned
+            during.preparesInRead = provider.prepareReaderCalls
         }
         let seen = record(ttp)
 
         let result = try await charge(ttp)
+        try await during.call?.value
 
         XCTAssertEqual(result.paymentTransId, Self.paymentTransId)
-        XCTAssertEqual(seen.states.prefix(3), [opening, waiting, .idle])
-        XCTAssertFalse(seen.states.contains(closing), "the closing write landed on a session the charge no longer held")
+        XCTAssertEqual(during.state, waiting, "the setup ran while the reader waited for a card")
+        XCTAssertEqual(during.callReturnedInRead, false)
+        XCTAssertEqual(during.preparesInRead, 1)
+        XCTAssertEqual(provider.prepareReaderCalls, 2)
+        XCTAssertEqual(seen.states.prefix(5), [opening, waiting, closing, .ready, .idle])
         XCTAssertEqual(ttp.sessionState, .ready)
+    }
+
+    func testActivatingDuringATapWaitsForTheChargeToEnd() async throws {
+        let (ttp, provider) = try await makeReadyTTP()
+        let during = Snapshot()
+        provider.whileReading = { [weak ttp] in
+            guard let ttp else { return }
+            during.call = Task { @MainActor in
+                defer { during.callReturned = true }
+                do {
+                    try await ttp.activateDevice(activationCode: "123456")
+                } catch {
+                    during.refusal = (error as? TapToPayError)?.type
+                }
+            }
+            await Self.letOtherWorkRun()
+            during.callReturnedInRead = during.callReturned
+        }
+
+        _ = try await charge(ttp)
+        try await during.call?.value
+
+        XCTAssertEqual(during.callReturnedInRead, false, "the activation ran while the reader waited for a card")
+        XCTAssertEqual(during.refusal, .deviceNotPending)
+        XCTAssertEqual(ttp.sessionState, .ready)
+    }
+
+    /// The repair a charge runs first belongs to the session, so cancelling the charge does not stop it.
+    func testCancellingAChargeDuringItsRepairLetsTheRepairFinish() async throws {
+        let (ttp, provider) = try await makeReadyTTP(
+            readFailure: PayabliTTPError.nfcFailed(reason: "Charges: readerSessionExpired")
+        )
+        _ = await chargeFailure(ttp)
+        XCTAssertEqual(ttp.sessionState, .sessionExpired)
+
+        let cancelled = Task { @MainActor in try await self.charge(ttp) }
+        cancelled.cancel()
+        _ = try? await cancelled.value
+
+        XCTAssertEqual(provider.prepareReaderCalls, 2)
+        XCTAssertEqual(ttp.sessionState, .ready, "the cancelled charge stopped the repair it started")
     }
 
     func testAPromptFromAReplacedReaderIsDropped() async throws {
@@ -181,22 +234,27 @@ final class PayabliTTPChargingTests: XCTestCase {
         XCTAssertEqual(during.state, waiting)
     }
 
-    func testReinitializingDuringATapLeavesTheChargeAlone() async throws {
+    func testReinitializingDuringATapWaitsForTheChargeToEnd() async throws {
         let (ttp, provider) = try await makeReadyTTP()
         let during = Snapshot()
         provider.whileReading = { [weak ttp] in
-            do {
-                try await ttp?.reinitializeIfNeeded()
-            } catch {
-                during.refusal = (error as? TapToPayError)?.type
+            guard let ttp else { return }
+            during.call = Task { @MainActor in
+                try await ttp.reinitializeIfNeeded()
+                during.callReturned = true
             }
-            during.state = ttp?.sessionState
+            await Self.letOtherWorkRun()
+            during.state = ttp.sessionState
+            during.callReturnedInRead = during.callReturned
         }
 
         _ = try await charge(ttp)
+        try await during.call?.value
 
-        XCTAssertNil(during.refusal)
         XCTAssertEqual(during.state, waiting)
+        XCTAssertEqual(during.callReturnedInRead, false, "the reinitialize returned while the reader waited for a card")
+        XCTAssertEqual(provider.prepareReaderCalls, 1)
+        XCTAssertEqual(ttp.sessionState, .ready)
     }
 
     func testTheReadersPromptsReportOnTheState() async throws {
@@ -252,6 +310,21 @@ final class PayabliTTPChargingTests: XCTestCase {
         var state: PayabliTTPSessionState?
         var isReady: Bool?
         var refusal: PayabliErrorType?
+        /// A setup call made during the read. It is never awaited inside the read, because it waits for the
+        /// charge that is waiting for the read.
+        var call: Task<Void, Error>?
+        var callReturned = false
+        var callReturnedInRead: Bool?
+        var preparesInRead: Int?
+    }
+
+    /// Gives a setup call started during the read the chance to run, so one that is not made to wait
+    /// would be seen running.
+    private static func letOtherWorkRun() async {
+        for _ in 0 ..< 50 {
+            await Task.yield()
+        }
+        try? await Task.sleep(nanoseconds: 50_000_000)
     }
 
     /// Every state the session publishes from here on, in order.

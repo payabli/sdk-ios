@@ -14,6 +14,8 @@ extension PayabliTTP {
     ///   2. `GET /config/{entry}` (attestation-gated).
     ///   3. Hand credentials to the provider, which holds them at runtime only.
     ///   4. Prepare reader, transition to `.ready`.
+    ///
+    /// A call made during a charge waits for the charge to end, then runs.
     public func initialize() async throws {
         try await reportingToHost {
             try await runSessionSetup(.initialize) { try await self.runInitialize() }
@@ -51,6 +53,40 @@ extension PayabliTTP {
             }
         }
         try await task.value
+    }
+
+    /// Holds the session for a charge. A setup call made meanwhile waits until `body` returns. `body` runs in
+    /// the caller's task, so cancelling the charge reaches it. A charge made while another holds the
+    /// session neither joins nor waits; the ready check refuses it.
+    ///
+    /// - Parameter body: The charge.
+    /// - Returns: What `body` returns.
+    func holdingSessionSetup<T>(_ body: @MainActor () async throws -> T) async throws -> T {
+        if inFlightSessionSetup?.kind == .charge {
+            return try await body()
+        }
+
+        // Claimed before the first suspension, so a setup call arriving while
+        // this one waits chains behind the charge rather than beside it.
+        let previous = inFlightSessionSetup?.task
+        let id = nextSessionSetupID
+        nextSessionSetupID += 1
+        let (released, release) = AsyncStream<Void>.makeStream()
+        let hold = Task<Void, Error> { @MainActor in
+            for await _ in released {}
+        }
+        inFlightSessionSetup = (.charge, hold, id)
+        defer {
+            release.finish()
+            if inFlightSessionSetup?.id == id {
+                inFlightSessionSetup = nil
+            }
+        }
+
+        if let previous {
+            _ = try? await previous.value
+        }
+        return try await body()
     }
 
     private func runInitialize() async throws {
@@ -100,7 +136,7 @@ extension PayabliTTP {
 
     /// Session refresh for host/bridge re-entry.
     ///
-    /// No-op when already `.ready` or while a charge runs. For non-terminal transient states
+    /// No-op when already `.ready`. A call made during a charge waits for the charge to end. For non-terminal transient states
     /// (`.sessionExpired`, `.idle`, `.error`) re-runs steps 2–4 of
     /// `initialize()`. Providers don't cache credentials across sessions, so every refresh
     /// re-fetches `/config`.
@@ -112,9 +148,9 @@ extension PayabliTTP {
         try await runSessionSetup(.reinitialize) { try await self.runReinitializeIfNeeded() }
     }
 
-    private func runReinitializeIfNeeded() async throws {
+    func runReinitializeIfNeeded() async throws {
         switch sessionState {
-        case .ready, .charging:
+        case .ready:
             return
         case .sessionExpired, .idle, .failed:
             break

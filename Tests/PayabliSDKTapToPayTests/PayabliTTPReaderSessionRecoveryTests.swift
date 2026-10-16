@@ -163,28 +163,34 @@ final class PayabliTTPReaderSessionRecoveryTests: XCTestCase {
 
     // MARK: - A failure from a reader that has been replaced
 
-    /// The read that fails may not be the read the current reader is doing.
-    ///
-    /// `startReading` suspends, so an `initialize()` in that window prepares a
-    /// replacement reader and returns to `.ready`. Expiring on the old read's
-    /// failure would kill the healthy session it just built.
-    func testFailureFromASupersededReaderDoesNotExpireTheNewSession() async throws {
+    /// An `initialize()` made while a read is failing waits for the charge, so the
+    /// dead reader expires the session first and the initialization then repairs it.
+    func testAnInitializeDuringAFailingReadRepairsTheSessionAfterIt() async throws {
         let provider = InterleavingProvider()
         let ttp = try makeTTP(provider: provider)
         try await bounded { try await ttp.initialize() }
         XCTAssertEqual(ttp.sessionState, .ready)
 
-        // Runs while the charge is suspended inside `startReading`, exactly as a
-        // host calling `initialize()` mid-charge would.
-        provider.duringRead = { try await ttp.initialize() }
+        var states: [PayabliTTPSessionState] = []
+        let observation = ttp.addSessionStateObserver { states.append(ttp.sessionState) }
+        defer { observation.cancel() }
+
+        // Started while the charge is suspended inside `startReading`, as a host
+        // calling `initialize()` on resume would, and not awaited there: it waits
+        // for the charge that is waiting for this read.
+        var initializing: Task<Void, Error>?
+        provider.duringRead = { initializing = Task { @MainActor in try await ttp.initialize() } }
         provider.readingResult = .failure(Self.sessionLevelFailure)
 
         await XCTAssertThrowsErrorAsync(try await self.charge(ttp))
+        try await bounded { try await initializing?.value }
 
-        XCTAssertEqual(
-            ttp.sessionState, .ready,
-            "the replacement reader was healthy; the old read's failure expired it"
+        let expired = try XCTUnwrap(states.firstIndex(of: .sessionExpired), "the dead reader did not expire the session")
+        XCTAssertFalse(
+            states[..<expired].contains(.idle),
+            "the initialization ran before the charge it was made during had ended"
         )
+        XCTAssertEqual(ttp.sessionState, .ready)
         XCTAssertEqual(provider.prepareReaderCalls, 2)
     }
 
@@ -245,9 +251,6 @@ final class PayabliTTPReaderSessionRecoveryTests: XCTestCase {
             }
             provider.openGate()
 
-            // The charge may fail: a host that re-initializes mid-charge takes
-            // the session out from under it, and `notReady` is the honest
-            // answer.
             _ = try await (recovering, initializing)
         }
 

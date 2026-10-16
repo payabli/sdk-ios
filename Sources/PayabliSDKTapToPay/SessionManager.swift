@@ -7,6 +7,8 @@ enum SessionSetupKind {
     case initialize
     case reinitialize
     case activate
+    /// A charge, which holds the session from its repair until it returns.
+    case charge
 }
 
 /// Manages the TTP session lifecycle. Transitions are enforced internally and occur on `@MainActor`, so host
