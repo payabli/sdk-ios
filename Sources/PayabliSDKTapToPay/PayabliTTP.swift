@@ -56,13 +56,9 @@ public final class PayabliTTP: NSObject, ObservableObject {
     /// Session state
     let sessionManager = SessionManager()
 
-    /// The configuration currently running, or `nil` when none is. A reader's
-    /// event handler outlives the configuration that installed it, so progress
-    /// is recorded only while its own configuration is still this one.
-    ///
-    /// Separate from the gate's reader generation, which bumps only when a reader
-    /// comes up: a percentage raised after a configuration failed would still
-    /// match that.
+    /// The configuration currently running, or `nil` when none is. A reader's event handler outlives the
+    /// configuration that installed it, so progress is recorded only while its own configuration is this one,
+    /// including after a configuration that failed, which the gate's reader generation would still match.
     var activeConfiguration: Int?
 
     /// The configuration whose reader came up last, or `nil` before one has. A
