@@ -288,7 +288,7 @@ From Objective-C, these errors arrive as `NSError`. See
 | `.deviceIneligible` | This iPhone or iOS version can't take Tap to Pay payments, the card reader refused it, or the app has no bundle identifier. If an iPhone that meets the requirements lands here, contact Payabli before replacing it. |
 | `.sdkInternalError` | Report it to Payabli. |
 | `.deviceKeyUnavailable` | This device's secure storage is unavailable, for example before the first unlock after a restart. Initialize again. If it keeps failing, the phone is the cause. |
-| `.sessionEnded` | This terminal's session was replaced or ended. Create a new terminal from the current session. |
+| `.sessionEnded` | This `PayabliTTP`'s `PayabliSession` was replaced or ended. Create a new one with `PayabliTTP.create()`. |
 
 ### Watching the session
 
