@@ -75,7 +75,9 @@ final class SessionSetupGate {
         let id = claimID()
         let (released, release) = AsyncStream<Void>.makeStream()
         let hold = Task<Void, Error> { @MainActor in
-            for await _ in released {}
+            // Ends when the charge finishes the stream; nothing is ever yielded.
+            var waiting = released.makeAsyncIterator()
+            _ = await waiting.next()
         }
         inFlight = Holder(kind: .charge, owner: owner, task: hold, id: id)
         isHeldByCharge = true
