@@ -66,8 +66,8 @@ extension PayabliTTP {
             return try await body()
         }
 
-        // Claimed before the first suspension, so a setup call arriving while
-        // this one waits chains behind the charge rather than beside it.
+        // Claimed before the first suspension, so a setup call made while the
+        // charge waits for the previous one chains behind the charge.
         let previous = inFlightSessionSetup?.task
         let id = nextSessionSetupID
         nextSessionSetupID += 1
@@ -136,8 +136,8 @@ extension PayabliTTP {
 
     /// Session refresh for host/bridge re-entry.
     ///
-    /// No-op when already `.ready`. A call made during a charge waits for the charge to end. For non-terminal transient states
-    /// (`.sessionExpired`, `.idle`, `.error`) re-runs steps 2–4 of
+    /// No-op when already `.ready`. A call made during a charge waits for the charge to end.
+    /// For non-terminal transient states (`.sessionExpired`, `.idle`, `.error`) re-runs steps 2–4 of
     /// `initialize()`. Providers don't cache credentials across sessions, so every refresh
     /// re-fetches `/config`.
     public func reinitializeIfNeeded() async throws {
