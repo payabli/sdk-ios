@@ -204,6 +204,72 @@ final class PayabliTTPChargingTests: XCTestCase {
         XCTAssertEqual(ttp.sessionState, .ready)
     }
 
+    // MARK: - Two terminals in one process
+
+    /// The device has one reader, so a setup on another terminal waits for a charge on this one.
+    func testASetupOnAnotherTerminalWaitsForTheCharge() async throws {
+        let (ttp, provider) = try await makeReadyTTP()
+        let (other, otherProvider) = try await makeReadyTTP()
+        let during = Snapshot()
+        provider.whileReading = { [weak other] in
+            guard let other else { return }
+            during.call = Task { @MainActor in
+                try await other.initialize()
+                during.callReturned = true
+            }
+            await Self.letOtherWorkRun()
+            during.state = other.sessionState
+            during.callReturnedInRead = during.callReturned
+            during.preparesInRead = otherProvider.prepareReaderCalls
+        }
+
+        let result = try await charge(ttp)
+        try await during.call?.value
+
+        XCTAssertEqual(result.paymentTransId, Self.paymentTransId)
+        XCTAssertEqual(during.state, .ready, "the other terminal set up while this one's reader waited for a card")
+        XCTAssertEqual(during.callReturnedInRead, false)
+        XCTAssertEqual(during.preparesInRead, 1)
+        XCTAssertEqual(otherProvider.prepareReaderCalls, 2)
+        XCTAssertEqual(ttp.sessionState, .ready)
+        XCTAssertEqual(other.sessionState, .ready)
+    }
+
+    func testAChargeOnAnotherTerminalDuringAChargeIsRefused() async throws {
+        let (ttp, provider) = try await makeReadyTTP()
+        let (other, otherProvider) = try await makeReadyTTP()
+        let during = Snapshot()
+        provider.whileReading = { [weak other] in
+            guard let other else { return }
+            do {
+                _ = try await other.charge(type: .sale, paymentDetails: PayabliTTPPaymentDetails(amount: 1))
+            } catch {
+                during.refusal = (error as? TapToPayError)?.type
+            }
+        }
+
+        _ = try await charge(ttp)
+
+        XCTAssertEqual(during.refusal, .terminalNotReady)
+        XCTAssertEqual(otherProvider.startReadingCalls, 0)
+        XCTAssertEqual(other.sessionState, .ready)
+    }
+
+    /// Two terminals setting up at once each run their own setup; one does not take the other's outcome.
+    func testTwoTerminalsInitializingAtOnceEachSetUpTheirOwnSession() async throws {
+        let (ttp, provider) = try await makeReadyTTP()
+        let (other, otherProvider) = try await makeReadyTTP()
+
+        async let first: Void = ttp.initialize()
+        async let second: Void = other.initialize()
+        _ = try await (first, second)
+
+        XCTAssertEqual(provider.prepareReaderCalls, 2)
+        XCTAssertEqual(otherProvider.prepareReaderCalls, 2, "the second terminal joined the first's setup")
+        XCTAssertEqual(ttp.sessionState, .ready)
+        XCTAssertEqual(other.sessionState, .ready)
+    }
+
     /// The repair a charge runs first belongs to the session, so cancelling the charge does not stop it.
     func testCancellingAChargeDuringItsRepairLetsTheRepairFinish() async throws {
         let (ttp, provider) = try await makeReadyTTP(

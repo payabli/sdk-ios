@@ -22,72 +22,32 @@ extension PayabliTTP {
         }
     }
 
-    /// Serialises the operations that move the session's state. A caller of the same kind joins the one
-    /// in flight; a caller of another kind waits for it and then runs its own.
+    /// Runs a session setup through the process's gate. A caller of the same kind on this terminal joins the
+    /// one in flight; any other caller waits for it and then runs its own.
+    ///
+    /// - Parameters:
+    ///   - kind: The setup.
+    ///   - work: Its body.
     func runSessionSetup(
         _ kind: SessionSetupKind,
         _ work: @escaping @MainActor () async throws -> Void
     ) async throws {
-        if let existing = inFlightSessionSetup, existing.kind == kind {
-            return try await existing.task.value
-        }
-
-        // Chains behind an operation of the other kind. Re-checking in a loop
-        // re-awaits a task that has already finished and spins the main actor
-        // until the slot is cleared, starving everything else on it.
-        let previous = inFlightSessionSetup?.task
-        let id = nextSessionSetupID
-        nextSessionSetupID += 1
-
-        let task = Task<Void, Error> { @MainActor in
-            // Its failure belongs to its own caller.
-            if let previous {
-                _ = try? await previous.value
-            }
-            try await work()
-        }
-        inFlightSessionSetup = (kind, task, id)
-        defer {
-            if inFlightSessionSetup?.id == id {
-                inFlightSessionSetup = nil
-            }
-        }
-        try await task.value
+        try await SessionSetupGate.shared.run(kind, for: ObjectIdentifier(self), work)
     }
 
-    /// Holds the session for a charge. A setup call made meanwhile waits until `body` returns. `body` runs in
-    /// the caller's task, so cancelling the charge reaches it.
+    /// Holds the process's gate for a charge. A setup call made meanwhile, on any terminal, waits until `body`
+    /// returns.
     ///
     /// - Parameter body: The charge.
     /// - Returns: What `body` returns.
-    /// - Throws: `notReady` when another charge holds the session, whether it is running or still waiting
+    /// - Throws: `notReady` when a charge already holds the gate, whether it is running or still waiting
     ///   for a setup to finish.
     func holdingSessionSetup<T>(_ body: @MainActor () async throws -> T) async throws -> T {
-        if inFlightSessionSetup?.kind == .charge {
+        let gate = SessionSetupGate.shared
+        if gate.isHeldByCharge {
             throw PayabliTTPError.notReady(current: sessionState)
         }
-
-        // Claimed before the first suspension, so a setup call made while the
-        // charge waits for the previous one chains behind the charge.
-        let previous = inFlightSessionSetup?.task
-        let id = nextSessionSetupID
-        nextSessionSetupID += 1
-        let (released, release) = AsyncStream<Void>.makeStream()
-        let hold = Task<Void, Error> { @MainActor in
-            for await _ in released {}
-        }
-        inFlightSessionSetup = (.charge, hold, id)
-        defer {
-            release.finish()
-            if inFlightSessionSetup?.id == id {
-                inFlightSessionSetup = nil
-            }
-        }
-
-        if let previous {
-            _ = try? await previous.value
-        }
-        return try await body()
+        return try await gate.holdForCharge(for: ObjectIdentifier(self), body)
     }
 
     private func runInitialize() async throws {
@@ -311,7 +271,7 @@ extension PayabliTTP {
             try await provider.prepareReader { [weak self] event in
                 self?.handleReaderEvent(event, from: configuration)
             }
-            readerSessionGeneration += 1
+            SessionSetupGate.shared.readerGeneration += 1
             preparedReader = configuration
         } catch PayabliTTPError.termsNotAccepted {
             // Not an error state: the session is waiting on a person, the way it waits on one in

@@ -56,16 +56,11 @@ public final class PayabliTTP: NSObject, ObservableObject {
     /// Session state
     let sessionManager = SessionManager()
 
-    /// Bumped every time a reader is prepared. A charge captures it before the
-    /// tap so a failure that arrives after the reader was replaced is not
-    /// attributed to the replacement.
-    var readerSessionGeneration = 0
-
     /// The configuration currently running, or `nil` when none is. A reader's
     /// event handler outlives the configuration that installed it, so progress
     /// is recorded only while its own configuration is still this one.
     ///
-    /// Separate from `readerSessionGeneration`, which bumps only when a reader
+    /// Separate from the gate's reader generation, which bumps only when a reader
     /// comes up: a percentage raised after a configuration failed would still
     /// match that.
     var activeConfiguration: Int?
@@ -76,15 +71,6 @@ public final class PayabliTTP: NSObject, ObservableObject {
 
     /// Names each configuration, so an ended one can be told from a new one.
     var nextConfigurationID = 0
-
-    /// The session setup in progress, if any, and which entry point started it.
-    /// A caller of the same kind joins it, the way `PayabliAuth` deduplicates a
-    /// token refresh; a caller of the other kind waits for it to finish.
-    var inFlightSessionSetup: (kind: SessionSetupKind, task: Task<Void, Error>, id: Int)?
-
-    /// Identifies a setup so it only clears the slot while it is still the
-    /// current one.
-    var nextSessionSetupID = 0
 
     /// Told every time ``sessionState`` changes.
     private var sessionStateObservations: [TapToPaySessionStateObservation] = []

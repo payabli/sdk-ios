@@ -109,7 +109,7 @@ extension PayabliTTP {
             invoice: context.invoice
         )
         let readResult: CardReadResult
-        let generation = readerSessionGeneration
+        let generation = SessionSetupGate.shared.readerGeneration
         // Set before the reader is asked, not after it answers: the processor can take the sale before the
         // answer arrives.
         progress.askedForCard = true
@@ -128,9 +128,9 @@ extension PayabliTTP {
             )
 
             // Expired after the close, so `closing` is published first. Only while the reader that failed is
-            // still the current one. A setup call made during the charge waits for it, so nothing replaces
-            // the reader here, and the check stays as a backstop.
-            if generation == readerSessionGeneration,
+            // still the current one. A setup call made during the charge, on any terminal, waits for it, so
+            // nothing prepares the reader again here, and the check stays as a backstop.
+            if generation == SessionSetupGate.shared.readerGeneration,
                readerFailureInvalidatesSession(error),
                sessionManager.transition(to: .sessionExpired)
             {
