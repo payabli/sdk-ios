@@ -3,12 +3,11 @@
 import PayabliSDKTestUtils
 import XCTest
 
-/// `initialize` reports once per run it owns: a start, then a success or a failure carrying the number the
-/// host was told, sent at once and naming nothing a host's error text does.
+/// `initialize` reports once per run it owns: a start, then one ending, carrying none of the text a host's error
+/// does.
 @MainActor
 final class TapToPayReportsTests: XCTestCase {
-    /// The keys `ttp.initialize.failed` may carry: the catalog row's, plus `error_number`, which the error
-    /// catalog rules onto every failure event with a code.
+    /// The keys `ttp.initialize.failed` may carry. `error_number` is the code the host was told.
     private static let failedKeys: Set<String> = ["outcome", "code", "duration_ms", "failure_type", "error_number"]
     private static let sentinel = "REASON-SENTINEL"
 
