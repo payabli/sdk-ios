@@ -63,7 +63,7 @@ extension PayabliTTP {
         } catch let withdrawn as CancellationError {
             throw withdrawn
         } catch {
-            reports.initializeFailed(error, after: clock.now - start)
+            reports.initializeEnded(error, after: clock.now - start)
             throw error
         }
         reports.initializeSucceeded(after: clock.now - start)

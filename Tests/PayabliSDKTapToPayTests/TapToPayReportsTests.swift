@@ -44,7 +44,7 @@ final class TapToPayReportsTests: XCTestCase {
             ("attestation", { _, attestation in
                 attestation.attestResult = .failure(PayabliTTPError.attestationFailed(reason: Self.sentinel))
             }),
-            ("pending activation", { _, attestation in
+            ("pending with no registration stored", { _, attestation in
                 attestation.attestResult = .failure(PayabliTTPError.devicePendingActivation)
             }),
             ("configure", { provider, _ in
@@ -52,9 +52,6 @@ final class TapToPayReportsTests: XCTestCase {
             }),
             ("prepare", { provider, _ in
                 provider.prepareReaderResult = .failure(PayabliTTPError.readerSetupFailed(reason: Self.sentinel))
-            }),
-            ("terms", { provider, _ in
-                provider.prepareReaderResult = .failure(PayabliTTPError.termsNotAccepted)
             })
         ]
 
@@ -71,6 +68,53 @@ final class TapToPayReportsTests: XCTestCase {
         attestation.isAlreadyAttested = true
 
         try await assertOneReportedFailure(ttp, transport, "config fetch")
+    }
+
+    func testADismissedSetupSheetReportsACancelSentAtOnceAndNoFailure() async throws {
+        let (ttp, provider, _, transport) = try makeTTP()
+        provider.prepareReaderResult = .failure(PayabliTTPError.readerSetupFailed(
+            reason: "\(FiservCardReader.cancellationReasonPrefix) \(Self.sentinel)"
+        ))
+
+        try await initializeToItsEnd(ttp, expecting: .userCancelled)
+        await ttp.reports.sent()
+
+        let events = await sent(transport)
+        XCTAssertFalse(events.contains { $0.event == "ttp.initialize.failed" }, "\(events.map(\.event))")
+        let cancelled = events.filter { $0.event == "ttp.initialize.cancelled" }
+        XCTAssertEqual(cancelled.count, 1, "sent at once, and once")
+        XCTAssertEqual(cancelled.first.map { Set($0.properties.keys) }, ["duration_ms"])
+        XCTAssertNotNil(Int(cancelled.first?.properties["duration_ms"] ?? ""))
+    }
+
+    func testASetupWaitingOnAPersonReportsPendingWithItsStateInTheNextBatch() async throws {
+        let paths: [(String, PayabliErrorType, (MockTapToPayProvider, MockDeviceAttestationService) -> Void)] = [
+            ("pending_activation", .devicePendingActivation, { _, attestation in
+                attestation.pendingRegistration = "dev"
+                attestation.attestResult = .failure(PayabliTTPError.devicePendingActivation)
+            }),
+            ("pending_terms", .termsNotAccepted, { provider, _ in
+                provider.prepareReaderResult = .failure(PayabliTTPError.termsNotAccepted)
+            })
+        ]
+
+        for (state, told, arrange) in paths {
+            let (ttp, provider, attestation, transport) = try makeTTP()
+            arrange(provider, attestation)
+
+            try await initializeToItsEnd(ttp, expecting: told)
+            await ttp.reports.sent()
+            let beforeTheBatch = await sent(transport).map(\.event)
+            XCTAssertFalse(beforeTheBatch.contains("ttp.initialize.pending"), "\(state): waits for the batch")
+            await ttp.session.telemetry.flush()
+
+            let events = await sent(transport)
+            XCTAssertFalse(events.contains { $0.event == "ttp.initialize.failed" }, "\(state): \(events.map(\.event))")
+            let pending = events.filter { $0.event == "ttp.initialize.pending" }
+            XCTAssertEqual(pending.count, 1, state)
+            XCTAssertEqual(pending.first?.properties["state"], state)
+            XCTAssertEqual(pending.first.map { Set($0.properties.keys) }, ["state", "duration_ms"], state)
+        }
     }
 
     func testAWithdrawnInitializeReportsNoFailure() async throws {
@@ -113,7 +157,7 @@ final class TapToPayReportsTests: XCTestCase {
         )
         let reports = TapToPayReports(telemetry: client)
 
-        reports.initializeFailed(PayabliTTPError.readerCredentialsUnusable, after: .milliseconds(5))
+        reports.initializeEnded(PayabliTTPError.readerCredentialsUnusable, after: .milliseconds(5))
         await transport.waitUntilHeld()
         reports.initializeStarted()
         let made = Date()
@@ -162,6 +206,20 @@ final class TapToPayReportsTests: XCTestCase {
         )
         for value in failed.properties.values {
             XCTAssertFalse(value.contains(Self.sentinel), "\(path): \(value)", file: file, line: line)
+        }
+    }
+
+    private func initializeToItsEnd(
+        _ ttp: PayabliTTP,
+        expecting type: PayabliErrorType,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) async throws {
+        do {
+            try await ttp.initialize()
+            XCTFail("expected \(type)", file: file, line: line)
+        } catch let told as TapToPayError {
+            XCTAssertEqual(told.type, type, file: file, line: line)
         }
     }
 

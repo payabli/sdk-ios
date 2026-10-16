@@ -26,19 +26,42 @@ final class TapToPayReports {
         enqueue { await $0.emit(TelemetryEventName.ttpInitializeSucceeded, properties: properties, occurredAt: now) }
     }
 
-    /// Reports the number the host is told, never its text, and sends at once.
+    /// Reports a run that ended without a reader, by what the host is told and never by its text.
     ///
-    /// - Parameter failure: what the run threw, before it was translated for the host.
+    /// A dismissed setup sheet is a cancel and a setup waiting on a person is pending, neither a failure.
+    /// A cancel or a failure is sent at once; a pending setup waits for the batch.
+    ///
+    /// - Parameter error: what the run threw, before it was translated for the host.
     /// - Parameter duration: how long the run took.
-    func initializeFailed(_ failure: Error, after duration: Duration) {
+    func initializeEnded(_ error: Error, after duration: Duration) {
         let now = Date()
-        var properties = ["outcome": "failed", "duration_ms": Self.milliseconds(duration)]
-        if let told = TapToPayErrorTranslation.hostError(for: failure) as? TapToPayError {
-            properties["error_number"] = String(told.code)
+        let told = TapToPayErrorTranslation.hostError(for: error) as? TapToPayError
+        var properties = ["duration_ms": Self.milliseconds(duration)]
+        let name: String
+        var sendsAtOnce = true
+        switch told?.type {
+        case .userCancelled:
+            name = TelemetryEventName.ttpInitializeCancelled
+        case .devicePendingActivation:
+            name = TelemetryEventName.ttpInitializePending
+            properties["state"] = "pending_activation"
+            sendsAtOnce = false
+        case .termsNotAccepted:
+            name = TelemetryEventName.ttpInitializePending
+            properties["state"] = "pending_terms"
+            sendsAtOnce = false
+        default:
+            name = TelemetryEventName.ttpInitializeFailed
+            properties["outcome"] = "failed"
+            if let told {
+                properties["error_number"] = String(told.code)
+            }
         }
-        enqueue { telemetry in
-            await telemetry.emit(TelemetryEventName.ttpInitializeFailed, properties: properties, occurredAt: now)
-            await telemetry.flush()
+        enqueue { [properties, sendsAtOnce] telemetry in
+            await telemetry.emit(name, properties: properties, occurredAt: now)
+            if sendsAtOnce {
+                await telemetry.flush()
+            }
         }
     }
 
