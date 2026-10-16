@@ -97,7 +97,6 @@ It renders the same form and takes the same configuration and style.
 ```swift
 let result = try await payIn.capture(
     PayabliPayInRequest(
-        paymentDetails: PayabliPayInPaymentDetails(totalAmount: 12.34),
         paymentMethod: .card(.init(data: PayabliPayInCardData(
             cardNumber: "4012000098765439",
             expiration: "12/30",
@@ -105,7 +104,10 @@ let result = try await payIn.capture(
             cvv: "999",
             billingZip: "12345"
         ))),
-        orderId: order.id
+        options: PayabliPayInRequestConfiguration(
+            paymentDetails: PayabliPayInPaymentDetails(totalAmount: 12.34),
+            orderId: order.id
+        )
     )
 )
 order.paymentTransId = result.transaction?.paymentTransId // store it; don't log it
@@ -129,7 +131,7 @@ releases it or voids a transaction that hasn't settled.
 ### Retry safely
 
 A charge always sends an idempotency key. The SDK mints one per call when you don't set
-`PayabliPayInRequest.idempotencyKey`, so calling again without your own key is a second payment, not a
+`idempotencyKey` on the request's options, so calling again without your own key is a second payment, not a
 retry. Don't resend a charge whose outcome is unknown. Find the transaction first.
 
 ## Outcomes and errors
