@@ -74,8 +74,8 @@ final class TelemetryWireContractTests: XCTestCase {
         XCTAssertEqual(sent["properties"] as? [String: String], ["outcome": "failed"])
     }
 
-    /// The service holds an undeclared member to printable ASCII, so a fact outside it is left out rather
-    /// than transcoded, and the event still goes.
+    /// The service accepts only printable ASCII in an undeclared member, so a fact outside it is left out and
+    /// the event still goes.
     func testADeviceFactOutsidePrintableASCIIIsLeftOut() {
         let facts = TelemetryDeviceFacts(
             deviceType: "Softpos",

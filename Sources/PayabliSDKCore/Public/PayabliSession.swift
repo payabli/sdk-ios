@@ -32,8 +32,6 @@ public final class PayabliSession: @unchecked Sendable {
 
     package let deviceIdentity: DeviceIdentity
 
-    /// This session's reporter. A capability takes it when it is built, so work started under this
-    /// session never reports under a later one.
     package let telemetry: TelemetryClient
 
     private let identity: ConfigIdentity
