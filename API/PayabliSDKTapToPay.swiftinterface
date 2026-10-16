@@ -94,6 +94,7 @@ public enum PayabliTTPFailureReason : Swift::Int, Swift::Sendable, Swift::CaseIt
   case deviceIneligible
   case sdkInternalError
   case deviceKeyUnavailable
+  case sessionEnded
   public init?(rawValue: Swift::Int)
   public typealias AllCases = [PayabliSDKTapToPay::PayabliTTPFailureReason]
   public typealias RawValue = Swift::Int

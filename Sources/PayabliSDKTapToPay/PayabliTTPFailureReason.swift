@@ -38,4 +38,7 @@ public enum PayabliTTPFailureReason: Int, Sendable, CaseIterable {
     /// The phone's key facility failed, so the SDK cannot tell whether this device's key still
     /// works. Calling initialize again may succeed; a failure that persists is the device's.
     case deviceKeyUnavailable = 5
+
+    /// This terminal's session was replaced or ended; create a new terminal from the current session.
+    case sessionEnded = 6
 }
