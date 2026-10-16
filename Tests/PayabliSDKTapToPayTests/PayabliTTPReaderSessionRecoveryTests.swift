@@ -264,6 +264,38 @@ final class PayabliTTPReaderSessionRecoveryTests: XCTestCase {
         )
     }
 
+    /// A charge waiting behind a setup already holds the session, so a second charge made then is refused
+    /// rather than reading a card while the setup rebuilds the reader.
+    func testASecondChargeMadeWhileTheFirstWaitsBehindASetupIsRefused() async throws {
+        let provider = InterleavingProvider()
+        let ttp = try makeTTP(provider: provider)
+        try await bounded { try await ttp.initialize() }
+        provider.readingResult = .success(Self.cardReadResult)
+        provider.holdEligibility = true
+        provider.armGate()
+
+        // Held in its eligibility check, so the session still reads `.ready`.
+        let initializing = Task { @MainActor in try await ttp.initialize() }
+        await Task.yield()
+        let first = Task { @MainActor in try await self.charge(ttp) }
+        await Task.yield()
+        let second = Task { @MainActor in try await self.charge(ttp) }
+        let secondRefusal: PayabliErrorType?
+        do {
+            _ = try await second.value
+            secondRefusal = nil
+        } catch {
+            secondRefusal = (error as? TapToPayError)?.type
+        }
+
+        provider.openGate()
+        try await bounded { try await initializing.value }
+        _ = try await bounded { try await first.value }
+
+        XCTAssertEqual(secondRefusal, .terminalNotReady, "the second charge read a card while a setup was in flight")
+        XCTAssertEqual(ttp.sessionState, .ready)
+    }
+
     // MARK: - Error text reaching the host
 
     /// A host shows `localizedDescription`. The adapter's own words reach it as
@@ -615,8 +647,15 @@ private final class InterleavingProvider: TapToPayProvider, @unchecked Sendable 
 
     private var inProvider = false
 
+    /// Holds the eligibility check at the gate as well, so a setup can be kept in flight while the session
+    /// still reads `.ready`.
+    var holdEligibility = false
+
     func checkEligibility() async -> Result<Void, PayabliTTPError> {
-        .success(())
+        if holdEligibility, lock.withLock({ gateArmed }) {
+            await waitAtGate()
+        }
+        return .success(())
     }
 
     func configure(credentials: [String: String]) throws {
@@ -635,21 +674,25 @@ private final class InterleavingProvider: TapToPayProvider, @unchecked Sendable 
         defer { lock.withLock { inProvider = false } }
 
         if held {
-            await withCheckedContinuation { continuation in
-                // Armed-ness re-read with the append, under one lock, so a gate
-                // opened between the two resumes this caller instead of leaving it
-                // on a list nothing will drain.
-                let resumeNow: Bool = lock.withLock {
-                    guard gateArmed else { return true }
-                    gate.append(continuation)
-                    return false
-                }
-                if resumeNow {
-                    continuation.resume()
-                }
-            }
+            await waitAtGate()
         } else if suspendDuringPrepare {
             await Task.yield()
+        }
+    }
+
+    private func waitAtGate() async {
+        await withCheckedContinuation { continuation in
+            // Armed-ness re-read with the append, under one lock, so a gate
+            // opened between the two resumes this caller instead of leaving it
+            // on a list nothing will drain.
+            let resumeNow: Bool = lock.withLock {
+                guard gateArmed else { return true }
+                gate.append(continuation)
+                return false
+            }
+            if resumeNow {
+                continuation.resume()
+            }
         }
     }
 

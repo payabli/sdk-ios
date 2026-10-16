@@ -56,14 +56,15 @@ extension PayabliTTP {
     }
 
     /// Holds the session for a charge. A setup call made meanwhile waits until `body` returns. `body` runs in
-    /// the caller's task, so cancelling the charge reaches it. A charge made while another holds the
-    /// session neither joins nor waits; the ready check refuses it.
+    /// the caller's task, so cancelling the charge reaches it.
     ///
     /// - Parameter body: The charge.
     /// - Returns: What `body` returns.
+    /// - Throws: `notReady` when another charge holds the session, whether it is running or still waiting
+    ///   for a setup to finish.
     func holdingSessionSetup<T>(_ body: @MainActor () async throws -> T) async throws -> T {
         if inFlightSessionSetup?.kind == .charge {
-            return try await body()
+            throw PayabliTTPError.notReady(current: sessionState)
         }
 
         // Claimed before the first suspension, so a setup call made while the
