@@ -281,8 +281,12 @@ final class PayabliTTPReaderSessionRecoveryTests: XCTestCase {
         await Task.yield()
         let second = Task { @MainActor in try await self.charge(ttp) }
         let secondRefusal: PayabliErrorType?
+        // Bounded, because a second charge that is queued instead of refused
+        // waits on the gate this test opens only after it.
         do {
-            _ = try await second.value
+            _ = try await bounded { try await second.value }
+            secondRefusal = nil
+        } catch is ChargeTimedOut {
             secondRefusal = nil
         } catch {
             secondRefusal = (error as? TapToPayError)?.type

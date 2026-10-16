@@ -23,10 +23,9 @@ final class SessionSetupGate {
     /// that arrives after the reader was prepared again is not attributed to the new one.
     var readerGeneration = 0
 
-    /// True while a charge holds the gate, running or still waiting for the operation before it.
-    var isHeldByCharge: Bool {
-        inFlight?.kind == .charge
-    }
+    /// True from the moment a charge claims the gate until it returns, whether it is running, waiting for
+    /// the operation before it, or has setups queued behind it.
+    private(set) var isHeldByCharge = false
 
     /// Runs `work` once the operation holding the gate has finished. A caller of the same kind on the same
     /// terminal joins the one in flight instead.
@@ -79,7 +78,9 @@ final class SessionSetupGate {
             for await _ in released {}
         }
         inFlight = Holder(kind: .charge, owner: owner, task: hold, id: id)
+        isHeldByCharge = true
         defer {
+            isHeldByCharge = false
             release.finish()
             self.release(id)
         }
