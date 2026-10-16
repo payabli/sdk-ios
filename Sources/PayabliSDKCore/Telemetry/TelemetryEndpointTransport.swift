@@ -49,7 +49,6 @@ package actor TelemetryEndpointTransport: TelemetryTransport {
             let response = try await transport.perform(
                 PayabliRequest.json(method: .post, path: path, jsonBody: body)
             )
-            // Refused or not, the batch is discarded: nothing in it is worth a payment's retry budget.
             if !(200 ..< 300).contains(response.statusCode) {
                 logger.warning("telemetry_batch_refused status=\(response.statusCode)")
             }

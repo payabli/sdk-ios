@@ -2,8 +2,8 @@ import Foundation
 
 /// What a telemetry event says about the device it came from, in the service's own words.
 ///
-/// The transport adds them beneath `emit`, so no call site can reach, omit or forge them. A blank fact,
-/// or one outside printable ASCII, is left out rather than transcoded.
+/// The transport adds them to every event, and no call site sets one. A blank fact, or one outside printable
+/// ASCII, is left out.
 package struct TelemetryDeviceFacts: Sendable, Equatable {
     /// The service's word for a card-present device.
     package static let cardPresentType = "Softpos"
