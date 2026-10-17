@@ -5,9 +5,7 @@ import XCTest
 
 /// Every money-moving route carries an idempotency key, which the SDK mints.
 ///
-/// Without one the service recognises no repeat, so a double submit or a retry is a second payment.
-/// These cases drive the facade rather than the client, because reserving the key is the facade's job
-/// and a client test is handed whatever key it is given.
+/// These cases drive the facade, because reserving the key is the facade's job.
 @MainActor
 final class PayInIdempotencyTests: XCTestCase {
     // MARK: - The key reaches the wire
