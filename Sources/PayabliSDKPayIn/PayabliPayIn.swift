@@ -303,7 +303,7 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
         try await client.details(transId: transId)
     }
 
-    /// The key this attempt sends, minted here, since no key comes from the app.
+    /// The key this attempt sends.
     ///
     /// - Returns: a new key; no submission reuses another's.
     private func reserveKey() -> String {
