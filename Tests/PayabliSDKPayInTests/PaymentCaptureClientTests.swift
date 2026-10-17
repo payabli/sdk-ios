@@ -13,9 +13,9 @@ final class PayInPaymentFlowClientTests: XCTestCase {
             entryPoint: "f743aed24a",
             request: cardRequest(
                 achValidation: true,
-                forceCustomerCreation: false,
-                idempotencyKey: "idem-1"
-            )
+                forceCustomerCreation: false
+            ),
+            idempotencyKey: "idem-1"
         )
 
         XCTAssertEqual(result.code, "A0000")
@@ -439,7 +439,6 @@ final class PayInPaymentFlowClientTests: XCTestCase {
         surchargeFee: Double? = nil,
         achValidation: Bool? = nil,
         forceCustomerCreation: Bool? = nil,
-        idempotencyKey: String? = nil,
         additionalData: [String: String]? = nil
     ) -> PayabliPayInRequest {
         PayabliPayInRequest(
@@ -468,7 +467,6 @@ final class PayInPaymentFlowClientTests: XCTestCase {
                 orderDescription: "SDK test transaction",
                 orderId: "order-123",
                 source: "ios-sdk",
-                idempotencyKey: idempotencyKey,
                 achValidation: achValidation,
                 forceCustomerCreation: forceCustomerCreation
             )
@@ -635,7 +633,7 @@ private extension PayInPaymentFlowClient {
         try await capture(
             entryPoint: entryPoint,
             request: request,
-            idempotencyKey: request.options.idempotencyKey ?? "reserved-by-test"
+            idempotencyKey: "reserved-by-test"
         )
     }
 
@@ -646,7 +644,7 @@ private extension PayInPaymentFlowClient {
         try await authorize(
             entryPoint: entryPoint,
             request: request,
-            idempotencyKey: request.options.idempotencyKey ?? "reserved-by-test"
+            idempotencyKey: "reserved-by-test"
         )
     }
 
@@ -655,7 +653,7 @@ private extension PayInPaymentFlowClient {
     ) async throws -> PayabliPayInResult {
         try await captureAuthorized(
             request,
-            idempotencyKey: request.idempotencyKey ?? "reserved-by-test"
+            idempotencyKey: "reserved-by-test"
         )
     }
 }
