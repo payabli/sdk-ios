@@ -127,12 +127,9 @@ enum TapToPaySteps {
         // From the step before.
         let charge = chargeStatus(activation: activation, session: session)
 
-        // Ordered like the steps, and for the same reason: the first thing that
-        // wants attention is the only thing offered. Recovery sits behind the
-        // token step because it fetches config, which a backend known to be
-        // down cannot answer.
-        // Derived before `nextAction`, which reads it, so the control and the
-        // sentence beside it cannot disagree about what went wrong.
+        // Only the first thing that wants attention is offered, and recovery waits
+        // behind the token step, since it fetches config. Derived before
+        // `nextAction`, which reads it, so control and sentence agree.
         let recovery = recoveryReason(token: token, session: session)
 
         let nextAction = nextControl(
