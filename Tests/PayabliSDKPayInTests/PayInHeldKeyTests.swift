@@ -241,6 +241,57 @@ final class PayInHeldKeyTests: XCTestCase {
         XCTAssertEqual(transport.sentKeys, ["k1", "k2"])
     }
 
+    func testANewKeyThatNeverLeftReportsThePlainFailure() async {
+        transport.script = [.cancelled(afterHandOff: false), .lostBeforeHandOff]
+
+        let cancelled = await failure { try await self.flow.capture(self.request(.newPayment)) }
+        let lost = await failure { try await self.flow.capture(self.request(.newPayment, reference: "p2")) }
+
+        XCTAssertTrue(cancelled is CancellationError, "\(cancelled)")
+        XCTAssertEqual((lost as? PayabliGenericError)?.type, .networkError)
+    }
+
+    func testAResentKeyThatNeverLeftStillReportsAnOpenOutcome() async {
+        transport.script = [.lost, .tokenFetchFailed, .cancelled(afterHandOff: false)]
+
+        _ = await failure { try await self.flow.capture(self.request(.newPayment)) }
+        let noToken = await failure { try await self.flow.capture(self.request(.retry)) }
+        let cancelled = await failure { try await self.flow.capture(self.request(.retry)) }
+
+        XCTAssertEqual(PayInFixture.interruption(noToken)?.type, .tokenProviderFailed)
+        XCTAssertEqual(Self.reference(in: noToken), "p1")
+        XCTAssertNotNil(PayInFixture.interruption(cancelled), "\(cancelled)")
+        XCTAssertEqual(transport.sentKeys, ["k1", "k1", "k1"])
+    }
+
+    func testAKeyThatAgesOutDuringAnUnknownSendIsHeldOnTheRestartedClock() async throws {
+        transport.script = [.lost, .lost, .approved]
+
+        _ = await failure { try await self.flow.capture(self.request(.newPayment)) }
+        clock.advance(by: payabliIdempotencyKeyMaxAge - .seconds(1))
+        let clock = clock
+        transport.duringSend = { clock.advance(by: .seconds(2)) }
+        _ = await failure { try await self.flow.capture(self.request(.retry)) }
+        transport.duringSend = nil
+        _ = try await flow.capture(request(.retry))
+
+        XCTAssertEqual(transport.sentKeys, ["k1", "k1", "k1"])
+    }
+
+    func testAKeyThatAgesOutDuringARefusedSendStaysGone() async throws {
+        transport.script = [.lost, .duplicate, .approved]
+
+        _ = await failure { try await self.flow.capture(self.request(.newPayment)) }
+        clock.advance(by: payabliIdempotencyKeyMaxAge - .seconds(1))
+        let clock = clock
+        transport.duringSend = { clock.advance(by: .seconds(2)) }
+        _ = await failure { try await self.flow.capture(self.request(.retry)) }
+        transport.duringSend = nil
+        _ = try await flow.capture(request(.retry))
+
+        XCTAssertEqual(transport.sentKeys, ["k1", "k1", "k2"])
+    }
+
     func testATransactionsUnknownOutcomeCarriesNoReference() async {
         transport.script = [.lost]
 
@@ -512,6 +563,7 @@ final class ScriptedTransport: PayabliTransport, @unchecked Sendable {
         case lost
         case unauthorized
         case lostBeforeHandOff
+        case tokenFetchFailed
         case cancelled(afterHandOff: Bool)
     }
 
@@ -530,6 +582,13 @@ final class ScriptedTransport: PayabliTransport, @unchecked Sendable {
     private let lock = NSLock()
     private var keys: [String] = []
     private var steps: [Step] = []
+    private var inFlight: (() -> Void)?
+
+    /// Runs while each call is in flight, after its key is recorded.
+    var duringSend: (() -> Void)? {
+        get { lock.withLock { inFlight } }
+        set { lock.withLock { inFlight = newValue } }
+    }
 
     var script: [Step] {
         get { lock.withLock { steps } }
@@ -546,11 +605,12 @@ final class ScriptedTransport: PayabliTransport, @unchecked Sendable {
             return steps.isEmpty ? .lost : steps.removeFirst()
         }
         switch step {
-        case .lostBeforeHandOff, .cancelled(afterHandOff: false):
+        case .lostBeforeHandOff, .cancelled(afterHandOff: false), .tokenFetchFailed:
             break
         default:
             PayabliSendMark.current?.set()
         }
+        duringSend?()
         switch step {
         case .approved:
             return PayabliResponse(statusCode: 200, headers: [:], body: Self.approved)
@@ -563,6 +623,8 @@ final class ScriptedTransport: PayabliTransport, @unchecked Sendable {
             return PayabliResponse(statusCode: 409, headers: [:], body: Self.duplicatePayment)
         case let .conflict(body):
             return PayabliResponse(statusCode: 409, headers: [:], body: Data(body.utf8))
+        case .tokenFetchFailed:
+            throw PayabliGenericError(type: .tokenProviderFailed, reason: "No token")
         case .lost, .lostBeforeHandOff:
             throw PayabliGenericError(type: .networkError, reason: "The response was lost.")
         case .cancelled:

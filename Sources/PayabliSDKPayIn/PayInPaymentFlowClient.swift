@@ -313,8 +313,7 @@ final class PayInPaymentFlowClient: Sendable {
                 paymentTransId: Self.namedTransaction(in: answer),
                 paymentReference: nil
             )
-            guard refusedKey else { throw interruption }
-            throw PayInKeyRefusal(interruption: interruption)
+            throw PayInOpenOutcome(interruption: interruption, cause: failure, refusedKey: refusedKey)
         }
     }
 
@@ -410,10 +409,14 @@ private struct NamedTransaction: Decodable {
 /// A 409 whose body is not a JSON object, which only the check that refuses a key it has already seen sends.
 private struct IdempotencyCheckRefusal: Error {}
 
-/// The service refused the key a request carried because it had already seen it.
-struct PayInKeyRefusal: Error {
+/// A money-moving request whose outcome is open, for the facade to report once it knows which key was sent.
+struct PayInOpenOutcome: Error {
     /// The failure as a caller receives it when nothing else applies.
     let interruption: PayabliPayInError
+    /// What failed, before it was read as an open outcome.
+    let cause: any Error
+    /// The service refused the key because it had already seen it.
+    let refusedKey: Bool
 }
 
 private struct TransactionRequestBody: Encodable {
