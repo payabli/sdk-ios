@@ -357,7 +357,7 @@ final class PayabliTTPChargingTests: XCTestCase {
         provider.whileReading = { [weak ttp] in
             guard let ttp else { return }
             during.call = Task { @MainActor in
-                try await ttp.reinitializeIfNeeded()
+                try await ttp.reinitialize()
                 during.callReturned = true
             }
             await Self.letOtherWorkRun()
