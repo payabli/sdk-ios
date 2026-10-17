@@ -295,7 +295,8 @@ final class PayInHeldKeyTests: XCTestCase {
     func testAConflictIsReadFromTheStatusWhateverTheBodySays() async throws {
         let envelopes = [
             #"{"status":200,"message":"Duplicate payment"}"#,
-            #"{"isSuccess":false,"responseCode":6000,"responseText":"Duplicate payment"}"#
+            #"{"isSuccess":false,"responseCode":6000,"responseText":"Duplicate payment"}"#,
+            #"{"status":401,"message":"Duplicate payment"}"#
         ]
         for envelope in envelopes {
             let flow = makeFlow(prefix: "k")
