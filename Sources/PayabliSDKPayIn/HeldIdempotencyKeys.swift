@@ -3,11 +3,11 @@ import PayabliSDKCore
 
 /// What a held key belongs to.
 ///
-/// A capture and an authorization hold the key of the most recent attempt on that route whose outcome is unknown.
-/// A capture of an authorization and a reversal hold one per transaction they name.
+/// A capture and an authorization hold one per payment reference; a capture of an authorization and a reversal hold
+/// one per transaction they name.
 enum HeldKeyScope: Hashable {
-    case capture
-    case authorize
+    case capture(reference: String)
+    case authorize(reference: String)
     case captureAuthorized(transId: String)
     case void(transId: String)
 
@@ -70,25 +70,23 @@ struct HeldIdempotencyKeys {
     /// The key an attempt sends.
     ///
     /// - Parameter scope: what the attempt belongs to.
-    /// - Parameter supplied: the caller's own key, which is sent whenever it is set.
     /// - Parameter claimsHeld: whether the attempt takes the key held for its scope.
     /// - Parameter payment: the payment the attempt is for, which must match the held key's to take it.
     /// - Parameter now: the moment the key is chosen.
     /// - Parameter mint: makes a new key.
     /// - Returns: the reservation to send under and to settle afterwards.
-    /// - Throws: ``PayabliErrorType/retryNotSamePayment`` when the held key was made for another payment.
+    /// - Throws: ``PayabliErrorType/retryNotSamePayment`` when the held key was made for another payment, and
+    ///   ``PayabliErrorType/paymentReferenceOpen`` when a new payment names a reference whose key is still held.
     mutating func reserve(
         scope: HeldKeyScope,
-        supplied: String?,
         claimsHeld: Bool,
         payment: HeldPaymentDescription? = nil,
         now: ContinuousClock.Instant,
         mint: () -> String
     ) throws -> Reservation {
         sweep(now: now)
-        if let supplied {
-            let key = supplied.payabliCaptureTrimmed
-            return Reservation(scope: scope, key: key, reused: false, reservedAt: now, payment: payment)
+        if !claimsHeld, records[scope] != nil {
+            throw PayabliGenericError(type: .paymentReferenceOpen, reason: "Payment reference still unresolved")
         }
         if claimsHeld, let held = records[scope] {
             if let heldPayment = held.payment, let payment, !heldPayment.isRepeated(by: payment) {
