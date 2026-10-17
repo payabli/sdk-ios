@@ -366,7 +366,7 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
             if heldKeys.settle(reservation, outcome: outcome, now: now()) {
                 logger.warning("payin_retry_keys_full")
             }
-            try Self.rethrow(error, as: outcome, reference: reference)
+            try Self.rethrow(error, as: outcome, reused: reservation.reused, reference: reference)
         }
     }
 
@@ -400,15 +400,26 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
     ///
     /// - Parameter error: what the attempt threw.
     /// - Parameter outcome: what it meant for the key.
+    /// - Parameter reused: whether the attempt resent a held key.
     /// - Parameter reference: the payment's reference, which an unknown outcome carries.
-    /// - Throws: the failure, with a refused held key reported as ``PayabliErrorType/retryRefused``.
+    /// - Throws: the failure, with a refused held key reported as ``PayabliErrorType/retryRefused`` and a refused
+    ///   credential on a resent key as an unknown outcome, since an earlier send of that payment may have run.
     private static func rethrow(
         _ error: any Error,
         as outcome: HeldIdempotencyKeys.Outcome,
+        reused: Bool,
         reference: String?
     ) throws -> Never {
         let refusal = error as? PayInKeyRefusal
         let failure = refusal?.interruption ?? error
+        if reused, !(failure is PayabliPayInError), (failure as? any PayabliError)?.type == .tokenExpired {
+            throw PayabliPayInError.submissionInterrupted(
+                type: .tokenExpired,
+                causeType: RedactedCause(failure).originalType,
+                paymentTransId: nil,
+                paymentReference: reference
+            )
+        }
         guard case let .submissionInterrupted(type, causeType, paymentTransId, _) = failure as? PayabliPayInError
         else { throw failure }
         throw PayabliPayInError.submissionInterrupted(
