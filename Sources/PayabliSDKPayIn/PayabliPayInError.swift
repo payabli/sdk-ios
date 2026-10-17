@@ -19,18 +19,9 @@ public enum PayabliPayInError: PayabliError, Equatable {
     /// **What settles the outcome is reading the transaction back**, not repeating the submission. A refused retry
     /// reports ``PayabliErrorType/retryRefused``: the earlier attempt reached the service and is still unresolved.
     ///
-    /// Raised only where a key was sent, which is the money-moving routes, and only where the answer
-    /// leaves the outcome open: a network failure, a cancellation, a 5xx, a response that could not be
-    /// decoded, a failure the service declared on a successful status without calling it a refusal, a
-    /// repeat the service recognised, and anything this SDK could not classify at all.
-    ///
-    /// A recognised repeat belongs to that list even though the service answered. What it answered is
-    /// that it has seen the key, and the marker behind that is written before the request is handled and
-    /// is never rolled back, so the attempt the key named may have taken the payment.
-    ///
-    /// Everything else arrives as itself, because the outcome is known and a retry there is a new
-    /// payment: a refusal, a validation failure, a refused credential, a locally refused request, and a
-    /// refusal for too many requests.
+    /// Raised when a send of this payment may have run and nothing says how it ended: a new payment's request reached
+    /// the network and got no answer, or a retry of a payment came back unanswered. A definite outcome, and a new
+    /// payment that never left the device, arrive as themselves.
     ///
     /// `type` is the classification to branch on. `causeType` names the failing type and carries none
     /// of its message, because that message can quote a response body or name a host's own endpoint,
