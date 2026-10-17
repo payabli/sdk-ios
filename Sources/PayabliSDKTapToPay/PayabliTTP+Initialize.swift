@@ -26,8 +26,8 @@ extension PayabliTTP {
     /// one in flight; any other caller waits for it and then runs its own.
     ///
     /// - Parameters:
-    ///   - kind: The setup.
-    ///   - work: Its body.
+    ///   - kind: Which setup this is; a later call of the same kind on this `PayabliTTP` joins it while it runs.
+    ///   - work: The setup, run once every operation already in the gate has finished.
     func runSessionSetup(
         _ kind: SessionSetupKind,
         _ work: @escaping @MainActor () async throws -> Void
@@ -38,8 +38,8 @@ extension PayabliTTP {
     /// Holds the process's gate for a charge. A setup call made meanwhile, on any `PayabliTTP`, waits until `body`
     /// returns.
     ///
-    /// - Parameter body: The charge.
-    /// - Returns: What `body` returns.
+    /// - Parameter body: The charge, run in the caller's task while the gate is held.
+    /// - Returns: The charge's result.
     /// - Throws: `notReady` when a charge already holds the gate, whether it is running or still waiting
     ///   for a setup to finish.
     func holdingSessionSetup<T>(_ body: @MainActor () async throws -> T) async throws -> T {

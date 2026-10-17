@@ -196,6 +196,34 @@ final class PayabliTTPReaderSessionRecoveryTests: XCTestCase {
 
     /// Two initializations must not run over each other.
     ///
+    /// A second `initialize()` on the same `PayabliTTP` joins its first, even when another `PayabliTTP`'s
+    /// setup was queued in between.
+    func testAnInitializeJoinsItsOwnSetupWhenAnotherIsQueuedBetween() async throws {
+        let provider = InterleavingProvider()
+        let otherProvider = InterleavingProvider()
+        let ttp = try makeTTP(provider: provider)
+        let other = try makeTTP(provider: otherProvider)
+        try await bounded { try await ttp.initialize() }
+        try await bounded { try await other.initialize() }
+        provider.armGate()
+
+        let first = Task { @MainActor in try await ttp.initialize() }
+        for _ in 0 ..< 20 { await Task.yield() }
+        let queued = Task { @MainActor in try await other.initialize() }
+        await Task.yield()
+        let second = Task { @MainActor in try await ttp.initialize() }
+        for _ in 0 ..< 20 { await Task.yield() }
+        provider.openGate()
+
+        try await bounded { try await first.value }
+        try await bounded { try await queued.value }
+        try await bounded { try await second.value }
+
+        XCTAssertEqual(provider.prepareReaderCalls, 2, "the second initialize ran a setup of its own instead of joining")
+        XCTAssertEqual(ttp.sessionState, .ready)
+        XCTAssertEqual(other.sessionState, .ready)
+    }
+
     /// Each resets the session, so interleaved runs leave the one that finishes
     /// second deciding the state while the first still reports success.
     func testConcurrentInitializeRunsOnce() async throws {

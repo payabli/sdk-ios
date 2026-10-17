@@ -6,8 +6,8 @@ import Foundation
 final class SessionSetupGate {
     static let shared = SessionSetupGate()
 
-    /// An operation holding the gate: its kind, the `PayabliTTP` it belongs to, the task a later caller waits
-    /// on, and an `id` that lets only this operation clear the slot.
+    /// An operation in the gate. `task` is what a later caller waits on or joins, and only the operation with
+    /// the `id` in a slot clears that slot.
     private struct Holder {
         let kind: SessionSetupKind
         let owner: ObjectIdentifier
@@ -15,7 +15,10 @@ final class SessionSetupGate {
         let id: Int
     }
 
-    private var inFlight: Holder?
+    /// The operation that claimed the gate last, which the next caller chains behind.
+    private var last: Holder?
+    /// Each `PayabliTTP`'s newest setup that has not finished, which its next caller of the same kind joins.
+    private var setups: [ObjectIdentifier: Holder] = [:]
     private var nextID = 0
 
     /// Bumped every time any `PayabliTTP` prepares a reader. A charge captures it before the tap, so a failure
@@ -26,26 +29,26 @@ final class SessionSetupGate {
     /// the operation before it, or has setups queued behind it.
     private(set) var isHeldByCharge = false
 
-    /// Runs `work` once the operation holding the gate has finished. A caller of the same kind on the same
-    /// `PayabliTTP` joins the one in flight instead.
+    /// Runs `work` once every operation already in the gate has finished, or joins the setup of the same kind
+    /// that `owner` already has in flight.
     ///
     /// - Parameters:
-    ///   - kind: The operation.
-    ///   - owner: The `PayabliTTP` it belongs to.
-    ///   - work: The operation's body, run in a task no caller owns, so a cancelled caller does not stop it.
+    ///   - kind: Which setup this is; a later call of the same kind from `owner` joins it while it runs.
+    ///   - owner: The `PayabliTTP` calling. Only its own calls join this setup; any other caller waits for it.
+    ///   - work: The setup, run in a task no caller owns, so a cancelled caller does not stop it.
     func run(
         _ kind: SessionSetupKind,
         for owner: ObjectIdentifier,
         _ work: @escaping @MainActor () async throws -> Void
     ) async throws {
-        if let existing = inFlight, existing.kind == kind, existing.owner == owner {
+        if let existing = setups[owner], existing.kind == kind {
             return try await existing.task.value
         }
 
         // Chains behind the operation holding the gate. Re-checking in a loop
         // re-awaits a task that has already finished and spins the main actor
         // until the slot is cleared, starving everything else on it.
-        let previous = inFlight?.task
+        let previous = last?.task
         let id = claimID()
 
         let task = Task<Void, Error> { @MainActor in
@@ -55,8 +58,15 @@ final class SessionSetupGate {
             }
             try await work()
         }
-        inFlight = Holder(kind: kind, owner: owner, task: task, id: id)
-        defer { release(id) }
+        let holder = Holder(kind: kind, owner: owner, task: task, id: id)
+        last = holder
+        setups[owner] = holder
+        defer {
+            release(id)
+            if setups[owner]?.id == id {
+                setups[owner] = nil
+            }
+        }
         try await task.value
     }
 
@@ -65,12 +75,12 @@ final class SessionSetupGate {
     ///
     /// - Parameters:
     ///   - owner: The `PayabliTTP` charging.
-    ///   - body: The charge.
-    /// - Returns: What `body` returns.
+    ///   - body: The charge, run in the caller's task once every operation already in the gate has finished.
+    /// - Returns: The charge's result.
     func holdForCharge<T>(for owner: ObjectIdentifier, _ body: @MainActor () async throws -> T) async throws -> T {
         // Claimed before the first suspension, so a setup call made while the
         // charge waits for the previous one chains behind the charge.
-        let previous = inFlight?.task
+        let previous = last?.task
         let id = claimID()
         let (released, release) = AsyncStream<Void>.makeStream()
         let hold = Task<Void, Error> { @MainActor in
@@ -78,7 +88,7 @@ final class SessionSetupGate {
             var waiting = released.makeAsyncIterator()
             _ = await waiting.next()
         }
-        inFlight = Holder(kind: .charge, owner: owner, task: hold, id: id)
+        last = Holder(kind: .charge, owner: owner, task: hold, id: id)
         isHeldByCharge = true
         defer {
             isHeldByCharge = false
@@ -97,10 +107,10 @@ final class SessionSetupGate {
         return nextID
     }
 
-    /// Clears the slot only while `id` still holds it, so an operation that chained behind keeps its claim.
+    /// Clears the last claim only while `id` still holds it, so an operation that chained behind keeps its claim.
     private func release(_ id: Int) {
-        if inFlight?.id == id {
-            inFlight = nil
+        if last?.id == id {
+            last = nil
         }
     }
 }
