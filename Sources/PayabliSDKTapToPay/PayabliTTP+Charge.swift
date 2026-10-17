@@ -64,8 +64,8 @@ extension PayabliTTP {
             throw PayabliTTPError.invalidState(current: sessionState, attempted: "charge(non-sale)")
         }
 
-        // The charge already holds the session, so its repair does not go through the gate, which would wait
-        // on the charge itself. It runs in a task of its own, so a cancelled charge does not stop it.
+        // The repair runs inside the charge's hold on the gate, and in a task of its own, so a cancelled charge
+        // does not stop it.
         try await Task { @MainActor in try await self.runReinitializeIfNeeded() }.value
 
         let charge = try enterCharge()
@@ -128,8 +128,7 @@ extension PayabliTTP {
             )
 
             // Expired after the close, so `closing` is published first. Only while the reader that failed is
-            // still the current one. A setup call made during the charge, on any terminal, waits for it, so
-            // nothing prepares the reader again here, and the check stays as a backstop.
+            // still the current one.
             if generation == SessionSetupGate.shared.readerGeneration,
                readerFailureInvalidatesSession(error),
                sessionManager.transition(to: .sessionExpired)

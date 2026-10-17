@@ -134,8 +134,8 @@ final class PayabliTTPChargingTests: XCTestCase {
     func testASecondChargeIsRefusedWhileOneHoldsTheReader() async throws {
         let (ttp, provider) = try await makeReadyTTP()
         let during = Snapshot()
-        // Started beside the read rather than awaited inside it, so a second charge that is queued
-        // instead of refused fails the assertions below rather than waiting on this read forever.
+        // Started beside the read: a second charge that is queued waits on this read, so awaiting it here
+        // would hang the suite.
         provider.whileReading = { [weak ttp] in
             guard let ttp else { return }
             during.second = Task { @MainActor in
@@ -214,10 +214,10 @@ final class PayabliTTPChargingTests: XCTestCase {
         XCTAssertEqual(ttp.sessionState, .ready)
     }
 
-    // MARK: - Two terminals in one process
+    // MARK: - Two PayabliTTPs in one process
 
-    /// The device has one reader, so a setup on another terminal waits for a charge on this one.
-    func testASetupOnAnotherTerminalWaitsForTheCharge() async throws {
+    /// The device has one reader, so a setup on another `PayabliTTP` waits for a charge on this one.
+    func testASetupOnAnotherPayabliTTPWaitsForTheCharge() async throws {
         let (ttp, provider) = try await makeReadyTTP()
         let (other, otherProvider) = try await makeReadyTTP()
         let during = Snapshot()
@@ -237,7 +237,7 @@ final class PayabliTTPChargingTests: XCTestCase {
         try await during.call?.value
 
         XCTAssertEqual(result.paymentTransId, Self.paymentTransId)
-        XCTAssertEqual(during.state, .ready, "the other terminal set up while this one's reader waited for a card")
+        XCTAssertEqual(during.state, .ready, "the other PayabliTTP set up while this one's reader waited for a card")
         XCTAssertEqual(during.callReturnedInRead, false)
         XCTAssertEqual(during.preparesInRead, 1)
         XCTAssertEqual(otherProvider.prepareReaderCalls, 2)
@@ -245,12 +245,12 @@ final class PayabliTTPChargingTests: XCTestCase {
         XCTAssertEqual(other.sessionState, .ready)
     }
 
-    func testAChargeOnAnotherTerminalDuringAChargeIsRefused() async throws {
+    func testAChargeOnAnotherPayabliTTPDuringAChargeIsRefused() async throws {
         let (ttp, provider) = try await makeReadyTTP()
         let (other, otherProvider) = try await makeReadyTTP()
         let during = Snapshot()
-        // Started beside the read rather than awaited inside it, so a second charge that is queued
-        // instead of refused fails the assertions below rather than waiting on this read forever.
+        // Started beside the read: a second charge that is queued waits on this read, so awaiting it here
+        // would hang the suite.
         provider.whileReading = { [weak other] in
             guard let other else { return }
             during.second = Task { @MainActor in
@@ -306,8 +306,8 @@ final class PayabliTTPChargingTests: XCTestCase {
         XCTAssertEqual(provider.startReadingCalls, 1, "the second charge read a card")
     }
 
-    /// Two terminals setting up at once each run their own setup; one does not take the other's outcome.
-    func testTwoTerminalsInitializingAtOnceEachSetUpTheirOwnSession() async throws {
+    /// Two `PayabliTTP`s setting up at once each run their own setup; one does not take the other's outcome.
+    func testTwoPayabliTTPsInitializingAtOnceEachSetUpTheirOwnSession() async throws {
         let (ttp, provider) = try await makeReadyTTP()
         let (other, otherProvider) = try await makeReadyTTP()
 
@@ -316,7 +316,7 @@ final class PayabliTTPChargingTests: XCTestCase {
         _ = try await (first, second)
 
         XCTAssertEqual(provider.prepareReaderCalls, 2)
-        XCTAssertEqual(otherProvider.prepareReaderCalls, 2, "the second terminal joined the first's setup")
+        XCTAssertEqual(otherProvider.prepareReaderCalls, 2, "the second PayabliTTP joined the first's setup")
         XCTAssertEqual(ttp.sessionState, .ready)
         XCTAssertEqual(other.sessionState, .ready)
     }

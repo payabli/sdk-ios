@@ -22,7 +22,7 @@ extension PayabliTTP {
         }
     }
 
-    /// Runs a session setup through the process's gate. A caller of the same kind on this terminal joins the
+    /// Runs a session setup through the process's gate. A caller of the same kind on this `PayabliTTP` joins the
     /// one in flight; any other caller waits for it and then runs its own.
     ///
     /// - Parameters:
@@ -35,7 +35,7 @@ extension PayabliTTP {
         try await SessionSetupGate.shared.run(kind, for: ObjectIdentifier(self), work)
     }
 
-    /// Holds the process's gate for a charge. A setup call made meanwhile, on any terminal, waits until `body`
+    /// Holds the process's gate for a charge. A setup call made meanwhile, on any `PayabliTTP`, waits until `body`
     /// returns.
     ///
     /// - Parameter body: The charge.

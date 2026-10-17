@@ -1,25 +1,24 @@
 import Foundation
 
-/// Serialises the operations that move a card-present session, for every terminal in the process, because
-/// the device has one card reader and one read at a time.
+/// Serialises the operations that move a card-present session, across every `PayabliTTP` in the process,
+/// because the device has one card reader and one read at a time.
 @MainActor
 final class SessionSetupGate {
     static let shared = SessionSetupGate()
 
-    /// An operation holding the gate.
+    /// An operation holding the gate: its kind, the `PayabliTTP` it belongs to, the task a later caller waits
+    /// on, and an `id` that lets only this operation clear the slot.
     private struct Holder {
         let kind: SessionSetupKind
-        /// The terminal it belongs to.
         let owner: ObjectIdentifier
         let task: Task<Void, Error>
-        /// Tells it from the next operation, so only it clears the slot.
         let id: Int
     }
 
     private var inFlight: Holder?
     private var nextID = 0
 
-    /// Bumped every time any terminal prepares a reader. A charge captures it before the tap, so a failure
+    /// Bumped every time any `PayabliTTP` prepares a reader. A charge captures it before the tap, so a failure
     /// that arrives after the reader was prepared again is not attributed to the new one.
     var readerGeneration = 0
 
@@ -28,11 +27,11 @@ final class SessionSetupGate {
     private(set) var isHeldByCharge = false
 
     /// Runs `work` once the operation holding the gate has finished. A caller of the same kind on the same
-    /// terminal joins the one in flight instead.
+    /// `PayabliTTP` joins the one in flight instead.
     ///
     /// - Parameters:
     ///   - kind: The operation.
-    ///   - owner: The terminal it belongs to.
+    ///   - owner: The `PayabliTTP` it belongs to.
     ///   - work: The operation's body, run in a task no caller owns, so a cancelled caller does not stop it.
     func run(
         _ kind: SessionSetupKind,
@@ -65,7 +64,7 @@ final class SessionSetupGate {
     /// charge reaches it.
     ///
     /// - Parameters:
-    ///   - owner: The terminal charging.
+    ///   - owner: The `PayabliTTP` charging.
     ///   - body: The charge.
     /// - Returns: What `body` returns.
     func holdForCharge<T>(for owner: ObjectIdentifier, _ body: @MainActor () async throws -> T) async throws -> T {
