@@ -292,6 +292,24 @@ final class PayInHeldKeyTests: XCTestCase {
         XCTAssertEqual(transport.sentKeys, ["k1", "k1", "k2"])
     }
 
+    func testAConflictIsReadFromTheStatusWhateverTheBodySays() async throws {
+        let envelopes = [
+            #"{"status":200,"message":"Duplicate payment"}"#,
+            #"{"isSuccess":false,"responseCode":6000,"responseText":"Duplicate payment"}"#
+        ]
+        for envelope in envelopes {
+            let flow = makeFlow(prefix: "k")
+            transport.script = [.lost, .conflict(envelope), .approved]
+            _ = await failure { try await flow.capture(self.request(.newPayment)) }
+
+            let refused = await failure { try await flow.capture(self.request(.retry)) }
+            _ = try await flow.capture(request(.retry))
+
+            XCTAssertEqual(PayInFixture.interruption(refused)?.type, .conflict, envelope)
+            XCTAssertEqual(transport.sentKeys.suffix(3), ["k1", "k1", "k2"], "the conflict kept the key: \(envelope)")
+        }
+    }
+
     func testATransactionsUnknownOutcomeCarriesNoReference() async {
         transport.script = [.lost]
 
