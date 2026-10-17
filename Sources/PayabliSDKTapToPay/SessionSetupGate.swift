@@ -33,10 +33,10 @@ final class SessionSetupGate {
     /// the operation before it, or has setups queued behind it.
     private(set) var isHeldByCharge = false
 
-    /// Runs `work` after every operation already in the gate, or joins `owner`'s newest setup of this `kind`.
+    /// Runs `work` after every operation already in the gate, or joins `owner`'s pending setup of this `kind`.
     ///
     /// - Parameters:
-    ///   - kind: Which setup this is; `owner`'s next call of the same kind joins it while it is the newest.
+    ///   - kind: Which setup this is; `owner`'s next call of the same kind joins it until a charge claims the gate.
     ///   - owner: The `PayabliTTP` calling. Only its own calls join this setup; any other caller waits for it.
     ///   - work: The setup, run in a task no caller owns, so a cancelled caller does not stop it.
     func run(

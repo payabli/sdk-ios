@@ -25,7 +25,8 @@ extension PayabliTTP {
     /// Runs a session setup through the process's gate.
     ///
     /// - Parameters:
-    ///   - kind: Which setup this is; this `PayabliTTP`'s next call of the same kind joins it while it is the newest.
+    ///   - kind: Which setup this is; this `PayabliTTP`'s next call of the same kind joins it until a charge claims
+    ///     the gate.
     ///   - work: The setup, run once every operation already in the gate has finished.
     func runSessionSetup(
         _ kind: SessionSetupKind,
