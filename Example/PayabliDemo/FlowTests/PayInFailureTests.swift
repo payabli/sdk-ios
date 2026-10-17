@@ -69,7 +69,8 @@ final class PayInFailureTests: XCTestCase {
         let refused = PayabliPayInError.submissionInterrupted(
             type: .retryRefused,
             causeType: "PayabliSDKCore.PayabliGenericError",
-            paymentTransId: nil
+            paymentTransId: nil,
+            paymentReference: nil
         )
 
         let failure = PayInFailure(refused, operation: .void)

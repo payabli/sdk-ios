@@ -153,7 +153,12 @@ final class PayInFlowHandleTests: XCTestCase {
     }
 
     private static let unknownOutcome = PayInFailure(
-        PayabliPayInError.submissionInterrupted(type: .networkError, causeType: "test", paymentTransId: nil),
+        PayabliPayInError.submissionInterrupted(
+            type: .networkError,
+            causeType: "test",
+            paymentTransId: nil,
+            paymentReference: "p1"
+        ),
         operation: .capture
     )
 
