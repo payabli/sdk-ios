@@ -194,8 +194,6 @@ final class PayabliTTPReaderSessionRecoveryTests: XCTestCase {
         XCTAssertEqual(provider.prepareReaderCalls, 2)
     }
 
-    /// Two initializations must not run over each other.
-    ///
     /// A second `initialize()` on the same `PayabliTTP` joins its first, even when another `PayabliTTP`'s
     /// setup was queued in between.
     func testAnInitializeJoinsItsOwnSetupWhenAnotherIsQueuedBetween() async throws {
@@ -220,10 +218,13 @@ final class PayabliTTPReaderSessionRecoveryTests: XCTestCase {
         try await bounded { try await second.value }
 
         XCTAssertEqual(provider.prepareReaderCalls, 2, "the second initialize ran a setup of its own instead of joining")
+        XCTAssertEqual(otherProvider.prepareReaderCalls, 2, "the other PayabliTTP's setup was joined instead of run")
         XCTAssertEqual(ttp.sessionState, .ready)
         XCTAssertEqual(other.sessionState, .ready)
     }
 
+    /// Two initializations must not run over each other.
+    ///
     /// Each resets the session, so interleaved runs leave the one that finishes
     /// second deciding the state while the first still reports success.
     func testConcurrentInitializeRunsOnce() async throws {
