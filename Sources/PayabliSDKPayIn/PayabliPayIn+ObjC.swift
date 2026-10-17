@@ -100,7 +100,7 @@ public final class PayabliPayInObjC: NSObject {
         fatalError("unavailable")
     }
 
-    private init(component: PayabliPayIn) {
+    init(component: PayabliPayIn) {
         self.component = component
         super.init()
     }
@@ -220,6 +220,67 @@ public final class PayabliPayInObjC: NSObject {
         }
     }
 
+    /// Charges a payment, as ``PayabliPayIn/capture(_:)`` does.
+    ///
+    /// - Parameter request: the payment and its settings.
+    /// - Parameter completion: the result, or the error the charge failed with.
+    @objc public func capture(
+        _ request: PayabliPayInRequestObjC,
+        completion: @escaping (PayabliPayInResultObjC?, NSError?) -> Void
+    ) {
+        let swiftRequest = request.toSwift()
+        complete(completion) { try await $0.capture(swiftRequest) }
+    }
+
+    /// Holds an amount, as ``PayabliPayIn/authorize(_:)`` does.
+    ///
+    /// - Parameter request: the payment and its settings.
+    /// - Parameter completion: the result, or the error the authorization failed with.
+    @objc public func authorize(
+        _ request: PayabliPayInRequestObjC,
+        completion: @escaping (PayabliPayInResultObjC?, NSError?) -> Void
+    ) {
+        let swiftRequest = request.toSwift()
+        complete(completion) { try await $0.authorize(swiftRequest) }
+    }
+
+    /// Captures an authorization, as ``PayabliPayIn/captureAuthorizedTransaction(_:)`` does.
+    ///
+    /// - Parameter request: the authorization and the amount to capture.
+    /// - Parameter completion: the result, or the error the capture failed with.
+    @objc public func captureAuthorizedTransaction(
+        _ request: PayabliPayInAuthorizedRequestObjC,
+        completion: @escaping (PayabliPayInResultObjC?, NSError?) -> Void
+    ) {
+        let swiftRequest = request.toSwift()
+        complete(completion) { try await $0.captureAuthorizedTransaction(swiftRequest) }
+    }
+
+    /// Reverses a transaction, as ``PayabliPayIn/voidTransaction(_:)`` does.
+    ///
+    /// - Parameter transId: the transaction to reverse.
+    /// - Parameter completion: the result, or the error the reversal failed with.
+    @objc public func voidTransaction(
+        transId: String,
+        completion: @escaping (PayabliPayInResultObjC?, NSError?) -> Void
+    ) {
+        complete(completion) { try await $0.voidTransaction(transId) }
+    }
+
+    private func complete(
+        _ completion: @escaping (PayabliPayInResultObjC?, NSError?) -> Void,
+        _ operation: @escaping @MainActor (PayabliPayIn) async throws -> PayabliPayInResult
+    ) {
+        Task { @MainActor in
+            do {
+                let result = try await operation(component)
+                completion(PayabliPayInResultObjC(result), nil)
+            } catch {
+                completion(nil, error.toPayabliPayInNSError())
+            }
+        }
+    }
+
     private func addPaymentMethod(
         _ paymentMethod: PayabliPayInMethodInput,
         options: PayabliPayInOptions,
@@ -247,8 +308,15 @@ public final class PayabliPayInObjC: NSObject {
     }
 }
 
-private extension Error {
+extension Error {
+    /// The `NSError` an Objective-C caller receives; an unknown outcome adds `paymentTransId` and `paymentReference`.
     func toPayabliPayInNSError() -> NSError {
-        payabliNSError(domain: payInObjCErrorDomain)
+        let error = payabliNSError(domain: payInObjCErrorDomain)
+        guard case let .submissionInterrupted(_, _, paymentTransId, paymentReference) = self as? PayabliPayInError
+        else { return error }
+        var userInfo = error.userInfo
+        userInfo["paymentTransId"] = paymentTransId
+        userInfo["paymentReference"] = paymentReference
+        return NSError(domain: error.domain, code: error.code, userInfo: userInfo)
     }
 }

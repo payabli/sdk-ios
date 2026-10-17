@@ -331,13 +331,17 @@ The SDK is written in Swift, and the card-not-present form is a SwiftUI view.
   `initializeWithTokenHandler:entryPoint:environment:telemetryEnabled:completionHandler:`. `PayabliTTP` has
   an `@objc` companion, taking a completion handler, for every `async` method, and is built with
   `createWithCompletionHandler:`. For card-not-present, Objective-C uses `PayabliPayInObjC`, built with
-  `createAndReturnError:` on the same session, which offers `addCard` and `addBankAccount`.
+  `createAndReturnError:` on the same session. It offers `addCard` and `addBankAccount`, and `capture`,
+  `authorize`, `captureAuthorizedTransaction` and `voidTransaction`, which take a `PayabliPayInRequestObjC` or
+  `PayabliPayInAuthorizedRequestObjC` and complete with a `PayabliPayInResultObjC`.
 - **Objective-C errors.** An SDK error reaches Objective-C as an `NSError` whose `code` is its catalog
   number, with the type's name in `userInfo["PayabliErrorType"]`. Tap to Pay errors are in the
   `com.payabli.ttp` domain, where `userInfo["capture"]` holds the `PayabliTTPCapture` raw value (`0` not
   charged, `1` unknown, `2` charged), `userInfo["paymentTransId"]` is absent when there is no
-  transaction ID, and `userInfo["retryAfter"]` holds the wait in seconds when the service asked for one. Card-not-present errors are in the `com.payabli.payIn` domain, and errors from
-  `PayabliSessionObjC`'s initializer are in `com.payabli.session`.
+  transaction ID, and `userInfo["retryAfter"]` holds the wait in seconds when the service asked for one.
+  Card-not-present errors are in the `com.payabli.payIn` domain. When a payment's outcome is unknown,
+  `userInfo["paymentTransId"]` holds the transaction ID and `userInfo["paymentReference"]` the payment's reference;
+  each is absent when there is none. Errors from `PayabliSessionObjC`'s initializer are in `com.payabli.session`.
 - **Flutter, .NET MAUI and React Native.** [`Bridges/`](Bridges/README.md) has an example integration for each.
   Use them as a starting point for your own integration.
 
