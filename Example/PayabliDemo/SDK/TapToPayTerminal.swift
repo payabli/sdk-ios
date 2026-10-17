@@ -49,11 +49,6 @@ final class TapToPayTerminal: ObservableObject {
         try await run { try await terminal.initialize() }
     }
 
-    /// Brings a session back after it has expired, and does nothing if it has not.
-    func reinitializeIfNeeded() async throws {
-        try await run { try await terminal.reinitializeIfNeeded() }
-    }
-
     /// Takes a sale. The returned string is the payment's transaction identifier,
     /// and `suppliesCustomer` names this app's stand-in customer on it.
     func charge(amount: Decimal, suppliesCustomer: Bool) async throws -> String {

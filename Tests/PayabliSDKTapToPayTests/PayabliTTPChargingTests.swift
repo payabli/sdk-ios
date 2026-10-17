@@ -186,9 +186,10 @@ final class PayabliTTPChargingTests: XCTestCase {
         let during = Snapshot()
         provider.whileReading = { [weak ttp] in
             do {
-                try await ttp?.reinitializeIfNeeded()
+                try await ttp?.reinitialize()
             } catch {
-                during.refusal = (error as? TapToPayError)?.type
+                // The internal repair throws the SDK's own error rather than a host one, so any error counts.
+                during.refusal = (error as? TapToPayError)?.type ?? .unknown
             }
             during.state = ttp?.sessionState
         }

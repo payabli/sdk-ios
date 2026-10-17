@@ -38,4 +38,7 @@ public enum PayabliTTPFailureReason: Int, Sendable, CaseIterable {
     /// The phone's key facility failed, so the SDK cannot tell whether this device's key still
     /// works. Calling initialize again may succeed; a failure that persists is the device's.
     case deviceKeyUnavailable = 5
+
+    /// This `PayabliTTP`'s `PayabliSession` was replaced or ended; create a new one with `PayabliTTP.create()`.
+    case sessionEnded = 6
 }

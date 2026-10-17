@@ -245,9 +245,6 @@ namespace Payabli.TapToPay
         [Export("initializeWithCompletion:")]
         void Initialize(PayabliTTPCompletion completion);
 
-        [Export("reinitializeIfNeededWithCompletion:")]
-        void ReinitializeIfNeeded(PayabliTTPCompletion completion);
-
         [Export("chargeWithType:paymentDetails:customer:invoice:orderDescription:completion:")]
         void Charge(
             nint type,
