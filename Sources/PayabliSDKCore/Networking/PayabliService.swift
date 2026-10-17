@@ -17,6 +17,9 @@ package final class PayabliService: PayabliTransport, Sendable {
     /// Default per-request timeout, in seconds; tokenization calls are bounded by it.
     package static let defaultRequestTimeout: TimeInterval = 10
 
+    /// The most one exchange may take end to end, in seconds, however slowly its bytes arrive.
+    package static let wholeCallTimeout: TimeInterval = defaultRequestTimeout * 3
+
     /// The only way to build a transport outside this module.
     ///
     /// There is no initializer that takes a chain, so every transport carries the one the factory
@@ -89,7 +92,7 @@ package final class PayabliService: PayabliTransport, Sendable {
     static func makeDefaultSession() -> URLSession {
         let config = URLSessionConfiguration.ephemeral
         config.timeoutIntervalForRequest = defaultRequestTimeout
-        config.timeoutIntervalForResource = defaultRequestTimeout * 3
+        config.timeoutIntervalForResource = wholeCallTimeout
         config.waitsForConnectivity = false
         config.httpShouldSetCookies = false
         return URLSession(configuration: config)
@@ -105,6 +108,8 @@ package final class PayabliService: PayabliTransport, Sendable {
         let decorated = try await decorations.applyTo(request)
         let urlRequest = try buildURLRequest(decorated)
         logger.debug("→ \(decorated.method.rawValue) \(decorated.path)")
+        // From here the service may see the request, so a failure no longer proves it never left.
+        PayabliSendMark.current?.set()
 
         do {
             let (data, urlResponse) = try await session.data(for: urlRequest)

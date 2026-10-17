@@ -57,6 +57,19 @@ final class PayInPaymentObjCBridgeTests: XCTestCase {
         XCTAssertEqual(failure.userInfo["paymentTransId"] as? String, "101-abc")
     }
 
+    func testAnUnknownOutcomeThroughObjectiveCCarriesTheTransactionAndThePaymentsReference() async throws {
+        let transport = RecordingIdempotencyTransport(body: Self.interrupted, status: 500)
+        let bridge = PayabliPayInObjC(component: PayInFixture.makeFlow(transport: transport, key: "reserved-1"))
+        let request = PayabliPayInRequestObjC.cash(totalAmount: 10)
+        request.paymentReference = "order-42"
+
+        let (_, error) = await call { bridge.capture(request, completion: $0) }
+
+        let failure = try XCTUnwrap(error)
+        XCTAssertEqual(failure.userInfo["paymentTransId"] as? String, "101-abc")
+        XCTAssertEqual(failure.userInfo["paymentReference"] as? String, "order-42")
+    }
+
     func testTheRequestCarriesEverySettingItIsGiven() {
         let request = PayabliPayInRequestObjC.cash(totalAmount: 12.5)
         request.serviceFee = 0.5

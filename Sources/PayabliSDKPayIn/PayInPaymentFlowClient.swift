@@ -300,17 +300,22 @@ final class PayInPaymentFlowClient: Sendable {
             answer = response
             return try decodeResult(from: response)
         } catch {
+            let refusedKey = error is IdempotencyCheckRefusal
+            let failure = refusedKey ? PayabliGenericError(type: .conflict, reason: "Conflict (409)") : error
+            // Every 409 is a conflict, whatever status or code its body's envelope names.
+            let conflict = answer?.statusCode == 409
             // A credential that was never obtained arrives as `.tokenExpired` or
             // `.tokenProviderFailed`, both of which `leavesOutcomeUnknown` answers false for: nothing
             // was sent, so the outcome is known and there is no key to report.
-            guard carriesKey, Self.leavesOutcomeUnknown(error) else { throw error }
-            throw PayabliPayInError.submissionInterrupted(
-                type: (error as? any PayabliError)?.type ?? .unknown,
+            guard carriesKey, conflict || Self.leavesOutcomeUnknown(failure) else { throw failure }
+            let interruption = PayabliPayInError.submissionInterrupted(
+                type: conflict ? .conflict : (failure as? any PayabliError)?.type ?? .unknown,
                 // One definition of what is kept from a failure, reused rather than restated.
-                causeType: RedactedCause(error).originalType,
+                causeType: RedactedCause(failure).originalType,
                 paymentTransId: Self.namedTransaction(in: answer),
                 paymentReference: nil
             )
+            throw PayInOpenOutcome(interruption: interruption, cause: failure, refusedKey: refusedKey)
         }
     }
 
@@ -348,6 +353,10 @@ final class PayInPaymentFlowClient: Sendable {
     }
 
     private func decodeResult(from response: PayabliResponse) throws -> PayabliPayInResult {
+        // A 409 whose body is not a JSON object refuses the key; any JSON body is the route's own answer.
+        if response.statusCode == 409, !Self.isJSONObject(response.body) {
+            throw IdempotencyCheckRefusal()
+        }
         // First, because the envelope decodes this body too and keeps none of the fields it names.
         if response.statusCode == 400 {
             try mapPayabliHTTPError(response: response)
@@ -369,6 +378,10 @@ final class PayInPaymentFlowClient: Sendable {
             type: .decodingError,
             reason: "Failed to decode payment capture response"
         )
+    }
+
+    private static func isJSONObject(_ body: Data) -> Bool {
+        (try? JSONSerialization.jsonObject(with: body)) is [String: Any]
     }
 
     private func decodeFailure(
@@ -393,6 +406,19 @@ private struct NamedTransaction: Decodable {
     }
 
     let data: Payload?
+}
+
+/// A 409 whose body is not a JSON object, which only the check that refuses a key it has already seen sends.
+private struct IdempotencyCheckRefusal: Error {}
+
+/// A money-moving request whose outcome is open, for the facade to report once it knows which key was sent.
+struct PayInOpenOutcome: Error {
+    /// The failure as a caller receives it when nothing else applies.
+    let interruption: PayabliPayInError
+    /// What failed, before it was read as an open outcome.
+    let cause: any Error
+    /// The service refused the key because it had already seen it.
+    let refusedKey: Bool
 }
 
 private struct TransactionRequestBody: Encodable {

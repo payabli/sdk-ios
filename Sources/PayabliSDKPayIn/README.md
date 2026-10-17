@@ -130,9 +130,28 @@ releases it or voids a transaction that hasn't settled.
 
 ### Retry safely
 
-A charge always sends an idempotency key. The SDK mints one per call when you don't set
-`idempotencyKey` on the request's options, so calling again without your own key is a second payment, not a
-retry. Don't resend a charge whose outcome is unknown. Find the transaction first.
+A charge always sends an idempotency key, which the SDK makes and keeps; your app never handles one. Name each
+payment with `paymentReference` on the request's options, or leave it unset and the SDK names the payment. The
+reference stays on the device. Calling again is a new payment unless you say otherwise.
+
+When a charge ends in `submissionInterrupted`, its outcome is unknown. The error carries the payment's
+`paymentReference` and, when the service named one, its `paymentTransId`. Find the transaction first. If you charge
+again, set `attempt: .retry` and that `paymentReference` on the options: the SDK sends that payment's key, so the
+service refuses a repeat while it still recognises the key. When it refuses one, the charge ends in
+`submissionInterrupted` with type `.retryRefused`, which means the earlier attempt reached the service. A refusal that
+names an earlier payment matching this one ends with type `.conflict`. `captureAuthorizedTransaction(_:)` and
+`voidTransaction(_:)` do this for their transaction without being asked.
+
+A retry describes the same payment as the attempt it repeats: the same amount, fee, surcharge, currency, kind of
+payment method and, if the first attempt set one, order identifier. A retry that describes another payment is refused
+before anything is sent, with type `.retryNotSamePayment`, and the earlier attempt's key stays for the right
+retry. A new payment that names a reference whose payment is still unresolved is refused before anything is sent,
+with type `.paymentReferenceOpen`. A blank reference is refused as invalid input.
+
+The SDK holds a payment's key in memory, on the `PayabliPayIn` it was sent from, for a few minutes after its latest
+send, and holds at most 16 at a time. A retry after that, from another `PayabliPayIn`, or after your app restarts
+sends a new key, so a reference you keep is a name and not a guard against a second charge. Past that point, read
+the transaction back instead.
 
 ## Outcomes and errors
 

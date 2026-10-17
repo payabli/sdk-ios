@@ -2,42 +2,21 @@
 import PayabliSDKPayIn
 import XCTest
 
-/// What drawing a new capture attempt does to the request the next submit carries.
+/// Whether the next submit is a new payment or a retry of one whose outcome is unknown.
 ///
-/// One attempt is one payment for as long as the service remembers its key: a
-/// resubmission carries the same idempotency key, and a repeat inside two minutes of
-/// the first request is refused rather than taken. Drawing a new attempt is the one
-/// action here that mints a key, and therefore the one that turns the next submit
-/// into a second payment. The other route to a second payment is a resubmission
-/// after the window, which these cases do not cover: they hold no clock, and the
-/// service's own is not reachable from here.
-///
-/// The refusal during a submission is not covered, and cannot be from this target:
-/// `isSubmitting` is `public private(set)`, and the initialiser that accepts a
-/// transport is internal to the SDK, so nothing here can hold a submission open
-/// without a live request. What is covered is every part reachable while idle.
+/// Idle only: nothing in this target can hold a submission open, so the refusal during one is not covered.
 @MainActor
 final class PayInFlowHandleTests: XCTestCase {
-    func testDrawingAnAttemptMintsAKeyThatWasNotThereBefore() throws {
-        let handle = try makeHandle()
-        XCTAssertTrue(handle.startNewAttempt(suppliesCustomer: true))
-        let first = try? XCTUnwrap(handle.requestReference)
-
-        XCTAssertTrue(handle.startNewAttempt(suppliesCustomer: true))
-
-        XCTAssertNotNil(first)
-        XCTAssertNotEqual(handle.requestReference, first, "a new attempt reused the earlier key")
-    }
-
-    /// The key is the only field a new attempt is guaranteed to change. The order
-    /// identifier names the device and the second, so two attempts inside one second
-    /// share it, and the amount is drawn at random and can repeat.
-    func testDrawingAnAttemptCarriesTheAttemptsOwnFields() throws {
+    func testDrawingAnAttemptIsANewPaymentUnderANewReference() throws {
         let handle = try makeHandle()
 
         XCTAssertTrue(handle.startNewAttempt(suppliesCustomer: true))
+        let first = handle.requestReference
+        XCTAssertTrue(handle.startNewAttempt(suppliesCustomer: true))
 
-        XCTAssertNotNil(handle.requestReference, "the attempt carries no key")
+        XCTAssertEqual(handle.requestAttempt, .newPayment)
+        XCTAssertNotNil(first, "the attempt names no payment")
+        XCTAssertNotEqual(handle.requestReference, first, "a new payment reused the earlier reference")
         XCTAssertNotNil(handle.requestOrderId, "the attempt names no order")
         XCTAssertEqual(handle.requestTotal.map { $0 > 0 }, true, "the attempt charges nothing")
     }
@@ -51,19 +30,53 @@ final class PayInFlowHandleTests: XCTestCase {
         XCTAssertEqual(handle.requestSource, "test-source")
     }
 
+    func testAnUnknownOutcomeMakesTheNextSubmitARetryOfTheSameAttempt() throws {
+        let handle = try makeHandle()
+        XCTAssertTrue(handle.startNewAttempt(suppliesCustomer: true))
+        let order = handle.requestOrderId
+        let total = handle.requestTotal
+        let reference = handle.requestReference
+
+        handle.chargeFailed(Self.unknownOutcome)
+
+        XCTAssertEqual(handle.requestAttempt, .retry)
+        XCTAssertEqual(handle.requestReference, reference, "the retry names another payment")
+        XCTAssertEqual(handle.requestOrderId, order)
+        XCTAssertEqual(handle.requestTotal, total)
+    }
+
+    func testAnAnsweredFailureLeavesTheNextSubmitANewPayment() throws {
+        let handle = try makeHandle()
+        XCTAssertTrue(handle.startNewAttempt(suppliesCustomer: true))
+
+        handle.chargeFailed(PayInFailure(PayabliPayInError.invalidInput("Refused."), operation: .capture))
+
+        XCTAssertEqual(handle.requestAttempt, .newPayment)
+    }
+
+    func testDrawingAnAttemptAfterAnUnknownOutcomeIsANewPayment() throws {
+        let handle = try makeHandle()
+        XCTAssertTrue(handle.startNewAttempt(suppliesCustomer: true))
+        handle.chargeFailed(Self.unknownOutcome)
+
+        XCTAssertTrue(handle.startNewAttempt(suppliesCustomer: true))
+
+        XCTAssertEqual(handle.requestAttempt, .newPayment)
+    }
+
     /// Moving the customer switch answers a different question, so it leaves the
     /// attempt's identity alone. Without this the retry of the payment on screen
     /// would become a payment of its own.
     func testChangingTheCustomerKeepsTheAttemptItIsOn() throws {
         let handle = try makeHandle()
         XCTAssertTrue(handle.startNewAttempt(suppliesCustomer: true))
-        let key = handle.requestReference
+        handle.chargeFailed(Self.unknownOutcome)
         let order = handle.requestOrderId
         let total = handle.requestTotal
 
         handle.applyCustomerChange(suppliesCustomer: false)
 
-        XCTAssertEqual(handle.requestReference, key, "the key changed with the customer")
+        XCTAssertEqual(handle.requestAttempt, .retry, "the retry became a new payment with the customer")
         XCTAssertEqual(handle.requestOrderId, order, "the order changed with the customer")
         XCTAssertEqual(handle.requestTotal, total, "the amount changed with the customer")
         XCTAssertNil(handle.requestCustomerNumber, "the customer was still sent")
@@ -81,47 +94,47 @@ final class PayInFlowHandleTests: XCTestCase {
 
     // MARK: - Several operations on one screen
 
-    func testAChangedAmountGivesOnlyTheFlowOnScreenANewKey() throws {
+    func testAChangedAmountGivesOnlyTheFlowOnScreenANewPayment() throws {
         let (capture, authorize) = try (makeHandle(), makeHandle(.authorize))
         var attempts = PayInAttempts()
         attempts.apply(amount: 10, to: capture, for: .capture, suppliesCustomer: true, source: "test")
         attempts.apply(amount: 10, to: authorize, for: .authorize, suppliesCustomer: true, source: "test")
-        let captureKey = capture.requestReference
-        let authorizeKey = authorize.requestReference
+        capture.chargeFailed(Self.unknownOutcome)
+        authorize.chargeFailed(Self.unknownOutcome)
 
         attempts.apply(amount: 12, to: capture, for: .capture, suppliesCustomer: true, source: "test")
 
-        XCTAssertNotEqual(capture.requestReference, captureKey, "the flow on screen kept its key for a new amount")
+        XCTAssertEqual(capture.requestAttempt, .newPayment, "the flow on screen kept its retry for a new amount")
         XCTAssertEqual(capture.requestTotal, 12)
-        XCTAssertEqual(authorize.requestReference, authorizeKey, "a flow off screen was given a new key")
+        XCTAssertEqual(authorize.requestAttempt, .retry, "a flow off screen lost its retry")
         XCTAssertEqual(authorize.requestTotal, 10)
     }
 
-    /// Coming back to an operation, and a failure whose outcome is unknown, both reapply the amount on screen. The
-    /// attempt and its key stay, so a retry is read as a repeat of the payment that may have gone through.
-    func testTheSameAmountKeepsTheFlowsKey() throws {
+    /// Coming back to an operation reapplies the amount on screen. The attempt stays, so a retry is still read as a
+    /// repeat of the payment that may have gone through.
+    func testTheSameAmountKeepsTheFlowsAttempt() throws {
         let capture = try makeHandle()
         var attempts = PayInAttempts()
         attempts.apply(amount: 10, to: capture, for: .capture, suppliesCustomer: true, source: "test")
-        let key = capture.requestReference
+        capture.chargeFailed(Self.unknownOutcome)
 
         attempts.apply(amount: 10, to: capture, for: .capture, suppliesCustomer: true, source: "test")
 
-        XCTAssertEqual(capture.requestReference, key, "reapplying the amount replaced the key")
+        XCTAssertEqual(capture.requestAttempt, .retry, "reapplying the amount dropped the retry")
     }
 
-    func testACompletedPaymentGivesItsOwnFlowANewKey() throws {
+    func testACompletedPaymentGivesItsOwnFlowANewPayment() throws {
         let (capture, authorize) = try (makeHandle(), makeHandle(.authorize))
         var attempts = PayInAttempts()
         attempts.apply(amount: 10, to: capture, for: .capture, suppliesCustomer: true, source: "test")
         attempts.apply(amount: 10, to: authorize, for: .authorize, suppliesCustomer: true, source: "test")
-        let captureKey = capture.requestReference
-        let authorizeKey = authorize.requestReference
+        capture.chargeFailed(Self.unknownOutcome)
+        authorize.chargeFailed(Self.unknownOutcome)
 
         attempts.paymentCompleted(amount: 10, on: capture, for: .capture, suppliesCustomer: true, source: "test")
 
-        XCTAssertNotEqual(capture.requestReference, captureKey, "a completed payment left its key for the next one")
-        XCTAssertEqual(authorize.requestReference, authorizeKey, "another flow's key changed with the completion")
+        XCTAssertEqual(capture.requestAttempt, .newPayment, "a completed payment left the next one a retry")
+        XCTAssertEqual(authorize.requestAttempt, .retry, "another flow's attempt changed with the completion")
     }
 
     func testTheSameAttemptKeepsEverySettingButTheCustomer() {
@@ -132,12 +145,22 @@ final class PayInFlowHandleTests: XCTestCase {
             attempt: .retry
         )
 
-        let same = PayInRequests.sameAttempt(as: current, customerData: nil, paymentReference: current.paymentReference)
+        let same = PayInRequests.sameAttempt(as: current, customerData: nil, attempt: current.attempt)
 
         XCTAssertEqual(same.attempt, .retry, "the retry became a new payment")
         XCTAssertEqual(same.paymentReference, "payment-1")
         XCTAssertEqual(same.orderId, "order-1")
     }
+
+    private static let unknownOutcome = PayInFailure(
+        PayabliPayInError.submissionInterrupted(
+            type: .networkError,
+            causeType: "test",
+            paymentTransId: nil,
+            paymentReference: "p1"
+        ),
+        operation: .capture
+    )
 
     // MARK: -
 
@@ -158,6 +181,10 @@ final class PayInFlowHandleTests: XCTestCase {
 
 /// The request's own fields, for a test that has to see what a new attempt changed.
 private extension PayInFlowHandle {
+    var requestAttempt: PayabliAttempt? {
+        flow.requestConfiguration?.attempt
+    }
+
     var requestReference: String? {
         flow.requestConfiguration?.paymentReference
     }
