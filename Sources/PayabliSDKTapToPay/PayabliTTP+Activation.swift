@@ -11,6 +11,7 @@ public extension PayabliTTP {
     /// On success the session returns to `.idle` so the caller runs `initialize()`
     /// again. A device that has to be set up again lands
     /// `.failed(reason: .deviceSetupRequired)`, and `initialize()` sets it up.
+    /// A call made during a charge waits for the charge to end.
     func activateDevice(activationCode: String) async throws {
         try await reportingToHost {
             try await runSessionSetup(.activate) { try await self.runActivateDevice(activationCode: activationCode) }

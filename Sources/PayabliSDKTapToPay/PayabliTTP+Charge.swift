@@ -33,14 +33,16 @@ extension PayabliTTP {
     ) async throws -> TransactionResult {
         let progress = ChargeProgress()
         do {
-            return try await runCharge(
-                type: type,
-                paymentDetails: paymentDetails,
-                customer: customer,
-                invoice: invoice,
-                orderDescription: orderDescription,
-                progress: progress
-            )
+            return try await holdingSessionSetup {
+                try await runCharge(
+                    type: type,
+                    paymentDetails: paymentDetails,
+                    customer: customer,
+                    invoice: invoice,
+                    orderDescription: orderDescription,
+                    progress: progress
+                )
+            }
         } catch {
             throw TapToPayErrorTranslation.hostError(
                 for: error,
@@ -62,7 +64,9 @@ extension PayabliTTP {
             throw PayabliTTPError.invalidState(current: sessionState, attempted: "charge(non-sale)")
         }
 
-        try await reinitialize()
+        // Called directly: `reinitialize()` would wait on the gate this charge holds. Its own task keeps a
+        // cancelled charge from stopping the repair.
+        try await Task { @MainActor in try await self.runReinitializeIfNeeded() }.value
 
         let charge = try enterCharge()
         defer { leaveCharge(charge) }
@@ -105,7 +109,7 @@ extension PayabliTTP {
             invoice: context.invoice
         )
         let readResult: CardReadResult
-        let generation = readerSessionGeneration
+        let generation = SessionSetupGate.shared.readerGeneration
         // Set before the reader is asked, not after it answers: the processor can take the sale before the
         // answer arrives.
         progress.askedForCard = true
@@ -124,8 +128,9 @@ extension PayabliTTP {
             )
 
             // Expired after the close, so `closing` is published first. Only while the reader that failed is
-            // still the current one: an `initialize()` during the read can have replaced it.
-            if generation == readerSessionGeneration,
+            // still the current one. The gate keeps every other setup out until the charge returns, so this
+            // compares equal unless that guarantee breaks.
+            if generation == SessionSetupGate.shared.readerGeneration,
                readerFailureInvalidatesSession(error),
                sessionManager.transition(to: .sessionExpired)
             {

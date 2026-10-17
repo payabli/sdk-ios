@@ -14,43 +14,40 @@ extension PayabliTTP {
     ///   2. `GET /config/{entry}` (attestation-gated).
     ///   3. Hand credentials to the provider, which holds them at runtime only.
     ///   4. Prepare reader, transition to `.ready`.
+    ///
+    /// A call made during a charge waits for the charge to end, then runs.
     public func initialize() async throws {
         try await reportingToHost {
             try await runSessionSetup(.initialize) { try await self.runInitialize() }
         }
     }
 
-    /// Serialises the operations that move the session's state. A caller of the same kind joins the one
-    /// in flight; a caller of another kind waits for it and then runs its own.
+    /// Runs a session setup through the process's gate.
+    ///
+    /// - Parameters:
+    ///   - kind: Which setup this is; this `PayabliTTP`'s next call of the same kind joins it until a charge claims
+    ///     the gate.
+    ///   - work: The setup, run once every operation already in the gate has finished.
     func runSessionSetup(
         _ kind: SessionSetupKind,
         _ work: @escaping @MainActor () async throws -> Void
     ) async throws {
-        if let existing = inFlightSessionSetup, existing.kind == kind {
-            return try await existing.task.value
-        }
+        try await SessionSetupGate.shared.run(kind, for: ObjectIdentifier(self), work)
+    }
 
-        // Chains behind an operation of the other kind. Re-checking in a loop
-        // re-awaits a task that has already finished and spins the main actor
-        // until the slot is cleared, starving everything else on it.
-        let previous = inFlightSessionSetup?.task
-        let id = nextSessionSetupID
-        nextSessionSetupID += 1
-
-        let task = Task<Void, Error> { @MainActor in
-            // Its failure belongs to its own caller.
-            if let previous {
-                _ = try? await previous.value
-            }
-            try await work()
+    /// Holds the process's gate for a charge. A setup call made meanwhile, on any `PayabliTTP`, waits until `body`
+    /// returns.
+    ///
+    /// - Parameter body: The charge, run in the caller's task while the gate is held.
+    /// - Returns: The charge's result.
+    /// - Throws: `notReady` when a charge already holds the gate, whether it is running or still waiting
+    ///   for a setup to finish.
+    func holdingSessionSetup<T>(_ body: @MainActor () async throws -> T) async throws -> T {
+        let gate = SessionSetupGate.shared
+        if gate.isHeldByCharge {
+            throw PayabliTTPError.notReady(current: sessionState)
         }
-        inFlightSessionSetup = (kind, task, id)
-        defer {
-            if inFlightSessionSetup?.id == id {
-                inFlightSessionSetup = nil
-            }
-        }
-        try await task.value
+        return try await gate.holdForCharge(body)
     }
 
     private func runInitialize() async throws {
@@ -100,8 +97,8 @@ extension PayabliTTP {
 
     /// Session refresh for host/bridge re-entry.
     ///
-    /// No-op when already `.ready` or while a charge runs. For non-terminal transient states
-    /// (`.sessionExpired`, `.idle`, `.error`) re-runs steps 2–4 of
+    /// No-op when already `.ready`. A call made during a charge waits for the charge to end.
+    /// For non-terminal transient states (`.sessionExpired`, `.idle`, `.error`) re-runs steps 2–4 of
     /// `initialize()`. Providers don't cache credentials across sessions, so every refresh
     /// re-fetches `/config`.
     public func reinitializeIfNeeded() async throws {
@@ -112,9 +109,9 @@ extension PayabliTTP {
         try await runSessionSetup(.reinitialize) { try await self.runReinitializeIfNeeded() }
     }
 
-    private func runReinitializeIfNeeded() async throws {
+    func runReinitializeIfNeeded() async throws {
         switch sessionState {
-        case .ready, .charging:
+        case .ready:
             return
         case .sessionExpired, .idle, .failed:
             break
@@ -274,7 +271,7 @@ extension PayabliTTP {
             try await provider.prepareReader { [weak self] event in
                 self?.handleReaderEvent(event, from: configuration)
             }
-            readerSessionGeneration += 1
+            SessionSetupGate.shared.readerGeneration += 1
             preparedReader = configuration
         } catch PayabliTTPError.termsNotAccepted {
             // Not an error state: the session is waiting on a person, the way it waits on one in
