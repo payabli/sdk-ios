@@ -305,14 +305,7 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
 
     /// The key this attempt sends, minted here, since no key comes from the app.
     ///
-    /// A money-moving request always carries one. Left absent, the service recognises no repeat, so a
-    /// double submit or a resend takes the money twice rather than being refused.
-    ///
-    /// One per submission, and no submission reuses another's. Whether a later submission retries this
-    /// payment or is a payment of its own is the host's to say rather than this SDK's to infer: two
-    /// submissions a host has described identically are one payment to anything readable here, so
-    /// inferring would refuse a legitimate second payment of equal value. The host declares a retry and
-    /// the SDK supplies the key, and until that member exists nothing here reuses one.
+    /// - Returns: a new key; no submission reuses another's.
     private func reserveKey() -> String {
         newIdempotencyKey()
     }
