@@ -86,8 +86,8 @@ final class PayInFlowHandle: ObservableObject {
         )
     }
 
-    /// After a charge whose outcome is unknown, declares the next submit a retry of it, so the SDK sends that
-    /// attempt's key and the service refuses a repeat rather than charging twice.
+    /// After a charge whose outcome is unknown, declares the next submit a retry of it, so the SDK sends the key it
+    /// holds for that payment's reference and the service refuses a repeat rather than charging twice.
     ///
     /// - Parameter failure: how the charge ended.
     func chargeFailed(_ failure: PayInFailure) {

@@ -773,7 +773,7 @@ let sheetConfiguration = PayabliPayInSheetConfiguration(
 | `source` | Optional source string. |
 | `subdomain` | Optional subdomain. |
 | `subscriptionId` | Optional subscription ID. |
-| `idempotencyKey` | Optional idempotency key. |
+| `paymentReference` | Optional. Your app's name for the payment, never sent; the SDK names it when unset. |
 | `achValidation` | Verifies a bank account before it is debited. `true` adds the check to any the merchant's account already applies, and never turns one off. A failed check is a decline. |
 | `forceCustomerCreation` | Applies only when the payer can't be matched to an existing customer: `true` creates a new customer record each time. No effect when the payer is identified. |
 | `validation` | Client-side validation options. |

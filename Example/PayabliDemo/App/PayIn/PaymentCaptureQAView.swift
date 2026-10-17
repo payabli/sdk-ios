@@ -201,7 +201,7 @@ struct PaymentCaptureQAView: View {
         // The request is built when the app launches and the switch is on another tab,
         // so a flip after that would otherwise apply to the payment after this one.
         // Not while a submission is in flight: replacing the configuration then loses
-        // the key that makes its retry safe. Only the customer changes, so the figure
+        // the reference that makes its retry safe. Only the customer changes, so the figure
         // on screen and the identifiers stay as they were.
         .onChange(of: demoCustomer.suppliesPayInCustomer) { supplies in
             paymentFlow.applyCustomerChange(suppliesCustomer: supplies)
@@ -238,8 +238,8 @@ struct PaymentCaptureQAView: View {
     }
 
     /// Abandons the attempt on screen and draws another. This is the one action
-    /// here that may charge a second time: submitting again retries the attempt
-    /// that already has a key, and this mints a new one.
+    /// here that may charge a second time: submitting again retries the payment
+    /// on screen, and this names a new one.
     private func startAnother() {
         // A reversal this screen has decided to send but not yet sent is still a reversal. The
         // flow does not know about it yet, so its own refusal below cannot cover this, and drawing
@@ -248,7 +248,7 @@ struct PaymentCaptureQAView: View {
 
         // The flow refuses while a submission is in flight, and this row keeps
         // offering the button through one. Clearing first would report an attempt
-        // that was never drawn, over a request still holding the earlier key.
+        // that was never drawn, over a request still naming the earlier payment.
         guard paymentFlow.startNewAttempt(suppliesCustomer: demoCustomer.suppliesPayInCustomer) else {
             return
         }

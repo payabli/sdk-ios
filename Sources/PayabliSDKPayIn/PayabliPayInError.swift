@@ -12,9 +12,9 @@ public enum PayabliPayInError: PayabliError, Equatable {
 
     /// The request may have moved money and the outcome is not known.
     ///
-    /// No key is reported. To try again, submit with `attempt` set to `.retry`: the SDK sends the key of the most
-    /// recent attempt whose outcome is unknown, so the service refuses a repeat rather than taking the payment again.
-    /// That protection lapses after a while, and a submission that declares nothing is a new payment.
+    /// No key is reported. To try again, submit with `attempt` set to `.retry` and the same `paymentReference`: the SDK
+    /// sends that payment's key, so the service refuses a repeat rather than taking the payment again. That protection
+    /// lapses after a while, and a submission that declares nothing is a new payment.
     ///
     /// **What settles the outcome is reading the transaction back**, not repeating the submission. A refused retry
     /// reports ``PayabliErrorType/retryRefused``: the earlier attempt reached the service and is still unresolved.
