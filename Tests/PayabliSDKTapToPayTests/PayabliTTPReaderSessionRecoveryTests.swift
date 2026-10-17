@@ -194,6 +194,31 @@ final class PayabliTTPReaderSessionRecoveryTests: XCTestCase {
         XCTAssertEqual(provider.prepareReaderCalls, 2)
     }
 
+    /// An `initialize()` made after a charge is queued waits for the charge and runs its own setup, even when
+    /// an earlier `initialize()` on the same `PayabliTTP` is still running ahead of the charge.
+    func testAnInitializeMadeAfterAChargeIsQueuedWaitsForTheCharge() async throws {
+        let provider = InterleavingProvider()
+        let ttp = try makeTTP(provider: provider)
+        try await bounded { try await ttp.initialize() }
+        provider.readingResult = .success(Self.cardReadResult)
+        provider.armGate()
+
+        let first = Task { @MainActor in try await ttp.initialize() }
+        for _ in 0 ..< 20 { await Task.yield() }
+        let charging = Task { @MainActor in try await self.charge(ttp) }
+        await Task.yield()
+        let second = Task { @MainActor in try await ttp.initialize() }
+        for _ in 0 ..< 20 { await Task.yield() }
+        provider.openGate()
+
+        try await bounded { try await first.value }
+        _ = try await bounded { try await charging.value }
+        try await bounded { try await second.value }
+
+        XCTAssertEqual(provider.prepareReaderCalls, 3, "the later initialize joined the earlier one instead of waiting")
+        XCTAssertEqual(ttp.sessionState, .ready)
+    }
+
     /// A second `initialize()` on the same `PayabliTTP` joins its first, even when another `PayabliTTP`'s
     /// setup was queued in between.
     func testAnInitializeJoinsItsOwnSetupWhenAnotherIsQueuedBetween() async throws {

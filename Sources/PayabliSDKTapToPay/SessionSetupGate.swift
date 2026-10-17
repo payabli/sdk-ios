@@ -6,8 +6,8 @@ import Foundation
 final class SessionSetupGate {
     static let shared = SessionSetupGate()
 
-    /// An operation's place in the gate: `task` is what a later caller waits on, and only the operation whose
-    /// `id` is in a slot clears that slot.
+    /// An operation's place in the gate: `task` is what a later caller waits on or joins, and only the
+    /// operation whose `id` is in a slot clears that slot.
     private struct Claim {
         let task: Task<Void, Error>
         let id: Int
@@ -21,7 +21,7 @@ final class SessionSetupGate {
 
     /// The operation that claimed the gate last, which the next caller chains behind.
     private var last: Claim?
-    /// Each `PayabliTTP`'s newest setup, until the call that started it returns.
+    /// Each `PayabliTTP`'s newest setup, until the call that started it returns or a charge claims the gate.
     private var setups: [ObjectIdentifier: Setup] = [:]
     private var nextID = 0
 
@@ -93,6 +93,8 @@ final class SessionSetupGate {
             id: claimID()
         )
         last = claim
+        // A setup call made from here on waits for this charge, so no earlier setup can be joined.
+        setups.removeAll()
         isHeldByCharge = true
         defer {
             isHeldByCharge = false
