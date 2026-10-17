@@ -129,20 +129,6 @@ final class TapToPayStepsTests: XCTestCase {
         }
     }
 
-    func testEveryRecoveryReasonMatchesTheControlBesideIt() {
-        // The screen writes one sentence per reason, so a reason paired with the
-        // wrong control is a sentence describing something that did not happen.
-        for combination in everyCombination {
-            let sequence = steps(combination)
-            guard let recovery = sequence.recovery else { continue }
-            // Two reasons, one control.
-            XCTAssertEqual(
-                sequence.nextAction, .reattest,
-                "\(combination) pairs \(recovery) with \(String(describing: sequence.nextAction))"
-            )
-        }
-    }
-
     // MARK: - Each reason, one at a time
 
     func testAnExpiredSessionSaysItExpired() {

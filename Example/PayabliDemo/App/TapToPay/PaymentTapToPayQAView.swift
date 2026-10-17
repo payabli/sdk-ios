@@ -173,7 +173,7 @@ struct PaymentTapToPayQAView: View {
     private func recoveryDetail(_ recovery: TapToPayRecovery) -> String {
         switch recovery {
         case .sessionExpired:
-            "The session expired. This runs the full setup, re-using the attested identity."
+            "The session expired. This runs the full setup, attesting again only if the attested identity is gone."
         case .sessionErrored:
             "The session errored. This runs the full setup, re-using the attested identity when it is still held and attesting again when it is not."
         }

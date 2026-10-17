@@ -98,8 +98,8 @@ extension PayabliTTP {
         }
     }
 
-    /// The repair `charge` runs first: nothing when `.ready`, and steps 2–4 of `initialize()` from
-    /// `.sessionExpired`, `.idle` or `.failed`, with a fresh `/config` each time.
+    /// The repair `charge` runs first: nothing when `.ready` or while a charge runs, and steps 2–4 of
+    /// `initialize()` from `.sessionExpired`, `.idle` or `.failed`, with a fresh `/config` each time.
     func reinitialize() async throws {
         try await runSessionSetup(.reinitialize) { try await self.runReinitializeIfNeeded() }
     }

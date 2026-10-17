@@ -128,8 +128,8 @@ enum TapToPaySteps {
         let charge = chargeStatus(activation: activation, session: session)
 
         // Ordered like the steps, and for the same reason: the first thing that
-        // wants attention is the only thing offered. Re-initialize sits behind
-        // the token step because it re-runs config, which a backend known to be
+        // wants attention is the only thing offered. Recovery sits behind the
+        // token step because it fetches config, which a backend known to be
         // down cannot answer.
         // Derived before `nextAction`, which reads it, so the control and the
         // sentence beside it cannot disagree about what went wrong.
