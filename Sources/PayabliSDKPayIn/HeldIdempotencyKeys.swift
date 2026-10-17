@@ -27,8 +27,6 @@ struct HeldIdempotencyKeys {
         /// The key was held for an earlier attempt and is being sent again.
         let reused: Bool
         let reservedAt: ContinuousClock.Instant
-        /// When the held key's record was last stamped, for a key sent again; nil for a new key.
-        let heldSince: ContinuousClock.Instant?
         /// The payment the key was made for, which stays the same each time a held key is sent.
         let payment: HeldPaymentDescription?
     }
@@ -88,11 +86,10 @@ struct HeldIdempotencyKeys {
             }
             // The first description stays with the key, even if the record ages out while this send is in flight.
             return Reservation(
-                scope: scope, key: held.key, reused: true, reservedAt: now, heldSince: held.reservedAt,
-                payment: held.payment ?? payment
+                scope: scope, key: held.key, reused: true, reservedAt: now, payment: held.payment ?? payment
             )
         }
-        return Reservation(scope: scope, key: mint(), reused: false, reservedAt: now, heldSince: nil, payment: payment)
+        return Reservation(scope: scope, key: mint(), reused: false, reservedAt: now, payment: payment)
     }
 
     /// Records what became of an attempt.
@@ -107,7 +104,6 @@ struct HeldIdempotencyKeys {
         let scope = reservation.scope
         switch outcome {
         case .notAnswered, .repeatRefused:
-            keep(reservation)
             return false
         case .answered:
             if records[scope]?.key == reservation.key {
@@ -117,17 +113,6 @@ struct HeldIdempotencyKeys {
         case .unknown:
             return hold(reservation, now: now)
         }
-    }
-
-    /// Keeps a resent key on its earlier time, putting it back if it aged out while the send ran.
-    ///
-    /// - Parameter reservation: the reservation the attempt was sent under.
-    private mutating func keep(_ reservation: Reservation) {
-        guard let heldSince = reservation.heldSince, records[reservation.scope] == nil,
-              records.count < Self.capacity
-        else { return }
-        // Its earlier time stays, so the next sweep removes it.
-        records[reservation.scope] = Record(key: reservation.key, reservedAt: heldSince, payment: reservation.payment)
     }
 
     /// Holds the key of an attempt whose outcome is unknown, from that attempt's reservation.
