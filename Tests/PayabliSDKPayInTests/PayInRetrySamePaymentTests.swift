@@ -78,19 +78,19 @@ final class PayInRetrySamePaymentTests: XCTestCase {
         let start = ContinuousClock.now
         let maxAge = payabliIdempotencyKeyMaxAge
         let first = try keys.reserve(
-            scope: .capture, supplied: nil, claimsHeld: false,
+            scope: .capture(reference: "p1"), claimsHeld: false,
             payment: HeldPaymentDescription(payment(.newPayment)), now: start, mint: { "k1" }
         )
         keys.settle(first, outcome: .unknown, now: start)
         let resent = try keys.reserve(
-            scope: .capture, supplied: nil, claimsHeld: true,
+            scope: .capture(reference: "p1"), claimsHeld: true,
             payment: HeldPaymentDescription(payment(.retry, orderId: "order-1")),
             now: start.advanced(by: maxAge - .seconds(1)), mint: { "k-other" }
         )
         keys.settle(resent, outcome: .unknown, now: start.advanced(by: maxAge))
 
         let retried = try keys.reserve(
-            scope: .capture, supplied: nil, claimsHeld: true,
+            scope: .capture(reference: "p1"), claimsHeld: true,
             payment: HeldPaymentDescription(payment(.retry, orderId: "order-2")),
             now: start.advanced(by: maxAge), mint: { "k-other" }
         )
@@ -115,19 +115,19 @@ final class PayInRetrySamePaymentTests: XCTestCase {
         transport.script = [.lost, .approved]
 
         _ = await failure { try await flow.capture(self.payment(.newPayment)) }
-        _ = try await flow.capture(payment(.newPayment, total: 20))
+        _ = try await flow.capture(payment(.newPayment, total: 20, reference: "p2"))
 
         XCTAssertEqual(transport.sentKeys, ["k1", "k2"])
     }
 
-    func testAKeyThatReplacesTheHeldOneBringsItsOwnPayment() async throws {
+    func testEachReferenceComparesAgainstItsOwnPayment() async throws {
         let flow = makeFlow()
         transport.script = [.lost, .lost, .approved]
 
         _ = await failure { try await flow.capture(self.payment(.newPayment)) }
-        _ = await failure { try await flow.capture(self.payment(.newPayment, total: 20)) }
-        let refused = await failure { try await flow.capture(self.payment(.retry)) }
-        _ = try await flow.capture(payment(.retry, total: 20))
+        _ = await failure { try await flow.capture(self.payment(.newPayment, total: 20, reference: "p2")) }
+        let refused = await failure { try await flow.capture(self.payment(.retry, total: 20)) }
+        _ = try await flow.capture(payment(.retry, total: 20, reference: "p2"))
 
         XCTAssertEqual((refused as? any PayabliError)?.type, .retryNotSamePayment)
         XCTAssertEqual(transport.sentKeys, ["k1", "k2", "k2"])
@@ -157,7 +157,8 @@ final class PayInRetrySamePaymentTests: XCTestCase {
         surcharge: Double? = nil,
         currency: String? = nil,
         method: Method = .storedCard,
-        orderId: String? = nil
+        orderId: String? = nil,
+        reference: String = "p1"
     ) -> PayabliPayInRequest {
         PayabliPayInRequest(
             paymentMethod: paymentMethod(method),
@@ -169,6 +170,7 @@ final class PayInRetrySamePaymentTests: XCTestCase {
                     currency: currency
                 ),
                 orderId: orderId,
+                paymentReference: reference,
                 attempt: attempt
             )
         )

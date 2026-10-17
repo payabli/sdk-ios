@@ -14,13 +14,63 @@ final class PayInHeldKeyTests: XCTestCase {
 
     // MARK: - A capture or an authorization
 
-    func testAnOrdinarySubmitAfterAnUnknownOutcomeSendsANewKey() async throws {
+    func testANewPaymentUnderAnotherReferenceSendsANewKey() async throws {
         transport.script = [.lost, .approved]
 
         _ = await failure { try await self.flow.capture(self.request(.newPayment)) }
-        _ = try await flow.capture(request(.newPayment))
+        _ = try await flow.capture(request(.newPayment, reference: "p2"))
 
         XCTAssertEqual(transport.sentKeys, ["k1", "k2"])
+    }
+
+    func testANewPaymentOnAReferenceWhoseKeyIsHeldIsRefusedUnsent() async throws {
+        transport.script = [.lost, .approved]
+
+        _ = await failure { try await self.flow.capture(self.request(.newPayment)) }
+        let refused = await failure { try await self.flow.capture(self.request(.newPayment)) }
+        _ = try await flow.capture(request(.retry))
+
+        XCTAssertEqual((refused as? any PayabliError)?.type, .paymentReferenceOpen)
+        XCTAssertEqual((refused as? any PayabliError)?.category, .invalidRequest)
+        XCTAssertEqual(transport.sentKeys, ["k1", "k1"])
+    }
+
+    func testAReferenceIsFreeAgainOnceItsPaymentIsAnswered() async throws {
+        transport.script = [.lost, .approved, .approved]
+
+        _ = await failure { try await self.flow.capture(self.request(.newPayment)) }
+        _ = try await flow.capture(request(.retry))
+        _ = try await flow.capture(request(.newPayment))
+
+        XCTAssertEqual(transport.sentKeys, ["k1", "k1", "k2"])
+    }
+
+    func testABlankReferenceIsRefusedUnsent() async {
+        let refused = await failure { try await self.flow.capture(self.request(.newPayment, reference: " ")) }
+
+        XCTAssertEqual(refused as? PayabliPayInError, .invalidInput("The payment reference cannot be blank."))
+        XCTAssertEqual(transport.sentKeys, [])
+    }
+
+    func testAnUnnamedPaymentIsGivenAReferenceThatAnUnknownOutcomeReturns() async throws {
+        flow.newPaymentReference = { "minted-1" }
+        transport.script = [.lost, .approved]
+
+        let interrupted = await failure { try await self.flow.capture(self.request(.newPayment, reference: nil)) }
+        _ = try await flow.capture(request(.retry, reference: "minted-1"))
+
+        XCTAssertEqual(Self.reference(in: interrupted), "minted-1")
+        XCTAssertEqual(transport.sentKeys, ["k1", "k1"])
+    }
+
+    func testAReferenceIsComparedAndReturnedTrimmed() async throws {
+        transport.script = [.lost, .approved]
+
+        let interrupted = await failure { try await self.flow.capture(self.request(.newPayment, reference: " p1 ")) }
+        _ = try await flow.capture(request(.retry))
+
+        XCTAssertEqual(Self.reference(in: interrupted), "p1")
+        XCTAssertEqual(transport.sentKeys, ["k1", "k1"])
     }
 
     func testADeclaredRetrySendsTheKeyOfTheAttemptNobodyKnows() async throws {
@@ -145,24 +195,34 @@ final class PayInHeldKeyTests: XCTestCase {
         XCTAssertEqual(transport.sentKeys, ["k1", "k1", "k2"])
     }
 
-    func testAnOrdinarySubmitNeitherTakesNorClearsTheHeldKey() async throws {
+    func testAnotherReferenceNeitherTakesNorClearsTheHeldKey() async throws {
         transport.script = [.lost, .approved, .approved]
 
         _ = await failure { try await self.flow.capture(self.request(.newPayment)) }
-        _ = try await flow.capture(request(.newPayment))
+        _ = try await flow.capture(request(.newPayment, reference: "p2"))
         _ = try await flow.capture(request(.retry))
 
         XCTAssertEqual(transport.sentKeys, ["k1", "k2", "k1"])
     }
 
-    func testARetryClaimsTheMostRecentAttemptNobodyKnows() async throws {
-        transport.script = [.lost, .lost, .approved]
+    func testEachReferenceRetriesUnderItsOwnKey() async throws {
+        transport.script = [.lost, .lost, .approved, .approved]
 
         _ = await failure { try await self.flow.capture(self.request(.newPayment)) }
-        _ = await failure { try await self.flow.capture(self.request(.newPayment)) }
+        _ = await failure { try await self.flow.capture(self.request(.newPayment, reference: "p2")) }
         _ = try await flow.capture(request(.retry))
+        _ = try await flow.capture(request(.retry, reference: "p2"))
 
-        XCTAssertEqual(transport.sentKeys, ["k1", "k2", "k2"])
+        XCTAssertEqual(transport.sentKeys, ["k1", "k2", "k1", "k2"])
+    }
+
+    func testATransactionsUnknownOutcomeCarriesNoReference() async {
+        transport.script = [.lost]
+
+        let interrupted = await failure { try await self.flow.voidTransaction("t-1") }
+
+        XCTAssertNotNil(PayInFixture.interruption(interrupted))
+        XCTAssertNil(Self.reference(in: interrupted))
     }
 
     func testARetryWithNothingHeldSendsANewKey() async throws {
@@ -322,18 +382,18 @@ final class PayInHeldKeyTests: XCTestCase {
         for index in 0 ..< HeldIdempotencyKeys.capacity {
             let reservedAt = index == 0 ? start : start.advanced(by: .seconds(10))
             let held = try keys.reserve(
-                scope: .void(transId: "t-\(index)"), supplied: nil, claimsHeld: true, now: reservedAt, mint: { "k\(index)" }
+                scope: .void(transId: "t-\(index)"), claimsHeld: true, now: reservedAt, mint: { "k\(index)" }
             )
             keys.settle(held, outcome: .unknown, now: reservedAt)
         }
 
         let sent = try keys.reserve(
-            scope: .void(transId: "t-new"), supplied: nil, claimsHeld: true,
+            scope: .void(transId: "t-new"), claimsHeld: true,
             now: start.advanced(by: maxAge - .seconds(1)), mint: { "k-new" }
         )
         let full = keys.settle(sent, outcome: .unknown, now: start.advanced(by: maxAge))
         let retried = try keys.reserve(
-            scope: .void(transId: "t-new"), supplied: nil, claimsHeld: true,
+            scope: .void(transId: "t-new"), claimsHeld: true,
             now: start.advanced(by: maxAge), mint: { "k-other" }
         )
 
@@ -354,12 +414,14 @@ final class PayInHeldKeyTests: XCTestCase {
 
     private func request(
         _ attempt: PayabliAttempt,
+        reference: String? = "p1",
         totalAmount: Double = 12.34
     ) -> PayabliPayInRequest {
         PayabliPayInRequest(
             paymentMethod: .stored(PayabliPayInPaymentMethod.Stored(method: .card, storedMethodId: "stored-1")),
             options: PayabliPayInRequestConfiguration(
                 paymentDetails: PayabliPayInPaymentDetails(totalAmount: totalAmount),
+                paymentReference: reference,
                 attempt: attempt
             )
         )
@@ -370,6 +432,11 @@ final class PayInHeldKeyTests: XCTestCase {
             transId: transId,
             paymentDetails: PayabliPayInPaymentDetails(totalAmount: 10)
         )
+    }
+
+    private static func reference(in failure: any Error) -> String? {
+        guard case let .submissionInterrupted(_, _, _, reference) = failure as? PayabliPayInError else { return nil }
+        return reference
     }
 
     private func failure(_ block: () async throws -> PayabliPayInResult) async -> any Error {

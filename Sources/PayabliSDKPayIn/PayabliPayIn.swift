@@ -41,6 +41,7 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
     /// Settable rather than an initialiser parameter: every initialiser here already carries seven, and
     /// a test only needs this pinned before it submits. Not public, so a host cannot supply one.
     var newIdempotencyKey: @Sendable () -> String = { UUID().uuidString }
+    var newPaymentReference: @Sendable () -> String = { UUID().uuidString.lowercased() }
     /// Reads the clock a held key ages against. One that keeps counting while the device sleeps.
     var now: @Sendable () -> ContinuousClock.Instant = { ContinuousClock.now }
 
@@ -234,11 +235,12 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
         _ request: PayabliPayInRequest
     ) async throws -> PayabliPayInResult {
         try await submit {
-            try await sending(
-                .capture,
-                supplied: nil,
+            let reference = try paymentReference(of: request)
+            return try await sending(
+                .capture(reference: reference),
                 claimsHeld: request.options.attempt == .retry,
-                payment: HeldPaymentDescription(request)
+                payment: HeldPaymentDescription(request),
+                reference: reference
             ) { key in
                 try await client.capture(entryPoint: entryPoint, request: request, idempotencyKey: key)
             }
@@ -254,11 +256,12 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
         _ request: PayabliPayInRequest
     ) async throws -> PayabliPayInResult {
         try await submit {
-            try await sending(
-                .authorize,
-                supplied: nil,
+            let reference = try paymentReference(of: request)
+            return try await sending(
+                .authorize(reference: reference),
                 claimsHeld: request.options.attempt == .retry,
-                payment: HeldPaymentDescription(request)
+                payment: HeldPaymentDescription(request),
+                reference: reference
             ) { key in
                 try await client.authorize(entryPoint: entryPoint, request: request, idempotencyKey: key)
             }
@@ -275,7 +278,6 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
         try await submit {
             try await sending(
                 .captureAuthorized(transId: request.transId.payabliCaptureTrimmed),
-                supplied: nil,
                 claimsHeld: true
             ) { key in
                 try await client.captureAuthorized(request, idempotencyKey: key)
@@ -302,7 +304,6 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
         try await exclusively {
             try await sending(
                 .void(transId: transId.payabliCaptureTrimmed),
-                supplied: nil,
                 claimsHeld: true
             ) { key in
                 try await client.void(transId: transId, idempotencyKey: key)
@@ -328,25 +329,24 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
 
     /// Sends one attempt under the key it takes, and records what became of it.
     ///
-    /// A money-moving request always carries a key: the caller's when it set one, the held one when the attempt
-    /// claims it, otherwise a new one. A refused held key reports ``PayabliErrorType/retryRefused``.
+    /// A money-moving request always carries a key: the held one when the attempt claims it, otherwise a new one.
+    /// A refused held key reports ``PayabliErrorType/retryRefused``.
     ///
     /// - Parameter scope: what the attempt belongs to.
-    /// - Parameter supplied: the caller's own key.
     /// - Parameter claimsHeld: whether the attempt takes the key held for its scope.
     /// - Parameter payment: the payment the attempt is for, compared with the held key's before taking it.
+    /// - Parameter reference: the payment's reference, returned on an unknown outcome.
     /// - Parameter send: sends the request under the key it is given.
     /// - Returns: the result the service sent.
     private func sending(
         _ scope: HeldKeyScope,
-        supplied: String?,
         claimsHeld: Bool,
         payment: HeldPaymentDescription? = nil,
+        reference: String? = nil,
         _ send: (String) async throws -> PayabliPayInResult
     ) async throws -> PayabliPayInResult {
         let reservation = try heldKeys.reserve(
             scope: scope,
-            supplied: supplied,
             claimsHeld: claimsHeld,
             payment: payment,
             now: now(),
@@ -366,7 +366,7 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
             if heldKeys.settle(reservation, outcome: outcome, now: now()) {
                 logger.warning("payin_retry_keys_full")
             }
-            try Self.rethrow(error, as: outcome)
+            try Self.rethrow(error, as: outcome, reference: reference)
         }
     }
 
@@ -400,18 +400,36 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
     ///
     /// - Parameter error: what the attempt threw.
     /// - Parameter outcome: what it meant for the key.
+    /// - Parameter reference: the payment's reference, which an unknown outcome carries.
     /// - Throws: the failure, with a refused held key reported as ``PayabliErrorType/retryRefused``.
-    private static func rethrow(_ error: any Error, as outcome: HeldIdempotencyKeys.Outcome) throws -> Never {
-        guard let refusal = error as? PayInKeyRefusal else { throw error }
-        guard outcome == .repeatRefused,
-              case let .submissionInterrupted(_, causeType, paymentTransId, paymentReference) = refusal.interruption
-        else { throw refusal.interruption }
+    private static func rethrow(
+        _ error: any Error,
+        as outcome: HeldIdempotencyKeys.Outcome,
+        reference: String?
+    ) throws -> Never {
+        let refusal = error as? PayInKeyRefusal
+        let failure = refusal?.interruption ?? error
+        guard case let .submissionInterrupted(type, causeType, paymentTransId, _) = failure as? PayabliPayInError
+        else { throw failure }
         throw PayabliPayInError.submissionInterrupted(
-            type: .retryRefused,
+            type: refusal != nil && outcome == .repeatRefused ? .retryRefused : type,
             causeType: causeType,
             paymentTransId: paymentTransId,
-            paymentReference: paymentReference
+            paymentReference: reference
         )
+    }
+
+    /// The reference a capture or an authorization is held under: the host's, trimmed, or one made here.
+    ///
+    /// - Parameter request: the request being sent.
+    /// - Returns: the reference to hold the payment's key under.
+    /// - Throws: ``PayabliPayInError/invalidInput(_:)`` when the host's reference is blank.
+    private func paymentReference(of request: PayabliPayInRequest) throws -> String {
+        guard let named = request.options.paymentReference else { return newPaymentReference() }
+        guard let trimmed = named.payabliCaptureTrimmed.payabliCaptureNilIfEmpty else {
+            throw PayabliPayInError.invalidInput("The payment reference cannot be blank.")
+        }
+        return trimmed
     }
 
     /// Runs one operation at a time and answers its caller, publishing nothing.
