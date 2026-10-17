@@ -198,11 +198,8 @@ struct PaymentCaptureQAView: View {
             onCompleted: handlePaymentCaptured,
             onFailed: handleError
         )
-        // The request is built when the app launches and the switch is on another tab,
-        // so a flip after that would otherwise apply to the payment after this one.
-        // Not while a submission is in flight: replacing the configuration then loses
-        // the reference that makes its retry safe. Only the customer changes, so the figure
-        // on screen and the identifiers stay as they were.
+        // Applies to the payment on screen, changing only its customer. Not while a submission is in flight:
+        // replacing the configuration then loses the reference that makes its retry safe.
         .onChange(of: demoCustomer.suppliesPayInCustomer) { supplies in
             paymentFlow.applyCustomerChange(suppliesCustomer: supplies)
         }
