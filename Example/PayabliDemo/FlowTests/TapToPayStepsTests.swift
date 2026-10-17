@@ -120,7 +120,7 @@ final class TapToPayStepsTests: XCTestCase {
     func testRecoveryIsGivenAReasonExactlyWhenItIsOffered() {
         for combination in everyCombination {
             let sequence = steps(combination)
-            let offered = sequence.nextAction == .reinitialize || sequence.nextAction == .reattest
+            let offered = sequence.nextAction == .reattest
             XCTAssertEqual(
                 sequence.recovery != nil, offered,
                 "\(combination) offers \(String(describing: sequence.nextAction)) "
@@ -135,10 +135,9 @@ final class TapToPayStepsTests: XCTestCase {
         for combination in everyCombination {
             let sequence = steps(combination)
             guard let recovery = sequence.recovery else { continue }
-            let expected: TapToPayAction = recovery == .sessionErrored ? .reattest : .reinitialize
-            // Two reasons, two controls, and the mapping is total.
+            // Two reasons, one control.
             XCTAssertEqual(
-                sequence.nextAction, expected,
+                sequence.nextAction, .reattest,
                 "\(combination) pairs \(recovery) with \(String(describing: sequence.nextAction))"
             )
         }
@@ -153,7 +152,7 @@ final class TapToPayStepsTests: XCTestCase {
             activation: .none
         )
         XCTAssertEqual(sequence.recovery, .sessionExpired)
-        XCTAssertEqual(sequence.nextAction, .reinitialize)
+        XCTAssertEqual(sequence.nextAction, .reattest)
     }
 
     func testAnyOtherErrorRunsTheFullSetup() {
@@ -236,8 +235,7 @@ final class TapToPayStepsTests: XCTestCase {
         // answer, and offering it beside the probe's own retry is two next
         // actions again.
         for combination in everyCombination
-            where steps(combination).nextAction == .reinitialize
-            || steps(combination).nextAction == .reattest
+            where steps(combination).nextAction == .reattest
         {
             let sequence = steps(combination)
             XCTAssertTrue(sequence.token.status.isFinished, "\(combination) offered recovery")
@@ -251,9 +249,7 @@ final class TapToPayStepsTests: XCTestCase {
     func testAnErroredSessionIsOfferedTheFullSetup() {
         // Two paths clear the attested identity and mark the session `.error`:
         // a config 401, and a `generateAssertion` that fails on a DeviceCheck
-        // error, which surfaces as `.activationFailed`. `reinitializeIfNeeded`
-        // skips attestation and asserts against an identity that is gone, so it
-        // would fail and offer itself again.
+        // error, which surfaces as `.activationFailed`. The full setup attests again.
         for combination in everyCombination where combination.session == .error {
             let sequence = steps(combination)
             // A failed probe holds the sequence, and one in flight offers
@@ -271,16 +267,6 @@ final class TapToPayStepsTests: XCTestCase {
         )
         XCTAssertEqual(sequence.recovery, .sessionErrored)
         XCTAssertEqual(sequence.nextAction, .reattest)
-    }
-
-    func testAnExpiredSessionKeepsTheCheaperRecovery() {
-        // Expiry does not touch the attested identity, so config and the reader
-        // are all that need re-running.
-        for combination in everyCombination where combination.session == .sessionExpired {
-            let sequence = steps(combination)
-            guard sequence.token.status.isFinished else { continue }
-            XCTAssertEqual(sequence.nextAction, .reinitialize, "\(combination)")
-        }
     }
 
     func testAFailedProbeKeepsTheOnlyActionOnTheProbe() {

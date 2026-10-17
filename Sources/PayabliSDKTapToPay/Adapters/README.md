@@ -83,7 +83,7 @@ SDK's own config object. `cancelReading` / `cleanUp` must release that by
 destroying the reader.
 
 Consequence: any retry / re-initialize needs a fresh `/config` fetch. The
-facade (`PayabliTTP+Initialize.swift → reinitializeIfNeeded`) already handles
+facade's repair (`PayabliTTP+Initialize.swift → reinitialize`) already handles
 this, so don't cache credentials yourself to "optimize" retries.
 
 ---

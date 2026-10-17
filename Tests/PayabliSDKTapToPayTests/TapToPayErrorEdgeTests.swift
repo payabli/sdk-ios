@@ -22,7 +22,6 @@ final class TapToPayErrorEdgeTests: XCTestCase {
     func testEveryCallHandsAHostOneTypeCarryingItsClassification() async throws {
         let calls: [(String, (PayabliTTP) async throws -> Void)] = [
             ("initialize", { try await $0.initialize() }),
-            ("reinitializeIfNeeded", { try await $0.reinitializeIfNeeded() }),
             ("charge", { _ = try await $0.charge(type: .sale, paymentDetails: Self.paymentDetails) }),
             ("areTermsAccepted", { _ = try await $0.areTermsAccepted() }),
             ("presentTerms", { try await $0.presentTerms() })
@@ -124,7 +123,6 @@ final class TapToPayErrorEdgeTests: XCTestCase {
     func testEveryObjectiveCCompanionCompletesWithTheCatalogNumber() async throws {
         let calls: [(String, (PayabliTTP, @escaping (NSError?) -> Void) -> Void)] = [
             ("initialize", { ttp, done in ttp.initialize(completion: done) }),
-            ("reinitializeIfNeeded", { ttp, done in ttp.reinitializeIfNeeded(completion: done) }),
             ("charge", { ttp, done in
                 ttp.charge(
                     type: 0,

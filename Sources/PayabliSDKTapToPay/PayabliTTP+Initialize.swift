@@ -98,16 +98,8 @@ extension PayabliTTP {
         }
     }
 
-    /// Session refresh for host/bridge re-entry.
-    ///
-    /// No-op when already `.ready` or while a charge runs. For non-terminal transient states
-    /// (`.sessionExpired`, `.idle`, `.error`) re-runs steps 2–4 of
-    /// `initialize()`. Providers don't cache credentials across sessions, so every refresh
-    /// re-fetches `/config`.
-    public func reinitializeIfNeeded() async throws {
-        try await reportingToHost { try await reinitialize() }
-    }
-
+    /// The repair `charge` runs first: nothing when `.ready`, and steps 2–4 of `initialize()` from
+    /// `.sessionExpired`, `.idle` or `.failed`, with a fresh `/config` each time.
     func reinitialize() async throws {
         try await runSessionSetup(.reinitialize) { try await self.runReinitializeIfNeeded() }
     }
@@ -137,22 +129,6 @@ extension PayabliTTP {
         try await runPrepareReaderPhase()
         _ = sessionManager.transition(to: .ready)
         syncPublished()
-    }
-
-    /// `@objc` companion to `reinitializeIfNeeded()`. Same callback contract
-    /// as the `initialize` companion above — always invoked on the main
-    /// thread.
-    @objc public func reinitializeIfNeeded(
-        completion: @escaping (NSError?) -> Void
-    ) {
-        Task { @MainActor in
-            do {
-                try await self.reinitializeIfNeeded()
-                completion(nil)
-            } catch {
-                completion(error.toPayabliNSError())
-            }
-        }
     }
 
     // MARK: - Phase 0 — eligibility

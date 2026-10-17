@@ -173,7 +173,7 @@ struct PaymentTapToPayQAView: View {
     private func recoveryDetail(_ recovery: TapToPayRecovery) -> String {
         switch recovery {
         case .sessionExpired:
-            "The session expired. This re-runs config and reader setup without a fresh attestation."
+            "The session expired. This runs the full setup, re-using the attested identity."
         case .sessionErrored:
             "The session errored. This runs the full setup, re-using the attested identity when it is still held and attesting again when it is not."
         }
@@ -196,13 +196,10 @@ struct PaymentTapToPayQAView: View {
                     .font(.caption)
                     .foregroundColor(.payabliOnSurfaceVariant)
                 Button {
-                    steps.nextAction == .reinitialize ? runReinitialize() : runEnableTerminal()
+                    runEnableTerminal()
                 } label: {
-                    Label(
-                        steps.nextAction == .reinitialize ? "Re-initialize" : "Run full setup",
-                        systemImage: "arrow.clockwise"
-                    )
-                    .frame(maxWidth: .infinity)
+                    Label("Run full setup", systemImage: "arrow.clockwise")
+                        .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.bordered)
                 .disabled(isWorking)
@@ -493,20 +490,6 @@ struct PaymentTapToPayQAView: View {
             do {
                 try await terminal.initialize()
                 enableMessage = "✓ Reader ready"
-            } catch {
-                enableMessage = "✗ \(error.localizedDescription)"
-            }
-        }
-    }
-
-    private func runReinitialize() {
-        clearOutcomesForNewSession()
-        isWorking = true
-        Task { @MainActor in
-            defer { isWorking = false }
-            do {
-                try await terminal.reinitializeIfNeeded()
-                enableMessage = "✓ Re-initialized"
             } catch {
                 enableMessage = "✗ \(error.localizedDescription)"
             }

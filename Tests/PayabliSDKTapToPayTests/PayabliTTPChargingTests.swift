@@ -186,7 +186,7 @@ final class PayabliTTPChargingTests: XCTestCase {
         let during = Snapshot()
         provider.whileReading = { [weak ttp] in
             do {
-                try await ttp?.reinitializeIfNeeded()
+                try await ttp?.reinitialize()
             } catch {
                 during.refusal = (error as? TapToPayError)?.type
             }

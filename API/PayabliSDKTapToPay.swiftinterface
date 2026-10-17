@@ -27,8 +27,6 @@ public enum PayabliTapToPayModule {
 @_Concurrency::MainActor extension PayabliSDKTapToPay::PayabliTTP {
   @_Concurrency::MainActor final public func initialize() async throws
   @objc @_Concurrency::MainActor final public func initialize(completion: @escaping (Foundation::NSError?) -> Swift::Void)
-  @_Concurrency::MainActor final public func reinitializeIfNeeded() async throws
-  @objc @_Concurrency::MainActor final public func reinitializeIfNeeded(completion: @escaping (Foundation::NSError?) -> Swift::Void)
 }
 @_Concurrency::MainActor extension PayabliSDKTapToPay::PayabliTTP {
   @_Concurrency::MainActor final public func areTermsAccepted() async throws -> Swift::Bool
