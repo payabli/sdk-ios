@@ -206,7 +206,9 @@ final class PayabliTTPReaderSessionRecoveryTests: XCTestCase {
         provider.armGate()
 
         let first = Task { @MainActor in try await ttp.initialize() }
-        for _ in 0 ..< 20 { await Task.yield() }
+        for _ in 0 ..< 20 {
+            await Task.yield()
+        }
         let charging = Task { @MainActor in try await self.charge(ttp) }
         await Task.yield()
         let readBeforeSecondReturned = Flag()
@@ -214,7 +216,9 @@ final class PayabliTTPReaderSessionRecoveryTests: XCTestCase {
             try await ttp.initialize()
             readBeforeSecondReturned.value = read.value
         }
-        for _ in 0 ..< 20 { await Task.yield() }
+        for _ in 0 ..< 20 {
+            await Task.yield()
+        }
         provider.openGate()
 
         try await bounded { try await first.value }
@@ -238,11 +242,15 @@ final class PayabliTTPReaderSessionRecoveryTests: XCTestCase {
         provider.armGate()
 
         let first = Task { @MainActor in try await ttp.initialize() }
-        for _ in 0 ..< 20 { await Task.yield() }
+        for _ in 0 ..< 20 {
+            await Task.yield()
+        }
         let queued = Task { @MainActor in try await other.initialize() }
         await Task.yield()
         let second = Task { @MainActor in try await ttp.initialize() }
-        for _ in 0 ..< 20 { await Task.yield() }
+        for _ in 0 ..< 20 {
+            await Task.yield()
+        }
         provider.openGate()
 
         try await bounded { try await first.value }
