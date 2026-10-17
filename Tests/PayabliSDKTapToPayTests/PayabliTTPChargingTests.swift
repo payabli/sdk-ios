@@ -134,8 +134,8 @@ final class PayabliTTPChargingTests: XCTestCase {
     func testASecondChargeIsRefusedWhileOneHoldsTheReader() async throws {
         let (ttp, provider) = try await makeReadyTTP()
         let during = Snapshot()
-        // Started beside the read: a second charge that is queued waits on this read, so awaiting it here
-        // would hang the suite.
+        // The second charge starts beside the read and is awaited after the first returns, so a queued one
+        // fails the assertions below.
         provider.whileReading = { [weak ttp] in
             guard let ttp else { return }
             during.second = Task { @MainActor in
@@ -249,8 +249,8 @@ final class PayabliTTPChargingTests: XCTestCase {
         let (ttp, provider) = try await makeReadyTTP()
         let (other, otherProvider) = try await makeReadyTTP()
         let during = Snapshot()
-        // Started beside the read: a second charge that is queued waits on this read, so awaiting it here
-        // would hang the suite.
+        // The second charge starts beside the read and is awaited after the first returns, so a queued one
+        // fails the assertions below.
         provider.whileReading = { [weak other] in
             guard let other else { return }
             during.second = Task { @MainActor in

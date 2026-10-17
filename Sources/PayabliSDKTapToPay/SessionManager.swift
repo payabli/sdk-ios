@@ -1,8 +1,8 @@
 import Combine
 import Foundation
 
-/// Which entry point is building the session, so the two can be told apart when
-/// one is already running.
+/// Which operation holds the session-setup gate, so a later call can tell whether it joins the one in
+/// flight or waits for it.
 enum SessionSetupKind {
     case initialize
     case reinitialize
