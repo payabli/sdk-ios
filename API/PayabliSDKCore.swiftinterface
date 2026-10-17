@@ -50,6 +50,7 @@ public enum PayabliErrorType : Swift::String, Swift::Sendable, Swift::CaseIterab
   case transactionNotFound
   case retryRefused
   case retryNotSamePayment
+  case paymentReferenceOpen
   case deviceKeyUnavailable
   case deviceSetupUnsupported
   case deviceServicesOutdated

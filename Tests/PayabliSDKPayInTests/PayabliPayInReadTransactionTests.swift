@@ -20,7 +20,7 @@ final class PayabliPayInReadTransactionTests: XCTestCase {
         let transport = RecordingIdempotencyTransport(bodies: [PayInFixture.approved, Self.record])
         let flow = PayInFixture.makeFlow(transport: transport, key: "reserved-1")
 
-        let captured = try await flow.capture(PayInFixture.request(idempotencyKey: nil))
+        let captured = try await flow.capture(PayInFixture.request())
         _ = try await flow.readTransaction("101-abc")
 
         XCTAssertEqual(flow.lastResult, captured)
@@ -30,7 +30,7 @@ final class PayabliPayInReadTransactionTests: XCTestCase {
         let transport = HeldSubmissionTransport(read: Self.record)
         let flow = PayInFixture.makeFlow(transport: transport, key: "reserved-2")
 
-        let submission = Task { try await flow.capture(PayInFixture.request(idempotencyKey: nil)) }
+        let submission = Task { try await flow.capture(PayInFixture.request()) }
         await transport.waitForTheSubmission()
         XCTAssertTrue(flow.isSubmitting)
 

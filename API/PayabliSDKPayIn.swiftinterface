@@ -142,7 +142,7 @@ public enum PayabliPayInError : PayabliSDKCore::PayabliError, Swift::Equatable {
   case missingAccessToken
   case submissionInProgress
   case transactionFailed(PayabliSDKPayIn::PayabliPayInFailure)
-  case submissionInterrupted(type: PayabliSDKCore::PayabliErrorType, causeType: Swift::String, paymentTransId: Swift::String?)
+  case submissionInterrupted(type: PayabliSDKCore::PayabliErrorType, causeType: Swift::String, paymentTransId: Swift::String?, paymentReference: Swift::String?)
   public var type: PayabliSDKCore::PayabliErrorType {
     get
   }
@@ -850,19 +850,18 @@ public struct PayabliPayInRequestConfiguration : Swift::Sendable {
   public let source: Swift::String?
   public let subdomain: Swift::String?
   public let subscriptionId: Swift::Int64?
-  public let idempotencyKey: Swift::String?
+  public let paymentReference: Swift::String?
   public let attempt: PayabliSDKCore::PayabliAttempt
   public let achValidation: Swift::Bool?
   public let forceCustomerCreation: Swift::Bool?
   public let validation: PayabliSDKPayIn::PayabliPayInValidation
-  public init(paymentDetails: PayabliSDKPayIn::PayabliPayInPaymentDetails, accountId: Swift::String? = nil, customerData: PayabliSDKPayIn::PayabliPayInCustomerData? = nil, ipAddress: Swift::String? = nil, orderDescription: Swift::String? = nil, orderId: Swift::String? = nil, source: Swift::String? = nil, subdomain: Swift::String? = nil, subscriptionId: Swift::Int64? = nil, idempotencyKey: Swift::String? = nil, attempt: PayabliSDKCore::PayabliAttempt = .newPayment, achValidation: Swift::Bool? = nil, forceCustomerCreation: Swift::Bool? = nil, validation: PayabliSDKPayIn::PayabliPayInValidation = .default)
+  public init(paymentDetails: PayabliSDKPayIn::PayabliPayInPaymentDetails, accountId: Swift::String? = nil, customerData: PayabliSDKPayIn::PayabliPayInCustomerData? = nil, ipAddress: Swift::String? = nil, orderDescription: Swift::String? = nil, orderId: Swift::String? = nil, source: Swift::String? = nil, subdomain: Swift::String? = nil, subscriptionId: Swift::Int64? = nil, paymentReference: Swift::String? = nil, attempt: PayabliSDKCore::PayabliAttempt = .newPayment, achValidation: Swift::Bool? = nil, forceCustomerCreation: Swift::Bool? = nil, validation: PayabliSDKPayIn::PayabliPayInValidation = .default)
   public func request(paymentMethod: PayabliSDKPayIn::PayabliPayInPaymentMethod, customerData formCustomerData: PayabliSDKPayIn::PayabliPayInCustomerData? = nil, orderDescription formOrderDescription: Swift::String? = nil) -> PayabliSDKPayIn::PayabliPayInRequest
 }
 public struct PayabliPayInAuthorizedRequest : Swift::Sendable {
   public let transId: Swift::String
   public let paymentDetails: PayabliSDKPayIn::PayabliPayInPaymentDetails
-  public let idempotencyKey: Swift::String?
-  public init(transId: Swift::String, paymentDetails: PayabliSDKPayIn::PayabliPayInPaymentDetails, idempotencyKey: Swift::String? = nil)
+  public init(transId: Swift::String, paymentDetails: PayabliSDKPayIn::PayabliPayInPaymentDetails)
 }
 public struct PayabliPayInFailure : Swift::Codable, Swift::Sendable, Swift::Equatable {
   public let code: Swift::String?

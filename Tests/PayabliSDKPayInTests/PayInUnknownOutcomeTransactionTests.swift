@@ -13,10 +13,10 @@ final class PayInUnknownOutcomeTransactionTests: XCTestCase {
         let flow = PayInFixture.makeFlow(transport: transport, key: "reserved-1")
 
         let failure = await PayInFixture.failure(from: {
-            _ = try await flow.capture(PayInFixture.request(idempotencyKey: nil))
+            _ = try await flow.capture(PayInFixture.request())
         })
 
-        guard case let .submissionInterrupted(type, _, paymentTransId) = failure as? PayabliPayInError else {
+        guard case let .submissionInterrupted(type, _, paymentTransId, _) = failure as? PayabliPayInError else {
             return XCTFail("expected submissionInterrupted, got \(failure)")
         }
         XCTAssertEqual(type, .serverError)
@@ -31,10 +31,10 @@ final class PayInUnknownOutcomeTransactionTests: XCTestCase {
         let flow = PayInFixture.makeFlow(transport: transport, key: "reserved-4")
 
         let failure = await PayInFixture.failure(from: {
-            _ = try await flow.capture(PayInFixture.request(idempotencyKey: nil))
+            _ = try await flow.capture(PayInFixture.request())
         })
 
-        guard case let .submissionInterrupted(_, _, paymentTransId) = failure as? PayabliPayInError else {
+        guard case let .submissionInterrupted(_, _, paymentTransId, _) = failure as? PayabliPayInError else {
             return XCTFail("expected submissionInterrupted, got \(failure)")
         }
         XCTAssertEqual(paymentTransId, "101-abc")
@@ -48,10 +48,10 @@ final class PayInUnknownOutcomeTransactionTests: XCTestCase {
         let flow = PayInFixture.makeFlow(transport: transport, key: "reserved-5")
 
         let failure = await PayInFixture.failure(from: {
-            _ = try await flow.capture(PayInFixture.request(idempotencyKey: nil))
+            _ = try await flow.capture(PayInFixture.request())
         })
 
-        guard case let .submissionInterrupted(_, _, paymentTransId) = failure as? PayabliPayInError else {
+        guard case let .submissionInterrupted(_, _, paymentTransId, _) = failure as? PayabliPayInError else {
             return XCTFail("expected submissionInterrupted, got \(failure)")
         }
         XCTAssertEqual(paymentTransId, "101-abc")
@@ -65,10 +65,10 @@ final class PayInUnknownOutcomeTransactionTests: XCTestCase {
         let flow = PayInFixture.makeFlow(transport: transport, key: "reserved-6")
 
         let failure = await PayInFixture.failure(from: {
-            _ = try await flow.capture(PayInFixture.request(idempotencyKey: nil))
+            _ = try await flow.capture(PayInFixture.request())
         })
 
-        guard case let .submissionInterrupted(type, _, paymentTransId) = failure as? PayabliPayInError else {
+        guard case let .submissionInterrupted(type, _, paymentTransId, _) = failure as? PayabliPayInError else {
             return XCTFail("expected submissionInterrupted, got \(failure)")
         }
         XCTAssertEqual(type, .decodingError)
@@ -83,10 +83,10 @@ final class PayInUnknownOutcomeTransactionTests: XCTestCase {
         let flow = PayInFixture.makeFlow(transport: transport, key: "reserved-7")
 
         let failure = await PayInFixture.failure(from: {
-            _ = try await flow.capture(PayInFixture.request(idempotencyKey: nil))
+            _ = try await flow.capture(PayInFixture.request())
         })
 
-        guard case let .submissionInterrupted(type, _, paymentTransId) = failure as? PayabliPayInError else {
+        guard case let .submissionInterrupted(type, _, paymentTransId, _) = failure as? PayabliPayInError else {
             return XCTFail("expected submissionInterrupted, got \(failure)")
         }
         XCTAssertEqual(type, .serverError)
@@ -100,10 +100,10 @@ final class PayInUnknownOutcomeTransactionTests: XCTestCase {
         let flow = PayInFixture.makeFlow(transport: transport, key: "reserved-2")
 
         let failure = await PayInFixture.failure(from: {
-            _ = try await flow.capture(PayInFixture.request(idempotencyKey: nil))
+            _ = try await flow.capture(PayInFixture.request())
         })
 
-        guard case let .submissionInterrupted(_, _, paymentTransId) = failure as? PayabliPayInError else {
+        guard case let .submissionInterrupted(_, _, paymentTransId, _) = failure as? PayabliPayInError else {
             return XCTFail("expected submissionInterrupted, got \(failure)")
         }
         XCTAssertNil(paymentTransId)
@@ -117,10 +117,10 @@ final class PayInUnknownOutcomeTransactionTests: XCTestCase {
         let flow = PayInFixture.makeFlow(transport: transport, key: "reserved-3")
 
         let failure = await PayInFixture.failure(from: {
-            _ = try await flow.capture(PayInFixture.request(idempotencyKey: nil))
+            _ = try await flow.capture(PayInFixture.request())
         })
 
-        guard case let .submissionInterrupted(_, _, paymentTransId) = failure as? PayabliPayInError else {
+        guard case let .submissionInterrupted(_, _, paymentTransId, _) = failure as? PayabliPayInError else {
             return XCTFail("expected submissionInterrupted, got \(failure)")
         }
         XCTAssertNil(paymentTransId)

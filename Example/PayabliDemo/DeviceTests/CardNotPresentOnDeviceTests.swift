@@ -168,7 +168,7 @@ final class CardNotPresentOnDeviceTests: XCTestCase {
                 orderDescription: configured.orderDescription,
                 orderId: configured.orderId,
                 source: configured.source,
-                idempotencyKey: configured.idempotencyKey,
+                paymentReference: configured.paymentReference,
                 forceCustomerCreation: configured.forceCustomerCreation,
                 validation: configured.validation
             )
