@@ -1,8 +1,7 @@
 import Combine
 import Foundation
 
-/// Which entry point is building the session, so the two can be told apart when
-/// one is already running.
+/// Which setup a call runs, so a later call of the same kind on the same `PayabliTTP` can join it.
 enum SessionSetupKind {
     case initialize
     case reinitialize
