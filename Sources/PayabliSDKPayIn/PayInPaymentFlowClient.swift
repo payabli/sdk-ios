@@ -307,7 +307,8 @@ final class PayInPaymentFlowClient: Sendable {
             // was sent, so the outcome is known and there is no key to report.
             guard carriesKey, Self.leavesOutcomeUnknown(failure) else { throw failure }
             let interruption = PayabliPayInError.submissionInterrupted(
-                type: (failure as? any PayabliError)?.type ?? .unknown,
+                // Every 409 is a conflict, whatever status its body's envelope names.
+                type: answer?.statusCode == 409 ? .conflict : (failure as? any PayabliError)?.type ?? .unknown,
                 // One definition of what is kept from a failure, reused rather than restated.
                 causeType: RedactedCause(failure).originalType,
                 paymentTransId: Self.namedTransaction(in: answer),
