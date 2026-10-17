@@ -285,7 +285,7 @@ final class PayInPaymentFlowClient: Sendable {
              .readerUnavailable, .readerSessionExpired, .paymentNotOpened, .cardDeclined, .activationCodeMalformed,
              .activationCodeIncorrect, .activationCodeExpired, .activationAttemptsExhausted, .activationCodeNotIssued,
              .deviceNotPending, .terminalNotReady, .tooManyOpenCharges, .paymentNotHeld, .deviceIdentityUnavailable,
-             .transactionNotFound, .retryNotSamePayment:
+             .transactionNotFound, .retryNotSamePayment, .paymentReferenceOpen:
             return false
         }
     }
@@ -308,7 +308,8 @@ final class PayInPaymentFlowClient: Sendable {
                 type: (error as? any PayabliError)?.type ?? .unknown,
                 // One definition of what is kept from a failure, reused rather than restated.
                 causeType: RedactedCause(error).originalType,
-                paymentTransId: Self.namedTransaction(in: answer)
+                paymentTransId: Self.namedTransaction(in: answer),
+                paymentReference: nil
             )
         }
     }

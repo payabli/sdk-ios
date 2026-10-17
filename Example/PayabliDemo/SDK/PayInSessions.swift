@@ -73,7 +73,7 @@ enum PayInSessions {
                         orderDescription: "Preview Payment",
                         orderId: "preview-order",
                         source: "preview",
-                        idempotencyKey: "preview-key"
+                        paymentReference: "preview-reference"
                     )
                     : nil
             )

@@ -3,11 +3,11 @@ import Combine
 @testable import PayabliSDKPayIn
 import XCTest
 
-/// Every money-moving route carries an idempotency key, whether or not the caller supplied one.
+/// Every money-moving route carries an idempotency key, which the SDK mints.
 ///
 /// Without one the service recognises no repeat, so a double submit or a retry is a second payment.
 /// These cases drive the facade rather than the client, because reserving the key is the facade's job
-/// and a client test cannot tell a reserved key from a caller's.
+/// and a client test is handed whatever key it is given.
 @MainActor
 final class PayInIdempotencyTests: XCTestCase {
     // MARK: - The key reaches the wire
@@ -16,25 +16,16 @@ final class PayInIdempotencyTests: XCTestCase {
         let transport = RecordingIdempotencyTransport(body: PayInFixture.approved)
         let flow = PayInFixture.makeFlow(transport: transport, key: "reserved-1")
 
-        _ = try await flow.capture(PayInFixture.request(idempotencyKey: nil))
+        _ = try await flow.capture(PayInFixture.request())
 
         XCTAssertEqual(transport.sentKeys, ["reserved-1"])
-    }
-
-    func testACallersOwnKeyIsSentUnchanged() async throws {
-        let transport = RecordingIdempotencyTransport(body: PayInFixture.approved)
-        let flow = PayInFixture.makeFlow(transport: transport, key: "reserved-1")
-
-        _ = try await flow.capture(PayInFixture.request(idempotencyKey: "caller-key"))
-
-        XCTAssertEqual(transport.sentKeys, ["caller-key"], "a reserved key must not replace the caller's")
     }
 
     func testAnAuthorizationCarriesAKey() async throws {
         let transport = RecordingIdempotencyTransport(body: PayInFixture.approved)
         let flow = PayInFixture.makeFlow(transport: transport, key: "reserved-2")
 
-        _ = try await flow.authorize(PayInFixture.request(idempotencyKey: nil, cardOnly: true))
+        _ = try await flow.authorize(PayInFixture.request(cardOnly: true))
 
         XCTAssertEqual(transport.sentKeys, ["reserved-2"])
     }
@@ -76,7 +67,7 @@ final class PayInIdempotencyTests: XCTestCase {
         )
         let flow = PayInFixture.makeFlow(transport: transport, key: "reserved-6")
 
-        let captured = try await flow.capture(PayInFixture.request(idempotencyKey: nil))
+        let captured = try await flow.capture(PayInFixture.request())
         let reversed = try await flow.voidTransaction("trans-1")
 
         XCTAssertEqual(reversed.code, "A0003", "the reversal did not get its own answer")
@@ -101,7 +92,7 @@ final class PayInIdempotencyTests: XCTestCase {
         }
         defer { watching.cancel() }
 
-        _ = try await flow.capture(PayInFixture.request(idempotencyKey: nil))
+        _ = try await flow.capture(PayInFixture.request())
 
         XCTAssertEqual(heldWhenFinished.count, 2, "the submission did not report itself finished")
         XCTAssertNotNil(
@@ -140,62 +131,12 @@ final class PayInIdempotencyTests: XCTestCase {
             return "reserved-\(minted)"
         }
 
-        _ = try await flow.capture(PayInFixture.request(idempotencyKey: nil))
-        _ = try await flow.capture(PayInFixture.request(idempotencyKey: nil))
+        _ = try await flow.capture(PayInFixture.request())
+        _ = try await flow.capture(PayInFixture.request())
 
         // A second payment is a second key. A retry the caller chooses is the caller's own key, which
         // is the case above.
         XCTAssertEqual(transport.sentKeys, ["reserved-1", "reserved-2"])
-    }
-
-    // MARK: - A key that cannot be sent is refused, not dropped
-
-    func testABlankKeyIsRefusedAndNothingIsSent() async {
-        let transport = RecordingIdempotencyTransport(body: PayInFixture.approved)
-        let flow = PayInFixture.makeFlow(transport: transport, key: "reserved-1")
-
-        let failure = await PayInFixture.failure(from: {
-            _ = try await flow.capture(PayInFixture.request(idempotencyKey: " "))
-        })
-
-        // Dropping it silently is the defect: the request would go out with no duplicate protection
-        // to a caller who set a key and believes it is protected.
-        XCTAssertEqual(
-            failure as? PayabliPayInError,
-            .invalidInput("The idempotency key cannot be blank.")
-        )
-        XCTAssertEqual(transport.count, 0, "nothing is sent")
-    }
-
-    func testAKeyThatCannotSitInAHeaderIsRefused() async {
-        let transport = RecordingIdempotencyTransport(body: PayInFixture.approved)
-        let flow = PayInFixture.makeFlow(transport: transport, key: "reserved-1")
-
-        let failure = await PayInFixture.failure(from: {
-            _ = try await flow.capture(PayInFixture.request(idempotencyKey: "key\r\nX-Injected: v"))
-        })
-
-        XCTAssertEqual(
-            failure as? PayabliPayInError,
-            .invalidInput("The idempotency key may contain printable ASCII only.")
-        )
-        XCTAssertEqual(transport.count, 0, "nothing is sent")
-    }
-
-    /// `sendableKey` normalises before the header is set, so a caller value with surrounding space
-    /// reaches the wire trimmed rather than as it was given.
-    func testACallersKeyIsSentTrimmedRatherThanAsGiven() async {
-        let transport = RecordingIdempotencyTransport(
-            failure: PayabliGenericError(type: .networkError, reason: "Network request failed")
-        )
-        let flow = PayInFixture.makeFlow(transport: transport, key: "unused")
-
-        let failure = await PayInFixture.failure(from: {
-            _ = try await flow.capture(PayInFixture.request(idempotencyKey: "  caller-key  "))
-        })
-
-        XCTAssertEqual(transport.sentKeys, ["caller-key"])
-        XCTAssertNotNil(PayInFixture.interruption(failure), "expected submissionInterrupted, got \(failure)")
     }
 
     // MARK: - Which failures leave the outcome open
@@ -209,7 +150,7 @@ final class PayInIdempotencyTests: XCTestCase {
         let flow = PayInFixture.makeFlow(transport: transport, key: "reserved-9")
 
         let failure = await PayInFixture.failure(from: {
-            _ = try await flow.capture(PayInFixture.request(idempotencyKey: nil))
+            _ = try await flow.capture(PayInFixture.request())
         })
 
         guard let interrupted = PayInFixture.interruption(failure) else {
@@ -232,7 +173,7 @@ final class PayInIdempotencyTests: XCTestCase {
         let flow = PayInFixture.makeFlow(transport: transport, key: "reserved-9")
 
         let failure = await PayInFixture.failure(from: {
-            _ = try await flow.capture(PayInFixture.request(idempotencyKey: nil))
+            _ = try await flow.capture(PayInFixture.request())
         })
 
         guard let interrupted = PayInFixture.interruption(failure) else {
@@ -250,7 +191,7 @@ final class PayInIdempotencyTests: XCTestCase {
         let flow = PayInFixture.makeFlow(transport: transport, key: "reserved-9")
 
         let failure = await PayInFixture.failure(from: {
-            _ = try await flow.capture(PayInFixture.request(idempotencyKey: nil))
+            _ = try await flow.capture(PayInFixture.request())
         })
 
         guard let interrupted = PayInFixture.interruption(failure) else {
@@ -275,7 +216,7 @@ final class PayInIdempotencyTests: XCTestCase {
         let flow = PayInFixture.makeFlow(transport: transport, key: "reserved-9")
 
         let failure = await PayInFixture.failure(from: {
-            _ = try await flow.capture(PayInFixture.request(idempotencyKey: nil))
+            _ = try await flow.capture(PayInFixture.request())
         })
 
         guard let interrupted = PayInFixture.interruption(failure) else {
@@ -294,7 +235,7 @@ final class PayInIdempotencyTests: XCTestCase {
         let flow = PayInFixture.makeFlow(transport: transport, key: "reserved-9")
 
         let failure = await PayInFixture.failure(from: {
-            _ = try await flow.capture(PayInFixture.request(idempotencyKey: nil))
+            _ = try await flow.capture(PayInFixture.request())
         })
 
         XCTAssertEqual((failure as? any PayabliError)?.type, .deviceIdentityUnavailable)
@@ -308,7 +249,7 @@ final class PayInIdempotencyTests: XCTestCase {
         let flow = PayInFixture.makeFlow(transport: transport, key: "reserved-9")
 
         let failure = await PayInFixture.failure(from: {
-            _ = try await flow.capture(PayInFixture.request(idempotencyKey: nil))
+            _ = try await flow.capture(PayInFixture.request())
         })
 
         guard let interrupted = PayInFixture.interruption(failure) else {
@@ -326,7 +267,7 @@ final class PayInIdempotencyTests: XCTestCase {
         let flow = PayInFixture.makeFlow(transport: transport, key: "reserved-9")
 
         let failure = await PayInFixture.failure(from: {
-            _ = try await flow.capture(PayInFixture.request(idempotencyKey: nil))
+            _ = try await flow.capture(PayInFixture.request())
         })
 
         guard case .transactionFailed = failure as? PayabliPayInError else {
@@ -346,7 +287,7 @@ final class PayInIdempotencyTests: XCTestCase {
         let flow = PayInFixture.makeFlow(transport: transport, key: "reserved-9")
 
         let failure = await PayInFixture.failure(from: {
-            _ = try await flow.capture(PayInFixture.request(idempotencyKey: nil))
+            _ = try await flow.capture(PayInFixture.request())
         })
 
         guard let interrupted = PayInFixture.interruption(failure) else {
@@ -367,7 +308,7 @@ final class PayInIdempotencyTests: XCTestCase {
         let flow = PayInFixture.makeFlow(transport: transport, key: "reserved-9")
 
         let failure = await PayInFixture.failure(from: {
-            _ = try await flow.capture(PayInFixture.request(idempotencyKey: nil))
+            _ = try await flow.capture(PayInFixture.request())
         })
 
         guard let interrupted = PayInFixture.interruption(failure) else {
@@ -385,7 +326,7 @@ final class PayInIdempotencyTests: XCTestCase {
         let flow = PayInFixture.makeFlow(transport: transport, key: "reserved-9")
 
         let failure = await PayInFixture.failure(from: {
-            _ = try await flow.capture(PayInFixture.request(idempotencyKey: nil))
+            _ = try await flow.capture(PayInFixture.request())
         })
 
         guard let interrupted = PayInFixture.interruption(failure) else {
@@ -401,7 +342,7 @@ final class PayInIdempotencyTests: XCTestCase {
         let flow = PayInFixture.makeFlow(transport: transport, key: "reserved-9")
 
         let failure = await PayInFixture.failure(from: {
-            _ = try await flow.capture(PayInFixture.request(idempotencyKey: nil))
+            _ = try await flow.capture(PayInFixture.request())
         })
 
         XCTAssertEqual((failure as? any PayabliError)?.type, .paymentDeclined)
@@ -415,7 +356,7 @@ final class PayInIdempotencyTests: XCTestCase {
         let flow = PayInFixture.makeFlow(transport: transport, key: "reserved-9")
 
         let failure = await PayInFixture.failure(from: {
-            _ = try await flow.capture(PayInFixture.request(idempotencyKey: nil))
+            _ = try await flow.capture(PayInFixture.request())
         })
 
         XCTAssertEqual((failure as? any PayabliError)?.type, .rateLimited)
@@ -430,7 +371,7 @@ final class PayInIdempotencyTests: XCTestCase {
         let flow = PayInFixture.makeFlow(transport: transport, key: "reserved-9")
 
         let failure = await PayInFixture.failure(from: {
-            _ = try await flow.capture(PayInFixture.request(idempotencyKey: nil))
+            _ = try await flow.capture(PayInFixture.request())
         })
 
         XCTAssertEqual((failure as? any PayabliError)?.type, .sessionNotInitialized)
@@ -455,7 +396,7 @@ final class PayInIdempotencyTests: XCTestCase {
             let flow = PayInFixture.makeFlow(transport: transport, key: "reserved-9")
 
             let failure = await PayInFixture.failure(from: {
-                _ = try await flow.capture(PayInFixture.request(idempotencyKey: nil))
+                _ = try await flow.capture(PayInFixture.request())
             })
 
             XCTAssertEqual(

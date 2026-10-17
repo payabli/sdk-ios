@@ -56,6 +56,14 @@ final class PayabliErrorCatalogTests: XCTestCase {
                 + "Check that payment first; to charge a different payment, send it as a new payment."
         ),
         (
+            .paymentReferenceOpen,
+            "PAYMENT_REFERENCE_OPEN",
+            1023,
+            .invalidRequest,
+            "A payment with this reference is still unresolved, so this one was not sent. "
+                + "Check that payment first, or retry it."
+        ),
+        (
             .deviceKeyUnavailable,
             "DEVICE_KEY_UNAVAILABLE",
             3001,

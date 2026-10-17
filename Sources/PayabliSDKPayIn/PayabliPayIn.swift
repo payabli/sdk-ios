@@ -231,7 +231,7 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
             try await client.capture(
                 entryPoint: entryPoint,
                 request: request,
-                idempotencyKey: self.reserveKey(request.options.idempotencyKey)
+                idempotencyKey: self.reserveKey()
             )
         }
     }
@@ -247,7 +247,7 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
             try await client.authorize(
                 entryPoint: entryPoint,
                 request: request,
-                idempotencyKey: self.reserveKey(request.options.idempotencyKey)
+                idempotencyKey: self.reserveKey()
             )
         }
     }
@@ -260,7 +260,7 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
         try await submit {
             try await client.captureAuthorized(
                 request,
-                idempotencyKey: self.reserveKey(request.idempotencyKey)
+                idempotencyKey: self.reserveKey()
             )
         }
     }
@@ -282,7 +282,7 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
         try await exclusively {
             try await client.void(
                 transId: transId,
-                idempotencyKey: self.reserveKey(nil)
+                idempotencyKey: self.reserveKey()
             )
         }
     }
@@ -290,7 +290,7 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
     /// Reads a transaction back by its identifier, to learn what a payment did.
     ///
     /// Moves no money, so it runs while a submission is in flight and leaves ``lastResult`` alone. A failed
-    /// read is never ``PayabliPayInError/submissionInterrupted(type:causeType:paymentTransId:)``.
+    /// read is never ``PayabliPayInError/submissionInterrupted(type:causeType:paymentTransId:paymentReference:)``.
     /// `TRANSACTION_NOT_FOUND` means nothing is visible under the identifier yet, and `PERMISSION_DENIED` that
     /// this session may not read it.
     ///
@@ -303,7 +303,7 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
         try await client.details(transId: transId)
     }
 
-    /// The key this attempt sends: the caller's when it set one, otherwise a fresh one.
+    /// The key this attempt sends, minted here, since no key comes from the app.
     ///
     /// A money-moving request always carries one. Left absent, the service recognises no repeat, so a
     /// double submit or a resend takes the money twice rather than being refused.
@@ -313,11 +313,8 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
     /// submissions a host has described identically are one payment to anything readable here, so
     /// inferring would refuse a legitimate second payment of equal value. The host declares a retry and
     /// the SDK supplies the key, and until that member exists nothing here reuses one.
-    ///
-    /// A key the caller supplied is refused rather than replaced when it cannot be sent, which is the
-    /// client's to decide, since substituting one would send a key the caller does not hold.
-    private func reserveKey(_ supplied: String?) -> String {
-        supplied ?? newIdempotencyKey()
+    private func reserveKey() -> String {
+        newIdempotencyKey()
     }
 
     /// Runs one operation at a time and answers its caller, publishing nothing.
