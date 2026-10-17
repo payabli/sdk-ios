@@ -124,6 +124,21 @@ final class PayInFlowHandleTests: XCTestCase {
         XCTAssertEqual(authorize.requestReference, authorizeKey, "another flow's key changed with the completion")
     }
 
+    func testTheSameAttemptKeepsEverySettingButTheCustomer() {
+        let current = PayabliPayInRequestConfiguration(
+            paymentDetails: PayabliPayInPaymentDetails(totalAmount: 10),
+            orderId: "order-1",
+            paymentReference: "payment-1",
+            attempt: .retry
+        )
+
+        let same = PayInRequests.sameAttempt(as: current, customerData: nil, paymentReference: current.paymentReference)
+
+        XCTAssertEqual(same.attempt, .retry, "the retry became a new payment")
+        XCTAssertEqual(same.paymentReference, "payment-1")
+        XCTAssertEqual(same.orderId, "order-1")
+    }
+
     // MARK: -
 
     private func makeHandle(_ operation: PayabliPayInOperation = .capture) throws -> PayInFlowHandle {

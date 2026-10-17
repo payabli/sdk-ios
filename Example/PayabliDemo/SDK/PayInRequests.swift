@@ -67,6 +67,7 @@ enum PayInRequests {
             subdomain: current.subdomain,
             subscriptionId: current.subscriptionId,
             paymentReference: paymentReference,
+            attempt: current.attempt,
             achValidation: current.achValidation,
             forceCustomerCreation: current.forceCustomerCreation,
             validation: current.validation
