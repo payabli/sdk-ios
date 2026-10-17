@@ -216,6 +216,31 @@ final class PayInHeldKeyTests: XCTestCase {
         XCTAssertEqual(transport.sentKeys, ["k1", "k2", "k1", "k2"])
     }
 
+    func testARefusedCredentialOnAResentKeyLeavesTheOutcomeOpenAndKeepsTheKey() async throws {
+        transport.script = [.lost, .unauthorized, .approved]
+
+        _ = await failure { try await self.flow.capture(self.request(.newPayment)) }
+        clock.advance(by: payabliIdempotencyKeyMaxAge - .seconds(1))
+        let refused = await failure { try await self.flow.capture(self.request(.retry)) }
+        clock.advance(by: .seconds(1))
+        _ = try await flow.capture(request(.retry))
+
+        XCTAssertEqual(PayInFixture.interruption(refused)?.type, .tokenExpired)
+        XCTAssertEqual(Self.reference(in: refused), "p1")
+        XCTAssertEqual(transport.sentKeys, ["k1", "k1", "k2"], "the refused send restarted the key's age")
+    }
+
+    func testARefusedCredentialOnANewKeyIsATokenErrorAndHoldsNothing() async throws {
+        transport.script = [.unauthorized, .approved]
+
+        let refused = await failure { try await self.flow.capture(self.request(.newPayment)) }
+        _ = try await flow.capture(request(.retry))
+
+        XCTAssertEqual((refused as? any PayabliError)?.type, .tokenExpired)
+        XCTAssertNil(PayInFixture.interruption(refused), "a new key's refused credential left the outcome open")
+        XCTAssertEqual(transport.sentKeys, ["k1", "k2"])
+    }
+
     func testATransactionsUnknownOutcomeCarriesNoReference() async {
         transport.script = [.lost]
 
@@ -485,6 +510,7 @@ final class ScriptedTransport: PayabliTransport, @unchecked Sendable {
         case duplicatePayment
         case conflict(String)
         case lost
+        case unauthorized
         case lostBeforeHandOff
         case cancelled(afterHandOff: Bool)
     }
@@ -541,6 +567,8 @@ final class ScriptedTransport: PayabliTransport, @unchecked Sendable {
             throw PayabliGenericError(type: .networkError, reason: "The response was lost.")
         case .cancelled:
             throw CancellationError()
+        case .unauthorized:
+            throw PayabliGenericError(type: .tokenExpired, reason: "Token expired")
         }
     }
 

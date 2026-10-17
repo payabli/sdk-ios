@@ -10,14 +10,6 @@ enum HeldKeyScope: Hashable {
     case authorize(reference: String)
     case captureAuthorized(transId: String)
     case void(transId: String)
-
-    /// Whether the scope names the transaction it acts on, so any answer about that transaction settles it.
-    var namesTransaction: Bool {
-        switch self {
-        case .capture, .authorize: false
-        case .captureAuthorized, .void: true
-        }
-    }
 }
 
 /// The keys of attempts whose outcome nobody knows, kept so a repeat can be refused rather than taken again.
@@ -35,6 +27,8 @@ struct HeldIdempotencyKeys {
         /// The key was held for an earlier attempt and is being sent again.
         let reused: Bool
         let reservedAt: ContinuousClock.Instant
+        /// When the held key's record was last stamped, for a key sent again; nil for a new key.
+        let heldSince: ContinuousClock.Instant?
         /// The payment the key was made for, which stays the same each time a held key is sent.
         let payment: HeldPaymentDescription?
     }
@@ -94,10 +88,11 @@ struct HeldIdempotencyKeys {
             }
             // The first description stays with the key, even if the record ages out while this send is in flight.
             return Reservation(
-                scope: scope, key: held.key, reused: true, reservedAt: now, payment: held.payment ?? payment
+                scope: scope, key: held.key, reused: true, reservedAt: now, heldSince: held.reservedAt,
+                payment: held.payment ?? payment
             )
         }
-        return Reservation(scope: scope, key: mint(), reused: false, reservedAt: now, payment: payment)
+        return Reservation(scope: scope, key: mint(), reused: false, reservedAt: now, heldSince: nil, payment: payment)
     }
 
     /// Records what became of an attempt.
@@ -111,24 +106,33 @@ struct HeldIdempotencyKeys {
     mutating func settle(_ reservation: Reservation, outcome: Outcome, now: ContinuousClock.Instant) -> Bool {
         let scope = reservation.scope
         switch outcome {
-        case .notAnswered:
+        case .notAnswered, .repeatRefused:
+            keep(reservation)
             return false
         case .answered:
-            if scope.namesTransaction || records[scope]?.key == reservation.key {
+            if records[scope]?.key == reservation.key {
                 records[scope] = nil
             }
-            return false
-        case .repeatRefused:
-            // The service already held the key from an earlier send, so this one restarts nothing.
             return false
         case .unknown:
             return hold(reservation, now: now)
         }
     }
 
+    /// Keeps a resent key on its earlier time, putting it back if it aged out while the send ran.
+    ///
+    /// - Parameter reservation: the reservation the attempt was sent under.
+    private mutating func keep(_ reservation: Reservation) {
+        guard let heldSince = reservation.heldSince, records[reservation.scope] == nil,
+              records.count < Self.capacity
+        else { return }
+        // Its earlier time stays, so the next sweep removes it.
+        records[reservation.scope] = Record(key: reservation.key, reservedAt: heldSince, payment: reservation.payment)
+    }
+
     /// Holds the key of an attempt whose outcome is unknown, from that attempt's reservation.
     ///
-    /// A transaction's record is never displaced by a different key; a route's is, since a retry claims the latest.
+    /// A scope holds one key, and a different key never displaces it.
     private mutating func hold(_ reservation: Reservation, now: ContinuousClock.Instant) -> Bool {
         // A key that expired during the send protects nothing, so it gives up its place before the cap is checked.
         sweep(now: now)
@@ -138,8 +142,6 @@ struct HeldIdempotencyKeys {
                 // This send may be the first to reach the service, so the key's age restarts from it.
                 existing.reservedAt = max(existing.reservedAt, reservation.reservedAt)
                 records[scope] = existing
-            } else if !scope.namesTransaction {
-                records[scope] = Record(key: reservation.key, reservedAt: reservation.reservedAt, payment: reservation.payment)
             }
             isSaturated = false
             return false
