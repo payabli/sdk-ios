@@ -119,38 +119,28 @@ final class FiservCardReaderTests: XCTestCase {
         ])
     }
 
-    func testConfigureMissingRequiredKeyThrows() {
-        let reader = FiservCardReader()
-        do {
-            // Missing `merchantId` and `terminalId`.
-            try reader.configure(credentials: [
-                "secretKey": "s",
-                "apiKey": "a"
-            ])
-            XCTFail("expected readerSetupFailed")
-        } catch let PayabliTTPError.readerSetupFailed(reason, _) {
-            XCTAssertTrue(reason.contains("merchantId"))
-            XCTAssertTrue(reason.contains("terminalId"))
-        } catch {
-            XCTFail("wrong error: \(error)")
+    /// Absent, empty and whitespace-only are one case, and the refusal carries no field name.
+    func testABlankRequiredCredentialIsRefusedAsUnusable() {
+        let complete = ["secretKey": "s", "apiKey": "a", "merchantId": "m", "terminalId": "t"]
+        for key in FiservCardReader.requiredCredentialKeys {
+            for value in [nil, "", "  \n"] as [String?] {
+                var raw = complete
+                raw[key] = value
+                do {
+                    try FiservCardReader().configure(credentials: raw)
+                    XCTFail("\(key)=\(String(describing: value)) was accepted")
+                } catch PayabliTTPError.readerCredentialsUnusable {
+                } catch {
+                    XCTFail("\(key)=\(String(describing: value)): wrong error \(error)")
+                }
+            }
         }
     }
 
-    func testConfigureEmptyRequiredFieldThrows() {
-        let reader = FiservCardReader()
-        do {
-            try reader.configure(credentials: [
-                "secretKey": "s",
-                "apiKey": "a",
-                "merchantId": "",
-                "terminalId": "t"
-            ])
-            XCTFail("expected readerSetupFailed")
-        } catch let PayabliTTPError.readerSetupFailed(reason, _) {
-            XCTAssertTrue(reason.contains("merchantId"))
-        } catch {
-            XCTFail("wrong error: \(error)")
-        }
+    func testCompleteCredentialsAreAccepted() throws {
+        try FiservCardReader().configure(credentials: [
+            "secretKey": "s", "apiKey": "a", "merchantId": "m", "terminalId": "t"
+        ])
     }
 
     func testCleanUpClearsCredentials() async {

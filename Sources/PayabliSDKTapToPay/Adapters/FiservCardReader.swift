@@ -118,14 +118,18 @@ package final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
         "merchantName", "merchantCategoryCode", "terminalProfileId"
     ]
 
-    /// Validates the `/config` `providerCredentials` dict and stores it as
-    /// `Credentials`. Throws on any missing required key.
+    /// Validates the `/config` `providerCredentials` dict and stores it as `Credentials`.
+    ///
+    /// - Parameter raw: the credentials the configuration route returned.
+    /// - Throws: `readerCredentialsUnusable` when a required key is absent, empty or whitespace. The error names
+    ///   no key; the missing names go to the log.
     package func configure(credentials raw: [String: String]) throws {
-        let missing = Self.requiredCredentialKeys.filter { raw[$0]?.isEmpty != false }
+        let missing = Self.requiredCredentialKeys.filter {
+            raw[$0]?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty != false
+        }
         guard missing.isEmpty else {
-            throw PayabliTTPError.readerSetupFailed(
-                reason: "Provider credentials missing required field(s): \(missing.joined(separator: ", "))"
-            )
+            logger.warning("[fiserv.configure] required credentials blank: \(missing.joined(separator: ", "))")
+            throw PayabliTTPError.readerCredentialsUnusable
         }
 
         let missingOptional = Self.optionalCredentialKeys.filter { raw[$0]?.isEmpty != false }
