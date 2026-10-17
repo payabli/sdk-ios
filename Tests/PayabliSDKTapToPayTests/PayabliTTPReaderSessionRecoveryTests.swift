@@ -201,13 +201,19 @@ final class PayabliTTPReaderSessionRecoveryTests: XCTestCase {
         let ttp = try makeTTP(provider: provider)
         try await bounded { try await ttp.initialize() }
         provider.readingResult = .success(Self.cardReadResult)
+        let read = Flag()
+        provider.duringRead = { read.value = true }
         provider.armGate()
 
         let first = Task { @MainActor in try await ttp.initialize() }
         for _ in 0 ..< 20 { await Task.yield() }
         let charging = Task { @MainActor in try await self.charge(ttp) }
         await Task.yield()
-        let second = Task { @MainActor in try await ttp.initialize() }
+        let readBeforeSecondReturned = Flag()
+        let second = Task { @MainActor in
+            try await ttp.initialize()
+            readBeforeSecondReturned.value = read.value
+        }
         for _ in 0 ..< 20 { await Task.yield() }
         provider.openGate()
 
@@ -216,6 +222,7 @@ final class PayabliTTPReaderSessionRecoveryTests: XCTestCase {
         try await bounded { try await second.value }
 
         XCTAssertEqual(provider.prepareReaderCalls, 3, "the later initialize joined the earlier one instead of waiting")
+        XCTAssertTrue(readBeforeSecondReturned.value, "the later initialize returned before the charge read a card")
         XCTAssertEqual(ttp.sessionState, .ready)
     }
 
@@ -605,6 +612,11 @@ final class PayabliTTPReaderSessionRecoveryTests: XCTestCase {
 /// Distinguishes "the charge never returned" from "the charge threw", so a
 /// wedge cannot be mistaken for the failure these tests expect.
 private struct ChargeTimedOut: Error {}
+
+/// A flag set on one task and read on another. `@unchecked` because the tests set and read it in order.
+private final class Flag: @unchecked Sendable {
+    var value = false
+}
 
 /// Guards a continuation so the deadline and the work cannot both resume it.
 /// Only touched from the main actor, which is where both racers run.
