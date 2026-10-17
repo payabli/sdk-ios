@@ -277,9 +277,9 @@ recognizable on the store route, so a key sent there is read by nothing.
 
 | Field | Meaning |
 | --- | --- |
-| `achValidation` | Whether the backend should validate ACH where supported. |
+| `achValidation` | Verifies a bank account before it is stored. On the store route this flag is the only way the check is requested. |
 | `createAnonymous` | Whether to create an anonymous stored method. |
-| `forceCustomerCreation` | Whether to force customer creation. |
+| `forceCustomerCreation` | Applies only when the payer can't be matched to an existing customer: `true` creates a new customer record each time. No effect when the payer is identified. |
 | `temporary` | Whether the stored method is temporary. |
 | `customerData` | `PayabliPayInCustomerData` merged into storage request. |
 | `vendorData` | Optional `PayabliPayInVendorData`. |
@@ -318,22 +318,24 @@ authorize forms:
 | `subdomain` | Optional subdomain query value. |
 | `subscriptionId` | Optional subscription ID. |
 | `idempotencyKey` | Optional. Left unset, the SDK reserves one for the attempt, so a money-in request always carries a key. Set it to resend the same attempt: the service recognises a repeat under one key for two minutes and refuses it, counting from when it read the first request rather than from when you sent it. Past that it has forgotten the key and executes the request, so an outcome you never saw is settled by reading the transaction back rather than by resending. Blank or unsendable is refused rather than dropped. |
-| `achValidation` | Optional ACH validation flag for capture. |
-| `forceCustomerCreation` | Optional customer-creation flag. |
+| `achValidation` | Verifies a bank account before it is debited. `true` adds the check to any the merchant's account already applies, and never turns one off. A failed check is a decline. |
+| `forceCustomerCreation` | Applies only when the payer can't be matched to an existing customer: `true` creates a new customer record each time. No effect when the payer is identified. |
 | `validation` | Client validation toggles. |
 
 Direct request:
 
 ```swift
 let request = PayabliPayInRequest(
-    paymentDetails: PayabliPayInPaymentDetails(
-        totalAmount: 1.00,
-        serviceFee: 0.10,
-        currency: "USD"
-    ),
     paymentMethod: .card(PayabliPayInPaymentMethod.Card(data: cardData)),
-    orderDescription: "iOS checkout",
-    source: "ios-sdk"
+    options: PayabliPayInRequestConfiguration(
+        paymentDetails: PayabliPayInPaymentDetails(
+            totalAmount: 1.00,
+            serviceFee: 0.10,
+            currency: "USD"
+        ),
+        orderDescription: "iOS checkout",
+        source: "ios-sdk"
+    )
 )
 
 let captured = try await paymentFlow.capture(request)
@@ -354,8 +356,10 @@ Direct authorize:
 
 ```swift
 let authorized = try await paymentFlow.authorize(PayabliPayInRequest(
-    paymentDetails: PayabliPayInPaymentDetails(totalAmount: 1.00),
-    paymentMethod: .card(PayabliPayInPaymentMethod.Card(data: cardData))
+    paymentMethod: .card(PayabliPayInPaymentMethod.Card(data: cardData)),
+    options: PayabliPayInRequestConfiguration(
+        paymentDetails: PayabliPayInPaymentDetails(totalAmount: 1.00)
+    )
 ))
 ```
 

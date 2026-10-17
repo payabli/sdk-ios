@@ -288,8 +288,10 @@ device, and refuses any other payment method before anything is sent:
 
 ```swift
 try await paymentFlow.authorize(PayabliPayInRequest(
-    paymentDetails: PayabliPayInPaymentDetails(totalAmount: 1.00),
-    paymentMethod: .card(PayabliPayInPaymentMethod.Card(data: cardData))
+    paymentMethod: .card(PayabliPayInPaymentMethod.Card(data: cardData)),
+    options: PayabliPayInRequestConfiguration(
+        paymentDetails: PayabliPayInPaymentDetails(totalAmount: 1.00)
+    )
 ))
 ```
 

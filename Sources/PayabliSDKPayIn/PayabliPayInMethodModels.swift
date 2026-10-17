@@ -377,8 +377,12 @@ public struct PayabliPayInVendorData: Codable, Sendable {
 /// the store route, so one sent there is read by nothing and offering it implies a protection the route
 /// does not give. A store whose outcome is unknown is settled by reading the stored methods back.
 public struct PayabliPayInTokenStorageOptions: Sendable {
+    /// Whether to verify a bank account before storing it. On this route the flag is the only way the check
+    /// is requested.
     public var achValidation: Bool?
     public var createAnonymous: Bool?
+    /// What happens to a payer the service can't match to an existing customer: `true` creates a new customer record
+    /// each time. It has no effect when the payer is identified.
     public var forceCustomerCreation: Bool?
     public var temporary: Bool?
     public var customerData: PayabliPayInCustomerData?

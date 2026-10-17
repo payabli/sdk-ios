@@ -29,8 +29,10 @@ final class PayabliPayInInstalledSessionTests: XCTestCase {
 
         do {
             _ = try await component.capture(PayabliPayInRequest(
-                paymentDetails: PayabliPayInPaymentDetails(totalAmount: 10),
-                paymentMethod: .cash
+                paymentMethod: .cash,
+                options: PayabliPayInRequestConfiguration(
+                    paymentDetails: PayabliPayInPaymentDetails(totalAmount: 10)
+                )
             ))
             XCTFail("a submission after a refused configuration was sent")
         } catch {

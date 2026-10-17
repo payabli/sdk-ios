@@ -51,11 +51,13 @@ final class StoredMethodRoundTripTests: XCTestCase {
         transport: RoutedTransport
     ) async throws -> [String: Any] {
         _ = try await component.capture(PayabliPayInRequest(
-            paymentDetails: PayabliPayInPaymentDetails(totalAmount: 1),
             paymentMethod: .stored(PayabliPayInPaymentMethod.Stored(
                 method: stored.method,
                 storedMethodId: try XCTUnwrap(stored.storedMethodId)
-            ))
+            )),
+            options: PayabliPayInRequestConfiguration(
+                paymentDetails: PayabliPayInPaymentDetails(totalAmount: 1)
+            )
         ))
 
         let requests = await transport.requests

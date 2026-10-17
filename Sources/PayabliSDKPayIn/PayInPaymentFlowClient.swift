@@ -175,20 +175,20 @@ final class PayInPaymentFlowClient: Sendable {
             throw PayabliPayInError.invalidInput("Entrypoint is required.")
         }
         try request.paymentDetails.validate()
-        try request.paymentMethod.validate(request.validation)
+        try request.paymentMethod.validate(request.options.validation)
 
         let body = TransactionRequestBody(
-            accountId: request.accountId?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty,
-            customerData: request.customerData,
+            accountId: request.options.accountId?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty,
+            customerData: request.options.customerData,
             entryPoint: entry,
-            ipaddress: request.ipAddress?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty,
-            orderDescription: request.orderDescription?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty,
-            orderId: request.orderId?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty,
+            ipaddress: request.options.ipAddress?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty,
+            orderDescription: request.options.orderDescription?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty,
+            orderId: request.options.orderId?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty,
             paymentDetails: request.paymentDetails,
             paymentMethod: request.paymentMethod,
-            source: request.source?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty,
-            subdomain: request.subdomain?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty,
-            subscriptionId: request.subscriptionId
+            source: request.options.source?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty,
+            subdomain: request.options.subdomain?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty,
+            subscriptionId: request.options.subscriptionId
         )
         let payabliRequest = try buildRequest(
             path: path,
@@ -572,9 +572,9 @@ private extension PayabliPayInRequest {
     func queryItems(allowsACHValidation: Bool) -> [URLQueryItem] {
         var items: [URLQueryItem] = []
         if allowsACHValidation {
-            appendBool(achValidation, name: "achValidation", to: &items)
+            appendBool(options.achValidation, name: "achValidation", to: &items)
         }
-        appendBool(forceCustomerCreation, name: "forceCustomerCreation", to: &items)
+        appendBool(options.forceCustomerCreation, name: "forceCustomerCreation", to: &items)
         return items
     }
 
