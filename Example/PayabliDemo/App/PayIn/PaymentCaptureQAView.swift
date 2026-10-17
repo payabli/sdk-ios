@@ -356,16 +356,9 @@ struct PaymentCaptureQAView: View {
         // back from that clears what a reversal had already reported.
         guard !failure.refusedForAnotherSubmission else { return }
         submitFailed = true
-        // A refused card and a lost response no longer read alike: the first
-        // arrives as a transaction the service declined, the second as an
-        // interruption saying the payment may already have been taken. Only the
-        // second needs reconciling, and reconciling means reading the earlier
-        // submission back. Submitting again sends this attempt's own key, which
-        // the service refuses for two minutes from the first request and executes
-        // after that, so a late resubmission is a second payment.
-        //
-        // Drawing a fresh attempt is the button beside this message, and it is
-        // the only place a key is minted.
+        // A lost response arrives as an interruption: the payment may have been taken, so it is read back,
+        // and submitting again is declared a retry. Drawing a fresh attempt is the button beside this message.
+        paymentFlow.chargeFailed(failure)
         resultText = "Payment capture failed: \(failure.message)"
         Logger(
             subsystem: "com.payabli.example.app",

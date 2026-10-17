@@ -12,13 +12,12 @@ public enum PayabliPayInError: PayabliError, Equatable {
 
     /// The request may have moved money and the outcome is not known.
     ///
-    /// No key is reported, and none is reused. This SDK mints one per submission and never hands it out,
-    /// so there is nothing here for a caller to carry; it also does not decide that a later submission
-    /// retries this one, because two submissions described identically are indistinguishable to it.
+    /// No key is reported. To try again, submit with `attempt` set to `.retry`: the SDK sends the key of the most
+    /// recent attempt whose outcome is unknown, so the service refuses a repeat rather than taking the payment again.
+    /// That protection lapses after a while, and a submission that declares nothing is a new payment.
     ///
-    /// **So resubmitting after this can take the payment a second time.** What settles the outcome is
-    /// reading the transaction back, not repeating the submission: the service answers a repeat rather
-    /// than replaying what it did.
+    /// **What settles the outcome is reading the transaction back**, not repeating the submission. A refused retry
+    /// reports ``PayabliErrorType/retryRefused``: the earlier attempt reached the service and is still unresolved.
     ///
     /// Raised only where a key was sent, which is the money-moving routes, and only where the answer
     /// leaves the outcome open: a network failure, a cancellation, a 5xx, a response that could not be

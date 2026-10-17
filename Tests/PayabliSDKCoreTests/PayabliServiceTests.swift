@@ -21,6 +21,37 @@ final class PayabliServiceTests: XCTestCase {
         )
     }
 
+    // MARK: - Hand-off
+
+    func testASendMarksItsHandOffToTheHTTPLayer() async throws {
+        StubURLProtocol.handler = { request in
+            (HTTPURLResponse(url: request.url!, statusCode: 500, httpVersion: nil, headerFields: nil)!, Data())
+        }
+        let mark = PayabliSendMark()
+
+        _ = try await PayabliSendMark.$current.withValue(mark) {
+            try await service().perform(PayabliRequest(method: .post, path: "/api/v2/MoneyIn/getpaid"))
+        }
+
+        XCTAssertTrue(mark.mayHaveLeft)
+    }
+
+    func testASendWhoseTokenReadFailsDoesNotMarkItsHandOff() async {
+        let service = PayabliService(
+            environment: .sandbox,
+            readToken: { throw PayabliGenericError(type: .tokenProviderFailed, reason: "No token") },
+            client: .none,
+            session: StubURLProtocol.makeSession()
+        )
+        let mark = PayabliSendMark()
+
+        _ = try? await PayabliSendMark.$current.withValue(mark) {
+            try await service.perform(PayabliRequest(method: .post, path: "/api/v2/MoneyIn/getpaid"))
+        }
+
+        XCTAssertFalse(mark.mayHaveLeft)
+    }
+
     // MARK: - V2 envelope decoding
 
     func testDecodesV2ApprovedEnvelope() async throws {

@@ -131,8 +131,20 @@ releases it or voids a transaction that hasn't settled.
 ### Retry safely
 
 A charge always sends an idempotency key. The SDK mints one per call when you don't set
-`idempotencyKey` on the request's options, so calling again without your own key is a second payment, not a
-retry. Don't resend a charge whose outcome is unknown. Find the transaction first.
+`idempotencyKey` on the request's options, so calling again is a second payment unless you say otherwise.
+
+When a charge ends in `submissionInterrupted`, its outcome is unknown. Find the transaction first. If you charge
+again, set `attempt: .retry` on the options: the SDK sends the earlier attempt's key, so the service refuses a
+repeat while it still recognises that key. When it refuses one, the charge ends in `submissionInterrupted` with
+type `.retryRefused`, which means the earlier attempt reached the service. A key you set yourself is always the
+one sent, and a refusal of it ends with type `.conflict`. So does a refusal that names an earlier payment
+matching this one, whichever key was sent. `captureAuthorizedTransaction(_:)` and
+`voidTransaction(_:)` do this for their transaction without being asked.
+
+A retry describes the same payment as the attempt it repeats: the same amount, fee, surcharge, currency, kind of
+payment method and, if the first attempt set one, order identifier. A retry that describes another payment is refused
+before anything is sent, with type `.retryNotSamePayment`, and the earlier attempt's key stays for the right
+retry. If your app keeps more than one payment open at a time, set your own `idempotencyKey` on each.
 
 ## Outcomes and errors
 
