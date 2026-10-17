@@ -94,22 +94,9 @@ final class CardNotPresentOnDeviceTests: XCTestCase {
     }
 
     private func request(paying method: PayabliPayInPaymentMethod) -> PayabliPayInRequest {
-        let configured = PayInRequests.freshCapture(suppliesCustomer: true)
-        return PayabliPayInRequest(
-            paymentDetails: configured.paymentDetails,
+        PayabliPayInRequest(
             paymentMethod: method,
-            accountId: configured.accountId,
-            customerData: configured.customerData,
-            ipAddress: configured.ipAddress,
-            orderDescription: configured.orderDescription,
-            orderId: configured.orderId,
-            source: configured.source,
-            subdomain: configured.subdomain,
-            subscriptionId: configured.subscriptionId,
-            idempotencyKey: configured.idempotencyKey,
-            achValidation: configured.achValidation,
-            forceCustomerCreation: configured.forceCustomerCreation,
-            validation: configured.validation
+            options: PayInRequests.freshCapture(suppliesCustomer: true)
         )
     }
 
@@ -174,15 +161,17 @@ final class CardNotPresentOnDeviceTests: XCTestCase {
             lastName: identity.lastName
         )
         let request = PayabliPayInRequest(
-            paymentDetails: configured.paymentDetails,
             paymentMethod: .card(PayabliPayInPaymentMethod.Card(data: try card())),
-            customerData: payer,
-            orderDescription: configured.orderDescription,
-            orderId: configured.orderId,
-            source: configured.source,
-            idempotencyKey: configured.idempotencyKey,
-            forceCustomerCreation: configured.forceCustomerCreation,
-            validation: configured.validation
+            options: PayabliPayInRequestConfiguration(
+                paymentDetails: configured.paymentDetails,
+                customerData: payer,
+                orderDescription: configured.orderDescription,
+                orderId: configured.orderId,
+                source: configured.source,
+                idempotencyKey: configured.idempotencyKey,
+                forceCustomerCreation: configured.forceCustomerCreation,
+                validation: configured.validation
+            )
         )
 
         let flow = try makeFlow()

@@ -40,10 +40,6 @@ final class PayInPaymentFlowTests: XCTestCase {
         )
 
         let result = try await component.capture(PayabliPayInRequest(
-            paymentDetails: PayabliPayInPaymentDetails(
-                totalAmount: 1,
-                serviceFee: 0.1 + 0.000_000_000_001
-            ),
             paymentMethod: .card(PayabliPayInPaymentMethod.Card(
                 data: PayabliPayInCardData(
                     cardNumber: "4111 1111 1111 1111",
@@ -52,7 +48,13 @@ final class PayInPaymentFlowTests: XCTestCase {
                     cvv: "123",
                     billingZip: "12345"
                 )
-            ))
+            )),
+            options: PayabliPayInRequestConfiguration(
+                paymentDetails: PayabliPayInPaymentDetails(
+                    totalAmount: 1,
+                    serviceFee: 0.1 + 0.000_000_000_001
+                )
+            )
         ))
 
         XCTAssertEqual(result.kind, .transaction)

@@ -231,7 +231,7 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
             try await client.capture(
                 entryPoint: entryPoint,
                 request: request,
-                idempotencyKey: self.reserveKey(request.idempotencyKey)
+                idempotencyKey: self.reserveKey(request.options.idempotencyKey)
             )
         }
     }
@@ -247,7 +247,7 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
             try await client.authorize(
                 entryPoint: entryPoint,
                 request: request,
-                idempotencyKey: self.reserveKey(request.idempotencyKey)
+                idempotencyKey: self.reserveKey(request.options.idempotencyKey)
             )
         }
     }

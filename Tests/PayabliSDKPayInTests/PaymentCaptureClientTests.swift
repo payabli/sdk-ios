@@ -443,12 +443,6 @@ final class PayInPaymentFlowClientTests: XCTestCase {
         additionalData: [String: String]? = nil
     ) -> PayabliPayInRequest {
         PayabliPayInRequest(
-            paymentDetails: PayabliPayInPaymentDetails(
-                totalAmount: totalAmount,
-                serviceFee: serviceFee,
-                surchargeFee: surchargeFee,
-                currency: "USD"
-            ),
             paymentMethod: .card(PayabliPayInPaymentMethod.Card(
                 data: PayabliPayInCardData(
                     cardNumber: "4111 1111 1111 1111",
@@ -459,17 +453,25 @@ final class PayInPaymentFlowClientTests: XCTestCase {
                 ),
                 saveIfSuccess: true
             )),
-            customerData: PayabliPayInCustomerData(
-                additionalData: additionalData,
-                customerId: 4440
-            ),
-            ipAddress: "255.255.255.255",
-            orderDescription: "SDK test transaction",
-            orderId: "order-123",
-            source: "ios-sdk",
-            idempotencyKey: idempotencyKey,
-            achValidation: achValidation,
-            forceCustomerCreation: forceCustomerCreation
+            options: PayabliPayInRequestConfiguration(
+                paymentDetails: PayabliPayInPaymentDetails(
+                    totalAmount: totalAmount,
+                    serviceFee: serviceFee,
+                    surchargeFee: surchargeFee,
+                    currency: "USD"
+                ),
+                customerData: PayabliPayInCustomerData(
+                    additionalData: additionalData,
+                    customerId: 4440
+                ),
+                ipAddress: "255.255.255.255",
+                orderDescription: "SDK test transaction",
+                orderId: "order-123",
+                source: "ios-sdk",
+                idempotencyKey: idempotencyKey,
+                achValidation: achValidation,
+                forceCustomerCreation: forceCustomerCreation
+            )
         )
     }
 
@@ -633,7 +635,7 @@ private extension PayInPaymentFlowClient {
         try await capture(
             entryPoint: entryPoint,
             request: request,
-            idempotencyKey: request.idempotencyKey ?? "reserved-by-test"
+            idempotencyKey: request.options.idempotencyKey ?? "reserved-by-test"
         )
     }
 
@@ -644,7 +646,7 @@ private extension PayInPaymentFlowClient {
         try await authorize(
             entryPoint: entryPoint,
             request: request,
-            idempotencyKey: request.idempotencyKey ?? "reserved-by-test"
+            idempotencyKey: request.options.idempotencyKey ?? "reserved-by-test"
         )
     }
 
