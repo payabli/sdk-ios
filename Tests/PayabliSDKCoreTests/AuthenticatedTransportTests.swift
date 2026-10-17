@@ -54,6 +54,25 @@ final class AuthenticatedTransportTests: XCTestCase {
         XCTAssertEqual(stub.sentTokens, [testToken, "refreshed-token"])
     }
 
+    func testASendStaysMarkedAsHandedOffWhenItsReplaysTokenFetchFails() async throws {
+        let stub = RecordingStub(status: Self.unauthorized)
+        stub.install()
+        defer { stub.uninstall() }
+
+        let auth = try makeTestAuth(tokenProvider: {
+            throw PayabliGenericError(type: .tokenProviderFailed, reason: "No token")
+        })
+        let transport = makeAuthenticatedStack(auth: auth)
+        let mark = PayabliSendMark()
+
+        _ = await failure(from: {
+            _ = try await PayabliSendMark.$current.withValue(mark) { try await transport.perform(self.ping()) }
+        })
+
+        XCTAssertEqual(stub.count, 1, "the replay never reached the network")
+        XCTAssertTrue(mark.mayHaveLeft)
+    }
+
     func testASecond401IsTerminalAndThereIsNoThirdAttempt() async throws {
         let stub = RecordingStub(status: Self.unauthorized)
         stub.install()

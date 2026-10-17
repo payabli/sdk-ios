@@ -64,6 +64,20 @@ final class PayInFailureTests: XCTestCase {
         )
     }
 
+    /// A refused repeat of a reversal says the earlier one may still be running, and leaves the read as the next step.
+    func testARefusedRepeatOfAReversalSaysTheEarlierOneMayStillBeRunning() {
+        let refused = PayabliPayInError.submissionInterrupted(
+            type: .retryRefused,
+            causeType: "PayabliSDKCore.PayabliGenericError",
+            paymentTransId: nil
+        )
+
+        let failure = PayInFailure(refused, operation: .void)
+
+        XCTAssertEqual(failure.message, "The earlier reversal may still be running. Read the payment again shortly.")
+        XCTAssertTrue(failure.outcomeIsUnresolved, "the refusal let the screen offer another reversal before a read")
+    }
+
     /// The classification the screen reads to stop offering a second reversal. What the screen does
     /// with it is asserted by the walkthrough, not here: this case would stay green if the button
     /// ignored it entirely.

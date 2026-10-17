@@ -69,8 +69,8 @@ struct PayInReversalState: Equatable {
         }
     }
 
-    /// A read reported the payment still captured, so a reversal that never answered did not take and
-    /// is offered again. Pressing it sends a new void. A payment with no open reversal is left alone.
+    /// A read reported the payment still captured, so a reversal that never answered has not taken and
+    /// is offered again. A payment with no open reversal is left alone.
     mutating func readCaptured(_ transId: String, onScreen: String?) {
         guard unreconciled.contains(transId) else { return }
         unreconciled.removeAll { $0 == transId }

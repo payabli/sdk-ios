@@ -34,18 +34,11 @@ final class PayInFlowHandle: ObservableObject {
         flow.lastResult != nil
     }
 
-    /// Draws a new attempt: a fresh amount, a fresh idempotency key, and whatever
-    /// the customer switch says now. This is the one place a key is minted, and it
-    /// is the only action here that may charge a second time.
+    /// Draws a new attempt: a fresh amount, a new payment, and whatever the customer switch says now.
     ///
-    /// Not while a submission is in flight. Its outcome is unknown until it answers,
-    /// and the key is what lets the next submit be read as a repeat of it; minting
-    /// another makes that submit a payment of its own. The screen keeps offering
-    /// this while a retry runs, so the refusal lives here rather than on the button.
+    /// Not while a submission is in flight; the screen keeps offering this then, so the refusal lives here.
     ///
-    /// - Returns: whether an attempt was drawn. A screen showing the last failure
-    ///   clears it on `true` only: cleared on a refusal it would report an attempt
-    ///   that was never made, over a request still holding the earlier key.
+    /// - Returns: whether an attempt was drawn; a screen clears the last failure on `true` only.
     func startNewAttempt(
         suppliesCustomer: Bool,
         amount: Double = QAAmount.random(),
@@ -62,15 +55,9 @@ final class PayInFlowHandle: ObservableObject {
         return true
     }
 
-    /// Reverses a payment already taken, releasing an authorization's hold or undoing a
-    /// capture that has not settled.
+    /// Reverses a payment already taken, releasing an authorization's hold or undoing a capture that has not settled.
     ///
-    /// Takes the transaction and nothing else. The key the request carries is the SDK's to
-    /// mint and to keep, so no screen holds one and none is reported back.
-    ///
-    /// Which transactions can still be reversed is the service's to decide, so a state it
-    /// will not reverse arrives here as the refusal it sent rather than being guessed at
-    /// before the call.
+    /// The SDK chooses and keeps the key. A state the service will not reverse arrives as the refusal it sent.
     func voidTransaction(_ transId: String) async throws -> PayInOutcome {
         PayInOutcome(try await flow.voidTransaction(transId))
     }
@@ -81,10 +68,9 @@ final class PayInFlowHandle: ObservableObject {
     }
 
     /// Puts the customer the switch now names onto the attempt already on screen,
-    /// leaving the amount, the order identifier and the key as they were.
+    /// leaving the amount, the order identifier and any declared retry as they were.
     ///
-    /// Not while a submission is in flight: replacing the configuration then loses
-    /// the key that makes its retry safe.
+    /// Not while a submission is in flight, whose configuration it would replace.
     func applyCustomerChange(suppliesCustomer: Bool) {
         guard !flow.isSubmitting else { return }
         guard let current = flow.requestConfiguration else {
@@ -95,7 +81,22 @@ final class PayInFlowHandle: ObservableObject {
             requestConfiguration: PayInRequests.sameAttempt(
                 as: current,
                 customerData: suppliesCustomer ? PayInDemoCustomer.customerData : nil,
-                paymentReference: current.paymentReference
+                attempt: current.attempt
+            )
+        )
+    }
+
+    /// After a charge whose outcome is unknown, declares the next submit a retry of it, so the SDK sends that
+    /// attempt's key and the service refuses a repeat rather than charging twice.
+    ///
+    /// - Parameter failure: how the charge ended.
+    func chargeFailed(_ failure: PayInFailure) {
+        guard failure.outcomeIsUnresolved, !flow.isSubmitting, let current = flow.requestConfiguration else { return }
+        flow.configure(
+            requestConfiguration: PayInRequests.sameAttempt(
+                as: current,
+                customerData: current.customerData,
+                attempt: .retry
             )
         )
     }
@@ -103,9 +104,7 @@ final class PayInFlowHandle: ObservableObject {
 
 /// When each charging flow on a screen that offers several operations draws a new attempt.
 ///
-/// Every flow keeps its own key. A flow is given a new attempt, and so a new key, only when the
-/// amount it would send has changed or its last payment went through. Switching operations, and a
-/// failure whose outcome is unknown, leave each flow's attempt and key where they were.
+/// Only a changed amount or a completed payment gives a flow a new attempt; anything else leaves it where it was.
 @MainActor
 struct PayInAttempts {
     private var amounts: [PayInOperation: Double] = [:]

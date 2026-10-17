@@ -277,6 +277,9 @@ struct SimpleCaptureView: View {
     private func handleFailed(_ failure: PayInFailure) {
         guard !failure.refusedForAnotherSubmission else { return }
         resultText = "Failed: \(failure.message)"
+        if charges {
+            flow(for: operation).chargeFailed(failure)
+        }
     }
 }
 

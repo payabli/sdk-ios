@@ -1,26 +1,15 @@
 import Foundation
+import PayabliSDKCore
 import PayabliSDKPayIn
 
 /// What this app asks the service for, for one capture attempt.
 enum PayInRequests {
-    /// A capture's request configuration, with a key minted per attempt.
+    /// A capture's request configuration for a new payment, named by a reference of its own.
     ///
-    /// One attempt is one payment for as long as the service remembers its key: a
-    /// retry carries the same key, and a repeat inside two minutes of the first
-    /// request is refused rather than taken. After that the service has forgotten
-    /// the key and a retry is a second payment, so an outcome nobody saw is settled
-    /// by reading the transaction back. A payment of its own is a new
-    /// configuration, which is what this builds, and the app builds the first at
-    /// launch.
+    /// The identifiers name this device and the moment, so a run over several devices produces rows a dashboard can
+    /// attribute. The form collects no amount and no customer number, so both are decided here.
     ///
-    /// The amount is drawn per attempt and the identifiers name this device and the
-    /// moment, so a run over several devices at once produces rows a dashboard can
-    /// attribute. The form collects no amount and no customer number, so both are
-    /// decided here.
-    ///
-    /// - Parameter suppliesCustomer: whether the request names the customer, which
-    ///   the app's customer switch decides. A value the payer types wins over this
-    ///   one; the form has no such box.
+    /// - Parameter suppliesCustomer: whether the request names the customer; a value the payer types wins.
     static func freshCapture(
         suppliesCustomer: Bool,
         amount: Double = QAAmount.random(),
@@ -44,15 +33,11 @@ enum PayInRequests {
 
     /// The attempt on screen with one thing changed.
     ///
-    /// The amount, the order identifier and the key are the attempt's identity.
-    /// Moving the customer switch answers a different question, so it changes the
-    /// customer alone: redrawing the amount would change the figure a payer is
-    /// about to confirm, and a new key would make the next submit a second payment
-    /// rather than a retry of this one.
+    /// The amount, the order identifier and whether the next submit is a retry are the attempt's identity.
     static func sameAttempt(
         as current: PayabliPayInRequestConfiguration,
         customerData: PayabliPayInCustomerData?,
-        paymentReference: String?
+        attempt: PayabliAttempt
     ) -> PayabliPayInRequestConfiguration {
         // Every field, not the ones this sample happens to set: anything omitted
         // here is silently reset the moment the switch moves.
@@ -66,8 +51,8 @@ enum PayInRequests {
             source: current.source,
             subdomain: current.subdomain,
             subscriptionId: current.subscriptionId,
-            paymentReference: paymentReference,
-            attempt: current.attempt,
+            paymentReference: current.paymentReference,
+            attempt: attempt,
             achValidation: current.achValidation,
             forceCustomerCreation: current.forceCustomerCreation,
             validation: current.validation
