@@ -1,13 +1,12 @@
 import Combine
 import Foundation
 
-/// Which operation holds the session-setup gate, so a later call can tell whether it joins the one in
-/// flight or waits for it.
+/// Which entry point is building the session, so the two can be told apart when
+/// one is already running.
 enum SessionSetupKind {
     case initialize
     case reinitialize
     case activate
-    case charge
 }
 
 /// Manages the TTP session lifecycle. Transitions are enforced internally and occur on `@MainActor`, so host

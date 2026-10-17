@@ -22,11 +22,10 @@ extension PayabliTTP {
         }
     }
 
-    /// Runs a session setup through the process's gate. A caller of the same kind on this `PayabliTTP` joins the
-    /// one in flight; any other caller waits for it and then runs its own.
+    /// Runs a session setup through the process's gate.
     ///
     /// - Parameters:
-    ///   - kind: Which setup this is; a later call of the same kind on this `PayabliTTP` joins it while it runs.
+    ///   - kind: Which setup this is; this `PayabliTTP`'s next call of the same kind joins it while it is the newest.
     ///   - work: The setup, run once every operation already in the gate has finished.
     func runSessionSetup(
         _ kind: SessionSetupKind,
@@ -47,7 +46,7 @@ extension PayabliTTP {
         if gate.isHeldByCharge {
             throw PayabliTTPError.notReady(current: sessionState)
         }
-        return try await gate.holdForCharge(for: ObjectIdentifier(self), body)
+        return try await gate.holdForCharge(body)
     }
 
     private func runInitialize() async throws {
