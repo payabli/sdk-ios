@@ -20,12 +20,6 @@ public enum PayabliPayInError: PayabliError, Equatable {
     /// reading the transaction back, not repeating the submission: the service answers a repeat rather
     /// than replaying what it did.
     ///
-    /// A caller that supplied its own key may send that same key again, and the service recognises the
-    /// repeat **for two minutes only**. That clock starts when the service reads the first request, not
-    /// when a caller sends it, so the window a caller can rely on is shorter than two minutes by however
-    /// long the attempt took. Past it the service has forgotten the key and executes the request, taking
-    /// the payment again. Past it, read the transaction back instead.
-    ///
     /// Raised only where a key was sent, which is the money-moving routes, and only where the answer
     /// leaves the outcome open: a network failure, a cancellation, a 5xx, a response that could not be
     /// decoded, a failure the service declared on a successful status without calling it a refusal, a
@@ -48,7 +42,15 @@ public enum PayabliPayInError: PayabliError, Equatable {
     /// When `paymentTransId` is `nil`, the answer named no transaction. After `voidTransaction(_:)` or
     /// `captureAuthorizedTransaction(_:)`, read back the ID you passed; after `capture(_:)` or `authorize(_:)`,
     /// find the transaction in the Payabli portal by its `orderId`.
-    case submissionInterrupted(type: PayabliErrorType, causeType: String, paymentTransId: String?)
+    ///
+    /// `paymentReference` names the payment after `capture(_:)` or `authorize(_:)`: the one you set, or the one the
+    /// SDK made. It is `nil` after `voidTransaction(_:)` and `captureAuthorizedTransaction(_:)`.
+    case submissionInterrupted(
+        type: PayabliErrorType,
+        causeType: String,
+        paymentTransId: String?,
+        paymentReference: String?
+    )
 
     public var type: PayabliErrorType {
         switch self {
@@ -58,7 +60,7 @@ public enum PayabliPayInError: PayabliError, Equatable {
             return .missingToken
         case let .transactionFailed(failure):
             return Self.classification(of: failure)
-        case let .submissionInterrupted(type, _, _):
+        case let .submissionInterrupted(type, _, _, _):
             return type
         }
     }
@@ -108,7 +110,7 @@ public enum PayabliPayInError: PayabliError, Equatable {
             return nil
         case let .transactionFailed(failure):
             return failure.detailText
-        case let .submissionInterrupted(_, causeType, _):
+        case let .submissionInterrupted(_, causeType, _, _):
             return causeType
         }
     }

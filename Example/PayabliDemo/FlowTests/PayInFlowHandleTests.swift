@@ -21,12 +21,12 @@ final class PayInFlowHandleTests: XCTestCase {
     func testDrawingAnAttemptMintsAKeyThatWasNotThereBefore() throws {
         let handle = try makeHandle()
         XCTAssertTrue(handle.startNewAttempt(suppliesCustomer: true))
-        let first = try? XCTUnwrap(handle.requestKey)
+        let first = try? XCTUnwrap(handle.requestReference)
 
         XCTAssertTrue(handle.startNewAttempt(suppliesCustomer: true))
 
         XCTAssertNotNil(first)
-        XCTAssertNotEqual(handle.requestKey, first, "a new attempt reused the earlier key")
+        XCTAssertNotEqual(handle.requestReference, first, "a new attempt reused the earlier key")
     }
 
     /// The key is the only field a new attempt is guaranteed to change. The order
@@ -37,7 +37,7 @@ final class PayInFlowHandleTests: XCTestCase {
 
         XCTAssertTrue(handle.startNewAttempt(suppliesCustomer: true))
 
-        XCTAssertNotNil(handle.requestKey, "the attempt carries no key")
+        XCTAssertNotNil(handle.requestReference, "the attempt carries no key")
         XCTAssertNotNil(handle.requestOrderId, "the attempt names no order")
         XCTAssertEqual(handle.requestTotal.map { $0 > 0 }, true, "the attempt charges nothing")
     }
@@ -57,13 +57,13 @@ final class PayInFlowHandleTests: XCTestCase {
     func testChangingTheCustomerKeepsTheAttemptItIsOn() throws {
         let handle = try makeHandle()
         XCTAssertTrue(handle.startNewAttempt(suppliesCustomer: true))
-        let key = handle.requestKey
+        let key = handle.requestReference
         let order = handle.requestOrderId
         let total = handle.requestTotal
 
         handle.applyCustomerChange(suppliesCustomer: false)
 
-        XCTAssertEqual(handle.requestKey, key, "the key changed with the customer")
+        XCTAssertEqual(handle.requestReference, key, "the key changed with the customer")
         XCTAssertEqual(handle.requestOrderId, order, "the order changed with the customer")
         XCTAssertEqual(handle.requestTotal, total, "the amount changed with the customer")
         XCTAssertNil(handle.requestCustomerNumber, "the customer was still sent")
@@ -86,14 +86,14 @@ final class PayInFlowHandleTests: XCTestCase {
         var attempts = PayInAttempts()
         attempts.apply(amount: 10, to: capture, for: .capture, suppliesCustomer: true, source: "test")
         attempts.apply(amount: 10, to: authorize, for: .authorize, suppliesCustomer: true, source: "test")
-        let captureKey = capture.requestKey
-        let authorizeKey = authorize.requestKey
+        let captureKey = capture.requestReference
+        let authorizeKey = authorize.requestReference
 
         attempts.apply(amount: 12, to: capture, for: .capture, suppliesCustomer: true, source: "test")
 
-        XCTAssertNotEqual(capture.requestKey, captureKey, "the flow on screen kept its key for a new amount")
+        XCTAssertNotEqual(capture.requestReference, captureKey, "the flow on screen kept its key for a new amount")
         XCTAssertEqual(capture.requestTotal, 12)
-        XCTAssertEqual(authorize.requestKey, authorizeKey, "a flow off screen was given a new key")
+        XCTAssertEqual(authorize.requestReference, authorizeKey, "a flow off screen was given a new key")
         XCTAssertEqual(authorize.requestTotal, 10)
     }
 
@@ -103,11 +103,11 @@ final class PayInFlowHandleTests: XCTestCase {
         let capture = try makeHandle()
         var attempts = PayInAttempts()
         attempts.apply(amount: 10, to: capture, for: .capture, suppliesCustomer: true, source: "test")
-        let key = capture.requestKey
+        let key = capture.requestReference
 
         attempts.apply(amount: 10, to: capture, for: .capture, suppliesCustomer: true, source: "test")
 
-        XCTAssertEqual(capture.requestKey, key, "reapplying the amount replaced the key")
+        XCTAssertEqual(capture.requestReference, key, "reapplying the amount replaced the key")
     }
 
     func testACompletedPaymentGivesItsOwnFlowANewKey() throws {
@@ -115,13 +115,28 @@ final class PayInFlowHandleTests: XCTestCase {
         var attempts = PayInAttempts()
         attempts.apply(amount: 10, to: capture, for: .capture, suppliesCustomer: true, source: "test")
         attempts.apply(amount: 10, to: authorize, for: .authorize, suppliesCustomer: true, source: "test")
-        let captureKey = capture.requestKey
-        let authorizeKey = authorize.requestKey
+        let captureKey = capture.requestReference
+        let authorizeKey = authorize.requestReference
 
         attempts.paymentCompleted(amount: 10, on: capture, for: .capture, suppliesCustomer: true, source: "test")
 
-        XCTAssertNotEqual(capture.requestKey, captureKey, "a completed payment left its key for the next one")
-        XCTAssertEqual(authorize.requestKey, authorizeKey, "another flow's key changed with the completion")
+        XCTAssertNotEqual(capture.requestReference, captureKey, "a completed payment left its key for the next one")
+        XCTAssertEqual(authorize.requestReference, authorizeKey, "another flow's key changed with the completion")
+    }
+
+    func testTheSameAttemptKeepsEverySettingButTheCustomer() {
+        let current = PayabliPayInRequestConfiguration(
+            paymentDetails: PayabliPayInPaymentDetails(totalAmount: 10),
+            orderId: "order-1",
+            paymentReference: "payment-1",
+            attempt: .retry
+        )
+
+        let same = PayInRequests.sameAttempt(as: current, customerData: nil, paymentReference: current.paymentReference)
+
+        XCTAssertEqual(same.attempt, .retry, "the retry became a new payment")
+        XCTAssertEqual(same.paymentReference, "payment-1")
+        XCTAssertEqual(same.orderId, "order-1")
     }
 
     // MARK: -
@@ -143,8 +158,8 @@ final class PayInFlowHandleTests: XCTestCase {
 
 /// The request's own fields, for a test that has to see what a new attempt changed.
 private extension PayInFlowHandle {
-    var requestKey: String? {
-        flow.requestConfiguration?.idempotencyKey
+    var requestReference: String? {
+        flow.requestConfiguration?.paymentReference
     }
 
     var requestOrderId: String? {

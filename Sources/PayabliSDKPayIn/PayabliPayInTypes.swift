@@ -200,7 +200,12 @@ public struct PayabliPayInRequestConfiguration: Sendable {
     public let source: String?
     public let subdomain: String?
     public let subscriptionId: Int64?
-    public let idempotencyKey: String?
+    /// Your app's own name for this payment, never sent. Left unset, the SDK makes one and returns it if the outcome
+    /// is unknown, so the payment can be retried by name. A blank one is refused.
+    public let paymentReference: String?
+    /// A new payment unless set to `.retry`, which resends the key held for ``paymentReference`` and must describe
+    /// that same payment. A new payment naming a reference whose outcome is still unknown is refused.
+    public let attempt: PayabliAttempt
     /// Whether to verify a bank account before debiting it. `true` adds the check to any the merchant's account
     /// already applies; it never turns one off. A failed check is a decline.
     public let achValidation: Bool?
@@ -219,7 +224,8 @@ public struct PayabliPayInRequestConfiguration: Sendable {
         source: String? = nil,
         subdomain: String? = nil,
         subscriptionId: Int64? = nil,
-        idempotencyKey: String? = nil,
+        paymentReference: String? = nil,
+        attempt: PayabliAttempt = .newPayment,
         achValidation: Bool? = nil,
         forceCustomerCreation: Bool? = nil,
         validation: PayabliPayInValidation = .default
@@ -233,7 +239,8 @@ public struct PayabliPayInRequestConfiguration: Sendable {
         self.source = source
         self.subdomain = subdomain
         self.subscriptionId = subscriptionId
-        self.idempotencyKey = idempotencyKey
+        self.paymentReference = paymentReference
+        self.attempt = attempt
         self.achValidation = achValidation
         self.forceCustomerCreation = forceCustomerCreation
         self.validation = validation
@@ -282,7 +289,8 @@ extension PayabliPayInRequestConfiguration {
             "source:\(source ?? "")",
             "subdomain:\(subdomain ?? "")",
             "subscriptionId:\(subscriptionId.map { "\($0)" } ?? "")",
-            "idempotencyKey:\(idempotencyKey ?? "")",
+            "paymentReference:\(paymentReference ?? "")",
+            "attempt:\(attempt.rawValue)",
             "achValidation:\(achValidation.map { "\($0)" } ?? "")",
             "forceCustomerCreation:\(forceCustomerCreation.map { "\($0)" } ?? "")",
             "validation:\(validation.payabliViewModelSignature)"
@@ -295,24 +303,12 @@ public struct PayabliPayInAuthorizedRequest: Sendable {
     public let transId: String
     public let paymentDetails: PayabliPayInPaymentDetails
 
-    /// The key this capture sends, or nil to have one minted for the attempt.
-    ///
-    /// This call moves money, so a response lost on the way back leaves the outcome open. Supplying a
-    /// key lets a caller resend the same capture rather than risk a second partial one, for two minutes
-    /// counted from when the service read the first request: inside that a repeat is refused rather than
-    /// executed, and past it the service has forgotten the key and executes the request. The first
-    /// response is never replayed either way, so an outcome nobody saw is settled by reading the
-    /// transaction back.
-    public let idempotencyKey: String?
-
     public init(
         transId: String,
-        paymentDetails: PayabliPayInPaymentDetails,
-        idempotencyKey: String? = nil
+        paymentDetails: PayabliPayInPaymentDetails
     ) {
         self.transId = transId
         self.paymentDetails = paymentDetails
-        self.idempotencyKey = idempotencyKey
     }
 }
 
