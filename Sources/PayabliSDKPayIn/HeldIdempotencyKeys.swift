@@ -118,7 +118,6 @@ struct HeldIdempotencyKeys {
     ///
     /// A scope holds one key, and a different key never displaces it.
     private mutating func hold(_ reservation: Reservation, now: ContinuousClock.Instant) -> Bool {
-        // A key that expired during the send protects nothing, so it gives up its place before the cap is checked.
         sweep(now: now)
         let scope = reservation.scope
         if var existing = records[scope] {

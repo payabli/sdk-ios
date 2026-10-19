@@ -352,7 +352,6 @@ final class PayInPaymentFlowClient: Sendable {
     }
 
     private func decodeResult(from response: PayabliResponse) throws -> PayabliPayInResult {
-        // A 409 whose body is not a JSON object refuses the key; any JSON body is the route's own answer.
         if response.statusCode == 409, !Self.isJSONObject(response.body) {
             throw IdempotencyCheckRefusal()
         }
@@ -362,7 +361,6 @@ final class PayInPaymentFlowClient: Sendable {
         }
         let decoder = JSONDecoder()
         if let decoded = try? decoder.decode(PayabliPayInAPIResponse.self, from: response.body) {
-            // A 409 is never an approval, whatever its body says.
             guard decoded.isApproved, response.statusCode != 409 else {
                 throw PayabliPayInError.transactionFailed(decoded.failure(httpStatusCode: response.statusCode))
             }

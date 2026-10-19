@@ -387,7 +387,6 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
         }
         switch open?.interruption ?? error as? PayabliPayInError {
         case let .submissionInterrupted(type, _, _, _):
-            // A conflict that names an earlier payment means the service no longer holds the key.
             return type == .conflict ? .answered : .unknown
         case .invalidInput, .submissionInProgress, .missingAccessToken:
             return .notAnswered
