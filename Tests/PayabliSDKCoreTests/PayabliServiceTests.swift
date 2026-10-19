@@ -36,6 +36,25 @@ final class PayabliServiceTests: XCTestCase {
         XCTAssertTrue(mark.mayHaveLeft)
     }
 
+    func testACancelledSendDoesNotMarkItsHandOff() async {
+        StubURLProtocol.handler = { request in
+            (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!, Data())
+        }
+        let mark = PayabliSendMark()
+        let service = service()
+
+        let send = Task {
+            withUnsafeCurrentTask { $0?.cancel() }
+            return try await PayabliSendMark.$current.withValue(mark) {
+                try await service.perform(PayabliRequest(method: .post, path: "/api/v2/MoneyIn/getpaid"))
+            }
+        }
+        let result = await send.result
+
+        XCTAssertThrowsError(try result.get()) { XCTAssertTrue($0 is CancellationError, "\($0)") }
+        XCTAssertFalse(mark.mayHaveLeft)
+    }
+
     func testASendWhoseTokenReadFailsDoesNotMarkItsHandOff() async {
         let service = PayabliService(
             environment: .sandbox,
