@@ -105,7 +105,7 @@ package final class PayabliService: PayabliTransport, Sendable {
     /// response body manually for non-v2 endpoints.
     package func perform(_ request: PayabliRequest) async throws -> PayabliResponse {
         // First statement, so no path through this method skips decoration.
-        let decorated = try await decorations.applyTo(request)
+        let decorated = try await PayabliSendMark.$current.withValue(nil) { try await decorations.applyTo(request) }
         let urlRequest = try buildURLRequest(decorated)
         logger.debug("→ \(decorated.method.rawValue) \(decorated.path)")
         try Task.checkCancellation()

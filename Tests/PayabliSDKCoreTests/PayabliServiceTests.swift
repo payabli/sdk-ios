@@ -55,6 +55,26 @@ final class PayabliServiceTests: XCTestCase {
         XCTAssertFalse(mark.mayHaveLeft)
     }
 
+    func testARequestMadeWhileReadingTheTokenDoesNotMarkThisSend() async {
+        let mark = PayabliSendMark()
+        let service = PayabliService(
+            environment: .sandbox,
+            readToken: {
+                PayabliSendMark.current?.set()
+                withUnsafeCurrentTask { $0?.cancel() }
+                return testToken
+            },
+            client: .none,
+            session: StubURLProtocol.makeSession()
+        )
+
+        _ = try? await PayabliSendMark.$current.withValue(mark) {
+            try await service.perform(PayabliRequest(method: .post, path: "/api/v2/MoneyIn/getpaid"))
+        }
+
+        XCTAssertFalse(mark.mayHaveLeft)
+    }
+
     func testASendWhoseTokenReadFailsDoesNotMarkItsHandOff() async {
         let service = PayabliService(
             environment: .sandbox,
