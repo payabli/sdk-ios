@@ -276,7 +276,7 @@ public final class PayabliPayInObjC: NSObject {
                 let result = try await operation(component)
                 completion(PayabliPayInResultObjC(result), nil)
             } catch {
-                completion(nil, error.toPayabliPayInNSError())
+                completion(nil, error.toPayabliPayInNSError(movesMoney: true))
             }
         }
     }
@@ -310,13 +310,21 @@ public final class PayabliPayInObjC: NSObject {
 
 extension Error {
     /// The `NSError` an Objective-C caller receives; an unknown outcome adds `paymentTransId` and `paymentReference`.
-    func toPayabliPayInNSError() -> NSError {
+    ///
+    /// - Parameter movesMoney: whether the call could take a payment, so the error says whether it may have.
+    /// - Returns: the error, with `capture` set to 1 when the payment may have been taken and 0 when it wasn't.
+    func toPayabliPayInNSError(movesMoney: Bool = false) -> NSError {
         let error = payabliNSError(domain: payInObjCErrorDomain)
-        guard case let .submissionInterrupted(_, _, paymentTransId, paymentReference) = self as? PayabliPayInError
-        else { return error }
         var userInfo = error.userInfo
-        userInfo["paymentTransId"] = paymentTransId
-        userInfo["paymentReference"] = paymentReference
+        if case let .submissionInterrupted(_, _, paymentTransId, paymentReference) = self as? PayabliPayInError {
+            userInfo["paymentTransId"] = paymentTransId
+            userInfo["paymentReference"] = paymentReference
+            if movesMoney {
+                userInfo["capture"] = 1
+            }
+        } else if movesMoney {
+            userInfo["capture"] = 0
+        }
         return NSError(domain: error.domain, code: error.code, userInfo: userInfo)
     }
 }

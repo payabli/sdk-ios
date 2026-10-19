@@ -13,11 +13,19 @@ package final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
         "fiserv"
     }
 
+    /// The environment a reader is armed against, by the names the configuration route sends.
+    enum ReaderEnvironment: String, CaseIterable, Sendable {
+        case production, sandbox
+    }
+
+    /// The one currency a reader is armed in.
+    static let readerCurrency = "USD"
+
     /// `/config` `credentials` block — maps 1:1 to `FiservTTPConfig`.
     struct Credentials: Sendable {
         let secretKey: String
         let apiKey: String
-        let environment: String
+        let environment: ReaderEnvironment
         let currencyCode: String
         let merchantId: String
         let appleTtpMerchantId: String
@@ -29,7 +37,7 @@ package final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
         init(
             secretKey: String,
             apiKey: String,
-            environment: String,
+            environment: ReaderEnvironment,
             currencyCode: String,
             merchantId: String,
             appleTtpMerchantId: String,
@@ -104,31 +112,41 @@ package final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
         lock.unlock()
     }
 
+    /// The credentials `configure` stored, or `nil` before it has.
+    func storedCredentials() -> Credentials? {
+        lock.withLock { credentials }
+    }
+
     // MARK: - TapToPayProvider
 
     /// Keys that must be present and non-empty in the `/config` dict.
     static let requiredCredentialKeys: [String] = [
-        "secretKey", "apiKey", "merchantId", "terminalId"
+        "secretKey", "apiKey", "merchantId", "terminalId", "environment", "currencyCode"
     ]
 
     /// Keys that fall back to safe defaults; `configure` logs a warning for
     /// each one missing.
     static let optionalCredentialKeys: [String] = [
-        "environment", "currencyCode", "appleTtpMerchantId",
-        "merchantName", "merchantCategoryCode", "terminalProfileId"
+        "appleTtpMerchantId", "merchantName", "merchantCategoryCode", "terminalProfileId"
     ]
 
     /// Validates the `/config` `providerCredentials` dict and stores it as `Credentials`.
     ///
     /// - Parameter raw: the credentials the configuration route returned.
-    /// - Throws: `readerCredentialsUnusable` when a required key is absent, empty or whitespace. The error names
-    ///   no key; the missing names go to the log.
+    /// - Throws: `readerCredentialsUnusable` when a required key is absent, empty or whitespace, or names an
+    ///   environment or a currency the reader is not armed in. The error names no key; the key names go to the log.
     package func configure(credentials raw: [String: String]) throws {
-        let missing = Self.requiredCredentialKeys.filter {
-            raw[$0]?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty != false
-        }
+        let missing = Self.requiredCredentialKeys.filter { Self.trimmed(raw[$0]).isEmpty }
         guard missing.isEmpty else {
             logger.warning("[fiserv.configure] required credentials blank: \(missing.joined(separator: ", "))")
+            throw PayabliTTPError.readerCredentialsUnusable
+        }
+        guard let environment = ReaderEnvironment(rawValue: Self.trimmed(raw["environment"]).lowercased()) else {
+            logger.warning("[fiserv.configure] environment is not one the reader knows")
+            throw PayabliTTPError.readerCredentialsUnusable
+        }
+        guard Self.trimmed(raw["currencyCode"]).uppercased() == Self.readerCurrency else {
+            logger.warning("[fiserv.configure] currencyCode is not one the reader is armed in")
             throw PayabliTTPError.readerCredentialsUnusable
         }
 
@@ -141,18 +159,22 @@ package final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
 
         setCredentials(
             Credentials(
-                secretKey: raw["secretKey"] ?? "",
-                apiKey: raw["apiKey"] ?? "",
-                environment: raw["environment"] ?? "sandbox",
-                currencyCode: raw["currencyCode"] ?? "USD",
-                merchantId: raw["merchantId"] ?? "",
+                secretKey: Self.trimmed(raw["secretKey"]),
+                apiKey: Self.trimmed(raw["apiKey"]),
+                environment: environment,
+                currencyCode: Self.readerCurrency,
+                merchantId: Self.trimmed(raw["merchantId"]),
                 appleTtpMerchantId: raw["appleTtpMerchantId"] ?? "",
                 merchantName: raw["merchantName"] ?? "",
                 merchantCategoryCode: raw["merchantCategoryCode"] ?? "",
-                terminalId: raw["terminalId"] ?? "",
+                terminalId: Self.trimmed(raw["terminalId"]),
                 terminalProfileId: raw["terminalProfileId"] ?? ""
             )
         )
+    }
+
+    private static func trimmed(_ value: String?) -> String {
+        value?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
     }
 
     /// Platform + `PaymentCardReader` hardware check. Runs before `/config`
@@ -360,6 +382,13 @@ package final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
             return creds
         }
 
+        static func vendorEnvironment(_ environment: ReaderEnvironment) -> FiservTTPEnvironment {
+            switch environment {
+            case .production: .Production
+            case .sandbox: .Sandbox
+            }
+        }
+
         /// Builds a fresh `FiservTTPCardReader` (vendored from PayabliCardReaderCore).
         /// Tears down the previous instance first — Apple's `PaymentCardReader`
         /// allows only one per process.
@@ -372,7 +401,7 @@ package final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
             let config = FiservTTPConfig(
                 secretKey: creds.secretKey,
                 apiKey: creds.apiKey,
-                environment: creds.environment.lowercased() == "production" ? .Production : .Sandbox,
+                environment: Self.vendorEnvironment(creds.environment),
                 currencyCode: creds.currencyCode,
                 merchantId: creds.merchantId,
                 appleTtpMerchantId: creds.appleTtpMerchantId,
