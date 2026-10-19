@@ -22,6 +22,23 @@ final class PayabliPayInFailureMessageTests: XCTestCase {
         }
     }
 
+    func testAnInterruptedSubmissionWarnsWhateverItsCausesCategory() {
+        for type in [PayabliErrorType.rateLimited, .tokenExpired, .tokenProviderFailed, .validation] {
+            let interrupted = PayabliPayInError.submissionInterrupted(
+                type: type,
+                causeType: "test",
+                paymentTransId: nil,
+                paymentReference: "p1"
+            )
+
+            XCTAssertEqual(
+                PayabliPayInFailureMessage.text(for: interrupted, operation: .capture),
+                "This payment may have gone through. Check before paying again.",
+                "\(type)"
+            )
+        }
+    }
+
     func testEachCategoryDrawsItsMessageForASave() {
         for category in PayabliErrorCategory.allCases {
             let expected = switch category {

@@ -181,7 +181,8 @@ The outcomes are the ones in the root README's [Handle the outcome](../../README
 
 Don't show `error.localizedDescription` to the payer or log it: it names what the service rejected and can
 quote what was submitted. Show the payer a message for the error's `category`, and log
-`(error as? any PayabliError)?.code`.
+`(error as? any PayabliError)?.code`. Check for `submissionInterrupted` first: it keeps its cause's category, so a
+retried payment refused for a rate limit or a credential is still one that may have gone through, and its message says so.
 
 ## Reference
 
