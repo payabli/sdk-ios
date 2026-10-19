@@ -163,29 +163,104 @@ final class PayabliTTPReaderSessionRecoveryTests: XCTestCase {
 
     // MARK: - A failure from a reader that has been replaced
 
-    /// The read that fails may not be the read the current reader is doing.
-    ///
-    /// `startReading` suspends, so an `initialize()` in that window prepares a
-    /// replacement reader and returns to `.ready`. Expiring on the old read's
-    /// failure would kill the healthy session it just built.
-    func testFailureFromASupersededReaderDoesNotExpireTheNewSession() async throws {
+    /// An `initialize()` made while a read is failing waits for the charge, so the
+    /// dead reader expires the session first and the initialization then repairs it.
+    func testAnInitializeDuringAFailingReadRepairsTheSessionAfterIt() async throws {
         let provider = InterleavingProvider()
         let ttp = try makeTTP(provider: provider)
         try await bounded { try await ttp.initialize() }
         XCTAssertEqual(ttp.sessionState, .ready)
 
-        // Runs while the charge is suspended inside `startReading`, exactly as a
-        // host calling `initialize()` mid-charge would.
-        provider.duringRead = { try await ttp.initialize() }
+        var states: [PayabliTTPSessionState] = []
+        let observation = ttp.addSessionStateObserver { states.append(ttp.sessionState) }
+        defer { observation.cancel() }
+
+        // Started while the charge is suspended inside `startReading`, as a host
+        // calling `initialize()` on resume would, and not awaited there: it waits
+        // for the charge that is waiting for this read.
+        var initializing: Task<Void, Error>?
+        provider.duringRead = { initializing = Task { @MainActor in try await ttp.initialize() } }
         provider.readingResult = .failure(Self.sessionLevelFailure)
 
         await XCTAssertThrowsErrorAsync(try await self.charge(ttp))
+        try await bounded { try await initializing?.value }
 
-        XCTAssertEqual(
-            ttp.sessionState, .ready,
-            "the replacement reader was healthy; the old read's failure expired it"
+        let expired = try XCTUnwrap(states.firstIndex(of: .sessionExpired), "the dead reader did not expire the session")
+        XCTAssertFalse(
+            states[..<expired].contains(.idle),
+            "the initialization ran before the charge it was made during had ended"
         )
+        XCTAssertEqual(ttp.sessionState, .ready)
         XCTAssertEqual(provider.prepareReaderCalls, 2)
+    }
+
+    /// An `initialize()` made after a charge is queued waits for the charge and runs its own setup, even when
+    /// an earlier `initialize()` on the same `PayabliTTP` is still running ahead of the charge.
+    func testAnInitializeMadeAfterAChargeIsQueuedWaitsForTheCharge() async throws {
+        let provider = InterleavingProvider()
+        let ttp = try makeTTP(provider: provider)
+        try await bounded { try await ttp.initialize() }
+        provider.readingResult = .success(Self.cardReadResult)
+        let read = Flag()
+        provider.duringRead = { read.value = true }
+        provider.armGate()
+
+        let first = Task { @MainActor in try await ttp.initialize() }
+        for _ in 0 ..< 20 {
+            await Task.yield()
+        }
+        let charging = Task { @MainActor in try await self.charge(ttp) }
+        await Task.yield()
+        let readBeforeSecondReturned = Flag()
+        let second = Task { @MainActor in
+            try await ttp.initialize()
+            readBeforeSecondReturned.value = read.value
+        }
+        for _ in 0 ..< 20 {
+            await Task.yield()
+        }
+        provider.openGate()
+
+        try await bounded { try await first.value }
+        _ = try await bounded { try await charging.value }
+        try await bounded { try await second.value }
+
+        XCTAssertEqual(provider.prepareReaderCalls, 3, "the later initialize joined the earlier one instead of waiting")
+        XCTAssertTrue(readBeforeSecondReturned.value, "the later initialize returned before the charge read a card")
+        XCTAssertEqual(ttp.sessionState, .ready)
+    }
+
+    /// A second `initialize()` on the same `PayabliTTP` joins its first, even when another `PayabliTTP`'s
+    /// setup was queued in between.
+    func testAnInitializeJoinsItsOwnSetupWhenAnotherIsQueuedBetween() async throws {
+        let provider = InterleavingProvider()
+        let otherProvider = InterleavingProvider()
+        let ttp = try makeTTP(provider: provider)
+        let other = try makeTTP(provider: otherProvider)
+        try await bounded { try await ttp.initialize() }
+        try await bounded { try await other.initialize() }
+        provider.armGate()
+
+        let first = Task { @MainActor in try await ttp.initialize() }
+        for _ in 0 ..< 20 {
+            await Task.yield()
+        }
+        let queued = Task { @MainActor in try await other.initialize() }
+        await Task.yield()
+        let second = Task { @MainActor in try await ttp.initialize() }
+        for _ in 0 ..< 20 {
+            await Task.yield()
+        }
+        provider.openGate()
+
+        try await bounded { try await first.value }
+        try await bounded { try await queued.value }
+        try await bounded { try await second.value }
+
+        XCTAssertEqual(provider.prepareReaderCalls, 2, "the second initialize ran a setup of its own instead of joining")
+        XCTAssertEqual(otherProvider.prepareReaderCalls, 2, "the other PayabliTTP's setup was joined instead of run")
+        XCTAssertEqual(ttp.sessionState, .ready)
+        XCTAssertEqual(other.sessionState, .ready)
     }
 
     /// Two initializations must not run over each other.
@@ -245,9 +320,6 @@ final class PayabliTTPReaderSessionRecoveryTests: XCTestCase {
             }
             provider.openGate()
 
-            // The charge may fail: a host that re-initializes mid-charge takes
-            // the session out from under it, and `notReady` is the honest
-            // answer.
             _ = try await (recovering, initializing)
         }
 
@@ -259,6 +331,42 @@ final class PayabliTTPReaderSessionRecoveryTests: XCTestCase {
             ttp.sessionState, .ready,
             "the initialization that finished last should decide the state"
         )
+    }
+
+    /// A charge waiting behind a setup already holds the session, so a second charge made then is refused
+    /// rather than reading a card while the setup rebuilds the reader.
+    func testASecondChargeMadeWhileTheFirstWaitsBehindASetupIsRefused() async throws {
+        let provider = InterleavingProvider()
+        let ttp = try makeTTP(provider: provider)
+        try await bounded { try await ttp.initialize() }
+        provider.readingResult = .success(Self.cardReadResult)
+        provider.holdEligibility = true
+        provider.armGate()
+
+        // Held in its eligibility check, so the session still reads `.ready`.
+        let initializing = Task { @MainActor in try await ttp.initialize() }
+        await Task.yield()
+        let first = Task { @MainActor in try await self.charge(ttp) }
+        await Task.yield()
+        let second = Task { @MainActor in try await self.charge(ttp) }
+        let secondRefusal: PayabliErrorType?
+        // Bounded, because a second charge that is queued instead of refused
+        // waits on the gate this test opens only after it.
+        do {
+            _ = try await bounded { try await second.value }
+            secondRefusal = nil
+        } catch is ChargeTimedOut {
+            secondRefusal = nil
+        } catch {
+            secondRefusal = (error as? TapToPayError)?.type
+        }
+
+        provider.openGate()
+        try await bounded { try await initializing.value }
+        _ = try await bounded { try await first.value }
+
+        XCTAssertEqual(secondRefusal, .terminalNotReady, "the second charge read a card while a setup was in flight")
+        XCTAssertEqual(ttp.sessionState, .ready)
     }
 
     // MARK: - Error text reaching the host
@@ -513,6 +621,11 @@ final class PayabliTTPReaderSessionRecoveryTests: XCTestCase {
 /// wedge cannot be mistaken for the failure these tests expect.
 private struct ChargeTimedOut: Error {}
 
+/// A flag set on one task and read on another. `@unchecked` because the tests set and read it in order.
+private final class Flag: @unchecked Sendable {
+    var value = false
+}
+
 /// Guards a continuation so the deadline and the work cannot both resume it.
 /// Only touched from the main actor, which is where both racers run.
 @MainActor
@@ -612,8 +725,15 @@ private final class InterleavingProvider: TapToPayProvider, @unchecked Sendable 
 
     private var inProvider = false
 
+    /// Holds the eligibility check at the gate as well, so a setup can be kept in flight while the session
+    /// still reads `.ready`.
+    var holdEligibility = false
+
     func checkEligibility() async -> Result<Void, PayabliTTPError> {
-        .success(())
+        if holdEligibility, lock.withLock({ gateArmed }) {
+            await waitAtGate()
+        }
+        return .success(())
     }
 
     func configure(credentials: [String: String]) throws {
@@ -632,21 +752,25 @@ private final class InterleavingProvider: TapToPayProvider, @unchecked Sendable 
         defer { lock.withLock { inProvider = false } }
 
         if held {
-            await withCheckedContinuation { continuation in
-                // Armed-ness re-read with the append, under one lock, so a gate
-                // opened between the two resumes this caller instead of leaving it
-                // on a list nothing will drain.
-                let resumeNow: Bool = lock.withLock {
-                    guard gateArmed else { return true }
-                    gate.append(continuation)
-                    return false
-                }
-                if resumeNow {
-                    continuation.resume()
-                }
-            }
+            await waitAtGate()
         } else if suspendDuringPrepare {
             await Task.yield()
+        }
+    }
+
+    private func waitAtGate() async {
+        await withCheckedContinuation { continuation in
+            // Armed-ness re-read with the append, under one lock, so a gate
+            // opened between the two resumes this caller instead of leaving it
+            // on a list nothing will drain.
+            let resumeNow: Bool = lock.withLock {
+                guard gateArmed else { return true }
+                gate.append(continuation)
+                return false
+            }
+            if resumeNow {
+                continuation.resume()
+            }
         }
     }
 

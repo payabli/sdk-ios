@@ -134,37 +134,207 @@ final class PayabliTTPChargingTests: XCTestCase {
     func testASecondChargeIsRefusedWhileOneHoldsTheReader() async throws {
         let (ttp, provider) = try await makeReadyTTP()
         let during = Snapshot()
+        // The second charge starts beside the read and is awaited after the first returns, so a queued one
+        // fails the assertions below.
         provider.whileReading = { [weak ttp] in
             guard let ttp else { return }
-            do {
-                _ = try await ttp.charge(type: .sale, paymentDetails: PayabliTTPPaymentDetails(amount: 1))
-            } catch {
-                during.refusal = (error as? TapToPayError)?.type
+            during.second = Task { @MainActor in
+                do {
+                    _ = try await ttp.charge(type: .sale, paymentDetails: PayabliTTPPaymentDetails(amount: 1))
+                } catch {
+                    during.refusal = (error as? TapToPayError)?.type
+                }
+                during.callReturned = true
             }
+            await Self.letOtherWorkRun()
+            during.callReturnedInRead = during.callReturned
         }
 
         _ = try await charge(ttp)
+        await during.second?.value
+
+        XCTAssertEqual(during.callReturnedInRead, true, "the second charge was queued instead of refused")
 
         XCTAssertEqual(during.refusal, .terminalNotReady)
         XCTAssertEqual(provider.startReadingCalls, 1)
         XCTAssertEqual(ttp.sessionState, .ready)
     }
 
-    /// An `initialize()` during the tap rebuilds the session, and the charge ending afterwards leaves what
-    /// it built alone.
-    func testASessionRebuiltDuringTheTapIsKept() async throws {
+    /// An `initialize()` made while the reader waits for a card runs after the charge ends, never under it.
+    func testInitializeDuringATapWaitsForTheChargeToEnd() async throws {
         let (ttp, provider) = try await makeReadyTTP()
+        let during = Snapshot()
         provider.whileReading = { [weak ttp] in
-            try? await ttp?.initialize()
+            guard let ttp else { return }
+            during.call = Task { @MainActor in
+                try await ttp.initialize()
+                during.callReturned = true
+            }
+            await Self.letOtherWorkRun()
+            during.state = ttp.sessionState
+            during.callReturnedInRead = during.callReturned
+            during.preparesInRead = provider.prepareReaderCalls
         }
         let seen = record(ttp)
 
         let result = try await charge(ttp)
+        try await during.call?.value
 
         XCTAssertEqual(result.paymentTransId, Self.paymentTransId)
-        XCTAssertEqual(seen.states.prefix(3), [opening, waiting, .idle])
-        XCTAssertFalse(seen.states.contains(closing), "the closing write landed on a session the charge no longer held")
+        XCTAssertEqual(during.state, waiting, "the setup ran while the reader waited for a card")
+        XCTAssertEqual(during.callReturnedInRead, false)
+        XCTAssertEqual(during.preparesInRead, 1)
+        XCTAssertEqual(provider.prepareReaderCalls, 2)
+        XCTAssertEqual(seen.states.prefix(5), [opening, waiting, closing, .ready, .idle])
         XCTAssertEqual(ttp.sessionState, .ready)
+    }
+
+    func testActivatingDuringATapWaitsForTheChargeToEnd() async throws {
+        let (ttp, provider) = try await makeReadyTTP()
+        let during = Snapshot()
+        provider.whileReading = { [weak ttp] in
+            guard let ttp else { return }
+            during.call = Task { @MainActor in
+                defer { during.callReturned = true }
+                do {
+                    try await ttp.activateDevice(activationCode: "123456")
+                } catch {
+                    during.refusal = (error as? TapToPayError)?.type
+                }
+            }
+            await Self.letOtherWorkRun()
+            during.callReturnedInRead = during.callReturned
+        }
+
+        _ = try await charge(ttp)
+        try await during.call?.value
+
+        XCTAssertEqual(during.callReturnedInRead, false, "the activation ran while the reader waited for a card")
+        XCTAssertEqual(during.refusal, .deviceNotPending)
+        XCTAssertEqual(ttp.sessionState, .ready)
+    }
+
+    // MARK: - Two PayabliTTPs in one process
+
+    /// The device has one reader, so a setup on another `PayabliTTP` waits for a charge on this one.
+    func testASetupOnAnotherPayabliTTPWaitsForTheCharge() async throws {
+        let (ttp, provider) = try await makeReadyTTP()
+        let (other, otherProvider) = try await makeReadyTTP()
+        let during = Snapshot()
+        provider.whileReading = { [weak other] in
+            guard let other else { return }
+            during.call = Task { @MainActor in
+                try await other.initialize()
+                during.callReturned = true
+            }
+            await Self.letOtherWorkRun()
+            during.state = other.sessionState
+            during.callReturnedInRead = during.callReturned
+            during.preparesInRead = otherProvider.prepareReaderCalls
+        }
+
+        let result = try await charge(ttp)
+        try await during.call?.value
+
+        XCTAssertEqual(result.paymentTransId, Self.paymentTransId)
+        XCTAssertEqual(during.state, .ready, "the other PayabliTTP set up while this one's reader waited for a card")
+        XCTAssertEqual(during.callReturnedInRead, false)
+        XCTAssertEqual(during.preparesInRead, 1)
+        XCTAssertEqual(otherProvider.prepareReaderCalls, 2)
+        XCTAssertEqual(ttp.sessionState, .ready)
+        XCTAssertEqual(other.sessionState, .ready)
+    }
+
+    func testAChargeOnAnotherPayabliTTPDuringAChargeIsRefused() async throws {
+        let (ttp, provider) = try await makeReadyTTP()
+        let (other, otherProvider) = try await makeReadyTTP()
+        let during = Snapshot()
+        // The second charge starts beside the read and is awaited after the first returns, so a queued one
+        // fails the assertions below.
+        provider.whileReading = { [weak other] in
+            guard let other else { return }
+            during.second = Task { @MainActor in
+                do {
+                    _ = try await other.charge(type: .sale, paymentDetails: PayabliTTPPaymentDetails(amount: 1))
+                } catch {
+                    during.refusal = (error as? TapToPayError)?.type
+                }
+                during.callReturned = true
+            }
+            await Self.letOtherWorkRun()
+            during.callReturnedInRead = during.callReturned
+        }
+
+        _ = try await charge(ttp)
+        await during.second?.value
+
+        XCTAssertEqual(during.callReturnedInRead, true, "the second charge was queued instead of refused")
+
+        XCTAssertEqual(during.refusal, .terminalNotReady)
+        XCTAssertEqual(otherProvider.startReadingCalls, 0)
+        XCTAssertEqual(other.sessionState, .ready)
+    }
+
+    /// A setup queued behind a charge does not let a second charge in behind it.
+    func testASecondChargeMadeWhileASetupWaitsBehindTheFirstIsRefused() async throws {
+        let (ttp, provider) = try await makeReadyTTP()
+        let (other, _) = try await makeReadyTTP()
+        let during = Snapshot()
+        provider.whileReading = { [weak ttp, weak other] in
+            guard let ttp, let other else { return }
+            during.call = Task { @MainActor in try await other.initialize() }
+            await Self.letOtherWorkRun()
+            let second = Task { @MainActor in
+                do {
+                    _ = try await ttp.charge(type: .sale, paymentDetails: PayabliTTPPaymentDetails(amount: 1))
+                } catch {
+                    during.refusal = (error as? TapToPayError)?.type
+                }
+                during.callReturned = true
+            }
+            await Self.letOtherWorkRun()
+            during.callReturnedInRead = during.callReturned
+            during.second = second
+        }
+
+        _ = try await charge(ttp)
+        try await during.call?.value
+        await during.second?.value
+
+        XCTAssertEqual(during.callReturnedInRead, true, "the second charge was queued instead of refused")
+        XCTAssertEqual(during.refusal, .terminalNotReady)
+        XCTAssertEqual(provider.startReadingCalls, 1, "the second charge read a card")
+    }
+
+    /// Two `PayabliTTP`s setting up at once each run their own setup; one does not take the other's outcome.
+    func testTwoPayabliTTPsInitializingAtOnceEachSetUpTheirOwnSession() async throws {
+        let (ttp, provider) = try await makeReadyTTP()
+        let (other, otherProvider) = try await makeReadyTTP()
+
+        async let first: Void = ttp.initialize()
+        async let second: Void = other.initialize()
+        _ = try await (first, second)
+
+        XCTAssertEqual(provider.prepareReaderCalls, 2)
+        XCTAssertEqual(otherProvider.prepareReaderCalls, 2, "the second PayabliTTP joined the first's setup")
+        XCTAssertEqual(ttp.sessionState, .ready)
+        XCTAssertEqual(other.sessionState, .ready)
+    }
+
+    /// The repair a charge runs first belongs to the session, so cancelling the charge does not stop it.
+    func testCancellingAChargeDuringItsRepairLetsTheRepairFinish() async throws {
+        let (ttp, provider) = try await makeReadyTTP(
+            readFailure: PayabliTTPError.nfcFailed(reason: "Charges: readerSessionExpired")
+        )
+        _ = await chargeFailure(ttp)
+        XCTAssertEqual(ttp.sessionState, .sessionExpired)
+
+        let cancelled = Task { @MainActor in try await self.charge(ttp) }
+        cancelled.cancel()
+        _ = try? await cancelled.value
+
+        XCTAssertEqual(provider.prepareReaderCalls, 2)
+        XCTAssertEqual(ttp.sessionState, .ready, "the cancelled charge stopped the repair it started")
     }
 
     func testAPromptFromAReplacedReaderIsDropped() async throws {
@@ -181,23 +351,27 @@ final class PayabliTTPChargingTests: XCTestCase {
         XCTAssertEqual(during.state, waiting)
     }
 
-    func testReinitializingDuringATapLeavesTheChargeAlone() async throws {
+    func testReinitializingDuringATapWaitsForTheChargeToEnd() async throws {
         let (ttp, provider) = try await makeReadyTTP()
         let during = Snapshot()
         provider.whileReading = { [weak ttp] in
-            do {
-                try await ttp?.reinitialize()
-            } catch {
-                // The internal repair throws the SDK's own error rather than a host one, so any error counts.
-                during.refusal = (error as? TapToPayError)?.type ?? .unknown
+            guard let ttp else { return }
+            during.call = Task { @MainActor in
+                try await ttp.reinitialize()
+                during.callReturned = true
             }
-            during.state = ttp?.sessionState
+            await Self.letOtherWorkRun()
+            during.state = ttp.sessionState
+            during.callReturnedInRead = during.callReturned
         }
 
         _ = try await charge(ttp)
+        try await during.call?.value
 
-        XCTAssertNil(during.refusal)
         XCTAssertEqual(during.state, waiting)
+        XCTAssertEqual(during.callReturnedInRead, false, "the reinitialize returned while the reader waited for a card")
+        XCTAssertEqual(provider.prepareReaderCalls, 1)
+        XCTAssertEqual(ttp.sessionState, .ready)
     }
 
     func testTheReadersPromptsReportOnTheState() async throws {
@@ -253,6 +427,22 @@ final class PayabliTTPChargingTests: XCTestCase {
         var state: PayabliTTPSessionState?
         var isReady: Bool?
         var refusal: PayabliErrorType?
+        /// A setup call made during the read. It is never awaited inside the read, because it waits for the
+        /// charge that is waiting for the read.
+        var call: Task<Void, Error>?
+        var callReturned = false
+        var callReturnedInRead: Bool?
+        var preparesInRead: Int?
+        var second: Task<Void, Never>?
+    }
+
+    /// Gives a setup call started during the read the chance to run, so one that is not made to wait
+    /// would be seen running.
+    private static func letOtherWorkRun() async {
+        for _ in 0 ..< 50 {
+            await Task.yield()
+        }
+        try? await Task.sleep(nanoseconds: 50_000_000)
     }
 
     /// Every state the session publishes from here on, in order.
