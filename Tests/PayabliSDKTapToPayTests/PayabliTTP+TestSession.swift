@@ -1,18 +1,21 @@
 import Foundation
 @testable import PayabliSDKCore
 @testable import PayabliSDKTapToPay
+import PayabliSDKTestUtils
 
 extension PayabliTTP {
-    /// A facade on a session of its own, outside the installed one, so a test needs no reset.
+    /// A facade on a session of its own, outside the installed one, so a test needs no reset. Telemetry goes to
+    /// memory unless a test passes its own, so no report reaches the stubbed network a test is counting.
     convenience init(
         config: PayabliConfig,
         provider: TapToPayProvider,
         attestation: DeviceAttestationService,
         retryPolicy: RetryPolicy = .default,
-        session: URLSession? = nil
+        session: URLSession? = nil,
+        telemetry: any TelemetryTransport = InMemoryTelemetryTransport()
     ) {
         self.init(
-            session: PayabliSession(config: config, urlSession: session),
+            session: PayabliSession(config: config, urlSession: session, telemetryTransport: telemetry),
             provider: provider,
             attestation: attestation,
             retryPolicy: retryPolicy

@@ -72,3 +72,8 @@ public enum TelemetryEventName {
     public static let authTokenFailed = "auth.tokenFailed"
     public static let authTokenRefreshed = "auth.tokenRefreshed"
 }
+
+package extension TelemetryEventName {
+    static let ttpInitializeCancelled = "ttp.initialize.cancelled"
+    static let ttpInitializePending = "ttp.initialize.pending"
+}

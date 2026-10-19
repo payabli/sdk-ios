@@ -50,7 +50,23 @@ extension PayabliTTP {
         return try await gate.holdForCharge(body)
     }
 
+    /// Runs once per setup, by its owner: a caller that joins it adds no report.
     private func runInitialize() async throws {
+        let clock = ContinuousClock()
+        let start = clock.now
+        reports.initializeStarted()
+        do {
+            try await runInitializePhases()
+        } catch let withdrawn as CancellationError {
+            throw withdrawn
+        } catch {
+            reports.initializeEnded(error, after: clock.now - start)
+            throw error
+        }
+        reports.initializeSucceeded(after: clock.now - start)
+    }
+
+    private func runInitializePhases() async throws {
         // 0. Eligibility.
         try await runEligibility()
 
