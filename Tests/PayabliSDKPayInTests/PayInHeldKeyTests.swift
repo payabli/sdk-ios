@@ -296,7 +296,8 @@ final class PayInHeldKeyTests: XCTestCase {
         let envelopes = [
             #"{"status":200,"message":"Duplicate payment"}"#,
             #"{"isSuccess":false,"responseCode":6000,"responseText":"Duplicate payment"}"#,
-            #"{"status":401,"message":"Duplicate payment"}"#
+            #"{"status":401,"message":"Duplicate payment"}"#,
+            #"{"code":"A0000","reason":"Approved"}"#
         ]
         for envelope in envelopes {
             let flow = makeFlow(prefix: "k")

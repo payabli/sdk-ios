@@ -363,7 +363,8 @@ final class PayInPaymentFlowClient: Sendable {
         }
         let decoder = JSONDecoder()
         if let decoded = try? decoder.decode(PayabliPayInAPIResponse.self, from: response.body) {
-            guard decoded.isApproved else {
+            // A 409 is never an approval, whatever its body says.
+            guard decoded.isApproved, response.statusCode != 409 else {
                 throw PayabliPayInError.transactionFailed(decoded.failure(httpStatusCode: response.statusCode))
             }
             return PayabliPayInResult(apiResponse: decoded)
