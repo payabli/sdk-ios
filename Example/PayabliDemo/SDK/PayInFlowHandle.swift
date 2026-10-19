@@ -95,7 +95,7 @@ final class PayInFlowHandle: ObservableObject {
             requestConfiguration: PayInRequests.sameAttempt(
                 as: current,
                 customerData: suppliesCustomer ? PayInDemoCustomer.customerData : nil,
-                idempotencyKey: current.idempotencyKey
+                paymentReference: current.paymentReference
             )
         )
     }

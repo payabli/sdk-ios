@@ -17,7 +17,7 @@ enum PayInFixture {
         _ failure: any Error
     ) -> (type: PayabliErrorType, causeType: String)? {
         guard
-            case let .submissionInterrupted(type, causeType, _) =
+            case let .submissionInterrupted(type, causeType, _, _) =
             failure as? PayabliPayInError
         else {
             return nil
@@ -39,7 +39,6 @@ enum PayInFixture {
     }
 
     static func request(
-        idempotencyKey: String?,
         cardOnly: Bool = false,
         totalAmount: Double = 12.34,
         orderId: String? = nil
@@ -59,8 +58,7 @@ enum PayInFixture {
                 : .stored(PayabliPayInPaymentMethod.Stored(method: .card, storedMethodId: "stored-1")),
             options: PayabliPayInRequestConfiguration(
                 paymentDetails: PayabliPayInPaymentDetails(totalAmount: totalAmount),
-                orderId: orderId,
-                idempotencyKey: idempotencyKey
+                orderId: orderId
             )
         )
     }

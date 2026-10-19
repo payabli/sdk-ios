@@ -117,8 +117,7 @@ final class PaymentMethodPayerFacingFailureTests: XCTestCase {
     }
 
     private static let requestConfiguration = PayabliPayInRequestConfiguration(
-        paymentDetails: PayabliPayInPaymentDetails(totalAmount: 10, currency: "USD"),
-        idempotencyKey: "idem-payer-facing"
+        paymentDetails: PayabliPayInPaymentDetails(totalAmount: 10, currency: "USD")
     )
 
     private func flowOnTransport(_ transport: any PayabliTransport) -> PayabliPayIn {
