@@ -57,6 +57,29 @@ final class PayInPaymentObjCBridgeTests: XCTestCase {
         XCTAssertEqual(failure.userInfo["paymentTransId"] as? String, "101-abc")
     }
 
+    func testAPaymentErrorSaysWhetherThePaymentMayHaveBeenTaken() async throws {
+        let open = PayabliPayInObjC(component: PayInFixture.makeFlow(
+            transport: RecordingIdempotencyTransport(body: Self.interrupted, status: 500),
+            key: "reserved-1"
+        ))
+        let declined = PayabliPayInObjC(component: PayInFixture.makeFlow(
+            transport: RecordingIdempotencyTransport(body: PayInFixture.declined),
+            key: "reserved-2"
+        ))
+
+        let (_, unknown) = await call { open.voidTransaction(transId: "t-1", completion: $0) }
+        let (_, refused) = await call { declined.capture(PayabliPayInRequestObjC.cash(totalAmount: 10), completion: $0) }
+
+        XCTAssertEqual(try XCTUnwrap(unknown).userInfo["capture"] as? Int, 1)
+        XCTAssertEqual(try XCTUnwrap(refused).userInfo["capture"] as? Int, 0)
+    }
+
+    func testAnErrorFromACallThatMovesNoMoneyCarriesNoCapture() {
+        let error = PayabliGenericError(type: .networkError, reason: "lost").toPayabliPayInNSError()
+
+        XCTAssertNil(error.userInfo["capture"])
+    }
+
     func testTheRequestCarriesEverySettingItIsGiven() {
         let request = PayabliPayInRequestObjC.cash(totalAmount: 12.5)
         request.serviceFee = 0.5

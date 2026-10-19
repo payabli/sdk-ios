@@ -339,9 +339,10 @@ The SDK is written in Swift, and the card-not-present form is a SwiftUI view.
   `com.payabli.ttp` domain, where `userInfo["capture"]` holds the `PayabliTTPCapture` raw value (`0` not
   charged, `1` unknown, `2` charged), `userInfo["paymentTransId"]` is absent when there is no
   transaction ID, and `userInfo["retryAfter"]` holds the wait in seconds when the service asked for one.
-  Card-not-present errors are in the `com.payabli.payIn` domain. When a payment's outcome is unknown,
-  `userInfo["paymentTransId"]` holds the transaction ID and `userInfo["paymentReference"]` the payment's reference;
-  each is absent when there is none. Errors from `PayabliSessionObjC`'s initializer are in `com.payabli.session`.
+  Card-not-present errors are in the `com.payabli.payIn` domain. An error from `capture`, `authorize`,
+  `captureAuthorizedTransaction` or `voidTransaction` carries `userInfo["capture"]`: `1` when the payment may have been
+  taken, `0` when it wasn't. When it's `1`, `userInfo["paymentTransId"]` holds the transaction ID and
+  `userInfo["paymentReference"]` the payment's reference; each is absent when there is none. Errors from `PayabliSessionObjC`'s initializer are in `com.payabli.session`.
 - **Flutter, .NET MAUI and React Native.** [`Bridges/`](Bridges/README.md) has an example integration for each.
   Use them as a starting point for your own integration.
 
