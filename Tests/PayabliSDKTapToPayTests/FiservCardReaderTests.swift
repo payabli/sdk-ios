@@ -146,9 +146,9 @@ final class FiservCardReaderTests: XCTestCase {
         try FiservCardReader().configure(credentials: Self.complete)
     }
 
-    /// An environment the reader does not know is refused; a known one is read in any case and spacing.
+    /// Only `production` and `sandbox` arm a reader, read in any case and spacing; any other name is refused.
     func testAnEnvironmentTheReaderDoesNotKnowIsRefusedAsUnusable() throws {
-        for value in ["prod", "staging", "live", "production-eu"] {
+        for value in ["qa", "int", "cat", "prod", "staging", "production-eu"] {
             var raw = Self.complete
             raw["environment"] = value
             XCTAssertThrowsError(try FiservCardReader().configure(credentials: raw), value) { error in
@@ -158,8 +158,7 @@ final class FiservCardReaderTests: XCTestCase {
             }
         }
         let known: [(String, FiservCardReader.ReaderEnvironment)] = [
-            ("production", .production), (" Production\n", .production), ("SANDBOX", .sandbox),
-            ("int", .int), ("QA", .qa), ("cat", .cat)
+            ("production", .production), (" Production\n", .production), ("sandbox", .sandbox), ("SANDBOX", .sandbox)
         ]
         for (value, expected) in known {
             var raw = Self.complete
@@ -173,13 +172,33 @@ final class FiservCardReaderTests: XCTestCase {
     #if canImport(PayabliCardReaderCore)
         func testEachEnvironmentArmsTheReaderAgainstItsOwnVendorEnvironment() {
             let expected: [FiservCardReader.ReaderEnvironment: FiservTTPEnvironment] = [
-                .production: .Production, .sandbox: .Sandbox, .int: .Int, .qa: .QA, .cat: .Cat
+                .production: .Production, .sandbox: .Sandbox
             ]
             for environment in FiservCardReader.ReaderEnvironment.allCases {
                 XCTAssertEqual(FiservCardReader.vendorEnvironment(environment), expected[environment], "\(environment)")
             }
         }
     #endif
+
+    /// A reader is armed in USD only, read in any case and spacing; any other currency is refused before it is armed.
+    func testACurrencyOtherThanUSDIsRefusedAsUnusable() throws {
+        for value in ["AUD", "CAD", "840", "US"] {
+            var raw = Self.complete
+            raw["currencyCode"] = value
+            XCTAssertThrowsError(try FiservCardReader().configure(credentials: raw), value) { error in
+                guard case PayabliTTPError.readerCredentialsUnusable = error else {
+                    return XCTFail("\(value): wrong error \(error)")
+                }
+            }
+        }
+        for value in ["USD", "usd", " Usd\n"] {
+            var raw = Self.complete
+            raw["currencyCode"] = value
+            let reader = FiservCardReader()
+            try reader.configure(credentials: raw)
+            XCTAssertEqual(reader.storedCredentials()?.currencyCode, "USD", value)
+        }
+    }
 
     func testRequiredValuesAreStoredWithoutSurroundingSpace() throws {
         var raw = Self.complete

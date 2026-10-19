@@ -13,10 +13,13 @@ package final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
         "fiserv"
     }
 
-    /// The environment a reader is armed against: the two names the configuration route sends, and the reader's own.
+    /// The environment a reader is armed against, by the names the configuration route sends.
     enum ReaderEnvironment: String, CaseIterable, Sendable {
-        case production, sandbox, int, qa, cat
+        case production, sandbox
     }
+
+    /// The one currency a reader is armed in.
+    static let readerCurrency = "USD"
 
     /// `/config` `credentials` block — maps 1:1 to `FiservTTPConfig`.
     struct Credentials: Sendable {
@@ -131,7 +134,7 @@ package final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
     ///
     /// - Parameter raw: the credentials the configuration route returned.
     /// - Throws: `readerCredentialsUnusable` when a required key is absent, empty or whitespace, or names an
-    ///   environment the reader does not know. The error names no key; the key names go to the log.
+    ///   environment or a currency the reader is not armed in. The error names no key; the key names go to the log.
     package func configure(credentials raw: [String: String]) throws {
         let missing = Self.requiredCredentialKeys.filter { Self.trimmed(raw[$0]).isEmpty }
         guard missing.isEmpty else {
@@ -140,6 +143,10 @@ package final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
         }
         guard let environment = ReaderEnvironment(rawValue: Self.trimmed(raw["environment"]).lowercased()) else {
             logger.warning("[fiserv.configure] environment is not one the reader knows")
+            throw PayabliTTPError.readerCredentialsUnusable
+        }
+        guard Self.trimmed(raw["currencyCode"]).uppercased() == Self.readerCurrency else {
+            logger.warning("[fiserv.configure] currencyCode is not one the reader is armed in")
             throw PayabliTTPError.readerCredentialsUnusable
         }
 
@@ -155,7 +162,7 @@ package final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
                 secretKey: Self.trimmed(raw["secretKey"]),
                 apiKey: Self.trimmed(raw["apiKey"]),
                 environment: environment,
-                currencyCode: Self.trimmed(raw["currencyCode"]),
+                currencyCode: Self.readerCurrency,
                 merchantId: Self.trimmed(raw["merchantId"]),
                 appleTtpMerchantId: raw["appleTtpMerchantId"] ?? "",
                 merchantName: raw["merchantName"] ?? "",
@@ -379,9 +386,6 @@ package final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
             switch environment {
             case .production: .Production
             case .sandbox: .Sandbox
-            case .int: .Int
-            case .qa: .QA
-            case .cat: .Cat
             }
         }
 
