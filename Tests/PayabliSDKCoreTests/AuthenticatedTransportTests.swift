@@ -73,6 +73,29 @@ final class AuthenticatedTransportTests: XCTestCase {
         XCTAssertFalse(mark.mayHaveLeft, "a send refused with 401 ran nothing")
     }
 
+    func testARequestMadeDuringTheRefreshDoesNotMarkTheRefusedSend() async throws {
+        let stub = RecordingStub(status: Self.unauthorized)
+        stub.install()
+        defer { stub.uninstall() }
+
+        let payment = PaymentTask()
+        let auth = try makeTestAuth(tokenProvider: {
+            PayabliSendMark.current?.set()
+            payment.cancel()
+            return "refreshed-token"
+        })
+        let transport = makeAuthenticatedStack(auth: auth)
+        let mark = PayabliSendMark()
+
+        payment.start {
+            _ = try await PayabliSendMark.$current.withValue(mark) { try await transport.perform(self.ping()) }
+        }
+        _ = await payment.result()
+
+        XCTAssertEqual(stub.count, 1, "the replay never reached the network")
+        XCTAssertFalse(mark.mayHaveLeft)
+    }
+
     func testTheReplayRaisesTheMarkAgainAtItsOwnHandOff() async throws {
         let stub = RecordingStub { request in
             bearer(of: request) == "refreshed-token" ? (Self.ok, Data()) : (Self.unauthorized, Data())
@@ -538,4 +561,22 @@ private func bearer(of request: URLRequest) -> String? {
 
 private struct TransactionPayload: Decodable, Sendable {
     let paymentTransId: String?
+}
+
+/// A payment task a token provider can cancel from inside the refresh it runs.
+private final class PaymentTask: @unchecked Sendable {
+    private let lock = NSLock()
+    private var task: Task<Void, any Error>?
+
+    func start(_ body: @escaping @Sendable () async throws -> Void) {
+        lock.withLock { task = Task { try await body() } }
+    }
+
+    func cancel() {
+        lock.withLock { task }?.cancel()
+    }
+
+    func result() async -> Result<Void, any Error>? {
+        await lock.withLock { task }?.result
+    }
 }
