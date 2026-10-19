@@ -2,7 +2,8 @@ import Foundation
 
 /// Records that a send may have left the device: set when core hands the request to the HTTP layer.
 ///
-/// One instance per payment request, bound as a task-local by the layer holding its key. Once set it stays set.
+/// One instance per payment request, bound as a task-local by the layer holding its key. A 401 lowers it, since the
+/// service ran nothing for that send, and the replay raises it again at its own hand-off.
 package final class PayabliSendMark: @unchecked Sendable {
     @TaskLocal package static var current: PayabliSendMark?
 
@@ -18,5 +19,9 @@ package final class PayabliSendMark: @unchecked Sendable {
 
     package func set() {
         lock.withLock { isSet = true }
+    }
+
+    package func lower() {
+        lock.withLock { isSet = false }
     }
 }

@@ -54,7 +54,7 @@ final class AuthenticatedTransportTests: XCTestCase {
         XCTAssertEqual(stub.sentTokens, [testToken, "refreshed-token"])
     }
 
-    func testASendStaysMarkedAsHandedOffWhenItsReplaysTokenFetchFails() async throws {
+    func testA401WhoseReplayNeverLeavesLowersTheMark() async throws {
         let stub = RecordingStub(status: Self.unauthorized)
         stub.install()
         defer { stub.uninstall() }
@@ -70,6 +70,23 @@ final class AuthenticatedTransportTests: XCTestCase {
         })
 
         XCTAssertEqual(stub.count, 1, "the replay never reached the network")
+        XCTAssertFalse(mark.mayHaveLeft, "a send refused with 401 ran nothing")
+    }
+
+    func testTheReplayRaisesTheMarkAgainAtItsOwnHandOff() async throws {
+        let stub = RecordingStub { request in
+            bearer(of: request) == "refreshed-token" ? (Self.ok, Data()) : (Self.unauthorized, Data())
+        }
+        stub.install()
+        defer { stub.uninstall() }
+
+        let auth = try makeTestAuth(tokenProvider: { "refreshed-token" })
+        let transport = makeAuthenticatedStack(auth: auth)
+        let mark = PayabliSendMark()
+
+        _ = try await PayabliSendMark.$current.withValue(mark) { try await transport.perform(self.ping()) }
+
+        XCTAssertEqual(stub.count, 2)
         XCTAssertTrue(mark.mayHaveLeft)
     }
 

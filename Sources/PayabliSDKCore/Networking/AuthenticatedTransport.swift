@@ -43,6 +43,9 @@ struct AuthenticatedTransport: PayabliTransport {
             "credential rejected: attempting recovery"
                 + " (\(request.method.rawValue) \(firstAttempt.statusCode))"
         )
+        if firstAttempt.statusCode == 401 {
+            PayabliSendMark.current?.lower()
+        }
 
         // The token the chain stamped, falling back to the one held for a chain that stamped
         // nothing. Held rather than minted: a token obtained here would name a credential that no
