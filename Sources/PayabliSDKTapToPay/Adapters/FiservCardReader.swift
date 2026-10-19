@@ -109,6 +109,11 @@ package final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
         lock.unlock()
     }
 
+    /// The credentials `configure` stored, or `nil` before it has.
+    func storedCredentials() -> Credentials? {
+        lock.withLock { credentials }
+    }
+
     // MARK: - TapToPayProvider
 
     /// Keys that must be present and non-empty in the `/config` dict.
@@ -147,15 +152,15 @@ package final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
 
         setCredentials(
             Credentials(
-                secretKey: raw["secretKey"] ?? "",
-                apiKey: raw["apiKey"] ?? "",
+                secretKey: Self.trimmed(raw["secretKey"]),
+                apiKey: Self.trimmed(raw["apiKey"]),
                 environment: environment,
                 currencyCode: Self.trimmed(raw["currencyCode"]),
-                merchantId: raw["merchantId"] ?? "",
+                merchantId: Self.trimmed(raw["merchantId"]),
                 appleTtpMerchantId: raw["appleTtpMerchantId"] ?? "",
                 merchantName: raw["merchantName"] ?? "",
                 merchantCategoryCode: raw["merchantCategoryCode"] ?? "",
-                terminalId: raw["terminalId"] ?? "",
+                terminalId: Self.trimmed(raw["terminalId"]),
                 terminalProfileId: raw["terminalProfileId"] ?? ""
             )
         )
@@ -370,7 +375,7 @@ package final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
             return creds
         }
 
-        private static func vendorEnvironment(_ environment: ReaderEnvironment) -> FiservTTPEnvironment {
+        static func vendorEnvironment(_ environment: ReaderEnvironment) -> FiservTTPEnvironment {
             switch environment {
             case .production: .Production
             case .sandbox: .Sandbox

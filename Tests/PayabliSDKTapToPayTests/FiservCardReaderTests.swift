@@ -157,11 +157,42 @@ final class FiservCardReaderTests: XCTestCase {
                 }
             }
         }
-        for value in ["production", " Production\n", "SANDBOX", "int", "QA", "cat"] {
+        let known: [(String, FiservCardReader.ReaderEnvironment)] = [
+            ("production", .production), (" Production\n", .production), ("SANDBOX", .sandbox),
+            ("int", .int), ("QA", .qa), ("cat", .cat)
+        ]
+        for (value, expected) in known {
             var raw = Self.complete
             raw["environment"] = value
-            XCTAssertNoThrow(try FiservCardReader().configure(credentials: raw), value)
+            let reader = FiservCardReader()
+            try reader.configure(credentials: raw)
+            XCTAssertEqual(reader.storedCredentials()?.environment, expected, value)
         }
+    }
+
+    #if canImport(PayabliCardReaderCore)
+        func testEachEnvironmentArmsTheReaderAgainstItsOwnVendorEnvironment() {
+            let expected: [FiservCardReader.ReaderEnvironment: FiservTTPEnvironment] = [
+                .production: .Production, .sandbox: .Sandbox, .int: .Int, .qa: .QA, .cat: .Cat
+            ]
+            for environment in FiservCardReader.ReaderEnvironment.allCases {
+                XCTAssertEqual(FiservCardReader.vendorEnvironment(environment), expected[environment], "\(environment)")
+            }
+        }
+    #endif
+
+    func testRequiredValuesAreStoredWithoutSurroundingSpace() throws {
+        var raw = Self.complete
+        for key in ["secretKey", "apiKey", "merchantId", "terminalId", "currencyCode"] {
+            raw[key] = " \(Self.complete[key] ?? "")\n"
+        }
+        let reader = FiservCardReader()
+        try reader.configure(credentials: raw)
+        let stored = try XCTUnwrap(reader.storedCredentials())
+        XCTAssertEqual(
+            [stored.secretKey, stored.apiKey, stored.merchantId, stored.terminalId, stored.currencyCode],
+            ["s", "a", "m", "t", "USD"]
+        )
     }
 
     func testCleanUpClearsCredentials() async {
