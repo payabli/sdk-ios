@@ -302,7 +302,6 @@ final class PayInPaymentFlowClient: Sendable {
         } catch {
             let refusedKey = error is IdempotencyCheckRefusal
             let failure = refusedKey ? PayabliGenericError(type: .conflict, reason: "Conflict (409)") : error
-            // Every 409 is a conflict, whatever status or code its body's envelope names.
             let conflict = answer?.statusCode == 409
             // A credential that was never obtained arrives as `.tokenExpired` or
             // `.tokenProviderFailed`, both of which `leavesOutcomeUnknown` answers false for: nothing

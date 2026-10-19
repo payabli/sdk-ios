@@ -312,6 +312,27 @@ final class PayInHeldKeyTests: XCTestCase {
         }
     }
 
+    func testARetryRefusedBeforeItIsSentKeepsTheHeldKey() async throws {
+        transport.script = [.lost, .approved]
+        let invalidCard = PayabliPayInRequest(
+            paymentMethod: .card(PayabliPayInPaymentMethod.Card(data: PayabliPayInCardData(
+                cardNumber: "4111111111111111",
+                expiration: "02/30",
+                cardholderName: "Jane Doe",
+                cvv: "",
+                billingZip: "12345"
+            ))),
+            options: request(.retry).options
+        )
+
+        _ = await failure { try await self.flow.capture(self.request(.newPayment)) }
+        let refused = await failure { try await self.flow.capture(invalidCard) }
+        _ = try await flow.capture(request(.retry))
+
+        XCTAssertNotNil(PayInFixture.interruption(refused), "a resent payment's local refusal closed it: \(refused)")
+        XCTAssertEqual(transport.sentKeys, ["k1", "k1"], "the local refusal dropped the held key")
+    }
+
     func testATransactionsUnknownOutcomeCarriesNoReference() async {
         transport.script = [.lost]
 

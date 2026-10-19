@@ -359,8 +359,7 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
             return result
         } catch {
             var outcome = Self.outcome(of: error, reused: reservation.reused)
-            if outcome == .unknown, !mark.mayHaveLeft {
-                // Nothing reached the HTTP layer, so the service never saw this send and its clock restarts nothing.
+            if !mark.mayHaveLeft {
                 outcome = .notAnswered
             }
             if heldKeys.settle(reservation, outcome: outcome, now: now()) {
