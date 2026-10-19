@@ -2,10 +2,9 @@
 
 Guidance for LLM-based coding agents working in this repository.
 
-The public surface is a shared contract with the Payabli SDK for Android: the same integration
-experience, the same state model, the same error taxonomy. Changing any of them here is a change to
-both, so treat a surface change as a coordinated one and say what the counterpart does, rather than
-landing it on one platform and calling it done.
+The public surface (types, the state model, the error taxonomy, storage and wire behaviour) is a published
+contract. A change to it is decided and recorded before it is written, outside this repository, and lands in
+a pull request of its own. A pull request here does not restate how that decision was coordinated.
 
 ## Simulator Setup
 
@@ -172,8 +171,8 @@ them, and the script refuses a build where that stops being true.
   `PayabliService.makeWithDecorations`, which is internal and named for that purpose.
 - **One percent-encoder, and every interpolated path segment goes through it.**
   `PercentEncoding.segment` keeps RFC 3986's unreserved set and encodes every other UTF-8 byte, so a
-  `/`, `?` or `#` in an identifier stays part of the identifier. It matches the sibling platform byte
-  for byte, and is stricter than `urlPathAllowed`, which admits the sub-delimiters. A route built by
+  `/`, `?` or `#` in an identifier stays part of the identifier. It is stricter
+  than `urlPathAllowed`, which admits the sub-delimiters. A route built by
   interpolating a value without it is a defect.
 - **The chain runs once per attempt**, so anything that must survive a replay unchanged — an
   idempotency key is the live example — is set by the client and not by a decoration.
