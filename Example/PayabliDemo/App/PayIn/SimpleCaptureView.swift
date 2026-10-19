@@ -114,7 +114,7 @@ struct SimpleCaptureView: View {
     }
 
     /// Authorize while the setting is on, and while it is the operation on screen, so turning the setting off never
-    /// moves the screen off an authorization. Its flow keeps its attempt and key either way.
+    /// moves the screen off an authorization. Its flow keeps its attempt and reference either way.
     private var offeredOperations: [PayInOperation] {
         let authorize: [PayInOperation] = offersAuthorize || operation == .authorize ? [.authorize] : []
         return [.capture] + authorize + [.storedMethod]
@@ -248,7 +248,7 @@ struct SimpleCaptureView: View {
         )
     }
 
-    /// The customer choice reaches each charging flow's attempt and leaves its amount and key as they were.
+    /// The customer choice reaches each charging flow's attempt and leaves its amount and reference as they were.
     private func applyCustomer(_ supplies: Bool) {
         captureFlow.applyCustomerChange(suppliesCustomer: supplies)
         authorizeFlow.applyCustomerChange(suppliesCustomer: supplies)
@@ -277,6 +277,9 @@ struct SimpleCaptureView: View {
     private func handleFailed(_ failure: PayInFailure) {
         guard !failure.refusedForAnotherSubmission else { return }
         resultText = "Failed: \(failure.message)"
+        if charges {
+            flow(for: operation).chargeFailed(failure)
+        }
     }
 }
 

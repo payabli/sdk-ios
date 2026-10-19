@@ -197,6 +197,11 @@ extension PayInFailure {
         "The reversal may have been applied and the outcome is unknown. Read the "
             + "transaction back rather than reversing it again."
 
+    /// A reversal refused because an earlier one on this payment reached the service. That one may still be
+    /// running, so the next step is a read a little later.
+    private static let reversalStillRunningMessage =
+        "The earlier reversal may still be running. Read the payment again shortly."
+
     /// Every failure reads as `localizedDescription`, which each SDK error type
     /// writes for a merchant: a validation failure appends the rejected fields, a
     /// decline appends the action the payer can take, and the rest fall back to the
@@ -223,6 +228,9 @@ extension PayInFailure {
     ) -> String {
         if duplicate {
             return duplicateMessage
+        }
+        if operation == .void, (error as? any PayabliError)?.type == .retryRefused {
+            return reversalStillRunningMessage
         }
         // The SDK words an open outcome as the payment's, because every other call here is one.
         if operation == .void, leavesOutcomeUnknown(error) {

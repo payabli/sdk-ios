@@ -133,6 +133,8 @@ final class RecordingIdempotencyTransport: PayabliTransport, @unchecked Sendable
     }
 
     func perform(_ request: PayabliRequest) async throws -> PayabliResponse {
+        // It stands for the service, so every call has reached the HTTP layer.
+        PayabliSendMark.current?.set()
         lock.lock()
         recorded.append(request.headers["idempotencyKey"])
         let nth = recorded.count - 1

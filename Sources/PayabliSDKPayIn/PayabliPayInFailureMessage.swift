@@ -10,9 +10,13 @@ enum PayabliPayInFailureMessage {
     /// - Parameters:
     ///   - error: The failure the submission threw.
     ///   - operation: What the form submitted.
-    /// - Returns: The message for the error's category, or the default message for an error outside the catalog.
+    /// - Returns: The unknown-outcome message for an interrupted submission, whatever its category; otherwise the
+    ///   message for the error's category, or the default message for an error outside the catalog.
     static func text(for error: any Error, operation: PayabliPayInOperation) -> String {
-        text(for: (error as? any PayabliError)?.category ?? .internal, operation: operation)
+        if case .submissionInterrupted = error as? PayabliPayInError {
+            return text(for: .outcomeUnknown, operation: operation)
+        }
+        return text(for: (error as? any PayabliError)?.category ?? .internal, operation: operation)
     }
 
     /// The message for one category of failure.

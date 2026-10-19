@@ -43,6 +43,9 @@ struct AuthenticatedTransport: PayabliTransport {
             "credential rejected: attempting recovery"
                 + " (\(request.method.rawValue) \(firstAttempt.statusCode))"
         )
+        if firstAttempt.statusCode == 401 {
+            PayabliSendMark.current?.lower()
+        }
 
         // The token the chain stamped, falling back to the one held for a chain that stamped
         // nothing. Held rather than minted: a token obtained here would name a credential that no
@@ -56,7 +59,9 @@ struct AuthenticatedTransport: PayabliTransport {
             logger.warning("credential rejected, and none was sent: nothing to recover")
             return firstAttempt
         }
-        _ = try await auth.invalidateAndRefresh(rejectedToken: rejected)
+        _ = try await PayabliSendMark.$current.withValue(nil) {
+            try await auth.invalidateAndRefresh(rejectedToken: rejected)
+        }
 
         // Asked here rather than inside the holder, because a refresh answers from several places: a
         // caller inside its own provider gets the current token, a token another request already rotated

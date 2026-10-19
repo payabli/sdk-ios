@@ -198,11 +198,8 @@ struct PaymentCaptureQAView: View {
             onCompleted: handlePaymentCaptured,
             onFailed: handleError
         )
-        // The request is built when the app launches and the switch is on another tab,
-        // so a flip after that would otherwise apply to the payment after this one.
-        // Not while a submission is in flight: replacing the configuration then loses
-        // the key that makes its retry safe. Only the customer changes, so the figure
-        // on screen and the identifiers stay as they were.
+        // Applies to the payment on screen, changing only its customer. Not while a submission is in flight:
+        // replacing the configuration then loses the reference that makes its retry safe.
         .onChange(of: demoCustomer.suppliesPayInCustomer) { supplies in
             paymentFlow.applyCustomerChange(suppliesCustomer: supplies)
         }
@@ -238,8 +235,8 @@ struct PaymentCaptureQAView: View {
     }
 
     /// Abandons the attempt on screen and draws another. This is the one action
-    /// here that may charge a second time: submitting again retries the attempt
-    /// that already has a key, and this mints a new one.
+    /// here that may charge a second time: submitting again retries the payment
+    /// on screen, and this names a new one.
     private func startAnother() {
         // A reversal this screen has decided to send but not yet sent is still a reversal. The
         // flow does not know about it yet, so its own refusal below cannot cover this, and drawing
@@ -248,7 +245,7 @@ struct PaymentCaptureQAView: View {
 
         // The flow refuses while a submission is in flight, and this row keeps
         // offering the button through one. Clearing first would report an attempt
-        // that was never drawn, over a request still holding the earlier key.
+        // that was never drawn, over a request still naming the earlier payment.
         guard paymentFlow.startNewAttempt(suppliesCustomer: demoCustomer.suppliesPayInCustomer) else {
             return
         }
@@ -356,16 +353,9 @@ struct PaymentCaptureQAView: View {
         // back from that clears what a reversal had already reported.
         guard !failure.refusedForAnotherSubmission else { return }
         submitFailed = true
-        // A refused card and a lost response no longer read alike: the first
-        // arrives as a transaction the service declined, the second as an
-        // interruption saying the payment may already have been taken. Only the
-        // second needs reconciling, and reconciling means reading the earlier
-        // submission back. Submitting again sends this attempt's own key, which
-        // the service refuses for two minutes from the first request and executes
-        // after that, so a late resubmission is a second payment.
-        //
-        // Drawing a fresh attempt is the button beside this message, and it is
-        // the only place a key is minted.
+        // A lost response arrives as an interruption: the payment may have been taken, so it is read back,
+        // and submitting again is declared a retry. Drawing a fresh attempt is the button beside this message.
+        paymentFlow.chargeFailed(failure)
         resultText = "Payment capture failed: \(failure.message)"
         Logger(
             subsystem: "com.payabli.example.app",
