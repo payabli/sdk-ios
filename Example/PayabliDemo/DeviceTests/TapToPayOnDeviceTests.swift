@@ -272,12 +272,12 @@ final class TapToPayOnDeviceTests: XCTestCase {
         LiveEnvironment.reportIdentifier("HARDWARE_ID", first, env: named.name)
     }
 
-    /// A reader that reached `.ready` can be re-prepared without re-attesting,
+    /// A device that reached `.ready` initializes again under the same binding,
     /// which is the path a host re-entry takes.
-    func testReinitializeKeepsTheBinding() async throws {
+    func testInitializingAgainKeepsTheBinding() async throws {
         let (ttp, before) = try await enrolledDevice()
 
-        try await ttp.reinitializeIfNeeded()
+        try await ttp.initialize()
 
         XCTAssertEqual(ttp.sessionState, .ready)
         XCTAssertEqual(try attestation().cachedDeviceId(for: named.entry), before)

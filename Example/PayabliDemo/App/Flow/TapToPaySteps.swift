@@ -36,13 +36,8 @@ struct TapToPayFlowSteps {
     /// something.
     let nextAction: TapToPayAction?
 
-    /// Why recovery is on offer, which is what the section says out loud.
-    ///
-    /// Two reasons and two controls, one each, as it stands. The sentence is
-    /// keyed on the reason because a control serves whichever reasons share it:
-    /// `.reinitialize` answered both an expired session and a refused activation
-    /// until the DeviceCheck path was traced, and the sentence beside it named
-    /// expiry for both.
+    /// Why recovery is on offer, which is what the section says out loud. Both
+    /// reasons share one control, so the sentence is keyed on the reason.
     let recovery: TapToPayRecovery?
 
     var all: [FlowStep] {
@@ -69,9 +64,6 @@ enum TapToPayAction {
     /// is the only state where presenting them changes anything.
     case presentTerms
     case charge
-    /// `reinitializeIfNeeded`, which re-runs config and the reader and skips
-    /// attestation. Only sound where the attested identity is still held.
-    case reinitialize
     /// `initialize`, the full setup. It re-uses a cached attestation and runs a
     /// cold one when there is none, so it is the way back from a session that
     /// still holds its attested identity and from one that has lost it.
@@ -135,12 +127,9 @@ enum TapToPaySteps {
         // From the step before.
         let charge = chargeStatus(activation: activation, session: session)
 
-        // Ordered like the steps, and for the same reason: the first thing that
-        // wants attention is the only thing offered. Re-initialize sits behind
-        // the token step because it re-runs config, which a backend known to be
-        // down cannot answer.
-        // Derived before `nextAction`, which reads it, so the control and the
-        // sentence beside it cannot disagree about what went wrong.
+        // Only the first thing that wants attention is offered, and recovery waits
+        // behind the token step, since it fetches config. Derived before
+        // `nextAction`, which reads it, so control and sentence agree.
         let recovery = recoveryReason(token: token, session: session)
 
         let nextAction = nextControl(
@@ -206,14 +195,9 @@ enum TapToPaySteps {
             return .checkToken
         }
         guard token.isFinished else { return nil }
-        // A session that expired still holds its attested identity, so
-        // re-running config and the reader is enough, and so does a refused
-        // activation, whose request reached the backend. `.error` otherwise
-        // is where a config 401 lands, and that path clears the attestation
-        // cache, so skipping attestation would fail on the assertion every
-        // time and offer the same control again.
-        if let recovery {
-            return recovery == .sessionErrored ? .reattest : .reinitialize
+        // `initialize` is the one way back, from an expired session and an errored one alike.
+        if recovery != nil {
+            return .reattest
         }
         // `.failed` as well as `.current`: an enable that failed is retried
         // from its own row, and this is the state a broken session does not
