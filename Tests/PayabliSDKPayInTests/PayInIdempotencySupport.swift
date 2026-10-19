@@ -45,7 +45,6 @@ enum PayInFixture {
         orderId: String? = nil
     ) -> PayabliPayInRequest {
         PayabliPayInRequest(
-            paymentDetails: PayabliPayInPaymentDetails(totalAmount: totalAmount),
             paymentMethod: cardOnly
                 ? .card(PayabliPayInPaymentMethod.Card(
                     data: PayabliPayInCardData(
@@ -58,8 +57,11 @@ enum PayInFixture {
                     saveIfSuccess: false
                 ))
                 : .stored(PayabliPayInPaymentMethod.Stored(method: .card, storedMethodId: "stored-1")),
-            orderId: orderId,
-            idempotencyKey: idempotencyKey
+            options: PayabliPayInRequestConfiguration(
+                paymentDetails: PayabliPayInPaymentDetails(totalAmount: totalAmount),
+                orderId: orderId,
+                idempotencyKey: idempotencyKey
+            )
         )
     }
 

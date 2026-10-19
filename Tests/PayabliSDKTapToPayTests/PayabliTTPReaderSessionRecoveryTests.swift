@@ -9,7 +9,7 @@ import XCTest
 
 /// A reader session that dies must leave the session repairable.
 ///
-/// `charge()` begins with `reinitializeIfNeeded()`, which does nothing while the
+/// `charge()` begins with `reinitialize()`, which does nothing while the
 /// state says `.ready`, so a failure that leaves it there wedges the session.
 @MainActor
 final class PayabliTTPReaderSessionRecoveryTests: XCTestCase {
@@ -289,7 +289,7 @@ final class PayabliTTPReaderSessionRecoveryTests: XCTestCase {
         )
     }
 
-    /// `charge()` recovers through `reinitializeIfNeeded()`, so a host calling
+    /// `charge()` recovers through `reinitialize()`, so a host calling
     /// `initialize()` during a recovery is two setups against one provider.
     func testInitializeDoesNotOverlapAReinitialize() async throws {
         let provider = InterleavingProvider()

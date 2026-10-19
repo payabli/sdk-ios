@@ -8,8 +8,6 @@ end to end against sandbox.
 
 - **Initialize** — cold/warm App Attest attestation, `/config` fetch, and
   reader prepare via `try await ttp.initialize()`.
-- **Re-initialize** — silent recovery from `.sessionExpired` /
-  `.idle` / `.error` via `ttp.reinitializeIfNeeded()`.
 - **Charge** — full sale pipeline (`/initiate` → NFC tap → `/update`)
   via `try await ttp.charge(type:paymentDetails:)`.
 - **Activate device** — pending-device activation with an out-of-band
