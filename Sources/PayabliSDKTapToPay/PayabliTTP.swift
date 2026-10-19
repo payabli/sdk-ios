@@ -50,6 +50,7 @@ public final class PayabliTTP: NSObject, ObservableObject {
 
     // Networking
     let session: PayabliSession
+    let reports: TapToPayReports
     let transactionClient: TTPTransactionClient
     let configClient: TTPConfigClient
 
@@ -144,6 +145,7 @@ public final class PayabliTTP: NSObject, ObservableObject {
         self.retryPolicy = retryPolicy
 
         self.session = session
+        self.reports = TapToPayReports(telemetry: session.telemetry)
         self.transactionClient = TTPTransactionClient(transport: session.transport)
         self.configClient = TTPConfigClient(
             transport: session.transport,
