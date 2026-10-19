@@ -119,10 +119,15 @@ final class FiservCardReaderTests: XCTestCase {
         ])
     }
 
+    private static let complete = [
+        "secretKey": "s", "apiKey": "a", "merchantId": "m", "terminalId": "t",
+        "environment": "production", "currencyCode": "USD"
+    ]
+
     /// Absent, empty and whitespace-only are one case, and the refusal carries no field name.
     func testABlankRequiredCredentialIsRefusedAsUnusable() {
-        let complete = ["secretKey": "s", "apiKey": "a", "merchantId": "m", "terminalId": "t"]
-        for key in FiservCardReader.requiredCredentialKeys {
+        let complete = Self.complete
+        for key in complete.keys.sorted() {
             for value in [nil, "", "  \n"] as [String?] {
                 var raw = complete
                 raw[key] = value
@@ -138,9 +143,25 @@ final class FiservCardReaderTests: XCTestCase {
     }
 
     func testCompleteCredentialsAreAccepted() throws {
-        try FiservCardReader().configure(credentials: [
-            "secretKey": "s", "apiKey": "a", "merchantId": "m", "terminalId": "t"
-        ])
+        try FiservCardReader().configure(credentials: Self.complete)
+    }
+
+    /// An environment the reader does not know is refused; a known one is read in any case and spacing.
+    func testAnEnvironmentTheReaderDoesNotKnowIsRefusedAsUnusable() throws {
+        for value in ["prod", "staging", "live", "production-eu"] {
+            var raw = Self.complete
+            raw["environment"] = value
+            XCTAssertThrowsError(try FiservCardReader().configure(credentials: raw), value) { error in
+                guard case PayabliTTPError.readerCredentialsUnusable = error else {
+                    return XCTFail("\(value): wrong error \(error)")
+                }
+            }
+        }
+        for value in ["production", " Production\n", "SANDBOX", "int", "QA", "cat"] {
+            var raw = Self.complete
+            raw["environment"] = value
+            XCTAssertNoThrow(try FiservCardReader().configure(credentials: raw), value)
+        }
     }
 
     func testCleanUpClearsCredentials() async {
@@ -149,7 +170,7 @@ final class FiservCardReaderTests: XCTestCase {
             FiservCardReader.Credentials(
                 secretKey: "s",
                 apiKey: "a",
-                environment: "sandbox",
+                environment: .sandbox,
                 currencyCode: "USD",
                 merchantId: "m",
                 appleTtpMerchantId: "atm",
@@ -308,7 +329,7 @@ final class FiservCardReaderTests: XCTestCase {
     private func preparedReader(_ stub: StubReaderSetup) -> FiservCardReader {
         let reader = FiservCardReader()
         reader.setCredentials(.init(
-            secretKey: "s", apiKey: "a", environment: "sandbox", currencyCode: "USD",
+            secretKey: "s", apiKey: "a", environment: .sandbox, currencyCode: "USD",
             merchantId: "m", appleTtpMerchantId: "t", merchantName: "n",
             merchantCategoryCode: "5999", terminalId: "t1", terminalProfileId: "p1"
         ))
