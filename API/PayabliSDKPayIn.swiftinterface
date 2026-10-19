@@ -44,6 +44,10 @@ import _SwiftConcurrencyShims
   @objc @_Concurrency::MainActor final public func addCard(cardNumber: Swift::String, expiration: Swift::String, cardholderName: Swift::String, cvv: Swift::String, billingZip: Swift::String, createAnonymous: Swift::Bool, forceCustomerCreation: Swift::Bool, temporary: Swift::Bool, source: Swift::String?, completion: @escaping (PayabliSDKPayIn::PayabliPayInStoredPaymentMethodObjC?, Foundation::NSError?) -> Swift::Void)
   @objc @_Concurrency::MainActor final public func addBankAccount(accountNumber: Swift::String, accountType: Swift::String, holderName: Swift::String, routingNumber: Swift::String, secCode: Swift::String?, holderType: Swift::String?, achValidation: Swift::Bool, createAnonymous: Swift::Bool, forceCustomerCreation: Swift::Bool, temporary: Swift::Bool, source: Swift::String?, completion: @escaping (PayabliSDKPayIn::PayabliPayInStoredPaymentMethodObjC?, Foundation::NSError?) -> Swift::Void)
   @objc @_Concurrency::MainActor final public func readTransaction(transId: Swift::String, completion: @escaping (PayabliSDKPayIn::PayabliPayInTransactionObjC?, Foundation::NSError?) -> Swift::Void)
+  @objc @_Concurrency::MainActor final public func capture(_ request: PayabliSDKPayIn::PayabliPayInRequestObjC, completion: @escaping (PayabliSDKPayIn::PayabliPayInResultObjC?, Foundation::NSError?) -> Swift::Void)
+  @objc @_Concurrency::MainActor final public func authorize(_ request: PayabliSDKPayIn::PayabliPayInRequestObjC, completion: @escaping (PayabliSDKPayIn::PayabliPayInResultObjC?, Foundation::NSError?) -> Swift::Void)
+  @objc @_Concurrency::MainActor final public func captureAuthorizedTransaction(_ request: PayabliSDKPayIn::PayabliPayInAuthorizedRequestObjC, completion: @escaping (PayabliSDKPayIn::PayabliPayInResultObjC?, Foundation::NSError?) -> Swift::Void)
+  @objc @_Concurrency::MainActor final public func voidTransaction(transId: Swift::String, completion: @escaping (PayabliSDKPayIn::PayabliPayInResultObjC?, Foundation::NSError?) -> Swift::Void)
   @objc deinit
 }
 @objc @_hasMissingDesignatedInitializers @_Concurrency::MainActor final public class PayabliPayIn : ObjectiveC::NSObject, Foundation::ObservableObject {
@@ -142,7 +146,7 @@ public enum PayabliPayInError : PayabliSDKCore::PayabliError, Swift::Equatable {
   case missingAccessToken
   case submissionInProgress
   case transactionFailed(PayabliSDKPayIn::PayabliPayInFailure)
-  case submissionInterrupted(type: PayabliSDKCore::PayabliErrorType, causeType: Swift::String, paymentTransId: Swift::String?)
+  case submissionInterrupted(type: PayabliSDKCore::PayabliErrorType, causeType: Swift::String, paymentTransId: Swift::String?, paymentReference: Swift::String?)
   public var type: PayabliSDKCore::PayabliErrorType {
     get
   }
@@ -571,6 +575,77 @@ extension PayabliSDKPayIn::PayabliPayInMethodInput : Swift::Encodable {
 extension PayabliSDKPayIn::PayabliPayInMethodInput {
   public func validate(_ validation: PayabliSDKPayIn::PayabliPayInValidation = .default) throws
 }
+@_hasMissingDesignatedInitializers @objc(PayabliPayInRequestObjC) final public class PayabliPayInRequestObjC : ObjectiveC::NSObject {
+  @objc final public var totalAmount: Swift::Double
+  @objc final public var serviceFee: Foundation::NSNumber?
+  @objc final public var surchargeFee: Foundation::NSNumber?
+  @objc final public var currency: Swift::String?
+  @objc final public var checkNumber: Swift::String?
+  @objc final public var checkUniqueId: Swift::String?
+  @objc final public var accountId: Swift::String?
+  @objc final public var customerData: PayabliSDKPayIn::PayabliPayInCustomerDataObjC?
+  @objc final public var ipAddress: Swift::String?
+  @objc final public var orderDescription: Swift::String?
+  @objc final public var orderId: Swift::String?
+  @objc final public var source: Swift::String?
+  @objc final public var subdomain: Swift::String?
+  @objc final public var subscriptionId: Foundation::NSNumber?
+  @objc final public var paymentReference: Swift::String?
+  @objc final public var attempt: PayabliSDKCore::PayabliAttempt
+  @objc final public var achValidation: Foundation::NSNumber?
+  @objc final public var forceCustomerCreation: Foundation::NSNumber?
+  @objc final public var requiresLuhnCheck: Swift::Bool
+  @objc final public var validatesRoutingNumberChecksum: Swift::Bool
+  @objc public static func stored(storedMethodId: Swift::String, method: Swift::String, totalAmount: Swift::Double) -> PayabliSDKPayIn::PayabliPayInRequestObjC?
+  @objc public static func card(cardNumber: Swift::String, expiration: Swift::String, cardholderName: Swift::String, cvv: Swift::String, billingZip: Swift::String, saveIfSuccess: Swift::Bool, totalAmount: Swift::Double) -> PayabliSDKPayIn::PayabliPayInRequestObjC
+  @objc public static func bankAccount(accountNumber: Swift::String, accountType: Swift::String, holderName: Swift::String, routingNumber: Swift::String, secCode: Swift::String?, holderType: Swift::String?, totalAmount: Swift::Double) -> PayabliSDKPayIn::PayabliPayInRequestObjC?
+  @objc public static func cloudDevice(device: Swift::String, saveIfSuccess: Swift::Bool, totalAmount: Swift::Double) -> PayabliSDKPayIn::PayabliPayInRequestObjC
+  @objc public static func check(holderName: Swift::String, totalAmount: Swift::Double) -> PayabliSDKPayIn::PayabliPayInRequestObjC
+  @objc public static func cash(totalAmount: Swift::Double) -> PayabliSDKPayIn::PayabliPayInRequestObjC
+  @objc deinit
+}
+@objc(PayabliPayInAuthorizedRequestObjC) final public class PayabliPayInAuthorizedRequestObjC : ObjectiveC::NSObject {
+  @objc final public let transId: Swift::String
+  @objc final public var totalAmount: Swift::Double
+  @objc final public var serviceFee: Foundation::NSNumber?
+  @objc final public var surchargeFee: Foundation::NSNumber?
+  @objc final public var currency: Swift::String?
+  @objc public init(transId: Swift::String, totalAmount: Swift::Double)
+  @objc deinit
+}
+@_inheritsConvenienceInitializers @objc(PayabliPayInCustomerDataObjC) final public class PayabliPayInCustomerDataObjC : ObjectiveC::NSObject {
+  @objc final public var additionalData: [Swift::String : Swift::String]?
+  @objc final public var billingAddress1: Swift::String?
+  @objc final public var billingAddress2: Swift::String?
+  @objc final public var billingCity: Swift::String?
+  @objc final public var billingCountry: Swift::String?
+  @objc final public var billingEmail: Swift::String?
+  @objc final public var billingPhone: Swift::String?
+  @objc final public var billingState: Swift::String?
+  @objc final public var billingZip: Swift::String?
+  @objc final public var company: Swift::String?
+  @objc final public var customerId: Foundation::NSNumber?
+  @objc final public var customerNumber: Swift::String?
+  @objc final public var firstName: Swift::String?
+  @objc final public var identifierFields: [Swift::String]?
+  @objc final public var lastName: Swift::String?
+  @objc final public var shippingAddress1: Swift::String?
+  @objc final public var shippingAddress2: Swift::String?
+  @objc final public var shippingCity: Swift::String?
+  @objc final public var shippingCountry: Swift::String?
+  @objc final public var shippingState: Swift::String?
+  @objc final public var shippingZip: Swift::String?
+  @objc override dynamic public init()
+  @objc deinit
+}
+@_hasMissingDesignatedInitializers @objc(PayabliPayInResultObjC) final public class PayabliPayInResultObjC : ObjectiveC::NSObject {
+  @objc final public let code: Swift::String
+  @objc final public let reason: Swift::String?
+  @objc final public let explanation: Swift::String?
+  @objc final public let action: Swift::String?
+  @objc final public let transaction: PayabliSDKPayIn::PayabliPayInTransactionObjC?
+  @objc deinit
+}
 public enum PayabliPayInSheetDismissButton : Swift::Sendable, Swift::Equatable {
   case close
   case back
@@ -850,18 +925,18 @@ public struct PayabliPayInRequestConfiguration : Swift::Sendable {
   public let source: Swift::String?
   public let subdomain: Swift::String?
   public let subscriptionId: Swift::Int64?
-  public let idempotencyKey: Swift::String?
+  public let paymentReference: Swift::String?
+  public let attempt: PayabliSDKCore::PayabliAttempt
   public let achValidation: Swift::Bool?
   public let forceCustomerCreation: Swift::Bool?
   public let validation: PayabliSDKPayIn::PayabliPayInValidation
-  public init(paymentDetails: PayabliSDKPayIn::PayabliPayInPaymentDetails, accountId: Swift::String? = nil, customerData: PayabliSDKPayIn::PayabliPayInCustomerData? = nil, ipAddress: Swift::String? = nil, orderDescription: Swift::String? = nil, orderId: Swift::String? = nil, source: Swift::String? = nil, subdomain: Swift::String? = nil, subscriptionId: Swift::Int64? = nil, idempotencyKey: Swift::String? = nil, achValidation: Swift::Bool? = nil, forceCustomerCreation: Swift::Bool? = nil, validation: PayabliSDKPayIn::PayabliPayInValidation = .default)
+  public init(paymentDetails: PayabliSDKPayIn::PayabliPayInPaymentDetails, accountId: Swift::String? = nil, customerData: PayabliSDKPayIn::PayabliPayInCustomerData? = nil, ipAddress: Swift::String? = nil, orderDescription: Swift::String? = nil, orderId: Swift::String? = nil, source: Swift::String? = nil, subdomain: Swift::String? = nil, subscriptionId: Swift::Int64? = nil, paymentReference: Swift::String? = nil, attempt: PayabliSDKCore::PayabliAttempt = .newPayment, achValidation: Swift::Bool? = nil, forceCustomerCreation: Swift::Bool? = nil, validation: PayabliSDKPayIn::PayabliPayInValidation = .default)
   public func request(paymentMethod: PayabliSDKPayIn::PayabliPayInPaymentMethod, customerData formCustomerData: PayabliSDKPayIn::PayabliPayInCustomerData? = nil, orderDescription formOrderDescription: Swift::String? = nil) -> PayabliSDKPayIn::PayabliPayInRequest
 }
 public struct PayabliPayInAuthorizedRequest : Swift::Sendable {
   public let transId: Swift::String
   public let paymentDetails: PayabliSDKPayIn::PayabliPayInPaymentDetails
-  public let idempotencyKey: Swift::String?
-  public init(transId: Swift::String, paymentDetails: PayabliSDKPayIn::PayabliPayInPaymentDetails, idempotencyKey: Swift::String? = nil)
+  public init(transId: Swift::String, paymentDetails: PayabliSDKPayIn::PayabliPayInPaymentDetails)
 }
 public struct PayabliPayInFailure : Swift::Codable, Swift::Sendable, Swift::Equatable {
   public let code: Swift::String?

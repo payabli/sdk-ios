@@ -139,11 +139,11 @@ final class PayabliPayInTests: XCTestCase {
             requestConfiguration: PayabliPayInRequestConfiguration(
                 paymentDetails: PayabliPayInPaymentDetails(totalAmount: 22, currency: "USD"),
                 source: "ios-sdk-test",
-                idempotencyKey: "idem-auth",
                 achValidation: true,
                 forceCustomerCreation: true
             )
         )
+        component.newIdempotencyKey = { "idem-auth" }
 
         let request = try XCTUnwrap(component.requestConfiguration?.request(
             paymentMethod: .card(PayabliPayInPaymentMethod.Card(data: PayabliPayInCardData(
@@ -363,11 +363,11 @@ final class PayabliPayInTests: XCTestCase {
             requestConfiguration: PayabliPayInRequestConfiguration(
                 paymentDetails: PayabliPayInPaymentDetails(totalAmount: 30, serviceFee: 1, currency: "USD"),
                 source: "ios-form-test",
-                idempotencyKey: "idem-form",
                 achValidation: true,
                 forceCustomerCreation: false
             )
         )
+        component.newIdempotencyKey = { "idem-form" }
         let configuration = PayabliPayInFormConfiguration(
             allowedMethods: [.card],
             defaultMethod: .card,
@@ -422,8 +422,7 @@ final class PayabliPayInTests: XCTestCase {
             transport: transport,
             operation: .capture,
             requestConfiguration: PayabliPayInRequestConfiguration(
-                paymentDetails: PayabliPayInPaymentDetails(totalAmount: 0.001, currency: "USD"),
-                idempotencyKey: "idem-form"
+                paymentDetails: PayabliPayInPaymentDetails(totalAmount: 0.001, currency: "USD")
             )
         )
         let viewModel = PayabliPayInViewModel(
@@ -510,6 +509,14 @@ final class PayabliPayInTests: XCTestCase {
 
 /// A form submission and a direct call take the same options type.
 extension PayabliPayInTests {
+    private static let janeDoeCard = PayabliPayInCardData(
+        cardNumber: "4111111111111111",
+        expiration: "02/27",
+        cardholderName: "Jane Doe",
+        cvv: "999",
+        billingZip: "12345"
+    )
+
     func testAFormThePayerAddsNothingToSendsWhatADirectCaptureWithTheSameOptionsSends() async throws {
         let options = PayabliPayInRequestConfiguration(
             paymentDetails: PayabliPayInPaymentDetails(totalAmount: 30, serviceFee: 1, currency: "USD"),
@@ -521,7 +528,7 @@ extension PayabliPayInTests {
             source: "ios-options-test",
             subdomain: "sub",
             subscriptionId: 7,
-            idempotencyKey: "idem-options",
+            paymentReference: "payment-1",
             achValidation: true,
             forceCustomerCreation: false
         )
@@ -534,6 +541,7 @@ extension PayabliPayInTests {
             operation: .capture,
             requestConfiguration: options
         )
+        formComponent.newIdempotencyKey = { "idem-options" }
         let viewModel = PayabliPayInViewModel(
             component: formComponent,
             configuration: PayabliPayInFormConfiguration(allowedMethods: [.card], defaultMethod: .card)
@@ -552,14 +560,9 @@ extension PayabliPayInTests {
             transport: directTransport,
             operation: .capture
         )
+        directComponent.newIdempotencyKey = { "idem-options" }
         _ = try await directComponent.capture(PayabliPayInRequest(
-            paymentMethod: .card(PayabliPayInPaymentMethod.Card(data: PayabliPayInCardData(
-                cardNumber: "4111111111111111",
-                expiration: "02/27",
-                cardholderName: "Jane Doe",
-                cvv: "999",
-                billingZip: "12345"
-            ))),
+            paymentMethod: .card(PayabliPayInPaymentMethod.Card(data: Self.janeDoeCard)),
             options: options
         ))
 
@@ -573,6 +576,7 @@ extension PayabliPayInTests {
         directBody["paymentMethod"] = nil
         XCTAssertEqual(formBody as NSDictionary, directBody as NSDictionary)
         XCTAssertEqual(directBody["orderId"] as? String, "order-1")
+        XCTAssertFalse(directBody.keys.contains("paymentReference"), "the payment reference is never sent")
         XCTAssertEqual(directBody["subscriptionId"] as? Int, 7)
     }
 }

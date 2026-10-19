@@ -37,7 +37,7 @@ enum PayInRequests {
             orderDescription: identity.note("capture"),
             orderId: identity.orderId(at: Date()),
             source: source,
-            idempotencyKey: UUID().uuidString,
+            paymentReference: UUID().uuidString,
             forceCustomerCreation: true
         )
     }
@@ -52,7 +52,7 @@ enum PayInRequests {
     static func sameAttempt(
         as current: PayabliPayInRequestConfiguration,
         customerData: PayabliPayInCustomerData?,
-        idempotencyKey: String?
+        paymentReference: String?
     ) -> PayabliPayInRequestConfiguration {
         // Every field, not the ones this sample happens to set: anything omitted
         // here is silently reset the moment the switch moves.
@@ -66,7 +66,8 @@ enum PayInRequests {
             source: current.source,
             subdomain: current.subdomain,
             subscriptionId: current.subscriptionId,
-            idempotencyKey: idempotencyKey,
+            paymentReference: paymentReference,
+            attempt: current.attempt,
             achValidation: current.achValidation,
             forceCustomerCreation: current.forceCustomerCreation,
             validation: current.validation
