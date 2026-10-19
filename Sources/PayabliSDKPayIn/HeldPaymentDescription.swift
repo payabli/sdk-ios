@@ -23,7 +23,6 @@ struct HeldPaymentDescription: Equatable, CustomStringConvertible {
     /// - Parameter request: the request an attempt sends.
     init(_ request: PayabliPayInRequest) {
         total = Self.asSent(request.paymentDetails.totalAmount)
-        // An absent fee or surcharge is charged as none, so it describes the same payment as one of zero.
         serviceFee = Self.asSent(request.paymentDetails.serviceFee ?? 0)
         surchargeFee = Self.asSent(request.paymentDetails.surchargeFee ?? 0)
         currency = request.paymentDetails.currency?.payabliCaptureTrimmed.uppercased().payabliCaptureNilIfEmpty

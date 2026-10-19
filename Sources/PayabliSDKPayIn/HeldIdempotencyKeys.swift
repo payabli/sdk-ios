@@ -84,7 +84,6 @@ struct HeldIdempotencyKeys {
             if let heldPayment = held.payment, let payment, !heldPayment.isRepeated(by: payment) {
                 throw PayabliGenericError(type: .retryNotSamePayment, reason: "Retry describes a different payment")
             }
-            // The first description stays with the key, even if the record ages out while this send is in flight.
             return Reservation(
                 scope: scope, key: held.key, reused: true, reservedAt: now, payment: held.payment ?? payment
             )
@@ -124,7 +123,6 @@ struct HeldIdempotencyKeys {
         let scope = reservation.scope
         if var existing = records[scope] {
             if existing.key == reservation.key {
-                // This send may be the first to reach the service, so the key's age restarts from it.
                 existing.reservedAt = max(existing.reservedAt, reservation.reservedAt)
                 records[scope] = existing
             }

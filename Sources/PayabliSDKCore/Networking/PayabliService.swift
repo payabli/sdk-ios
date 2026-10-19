@@ -108,8 +108,6 @@ package final class PayabliService: PayabliTransport, Sendable {
         let decorated = try await decorations.applyTo(request)
         let urlRequest = try buildURLRequest(decorated)
         logger.debug("→ \(decorated.method.rawValue) \(decorated.path)")
-        // From here the service may see the request, so a failure no longer proves it never left. A task already
-        // cancelled is refused by `URLSession` before anything is sent.
         try Task.checkCancellation()
         PayabliSendMark.current?.set()
 
