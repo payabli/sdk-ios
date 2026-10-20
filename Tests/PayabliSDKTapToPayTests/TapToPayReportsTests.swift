@@ -30,7 +30,10 @@ final class TapToPayReportsTests: XCTestCase {
         await ttp.session.telemetry.flush()
 
         let events = await sent(transport)
-        XCTAssertEqual(events.map(\.event), ["ttp.initialize.started", "ttp.initialize.succeeded"])
+        XCTAssertEqual(
+            events.map(\.event),
+            ["ttp.initialize.started", "ttp.attestation.started", "ttp.attestation.succeeded", "ttp.initialize.succeeded"]
+        )
         let succeeded = try XCTUnwrap(events.last)
         XCTAssertEqual(Set(succeeded.properties.keys), ["duration_ms"])
         XCTAssertNotNil(Int(succeeded.properties["duration_ms"] ?? ""))

@@ -23,6 +23,12 @@ public extension PayabliTTP {
         guard case let .pendingActivation(activationId) = sessionState else {
             throw TapToPayError(type: .deviceNotPending, reason: PayabliErrorType.deviceNotPending.message, detail: nil)
         }
+        try await renewingRefusedToken(landsSecondRefusal: false) {
+            try await self.sendActivation(activationCode: activationCode, activationId: activationId)
+        }
+    }
+
+    private func sendActivation(activationCode: String, activationId: String) async throws {
         do {
             try await attestation.activateDevice(
                 activationCode: activationCode,

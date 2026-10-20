@@ -13,6 +13,9 @@ actor PayabliAuth {
     /// Names the call `inFlightMint` is running, so a mark that outlived its own call is ignored
     /// rather than answering a later rejection.
     private var inFlightMintID: UUID?
+    /// A token a pinned route refused, kept until it is renewed. Only the held token is kept, so a late refusal of
+    /// one already replaced asks for nothing.
+    private var pinnedRefusal: String?
 
     /// What times the provider bound below. A parameter rather than a hardwired `SystemRetryClock()`
     /// so a test can race the deadline deterministically instead of waiting thirty real seconds —
@@ -118,6 +121,30 @@ actor PayabliAuth {
         }
 
         return try await mint(replacing: rejectedToken)
+    }
+
+    /// Keeps `token` as refused by a pinned route, when it is still the token held.
+    ///
+    /// - Parameter token: The credential the pinned request carried.
+    func recordPinnedRefusal(of token: String) {
+        if token == currentToken {
+            pinnedRefusal = token
+        }
+    }
+
+    /// Replaces the token a pinned route refused, through the same shared refresh a rejection takes.
+    ///
+    /// A token that has rotated since the refusal is kept, and a renewal that starts while another runs joins it.
+    ///
+    /// - Returns: Whether a refusal was waiting to be renewed. False asks the provider for nothing.
+    /// - Throws: The provider's failure, as a refresh raises it.
+    func renewPinnedRefusal() async throws -> Bool {
+        guard let refused = pinnedRefusal else { return false }
+        _ = try await invalidateAndRefresh(rejectedToken: refused)
+        if pinnedRefusal == refused {
+            pinnedRefusal = nil
+        }
+        return true
     }
 
     /// Calls the provider, checks what it returned, and installs it, with one call shared between
@@ -313,5 +340,6 @@ actor PayabliAuth {
         currentToken = nil
         inFlightMint = nil
         inFlightMintID = nil
+        pinnedRefusal = nil
     }
 }

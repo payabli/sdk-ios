@@ -3,7 +3,7 @@ import Foundation
 
 /// Which setup a call runs, so a later call of the same kind on the same `PayabliTTP` joins it until a charge
 /// claims the gate.
-enum SessionSetupKind {
+enum SessionSetupKind: CaseIterable {
     case initialize
     case reinitialize
     case activate

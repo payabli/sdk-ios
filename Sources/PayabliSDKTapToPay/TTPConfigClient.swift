@@ -23,9 +23,9 @@ final class TTPConfigClient: Sendable {
         self.attestation = attestation
     }
 
-    /// Fetches the TTP config for `entry`. A 401 inside a 200 envelope drops the binding so the next
-    /// `initialize()` enrols. An HTTP 401 surviving refresh drops nothing: clearing on it retires an enrolled
-    /// device. Both throw `PayabliGenericError(.tokenExpired)`, whose reason names which happened.
+    /// Fetches the TTP config for `entry` on a pinned credential. A 401 saying the binding is gone, or one inside a 200
+    /// envelope, drops the binding; the first throws `attestationRevoked` and the second `.tokenExpired`. Any other 401
+    /// is the token itself, drops nothing, and throws ``PinnedTokenRefusal`` for the session to renew.
     func fetchConfig(entry: String) async throws -> TTPConfig {
         let headers = try await assertionHeaders(entry: entry)
 
@@ -33,7 +33,8 @@ final class TTPConfigClient: Sendable {
         let request = PayabliRequest(
             method: .get,
             path: "/api/v2/device/taptopay/config/\(PercentEncoding.segment(entry))",
-            headers: headers.asDictionary
+            headers: headers.asDictionary,
+            pinsCredential: true
         )
 
         // The headers carry the App Attest assertion, key id and device id.
@@ -44,6 +45,19 @@ final class TTPConfigClient: Sendable {
         // This body is `ConfigCredentialsPayload`, whose `credentials` block
         // carries the card reader's secretKey and apiKey. The log gets its shape.
         logger.info("[config] ← [\(response.statusCode)] bytes=\(response.body.count)")
+
+        if let (_, reason) = PayabliEnvelope.declineOutcome(from: response.body),
+           BindingRefusal.isBindingGone(statusCode: response.statusCode, reason: reason)
+        {
+            logger.error("[config] the service holds no live attestation for this binding")
+            guard dropRefusedBinding(entry: entry, presented: headers) else {
+                throw PayabliTTPError.attestationRevoked(reason: "\(reason) — the stored binding could not be dropped")
+            }
+            throw PayabliTTPError.attestationRevoked(reason: reason)
+        }
+        if response.statusCode == 401 {
+            throw PinnedTokenRefusal()
+        }
 
         try mapPayabliHTTPError(response: response) { code in
             if code == 403 {

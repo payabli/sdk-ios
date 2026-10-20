@@ -17,6 +17,9 @@ package struct PayabliRequest: Sendable {
     /// Whether a refused answer refuses this caller rather than its credential. True means the answer is
     /// returned as it arrived, with no refresh and no replay.
     package let isCallerRefusal: @Sendable (PayabliResponse) -> Bool
+    /// Whether a credential rejection is returned as it arrived, with no refresh and no replay, because the route
+    /// holds only for the credential it was sent. The refused token is kept for the caller to renew.
+    package let pinsCredential: Bool
 
     package init(
         method: HTTPMethod,
@@ -24,7 +27,8 @@ package struct PayabliRequest: Sendable {
         query: [URLQueryItem] = [],
         headers: [String: String] = [:],
         body: Data? = nil,
-        isCallerRefusal: @escaping @Sendable (PayabliResponse) -> Bool = { _ in false }
+        isCallerRefusal: @escaping @Sendable (PayabliResponse) -> Bool = { _ in false },
+        pinsCredential: Bool = false
     ) {
         self.method = method
         self.path = path
@@ -32,6 +36,7 @@ package struct PayabliRequest: Sendable {
         self.headers = headers
         self.body = body
         self.isCallerRefusal = isCallerRefusal
+        self.pinsCredential = pinsCredential
     }
 
     /// Convenience for JSON POSTs with a `Content-Type: application/json` header.
@@ -40,7 +45,8 @@ package struct PayabliRequest: Sendable {
         path: String,
         query: [URLQueryItem] = [],
         headers: [String: String] = [:],
-        jsonBody: some Encodable
+        jsonBody: some Encodable,
+        pinsCredential: Bool = false
     ) throws -> PayabliRequest {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
@@ -52,7 +58,8 @@ package struct PayabliRequest: Sendable {
             path: path,
             query: query,
             headers: mergedHeaders,
-            body: body
+            body: body,
+            pinsCredential: pinsCredential
         )
     }
 }

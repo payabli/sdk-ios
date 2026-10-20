@@ -15,14 +15,14 @@ enum AttestFixture {
     static func makeService(
         storage: SecureStorage = InMemorySecureStorage(),
         hardwareIdProvider: @Sendable @escaping () throws -> String = { "fixed-hw-id" },
-        appIdProvider: @Sendable @escaping () throws -> String? = { "TEAM.bundle.id" }
+        appIdProvider: @Sendable @escaping () throws -> String? = { "TEAM.bundle.id" },
+        tokenProvider: @escaping PayabliTokenRefresh = { "seed" }
     ) throws -> (AppAttestService, MockAppAttestor, PayabliAuth) {
         let urlSession = StubURLProtocol.makeSession()
         let config = try PayabliConfig(
             entryPoint: "myEntry",
             environment: .sandbox,
-
-            tokenProvider: { "seed" }
+            tokenProvider: tokenProvider
         )
         // The holder comes first: the service's chain reads the token from it, so the same instance
         // has to serve the chain and the recovery layer above it.

@@ -36,6 +36,7 @@ package extension AppAttestService {
             label: "activate",
             assertion: assertion,
             readsRefusalBeforeStatus: true,
+            pinsCredential: true,
             makeDeclineError: { code, reason in
                 // A 401 here means this keyId has no attestation on record, so
                 // the binding names a key that buys nothing. Drop it and let the

@@ -64,6 +64,35 @@ final class TapToPayReports {
         }
     }
 
+    func attestationStarted() {
+        let now = Date()
+        enqueue { await $0.emit(TelemetryEventName.ttpAttestationStarted, occurredAt: now) }
+    }
+
+    /// - Parameter duration: how long the attestation took.
+    func attestationSucceeded(after duration: Duration) {
+        let now = Date()
+        let properties = ["duration_ms": Self.milliseconds(duration)]
+        enqueue { await $0.emit(TelemetryEventName.ttpAttestationSucceeded, properties: properties, occurredAt: now) }
+    }
+
+    /// Reports an attestation that was refused, by the number the host is told, and sends it at once. A token the
+    /// session renews reports 1002 here, and the run after the renewal reports its own outcome.
+    ///
+    /// - Parameter error: what the attestation threw, before it was translated for the host.
+    /// - Parameter duration: how long the attestation took.
+    func attestationFailed(_ error: Error, after duration: Duration) {
+        let now = Date()
+        var properties = ["duration_ms": Self.milliseconds(duration), "outcome": "failed"]
+        if let told = TapToPayErrorTranslation.hostError(for: error) as? any PayabliError {
+            properties["error_number"] = String(told.code)
+        }
+        enqueue { [properties] telemetry in
+            await telemetry.emit(TelemetryEventName.ttpAttestationFailed, properties: properties, occurredAt: now)
+            await telemetry.flush()
+        }
+    }
+
     /// Waits until every report made so far has reached the client.
     func sent() async {
         await tail?.value

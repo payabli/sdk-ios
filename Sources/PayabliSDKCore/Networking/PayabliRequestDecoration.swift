@@ -55,7 +55,8 @@ extension PayabliRequest {
             query: query,
             headers: headers,
             body: body,
-            isCallerRefusal: isCallerRefusal
+            isCallerRefusal: isCallerRefusal,
+            pinsCredential: pinsCredential
         )
     }
 }

@@ -121,6 +121,22 @@ package final class MockDeviceAttestationService: DeviceAttestationService, @unc
         set { lock.withLock { storedAttestResult = newValue } }
     }
 
+    /// Thrown by `attest` one at a time, in order, before `attestResult` answers.
+    package var attestFailuresFirst: [Error] {
+        get { lock.withLock { storedAttestFailuresFirst } }
+        set { lock.withLock { storedAttestFailuresFirst = newValue } }
+    }
+
+    private var storedAttestFailuresFirst: [Error] = []
+
+    /// Thrown by `activateDevice` one at a time, in order, before `activationResult` answers.
+    package var activationFailuresFirst: [Error] {
+        get { lock.withLock { storedActivationFailuresFirst } }
+        set { lock.withLock { storedActivationFailuresFirst = newValue } }
+    }
+
+    private var storedActivationFailuresFirst: [Error] = []
+
     package var pendingRegistration: String? {
         get { lock.withLock { storedPendingRegistration } }
         set { lock.withLock { storedPendingRegistration = newValue } }
@@ -154,6 +170,9 @@ package final class MockDeviceAttestationService: DeviceAttestationService, @unc
     package func attest(entry: String) async throws -> AttestationResult {
         let result: Result<AttestationResult, Error> = lock.withLock {
             storedAttestCalls += 1
+            if !storedAttestFailuresFirst.isEmpty {
+                return .failure(storedAttestFailuresFirst.removeFirst())
+            }
             if let storedPendingRegistration {
                 storedBindings[entry] = storedPendingRegistration
                 storedKeys[entry] = Self.defaultKeyId
@@ -213,6 +232,9 @@ package final class MockDeviceAttestationService: DeviceAttestationService, @unc
             storedActivateCalls += 1
             guard (storedBindings[entry] ?? storedBindings[Self.anyEntry]) == activationId else {
                 return .failure(ActivationRegistrationChanged())
+            }
+            if !storedActivationFailuresFirst.isEmpty {
+                return .failure(storedActivationFailuresFirst.removeFirst())
             }
             return storedActivationResult
         }
