@@ -65,7 +65,7 @@ final class TokenStorageClientCoverageTests: XCTestCase {
         XCTAssertEqual(request.path, "/api/TokenStorage/add")
         XCTAssertTrue(request.query.contains(URLQueryItem(name: "createAnonymous", value: "false")))
         XCTAssertTrue(request.query.contains(URLQueryItem(name: "temporary", value: "true")))
-        XCTAssertNil(request.headers["Authorization"])
+        XCTAssertFalse(request.headers.keys.contains { $0.lowercased() == "authorization" })
     }
 
     func testArrayAndNonJSONResponsesAreDecodingErrors() async throws {

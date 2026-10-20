@@ -294,7 +294,7 @@ final class PayInPaymentFlowClientTests: XCTestCase {
 
         let request = try await firstRequest(from: transport)
         let body = try XCTUnwrap(String(bytes: XCTUnwrap(request.body), encoding: .utf8))
-        XCTAssertNil(request.headers["Authorization"])
+        XCTAssertFalse(request.headers.keys.contains { $0.lowercased() == "authorization" })
         XCTAssertTrue(body.contains(#""totalAmount":100.00"#), body)
         XCTAssertTrue(body.contains(#""serviceFee":5.00"#), body)
     }

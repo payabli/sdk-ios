@@ -413,7 +413,7 @@ final class TokenStorageClientTests: XCTestCase {
         XCTAssertTrue(request.query.contains(URLQueryItem(name: "createAnonymous", value: "false")))
         XCTAssertTrue(request.query.contains(URLQueryItem(name: "forceCustomerCreation", value: "true")))
         XCTAssertTrue(request.query.contains(URLQueryItem(name: "temporary", value: "false")))
-        XCTAssertNil(request.headers["Authorization"])
+        XCTAssertFalse(request.headers.keys.contains { $0.lowercased() == "authorization" })
         XCTAssertEqual(request.headers["Content-Type"], "application/json")
         let body = try XCTUnwrap(String(bytes: XCTUnwrap(request.body), encoding: .utf8))
         XCTAssertTrue(body.contains("\"entryPoint\":\"f743aed24a\""), body)

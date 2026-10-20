@@ -56,11 +56,8 @@ let package = Package(
         // attestation, provider and storage protocols, so a linkable library of them requires
         // those protocols to be `public`.
     ],
-    // Zero external SPM dependencies. PayabliCardReaderCore (MIT-licensed Tap
-    // to Phone engine) is vendored at `ThirdParty/PayabliCardReaderCoreSource/`
-    // and compiled as a local target so the public Package.swift, Package.resolved,
-    // `otool -L`, and `.swiftinterface` of the shipped binary contain no
-    // third-party package references.
+    // Zero external dependencies: PayabliCardReaderCore is vendored under `ThirdParty/` and built as a
+    // local target, so nothing about the shipped binary or this manifest names a third-party package.
     dependencies: [],
     targets: [
         .target(
