@@ -76,8 +76,8 @@ final class TapToPayReports {
         enqueue { await $0.emit(TelemetryEventName.ttpAttestationSucceeded, properties: properties, occurredAt: now) }
     }
 
-    /// Reports an attestation that was refused, by the number the host is told, and sends it at once. A token the
-    /// session renews reports 1002 here, and the run after the renewal reports its own outcome.
+    /// Reports an attestation that was refused, by the number the host is told, and sends it at once, except a token the
+    /// session is about to renew: a send forced now would carry the refused token, so that one waits for its batch.
     ///
     /// - Parameter error: what the attestation threw, before it was translated for the host.
     /// - Parameter duration: how long the attestation took.
@@ -87,9 +87,12 @@ final class TapToPayReports {
         if let told = TapToPayErrorTranslation.hostError(for: error) as? any PayabliError {
             properties["error_number"] = String(told.code)
         }
+        let sendsAtOnce = !(error is PinnedTokenRefusal)
         enqueue { [properties] telemetry in
             await telemetry.emit(TelemetryEventName.ttpAttestationFailed, properties: properties, occurredAt: now)
-            await telemetry.flush()
+            if sendsAtOnce {
+                await telemetry.flush()
+            }
         }
     }
 

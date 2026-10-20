@@ -39,6 +39,28 @@ final class TapToPayReportsTests: XCTestCase {
         XCTAssertNotNil(Int(succeeded.properties["duration_ms"] ?? ""))
     }
 
+    func testAnAttestationRefusalTheSessionRenewsWaitsForItsBatch() async throws {
+        let (ttp, _, _, transport) = try makeTTP()
+
+        ttp.reports.attestationFailed(PinnedTokenRefusal(), after: .zero)
+        await ttp.reports.sent()
+
+        let sent = await transport.batches
+        XCTAssertTrue(sent.isEmpty, "a send forced now would carry the token being renewed")
+        let buffered = await ttp.session.telemetry.bufferedCount
+        XCTAssertEqual(buffered, 1)
+    }
+
+    func testAnyOtherAttestationFailureIsSentAtOnce() async throws {
+        let (ttp, _, _, transport) = try makeTTP()
+
+        ttp.reports.attestationFailed(PayabliTTPError.attestationFailed(reason: Self.sentinel), after: .zero)
+        await ttp.reports.sent()
+
+        let sent = await sent(transport).map(\.event)
+        XCTAssertEqual(sent, ["ttp.attestation.failed"])
+    }
+
     func testEveryFailurePathReportsOneFailureWithTheNumberTheHostWasTold() async throws {
         let paths: [(String, (MockTapToPayProvider, MockDeviceAttestationService) -> Void)] = [
             ("eligibility", { provider, _ in
