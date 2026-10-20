@@ -237,15 +237,10 @@ final class PayInPaymentFlowClientTests: XCTestCase {
         }
     }
 
-    /// A provider that throws does not put its own error into the diagnostics record.
-    ///
-    /// The read runs inside `transport.perform` now, so anything it throws reaches the sink, which
-    /// describes a non-SDK error whole and redacts only digit sequences shaped like a card number. A
-    /// host's provider can name its backend in that error.
+    /// A provider that throws reaches the caller as this SDK's own error, not the host's error verbatim.
     @MainActor
-    func testAProviderFailureDoesNotReachTheDiagnosticsRecord() async throws {
+    func testAProviderFailureSurfacesAsTheSDKsOwnError() async throws {
         let sentinel = "SENTINEL-BACKEND-https://tokens.internal.example/mint?client=acme"
-        let captured = LockedDiagnosticStrings()
         let config = try PayabliConfig(
             entryPoint: "entry",
             environment: .sandbox,
@@ -258,10 +253,7 @@ final class PayInPaymentFlowClientTests: XCTestCase {
                 )
             }
         )
-        let component = PayabliPayIn(
-            session: PayabliSession(config: config),
-            diagnostics: .enabled { captured.append($0) }
-        )
+        let component = PayabliPayIn(session: PayabliSession(config: config))
 
         do {
             _ = try await component.capture(cardRequest())
@@ -270,35 +262,8 @@ final class PayInPaymentFlowClientTests: XCTestCase {
             // The holder owns the provider now, so a host failure arrives as this SDK's own
             // `.tokenProviderFailed` with the cause redacted, rather than as the host's error verbatim.
             XCTAssertEqual(error.type, .tokenProviderFailed)
+            XCTAssertFalse(error.reason.contains("SENTINEL-BACKEND"), error.reason)
         }
-
-        let rendered = captured.all.joined(separator: "\n")
-        XCTAssertFalse(rendered.contains("SENTINEL-BACKEND"), rendered)
-        XCTAssertFalse(rendered.contains("tokens.internal.example"), rendered)
-    }
-
-    /// The key this SDK generates reaches no surface a host reads, diagnostics included.
-    ///
-    /// The record copies request headers, so a key left out of the error type still arrived here. A key
-    /// this SDK mints and sends is not something a caller is asked to carry, and a diagnostics entry a
-    /// host can read is a surface like any other.
-    @MainActor
-    func testAGeneratedKeyDoesNotReachTheDiagnosticsRecord() async {
-        let sentinel = "SENTINEL-GENERATED-KEY"
-        let captured = LockedDiagnosticStrings()
-        let component = PayabliPayIn(
-            entryPoint: "entry",
-            environment: .sandbox,
-            transport: MockPaymentCaptureTransport(responseBody: Self.approvedResponse),
-            diagnostics: .enabled { captured.append($0) }
-        )
-        component.newIdempotencyKey = { sentinel }
-
-        _ = try? await component.capture(cardRequest())
-
-        let rendered = captured.all.joined(separator: "\n")
-        XCTAssertFalse(rendered.isEmpty, "the record should have entries to check")
-        XCTAssertFalse(rendered.contains(sentinel), rendered)
     }
 
     /// A blank token is refused where it is installed, which is the session's holder.
@@ -320,117 +285,18 @@ final class PayInPaymentFlowClientTests: XCTestCase {
         }
     }
 
-    /// The verification answer is the field that says why a card was refused, and
-    /// the value a cardholder typed is next to it under a name one character apart.
-    func testDiagnosticsShowsTheVerificationAnswerAndStillHidesTheSubmittedCVV() async throws {
-        let declined = """
-        {
-          "isSuccess": false,
-          "responseText": "Declined",
-          "responseData": {
-            "resultCode": 2,
-            "resultText": "AVS or CVV failed",
-            "cvvresponse": "N",
-            "CVVResponse_Text": "no match",
-            "avsresponse": "Z",
-            "cvv": "123",
-            "cardcvv": "456"
-          }
-        }
-        """
-        let expectation = expectation(description: "diagnostic response emitted")
-        let transport = MockPaymentCaptureTransport(responseBody: declined)
-        let responseEntry = LockedDiagnosticEntry()
-        let diagnostics = PayabliPayInDiagnostics.enabled { entry in
-            if entry.phase == .response {
-                responseEntry.set(entry)
-                expectation.fulfill()
-            }
-        }
-        let client = PayInPaymentFlowClient(
-            transport: transport,
-            diagnostics: diagnostics
-        )
-
-        _ = try? await client.capture(entryPoint: "entry", request: cardRequest())
-
-        await fulfillment(of: [expectation], timeout: 1)
-        let body = try XCTUnwrap(try XCTUnwrap(responseEntry.value).body)
-
-        // Allowed: the answer, whatever case and punctuation the service spells it in.
-        XCTAssertTrue(body.contains(#""cvvresponse":"N""#), body)
-        XCTAssertTrue(body.contains("no match"), body)
-        XCTAssertTrue(body.contains(#""avsresponse":"Z""#), body)
-
-        // Redacted: what was submitted, matched by the rules the allowlist runs before.
-        XCTAssertTrue(body.contains(#""cvv":"[REDACTED]""#), body)
-        XCTAssertTrue(body.contains(#""cardcvv":"[REDACTED]""#), body)
-        XCTAssertFalse(body.contains("123"), body)
-        XCTAssertFalse(body.contains("456"), body)
-    }
-
-    /// `additionalData` takes any key a caller puts in it, so the verification
-    /// allowlist has to be the response's alone: on a request those names are a
-    /// submitted value wearing the answer's name.
-    func testDiagnosticsHidesAVerificationNameCarryingASubmittedValueOnARequest() async throws {
-        let expectation = expectation(description: "diagnostic request emitted")
+    /// The credential is attached below this client, so the request it hands the transport carries none.
+    func testACaptureRequestCarriesItsAmountsAndNoCredential() async throws {
         let transport = MockPaymentCaptureTransport(responseBody: Self.approvedResponse)
-        let requestEntry = LockedDiagnosticEntry()
-        let diagnostics = PayabliPayInDiagnostics.enabled { entry in
-            if entry.phase == .request {
-                requestEntry.set(entry)
-                expectation.fulfill()
-            }
-        }
-        let client = PayInPaymentFlowClient(
-            transport: transport,
-            diagnostics: diagnostics
-        )
-        let request = cardRequest(additionalData: [
-            "cvvresponse": "321",
-            "CVVResponse_Text": "654"
-        ])
-
-        _ = try? await client.capture(entryPoint: "entry", request: request)
-
-        await fulfillment(of: [expectation], timeout: 1)
-        let body = try XCTUnwrap(try XCTUnwrap(requestEntry.value).body)
-
-        XCTAssertFalse(body.contains("321"), body)
-        XCTAssertFalse(body.contains("654"), body)
-        XCTAssertTrue(body.contains(#""cvvresponse":"[REDACTED]""#), body)
-    }
-
-    func testDiagnosticsRedactsBearerAndSensitivePaymentFields() async throws {
-        let expectation = expectation(description: "diagnostic request emitted")
-        let transport = MockPaymentCaptureTransport(responseBody: Self.approvedResponse)
-        let requestEntry = LockedDiagnosticEntry()
-        let diagnostics = PayabliPayInDiagnostics.enabled { entry in
-            if entry.phase == .request {
-                requestEntry.set(entry)
-                expectation.fulfill()
-            }
-        }
-        let client = PayInPaymentFlowClient(
-            transport: transport,
-            baseURL: URL(string: "https://api-sandbox.payabli.com"),
-            diagnostics: diagnostics
-        )
+        let client = PayInPaymentFlowClient(transport: transport)
 
         _ = try await client.capture(entryPoint: "entry", request: cardRequest())
 
-        await fulfillment(of: [expectation], timeout: 1)
-        let entry = try XCTUnwrap(requestEntry.value)
-        // Stronger than redaction: the credential is attached below this layer, so it never enters the
-        // diagnostic record and there is nothing here to redact. The rule that decides what is
-        // sensitive is the same one the body assertions below exercise.
-        XCTAssertNil(entry.headers["Authorization"])
-        XCTAssertTrue(entry.body?.contains(#""cardnumber":"[REDACTED]""#) == true)
-        XCTAssertTrue(entry.body?.contains(#""cardcvv":"[REDACTED]""#) == true)
-        XCTAssertTrue(entry.body?.contains(#""totalAmount":100.00"#) == true)
-        XCTAssertTrue(entry.body?.contains(#""serviceFee":5.00"#) == true)
-        XCTAssertFalse(entry.body?.contains("4111111111111111") == true)
-        XCTAssertFalse(entry.body?.contains("secret-token") == true)
+        let request = try await firstRequest(from: transport)
+        let body = try XCTUnwrap(String(bytes: XCTUnwrap(request.body), encoding: .utf8))
+        XCTAssertFalse(request.headers.keys.contains { $0.lowercased() == "authorization" })
+        XCTAssertTrue(body.contains(#""totalAmount":100.00"#))
+        XCTAssertTrue(body.contains(#""serviceFee":5.00"#))
     }
 
     private func cardRequest(
@@ -560,50 +426,6 @@ actor MockPaymentCaptureTransport: PayabliTransport {
     ) async throws -> PayabliV2Envelope<T> {
         requests.append(request)
         return try JSONDecoder().decode(PayabliV2Envelope<T>.self, from: Data(responseBody.utf8))
-    }
-}
-
-/// Every diagnostic entry a run produced, rendered, so an assertion can sweep the lot for a value that
-/// must not be in any of them.
-private final class LockedDiagnosticStrings: @unchecked Sendable {
-    private let lock = NSLock()
-    private var entries: [String] = []
-
-    var all: [String] {
-        lock.lock()
-        defer { lock.unlock() }
-        return entries
-    }
-
-    func append(_ entry: PayabliPayInDiagnosticEntry) {
-        lock.lock()
-        defer { lock.unlock() }
-        entries.append(
-            [
-                entry.url,
-                entry.method,
-                entry.body ?? "",
-                entry.errorDescription ?? "",
-                entry.headers.map { "\($0.key)=\($0.value)" }.sorted().joined(separator: " ")
-            ].joined(separator: " | ")
-        )
-    }
-}
-
-private final class LockedDiagnosticEntry: @unchecked Sendable {
-    private let lock = NSLock()
-    private var entry: PayabliPayInDiagnosticEntry?
-
-    var value: PayabliPayInDiagnosticEntry? {
-        lock.lock()
-        defer { lock.unlock() }
-        return entry
-    }
-
-    func set(_ entry: PayabliPayInDiagnosticEntry) {
-        lock.lock()
-        defer { lock.unlock() }
-        self.entry = entry
     }
 }
 

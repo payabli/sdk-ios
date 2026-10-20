@@ -42,7 +42,6 @@
 		5DC00000000000000000B903 /* TapToPaySessionStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DC00000000000000000B901 /* TapToPaySessionStatus.swift */; };
 		5DC00000000000000000B902 /* TapToPaySessionStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DC00000000000000000B901 /* TapToPaySessionStatus.swift */; };
 		5DC00000000000000000B802 /* DemoCustomerData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DC00000000000000000B801 /* DemoCustomerData.swift */; };
-		5DC00000000000000000B702 /* PayInDiagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DC00000000000000000B701 /* PayInDiagnostics.swift */; };
 		5DC00000000000000000B602 /* PayInSessions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DC00000000000000000B601 /* PayInSessions.swift */; };
 		5DC00000000000000000B502 /* PayInRequests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DC00000000000000000B501 /* PayInRequests.swift */; };
 		5DC00000000000000000B402 /* PayInForms.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DC00000000000000000B401 /* PayInForms.swift */; };
@@ -87,8 +86,6 @@
 		AF77F479977FE319B28EB3D7 /* PayabliDemoQAApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6EA1E9A0909DDC1A7B827C8D /* PayabliDemoQAApp.swift */; };
 		C9B9D43650B2230A8582B93C /* Secrets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C921D1F3EE7130C23911757 /* Secrets.swift */; };
 		D20000000000000000000001 /* DemoConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000000000000000000001 /* DemoConfiguration.swift */; };
-		D20000000000000000000002 /* DiagnosticsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000000000000000000002 /* DiagnosticsStore.swift */; };
-		D20000000000000000000003 /* DiagnosticsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000000000000000000003 /* DiagnosticsSection.swift */; };
 		D20000000000000000000004 /* PayInSharedConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000000000000000000004 /* PayInSharedConfiguration.swift */; };
 		D20000000000000000000005 /* QADetailRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000000000000000000005 /* QADetailRow.swift */; };
 		D20000000000000000000006 /* TerminalReadinessView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000000000000000000006 /* TerminalReadinessView.swift */; };
@@ -171,7 +168,6 @@
 		5DC00000000000000000BA01 /* TapToPayTerminal.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TapToPayTerminal.swift; sourceTree = "<group>"; };
 		5DC00000000000000000B901 /* TapToPaySessionStatus.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TapToPaySessionStatus.swift; sourceTree = "<group>"; };
 		5DC00000000000000000B801 /* DemoCustomerData.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DemoCustomerData.swift; sourceTree = "<group>"; };
-		5DC00000000000000000B701 /* PayInDiagnostics.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PayInDiagnostics.swift; sourceTree = "<group>"; };
 		5DC00000000000000000B601 /* PayInSessions.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PayInSessions.swift; sourceTree = "<group>"; };
 		5DC00000000000000000B501 /* PayInRequests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PayInRequests.swift; sourceTree = "<group>"; };
 		5DC00000000000000000B401 /* PayInForms.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PayInForms.swift; sourceTree = "<group>"; };
@@ -211,8 +207,6 @@
 		A1B2C3D4E5F600000000BB01 /* TokenServerHealth.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TokenServerHealth.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F600000000BB11 /* TokenServerHealthTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TokenServerHealthTests.swift; sourceTree = "<group>"; };
 		D10000000000000000000001 /* DemoConfiguration.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DemoConfiguration.swift; sourceTree = "<group>"; };
-		D10000000000000000000002 /* DiagnosticsStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DiagnosticsStore.swift; sourceTree = "<group>"; };
-		D10000000000000000000003 /* DiagnosticsSection.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DiagnosticsSection.swift; sourceTree = "<group>"; };
 		D10000000000000000000004 /* PayInSharedConfiguration.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PayInSharedConfiguration.swift; sourceTree = "<group>"; };
 		D10000000000000000000005 /* QADetailRow.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = QADetailRow.swift; sourceTree = "<group>"; };
 		D10000000000000000000006 /* TerminalReadinessView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TerminalReadinessView.swift; sourceTree = "<group>"; };
@@ -336,7 +330,6 @@
 				E10000000000000000000020 /* Shared */,
 				E1000000000000000000000D /* PayIn */,
 				F20000000000000000000010 /* Flow */,
-				E1000000000000000000000E /* Diagnostics */,
 				E1000000000000000000000F /* Debug */,
 				E1000000000000000000000B /* Configuration */,
 				6EA1E9A0909DDC1A7B827C8D /* PayabliDemoQAApp.swift */,
@@ -356,7 +349,6 @@
 				5DC00000000000000000BA01 /* TapToPayTerminal.swift */,
 				5DC00000000000000000B901 /* TapToPaySessionStatus.swift */,
 				5DC00000000000000000B801 /* DemoCustomerData.swift */,
-				5DC00000000000000000B701 /* PayInDiagnostics.swift */,
 				5DC00000000000000000B601 /* PayInSessions.swift */,
 				5DC00000000000000000B501 /* PayInRequests.swift */,
 				5DC00000000000000000B401 /* PayInForms.swift */,
@@ -404,15 +396,6 @@
 				5DC00000000000000000D011 /* SimpleCaptureView.swift */,
 			);
 			path = PayIn;
-			sourceTree = "<group>";
-		};
-		E1000000000000000000000E /* Diagnostics */ = {
-			isa = PBXGroup;
-			children = (
-				D10000000000000000000002 /* DiagnosticsStore.swift */,
-				D10000000000000000000003 /* DiagnosticsSection.swift */,
-			);
-			path = Diagnostics;
 			sourceTree = "<group>";
 		};
 		E1000000000000000000000F /* Debug */ = {
@@ -808,7 +791,6 @@
 				5DC00000000000000000BA02 /* TapToPayTerminal.swift in Sources */,
 				5DC00000000000000000B902 /* TapToPaySessionStatus.swift in Sources */,
 				5DC00000000000000000B802 /* DemoCustomerData.swift in Sources */,
-				5DC00000000000000000B702 /* PayInDiagnostics.swift in Sources */,
 				5DC00000000000000000B602 /* PayInSessions.swift in Sources */,
 				5DC00000000000000000B502 /* PayInRequests.swift in Sources */,
 				5DC00000000000000000B402 /* PayInForms.swift in Sources */,
@@ -821,8 +803,6 @@
 				D20000000000000000000005 /* QADetailRow.swift in Sources */,
 				D20000000000000000000006 /* TerminalReadinessView.swift in Sources */,
 				D20000000000000000000001 /* DemoConfiguration.swift in Sources */,
-				D20000000000000000000002 /* DiagnosticsStore.swift in Sources */,
-				D20000000000000000000003 /* DiagnosticsSection.swift in Sources */,
 				D20000000000000000000004 /* PayInSharedConfiguration.swift in Sources */,
 				D4DCE94B54535A867D1DDB65 /* PaymentMethodQAView.swift in Sources */,
 				1C7A9E9B6D2F4C0F8A1B3D5E /* PaymentCaptureQAView.swift in Sources */,

@@ -8,17 +8,9 @@ import PayabliSDKCore
 /// recovery: this surface's credential comes from a per-call provider, not from a session.
 final class PayInPaymentFlowTokenStorageClient: Sendable {
     private let transport: any PayabliTransport
-    private let baseURL: URL?
-    private let diagnostics: PayabliPayInDiagnostics
 
-    init(
-        transport: any PayabliTransport,
-        baseURL: URL? = nil,
-        diagnostics: PayabliPayInDiagnostics = .disabled
-    ) {
+    init(transport: any PayabliTransport) {
         self.transport = transport
-        self.baseURL = baseURL
-        self.diagnostics = diagnostics
     }
 
     func addMethod(
@@ -38,18 +30,10 @@ final class PayInPaymentFlowTokenStorageClient: Sendable {
             paymentMethod: paymentMethod,
             options: options
         )
-        diagnostics.logRequest(request, baseURL: baseURL)
-        let start = Date()
         let response: PayabliResponse
         do {
             response = try await transport.perform(request)
         } catch {
-            diagnostics.logFailure(
-                error,
-                request: request,
-                baseURL: baseURL,
-                durationMilliseconds: Date().timeIntervalSince(start) * 1000
-            )
             // The chain refuses an empty credential in the capture surface's error type. Translated,
             // so this surface answers in its own.
             if case PayabliPayInError.missingAccessToken = error {
@@ -57,12 +41,6 @@ final class PayInPaymentFlowTokenStorageClient: Sendable {
             }
             throw error
         }
-        diagnostics.logResponse(
-            response,
-            request: request,
-            baseURL: baseURL,
-            durationMilliseconds: Date().timeIntervalSince(start) * 1000
-        )
         // The status first: a failed status is the core error for that status, so only a refusal
         // answered on a success status is this surface's own. This route refuses a 400 with prose
         // alone, which is kept as the validation error's detail.

@@ -50,7 +50,6 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
 
     private(set) var session: PayabliSession?
     private let injectedTransport: (any PayabliTransport)?
-    private let diagnostics: PayabliPayInDiagnostics
     private var client: PayInPaymentFlowClient
     private var tokenStorageClient: PayInPaymentFlowTokenStorageClient
     private var activeSubmissionCount = 0
@@ -61,9 +60,13 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
     ///
     /// The entry point and the environment come from the session's configuration, so a flow and the
     /// session it runs on cannot disagree about which merchant or which host they are for.
+    ///
+    /// - Parameters:
+    ///   - session: The session the flow sends on.
+    ///   - operation: What a submission does.
+    ///   - requestConfiguration: The request the flow starts with, if any.
     public init(
         session: PayabliSession,
-        diagnostics: PayabliPayInDiagnostics = .disabled,
         operation: PayabliPayInOperation = .storePaymentMethod,
         requestConfiguration: PayabliPayInRequestConfiguration? = nil
     ) {
@@ -73,17 +76,8 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
         self.requestConfiguration = requestConfiguration
         self.session = session
         injectedTransport = nil
-        self.diagnostics = diagnostics
-        client = PayInPaymentFlowClient(
-            transport: session.transport,
-            baseURL: session.config.environment.baseURL,
-            diagnostics: diagnostics
-        )
-        tokenStorageClient = PayInPaymentFlowTokenStorageClient(
-            transport: session.transport,
-            baseURL: session.config.environment.baseURL,
-            diagnostics: diagnostics
-        )
+        client = PayInPaymentFlowClient(transport: session.transport)
+        tokenStorageClient = PayInPaymentFlowTokenStorageClient(transport: session.transport)
         super.init()
     }
 
@@ -95,7 +89,6 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
         entryPoint: String,
         environment: PayabliEnvironment,
         transport: any PayabliTransport,
-        diagnostics: PayabliPayInDiagnostics = .disabled,
         operation: PayabliPayInOperation = .storePaymentMethod,
         requestConfiguration: PayabliPayInRequestConfiguration? = nil
     ) {
@@ -105,17 +98,8 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
         self.requestConfiguration = requestConfiguration
         session = nil
         injectedTransport = transport
-        self.diagnostics = diagnostics
-        client = PayInPaymentFlowClient(
-            transport: transport,
-            baseURL: environment.baseURL,
-            diagnostics: diagnostics
-        )
-        tokenStorageClient = PayInPaymentFlowTokenStorageClient(
-            transport: transport,
-            baseURL: environment.baseURL,
-            diagnostics: diagnostics
-        )
+        client = PayInPaymentFlowClient(transport: transport)
+        tokenStorageClient = PayInPaymentFlowTokenStorageClient(transport: transport)
         super.init()
     }
 
@@ -141,16 +125,8 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
                 reason: "the configuration is not the one the session was initialized with"
             ))
         }
-        client = PayInPaymentFlowClient(
-            transport: transport,
-            baseURL: config.environment.baseURL,
-            diagnostics: diagnostics
-        )
-        tokenStorageClient = PayInPaymentFlowTokenStorageClient(
-            transport: transport,
-            baseURL: config.environment.baseURL,
-            diagnostics: diagnostics
-        )
+        client = PayInPaymentFlowClient(transport: transport)
+        tokenStorageClient = PayInPaymentFlowTokenStorageClient(transport: transport)
     }
 
     public func configure(config: PayabliConfig, theme _: PayabliTheme) {

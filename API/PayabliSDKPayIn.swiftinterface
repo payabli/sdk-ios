@@ -84,7 +84,7 @@ import _SwiftConcurrencyShims
   @_Concurrency::MainActor final public var $requestConfiguration: Combine::Published<PayabliSDKPayIn::PayabliPayInRequestConfiguration?>.Combine::Publisher {
     get
   }
-  @_Concurrency::MainActor public init(session: PayabliSDKCore::PayabliSession, diagnostics: PayabliSDKPayIn::PayabliPayInDiagnostics = .disabled, operation: PayabliSDKPayIn::PayabliPayInOperation = .storePaymentMethod, requestConfiguration: PayabliSDKPayIn::PayabliPayInRequestConfiguration? = nil)
+  @_Concurrency::MainActor public init(session: PayabliSDKCore::PayabliSession, operation: PayabliSDKPayIn::PayabliPayInOperation = .storePaymentMethod, requestConfiguration: PayabliSDKPayIn::PayabliPayInRequestConfiguration? = nil)
   @_Concurrency::MainActor final public func configure(config: PayabliSDKCore::PayabliConfig)
   @_Concurrency::MainActor final public func configure(config: PayabliSDKCore::PayabliConfig, theme _: PayabliSDKCore::PayabliTheme)
   @_Concurrency::MainActor final public func configure(operation: PayabliSDKPayIn::PayabliPayInOperation, requestConfiguration: PayabliSDKPayIn::PayabliPayInRequestConfiguration? = nil)
@@ -108,38 +108,6 @@ import _SwiftConcurrencyShims
     get
   }
   public typealias Body = @_opaqueReturnTypeOf("$s15PayabliSDKPayIn0a3PayC13CardBrandIconV4bodyQrvp", 0) __
-}
-public typealias PayabliPayInDiagnosticHandler = @Sendable (PayabliSDKPayIn::PayabliPayInDiagnosticEntry) -> Swift::Void
-public struct PayabliPayInDiagnostics : Swift::Sendable {
-  public let isEnabled: Swift::Bool
-  public let handler: PayabliSDKPayIn::PayabliPayInDiagnosticHandler?
-  public init(isEnabled: Swift::Bool = false, handler: PayabliSDKPayIn::PayabliPayInDiagnosticHandler? = nil)
-  public static let disabled: PayabliSDKPayIn::PayabliPayInDiagnostics
-  public static func enabled(handler: @escaping PayabliSDKPayIn::PayabliPayInDiagnosticHandler) -> PayabliSDKPayIn::PayabliPayInDiagnostics
-}
-public struct PayabliPayInDiagnosticEntry : Swift::Identifiable, Swift::Sendable {
-  public enum Phase : Swift::String, Swift::Sendable {
-    case request
-    case response
-    case failure
-    public init?(rawValue: Swift::String)
-    public typealias RawValue = Swift::String
-    public var rawValue: Swift::String {
-      get
-    }
-  }
-  public let id: Foundation::UUID
-  public let phase: PayabliSDKPayIn::PayabliPayInDiagnosticEntry.PayabliSDKPayIn::Phase
-  public let timestamp: Foundation::Date
-  public let method: Swift::String
-  public let url: Swift::String
-  public let statusCode: Swift::Int?
-  public let headers: [Swift::String : Swift::String]
-  public let body: Swift::String?
-  public let durationMilliseconds: Swift::Double?
-  public let errorDescription: Swift::String?
-  public init(id: Foundation::UUID = UUID(), phase: PayabliSDKPayIn::PayabliPayInDiagnosticEntry.PayabliSDKPayIn::Phase, timestamp: Foundation::Date = Date(), method: Swift::String, url: Swift::String, statusCode: Swift::Int? = nil, headers: [Swift::String : Swift::String] = [:], body: Swift::String? = nil, durationMilliseconds: Swift::Double? = nil, errorDescription: Swift::String? = nil)
-  public typealias ID = Foundation::UUID
 }
 public enum PayabliPayInError : PayabliSDKCore::PayabliError, Swift::Equatable {
   case invalidInput(Swift::String)
@@ -1061,9 +1029,6 @@ public enum PayabliPayInModule {
 extension PayabliSDKPayIn::PayabliPayInObjC : Swift::Sendable {}
 extension PayabliSDKPayIn::PayabliPayIn : Swift::Sendable {}
 extension PayabliSDKPayIn::PayabliPayInCardBrandIcon : Swift::Sendable {}
-extension PayabliSDKPayIn::PayabliPayInDiagnosticEntry.PayabliSDKPayIn::Phase : Swift::Equatable {}
-extension PayabliSDKPayIn::PayabliPayInDiagnosticEntry.PayabliSDKPayIn::Phase : Swift::Hashable {}
-extension PayabliSDKPayIn::PayabliPayInDiagnosticEntry.PayabliSDKPayIn::Phase : Swift::RawRepresentable {}
 extension PayabliSDKPayIn::PayabliPayInField : Swift::Equatable {}
 extension PayabliSDKPayIn::PayabliPayInField : Swift::Hashable {}
 extension PayabliSDKPayIn::PayabliPayInField : Swift::RawRepresentable {}

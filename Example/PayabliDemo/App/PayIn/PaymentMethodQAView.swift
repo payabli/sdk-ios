@@ -5,7 +5,6 @@ import SwiftUI
 struct PaymentMethodQAView: View {
     @ObservedObject var paymentFlow: PayInFlowHandle
 
-    @StateObject private var diagnosticsStore = DiagnosticsStore.paymentMethod
     @EnvironmentObject private var tokenProbes: TokenProbeResults
     @State private var resultText = ""
     @State private var resultAcknowledged = false
@@ -91,8 +90,6 @@ struct PaymentMethodQAView: View {
                             .buttonStyle(.bordered)
                         }
                     }
-
-                    DiagnosticsSection(store: diagnosticsStore, isEnabled: Secrets.paymentMethodDiagnosticsEnabled)
                 }
                 .padding(16)
             }
