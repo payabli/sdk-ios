@@ -11,7 +11,8 @@ external reader. This guide is part of the [Payabli iOS SDK](../../README.md); s
 
 ### Your app
 
-- iOS 16.7 or later as the deployment target.
+- iOS 16.0 or later as the deployment target. Tap to Pay needs iOS 16.7, so below that target every
+  `PayabliTTP` call goes behind `if #available(iOS 16.7, *)`.
 - Apple's Tap to Pay entitlement and the App Attest environment entitlement, in
   [Request Apple's entitlement](#request-apples-entitlement).
 

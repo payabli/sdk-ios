@@ -178,10 +178,24 @@ package final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
         value?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
     }
 
+    /// Whether an OS version can run Tap to Pay.
+    ///
+    /// - Parameter version: The OS version to check.
+    /// - Returns: `true` for iOS 16.7 or later.
+    static func supportsTapToPay(_ version: OperatingSystemVersion) -> Bool {
+        (version.majorVersion, version.minorVersion) >= (16, 7)
+    }
+
     /// Platform + `PaymentCardReader` hardware check. Runs before `/config`
     /// is fetched, so must not require credentials.
+    ///
+    /// The OS check runs although the type requires iOS 16.7, because an
+    /// Objective-C caller below 16.7 gets only a compiler warning.
     package func checkEligibility() async -> Result<Void, PayabliTTPError> {
         #if canImport(PayabliCardReaderCore)
+            guard Self.supportsTapToPay(ProcessInfo.processInfo.operatingSystemVersion) else {
+                return .failure(.readerSetupFailed(reason: "Tap to Pay requires iOS 16.7+"))
+            }
             guard PaymentCardReader.isSupported else {
                 return .failure(.readerSetupFailed(
                     reason: "Tap to Pay hardware not supported on this device"
