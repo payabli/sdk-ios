@@ -61,12 +61,6 @@ final class PayabliSessionTests: XCTestCase {
         await assertRefused(try makeConfig(environment: .production))
     }
 
-    func testInitializeRefusesADifferentTelemetrySetting() async throws {
-        try await PayabliSession.initialize(config: makeConfig())
-
-        await assertRefused(try makeConfig(telemetryEnabled: false))
-    }
-
     func testConcurrentInitializeInstallsOneSession() async throws {
         let config = try makeConfig()
         let installed = InstalledSessions()
@@ -117,14 +111,12 @@ final class PayabliSessionTests: XCTestCase {
     private func makeConfig(
         entryPoint: String = "demo",
         environment: PayabliEnvironment = .sandbox,
-        telemetryEnabled: Bool = true,
         tokenProvider: @escaping PayabliTokenRefresh = { "tok" }
     ) throws -> PayabliConfig {
         try PayabliConfig(
             entryPoint: entryPoint,
             environment: environment,
-            tokenProvider: tokenProvider,
-            telemetryEnabled: telemetryEnabled
+            tokenProvider: tokenProvider
         )
     }
 }

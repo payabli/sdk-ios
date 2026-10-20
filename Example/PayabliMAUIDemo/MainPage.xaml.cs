@@ -50,7 +50,6 @@ public partial class MainPage : ContentPage
             },
             entryPoint: Secrets.EntryPoint,
             environment: PayabliEnvironment.Sandbox,
-            telemetryEnabled: true,
             completionHandler: sessionError =>
             {
                 MainThread.BeginInvokeOnMainThread(() =>
