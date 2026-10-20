@@ -13,7 +13,7 @@ final class SessionSetupGate {
         let id: Int
     }
 
-    /// A setup a later call of the same `kind`, from the same `PayabliTTP`, joins.
+    /// A setup a later call of an equal `kind`, from the same `PayabliTTP`, joins.
     private struct Setup {
         let kind: SessionSetupKind
         let claim: Claim
@@ -33,10 +33,10 @@ final class SessionSetupGate {
     /// the operation before it, or has setups queued behind it.
     private(set) var isHeldByCharge = false
 
-    /// Runs `work` after every operation already in the gate, or joins `owner`'s pending setup of this `kind`.
+    /// Runs `work` after every operation already in the gate, or joins `owner`'s pending setup of an equal `kind`.
     ///
     /// - Parameters:
-    ///   - kind: Which setup this is; `owner`'s next call of the same kind joins it until a charge claims the gate.
+    ///   - kind: Which setup this is; `owner`'s next call of an equal kind joins it until a charge claims the gate.
     ///   - owner: The `PayabliTTP` calling. Only its own calls join this setup; any other caller waits for it.
     ///   - work: The setup, run in a task no caller owns, so a cancelled caller does not stop it.
     func run(

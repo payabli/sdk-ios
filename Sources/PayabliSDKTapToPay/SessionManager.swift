@@ -1,12 +1,13 @@
 import Combine
 import Foundation
 
-/// Which setup a call runs, so a later call of the same kind on the same `PayabliTTP` joins it until a charge
+/// Which setup a call runs, so a later call of an equal kind on the same `PayabliTTP` joins it until a charge
 /// claims the gate.
-enum SessionSetupKind {
+enum SessionSetupKind: Equatable {
     case initialize
     case reinitialize
-    case activate
+    /// An activation joins only one carrying the same code, so a corrected code is sent at its own turn.
+    case activate(code: String)
 }
 
 /// Manages the TTP session lifecycle. Transitions are enforced internally and occur on `@MainActor`, so host

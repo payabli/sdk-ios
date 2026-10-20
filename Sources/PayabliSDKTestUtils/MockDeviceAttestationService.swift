@@ -149,6 +149,19 @@ package final class MockDeviceAttestationService: DeviceAttestationService, @unc
         lock.withLock { storedActivateCalls }
     }
 
+    private var storedActivationResultsByCode: [String: Result<Void, Error>] = [:]
+    /// The answer for one code, in place of `activationResult`.
+    package var activationResultsByCode: [String: Result<Void, Error>] {
+        get { lock.withLock { storedActivationResultsByCode } }
+        set { lock.withLock { storedActivationResultsByCode = newValue } }
+    }
+
+    private var storedActivationCodes: [String] = []
+    /// The codes activations sent, in order.
+    package var activationCodes: [String] {
+        lock.withLock { storedActivationCodes }
+    }
+
     package init() {}
 
     package func attest(entry: String) async throws -> AttestationResult {
@@ -214,7 +227,8 @@ package final class MockDeviceAttestationService: DeviceAttestationService, @unc
             guard (storedBindings[entry] ?? storedBindings[Self.anyEntry]) == activationId else {
                 return .failure(ActivationRegistrationChanged())
             }
-            return storedActivationResult
+            storedActivationCodes.append(activationCode)
+            return storedActivationResultsByCode[activationCode] ?? storedActivationResult
         }
         if case let .failure(err) = result {
             throw err
