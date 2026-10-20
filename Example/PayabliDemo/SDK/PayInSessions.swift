@@ -11,11 +11,7 @@ enum PayInSessions {
     static func storedMethod(session: PayabliSession) -> PayInFlowHandle {
         PayInFlowHandle(
             PayabliPayIn(
-                session: session,
-                diagnostics: .qaLogging(
-                    enabled: Secrets.paymentMethodDiagnosticsEnabled,
-                    store: .paymentMethod
-                )
+                session: session
             )
         )
     }
@@ -29,10 +25,6 @@ enum PayInSessions {
         PayInFlowHandle(
             PayabliPayIn(
                 session: session,
-                diagnostics: .qaLogging(
-                    enabled: Secrets.paymentCaptureDiagnosticsEnabled,
-                    store: .paymentCapture
-                ),
                 operation: .capture,
                 requestConfiguration: PayInRequests.freshCapture(suppliesCustomer: true)
             )
@@ -44,10 +36,6 @@ enum PayInSessions {
         PayInFlowHandle(
             PayabliPayIn(
                 session: session,
-                diagnostics: .qaLogging(
-                    enabled: Secrets.paymentCaptureDiagnosticsEnabled,
-                    store: .paymentCapture
-                ),
                 operation: .authorize,
                 requestConfiguration: PayInRequests.freshCapture(suppliesCustomer: true)
             )

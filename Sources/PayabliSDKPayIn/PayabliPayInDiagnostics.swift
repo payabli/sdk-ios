@@ -1,13 +1,13 @@
 import Foundation
 import PayabliSDKCore
 
-public typealias PayabliPayInDiagnosticHandler = @Sendable (PayabliPayInDiagnosticEntry) -> Void
+package typealias PayabliPayInDiagnosticHandler = @Sendable (PayabliPayInDiagnosticEntry) -> Void
 
-public struct PayabliPayInDiagnostics: Sendable {
-    public let isEnabled: Bool
-    public let handler: PayabliPayInDiagnosticHandler?
+package struct PayabliPayInDiagnostics: Sendable {
+    package let isEnabled: Bool
+    package let handler: PayabliPayInDiagnosticHandler?
 
-    public init(
+    package init(
         isEnabled: Bool = false,
         handler: PayabliPayInDiagnosticHandler? = nil
     ) {
@@ -15,34 +15,34 @@ public struct PayabliPayInDiagnostics: Sendable {
         self.handler = handler
     }
 
-    public static let disabled = PayabliPayInDiagnostics()
+    package static let disabled = PayabliPayInDiagnostics()
 
-    public static func enabled(
+    package static func enabled(
         handler: @escaping PayabliPayInDiagnosticHandler
     ) -> PayabliPayInDiagnostics {
         PayabliPayInDiagnostics(isEnabled: true, handler: handler)
     }
 }
 
-public struct PayabliPayInDiagnosticEntry: Identifiable, Sendable {
-    public enum Phase: String, Sendable {
+package struct PayabliPayInDiagnosticEntry: Identifiable, Sendable {
+    package enum Phase: String, Sendable {
         case request
         case response
         case failure
     }
 
-    public let id: UUID
-    public let phase: Phase
-    public let timestamp: Date
-    public let method: String
-    public let url: String
-    public let statusCode: Int?
-    public let headers: [String: String]
-    public let body: String?
-    public let durationMilliseconds: Double?
-    public let errorDescription: String?
+    package let id: UUID
+    package let phase: Phase
+    package let timestamp: Date
+    package let method: String
+    package let url: String
+    package let statusCode: Int?
+    package let headers: [String: String]
+    package let body: String?
+    package let durationMilliseconds: Double?
+    package let errorDescription: String?
 
-    public init(
+    package init(
         id: UUID = UUID(),
         phase: Phase,
         timestamp: Date = Date(),

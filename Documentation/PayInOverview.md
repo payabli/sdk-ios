@@ -28,7 +28,7 @@ iOS integrations harder to configure, secure, test, and document consistently.
 `PayabliSDKPayIn` provides one native SwiftUI and async API surface
 for the common PayIn lifecycle. It centralizes mobile access-token usage,
 SDK-owned sensitive-field collection, MoneyIn request construction, result
-handling, diagnostics redaction, accessibility behavior, and visual
+handling, accessibility behavior, and visual
 customization so host apps can choose between a low-PCI hosted form and direct
 PCI-sensitive APIs without switching components.
 
@@ -46,7 +46,7 @@ At a high level, the component provides:
   of a prior authorization
 - configurable fields, field order, sections, labels, placeholders, hidden
   values, validation, payment summary rows, and visual styling
-- redacted diagnostics, stable accessibility identifiers, Dynamic Type support,
+- stable accessibility identifiers, Dynamic Type support,
   and unified stored-method or transaction results
 
 ## What The Component Does
@@ -94,8 +94,6 @@ host app must avoid direct access to clear card data. In hosted form mode:
 
 - the SDK owns card and bank account field state
 - clear PAN is not written into host-visible `UITextField.text`
-- PAN, CVV, account number, routing number, tokens, and customer contact fields are
-  redacted from diagnostics
 - accessibility values do not expose sensitive values
 - completion callbacks return stored-method or transaction results, not raw
   card or bank data
@@ -306,20 +304,6 @@ try await paymentFlow.authorize(PayabliPayInRequest(
 - `transaction` contains transaction IDs, method, amount, status, response data,
   and other MoneyIn response fields
 - `apiResponse` carries the full MoneyIn response for transaction operations
-
-## Diagnostics And Redaction
-
-Diagnostics are disabled by default. When enabled, request, response, and
-failure events are delivered through a handler. Diagnostics redact sensitive
-headers and bodies, including access tokens, request tokens, card data, bank account
-data, stored method identifiers, customer identifiers, emails, phones, and
-addresses.
-
-```swift
-let diagnostics = PayabliPayInDiagnostics.enabled { entry in
-    print(entry.phase, entry.method, entry.statusCode ?? 0)
-}
-```
 
 ## Bridge Scope
 

@@ -6,7 +6,6 @@ import SwiftUI
 struct PaymentCaptureQAView: View {
     @ObservedObject var paymentFlow: PayInFlowHandle
 
-    @StateObject private var diagnosticsStore = DiagnosticsStore.paymentCapture
     @EnvironmentObject private var tokenProbes: TokenProbeResults
     @EnvironmentObject private var demoCustomer: DemoCustomerSetting
     @State private var resultText = ""
@@ -177,8 +176,6 @@ struct PaymentCaptureQAView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .textSelection(.enabled)
                     }
-
-                    DiagnosticsSection(store: diagnosticsStore, isEnabled: Secrets.paymentCaptureDiagnosticsEnabled)
                 }
                 .padding(16)
             }

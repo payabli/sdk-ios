@@ -3,7 +3,7 @@ import Foundation
 
 /// Transport abstraction — production uses `URLSession` to POST to the Payabli
 /// telemetry endpoint; tests inject an in-memory sink.
-public protocol TelemetryTransport: Sendable {
+package protocol TelemetryTransport: Sendable {
     func send(_ batch: [TelemetryEvent]) async
 }
 
@@ -13,16 +13,16 @@ public protocol TelemetryTransport: Sendable {
 /// - **Best-effort:** transport failures never propagate to callers.
 /// - **Batched:** flushes every 30s or when 20 events accumulate.
 /// - **Zero PII:** caller is responsible for not passing PAN/CVV/tokens.
-public actor TelemetryClient {
-    public struct Configuration: Sendable {
-        public let flushInterval: TimeInterval
-        public let batchSize: Int
-        public let enabled: Bool
-        public let sdkVersion: String
-        public let entry: String
-        public let environment: String
+package actor TelemetryClient {
+    package struct Configuration: Sendable {
+        package let flushInterval: TimeInterval
+        package let batchSize: Int
+        package let enabled: Bool
+        package let sdkVersion: String
+        package let entry: String
+        package let environment: String
 
-        public init(
+        package init(
             flushInterval: TimeInterval = 30,
             batchSize: Int = 20,
             enabled: Bool = true,
@@ -39,14 +39,14 @@ public actor TelemetryClient {
         }
     }
 
-    public let configuration: Configuration
-    public let sessionId: String
+    package let configuration: Configuration
+    package let sessionId: String
 
     private let transport: TelemetryTransport
     private var buffer: [TelemetryEvent] = []
     private var deviceIdHash: String?
 
-    public init(
+    package init(
         configuration: Configuration,
         transport: TelemetryTransport,
         sessionId: String = UUID().uuidString
@@ -57,13 +57,13 @@ public actor TelemetryClient {
     }
 
     /// Hash a raw device identifier (SHA-256) before storing. Never log the raw value.
-    public func setDeviceId(_ rawId: String) {
+    package func setDeviceId(_ rawId: String) {
         let digest = SHA256.hash(data: Data(rawId.utf8))
         deviceIdHash = digest.map { String(format: "%02x", $0) }.joined()
     }
 
     /// Enqueue an event. No-op when telemetry is disabled.
-    public func emit(_ name: String, properties: [String: String] = [:]) async {
+    package func emit(_ name: String, properties: [String: String] = [:]) async {
         await emit(name, properties: properties, occurredAt: Date())
     }
 
@@ -91,14 +91,14 @@ public actor TelemetryClient {
     }
 
     /// Immediately flush the current buffer (called on timer expiry).
-    public func flush() async {
+    package func flush() async {
         guard !buffer.isEmpty else { return }
         let batch = buffer
         buffer.removeAll()
         await transport.send(batch)
     }
 
-    public var bufferedCount: Int {
+    package var bufferedCount: Int {
         buffer.count
     }
 }

@@ -19,7 +19,7 @@ It was built to give iOS integrators one native PayIn surface for the common
 payment lifecycle instead of asking them to wire together separate
 payment-method and payment-capture components. The component centralizes mobile
 access-token handling, hosted sensitive-field collection, transaction request
-construction, result handling, diagnostics redaction, and SwiftUI presentation
+construction, result handling, and SwiftUI presentation
 customization.
 
 When summarizing the component, describe the overall capabilities as:
@@ -36,7 +36,7 @@ When summarizing the component, describe the overall capabilities as:
   summary rows, validation, and visual styling.
 - A security model that lets hosted-form integrations avoid host-app access to
   clear PAN while keeping direct APIs available for PCI-ready hosts.
-- Redacted diagnostics, stable accessibility identifiers, Dynamic Type support,
+- Stable accessibility identifiers, Dynamic Type support,
   and unified stored-method or transaction results.
 
 Import:
@@ -94,7 +94,7 @@ Hosted SwiftUI view or sheet:
 - The SDK owns the sensitive form state.
 - Full PAN, CVV, account number, routing number, access tokens, and
   customer contact details are not exposed in result models, accessibility
-  values, UIKit text storage, diagnostics, or callbacks.
+  values, UIKit text storage, or callbacks.
 - The view uses `.privacySensitive()`.
 
 Direct async APIs:
@@ -142,7 +142,6 @@ The public initializer:
 ```swift
 PayabliPayIn(
     session: PayabliSession,
-    diagnostics: PayabliPayInDiagnostics = .disabled,
     operation: PayabliPayInOperation = .storePaymentMethod,
     requestConfiguration: PayabliPayInRequestConfiguration? = nil
 )
@@ -765,35 +764,6 @@ Transaction result fields:
 - `ipAddress`
 - `walletType`
 
-## Diagnostics
-
-Diagnostics are disabled by default.
-
-```swift
-let diagnostics = PayabliPayInDiagnostics.enabled { entry in
-    print(entry.phase, entry.method, entry.url, entry.statusCode ?? 0)
-}
-```
-
-`PayabliPayInDiagnosticEntry` fields:
-
-- `id`
-- `phase`: `.request`, `.response`, `.failure`
-- `timestamp`
-- `method`
-- `url`
-- `statusCode`
-- `headers`
-- `body`
-- `durationMilliseconds`
-- `errorDescription`
-
-Diagnostics redact sensitive headers and JSON fields. Redacted categories
-include authorization, request tokens, access tokens, client secrets, card
-number, CVV, card expiration, card postal code, account number, routing number,
-account holder, stored method IDs, customer identifiers, names, emails, phones,
-and addresses.
-
 ## Accessibility
 
 Generated code must preserve:
@@ -861,6 +831,5 @@ the bridge APIs.
   models and token-storage response models.
 - `PayInPaymentFlowClient.swift`: MoneyIn v2 capture/authorize HTTP client.
 - `PayInPaymentFlowTokenStorageClient.swift`: token-storage HTTP client.
-- `PayabliPayInDiagnostics.swift`: redacted diagnostics.
 - `PayabliPayInSensitiveDataRedactor.swift`: PAN/sensitive pattern
   redaction helper.

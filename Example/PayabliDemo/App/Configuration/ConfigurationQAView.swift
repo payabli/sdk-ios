@@ -26,7 +26,6 @@ struct ConfigurationQAView: View {
                     tokenEndpointSection
                     terminalSection
                     cardNotPresentSection
-                    diagnosticsSection
                     buildSection
                 }
                 .padding(16)
@@ -204,21 +203,6 @@ struct ConfigurationQAView: View {
             .font(.caption)
             .foregroundColor(.payabliOnSurfaceVariant)
             .frame(maxWidth: .infinity, alignment: .leading)
-        }
-    }
-
-    // MARK: - Diagnostics
-
-    private var diagnosticsSection: some View {
-        section("Diagnostics", note: "Redacted request/response logging in the PayIn tabs.") {
-            QADetailRow(
-                label: "Stored method",
-                value: Secrets.paymentMethodDiagnosticsEnabled ? "on" : "off"
-            )
-            QADetailRow(
-                label: "Capture",
-                value: Secrets.paymentCaptureDiagnosticsEnabled ? "on" : "off"
-            )
         }
     }
 

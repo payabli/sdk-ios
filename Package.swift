@@ -60,8 +60,7 @@ let package = Package(
     // to Phone engine) is vendored at `ThirdParty/PayabliCardReaderCoreSource/`
     // and compiled as a local target so the public Package.swift, Package.resolved,
     // `otool -L`, and `.swiftinterface` of the shipped binary contain no
-    // third-party package references. Telemetry integrations with Sentry /
-    // PostHog remain "bring your own instance".
+    // third-party package references.
     dependencies: [],
     targets: [
         .target(

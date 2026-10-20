@@ -104,9 +104,9 @@ channel, so an app that never accepts card-present never links the certified car
   (depends on Core)
 
 **Shared:**
-- `PayabliSDKTelemetry` - Sentry and PostHog transports, bring your own instance, opt out via
-  `PayabliConfig.telemetryEnabled` (depends on Core). Every product carries it; it has no product of
-  its own, for the same reason Core has none (see `Package.swift`).
+- `PayabliSDKTelemetry` - holds only the version marker (depends on Core). The telemetry client lives in
+  Core at `package` level, so no host can reach it. Every product carries this module; it has no product
+  of its own, for the same reason Core has none (see `Package.swift`).
 
 **Test-only:**
 - `PayabliSDKTestUtils` - a target rather than a product, carrying every in-memory fixture (depends on

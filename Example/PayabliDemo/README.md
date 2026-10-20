@@ -101,15 +101,10 @@ Submitting either form requires the sample's PayIn access-token callbacks to
 call your backend or the bundled `LocalTokenServer` for a short-lived Payabli
 access token.
 
-### PayIn payment flow diagnostics
-
 The sample uses the public `PayabliPayIn` initializers and the
 SDK-owned transport path. This preserves the hosted-form security model: clear
 PAN is not exposed to host-visible text fields, accessibility values,
-diagnostics, callbacks, or custom transports.
-
-For local debugging, enable the PayIn diagnostics flag in `Secrets.swift`.
-Diagnostics are redacted before they are printed or displayed in the app.
+callbacks, or custom transports.
 
 ## Architecture notes
 
@@ -117,7 +112,7 @@ The entry point is **`App/PayabliDemoQAApp.swift`**, a four-tab `TabView`:
 **Save · Capture · TapToPay · Config**. It holds two PayIn flow handles
 (stored-method and capture) and one terminal handle as `@StateObject`s, each built
 by `SDK/`, and passes them into their tabs. That is the whole file: the flows
-themselves, the diagnostics wiring and the form configuration live in `SDK/`.
+themselves and the form configuration live in `SDK/`.
 
 ```
 PayabliDemo/
@@ -128,7 +123,6 @@ PayabliDemo/
                   PayInRequests.swift           what a capture attempt asks for
                   PaymentFormHost.swift         where the SDK's form mounts
                   PayInOutcome.swift            the app's own result and failure
-                  PayInDiagnostics.swift        the redacted request log
                   TapToPaySessions.swift        builds the card reader
                   TapToPayTerminal.swift        owns the reader, hands screens answers
                   TapToPaySessionStatus.swift   the SDK's states, in this app's words
@@ -151,7 +145,6 @@ PayabliDemo/
     PayIn/          PaymentMethodQAView.swift, PaymentCaptureQAView.swift,
                     PaymentMethodAddedView.swift
     Flow/           the step sequences each screen renders
-    Diagnostics/    DiagnosticsStore.swift, DiagnosticsSection.swift
     Debug/          DebugPrefill.swift, DebugPrefill.json
     Shared/         rows, identity, amounts, token probes
     Theme/          the palette
@@ -185,8 +178,8 @@ so an editable field would show a value it never received. Edit `Secrets.swift`
 and relaunch.
 
 It shows Integration, Token endpoint (with **Check token** and **Health**
-probes), card-present readiness, the shared card-not-present settings, the
-diagnostics toggles, and a Build section carrying the bundle ID, signing team,
+probes), card-present readiness, the shared card-not-present settings, and a
+Build section carrying the bundle ID, signing team,
 device, host kind, SDK linkage and SDK version. The card-not-present rows read
 from `PayInSharedConfiguration` — the same source the forms use — so the screen
 cannot drift from real behaviour.

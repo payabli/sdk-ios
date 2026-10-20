@@ -61,9 +61,28 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
     ///
     /// The entry point and the environment come from the session's configuration, so a flow and the
     /// session it runs on cannot disagree about which merchant or which host they are for.
-    public init(
+    ///
+    /// - Parameters:
+    ///   - session: The session the flow sends on.
+    ///   - operation: What a submission does.
+    ///   - requestConfiguration: The request the flow starts with, if any.
+    public convenience init(
         session: PayabliSession,
-        diagnostics: PayabliPayInDiagnostics = .disabled,
+        operation: PayabliPayInOperation = .storePaymentMethod,
+        requestConfiguration: PayabliPayInRequestConfiguration? = nil
+    ) {
+        self.init(
+            session: session,
+            diagnostics: .disabled,
+            operation: operation,
+            requestConfiguration: requestConfiguration
+        )
+    }
+
+    /// Builds the flow on a session, handing each request and answer to `diagnostics`.
+    package init(
+        session: PayabliSession,
+        diagnostics: PayabliPayInDiagnostics,
         operation: PayabliPayInOperation = .storePaymentMethod,
         requestConfiguration: PayabliPayInRequestConfiguration? = nil
     ) {
