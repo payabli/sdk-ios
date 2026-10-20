@@ -59,11 +59,7 @@ final class FiservCardReaderTests: XCTestCase {
         }
     #endif
 
-    /// Eligibility is platform/hardware-only and is called before
-    /// `/config` delivers credentials — so a fresh reader on a supported device
-    /// must report `success`.
-    /// A host below iOS 16.7 can still reach the reader from Objective-C, so eligibility refuses those
-    /// versions itself. The test bundle cannot run below 16.7, so the boundary is checked on the version.
+    /// The test bundle cannot run below 16.7, so the refusal is checked on the version itself.
     func testEligibilityRefusesAnOSBelow16Point7() {
         let version = { (minor: Int, patch: Int) in
             OperatingSystemVersion(majorVersion: 16, minorVersion: minor, patchVersion: patch)
@@ -79,6 +75,9 @@ final class FiservCardReaderTests: XCTestCase {
         ))
     }
 
+    /// Eligibility is platform/hardware-only and is called before
+    /// `/config` delivers credentials — so a fresh reader on a supported device
+    /// must report `success`.
     func testEligibilityIsPlatformOnly() async {
         let reader = FiservCardReader()
         let result = await reader.checkEligibility()

@@ -186,11 +186,8 @@ package final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
         (version.majorVersion, version.minorVersion) >= (16, 7)
     }
 
-    /// Platform + `PaymentCardReader` hardware check. Runs before `/config`
-    /// is fetched, so must not require credentials.
-    ///
-    /// The OS check runs although the type requires iOS 16.7, because an
-    /// Objective-C caller below 16.7 gets only a compiler warning.
+    /// Platform and `PaymentCardReader` check, run before `/config`, so it needs no credentials. It checks
+    /// the OS too, because an Objective-C caller below 16.7 gets only a compiler warning.
     package func checkEligibility() async -> Result<Void, PayabliTTPError> {
         #if canImport(PayabliCardReaderCore)
             guard Self.supportsTapToPay(ProcessInfo.processInfo.operatingSystemVersion) else {
