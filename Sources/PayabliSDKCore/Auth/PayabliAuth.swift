@@ -29,6 +29,11 @@ actor PayabliAuth {
 
     /// The logger is required rather than defaulted: a holder that built its own would leave a
     /// caller's substitution reaching nothing, and nothing would report it.
+    ///
+    /// - Parameter config: the configuration whose `tokenProvider` mints every token.
+    /// - Parameter logger: where the holder reports its provider calls, so a substitution reaches them.
+    /// - Parameter clock: what times the provider bound; a test injects one to race the deadline.
+    /// - Parameter onJoinedInFlightMint: fired after a caller joined an in-flight mint; nil in production.
     init(
         config: PayabliConfig,
         logger: PayabliLogger,
@@ -45,6 +50,8 @@ actor PayabliAuth {
     ///
     /// The first read has nothing to return, so it calls the provider exactly as a rejection does and
     /// shares that call: concurrent cold requests spend one provider call between them, not one each.
+    ///
+    /// - Returns: the access token to send, minted when none is held and the call shared with cold joiners.
     func currentAccessToken() async throws -> String {
         if let held = currentToken {
             return held
@@ -74,27 +81,18 @@ actor PayabliAuth {
     ///
     /// For the recovery path, which needs to name what was sent rather than obtain something to
     /// send. Minting here would name a credential no request carried.
+    ///
+    /// - Returns: the token held right now, or `nil` when none is held.
     func heldToken() -> String? {
         currentToken
     }
 
     /// Reports `rejectedToken` as refused and returns the token to use instead.
     /// Callers invoke this after receiving HTTP 401, then retry once.
+    /// An in-flight mint is joined before the already-rotated check, because the token held may itself be the one just refused.
     ///
-    /// Passing the token that was actually rejected is what makes a staggered
-    /// rejection cheap: two requests sent with the same token can have their 401s
-    /// arrive far apart, and the later one must not refresh again on a token that
-    /// has already rotated, which would discard the rotation the first one obtained.
-    ///
-    /// A caller already inside this holder's own provider call is answered first, with the token
-    /// currently held: the call it would otherwise join is the one waiting on it. That holds at
-    /// any depth, where one provider calls a second session whose provider calls back into this one.
-    /// A mark naming a call that has already finished is not one of these and takes the ordinary
-    /// path, so a task a provider left running cannot answer for a call that is over.
-    ///
-    /// The in-flight join comes before the already-rotated check, because the
-    /// current token may itself be the one under refresh and handing it back would
-    /// return a credential already known to be rejected.
+    /// - Parameter rejectedToken: the token the 401 named, so a late rejection reuses the rotation instead of minting over it.
+    /// - Returns: the token to send instead, joined from an in-flight mint when one is under way.
     func invalidateAndRefresh(rejectedToken: String) async throws -> String {
         if let mintID = inFlightMintID, RefreshInProgress.carries(self, refresh: mintID) {
             guard let held = currentToken else {
@@ -122,14 +120,10 @@ actor PayabliAuth {
 
     /// Calls the provider, checks what it returned, and installs it, with one call shared between
     /// every caller waiting on it.
+    /// The check and the install are inside the task, so a joiner resumes only with a token already installed.
     ///
-    /// `replacing` is the token a rejection named, and nil on the first mint. It is what
-    /// `check(_:replacing:)` refuses a repeat of.
-    ///
-    /// Validation, redaction and the install are all inside the task, because a joiner awaits this
-    /// same value. So a joiner receives a checked token, never the host's own error text, and never
-    /// resumes before the token is installed, which matters because the decoration chain reads the
-    /// holder again on the replay.
+    /// - Parameter rejectedToken: the token a rejection named, nil on the first mint, and what `check` refuses a repeat of.
+    /// - Returns: the minted token, checked and installed, shared with every caller that joined.
     private func mint(replacing rejectedToken: String?) async throws -> String {
         let provider = config.tokenProvider
         let mintID = UUID()
@@ -196,6 +190,8 @@ actor PayabliAuth {
         private var fired = false
 
         /// True the first call, false every call after.
+        ///
+        /// - Returns: whether this is the first claim, so only one of two racing sides takes it.
         func claim() -> Bool {
             lock.lock()
             defer { lock.unlock() }
@@ -210,6 +206,12 @@ actor PayabliAuth {
     /// Races `provider` against `clock`'s deadline through a continuation, not a `TaskGroup`, which would wait
     /// on a provider that ignores cancellation. The loser runs on unawaited; `decided` stops it resuming.
     /// A provider blocking a thread outside a suspension point isn't bounded by this.
+    ///
+    /// - Parameter holder: the auth whose provider call this is, named in the mark `withMark` records.
+    /// - Parameter mintID: the id naming this mint, which the mark carries so a stale task cannot answer for it.
+    /// - Parameter provider: the host's `tokenProvider`, the side that returns the token.
+    /// - Parameter clock: what the deadline is waited on, `expire(after:)` bounding the call.
+    /// - Returns: the token the provider returned before the deadline passed.
     private static func racedMint(
         holder: PayabliAuth,
         mintID: UUID,
@@ -241,13 +243,10 @@ actor PayabliAuth {
 
     /// Waits for a mint already under way and answers with what it produced, unless this caller was
     /// cancelled while waiting.
+    /// The mint runs on for its other waiters, and this caller's cancellation is raised, not answered past.
     ///
-    /// The mint itself runs on: it is shared, so one waiter going away must not take the credential from
-    /// the others. Only this caller stops.
-    ///
-    /// Cancellation is raised rather than returned because a caller who is cancelled and handed a token
-    /// carries on with it, which on the recovery path means sending the request again. `Task.value` does
-    /// not observe the awaiting task's cancellation, so nothing else here would notice.
+    /// - Parameter mint: the in-flight mint, awaited by result so its failure does not throw past the cancellation check.
+    /// - Returns: the token the mint produced.
     private func join(_ mint: Task<String, Error>) async throws -> String {
         // The result rather than the value, so a mint that fails does not throw past the check. A caller
         // cancelled while a provider was failing is cancelled, not told what the provider said: the
@@ -261,6 +260,8 @@ actor PayabliAuth {
     ///
     /// A call whose mark has already been replaced clears nothing, so a finished mint cannot
     /// discard a later one's task and leave its joiners waiting on a task no mark names.
+    ///
+    /// - Parameter mintID: the id of the mint whose mark this is; a later mint's mark is left alone.
     private func releaseMint(_ mintID: UUID) {
         guard inFlightMintID == mintID else { return }
         inFlightMint = nil
@@ -269,6 +270,9 @@ actor PayabliAuth {
 
     /// Installs the minted token. Called only once the token has passed `check(_:replacing:)`, so
     /// nothing here can install one that was refused.
+    ///
+    /// - Parameter fresh: the token the provider returned, already passed `check(_:replacing:)`.
+    /// - Parameter mintID: the id naming the mint that produced it, dropped from the in-flight mark here.
     private func commit(_ fresh: String, mintID: UUID) {
         currentToken = fresh
         releaseMint(mintID)
@@ -277,13 +281,10 @@ actor PayabliAuth {
 
     /// Throws rather than let a minted token be committed. Every token this holder installs passes
     /// here, so nothing downstream re-checks one.
+    /// A blank one goes out unauthenticated, and a repeat of the refused one costs a provider call per 401 with no end.
     ///
-    /// A blank one becomes the session's credential and every later request goes out
-    /// unauthenticated. A token equal to the one just refused publishes a rotation
-    /// that did not happen and hands the caller a credential the server has already
-    /// rejected; because `currentToken` would be unchanged, the next rejection starts
-    /// another provider call instead of taking the already-rotated path, so a
-    /// provider that keeps returning it costs one call per 401 with no end.
+    /// - Parameter fresh: the token the provider returned, refused when blank, unsafe as a header value, or a repeat of the refusal.
+    /// - Parameter rejectedToken: the token a rejection named; a mint equal to it is refused rather than installed.
     private static func check(_ fresh: String, replacing rejectedToken: String?) throws {
         guard !fresh.isBlank else {
             throw PayabliGenericError(

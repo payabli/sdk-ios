@@ -73,6 +73,9 @@ public enum PayabliPayInError: PayabliError, Equatable {
     /// What a described failure amounts to. A `D` response code is a refusal and decides first, since a
     /// money-moving route answers `200` with the outcome in the body; otherwise the envelope's status, then
     /// the transport's, goes to ``mapPayabliHTTPError``, the one place a status becomes a classification.
+    ///
+    /// - Parameter failure: the failed attempt as the envelope read it, whose code and status decide.
+    /// - Returns: the classification a caller branches on.
     private static func classification(
         of failure: PayabliPayInFailure
     ) -> PayabliErrorType {

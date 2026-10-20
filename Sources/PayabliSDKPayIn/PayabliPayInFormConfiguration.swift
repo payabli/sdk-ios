@@ -138,6 +138,9 @@ public struct PayabliPayInLabels: Sendable {
     }
 
     /// The host's label for `field`, or the default when the host's is absent or blank.
+    ///
+    /// - Parameter field: the field whose label the form draws.
+    /// - Returns: the label to draw: the host's, the default's, or the field's own name.
     public func label(for field: PayabliPayInField) -> String {
         fieldLabels[field].flatMap { Self.isBlank($0) ? nil : $0 }
             ?? Self.defaultFieldLabels[field]
@@ -156,6 +159,9 @@ public struct PayabliPayInLabels: Sendable {
 
     /// Blank when every scalar is a space, line or paragraph separator, or a control in U+0009–U+000D or
     /// U+001C–U+001F.
+    ///
+    /// - Parameter text: the label or heading to test.
+    /// - Returns: whether the text is blank.
     static func isBlank(_ text: String) -> Bool {
         text.unicodeScalars.allSatisfy { scalar in
             switch scalar.properties.generalCategory {

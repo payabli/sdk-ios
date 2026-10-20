@@ -21,6 +21,11 @@ struct PayInSubmitWording {
 
     /// The host's wording replaces the idle text only. While a submission runs the button reads the busy text of
     /// the operation being sent, even if the form has since been given another.
+    ///
+    /// - Parameter operation: the operation the form is set to, whose idle text the button reads at rest.
+    /// - Parameter submitting: the operation being sent, whose busy text wins while it runs.
+    /// - Parameter hostWording: the host's replacement for the idle text, ignored while a submission runs.
+    /// - Returns: the text the button reads.
     static func text(
         showing operation: PayabliPayInOperation,
         submitting: PayabliPayInOperation?,

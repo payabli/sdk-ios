@@ -14,6 +14,8 @@ import Foundation
 /// session token that reader obtained, and asking again afterwards is how the answer changes.
 protocol AccountLinking: AnyObject {
     /// Whether the merchant has accepted the terms the platform requires.
+    ///
+    /// - Returns: whether the platform will read a card for this merchant yet.
     func isAccountLinked() async throws -> Bool
 
     /// Asks the platform to present its own terms. Returns once the request is done, which is not
@@ -54,6 +56,9 @@ protocol ReaderSetup: AccountLinking {
     extension FiservTTPCardReader: ReaderSetup {
         /// The fourth speaks the platform's event vocabulary, so it is converted
         /// here. This is the boundary the rest of the SDK is kept behind.
+        ///
+        /// - Parameter onReaderEvent: called with each vendor event mapped into the SDK's vocabulary;
+        ///   events with no mapping never reach it.
         func initializeSession(onReaderEvent: @escaping @MainActor (TapToPayReaderEvent) -> Void) async throws {
             try await initializeSession(eventHandler: { event in
                 guard let mapped = FiservCardReader.mapReaderEvent(event) else { return }

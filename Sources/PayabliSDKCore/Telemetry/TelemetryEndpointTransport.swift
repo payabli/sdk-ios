@@ -14,6 +14,10 @@ package actor TelemetryEndpointTransport: TelemetryTransport {
     /// Takes the service rather than any transport, so the recovery layer cannot be wrapped around it.
     /// A telemetry 401 would otherwise spend the session's refresh and replay the batch, which is the
     /// opposite of the contract above.
+    ///
+    /// - Parameter transport: the service to post through, taken bare so the recovery layer cannot wrap it.
+    /// - Parameter path: the route the batch is posted to.
+    /// - Parameter deviceFacts: the device facts each event carries.
     package init(
         transport: PayabliService,
         path: String = TelemetryEndpointTransport.defaultPath,

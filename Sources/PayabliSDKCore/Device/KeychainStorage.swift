@@ -19,6 +19,9 @@ package struct KeychainStorage: SecureStorage, Sendable {
 
     /// Opening the store corrects what an older version of the SDK wrote under `keys`,
     /// since nothing else will: see `migrateAccessibility(forKeys:)`.
+    ///
+    /// - Parameter service: the Keychain service the items are stored under, apart from the host app's entries.
+    /// - Parameter keys: the account names an older version wrote, whose accessibility is corrected on open.
     package init(service: String = KeychainStorage.service, migrating keys: [String]) {
         self.service = service
         migrateAccessibility(forKeys: keys)
@@ -31,13 +34,12 @@ package struct KeychainStorage: SecureStorage, Sendable {
         return String(data: data, encoding: .utf8)
     }
 
-    /// The stored bytes, `nil` when the item is not there, and a raise for every
-    /// other answer the Keychain can give.
+    /// The stored bytes, `nil` when the item is not there, and a raise for every other Keychain answer.
+    /// `errSecInteractionNotAllowed`, what a read gets before the first unlock, raises so an
+    /// enrolled device is not reported as a new one.
     ///
-    /// `errSecItemNotFound` is the only status that means nothing is stored. The
-    /// rest can pass: `errSecInteractionNotAllowed` is what a read gets before the
-    /// first unlock after a boot, and answering `nil` there reports an enrolled
-    /// device as a new one.
+    /// - Parameter key: the account name the item is stored under, within the SDK's service.
+    /// - Returns: the stored bytes, or `nil` only for `errSecItemNotFound`, the status that means none is stored.
     package func data(forKey key: String) throws -> Data? {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
@@ -56,6 +58,9 @@ package struct KeychainStorage: SecureStorage, Sendable {
     }
 
     /// The access group the item was written to, `nil` when the item is not there.
+    ///
+    /// - Parameter key: the account name the item is stored under.
+    /// - Returns: the item's `kSecAttrAccessGroup`, or `nil` when the item is not there.
     package func accessGroup(forKey key: String) throws -> String? {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
@@ -75,6 +80,9 @@ package struct KeychainStorage: SecureStorage, Sendable {
 
     /// The only status that means nothing is stored, so the only one a read answers
     /// `nil` for.
+    ///
+    /// - Parameter status: the OSStatus the Keychain answered.
+    /// - Returns: whether the status is `errSecItemNotFound`, the only one that means none is stored.
     package static func isMissing(_ status: OSStatus) -> Bool {
         status == errSecItemNotFound
     }
@@ -96,6 +104,9 @@ package struct KeychainStorage: SecureStorage, Sendable {
 
     /// What both write paths carry, built once so neither can be given a
     /// different attribute from the other.
+    ///
+    /// - Parameter data: the bytes to store as the item's value.
+    /// - Returns: the attributes both write paths carry, `data` with the shared device-only accessibility.
     package static func writeAttributes(_ data: Data) -> [String: Any] {
         [
             kSecValueData as String: data,
@@ -123,17 +134,11 @@ package struct KeychainStorage: SecureStorage, Sendable {
 
     // MARK: - Migration
 
-    /// Corrects the attribute on what is already stored, so an install that attested
-    /// before this attribute existed stops being carried by a backup. Correcting an
-    /// item is its next write, and a phone that has already attested never writes
-    /// again.
+    /// Corrects the attribute on what is already stored, so an item an older version
+    /// wrote stops being carried by a backup.
+    /// The attribute is changed on its own, so a value deleted in between is not restored.
     ///
-    /// The attribute is changed on its own: reading the value and writing it back
-    /// would restore one deleted in between, and `pendingKeyId` is deleted once
-    /// attestation ends.
-    ///
-    /// Runs whenever the store is opened, since a locked Keychain makes any single
-    /// attempt a no-op and an item it cannot reach waits for the next one.
+    /// - Parameter keys: the account names whose stored items are corrected; a locked Keychain leaves one for the next open.
     package func migrateAccessibility(forKeys keys: [String]) {
         for key in keys {
             let query: [String: Any] = [
@@ -151,6 +156,8 @@ package struct KeychainStorage: SecureStorage, Sendable {
 
     /// Deleting what is not there is a success, so `errSecItemNotFound` passes: the
     /// caller asked for the item to be gone and it is.
+    ///
+    /// - Parameter key: the account name of the item to delete, whether or not it is stored.
     package func remove(forKey key: String) throws {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,

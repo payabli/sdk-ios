@@ -54,6 +54,11 @@ public struct PayabliConfig: Sendable {
     /// Nothing about the token is checked here, because no token is supplied here. What the
     /// provider returns is checked where it is installed, on the first call and on every one
     /// after, so no token reaches `Authorization` unchecked.
+    ///
+    /// - Parameter entryPoint: the partner integration point, refused when blank.
+    /// - Parameter environment: the API environment every base URL is taken from.
+    /// - Parameter tokenProvider: asks the host's backend for an access token; the only credential this config carries.
+    /// - Parameter telemetryEnabled: whether to emit telemetry events, `true` by default.
     public init(
         entryPoint: String,
         environment: PayabliEnvironment,

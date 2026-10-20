@@ -15,13 +15,18 @@ package final class TTPTransactionClient: Sendable {
         self.transport = transport
     }
 
-    /// `POST /api/v2/MoneyIn/initiate` — returns the authoritative
-    /// `paymentTransId` from the backend. Mirrors the reference flow used by
-    /// the Fiserv direct POC (`SaleView.swift`): `paymentMethod.method` is
-    /// always `"device"` (the POI-device flavor), and the three legacy fields
-    /// (`firstName`, `lastName`, `customerNumber`) are sent as empty strings
-    /// rather than `null` for backward compatibility. All other customer
-    /// fields are omitted from the JSON when nil.
+    /// `POST /api/v2/MoneyIn/initiate`, returning the authoritative `paymentTransId`.
+    ///
+    /// `paymentMethod.method` is always `"device"`, and the legacy `firstName`, `lastName` and
+    /// `customerNumber` are sent as empty strings, not `null`; other nil fields are omitted.
+    ///
+    /// - Parameter entryPoint: the entry point the transaction is initiated for.
+    /// - Parameter deviceId: the device handle the payment method carries.
+    /// - Parameter paymentDetails: the amounts and currency to charge.
+    /// - Parameter customer: the customer attached to the transaction, empty for an anonymous payor.
+    /// - Parameter invoice: the invoice attached, its number when one is given.
+    /// - Parameter orderDescription: an order description, sent as an empty string where none is given.
+    /// - Returns: the `paymentTransId` the backend minted.
     package func initiate(
         entryPoint: String,
         deviceId: String,
@@ -111,10 +116,12 @@ package final class TTPTransactionClient: Sendable {
     }
 
     /// Encodes a typed update payload for `PATCH /MoneyIn/update/{id}`.
-    /// Atomic providers forward their full response under the
-    /// `providerResponse` Swift field (mapped to the legacy `fiservResponse`
-    /// JSON key on the wire); payload-only providers are wrapped into the
-    /// same shape.
+    ///
+    /// Atomic providers forward their full response; payload-only providers are wrapped into the same
+    /// shape.
+    ///
+    /// - Parameter payload: what the reader did, as the success or failure to encode.
+    /// - Returns: the wire body for the update, the response under the `fiservResponse` key.
     static func updateBody(for payload: TTPUpdatePayload) -> Data {
         let encoder = JSONEncoder()
         switch payload {
@@ -135,6 +142,9 @@ package final class TTPTransactionClient: Sendable {
     /// Prefer the provider's own response JSON when it's available (atomic
     /// flow). Fall back to the payload-only shape otherwise, so the backend
     /// always sees the same wire envelope regardless of provider.
+    ///
+    /// - Parameter result: what the reader read, whose provider response is encoded.
+    /// - Returns: the provider's response JSON where it carries one, otherwise the payload-only shape.
     private static func providerResponse(from result: CardReadResult) -> ProviderResponsePayload {
         if let json = result.providerResponseJSON {
             return .opaqueJSON(json)

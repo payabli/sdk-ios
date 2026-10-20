@@ -127,6 +127,8 @@ extension Error {
     /// Bridges a public call's failure to the `NSError` its `@objc` companion completes with: a
     /// ``TapToPayError`` carries its catalog number as the code in the `"com.payabli.ttp"` domain, and
     /// a cancellation bridges as Swift does.
+    ///
+    /// - Returns: the bridged `NSError`: a ``TapToPayError`` carries its catalog number as the code, anything else bridges as Swift does.
     func toPayabliNSError() -> NSError {
         if let tapToPayError = self as? TapToPayError {
             return tapToPayError as NSError

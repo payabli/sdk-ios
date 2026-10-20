@@ -87,6 +87,9 @@ public final class PayabliSession: @unchecked Sendable {
     /// token provider is not compared, so a second call keeps the provider the session started with.
     /// A different configuration throws `invalidConfiguration` and leaves the installed session in
     /// place, because every facade already built is running on it.
+    ///
+    /// - Parameter config: the configuration to install; equal by entry point, environment and telemetry setting.
+    /// - Returns: the process's installed session, the one already installed when the configuration is equal.
     @discardableResult
     public static func initialize(config: PayabliConfig) async throws -> PayabliSession {
         try install(config: config)
@@ -111,6 +114,9 @@ public final class PayabliSession: @unchecked Sendable {
     }
 
     /// Whether `config` describes this session, by the same rule `initialize` applies.
+    ///
+    /// - Parameter config: the configuration to compare this session's against.
+    /// - Returns: whether it describes this session, by the same rule `initialize` applies.
     package func matches(_ config: PayabliConfig) -> Bool {
         identity == ConfigIdentity(config)
     }

@@ -135,6 +135,11 @@ package protocol AppAttestor: Sendable {
 
         /// What one App Attest completion handler answered. Its error is passed on as it arrived, for
         /// the caller to classify; an answer with neither breaks the handler's contract.
+        ///
+        /// - Parameter value: what the handler answered, or `nil` where it failed.
+        /// - Parameter error: what the handler threw, passed on as it arrived.
+        /// - Parameter call: the App Attest call's name, which the broken-contract error carries.
+        /// - Returns: the answer, or the failure for the caller to classify.
         static func completion<Value>(_ value: Value?, _ error: Error?, call: String) -> Result<Value, Error> {
             if let error {
                 return .failure(error)
