@@ -12,7 +12,7 @@ Code, Neovim) that consume sourcekit-lsp directly:
 - …and similar for `actor`, `@MainActor`, `Task`, etc.
 
 These warnings are noise — `Package.swift` declares the SDK as
-**iOS-only** (`.iOS("16.7")`), so build, CI, and release all target
+**iOS-only** (`.iOS("16.0")`), so build, CI, and release all target
 iOS via `xcodebuild` and never see them. They only appear in the IDE
 because sourcekit-lsp falls back to the host triple (`arm64-apple-macosx`)
 when no platform is supplied. Setting the triple here aligns the IDE
@@ -23,7 +23,7 @@ analysis with the actual deployment target.
 ```json
 {
   "swiftPM": {
-    "triple": "arm64-apple-ios16.7-simulator"
+    "triple": "arm64-apple-ios16.0-simulator"
   }
 }
 ```
@@ -35,7 +35,7 @@ the legacy `swiftPM.swiftCompilerFlags` form instead:
 ```json
 {
   "swiftPM": {
-    "swiftCompilerFlags": ["-target", "arm64-apple-ios16.7-simulator"]
+    "swiftCompilerFlags": ["-target", "arm64-apple-ios16.0-simulator"]
   }
 }
 ```

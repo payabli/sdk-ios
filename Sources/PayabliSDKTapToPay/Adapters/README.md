@@ -100,7 +100,7 @@ matches where in the pipeline the failure happened:
 | Called `startReading` before `prepareReader` | `.readerSetupFailed(reason: "Reader not prepared")` |
 
 **User cancellation** is encoded inside `.nfcFailed` with the
-`cancellationReasonPrefix` constant from `FiservCardReader+Errors.swift`
+`PayabliTTPError.cancellationReasonPrefix` constant
 (`"cancelled:"`). The prefix is internal to the SDK: the public edge reads it and
 hands a host `TapToPayError` with type `.userCancelled`, so a host reads the type
 and never the text. A new adapter marks a cancel with the same prefix.
@@ -196,7 +196,7 @@ source tree, and the facade holds its provider directly.
    it can resolve. Read that condition from the platform rather than from the error's text, and
    only where the platform can actually report it.
 7. `cancelReading()` and `cleanUp()` both call `clearAllState()`.
-8. `XxxCardReader+Errors.swift` with `mapError(_:fallback:)` and `cancellationReasonPrefix`.
+8. `XxxCardReader+Errors.swift` with `mapError(_:fallback:)`, marking a cancel with `PayabliTTPError.cancellationReasonPrefix`.
 9. Unit tests: `XxxCardReaderTests.swift` under `Tests/PayabliSDKTapToPayTests/` covering eligibility, `configure` validation, and the `cleanUp → prepareReader` failure path.
 10. Build it from a `PayabliTTP` convenience initializer; there is no registry to register with.
 11. Verify `swift build` + `swift test --filter PayabliSDKTapToPayTests` are green.

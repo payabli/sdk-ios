@@ -8,6 +8,7 @@ import XCTest
 /// The retry engine and the error mapper are covered in isolation, and both stay green if the call site
 /// stops raising a non-2xx: a failed update would simply look successful. These cases run the charge
 /// pipeline against sequenced responses and count what reached the wire, so that shape fails here.
+@available(iOS 16.7, *)
 @MainActor
 final class TTPUpdateRetryTests: XCTestCase {
     private static let paymentTransId = "TXN-RETRY"

@@ -3,6 +3,7 @@ import PayabliSDKCore
 
 // MARK: - Device activation
 
+@available(iOS 16.7, *)
 @MainActor
 public extension PayabliTTP {
     /// Activate a pending device using an activation code supplied by the

@@ -8,6 +8,7 @@ import PayabliSDKCore
 /// `TapToPayProvider` adapter over the vendored `PayabliCardReaderCore`. `charges(amount:)` reads and charges
 /// in one call, so `startReading` returns the processor response as `providerResponseJSON`, forwarded verbatim.
 /// `/config` credentials live in RAM only, dropped once `buildReader` hands them over; a retry refetches them.
+@available(iOS 16.7, *)
 package final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
     package static var providerId: String {
         "fiserv"
@@ -177,19 +178,27 @@ package final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
         value?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
     }
 
-    /// Platform + `PaymentCardReader` hardware check. Runs before `/config`
-    /// is fetched, so must not require credentials.
+    /// Whether an OS version can run Tap to Pay.
+    ///
+    /// - Parameter version: The OS version to check.
+    /// - Returns: `true` for iOS 16.7 or later.
+    static func supportsTapToPay(_ version: OperatingSystemVersion) -> Bool {
+        (version.majorVersion, version.minorVersion) >= (16, 7)
+    }
+
+    /// Platform and `PaymentCardReader` check, run before `/config`, so it needs no credentials. It checks
+    /// the OS too, because an Objective-C caller below 16.7 gets only a compiler warning.
     package func checkEligibility() async -> Result<Void, PayabliTTPError> {
         #if canImport(PayabliCardReaderCore)
-            if #available(iOS 16.7, *) {
-                guard PaymentCardReader.isSupported else {
-                    return .failure(.readerSetupFailed(
-                        reason: "Tap to Pay hardware not supported on this device"
-                    ))
-                }
-                return .success(())
+            guard Self.supportsTapToPay(ProcessInfo.processInfo.operatingSystemVersion) else {
+                return .failure(.readerSetupFailed(reason: "Tap to Pay requires iOS 16.7+"))
             }
-            return .failure(.readerSetupFailed(reason: "Tap to Pay requires iOS 16.7+"))
+            guard PaymentCardReader.isSupported else {
+                return .failure(.readerSetupFailed(
+                    reason: "Tap to Pay hardware not supported on this device"
+                ))
+            }
+            return .success(())
         #else
             return .failure(.readerSetupFailed(reason: "Tap to Pay is iOS-only"))
         #endif

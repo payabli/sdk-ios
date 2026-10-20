@@ -100,9 +100,8 @@ package protocol AppAttestor: Sendable {
 #if canImport(DeviceCheck)
     /// Production `AppAttestor` backed by `DCAppAttestService`.
     ///
-    /// `DCAppAttestService` itself is iOS 14+ / macOS 11.3+, which is well below
-    /// this package's declared minimums (iOS 16.7 / macOS 12), so no extra
-    /// `@available` gate is required.
+    /// `DCAppAttestService` is iOS 14+, below this package's iOS 16.0 floor, so
+    /// no `@available` gate is required.
     package final class RealAppAttestor: AppAttestor, @unchecked Sendable {
         package init() {}
 

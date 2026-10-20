@@ -4,6 +4,7 @@ import PayabliSDKTestUtils
 import XCTest
 
 /// What `sessionState` reports while a charge runs, from the state a host reads.
+@available(iOS 16.7, *)
 @MainActor
 final class PayabliTTPChargingTests: XCTestCase {
     private static let paymentTransId = "TXN-CHARGING"
