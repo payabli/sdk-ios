@@ -872,56 +872,19 @@ Transaction fields include:
 - `ipAddress`
 - `walletType`
 
-## 15. Diagnostics
-
-Diagnostics are disabled by default:
-
-```swift
-let paymentFlow = PayabliPayIn(
-    session: session,
-    diagnostics: .disabled
-)
-```
-
-Enable diagnostics for QA:
-
-```swift
-let diagnostics = PayabliPayInDiagnostics.enabled { entry in
-    print("[PayIn]", entry.phase.rawValue, entry.method, entry.url)
-    if let body = entry.body {
-        print(body)
-    }
-}
-```
-
-Diagnostic entries include:
-
-- `phase`
-- `timestamp`
-- `method`
-- `url`
-- `statusCode`
-- `headers`
-- `body`
-- `durationMilliseconds`
-- `errorDescription`
-
-The SDK redacts sensitive fields, including authorization headers, request
-tokens, access tokens, client secrets, card number, CVV, account number, routing, stored method IDs, customer IDs, names, emails, phones, and addresses.
-
-## 16. Accessibility Checklist
+## 15. Accessibility Checklist
 
 When customizing:
 
 - Keep input and submit heights at or above the SDK minimum touch target.
 - If visual labels are hidden, keep `fieldLabels` meaningful for accessibility.
 - Do not put clear PAN, CVV, account number, routing number, tokens, or customer
-  contact values in custom labels, placeholders, diagnostics, or result UI.
+  contact values in custom labels, placeholders, or result UI.
 - Keep section titles concise and meaningful.
 - Test Dynamic Type, especially accessibility sizes.
 - Ensure custom colors have sufficient contrast.
 
-## 17. Bridge Scope
+## 16. Bridge Scope
 
 The Flutter, React Native and .NET MAUI bridges in `Bridges/` are examples of integrating the SDK from each
 technology. Use them as a starting point for your own integration. They show stored card and bank account
@@ -933,7 +896,7 @@ The `@objc` interface covers `addCard` and `addBankAccount` only. Capture, autho
 
 The React Native example app is under `Example/PayabliReactNativeDemo`.
 
-## 18. Testing
+## 17. Testing
 
 Run component tests:
 

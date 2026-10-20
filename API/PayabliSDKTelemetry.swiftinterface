@@ -1,5 +1,5 @@
 // swift-interface-format-version: 1.0
-// swift-module-flags: -target arm64-apple-ios16.7 -enable-objc-interop -enable-library-evolution -language-mode 5 -O -enable-experimental-feature DebugDescriptionMacro -module-name PayabliSDKTelemetry -package-name PayabliSDK
+// swift-module-flags: -target arm64-apple-ios16.0 -enable-objc-interop -enable-library-evolution -language-mode 5 -O -enable-experimental-feature DebugDescriptionMacro -module-name PayabliSDKTelemetry -package-name PayabliSDK
 import Foundation
 import PayabliSDKCore
 import Swift
@@ -10,22 +10,4 @@ public enum PayabliSDKTelemetry {
   public static var version: Swift::String {
     get
   }
-}
-public protocol PayabliPostHogBridge : Swift::Sendable {
-  func capture(_ event: Swift::String, distinctId: Swift::String, properties: [Swift::String : Any])
-  func flush()
-}
-final public class PostHogTelemetryTransport : PayabliSDKCore::TelemetryTransport, @unchecked Swift::Sendable {
-  public init(bridge: any PayabliSDKTelemetry::PayabliPostHogBridge)
-  final public func send(_ batch: [PayabliSDKCore::TelemetryEvent]) async
-  @objc deinit
-}
-public protocol PayabliSentryBridge : Swift::Sendable {
-  func addBreadcrumb(_ category: Swift::String, data: [Swift::String : Any])
-  func captureError(_ message: Swift::String, tags: [Swift::String : Swift::String], extra: [Swift::String : Any])
-}
-final public class SentryTelemetryTransport : PayabliSDKCore::TelemetryTransport, @unchecked Swift::Sendable {
-  public init(bridge: any PayabliSDKTelemetry::PayabliSentryBridge)
-  final public func send(_ batch: [PayabliSDKCore::TelemetryEvent]) async
-  @objc deinit
 }

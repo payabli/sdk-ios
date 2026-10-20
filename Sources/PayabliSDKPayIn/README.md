@@ -11,7 +11,7 @@ This guide is part of the [Payabli iOS SDK](../../README.md); set up the SDK and
 
 ### Your app
 
-- iOS 16.7 or later as the deployment target. The form runs in the simulator.
+- iOS 16.0 or later as the deployment target. The form runs in the simulator.
 
 ### Your account
 
@@ -29,7 +29,7 @@ OAuth2 credentials with a permission for each operation you use:
 ### Choose the form or your own UI
 
 - **The SDK's form** keeps the card number inside SDK-owned state. It isn't written into a text field's
-  `text`, an accessibility value, diagnostics or a callback, so your code never handles a card number.
+  `text`, an accessibility value or a callback, so your code never handles a card number.
 - **Your own UI** passes `PayabliPayInCardData` you collected to the direct API. Your app then handles card
   numbers and security codes, which brings it into scope for PCI DSS.
 

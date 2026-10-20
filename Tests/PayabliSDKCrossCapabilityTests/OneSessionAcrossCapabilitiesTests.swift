@@ -3,6 +3,7 @@
 @testable import PayabliSDKTapToPay
 import XCTest
 
+@available(iOS 16.7, *)
 @MainActor
 final class OneSessionAcrossCapabilitiesTests: XCTestCase {
     override func tearDown() {

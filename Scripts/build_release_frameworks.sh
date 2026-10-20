@@ -107,7 +107,7 @@ import PackageDescription
 
 let package = Package(
     name: "PayabliReleaseClient",
-    platforms: [.iOS("16.7")],
+    platforms: [.iOS("16.0")],
     products: [
         .library(name: "PayabliReleaseClient", type: .dynamic, targets: ["PayabliReleaseClient"])
     ],

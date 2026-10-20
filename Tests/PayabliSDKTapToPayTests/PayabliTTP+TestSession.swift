@@ -3,6 +3,7 @@ import Foundation
 @testable import PayabliSDKTapToPay
 import PayabliSDKTestUtils
 
+@available(iOS 16.7, *)
 extension PayabliTTP {
     /// A facade on a session of its own, outside the installed one, so a test needs no reset. Telemetry goes to
     /// memory unless a test passes its own, so no report reaches the stubbed network a test is counting.

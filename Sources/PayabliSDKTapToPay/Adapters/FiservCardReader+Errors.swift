@@ -7,11 +7,8 @@ import PayabliSDKCore
 
 // MARK: - Card reader error mapping
 
+@available(iOS 16.7, *)
 extension FiservCardReader {
-    /// Prefix inside a case's reason that marks a person dismissing the sheet. The
-    /// public edge reads it to report `USER_CANCELLED`.
-    static let cancellationReasonPrefix = "cancelled:"
-
     #if canImport(PayabliCardReaderCore)
 
         /// Translates a card-reader / ProximityReader error into `PayabliTTPError`.
@@ -29,7 +26,7 @@ extension FiservCardReader {
 
             if isCancellation(platform) || (error as NSError).code == NSUserCancelledError {
                 return fallback(
-                    "\(cancellationReasonPrefix) user dismissed Tap to Pay sheet"
+                    "\(PayabliTTPError.cancellationReasonPrefix) user dismissed Tap to Pay sheet"
                 )
             }
 

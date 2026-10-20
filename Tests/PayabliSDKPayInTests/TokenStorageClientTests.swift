@@ -370,8 +370,7 @@ final class TokenStorageClientTests: XCTestCase {
         }
     }
 
-    func testDiagnosticsLogRedactedRequestAndResponse() async throws {
-        let sink = DiagnosticSink()
+    func testAnAddRequestCarriesItsQueryAndBodyAndNoCredential() async throws {
         let transport = MockTransport(responseBody: """
         {
           "responseText": "Success",
@@ -385,11 +384,7 @@ final class TokenStorageClientTests: XCTestCase {
           }
         }
         """)
-        let client = PayInPaymentFlowTokenStorageClient(
-            transport: transport,
-            baseURL: URL(string: "https://api-sandbox.payabli.com"),
-            diagnostics: .enabled { sink.append($0) }
-        )
+        let client = PayInPaymentFlowTokenStorageClient(transport: transport)
 
         _ = try await client.addMethod(
             entryPoint: "f743aed24a",
@@ -412,34 +407,17 @@ final class TokenStorageClientTests: XCTestCase {
             )
         )
 
-        let entries = sink.entries()
-        XCTAssertEqual(entries.map(\.phase), [.request, .response])
-
-        let request = try XCTUnwrap(entries.first)
-        XCTAssertTrue(request.url.contains("https://api-sandbox.payabli.com/api/TokenStorage/add"))
-        XCTAssertTrue(request.url.contains("createAnonymous=false"))
-        XCTAssertTrue(request.url.contains("forceCustomerCreation=true"))
-        XCTAssertTrue(request.url.contains("temporary=false"))
-        // The credential is attached below this layer, so it never enters the diagnostic record.
-        XCTAssertNil(request.headers["Authorization"])
+        let requests = await transport.requests
+        let request = try XCTUnwrap(requests.first)
+        XCTAssertEqual(request.path, "/api/TokenStorage/add")
+        XCTAssertTrue(request.query.contains(URLQueryItem(name: "createAnonymous", value: "false")))
+        XCTAssertTrue(request.query.contains(URLQueryItem(name: "forceCustomerCreation", value: "true")))
+        XCTAssertTrue(request.query.contains(URLQueryItem(name: "temporary", value: "false")))
+        XCTAssertFalse(request.headers.keys.contains { $0.lowercased() == "authorization" })
         XCTAssertEqual(request.headers["Content-Type"], "application/json")
-        let requestBody = try XCTUnwrap(request.body)
-        XCTAssertTrue(requestBody.contains("\"entryPoint\":\"f743aed24a\""))
-        XCTAssertTrue(requestBody.contains("\"source\":\"ios-sdk\""))
-        XCTAssertFalse(requestBody.contains("4111111111111111"))
-        XCTAssertFalse(requestBody.contains("Jane Doe"))
-        XCTAssertFalse(requestBody.contains("123"))
-        XCTAssertFalse(requestBody.contains("jane@example.com"))
-        XCTAssertFalse(requestBody.contains("cust-secret"))
-
-        let response = try XCTUnwrap(entries.last)
-        XCTAssertEqual(response.statusCode, 200)
-        let responseBody = try XCTUnwrap(response.body)
-        XCTAssertTrue(responseBody.contains("\"resultCode\":1"))
-        XCTAssertTrue(responseBody.contains("\"resultText\":\"Added\""))
-        XCTAssertFalse(responseBody.contains("stored-secret-123"))
-        XCTAssertFalse(responseBody.contains("method-secret-123"))
-        XCTAssertFalse(responseBody.contains("4440"))
+        let body = try XCTUnwrap(String(bytes: XCTUnwrap(request.body), encoding: .utf8))
+        XCTAssertTrue(body.contains("\"entryPoint\":\"f743aed24a\""))
+        XCTAssertTrue(body.contains("\"source\":\"ios-sdk\""))
     }
 
     func testDeclinedPaymentMethodThrowsDomainError() async throws {
@@ -871,22 +849,5 @@ private actor MockTransport: PayabliTransport {
         decoding: T.Type
     ) async throws -> PayabliV2Envelope<T> {
         throw PayabliGenericError(type: .unknown, reason: "performV2 is not used")
-    }
-}
-
-private final class DiagnosticSink: @unchecked Sendable {
-    private let lock = NSLock()
-    private var captured: [PayabliPayInDiagnosticEntry] = []
-
-    func append(_ entry: PayabliPayInDiagnosticEntry) {
-        lock.lock()
-        defer { lock.unlock() }
-        captured.append(entry)
-    }
-
-    func entries() -> [PayabliPayInDiagnosticEntry] {
-        lock.lock()
-        defer { lock.unlock() }
-        return captured
     }
 }

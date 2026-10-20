@@ -5,6 +5,7 @@ import XCTest
 
 /// What a start does with the binding it finds: one it cannot use is enrolled over
 /// under the same install, and one it can use is left alone.
+@available(iOS 16.7, *)
 final class AttestationRecoveryTests: XCTestCase {
     override func tearDown() {
         StubURLProtocol.handler = nil

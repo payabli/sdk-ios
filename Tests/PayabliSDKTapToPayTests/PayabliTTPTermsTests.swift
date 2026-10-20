@@ -3,6 +3,7 @@ import PayabliSDKCore
 import PayabliSDKTestUtils
 import XCTest
 
+@available(iOS 16.7, *)
 @MainActor
 final class PayabliTTPTermsTests: XCTestCase {
     override func setUp() {

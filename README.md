@@ -41,7 +41,7 @@ token in memory while the session runs.
 
 | | Requirement |
 |---|---|
-| iOS | 16.7 or later |
+| iOS | 16.0 or later. Tap to Pay needs 16.7 or later |
 | Toolchain | Xcode 15 or later, Swift 5.9 or later |
 | Tap to Pay | A physical iPhone XS or newer. See the [Tap to Pay guide](Sources/PayabliSDKTapToPay/README.md#requirements). Card-not-present runs in the simulator |
 

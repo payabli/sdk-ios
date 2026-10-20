@@ -6,6 +6,7 @@ import XCTest
     import ProximityReader
 #endif
 
+@available(iOS 16.7, *)
 final class FiservCardReaderTests: XCTestCase {
     func testProviderId() {
         XCTAssertEqual(FiservCardReader.providerId, "fiserv")
@@ -59,6 +60,22 @@ final class FiservCardReaderTests: XCTestCase {
         }
     #endif
 
+    /// The test bundle cannot run below 16.7, so the refusal is checked on the version itself.
+    func testEligibilityRefusesAnOSBelow16Point7() {
+        let version = { (minor: Int, patch: Int) in
+            OperatingSystemVersion(majorVersion: 16, minorVersion: minor, patchVersion: patch)
+        }
+        XCTAssertFalse(FiservCardReader.supportsTapToPay(version(0, 0)))
+        XCTAssertFalse(FiservCardReader.supportsTapToPay(version(6, 9)))
+        XCTAssertTrue(FiservCardReader.supportsTapToPay(version(7, 0)))
+        XCTAssertTrue(FiservCardReader.supportsTapToPay(
+            OperatingSystemVersion(majorVersion: 17, minorVersion: 0, patchVersion: 0)
+        ))
+        XCTAssertFalse(FiservCardReader.supportsTapToPay(
+            OperatingSystemVersion(majorVersion: 15, minorVersion: 8, patchVersion: 0)
+        ))
+    }
+
     /// Eligibility is platform/hardware-only and is called before
     /// `/config` delivers credentials — so a fresh reader on a supported device
     /// must report `success`.
@@ -66,20 +83,14 @@ final class FiservCardReaderTests: XCTestCase {
         let reader = FiservCardReader()
         let result = await reader.checkEligibility()
         #if os(iOS)
-            if #available(iOS 16.7, *) {
-                // On a real iPhone `success`; on an incompatible device
-                // `readerSetupFailed`. Both are acceptable, so the assertion is
-                // only that the error, if any, is not about missing credentials.
-                if case let .failure(err) = result, case let .readerSetupFailed(reason, _) = err {
-                    XCTAssertFalse(
-                        reason.lowercased().contains("credentials"),
-                        "eligibility should not require credentials"
-                    )
-                }
-            } else {
-                if case .success = result {
-                    XCTFail("iOS < 16.7 must fail eligibility")
-                }
+            // On a real iPhone `success`; on an incompatible device
+            // `readerSetupFailed`. Both are acceptable, so the assertion is
+            // only that the error, if any, is not about missing credentials.
+            if case let .failure(err) = result, case let .readerSetupFailed(reason, _) = err {
+                XCTAssertFalse(
+                    reason.lowercased().contains("credentials"),
+                    "eligibility should not require credentials"
+                )
             }
         #else
             if case .success = result {
@@ -338,7 +349,7 @@ final class FiservCardReaderTests: XCTestCase {
                 return XCTFail("expected readerSetupFailed, got \(error)")
             }
             XCTAssertTrue(
-                reason.hasPrefix(FiservCardReader.cancellationReasonPrefix),
+                reason.hasPrefix(PayabliTTPError.cancellationReasonPrefix),
                 "cancel keeps the prefix a host already matches: \(reason)"
             )
         } catch {

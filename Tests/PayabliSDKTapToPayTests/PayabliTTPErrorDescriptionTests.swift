@@ -2,6 +2,7 @@
 import XCTest
 
 /// What each internal failure says about itself, which is the reason a host error carries.
+@available(iOS 16.7, *)
 final class PayabliTTPErrorDescriptionTests: XCTestCase {
     func testAFailureWithAReasonDescribesItselfByThatReason() {
         let reason = "the words the failure carries"

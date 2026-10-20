@@ -4,6 +4,7 @@ import XCTest
 
 /// What a host is handed for each failure the SDK raises: always a `TapToPayError`, under the catalog entry
 /// for its cause, still naming the payment it belongs to.
+@available(iOS 16.7, *)
 final class TapToPayErrorTranslationTests: XCTestCase {
     // MARK: - Every case reaches its catalog code
 
@@ -28,7 +29,7 @@ final class TapToPayErrorTranslationTests: XCTestCase {
     }
 
     func testADismissedSheetIsACancellationByThePerson() throws {
-        let prefix = FiservCardReader.cancellationReasonPrefix
+        let prefix = PayabliTTPError.cancellationReasonPrefix
         XCTAssertEqual(try translated(PayabliTTPError.nfcFailed(reason: "\(prefix) dismissed")).type, .userCancelled)
         XCTAssertEqual(
             try translated(PayabliTTPError.readerSetupFailed(reason: "\(prefix) dismissed")).type,

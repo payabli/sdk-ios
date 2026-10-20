@@ -12,6 +12,7 @@ import XCTest
     /// and the error it was built from. These tests assert against that shape
     /// rather than against a raw `PaymentCardReaderError`, because the raw one
     /// never arrives.
+    @available(iOS 16.7, *)
     final class FiservCardReaderErrorMappingTests: XCTestCase {
         // MARK: - Pass-through
 
@@ -54,7 +55,7 @@ import XCTest
             guard case let .nfcFailed(reason, _) = mapped else {
                 return XCTFail("expected .nfcFailed, got \(mapped)")
             }
-            XCTAssertTrue(reason.hasPrefix(FiservCardReader.cancellationReasonPrefix), reason)
+            XCTAssertTrue(reason.hasPrefix(PayabliTTPError.cancellationReasonPrefix), reason)
         }
 
         func testAFailedReadIsNotACancellation() {
@@ -63,7 +64,7 @@ import XCTest
             guard case let .nfcFailed(reason, _) = mapped else {
                 return XCTFail("expected .nfcFailed, got \(mapped)")
             }
-            XCTAssertFalse(reason.hasPrefix(FiservCardReader.cancellationReasonPrefix), reason)
+            XCTAssertFalse(reason.hasPrefix(PayabliTTPError.cancellationReasonPrefix), reason)
         }
 
         // MARK: - The unrecognised path

@@ -11,6 +11,7 @@ import XCTest
 ///
 /// `charge()` begins with `reinitialize()`, which does nothing while the
 /// state says `.ready`, so a failure that leaves it there wedges the session.
+@available(iOS 16.7, *)
 @MainActor
 final class PayabliTTPReaderSessionRecoveryTests: XCTestCase {
     override func setUp() {
@@ -475,7 +476,7 @@ final class PayabliTTPReaderSessionRecoveryTests: XCTestCase {
     )
 
     private static let cancellationFailure = PayabliTTPError.nfcFailed(
-        reason: "\(FiservCardReader.cancellationReasonPrefix) user dismissed Tap to Pay sheet"
+        reason: "\(PayabliTTPError.cancellationReasonPrefix) user dismissed Tap to Pay sheet"
     )
 
     private static let cardReadResult = CardReadResult(

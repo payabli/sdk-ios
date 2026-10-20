@@ -35,6 +35,7 @@ import PayabliSDKCore
 /// extensions. Swift consumers use the `async throws` API, the published
 /// ``sessionState`` and value-type `struct`s. See `README.md` for the
 /// bilingual contract.
+@available(iOS 16.7, *)
 @objc(PayabliTTP)
 @MainActor
 public final class PayabliTTP: NSObject, ObservableObject {

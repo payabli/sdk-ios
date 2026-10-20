@@ -104,9 +104,9 @@ channel, so an app that never accepts card-present never links the certified car
   (depends on Core)
 
 **Shared:**
-- `PayabliSDKTelemetry` - Sentry and PostHog transports, bring your own instance, opt out via
-  `PayabliConfig.telemetryEnabled` (depends on Core). Every product carries it; it has no product of
-  its own, for the same reason Core has none (see `Package.swift`).
+- `PayabliSDKTelemetry` - holds only the version marker (depends on Core). The telemetry client lives in
+  Core at `package` level, so no host can reach it. Every product carries this module; it has no product
+  of its own, for the same reason Core has none (see `Package.swift`).
 
 **Test-only:**
 - `PayabliSDKTestUtils` - a target rather than a product, carrying every in-memory fixture (depends on
@@ -123,7 +123,10 @@ channel, so an app that never accepts card-present never links the certified car
   the reader's event stream flattened to a case name, and the platform's typed
   error rebuilt as two strings, are the two. Both are boundary signatures rather
   than behaviour, so the change widens what crosses and alters nothing the
-  component does. Anything else belongs above the boundary. Read
+  component does. Anything else belongs above the boundary. An `@available`
+  annotation on a declaration that calls newer platform API than the package
+  floor is the other permitted edit, because without it the package cannot
+  compile at its floor; it changes nothing on an OS that has the API. Read
   `ThirdParty/PayabliCardReaderCoreSource/README.md` first: a refresh from
   upstream is a merge, never an overwrite, and treating it as one drops these
   silently.
@@ -214,9 +217,10 @@ them, and the script refuses a build where that stops being true.
 
 ### Package Manager Support
 
-- **Swift Package Manager**: `Package.swift`, **iOS 16.7 minimum**, pinned by ProximityReader (Tap to
-  Pay on iPhone). App Attest needs only iOS 14 and Secure Enclave P-256 is older still, so 16.7 is set
-  by the card reader, not by the security foundation.
+- **Swift Package Manager**: `Package.swift`, **iOS 16.0 minimum**, the lowest Core and PayIn compile
+  at (`ContinuousClock`, `PresentationDetent`). Tap to Pay needs 16.7: `PayabliTTP`, its extensions
+  and the card-reader adapter carry `@available(iOS 16.7, *)`, and new code that reaches the card
+  reader carries it too. App Attest needs only iOS 14 and Secure Enclave P-256 is older still.
 - The package is **iOS-only**. There is no macOS, tvOS or watchOS support to preserve.
 
 ## Development Workflow
@@ -224,7 +228,7 @@ them, and the script refuses a build where that stops being true.
 ### Requirements
 
 - Xcode with an installed iOS simulator runtime
-- iOS 16.7 minimum deployment target
+- iOS 16.0 minimum deployment target; Tap to Pay code is available from 16.7
 - No Ruby, Bundler, Fastlane or CocoaPods tooling is used locally
 
 ### Testing Strategy

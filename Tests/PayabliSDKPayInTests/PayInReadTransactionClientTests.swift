@@ -194,22 +194,6 @@ final class PayInReadTransactionClientTests: XCTestCase {
         XCTAssertNil(error as? PayabliPayInError)
     }
 
-    func testADiagnosticsEntryCarriesTheReadsStatusAndNoneOfItsBody() async throws {
-        let entries = ReadDiagnosticEntries()
-        let transport = MockPaymentCaptureTransport(statusCode: 200, responseBody: Self.record())
-        let client = PayInPaymentFlowClient(transport: transport, diagnostics: .enabled { entries.append($0) })
-
-        _ = try await client.details(transId: "101-abc")
-
-        let response = try XCTUnwrap(entries.all.first { $0.phase == .response })
-        XCTAssertEqual(response.statusCode, 200)
-        XCTAssertNil(response.body)
-        let rendered = entries.all.map { "\($0.body ?? "") \($0.url)" }.joined(separator: "\n")
-        for value in ["Pat Payer", "Payer Co", "203.0.113.7"] {
-            XCTAssertFalse(rendered.contains(value), value)
-        }
-    }
-
     // MARK: - Fixtures
 
     /// A details record, PascalCase as the route answers, carrying fields that are never read.
@@ -284,22 +268,5 @@ final class PayInReadTransactionClientTests: XCTestCase {
         }
         XCTFail("expected a failure", file: file, line: line)
         return CancellationError()
-    }
-}
-
-private final class ReadDiagnosticEntries: @unchecked Sendable {
-    private let lock = NSLock()
-    private var entries: [PayabliPayInDiagnosticEntry] = []
-
-    func append(_ entry: PayabliPayInDiagnosticEntry) {
-        lock.lock()
-        defer { lock.unlock() }
-        entries.append(entry)
-    }
-
-    var all: [PayabliPayInDiagnosticEntry] {
-        lock.lock()
-        defer { lock.unlock() }
-        return entries
     }
 }

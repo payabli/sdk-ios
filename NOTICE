@@ -21,11 +21,5 @@ governed by its own license.
   * Apple PassKit — provided by Apple under the Apple Developer Program
     License Agreement.
 
-  * sentry-cocoa (Sentry SDK) — MIT License, optional, included only when the
-    host app pulls in the `PayabliSDKTelemetry` module with Sentry enabled.
-
-  * posthog-ios (PostHog SDK) — MIT License, optional, included only when the
-    host app pulls in the `PayabliSDKTelemetry` module with PostHog enabled.
-
 Copies of each license are distributed with the respective component and are
 available upon written request to security@payabli.com.
