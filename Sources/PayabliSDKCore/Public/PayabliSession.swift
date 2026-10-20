@@ -75,7 +75,9 @@ public final class PayabliSession: @unchecked Sendable {
                 entry: config.entryPoint,
                 environment: config.environment.name
             ),
-            transport: telemetryTransport ?? TelemetryEndpointTransport(transport: service)
+            transport: telemetryTransport ?? TelemetryEndpointTransport(transport: service),
+            sleep: { try await ContinuousClock().sleep(for: .seconds($0)) },
+            lifecycle: UIKitAppLifecycle()
         )
     }
 
