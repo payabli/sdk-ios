@@ -14,6 +14,10 @@ extension FiservCardReader {
         /// Translates a card-reader / ProximityReader error into `PayabliTTPError`.
         /// `fallback` picks the case (setup vs. NFC), including for a user cancel: dismissing
         /// the terms sheet is a setup failure, dismissing the tap sheet is an NFC one.
+        ///
+        /// - Parameter error: what the reader stack threw, before it was translated for the host.
+        /// - Parameter fallback: builds the case from the detail text a host is shown.
+        /// - Returns: the typed error a host receives.
         static func mapError(
             _ error: Error,
             fallback: (String) -> PayabliTTPError
@@ -40,17 +44,20 @@ extension FiservCardReader {
             return fallback(detail.isEmpty ? error.localizedDescription : detail)
         }
 
-        /// The platform error the card-reader component was built from, where it
-        /// kept one.
+        /// The platform error behind a card-reader component error, where it kept one.
         ///
-        /// That component's throwing methods only ever throw their own type, so
-        /// this is the only way to tell one refusal from another without
-        /// matching prose.
+        /// The component only ever throws its own type, so this is the only way to tell one refusal from another without matching prose.
+        ///
+        /// - Parameter error: what the reader stack threw, which may be the component's own wrapper type.
+        /// - Returns: the platform error behind the wrapper, or the error as thrown where there is none.
         static func platformError(behind error: Error) -> Error? {
             (error as? FiservTTPCardReaderError)?.underlying ?? error
         }
 
         /// Whether the payer or the platform ended the read.
+        ///
+        /// - Parameter error: the error the read ended with, nil where none was thrown.
+        /// - Returns: whether the read was cancelled, which the public edge reports as `USER_CANCELLED`.
         static func isCancellation(_ error: Error?) -> Bool {
             if let readError = error as? PaymentCardReaderSession.ReadError, case .readCancelled = readError {
                 return true
@@ -60,6 +67,9 @@ extension FiservCardReader {
 
         /// `title` and `localizedDescription` together, which is what a host is
         /// shown when nothing more specific was recognised.
+        ///
+        /// - Parameter error: what the reader stack threw, before it was translated for the host.
+        /// - Returns: the two joined, or an empty string where the error is not the component's own.
         static func readerDetail(_ error: Error) -> String {
             guard let readerError = error as? FiservTTPCardReaderError else {
                 return ""

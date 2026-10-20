@@ -35,6 +35,13 @@ extension AppAttestService {
 
     /// Authenticated POST that expects a non-empty `responseData` of type
     /// `Payload`. Throws if the envelope is missing it.
+    ///
+    /// - Parameter path: the route the request is sent to.
+    /// - Parameter body: the request's body, encoded as JSON.
+    /// - Parameter label: the request's name, carried by its logs and decode errors.
+    /// - Parameter assertion: the assertion headers to append, or `nil` where the route needs none.
+    /// - Parameter makeDeclineError: builds the error a refusal or decline throws, from the code and reason the service sent.
+    /// - Returns: the envelope's `responseData`, decoded as `Payload`.
     func postAttestationRequest<Payload: Decodable>(
         path: String,
         body: some Encodable,
@@ -69,11 +76,16 @@ extension AppAttestService {
         }
     }
 
-    /// Authenticated POST for endpoints that do not return a `responseData`
-    /// body (only an `isSuccess` acknowledgement).
+    /// Authenticated POST for endpoints that do not return a `responseData` body (only an `isSuccess`
+    /// acknowledgement).
     ///
-    /// `readsRefusalBeforeStatus` hands a 400, 403 or 404 carrying a refusal envelope to `makeDeclineError`, for a route
-    /// whose refusals are told apart by their text rather than by their status.
+    /// - Parameter path: the route the request is sent to.
+    /// - Parameter body: the request's body, encoded as JSON.
+    /// - Parameter label: the request's name, carried by its logs and errors.
+    /// - Parameter assertion: the assertion headers to append, or `nil` where the route needs none.
+    /// - Parameter readsRefusalBeforeStatus: hands a 400, 403 or 404 carrying a refusal envelope to
+    ///   `makeDeclineError`, for a route whose refusals are told apart by their text rather than by their status.
+    /// - Parameter makeDeclineError: builds the error a refusal or decline throws, from the code and reason the service sent.
     func postAttestationRequestExpectingNoBody(
         path: String,
         body: some Encodable,
@@ -96,14 +108,18 @@ extension AppAttestService {
 
     // MARK: - Private plumbing
 
-    /// Bearer + (optional) assertion headers, logging, HTTP error mapping, and
-    /// the "HTTP 200 with `isSuccess: false`" decline check. Returns the raw
-    /// response so the two public variants above can decide how to decode.
+    /// Bearer + (optional) assertion headers, logging, HTTP error mapping, and the "HTTP 200 with
+    /// `isSuccess: false`" decline check, returning the raw response for the variants above to decode.
     ///
-    /// Bearer injection and 401 refresh-and-retry are handled by the
-    /// `transport` decorator (`AuthenticatedTransport`); this method only
-    /// appends the App Attest assertion headers that are specific to the
-    /// attestation/activation endpoint family.
+    /// Bearer injection and 401 refresh-and-retry are handled by the `transport` decorator.
+    ///
+    /// - Parameter path: the route the request is sent to.
+    /// - Parameter body: the request's body, encoded as JSON.
+    /// - Parameter label: the request's name, carried by its logs and errors.
+    /// - Parameter assertion: the assertion headers to append, or `nil` where the route needs none.
+    /// - Parameter readsRefusalBeforeStatus: reads a 400, 403 or 404's refusal envelope before the status mapping.
+    /// - Parameter makeDeclineError: builds the error a refusal or decline throws, from the code and reason the service sent.
+    /// - Returns: the raw response, for the caller to decode.
     private func performAuthenticatedPOST(
         path: String,
         body: some Encodable,

@@ -47,6 +47,10 @@ enum PayabliPayInAccessibility {
     }
 
     /// Empty while the button can submit, since its label names the action. Otherwise it says what is missing.
+    ///
+    /// - Parameter canSubmit: whether the form would send the submission now.
+    /// - Parameter hasMarkedField: whether a refusal has a field marked on screen.
+    /// - Returns: the hint, empty while the button can submit.
     static func submitHint(
         canSubmit: Bool,
         hasMarkedField: Bool

@@ -117,6 +117,11 @@ struct HeldIdempotencyKeys {
     /// Holds the key of an attempt whose outcome is unknown, from that attempt's reservation.
     ///
     /// A scope holds one key, and a different key never displaces it.
+    ///
+    /// - Parameter reservation: the attempt whose key is held, carrying the scope, the key and the moment
+    ///   it was chosen.
+    /// - Parameter now: the moment the attempt ended, against which expired keys are dropped before one is held.
+    /// - Returns: whether the key found no room, reported the first time since a key was last held.
     private mutating func hold(_ reservation: Reservation, now: ContinuousClock.Instant) -> Bool {
         sweep(now: now)
         let scope = reservation.scope
@@ -138,6 +143,8 @@ struct HeldIdempotencyKeys {
     }
 
     /// Drops every key the service would no longer recognise.
+    ///
+    /// - Parameter now: the moment a key's age is read against.
     private mutating func sweep(now: ContinuousClock.Instant) {
         records = records.filter { _, record in
             record.reservedAt.duration(to: now) < maxAge

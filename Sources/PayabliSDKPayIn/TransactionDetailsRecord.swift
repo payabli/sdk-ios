@@ -73,11 +73,18 @@ private struct EitherCaseKey: CodingKey {
 
 private extension KeyedDecodingContainer where Key == EitherCaseKey {
     /// The value under the PascalCase spelling of `name`, else under `name` itself.
+    ///
+    /// - Parameter type: the type the value decodes as.
+    /// - Parameter name: the key as the record writes it, in camelCase.
+    /// - Returns: the decoded value, or nil when the record carries none.
     func value<T: Decodable>(_ type: T.Type, _ name: String) throws -> T? {
         try decodeIfPresent(type, forKey: key(for: name))
     }
 
     /// An amount written as a JSON number or as a decimal string. Any other string is refused.
+    ///
+    /// - Parameter name: the key the amount sits under, in camelCase.
+    /// - Returns: the amount, or nil when the record carries none.
     func amount(_ name: String) throws -> Double? {
         let key = key(for: name)
         if let number = try? decodeIfPresent(Double.self, forKey: key) {

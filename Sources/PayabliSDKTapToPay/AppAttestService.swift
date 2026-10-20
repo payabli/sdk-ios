@@ -25,6 +25,12 @@ package final class AppAttestService: DeviceAttestationService, @unchecked Senda
 
     /// The App ID is read from the access group of the install identifier's item, which
     /// `/register` has written before `/attest` needs it.
+    ///
+    /// - Parameters:
+    ///   - transport: what every attestation request is sent over.
+    ///   - attestor: what signs and attests on this device.
+    ///   - storage: the Keychain the bindings and the install identifier are held in.
+    ///   - deviceIdentity: the install identifier `hardwareId()` sends.
     package convenience init(
         transport: any PayabliTransport,
         attestor: AppAttestor,
@@ -65,14 +71,13 @@ package final class AppAttestService: DeviceAttestationService, @unchecked Senda
 
     // MARK: DeviceAttestationService — the binding this device holds
 
-    /// Whether this device is enrolled for this entry point. A handle issued under
-    /// another one answers false, and the binding also has to name a key this device
-    /// still holds — a key can go on reinstall, restore or platform invalidation,
-    /// and none of those leaves anything on the device to read.
+    /// Whether this device is enrolled for this entry point, with a binding naming a key it still holds.
     ///
-    /// Raises when the store could not be read, which is not the same answer as
-    /// `false`: `false` runs the cold sequence and registers a second device for a
-    /// paypoint that is already enrolled. Raises too when the key check cannot answer.
+    /// Raises when the store cannot be read or the key check cannot answer: answering `false` there
+    /// registers a second device for a paypoint already enrolled.
+    ///
+    /// - Parameter entry: the entry point whose held binding is asked about.
+    /// - Returns: whether the entry point is enrolled, false with no binding held or one naming an unheld key.
     package func isAttested(for entry: String) async throws -> Bool {
         // The entry point's turn, so no attestation replaces the binding while its key is being checked.
         try await Self.attestations.takingTurns(entry) {
@@ -86,6 +91,9 @@ package final class AppAttestService: DeviceAttestationService, @unchecked Senda
     /// Whether the platform will still sign with this binding's key, by signing a hash sent nowhere.
     /// Only `deviceCheckUnusableKeyCodes` drop the binding: re-enrolling costs an enrolment for a key
     /// that may still work, so every other failure keeps it and raises.
+    ///
+    /// - Parameter binding: the stored binding whose key the probe signs with.
+    /// - Returns: whether the binding's key still signs on this device.
     func keyIsStillHeld(_ binding: AttestedDevice) async throws -> Bool {
         do {
             _ = try await attestor.generateAssertion(
@@ -121,6 +129,9 @@ package final class AppAttestService: DeviceAttestationService, @unchecked Senda
     /// Drops the binding a refusal was about while it is still the one held, and
     /// raises if the store refuses. The pending key belongs to whatever is running
     /// now.
+    ///
+    /// - Parameter binding: the binding the refusal named, dropped only while it is still the one held.
+    /// - Returns: whether the binding was dropped.
     @discardableResult
     func forgetRefused(_ binding: AttestedDevice) throws -> Bool {
         try reportingStorageFailure {
@@ -130,9 +141,10 @@ package final class AppAttestService: DeviceAttestationService, @unchecked Senda
 
     /// Drops the binding this probe asked about, and only that one.
     ///
-    /// The probe suspends, so the entry point can hold a binding attested while the
-    /// answer was travelling, and dropping by entry point would take that one for a
-    /// key it never named. The pending key is left alone for the same reason.
+    /// The probe suspends, so the entry point can hold a binding attested meanwhile; a newer one
+    /// never drops for the key this probe asked about.
+    ///
+    /// - Parameter binding: the binding the probe asked about, dropped only while it is still the one held.
     func forgetIfUnchanged(_ binding: AttestedDevice) {
         do {
             let dropped = try bindingStore.forget(entry: binding.entry, ifStill: binding)
@@ -152,16 +164,12 @@ package final class AppAttestService: DeviceAttestationService, @unchecked Senda
         try binding(for: entry)?.deviceId
     }
 
-    /// Drops this entry point's binding and leaves every other one alone: a
-    /// refusal is about the paypoint that refused, and the other bindings still
-    /// name keys that work.
+    /// Drops this entry point's binding and leaves every other one alone.
     ///
-    /// Raises when the store refuses. A binding refused by the service names a key
-    /// the platform still signs with, so a warm check finds it sound and sends the
-    /// same refused binding again.
+    /// Raises when the store refuses. A binding refused by the service still signs, so a warm check
+    /// sends the same one again; a caller acting on a refused key uses `forgetIfUnchanged`.
     ///
-    /// A caller acting on a refused key uses `forgetIfUnchanged` instead: it holds
-    /// the record its answer is about, and the entry point may hold a newer one.
+    /// - Parameter entry: the entry point whose binding is dropped.
     package func clearCache(for entry: String) throws {
         try reportingStorageFailure {
             try bindingStore.forgetEverything(for: entry)
@@ -175,11 +183,11 @@ package final class AppAttestService: DeviceAttestationService, @unchecked Senda
 
     /// Runs a store operation and reports a failure as this SDK's own error.
     ///
-    /// A `KeychainError` carries another domain the ObjC, MAUI, Flutter and React
-    /// Native bridges all report as a bare failure, so a status is reported by what
-    /// repairs it: a missing entitlement is the app's configuration, an invalid
-    /// parameter is this SDK's own query, and any other status is storage that did not
-    /// answer, as every read and write meets before the first unlock after a boot.
+    /// A `KeychainError`'s status is reported by what repairs it: a missing entitlement is the
+    /// app's, an invalid parameter is this SDK's, anything else is storage that did not answer.
+    ///
+    /// - Parameter work: the store operation, run once.
+    /// - Returns: what `work` answered.
     private func reportingStorageFailure<T>(_ work: () throws -> T) throws -> T {
         do {
             return try work()
@@ -213,6 +221,9 @@ package final class AppAttestService: DeviceAttestationService, @unchecked Senda
     }
 
     /// The binding held for an entry point, for tests and for the accessors above.
+    ///
+    /// - Parameter entry: the entry point whose held binding is asked for.
+    /// - Returns: the entry point's binding, or `nil` where none is held.
     func binding(for entry: String) throws -> AttestedDevice? {
         try reportingStorageFailure { try bindingStore.binding(for: entry) }
     }
@@ -246,6 +257,8 @@ package final class AppAttestService: DeviceAttestationService, @unchecked Senda
 
     /// The value registration identifies this install by. Raises rather than sending a blank one,
     /// which is what an app with no bundle identifier produces.
+    ///
+    /// - Returns: the install identifier `/register` sends, never blank.
     func hardwareId() throws -> String {
         let hardwareId = try reportingStorageFailure { try hardwareIdProvider() }
         guard !hardwareId.isEmpty else {
@@ -260,6 +273,8 @@ package final class AppAttestService: DeviceAttestationService, @unchecked Senda
 
     /// The App ID `/attest` is sent. Raises rather than sending a blank one: with no
     /// Keychain access group to read it from, the app is not configured for App Attest.
+    ///
+    /// - Returns: the App ID `/attest` sends, never blank.
     func appId() throws -> String {
         guard let appId = try reportingStorageFailure({ try appIdProvider() }) else {
             throw TapToPayError(

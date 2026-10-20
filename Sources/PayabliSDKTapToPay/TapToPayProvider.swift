@@ -11,11 +11,15 @@ package protocol TapToPayProvider: AnyObject, Sendable {
     /// Validates that the device + OS + entitlements are acceptable, before any UI is presented. Runs before
     /// `/config` returns credentials, so implementations must NOT require them: validate only platform,
     /// hardware and entitlements.
+    ///
+    /// - Returns: whether this device is eligible to read cards, as success or the refusal naming why it is not.
     func checkEligibility() async -> Result<Void, PayabliTTPError>
 
     /// Applies the raw credentials block from `/api/v2/device/taptopay/config/{entry}`, validating its keys and
     /// throwing a `PayabliTTPError` such as `.readerSetupFailed(reason:)` before `prepareReader()` when one is
     /// missing or malformed. Credentials live only in RAM and must be cleared in `cleanUp()`.
+    ///
+    /// - Parameter credentials: the raw `providerCredentials` block, keyed as the configuration route sent it.
     func configure(credentials: [String: String]) throws
 
     /// Prepares the reader: connect, request a session token, open the session.
@@ -29,18 +33,13 @@ package protocol TapToPayProvider: AnyObject, Sendable {
     ///   exists to report.
     func prepareReader(onReaderEvent: @escaping @MainActor @Sendable (TapToPayReaderEvent) -> Void) async throws
 
-    /// Whether the merchant has accepted the terms their platform requires
-    /// before it will take a contactless payment.
+    /// Whether the merchant has accepted the terms the platform requires before it takes a contactless payment.
     ///
-    /// Called by the facade on demand rather than during a phase, so it may
-    /// arrive at any point. Implementations answer from the platform each time
-    /// instead of caching, since acceptance can be granted or withdrawn outside
-    /// this process.
+    /// Implementations answer from the platform each time, since acceptance can be granted or withdrawn
+    /// outside this process.
     ///
-    /// A platform that requires no acceptance returns `true`.
-    ///
-    /// Must throw `PayabliTTPError.readerSetupFailed(reason:)` when there is no
-    /// reader to ask, so a caller can tell "not accepted" from "cannot answer".
+    /// - Returns: whether the merchant has accepted; a platform that requires no acceptance answers `true`.
+    /// - Throws: `.readerSetupFailed` when there is no reader to ask, so a caller can tell "not accepted" from "cannot answer".
     func areTermsAccepted() async throws -> Bool
 
     /// Asks the platform to present its own terms so the merchant can accept, and
@@ -62,6 +61,9 @@ package protocol TapToPayProvider: AnyObject, Sendable {
     /// Runs the NFC interaction and (for atomic providers like Fiserv) the
     /// actual charge. Providers that only collect card data should ignore the
     /// merchant correlation IDs and populate `encryptedPayload` in the result.
+    ///
+    /// - Parameter request: the charge to read a card for, with the amount and the merchant correlation IDs.
+    /// - Returns: the result of the read, carrying the processor response or the collected card data.
     func startReading(_ request: CardReadRequest) async throws -> CardReadResult
 
     /// Cancels an active reader session.

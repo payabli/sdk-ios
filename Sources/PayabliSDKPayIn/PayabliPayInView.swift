@@ -870,6 +870,9 @@ extension PayabliPayInView {
     }
 
     /// The mark's own text, which a screen reader hears once when the mark appears and again on the field.
+    ///
+    /// - Parameter field: the field the refusal marked.
+    /// - Returns: the mark's text, or nil when the field is not marked.
     func rejectedMessage(for field: PayabliPayInField) -> String? {
         viewModel.rejectedFields.contains(field) ? PayabliPayInAccessibility.rejectedFieldMessage : nil
     }

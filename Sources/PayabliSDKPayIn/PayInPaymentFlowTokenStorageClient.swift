@@ -57,6 +57,11 @@ final class PayInPaymentFlowTokenStorageClient: Sendable {
     ///
     /// No idempotency key: a repeat is not recognisable on this route, so a key sent here is read by
     /// nothing.
+    ///
+    /// - Parameter entryPoint: the paypoint's entry point, already trimmed by the caller.
+    /// - Parameter paymentMethod: the card or bank account data the body carries to store.
+    /// - Parameter options: what the request carries besides the method, from the customer to the flags.
+    /// - Returns: the request the transport sends.
     private func addMethodRequest(
         entryPoint: String,
         paymentMethod: PayabliPayInMethodInput,

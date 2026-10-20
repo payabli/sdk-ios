@@ -23,12 +23,13 @@ enum ErrorSummary {
         }
     }
 
-    /// A decline and a server failure both name their kind, and each carries a structured value that
-    /// says which one it was: the decline's wire code and the server's status. Neither is free text.
+    /// A decline and a server failure both name their kind by a structured value: the decline's wire
+    /// code and the server's status. Neither is free text.
     ///
-    /// The server's status is read from the response before the body. A body that will not decode
-    /// leaves the body's own `status` empty, and a body that disagrees with the response is not the
-    /// authority on what was answered.
+    /// The server's status is read from the response before the body, which is not the authority on what was answered.
+    ///
+    /// - Parameter error: the payment error to name for a log.
+    /// - Returns: the error's kind, with its wire code or status where it carries one.
     static func of(_ error: PayabliPaymentError) -> String {
         switch error {
         case let .decline(decline):
@@ -45,21 +46,13 @@ enum ErrorSummary {
 
     // swiftlint:disable cyclomatic_complexity
 
-    /// The case, and details that are not free text. No `reason` reaches this
-    /// string.
+    /// The case, and details that are not free text. No `reason` reaches this string.
     ///
-    /// A reason cannot be classified by the case that holds it. The same
-    /// `attestationFailed` carries this SDK's own words from `AppAttestService`
-    /// and the service's from a decline body; `configFailed` carries a sentence
-    /// written here and a `resultText` from `TTPConfigClient`; `readerSetupFailed`
-    /// and `activationFailed` carry `String(describing:)` of whatever was caught.
-    /// The reason still reaches the caller and the screen, on the error itself.
+    /// A reason cannot be classified by the case that holds it — the same `attestationFailed` carries this
+    /// SDK's words and the service's — so the reason stays on the error the caller reads.
     ///
-    /// Written out case by case rather than reflected over, because a log is
-    /// searched by this string and a reflected one is whatever the compiler
-    /// renders today. Its complexity is therefore one branch per error case, and the
-    /// compiler requires every one of them, which is why the rule is suppressed
-    /// around it rather than the switch being split across two functions.
+    /// - Parameter error: the Tap to Pay error to name for a log.
+    /// - Returns: the case's name, with structured details where it carries them.
     static func of(_ error: PayabliTTPError) -> String {
         switch error {
         case .notInitialized:
@@ -106,6 +99,9 @@ enum ErrorSummary {
     // swiftlint:enable cyclomatic_complexity
 
     /// A log read at speed wants the name rather than the case's description.
+    ///
+    /// - Parameter state: the session state being named in a log line.
+    /// - Returns: the state's name, as its case declares it.
     private static func name(of state: PayabliTTPSessionState) -> String {
         switch state {
         case .idle: return "idle"

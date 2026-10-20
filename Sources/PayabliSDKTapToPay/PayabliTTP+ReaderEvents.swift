@@ -6,6 +6,9 @@ import Foundation
 extension PayabliTTP {
     /// Progress counts only from the configuration still running, and a prompt only
     /// from the reader now prepared while a charge holds the session.
+    ///
+    /// - Parameter event: the reader event to route to its listener.
+    /// - Parameter configuration: the configuration the reader raised the event during.
     func handleReaderEvent(_ event: TapToPayReaderEvent, from configuration: Int) {
         if case let .configurationProgress(percent) = event {
             guard configuration == activeConfiguration else { return }
@@ -22,6 +25,9 @@ extension PayabliTTP {
 
     /// The activity a reader prompt reports, or `nil` for an event that reaches a
     /// host some other way.
+    ///
+    /// - Parameter event: the reader event to translate.
+    /// - Returns: the activity for the charge's record, or `nil` where the event reports nothing for it.
     private static func chargeActivity(for event: TapToPayReaderEvent) -> TapToPayChargeActivity? {
         switch event {
         case .configurationProgress, .notReady:

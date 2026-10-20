@@ -17,6 +17,10 @@ public enum PayabliPayInSummaryRows {
     ///
     /// Amount is the total amount less the service fee, and has a figure only while a fee or a surcharge sits
     /// beside it. Every row is nil while submit would refuse the payment details.
+    ///
+    /// - Parameter field: the money field whose figure the row shows; any other field draws no row.
+    /// - Parameter paymentDetails: the payment's amounts, at the precision the request carries them.
+    /// - Returns: the figure the row shows, or nil when there is none to show.
     public static func rowAmount(for field: PayabliPayInField, paymentDetails: PayabliPayInPaymentDetails?) -> Decimal? {
         guard let paymentDetails, areValid(paymentDetails) else { return nil }
         let fee = PayInAmount.shown(paymentDetails.serviceFee)
@@ -39,6 +43,9 @@ public enum PayabliPayInSummaryRows {
 
     /// What the service charges, the total amount plus any surcharge, or nil when that is nothing or when submit
     /// would refuse the payment details.
+    ///
+    /// - Parameter paymentDetails: the payment's amounts, from which the charge is computed.
+    /// - Returns: the charge the Total row shows, or nil when there is none.
     public static func totalRowAmount(paymentDetails: PayabliPayInPaymentDetails?) -> Decimal? {
         guard let paymentDetails, areValid(paymentDetails),
               let charge = PayInAmount.shown(paymentDetails.totalAmount)
@@ -51,6 +58,11 @@ public enum PayabliPayInSummaryRows {
     ///
     /// A currency that is absent or not an ISO 4217 code writes the number alone, since the charge is then made
     /// in a currency the request does not name.
+    ///
+    /// - Parameter amount: the figure to write, rounded here to the wire's two places.
+    /// - Parameter currency: the charge's ISO 4217 code, which names the symbol; absent or not a code writes
+    ///   the figure without one.
+    /// - Returns: the figure as text, in the device locale's separators.
     public static func formattedAmount(_ amount: Decimal, currency: String?) -> String {
         formattedAmount(amount, currency: currency, locale: .current)
     }

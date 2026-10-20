@@ -13,6 +13,8 @@ public extension PayabliTTP {
     /// again. A device that has to be set up again lands
     /// `.failed(reason: .deviceSetupRequired)`, and `initialize()` sets it up.
     /// A call made during a charge waits for the charge to end.
+    ///
+    /// - Parameter activationCode: the code the partner issued out of band, e.g. from an admin dashboard.
     func activateDevice(activationCode: String) async throws {
         try await reportingToHost {
             try await runSessionSetup(.activate) { try await self.runActivateDevice(activationCode: activationCode) }
@@ -74,6 +76,9 @@ public extension PayabliTTP {
     ///
     /// The completion handler is always invoked on the main thread because
     /// the entire `PayabliTTP` surface is `@MainActor`.
+    ///
+    /// - Parameter activationCode: the code the partner issued out of band, e.g. from an admin dashboard.
+    /// - Parameter completion: the error the activation failed with, or `nil` when it succeeded.
     @objc func activateDevice(
         activationCode: String,
         completion: @escaping (NSError?) -> Void

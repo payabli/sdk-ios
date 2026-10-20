@@ -38,11 +38,16 @@ package struct PayabliLogger: Sendable {
 
     /// The logger a shipping path uses. This is the one place the unified log is named, which is what
     /// makes every layer below take the logger it was given rather than build its own.
+    ///
+    /// - Parameter category: the diagnostics category every record is written under.
     package init(category: Category) {
         self.init(category: category, sink: UnifiedLogSink())
     }
 
     /// Internal, so it widens what a test can construct and not what production can.
+    ///
+    /// - Parameter category: the diagnostics category records are written under.
+    /// - Parameter sink: where the records go, a test's injection point in place of the unified log.
     init(category: Category, sink: any LogSink) {
         self.category = category
         self.sink = sink
@@ -75,12 +80,18 @@ package extension PayabliLogger {
     /// Returns a redacted form of a sensitive string, showing only the last 4
     /// characters. Use for transaction debugging where the full value must never
     /// be logged (e.g. never use this for PAN/CVV — those must be dropped entirely).
+    ///
+    /// - Parameter value: the sensitive string to redact, its last 4 characters staying visible.
+    /// - Returns: `"[REDACTED]…"` plus the last 4 characters, or `"[REDACTED]"` when there are 4 or fewer.
     static func redact(_ value: String) -> String {
         guard value.count > 4 else { return "[REDACTED]" }
         return "[REDACTED]…" + String(value.suffix(4))
     }
 
     /// Returns `"[REDACTED]"`. Use when any trace of the value is unacceptable.
+    ///
+    /// - Parameter value: the value to leave no trace of, or nil.
+    /// - Returns: `"[REDACTED]"`, or `"[nil]"` when the value is nil.
     static func redactFully(_ value: String?) -> String {
         guard value != nil else { return "[nil]" }
         return "[REDACTED]"

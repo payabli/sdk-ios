@@ -91,6 +91,8 @@ package final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
     }
 
     /// Injects what the terms surface reads and presents. Tests only.
+    ///
+    /// - Parameter source: what serves the terms surface from now on, or `nil` to leave it to the prepared reader.
     func setLinkStateSource(_ source: AccountLinking?) {
         lock.lock()
         injectedLinkStateSource = source
@@ -98,6 +100,8 @@ package final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
     }
 
     /// Injects the reader `prepareReader()` drives. Tests only.
+    ///
+    /// - Parameter make: builds the reader `prepareReader()` drives from the credentials, or `nil` to build the vendored one.
     func setReaderFactory(_ make: ((Credentials) throws -> ReaderSetup)?) {
         lock.lock()
         injectedReaderFactory = make
@@ -107,13 +111,17 @@ package final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
     package init() {}
 
     /// Injects `Credentials` directly. Facade path uses `configure(credentials:)`.
+    ///
+    /// - Parameter credentials: the credentials the adapter holds for the next `prepareReader()` run.
     func setCredentials(_ credentials: Credentials) {
         lock.lock()
         self.credentials = credentials
         lock.unlock()
     }
 
-    /// The credentials `configure` stored, or `nil` before it has.
+    /// What the adapter holds for the next `prepareReader()` run.
+    ///
+    /// - Returns: the stored credentials, or `nil` before any are stored and after `prepareReader()` has handed them over.
     func storedCredentials() -> Credentials? {
         lock.withLock { credentials }
     }
@@ -188,6 +196,8 @@ package final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
 
     /// Platform and `PaymentCardReader` check, run before `/config`, so it needs no credentials. It checks
     /// the OS too, because an Objective-C caller below 16.7 gets only a compiler warning.
+    ///
+    /// - Returns: whether this device is eligible to read cards, as success or the refusal naming why it is not.
     package func checkEligibility() async -> Result<Void, PayabliTTPError> {
         #if canImport(PayabliCardReaderCore)
             guard Self.supportsTapToPay(ProcessInfo.processInfo.operatingSystemVersion) else {
@@ -344,6 +354,9 @@ package final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
 
     /// A held device auth and a settled sale are both approvals. Anything the gateway has not named as one
     /// or the other, a missing state included, is neither.
+    ///
+    /// - Parameter state: the gateway's transaction state, as the provider response carried it.
+    /// - Returns: the outcome the state names, `indeterminate` where it names none.
     static func outcome(ofGatewayState state: String?) -> CardReadOutcome {
         switch state?.uppercased() {
         case "AUTHORIZED", "CAPTURED":
@@ -401,6 +414,9 @@ package final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
         /// Builds a fresh `FiservTTPCardReader` (vendored from PayabliCardReaderCore).
         /// Tears down the previous instance first — Apple's `PaymentCardReader`
         /// allows only one per process.
+        ///
+        /// - Parameter creds: the credentials the reader is armed with, as its vendor configuration.
+        /// - Returns: the new reader, already stored as the adapter's `reader`.
         private func buildReader(credentials creds: Credentials) throws -> FiservTTPCardReader {
             lock.lock()
             reader?.finalize()
@@ -455,6 +471,9 @@ package final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
 
         /// Pulls `card.brand` out of the CommerceHub response for
         /// `CardReadResult.cardNetwork`. Tolerates minor schema drift.
+        ///
+        /// - Parameter json: the whole provider response, as the JSON `providerResponseJSON` carries.
+        /// - Returns: the card's brand, or `nil` where the response names none.
         private static func extractCardNetwork(from json: Data) -> String? {
             guard
                 let obj = try? JSONSerialization.jsonObject(with: json) as? [String: Any]

@@ -55,7 +55,6 @@ public final class PayabliTTP: NSObject, ObservableObject {
     let transactionClient: TTPTransactionClient
     let configClient: TTPConfigClient
 
-    /// Session state
     let sessionManager = SessionManager()
 
     /// The configuration currently running, or `nil` when none is. A reader's event handler outlives the
@@ -115,6 +114,12 @@ public final class PayabliTTP: NSObject, ObservableObject {
 
     /// `package`: it takes the provider and the attestation service, so a host reaching
     /// it could substitute either. A host uses `create()` below instead.
+    ///
+    /// - Parameters:
+    ///   - session: the session whose entry point, environment and transport the facade runs on.
+    ///   - provider: the card reader the charges read through.
+    ///   - attestation: the service that holds the device's binding and signs requests.
+    ///   - retryPolicy: the retry policy the charge's update runs under.
     package init(
         session: PayabliSession,
         provider: TapToPayProvider,
@@ -142,6 +147,8 @@ public final class PayabliTTP: NSObject, ObservableObject {
         /// installed, with the default card reader and App Attest backed by the Keychain.
         ///
         /// Throws `sessionNotInitialized` when no session is installed.
+        ///
+        /// - Returns: the card-present facade, built on the installed session.
         @objc public static func create() async throws -> PayabliTTP {
             guard let payabliSession = PayabliSession.current else {
                 throw TapToPayError(type: .sessionNotInitialized, reason: "no session is initialized", detail: nil)
@@ -185,6 +192,9 @@ public final class PayabliTTP: NSObject, ObservableObject {
     ///
     /// Observing lasts until ``TapToPaySessionStateObservation/cancel()`` or for
     /// the lifetime of this instance.
+    ///
+    /// - Parameter handler: the callback to run after every change to ``sessionState``.
+    /// - Returns: the observation to cancel it with, lasting otherwise for this instance's lifetime.
     @objc public func addSessionStateObserver(
         _ handler: @escaping () -> Void
     ) -> TapToPaySessionStateObservation {
