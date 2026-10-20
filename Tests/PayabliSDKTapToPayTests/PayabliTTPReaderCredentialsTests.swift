@@ -5,6 +5,7 @@ import XCTest
 
 /// A paypoint whose gateway keys come back blank, from the configuration route to what the host is told and
 /// where the session is left.
+@available(iOS 16.7, *)
 @MainActor
 final class PayabliTTPReaderCredentialsTests: XCTestCase {
     override func tearDown() {
@@ -44,6 +45,7 @@ final class PayabliTTPReaderCredentialsTests: XCTestCase {
 }
 
 /// Everything succeeds except `configure`, which is the real reader's check of the credentials.
+@available(iOS 16.7, *)
 private final class ReaderCheckingProvider: TapToPayProvider, @unchecked Sendable {
     static var providerId: String {
         "reader-checking"

@@ -6,6 +6,7 @@ import XCTest
     import ProximityReader
 #endif
 
+@available(iOS 16.7, *)
 final class FiservCardReaderTests: XCTestCase {
     func testProviderId() {
         XCTAssertEqual(FiservCardReader.providerId, "fiserv")

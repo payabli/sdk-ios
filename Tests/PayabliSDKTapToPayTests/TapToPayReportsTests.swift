@@ -5,6 +5,7 @@ import XCTest
 
 /// `initialize` reports once per run it owns: a start, then one ending, carrying none of the text a host's error
 /// does.
+@available(iOS 16.7, *)
 @MainActor
 final class TapToPayReportsTests: XCTestCase {
     /// The keys `ttp.initialize.failed` may carry. `error_number` is the code the host was told.

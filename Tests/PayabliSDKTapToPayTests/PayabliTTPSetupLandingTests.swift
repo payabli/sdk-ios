@@ -5,6 +5,7 @@ import XCTest
 
 /// Where `initialize` leaves the session when setting the device up fails, read through the facade a
 /// host calls.
+@available(iOS 16.7, *)
 @MainActor
 final class PayabliTTPSetupLandingTests: XCTestCase {
     /// Each way setting the device up fails reaches the state its remedy repairs, and none of them

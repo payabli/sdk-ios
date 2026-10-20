@@ -12,6 +12,7 @@ import XCTest
     /// and the error it was built from. These tests assert against that shape
     /// rather than against a raw `PaymentCardReaderError`, because the raw one
     /// never arrives.
+    @available(iOS 16.7, *)
     final class FiservCardReaderErrorMappingTests: XCTestCase {
         // MARK: - Pass-through
 

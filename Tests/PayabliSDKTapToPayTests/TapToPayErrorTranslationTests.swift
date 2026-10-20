@@ -4,6 +4,7 @@ import XCTest
 
 /// What a host is handed for each failure the SDK raises: always a `TapToPayError`, under the catalog entry
 /// for its cause, still naming the payment it belongs to.
+@available(iOS 16.7, *)
 final class TapToPayErrorTranslationTests: XCTestCase {
     // MARK: - Every case reaches its catalog code
 

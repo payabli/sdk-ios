@@ -11,6 +11,7 @@ import XCTest
 ///
 /// `charge()` begins with `reinitialize()`, which does nothing while the
 /// state says `.ready`, so a failure that leaves it there wedges the session.
+@available(iOS 16.7, *)
 @MainActor
 final class PayabliTTPReaderSessionRecoveryTests: XCTestCase {
     override func setUp() {

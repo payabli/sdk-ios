@@ -3,6 +3,7 @@
 import PayabliSDKTestUtils
 import XCTest
 
+@available(iOS 16.7, *)
 @MainActor
 final class PayabliTTPSessionInitTests: XCTestCase {
     func testTwoFacadesShareTheSameSession() throws {

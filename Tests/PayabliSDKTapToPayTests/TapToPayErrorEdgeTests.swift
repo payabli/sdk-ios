@@ -5,6 +5,7 @@ import XCTest
 
 /// Every public card-present call, in Swift and in Objective-C, hands its failure to a host as one
 /// `TapToPayError` carrying the catalog entry for its cause.
+@available(iOS 16.7, *)
 @MainActor
 final class TapToPayErrorEdgeTests: XCTestCase {
     override func setUp() {
