@@ -831,5 +831,3 @@ the bridge APIs.
   models and token-storage response models.
 - `PayInPaymentFlowClient.swift`: MoneyIn v2 capture/authorize HTTP client.
 - `PayInPaymentFlowTokenStorageClient.swift`: token-storage HTTP client.
-- `PayabliPayInSensitiveDataRedactor.swift`: PAN/sensitive pattern
-  redaction helper.

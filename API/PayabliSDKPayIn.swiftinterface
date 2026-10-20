@@ -84,7 +84,7 @@ import _SwiftConcurrencyShims
   @_Concurrency::MainActor final public var $requestConfiguration: Combine::Published<PayabliSDKPayIn::PayabliPayInRequestConfiguration?>.Combine::Publisher {
     get
   }
-  @_Concurrency::MainActor convenience public init(session: PayabliSDKCore::PayabliSession, operation: PayabliSDKPayIn::PayabliPayInOperation = .storePaymentMethod, requestConfiguration: PayabliSDKPayIn::PayabliPayInRequestConfiguration? = nil)
+  @_Concurrency::MainActor public init(session: PayabliSDKCore::PayabliSession, operation: PayabliSDKPayIn::PayabliPayInOperation = .storePaymentMethod, requestConfiguration: PayabliSDKPayIn::PayabliPayInRequestConfiguration? = nil)
   @_Concurrency::MainActor final public func configure(config: PayabliSDKCore::PayabliConfig)
   @_Concurrency::MainActor final public func configure(config: PayabliSDKCore::PayabliConfig, theme _: PayabliSDKCore::PayabliTheme)
   @_Concurrency::MainActor final public func configure(operation: PayabliSDKPayIn::PayabliPayInOperation, requestConfiguration: PayabliSDKPayIn::PayabliPayInRequestConfiguration? = nil)

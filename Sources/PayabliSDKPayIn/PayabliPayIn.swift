@@ -50,7 +50,6 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
 
     private(set) var session: PayabliSession?
     private let injectedTransport: (any PayabliTransport)?
-    private let diagnostics: PayabliPayInDiagnostics
     private var client: PayInPaymentFlowClient
     private var tokenStorageClient: PayInPaymentFlowTokenStorageClient
     private var activeSubmissionCount = 0
@@ -66,23 +65,8 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
     ///   - session: The session the flow sends on.
     ///   - operation: What a submission does.
     ///   - requestConfiguration: The request the flow starts with, if any.
-    public convenience init(
+    public init(
         session: PayabliSession,
-        operation: PayabliPayInOperation = .storePaymentMethod,
-        requestConfiguration: PayabliPayInRequestConfiguration? = nil
-    ) {
-        self.init(
-            session: session,
-            diagnostics: .disabled,
-            operation: operation,
-            requestConfiguration: requestConfiguration
-        )
-    }
-
-    /// Builds the flow on a session, handing each request and answer to `diagnostics`.
-    package init(
-        session: PayabliSession,
-        diagnostics: PayabliPayInDiagnostics,
         operation: PayabliPayInOperation = .storePaymentMethod,
         requestConfiguration: PayabliPayInRequestConfiguration? = nil
     ) {
@@ -92,17 +76,8 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
         self.requestConfiguration = requestConfiguration
         self.session = session
         injectedTransport = nil
-        self.diagnostics = diagnostics
-        client = PayInPaymentFlowClient(
-            transport: session.transport,
-            baseURL: session.config.environment.baseURL,
-            diagnostics: diagnostics
-        )
-        tokenStorageClient = PayInPaymentFlowTokenStorageClient(
-            transport: session.transport,
-            baseURL: session.config.environment.baseURL,
-            diagnostics: diagnostics
-        )
+        client = PayInPaymentFlowClient(transport: session.transport)
+        tokenStorageClient = PayInPaymentFlowTokenStorageClient(transport: session.transport)
         super.init()
     }
 
@@ -114,7 +89,6 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
         entryPoint: String,
         environment: PayabliEnvironment,
         transport: any PayabliTransport,
-        diagnostics: PayabliPayInDiagnostics = .disabled,
         operation: PayabliPayInOperation = .storePaymentMethod,
         requestConfiguration: PayabliPayInRequestConfiguration? = nil
     ) {
@@ -124,17 +98,8 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
         self.requestConfiguration = requestConfiguration
         session = nil
         injectedTransport = transport
-        self.diagnostics = diagnostics
-        client = PayInPaymentFlowClient(
-            transport: transport,
-            baseURL: environment.baseURL,
-            diagnostics: diagnostics
-        )
-        tokenStorageClient = PayInPaymentFlowTokenStorageClient(
-            transport: transport,
-            baseURL: environment.baseURL,
-            diagnostics: diagnostics
-        )
+        client = PayInPaymentFlowClient(transport: transport)
+        tokenStorageClient = PayInPaymentFlowTokenStorageClient(transport: transport)
         super.init()
     }
 
@@ -160,16 +125,8 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
                 reason: "the configuration is not the one the session was initialized with"
             ))
         }
-        client = PayInPaymentFlowClient(
-            transport: transport,
-            baseURL: config.environment.baseURL,
-            diagnostics: diagnostics
-        )
-        tokenStorageClient = PayInPaymentFlowTokenStorageClient(
-            transport: transport,
-            baseURL: config.environment.baseURL,
-            diagnostics: diagnostics
-        )
+        client = PayInPaymentFlowClient(transport: transport)
+        tokenStorageClient = PayInPaymentFlowTokenStorageClient(transport: transport)
     }
 
     public func configure(config: PayabliConfig, theme _: PayabliTheme) {

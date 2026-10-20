@@ -7,17 +7,9 @@ import PayabliSDKCore
 /// transport, so nothing here holds a token or a token source.
 final class PayInPaymentFlowClient: Sendable {
     private let transport: any PayabliTransport
-    private let baseURL: URL?
-    private let diagnostics: PayabliPayInDiagnostics
 
-    init(
-        transport: any PayabliTransport,
-        baseURL: URL? = nil,
-        diagnostics: PayabliPayInDiagnostics = .disabled
-    ) {
+    init(transport: any PayabliTransport) {
         self.transport = transport
-        self.baseURL = baseURL
-        self.diagnostics = diagnostics
     }
 
     func capture(
@@ -120,9 +112,7 @@ final class PayInPaymentFlowClient: Sendable {
             path: "/api/MoneyIn/details/\(PercentEncoding.segment(transId))",
             isCallerRefusal: { $0.statusCode == 401 && Self.legacyCode(of: $0) == Self.callerMayNotRead }
         )
-        // The record also carries the payer and the card holder, under names no redaction rule matches, so
-        // no part of it reaches a diagnostics entry.
-        let response = try await send(request, logsResponseBody: false)
+        let response = try await transport.perform(request)
         return try Self.decodeDetails(from: response, asked: transId)
     }
 
@@ -296,7 +286,7 @@ final class PayInPaymentFlowClient: Sendable {
     ) async throws -> PayabliPayInResult {
         var answer: PayabliResponse?
         do {
-            let response = try await send(request)
+            let response = try await transport.perform(request)
             answer = response
             return try decodeResult(from: response)
         } catch {
@@ -324,31 +314,6 @@ final class PayInPaymentFlowClient: Sendable {
         guard let answer else { return nil }
         let decoded = try? JSONDecoder().decode(NamedTransaction.self, from: answer.body)
         return decoded?.data?.paymentTransId?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty
-    }
-
-    private func send(_ request: PayabliRequest, logsResponseBody: Bool = true) async throws -> PayabliResponse {
-        diagnostics.logRequest(request, baseURL: baseURL)
-        let start = Date()
-        let response: PayabliResponse
-        do {
-            response = try await transport.perform(request)
-        } catch {
-            diagnostics.logFailure(
-                error,
-                request: request,
-                baseURL: baseURL,
-                durationMilliseconds: Date().timeIntervalSince(start) * 1000
-            )
-            throw error
-        }
-        diagnostics.logResponse(
-            response,
-            request: request,
-            baseURL: baseURL,
-            durationMilliseconds: Date().timeIntervalSince(start) * 1000,
-            includingBody: logsResponseBody
-        )
-        return response
     }
 
     private func decodeResult(from response: PayabliResponse) throws -> PayabliPayInResult {

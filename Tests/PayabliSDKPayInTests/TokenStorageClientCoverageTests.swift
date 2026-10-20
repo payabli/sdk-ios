@@ -30,16 +30,12 @@ final class TokenStorageClientCoverageTests: XCTestCase {
         }
     }
 
-    func testDiagnosticsLogFailureWithRelativeURLAndRedactedHeaders() async throws {
-        let sink = CoverageDiagnosticSink()
+    func testAFailedAddSendsItsQueryAndSurfacesTheTransportError() async throws {
         let transport = CoverageFailingTransport(error: PayabliGenericError(
             type: .networkError,
             reason: "Offline"
         ))
-        let client = PayInPaymentFlowTokenStorageClient(
-            transport: transport,
-            diagnostics: .enabled { sink.append($0) }
-        )
+        let client = PayInPaymentFlowTokenStorageClient(transport: transport)
 
         do {
             _ = try await client.addMethod(
@@ -63,59 +59,16 @@ final class TokenStorageClientCoverageTests: XCTestCase {
             XCTFail("Wrong error: \(error)")
         }
 
-        let entries = sink.entries()
-        XCTAssertEqual(entries.map(\.phase), [.request, .failure])
-
-        let failure = try XCTUnwrap(entries.last)
-        XCTAssertEqual(failure.method, "POST")
-        XCTAssertTrue(failure.url.hasPrefix("/api/TokenStorage/add?"))
-        XCTAssertTrue(failure.url.contains("createAnonymous=false"))
-        XCTAssertTrue(failure.url.contains("temporary=true"))
-        // The credential is attached below this layer, so it never enters the diagnostic record.
-        XCTAssertNil(failure.headers["Authorization"])
-        XCTAssertNil(failure.body)
-        XCTAssertNotNil(failure.durationMilliseconds)
-        XCTAssertFalse((failure.errorDescription ?? "").isEmpty)
+        let requests = await transport.requests
+        let request = try XCTUnwrap(requests.first)
+        XCTAssertEqual(request.method, .post)
+        XCTAssertEqual(request.path, "/api/TokenStorage/add")
+        XCTAssertTrue(request.query.contains(URLQueryItem(name: "createAnonymous", value: "false")))
+        XCTAssertTrue(request.query.contains(URLQueryItem(name: "temporary", value: "true")))
+        XCTAssertNil(request.headers["Authorization"])
     }
 
-    func testDiagnosticsRedactsPANLikeValuesFromFailureMessages() async throws {
-        let sink = CoverageDiagnosticSink()
-        let transport = CoverageFailingTransport(error: PayabliGenericError(
-            type: .networkError,
-            reason: "Gateway echoed 4111 1111 1111 1111",
-            detail: "Retry without card 4111111111111111."
-        ))
-        let client = PayInPaymentFlowTokenStorageClient(
-            transport: transport,
-            diagnostics: .enabled { sink.append($0) }
-        )
-
-        do {
-            _ = try await client.addMethod(
-                entryPoint: "entry",
-                paymentMethod: .card(PayabliPayInCardData(
-                    cardNumber: "4111111111111111",
-                    expiration: "02/28",
-                    cardholderName: "Jane Doe",
-                    cvv: "123",
-                    billingZip: "33139"
-                ))
-            )
-            XCTFail("Expected transport error")
-        } catch let error as PayabliGenericError {
-            XCTAssertEqual(error.type, .networkError)
-        } catch {
-            XCTFail("Wrong error: \(error)")
-        }
-
-        let failure = try XCTUnwrap(sink.entries().last)
-        XCTAssertTrue(failure.errorDescription?.contains("[REDACTED]") == true)
-        XCTAssertFalse(failure.errorDescription?.contains("4111111111111111") == true)
-        XCTAssertFalse(failure.errorDescription?.contains("4111 1111 1111 1111") == true)
-    }
-
-    func testDiagnosticsRedactsArrayResponsesAndNonJSONBodies() async throws {
-        let arraySink = CoverageDiagnosticSink()
+    func testArrayAndNonJSONResponsesAreDecodingErrors() async throws {
         let arrayTransport = CoverageMockTransport(responseBody: """
         [
           {
@@ -125,10 +78,7 @@ final class TokenStorageClientCoverageTests: XCTestCase {
           }
         ]
         """)
-        let arrayClient = PayInPaymentFlowTokenStorageClient(
-            transport: arrayTransport,
-            diagnostics: .enabled { arraySink.append($0) }
-        )
+        let arrayClient = PayInPaymentFlowTokenStorageClient(transport: arrayTransport)
 
         do {
             _ = try await arrayClient.addMethod(
@@ -148,17 +98,8 @@ final class TokenStorageClientCoverageTests: XCTestCase {
             XCTFail("Wrong error: \(error)")
         }
 
-        let arrayResponseBody = try XCTUnwrap(arraySink.entries().last?.body)
-        XCTAssertTrue(arrayResponseBody.contains("\"resultText\":\"Visible\""))
-        XCTAssertFalse(arrayResponseBody.contains("4111111111111111"))
-        XCTAssertFalse(arrayResponseBody.contains("jane@example.com"))
-
-        let nonJSONSink = CoverageDiagnosticSink()
         let nonJSONTransport = CoverageMockTransport(responseBody: "gateway text response")
-        let nonJSONClient = PayInPaymentFlowTokenStorageClient(
-            transport: nonJSONTransport,
-            diagnostics: .enabled { nonJSONSink.append($0) }
-        )
+        let nonJSONClient = PayInPaymentFlowTokenStorageClient(transport: nonJSONTransport)
 
         do {
             _ = try await nonJSONClient.addMethod(
@@ -177,11 +118,6 @@ final class TokenStorageClientCoverageTests: XCTestCase {
         } catch {
             XCTFail("Wrong error: \(error)")
         }
-
-        XCTAssertEqual(
-            nonJSONSink.entries().last?.body,
-            "[REDACTED NON-JSON BODY; 21 bytes]"
-        )
     }
 
     func testApprovedResultCodeWithoutSuccessFlagDecodesStoredMethod() async throws {
@@ -421,22 +357,5 @@ private actor CoverageFailingTransport: PayabliTransport {
         decoding: T.Type
     ) async throws -> PayabliV2Envelope<T> {
         throw PayabliGenericError(type: .unknown, reason: "performV2 is not used")
-    }
-}
-
-private final class CoverageDiagnosticSink: @unchecked Sendable {
-    private let lock = NSLock()
-    private var captured: [PayabliPayInDiagnosticEntry] = []
-
-    func append(_ entry: PayabliPayInDiagnosticEntry) {
-        lock.lock()
-        defer { lock.unlock() }
-        captured.append(entry)
-    }
-
-    func entries() -> [PayabliPayInDiagnosticEntry] {
-        lock.lock()
-        defer { lock.unlock() }
-        return captured
     }
 }
