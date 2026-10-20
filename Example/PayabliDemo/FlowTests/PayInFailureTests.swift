@@ -87,8 +87,8 @@ final class PayInFailureTests: XCTestCase {
     }
 
     /// The text a screen shows must not answer an open outcome by telling an operator to send another
-    /// payment: the earlier attempt may have taken one, and past the service's window the next attempt
-    /// is executed rather than refused. The wording is what this pins; what a screen offers is its own.
+    /// payment: the earlier attempt may have taken one, and the refusal lapses, so the next attempt can
+    /// be executed rather than refused. The wording is what this pins; what a screen offers is its own.
     func testARecognisedRepeatOnACaptureIsNotWordedAsAnInvitationToRetry() {
         let failure = PayInFailure(Self.interruptedConflict, operation: .capture)
 
