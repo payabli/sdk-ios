@@ -30,6 +30,12 @@ struct AuthenticatedTransport: PayabliTransport {
     }
 
     func perform(_ request: PayabliRequest) async throws -> PayabliResponse {
+        // Fails without a round trip once the holder is finished. The holder refuses a new mint on its own,
+        // so this saves a send rather than guarding one.
+        if let failure = auth.terminalFailure {
+            throw failure
+        }
+
         let stamped = SentToken()
         let firstAttempt = try await SentToken.$current.withValue(stamped) {
             try await base.perform(request)
@@ -90,7 +96,17 @@ struct AuthenticatedTransport: PayabliTransport {
                 "recovery exhausted: the replay was refused too"
                     + " (\(request.method.rawValue) \(secondAttempt.statusCode))"
             )
-            throw recovery.exhausted()
+            // A token minted moments ago and refused again finishes the session, unless it has moved on or is
+            // being replaced: then the refusal is about a token, and finishing would end a session whose next
+            // token works. The holder decides and records that in one turn.
+            let exhausted = recovery.exhausted()
+            if let sent = replayed.value {
+                _ = await auth.finishIfSettled(on: sent, with: exhausted)
+            } else {
+                // Nothing stamped means the replay carried no bearer, which is not a state to be lenient about.
+                await auth.finish(with: exhausted)
+            }
+            throw exhausted
         }
         return secondAttempt
     }

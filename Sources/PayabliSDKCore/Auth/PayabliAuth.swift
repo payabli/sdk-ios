@@ -23,6 +23,15 @@ actor PayabliAuth {
     /// to gate a synchronized deadline on every intended joiner having arrived.
     private let onJoinedInFlightMint: (@Sendable () -> Void)?
 
+    /// Why this holder is finished, or nil while it still works. Written only inside this actor, so no mint
+    /// can start between deciding and recording. Readable without awaiting.
+    private nonisolated let finished = FinishedSlot()
+
+    /// Non-nil once this holder is finished: a token refreshed after a rejection was refused in turn.
+    nonisolated var terminalFailure: PayabliGenericError? {
+        finished.failure
+    }
+
     init(config: PayabliConfig) {
         self.init(config: config, logger: PayabliLogger(category: .auth))
     }
@@ -62,12 +71,38 @@ actor PayabliAuth {
             )
         }
 
+        if let failure = terminalFailure {
+            throw failure
+        }
+
         if let existing = inFlightMint {
             onJoinedInFlightMint?()
             return try await join(existing)
         }
 
         return try await mint(replacing: nil)
+    }
+
+    /// Marks this holder finished when `token` is still the one it would send and no mint is in flight.
+    ///
+    /// A token that has moved on, or is being replaced, says nothing about the session, so a rejection of
+    /// it finishes nothing.
+    ///
+    /// - Parameters:
+    ///   - token: The credential the rejection arrived on.
+    ///   - failure: What finished the holder.
+    /// - Returns: Whether the holder was marked finished.
+    func finishIfSettled(on token: String, with failure: PayabliGenericError) -> Bool {
+        guard inFlightMint == nil, currentToken == token else { return false }
+        finished.failure = failure
+        return true
+    }
+
+    /// Marks this holder finished outright, for a rejection no rotation could have fixed.
+    ///
+    /// - Parameter failure: What finished the holder.
+    func finish(with failure: PayabliGenericError) {
+        finished.failure = failure
     }
 
     /// The token held right now, without minting one.
@@ -106,6 +141,10 @@ actor PayabliAuth {
                 )
             }
             return held
+        }
+
+        if let failure = terminalFailure {
+            throw failure
         }
 
         if let existing = inFlightMint {
@@ -308,10 +347,22 @@ actor PayabliAuth {
         }
     }
 
-    /// Drops the held token and any call in flight, so the next read mints again.
+    /// Drops the held token and any call in flight, and revives a finished holder, so the next read mints again.
     func reset() {
         currentToken = nil
         inFlightMint = nil
         inFlightMintID = nil
+        finished.failure = nil
+    }
+}
+
+/// The failure that finished a holder, behind a lock so it can be read from outside the actor.
+private final class FinishedSlot: @unchecked Sendable {
+    private let lock = NSLock()
+    private var stored: PayabliGenericError?
+
+    var failure: PayabliGenericError? {
+        get { lock.withLock { stored } }
+        set { lock.withLock { stored = newValue } }
     }
 }
