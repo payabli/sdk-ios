@@ -416,8 +416,8 @@ final class TokenStorageClientTests: XCTestCase {
         XCTAssertFalse(request.headers.keys.contains { $0.lowercased() == "authorization" })
         XCTAssertEqual(request.headers["Content-Type"], "application/json")
         let body = try XCTUnwrap(String(bytes: XCTUnwrap(request.body), encoding: .utf8))
-        XCTAssertTrue(body.contains("\"entryPoint\":\"f743aed24a\""), body)
-        XCTAssertTrue(body.contains("\"source\":\"ios-sdk\""), body)
+        XCTAssertTrue(body.contains("\"entryPoint\":\"f743aed24a\""))
+        XCTAssertTrue(body.contains("\"source\":\"ios-sdk\""))
     }
 
     func testDeclinedPaymentMethodThrowsDomainError() async throws {
