@@ -531,7 +531,97 @@ final class AuthenticatedTransportTests: XCTestCase {
         XCTAssertNil(held, "the recovery path installs no token of its own")
     }
 
+    // MARK: - A run of failing calls
+
+    func testAProviderThatAlwaysFailsIsAskedOncePerCallAcrossARunOfCalls() async throws {
+        let stub = RecordingStub(status: Self.ok)
+        stub.install()
+        defer { stub.uninstall() }
+
+        let provider = Counter()
+        let transport = try makeAuthenticatedStack(auth: authOver {
+            _ = await provider.increment()
+            throw URLError(.cannotConnectToHost)
+        })
+
+        for done in 0 ..< Self.run {
+            let failure = await failure(from: { _ = try await self.retrying(transport) })
+
+            XCTAssertEqual((failure as? any PayabliError)?.type, .tokenProviderFailed)
+            let calls = await provider.count
+            XCTAssertEqual(calls, done + 1, "one provider call per call, and none between calls")
+        }
+        XCTAssertEqual(stub.count, 0, "no request goes out without a token")
+    }
+
+    func testAProviderAnsweringTheTokenJustRefusedIsAskedTwiceThenOncePerCall() async throws {
+        let stub = RecordingStub(status: Self.unauthorized)
+        stub.install()
+        defer { stub.uninstall() }
+
+        let provider = Counter()
+        let transport = try makeAuthenticatedStack(auth: authOver {
+            _ = await provider.increment()
+            return testToken
+        })
+
+        for done in 0 ..< Self.run {
+            let before = await provider.count
+            let failure = await failure(from: { _ = try await self.retrying(transport) })
+
+            XCTAssertEqual((failure as? any PayabliError)?.type, .tokenProviderFailed)
+            let after = await provider.count
+            // The first call mints the token and asks again after the 401; later calls hold it.
+            XCTAssertEqual(after - before, done == 0 ? 2 : 1, "provider calls on call \(done + 1)")
+            XCTAssertEqual(stub.count, done + 1, "one request per call")
+        }
+    }
+
+    func testAProviderWhoseEveryNewTokenIsRefusedIsAskedTwiceThenOncePerCall() async throws {
+        let stub = RecordingStub(status: Self.unauthorized)
+        stub.install()
+        defer { stub.uninstall() }
+
+        let provider = Counter()
+        let transport = try makeAuthenticatedStack(auth: authOver {
+            "token-\(await provider.increment())"
+        })
+
+        for done in 0 ..< Self.run {
+            let before = await provider.count
+            let failure = await failure(from: { _ = try await self.retrying(transport) })
+
+            XCTAssertEqual((failure as? any PayabliError)?.type, .tokenExpired)
+            let after = await provider.count
+            // The first call mints a token and refreshes it; each later call refreshes the token it holds once.
+            XCTAssertEqual(after - before, done == 0 ? 2 : 1, "provider calls on call \(done + 1)")
+            XCTAssertEqual(stub.count, 2 * (done + 1), "a request and its one replay per call")
+        }
+    }
+
     // MARK: - Helpers
+
+    /// How many calls in a row a test drives against a token that never works.
+    private static let run = 5
+
+    /// A holder whose every token, the first included, comes from `provider`.
+    private func authOver(_ provider: @escaping PayabliTokenRefresh) throws -> PayabliAuth {
+        let config = try PayabliConfig(entryPoint: "entry", environment: .sandbox, tokenProvider: provider)
+        return PayabliAuth(config: config, logger: PayabliLogger(category: .auth, sink: RecordingLogSink()))
+    }
+
+    /// One call the way a capability makes it: through `Retry`, which would repeat any code it retries.
+    private func retrying(_ transport: any PayabliTransport) async throws -> PayabliResponse {
+        try await Retry.run(
+            policy: .test(),
+            logger: PayabliLogger(category: .network, sink: RecordingLogSink()),
+            clock: FakeRetryClock()
+        ) { _ in
+            let response = try await transport.perform(self.ping())
+            try mapPayabliHTTPError(response: response)
+            return response
+        }
+    }
 
     private func ping() -> PayabliRequest {
         PayabliRequest(method: .get, path: "/api/v2/ping")

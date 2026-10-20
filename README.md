@@ -213,6 +213,8 @@ func fetchPayabliAccessToken() async throws -> String {
 - Concurrent callers share one call.
 - Each call has 30 seconds to return. A call that takes longer, throws, or returns a token the SDK can't
   use fails with `PayabliErrorType.tokenProviderFailed`.
+- The SDK doesn't retry a `.tokenProviderFailed` or `.tokenExpired` failure itself. Try again only when someone
+  using your app asks to, or wait longer before each attempt.
 - Return a token. Don't make SDK calls from inside the provider.
 
 ### Device identity
