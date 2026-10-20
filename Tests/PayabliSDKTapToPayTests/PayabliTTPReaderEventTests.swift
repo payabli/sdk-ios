@@ -9,6 +9,7 @@ import XCTest
 /// A real reader only reports on a device. The provider seam is what makes
 /// these answerable on a simulator; what a device still has to answer is that
 /// the platform raises the events at all, which is the manual tier.
+@available(iOS 16.7, *)
 @MainActor
 final class PayabliTTPReaderEventTests: XCTestCase {
     override func setUp() {

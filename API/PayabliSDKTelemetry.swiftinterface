@@ -1,5 +1,5 @@
 // swift-interface-format-version: 1.0
-// swift-module-flags: -target arm64-apple-ios16.7 -enable-objc-interop -enable-library-evolution -language-mode 5 -O -enable-experimental-feature DebugDescriptionMacro -module-name PayabliSDKTelemetry -package-name PayabliSDK
+// swift-module-flags: -target arm64-apple-ios16.0 -enable-objc-interop -enable-library-evolution -language-mode 5 -O -enable-experimental-feature DebugDescriptionMacro -module-name PayabliSDKTelemetry -package-name PayabliSDK
 import Foundation
 import PayabliSDKCore
 import Swift

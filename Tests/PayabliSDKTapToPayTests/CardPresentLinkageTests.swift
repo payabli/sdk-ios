@@ -3,6 +3,7 @@ import PayabliSDKTapToPay
 import XCTest
 
 /// The positive case can only be asserted where the card-present product is linked, which is here.
+@available(iOS 16.7, *)
 final class CardPresentLinkageTests: XCTestCase {
     func testTheNameCoreLooksUpIsTheCardPresentFacade() {
         XCTAssertTrue(NSClassFromString(CardPresentLinkage.module) === PayabliTTP.self)

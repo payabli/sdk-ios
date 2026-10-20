@@ -3,6 +3,7 @@ import PayabliSDKCore
 
 // MARK: - Contactless payment terms
 
+@available(iOS 16.7, *)
 @MainActor
 public extension PayabliTTP {
     /// Checks whether the merchant has accepted the terms required before this

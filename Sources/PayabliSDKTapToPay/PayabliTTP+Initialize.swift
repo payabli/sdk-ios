@@ -3,6 +3,7 @@ import PayabliSDKCore
 
 // MARK: - Initialize & reinitialize
 
+@available(iOS 16.7, *)
 @MainActor
 extension PayabliTTP {
     // MARK: - Public entrypoints

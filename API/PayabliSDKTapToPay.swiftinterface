@@ -1,5 +1,5 @@
 // swift-interface-format-version: 1.0
-// swift-module-flags: -target arm64-apple-ios16.7 -enable-objc-interop -enable-library-evolution -language-mode 5 -O -enable-experimental-feature DebugDescriptionMacro -module-name PayabliSDKTapToPay -package-name PayabliSDK
+// swift-module-flags: -target arm64-apple-ios16.0 -enable-objc-interop -enable-library-evolution -language-mode 5 -O -enable-experimental-feature DebugDescriptionMacro -module-name PayabliSDKTapToPay -package-name PayabliSDK
 import Combine
 import CryptoKit
 import DeviceCheck
@@ -16,25 +16,30 @@ public enum PayabliTapToPayModule {
     get
   }
 }
+@available(iOS 16.7, *)
 @_Concurrency::MainActor extension PayabliSDKTapToPay::PayabliTTP {
   @_Concurrency::MainActor final public func activateDevice(activationCode: Swift::String) async throws
   @objc @_Concurrency::MainActor final public func activateDevice(activationCode: Swift::String, completion: @escaping (Foundation::NSError?) -> Swift::Void)
 }
+@available(iOS 16.7, *)
 @_Concurrency::MainActor extension PayabliSDKTapToPay::PayabliTTP {
   @_Concurrency::MainActor final public func charge(type: PayabliSDKTapToPay::PayabliTTPPaymentType, paymentDetails: PayabliSDKTapToPay::PayabliTTPPaymentDetails, customer: PayabliSDKTapToPay::PayabliTTPCustomerData = PayabliTTPCustomerData(), invoice: PayabliSDKTapToPay::PayabliTTPInvoiceData = PayabliTTPInvoiceData(), orderDescription: Swift::String? = nil) async throws -> PayabliSDKTapToPay::TransactionResult
   @objc @_Concurrency::MainActor final public func charge(type: Swift::Int, paymentDetails: PayabliSDKTapToPay::PayabliTTPPaymentDetailsObjC, customer: PayabliSDKTapToPay::PayabliTTPCustomerDataObjC?, invoice: PayabliSDKTapToPay::PayabliTTPInvoiceDataObjC?, orderDescription: Swift::String?, completion: @escaping (PayabliSDKTapToPay::PayabliTTPTransactionResultObjC?, Foundation::NSError?) -> Swift::Void)
 }
+@available(iOS 16.7, *)
 @_Concurrency::MainActor extension PayabliSDKTapToPay::PayabliTTP {
   @_Concurrency::MainActor final public func initialize() async throws
   @objc @_Concurrency::MainActor final public func initialize(completion: @escaping (Foundation::NSError?) -> Swift::Void)
 }
+@available(iOS 16.7, *)
 @_Concurrency::MainActor extension PayabliSDKTapToPay::PayabliTTP {
   @_Concurrency::MainActor final public func areTermsAccepted() async throws -> Swift::Bool
   @objc @_Concurrency::MainActor final public func areTermsAccepted(completion: @escaping (Swift::Bool, Foundation::NSError?) -> Swift::Void)
   @_Concurrency::MainActor final public func presentTerms() async throws
   @objc @_Concurrency::MainActor final public func presentTerms(completion: @escaping (Foundation::NSError?) -> Swift::Void)
 }
-@_hasMissingDesignatedInitializers @objc(PayabliTTP) @_Concurrency::MainActor final public class PayabliTTP : ObjectiveC::NSObject, Foundation::ObservableObject {
+@_hasMissingDesignatedInitializers @available(iOS 16.7, *)
+@objc(PayabliTTP) @_Concurrency::MainActor final public class PayabliTTP : ObjectiveC::NSObject, Foundation::ObservableObject {
   @Combine::Published<PayabliSDKTapToPay::PayabliTTPSessionState> @_projectedValueProperty($sessionState) @_Concurrency::MainActor final public var sessionState: PayabliSDKTapToPay::PayabliTTPSessionState {
     get
   }
@@ -64,6 +69,7 @@ public enum PayabliTapToPayModule {
   }
   @objc @_Concurrency::MainActor public static func create() async throws -> PayabliSDKTapToPay::PayabliTTP
   @objc @_Concurrency::MainActor final public func addSessionStateObserver(_ handler: @escaping () -> Swift::Void) -> PayabliSDKTapToPay::TapToPaySessionStateObservation
+  @available(iOS 16.7, *)
   public typealias ObjectWillChangePublisher = Combine::ObservableObjectPublisher
   @objc deinit
 }
@@ -292,6 +298,7 @@ extension PayabliSDKTapToPay::TapToPayError : Foundation::CustomNSError {
     get
   }
 }
+@available(iOS 16.7, *)
 extension PayabliSDKTapToPay::PayabliTTP : Swift::Sendable {}
 extension PayabliSDKTapToPay::PayabliTTPCapture : Swift::Equatable {}
 extension PayabliSDKTapToPay::PayabliTTPCapture : Swift::Hashable {}

@@ -5,6 +5,7 @@ import XCTest
 
 /// `initialize` reports once per run it owns: a start, then one ending, carrying none of the text a host's error
 /// does.
+@available(iOS 16.7, *)
 @MainActor
 final class TapToPayReportsTests: XCTestCase {
     /// The keys `ttp.initialize.failed` may carry. `error_number` is the code the host was told.
@@ -72,7 +73,7 @@ final class TapToPayReportsTests: XCTestCase {
     func testADismissedSetupSheetReportsACancelSentAtOnceAndNoFailure() async throws {
         let (ttp, provider, _, transport) = try makeTTP()
         provider.prepareReaderResult = .failure(PayabliTTPError.readerSetupFailed(
-            reason: "\(FiservCardReader.cancellationReasonPrefix) \(Self.sentinel)"
+            reason: "\(PayabliTTPError.cancellationReasonPrefix) \(Self.sentinel)"
         ))
 
         try await initializeToItsEnd(ttp, expecting: .userCancelled)

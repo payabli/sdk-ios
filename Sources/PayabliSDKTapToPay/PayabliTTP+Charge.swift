@@ -13,6 +13,7 @@ private enum TTPUpdateOutcome {
     case cancelled
 }
 
+@available(iOS 16.7, *)
 @MainActor
 extension PayabliTTP {
     /// Charge a transaction. `.sale` is the only type.

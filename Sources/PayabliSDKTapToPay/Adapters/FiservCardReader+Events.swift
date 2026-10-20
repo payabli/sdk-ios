@@ -6,6 +6,7 @@ import Foundation
 
 // MARK: - Card reader event mapping
 
+@available(iOS 16.7, *)
 extension FiservCardReader {
     #if canImport(PayabliCardReaderCore) && canImport(ProximityReader)
 

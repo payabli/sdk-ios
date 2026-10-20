@@ -61,7 +61,9 @@ GitHub metadata — not needed for our use case.
 own, so replacing a file with the upstream version silently drops them. Resolve
 the upstream checkout at the new tag, diff each of the 5 files against it, and
 take the upstream changes into ours rather than the other way round. Upstream
-declarations arrive `public`; each one merged in becomes `package`.
+declarations arrive `public`; each one merged in becomes `package`. A
+declaration that calls platform API newer than the package floor keeps its
+`@available` annotation, as `FiservTTPCardReader.isAccountLinked()` does.
 
 `Scripts/refresh_vendored_ttp.sh`, which earlier versions of this file
 described, does not exist. It was specified as an `rsync` of the 5 files, which

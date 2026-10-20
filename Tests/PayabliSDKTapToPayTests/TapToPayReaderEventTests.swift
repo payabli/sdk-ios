@@ -5,6 +5,7 @@ import XCTest
     import ProximityReader
 
     /// What the adapter makes of the platform's reader events.
+    @available(iOS 16.7, *)
     final class TapToPayReaderEventTests: XCTestCase {
         // MARK: - Mapped
 

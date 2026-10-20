@@ -117,6 +117,12 @@ extension PayabliTTPError: LocalizedError {
     }
 }
 
+extension PayabliTTPError {
+    /// Prefix inside a case's reason that marks a person dismissing the sheet. An adapter writes it and the
+    /// public edge reads it to report `USER_CANCELLED`.
+    static let cancellationReasonPrefix = "cancelled:"
+}
+
 extension Error {
     /// Bridges a public call's failure to the `NSError` its `@objc` companion completes with: a
     /// ``TapToPayError`` carries its catalog number as the code in the `"com.payabli.ttp"` domain, and
