@@ -17,8 +17,6 @@ package struct PayabliRequest: Sendable {
     /// Whether a refused answer refuses this caller rather than its credential. True means the answer is
     /// returned as it arrived, with no refresh and no replay.
     package let isCallerRefusal: @Sendable (PayabliResponse) -> Bool
-    /// Whether a credential rejection is returned as it arrived, with no refresh and no replay, because the route
-    /// holds only for the credential it was sent. The refused token is kept for the caller to renew.
     package let pinsCredential: Bool
 
     package init(

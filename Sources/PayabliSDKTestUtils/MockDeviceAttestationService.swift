@@ -121,7 +121,6 @@ package final class MockDeviceAttestationService: DeviceAttestationService, @unc
         set { lock.withLock { storedAttestResult = newValue } }
     }
 
-    /// Thrown by `attest` one at a time, in order, before `attestResult` answers.
     package var attestFailuresFirst: [Error] {
         get { lock.withLock { storedAttestFailuresFirst } }
         set { lock.withLock { storedAttestFailuresFirst = newValue } }
@@ -129,7 +128,6 @@ package final class MockDeviceAttestationService: DeviceAttestationService, @unc
 
     private var storedAttestFailuresFirst: [Error] = []
 
-    /// Thrown by `activateDevice` one at a time, in order, before `activationResult` answers.
     package var activationFailuresFirst: [Error] {
         get { lock.withLock { storedActivationFailuresFirst } }
         set { lock.withLock { storedActivationFailuresFirst = newValue } }

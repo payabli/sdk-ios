@@ -13,8 +13,6 @@ actor PayabliAuth {
     /// Names the call `inFlightMint` is running, so a mark that outlived its own call is ignored
     /// rather than answering a later rejection.
     private var inFlightMintID: UUID?
-    /// A token a pinned route refused, kept until it is renewed. Only the held token is kept, so a late refusal of
-    /// one already replaced asks for nothing.
     private var pinnedRefusal: String?
 
     /// What times the provider bound below. A parameter rather than a hardwired `SystemRetryClock()`

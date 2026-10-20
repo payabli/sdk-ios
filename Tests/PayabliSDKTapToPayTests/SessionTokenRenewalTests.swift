@@ -339,25 +339,21 @@ private final class RenewalStub: @unchecked Sendable {
     private var bearers: [String] = []
     private var configHook: (@Sendable (Int) -> Void)?
 
-    /// Runs on each `/config` call with its one-based number, before the answer is chosen.
     var onConfig: (@Sendable (Int) -> Void)? {
         get { lock.withLock { configHook } }
         set { lock.withLock { configHook = newValue } }
     }
 
-    /// Consumed one per `/config` call; once empty, `/config` answers 200.
     var configStatuses: [Int] {
         get { lock.withLock { statuses } }
         set { lock.withLock { statuses = newValue } }
     }
 
-    /// The `resultText` a refused `/config` carries, or none for a bare status.
     var configRefusalText: String? {
         get { lock.withLock { refusalText } }
         set { lock.withLock { refusalText = newValue } }
     }
 
-    /// The bearer each `/config` call carried, in order.
     var configBearers: [String] {
         lock.withLock { bearers }
     }

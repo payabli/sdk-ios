@@ -1,12 +1,10 @@
 import Foundation
 import PayabliSDKCore
 
-/// The refusal `/activate` and `/config` send when the service holds no live attestation for the key and device the
-/// request presented, so the binding names nothing and the device has to be set up again.
-///
-/// Told apart from an expired token by its text alone, because both arrive as a 401.
+/// The refusal `/activate` and `/config` send when the service holds no live attestation for the device the request
+/// presented, so it has to be set up again. Both this and an expired token arrive as a 401, so only the text tells
+/// them apart, and the text is sent without a final period.
 enum BindingRefusal {
-    /// Sent without a final period.
     static let text = "Device not attested or attestation revoked"
 
     /// Whether a response with `statusCode` and `reason` says the binding is gone.
