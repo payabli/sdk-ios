@@ -121,7 +121,7 @@ package final class TTPTransactionClient: Sendable {
     /// shape.
     ///
     /// - Parameter payload: what the reader did, as the success or failure to encode.
-    /// - Returns: the wire body for the update, the response under the `fiservResponse` key.
+    /// - Returns: the wire body for the update: the response under the `fiservResponse` key on a success, an `error` object on a failure.
     static func updateBody(for payload: TTPUpdatePayload) -> Data {
         let encoder = JSONEncoder()
         switch payload {
