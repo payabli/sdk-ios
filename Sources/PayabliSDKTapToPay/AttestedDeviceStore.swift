@@ -39,6 +39,9 @@ final class AttestedDeviceStore {
     /// The binding for this entry point, moved to the front when it was not already
     /// there: reading is what makes a binding recent, so the one that falls off the
     /// back is the coldest.
+    ///
+    /// - Parameter entry: the entry point whose held binding is asked for.
+    /// - Returns: the entry point's binding, or `nil` where none is held.
     func binding(for entry: String) throws -> AttestedDevice? {
         try Self.lock.withLock {
             let held = try load()
@@ -60,6 +63,8 @@ final class AttestedDeviceStore {
     ///
     /// Throws when the write fails: nothing here keeps an in-memory copy, so the
     /// service would be enrolled with this device holding nothing.
+    ///
+    /// - Parameter record: the binding to hold, replacing the entry point's earlier one.
     func remember(_ record: AttestedDevice) throws {
         try Self.lock.withLock {
             try write(load().with(record))
@@ -70,6 +75,8 @@ final class AttestedDeviceStore {
     ///
     /// Throws when the rewrite fails, so a caller is never told a binding was
     /// dropped while it is still readable.
+    ///
+    /// - Parameter entry: the entry point whose binding is dropped.
     func forget(entry: String) throws {
         try Self.lock.withLock {
             try write(load().without(entry: entry))
@@ -78,9 +85,12 @@ final class AttestedDeviceStore {
 
     /// Drops this entry point's binding only while it is still the one given.
     ///
-    /// For a caller that read a binding, went away to ask about it, and came back:
-    /// the entry point may hold a newly attested binding by now. Answers whether it
-    /// dropped anything.
+    /// For a caller that read a binding, went away, and came back: the entry point may hold a newly
+    /// attested binding by now.
+    ///
+    /// - Parameter entry: the entry point whose binding is dropped.
+    /// - Parameter record: the binding the caller read, the only one dropped.
+    /// - Returns: whether the binding was still the one given and was dropped.
     @discardableResult
     func forget(entry: String, ifStill record: AttestedDevice) throws -> Bool {
         try Self.lock.withLock {
@@ -93,9 +103,10 @@ final class AttestedDeviceStore {
 
     /// Drops this entry point's binding and its pending key together.
     ///
-    /// One turn of the lock, because the two are one decision. Taken separately, an
-    /// attestation that mints a key in the gap has it deleted by the second half of
-    /// a clear that was never about it, and its retry registers another device.
+    /// One turn of the lock, because the two are one decision: a key minted in the gap between
+    /// them is deleted by a clear that was never about it.
+    ///
+    /// - Parameter entry: the entry point whose binding and pending key are dropped.
     func forgetEverything(for entry: String) throws {
         try Self.lock.withLock {
             try write(load().without(entry: entry))
@@ -109,6 +120,9 @@ final class AttestedDeviceStore {
     // MARK: - Keys an attestation is part way through
 
     /// The key this entry point minted and has not finished attesting.
+    ///
+    /// - Parameter entry: the entry point whose unfinished key is asked for.
+    /// - Returns: the minted key's id, or `nil` where no attestation is unfinished.
     func pendingKey(for entry: String) throws -> String? {
         try Self.lock.withLock { try loadPending().keyId(for: entry) }
     }
@@ -116,17 +130,21 @@ final class AttestedDeviceStore {
     /// Kept per entry point. A key can be attested once, so one entry point's key is
     /// no use to another, and a single slot let whichever started second overwrite
     /// the first.
+    ///
+    /// - Parameter keyId: the minted key's id, held until the attestation spends it.
+    /// - Parameter entry: the entry point the key was minted for.
     func rememberPendingKey(_ keyId: String, for entry: String) throws {
         try Self.lock.withLock {
             try writePending(try loadPending().with(keyId, for: entry))
         }
     }
 
-    /// Only this entry point's: removing every one takes away a retry another
-    /// paypoint is part way through.
+    /// Only this entry point's: removing every one takes away a retry another paypoint is part way through.
     ///
-    /// Throws, because the caller drops the slot immediately before burning the key
-    /// it names, and a spent key is refused every time it is reused.
+    /// Raises when the write fails: the caller drops the slot immediately before burning the key it
+    /// names, and a spent key is refused every time it is reused.
+    ///
+    /// - Parameter entry: the entry point whose pending key is dropped.
     func forgetPendingKey(for entry: String) throws {
         try Self.lock.withLock {
             let held = try loadPending()
@@ -164,11 +182,12 @@ final class AttestedDeviceStore {
 
     // MARK: - Under the lock
 
-    /// Everything stored, empty when there is nothing to read, and a raise when the
-    /// store could not answer.
+    /// Everything stored, empty when there is nothing to read, and a raise when the store could not
+    /// answer.
     ///
-    /// A record that will not decode is gone, so the item goes with it. That
-    /// removal is best effort: a read that raises never reaches it either.
+    /// A record that will not decode is gone, and the item goes with it.
+    ///
+    /// - Returns: the stored bindings, empty where nothing decodes.
     private func load() throws -> DeviceBindings {
         guard let raw = try storage.string(forKey: PayabliKeychainKey.deviceBindings) else {
             return DeviceBindings()

@@ -15,11 +15,16 @@ package protocol PayabliComponent: AnyObject {
     nonisolated static var requiredPermissions: [String] { get }
 
     /// Initialize the component with shared configuration.
+    ///
+    /// - Parameter config: the session's configuration the component initializes from.
     func configure(config: PayabliConfig)
 
     /// Legacy compatibility entry point for integrations compiled against the
     /// original component protocol. New component-specific style APIs replace
     /// the shared theme object.
+    ///
+    /// - Parameter config: the session's configuration the component initializes from.
+    /// - Parameter theme: the shared theme object to style the component with.
     func configure(config: PayabliConfig, theme: PayabliTheme)
 }
 

@@ -46,6 +46,8 @@ actor AttestationsInFlight {
 
     /// Returns once this caller holds the entry point, or raises if it is cancelled
     /// first.
+    ///
+    /// - Parameter entry: the entry point whose turn this caller waits for.
     private func waitForTurn(_ entry: String) async throws {
         guard running.contains(entry) else {
             running.insert(entry)
@@ -71,6 +73,9 @@ actor AttestationsInFlight {
 
     /// Releases a caller that was cancelled while queued. The turn ahead is left
     /// alone: it belongs to a caller that did not cancel.
+    ///
+    /// - Parameter entry: the entry point whose queue the cancelled caller sat in.
+    /// - Parameter id: the cancelled caller's queue identity, so only that one is released.
     private func abandon(_ entry: String, _ id: UUID) {
         guard var queue = waiting[entry],
               let index = queue.firstIndex(where: { $0.id == id })
@@ -84,6 +89,8 @@ actor AttestationsInFlight {
 
     /// Passes the entry point to the next caller, or gives it up when none is
     /// waiting.
+    ///
+    /// - Parameter entry: the entry point whose turn ends with this call.
     private func handOn(_ entry: String) {
         guard var queue = waiting[entry], !queue.isEmpty else {
             running.remove(entry)

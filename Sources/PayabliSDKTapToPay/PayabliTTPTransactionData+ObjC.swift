@@ -49,6 +49,29 @@ public final class PayabliTTPCustomerDataObjC: NSObject {
     @objc public let shippingCountry: String?
 
     /// Designated init. Argument labels match `PayabliTTPCustomerData.init`.
+    ///
+    /// - Parameters:
+    ///   - firstName: the customer's first name, or `nil` when none is given.
+    ///   - lastName: the customer's last name, or `nil` when none is given.
+    ///   - customerNumber: the merchant's own number for the customer.
+    ///   - email: the customer's email address, or `nil` when none is given.
+    ///   - phone: the customer's phone number, or `nil` when none is given.
+    ///   - customerId: the merchant's numeric id for the customer.
+    ///   - company: the customer's company name, or `nil` when none is given.
+    ///   - billingAddress1: the billing street address, first line.
+    ///   - billingAddress2: the billing street address, second line.
+    ///   - billingCity: the billing address's city.
+    ///   - billingState: the billing address's state.
+    ///   - billingZip: the billing address's postal code.
+    ///   - billingCountry: the billing address's country.
+    ///   - billingPhone: the billing contact's phone number.
+    ///   - billingEmail: the billing contact's email address.
+    ///   - shippingAddress1: the shipping street address, first line.
+    ///   - shippingAddress2: the shipping street address, second line.
+    ///   - shippingCity: the shipping address's city.
+    ///   - shippingState: the shipping address's state.
+    ///   - shippingZip: the shipping address's postal code.
+    ///   - shippingCountry: the shipping address's country.
     @objc public init(
         firstName: String?,
         lastName: String?,
@@ -97,6 +120,8 @@ public final class PayabliTTPCustomerDataObjC: NSObject {
     }
 
     /// Bridge to the Swift value type used internally by the charge pipeline.
+    ///
+    /// - Returns: the customer data the charge pipeline carries.
     func toSwift() -> PayabliTTPCustomerData {
         PayabliTTPCustomerData(
             firstName: firstName,
@@ -134,6 +159,8 @@ public final class PayabliTTPTransactionResultObjC: NSObject {
     @objc public let paymentTransId: String
 
     /// Bridge from the Swift value type returned by the charge pipeline.
+    ///
+    /// - Parameter result: the charge's result, as the Swift pipeline answered it.
     init(_ result: TransactionResult) {
         self.paymentTransId = result.paymentTransId
         super.init()

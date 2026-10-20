@@ -85,6 +85,12 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
     ///
     /// There is no token source here because there is nothing to authenticate: the transport given
     /// is the one used, and a fake one never reads a credential.
+    ///
+    /// - Parameter entryPoint: the paypoint's entry point, as the requests carry it.
+    /// - Parameter environment: the environment the requests go to, whose base URL builds the routes.
+    /// - Parameter transport: the transport that sends every request, used whole.
+    /// - Parameter operation: what a rendered form submits, `.storePaymentMethod` when nothing is given.
+    /// - Parameter requestConfiguration: the transaction configuration a rendered form's request is built from.
     init(
         entryPoint: String,
         environment: PayabliEnvironment,
@@ -108,6 +114,9 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
     /// The process has one session, so a different configuration, or none installed, is not applied:
     /// the flow keeps its entry point and environment, and every submission after it fails with
     /// `invalidConfiguration`.
+    ///
+    /// - Parameter config: the configuration to run on, applied only when it is the one the installed
+    ///   session runs on.
     public func configure(config: PayabliConfig) {
         let transport: any PayabliTransport
         if let injectedTransport {
@@ -173,6 +182,10 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
     }
 
     /// Stores card or bank account payment data using `POST /api/TokenStorage/add`.
+    ///
+    /// - Parameter paymentMethod: the card or bank account data to store.
+    /// - Parameter options: what the request carries besides the method, from the customer to the flags.
+    /// - Returns: the method the service stored, with its identifiers.
     public func addPaymentMethod(
         _ paymentMethod: PayabliPayInMethodInput,
         options: PayabliPayInTokenStorageOptions = PayabliPayInTokenStorageOptions()
@@ -207,6 +220,9 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
     /// `POST /api/v2/MoneyIn/getpaid`.
     ///
     /// Each call is a new payment unless its options declare `attempt` as `.retry`.
+    ///
+    /// - Parameter request: the payment and its settings.
+    /// - Returns: the result the service sent.
     public func capture(
         _ request: PayabliPayInRequest
     ) async throws -> PayabliPayInResult {
@@ -228,6 +244,10 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
     ///
     /// Any other payment method is refused before anything is sent. Each call is a new payment unless its
     /// options declare `attempt` as `.retry`.
+    ///
+    /// - Parameter request: the payment and its settings, which must be taken by a card, a stored card
+    ///   or a cloud-device reading.
+    /// - Returns: the result the service sent.
     public func authorize(
         _ request: PayabliPayInRequest
     ) async throws -> PayabliPayInResult {
@@ -248,6 +268,9 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
     /// `POST /api/v2/MoneyIn/capture/{transId}`.
     ///
     /// Calling again on a transaction whose capture ended with its outcome unknown sends the key held for it.
+    ///
+    /// - Parameter request: the authorization and the amount to capture.
+    /// - Returns: the result the service sent.
     public func captureAuthorizedTransaction(
         _ request: PayabliPayInAuthorizedRequest
     ) async throws -> PayabliPayInResult {
@@ -274,6 +297,7 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
     ///
     /// - Parameter transId: the transaction to reverse, as
     ///   ``PayabliPayInTransaction/paymentTransId`` reported it.
+    /// - Returns: the result the service sent.
     public func voidTransaction(
         _ transId: String
     ) async throws -> PayabliPayInResult {
@@ -416,7 +440,7 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
 
     /// The reference a capture or an authorization is held under: the host's, trimmed, or one made here.
     ///
-    /// - Parameter request: the request being sent.
+    /// - Parameter request: the request whose options carry the host's payment reference.
     /// - Returns: the reference to hold the payment's key under.
     /// - Throws: ``PayabliPayInError/invalidInput(_:)`` when the host's reference is blank.
     private func paymentReference(of request: PayabliPayInRequest) throws -> String {
@@ -429,12 +453,11 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
 
     /// Runs one operation at a time and answers its caller, publishing nothing.
     ///
-    /// One channel per caller: a host that called a member learns the outcome from that member's
-    /// return value, so the operation does not also replace ``lastResult``. A screen showing what a
-    /// payment did must not change because an unrelated operation happened to it afterwards.
+    /// The outcome reaches the caller through the member's return value, so the operation does not
+    /// also replace ``lastResult``; the exclusion itself is kept either way.
     ///
-    /// The exclusion is separate from the publishing and is kept either way: two submissions in
-    /// flight at once is a second payment, not a display question.
+    /// - Parameter operation: the operation to run under the exclusion.
+    /// - Returns: the result the operation ended with.
     private func exclusively(
         _ operation: () async throws -> PayabliPayInResult
     ) async throws -> PayabliPayInResult {
@@ -448,6 +471,9 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
     ///
     /// For the operations a rendered form drives, where the screen observes the flow rather than
     /// holding a return value.
+    ///
+    /// - Parameter operation: the operation to run under the exclusion.
+    /// - Returns: the result the operation ended with, published as ``lastResult``.
     private func submit(
         _ operation: () async throws -> PayabliPayInResult
     ) async throws -> PayabliPayInResult {

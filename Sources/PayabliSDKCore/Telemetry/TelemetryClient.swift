@@ -52,12 +52,17 @@ package actor TelemetryClient {
     }
 
     /// Hash a raw device identifier (SHA-256) before storing. Never log the raw value.
+    ///
+    /// - Parameter rawId: the raw device identifier, hashed (SHA-256) before anything is stored.
     package func setDeviceId(_ rawId: String) {
         let digest = SHA256.hash(data: Data(rawId.utf8))
         deviceIdHash = digest.map { String(format: "%02x", $0) }.joined()
     }
 
     /// Enqueue an event. No-op when telemetry is disabled.
+    ///
+    /// - Parameter name: the event's catalog name.
+    /// - Parameter properties: the string values the event carries, sent on as given.
     package func emit(_ name: String, properties: [String: String] = [:]) async {
         await emit(name, properties: properties, occurredAt: Date())
     }
@@ -65,7 +70,7 @@ package actor TelemetryClient {
     /// Enqueue an event stamped with when it happened.
     ///
     /// - Parameter name: the event's catalog name.
-    /// - Parameter properties: the event's properties.
+    /// - Parameter properties: the string values the event carries, sent on as given.
     /// - Parameter occurredAt: when the reported thing happened.
     package func emit(_ name: String, properties: [String: String] = [:], occurredAt: Date) async {
         let event = TelemetryEvent(

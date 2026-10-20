@@ -19,6 +19,9 @@ enum SessionTierValidator {
     }
 
     /// Always Tier 1: nothing in the configuration carries a tier.
+    ///
+    /// - Parameter config: the configuration a tier is looked for in.
+    /// - Returns: the detected tier, always `.tier1Transactional`.
     static func detectedTier(from config: PayabliConfig) -> PayabliSessionTier {
         .tier1Transactional
     }

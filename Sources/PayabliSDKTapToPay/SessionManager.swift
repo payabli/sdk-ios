@@ -20,6 +20,9 @@ final class SessionManager: ObservableObject {
     init() {}
 
     /// Attempt to transition to a new state. Rejects invalid transitions.
+    ///
+    /// - Parameter target: the state to move the session to.
+    /// - Returns: whether the matrix allowed the move.
     @discardableResult
     func transition(to target: PayabliTTPSessionState) -> Bool {
         guard Self.isValidTransition(from: sessionState, to: target) else {
@@ -44,6 +47,9 @@ final class SessionManager: ObservableObject {
 
     /// Lands a failure where the map says it lands. A failure that leaves the
     /// session where it was moves nothing but `lastError`.
+    ///
+    /// - Parameter error: the failure to land, as the caller caught it.
+    /// - Parameter registration: the activation registration the store still holds, for the code remedy.
     func markError(_ error: Error, registration: StoredRegistration) {
         lastError = error
         guard let landing = PayabliTTPSessionState.landing(for: error, registration: registration) else { return }
@@ -54,6 +60,8 @@ final class SessionManager: ObservableObject {
     /// Records how far the reader has got, without leaving the state it belongs
     /// to. Does nothing unless a configuration is running, so a percentage
     /// cannot exist outside one.
+    ///
+    /// - Parameter percent: how far the reader has got, within 0 through 100.
     func recordConfigurationProgress(_ percent: Int) {
         guard case .initializingReader = sessionState else { return }
         sessionState = .initializingReader(percent: percent)
@@ -66,6 +74,8 @@ final class SessionManager: ObservableObject {
     /// Enters a charge and names it, or answers `nil` when the session is not
     /// ready. The ready check and the entry are one write, so a second charge is
     /// refused while one holds the reader.
+    ///
+    /// - Returns: the charge's name, or `nil` where the session is not ready.
     func beginCharge() -> Int? {
         guard sessionState == .ready, transition(to: .charging(activity: .opening)) else { return nil }
         nextCharge += 1
@@ -74,12 +84,18 @@ final class SessionManager: ObservableObject {
     }
 
     /// Dropped unless `charge` still holds the session.
+    ///
+    /// - Parameter activity: what the reader is doing now.
+    /// - Parameter charge: the charge the activity belongs to.
     func recordChargeActivity(_ activity: TapToPayChargeActivity, for charge: Int) {
         guard charge == runningCharge, case .charging = sessionState else { return }
         transition(to: .charging(activity: activity))
     }
 
     /// Ends `charge` on `failed(reason)`, only while it still holds the session.
+    ///
+    /// - Parameter reason: the failure the charge ends on.
+    /// - Parameter charge: the charge to end, only while it still holds the session.
     func failCharge(_ reason: PayabliTTPFailureReason, for charge: Int) {
         guard charge == runningCharge, case .charging = sessionState else { return }
         runningCharge = nil
@@ -89,6 +105,8 @@ final class SessionManager: ObservableObject {
 
     /// Returns to ready only while `charge` still holds the session, so a move
     /// made during the charge, by it or by another caller, is kept.
+    ///
+    /// - Parameter charge: the charge ending, only while it still holds the session.
     func endCharge(_ charge: Int) {
         guard charge == runningCharge else { return }
         runningCharge = nil
@@ -179,6 +197,10 @@ final class SessionManager: ObservableObject {
 
     /// A charge ends back at ready whatever it ended in, or expired when the
     /// read found the reader session spent, and starting over is always reachable.
+    ///
+    /// - Parameter activity: the activity the charge is in now.
+    /// - Parameter target: the state the charge would move to.
+    /// - Returns: whether the charge may make the move.
     private static func chargeMayMove(from activity: TapToPayChargeActivity, to target: PayabliTTPSessionState) -> Bool {
         switch target {
         case .idle, .ready, .sessionExpired:
@@ -192,6 +214,10 @@ final class SessionManager: ObservableObject {
 
     /// A charge opens, waits for a card, then closes. While it waits, the
     /// reader's prompts follow each other in whatever order the payer causes.
+    ///
+    /// - Parameter from: the activity the charge is in.
+    /// - Parameter to: the next prompt the reader raised.
+    /// - Returns: whether the second follows from the first.
     private static func advances(_ from: TapToPayChargeActivity, _ to: TapToPayChargeActivity) -> Bool {
         switch from {
         case .opening:

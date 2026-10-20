@@ -22,6 +22,12 @@ public final class PayabliSessionObjC: NSObject {
     ///
     /// `tokenHandler` receives a `(token, error) -> Void` callback the host calls exactly once, with
     /// either an access token or an `NSError`.
+    ///
+    /// - Parameter tokenHandler: the host's block, called with a completion it answers exactly once
+    ///   with an access token or an `NSError`.
+    /// - Parameter entryPoint: the partner integration point, refused when blank.
+    /// - Parameter environment: the API environment every base URL is taken from.
+    /// - Parameter telemetryEnabled: whether to emit telemetry events, forwarded to the configuration as given.
     @objc public static func initialize(
         tokenHandler: @escaping (@escaping (String?, NSError?) -> Void) -> Void,
         entryPoint: String,

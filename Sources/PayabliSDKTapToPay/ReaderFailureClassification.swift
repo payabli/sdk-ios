@@ -3,14 +3,13 @@ import Foundation
     import ProximityReader
 #endif
 
-/// Whether the reader session is gone, or only this read failed. A dead session
-/// needs a fresh config and a reader re-prepare; a failed read needs neither.
+/// Whether the reader session is gone, or only this read failed.
 ///
-/// The set is Apple's: `PaymentCardReaderSession.ReadError` draws this line.
+/// A dead session needs a fresh config and a reader re-prepare; a failed read needs neither. The set is
+/// Apple's, from `PaymentCardReaderSession.ReadError`; where the type does not survive, only the case name arrives, in text.
 ///
-/// Two tiers, because the type does not always survive. The card-reader
-/// component rebuilds the error as a title plus a description, so on a device
-/// only the case name arrives, in text.
+/// - Parameter error: the failure the read ended with, typed or rebuilt as text.
+/// - Returns: whether the session is gone with it.
 func readerFailureInvalidatesSession(_ error: Error) -> Bool {
     #if canImport(ProximityReader)
         if let readError = error as? PaymentCardReaderSession.ReadError {
@@ -40,6 +39,9 @@ private let sessionLevelReadErrorNames: Set<String> = [
 
 /// The text to match against, preferring the reason carried by the SDK's own
 /// error over a generic `localizedDescription`.
+///
+/// - Parameter error: the failure whose text is matched.
+/// - Returns: the SDK error's reason where it carries one, or the failure described generically.
 private func failureText(of error: Error) -> String {
     if let ttpError = error as? PayabliTTPError {
         switch ttpError {

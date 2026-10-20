@@ -74,6 +74,9 @@ package struct RetryPolicy: Sendable {
     }
 
     /// The status the response itself carried, where the error kept it.
+    ///
+    /// - Parameter error: the failure whose kept status is looked for.
+    /// - Returns: the status a wrapped server error carried, or `nil` for any other failure.
     private static func httpStatus(of error: any PayabliError) -> Int? {
         guard case let .server(server)? = error as? PayabliPaymentError else { return nil }
         return server.httpStatus
@@ -83,6 +86,16 @@ package struct RetryPolicy: Sendable {
 
     /// Every timing input is checked. A negative delay reaches the sleep and masks the failure it was
     /// retrying, and a multiplier below one shrinks the wait on each attempt instead of growing it.
+    ///
+    /// - Parameter maxAttempts: total attempts, not retries; `1` disables retrying without disabling the caller.
+    /// - Parameter baseDelay: the wait before the second attempt, in seconds.
+    /// - Parameter maxDelay: the cap on the computed backoff, in seconds.
+    /// - Parameter multiplier: how the backoff grows per attempt.
+    /// - Parameter maxJitter: the most added to a capped wait, in seconds.
+    /// - Parameter totalTimeout: one deadline over every attempt and wait, or `nil` for none.
+    /// - Parameter maxRetryAfter: the longest server-supplied wait worth honouring, in seconds.
+    /// - Parameter jitter: how much of its bound is added to each wait.
+    /// - Parameter isRetryable: whether a failure is worth another attempt.
     package init(
         maxAttempts: Int = defaultMaxAttempts,
         baseDelay: TimeInterval = defaultBaseDelay,
@@ -118,10 +131,16 @@ package struct RetryPolicy: Sendable {
     }
 
     /// Why these values cannot be a policy, or `nil` if they can.
+    /// Separate from the initializer so the rules can be read back.
     ///
-    /// Separate from the initializer so the rules can be read back. Only SDK code constructs a policy, so
-    /// a bad combination is a programmer error and traps rather than throwing; a trap cannot be caught,
-    /// and rules nothing can exercise stop matching the ones the initializer applies.
+    /// - Parameter maxAttempts: the total-attempts bound to check.
+    /// - Parameter baseDelay: the first wait to check.
+    /// - Parameter maxDelay: the capped wait to check.
+    /// - Parameter multiplier: the growth to check.
+    /// - Parameter maxJitter: the jitter bound to check.
+    /// - Parameter totalTimeout: the deadline to check, or `nil`.
+    /// - Parameter maxRetryAfter: the server-wait ceiling to check.
+    /// - Returns: the first failed rule's complaint, or `nil` when the values make a policy.
     package static func rejection(
         maxAttempts: Int,
         baseDelay: TimeInterval,
@@ -159,6 +178,9 @@ package struct RetryPolicy: Sendable {
     /// The wait before `attempt`, 1-indexed. Attempt 1 does not wait.
     ///
     /// Jitter is added after the cap, so the longest possible wait is `maxDelay + maxJitter`.
+    ///
+    /// - Parameter attempt: the attempt the wait precedes, 1-indexed.
+    /// - Returns: the wait before it, capped, with jitter added after the cap.
     package func delay(forAttempt attempt: Int) -> TimeInterval {
         guard attempt > 1 else { return 0 }
 
@@ -183,12 +205,11 @@ package struct RetryPolicy: Sendable {
         }
 
         /// The jitter for a wait, clamped to the bound it was given.
+        /// The closure is supplied rather than chosen here, so its answer is clamped like every other
+        /// timing input.
         ///
-        /// The closure is supplied rather than chosen here, so its answer is treated the way every other
-        /// timing input is. An unclamped one defeats the initializer's validation from outside: a negative
-        /// value shortens a wait the policy already sized, a value past the bound lengthens it past the
-        /// ceiling those numbers were checked against, and a non-finite one reaches the clock as an
-        /// unbounded sleep.
+        /// - Parameter bound: the most jitter this wait may take.
+        /// - Returns: the computed jitter clamped into `0 ... bound`, or `0` when the bound is not positive.
         package func value(upTo bound: TimeInterval) -> TimeInterval {
             guard bound > 0 else { return 0 }
             let computed = compute(bound)

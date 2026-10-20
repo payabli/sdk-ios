@@ -68,9 +68,11 @@ final class PayInPaymentFlowClient: Sendable {
     /// Reverses a transaction, releasing an authorization's hold or undoing a capture that has not
     /// settled.
     ///
-    /// No body: the route carries the identifier in its path and takes nothing else, so there is no
-    /// partial void. Which states can still be reversed is the service's to decide and is not mirrored
-    /// here; a state it refuses arrives as the refusal it sent, carrying its own reason.
+    /// The route carries the identifier in its path and takes no body, so there is no partial void.
+    ///
+    /// - Parameter transId: the transaction to reverse, as ``PayabliPayInTransaction/paymentTransId`` reported it.
+    /// - Parameter idempotencyKey: the key to carry as the `idempotencyKey` header, trimmed before it is set.
+    /// - Returns: the result the service sent.
     func void(
         transId: String,
         idempotencyKey: String
@@ -144,11 +146,17 @@ final class PayInPaymentFlowClient: Sendable {
     }
 
     /// A refusal whose reason is the catalog's own text for `type`, so every platform words it the same.
+    ///
+    /// - Parameter type: the refusal's type, which picks the catalog's text.
+    /// - Returns: the refusal, carrying the catalog's text as its reason.
     private static func catalogRefusal(_ type: PayabliErrorType) -> PayabliGenericError {
         PayabliGenericError(type: type, reason: PayabliGenericError(type: type, reason: "").message)
     }
 
     /// The numeric `responseCode` of the older envelope, or `nil` when the body carries none.
+    ///
+    /// - Parameter response: the answer being classified, whose body is read for the code.
+    /// - Returns: the numeric `responseCode`, or nil when the body carries none.
     private static func legacyCode(of response: PayabliResponse) -> Int? {
         try? JSONDecoder().decode(LegacyRefusal.self, from: response.body).responseCode
     }
@@ -195,6 +203,12 @@ final class PayInPaymentFlowClient: Sendable {
     ///
     /// The idempotency key is set here because the chain runs once per attempt, and a key minted
     /// there would differ on a replay.
+    ///
+    /// - Parameter path: the route's path, as `/api/v2/MoneyIn/getpaid`.
+    /// - Parameter query: the query items the route reads, such as `achValidation`.
+    /// - Parameter idempotencyKey: the key to carry as the `idempotencyKey` header; nil sends none.
+    /// - Parameter body: the request's body, encoded as the route reads it.
+    /// - Returns: the request the transport sends.
     private func buildRequest(
         path: String,
         query: [URLQueryItem],
@@ -214,6 +228,11 @@ final class PayInPaymentFlowClient: Sendable {
     ///
     /// The body stays absent rather than being an empty object: the two are different requests, and
     /// only the first is what the route was measured against.
+    ///
+    /// - Parameter path: the route's path, as `/api/v2/MoneyIn/void/<transId>`.
+    /// - Parameter query: the query items the route reads, empty on these routes.
+    /// - Parameter idempotencyKey: the key to carry as the `idempotencyKey` header; nil sends none.
+    /// - Returns: the request the transport sends, with no body.
     private func buildRequest(
         path: String,
         query: [URLQueryItem],
@@ -234,11 +253,12 @@ final class PayInPaymentFlowClient: Sendable {
 
     /// The key as it will be sent, or a refusal.
     ///
-    /// A value that is blank once trimmed is refused rather than dropped. Dropping it sends a
-    /// money-moving request with no duplicate protection to a caller who set a key and believes it is
-    /// protected. A value that cannot sit in a header is refused for the reason `isHeaderSafe` exists:
-    /// `URLRequest.setValue` mangles a header holding a carriage return rather than reporting it, so the
-    /// request would go out unprotected and the failure would name something else.
+    /// A key that is blank once trimmed, or cannot sit in a header, is refused rather than dropped: a
+    /// caller that set one is never sent a request the header does not protect.
+    ///
+    /// - Parameter key: the key as the caller set it.
+    /// - Returns: the trimmed key, as the `idempotencyKey` header carries it.
+    /// - Throws: ``PayabliPayInError/invalidInput(_:)`` when the key is blank once trimmed or cannot sit in a header.
     private static func sendableKey(_ key: String) throws -> String {
         let trimmed = key.payabliCaptureTrimmed
         guard !trimmed.isBlank else {
@@ -255,6 +275,9 @@ final class PayInPaymentFlowClient: Sendable {
     ///
     /// Open: a cancellation, a network failure, a 5xx, an unreadable answer, a `409` and anything unclassified.
     /// A decline, a validation refusal, a rate limit and a refused credential are answers.
+    ///
+    /// - Parameter failure: the failure a send ended in, classified by its ``PayabliErrorType``.
+    /// - Returns: whether the failure leaves the outcome open.
     private static func leavesOutcomeUnknown(_ failure: any Error) -> Bool {
         guard let code = (failure as? any PayabliError)?.type else {
             // Not this SDK's error at all, so nothing classified it and nothing can say it settled.
@@ -299,7 +322,6 @@ final class PayInPaymentFlowClient: Sendable {
             guard carriesKey, conflict || Self.leavesOutcomeUnknown(failure) else { throw failure }
             let interruption = PayabliPayInError.submissionInterrupted(
                 type: conflict ? .conflict : (failure as? any PayabliError)?.type ?? .unknown,
-                // One definition of what is kept from a failure, reused rather than restated.
                 causeType: RedactedCause(failure).originalType,
                 paymentTransId: Self.namedTransaction(in: answer),
                 paymentReference: nil
@@ -310,6 +332,9 @@ final class PayInPaymentFlowClient: Sendable {
 
     /// The `data.paymentTransId` an answer that left the outcome open names, if any. Only that field is
     /// decoded, so an answer that could not otherwise be read still names its transaction.
+    ///
+    /// - Parameter answer: the answer the failed send got, nil when there was none.
+    /// - Returns: the transaction the answer names, trimmed, or nil when it names none.
     private static func namedTransaction(in answer: PayabliResponse?) -> String? {
         guard let answer else { return nil }
         let decoded = try? JSONDecoder().decode(NamedTransaction.self, from: answer.body)

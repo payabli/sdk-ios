@@ -14,9 +14,7 @@ import Foundation
 struct AttestedDevice: Codable, Equatable, CustomStringConvertible, Sendable {
     /// The paypoint this binding is against.
     let entry: String
-    /// The handle the device was registered under.
     let deviceId: String
-    /// The App Attest key that was attested.
     let keyId: String
 
     var description: String {
@@ -55,6 +53,9 @@ struct DeviceBindings: Codable, Equatable, CustomStringConvertible, Sendable {
     }
 
     /// `record` at the front, replacing any binding for the same entry point.
+    ///
+    /// - Parameter record: the binding to hold at the front, for its entry point.
+    /// - Returns: the bindings with `record` at the front, those past `maximum` dropped.
     func with(_ record: AttestedDevice) -> DeviceBindings {
         DeviceBindings(([record] + bindings.filter { $0.entry != record.entry }).prefix(Self.maximum).map { $0 })
     }
@@ -106,6 +107,10 @@ struct PendingKeys: Codable, Equatable, CustomStringConvertible, Sendable {
     }
 
     /// `keyId` at the front, replacing any key held for the same entry point.
+    ///
+    /// - Parameter keyId: the key to hold at the front, for the entry point.
+    /// - Parameter entry: the entry point the key was minted for.
+    /// - Returns: the keys with `keyId` at the front, those past `maximum` dropped.
     func with(_ keyId: String, for entry: String) -> PendingKeys {
         let record = PendingKey(entry: entry, keyId: keyId)
         return PendingKeys(([record] + keys.filter { $0.entry != entry }).prefix(Self.maximum).map { $0 })
