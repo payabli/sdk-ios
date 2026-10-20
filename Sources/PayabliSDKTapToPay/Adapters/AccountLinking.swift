@@ -47,8 +47,10 @@ protocol ReaderSetup: AccountLinking {
 
 #if canImport(PayabliCardReaderCore)
     /// The vendored reader answers three of the four as they stand.
+    @available(iOS 16.7, *)
     extension FiservTTPCardReader: AccountLinking {}
 
+    @available(iOS 16.7, *)
     extension FiservTTPCardReader: ReaderSetup {
         /// The fourth speaks the platform's event vocabulary, so it is converted
         /// here. This is the boundary the rest of the SDK is kept behind.

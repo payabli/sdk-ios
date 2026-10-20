@@ -8,6 +8,7 @@ import PayabliSDKCore
 /// `TapToPayProvider` adapter over the vendored `PayabliCardReaderCore`. `charges(amount:)` reads and charges
 /// in one call, so `startReading` returns the processor response as `providerResponseJSON`, forwarded verbatim.
 /// `/config` credentials live in RAM only, dropped once `buildReader` hands them over; a retry refetches them.
+@available(iOS 16.7, *)
 package final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
     package static var providerId: String {
         "fiserv"
@@ -181,15 +182,12 @@ package final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
     /// is fetched, so must not require credentials.
     package func checkEligibility() async -> Result<Void, PayabliTTPError> {
         #if canImport(PayabliCardReaderCore)
-            if #available(iOS 16.7, *) {
-                guard PaymentCardReader.isSupported else {
-                    return .failure(.readerSetupFailed(
-                        reason: "Tap to Pay hardware not supported on this device"
-                    ))
-                }
-                return .success(())
+            guard PaymentCardReader.isSupported else {
+                return .failure(.readerSetupFailed(
+                    reason: "Tap to Pay hardware not supported on this device"
+                ))
             }
-            return .failure(.readerSetupFailed(reason: "Tap to Pay requires iOS 16.7+"))
+            return .success(())
         #else
             return .failure(.readerSetupFailed(reason: "Tap to Pay is iOS-only"))
         #endif

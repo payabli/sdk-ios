@@ -11,7 +11,7 @@ This guide is part of the [Payabli iOS SDK](../../README.md); set up the SDK and
 
 ### Your app
 
-- iOS 16.7 or later as the deployment target. The form runs in the simulator.
+- iOS 16.0 or later as the deployment target. The form runs in the simulator.
 
 ### Your account
 

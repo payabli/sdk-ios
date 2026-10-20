@@ -475,7 +475,7 @@ final class PayabliTTPReaderSessionRecoveryTests: XCTestCase {
     )
 
     private static let cancellationFailure = PayabliTTPError.nfcFailed(
-        reason: "\(FiservCardReader.cancellationReasonPrefix) user dismissed Tap to Pay sheet"
+        reason: "\(PayabliTTPError.cancellationReasonPrefix) user dismissed Tap to Pay sheet"
     )
 
     private static let cardReadResult = CardReadResult(

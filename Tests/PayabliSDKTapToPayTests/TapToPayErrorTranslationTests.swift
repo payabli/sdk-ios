@@ -28,7 +28,7 @@ final class TapToPayErrorTranslationTests: XCTestCase {
     }
 
     func testADismissedSheetIsACancellationByThePerson() throws {
-        let prefix = FiservCardReader.cancellationReasonPrefix
+        let prefix = PayabliTTPError.cancellationReasonPrefix
         XCTAssertEqual(try translated(PayabliTTPError.nfcFailed(reason: "\(prefix) dismissed")).type, .userCancelled)
         XCTAssertEqual(
             try translated(PayabliTTPError.readerSetupFailed(reason: "\(prefix) dismissed")).type,

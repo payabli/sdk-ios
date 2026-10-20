@@ -338,7 +338,7 @@ final class FiservCardReaderTests: XCTestCase {
                 return XCTFail("expected readerSetupFailed, got \(error)")
             }
             XCTAssertTrue(
-                reason.hasPrefix(FiservCardReader.cancellationReasonPrefix),
+                reason.hasPrefix(PayabliTTPError.cancellationReasonPrefix),
                 "cancel keeps the prefix a host already matches: \(reason)"
             )
         } catch {

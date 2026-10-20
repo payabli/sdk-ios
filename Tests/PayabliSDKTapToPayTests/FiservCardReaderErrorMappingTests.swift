@@ -54,7 +54,7 @@ import XCTest
             guard case let .nfcFailed(reason, _) = mapped else {
                 return XCTFail("expected .nfcFailed, got \(mapped)")
             }
-            XCTAssertTrue(reason.hasPrefix(FiservCardReader.cancellationReasonPrefix), reason)
+            XCTAssertTrue(reason.hasPrefix(PayabliTTPError.cancellationReasonPrefix), reason)
         }
 
         func testAFailedReadIsNotACancellation() {
@@ -63,7 +63,7 @@ import XCTest
             guard case let .nfcFailed(reason, _) = mapped else {
                 return XCTFail("expected .nfcFailed, got \(mapped)")
             }
-            XCTAssertFalse(reason.hasPrefix(FiservCardReader.cancellationReasonPrefix), reason)
+            XCTAssertFalse(reason.hasPrefix(PayabliTTPError.cancellationReasonPrefix), reason)
         }
 
         // MARK: - The unrecognised path

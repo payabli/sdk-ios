@@ -72,7 +72,7 @@ final class TapToPayReportsTests: XCTestCase {
     func testADismissedSetupSheetReportsACancelSentAtOnceAndNoFailure() async throws {
         let (ttp, provider, _, transport) = try makeTTP()
         provider.prepareReaderResult = .failure(PayabliTTPError.readerSetupFailed(
-            reason: "\(FiservCardReader.cancellationReasonPrefix) \(Self.sentinel)"
+            reason: "\(PayabliTTPError.cancellationReasonPrefix) \(Self.sentinel)"
         ))
 
         try await initializeToItsEnd(ttp, expecting: .userCancelled)

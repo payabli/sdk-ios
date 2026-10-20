@@ -5,11 +5,15 @@ let package = Package(
     name: "PayabliSDK",
     defaultLocalization: "en",
     platforms: [
-        // iOS-only. 16.7 is the minimum required by PayabliCardReaderCore
-        // (Apple's ProximityReader). The SDK is not intended to run on any
-        // other Apple platform, so development, CI, and release all target
-        // iPhone iOS (device + simulator) via `xcodebuild`. No macOS
-        // compatibility shims are maintained.
+        // iOS-only. 16.0 is the lowest the shared and card-not-present
+        // targets compile at: Core's retry clock is a `ContinuousClock` and
+        // PayIn's public sheet configuration carries a `PresentationDetent`.
+        // Tap to Pay needs 16.7, and the declarations that reach the card
+        // reader carry `@available(iOS 16.7, *)`.
+        // The SDK is not intended to run on any other Apple platform, so
+        // development, CI, and release all target iPhone iOS (device +
+        // simulator) via `xcodebuild`. No macOS compatibility shims are
+        // maintained.
         //
         // Non-Xcode IDEs (Cursor, VS Code with sourcekit-lsp) need to be
         // told that "host = iOS Simulator" — otherwise sourcekit-lsp falls
@@ -18,7 +22,7 @@ let package = Package(
         // even though build/CI/release are unaffected. See the repo-level
         // `.sourcekit-lsp/config.json` which configures that triple
         // automatically when you open the package in Cursor / VS Code.
-        .iOS("16.7")
+        .iOS("16.0")
     ],
     products: [
         // Core and Telemetry are shared targets with no product of their own.

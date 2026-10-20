@@ -2,6 +2,7 @@ import Foundation
 
 // MARK: - Reader events
 
+@available(iOS 16.7, *)
 extension PayabliTTP {
     /// Progress counts only from the configuration still running, and a prompt only
     /// from the reader now prepared while a charge holds the session.

@@ -116,7 +116,7 @@ enum TapToPayErrorTranslation {
 
     /// A person dismissed the platform's sheet. The reader marks it at the start of the case's reason.
     private static func isCancellation(_ reason: String) -> Bool {
-        reason.hasPrefix(FiservCardReader.cancellationReasonPrefix)
+        reason.hasPrefix(PayabliTTPError.cancellationReasonPrefix)
     }
 
     /// The service's or the reader's own words, which a host shows beside the fixed message.
@@ -149,6 +149,7 @@ final class ChargeProgress {
     var askedForCard = false
 }
 
+@available(iOS 16.7, *)
 extension PayabliTTP {
     /// Runs one public call, handing a host its failure as ``TapToPayError``.
     func reportingToHost<Result>(_ work: () async throws -> Result) async throws -> Result {
