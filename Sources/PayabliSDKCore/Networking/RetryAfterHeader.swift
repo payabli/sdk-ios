@@ -29,10 +29,11 @@ enum RetryAfterHeader {
 
     /// The wait `response` asked for, or `nil` when it named none, named one that cannot be read, or named
     /// a negative delay.
+    /// A value too large to hold saturates, so it stays above any ceiling instead of reading as a short wait.
     ///
-    /// A value too large to hold saturates rather than wrapping, so it stays above any ceiling a caller
-    /// compares it against instead of coming back as a short wait. A date already in the past reads as no
-    /// wait rather than as a negative one.
+    /// - Parameter response: the answered response, whose `Retry-After` is read.
+    /// - Parameter now: the moment the wait is measured from, so a past date reads as no wait.
+    /// - Returns: the wait in seconds, or `nil` when the header named none or an unreadable one.
     static func value(from response: PayabliResponse, now: Date = Date()) -> TimeInterval? {
         guard let raw = response.header(name)?.trimmingCharacters(in: .whitespaces), !raw.isEmpty else {
             return nil
@@ -64,15 +65,12 @@ enum RetryAfterHeader {
     }
 
     /// The instant a two-digit year names, by the rule rather than by the formatter's window.
+    /// A date read in the past is no wait at all, so a long wait the server asked for becomes an
+    /// immediate repeat.
     ///
-    /// RFC 9110 Section 5.6.7 requires a recipient to read a timestamp "that appears to be more than 50
-    /// years in the future as representing the most recent year in the past that had the same last two
-    /// digits". `DateFormatter` answers from a window fixed at 1950 instead, which is not that rule and
-    /// does not move: read in 2026, `09-Sep-50` is 1950.
-    ///
-    /// Getting it wrong here is the one reading that makes a client louder rather than quieter. A date in
-    /// the past is no wait at all, so a long wait the server asked for becomes an immediate repeat,
-    /// against a service that has just said it is under too much load.
+    /// - Parameter parsed: the instant the formatter produced from a two-digit year.
+    /// - Parameter now: the moment the fifty-year rule is measured from.
+    /// - Returns: the instant moved to the most recent year with the same two digits, within fifty years of `now`.
     private static func century(of parsed: Date, near now: Date) -> Date {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(identifier: "GMT") ?? calendar.timeZone

@@ -25,6 +25,14 @@ extension PayabliTTP {
     ///      both `merchantTransactionId` and `merchantOrderId`.
     ///   3. `PATCH /MoneyIn/update/{paymentTransId}` — only the provider
     ///      response travels; everything else was persisted at step 1.
+    ///
+    /// - Parameters:
+    ///   - type: the transaction's kind; `.sale` is the only one this surface takes.
+    ///   - paymentDetails: the amount, service fee and currency to charge.
+    ///   - customer: the customer to attach, empty when the caller passes none.
+    ///   - invoice: the invoice to attach, whose `invoiceNumber` reaches the read.
+    ///   - orderDescription: an order description, trimmed, with a blank one dropped.
+    /// - Returns: the transaction result, carrying the `paymentTransId` minted at initiate.
     public func charge(
         type: PayabliTTPPaymentType,
         paymentDetails: PayabliTTPPaymentDetails,
@@ -146,6 +154,10 @@ extension PayabliTTP {
 
     /// Step 3 — the update, sent whatever the processor answered. Only an approval is a payment, and a
     /// refusal stays a refusal even when the update then fails.
+    ///
+    /// - Parameter paymentTransId: the transaction the update closes, minted at initiate.
+    /// - Parameter readResult: what the reader read, whose outcome decides the capture.
+    /// - Returns: the transaction's result, on an approval the update confirmed.
     private func runSuccessUpdate(
         paymentTransId: String,
         readResult: CardReadResult
@@ -196,6 +208,14 @@ extension PayabliTTP {
     /// completion receives a nil result and an `NSError`, a ``TapToPayError``
     /// with its catalog number as the code. The completion is always invoked
     /// on the main thread.
+    ///
+    /// - Parameters:
+    ///   - type: the raw value of `PayabliTTPPaymentType`, `.sale` where the value is unknown.
+    ///   - paymentDetails: the payment's amounts and currency, converted from the companion class.
+    ///   - customer: the customer as the companion class carries it, or `nil` for none.
+    ///   - invoice: the invoice as the companion class carries it, or `nil` for none.
+    ///   - orderDescription: an order description, or `nil` for none.
+    ///   - completion: the result, or the error the charge failed with.
     @objc public func charge(
         type: Int,
         paymentDetails: PayabliTTPPaymentDetailsObjC,
@@ -228,6 +248,8 @@ extension PayabliTTP {
     // MARK: - Charge helpers
 
     /// Holds the reader for a new charge and names it, or throws when the session is not ready.
+    ///
+    /// - Returns: the charge's name, held until `leaveCharge` releases it.
     private func enterCharge() throws -> Int {
         guard let charge = sessionManager.beginCharge() else {
             throw PayabliTTPError.notReady(current: sessionState)
@@ -249,6 +271,10 @@ extension PayabliTTP {
     /// The case the reader raised, with the payment it opened. A failure the reader already classified is
     /// kept, and the charge adds its payment at the edge. Any other failure with no case of its own that can
     /// carry the payment is reported as `nfcFailed`.
+    ///
+    /// - Parameter error: what the reader threw, before the charge attached its payment.
+    /// - Parameter paymentTransId: the payment the failure is attached to, minted at initiate.
+    /// - Returns: the failure the caller is told, carrying the payment.
     private func readFailure(_ error: Error, paymentTransId: String) -> Error {
         if let classified = error as? TapToPayError {
             return classified
@@ -270,6 +296,10 @@ extension PayabliTTP {
     /// `POST /MoneyIn/initiate`. Fails loudly if `deviceId` is missing —
     /// otherwise any later `PATCH /update/{id}` would 400 on a non-existent
     /// transaction.
+    ///
+    /// - Parameter context: the payment's details, customer, invoice and description, as the caller gave them.
+    /// - Parameter charge: the charge's name, marked failed where `deviceId` is missing.
+    /// - Returns: the `paymentTransId` the backend minted.
     private func runInitiate(context: TTPTransactionContext, charge: Int) async throws -> String {
         // Read at the point of use: the binding can be replaced between calls, and
         // a copy taken earlier names a device this request cannot sign for.
@@ -295,6 +325,10 @@ extension PayabliTTP {
 
     /// Runs `PATCH /update/{paymentTransId}` with retry; bearer auth and 401 refresh-and-retry are
     /// `session.transport`'s. Returns a typed outcome rather than a `Bool`.
+    ///
+    /// - Parameter paymentTransId: the transaction the update is sent for, minted at initiate.
+    /// - Parameter payload: what the reader did, as the success or failure the update carries.
+    /// - Returns: what the update ended as: succeeded, failed with its reason and wait, or cancelled.
     private func tryUpdate(
         paymentTransId: String,
         payload: TTPUpdatePayload
@@ -340,6 +374,11 @@ extension PayabliTTP {
 
     /// Two lines: the charge summary, then which customer fields the caller
     /// populated. No customer value is emitted at any privacy level.
+    ///
+    /// - Parameter paymentDetails: the amounts and currency the summary line logs.
+    /// - Parameter customer: the customer whose set fields the second line names.
+    /// - Parameter invoice: the invoice whose number the summary line carries.
+    /// - Parameter orderDescription: the description, trimmed, with a blank one already dropped.
     private func logChargeStart(
         paymentDetails: PayabliTTPPaymentDetails,
         customer: PayabliTTPCustomerData,

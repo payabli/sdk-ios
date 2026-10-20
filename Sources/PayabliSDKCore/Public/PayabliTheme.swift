@@ -50,6 +50,9 @@ public extension PayabliTheme {
 extension Color {
     /// Parses a hex color string of the form `#RRGGBB` or `#RRGGBBAA`.
     /// Returns `nil` on invalid input.
+    ///
+    /// - Parameter hex: the color as `#RRGGBB` or `#RRGGBBAA`, the `#` optional.
+    /// - Returns: the color, or `nil` when the string is neither form.
     init?(hex: String) {
         var cleaned = hex.trimmingCharacters(in: .whitespacesAndNewlines)
         if cleaned.hasPrefix("#") {

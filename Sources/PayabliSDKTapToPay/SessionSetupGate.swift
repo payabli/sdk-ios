@@ -114,6 +114,8 @@ final class SessionSetupGate {
     }
 
     /// Clears the last claim only while `id` still holds it, so an operation that chained behind keeps its claim.
+    ///
+    /// - Parameter id: the claim to clear, only while it is still the last.
     private func release(_ id: Int) {
         if last?.id == id {
             last = nil

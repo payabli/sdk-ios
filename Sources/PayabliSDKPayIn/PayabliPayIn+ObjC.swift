@@ -61,6 +61,7 @@ public final class PayabliPayInTransactionObjC: NSObject {
     @objc public let feeAmount: NSNumber?
     @objc public let surchargeFee: NSNumber?
 
+    /// - Parameter transaction: the transaction read back, whose fields this carries.
     init(_ transaction: PayabliPayInTransaction) {
         paymentTransId = transaction.paymentTransId
         gatewayTransId = transaction.gatewayTransId
@@ -106,6 +107,8 @@ public final class PayabliPayInObjC: NSObject {
     }
 
     /// Builds the facade on the installed session. Throws `sessionNotInitialized` when none is installed.
+    ///
+    /// - Returns: the facade, wrapping a flow built on the installed session.
     @objc public static func create() throws -> PayabliPayInObjC {
         guard let session = PayabliSession.current else {
             throw PayabliGenericError(type: .sessionNotInitialized, reason: "no session is initialized")

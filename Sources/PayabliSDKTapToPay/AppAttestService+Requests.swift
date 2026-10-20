@@ -36,6 +36,13 @@ extension AppAttestService {
 
     /// Authenticated POST that expects a non-empty `responseData` of type
     /// `Payload`. Throws if the envelope is missing it.
+    ///
+    /// - Parameter path: the route the request is sent to.
+    /// - Parameter body: the request's body, encoded as JSON.
+    /// - Parameter label: the request's name, carried by its logs and decode errors.
+    /// - Parameter assertion: the assertion headers to append, or `nil` where the route needs none.
+    /// - Parameter makeDeclineError: builds the error a refusal or decline throws, from the code and reason the service sent.
+    /// - Returns: the envelope's `responseData`, decoded as `Payload`.
     func postAttestationRequest<Payload: Decodable>(
         path: String,
         body: some Encodable,
@@ -71,8 +78,15 @@ extension AppAttestService {
     }
 
     /// Authenticated POST for endpoints that answer with an `isSuccess` acknowledgement and no `responseData`.
-    /// `readsRefusalBeforeStatus` hands a refusal envelope on a 400, 403 or 404, or a 401 saying the binding is gone, to
-    /// `makeDeclineError`. `pinsCredential` sends a refused token once and throws ``PinnedTokenRefusal``.
+    ///
+    /// - Parameter path: the route the request is sent to.
+    /// - Parameter body: the request's body, encoded as JSON.
+    /// - Parameter label: the request's name, carried by its logs and errors.
+    /// - Parameter assertion: the assertion headers to append, or `nil` where the route needs none.
+    /// - Parameter readsRefusalBeforeStatus: hands a refusal envelope on a 400, 403 or 404, or a 401 saying the binding is
+    ///   gone, to `makeDeclineError`, for a route whose refusals are told apart by their text rather than by their status.
+    /// - Parameter pinsCredential: sends a refused token once and throws ``PinnedTokenRefusal``.
+    /// - Parameter makeDeclineError: builds the error a refusal or decline throws, from the code and reason the service sent.
     func postAttestationRequestExpectingNoBody(
         path: String,
         body: some Encodable,
@@ -98,8 +112,17 @@ extension AppAttestService {
     // MARK: - Private plumbing
 
     /// Sends an attestation-family POST with its assertion headers and maps the answer: a refusal envelope, a pinned 401,
-    /// an HTTP error, or a 200 carrying `isSuccess: false`. The bearer and any refresh are the transport's. Returns the
-    /// raw response so the two variants above can decide how to decode.
+    /// an HTTP error, or a 200 carrying `isSuccess: false`. The bearer and any refresh are the transport's.
+    ///
+    /// - Parameter path: the route the request is sent to.
+    /// - Parameter body: the request's body, encoded as JSON.
+    /// - Parameter label: the request's name, carried by its logs and errors.
+    /// - Parameter assertion: the assertion headers to append, or `nil` where the route needs none.
+    /// - Parameter readsRefusalBeforeStatus: reads a 400, 403 or 404's refusal envelope, or a 401 saying the binding is
+    ///   gone, before the status mapping.
+    /// - Parameter pinsCredential: sends a refused token once and throws ``PinnedTokenRefusal``.
+    /// - Parameter makeDeclineError: builds the error a refusal or decline throws, from the code and reason the service sent.
+    /// - Returns: the raw response, for the caller to decode.
     private func performAuthenticatedPOST(
         path: String,
         body: some Encodable,

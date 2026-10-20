@@ -20,6 +20,9 @@ enum PayInPaymentFlowJSONBody {
 
     /// Writes the payment's own amounts at two places. Nothing else is read as money: free-form data such as
     /// `additionalData` is sent exactly as the host gave it, whatever its keys are called.
+    ///
+    /// - Parameter value: the encoded body as a JSON object, whose `paymentDetails` amounts are rewritten.
+    /// - Returns: the body with its money fields written as two-place numbers, everything else as given.
     static func normalizingCurrencyFields(in value: Any) throws -> Any {
         guard var body = value as? [String: Any], let details = body["paymentDetails"] as? [String: Any] else {
             return value

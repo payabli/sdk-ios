@@ -33,6 +33,9 @@ package enum InstallIdentifier {
 
     /// Read under the lock, and minted there when the read finds nothing, so the
     /// value one caller writes is the value every later caller reads.
+    ///
+    /// - Parameter storage: where the install UUID is read from and minted into, under `storageKey`.
+    /// - Returns: the install UUID from storage, or a freshly minted one written under it.
     private static func installValue(storage: SecureStorage) throws -> String {
         if let existing = try storage.string(forKey: storageKey),
            !existing.isEmpty

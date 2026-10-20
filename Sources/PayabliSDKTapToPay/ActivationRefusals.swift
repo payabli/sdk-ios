@@ -19,12 +19,20 @@ enum ActivationRefusals {
 
     /// Whether the refusal says the service holds no record of the device, so the binding presented names
     /// nothing and setting the device up again needs it gone. A rejected assertion keeps it.
+    ///
+    /// - Parameter resultCode: the HTTP status the service refused the activation with.
+    /// - Parameter reason: the service's refusal text, matched exactly against its fixed words.
+    /// - Returns: whether the stored binding has to be dropped before the device can be set up again.
     static func discardsBinding(resultCode: Int?, reason: String) -> Bool {
         resultCode == 404 && reason == deviceNotFound
     }
 
     /// Whether the refusal says something about the session as well as the call: the device is unknown, or the
     /// entry point cannot be used. Every other refusal leaves the session waiting for its code.
+    ///
+    /// - Parameter resultCode: the HTTP status the service refused the activation with.
+    /// - Parameter reason: the service's refusal text, matched exactly against its fixed words.
+    /// - Returns: whether the session should move off the state it waited in.
     static func movesSession(resultCode: Int?, reason: String) -> Bool {
         discardsBinding(resultCode: resultCode, reason: reason) || (resultCode == 403 && reason == entryPointUnusable)
     }

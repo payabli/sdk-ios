@@ -26,6 +26,9 @@ final class TTPConfigClient: Sendable {
     /// Fetches the TTP config for `entry` on a pinned credential. A 401 saying the binding is gone, or one inside a 200
     /// envelope, drops the binding; the first throws `attestationRevoked` and the second `.tokenExpired`. Any other 401
     /// is the token itself, drops nothing, and throws ``PinnedTokenRefusal`` for the session to renew.
+    ///
+    /// - Parameter entry: the entry point whose configuration is fetched.
+    /// - Returns: the route's configuration, carrying the reader credentials.
     func fetchConfig(entry: String) async throws -> TTPConfig {
         let headers = try await assertionHeaders(entry: entry)
 
@@ -106,26 +109,13 @@ final class TTPConfigClient: Sendable {
         try await attestation.generateAssertion(for: entry)
     }
 
-    /// Drops the refused binding while it is still the one held, and answers whether
-    /// the paypoint was left in a state the caller need not report.
+    /// Drops the refused binding while it is still the one held.
     ///
-    /// The handle and the key both come from the assertion this request carried, so
-    /// the comparison names the device the service answered about.
+    /// `true` covers a removed binding and a newer one kept; `false` is only a store that refused.
     ///
-    /// **True covers two outcomes, and one of them dropped nothing.** The binding was
-    /// removed, or a newer one is held and stays: a refusal about the handle this
-    /// request presented says nothing about a binding attested since, and dropping it
-    /// would retire a device that just enrolled. Neither is a failure, so neither is
-    /// reported.
-    ///
-    /// **False is a store that refused the operation**, and only that. The binding is
-    /// still readable and its App Attest key still signs, so the next warm check
-    /// trusts it and presents the refused handle again, which is what the caller
-    /// reports.
-    ///
-    /// Narrowing true to "removed" turns the safeguard into a reported failure, and
-    /// widening the removal to drop whatever the entry point holds is the defect the
-    /// comparison exists to prevent.
+    /// - Parameter entry: the entry point the refused binding names.
+    /// - Parameter headers: the assertion headers this request presented, naming the device and key the refusal was about.
+    /// - Returns: whether the paypoint was left in a state the caller need not report.
     private func dropRefusedBinding(entry: String, presented headers: AssertionHeaders) -> Bool {
         do {
             let dropped = try attestation.forgetRefusedBinding(

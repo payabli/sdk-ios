@@ -1,27 +1,12 @@
 import Foundation
 
 /// Wraps an ObjC completion-block token source in a `PayabliTokenRefresh` continuation.
+/// Whichever of the host's completion block or a cancellation resumes it first swaps the stored
+/// continuation away, so a second completion call is a no-op rather than a double resume.
 ///
-/// `package` so `PayabliSDKPayIn` and `PayabliSDKTapToPay` share one implementation of
-/// cancellation-sensitive logic instead of each carrying its own copy: a fix to one bridge landing
-/// without the other is exactly the drift a single caller cannot cause. `errorDomain` is the only
-/// thing that varies between them, for the `NSError` a nil token and nil error both produce.
-///
-/// `pending` holds the continuation between setup and whichever of the host's completion block or a
-/// cancellation resumes it first. Swapped to nil by whichever gets there, so the other — a second
-/// completion call, or the completion arriving after this task was already cancelled — is a no-op
-/// rather than a double resume.
-///
-/// The cancellation handler exists for a call `PayabliAuth` gave up on, not for the host's ordinary
-/// cancellation: `PayabliAuth`'s `racedMint` returns at its deadline whether or not this call has
-/// answered, so a caller is never left waiting on it either way. What resuming here prevents is this
-/// call otherwise running forever unseen, holding the host's completion and a continuation neither
-/// side is waiting on.
-///
-/// A free function rather than inlined into either `@objc` init, so a test can build one directly
-/// and cancel the `Task` running it with `Task.cancel()`, instead of driving `PayabliAuth`'s real
-/// 30s bound (or, for the TapToPay side, its `initialize()` pipeline — which App Attest refuses on a
-/// simulator before that pipeline ever reaches this call) to reach the same cancellation path.
+/// - Parameter errorDomain: the `NSError` domain for an answer of nil token and nil error.
+/// - Parameter tokenHandler: the host's block, answered once with the token or an `NSError`; a second answer is a no-op.
+/// - Returns: the wrapped source `PayabliAuth` calls; it throws `CancellationError` when given up on first.
 package func bridgedTokenProvider(
     errorDomain: String,
     _ tokenHandler: @escaping (@escaping (String?, NSError?) -> Void) -> Void
@@ -102,6 +87,9 @@ private final class Locked<Value>: @unchecked Sendable {
 
     /// Mutates and returns whatever the caller derives from the protected
     /// state, atomically. Use the inout argument to read+write.
+    ///
+    /// - Parameter body: what to do to the protected state, reading and writing it through the inout argument.
+    /// - Returns: what `body` derived from the protected state.
     func withLock<R>(_ body: (inout Value) -> R) -> R {
         lock.lock()
         defer { lock.unlock() }

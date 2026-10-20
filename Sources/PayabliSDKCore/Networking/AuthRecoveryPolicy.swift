@@ -16,17 +16,18 @@ import Foundation
 /// replay separately and for a different reason.
 protocol AuthRecoveryPolicy: Sendable {
     /// Whether `response` says the credential was refused.
+    ///
+    /// - Parameter response: the answered response, whose status the policy reads.
+    /// - Returns: whether that status says the credential was refused, so a new one is worth minting.
     func isCredentialRejection(_ response: PayabliResponse) -> Bool
 }
 
 extension AuthRecoveryPolicy {
     /// What a caller gets when a refreshed credential was refused too.
+    /// Carries no text from the response: a 401 body belongs to the service.
+    /// A retryable code here would make the retry layer read a settled credential failure as transient.
     ///
-    /// Not a protocol requirement, so it cannot be substituted. An implementation answering a retryable
-    /// code here would make the retry layer above read a settled credential failure as transient and
-    /// spend the whole policy on refresh-and-replay cycles.
-    ///
-    /// Carries no text from the response. A 401 body belongs to the service.
+    /// - Returns: the ``PayabliErrorType/tokenExpired`` error with no service text.
     func exhausted() -> PayabliGenericError {
         PayabliGenericError(type: .tokenExpired, reason: "Refresh token rejected")
     }

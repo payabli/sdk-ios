@@ -25,16 +25,22 @@ enum PayInSummaryPlacement {
     static let amountFields: [PayabliPayInField] = [.amount, .serviceFee, .surchargeFee]
 
     /// The summary section that is drawn: the last one listed. An earlier one draws nothing.
+    ///
+    /// - Parameter sections: the host's sections, in the order the form draws them.
+    /// - Returns: the index of the last summary section, or nil when none is a summary.
     static func drawnSummaryIndex(in sections: [PayabliPayInFieldSection]) -> Int? {
         sections.lastIndex { $0.style == .summary }
     }
 
     /// `sections` with every amount that has a figure placed in one summary.
     ///
-    /// A host's summary decides where the rows go and what the section is called, never which figures appear:
-    /// they follow the order it lists them, then any it left out. A money field listed in an inputs section is
-    /// drawn in the summary instead. Of several summary sections only the last is drawn. With no summary section
-    /// one is appended after the inputs, and with no figure to show no summary is drawn.
+    /// A host's summary decides where the rows go and what the section is called, never which figures appear.
+    /// With no summary section one is appended after the inputs, and with no figure to show no summary is drawn.
+    ///
+    /// - Parameter sections: the host's sections, inputs and summaries in the order it lists them.
+    /// - Parameter paymentDetails: the payment's amounts, from which each row's figure is read.
+    /// - Parameter showsBaseAmount: whether the base amount draws its own row; `false` leaves fees and total only.
+    /// - Returns: the sections to draw, with every money field that has a figure a row in one summary.
     static func place(
         _ sections: [PayabliPayInFieldSection],
         paymentDetails: PayabliPayInPaymentDetails?,

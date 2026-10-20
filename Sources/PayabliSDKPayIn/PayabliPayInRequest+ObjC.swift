@@ -53,7 +53,7 @@ public final class PayabliPayInRequestObjC: NSObject {
         return PayabliPayInRequestObjC(paymentMethod: .stored(stored), totalAmount: totalAmount)
     }
 
-    /// - Parameter cardNumber: the card number.
+    /// - Parameter cardNumber: the card number the payer entered.
     /// - Parameter expiration: the expiry, as `MM/YY`.
     /// - Parameter cardholderName: the name on the card.
     /// - Parameter cvv: the card's security code.
@@ -81,10 +81,10 @@ public final class PayabliPayInRequestObjC: NSObject {
         return PayabliPayInRequestObjC(paymentMethod: .card(card), totalAmount: totalAmount)
     }
 
-    /// - Parameter accountNumber: the account number.
+    /// - Parameter accountNumber: the number of the bank account to debit.
     /// - Parameter accountType: `Checking` or `Savings`.
     /// - Parameter holderName: the account holder's name.
-    /// - Parameter routingNumber: the routing number.
+    /// - Parameter routingNumber: the routing number of the bank holding the account.
     /// - Parameter secCode: `PPD`, `WEB`, `TEL`, `CCD` or `BOC`; nil for `WEB`.
     /// - Parameter holderType: `personal` or `business`, or nil.
     /// - Parameter totalAmount: the amount to debit.

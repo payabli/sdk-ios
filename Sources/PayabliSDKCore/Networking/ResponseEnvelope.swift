@@ -56,15 +56,13 @@ package enum PayabliEnvelope {
     /// `/attest` just returns `isSuccess: true`).
     package struct EmptyPayload: Decodable, Sendable {}
 
-    /// Returns `(code, reason)` when `data` is a decline body
-    /// (HTTP 200 + `isSuccess == false`), or `nil` when it looks like a
-    /// success. `reason` falls back through decline text → top-level
-    /// `responseText` → `"server declined"` so the caller always has a
-    /// non-empty message.
+    /// Reads `(code, reason)` from a decline body: HTTP 200 with `isSuccess == false`.
+    /// `reason` falls back through decline text → top-level `responseText` → `"server declined"`, so
+    /// it is never empty.
     ///
-    /// Uses `try?` decodes so a malformed body simply returns `nil`; the
-    /// caller's subsequent `Success<Payload>` decode will produce the
-    /// canonical "failed to decode response" error.
+    /// - Parameter data: the response body to peek at, decoded with `try?` so a malformed one reads as nil.
+    /// - Parameter decoder: the decoder the peeks run through.
+    /// - Returns: the decline's code and reason, or `nil` when the body reads as a success.
     package static func declineOutcome(
         from data: Data,
         decoder: JSONDecoder = JSONDecoder()

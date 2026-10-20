@@ -11,10 +11,9 @@ enum BindingRefusal {
 
     /// Whether a response with `statusCode` and `reason` says the binding is gone.
     ///
-    /// - Parameters:
-    ///   - statusCode: The HTTP status the refusal arrived with.
-    ///   - reason: The envelope's `resultText`.
-    /// - Returns: True only for a 401 carrying exactly ``text``.
+    /// - Parameter statusCode: the HTTP status the refusal arrived with.
+    /// - Parameter reason: the envelope's `resultText`.
+    /// - Returns: true only for a 401 carrying exactly ``text``.
     static func isBindingGone(statusCode: Int, reason: String) -> Bool {
         statusCode == 401 && reason == text
     }

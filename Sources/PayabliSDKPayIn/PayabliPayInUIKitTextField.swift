@@ -73,10 +73,13 @@ struct PayabliPayInUIKitTextField: UIViewRepresentable {
         self.sanitize = sanitize
     }
 
-    /// Keyboards that carry no return key. A field using one cannot end its own
-    /// editing, so nothing on screen takes the keyboard back and it covers
-    /// whatever sits below the field, including the button that submits the form.
-    /// Every other keyboard here already has a way out.
+    /// Keyboards that carry no return key, so a field using one cannot end its own editing.
+    ///
+    /// Nothing on screen takes the keyboard back, so it covers whatever sits below the field,
+    /// including the button that submits the form.
+    ///
+    /// - Parameter keyboardType: the keyboard the field raises.
+    /// - Returns: whether it is one of the pads, which carry no return key.
     static func requiresDoneAccessory(_ keyboardType: UIKeyboardType) -> Bool {
         switch keyboardType {
         case .numberPad, .decimalPad, .phonePad, .asciiCapableNumberPad:
@@ -142,12 +145,13 @@ struct PayabliPayInUIKitTextField: UIViewRepresentable {
         Self.applyAccessory(to: textField, keyboardType: keyboardType, from: context.coordinator)
     }
 
-    /// Separate from `updateUIView` because a `Context` cannot be built outside SwiftUI, so this is
-    /// the only place the application can be checked.
+    /// Applies the environment's enabled state to the field, resigning the focus a disabled field holds.
     ///
-    /// The field's own flag carries the environment's disabled state: the framework applies it to a
-    /// wrapped view on current runtimes but documents nothing, so the deployment floor cannot rely
-    /// on that.
+    /// The framework applies a wrapped view's disabled state on current runtimes but documents
+    /// nothing, so the deployment floor cannot rely on that.
+    ///
+    /// - Parameter textField: the field the state applies to.
+    /// - Parameter isEnabled: whether the field takes input; false also resigns its focus.
     static func applyEnabledState(
         to textField: UITextField,
         isEnabled: Bool
@@ -161,6 +165,10 @@ struct PayabliPayInUIKitTextField: UIViewRepresentable {
     /// Separate from `updateUIView` because a `Context` cannot be built outside
     /// SwiftUI, and an accessory's contents never enter the accessibility tree, so
     /// this is the only place the assignment can be checked.
+    ///
+    /// - Parameter textField: the field the accessory attaches to.
+    /// - Parameter keyboardType: the keyboard the field raises, which decides whether the accessory is attached.
+    /// - Parameter coordinator: the coordinator holding the accessory to reuse.
     static func applyAccessory(
         to textField: UITextField,
         keyboardType: UIKeyboardType,
@@ -217,11 +225,11 @@ struct PayabliPayInUIKitTextField: UIViewRepresentable {
             self.parent = parent
         }
 
-        /// Built once and reused. A `UIToolbar` cannot be used here: as an input
-        /// accessory it draws no background and lays its items out floating, so
-        /// the control appears alone over the form rather than on a bar. This is a
-        /// keyboard-styled input view instead, which spans the keyboard's width
-        /// and follows its material in both appearances.
+        /// The done accessory, built once and reused: a keyboard-styled input view, since a
+        /// `UIToolbar` as an input accessory draws no background and lays its items out floating.
+        ///
+        /// - Returns: the bar the field carries over the keyboard, spanning its width and following
+        ///   its material in both appearances.
         func doneAccessoryView() -> UIInputView {
             if let doneAccessory {
                 return doneAccessory
@@ -301,6 +309,9 @@ struct PayabliPayInUIKitTextField: UIViewRepresentable {
         /// A return key does nothing on its own: `UITextField` keeps first
         /// responder unless a delegate gives it up. Without this, the keyboards
         /// that carry no accessory would have no way back either.
+        ///
+        /// - Parameter textField: the field whose return key was tapped.
+        /// - Returns: always `false`, so the field resigns and nothing is inserted.
         func textFieldShouldReturn(_ textField: UITextField) -> Bool {
             textField.resignFirstResponder()
             return false

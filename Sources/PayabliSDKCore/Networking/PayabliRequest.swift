@@ -40,6 +40,13 @@ package struct PayabliRequest: Sendable {
     }
 
     /// Convenience for JSON POSTs with a `Content-Type: application/json` header.
+    ///
+    /// - Parameter method: the request's HTTP method, `POST` for the usual JSON send.
+    /// - Parameter path: the route path, resolved against the environment's base URL.
+    /// - Parameter query: the query items appended to the path.
+    /// - Parameter headers: the request's own headers, where a `Content-Type` spelled exactly is replaced by the JSON one.
+    /// - Parameter jsonBody: the body value, encoded as JSON with ISO-8601 dates.
+    /// - Returns: the assembled request, ready for the decoration chain.
     package static func json(
         method: HTTPMethod,
         path: String,

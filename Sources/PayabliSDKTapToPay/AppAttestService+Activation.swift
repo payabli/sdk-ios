@@ -82,6 +82,9 @@ package extension AppAttestService {
     ///
     /// The binding is already dropped for a key the platform no longer holds, so that refusal is a
     /// setup that has ended.
+    ///
+    /// - Parameter entry: the entry point whose stored binding signs the activation.
+    /// - Returns: the assertion to sign `/activate` with, or the failure that says it was not sent.
     private func signingActivation(entry: String) async throws -> AssertionHeaders {
         do {
             return try await generateAssertion(for: entry)

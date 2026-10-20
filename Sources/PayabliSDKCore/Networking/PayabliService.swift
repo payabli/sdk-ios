@@ -21,10 +21,13 @@ package final class PayabliService: PayabliTransport, Sendable {
     package static let wholeCallTimeout: TimeInterval = defaultRequestTimeout * 3
 
     /// The only way to build a transport outside this module.
-    ///
     /// There is no initializer that takes a chain, so every transport carries the one the factory
-    /// builds. `readToken` reaches the chain and nothing here reads it; it is called once per request,
-    /// so a rotation needs no cache invalidated.
+    /// builds.
+    ///
+    /// - Parameter environment: the environment whose base URL every request resolves against.
+    /// - Parameter readToken: reads the bearer for the chain, once per request so a rotation needs no cache invalidated.
+    /// - Parameter client: the facts the client header carries.
+    /// - Parameter session: the `URLSession` to send on, or the SDK's own when nil.
     convenience init(
         environment: PayabliEnvironment,
         readToken: @escaping @Sendable () async throws -> String,
@@ -52,10 +55,14 @@ package final class PayabliService: PayabliTransport, Sendable {
     }
 
     /// Builds a transport carrying the shipping chain, with the caller's logger.
+    /// Internal, so it widens what a test can construct and not what production can.
     ///
-    /// Internal, so it widens what a test can construct and not what production can. The chain is the
-    /// one the public initializer builds, because a test that reads what this layer logged still has to
-    /// be running the decorations that attach the credential.
+    /// - Parameter environment: the environment whose base URL every request resolves against.
+    /// - Parameter readToken: reads the bearer for the chain, once per request.
+    /// - Parameter client: the facts the client header carries.
+    /// - Parameter session: the `URLSession` to send on, or the SDK's own when nil.
+    /// - Parameter logger: where this transport reports its sends, so a test reads what it logged.
+    /// - Returns: the transport carrying the shipping chain, the one the public initializer builds.
     static func makeWithChain(
         environment: PayabliEnvironment,
         readToken: @escaping @Sendable () async throws -> String,
@@ -75,6 +82,12 @@ package final class PayabliService: PayabliTransport, Sendable {
     ///
     /// Internal, so it widens what a test can construct and not what production can. Not for a
     /// shipping code path.
+    ///
+    /// - Parameter environment: the environment whose base URL every request resolves against.
+    /// - Parameter decorations: the chain to apply to every request, the caller's own.
+    /// - Parameter session: the `URLSession` to send on, or the SDK's own when nil.
+    /// - Parameter logger: where this transport reports its sends.
+    /// - Returns: the transport running the caller's chain.
     static func makeWithDecorations(
         environment: PayabliEnvironment,
         decorations: [any PayabliRequestDecoration],
@@ -100,9 +113,10 @@ package final class PayabliService: PayabliTransport, Sendable {
 
     /// Performs an HTTP request. Returns the raw response; throws for transport
     /// failures or non-decodable responses.
+    /// Callers needing envelope decoding use `performV2` instead.
     ///
-    /// Callers should use `performV2` for envelope decoding, or decode the raw
-    /// response body manually for non-v2 endpoints.
+    /// - Parameter request: the request to decorate, resolve against the base URL, and send.
+    /// - Returns: the raw response, its status and body uninterpreted.
     package func perform(_ request: PayabliRequest) async throws -> PayabliResponse {
         // First statement, so no path through this method skips decoration.
         let decorated = try await PayabliSendMark.$current.withValue(nil) { try await decorations.applyTo(request) }
@@ -148,6 +162,10 @@ package final class PayabliService: PayabliTransport, Sendable {
     }
 
     /// Performs a request and decodes a v2 (MoneyIn) envelope.
+    ///
+    /// - Parameter request: the request to send.
+    /// - Parameter decoding: the type the envelope's `data` decodes as.
+    /// - Returns: the v2 envelope, decoded after a non-2xx answer became a typed error.
     package func performV2<T: Decodable & Sendable>(
         _ request: PayabliRequest,
         decoding: T.Type
@@ -191,6 +209,8 @@ package final class PayabliService: PayabliTransport, Sendable {
     /// Maps a non-2xx `PayabliResponse` to a typed error. No-op for 2xx.
     /// Callers that decode responses manually (e.g. attestation endpoints
     /// that return a non-v2 envelope) should invoke this before decoding.
+    ///
+    /// - Parameter response: the answered response, whose status fixes the classification.
     package func mapHTTPError(response: PayabliResponse) throws {
         try mapPayabliHTTPError(response: response)
     }
@@ -199,25 +219,11 @@ package final class PayabliService: PayabliTransport, Sendable {
 // MARK: - Shared HTTP error mapping
 
 /// Maps a non-2xx `PayabliResponse` to a typed error. No-op for 2xx.
-///
-/// The `override` closure receives the raw HTTP status code and may return a
-/// component-specific error (e.g. `PayabliTTPError.devicePendingActivation`
-/// for a 403 on the config endpoint). Return `nil` to fall through to the
-/// standard mapping.
-///
-/// Standard mappings:
-/// - 400 → `PayabliPaymentError.validation`
-/// - 401 → `PayabliGenericError(.tokenExpired)`
-/// - 402 → `PayabliPaymentError.decline`
-/// - 403 → `PayabliGenericError(.permissionDenied)`
-/// - 408 → `PayabliGenericError(.networkError)`
-/// - 409 → `PayabliGenericError(.conflict)`
-/// - 410 → `PayabliGenericError(.sessionBurned)`
-/// - 429 → `PayabliRateLimitError`
-/// - 500 and above → `PayabliPaymentError.server`
-/// - other non-2xx → `PayabliGenericError(.unknown)`
-///
 /// The status fixes the classification; the body only decides how many fields get filled.
+///
+/// - Parameter response: the answered response, whose status fixes the error: 400 validation, 401 token expiry, 402 decline,
+///   403 permission, 408 network, 409 conflict, 410 session burned, 429 rate limit, at or above 500 server, any other unknown.
+/// - Parameter override: answers one status with a component-specific error of its own, or nil for the standard mapping.
 package func mapPayabliHTTPError(
     response: PayabliResponse,
     override: ((Int) -> (any Error)?)? = nil

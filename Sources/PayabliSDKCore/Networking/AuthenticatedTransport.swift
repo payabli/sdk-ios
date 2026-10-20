@@ -17,6 +17,11 @@ struct AuthenticatedTransport: PayabliTransport {
     /// `.network`, not `.auth`: recovering, or giving up on it, is this layer's decision and not the
     /// holder's. The logger is required rather than defaulted, so no composition can build its own and
     /// leave a caller's substitution reaching nothing.
+    ///
+    /// - Parameter base: the transport performing each attempt, whose chain attaches the bearer.
+    /// - Parameter auth: the holder that replaces a refused credential, once.
+    /// - Parameter recovery: what counts as a credential refusal; 401 only, by default.
+    /// - Parameter logger: the logger, required rather than defaulted, so a caller's substitution reaches it.
     init(
         base: any PayabliTransport,
         auth: PayabliAuth,
@@ -110,16 +115,21 @@ struct AuthenticatedTransport: PayabliTransport {
     }
 
     /// Whether sending `request` a second time is defensible after `rejection`.
+    /// A 401 was refused before the request was processed, so replaying one cannot execute it twice.
+    /// It lives here rather than on `AuthRecoveryPolicy`, so widening rejections does not widen what gets replayed.
     ///
-    /// A 401 is refused before the request is processed, so replaying one cannot execute it twice. No
-    /// other status carries that argument, which leaves the method's own idempotence as the only signal
-    /// for a widened rejection. It lives here and not on `AuthRecoveryPolicy`: a hook there would let
-    /// whoever widened what counts as a rejection widen what gets replayed along with it.
+    /// - Parameter request: the request whose replay is decided, its method the signal for a non-401 status.
+    /// - Parameter rejection: the response that refused the credential, whose status carries the 401 argument.
+    /// - Returns: whether the replay may run.
     private func mayReplay(_ request: PayabliRequest, rejectedBy rejection: PayabliResponse) -> Bool {
         rejection.statusCode == 401 || request.method.isIdempotent
     }
 
     /// `base`'s overload maps a 401 to a typed error, so this decodes after its own `perform`.
+    ///
+    /// - Parameter request: the request to send through this transport's own recovery.
+    /// - Parameter decoding: the type the envelope's `data` decodes as.
+    /// - Returns: the decoded envelope, after a non-2xx answer already became a typed error.
     func performV2<T: Decodable & Sendable>(
         _ request: PayabliRequest,
         decoding: T.Type

@@ -21,6 +21,8 @@ public enum PayabliPayInTransactionStatus: Sendable, Hashable {
     case other(Int)
 
     /// Reads the status number. Each number is listed, so an unlisted one is ``other(_:)``.
+    ///
+    /// - Parameter wire: the status number, as ``PayabliPayInTransaction/transStatus`` carries it.
     init(wire: Int) {
         switch wire {
         case 10: self = .initiated

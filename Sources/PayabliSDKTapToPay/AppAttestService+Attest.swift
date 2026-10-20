@@ -10,15 +10,13 @@ extension AppAttestService {
     /// hosts where `DCAppAttestService` is unavailable.
     static let deviceCheckErrorDomain = "com.apple.devicecheck.error"
 
-    /// One attestation at a time per entry point, across every service in the
-    /// process.
+    /// One attestation at a time per entry point, across every service in the process.
     ///
-    /// The pending-key lookup and the mint that follows it are separated by an
-    /// `await`, and App Attest issues a fresh key on every call, so two callers for
-    /// one entry point both mint and both register. A caller for an entry point
-    /// already being attested waits for that attempt to end and then runs its own,
-    /// which reads the store first. Different entry points never wait for each
-    /// other.
+    /// Two callers for one entry point both mint and both register, so a caller for an entry point
+    /// already being attested waits for that attempt to end and then runs its own.
+    ///
+    /// - Parameter entry: the entry point being attested, whose callers take turns.
+    /// - Returns: the key and device ids the entry point's binding names.
     package func attest(entry: String) async throws -> AttestationResult {
         try await Self.attestations.takingTurns(entry) {
             try await self.runAttest(entry: entry)
@@ -201,6 +199,9 @@ extension AppAttestService {
     /// The DeviceCheck failures that mean the same thing from every App Attest call: a device that
     /// cannot use App Attest, and Apple's service out of reach. `nil` for the rest, which each
     /// caller reports for its own call.
+    ///
+    /// - Parameter error: what an App Attest call threw, before it was translated for the host.
+    /// - Returns: the shared setup failure, or `nil` where the caller reports the error for its own call.
     static func deviceSetupError(for error: Error) -> TapToPayError? {
         let nsError = error as NSError
         guard nsError.domain == deviceCheckErrorDomain else { return nil }
@@ -225,6 +226,10 @@ extension AppAttestService {
     /// Runs one App Attest call made while setting the device up. Any other DeviceCheck refusal
     /// discards the key, as Apple asks, and the pending key is already gone, so setting up again
     /// makes a new one. A refusal from outside DeviceCheck is this SDK's own.
+    ///
+    /// - Parameter call: the App Attest call's name, which the refusal's reason carries.
+    /// - Parameter work: the App Attest call, run once and translated when it refuses.
+    /// - Returns: what `work` answered.
     func settingUp<Value>(_ call: String, _ work: () async throws -> Value) async throws -> Value {
         do {
             return try await work()
