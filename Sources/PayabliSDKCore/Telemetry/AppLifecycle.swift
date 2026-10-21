@@ -70,7 +70,11 @@ package struct UIKitAppLifecycle: AppLifecycle, @unchecked Sendable {
         MainActor.assumeIsolated {
             let task = ApplicationBackgroundTask()
             let window = BackgroundWindow { Task { @MainActor in task.end() } }
-            task.begin { window.close() }
+            // The system ends the app if the task is still open when this handler returns.
+            task.begin {
+                task.end()
+                window.close()
+            }
             return window
         }
     }
