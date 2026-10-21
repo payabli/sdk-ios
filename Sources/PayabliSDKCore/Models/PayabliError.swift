@@ -239,7 +239,7 @@ public extension PayabliErrorType {
         case .deviceHardwareUnsupported: "This device cannot take contactless payments."
         case .termsNotAccepted: "The merchant has not accepted the Tap to Pay terms."
         case .cardPresentNotEnabled: "Card-present payments are not enabled for this paypoint."
-        case .readerDeviceRefused: "The card reader refused this device."
+        case .readerDeviceRefused: "This device is not set up for Tap to Pay with this app. Contact Payabli support with the device ID."
         case .readerUnavailable: "The card reader could not be started."
         case .readerSessionExpired: "The card reader session expired."
         case .tapNotCompleted: "The card read did not complete."
