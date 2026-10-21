@@ -5,6 +5,16 @@ import XCTest
 /// The session owns one telemetry client, reporting under its own entry point and environment, and a
 /// refusal on the telemetry route never touches the credential a payment is using.
 final class PayabliSessionTelemetryTests: XCTestCase {
+    override func setUp() {
+        super.setUp()
+        PayabliSession.resetForTesting()
+    }
+
+    override func tearDown() {
+        PayabliSession.resetForTesting()
+        super.tearDown()
+    }
+
     func testTheSessionReportsUnderItsEntryPointAndEnvironment() async throws {
         let transport = InMemoryTelemetryTransport()
         let session = PayabliSession(
@@ -16,11 +26,109 @@ final class PayabliSessionTelemetryTests: XCTestCase {
         await session.telemetry.emit(TelemetryEventName.ttpInitializeStarted)
         await session.telemetry.flush()
 
-        let batches = await transport.batches
-        let sent = try XCTUnwrap(batches.first?.first)
+        let events = await transport.batches.flatMap { $0 }
+        let sent = try XCTUnwrap(events.first { $0.event == "ttp.initialize.started" })
         XCTAssertEqual(sent.entry, "demo")
         XCTAssertEqual(sent.environment, "sandbox")
-        XCTAssertEqual(sent.event, "ttp.initialize.started")
+    }
+
+    func testAnInstalledSessionReportsItsStartFirstWithNoHostCode() async throws {
+        let transport = InMemoryTelemetryTransport()
+        let session = try PayabliSession.install(config: makeConfig(), telemetryTransport: transport)
+
+        await session.telemetry.emit(TelemetryEventName.ttpInitializeStarted)
+        await session.telemetry.flush()
+
+        let events = await transport.batches.flatMap { $0 }
+        XCTAssertEqual(events.map(\.event), ["sdk.initialized", "ttp.initialize.started"])
+        XCTAssertEqual(events.first?.properties, ["state": "ready"])
+        XCTAssertEqual(events.first?.sessionId, session.telemetry.sessionId)
+    }
+
+    func testARefusedRepeatCallReportsAStartAndAFailureOnTheLiveSession() async throws {
+        let transport = InMemoryTelemetryTransport()
+        let live = try PayabliSession.install(config: makeConfig(), telemetryTransport: transport)
+
+        do {
+            try await PayabliSession.initialize(config: makeConfig(entryPoint: "other"))
+            XCTFail("a different configuration was accepted")
+        } catch {}
+        await live.telemetry.settled()
+
+        let events = await transport.batches.flatMap { $0 }
+        guard events.map(\.event) == ["sdk.initialized", "sdk.initialize.started", "sdk.initialize.failed"] else {
+            return XCTFail("sent without a flush, because a failure leaves at once: \(events.map(\.event))")
+        }
+        XCTAssertTrue(events.allSatisfy { $0.sessionId == live.telemetry.sessionId && $0.entry == "demo" })
+        XCTAssertEqual(events[1].properties, ["state": "ready"])
+        let failed = events[2].properties
+        XCTAssertEqual(Set(failed.keys), ["outcome", "code", "error_number", "reason", "duration_ms"])
+        XCTAssertEqual(failed["outcome"], "refused")
+        XCTAssertEqual(failed["code"], "INVALID_CONFIGURATION")
+        XCTAssertEqual(failed["error_number"], String(PayabliErrorType.invalidConfiguration.number))
+        XCTAssertEqual(failed["reason"], "a session is already initialized with a different configuration")
+        XCTAssertNotNil(Int(failed["duration_ms"] ?? ""))
+    }
+
+    func testARepeatCallThatChangesNothingReportsNothing() async throws {
+        let transport = InMemoryTelemetryTransport()
+        let live = try PayabliSession.install(config: makeConfig(), telemetryTransport: transport)
+
+        let again = try await PayabliSession.initialize(config: makeConfig())
+        await live.telemetry.settled()
+
+        XCTAssertTrue(again === live)
+        let buffered = await live.telemetry.bufferedCount
+        let batches = await transport.batches
+        XCTAssertEqual(buffered, 1, "only the start reported at install")
+        XCTAssertTrue(batches.isEmpty)
+    }
+
+    func testATelemetryRouteThatRefusesEverythingLeavesTheSessionWorking() async throws {
+        let transport = InMemoryTelemetryTransport()
+        await transport.refuse(true)
+        let live = try PayabliSession.install(config: makeConfig(), telemetryTransport: transport)
+        await live.telemetry.emit(TelemetryEventName.ttpInitializeFailed, properties: ["outcome": "failed"])
+        await live.telemetry.settled()
+
+        let again = try await PayabliSession.initialize(config: makeConfig())
+
+        XCTAssertTrue(again === live)
+        let batches = await transport.batches
+        XCTAssertEqual(batches.count, 1, "attempted once and dropped")
+    }
+
+    func testEveryEventCarriesTheSessionsDeviceIdentifierUnchanged() async throws {
+        let transport = InMemoryTelemetryTransport()
+        let session = try PayabliSession(
+            config: makeConfig(),
+            urlSession: StubURLProtocol.makeSession(),
+            deviceIdentity: DeviceIdentity { "0f8d2a1c4b6e4a2f9c3d5e7f8a9b0c1d" },
+            telemetryTransport: transport
+        )
+
+        await session.telemetry.flush()
+
+        let events = await transport.batches.flatMap { $0 }
+        XCTAssertEqual(events.first?.deviceIdHash, session.deviceId)
+        XCTAssertEqual(events.first?.deviceIdHash, "0f8d2a1c4b6e4a2f9c3d5e7f8a9b0c1d")
+    }
+
+    func testADeviceThatCannotBeIdentifiedReportsNoIdentifier() async throws {
+        struct Unreadable: Error {}
+        let transport = InMemoryTelemetryTransport()
+        let session = try PayabliSession(
+            config: makeConfig(),
+            urlSession: StubURLProtocol.makeSession(),
+            deviceIdentity: DeviceIdentity { throw Unreadable() },
+            telemetryTransport: transport
+        )
+
+        await session.telemetry.flush()
+
+        let events = await transport.batches.flatMap { $0 }
+        XCTAssertEqual(events.count, 1)
+        XCTAssertNil(events.first?.deviceIdHash)
     }
 
     /// The default client posts to the telemetry route through the service, beneath the recovery layer.
@@ -58,10 +166,11 @@ final class PayabliSessionTelemetryTests: XCTestCase {
     }
 
     private func makeConfig(
+        entryPoint: String = "demo",
         tokenProvider: @escaping PayabliTokenRefresh = { "tok" }
     ) throws -> PayabliConfig {
         try PayabliConfig(
-            entryPoint: "demo",
+            entryPoint: entryPoint,
             environment: .sandbox,
             tokenProvider: tokenProvider
         )

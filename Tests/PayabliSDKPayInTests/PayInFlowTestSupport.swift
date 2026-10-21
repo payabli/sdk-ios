@@ -20,8 +20,15 @@ func flowOnSession(
         tokenProvider: { token }
     )
     return PayabliPayIn(
-        session: PayabliSession(config: config),
+        session: PayabliSession(config: config, telemetryTransport: DiscardingTelemetryTransport()),
         operation: operation,
         requestConfiguration: requestConfiguration
     )
+}
+
+/// Accepts every telemetry batch and sends nothing, so a session built in a test never reaches the network.
+struct DiscardingTelemetryTransport: TelemetryTransport {
+    func send(_ batch: [TelemetryEvent], droppedSinceLastSend: Int) async -> Bool {
+        true
+    }
 }

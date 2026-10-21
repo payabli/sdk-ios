@@ -48,7 +48,8 @@ final class PayabliSessionTests: XCTestCase {
     }
 
     func testInitializeRefusesADifferentEntryPointAndKeepsTheInstalledSession() async throws {
-        let installed = try await PayabliSession.initialize(config: makeConfig())
+        // Installed with a test transport, because the refusal reports at once.
+        let installed = try PayabliSession.install(config: makeConfig(), telemetryTransport: InMemoryTelemetryTransport())
 
         await assertRefused(try makeConfig(entryPoint: "other"))
         let again = try await PayabliSession.initialize(config: makeConfig())
@@ -56,7 +57,7 @@ final class PayabliSessionTests: XCTestCase {
     }
 
     func testInitializeRefusesADifferentEnvironment() async throws {
-        try await PayabliSession.initialize(config: makeConfig())
+        _ = try PayabliSession.install(config: makeConfig(), telemetryTransport: InMemoryTelemetryTransport())
 
         await assertRefused(try makeConfig(environment: .production))
     }
