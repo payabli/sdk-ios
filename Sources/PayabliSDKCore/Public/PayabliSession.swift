@@ -72,7 +72,6 @@ public final class PayabliSession: @unchecked Sendable {
         // The bare service, so a refused batch never reaches the recovery layer above.
         telemetry = TelemetryClient(
             configuration: TelemetryClient.Configuration(
-                enabled: config.telemetryEnabled,
                 entry: config.entryPoint,
                 environment: config.environment.name
             ),
@@ -83,8 +82,8 @@ public final class PayabliSession: @unchecked Sendable {
     /// Installs the process's session, or returns it if one is already installed for an equal
     /// configuration.
     ///
-    /// Configurations are equal when their entry point, environment and telemetry setting are. The
-    /// token provider is not compared, so a second call keeps the provider the session started with.
+    /// Configurations are equal when their entry point and environment are. The token provider is
+    /// not compared, so a second call keeps the provider the session started with.
     /// A different configuration throws `invalidConfiguration` and leaves the installed session in
     /// place, because every facade already built is running on it.
     ///
@@ -137,11 +136,9 @@ public final class PayabliSession: @unchecked Sendable {
 private struct ConfigIdentity: Equatable {
     let entryPoint: String
     let environment: PayabliEnvironment
-    let telemetryEnabled: Bool
 
     init(_ config: PayabliConfig) {
         entryPoint = config.entryPoint
         environment = config.environment
-        telemetryEnabled = config.telemetryEnabled
     }
 }

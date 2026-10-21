@@ -4,7 +4,6 @@ import XCTest
 
 final class TelemetryClientTests: XCTestCase {
     private func makeClient(
-        enabled: Bool = true,
         batchSize: Int = 20
     ) async -> (TelemetryClient, InMemoryTelemetryTransport) {
         let transport = InMemoryTelemetryTransport()
@@ -12,7 +11,6 @@ final class TelemetryClientTests: XCTestCase {
             configuration: .init(
                 flushInterval: 30,
                 batchSize: batchSize,
-                enabled: enabled,
                 entry: "test_entry",
                 environment: "sandbox"
             ),
@@ -41,15 +39,6 @@ final class TelemetryClientTests: XCTestCase {
         XCTAssertTrue(batches.isEmpty)
         let buffered = await client.bufferedCount
         XCTAssertEqual(buffered, 2)
-    }
-
-    func testOptOutSuppressesEmission() async {
-        let (client, transport) = await makeClient(enabled: false, batchSize: 1)
-        await client.emit("never.sent")
-        await client.flush()
-
-        let batches = await transport.batches
-        XCTAssertTrue(batches.isEmpty)
     }
 
     func testManualFlushSendsPartialBuffer() async {

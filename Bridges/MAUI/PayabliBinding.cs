@@ -209,15 +209,14 @@ namespace Payabli.TapToPay
     {
         // Installs the one session every facade runs on. The token handler is the only source of a
         // credential: the SDK asks it for the first token as well as for a replacement. A second
-        // call with the same entry point, environment and telemetry setting is a no-op; a different
-        // one fails with the error the completion receives.
+        // call with the same entry point and environment is a no-op; a different one fails with the
+        // error the completion receives.
         [Static]
-        [Export("initializeWithTokenHandler:entryPoint:environment:telemetryEnabled:completionHandler:")]
+        [Export("initializeWithTokenHandler:entryPoint:environment:completionHandler:")]
         void Initialize(
             TokenRefreshRequest tokenHandler,
             string entryPoint,
             PayabliEnvironment environment,
-            bool telemetryEnabled,
             PayabliSessionCompletion completionHandler
         );
 
