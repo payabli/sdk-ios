@@ -3,16 +3,13 @@ import PayabliSDKCore
 
 /// An app lifecycle the test moves to the background by hand.
 ///
-/// The stream exists from construction, so a backgrounding made before delivery starts listening is kept.
+/// Like UIKit, it hears only what happens after delivery subscribes; a backgrounding before that is lost.
 package final class ManualAppLifecycle: AppLifecycle, @unchecked Sendable {
     private let lock = NSLock()
-    private let stream: AsyncStream<BackgroundWindow>
-    private let continuation: AsyncStream<BackgroundWindow>.Continuation
+    private var continuation: AsyncStream<BackgroundWindow>.Continuation?
     private var closed = 0
 
-    package init() {
-        (stream, continuation) = AsyncStream.makeStream(of: BackgroundWindow.self)
-    }
+    package init() {}
 
     /// How many windows delivery has closed.
     package var closedCount: Int {
@@ -33,12 +30,14 @@ package final class ManualAppLifecycle: AppLifecycle, @unchecked Sendable {
             try? await Task.sleep(for: .seconds(2))
             closedOrTimedOut.settle(false)
         }
-        continuation.yield(window)
+        _ = lock.withLock { continuation }?.yield(window)
         return await closedOrTimedOut.value()
     }
 
     package func backgroundings() -> AsyncStream<BackgroundWindow> {
-        stream
+        let (stream, continuation) = AsyncStream.makeStream(of: BackgroundWindow.self)
+        lock.withLock { self.continuation = continuation }
+        return stream
     }
 }
 

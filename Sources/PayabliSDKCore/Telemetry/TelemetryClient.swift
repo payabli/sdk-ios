@@ -202,9 +202,10 @@ package actor TelemetryClient {
                 await self.requestFlush()
             }
         }
-        let lifecycle = lifecycle
+        // Subscribed here rather than in the task, so a backgrounding before the task runs is not missed.
+        let backgroundings = lifecycle.backgroundings()
         watcher = Task { [weak self] in
-            for await window in lifecycle.backgroundings() {
+            for await window in backgroundings {
                 guard let drain = await self?.requestFlush() else {
                     window.close()
                     return
