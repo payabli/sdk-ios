@@ -17,7 +17,7 @@ public extension PayabliTTP {
     /// - Parameter activationCode: the code the partner issued out of band, e.g. from an admin dashboard.
     func activateDevice(activationCode: String) async throws {
         try await reportingToHost {
-            try await runSessionSetup(.activate) { try await self.runActivateDevice(activationCode: activationCode) }
+            try await runSessionSetup(.activate(code: activationCode)) { try await self.runActivateDevice(activationCode: activationCode) }
         }
     }
 

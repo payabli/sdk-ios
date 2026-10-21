@@ -18,11 +18,6 @@ package extension AppAttestService {
             throw ActivationRegistrationChanged()
         }
 
-        // Rotate the nonce before `/activate` verifies the assertion. The
-        // returned payload is unused here, since the assertion is signed over a
-        // fresh timestamp rather than the challenge.
-        _ = try await postChallenge(entry: entry)
-
         let assertion = try await signingActivation(entry: entry)
         guard assertion.deviceId == activationId, try cachedDeviceId(for: entry) == activationId else {
             throw ActivationRegistrationChanged()

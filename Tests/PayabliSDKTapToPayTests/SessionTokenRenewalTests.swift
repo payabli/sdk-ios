@@ -196,9 +196,10 @@ final class SessionTokenRenewalTests: XCTestCase {
 
     // MARK: - Every way in
 
-    /// Fails to compile when a kind is added, and fails when a kind's sequence does not renew.
+    /// Fails to compile when a kind is added without a case here, and fails when a kind's sequence does not renew.
     func testEveryKindOfSessionSetupRenewsARefusedToken() async throws {
-        for kind in SessionSetupKind.allCases {
+        let kinds: [SessionSetupKind] = [.initialize, .reinitialize, .activate(code: "123456")]
+        for kind in kinds {
             stub = RenewalStub()
             tokens = TokenCalls()
             StubURLProtocol.handler = stub.handle
@@ -215,10 +216,10 @@ final class SessionTokenRenewalTests: XCTestCase {
                 stub.configStatuses = [401]
                 try await ttp.reinitialize()
                 renewed = ttp.sessionState == .ready
-            case .activate:
+            case let .activate(code):
                 let (ttp, attestation) = try await makePendingTTP()
                 attestation.activationFailuresFirst = [PinnedTokenRefusal()]
-                try await ttp.activateDevice(activationCode: "123456")
+                try await ttp.activateDevice(activationCode: code)
                 renewed = ttp.sessionState == .idle
             }
             XCTAssertTrue(renewed, "\(kind) did not renew a refused token")
