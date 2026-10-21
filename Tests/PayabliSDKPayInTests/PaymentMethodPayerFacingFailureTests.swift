@@ -137,7 +137,7 @@ final class PaymentMethodPayerFacingFailureTests: XCTestCase {
             tokenProvider: { throw URLError(.userAuthenticationRequired) }
         )
         return PayabliPayIn(
-            session: PayabliSession(config: config),
+            session: PayabliSession(config: config, telemetryTransport: DiscardingTelemetryTransport()),
             operation: .capture,
             requestConfiguration: Self.requestConfiguration
         )

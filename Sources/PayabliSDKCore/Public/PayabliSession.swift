@@ -77,9 +77,14 @@ public final class PayabliSession: @unchecked Sendable {
             ),
             transport: telemetryTransport ?? TelemetryEndpointTransport(transport: service),
             sleep: { try await ContinuousClock().sleep(for: .seconds($0)) },
-            lifecycle: UIKitAppLifecycle()
+            lifecycle: UIKitAppLifecycle(),
+            deviceId: { try? deviceIdentity.value() },
+            queued: [(TelemetryEventName.sdkInitialized, ["state": Self.reportedState])]
         )
     }
+
+    /// The state a report gives for this session. An installed session is usable, and iOS has no other.
+    private static let reportedState = "ready"
 
     /// Installs the process's session, or returns it if one is already installed for an equal
     /// configuration.
@@ -93,10 +98,39 @@ public final class PayabliSession: @unchecked Sendable {
     /// - Returns: the process's installed session, the one already installed when the configuration is equal.
     @discardableResult
     public static func initialize(config: PayabliConfig) async throws -> PayabliSession {
-        try install(config: config)
+        let startedAt = ContinuousClock.now
+        do {
+            return try install(config: config)
+        } catch let refusal as PayabliGenericError {
+            await current?.reportRefusedInitialize(refusal, after: ContinuousClock.now - startedAt)
+            throw refusal
+        }
     }
 
-    static func install(config: PayabliConfig, urlSession: URLSession? = nil) throws -> PayabliSession {
+    /// Reports a refused call as a start and its failure on this session's channel, so the start is answered.
+    ///
+    /// - Parameter refusal: what the call is about to throw.
+    /// - Parameter duration: how long the call took.
+    private func reportRefusedInitialize(_ refusal: PayabliGenericError, after duration: Duration) async {
+        let (seconds, attoseconds) = duration.components
+        let milliseconds = seconds * 1000 + attoseconds / 1_000_000_000_000_000
+        await telemetry.emit([
+            (TelemetryEventName.sdkInitializeStarted, ["state": Self.reportedState]),
+            (TelemetryEventName.sdkInitializeFailed, [
+                "outcome": "refused",
+                "code": refusal.type.rawValue,
+                "error_number": String(refusal.code),
+                "reason": refusal.reason,
+                "duration_ms": String(milliseconds)
+            ])
+        ])
+    }
+
+    static func install(
+        config: PayabliConfig,
+        urlSession: URLSession? = nil,
+        telemetryTransport: (any TelemetryTransport)? = nil
+    ) throws -> PayabliSession {
         try lock.withLock {
             let identity = ConfigIdentity(config)
             if let current = installed {
@@ -108,7 +142,7 @@ public final class PayabliSession: @unchecked Sendable {
                 }
                 return current
             }
-            let session = PayabliSession(config: config, urlSession: urlSession)
+            let session = PayabliSession(config: config, urlSession: urlSession, telemetryTransport: telemetryTransport)
             installed = session
             return session
         }

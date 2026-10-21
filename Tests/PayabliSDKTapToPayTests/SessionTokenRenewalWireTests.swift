@@ -51,8 +51,8 @@ final class SessionTokenRenewalWireTests: XCTestCase {
         StubURLProtocol.handler = wire.handle
         let renewal = RenewalGate()
         let (ttp, _) = try makeTTP(renewal: renewal)
-        // Three short of a batch: the start, the attempt and its refusal make twenty.
-        for _ in 0 ..< 17 {
+        // Three short of a batch with the session's own start: the setup's start, the attempt and its refusal make twenty.
+        for _ in 0 ..< 16 {
             await ttp.session.telemetry.emit("test.filler")
         }
 

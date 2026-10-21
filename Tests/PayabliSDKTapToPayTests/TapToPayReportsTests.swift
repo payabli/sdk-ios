@@ -29,7 +29,7 @@ final class TapToPayReportsTests: XCTestCase {
         await ttp.reports.sent()
         await ttp.session.telemetry.flush()
 
-        let events = await sent(transport)
+        let events = await sent(transport).filter { $0.event.hasPrefix("ttp.") }
         XCTAssertEqual(
             events.map(\.event),
             ["ttp.initialize.started", "ttp.attestation.started", "ttp.attestation.succeeded", "ttp.initialize.succeeded"]
@@ -41,6 +41,7 @@ final class TapToPayReportsTests: XCTestCase {
 
     func testAnAttestationRefusalTheSessionRenewsWaitsForItsBatch() async throws {
         let (ttp, _, _, transport) = try makeTTP()
+        let before = await ttp.session.telemetry.bufferedCount
 
         ttp.reports.attestationFailed(PinnedTokenRefusal(), after: .zero)
         await ttp.reports.sent()
@@ -48,9 +49,9 @@ final class TapToPayReportsTests: XCTestCase {
         ttp.reports.releaseHeld()
         await ttp.reports.sent()
 
-        XCTAssertEqual(whileHeld, 0, "held until the renewal, so no batch it fills can carry the token being renewed")
+        XCTAssertEqual(whileHeld, before, "held until the renewal, so no batch it fills can carry the token being renewed")
         let buffered = await ttp.session.telemetry.bufferedCount
-        XCTAssertEqual(buffered, 1, "released into the batch")
+        XCTAssertEqual(buffered, before + 1, "released into the batch")
         let sent = await transport.batches
         XCTAssertTrue(sent.isEmpty, "and not sent at once")
     }
@@ -61,7 +62,7 @@ final class TapToPayReportsTests: XCTestCase {
         ttp.reports.attestationFailed(PayabliTTPError.attestationFailed(reason: Self.sentinel), after: .zero)
         await ttp.reports.sent()
 
-        let sent = await sent(transport).map(\.event)
+        let sent = await sent(transport).map(\.event).filter { $0.hasPrefix("ttp.") }
         XCTAssertEqual(sent, ["ttp.attestation.failed"])
     }
 
@@ -181,13 +182,55 @@ final class TapToPayReportsTests: XCTestCase {
         XCTAssertEqual(events.filter { $0 == "ttp.initialize.failed" }.count, 1, "\(events)")
     }
 
+    func testWorkStartedUnderOneSessionReportsToThatSessionAfterAnotherIsInstalled() async throws {
+        PayabliSession.resetForTesting()
+        defer { PayabliSession.resetForTesting() }
+        let firstTransport = InMemoryTelemetryTransport()
+        let first = try PayabliSession.install(
+            config: PayabliConfig(entryPoint: "first", environment: .sandbox, tokenProvider: { "seed_token" }),
+            urlSession: StubURLProtocol.makeSession(),
+            telemetryTransport: firstTransport
+        )
+        let provider = MockTapToPayProvider()
+        provider.prepareReaderResult = .failure(PayabliTTPError.readerCredentialsUnusable)
+        let ttp = PayabliTTP(
+            session: first,
+            provider: provider,
+            attestation: MockDeviceAttestationService(),
+            retryPolicy: RetryPolicy(maxAttempts: 1, baseDelay: 0, maxDelay: 0, multiplier: 1, maxJitter: 0)
+        )
+        PayabliSession.resetForTesting()
+        let secondTransport = InMemoryTelemetryTransport()
+        let second = try PayabliSession.install(
+            config: PayabliConfig(entryPoint: "second", environment: .sandbox, tokenProvider: { "seed_token" }),
+            urlSession: StubURLProtocol.makeSession(),
+            telemetryTransport: secondTransport
+        )
+
+        _ = try? await ttp.initialize()
+        await ttp.reports.sent()
+        await first.telemetry.flush()
+        await second.telemetry.flush()
+
+        let reported = await sent(firstTransport).filter { $0.event.hasPrefix("ttp.") }
+        XCTAssertEqual(
+            reported.map(\.event),
+            ["ttp.initialize.started", "ttp.attestation.started", "ttp.attestation.succeeded", "ttp.initialize.failed"]
+        )
+        XCTAssertTrue(reported.allSatisfy { $0.sessionId == first.telemetry.sessionId && $0.entry == "first" })
+        let installedSinceGotOnlyItsOwnStart = await sent(secondTransport).map(\.event)
+        XCTAssertEqual(installedSinceGotOnlyItsOwnStart, ["sdk.initialized"])
+    }
+
     func testAReportQueuedBehindASlowSendKeepsTheTimeItWasMade() async throws {
         let transport = HeldTelemetryTransport()
         let client = TelemetryClient(
             configuration: .init(entry: "e", environment: "sandbox"),
             transport: transport,
             sleep: ManualTelemetryClock().sleep,
-            lifecycle: ManualAppLifecycle()
+            lifecycle: ManualAppLifecycle(),
+            deviceId: { nil },
+            queued: []
         )
         let reports = TapToPayReports(telemetry: client)
 

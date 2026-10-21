@@ -1,4 +1,3 @@
-import CryptoKit
 import Foundation
 
 /// Transport abstraction — production uses `URLSession` to POST to the Payabli
@@ -52,14 +51,14 @@ package actor TelemetryClient {
     package typealias Sleep = @Sendable (TimeInterval) async throws -> Void
 
     package let configuration: Configuration
-    package let sessionId: String
+    package nonisolated let sessionId: String
 
     private let transport: TelemetryTransport
     private let sleep: Sleep
     private let lifecycle: any AppLifecycle
     private let logger = PayabliLogger(category: .telemetry)
+    private let deviceId: @Sendable () -> String?
     private var queue: TelemetryQueue
-    private var deviceIdHash: String?
 
     /// The last drain scheduled. Drains run one after another, so this is also the one that finishes last.
     private var tail: Task<Void, Never>?
@@ -72,33 +71,47 @@ package actor TelemetryClient {
     /// - Parameter transport: where batches are sent.
     /// - Parameter sleep: the timer's wait.
     /// - Parameter lifecycle: the app's movement to the background.
+    /// - Parameter deviceId: the device's identity, read as each batch leaves; `nil` while it cannot be read.
+    /// - Parameter queued: events queued before anything else can record, oldest first.
     /// - Parameter sessionId: the identifier every event from this client carries.
     package init(
         configuration: Configuration,
         transport: TelemetryTransport,
         sleep: @escaping Sleep,
         lifecycle: any AppLifecycle,
+        deviceId: @escaping @Sendable () -> String?,
+        queued: [(name: String, properties: [String: String])],
         sessionId: String = UUID().uuidString
     ) {
         self.configuration = configuration
         self.transport = transport
         self.sleep = sleep
         self.lifecycle = lifecycle
+        self.deviceId = deviceId
         self.sessionId = sessionId
-        queue = TelemetryQueue(capacity: configuration.queueCapacity)
+        var queue = TelemetryQueue(capacity: configuration.queueCapacity)
+        let now = Date()
+        for (name, properties) in queued {
+            _ = queue.offer(TelemetryEvent(
+                sdkVersion: configuration.sdkVersion,
+                sessionId: sessionId,
+                deviceIdHash: nil,
+                entry: configuration.entry,
+                environment: configuration.environment,
+                event: name,
+                properties: properties,
+                timestamp: now
+            ))
+        }
+        self.queue = queue
+        if !queued.isEmpty {
+            Task { [weak self] in await self?.startIfNeeded() }
+        }
     }
 
     deinit {
         timer?.cancel()
         watcher?.cancel()
-    }
-
-    /// Hash a raw device identifier (SHA-256) before storing. Never log the raw value.
-    ///
-    /// - Parameter rawId: the raw device identifier, hashed (SHA-256) before anything is stored.
-    package func setDeviceId(_ rawId: String) {
-        let digest = SHA256.hash(data: Data(rawId.utf8))
-        deviceIdHash = digest.map { String(format: "%02x", $0) }.joined()
     }
 
     /// Enqueue an event.
@@ -121,11 +134,25 @@ package actor TelemetryClient {
         occurredAt: Date,
         waitsForBatch: Bool = false
     ) async {
+        enqueue(name, properties: properties, occurredAt: occurredAt, waitsForBatch: waitsForBatch)
+    }
+
+    /// Enqueue events in order, with nothing another caller records between them.
+    ///
+    /// - Parameter records: each event's catalog name and properties, in the order they happened.
+    package func emit(_ records: [(name: String, properties: [String: String])]) async {
+        let now = Date()
+        for record in records {
+            enqueue(record.name, properties: record.properties, occurredAt: now, waitsForBatch: false)
+        }
+    }
+
+    private func enqueue(_ name: String, properties: [String: String], occurredAt: Date, waitsForBatch: Bool) {
         startIfNeeded()
         let event = TelemetryEvent(
             sdkVersion: configuration.sdkVersion,
             sessionId: sessionId,
-            deviceIdHash: deviceIdHash,
+            deviceIdHash: nil,
             entry: configuration.entry,
             environment: configuration.environment,
             event: name,
@@ -179,7 +206,8 @@ package actor TelemetryClient {
         TelemetryEventName.ttpCloseFailed,
         TelemetryEventName.ttpNfcFailed,
         TelemetryEventName.ttpAttestationQuotaExhausted,
-        TelemetryEventName.authTokenFailed
+        TelemetryEventName.authTokenFailed,
+        TelemetryEventName.sdkInitializeFailed
     ]
 
     private static let successfulOutcomes: Set<String> = ["succeeded", "approved"]
@@ -257,7 +285,10 @@ package actor TelemetryClient {
         if dropped > 0 {
             logger.warning("telemetry_queue_overflow dropped=\(dropped)")
         }
-        if await !transport.send(batch, droppedSinceLastSend: dropped) {
+        // The session's identifier as it is, already a digest; the route compares it with the one registration sent.
+        let device = deviceId().flatMap { $0.isEmpty ? nil : $0 }
+        let stamped = batch.map { $0.carrying(deviceIdHash: device) }
+        if await !transport.send(stamped, droppedSinceLastSend: dropped) {
             queue.restoreDropCount(dropped)
         }
         return true

@@ -36,15 +36,28 @@ package struct TelemetryEvent: Encodable, Sendable {
         self.event = event
         self.properties = properties
     }
+
+    /// The same event with the device's identifier set.
+    ///
+    /// - Parameter deviceIdHash: the identifier, or `nil` when the device cannot be identified.
+    /// - Returns: the event carrying it.
+    package func carrying(deviceIdHash: String?) -> TelemetryEvent {
+        TelemetryEvent(
+            sdkVersion: sdkVersion,
+            sessionId: sessionId,
+            deviceIdHash: deviceIdHash,
+            entry: entry,
+            environment: environment,
+            event: event,
+            properties: properties,
+            timestamp: timestamp
+        )
+    }
 }
 
 /// Catalog of event names emitted by the SDK.
 package enum TelemetryEventName {
-    // Tokenization
-    package static let tokenizationStarted = "tokenization.started"
-    package static let tokenizationSucceeded = "tokenization.succeeded"
-    package static let tokenizationFailed = "tokenization.failed"
-    package static let tokenizationCancelled = "tokenization.cancelled"
+    // Form
     package static let formPresented = "form.presented"
     package static let formValidationError = "form.validationError"
 
@@ -69,7 +82,8 @@ package enum TelemetryEventName {
 
     // System
     package static let sdkInitialized = "sdk.initialized"
-    package static let telemetryDisabled = "sdk.telemetryDisabled"
+    package static let sdkInitializeStarted = "sdk.initialize.started"
+    package static let sdkInitializeFailed = "sdk.initialize.failed"
     package static let authTokenAcquired = "auth.tokenAcquired"
     package static let authTokenFailed = "auth.tokenFailed"
     package static let authTokenRefreshed = "auth.tokenRefreshed"

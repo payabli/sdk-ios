@@ -10,7 +10,9 @@ final class TelemetryClientTests: XCTestCase {
     private func makeClient(
         batchSize: Int = 20,
         queueCapacity: Int = 500,
-        maxEventsPerRequest: Int = 100
+        maxEventsPerRequest: Int = 100,
+        deviceId: String? = nil,
+        queued: [(name: String, properties: [String: String])] = []
     ) -> TelemetryClient {
         TelemetryClient(
             configuration: .init(
@@ -23,7 +25,9 @@ final class TelemetryClientTests: XCTestCase {
             ),
             transport: transport,
             sleep: clock.sleep,
-            lifecycle: lifecycle
+            lifecycle: lifecycle,
+            deviceId: { deviceId },
+            queued: queued
         )
     }
 
@@ -37,12 +41,12 @@ final class TelemetryClientTests: XCTestCase {
 
     func testAFullBatchIsSentWithoutWaitingForTheTimer() async {
         let client = makeClient(batchSize: 2)
-        await client.emit("tokenization.started", properties: ["method": "card"])
-        await client.emit("tokenization.succeeded", properties: ["method": "card"])
+        await client.emit("form.presented")
+        await client.emit("ttp.initialize.started")
         await client.settled()
 
         let batches = await transport.batches
-        XCTAssertEqual(batches.map { $0.map(\.event) }, [["tokenization.started", "tokenization.succeeded"]])
+        XCTAssertEqual(batches.map { $0.map(\.event) }, [["form.presented", "ttp.initialize.started"]])
     }
 
     func testShortOfAFullBatchNothingIsSentUntilTheTimerFires() async {
@@ -103,7 +107,9 @@ final class TelemetryClientTests: XCTestCase {
             configuration: .init(entry: "test_entry", environment: "sandbox"),
             transport: gated,
             sleep: clock.sleep,
-            lifecycle: lifecycle
+            lifecycle: lifecycle,
+            deviceId: { nil },
+            queued: []
         )
         await client.emit("a", properties: ["outcome": "failed"])
         await gated.untilHeld()
@@ -270,17 +276,44 @@ final class TelemetryClientTests: XCTestCase {
 
     // MARK: - The event
 
-    func testDeviceIdIsHashedNotRaw() async {
-        let client = makeClient()
-        await client.setDeviceId("abc-device-123")
-        await client.emit("event", properties: [:])
+    func testEveryEventCarriesTheDeviceIdentifierAsItIs() async {
+        let identifier = "0f8d2a1c4b6e4a2f9c3d5e7f8a9b0c1d"
+        let client = makeClient(deviceId: identifier, queued: [("sdk.initialized", ["state": "ready"])])
+        await client.emit("ttp.initialize.started")
+        await client.flush()
+
+        let events = await transport.batches.flatMap { $0 }
+        XCTAssertEqual(events.map(\.deviceIdHash), [identifier, identifier], "not hashed again")
+    }
+
+    func testADeviceThatCannotBeIdentifiedSendsNoIdentifier() async {
+        let client = makeClient(deviceId: "")
+        await client.emit("x")
+        await client.flush()
+
+        let events = await transport.batches.flatMap { $0 }
+        XCTAssertEqual(events.count, 1)
+        XCTAssertNil(events.first?.deviceIdHash)
+    }
+
+    func testWhatWasQueuedAtConstructionLeavesFirst() async {
+        let client = makeClient(queued: [("sdk.initialized", ["state": "ready"])])
+        await client.emit("ttp.initialize.started")
         await client.flush()
 
         let batches = await transport.batches
-        let event = batches.first?.first
-        XCTAssertNotNil(event?.deviceIdHash)
-        XCTAssertNotEqual(event?.deviceIdHash, "abc-device-123")
-        XCTAssertEqual(event?.deviceIdHash?.count, 64, "SHA-256 hex digest is 64 chars")
+        XCTAssertEqual(batches.map { $0.map(\.event) }, [["sdk.initialized", "ttp.initialize.started"]])
+        XCTAssertEqual(batches.first?.first?.properties, ["state": "ready"])
+    }
+
+    func testWhatWasQueuedAtConstructionLeavesOnTheTimerWithNothingElseRecorded() async {
+        let client = makeClient(queued: [("sdk.initialized", ["state": "ready"])])
+
+        await clock.tick()
+        await client.settled()
+
+        let batches = await transport.batches
+        XCTAssertEqual(batches.map { $0.map(\.event) }, [["sdk.initialized"]])
     }
 
     func testEnvelopeIncludesVersion() async {
