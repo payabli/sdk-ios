@@ -87,7 +87,7 @@ public final class PayabliSession: @unchecked Sendable {
     /// A different configuration throws `invalidConfiguration` and leaves the installed session in
     /// place, because every facade already built is running on it.
     ///
-    /// - Parameter config: the configuration to install; equal by entry point, environment and telemetry setting.
+    /// - Parameter config: the configuration to install; equal by entry point and environment.
     /// - Returns: the process's installed session, the one already installed when the configuration is equal.
     @discardableResult
     public static func initialize(config: PayabliConfig) async throws -> PayabliSession {
