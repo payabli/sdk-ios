@@ -7,17 +7,14 @@ package protocol TelemetryTransport: Sendable {
     func send(_ batch: [TelemetryEvent]) async
 }
 
-/// Batched, best-effort, opt-out telemetry client.
+/// Batched, best-effort telemetry client.
 ///
-/// - **Opt-out:** disabled when `PayabliConfig.telemetryEnabled == false`.
 /// - **Best-effort:** transport failures never propagate to callers.
-/// - **Batched:** flushes every 30s or when 20 events accumulate.
 /// - **Zero PII:** caller is responsible for not passing PAN/CVV/tokens.
 package actor TelemetryClient {
     package struct Configuration: Sendable {
         package let flushInterval: TimeInterval
         package let batchSize: Int
-        package let enabled: Bool
         package let sdkVersion: String
         package let entry: String
         package let environment: String
@@ -25,14 +22,12 @@ package actor TelemetryClient {
         package init(
             flushInterval: TimeInterval = 30,
             batchSize: Int = 20,
-            enabled: Bool = true,
             sdkVersion: String = PayabliCore.version,
             entry: String,
             environment: String
         ) {
             self.flushInterval = flushInterval
             self.batchSize = batchSize
-            self.enabled = enabled
             self.sdkVersion = sdkVersion
             self.entry = entry
             self.environment = environment
@@ -78,7 +73,6 @@ package actor TelemetryClient {
     /// - Parameter properties: the string values the event carries, sent on as given.
     /// - Parameter occurredAt: when the reported thing happened.
     package func emit(_ name: String, properties: [String: String] = [:], occurredAt: Date) async {
-        guard configuration.enabled else { return }
         let event = TelemetryEvent(
             sdkVersion: configuration.sdkVersion,
             sessionId: sessionId,

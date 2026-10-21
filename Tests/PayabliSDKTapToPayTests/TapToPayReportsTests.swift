@@ -181,7 +181,7 @@ final class TapToPayReportsTests: XCTestCase {
     func testAReportQueuedBehindASlowSendKeepsTheTimeItWasMade() async throws {
         let transport = HeldTelemetryTransport()
         let client = TelemetryClient(
-            configuration: .init(enabled: true, entry: "e", environment: "sandbox"),
+            configuration: .init(entry: "e", environment: "sandbox"),
             transport: transport
         )
         let reports = TapToPayReports(telemetry: client)

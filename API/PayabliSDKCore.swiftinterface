@@ -254,8 +254,7 @@ public enum PayabliCore {
 public struct PayabliConfig : Swift::Sendable {
   public let entryPoint: Swift::String
   public let environment: PayabliSDKCore::PayabliEnvironment
-  public let telemetryEnabled: Swift::Bool
-  public init(entryPoint: Swift::String, environment: PayabliSDKCore::PayabliEnvironment, tokenProvider: @escaping PayabliSDKCore::PayabliTokenRefresh, telemetryEnabled: Swift::Bool = true) throws
+  public init(entryPoint: Swift::String, environment: PayabliSDKCore::PayabliEnvironment, tokenProvider: @escaping PayabliSDKCore::PayabliTokenRefresh) throws
 }
 extension PayabliSDKCore::PayabliConfig : Swift::CustomStringConvertible {
   public var description: Swift::String {
@@ -279,7 +278,7 @@ extension PayabliSDKCore::PayabliConfig : Swift::CustomStringConvertible {
   @objc public static var deviceId: Swift::String? {
     @objc get
   }
-  @objc public static func initialize(tokenHandler: @escaping (@escaping (Swift::String?, Foundation::NSError?) -> Swift::Void) -> Swift::Void, entryPoint: Swift::String, environment: PayabliSDKCore::PayabliEnvironment, telemetryEnabled: Swift::Bool) async throws
+  @objc public static func initialize(tokenHandler: @escaping (@escaping (Swift::String?, Foundation::NSError?) -> Swift::Void) -> Swift::Void, entryPoint: Swift::String, environment: PayabliSDKCore::PayabliEnvironment) async throws
   @objc deinit
 }
 @_hasMissingDesignatedInitializers final public class PayabliSession : @unchecked Swift::Sendable {

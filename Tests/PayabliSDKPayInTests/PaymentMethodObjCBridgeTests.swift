@@ -19,8 +19,7 @@ final class PaymentMethodObjCBridgeTests: XCTestCase {
         try await PayabliSessionObjC.initialize(
             tokenHandler: tokenHandler,
             entryPoint: "entry",
-            environment: .sandbox,
-            telemetryEnabled: true
+            environment: .sandbox
         )
         return try PayabliPayInObjC.create()
     }
