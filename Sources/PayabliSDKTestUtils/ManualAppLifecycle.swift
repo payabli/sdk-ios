@@ -11,6 +11,11 @@ package final class ManualAppLifecycle: AppLifecycle, @unchecked Sendable {
 
     package init() {}
 
+    /// Whether delivery has subscribed to backgroundings.
+    package var isSubscribed: Bool {
+        lock.withLock { continuation != nil }
+    }
+
     /// How many windows delivery has closed.
     package var closedCount: Int {
         lock.withLock { closed }

@@ -76,6 +76,14 @@ final class TelemetryClientTests: XCTestCase {
         XCTAssertEqual(batches.map { $0.map(\.event) }, [["first"], ["second"]])
     }
 
+    func testDeliveryListensForBackgroundingOnceTheFirstEventIsRecorded() async {
+        let client = makeClient()
+
+        await client.emit("a")
+
+        XCTAssertTrue(lifecycle.isSubscribed, "subscribed before the first emit returns, not when a task gets to run")
+    }
+
     func testGoingToTheBackgroundSendsEverythingQueuedWithTimeToFinish() async {
         let client = makeClient()
         await client.emit("a")
@@ -87,6 +95,33 @@ final class TelemetryClientTests: XCTestCase {
         XCTAssertEqual(batches.map { $0.map(\.event) }, [["a", "b"]])
         XCTAssertTrue(closed, "the background time is handed back once the send has ended")
         XCTAssertEqual(lifecycle.closedCount, 1)
+    }
+
+    func testOverlappingTriggersRunOneSendAtATimeAndLoseNothing() async {
+        let gated = GatedTelemetryTransport()
+        let client = TelemetryClient(
+            configuration: .init(entry: "test_entry", environment: "sandbox"),
+            transport: gated,
+            sleep: clock.sleep,
+            lifecycle: lifecycle
+        )
+        await client.emit("a", properties: ["outcome": "failed"])
+        await gated.untilHeld()
+
+        await client.emit("b")
+        await tick()
+        await client.emit("c", properties: ["outcome": "declined"])
+        let backgrounded = Task { await lifecycle.background() }
+        XCTAssertEqual(lifecycle.closedCount, 0, "the background time stays open while a send is held")
+        await gated.open()
+        let closed = await backgrounded.value
+        await client.settled()
+
+        let sent = await gated.sent.flatMap { $0 }.map(\.event)
+        let mostAtOnce = await gated.mostAtOnce
+        XCTAssertEqual(sent, ["a", "b", "c"])
+        XCTAssertEqual(mostAtOnce, 1)
+        XCTAssertTrue(closed)
     }
 
     // MARK: - Sent at once
@@ -256,5 +291,43 @@ final class TelemetryClientTests: XCTestCase {
         let event = batches.first?.first
         XCTAssertEqual(event?.schemaVersion, 1)
         XCTAssertFalse(event?.sdkVersion.isEmpty ?? true)
+    }
+}
+
+/// Holds every send until opened, and records how many were in flight at once.
+private actor GatedTelemetryTransport: TelemetryTransport {
+    private(set) var sent: [[TelemetryEvent]] = []
+    private(set) var mostAtOnce = 0
+    private var active = 0
+    private var isOpen = false
+    private var gates: [CheckedContinuation<Void, Never>] = []
+    private var heldWaiters: [CheckedContinuation<Void, Never>] = []
+
+    func send(_ batch: [TelemetryEvent], droppedSinceLastSend: Int) async -> Bool {
+        active += 1
+        mostAtOnce = max(mostAtOnce, active)
+        if !isOpen {
+            await withCheckedContinuation { gate in
+                gates.append(gate)
+                heldWaiters.forEach { $0.resume() }
+                heldWaiters.removeAll()
+            }
+        }
+        sent.append(batch)
+        active -= 1
+        return true
+    }
+
+    /// Returns once a send is held.
+    func untilHeld() async {
+        guard gates.isEmpty else { return }
+        await withCheckedContinuation { heldWaiters.append($0) }
+    }
+
+    /// Lets every held send through, and every later one without holding it.
+    func open() {
+        isOpen = true
+        gates.forEach { $0.resume() }
+        gates.removeAll()
     }
 }
