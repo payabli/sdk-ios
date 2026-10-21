@@ -55,7 +55,6 @@ public struct PayabliConfig: Sendable {
     /// - Parameter entryPoint: the partner integration point, refused when blank.
     /// - Parameter environment: the API environment every base URL is taken from.
     /// - Parameter tokenProvider: asks the host's backend for an access token; the only credential this config carries.
-    /// - Parameter telemetryEnabled: whether to emit telemetry events, `true` by default.
     public init(
         entryPoint: String,
         environment: PayabliEnvironment,
