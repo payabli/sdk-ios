@@ -223,13 +223,17 @@ refused once is handled inside the SDK: it asks your provider for a new one, rep
 succeeds. A 1002 means the service refused the token **and** the new one your provider just returned, so even a
 freshly minted token is being rejected. Don't treat it as a signal to fetch a token; treat it as a credential your
 app has to fix. The usual causes are a token for another environment or entry point, a missing permission, or a
-disabled paypoint. After a 1002 the session's credential is finished: every later call on that session fails at
-once with 1002, without sending a request or calling your provider. Fix the cause, then call `initialize` again;
-it starts a fresh session and calls your provider.
+disabled paypoint. Apart from the two cases below, after a 1002 the session's credential is finished: every later
+call on that session fails at once with 1002, without sending a request or calling your provider. Fix the cause,
+then call `initialize` again; it starts a fresh session and calls your provider.
 
-One 1002 leaves the session usable: one from Tap to Pay setting up the device (`PayabliTTP.initialize()`,
-`activateDevice`, or the repair `charge` runs first). Those requests keep the token they were sent, so the session
-isn't finished. Fix the cause, then call that setup again; it asks your provider for a new token.
+Two kinds of 1002 leave the session usable:
+
+- One from Tap to Pay setting up the device (`PayabliTTP.initialize()`, `activateDevice`, or the repair `charge`
+  runs first). Those requests keep the token they were sent, so the session isn't finished. Fix the cause, then
+  call that setup again; it asks your provider for a new token.
+- One whose refused token another call had already replaced. Only that call fails; the next call uses the new
+  token, and `initialize` with the same configuration returns the same session.
 
 ### Device identity
 
