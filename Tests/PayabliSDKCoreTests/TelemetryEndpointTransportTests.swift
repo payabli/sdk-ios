@@ -33,6 +33,23 @@ final class TelemetryEndpointTransportTests: XCTestCase {
         )
     }
 
+    /// A batch carries no pin and declares a 401 a refusal of its caller, so a refusal of the batch
+    /// is not recorded for the device setup to renew.
+    func testABatchCarriesNoPinAndDeclaresA401ARefusalOfItsCaller() async throws {
+        let stub = RecordingStub()
+        stub.install()
+        defer { stub.uninstall() }
+        let recording = RecordingDecoration()
+        let transport = makeStackWithChain([recording], auth: try makeTestAuth())
+
+        await TelemetryEndpointTransport(transport: transport).send([event()], droppedSinceLastSend: 0)
+
+        let request = try XCTUnwrap(recording.observed.first)
+        XCTAssertFalse(request.pinsCredential, "a refusal is not recorded for the device setup to renew")
+        XCTAssertTrue(request.isCallerRefusal(answered(401)), "a 401 refuses the caller")
+        XCTAssertFalse(request.isCallerRefusal(answered(200)), "an accepted batch does not")
+    }
+
     func testAnEmptyBatchSendsNothing() async {
         let stub = RecordingStub()
         stub.install()
@@ -121,6 +138,28 @@ final class TelemetryEndpointTransportTests: XCTestCase {
         let calls = await provider.count
         XCTAssertEqual(calls, 1, "the first token only, no refresh")
         XCTAssertNil(session.auth.terminalFailure)
+    }
+
+    /// A refused batch leaves nothing for the setup to renew, so a setup that follows asks the
+    /// provider for nothing.
+    func testARefusedBatchLeavesNothingForTheSetupToRenewAndAsksTheProviderForNothing() async throws {
+        let stub = RecordingStub(status: 401)
+        stub.install()
+        defer { stub.uninstall() }
+        let provider = Counter()
+        let session = try makeSession(tokenProvider: {
+            _ = await provider.increment()
+            return "telemetry-token"
+        })
+
+        await session.telemetry.emit("sdk_initialized")
+        await session.telemetry.flush()
+
+        XCTAssertEqual(stub.count, 1, "no replay")
+        let renewed = try await session.auth.renewPinnedRefusal()
+        XCTAssertFalse(renewed, "a refused batch leaves nothing for the setup to renew")
+        let calls = await provider.count
+        XCTAssertEqual(calls, 1, "the first token only; the setup asked the provider for nothing")
     }
 
     /// A session built the way a host's is, so its batches take the production route.

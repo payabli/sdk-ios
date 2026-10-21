@@ -46,6 +46,11 @@ actor Counter {
     }
 }
 
+/// A bodyless answer for a status, for asserting on a response no request met.
+func answered(_ status: Int) -> PayabliResponse {
+    PayabliResponse(statusCode: status, headers: [:], body: Data())
+}
+
 /// Records every request that reached the network and answers each one from the request itself.
 ///
 /// The response is chosen from the request, not from its position, so a concurrent test carries no

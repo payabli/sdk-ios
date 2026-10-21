@@ -11,8 +11,9 @@ package actor TelemetryEndpointTransport: TelemetryTransport {
     private let deviceFacts: TelemetryDeviceFacts
     private let logger: PayabliLogger
 
-    /// Every batch pins its credential, so a telemetry 401 neither spends the session's refresh nor replays
-    /// the batch, and a finished session refuses it before it is sent.
+    /// Every batch declares a 401 a refusal of its caller, so the answer returns as it arrived, with no
+    /// refresh, no replay and nothing for the device setup to renew. A finished session refuses the
+    /// batch before it is sent.
     ///
     /// - Parameter transport: the session's transport, so a batch takes the same path as every other route.
     /// - Parameter path: the route the batch is posted to.
@@ -52,7 +53,12 @@ package actor TelemetryEndpointTransport: TelemetryTransport {
         )
         do {
             let response = try await transport.perform(
-                PayabliRequest.json(method: .post, path: path, jsonBody: body, pinsCredential: true)
+                PayabliRequest.json(
+                    method: .post,
+                    path: path,
+                    jsonBody: body,
+                    isCallerRefusal: { $0.statusCode == 401 }
+                )
             )
             guard (200 ..< 300).contains(response.statusCode) else {
                 logger.warning("telemetry_batch_refused status=\(response.statusCode)")
