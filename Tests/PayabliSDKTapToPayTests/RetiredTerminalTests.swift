@@ -64,6 +64,22 @@ final class RetiredTerminalTests: XCTestCase {
         XCTAssertEqual(provider.startReadingCalls, 0)
     }
 
+    func testAReplacementLandingWhileThePaymentOpensReadsNoCardAndAttemptsTheClose() async throws {
+        let live = LiveFlag()
+        let (ttp, provider, _, requests) = try makeTTP(live: live)
+        try await ttp.initialize()
+        requests.onInitiate = { live.value = false }
+
+        let refusal = await failure { _ = try await self.charge(ttp) }
+
+        assertRetired(refusal, on: ttp)
+        let error = refusal as? TapToPayError
+        XCTAssertEqual(error?.paymentTransId, Self.paymentTransId)
+        XCTAssertEqual(error?.capture, .notCharged)
+        XCTAssertEqual(provider.startReadingCalls, 0, "no card was read")
+        XCTAssertEqual(requests.updates, 1, "the opened payment's close was attempted")
+    }
+
     func testARetiredTerminalRefusesActivation() async throws {
         let live = LiveFlag()
         let (ttp, _, attestation, _) = try makeTTP(live: live)
@@ -187,6 +203,13 @@ private final class Requests: @unchecked Sendable {
     private let lock = NSLock()
     private var sent = 0
     private var closes = 0
+    private var initiated: (@Sendable () -> Void)?
+
+    /// Runs while the open is in flight, before its answer returns.
+    var onInitiate: (@Sendable () -> Void)? {
+        get { lock.withLock { initiated } }
+        set { lock.withLock { initiated = newValue } }
+    }
 
     var count: Int {
         lock.withLock { sent }
@@ -204,6 +227,9 @@ private final class Requests: @unchecked Sendable {
                 if path.contains("/MoneyIn/update/") {
                     closes += 1
                 }
+            }
+            if path.contains("/MoneyIn/initiate") {
+                onInitiate?()
             }
             let body: [String: Any] = if path.contains("/MoneyIn/") {
                 ["code": "A01", "data": ["paymentTransId": paymentTransId]]

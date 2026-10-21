@@ -385,17 +385,16 @@ extension PayabliTTP {
         sessionManager.markError(error, registration: storedRegistration())
     }
 
+    /// Why a terminal whose session was replaced or ended refuses.
+    static let retiredReason = "the session this was created with was replaced or ended; create a new one"
+
     /// Refuses to go on for a terminal whose session was replaced or ended, before the reader is touched, and lands
     /// the terminal on `.failed(reason: .sessionEnded)`.
     ///
     /// - Throws: `sessionNotInitialized` once this terminal's session is no longer the installed one.
     func requireLiveSession() throws {
         guard !isLive() else { return }
-        let refusal = TapToPayError(
-            type: .sessionNotInitialized,
-            reason: "the session this was created with was replaced or ended; create a new one",
-            detail: nil
-        )
+        let refusal = TapToPayError(type: .sessionNotInitialized, reason: Self.retiredReason, detail: nil)
         markError(refusal)
         syncPublished()
         throw refusal
