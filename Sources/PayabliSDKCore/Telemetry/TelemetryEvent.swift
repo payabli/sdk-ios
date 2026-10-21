@@ -57,6 +57,13 @@ package struct TelemetryEvent: Encodable, Sendable {
 
 /// Catalog of event names emitted by the SDK.
 package enum TelemetryEventName {
+    // Card-not-present operations
+    package static let payinCaptureCompleted = "payin.capture.completed"
+    package static let payinAuthorizeCompleted = "payin.authorize.completed"
+    package static let payinStoreMethodCompleted = "payin.storeMethod.completed"
+    package static let payinVoidCompleted = "payin.void.completed"
+    package static let payinReadCompleted = "payin.read.completed"
+
     // Form
     package static let formPresented = "form.presented"
     package static let formValidationError = "form.validationError"

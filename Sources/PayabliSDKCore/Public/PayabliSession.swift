@@ -39,6 +39,7 @@ public final class PayabliSession: @unchecked Sendable {
     /// A process-wide lock, because the installed session is process-wide.
     private static let lock = NSLock()
     private static var installed: PayabliSession?
+    private static var testTelemetryTransport: (any TelemetryTransport)?
 
     init(
         config: PayabliConfig,
@@ -142,7 +143,11 @@ public final class PayabliSession: @unchecked Sendable {
                 }
                 return current
             }
-            let session = PayabliSession(config: config, urlSession: urlSession, telemetryTransport: telemetryTransport)
+            let session = PayabliSession(
+                config: config,
+                urlSession: urlSession,
+                telemetryTransport: telemetryTransport ?? testTelemetryTransport
+            )
             installed = session
             return session
         }
@@ -169,8 +174,14 @@ public final class PayabliSession: @unchecked Sendable {
         lock.withLock { installed }
     }
 
-    static func resetForTesting() {
-        lock.withLock { installed = nil }
+    /// Removes the installed session.
+    ///
+    /// - Parameter telemetryTransport: what later installs report through, so a test reaches no network; nil restores the default.
+    static func resetForTesting(telemetryTransport: (any TelemetryTransport)? = nil) {
+        lock.withLock {
+            installed = nil
+            testTelemetryTransport = telemetryTransport
+        }
     }
 }
 
