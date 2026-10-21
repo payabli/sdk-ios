@@ -53,4 +53,18 @@ struct TelemetryQueue {
     mutating func restoreDropCount(_ count: Int) {
         dropped += count
     }
+
+    /// Returns a kept batch to the front of the queue, in the order it was taken, with the eviction
+    /// count it carried, evicting the oldest when the return overflows the capacity.
+    ///
+    /// - Parameter batch: the events the transport kept, oldest first as they were taken.
+    /// - Parameter droppedSinceLastSend: the eviction count the batch carried.
+    mutating func restoreFront(_ batch: [TelemetryEvent], droppedSinceLastSend: Int) {
+        events.insert(contentsOf: batch, at: 0)
+        dropped += droppedSinceLastSend
+        while events.count > capacity {
+            events.removeFirst()
+            dropped += 1
+        }
+    }
 }

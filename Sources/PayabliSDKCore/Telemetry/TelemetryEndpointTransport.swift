@@ -44,8 +44,8 @@ package actor TelemetryEndpointTransport: TelemetryTransport {
     }
 
     @discardableResult
-    package func send(_ batch: [TelemetryEvent], droppedSinceLastSend: Int) async -> Bool {
-        guard let entry = batch.first?.entry else { return true }
+    package func send(_ batch: [TelemetryEvent], droppedSinceLastSend: Int) async -> TelemetrySendOutcome {
+        guard let entry = batch.first?.entry else { return .delivered }
         let body = TelemetryBatchBody(
             entry: entry,
             events: batch.map { TelemetryEventBody($0, facts: deviceFacts) },
@@ -62,12 +62,14 @@ package actor TelemetryEndpointTransport: TelemetryTransport {
             )
             guard (200 ..< 300).contains(response.statusCode) else {
                 logger.warning("telemetry_batch_refused status=\(response.statusCode)")
-                return false
+                // A 413 alone discards: the same body is refused the same way every time. Every other
+                // refusal is about the caller or the transport, so the batch is kept for the next flush.
+                return response.statusCode == 413 ? .discarded : .kept
             }
-            return true
+            return .delivered
         } catch {
             logger.warning("Telemetry batch send failed (best-effort)")
-            return false
+            return .kept
         }
     }
 }

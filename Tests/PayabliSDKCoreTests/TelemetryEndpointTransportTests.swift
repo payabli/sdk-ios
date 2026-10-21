@@ -162,10 +162,68 @@ final class TelemetryEndpointTransportTests: XCTestCase {
         XCTAssertEqual(calls, 1, "the first token only; the setup asked the provider for nothing")
     }
 
+    func testA401IsKeptForTheNextFlush() async throws {
+        let outcome = try await sendAgainst(status: 401)
+        XCTAssertEqual(outcome, .kept)
+    }
+
+    func testA429IsKeptForTheNextFlush() async throws {
+        let outcome = try await sendAgainst(status: 429)
+        XCTAssertEqual(outcome, .kept)
+    }
+
+    func testA5xxIsKeptForTheNextFlush() async throws {
+        let outcome = try await sendAgainst(status: 500)
+        XCTAssertEqual(outcome, .kept)
+    }
+
+    func testA413IsDiscarded() async throws {
+        let outcome = try await sendAgainst(status: 413)
+        XCTAssertEqual(outcome, .discarded)
+    }
+
+    func testAnAcceptedBatchIsDelivered() async throws {
+        let outcome = try await sendAgainst(status: 202)
+        XCTAssertEqual(outcome, .delivered)
+    }
+
+    /// A send that never reaches an answer is kept too: the next flush tries the batch again.
+    func testATransportFailureIsKeptForTheNextFlush() async {
+        struct NoAnswer: Error {}
+
+        let stub = RecordingStub()
+        stub.install()
+        defer { stub.uninstall() }
+        let service = PayabliService(
+            environment: .sandbox,
+            readToken: { throw NoAnswer() },
+            client: .none,
+            session: StubURLProtocol.makeSession()
+        )
+
+        let outcome = await TelemetryEndpointTransport(transport: service).send([event()], droppedSinceLastSend: 0)
+
+        XCTAssertEqual(outcome, .kept)
+    }
+
     /// A session built the way a host's is, so its batches take the production route.
     private func makeSession(tokenProvider: @escaping PayabliTokenRefresh) throws -> PayabliSession {
         let config = try PayabliConfig(entryPoint: "entry", environment: .sandbox, tokenProvider: tokenProvider)
         return PayabliSession(config: config, urlSession: StubURLProtocol.makeSession())
+    }
+
+    /// Sends one batch against a stub answering one status, and returns what the send said about it.
+    private func sendAgainst(status: Int) async throws -> TelemetrySendOutcome {
+        let stub = RecordingStub(status: status)
+        stub.install()
+        defer { stub.uninstall() }
+        let service = PayabliService(
+            environment: .sandbox,
+            readToken: { "telemetry-token" },
+            client: .none,
+            session: StubURLProtocol.makeSession()
+        )
+        return await TelemetryEndpointTransport(transport: service).send([event()], droppedSinceLastSend: 0)
     }
 
     private func event() -> TelemetryEvent {

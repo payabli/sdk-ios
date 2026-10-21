@@ -157,9 +157,9 @@ final class PayabliSessionTelemetryTests: XCTestCase {
         let providerCalls = await calls.count
         XCTAssertEqual(providerCalls, 1, "a telemetry 401 must not mint a new token")
         XCTAssertEqual(stub.requests.map { $0.url?.path }, [
-            "/api/v2/before", TelemetryEndpointTransport.defaultPath, "/api/v2/after"
-        ], "the refused batch is sent once and not replayed")
-        XCTAssertEqual(stub.sentTokens, ["token-1", "token-1", "token-1"])
+            "/api/v2/before", TelemetryEndpointTransport.defaultPath, TelemetryEndpointTransport.defaultPath, "/api/v2/after"
+        ], "the refused batch goes back to the queue and the flush after it sends it again")
+        XCTAssertEqual(stub.sentTokens, ["token-1", "token-1", "token-1", "token-1"])
         let body = try XCTUnwrap(stub.requests[1].httpBody)
         let envelope = try XCTUnwrap(try JSONSerialization.jsonObject(with: body) as? [String: Any])
         XCTAssertEqual(envelope["entry"] as? String, "demo")
