@@ -28,12 +28,21 @@ enum RefreshInProgress {
     @TaskLocal static var marks: [Mark] = []
 
     /// Whether this task is inside `auth`'s own provider call for `refresh`, at any depth.
+    ///
+    /// - Parameter auth: the session whose provider call a mark must name.
+    /// - Parameter refresh: the mint id a mark must name alongside it, so a stale task answers for none.
+    /// - Returns: whether a mark names both, at any depth of the chain.
     static func carries(_ auth: PayabliAuth, refresh: UUID) -> Bool {
         let session = ObjectIdentifier(auth)
         return marks.contains { $0.session == session && $0.refresh == refresh }
     }
 
     /// Runs `operation` with this refresh appended, so every enclosing one stays marked.
+    ///
+    /// - Parameter holder: the session whose provider call `operation` is.
+    /// - Parameter refresh: the mint id naming this refresh, appended to the chain.
+    /// - Parameter operation: the provider call to run under the mark.
+    /// - Returns: what `operation` produced.
     static func withMark<T>(
         holder: PayabliAuth,
         refresh: UUID,

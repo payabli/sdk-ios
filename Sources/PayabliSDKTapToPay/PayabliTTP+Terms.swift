@@ -28,17 +28,14 @@ public extension PayabliTTP {
         try await reportingToHost { try await provider.areTermsAccepted() }
     }
 
-    /// `@objc` companion to `areTermsAccepted()` for ObjC / MAUI / Flutter / RN
-    /// consumers. Bridges the `async throws` Swift method to a callback-based
-    /// signature: `completion(accepted, nil)` on success, `completion(false,
-    /// NSError)` on failure, a ``TapToPayError`` with its catalog number as the
-    /// code.
+    /// `@objc` companion to `areTermsAccepted()`: `completion(accepted, nil)` on success, `completion(false,
+    /// NSError)` on failure, a ``TapToPayError`` with its catalog number as the code.
     ///
-    /// `false` on the failure path is the bridging default and never an answer.
-    /// Read the error first; the two cases are only distinguishable by it.
+    /// `false` on the failure path is the bridging default and never an answer: read the error first.
+    /// The completion handler is always invoked on the main thread because
+    /// the entire `PayabliTTP` surface is `@MainActor`.
     ///
-    /// The completion handler is always invoked on the main thread because the
-    /// entire `PayabliTTP` surface is `@MainActor`.
+    /// - Parameter completion: the answer, or the error the check failed with.
     @objc func areTermsAccepted(
         completion: @escaping (Bool, NSError?) -> Void
     ) {
@@ -85,13 +82,13 @@ public extension PayabliTTP {
         try await reportingToHost { try await provider.presentTerms() }
     }
 
-    /// `@objc` companion to `presentTerms()` for ObjC / MAUI / Flutter / RN
-    /// consumers. Bridges the `async throws` Swift method to a callback-based
-    /// signature: `completion(nil)` on success, `completion(NSError)` on failure,
-    /// a ``TapToPayError`` with its catalog number as the code.
+    /// `@objc` companion to `presentTerms()`: `completion(nil)` on success, `completion(NSError)` on
+    /// failure, a ``TapToPayError`` with its catalog number as the code.
     ///
-    /// The completion handler is always invoked on the main thread because the
-    /// entire `PayabliTTP` surface is `@MainActor`.
+    /// The completion handler is always invoked on the main thread because
+    /// the entire `PayabliTTP` surface is `@MainActor`.
+    ///
+    /// - Parameter completion: the error the presentation failed with, or `nil` when it succeeded.
     @objc func presentTerms(
         completion: @escaping (NSError?) -> Void
     ) {

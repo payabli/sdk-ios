@@ -112,7 +112,7 @@ final class PayInHeldKeyTests: XCTestCase {
         XCTAssertEqual(transport.sentKeys, ["k1", "k1"])
     }
 
-    func testTheWindowIsTheServicesTwoMinutesPlusFourWholeCalls() {
+    func testTheMaxAgeIsFourMinutes() {
         XCTAssertEqual(payabliIdempotencyKeyMaxAge, .seconds(240))
     }
 

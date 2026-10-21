@@ -106,7 +106,7 @@ Each operation needs its own permission on those credentials:
 | Read a transaction back | `inboundpayments_read` |
 | Save a payment method | `tokens_create` |
 | Initialize Tap to Pay on a phone | `tools_init` and `pos_create` |
-| Activate a phone with its code | `tools_init` and `pos_create` |
+| Activate a phone with its code | `pos_create` |
 | Take a Tap to Pay payment | `inboundpayments_create` |
 | Register an authorized app through the API | `pos_create` |
 
@@ -188,9 +188,9 @@ let session = try await PayabliSession.initialize(config: PayabliConfig(
 | `.production` | `https://api.payabli.com` |
 
 - `PayabliConfig` throws when the entry point is blank.
-- Calling `initialize` again with the same entry point, environment and telemetry setting returns the same
-  session, which keeps its original token provider. A different one throws `invalidConfiguration`, and the
-  session already running stays in place.
+- Calling `initialize` again with the same entry point and environment returns the same session, which keeps
+  its original token provider. A different one throws `invalidConfiguration`, and the session already running
+  stays in place.
 
 The token provider is an `async throws` function that returns a new access token from your token
 endpoint:
@@ -213,6 +213,8 @@ func fetchPayabliAccessToken() async throws -> String {
 - Concurrent callers share one call.
 - Each call has 30 seconds to return. A call that takes longer, throws, or returns a token the SDK can't
   use fails with `PayabliErrorType.tokenProviderFailed`.
+- The SDK doesn't retry a `.tokenProviderFailed` or `.tokenExpired` failure itself. Try again only when someone
+  using your app asks to, or wait longer before each attempt.
 - Return a token. Don't make SDK calls from inside the provider.
 
 ### Device identity
@@ -328,8 +330,8 @@ and [Tap to Pay](Sources/PayabliSDKTapToPay/README.md#outcomes-and-errors).
 The SDK is written in Swift, and the card-not-present form is a SwiftUI view.
 
 - **Objective-C.** Start the session with `PayabliSessionObjC`'s
-  `initializeWithTokenHandler:entryPoint:environment:telemetryEnabled:completionHandler:`. `PayabliTTP` has
-  an `@objc` companion, taking a completion handler, for every `async` method, and is built with
+  `initializeWithTokenHandler:entryPoint:environment:completionHandler:`. `PayabliTTP` has an `@objc`
+  companion, taking a completion handler, for every `async` method, and is built with
   `createWithCompletionHandler:`. For card-not-present, Objective-C uses `PayabliPayInObjC`, built with
   `createAndReturnError:` on the same session. It offers `addCard` and `addBankAccount`, and `capture`,
   `authorize`, `captureAuthorizedTransaction` and `voidTransaction`, which take a `PayabliPayInRequestObjC` or
@@ -363,9 +365,6 @@ Fill in `Secrets.swift`, then start the token server as its
 [test cards](https://docs.payabli.com/guides/test-accounts-reference).
 
 ## Privacy and data collection
-
-The SDK sends no error or usage reports to Payabli. `PayabliConfig` accepts `telemetryEnabled`, which
-changes nothing.
 
 Every request the SDK sends to Payabli carries an `X-Pyb-Client` header with the SDK version, the platform, the OS
 version, the device model, the locale and the device ID described under [Device identity](#device-identity).

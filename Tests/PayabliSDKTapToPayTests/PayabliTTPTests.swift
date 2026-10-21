@@ -233,7 +233,7 @@ final class PayabliTTPTests: XCTestCase {
                     headerFields: ["Content-Type": "application/json"]
                 )!,
                 Data(
-                    #"{"isSuccess":false,"responseText":"revoked","responseData":{"resultCode":401,"resultText":"revoked"}}"#
+                    #"{"isSuccess":false,"responseText":"Declined","responseData":{"resultCode":401,"resultText":"Device not attested or attestation revoked"}}"#
                         .utf8
                 )
             )
@@ -272,7 +272,7 @@ final class PayabliTTPTests: XCTestCase {
                     headerFields: ["Content-Type": "application/json"]
                 )!,
                 Data(
-                    #"{"isSuccess":false,"responseText":"revoked","responseData":{"resultCode":401,"resultText":"revoked"}}"#
+                    #"{"isSuccess":false,"responseText":"Declined","responseData":{"resultCode":401,"resultText":"Device not attested or attestation revoked"}}"#
                         .utf8
                 )
             )
@@ -409,7 +409,7 @@ final class PayabliTTPTests: XCTestCase {
         XCTAssertTrue(host.localizedDescription.contains(serversWords), host.localizedDescription)
     }
 
-    /// The 401 branch clears the attestation cache, marks the state and throws. A missing clear leaves the
+    /// A binding the service no longer holds is cleared, marks the state and throws. A missing clear leaves the
     /// next call re-sending a handle the service has already refused.
     func testConfigRejectionClearsTheAttestationCacheAndReportsItOnce() async throws {
         let (ttp, _, attestation) = try makeTTP()
@@ -423,7 +423,7 @@ final class PayabliTTPTests: XCTestCase {
                     headerFields: ["Content-Type": "application/json"]
                 )!,
                 Data(
-                    #"{"isSuccess":false,"responseText":"attestation revoked","responseData":{"resultCode":401,"resultText":"attestation revoked"}}"#
+                    #"{"isSuccess":false,"responseText":"Declined","responseData":{"resultCode":401,"resultText":"Device not attested or attestation revoked"}}"#
                         .utf8
                 )
             )
@@ -437,13 +437,10 @@ final class PayabliTTPTests: XCTestCase {
             thrown = error
         }
         let raised = try XCTUnwrap(thrown)
-        let marked = try XCTUnwrap(ttp.sessionManager.lastError)
 
         XCTAssertFalse(attestation.isAlreadyAttested, "a refused handle must not be sent again")
-        // A refused binding and a refused bearer are both worth another call,
-        // which is the remedy the 401 carries.
-        XCTAssertEqual(ttp.sessionState, .failed(reason: .serviceUnavailable))
-        XCTAssertEqual((raised as? TapToPayError)?.type, .tokenExpired, "got \(raised)")
+        XCTAssertEqual(ttp.sessionState, .failed(reason: .deviceSetupRequired))
+        XCTAssertEqual((raised as? TapToPayError)?.type, .deviceSetupRequired, "got \(raised)")
         // The drop is the config call's to make, so the reason claims nothing about
         // it. Claiming it here is what told a caller the binding was gone when it
         // was not.
@@ -451,7 +448,37 @@ final class PayabliTTPTests: XCTestCase {
             raised.localizedDescription.contains("cleared"),
             "the reason claims an outcome this layer does not decide"
         )
-        XCTAssertFalse(marked is PayabliTTPError, "the state is classified from the 401 itself")
+    }
+
+    /// A 401 in the body with any other text is not the binding being gone, so the binding stays.
+    func testAConfigRefusalInTheBodyWithAnyOtherTextKeepsTheBinding() async throws {
+        let (ttp, _, attestation) = try makeTTP()
+        attestation.isAlreadyAttested = true
+        StubURLProtocol.handler = { request in
+            (
+                HTTPURLResponse(
+                    url: request.url!,
+                    statusCode: 200,
+                    httpVersion: "HTTP/1.1",
+                    headerFields: ["Content-Type": "application/json"]
+                )!,
+                Data(
+                    #"{"isSuccess":false,"responseText":"Declined","responseData":{"resultCode":401,"resultText":"Unauthorized"}}"#
+                        .utf8
+                )
+            )
+        }
+
+        var thrown: Error?
+        do {
+            try await ttp.initialize()
+            XCTFail("expected the config phase to reject")
+        } catch {
+            thrown = error
+        }
+
+        XCTAssertTrue(attestation.isAlreadyAttested, "a binding the refusal did not name as gone was dropped")
+        XCTAssertEqual((try XCTUnwrap(thrown) as? TapToPayError)?.type, .tokenExpired)
     }
 
     /// An Objective-C host is told about every state `initialize()` passes through, and reads each one.

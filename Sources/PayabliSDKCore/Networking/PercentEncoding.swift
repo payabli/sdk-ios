@@ -22,18 +22,12 @@ package enum PercentEncoding {
     /// of a percent-encoding in upper case.
     private static let hex = Array("0123456789ABCDEF")
 
-    /// Encodes `value` for use as a single path segment.
+    /// Encodes `value` as a single path segment, every byte outside the unreserved set percent-encoded.
+    /// A `?`, `#` or `/` in an identifier stays part of it instead of becoming a query, a fragment or another route.
+    /// `urlPathAllowed` is not this: it admits the sub-delimiters and `:@`, which a route is free to give meaning to.
     ///
-    /// Keeps the unreserved set and encodes every other byte of the UTF-8 encoding, so a `?`, `#`
-    /// or `/` in an identifier stays part of the identifier instead of becoming a query, a fragment
-    /// or another route.
-    ///
-    /// `addingPercentEncoding(withAllowedCharacters: .urlPathAllowed)` is not this: that set admits
-    /// the sub-delimiters `!$&'()*+,;=` and also `:@`, which a route is free to give meaning to.
-    ///
-    /// Whether a value is acceptable at all is the caller's question rather than this one's. An
-    /// empty `value` encodes to an empty string, which is a different route rather than a refusal,
-    /// so a caller that cannot accept that checks first.
+    /// - Parameter value: the segment text to encode; empty stays empty, a different route, not a refusal.
+    /// - Returns: the percent-encoded segment, every other UTF-8 byte in upper-case hex.
     package static func segment(_ value: String) -> String {
         var encoded = ""
         encoded.reserveCapacity(value.utf8.count)

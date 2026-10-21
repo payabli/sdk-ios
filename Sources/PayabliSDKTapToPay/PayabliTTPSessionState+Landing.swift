@@ -7,10 +7,18 @@ extension PayabliTTPSessionState {
     /// The state a failure leaves the session in, or `nil` when it leaves the session where it was. Failures
     /// a host repairs identically land together; one whose remedy is unknown lands on
     /// ``PayabliTTPFailureReason/serviceUnavailable``, where being wrong costs a retry rather than a bug report.
+    ///
+    /// - Parameter error: the failure to land, as the caller caught it.
+    /// - Parameter registration: the activation registration the store still holds, for failures whose remedy is a code.
+    /// - Returns: the state to land on, or `nil` where the session stays.
     static func landing(for error: Error, registration: StoredRegistration) -> PayabliTTPSessionState? {
         if let refusal = error as? ActivationRefusal {
             // Most refusals are about the code, and the device still owes one.
             return refusal.movesSession ? landingByType(refusal.hostError, registration: registration) : nil
+        }
+        if error is PinnedTokenRefusal {
+            // Renewed and run once more, so it lands only if the second run is refused too, as a plain 1002.
+            return nil
         }
         if error is CancellationError {
             // A withdrawn setup is asked again, which is safe.
@@ -61,6 +69,10 @@ extension PayabliTTPSessionState {
     }
 
     /// A failure that carries a catalog type, landed by that type.
+    ///
+    /// - Parameter error: the failure to land, read for its catalog type.
+    /// - Parameter registration: the activation registration the store still holds, for the code remedy.
+    /// - Returns: the state the type lands on.
     private static func landingByType(_ error: Error, registration: StoredRegistration) -> PayabliTTPSessionState {
         guard let payabliError = error as? any PayabliError else {
             return .failed(reason: .sdkInternalError)

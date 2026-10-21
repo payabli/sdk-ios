@@ -13,16 +13,17 @@ final class SessionSetupGate {
         let id: Int
     }
 
-    /// A setup a later call of the same `kind`, from the same `PayabliTTP`, joins.
-    private struct Setup {
+    /// Which setup a later call joins: one of an equal `kind`, from the same `PayabliTTP`.
+    private struct SetupKey: Hashable {
+        let owner: ObjectIdentifier
         let kind: SessionSetupKind
-        let claim: Claim
     }
 
     /// The operation that claimed the gate last, which the next caller chains behind.
     private var last: Claim?
-    /// Each `PayabliTTP`'s newest setup, until the call that started it returns or a charge claims the gate.
-    private var setups: [ObjectIdentifier: Setup] = [:]
+    /// Each `PayabliTTP`'s pending setups, one per kind, until the call that started it returns or a charge claims
+    /// the gate.
+    private var setups: [SetupKey: Claim] = [:]
     private var nextID = 0
 
     /// Bumped every time any `PayabliTTP` prepares a reader. A charge captures it before the tap, so a failure
@@ -33,10 +34,10 @@ final class SessionSetupGate {
     /// the operation before it, or has setups queued behind it.
     private(set) var isHeldByCharge = false
 
-    /// Runs `work` after every operation already in the gate, or joins `owner`'s pending setup of this `kind`.
+    /// Runs `work` after every operation already in the gate, or joins `owner`'s pending setup of an equal `kind`.
     ///
     /// - Parameters:
-    ///   - kind: Which setup this is; `owner`'s next call of the same kind joins it until a charge claims the gate.
+    ///   - kind: Which setup this is; `owner`'s next call of an equal kind joins it until a charge claims the gate.
     ///   - owner: The `PayabliTTP` calling. Only its own calls join this setup; any other caller waits for it.
     ///   - work: The setup, run in a task no caller owns, so a cancelled caller does not stop it.
     func run(
@@ -44,8 +45,9 @@ final class SessionSetupGate {
         for owner: ObjectIdentifier,
         _ work: @escaping @MainActor () async throws -> Void
     ) async throws {
-        if let existing = setups[owner], existing.kind == kind {
-            return try await existing.claim.task.value
+        let key = SetupKey(owner: owner, kind: kind)
+        if let existing = setups[key] {
+            return try await existing.task.value
         }
 
         // Chains behind the operation that claimed the gate last. Re-checking in
@@ -63,11 +65,11 @@ final class SessionSetupGate {
             id: claimID()
         )
         last = claim
-        setups[owner] = Setup(kind: kind, claim: claim)
+        setups[key] = claim
         defer {
             release(claim.id)
-            if setups[owner]?.claim.id == claim.id {
-                setups[owner] = nil
+            if setups[key]?.id == claim.id {
+                setups[key] = nil
             }
         }
         try await claim.task.value
@@ -114,6 +116,8 @@ final class SessionSetupGate {
     }
 
     /// Clears the last claim only while `id` still holds it, so an operation that chained behind keeps its claim.
+    ///
+    /// - Parameter id: the claim to clear, only while it is still the last.
     private func release(_ id: Int) {
         if last?.id == id {
             last = nil

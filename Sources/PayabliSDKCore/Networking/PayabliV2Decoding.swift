@@ -4,6 +4,10 @@ import Foundation
 ///
 /// The base transport's own overload maps a 401 to a typed error, so the recovery layer decodes
 /// through this after its own `perform`.
+///
+/// - Parameter type: the type the envelope's `data` decodes as.
+/// - Parameter response: the answered response whose body holds the envelope.
+/// - Returns: the decoded envelope; an undecodable body raises ``PayabliErrorType/decodingError``.
 func decodePayabliV2Envelope<T: Decodable & Sendable>(
     _ type: T.Type,
     from response: PayabliResponse

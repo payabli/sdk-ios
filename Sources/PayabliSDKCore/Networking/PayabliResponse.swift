@@ -25,11 +25,11 @@ package struct PayabliResponse: Sendable {
     }
 
     /// The value of `name`, matched without regard to case.
+    /// Nothing normalizes the case reported here and HTTP/2 lower-cases every field name, so
+    /// subscripting `headers` finds a field only when the sender spelled it the same way.
     ///
-    /// Header field names are case-insensitive (RFC 9110 Section 5.1) and nothing normalizes the case
-    /// reported here, so subscripting `headers` finds a field only when the sender happened to spell it
-    /// the same way. HTTP/2 lower-cases every field name. Read a header through this and not through the
-    /// dictionary.
+    /// - Parameter name: the field name to read, matched whatever its case.
+    /// - Returns: the value carried under that field name, or `nil` when the response names none.
     package func header(_ name: String) -> String? {
         let lowered = name.lowercased()
         return headers.first { $0.key.lowercased() == lowered }?.value

@@ -29,7 +29,7 @@ external reader. This guide is part of the [Payabli iOS SDK](../../README.md); s
   | Operation | Permission |
   |---|---|
   | `initialize()` | `tools_init` and `pos_create` |
-  | `activateDevice(activationCode:)` | `tools_init` and `pos_create` |
+  | `activateDevice(activationCode:)` | `pos_create` |
   | `charge` | `inboundpayments_create` |
   | Registering an authorized app through the API | `pos_create` |
 
@@ -66,9 +66,11 @@ curl -X POST "https://api-sandbox.payabli.com/api/v2/paypoint/{entryPoint}/apps"
 - The SDK reads the app ID from the signed app and sends it when the device attests, so your code never
   passes it.
 
-An app that isn't an authorized app is refused when the device attests, with an HTTP 403. `initialize()`
-throws a `TapToPayError` whose `type` is `.permissionDenied`, and `sessionState` is
-`.failed(reason: .configurationRejected)`. Register the app, then initialize again.
+An app that isn't registered on the paypoint is refused. A phone with nothing stored is refused when it
+attests, and a phone holding a registration is refused when it fetches its configuration. Either way
+`initialize()` throws a `TapToPayError` whose `type` is `.deviceSetupNotConfigured` (3008), and
+`sessionState` is `.failed(reason: .configurationRejected)`. `activateDevice(activationCode:)` reports the
+same. Register the app, then initialize again.
 
 ## Set up
 

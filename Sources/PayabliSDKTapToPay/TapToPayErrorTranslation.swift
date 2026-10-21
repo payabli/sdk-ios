@@ -39,6 +39,11 @@ enum TapToPayErrorTranslation {
     /// What a charge's failure reaches a host as. Once the reader has been asked for a card, a code saying
     /// nothing was sent becomes `paymentOutcomeUnknown`, because the sale may already be taken, and a failure
     /// that names no payment takes the charge's.
+    ///
+    /// - Parameter error: what the charge threw, before it was translated for the host.
+    /// - Parameter paymentTransId: the charge's payment, which a failure naming none takes.
+    /// - Parameter askedForCard: whether the reader was already asked for a card.
+    /// - Returns: the failure a host receives, with its catalog entry.
     static func hostError(for error: Error, chargeOf paymentTransId: String?, askedForCard: Bool) -> Error {
         guard let failure = hostError(for: error) as? TapToPayError else { return error }
         let claimsNothingWasSent = failure.type == .validation || failure.type == .sdkInternalError
@@ -58,6 +63,9 @@ enum TapToPayErrorTranslation {
 
     /// One branch per case, with no `default`, so a case added without an entry stops this compiling. A
     /// case collecting causes that do not share a code reports `unknown`.
+    ///
+    /// - Parameter error: the failure whose catalog entry is chosen.
+    /// - Returns: the catalog type a host receives the failure as.
     static func catalogType(of error: PayabliTTPError) -> PayabliErrorType {
         switch error {
         case .notInitialized:
@@ -100,6 +108,9 @@ enum TapToPayErrorTranslation {
 
     /// Everything a core error shows after its reason: its detail, and the field errors or the payer's next
     /// step some of them add.
+    ///
+    /// - Parameter error: the core error whose shown detail is extracted.
+    /// - Returns: what the error shows after its reason, or its `detail` where it shows nothing.
     private static func displayedDetail(of error: any PayabliError) -> String? {
         guard let shown = error.errorDescription, shown != error.reason else { return error.detail }
         for separator in [" · ", ": "] where shown.hasPrefix(error.reason + separator) {
@@ -109,17 +120,26 @@ enum TapToPayErrorTranslation {
     }
 
     /// The wait a failed close was given, which is the only case that carries one.
+    ///
+    /// - Parameter error: the failure whose wait is read.
+    /// - Returns: the wait the close was given, or `nil` where the case carries none.
     private static func retryAfter(of error: PayabliTTPError) -> TimeInterval? {
         guard case let .updateFailed(_, _, _, retryAfter) = error else { return nil }
         return retryAfter
     }
 
     /// A person dismissed the platform's sheet. The reader marks it at the start of the case's reason.
+    ///
+    /// - Parameter reason: the case's reason, whose start carries the marker.
+    /// - Returns: whether the reason marks a dismissal.
     private static func isCancellation(_ reason: String) -> Bool {
         reason.hasPrefix(PayabliTTPError.cancellationReasonPrefix)
     }
 
     /// The service's or the reader's own words, which a host shows beside the fixed message.
+    ///
+    /// - Parameter error: the failure whose own words are read.
+    /// - Returns: the words, or `nil` where the case carries none.
     private static func serviceText(of error: PayabliTTPError) -> String? {
         let text: String? = switch error {
         case let .attestationRevoked(reason),
@@ -152,6 +172,9 @@ final class ChargeProgress {
 @available(iOS 16.7, *)
 extension PayabliTTP {
     /// Runs one public call, handing a host its failure as ``TapToPayError``.
+    ///
+    /// - Parameter work: the public call, run once.
+    /// - Returns: what `work` answered.
     func reportingToHost<Result>(_ work: () async throws -> Result) async throws -> Result {
         do {
             return try await work()

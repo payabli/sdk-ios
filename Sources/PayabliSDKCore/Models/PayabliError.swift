@@ -359,6 +359,8 @@ public struct PayabliFieldError: Decodable, Sendable {
 
     /// Reads both shapes the platform sends: a bare string becomes `message` with
     /// no suggestion, and the declared object decodes as-is. Both are live.
+    ///
+    /// - Parameter decoder: the container the field entry arrives in, a bare string or the declared object.
     public init(from decoder: any Decoder) throws {
         if let message = try? decoder.singleValueContainer().decode(String.self) {
             self.message = message
@@ -419,6 +421,8 @@ public struct PayabliValidationError: PayabliError, Decodable {
     /// `errors` decodes separately because the synthesised decoder throws on a
     /// present-but-mismatched value, taking `title`, `detail` and `type` with it.
     /// One unreadable entry drops the whole map.
+    ///
+    /// - Parameter decoder: the validation body's container, whose `errors` map decodes alone so one unreadable entry drops only the map.
     public init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         problemType = try container.decodeIfPresent(String.self, forKey: .problemType)
@@ -479,6 +483,9 @@ public struct PayabliServerError: PayabliError, Decodable, PayabliRetryAfter {
     }
 
     /// The empty error, for a 5xx whose body will not decode at all.
+    ///
+    /// - Parameter httpStatus: the status the response itself carried, which the body's `status` does not always name.
+    /// - Parameter retryAfter: the delay the response's `Retry-After` header named, if any.
     init(httpStatus: Int? = nil, retryAfter: TimeInterval? = nil) {
         problemType = nil
         title = nil
@@ -519,6 +526,10 @@ public struct PayabliServerError: PayabliError, Decodable, PayabliRetryAfter {
     }
 
     /// The same error, carrying the two things only the response envelope knows.
+    ///
+    /// - Parameter httpStatus: the status the response itself carried, not the body's `status` field.
+    /// - Parameter retryAfter: the delay the response's `Retry-After` header named, if any.
+    /// - Returns: the same error with `httpStatus` and `retryAfter` filled in.
     func carrying(httpStatus: Int, retryAfter: TimeInterval?) -> PayabliServerError {
         PayabliServerError(
             problemType: problemType,
@@ -569,6 +580,8 @@ public struct PayabliDeclineError: PayabliError, Decodable {
     }
 
     /// A missing `code` or `reason` degrades that field and does not fail the decode.
+    ///
+    /// - Parameter decoder: the declined-payment body, whose missing `code` or `reason` degrades that field alone.
     public init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         rawCode = try container.decodeIfPresent(String.self, forKey: .rawCode)

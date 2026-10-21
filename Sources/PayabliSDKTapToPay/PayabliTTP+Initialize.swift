@@ -26,7 +26,7 @@ extension PayabliTTP {
     /// Runs a session setup through the process's gate.
     ///
     /// - Parameters:
-    ///   - kind: Which setup this is; this `PayabliTTP`'s next call of the same kind joins it until a charge claims
+    ///   - kind: Which setup this is; this `PayabliTTP`'s next call of an equal kind joins it until a charge claims
     ///     the gate.
     ///   - work: The setup, run once every operation already in the gate has finished.
     func runSessionSetup(
@@ -57,7 +57,7 @@ extension PayabliTTP {
         let start = clock.now
         reports.initializeStarted()
         do {
-            try await runInitializePhases()
+            try await renewingRefusedToken(landsSecondRefusal: true) { try await self.runInitializePhases() }
         } catch let withdrawn as CancellationError {
             throw withdrawn
         } catch {
@@ -101,6 +101,8 @@ extension PayabliTTP {
     ///
     /// The completion handler is always invoked on the main thread because
     /// the entire `PayabliTTP` surface is `@MainActor`.
+    ///
+    /// - Parameter completion: the error the initialization failed with, or `nil` when it succeeded.
     @objc public func initialize(completion: @escaping (NSError?) -> Void) {
         Task { @MainActor in
             do {
@@ -127,7 +129,11 @@ extension PayabliTTP {
         default:
             throw PayabliTTPError.notReady(current: sessionState)
         }
+        try await renewingRefusedToken(landsSecondRefusal: true) { try await self.runRepair() }
+    }
 
+    /// Steps 2–4 of `initialize()`, from a state the repair has already accepted.
+    private func runRepair() async throws {
         _ = sessionManager.transition(to: .reinitializing)
         syncPublished()
         _ = sessionManager.transition(to: .fetchingConfig)
@@ -142,6 +148,48 @@ extension PayabliTTP {
         // 4. Re-prepare reader and mark ready.
         try await runPrepareReaderPhase()
         _ = sessionManager.transition(to: .ready)
+        syncPublished()
+    }
+
+    /// Runs `sequence`, and once more after renewing the token when a device route refused it. Every session sequence
+    /// runs through here. The first refusal lands nowhere; a second, or a failed renewal, reaches the caller and lands
+    /// only when `landsSecondRefusal` is true, so an activation's leaves the session waiting for its code.
+    ///
+    /// - Parameter landsSecondRefusal: whether a failure after the renewal moves the session.
+    /// - Parameter sequence: the session work, from its first call.
+    func renewingRefusedToken(
+        landsSecondRefusal: Bool,
+        _ sequence: @MainActor () async throws -> Void
+    ) async throws {
+        do {
+            return try await sequence()
+        } catch is PinnedTokenRefusal {
+            logger.info("a device route refused the token: renewing it and running again")
+        }
+        // Once after the renewal, so its refusal is reported ahead of the second run, and once at the end, for that
+        // run's own refusal.
+        defer { reports.releaseHeld() }
+        do {
+            defer { reports.releaseHeld() }
+            _ = try await session.renewRefusedToken()
+        } catch {
+            landIfAsked(error, landsSecondRefusal)
+            throw error
+        }
+        do {
+            try await sequence()
+        } catch let refused as PinnedTokenRefusal {
+            let expired = PayabliGenericError(type: refused.type, reason: refused.reason)
+            landIfAsked(expired, landsSecondRefusal)
+            throw expired
+        }
+        // Any other failure of the second run was landed by the phase that threw it, which may have chosen a state
+        // its error alone would not name.
+    }
+
+    private func landIfAsked(_ failure: Error, _ lands: Bool) {
+        guard lands else { return }
+        markError(failure)
         syncPublished()
     }
 
@@ -162,6 +210,25 @@ extension PayabliTTP {
     /// Returns nothing: the handle worth keeping is the one the config call's
     /// assertion is signed for, which this phase cannot know.
     private func runAttestationPhase() async throws {
+        let clock = ContinuousClock()
+        let start = clock.now
+        reports.attestationStarted()
+        do {
+            try await attestOrReuseBinding()
+        } catch let withdrawn as CancellationError {
+            throw withdrawn
+        } catch PayabliTTPError.devicePendingActivation {
+            // Attested: the device owes an activation code, which is not a failed attestation.
+            reports.attestationSucceeded(after: clock.now - start)
+            throw PayabliTTPError.devicePendingActivation
+        } catch {
+            reports.attestationFailed(error, after: clock.now - start)
+            throw error
+        }
+        reports.attestationSucceeded(after: clock.now - start)
+    }
+
+    private func attestOrReuseBinding() async throws {
         do {
             // Inside the handling below, because reading the binding can fail and a
             // failure that skipped it would throw out of `initialize()` while the
@@ -193,14 +260,12 @@ extension PayabliTTP {
 
     // MARK: - Phase 2 — fetch /config
 
-    /// Pre: session is in `.fetchingConfig`. Error handling:
-    ///   - backend says pending → `.pendingActivation`
-    ///   - a core error, a 401 included, is thrown as it arrived, so its code
-    ///     reaches the host. Dropping a binding on a 401 is the config call's,
-    ///     which knows which handle it presented
-    ///   - anything else → wrapped as `.configFailed`, keeping the parsed reason
+    /// Fetches `/config`, with the session in `.fetchingConfig`.
     ///
-    /// The state is classified from the failure as it arrived.
+    /// A pending backend lands `.pendingActivation`; a core error, a 401 included, passes through as it
+    /// arrived; anything else wraps as `.configFailed`, with the state classified from the arrival.
+    ///
+    /// - Returns: the route's configuration, carrying the reader credentials.
     private func runFetchConfigPhase() async throws -> TTPConfig {
         do {
             return try await configClient.fetchConfig(entry: entryPoint)
@@ -232,6 +297,8 @@ extension PayabliTTP {
 
     /// Hands the opaque `credentials` dict to the adapter. Provider-specific
     /// parsing never leaks into the facade.
+    ///
+    /// - Parameter credentials: the `providerCredentials` dict `/config` answered with, opaque to the facade.
     private func runConfigurePhase(credentials: [String: String]) throws {
         do {
             try provider.configure(credentials: credentials)

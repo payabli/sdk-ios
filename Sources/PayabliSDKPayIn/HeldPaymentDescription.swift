@@ -48,6 +48,9 @@ struct HeldPaymentDescription: Equatable, CustomStringConvertible {
     }
 
     /// The amount as the request carries it, or as given when it cannot be sent at all.
+    ///
+    /// - Parameter amount: the amount as the request carries it, before the wire's two places.
+    /// - Returns: the amount at the wire's two decimal places, or the value as given when it cannot be sent.
     private static func asSent(_ amount: Double) -> Decimal {
         PayInAmount.sendable(amount) ?? Decimal(string: String(amount)) ?? .nan
     }

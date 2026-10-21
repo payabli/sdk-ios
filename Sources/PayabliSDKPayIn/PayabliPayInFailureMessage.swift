@@ -24,7 +24,7 @@ enum PayabliPayInFailureMessage {
     /// A save moves no money, so it has its own texts and none says a payment may have gone through.
     ///
     /// - Parameters:
-    ///   - category: The failure's category.
+    ///   - category: Which of the catalog's categories the failure is, which picks the message.
     ///   - operation: What the form submitted.
     /// - Returns: The message the payer sees.
     static func text(for category: PayabliErrorCategory, operation: PayabliPayInOperation) -> String {

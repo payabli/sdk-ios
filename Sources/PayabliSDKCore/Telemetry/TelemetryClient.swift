@@ -7,17 +7,14 @@ package protocol TelemetryTransport: Sendable {
     func send(_ batch: [TelemetryEvent]) async
 }
 
-/// Batched, best-effort, opt-out telemetry client.
+/// Batched, best-effort telemetry client.
 ///
-/// - **Opt-out:** disabled when `PayabliConfig.telemetryEnabled == false`.
 /// - **Best-effort:** transport failures never propagate to callers.
-/// - **Batched:** flushes every 30s or when 20 events accumulate.
 /// - **Zero PII:** caller is responsible for not passing PAN/CVV/tokens.
 package actor TelemetryClient {
     package struct Configuration: Sendable {
         package let flushInterval: TimeInterval
         package let batchSize: Int
-        package let enabled: Bool
         package let sdkVersion: String
         package let entry: String
         package let environment: String
@@ -25,14 +22,12 @@ package actor TelemetryClient {
         package init(
             flushInterval: TimeInterval = 30,
             batchSize: Int = 20,
-            enabled: Bool = true,
             sdkVersion: String = PayabliCore.version,
             entry: String,
             environment: String
         ) {
             self.flushInterval = flushInterval
             self.batchSize = batchSize
-            self.enabled = enabled
             self.sdkVersion = sdkVersion
             self.entry = entry
             self.environment = environment
@@ -57,12 +52,17 @@ package actor TelemetryClient {
     }
 
     /// Hash a raw device identifier (SHA-256) before storing. Never log the raw value.
+    ///
+    /// - Parameter rawId: the raw device identifier, hashed (SHA-256) before anything is stored.
     package func setDeviceId(_ rawId: String) {
         let digest = SHA256.hash(data: Data(rawId.utf8))
         deviceIdHash = digest.map { String(format: "%02x", $0) }.joined()
     }
 
-    /// Enqueue an event. No-op when telemetry is disabled.
+    /// Enqueue an event.
+    ///
+    /// - Parameter name: the event's catalog name.
+    /// - Parameter properties: the string values the event carries, sent on as given.
     package func emit(_ name: String, properties: [String: String] = [:]) async {
         await emit(name, properties: properties, occurredAt: Date())
     }
@@ -70,10 +70,9 @@ package actor TelemetryClient {
     /// Enqueue an event stamped with when it happened.
     ///
     /// - Parameter name: the event's catalog name.
-    /// - Parameter properties: the event's properties.
+    /// - Parameter properties: the string values the event carries, sent on as given.
     /// - Parameter occurredAt: when the reported thing happened.
     package func emit(_ name: String, properties: [String: String] = [:], occurredAt: Date) async {
-        guard configuration.enabled else { return }
         let event = TelemetryEvent(
             sdkVersion: configuration.sdkVersion,
             sessionId: sessionId,

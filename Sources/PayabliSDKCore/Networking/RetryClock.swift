@@ -7,17 +7,20 @@ import Foundation
 /// proves nothing about the arithmetic that produced them.
 package protocol RetryClock: Sendable {
     /// Seconds since an arbitrary origin fixed at creation. Monotonic.
+    ///
+    /// - Returns: the seconds elapsed since the origin, which never runs backwards.
     func elapsed() -> TimeInterval
 
     /// Waits before the next attempt.
+    ///
+    /// - Parameter seconds: how long to wait before the next attempt.
     func sleep(for seconds: TimeInterval) async throws
 
     /// Returns once `seconds` have passed, to bound an attempt already running.
+    /// Separate from `sleep(for:)`: a deadline racing work in flight, not a wait the caller chose.
+    /// The two coincide on the shipping clock and must not on a test one.
     ///
-    /// Separate from `sleep(for:)` because the two are different operations on the same clock: one is a
-    /// wait the caller has decided to take, the other a deadline racing work in flight. They coincide on
-    /// the shipping clock and must not on a test one, which has to settle that race by decision rather
-    /// than by elapsed time.
+    /// - Parameter seconds: how long the deadline races the running attempt before returning.
     func expire(after seconds: TimeInterval) async throws
 }
 

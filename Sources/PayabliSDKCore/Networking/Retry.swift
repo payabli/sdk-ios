@@ -13,6 +13,12 @@ package enum Retry {
     ///
     /// Only a `PayabliError` is considered. Anything else propagates on the first throw, because a
     /// failure this layer cannot classify is not one it may repeat.
+    ///
+    /// - Parameter policy: which failures are worth another attempt, and the waits between them.
+    /// - Parameter logger: where each retry decision is reported.
+    /// - Parameter clock: the passage of time the budget and backoff run on.
+    /// - Parameter operation: the call to run, given the attempt number it is on.
+    /// - Returns: what the operation answered, from the attempt that succeeded.
     package static func run<T: Sendable>(
         policy: RetryPolicy = .default,
         logger: PayabliLogger,
@@ -73,6 +79,14 @@ package enum Retry {
     }
 
     /// The attempt number to run next, or a throw if there is not going to be one.
+    ///
+    /// - Parameter failure: what the attempt threw, a `PayabliError` only.
+    /// - Parameter attempt: the attempt that just failed, 1-indexed.
+    /// - Parameter policy: the bounds the next attempt is decided under.
+    /// - Parameter logger: where the decision is reported.
+    /// - Parameter clock: what the wait before the next attempt sleeps on.
+    /// - Parameter startedAt: the clock reading the whole run began at, for the total budget.
+    /// - Returns: the attempt number to run next.
     private static func nextAttempt(
         after failure: any PayabliError,
         attempt: Int,
@@ -138,16 +152,13 @@ package enum Retry {
     }
 
     /// Runs `operation` under `seconds`, answering `nil` if the bound is reached first.
+    /// The optional separates an expiry from the operation legitimately answering.
+    /// The bound is only as tight as `operation` is cancellable; one that blocks does not belong under it.
     ///
-    /// The optional is what separates an expiry from the operation legitimately answering, which a bare
-    /// throw could not.
-    ///
-    /// **The bound is only as tight as `operation` is cancellable.** A task group cannot leave its scope
-    /// until every child has finished, so reaching the deadline cancels the operation and then waits for
-    /// it to notice. An operation that ignores cancellation runs to completion and the budget expires
-    /// late rather than on time; it never returns while that work is still in flight, which is what would
-    /// make a write unsafe. Every caller is transport work over `URLSession`, which ends promptly on
-    /// cancellation. An operation that blocks without checking does not belong under a budget.
+    /// - Parameter seconds: the bound, in seconds, on one attempt.
+    /// - Parameter clock: what the deadline races the attempt on, through `expire(after:)`.
+    /// - Parameter operation: the attempt to bound, cancelled when the deadline is reached first.
+    /// - Returns: what the operation answered, or `nil` when the bound was reached first.
     private static func withBudget<T: Sendable>(
         _ seconds: TimeInterval,
         clock: any RetryClock,

@@ -15,6 +15,10 @@ enum PayInAmount {
     }
 
     /// The amount as sent, or nil when it cannot be sent.
+    ///
+    /// - Parameter value: the amount as the request carries it, before rounding.
+    /// - Returns: the amount at the wire's two decimal places, or nil when the value is not finite, beyond
+    ///   the wire's range, or not readable as a decimal.
     static func sendable(_ value: Double) -> Decimal? {
         // Checked as a Double first: `Decimal(_:)` traps on a non-finite value.
         guard value.isFinite, abs(value) < 1e28,
@@ -27,6 +31,9 @@ enum PayInAmount {
     }
 
     /// The figure a row shows: nil when the amount is absent, cannot be sent, or is sent as zero.
+    ///
+    /// - Parameter value: the amount the row is for, nil when the payment carries none.
+    /// - Returns: the figure to draw, or nil when the amount is absent, cannot be sent, or is sent as zero.
     static func shown(_ value: Double?) -> Decimal? {
         guard let value, let sent = sendable(value), !sent.isZero else { return nil }
         return sent

@@ -3,6 +3,9 @@ import Foundation
 package extension Error {
     /// The `NSError` an Objective-C caller receives: a `PayabliError` carries its catalog number as the
     /// code and its wire name under `PayabliErrorType`, in `domain`. Anything else bridges as Swift does.
+    ///
+    /// - Parameter domain: the domain the error is reported in, one of the three an Objective-C host meets.
+    /// - Returns: the `NSError` carrying the catalog number as the code; a non-`PayabliError` bridges as Swift does.
     func payabliNSError(domain: String) -> NSError {
         guard let payabliError = self as? any PayabliError else {
             return self as NSError

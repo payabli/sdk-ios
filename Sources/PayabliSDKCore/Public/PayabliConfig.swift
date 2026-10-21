@@ -43,9 +43,6 @@ public struct PayabliConfig: Sendable {
     /// API environment. Determines all base URLs.
     public let environment: PayabliEnvironment
 
-    /// Whether to emit telemetry events. Defaults to `true` (opt-out).
-    public let telemetryEnabled: Bool
-
     /// Throws `PayabliGenericError(.invalidConfiguration)` when the entry point is empty.
     ///
     /// It throws rather than trapping because an entry point can arrive from a remote
@@ -54,11 +51,14 @@ public struct PayabliConfig: Sendable {
     /// Nothing about the token is checked here, because no token is supplied here. What the
     /// provider returns is checked where it is installed, on the first call and on every one
     /// after, so no token reaches `Authorization` unchecked.
+    ///
+    /// - Parameter entryPoint: the partner integration point, refused when blank.
+    /// - Parameter environment: the API environment every base URL is taken from.
+    /// - Parameter tokenProvider: asks the host's backend for an access token; the only credential this config carries.
     public init(
         entryPoint: String,
         environment: PayabliEnvironment,
-        tokenProvider: @escaping PayabliTokenRefresh,
-        telemetryEnabled: Bool = true
+        tokenProvider: @escaping PayabliTokenRefresh
     ) throws {
         guard !entryPoint.isBlank else {
             throw PayabliGenericError(
@@ -70,7 +70,6 @@ public struct PayabliConfig: Sendable {
         self.tokenProvider = tokenProvider
         self.entryPoint = entryPoint
         self.environment = environment
-        self.telemetryEnabled = telemetryEnabled
     }
 }
 
@@ -79,6 +78,6 @@ extension PayabliConfig: CustomStringConvertible {
     /// every property, and this type reaches assertion failures and crash reports without
     /// passing the logger.
     public var description: String {
-        "PayabliConfig(environment: \(environment), telemetryEnabled: \(telemetryEnabled))"
+        "PayabliConfig(environment: \(environment))"
     }
 }

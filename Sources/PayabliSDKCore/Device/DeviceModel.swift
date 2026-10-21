@@ -8,6 +8,8 @@ package enum DeviceModel {
     /// Read over the field's own bytes, up to the first zero. `utsname.machine`
     /// is 256 of them, and neither a pointer rebound with a claimed capacity of
     /// one nor a C-string scan stays inside them.
+    ///
+    /// - Returns: the machine identifier as UTF-8, or a blank string when the bytes are not, which registration refuses.
     package static func hardware() -> String {
         var sysinfo = utsname()
         uname(&sysinfo)

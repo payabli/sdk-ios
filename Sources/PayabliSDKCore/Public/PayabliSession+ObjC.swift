@@ -22,18 +22,21 @@ public final class PayabliSessionObjC: NSObject {
     ///
     /// `tokenHandler` receives a `(token, error) -> Void` callback the host calls exactly once, with
     /// either an access token or an `NSError`.
+    ///
+    /// - Parameter tokenHandler: the host's block, called with a completion it answers exactly once
+    ///   with an access token or an `NSError`.
+    /// - Parameter entryPoint: the partner integration point, refused when blank.
+    /// - Parameter environment: the API environment every base URL is taken from.
     @objc public static func initialize(
         tokenHandler: @escaping (@escaping (String?, NSError?) -> Void) -> Void,
         entryPoint: String,
-        environment: PayabliEnvironment,
-        telemetryEnabled: Bool
+        environment: PayabliEnvironment
     ) async throws {
         do {
             let config = try PayabliConfig(
                 entryPoint: entryPoint,
                 environment: environment,
-                tokenProvider: bridgedTokenProvider(errorDomain: sessionErrorDomain, tokenHandler),
-                telemetryEnabled: telemetryEnabled
+                tokenProvider: bridgedTokenProvider(errorDomain: sessionErrorDomain, tokenHandler)
             )
             try await PayabliSession.initialize(config: config)
         } catch {

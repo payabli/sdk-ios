@@ -1,14 +1,9 @@
 import Foundation
 import PayabliSDKCore
 
-/// Turns an `/activate` refusal into the catalog entry a host receives, by reading the service's own words.
-///
-/// The only place that reads an activation refusal's text, so the day the service stops telling its refusals
-/// apart by text there is one file to rewrite. Every comparison is exact, or a prefix where the service appends
-/// detail, and a refusal matching nothing reports `unknown`, which tells a host nothing it would act on wrongly.
-///
-/// A 401 never reaches this table: the transport answers it as an expired token. A 5xx keeps the service's
-/// own error, and the wait it asked for.
+/// Turns an `/activate` refusal into the catalog entry a host receives, by the service's own words: each comparison is
+/// exact, or a prefix where the service appends detail, and one matching nothing reports `unknown`. A binding that is gone
+/// (`BindingRefusal`) and an unregistered app (`AppRegistrationRefusals`) are read before it; a 5xx keeps its own error.
 enum ActivationRefusals {
     static func refusal(resultCode: Int?, reason: String) -> ActivationRefusal {
         ActivationRefusal(
@@ -24,12 +19,20 @@ enum ActivationRefusals {
 
     /// Whether the refusal says the service holds no record of the device, so the binding presented names
     /// nothing and setting the device up again needs it gone. A rejected assertion keeps it.
+    ///
+    /// - Parameter resultCode: the HTTP status the service refused the activation with.
+    /// - Parameter reason: the service's refusal text, matched exactly against its fixed words.
+    /// - Returns: whether the stored binding has to be dropped before the device can be set up again.
     static func discardsBinding(resultCode: Int?, reason: String) -> Bool {
         resultCode == 404 && reason == deviceNotFound
     }
 
     /// Whether the refusal says something about the session as well as the call: the device is unknown, or the
     /// entry point cannot be used. Every other refusal leaves the session waiting for its code.
+    ///
+    /// - Parameter resultCode: the HTTP status the service refused the activation with.
+    /// - Parameter reason: the service's refusal text, matched exactly against its fixed words.
+    /// - Returns: whether the session should move off the state it waited in.
     static func movesSession(resultCode: Int?, reason: String) -> Bool {
         discardsBinding(resultCode: resultCode, reason: reason) || (resultCode == 403 && reason == entryPointUnusable)
     }
