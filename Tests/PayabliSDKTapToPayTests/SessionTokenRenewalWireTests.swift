@@ -50,7 +50,7 @@ final class SessionTokenRenewalWireTests: XCTestCase {
         let wire = Wire(refusingOnce: "attest")
         StubURLProtocol.handler = wire.handle
         let renewal = RenewalGate()
-        let (ttp, _) = try makeTTP(telemetryEnabled: true, renewal: renewal)
+        let (ttp, _) = try makeTTP(renewal: renewal)
         // Three short of a batch: the start, the attempt and its refusal make twenty.
         for _ in 0 ..< 17 {
             await ttp.session.telemetry.emit("test.filler")
@@ -71,10 +71,7 @@ final class SessionTokenRenewalWireTests: XCTestCase {
 
     /// A facade whose attestation service runs on the facade's own session, so a refusal is recorded where the
     /// renewal reads it.
-    private func makeTTP(
-        telemetryEnabled: Bool = false,
-        renewal: RenewalGate? = nil
-    ) throws -> (PayabliTTP, Tokens) {
+    private func makeTTP(renewal: RenewalGate? = nil) throws -> (PayabliTTP, Tokens) {
         let tokens = Tokens()
         let config = try PayabliConfig(entryPoint: "myEntry", environment: .sandbox, tokenProvider: {
             let call = tokens.next()
@@ -82,7 +79,7 @@ final class SessionTokenRenewalWireTests: XCTestCase {
                 await renewal?.ask()
             }
             return call == 1 ? "seed" : "renewed-\(call)"
-        }, telemetryEnabled: telemetryEnabled)
+        })
         let session = PayabliSession(config: config, urlSession: StubURLProtocol.makeSession())
         let attestation = AppAttestService(
             transport: session.transport,

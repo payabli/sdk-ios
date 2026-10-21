@@ -148,8 +148,7 @@ final class PinnedCredentialTests: XCTestCase {
             tokenProvider: {
                 let call = await calls.increment()
                 return call == 1 ? testToken : try await tokenProvider()
-            },
-            telemetryEnabled: false
+            }
         )
         return PayabliSession(config: config, urlSession: StubURLProtocol.makeSession())
     }
