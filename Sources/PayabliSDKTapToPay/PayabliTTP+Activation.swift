@@ -17,7 +17,7 @@ public extension PayabliTTP {
     /// - Parameter activationCode: the code the partner issued out of band, e.g. from an admin dashboard.
     func activateDevice(activationCode: String) async throws {
         try await reportingToHost {
-            try await runSessionSetup(.activate) { try await self.runActivateDevice(activationCode: activationCode) }
+            try await runSessionSetup(.activate(code: activationCode)) { try await self.runActivateDevice(activationCode: activationCode) }
         }
     }
 
@@ -25,6 +25,12 @@ public extension PayabliTTP {
         guard case let .pendingActivation(activationId) = sessionState else {
             throw TapToPayError(type: .deviceNotPending, reason: PayabliErrorType.deviceNotPending.message, detail: nil)
         }
+        try await renewingRefusedToken(landsSecondRefusal: false) {
+            try await self.sendActivation(activationCode: activationCode, activationId: activationId)
+        }
+    }
+
+    private func sendActivation(activationCode: String, activationId: String) async throws {
         do {
             try await attestation.activateDevice(
                 activationCode: activationCode,

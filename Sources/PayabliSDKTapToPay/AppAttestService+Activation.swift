@@ -18,11 +18,6 @@ package extension AppAttestService {
             throw ActivationRegistrationChanged()
         }
 
-        // Rotate the nonce before `/activate` verifies the assertion. The
-        // returned payload is unused here, since the assertion is signed over a
-        // fresh timestamp rather than the challenge.
-        _ = try await postChallenge(entry: entry)
-
         let assertion = try await signingActivation(entry: entry)
         guard assertion.deviceId == activationId, try cachedDeviceId(for: entry) == activationId else {
             throw ActivationRegistrationChanged()
@@ -36,11 +31,11 @@ package extension AppAttestService {
             label: "activate",
             assertion: assertion,
             readsRefusalBeforeStatus: true,
+            pinsCredential: true,
             makeDeclineError: { code, reason in
-                // A 401 here means this keyId has no attestation on record, so
-                // the binding names a key that buys nothing. Drop it and let the
-                // next `initialize()` enrol.
-                if code == 401 {
+                // The service holds no attestation for this key, so the binding names a key that buys nothing. Drop
+                // it and let the next `initialize()` enrol. Any other 401 goes to the table and keeps it.
+                if BindingRefusal.isBindingGone(code: code, reason: reason) {
                     self.logger.error("[activate] clearing local attestation cache and signaling attestationRevoked")
                     // The binding this assertion named, not whatever is held now.
                     let refused = AttestedDevice(

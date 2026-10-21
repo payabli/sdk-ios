@@ -44,13 +44,27 @@ struct AuthenticatedTransport: PayabliTransport {
             return firstAttempt
         }
 
+        if firstAttempt.statusCode == 401 {
+            PayabliSendMark.current?.lower()
+        }
+
+        // Above the refresh, which is the half that breaks a pinned credential. The caller renews the token
+        // once the sequence it belongs to has ended.
+        if request.pinsCredential {
+            logger.warning(
+                "recovery declined: the route pins the credential it was sent"
+                    + " (\(request.method.rawValue) \(firstAttempt.statusCode))"
+            )
+            if let sent = stamped.value {
+                await auth.recordPinnedRefusal(of: sent)
+            }
+            return firstAttempt
+        }
+
         logger.info(
             "credential rejected: attempting recovery"
                 + " (\(request.method.rawValue) \(firstAttempt.statusCode))"
         )
-        if firstAttempt.statusCode == 401 {
-            PayabliSendMark.current?.lower()
-        }
 
         // The token the chain stamped, falling back to the one held for a chain that stamped
         // nothing. Held rather than minted: a token obtained here would name a credential that no

@@ -23,9 +23,9 @@ final class TTPConfigClient: Sendable {
         self.attestation = attestation
     }
 
-    /// Fetches the TTP config for `entry`. A 401 inside a 200 envelope drops the binding so the next
-    /// `initialize()` enrols. An HTTP 401 surviving refresh drops nothing: clearing on it retires an enrolled
-    /// device. Both throw `PayabliGenericError(.tokenExpired)`, whose reason names which happened.
+    /// Fetches the TTP config for `entry` on a pinned credential. A 401 saying the binding is gone, in the status or the
+    /// envelope, drops the binding and throws `attestationRevoked`. Any other HTTP 401 throws ``PinnedTokenRefusal`` for the
+    /// session to renew, and any other envelope 401 throws `.tokenExpired`; neither drops the binding.
     ///
     /// - Parameter entry: the entry point whose configuration is fetched.
     /// - Returns: the route's configuration, carrying the reader credentials.
@@ -36,7 +36,8 @@ final class TTPConfigClient: Sendable {
         let request = PayabliRequest(
             method: .get,
             path: "/api/v2/device/taptopay/config/\(PercentEncoding.segment(entry))",
-            headers: headers.asDictionary
+            headers: headers.asDictionary,
+            pinsCredential: true
         )
 
         // The headers carry the App Attest assertion, key id and device id.
@@ -48,11 +49,9 @@ final class TTPConfigClient: Sendable {
         // carries the card reader's secretKey and apiKey. The log gets its shape.
         logger.info("[config] ← [\(response.statusCode)] bytes=\(response.body.count)")
 
-        if let (_, reason) = PayabliEnvelope.declineOutcome(from: response.body),
-           let unregistered = AppRegistrationRefusals.hostError(status: response.statusCode, reason: reason)
-        {
-            logger.error("[config] refused: the app is not registered on the paypoint")
-            throw unregistered
+        try throwRefusalToldByItsText(response, entry: entry, presented: headers)
+        if response.statusCode == 401 {
+            throw PinnedTokenRefusal()
         }
 
         try mapPayabliHTTPError(response: response) { code in
@@ -67,15 +66,15 @@ final class TTPConfigClient: Sendable {
             let code = rawCode ?? 0
             // Same as the attestation path: the code, not the service's sentence.
             logger.error("[config] declined (isSuccess=false code=\(code))")
-            // A 401 in the body refuses the binding this request presented, so
-            // it is dropped here, where which handle that was is known.
-            if code == 401 {
+            // A binding the service no longer holds is dropped here, where which handle the request presented is
+            // known. Any other 401 in the body keeps it.
+            if BindingRefusal.isBindingGone(code: code, reason: reason) {
                 guard dropRefusedBinding(entry: entry, presented: headers) else {
-                    throw PayabliGenericError(
-                        type: .tokenExpired,
-                        reason: "\(reason) — the stored binding could not be dropped"
-                    )
+                    throw PayabliTTPError.attestationRevoked(reason: "\(reason) — the stored binding could not be dropped")
                 }
+                throw PayabliTTPError.attestationRevoked(reason: reason)
+            }
+            if code == 401 {
                 throw PayabliGenericError(type: .tokenExpired, reason: reason)
             }
             if code == 403 {
@@ -96,6 +95,30 @@ final class TTPConfigClient: Sendable {
         }
 
         return TTPConfig(providerCredentials: credentials)
+    }
+
+    /// Throws the refusals told apart by their text before the status is mapped: an app the paypoint has not registered,
+    /// and a binding the service no longer holds, which is dropped here while the handle the request presented is known.
+    ///
+    /// - Parameter response: the answer to the config request.
+    /// - Parameter entry: the entry point the request was made for.
+    /// - Parameter headers: the assertion the request carried, naming the binding it presented.
+    private func throwRefusalToldByItsText(
+        _ response: PayabliResponse,
+        entry: String,
+        presented headers: AssertionHeaders
+    ) throws {
+        guard let (_, reason) = PayabliEnvelope.declineOutcome(from: response.body) else { return }
+        if let unregistered = AppRegistrationRefusals.hostError(status: response.statusCode, reason: reason) {
+            logger.error("[config] refused: the app is not registered on the paypoint")
+            throw unregistered
+        }
+        guard BindingRefusal.isBindingGone(code: response.statusCode, reason: reason) else { return }
+        logger.error("[config] the service holds no live attestation for this binding")
+        guard dropRefusedBinding(entry: entry, presented: headers) else {
+            throw PayabliTTPError.attestationRevoked(reason: "\(reason) — the stored binding could not be dropped")
+        }
+        throw PayabliTTPError.attestationRevoked(reason: reason)
     }
 
     private func assertionHeaders(entry: String) async throws -> AssertionHeaders {

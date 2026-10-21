@@ -87,7 +87,7 @@ public final class PayabliSession: @unchecked Sendable {
     /// A different configuration throws `invalidConfiguration` and leaves the installed session in
     /// place, because every facade already built is running on it.
     ///
-    /// - Parameter config: the configuration to install; equal by entry point, environment and telemetry setting.
+    /// - Parameter config: the configuration to install; equal by entry point and environment.
     /// - Returns: the process's installed session, the one already installed when the configuration is equal.
     @discardableResult
     public static func initialize(config: PayabliConfig) async throws -> PayabliSession {
@@ -110,6 +110,14 @@ public final class PayabliSession: @unchecked Sendable {
             installed = session
             return session
         }
+    }
+
+    /// Replaces the token a pinned route refused, for a capability to call between the calls of its own sequence.
+    ///
+    /// - Returns: whether a refused token was waiting; false means nothing was asked of the provider.
+    /// - Throws: the provider's failure, as a refresh raises it.
+    package func renewRefusedToken() async throws -> Bool {
+        try await auth.renewPinnedRefusal()
     }
 
     /// Whether `config` describes this session, by the same rule `initialize` applies.

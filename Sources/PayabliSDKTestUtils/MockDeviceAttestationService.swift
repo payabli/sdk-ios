@@ -121,6 +121,20 @@ package final class MockDeviceAttestationService: DeviceAttestationService, @unc
         set { lock.withLock { storedAttestResult = newValue } }
     }
 
+    package var attestFailuresFirst: [Error] {
+        get { lock.withLock { storedAttestFailuresFirst } }
+        set { lock.withLock { storedAttestFailuresFirst = newValue } }
+    }
+
+    private var storedAttestFailuresFirst: [Error] = []
+
+    package var activationFailuresFirst: [Error] {
+        get { lock.withLock { storedActivationFailuresFirst } }
+        set { lock.withLock { storedActivationFailuresFirst = newValue } }
+    }
+
+    private var storedActivationFailuresFirst: [Error] = []
+
     package var pendingRegistration: String? {
         get { lock.withLock { storedPendingRegistration } }
         set { lock.withLock { storedPendingRegistration = newValue } }
@@ -149,11 +163,27 @@ package final class MockDeviceAttestationService: DeviceAttestationService, @unc
         lock.withLock { storedActivateCalls }
     }
 
+    private var storedActivationResultsByCode: [String: Result<Void, Error>] = [:]
+    /// The answer for one code, in place of `activationResult`.
+    package var activationResultsByCode: [String: Result<Void, Error>] {
+        get { lock.withLock { storedActivationResultsByCode } }
+        set { lock.withLock { storedActivationResultsByCode = newValue } }
+    }
+
+    private var storedActivationCodes: [String] = []
+    /// The codes activations sent, in order.
+    package var activationCodes: [String] {
+        lock.withLock { storedActivationCodes }
+    }
+
     package init() {}
 
     package func attest(entry: String) async throws -> AttestationResult {
         let result: Result<AttestationResult, Error> = lock.withLock {
             storedAttestCalls += 1
+            if !storedAttestFailuresFirst.isEmpty {
+                return .failure(storedAttestFailuresFirst.removeFirst())
+            }
             if let storedPendingRegistration {
                 storedBindings[entry] = storedPendingRegistration
                 storedKeys[entry] = Self.defaultKeyId
@@ -214,7 +244,11 @@ package final class MockDeviceAttestationService: DeviceAttestationService, @unc
             guard (storedBindings[entry] ?? storedBindings[Self.anyEntry]) == activationId else {
                 return .failure(ActivationRegistrationChanged())
             }
-            return storedActivationResult
+            storedActivationCodes.append(activationCode)
+            if !storedActivationFailuresFirst.isEmpty {
+                return .failure(storedActivationFailuresFirst.removeFirst())
+            }
+            return storedActivationResultsByCode[activationCode] ?? storedActivationResult
         }
         if case let .failure(err) = result {
             throw err

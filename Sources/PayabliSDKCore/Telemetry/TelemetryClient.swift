@@ -59,7 +59,7 @@ package actor TelemetryClient {
         deviceIdHash = digest.map { String(format: "%02x", $0) }.joined()
     }
 
-    /// Enqueue an event. No-op when telemetry is disabled.
+    /// Enqueue an event.
     ///
     /// - Parameter name: the event's catalog name.
     /// - Parameter properties: the string values the event carries, sent on as given.
