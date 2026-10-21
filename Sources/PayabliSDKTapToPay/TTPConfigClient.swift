@@ -48,6 +48,13 @@ final class TTPConfigClient: Sendable {
         // carries the card reader's secretKey and apiKey. The log gets its shape.
         logger.info("[config] ← [\(response.statusCode)] bytes=\(response.body.count)")
 
+        if let (_, reason) = PayabliEnvelope.declineOutcome(from: response.body),
+           let unregistered = AppRegistrationRefusals.hostError(status: response.statusCode, reason: reason)
+        {
+            logger.error("[config] refused: the app is not registered on the paypoint")
+            throw unregistered
+        }
+
         try mapPayabliHTTPError(response: response) { code in
             if code == 403 {
                 return ConfigPendingActivation(presentedDeviceId: headers.deviceId)

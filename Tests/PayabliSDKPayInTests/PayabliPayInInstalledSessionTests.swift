@@ -58,8 +58,7 @@ final class PayabliPayInInstalledSessionTests: XCTestCase {
         try await PayabliSessionObjC.initialize(
             tokenHandler: { completion in completion("tok", nil) },
             entryPoint: "demo",
-            environment: .sandbox,
-            telemetryEnabled: true
+            environment: .sandbox
         )
 
         let bridged = try PayabliPayInObjC.create()
@@ -75,8 +74,7 @@ final class PayabliPayInInstalledSessionTests: XCTestCase {
             try await PayabliSessionObjC.initialize(
                 tokenHandler: { completion in completion("tok", nil) },
                 entryPoint: "other",
-                environment: .sandbox,
-                telemetryEnabled: true
+                environment: .sandbox
             )
             XCTFail("a different configuration was accepted")
         } catch {
@@ -89,8 +87,7 @@ final class PayabliPayInInstalledSessionTests: XCTestCase {
             try await PayabliSessionObjC.initialize(
                 tokenHandler: { completion in completion("tok", nil) },
                 entryPoint: " ",
-                environment: .sandbox,
-                telemetryEnabled: true
+                environment: .sandbox
             )
             XCTFail("a blank entry point was accepted")
         } catch {

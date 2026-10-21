@@ -23,21 +23,6 @@ final class PayabliSessionTelemetryTests: XCTestCase {
         XCTAssertEqual(sent.event, "ttp.initialize.started")
     }
 
-    func testTheTelemetrySettingReachesTheClient() async throws {
-        let transport = InMemoryTelemetryTransport()
-        let session = PayabliSession(
-            config: try makeConfig(telemetryEnabled: false),
-            urlSession: StubURLProtocol.makeSession(),
-            telemetryTransport: transport
-        )
-
-        await session.telemetry.emit(TelemetryEventName.ttpInitializeStarted)
-        await session.telemetry.flush()
-
-        let batches = await transport.batches
-        XCTAssertTrue(batches.isEmpty)
-    }
-
     /// The default client posts to the telemetry route through the service, beneath the recovery layer.
     func testATelemetry401SpendsNoRefreshAndLeavesTheCredential() async throws {
         let stub = RecordingStub { request in
@@ -73,14 +58,12 @@ final class PayabliSessionTelemetryTests: XCTestCase {
     }
 
     private func makeConfig(
-        telemetryEnabled: Bool = true,
         tokenProvider: @escaping PayabliTokenRefresh = { "tok" }
     ) throws -> PayabliConfig {
         try PayabliConfig(
             entryPoint: "demo",
             environment: .sandbox,
-            tokenProvider: tokenProvider,
-            telemetryEnabled: telemetryEnabled
+            tokenProvider: tokenProvider
         )
     }
 }
