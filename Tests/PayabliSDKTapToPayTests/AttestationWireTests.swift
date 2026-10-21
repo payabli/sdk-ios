@@ -274,7 +274,7 @@ final class AttestationWireTests: XCTestCase {
         let storage = InMemorySecureStorage()
         try AttestFixture.seedBinding(entry: "myEntry", deviceId: "dev_old", keyId: "old_key", in: storage)
 
-        let refusal = #"{"isSuccess":false,"responseText":"revoked","responseData":{"resultCode":401,"resultText":"revoked"}}"#
+        let refusal = #"{"isSuccess":false,"responseText":"Declined","responseData":{"resultCode":401,"resultText":"Device not attested or attestation revoked"}}"#
         StubURLProtocol.handler = { request in
             if request.url!.path == "/api/v2/device/taptopay/activate" {
                 // Enrolled again while the activation request is in flight.

@@ -7,13 +7,13 @@ import PayabliSDKCore
 enum BindingRefusal {
     static let text = "Device not attested or attestation revoked"
 
-    /// Whether a response with `statusCode` and `reason` says the binding is gone.
+    /// Whether a refusal says the binding is gone, whether its 401 arrived as the HTTP status or inside the envelope.
     ///
-    /// - Parameter statusCode: the HTTP status the refusal arrived with.
+    /// - Parameter code: the HTTP status, or the envelope's `resultCode`.
     /// - Parameter reason: the envelope's `resultText`.
     /// - Returns: true only for a 401 carrying exactly ``text``.
-    static func isBindingGone(statusCode: Int, reason: String) -> Bool {
-        statusCode == 401 && reason == text
+    static func isBindingGone(code: Int?, reason: String) -> Bool {
+        code == 401 && reason == text
     }
 }
 

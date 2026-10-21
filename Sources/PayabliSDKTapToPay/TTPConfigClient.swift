@@ -23,9 +23,9 @@ final class TTPConfigClient: Sendable {
         self.attestation = attestation
     }
 
-    /// Fetches the TTP config for `entry` on a pinned credential. A 401 saying the binding is gone, or one inside a 200
-    /// envelope, drops the binding; the first throws `attestationRevoked` and the second `.tokenExpired`. Any other 401
-    /// is the token itself, drops nothing, and throws ``PinnedTokenRefusal`` for the session to renew.
+    /// Fetches the TTP config for `entry` on a pinned credential. A 401 saying the binding is gone, in the status or the
+    /// envelope, drops the binding and throws `attestationRevoked`. Any other HTTP 401 throws ``PinnedTokenRefusal`` for the
+    /// session to renew, and any other envelope 401 throws `.tokenExpired`; neither drops the binding.
     ///
     /// - Parameter entry: the entry point whose configuration is fetched.
     /// - Returns: the route's configuration, carrying the reader credentials.
@@ -50,7 +50,7 @@ final class TTPConfigClient: Sendable {
         logger.info("[config] ← [\(response.statusCode)] bytes=\(response.body.count)")
 
         if let (_, reason) = PayabliEnvelope.declineOutcome(from: response.body),
-           BindingRefusal.isBindingGone(statusCode: response.statusCode, reason: reason)
+           BindingRefusal.isBindingGone(code: response.statusCode, reason: reason)
         {
             logger.error("[config] the service holds no live attestation for this binding")
             guard dropRefusedBinding(entry: entry, presented: headers) else {
@@ -74,15 +74,15 @@ final class TTPConfigClient: Sendable {
             let code = rawCode ?? 0
             // Same as the attestation path: the code, not the service's sentence.
             logger.error("[config] declined (isSuccess=false code=\(code))")
-            // A 401 in the body refuses the binding this request presented, so
-            // it is dropped here, where which handle that was is known.
-            if code == 401 {
+            // A binding the service no longer holds is dropped here, where which handle the request presented is
+            // known. Any other 401 in the body keeps it.
+            if BindingRefusal.isBindingGone(code: code, reason: reason) {
                 guard dropRefusedBinding(entry: entry, presented: headers) else {
-                    throw PayabliGenericError(
-                        type: .tokenExpired,
-                        reason: "\(reason) — the stored binding could not be dropped"
-                    )
+                    throw PayabliTTPError.attestationRevoked(reason: "\(reason) — the stored binding could not be dropped")
                 }
+                throw PayabliTTPError.attestationRevoked(reason: reason)
+            }
+            if code == 401 {
                 throw PayabliGenericError(type: .tokenExpired, reason: reason)
             }
             if code == 403 {

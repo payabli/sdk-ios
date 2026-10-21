@@ -115,6 +115,51 @@ final class DeviceRoutePinTests: XCTestCase {
         XCTAssertEqual(try sut.binding(for: "myEntry")?.deviceId, "dev_1")
     }
 
+    func testAnActivationRefusalInTheBodyWithAnyOtherTextKeepsTheBinding() async throws {
+        let storage = InMemorySecureStorage()
+        try AttestFixture.seedBinding(entry: "myEntry", deviceId: "dev_1", keyId: "key_1", in: storage)
+        let body = #"{"isSuccess":false,"responseText":"Declined","responseData":{"resultCode":401,"resultText":"Unauthorized"}}"#
+        StubURLProtocol.handler = { request in
+            if request.url!.path == Self.activate {
+                return (
+                    HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
+                    Data(body.utf8)
+                )
+            }
+            return AttestFixture.ok(request, ["challengeId": "c_1", "challenge": "Y2hhbGxlbmdl"])
+        }
+        let (sut, _, _) = try AttestFixture.makeService(storage: storage)
+
+        _ = await failure {
+            try await sut.activateDevice(activationCode: "123456", entry: "myEntry", activationId: "dev_1")
+        }
+
+        XCTAssertEqual(try sut.binding(for: "myEntry")?.deviceId, "dev_1", "the binding was dropped on another text")
+    }
+
+    func testAnActivationRefusalInTheBodyWithTheBindingGoneTextDropsIt() async throws {
+        let storage = InMemorySecureStorage()
+        try AttestFixture.seedBinding(entry: "myEntry", deviceId: "dev_1", keyId: "key_1", in: storage)
+        let body = #"{"isSuccess":false,"responseText":"Declined","responseData":{"resultCode":401,"resultText":"\#(BindingRefusal.text)"}}"#
+        StubURLProtocol.handler = { request in
+            if request.url!.path == Self.activate {
+                return (
+                    HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
+                    Data(body.utf8)
+                )
+            }
+            return AttestFixture.ok(request, ["challengeId": "c_1", "challenge": "Y2hhbGxlbmdl"])
+        }
+        let (sut, _, _) = try AttestFixture.makeService(storage: storage)
+
+        let failure = await failure {
+            try await sut.activateDevice(activationCode: "123456", entry: "myEntry", activationId: "dev_1")
+        }
+
+        XCTAssertEqual((TapToPayErrorTranslation.hostError(for: failure) as? any PayabliError)?.code, 3005, "got \(failure)")
+        XCTAssertNil(try sut.binding(for: "myEntry"))
+    }
+
     // MARK: - Helpers
 
     /// `seed` first, then `renewed-2`, `renewed-3` and so on, counting every call.

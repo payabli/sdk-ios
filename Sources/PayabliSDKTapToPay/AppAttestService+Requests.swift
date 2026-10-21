@@ -169,7 +169,7 @@ extension AppAttestService {
         if readsRefusalBeforeStatus,
            let (code, reason) = PayabliEnvelope.declineOutcome(from: response.body, decoder: decoder),
            [400, 403, 404].contains(response.statusCode)
-           || BindingRefusal.isBindingGone(statusCode: response.statusCode, reason: reason)
+           || BindingRefusal.isBindingGone(code: response.statusCode, reason: reason)
         {
             logger.error("[\(label)] refused (code=\(code.map(String.init) ?? "nil"))")
             throw makeDeclineError(code ?? response.statusCode, reason)
