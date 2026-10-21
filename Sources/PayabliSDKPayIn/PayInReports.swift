@@ -44,15 +44,18 @@ final class PayInReports {
     /// - Parameter method: the kind of payment method, or nil when the operation names none.
     /// - Parameter duration: how long it took; a refusal before anything was sent carries none.
     /// - Parameter error: what it threw, or nil when it succeeded.
+    /// - Parameter refusedLocally: whether the operation refused its request before anything was sent, which the
+    ///   error alone does not show when it reports the payment as still open.
     func completed(
         _ operation: Operation,
         origin: Origin,
         method: String?,
         after duration: Duration?,
-        error: (any Error)?
+        error: (any Error)?,
+        refusedLocally: Bool = false
     ) {
         let now = Date()
-        let outcome = error.map(Self.outcome(of:)) ?? "approved"
+        let outcome = error.map { refusedLocally ? "refused_locally" : Self.outcome(of: $0) } ?? "approved"
         var properties = ["outcome": outcome, "origin": origin.rawValue]
         if let method {
             properties["method"] = method
@@ -134,7 +137,11 @@ final class PayInReports {
         }
     }
 
-    private static func isRefusedBeforeSending(_ error: any Error) -> Bool {
+    /// Whether an error is the SDK refusing a request before sending it.
+    ///
+    /// - Parameter error: what the attempt threw, before anything wrapped it.
+    /// - Returns: whether nothing was sent because the SDK refused it.
+    static func isRefusedBeforeSending(_ error: any Error) -> Bool {
         switch error {
         case PayabliPayInError.invalidInput, PayabliPayInError.submissionInProgress,
              PayabliPayInTokenStorageError.invalidInput:
@@ -187,5 +194,25 @@ final class PayInReports {
     private static func milliseconds(_ duration: Duration) -> String {
         let (seconds, attoseconds) = duration.components
         return String(seconds * 1000 + attoseconds / 1_000_000_000_000_000)
+    }
+}
+
+/// Records that an attempt was refused before anything was sent, for the report around it.
+///
+/// Bound as a task-local by the report around each operation. The error a retry under a held key throws reports
+/// the payment as still open, so it cannot carry this itself.
+final class PayInLocalRefusal: @unchecked Sendable {
+    @TaskLocal static var current: PayInLocalRefusal?
+
+    private let lock = NSLock()
+    private var isSet = false
+
+    /// Whether an attempt under this record was refused before anything was sent.
+    var wasRefused: Bool {
+        lock.withLock { isSet }
+    }
+
+    func set() {
+        lock.withLock { isSet = true }
     }
 }

@@ -430,12 +430,20 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
         _ body: () async throws -> Value
     ) async throws -> Value {
         let startedAt = now()
+        let refusal = PayInLocalRefusal()
         do {
-            let value = try await body()
+            let value = try await PayInLocalRefusal.$current.withValue(refusal) { try await body() }
             reports?.completed(operation, origin: origin, method: method, after: now() - startedAt, error: nil)
             return value
         } catch {
-            reports?.completed(operation, origin: origin, method: method, after: now() - startedAt, error: error)
+            reports?.completed(
+                operation,
+                origin: origin,
+                method: method,
+                after: now() - startedAt,
+                error: error,
+                refusedLocally: refusal.wasRefused
+            )
             throw error
         }
     }
@@ -474,6 +482,9 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
             var outcome = Self.outcome(of: error, reused: reservation.reused)
             if !mark.mayHaveLeft {
                 outcome = .notAnswered
+                if PayInReports.isRefusedBeforeSending(error) {
+                    PayInLocalRefusal.current?.set()
+                }
             }
             if heldKeys.settle(reservation, outcome: outcome, now: now()) {
                 logger.warning("payin_retry_keys_full")

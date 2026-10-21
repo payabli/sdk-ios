@@ -153,6 +153,26 @@ final class PayInTelemetryTests: XCTestCase {
         XCTAssertNil(event.properties["duration_ms"])
     }
 
+    func testARetryUnderAHeldKeyRefusedBeforeSendingIsRefusedLocally() async throws {
+        let transport = ScriptedTransport()
+        transport.script = [.lost]
+        let flow = makeFlow(transport)
+
+        _ = await PayInFixture.failure { _ = try await flow.capture(Self.heldKeyRequest(.newPayment, cvv: "123")) }
+        let told = await PayInFixture.failure { _ = try await flow.capture(Self.heldKeyRequest(.retry, cvv: "")) }
+
+        let reports = try XCTUnwrap(flow.reports)
+        await reports.sent()
+        await telemetry?.flush()
+        let events = await recorder.events
+        XCTAssertEqual(events.count, 2, "\(events.map(\.event))")
+        let refused = try XCTUnwrap(events.last)
+        XCTAssertNotNil(PayInFixture.interruption(told), "the caller is no longer told the payment is open: \(told)")
+        XCTAssertEqual(refused.properties["outcome"], "refused_locally")
+        XCTAssertNil(refused.properties["duration_ms"])
+        XCTAssertEqual(transport.sentKeys.count, 1, "the refused retry reached the transport")
+    }
+
     func testAFieldTheServiceRejectedIsRefusedNotRefusedLocally() async throws {
         let flow = makeFlow(RecordingIdempotencyTransport(body: Data(#"{"responseText":"Bad"}"#.utf8), status: 400))
 
@@ -341,6 +361,24 @@ final class PayInTelemetryTests: XCTestCase {
         let events = await recorder.events
         XCTAssertEqual(events.count, 1, "\(events.map(\.event))", file: file, line: line)
         return try XCTUnwrap(events.first, file: file, line: line)
+    }
+
+    /// A card capture under reference `p1`, so a lost first attempt holds a key that a retry takes.
+    private static func heldKeyRequest(_ attempt: PayabliAttempt, cvv: String) -> PayabliPayInRequest {
+        PayabliPayInRequest(
+            paymentMethod: .card(PayabliPayInPaymentMethod.Card(data: PayabliPayInCardData(
+                cardNumber: "4111111111111111",
+                expiration: "12/30",
+                cardholderName: "Jane",
+                cvv: cvv,
+                billingZip: "12345"
+            ))),
+            options: PayabliPayInRequestConfiguration(
+                paymentDetails: PayabliPayInPaymentDetails(totalAmount: 12.34),
+                paymentReference: "p1",
+                attempt: attempt
+            )
+        )
     }
 
     private static let card = PayabliPayInCardData(
