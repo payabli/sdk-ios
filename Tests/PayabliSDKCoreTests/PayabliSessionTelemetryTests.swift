@@ -95,7 +95,7 @@ final class PayabliSessionTelemetryTests: XCTestCase {
 
         XCTAssertTrue(again === live)
         let batches = await transport.batches
-        XCTAssertEqual(batches.count, 1, "attempted once and dropped")
+        XCTAssertEqual(batches.count, 1, "attempted once and not retried")
     }
 
     func testEveryEventCarriesTheSessionsDeviceIdentifierUnchanged() async throws {
