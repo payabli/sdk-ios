@@ -520,13 +520,59 @@ final class PayInHeldKeyTests: XCTestCase {
 
     // MARK: - Support
 
-    private func makeFlow(prefix: String) -> PayabliPayIn {
-        let flow = PayabliPayIn(entryPoint: "entry", environment: .sandbox, transport: transport)
+    // MARK: - A finished session
+
+    func testANewPaymentOnAFinishedSessionIsATokenErrorSendsNothingAndHoldsNothing() async throws {
+        let auth = try finishedAuth()
+        let flow = makeFlow(prefix: "k", over: finishing(auth))
+        await auth.finish(with: PayabliGenericError(type: .tokenExpired, reason: "finished"))
+
+        let refused = await failure { try await flow.capture(self.request(.newPayment)) }
+        let again = await failure { try await flow.capture(self.request(.newPayment)) }
+
+        XCTAssertEqual((refused as? any PayabliError)?.type, .tokenExpired)
+        XCTAssertNil(PayInFixture.interruption(refused), "nothing left, so no outcome is open")
+        XCTAssertEqual((again as? any PayabliError)?.type, .tokenExpired, "the reference holds no key")
+        XCTAssertEqual(transport.sentKeys, [])
+    }
+
+    func testAHeldKeyOnAFinishedSessionStaysHeldAndItsOutcomeOpen() async throws {
+        transport.script = [.lost]
+        let auth = try finishedAuth()
+        let flow = makeFlow(prefix: "k", over: finishing(auth))
+
+        _ = await failure { try await flow.capture(self.request(.newPayment)) }
+        await auth.finish(with: PayabliGenericError(type: .tokenExpired, reason: "finished"))
+        let refused = await failure { try await flow.capture(self.request(.retry)) }
+        let newPayment = await failure { try await flow.capture(self.request(.newPayment)) }
+
+        XCTAssertEqual(PayInFixture.interruption(refused)?.type, .tokenExpired)
+        XCTAssertEqual(Self.reference(in: refused), "p1")
+        XCTAssertEqual((newPayment as? any PayabliError)?.type, .paymentReferenceOpen, "the key is still held")
+        XCTAssertEqual(transport.sentKeys, ["k1"], "nothing was sent once the session finished")
+    }
+
+    /// A holder whose provider is never reached: every test here finishes it before a refresh could run.
+    private func finishedAuth() throws -> PayabliAuth {
+        try PayabliAuth(config: PayabliConfig(entryPoint: "entry", environment: .sandbox, tokenProvider: { "token" }))
+    }
+
+    /// The scripted transport behind the recovery layer, so a finished session refuses before the script runs.
+    private func finishing(_ auth: PayabliAuth) -> any PayabliTransport {
+        AuthenticatedTransport(base: transport, auth: auth, logger: PayabliLogger(category: .network))
+    }
+
+    private func makeFlow(prefix: String, over base: any PayabliTransport) -> PayabliPayIn {
+        let flow = PayabliPayIn(entryPoint: "entry", environment: .sandbox, transport: base)
         let minted = Counter()
         flow.newIdempotencyKey = { "\(prefix)\(minted.next())" }
         let clock = clock
         flow.now = { clock.now }
         return flow
+    }
+
+    private func makeFlow(prefix: String) -> PayabliPayIn {
+        makeFlow(prefix: prefix, over: transport)
     }
 
     private func request(

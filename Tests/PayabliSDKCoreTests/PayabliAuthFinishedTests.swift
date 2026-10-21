@@ -40,6 +40,37 @@ final class PayabliAuthFinishedTests: XCTestCase {
         XCTAssertEqual(calls, 0)
     }
 
+    func testEveryConcurrentCallerOnAFinishedHolderGetsTheSameRefusal() async throws {
+        let counter = Counter()
+        let auth = try await makeWarmAuth(accessToken: "held", tokenProvider: {
+            _ = await counter.increment()
+            return "never-minted"
+        })
+        let finished = await auth.finishIfSettled(
+            on: "held",
+            with: PayabliGenericError(type: .tokenExpired, reason: "finished")
+        )
+        XCTAssertTrue(finished)
+
+        let reasons = await withTaskGroup(of: String?.self) { group in
+            for _ in 0 ..< 3 {
+                group.addTask {
+                    do {
+                        _ = try await auth.invalidateAndRefresh(rejectedToken: "held")
+                        return nil
+                    } catch {
+                        return (error as? PayabliGenericError)?.reason
+                    }
+                }
+            }
+            return await group.reduce(into: [String?]()) { $0.append($1) }
+        }
+
+        XCTAssertEqual(reasons, ["finished", "finished", "finished"], "every caller is refused, none waits")
+        let calls = await counter.count
+        XCTAssertEqual(calls, 0, "no caller reached the provider")
+    }
+
     func testARejectionArrivingWhileItsTokenIsBeingReplacedFinishesNothing() async throws {
         let entered = Slot<String>()
         let release = Latch()
