@@ -552,7 +552,7 @@ final class AuthenticatedTransportTests: XCTestCase {
         }
     }
 
-    func testAProviderWhoseEveryNewTokenIsRefusedIsAskedTwiceThenOncePerCall() async throws {
+    func testAProviderWhoseEveryNewTokenIsRefusedIsAskedTwiceThenTheSessionAsksNoMore() async throws {
         let stub = RecordingStub(status: Self.unauthorized)
         stub.install()
         defer { stub.uninstall() }
@@ -563,14 +563,13 @@ final class AuthenticatedTransportTests: XCTestCase {
         })
 
         for done in 0 ..< Self.run {
-            let before = await provider.count
             let failure = await failure(from: { _ = try await self.retrying(transport) })
 
             XCTAssertEqual((failure as? any PayabliError)?.type, .tokenExpired)
-            let after = await provider.count
-            // The first call mints a token and refreshes it; each later call refreshes the token it holds once.
-            XCTAssertEqual(after - before, done == 0 ? 2 : 1, "provider calls on call \(done + 1)")
-            XCTAssertEqual(stub.count, 2 * (done + 1), "a request and its one replay per call")
+            // A refreshed token refused in turn ends the session, so later calls reach nothing.
+            let calls = await provider.count
+            XCTAssertEqual(calls, 2, "provider calls after call \(done + 1)")
+            XCTAssertEqual(stub.count, 2, "requests after call \(done + 1)")
         }
     }
 
