@@ -14,36 +14,20 @@ final class AttestationWireTests: XCTestCase {
         super.tearDown()
     }
 
-    /// A code is issued for one registration. One enrolled while the nonce is rotated is signed for
-    /// by the assertion, so the activation is refused before anything is sent.
-    func testAnActivationForARegistrationReplacedMidCallSendsNothing() async throws {
+    /// The activation assertion is signed over a timestamp, so nothing is fetched before `/activate`.
+    func testAnActivationSendsOnlyActivate() async throws {
         let storage = InMemorySecureStorage()
         try AttestFixture.seedBinding(entry: "myEntry", deviceId: "dev_old", keyId: "old_key", in: storage)
-
-        let bodies = BodyBox()
+        let paths = PathsBox()
         StubURLProtocol.handler = { request in
-            if request.url!.path == "/api/v2/device/taptopay/activate" {
-                bodies.append(request.payabliTestBody)
-            }
-            if request.url!.path == "/api/v2/device/taptopay/challenge" {
-                // Enrolled again while the nonce is being rotated, which is the
-                // window between the read at the top of the call and the one the
-                // assertion makes. Later than this and both reads see one binding.
-                try? AttestFixture.seedBinding(
-                    entry: "myEntry", deviceId: "dev_new", keyId: "new_key", in: storage
-                )
-            }
-            return AttestFixture.ok(request, ["challengeId": "c_1", "challenge": "Y2hhbGxlbmdl"])
+            paths.append(request.url!.path)
+            return AttestFixture.ok(request, ["ok": true])
         }
-
         let (sut, _, _) = try AttestFixture.makeService(storage: storage)
 
-        do {
-            try await sut.activateDevice(activationCode: "123456", entry: "myEntry", activationId: "dev_old")
-            XCTFail("an activation for a replaced registration was sent")
-        } catch is ActivationRegistrationChanged {}
+        try await sut.activateDevice(activationCode: "123456", entry: "myEntry", activationId: "dev_old")
 
-        XCTAssertTrue(bodies.values.isEmpty, "the code issued for dev_old was sent for dev_new")
+        XCTAssertEqual(paths.values, ["/api/v2/device/taptopay/activate"])
     }
 
     /// The platform signs after the binding is read, so one replaced while it signs is caught by the
