@@ -50,6 +50,12 @@ final class TTPConfigClient: Sendable {
         logger.info("[config] ← [\(response.statusCode)] bytes=\(response.body.count)")
 
         if let (_, reason) = PayabliEnvelope.declineOutcome(from: response.body),
+           let unregistered = AppRegistrationRefusals.hostError(status: response.statusCode, reason: reason)
+        {
+            logger.error("[config] refused: the app is not registered on the paypoint")
+            throw unregistered
+        }
+        if let (_, reason) = PayabliEnvelope.declineOutcome(from: response.body),
            BindingRefusal.isBindingGone(code: response.statusCode, reason: reason)
         {
             logger.error("[config] the service holds no live attestation for this binding")

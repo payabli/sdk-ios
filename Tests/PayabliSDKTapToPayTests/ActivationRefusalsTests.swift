@@ -43,7 +43,6 @@ final class ActivationRefusalsTests: XCTestCase {
             (400, "Invalid activation code"),
             (400, "Device is not pending activation."),
             (403, "Forbidden"),
-            (403, "No iOS apps are registered on the paypoint allowlist."),
             (404, "Not found"),
             (409, "Invalid activation code."),
             (nil, "Invalid activation code.")

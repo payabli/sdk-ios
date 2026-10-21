@@ -2,8 +2,8 @@ import Foundation
 import PayabliSDKCore
 
 /// Turns an `/activate` refusal into the catalog entry a host receives, by the service's own words: each comparison is
-/// exact, or a prefix where the service appends detail, and one matching nothing reports `unknown`. A 401 saying the
-/// binding is gone is read before it (`BindingRefusal`), and a 5xx keeps the service's own error.
+/// exact, or a prefix where the service appends detail, and one matching nothing reports `unknown`. A binding that is gone
+/// (`BindingRefusal`) and an unregistered app (`AppRegistrationRefusals`) are read before it; a 5xx keeps its own error.
 enum ActivationRefusals {
     static func refusal(resultCode: Int?, reason: String) -> ActivationRefusal {
         ActivationRefusal(
