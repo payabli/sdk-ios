@@ -1,19 +1,8 @@
 import Foundation
 
-/// What counts as the credential being refused, and what a caller is told when replacing it did not help.
-///
-/// `DefaultAuthRecoveryPolicy` is what ships: every request through `AuthenticatedTransport` is asked
-/// through this, so the default is a production participant rather than a placeholder.
-///
-/// **Substituting one is not reachable from a capability target yet.** `PayabliSession` builds the
-/// transport with the default and takes no policy, so only this module's tests supply another. The route
-/// that needs a different answer is card-present device attestation, which is valid only for the exact
-/// credential that obtained it, and refusing recovery there is a per-request property read above this
-/// policy rather than a policy of its own. That work brings the injection path with it.
-///
-/// What the seam settles now is that the transport asks rather than re-deriving the status itself, which
-/// is what keeps widening the refresh from also widening the replay: `AuthenticatedTransport` decides the
-/// replay separately and for a different reason.
+/// What counts as the credential being refused, asked of every request by `AuthenticatedTransport`, which decides the
+/// replay itself so widening one never widens the other. Only this module's tests substitute a policy; a route that
+/// refuses recovery says so per request (`PayabliRequest.pinsCredential`).
 protocol AuthRecoveryPolicy: Sendable {
     /// Whether `response` says the credential was refused.
     ///

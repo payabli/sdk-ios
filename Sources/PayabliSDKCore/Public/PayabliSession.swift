@@ -112,6 +112,14 @@ public final class PayabliSession: @unchecked Sendable {
         }
     }
 
+    /// Replaces the token a pinned route refused, for a capability to call between the calls of its own sequence.
+    ///
+    /// - Returns: whether a refused token was waiting; false means nothing was asked of the provider.
+    /// - Throws: the provider's failure, as a refresh raises it.
+    package func renewRefusedToken() async throws -> Bool {
+        try await auth.renewPinnedRefusal()
+    }
+
     /// Whether `config` describes this session, by the same rule `initialize` applies.
     ///
     /// - Parameter config: the configuration to compare this session's against.

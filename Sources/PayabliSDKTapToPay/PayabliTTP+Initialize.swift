@@ -57,7 +57,7 @@ extension PayabliTTP {
         let start = clock.now
         reports.initializeStarted()
         do {
-            try await runInitializePhases()
+            try await renewingRefusedToken(landsSecondRefusal: true) { try await self.runInitializePhases() }
         } catch let withdrawn as CancellationError {
             throw withdrawn
         } catch {
@@ -129,7 +129,11 @@ extension PayabliTTP {
         default:
             throw PayabliTTPError.notReady(current: sessionState)
         }
+        try await renewingRefusedToken(landsSecondRefusal: true) { try await self.runRepair() }
+    }
 
+    /// Steps 2–4 of `initialize()`, from a state the repair has already accepted.
+    private func runRepair() async throws {
         _ = sessionManager.transition(to: .reinitializing)
         syncPublished()
         _ = sessionManager.transition(to: .fetchingConfig)
@@ -144,6 +148,48 @@ extension PayabliTTP {
         // 4. Re-prepare reader and mark ready.
         try await runPrepareReaderPhase()
         _ = sessionManager.transition(to: .ready)
+        syncPublished()
+    }
+
+    /// Runs `sequence`, and once more after renewing the token when a device route refused it. Every session sequence
+    /// runs through here. The first refusal lands nowhere; a second, or a failed renewal, reaches the caller and lands
+    /// only when `landsSecondRefusal` is true, so an activation's leaves the session waiting for its code.
+    ///
+    /// - Parameter landsSecondRefusal: whether a failure after the renewal moves the session.
+    /// - Parameter sequence: the session work, from its first call.
+    func renewingRefusedToken(
+        landsSecondRefusal: Bool,
+        _ sequence: @MainActor () async throws -> Void
+    ) async throws {
+        do {
+            return try await sequence()
+        } catch is PinnedTokenRefusal {
+            logger.info("a device route refused the token: renewing it and running again")
+        }
+        // Once after the renewal, so its refusal is reported ahead of the second run, and once at the end, for that
+        // run's own refusal.
+        defer { reports.releaseHeld() }
+        do {
+            defer { reports.releaseHeld() }
+            _ = try await session.renewRefusedToken()
+        } catch {
+            landIfAsked(error, landsSecondRefusal)
+            throw error
+        }
+        do {
+            try await sequence()
+        } catch let refused as PinnedTokenRefusal {
+            let expired = PayabliGenericError(type: refused.type, reason: refused.reason)
+            landIfAsked(expired, landsSecondRefusal)
+            throw expired
+        }
+        // Any other failure of the second run was landed by the phase that threw it, which may have chosen a state
+        // its error alone would not name.
+    }
+
+    private func landIfAsked(_ failure: Error, _ lands: Bool) {
+        guard lands else { return }
+        markError(failure)
         syncPublished()
     }
 
@@ -164,6 +210,25 @@ extension PayabliTTP {
     /// Returns nothing: the handle worth keeping is the one the config call's
     /// assertion is signed for, which this phase cannot know.
     private func runAttestationPhase() async throws {
+        let clock = ContinuousClock()
+        let start = clock.now
+        reports.attestationStarted()
+        do {
+            try await attestOrReuseBinding()
+        } catch let withdrawn as CancellationError {
+            throw withdrawn
+        } catch PayabliTTPError.devicePendingActivation {
+            // Attested: the device owes an activation code, which is not a failed attestation.
+            reports.attestationSucceeded(after: clock.now - start)
+            throw PayabliTTPError.devicePendingActivation
+        } catch {
+            reports.attestationFailed(error, after: clock.now - start)
+            throw error
+        }
+        reports.attestationSucceeded(after: clock.now - start)
+    }
+
+    private func attestOrReuseBinding() async throws {
         do {
             // Inside the handling below, because reading the binding can fail and a
             // failure that skipped it would throw out of `initialize()` while the

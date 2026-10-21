@@ -16,6 +16,10 @@ extension PayabliTTPSessionState {
             // Most refusals are about the code, and the device still owes one.
             return refusal.movesSession ? landingByType(refusal.hostError, registration: registration) : nil
         }
+        if error is PinnedTokenRefusal {
+            // Renewed and run once more, so it lands only if the second run is refused too, as a plain 1002.
+            return nil
+        }
         if error is CancellationError {
             // A withdrawn setup is asked again, which is safe.
             return .idle
