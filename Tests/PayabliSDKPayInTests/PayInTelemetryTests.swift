@@ -290,7 +290,8 @@ final class PayInTelemetryTests: XCTestCase {
     }
 
     func testASecondFormSubmissionWhileOneRunsIsCountedByItsOutcomeAlone() async throws {
-        let flow = makeFlow(RecordingIdempotencyTransport(body: Self.stored))
+        let transport = GatedTransport(RecordingIdempotencyTransport(body: Self.stored))
+        let flow = makeFlow(transport)
         let viewModel = PayabliPayInViewModel(
             component: flow,
             configuration: PayabliPayInFormConfiguration(allowedMethods: [.card], defaultMethod: .card)
@@ -301,9 +302,11 @@ final class PayInTelemetryTests: XCTestCase {
         viewModel.cardholderName = "Jane"
         viewModel.cardZip = "12345"
 
-        async let first = viewModel.submit()
-        async let second = viewModel.submit()
-        _ = try? await (first, second)
+        let first = Task { try await viewModel.submit() }
+        await transport.firstArrival()
+        _ = try? await viewModel.submit()
+        transport.open()
+        _ = try? await first.value
 
         let reports = try XCTUnwrap(flow.reports)
         await reports.sent()
@@ -406,6 +409,72 @@ private actor RecordingTelemetryTransport: TelemetryTransport {
     func send(_ batch: [TelemetryEvent], droppedSinceLastSend: Int) async -> Bool {
         events += batch
         return true
+    }
+}
+
+/// Holds every request until opened, so a test can act while one is in flight.
+private final class GatedTransport: PayabliTransport, @unchecked Sendable {
+    private let inner: any PayabliTransport
+    private let lock = NSLock()
+    private var isOpen = false
+    private var held: [CheckedContinuation<Void, Never>] = []
+    private var hasArrived = false
+    private var arrivalWaiters: [CheckedContinuation<Void, Never>] = []
+
+    init(_ inner: any PayabliTransport) {
+        self.inner = inner
+    }
+
+    /// Returns once the first request has reached the transport.
+    func firstArrival() async {
+        await withCheckedContinuation { continuation in
+            let arrived = lock.withLock {
+                if !hasArrived {
+                    arrivalWaiters.append(continuation)
+                }
+                return hasArrived
+            }
+            if arrived {
+                continuation.resume()
+            }
+        }
+    }
+
+    /// Lets every held request, and every later one, through.
+    func open() {
+        let waiting = lock.withLock {
+            isOpen = true
+            defer { held = [] }
+            return held
+        }
+        waiting.forEach { $0.resume() }
+    }
+
+    func perform(_ request: PayabliRequest) async throws -> PayabliResponse {
+        await withCheckedContinuation { continuation in
+            let (passes, waiters) = lock.withLock {
+                hasArrived = true
+                defer { arrivalWaiters = [] }
+                if !isOpen {
+                    held.append(continuation)
+                }
+                return (isOpen, arrivalWaiters)
+            }
+            waiters.forEach { $0.resume() }
+            if passes {
+                continuation.resume()
+            }
+        }
+        return try await inner.perform(request)
+    }
+
+    func performV2<T: Decodable & Sendable>(
+        _ request: PayabliRequest,
+        decoding: T.Type
+    ) async throws -> PayabliV2Envelope<T> {
+        let response = try await perform(request)
+        try mapPayabliHTTPError(response: response)
+        return try decodePayabliV2Envelope(T.self, from: response)
     }
 }
 
