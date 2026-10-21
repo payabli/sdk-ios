@@ -100,10 +100,10 @@ public enum PayabliErrorType: String, Sendable, CaseIterable {
 
 /// What a host does about a failure. Each ``PayabliErrorType`` belongs to one.
 public enum PayabliErrorCategory: String, Sendable, CaseIterable {
-    /// The SDK could not obtain or use a credential, a token or this device's setup. The SDK asks
-    /// the token provider again on the next call, so a provider that can return a working token
-    /// repairs it. A session or a device setup that has ended, which the state reports, is
-    /// established again by calling `initialize`.
+    /// The SDK could not obtain or use a credential, a token or this device's setup. A provider that
+    /// failed is asked again on the next call. `tokenExpired` means a fresh token was refused too, so
+    /// the session is finished until `initialize`, once the cause is fixed. A device setup that has
+    /// ended, which the state reports, is established again by calling `initialize`.
     case credential = "CREDENTIAL"
 
     /// The same call may work later.

@@ -227,9 +227,10 @@ other error.
 
 A `TapToPayError` carries the catalog entry for its cause:
 
-- `category` says what to do, such as `.credential` (your token provider is asked again on the next call; when
-  the state shows the session or the device setup has ended, initialize again) or `.outcomeUnknown` (the call
-  may have taken effect: check before repeating it). Choose your remedy from `category`.
+- `category` says what to do, such as `.credential` (a provider that failed is asked again on the next call;
+  after `.tokenExpired`, or when the state shows the device setup has ended, initialize again) or
+  `.outcomeUnknown` (the call may have taken effect: check before repeating it). Choose your remedy from
+  `category`.
 - `type` names the cause, for a case your app handles on its own, such as `.devicePendingActivation`.
 - `code` is the catalog number Payabli support reads. Give it to them with the failure.
 - `message` is fixed text, safe to show and to log. `reason` is a short summary and `detail` a longer
@@ -258,7 +259,9 @@ It also carries `capture` and `paymentTransId`:
 | `.charged` | The card was charged, but a later step failed. | Don't charge again. Reconcile the payment. |
 
 `PayabliTTP.create()` throws a `TapToPayError` whose `type` is `.sessionNotInitialized` (1019) when no session
-has been started: call `PayabliSession.initialize` first.
+has been started: call `PayabliSession.initialize` first. A `PayabliTTP` whose session was replaced or ended
+refuses setup, activation and a new charge with the same error and lands `.failed(reason: .sessionEnded)`: create
+a new one with `PayabliTTP.create()`.
 
 From Objective-C, these errors arrive as `NSError`. See
 [Language support](../../README.md#language-support) in the root README.

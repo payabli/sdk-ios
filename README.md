@@ -190,7 +190,8 @@ let session = try await PayabliSession.initialize(config: PayabliConfig(
 - `PayabliConfig` throws when the entry point is blank.
 - Calling `initialize` again with the same entry point and environment returns the same session, which keeps
   its original token provider. A different one throws `invalidConfiguration`, and the session already running
-  stays in place.
+  stays in place. Once the session's credential is finished (see `tokenExpired` below), `initialize` with any
+  configuration starts a fresh session in its place.
 
 The token provider is an `async throws` function that returns a new access token from your token
 endpoint:
@@ -216,6 +217,15 @@ func fetchPayabliAccessToken() async throws -> String {
 - The SDK doesn't retry a `.tokenProviderFailed` or `.tokenExpired` failure itself. Try again only when someone
   using your app asks to, or wait longer before each attempt.
 - Return a token. Don't make SDK calls from inside the provider.
+
+**What `tokenExpired` (1002) means.** It isn't how an expired token reaches you. A token that expires or is
+refused once is handled inside the SDK: it asks your provider for a new one, repeats the request, and your call
+succeeds. A 1002 means the service refused the token **and** the new one your provider just returned, so even a
+freshly minted token is being rejected. Don't treat it as a signal to fetch a token; treat it as a credential your
+app has to fix. The usual causes are a token for another environment or entry point, a missing permission, or a
+disabled paypoint. After a 1002 the session's credential is finished: every later call on that session fails at
+once with 1002, without sending a request or calling your provider. Fix the cause, then call `initialize` again;
+it starts a fresh session and calls your provider.
 
 ### Device identity
 
