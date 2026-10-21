@@ -227,6 +227,10 @@ disabled paypoint. After a 1002 the session's credential is finished: every late
 once with 1002, without sending a request or calling your provider. Fix the cause, then call `initialize` again;
 it starts a fresh session and calls your provider.
 
+One 1002 leaves the session usable: one from Tap to Pay setting up the device (`PayabliTTP.initialize()`,
+`activateDevice`, or the repair `charge` runs first). Those requests keep the token they were sent, so the session
+isn't finished. Fix the cause, then call that setup again; it asks your provider for a new token.
+
 ### Device identity
 
 `PayabliSession.deviceId` is this device's identity, the same for every capability. It is stable across

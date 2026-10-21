@@ -228,9 +228,9 @@ other error.
 A `TapToPayError` carries the catalog entry for its cause:
 
 - `category` says what to do, such as `.credential` (a provider that failed is asked again on the next call;
-  after `.tokenExpired`, or when the state shows the device setup has ended, initialize again) or
-  `.outcomeUnknown` (the call may have taken effect: check before repeating it). Choose your remedy from
-  `category`.
+  what `.tokenExpired` means is in [the root README](../../README.md); when the state shows the device setup has
+  ended, initialize again) or `.outcomeUnknown` (the call may have taken effect: check before repeating it).
+  Choose your remedy from `category`.
 - `type` names the cause, for a case your app handles on its own, such as `.devicePendingActivation`.
 - `code` is the catalog number Payabli support reads. Give it to them with the failure.
 - `message` is fixed text, safe to show and to log. `reason` is a short summary and `detail` a longer
