@@ -115,19 +115,26 @@ struct AuthenticatedTransport: PayabliTransport {
                 "recovery exhausted: the replay was refused too"
                     + " (\(request.method.rawValue) \(secondAttempt.statusCode))"
             )
-            // A token minted moments ago and refused again finishes the session, unless it has moved on or is
-            // being replaced: then the refusal is about a token, and finishing would end a session whose next
-            // token works. The holder decides and records that in one turn.
-            let exhausted = recovery.exhausted()
-            if let sent = replayed.value {
-                _ = await auth.finishIfSettled(on: sent, with: exhausted)
-            } else {
-                // Nothing stamped means the replay carried no bearer, which is not a state to be lenient about.
-                await auth.finish(with: exhausted)
-            }
-            throw exhausted
+            throw await finishingTheSession(refusedOn: replayed)
         }
         return secondAttempt
+    }
+
+    /// Finishes the session on a replay refused in turn, unless its token has moved on or is being replaced: then the
+    /// refusal is about a token, and finishing would end a session whose next token works. The holder decides and
+    /// records that in one turn.
+    ///
+    /// - Parameter replayed: the token the refused replay carried, if one was stamped.
+    /// - Returns: the failure the caller throws.
+    private func finishingTheSession(refusedOn replayed: SentToken) async -> PayabliGenericError {
+        let exhausted = recovery.exhausted()
+        if let sent = replayed.value {
+            _ = await auth.finishIfSettled(on: sent, with: exhausted)
+        } else {
+            // Nothing stamped means the replay carried no bearer, which is not a state to be lenient about.
+            await auth.finish(with: exhausted)
+        }
+        return exhausted
     }
 
     /// Whether sending `request` a second time is defensible after `rejection`.
