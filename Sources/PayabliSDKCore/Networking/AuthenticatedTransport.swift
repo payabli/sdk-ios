@@ -13,6 +13,7 @@ struct AuthenticatedTransport: PayabliTransport {
     private let auth: PayabliAuth
     private let recovery: any AuthRecoveryPolicy
     private let logger: PayabliLogger
+    private let onUnrecoverable: @Sendable (PayabliGenericError) -> Void
 
     /// `.network`, not `.auth`: recovering, or giving up on it, is this layer's decision and not the
     /// holder's. The logger is required rather than defaulted, so no composition can build its own and
@@ -22,16 +23,19 @@ struct AuthenticatedTransport: PayabliTransport {
     /// - Parameter auth: the holder that replaces a refused credential, once.
     /// - Parameter recovery: what counts as a credential refusal; 401 only, by default.
     /// - Parameter logger: the logger, required rather than defaulted, so a caller's substitution reaches it.
+    /// - Parameter onUnrecoverable: told once this layer has finished the session, with the failure that finished it.
     init(
         base: any PayabliTransport,
         auth: PayabliAuth,
         recovery: any AuthRecoveryPolicy = DefaultAuthRecoveryPolicy(),
-        logger: PayabliLogger
+        logger: PayabliLogger,
+        onUnrecoverable: @escaping @Sendable (PayabliGenericError) -> Void = { _ in }
     ) {
         self.base = base
         self.auth = auth
         self.recovery = recovery
         self.logger = logger
+        self.onUnrecoverable = onUnrecoverable
     }
 
     func perform(_ request: PayabliRequest) async throws -> PayabliResponse {
@@ -151,11 +155,17 @@ struct AuthenticatedTransport: PayabliTransport {
     /// - Returns: the failure the caller throws.
     private func finishingTheSession(refusedOn replayed: SentToken) async -> PayabliGenericError {
         let exhausted = recovery.exhausted()
+        let finished: Bool
         if let sent = replayed.value {
-            _ = await auth.finishIfSettled(on: sent, with: exhausted)
+            finished = await auth.finishIfSettled(on: sent, with: exhausted)
         } else {
             // Nothing stamped means the replay carried no bearer, which is not a state to be lenient about.
             await auth.finish(with: exhausted)
+            finished = true
+        }
+        // After the holder has recorded it, so the session is never told of a finish the holder could still undo.
+        if finished {
+            onUnrecoverable(exhausted)
         }
         return exhausted
     }

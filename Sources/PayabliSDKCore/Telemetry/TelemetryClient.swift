@@ -66,6 +66,7 @@ package actor TelemetryClient {
     private var waiting: Task<Void, Never>?
     private var timer: Task<Void, Never>?
     private var watcher: Task<Void, Never>?
+    private var stopped = false
 
     /// - Parameter configuration: the batch and queue sizes and the identifiers every event carries.
     /// - Parameter transport: where batches are sent.
@@ -110,6 +111,14 @@ package actor TelemetryClient {
     }
 
     deinit {
+        timer?.cancel()
+        watcher?.cancel()
+    }
+
+    /// Stops this client scheduling sends of its own: its timer and its background watcher end, and nothing starts
+    /// them again. Called once, when the session it reports for is replaced.
+    package func stop() {
+        stopped = true
         timer?.cancel()
         watcher?.cancel()
     }
@@ -214,7 +223,7 @@ package actor TelemetryClient {
 
     /// Starts the timer and the background watcher, once. Neither holds the client alive.
     private func startIfNeeded() {
-        guard timer == nil else { return }
+        guard timer == nil, !stopped else { return }
         let sleep = sleep
         let interval = configuration.flushInterval
         // The timer asks for a flush rather than sending on its own task, so cancelling it never cancels
