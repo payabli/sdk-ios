@@ -46,25 +46,17 @@ struct AuthenticatedTransport: PayabliTransport {
             try await base.perform(request)
         }
 
-        guard recovery.isCredentialRejection(firstAttempt), !request.isCallerRefusal(firstAttempt) else {
+        guard recovery.isCredentialRejection(firstAttempt) else {
             return firstAttempt
         }
 
+        if await declinesRecovery(of: request, rejectedBy: firstAttempt, carrying: stamped) {
+            return firstAttempt
+        }
+
+        // A 401 is refused before the service acts on a request, so that send ran nothing; the replay marks again.
         if firstAttempt.statusCode == 401 {
             PayabliSendMark.current?.lower()
-        }
-
-        // Above the refresh, which is the half that breaks a pinned credential. The caller renews the token
-        // once the sequence it belongs to has ended.
-        if request.pinsCredential {
-            logger.warning(
-                "recovery declined: the route pins the credential it was sent"
-                    + " (\(request.method.rawValue) \(firstAttempt.statusCode))"
-            )
-            if let sent = stamped.value {
-                await auth.recordPinnedRefusal(of: sent)
-            }
-            return firstAttempt
         }
 
         logger.info(
@@ -118,6 +110,42 @@ struct AuthenticatedTransport: PayabliTransport {
             throw await finishingTheSession(refusedOn: replayed)
         }
         return secondAttempt
+    }
+
+    /// Whether `rejection` goes back to the caller unrecovered: the route pins its credential, or refused the caller
+    /// rather than the credential.
+    ///
+    /// - Parameter request: the request whose route decides.
+    /// - Parameter rejection: the credential rejection its first attempt received.
+    /// - Parameter stamped: the token that attempt carried.
+    /// - Returns: true when no refresh or replay follows.
+    private func declinesRecovery(
+        of request: PayabliRequest,
+        rejectedBy rejection: PayabliResponse,
+        carrying stamped: SentToken
+    ) async -> Bool {
+        // Above the refresh, which is the half that breaks a pinned credential. The caller renews the token
+        // once the sequence it belongs to has ended.
+        if request.pinsCredential {
+            logger.warning(
+                "recovery declined: the route pins the credential it was sent"
+                    + " (\(request.method.rawValue) \(rejection.statusCode))"
+            )
+            if let sent = stamped.value {
+                await auth.recordPinnedRefusal(of: sent)
+            }
+            return true
+        }
+
+        // Before the refresh: a fresh credential would be refused for this caller too.
+        if request.isCallerRefusal(rejection) {
+            logger.warning(
+                "recovery declined: the route refused this caller rather than its credential"
+                    + " (\(request.method.rawValue) \(rejection.statusCode))"
+            )
+            return true
+        }
+        return false
     }
 
     /// Finishes the session on a replay refused in turn, unless its token has moved on or is being replaced: then the

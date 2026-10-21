@@ -113,6 +113,22 @@ final class AuthenticatedTransportTests: XCTestCase {
         XCTAssertTrue(mark.mayHaveLeft)
     }
 
+    func testAPinned401LeavesTheMarkItsSendRaised() async throws {
+        let stub = RecordingStub(status: Self.unauthorized)
+        stub.install()
+        defer { stub.uninstall() }
+
+        let auth = try makeTestAuth(tokenProvider: { "refreshed-token" })
+        let transport = makeAuthenticatedStack(auth: auth)
+        let mark = PayabliSendMark()
+        let pinned = PayabliRequest(method: .get, path: "/api/v2/ping", pinsCredential: true)
+
+        _ = try await PayabliSendMark.$current.withValue(mark) { try await transport.perform(pinned) }
+
+        XCTAssertEqual(stub.count, 1)
+        XCTAssertTrue(mark.mayHaveLeft, "recovery declined, so nothing past the pinned branch touches the mark")
+    }
+
     func testASecond401IsTerminalAndThereIsNoThirdAttempt() async throws {
         let stub = RecordingStub(status: Self.unauthorized)
         stub.install()
