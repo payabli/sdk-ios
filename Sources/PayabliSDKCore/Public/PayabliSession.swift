@@ -41,6 +41,7 @@ public final class PayabliSession: @unchecked Sendable {
     /// A process-wide lock, because the installed session is process-wide.
     private static let lock = NSLock()
     private static var installed: PayabliSession?
+    private static var testTelemetryTransport: (any TelemetryTransport)?
 
     /// Written only by the machine of whichever session `install` installed, so it reads `uninitialized` before any.
     static let sink = SdkStateSink()
@@ -178,7 +179,7 @@ public final class PayabliSession: @unchecked Sendable {
             let session = PayabliSession(
                 config: config,
                 urlSession: urlSession,
-                telemetryTransport: telemetryTransport,
+                telemetryTransport: telemetryTransport ?? testTelemetryTransport,
                 sink: sink
             )
             session.machine.markReady()
@@ -216,11 +217,14 @@ public final class PayabliSession: @unchecked Sendable {
     }
 
     /// Drops the installed session and puts the state back, so one test cannot decide the outcome of the next.
-    static func resetForTesting() {
+    ///
+    /// - Parameter telemetryTransport: what later installs report through, so a test reaches no network; nil restores the default.
+    static func resetForTesting(telemetryTransport: (any TelemetryTransport)? = nil) {
         lock.withLock {
             installed?.machine.finish()
             installed = nil
             sink.value = .uninitialized
+            testTelemetryTransport = telemetryTransport
         }
     }
 }
