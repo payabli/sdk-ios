@@ -166,7 +166,11 @@ extension PayabliTTP {
         } catch is PinnedTokenRefusal {
             logger.info("a device route refused the token: renewing it and running again")
         }
+        // Once after the renewal, so its refusal is reported ahead of the second run, and once at the end, for that
+        // run's own refusal.
+        defer { reports.releaseHeld() }
         do {
+            defer { reports.releaseHeld() }
             _ = try await session.renewRefusedToken()
         } catch {
             landIfAsked(error, landsSecondRefusal)

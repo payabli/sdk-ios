@@ -249,6 +249,18 @@ final class SessionTokenRenewalTests: XCTestCase {
         XCTAssertEqual(failed.properties["outcome"], "failed")
     }
 
+    func testASecondRefusalStillReportsBothAttestationAttempts() async throws {
+        let (ttp, _, attestation, telemetry) = try makeTTP()
+        attestation.attestFailuresFirst = [PinnedTokenRefusal(), PinnedTokenRefusal()]
+
+        _ = await failure { try await ttp.initialize() }
+        await ttp.reports.sent()
+        await ttp.session.telemetry.flush()
+
+        let names = await telemetry.batches.flatMap { $0 }.map(\.event)
+        XCTAssertEqual(names.filter { $0 == "ttp.attestation.failed" }.count, 2, "\(names)")
+    }
+
     // MARK: - Fixtures
 
     private func makeTTP(

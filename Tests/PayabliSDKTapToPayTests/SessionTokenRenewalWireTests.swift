@@ -44,16 +44,45 @@ final class SessionTokenRenewalWireTests: XCTestCase {
         XCTAssertEqual(tokens.count, 2, "one renewal")
     }
 
+    /// The held refusal can be the event that fills a batch, which sends it at once. It is held until the renewal has
+    /// run, so that send carries the renewed token and not the one being replaced.
+    func testARenewableRefusalThatFillsTheBatchLeavesUnderTheRenewedToken() async throws {
+        let wire = Wire(refusingOnce: "attest")
+        StubURLProtocol.handler = wire.handle
+        let renewal = RenewalGate()
+        let (ttp, _) = try makeTTP(telemetryEnabled: true, renewal: renewal)
+        // Three short of a batch: the start, the attempt and its refusal make twenty.
+        for _ in 0 ..< 17 {
+            await ttp.session.telemetry.emit("test.filler")
+        }
+
+        let setup = Task { try await ttp.initialize() }
+        await renewal.waitUntilAsked()
+        await ttp.reports.sent()
+        XCTAssertEqual(wire.bearers(for: "telemetry"), [], "a batch was sent while the token was being replaced")
+        renewal.release()
+        try await setup.value
+        await ttp.reports.sent()
+
+        XCTAssertEqual(wire.bearers(for: "telemetry").first, "renewed-2")
+    }
+
     // MARK: - Fixtures
 
     /// A facade whose attestation service runs on the facade's own session, so a refusal is recorded where the
     /// renewal reads it.
-    private func makeTTP() throws -> (PayabliTTP, Tokens) {
+    private func makeTTP(
+        telemetryEnabled: Bool = false,
+        renewal: RenewalGate? = nil
+    ) throws -> (PayabliTTP, Tokens) {
         let tokens = Tokens()
         let config = try PayabliConfig(entryPoint: "myEntry", environment: .sandbox, tokenProvider: {
             let call = tokens.next()
+            if call > 1 {
+                await renewal?.ask()
+            }
             return call == 1 ? "seed" : "renewed-\(call)"
-        }, telemetryEnabled: false)
+        }, telemetryEnabled: telemetryEnabled)
         let session = PayabliSession(config: config, urlSession: StubURLProtocol.makeSession())
         let attestation = AppAttestService(
             transport: session.transport,
@@ -91,6 +120,51 @@ private final class Tokens: @unchecked Sendable {
     }
 }
 
+/// Holds the provider's renewal open until the test releases it, and says when it has been asked.
+private final class RenewalGate: @unchecked Sendable {
+    private let lock = NSLock()
+    private var asked = false
+    private var released = false
+    private var waiting: CheckedContinuation<Void, Never>?
+
+    func ask() async {
+        await withCheckedContinuation { continuation in
+            let resumeNow: Bool = lock.withLock {
+                asked = true
+                if released {
+                    return true
+                }
+                waiting = continuation
+                return false
+            }
+            if resumeNow {
+                continuation.resume()
+            }
+        }
+    }
+
+    func release() {
+        let continuation: CheckedContinuation<Void, Never>? = lock.withLock {
+            released = true
+            defer { waiting = nil }
+            return waiting
+        }
+        continuation?.resume()
+    }
+
+    /// Polled under a ceiling, so a renewal that never starts fails the test rather than hanging the suite.
+    func waitUntilAsked(file: StaticString = #filePath, line: UInt = #line) async {
+        for _ in 0 ..< 300 {
+            if lock.withLock({ asked }) {
+                return
+            }
+            try? await Task.sleep(nanoseconds: 10_000_000)
+        }
+        release()
+        XCTFail("the renewal was never asked for", file: file, line: line)
+    }
+}
+
 /// Every device route answering as the service does, with one route refusing its first request with a bare 401.
 private final class Wire: @unchecked Sendable {
     private let lock = NSLock()
@@ -111,7 +185,8 @@ private final class Wire: @unchecked Sendable {
 
     func handle(_ request: URLRequest) throws -> (HTTPURLResponse, Data) {
         let path = request.url?.path ?? ""
-        let route = path.replacingOccurrences(of: "/api/v2/device/taptopay/", with: "").components(separatedBy: "/")[0]
+        let route = path.hasSuffix(TelemetryEndpointTransport.defaultPath) ? "telemetry"
+            : path.replacingOccurrences(of: "/api/v2/device/taptopay/", with: "").components(separatedBy: "/")[0]
         let bearer = request.value(forHTTPHeaderField: "Authorization")?.replacingOccurrences(of: "Bearer ", with: "")
         let refuses: Bool = lock.withLock {
             seen[route, default: []].append(bearer ?? "")

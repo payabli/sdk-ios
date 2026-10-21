@@ -44,11 +44,15 @@ final class TapToPayReportsTests: XCTestCase {
 
         ttp.reports.attestationFailed(PinnedTokenRefusal(), after: .zero)
         await ttp.reports.sent()
+        let whileHeld = await ttp.session.telemetry.bufferedCount
+        ttp.reports.releaseHeld()
+        await ttp.reports.sent()
 
-        let sent = await transport.batches
-        XCTAssertTrue(sent.isEmpty, "a send forced now would carry the token being renewed")
+        XCTAssertEqual(whileHeld, 0, "held until the renewal, so no batch it fills can carry the token being renewed")
         let buffered = await ttp.session.telemetry.bufferedCount
-        XCTAssertEqual(buffered, 1)
+        XCTAssertEqual(buffered, 1, "released into the batch")
+        let sent = await transport.batches
+        XCTAssertTrue(sent.isEmpty, "and not sent at once")
     }
 
     func testAnyOtherAttestationFailureIsSentAtOnce() async throws {
