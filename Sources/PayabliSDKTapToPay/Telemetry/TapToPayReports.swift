@@ -29,7 +29,6 @@ final class TapToPayReports {
     /// Reports a run that ended without a reader, by what the host is told and never by its text.
     ///
     /// A dismissed setup sheet is a cancel and a setup waiting on a person is pending, neither a failure.
-    /// A cancel or a failure is sent at once; a pending setup waits for the batch.
     ///
     /// - Parameter error: what the run threw, before it was translated for the host.
     /// - Parameter duration: how long the run took.
@@ -38,18 +37,15 @@ final class TapToPayReports {
         let told = TapToPayErrorTranslation.hostError(for: error) as? TapToPayError
         var properties = ["duration_ms": Self.milliseconds(duration)]
         let name: String
-        var sendsAtOnce = true
         switch told?.type {
         case .userCancelled:
             name = TelemetryEventName.ttpInitializeCancelled
         case .devicePendingActivation:
             name = TelemetryEventName.ttpInitializePending
             properties["state"] = "pending_activation"
-            sendsAtOnce = false
         case .termsNotAccepted:
             name = TelemetryEventName.ttpInitializePending
             properties["state"] = "pending_terms"
-            sendsAtOnce = false
         default:
             name = TelemetryEventName.ttpInitializeFailed
             properties["outcome"] = "failed"
@@ -57,12 +53,7 @@ final class TapToPayReports {
                 properties["error_number"] = String(told.code)
             }
         }
-        enqueue { [properties, sendsAtOnce] telemetry in
-            await telemetry.emit(name, properties: properties, occurredAt: now)
-            if sendsAtOnce {
-                await telemetry.flush()
-            }
-        }
+        enqueue { [properties] in await $0.emit(name, properties: properties, occurredAt: now) }
     }
 
     func attestationStarted() {
@@ -90,13 +81,17 @@ final class TapToPayReports {
         }
         guard !(error is PinnedTokenRefusal) else {
             held.append { [properties] in
-                await $0.emit(TelemetryEventName.ttpAttestationFailed, properties: properties, occurredAt: now)
+                await $0.emit(
+                    TelemetryEventName.ttpAttestationFailed,
+                    properties: properties,
+                    occurredAt: now,
+                    waitsForBatch: true
+                )
             }
             return
         }
-        enqueue { [properties] telemetry in
-            await telemetry.emit(TelemetryEventName.ttpAttestationFailed, properties: properties, occurredAt: now)
-            await telemetry.flush()
+        enqueue { [properties] in
+            await $0.emit(TelemetryEventName.ttpAttestationFailed, properties: properties, occurredAt: now)
         }
     }
 
@@ -109,9 +104,10 @@ final class TapToPayReports {
         }
     }
 
-    /// Waits until every report made so far has reached the client.
+    /// Waits until every report made so far has reached the client, and every send it started has ended.
     func sent() async {
         await tail?.value
+        await telemetry.settled()
     }
 
     private func enqueue(_ report: @escaping @Sendable (TelemetryClient) async -> Void) {

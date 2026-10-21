@@ -68,7 +68,8 @@ final class PayabliPayInInstalledSessionTests: XCTestCase {
     }
 
     func testObjectiveCEntryPointRefusesADifferentConfiguration() async throws {
-        try await PayabliSession.initialize(config: makeConfig(entryPoint: "demo"))
+        // Installed with a test transport, because the refusal reports at once.
+        _ = try PayabliSession.install(config: makeConfig(entryPoint: "demo"), telemetryTransport: DiscardingTelemetryTransport())
 
         do {
             try await PayabliSessionObjC.initialize(

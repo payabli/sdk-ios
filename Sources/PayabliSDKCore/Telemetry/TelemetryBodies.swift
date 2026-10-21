@@ -1,15 +1,18 @@
 import Foundation
 
-/// The body the telemetry route reads: the batch's entry point and its events.
+/// The body the telemetry route reads: the batch's entry point, its events, and what the queue evicted.
 package struct TelemetryBatchBody: Encodable, Sendable {
     package let entry: String
     package let events: [TelemetryEventBody]
+    package let droppedSinceLastSend: Int?
 
     /// - Parameter entry: the entry point every event in the batch was reported under.
     /// - Parameter events: the events, each already carrying the device facts.
-    package init(entry: String, events: [TelemetryEventBody]) {
+    /// - Parameter droppedSinceLastSend: the eviction count, left out of the JSON when nothing was evicted.
+    package init(entry: String, events: [TelemetryEventBody], droppedSinceLastSend: Int) {
         self.entry = entry
         self.events = events
+        self.droppedSinceLastSend = droppedSinceLastSend > 0 ? droppedSinceLastSend : nil
     }
 }
 

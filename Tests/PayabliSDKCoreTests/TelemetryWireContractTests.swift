@@ -24,7 +24,7 @@ final class TelemetryWireContractTests: XCTestCase {
                 properties: ["outcome": "approved"],
                 timestamp: Date(timeIntervalSince1970: 1_755_000_000)
             )
-        ])
+        ], droppedSinceLastSend: 0)
 
         let expected = """
         {"entry":"an-entry-point","events":[{"schemaVersion":"1","sdkVersion":"0.1.0",\
@@ -45,7 +45,7 @@ final class TelemetryWireContractTests: XCTestCase {
 
         await makeTransport(facts: facts).send([
             event(timestamp: Date(timeIntervalSince1970: 1_755_000_000.25))
-        ])
+        ], droppedSinceLastSend: 0)
 
         let sent = try XCTUnwrap(try firstEvent(stub.requests.first?.httpBody))
         XCTAssertEqual(sent["timestamp"] as? String, "2025-08-12T12:00:00.250Z")
@@ -63,7 +63,7 @@ final class TelemetryWireContractTests: XCTestCase {
             packageName: nil
         )
 
-        await makeTransport(facts: partial).send([event(properties: ["outcome": "failed"])])
+        await makeTransport(facts: partial).send([event(properties: ["outcome": "failed"])], droppedSinceLastSend: 0)
 
         let sent = try XCTUnwrap(try firstEvent(stub.requests.first?.httpBody))
         XCTAssertNil(sent["deviceType"])
@@ -106,8 +106,8 @@ final class TelemetryWireContractTests: XCTestCase {
         let sink = RecordingLogSink()
         let subject = makeTransport(facts: facts, sink: sink)
 
-        await subject.send([event()])
-        await subject.send([event()])
+        await subject.send([event()], droppedSinceLastSend: 0)
+        await subject.send([event()], droppedSinceLastSend: 0)
 
         XCTAssertEqual(stub.count, 2, "each batch is sent once and none is retried")
         let refusals = sink.records.filter { $0.message.contains("telemetry_batch_refused") }
@@ -121,9 +121,42 @@ final class TelemetryWireContractTests: XCTestCase {
         defer { stub.uninstall() }
         let sink = RecordingLogSink()
 
-        await makeTransport(facts: facts, sink: sink).send([event()])
+        let accepted = await makeTransport(facts: facts, sink: sink).send([event()], droppedSinceLastSend: 0)
 
+        XCTAssertTrue(accepted)
         XCTAssertTrue(sink.records.filter { $0.message.contains("telemetry_batch_refused") }.isEmpty)
+    }
+
+    func testARefusedBatchAnswersThatItWasRefused() async {
+        let stub = RecordingStub(status: 401)
+        stub.install()
+        defer { stub.uninstall() }
+
+        let accepted = await makeTransport(facts: facts).send([event()], droppedSinceLastSend: 0)
+
+        XCTAssertFalse(accepted)
+    }
+
+    func testTheEvictionCountRidesTheBatch() async throws {
+        let stub = RecordingStub(status: 202)
+        stub.install()
+        defer { stub.uninstall() }
+
+        await makeTransport(facts: facts).send([event()], droppedSinceLastSend: 3)
+
+        let body = try XCTUnwrap(try json(stub.requests.first?.httpBody) as? [String: Any])
+        XCTAssertEqual(body["droppedSinceLastSend"] as? Int, 3)
+    }
+
+    func testABatchThatLostNothingHasNoEvictionCount() async throws {
+        let stub = RecordingStub(status: 202)
+        stub.install()
+        defer { stub.uninstall() }
+
+        await makeTransport(facts: facts).send([event()], droppedSinceLastSend: 0)
+
+        let body = try XCTUnwrap(try json(stub.requests.first?.httpBody) as? [String: Any])
+        XCTAssertNil(body["droppedSinceLastSend"])
     }
 
     func testALinkageLookupAnswersByClassName() {

@@ -253,7 +253,7 @@ final class PayInPaymentFlowClientTests: XCTestCase {
                 )
             }
         )
-        let component = PayabliPayIn(session: PayabliSession(config: config))
+        let component = PayabliPayIn(session: PayabliSession(config: config, telemetryTransport: DiscardingTelemetryTransport()))
 
         do {
             _ = try await component.capture(cardRequest())

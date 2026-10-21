@@ -42,22 +42,26 @@ package actor TelemetryEndpointTransport: TelemetryTransport {
         self.logger = logger
     }
 
-    package func send(_ batch: [TelemetryEvent]) async {
-        guard let entry = batch.first?.entry else { return }
+    @discardableResult
+    package func send(_ batch: [TelemetryEvent], droppedSinceLastSend: Int) async -> Bool {
+        guard let entry = batch.first?.entry else { return true }
         let body = TelemetryBatchBody(
             entry: entry,
-            events: batch.map { TelemetryEventBody($0, facts: deviceFacts) }
+            events: batch.map { TelemetryEventBody($0, facts: deviceFacts) },
+            droppedSinceLastSend: droppedSinceLastSend
         )
         do {
             let response = try await transport.perform(
                 PayabliRequest.json(method: .post, path: path, jsonBody: body, pinsCredential: true)
             )
-            if !(200 ..< 300).contains(response.statusCode) {
+            guard (200 ..< 300).contains(response.statusCode) else {
                 logger.warning("telemetry_batch_refused status=\(response.statusCode)")
+                return false
             }
+            return true
         } catch {
-            // Best-effort: a failed send is swallowed.
             logger.warning("Telemetry batch send failed (best-effort)")
+            return false
         }
     }
 }

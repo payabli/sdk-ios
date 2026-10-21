@@ -18,7 +18,7 @@ final class TelemetryEndpointTransportTests: XCTestCase {
         )
         let subject = TelemetryEndpointTransport(transport: service)
 
-        await subject.send([event()])
+        await subject.send([event()], droppedSinceLastSend: 0)
 
         XCTAssertEqual(stub.count, 1)
         XCTAssertEqual(stub.sentTokens, ["telemetry-token"])
@@ -45,7 +45,7 @@ final class TelemetryEndpointTransportTests: XCTestCase {
             session: StubURLProtocol.makeSession()
         )
 
-        await TelemetryEndpointTransport(transport: service).send([])
+        await TelemetryEndpointTransport(transport: service).send([], droppedSinceLastSend: 0)
 
         XCTAssertEqual(stub.count, 0)
     }
@@ -63,7 +63,7 @@ final class TelemetryEndpointTransportTests: XCTestCase {
             session: StubURLProtocol.makeSession()
         )
 
-        await TelemetryEndpointTransport(transport: service).send([event()])
+        await TelemetryEndpointTransport(transport: service).send([event()], droppedSinceLastSend: 0)
 
         XCTAssertEqual(stub.count, 1, "it was attempted and not retried")
     }
@@ -83,7 +83,7 @@ final class TelemetryEndpointTransportTests: XCTestCase {
             session: StubURLProtocol.makeSession()
         )
 
-        await TelemetryEndpointTransport(transport: service).send([event()])
+        await TelemetryEndpointTransport(transport: service).send([event()], droppedSinceLastSend: 0)
 
         XCTAssertEqual(stub.count, 0)
     }
