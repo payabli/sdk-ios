@@ -107,7 +107,13 @@ final class PayabliErrorCatalogTests: XCTestCase {
             .configuration,
             "Card-present payments are not enabled for this paypoint."
         ),
-        (.readerDeviceRefused, "READER_DEVICE_REFUSED", 3015, .device, "The card reader refused this device."),
+        (
+            .readerDeviceRefused,
+            "READER_DEVICE_REFUSED",
+            3015,
+            .device,
+            "This device is not set up for Tap to Pay with this app. Contact Payabli support with the device ID."
+        ),
         (.readerUnavailable, "READER_UNAVAILABLE", 3016, .retryLater, "The card reader could not be started."),
         (.readerSessionExpired, "READER_SESSION_EXPIRED", 3017, .retryLater, "The card reader session expired."),
         (.tapNotCompleted, "TAP_NOT_COMPLETED", 3018, .outcomeUnknown, "The card read did not complete."),
