@@ -49,8 +49,10 @@ public final class PayabliTTP: NSObject, ObservableObject {
     let retryPolicy: RetryPolicy
     let logger = PayabliLogger(category: .taptopay)
 
-    // Networking
+    /// Networking
     let session: PayabliSession
+
+    let isLive: @Sendable () -> Bool
     let reports: TapToPayReports
     let transactionClient: TTPTransactionClient
     let configClient: TTPConfigClient
@@ -120,12 +122,15 @@ public final class PayabliTTP: NSObject, ObservableObject {
     ///   - provider: the card reader the charges read through.
     ///   - attestation: the service that holds the device's binding and signs requests.
     ///   - retryPolicy: the retry policy the charge's update runs under.
+    ///   - isLive: whether `session` is still the installed one; this terminal stops arming the reader once it is not.
     package init(
         session: PayabliSession,
         provider: TapToPayProvider,
         attestation: DeviceAttestationService,
-        retryPolicy: RetryPolicy = .default
+        retryPolicy: RetryPolicy = .default,
+        isLive: (@Sendable () -> Bool)? = nil
     ) {
+        self.isLive = isLive ?? { session.isLive }
         self.entryPoint = session.config.entryPoint
         self.environment = session.config.environment
         self.provider = provider

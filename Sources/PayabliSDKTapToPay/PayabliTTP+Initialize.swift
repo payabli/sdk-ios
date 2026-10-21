@@ -53,6 +53,7 @@ extension PayabliTTP {
 
     /// Runs once per setup, by its owner: a caller that joins it adds no report.
     private func runInitialize() async throws {
+        try requireLiveSession()
         let clock = ContinuousClock()
         let start = clock.now
         reports.initializeStarted()
@@ -121,6 +122,7 @@ extension PayabliTTP {
     }
 
     func runReinitializeIfNeeded() async throws {
+        try requireLiveSession()
         switch sessionState {
         case .ready:
             return
@@ -300,6 +302,8 @@ extension PayabliTTP {
     ///
     /// - Parameter credentials: the `providerCredentials` dict `/config` answered with, opaque to the facade.
     private func runConfigurePhase(credentials: [String: String]) throws {
+        // Again here, because a replacement can land while the run attests.
+        try requireLiveSession()
         do {
             try provider.configure(credentials: credentials)
         } catch {
@@ -379,6 +383,22 @@ extension PayabliTTP {
 
     func markError(_ error: Error) {
         sessionManager.markError(error, registration: storedRegistration())
+    }
+
+    /// Refuses to go on for a terminal whose session was replaced or ended, before the reader is touched, and lands
+    /// the terminal on `.failed(reason: .sessionEnded)`.
+    ///
+    /// - Throws: `sessionNotInitialized` once this terminal's session is no longer the installed one.
+    func requireLiveSession() throws {
+        guard !isLive() else { return }
+        let refusal = TapToPayError(
+            type: .sessionNotInitialized,
+            reason: "the session this was created with was replaced or ended; create a new one",
+            detail: nil
+        )
+        markError(refusal)
+        syncPublished()
+        throw refusal
     }
 
     private func storedRegistration() -> StoredRegistration {

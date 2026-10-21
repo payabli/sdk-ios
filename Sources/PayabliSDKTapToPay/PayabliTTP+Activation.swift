@@ -22,6 +22,7 @@ public extension PayabliTTP {
     }
 
     private func runActivateDevice(activationCode: String) async throws {
+        try requireLiveSession()
         guard case let .pendingActivation(activationId) = sessionState else {
             throw TapToPayError(type: .deviceNotPending, reason: PayabliErrorType.deviceNotPending.message, detail: nil)
         }
