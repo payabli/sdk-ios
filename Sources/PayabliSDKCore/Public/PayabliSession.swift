@@ -64,18 +64,18 @@ public final class PayabliSession: @unchecked Sendable {
             ),
             session: urlSession
         )
-        self.transport = AuthenticatedTransport(
+        let transport = AuthenticatedTransport(
             base: service,
             auth: auth,
             logger: PayabliLogger(category: .network)
         )
-        // The bare service, so a refused batch never reaches the recovery layer above.
+        self.transport = transport
         telemetry = TelemetryClient(
             configuration: TelemetryClient.Configuration(
                 entry: config.entryPoint,
                 environment: config.environment.name
             ),
-            transport: telemetryTransport ?? TelemetryEndpointTransport(transport: service)
+            transport: telemetryTransport ?? TelemetryEndpointTransport(transport: transport)
         )
     }
 

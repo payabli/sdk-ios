@@ -88,6 +88,47 @@ final class TelemetryEndpointTransportTests: XCTestCase {
         XCTAssertEqual(stub.count, 0)
     }
 
+    func testAFinishedSessionSendsNoBatch() async throws {
+        let stub = RecordingStub(status: 401)
+        stub.install()
+        defer { stub.uninstall() }
+        let calls = Counter()
+        let session = try makeSession(tokenProvider: { await "refused-token-\(calls.increment())" })
+        _ = try? await session.transport.perform(PayabliRequest(method: .get, path: "/api/v2/ping"))
+        XCTAssertNotNil(session.auth.terminalFailure, "a refused replay finished the session")
+        let sentBefore = stub.count
+
+        await session.telemetry.emit("sdk_initialized")
+        await session.telemetry.flush()
+
+        XCTAssertEqual(stub.count, sentBefore, "the batch never left")
+    }
+
+    func testARefusedBatchNeitherRefreshesNorReplaysNorFinishesTheSession() async throws {
+        let stub = RecordingStub(status: 401)
+        stub.install()
+        defer { stub.uninstall() }
+        let provider = Counter()
+        let session = try makeSession(tokenProvider: {
+            _ = await provider.increment()
+            return "telemetry-token"
+        })
+
+        await session.telemetry.emit("sdk_initialized")
+        await session.telemetry.flush()
+
+        XCTAssertEqual(stub.count, 1, "no replay")
+        let calls = await provider.count
+        XCTAssertEqual(calls, 1, "the first token only, no refresh")
+        XCTAssertNil(session.auth.terminalFailure)
+    }
+
+    /// A session built the way a host's is, so its batches take the production route.
+    private func makeSession(tokenProvider: @escaping PayabliTokenRefresh) throws -> PayabliSession {
+        let config = try PayabliConfig(entryPoint: "entry", environment: .sandbox, tokenProvider: tokenProvider)
+        return PayabliSession(config: config, urlSession: StubURLProtocol.makeSession())
+    }
+
     private func event() -> TelemetryEvent {
         TelemetryEvent(
             sdkVersion: "0.1.0",

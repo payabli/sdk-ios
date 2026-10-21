@@ -6,20 +6,19 @@ import Foundation
 package actor TelemetryEndpointTransport: TelemetryTransport {
     package static let defaultPath = "/api/v2/telemetry/sdk"
 
-    private let transport: PayabliService
+    private let transport: any PayabliTransport
     private let path: String
     private let deviceFacts: TelemetryDeviceFacts
     private let logger: PayabliLogger
 
-    /// Takes the service rather than any transport, so the recovery layer cannot be wrapped around it.
-    /// A telemetry 401 would otherwise spend the session's refresh and replay the batch, which is the
-    /// opposite of the contract above.
+    /// Every batch pins its credential, so a telemetry 401 neither spends the session's refresh nor replays
+    /// the batch, and a finished session refuses it before it is sent.
     ///
-    /// - Parameter transport: the service to post through, taken bare so the recovery layer cannot wrap it.
+    /// - Parameter transport: the session's transport, so a batch takes the same path as every other route.
     /// - Parameter path: the route the batch is posted to.
     /// - Parameter deviceFacts: the device facts each event carries.
     package init(
-        transport: PayabliService,
+        transport: any PayabliTransport,
         path: String = TelemetryEndpointTransport.defaultPath,
         deviceFacts: TelemetryDeviceFacts = .current()
     ) {
@@ -32,7 +31,7 @@ package actor TelemetryEndpointTransport: TelemetryTransport {
     }
 
     init(
-        transport: PayabliService,
+        transport: any PayabliTransport,
         path: String = TelemetryEndpointTransport.defaultPath,
         deviceFacts: TelemetryDeviceFacts,
         logger: PayabliLogger
@@ -51,7 +50,7 @@ package actor TelemetryEndpointTransport: TelemetryTransport {
         )
         do {
             let response = try await transport.perform(
-                PayabliRequest.json(method: .post, path: path, jsonBody: body)
+                PayabliRequest.json(method: .post, path: path, jsonBody: body, pinsCredential: true)
             )
             if !(200 ..< 300).contains(response.statusCode) {
                 logger.warning("telemetry_batch_refused status=\(response.statusCode)")
