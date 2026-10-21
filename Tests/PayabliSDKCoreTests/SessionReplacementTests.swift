@@ -36,8 +36,8 @@ final class SessionReplacementTests: XCTestCase {
 
         // A request resuming under the replaced session discovers its finish, or tries to revive it.
         replaced.markReinitializeRequired()
+        XCTAssertEqual(sink.value, .ready)
         replaced.markReady()
-
         XCTAssertEqual(sink.value, .ready)
     }
 
