@@ -159,6 +159,12 @@ extension AppAttestService {
 
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
+        if let (_, reason) = PayabliEnvelope.declineOutcome(from: response.body, decoder: decoder),
+           let unregistered = AppRegistrationRefusals.hostError(status: response.statusCode, reason: reason)
+        {
+            logger.error("[\(label)] refused: the app is not registered on the paypoint")
+            throw unregistered
+        }
         // Only the statuses a refusal is sent with. Every other status keeps the transport's own
         // classification, a rate limit's wait among them.
         if readsRefusalBeforeStatus, [400, 403, 404].contains(response.statusCode),
