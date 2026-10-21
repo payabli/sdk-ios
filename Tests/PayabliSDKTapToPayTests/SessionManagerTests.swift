@@ -9,6 +9,13 @@ final class SessionManagerTests: XCTestCase {
         XCTAssertFalse(sm.isReady)
     }
 
+    func testAnActivationSetupDescribesItselfWithoutItsCode() {
+        let kind = SessionSetupKind.activate(code: "798916")
+        XCTAssertFalse("\(kind)".contains("798916"))
+        XCTAssertFalse(String(reflecting: kind).contains("798916"))
+        XCTAssertNotEqual(kind, .activate(code: "000000"))
+    }
+
     // MARK: - Valid transitions
 
     func testColdPathTransitions() {
