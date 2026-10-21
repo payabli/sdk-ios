@@ -251,6 +251,36 @@ final class PayabliTTPActivationIdTests: XCTestCase {
         XCTAssertEqual(ttp.sessionState, .idle)
     }
 
+    /// A code tapped again after a different one was queued still joins its own run in flight, so it is not
+    /// sent twice.
+    func testACodeRepeatedAfterAnotherJoinsItsOwnRun() async throws {
+        let (ttp, attestation, gate) = try await makePendingTTPHeldAtActivation()
+        let wrong = ActivationRefusals.refusal(resultCode: 400, reason: "Invalid activation code.")
+        attestation.activationResultsByCode = ["111111": .failure(wrong), "222222": .failure(wrong)]
+
+        let first = Task { try await ttp.activateDevice(activationCode: "111111") }
+        await gate.waitUntilHeld()
+        let second = Task { try await ttp.activateDevice(activationCode: "222222") }
+        for _ in 0 ..< 20 {
+            await Task.yield()
+        }
+        let repeated = Task { try await ttp.activateDevice(activationCode: "111111") }
+        for _ in 0 ..< 20 {
+            await Task.yield()
+        }
+        await gate.release()
+
+        for call in [first, second, repeated] {
+            do {
+                try await call.value
+                XCTFail("a wrong code was accepted")
+            } catch let error as TapToPayError {
+                XCTAssertEqual(error.type, .activationCodeIncorrect)
+            }
+        }
+        XCTAssertEqual(attestation.activationCodes, ["111111", "222222"])
+    }
+
     /// Once the first code activates the device, a different code waiting behind it is refused without
     /// being sent.
     func testADifferentCodeAfterAnActivationIsNotPendingAndSendsNothing() async throws {
