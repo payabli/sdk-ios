@@ -99,7 +99,7 @@ final class TapToPayReportsTests: XCTestCase {
         try await assertOneReportedFailure(ttp, transport, "config fetch")
     }
 
-    func testADismissedSetupSheetReportsACancelSentAtOnceAndNoFailure() async throws {
+    func testADismissedSetupSheetReportsACancelInTheNextBatchAndNoFailure() async throws {
         let (ttp, provider, _, transport) = try makeTTP()
         provider.prepareReaderResult = .failure(PayabliTTPError.readerSetupFailed(
             reason: "\(PayabliTTPError.cancellationReasonPrefix) \(Self.sentinel)"
@@ -107,11 +107,14 @@ final class TapToPayReportsTests: XCTestCase {
 
         try await initializeToItsEnd(ttp, expecting: .userCancelled)
         await ttp.reports.sent()
+        let beforeTheBatch = await sent(transport).map(\.event)
+        XCTAssertFalse(beforeTheBatch.contains("ttp.initialize.cancelled"), "a choice waits for the batch")
+        await ttp.session.telemetry.flush()
 
         let events = await sent(transport)
         XCTAssertFalse(events.contains { $0.event == "ttp.initialize.failed" }, "\(events.map(\.event))")
         let cancelled = events.filter { $0.event == "ttp.initialize.cancelled" }
-        XCTAssertEqual(cancelled.count, 1, "sent at once, and once")
+        XCTAssertEqual(cancelled.count, 1)
         XCTAssertEqual(cancelled.first.map { Set($0.properties.keys) }, ["duration_ms"])
         XCTAssertNotNil(Int(cancelled.first?.properties["duration_ms"] ?? ""))
     }
@@ -182,7 +185,9 @@ final class TapToPayReportsTests: XCTestCase {
         let transport = HeldTelemetryTransport()
         let client = TelemetryClient(
             configuration: .init(entry: "e", environment: "sandbox"),
-            transport: transport
+            transport: transport,
+            sleep: ManualTelemetryClock().sleep,
+            lifecycle: ManualAppLifecycle()
         )
         let reports = TapToPayReports(telemetry: client)
 
@@ -304,14 +309,15 @@ private actor HeldTelemetryTransport: TelemetryTransport {
     private var heldWaiters: [CheckedContinuation<Void, Never>] = []
     private var released = false
 
-    func send(_ batch: [TelemetryEvent]) async {
+    func send(_ batch: [TelemetryEvent], droppedSinceLastSend: Int) async -> Bool {
         sent += batch
-        guard !released else { return }
+        guard !released else { return true }
         await withCheckedContinuation { continuation in
             held = continuation
             heldWaiters.forEach { $0.resume() }
             heldWaiters.removeAll()
         }
+        return true
     }
 
     func waitUntilHeld() async {
