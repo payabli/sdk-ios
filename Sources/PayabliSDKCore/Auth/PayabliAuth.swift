@@ -115,9 +115,6 @@ actor PayabliAuth {
 
     /// The token held right now, without minting one.
     ///
-    /// For the recovery path, which needs to name what was sent rather than obtain something to
-    /// send. Minting here would name a credential no request carried.
-    ///
     /// - Returns: the token held right now, or `nil` when none is held.
     func heldToken() -> String? {
         currentToken

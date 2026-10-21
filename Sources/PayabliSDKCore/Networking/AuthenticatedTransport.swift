@@ -64,20 +64,15 @@ struct AuthenticatedTransport: PayabliTransport {
                 + " (\(request.method.rawValue) \(firstAttempt.statusCode))"
         )
 
-        // The token the chain stamped, falling back to the one held for a chain that stamped
-        // nothing. Held rather than minted: a token obtained here would name a credential that no
-        // request carried, and holding none means there is nothing to replace.
-        let sentOrHeld: String? = if let sent = stamped.value {
-            sent
-        } else {
-            await auth.heldToken()
-        }
-        guard let rejected = sentOrHeld else {
-            logger.warning("credential rejected, and none was sent: nothing to recover")
-            return firstAttempt
-        }
+        // The token the chain stamped, not one read earlier: a rotation between the two reads would make them
+        // disagree, and reporting the earlier one replays the credential just refused.
         _ = try await PayabliSendMark.$current.withValue(nil) {
-            try await auth.invalidateAndRefresh(rejectedToken: rejected)
+            let rejected = if let sent = stamped.value {
+                sent
+            } else {
+                try await auth.currentAccessToken()
+            }
+            return try await auth.invalidateAndRefresh(rejectedToken: rejected)
         }
 
         // Asked here rather than inside the holder, because a refresh answers from several places: a
