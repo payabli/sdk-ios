@@ -35,30 +35,28 @@ struct AuthenticatedTransport: PayabliTransport {
     }
 
     func perform(_ request: PayabliRequest) async throws -> PayabliResponse {
+        // Fails without a round trip once the holder is finished. The holder refuses a new mint on its own,
+        // so this saves a send rather than guarding one.
+        if let failure = auth.terminalFailure {
+            throw failure
+        }
+
         let stamped = SentToken()
         let firstAttempt = try await SentToken.$current.withValue(stamped) {
             try await base.perform(request)
         }
 
-        guard recovery.isCredentialRejection(firstAttempt), !request.isCallerRefusal(firstAttempt) else {
+        guard recovery.isCredentialRejection(firstAttempt) else {
             return firstAttempt
         }
 
+        if await declinesRecovery(of: request, rejectedBy: firstAttempt, carrying: stamped) {
+            return firstAttempt
+        }
+
+        // A 401 is refused before the service acts on a request, so that send ran nothing; the replay marks again.
         if firstAttempt.statusCode == 401 {
             PayabliSendMark.current?.lower()
-        }
-
-        // Above the refresh, which is the half that breaks a pinned credential. The caller renews the token
-        // once the sequence it belongs to has ended.
-        if request.pinsCredential {
-            logger.warning(
-                "recovery declined: the route pins the credential it was sent"
-                    + " (\(request.method.rawValue) \(firstAttempt.statusCode))"
-            )
-            if let sent = stamped.value {
-                await auth.recordPinnedRefusal(of: sent)
-            }
-            return firstAttempt
         }
 
         logger.info(
@@ -66,20 +64,15 @@ struct AuthenticatedTransport: PayabliTransport {
                 + " (\(request.method.rawValue) \(firstAttempt.statusCode))"
         )
 
-        // The token the chain stamped, falling back to the one held for a chain that stamped
-        // nothing. Held rather than minted: a token obtained here would name a credential that no
-        // request carried, and holding none means there is nothing to replace.
-        let sentOrHeld: String? = if let sent = stamped.value {
-            sent
-        } else {
-            await auth.heldToken()
-        }
-        guard let rejected = sentOrHeld else {
-            logger.warning("credential rejected, and none was sent: nothing to recover")
-            return firstAttempt
-        }
+        // The token the chain stamped, not one read earlier: a rotation between the two reads would make them
+        // disagree, and reporting the earlier one replays the credential just refused.
         _ = try await PayabliSendMark.$current.withValue(nil) {
-            try await auth.invalidateAndRefresh(rejectedToken: rejected)
+            let rejected = if let sent = stamped.value {
+                sent
+            } else {
+                try await auth.currentAccessToken()
+            }
+            return try await auth.invalidateAndRefresh(rejectedToken: rejected)
         }
 
         // Asked here rather than inside the holder, because a refresh answers from several places: a
@@ -109,9 +102,62 @@ struct AuthenticatedTransport: PayabliTransport {
                 "recovery exhausted: the replay was refused too"
                     + " (\(request.method.rawValue) \(secondAttempt.statusCode))"
             )
-            throw recovery.exhausted()
+            throw await finishingTheSession(refusedOn: replayed)
         }
         return secondAttempt
+    }
+
+    /// Whether `rejection` goes back to the caller unrecovered: the route pins its credential, or refused the caller
+    /// rather than the credential.
+    ///
+    /// - Parameter request: the request whose route decides.
+    /// - Parameter rejection: the credential rejection its first attempt received.
+    /// - Parameter stamped: the token that attempt carried.
+    /// - Returns: true when no refresh or replay follows.
+    private func declinesRecovery(
+        of request: PayabliRequest,
+        rejectedBy rejection: PayabliResponse,
+        carrying stamped: SentToken
+    ) async -> Bool {
+        // Above the refresh, which is the half that breaks a pinned credential. The caller renews the token
+        // once the sequence it belongs to has ended.
+        if request.pinsCredential {
+            logger.warning(
+                "recovery declined: the route pins the credential it was sent"
+                    + " (\(request.method.rawValue) \(rejection.statusCode))"
+            )
+            if let sent = stamped.value {
+                await auth.recordPinnedRefusal(of: sent)
+            }
+            return true
+        }
+
+        // Before the refresh: a fresh credential would be refused for this caller too.
+        if request.isCallerRefusal(rejection) {
+            logger.warning(
+                "recovery declined: the route refused this caller rather than its credential"
+                    + " (\(request.method.rawValue) \(rejection.statusCode))"
+            )
+            return true
+        }
+        return false
+    }
+
+    /// Finishes the session on a replay refused in turn, unless its token has moved on or is being replaced: then the
+    /// refusal is about a token, and finishing would end a session whose next token works. The holder decides and
+    /// records that in one turn.
+    ///
+    /// - Parameter replayed: the token the refused replay carried, if one was stamped.
+    /// - Returns: the failure the caller throws.
+    private func finishingTheSession(refusedOn replayed: SentToken) async -> PayabliGenericError {
+        let exhausted = recovery.exhausted()
+        if let sent = replayed.value {
+            _ = await auth.finishIfSettled(on: sent, with: exhausted)
+        } else {
+            // Nothing stamped means the replay carried no bearer, which is not a state to be lenient about.
+            await auth.finish(with: exhausted)
+        }
+        return exhausted
     }
 
     /// Whether sending `request` a second time is defensible after `rejection`.

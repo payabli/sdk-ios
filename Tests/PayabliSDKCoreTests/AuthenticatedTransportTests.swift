@@ -113,6 +113,22 @@ final class AuthenticatedTransportTests: XCTestCase {
         XCTAssertTrue(mark.mayHaveLeft)
     }
 
+    func testAPinned401LeavesTheMarkItsSendRaised() async throws {
+        let stub = RecordingStub(status: Self.unauthorized)
+        stub.install()
+        defer { stub.uninstall() }
+
+        let auth = try makeTestAuth(tokenProvider: { "refreshed-token" })
+        let transport = makeAuthenticatedStack(auth: auth)
+        let mark = PayabliSendMark()
+        let pinned = PayabliRequest(method: .get, path: "/api/v2/ping", pinsCredential: true)
+
+        _ = try await PayabliSendMark.$current.withValue(mark) { try await transport.perform(pinned) }
+
+        XCTAssertEqual(stub.count, 1)
+        XCTAssertTrue(mark.mayHaveLeft, "recovery declined, so nothing past the pinned branch touches the mark")
+    }
+
     func testASecond401IsTerminalAndThereIsNoThirdAttempt() async throws {
         let stub = RecordingStub(status: Self.unauthorized)
         stub.install()
@@ -125,31 +141,6 @@ final class AuthenticatedTransportTests: XCTestCase {
 
         XCTAssertEqual((failure as? PayabliGenericError)?.type, .tokenExpired)
         XCTAssertEqual(stub.count, 2, "no third attempt")
-    }
-
-    func testA401TheRequestNamesAsARefusalOfTheCallerIsReturnedWithoutRefreshOrReplay() async throws {
-        let provider = Counter()
-        let stub = RecordingStub(status: Self.unauthorized)
-        stub.install()
-        defer { stub.uninstall() }
-
-        let auth = try makeTestAuth(tokenProvider: {
-            _ = await provider.increment()
-            return "refreshed-token"
-        })
-        let transport = makeAuthenticatedStack(auth: auth)
-        let request = PayabliRequest(
-            method: .get,
-            path: "/api/v2/ping",
-            isCallerRefusal: { $0.statusCode == Self.unauthorized }
-        )
-
-        let response = try await transport.perform(request)
-
-        XCTAssertEqual(response.statusCode, Self.unauthorized)
-        XCTAssertEqual(stub.count, 1, "no replay")
-        let refreshes = await provider.count
-        XCTAssertEqual(refreshes, 0, "no refresh")
     }
 
     func testARefusalOfTheCallerOnTheReplayIsReturnedAndNotReadAsAnExpiredToken() async throws {
@@ -494,12 +485,9 @@ final class AuthenticatedTransportTests: XCTestCase {
         XCTAssertEqual(stub.count, 1)
     }
 
-    /// A 401 on a request that carried no credential is returned as it arrived.
-    ///
-    /// Nothing was sent, so there is nothing a refresh would replace, and minting here would name a
-    /// credential no request carried. The provider is asserted untouched: calling it would turn a
-    /// route that needs no token into one that obtains one.
-    func testA401OnARequestThatSentNoCredentialIsReturnedAndMintsNothing() async throws {
+    /// A 401 on a request whose chain stamped nothing refreshes against the token the holder reads, and a replay
+    /// refused in turn finishes the session outright.
+    func testA401OnARequestThatStampedNothingRefreshesAgainstTheHolderAndAReplayRefusedFinishes() async throws {
         let provider = Counter()
         let stub = RecordingStub(status: Self.unauthorized)
         stub.install()
@@ -508,27 +496,22 @@ final class AuthenticatedTransportTests: XCTestCase {
         let config = try PayabliConfig(
             entryPoint: "entry",
             environment: .sandbox,
-            tokenProvider: {
-                _ = await provider.increment()
-                return "minted-token"
-            }
+            tokenProvider: { await "minted-\(provider.increment())" }
         )
         let auth = PayabliAuth(
             config: config,
             logger: PayabliLogger(category: .auth, sink: RecordingLogSink())
         )
-        // An empty chain, so no decoration stamps the sent token and none reads the holder. The
-        // holder is cold for the same reason: this case is the one where neither source has a token.
+        // An empty chain, so no decoration stamps the sent token.
         let transport = makeStackWithChain([], auth: auth)
 
-        let response = try await transport.perform(ping())
+        let failure = await failure(from: { _ = try await transport.perform(self.ping()) })
 
-        XCTAssertEqual(response.statusCode, Self.unauthorized)
-        XCTAssertEqual(stub.count, 1, "nothing was sent, so nothing is replayed")
+        XCTAssertEqual((failure as? PayabliGenericError)?.type, .tokenExpired)
+        XCTAssertEqual(stub.count, 2, "the refused request and its replay")
         let mints = await provider.count
-        XCTAssertEqual(mints, 0)
-        let held = await auth.heldToken()
-        XCTAssertNil(held, "the recovery path installs no token of its own")
+        XCTAssertEqual(mints, 2, "the token the holder read, then its replacement")
+        XCTAssertNotNil(auth.terminalFailure, "a replay with nothing stamped finishes the session")
     }
 
     // MARK: - A run of failing calls
@@ -577,7 +560,7 @@ final class AuthenticatedTransportTests: XCTestCase {
         }
     }
 
-    func testAProviderWhoseEveryNewTokenIsRefusedIsAskedTwiceThenOncePerCall() async throws {
+    func testAProviderWhoseEveryNewTokenIsRefusedIsAskedTwiceThenTheSessionAsksNoMore() async throws {
         let stub = RecordingStub(status: Self.unauthorized)
         stub.install()
         defer { stub.uninstall() }
@@ -588,14 +571,13 @@ final class AuthenticatedTransportTests: XCTestCase {
         })
 
         for done in 0 ..< Self.run {
-            let before = await provider.count
             let failure = await failure(from: { _ = try await self.retrying(transport) })
 
             XCTAssertEqual((failure as? any PayabliError)?.type, .tokenExpired)
-            let after = await provider.count
-            // The first call mints a token and refreshes it; each later call refreshes the token it holds once.
-            XCTAssertEqual(after - before, done == 0 ? 2 : 1, "provider calls on call \(done + 1)")
-            XCTAssertEqual(stub.count, 2 * (done + 1), "a request and its one replay per call")
+            // A refreshed token refused in turn ends the session, so later calls reach nothing.
+            let calls = await provider.count
+            XCTAssertEqual(calls, 2, "provider calls after call \(done + 1)")
+            XCTAssertEqual(stub.count, 2, "requests after call \(done + 1)")
         }
     }
 
