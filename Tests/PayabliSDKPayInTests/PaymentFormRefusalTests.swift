@@ -87,6 +87,36 @@ final class PaymentFormRefusalTests: XCTestCase {
         XCTAssertEqual(viewModel.cardCvv, "")
     }
 
+    func testAPaymentRefusedWith401OnItsReplayTooKeepsTheCardFields() async throws {
+        let http = UnauthorizedTransport()
+        let tokens = TokenSequence()
+        let config = try PayabliConfig(entryPoint: "entry", environment: .sandbox, tokenProvider: { await tokens.next() })
+        let auth = PayabliAuth(config: config)
+        let transport = AuthenticatedTransport(base: http, auth: auth, logger: PayabliLogger(category: .network))
+        let viewModel = PayabliPayInViewModel(
+            component: PayabliPayIn(
+                entryPoint: "entry",
+                environment: .sandbox,
+                transport: transport,
+                operation: .capture,
+                requestConfiguration: PayabliPayInRequestConfiguration(
+                    paymentDetails: PayabliPayInPaymentDetails(totalAmount: 12.34, currency: "USD")
+                )
+            ),
+            configuration: PayabliPayInFormConfiguration(allowedMethods: [.card], defaultMethod: .card)
+        )
+        fillCard(viewModel)
+
+        do {
+            _ = try await viewModel.submit()
+            XCTFail("both sends are refused with 401")
+        } catch {}
+        let sends = await http.count
+        XCTAssertEqual(sends, 2, "the payment and its replay")
+        XCTAssertEqual(viewModel.cardNumber.filter(\.isNumber), "4111111111111111")
+        XCTAssertEqual(viewModel.cardCvv, "999")
+    }
+
     func testAMissingRequiredFieldIsRefusedBeforeAnythingIsSent() async throws {
         let transport = RecordingTransport()
         let viewModel = form(
@@ -136,6 +166,36 @@ final class PaymentFormRefusalTests: XCTestCase {
         viewModel.cardExpiration = "02/27"
         viewModel.cardCvv = "999"
         viewModel.cardZip = "12345"
+    }
+}
+
+/// Answers every request 401 after the hand-off, as the service does for a credential it refuses.
+private actor UnauthorizedTransport: PayabliTransport {
+    private(set) var count = 0
+
+    func perform(_: PayabliRequest) async throws -> PayabliResponse {
+        // It stands for the service, so every call has reached the HTTP layer.
+        PayabliSendMark.current?.set()
+        count += 1
+        return PayabliResponse(statusCode: 401, headers: [:], body: Data())
+    }
+
+    func performV2<T: Decodable & Sendable>(
+        _ request: PayabliRequest,
+        decoding _: T.Type
+    ) async throws -> PayabliV2Envelope<T> {
+        _ = try await perform(request)
+        throw PayabliGenericError(type: .tokenExpired, reason: "not answered in this test")
+    }
+}
+
+/// A new token on every call, so a refresh never returns the token just refused.
+private actor TokenSequence {
+    private var issued = 0
+
+    func next() -> String {
+        issued += 1
+        return "token-\(issued)"
     }
 }
 
