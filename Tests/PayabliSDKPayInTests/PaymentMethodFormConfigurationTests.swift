@@ -501,11 +501,9 @@ final class PaymentMethodFormConfigurationTests: XCTestCase {
             XCTFail("Wrong error: \(error)")
         }
 
-        XCTAssertEqual(viewModel.routingNumber, "")
-        XCTAssertEqual(viewModel.accountNumber, "")
+        XCTAssertEqual(viewModel.routingNumber, "123456780", "a missing field is refused before sending and keeps what was typed")
+        XCTAssertEqual(viewModel.accountNumber, "1111111111")
 
-        viewModel.routingNumber = "123456780"
-        viewModel.accountNumber = "1111111111"
         viewModel.lastName = "Doe"
         viewModel.customerNumber = "cust-1"
         viewModel.billingEmail = "jane@example.com"

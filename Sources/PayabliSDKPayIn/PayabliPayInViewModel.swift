@@ -293,15 +293,16 @@ final class PayabliPayInViewModel: ObservableObject {
         }
         let submittedFlow = component
 
-        // Refused before anything else, and without clearing what the payer typed: only the host can change it.
-        if component.operation != .storePaymentMethod, let details = component.requestConfiguration?.paymentDetails {
-            do {
+        // Refused before anything is sent, and without clearing what the payer typed.
+        do {
+            if component.operation != .storePaymentMethod, let details = component.requestConfiguration?.paymentDetails {
                 try details.validate()
-            } catch {
-                component.reportFormRefusal(error, method: effectiveSelectedMethod)
-                errorMessage = PayabliPayInFailureMessage.text(for: error, operation: operation)
-                throw error
             }
+            try validateRequiredFields()
+        } catch {
+            component.reportFormRefusal(error, method: effectiveSelectedMethod)
+            errorMessage = PayabliPayInFailureMessage.text(for: error, operation: operation)
+            throw error
         }
 
         do {
@@ -327,7 +328,6 @@ final class PayabliPayInViewModel: ObservableObject {
     private func submitToFlow() async throws -> PayabliPayInResult {
         let request: PayabliPayInRequest?
         do {
-            try validateRequiredFields()
             request = try configuredRequest()
         } catch {
             component.reportFormRefusal(error, method: effectiveSelectedMethod)
