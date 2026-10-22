@@ -209,7 +209,6 @@ interface NativePayabliSDKModule {
     initialize(): Promise<void>;
 
     charge(params: {
-        type: number;
         paymentDetails: {
             amount: number;
             serviceFee: number;
