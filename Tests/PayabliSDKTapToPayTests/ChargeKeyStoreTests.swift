@@ -111,6 +111,13 @@ final class ChargeKeyStoreTests: XCTestCase {
         XCTAssertEqual(retry.key, held.key)
     }
 
+    func testAmountsAreComparedAtTheTwoPlacesTheServiceCharges() throws {
+        let held = try endUnknown(reserve(.newPayment, amount: 10, serviceFee: 0.5))
+
+        XCTAssertEqual(try reserve(.retry, amount: Decimal(string: "10.001")!, serviceFee: Decimal(string: "0.499")!).key, held.key)
+        XCTAssertThrowsError(try reserve(.retry, amount: Decimal(string: "10.005")!, serviceFee: 0.5))
+    }
+
     func testAKeyHeldAgainKeepsThePaymentItWasFirstSentFor() throws {
         _ = try endUnknown(reserve(.newPayment, amount: 10, invoice: "INV-1"))
         _ = try endUnknown(reserve(.retry, amount: 10, invoice: "INV-1"))

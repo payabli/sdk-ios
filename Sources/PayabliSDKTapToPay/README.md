@@ -234,8 +234,8 @@ set one, invoice number. A retry that describes another payment is refused befor
 whose outcome is unknown can be retried: a later one with an unknown outcome replaces it.
 
 The SDK holds a charge's key in memory for four minutes after its latest send, across every `PayabliTTP` in the
-process, for up to four entry points at once. A charge for a fifth entry point while four hold an unresolved charge
-is refused before anything is sent, with `.tooManyOpenCharges` (3030). A retry after the four minutes, or after your
+process, for up to four entry points at once, counting an entry point once per environment. A charge for a fifth
+while four hold an unresolved charge is refused before anything is sent, with `.tooManyOpenCharges` (3030). A retry after the four minutes, or after your
 app restarts, sends a new key, so past that point read the transaction back instead.
 
 ## Outcomes and errors
