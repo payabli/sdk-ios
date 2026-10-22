@@ -176,7 +176,7 @@ final class TapToPayErrorTranslationTests: XCTestCase {
         )
         let raisedDirectly: Set<PayabliErrorType> = [
             .deviceKeyUnavailable, .deviceSetupUnsupported, .deviceNotPending, .deviceSetupUnavailable,
-            .deviceSetupNotConfigured, .deviceIdentityUnavailable
+            .deviceSetupNotConfigured, .deviceIdentityUnavailable, .tooManyOpenCharges, .chargeNotFinished
         ]
         let notProducedYet: Set<PayabliErrorType> = [
             .deviceServicesOutdated, // a Google Play cause, which this platform has no counterpart for
@@ -184,8 +184,7 @@ final class TapToPayErrorTranslationTests: XCTestCase {
             .deviceHardwareUnsupported, .cardPresentNotEnabled, .readerDeviceRefused, .readerSessionExpired,
             .activationCodeMalformed, .readerUnavailable, .paymentNotOpened,
             // carried by coarse cases until they are classified
-            .tooManyOpenCharges, .paymentNotHeld, // no held charge and no close call on this platform yet
-            .chargeNotFinished // no charge sends a key on this platform yet
+            .paymentNotHeld // no close call on this platform yet
         ]
         let produced = fromTheTable.union(fromActivation).union(raisedDirectly)
         for type in PayabliErrorType.allCases where (3001 ... 3999).contains(type.number) {

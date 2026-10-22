@@ -38,23 +38,37 @@ enum TapToPayErrorTranslation {
 
     /// What a charge's failure reaches a host as. Once the reader has been asked for a card, a code saying
     /// nothing was sent becomes `paymentOutcomeUnknown`, because the sale may already be taken, and a failure
-    /// that names no payment takes the charge's.
+    /// that names no payment takes the charge's. A resent key names an earlier charge, so it never reports not charged.
     ///
     /// - Parameter error: what the charge threw, before it was translated for the host.
     /// - Parameter paymentTransId: the charge's payment, which a failure naming none takes.
     /// - Parameter askedForCard: whether the reader was already asked for a card.
+    /// - Parameter resentKey: whether the charge resent a key held for an earlier one.
     /// - Returns: the failure a host receives, with its catalog entry.
-    static func hostError(for error: Error, chargeOf paymentTransId: String?, askedForCard: Bool) -> Error {
+    static func hostError(
+        for error: Error,
+        chargeOf paymentTransId: String?,
+        askedForCard: Bool,
+        resentKey: Bool = false
+    ) -> Error {
         guard let failure = hostError(for: error) as? TapToPayError else { return error }
         let claimsNothingWasSent = failure.type == .validation || failure.type == .sdkInternalError
-        let type = askedForCard && claimsNothingWasSent ? PayabliErrorType.paymentOutcomeUnknown : failure.type
+        let type: PayabliErrorType = if !askedForCard, resentKey, error is ChargeKeyRefusal {
+            // The opening was refused as a repeat of an earlier charge that has not finished.
+            .chargeNotFinished
+        } else if askedForCard, claimsNothingWasSent {
+            .paymentOutcomeUnknown
+        } else {
+            failure.type
+        }
         let namesNoPayment = failure.paymentTransId == nil
+        let capture: PayabliTTPCapture = namesNoPayment && askedForCard ? .unknown : failure.capture
         return TapToPayError(
             type: type,
             reason: type == failure.type ? failure.reason : type.message,
             detail: failure.detail,
             paymentTransId: failure.paymentTransId ?? paymentTransId,
-            capture: namesNoPayment && askedForCard ? .unknown : failure.capture,
+            capture: resentKey && capture == .notCharged ? .unknown : capture,
             retryAfter: failure.retryAfter
         )
     }
@@ -167,6 +181,7 @@ enum TapToPayErrorTranslation {
 final class ChargeProgress {
     var paymentTransId: String?
     var askedForCard = false
+    var resentKey = false
 }
 
 @available(iOS 16.7, *)

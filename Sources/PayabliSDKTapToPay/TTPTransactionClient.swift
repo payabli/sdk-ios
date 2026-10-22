@@ -22,6 +22,7 @@ package final class TTPTransactionClient: Sendable {
     ///
     /// - Parameter entryPoint: the entry point the transaction is initiated for.
     /// - Parameter deviceId: the device handle the payment method carries.
+    /// - Parameter idempotencyKey: the key the service recognises a repeat of this opening by.
     /// - Parameter paymentDetails: the amounts and currency to charge.
     /// - Parameter customer: the customer attached to the transaction, empty for an anonymous payor.
     /// - Parameter invoice: the invoice attached, its number when one is given.
@@ -30,6 +31,7 @@ package final class TTPTransactionClient: Sendable {
     package func initiate(
         entryPoint: String,
         deviceId: String,
+        idempotencyKey: String,
         paymentDetails: PayabliTTPPaymentDetails,
         customer: PayabliTTPCustomerData = PayabliTTPCustomerData(),
         invoice: PayabliTTPInvoiceData = PayabliTTPInvoiceData(),
@@ -48,7 +50,7 @@ package final class TTPTransactionClient: Sendable {
         let request = try PayabliRequest.json(
             method: .post,
             path: "/api/v2/MoneyIn/initiate",
-            headers: [:],
+            headers: [payabliIdempotencyKeyHeader: idempotencyKey],
             jsonBody: body
         )
 
@@ -59,7 +61,12 @@ package final class TTPTransactionClient: Sendable {
 
         let envelope: PayabliV2Envelope<InitiateData>
         do {
-            envelope = try await transport.performV2(request, decoding: InitiateData.self)
+            let response = try await transport.perform(request)
+            if response.statusCode == 409, !Self.isJSONObject(response.body) {
+                throw ChargeKeyRefusal()
+            }
+            try mapPayabliHTTPError(response: response)
+            envelope = try decodePayabliV2Envelope(InitiateData.self, from: response)
         } catch {
             logger.error("[initiate] transport/decode error: \(ErrorSummary.of(error))")
             throw error
@@ -74,6 +81,10 @@ package final class TTPTransactionClient: Sendable {
             throw PayabliTTPError.initiateFailed(reason: envelope.reason ?? envelope.code)
         }
         return data.paymentTransId
+    }
+
+    private static func isJSONObject(_ body: Data) -> Bool {
+        (try? JSONSerialization.jsonObject(with: body)) is [String: Any]
     }
 
     private static func makeWirePaymentDetails(
@@ -155,5 +166,21 @@ package final class TTPTransactionClient: Sendable {
             cardNetwork: result.cardNetwork,
             providerMetadata: result.providerMetadata
         ))
+    }
+}
+
+/// A 409 whose body is not a JSON object, which only the check refusing a key it has already seen sends. Any other 409,
+/// such as a refused duplicate sale, carries a JSON body.
+struct ChargeKeyRefusal: PayabliError {
+    var type: PayabliErrorType {
+        .conflict
+    }
+
+    var reason: String {
+        PayabliErrorType.conflict.message
+    }
+
+    var detail: String? {
+        nil
     }
 }

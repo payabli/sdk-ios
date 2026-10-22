@@ -54,6 +54,7 @@ public final class PayabliTTP: NSObject, ObservableObject {
     let isLive: @Sendable () -> Bool
     let reports: TapToPayReports
     let transactionClient: TTPTransactionClient
+    let chargeKeys: ChargeKeyStore
     let configClient: TTPConfigClient
 
     let sessionManager = SessionManager()
@@ -122,12 +123,14 @@ public final class PayabliTTP: NSObject, ObservableObject {
     ///   - attestation: the service that holds the device's binding and signs requests.
     ///   - retryPolicy: the retry policy the charge's update runs under.
     ///   - isLive: whether `session` is still the installed one; this terminal stops arming the reader once it is not.
+    ///   - chargeKeys: the idempotency keys of unsettled charges, shared by every terminal in the process.
     package init(
         session: PayabliSession,
         provider: TapToPayProvider,
         attestation: DeviceAttestationService,
         retryPolicy: RetryPolicy = .default,
-        isLive: (@Sendable () -> Bool)? = nil
+        isLive: (@Sendable () -> Bool)? = nil,
+        chargeKeys: ChargeKeyStore = .process
     ) {
         self.isLive = isLive ?? { session.isLive }
         self.entryPoint = session.config.entryPoint
@@ -139,6 +142,7 @@ public final class PayabliTTP: NSObject, ObservableObject {
         self.session = session
         self.reports = TapToPayReports(telemetry: session.telemetry)
         self.transactionClient = TTPTransactionClient(transport: session.transport)
+        self.chargeKeys = chargeKeys
         self.configClient = TTPConfigClient(
             transport: session.transport,
             attestation: attestation
