@@ -675,8 +675,17 @@ extension PayabliPayInPaymentDetails {
                 throw PayabliPayInError.invalidInput("Service fee cannot be negative.")
             }
         }
-        if let surchargeFee, PayInAmount.sendable(surchargeFee) == nil {
-            throw PayabliPayInError.invalidInput("Surcharge is out of range.")
+        if let surchargeFee {
+            guard let surcharge = PayInAmount.sendable(surchargeFee) else {
+                throw PayabliPayInError.invalidInput("Surcharge is out of range.")
+            }
+            guard surcharge >= 0 else {
+                throw PayabliPayInError.invalidInput("Surcharge cannot be negative.")
+            }
+        }
+        let fees = (serviceFee.flatMap(PayInAmount.sendable) ?? 0) + (surchargeFee.flatMap(PayInAmount.sendable) ?? 0)
+        guard fees < total else {
+            throw PayabliPayInError.invalidInput("Service fee and surcharge must be less than the total amount.")
         }
     }
 }

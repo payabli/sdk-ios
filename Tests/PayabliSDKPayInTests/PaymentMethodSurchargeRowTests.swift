@@ -56,15 +56,15 @@ final class PaymentMethodSurchargeRowTests: XCTestCase {
     }
 
     @MainActor
-    func testANegativeSurchargeDrawsItsRow() {
+    func testANegativeSurchargeDrawsNoSummary() {
         let view = captureForm(paymentDetails: PayabliPayInPaymentDetails(
             totalAmount: 12.34,
             surchargeFee: -0.30
         ))
 
-        XCTAssertTrue(
-            view.drawnSections.contains { $0.rows.contains { $0.field == .surchargeFee } },
-            "a negative surcharge draws as the minus figure it is"
+        XCTAssertFalse(
+            view.drawnSections.contains(where: \.isSummary),
+            "a negative surcharge is refused, so no summary is drawn"
         )
     }
 

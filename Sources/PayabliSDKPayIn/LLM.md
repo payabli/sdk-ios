@@ -295,9 +295,9 @@ recognizable on the store route, so a key sent there is read by nothing.
 
 | Field | Notes |
 | --- | --- |
-| `totalAmount` | Required. The amount charged, including any surcharge sent. Must be greater than 0. |
+| `totalAmount` | Required. The amount charged, including any surcharge sent. Must be greater than 0, and greater than `serviceFee` plus `surchargeFee`. |
 | `serviceFee` | Optional. Must not be negative. Currency JSON is normalized to two decimals such as `0.10`. |
-| `surchargeFee` | Optional. Already included in `totalAmount`. Currency JSON is normalized to two decimals such as `0.30`. |
+| `surchargeFee` | Optional. Already included in `totalAmount`. Must not be negative. Currency JSON is normalized to two decimals such as `0.30`. |
 | `currency` | Optional processor currency, for example `USD`. |
 | `checkNumber` | Optional for check flows. |
 | `checkUniqueId` | Optional for check flows. |
