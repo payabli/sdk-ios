@@ -270,6 +270,31 @@ final class PayInTelemetryTests: XCTestCase {
         XCTAssertEqual(event.properties["outcome"], "refused_locally")
     }
 
+    func testAFormAmountRefusalIsReportedOnceByTheFlow() async throws {
+        let transport = RecordingIdempotencyTransport(body: PayInFixture.approved)
+        let flow = makeFlow(transport, operation: .capture)
+        flow.configure(requestConfiguration: PayabliPayInRequestConfiguration(
+            paymentDetails: PayabliPayInPaymentDetails(totalAmount: 1.00, serviceFee: 1.00, currency: "USD")
+        ))
+        let viewModel = PayabliPayInViewModel(
+            component: flow,
+            configuration: PayabliPayInFormConfiguration(allowedMethods: [.card], defaultMethod: .card)
+        )
+        viewModel.cardNumber = "4111111111111111"
+        viewModel.cardExpiration = "12/30"
+        viewModel.cardCvv = "123"
+        viewModel.cardholderName = "Jane"
+        viewModel.cardZip = "12345"
+
+        _ = await PayInFixture.failure { _ = try await viewModel.submit() }
+
+        XCTAssertEqual(transport.count, 0, "a fee equal to the total is refused before sending")
+        let event = try await onlyEvent(of: flow)
+        XCTAssertEqual(event.event, "payin.capture.completed")
+        XCTAssertEqual(event.properties["origin"], "form")
+        XCTAssertEqual(event.properties["outcome"], "refused_locally")
+    }
+
     func testAFormSubmissionTheServiceRefusesIsReportedOnceByTheFlow() async throws {
         let flow = makeFlow(RecordingIdempotencyTransport(body: Data(#"{"responseText":"Bad"}"#.utf8), status: 400))
         let viewModel = PayabliPayInViewModel(

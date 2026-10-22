@@ -293,11 +293,8 @@ final class PayabliPayInViewModel: ObservableObject {
         }
         let submittedFlow = component
 
-        // Refused before anything is sent, and without clearing what the payer typed.
+        // A missing field never becomes a submission, so nothing the payer typed is cleared.
         do {
-            if component.operation != .storePaymentMethod, let details = component.requestConfiguration?.paymentDetails {
-                try details.validate()
-            }
             try validateRequiredFields()
         } catch {
             component.reportFormRefusal(error, method: effectiveSelectedMethod)
@@ -305,12 +302,16 @@ final class PayabliPayInViewModel: ObservableObject {
             throw error
         }
 
+        let sendMark = PayabliSendMark()
         do {
-            let result = try await submitToFlow()
+            let result = try await PayabliSendMark.$current.withValue(sendMark) { try await submitToFlow() }
             clearSensitiveFields()
             return result
         } catch {
-            clearSensitiveFieldsAfterFailure()
+            // The card and bank fields go only once they were handed to the network, whatever the error.
+            if sendMark.mayHaveLeft {
+                clearSensitiveFieldsAfterFailure()
+            }
             // After the clear, because its edits take a mark off. A refusal of a flow replaced while
             // it was in flight marks nothing.
             if component === submittedFlow {
