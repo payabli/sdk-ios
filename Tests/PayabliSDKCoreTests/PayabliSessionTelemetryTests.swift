@@ -95,7 +95,7 @@ final class PayabliSessionTelemetryTests: XCTestCase {
 
         XCTAssertTrue(again === live)
         let batches = await transport.batches
-        XCTAssertEqual(batches.count, 1, "attempted once and dropped")
+        XCTAssertEqual(batches.count, 1, "attempted once and not retried")
     }
 
     func testEveryEventCarriesTheSessionsDeviceIdentifierUnchanged() async throws {
@@ -151,15 +151,18 @@ final class PayabliSessionTelemetryTests: XCTestCase {
 
         _ = try await session.transport.perform(PayabliRequest(method: .get, path: "/api/v2/before"))
         await session.telemetry.emit(TelemetryEventName.ttpInitializeFailed)
+        // Settled first, so the explicit flush below is its own drain rather than joining the one the
+        // failure event already scheduled: the two sends this test asserts are then deterministic.
+        await session.telemetry.settled()
         await session.telemetry.flush()
         _ = try await session.transport.perform(PayabliRequest(method: .get, path: "/api/v2/after"))
 
         let providerCalls = await calls.count
         XCTAssertEqual(providerCalls, 1, "a telemetry 401 must not mint a new token")
         XCTAssertEqual(stub.requests.map { $0.url?.path }, [
-            "/api/v2/before", TelemetryEndpointTransport.defaultPath, "/api/v2/after"
-        ], "the refused batch is sent once and not replayed")
-        XCTAssertEqual(stub.sentTokens, ["token-1", "token-1", "token-1"])
+            "/api/v2/before", TelemetryEndpointTransport.defaultPath, TelemetryEndpointTransport.defaultPath, "/api/v2/after"
+        ], "the refused batch goes back to the queue and the flush after it sends it again")
+        XCTAssertEqual(stub.sentTokens, ["token-1", "token-1", "token-1", "token-1"])
         let body = try XCTUnwrap(stub.requests[1].httpBody)
         let envelope = try XCTUnwrap(try JSONSerialization.jsonObject(with: body) as? [String: Any])
         XCTAssertEqual(envelope["entry"] as? String, "demo")

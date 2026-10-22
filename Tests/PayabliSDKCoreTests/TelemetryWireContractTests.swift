@@ -99,7 +99,7 @@ final class TelemetryWireContractTests: XCTestCase {
         XCTAssertEqual(current.deviceType, CardPresentLinkage.isLinked ? "Softpos" : nil)
     }
 
-    func testARefusedBatchIsObservedDiscardedAndTheNextOneStillGoes() async {
+    func testARefusedBatchIsObservedAndTheNextOneStillGoes() async {
         let stub = RecordingStub(status: 401)
         stub.install()
         defer { stub.uninstall() }
@@ -123,18 +123,18 @@ final class TelemetryWireContractTests: XCTestCase {
 
         let accepted = await makeTransport(facts: facts, sink: sink).send([event()], droppedSinceLastSend: 0)
 
-        XCTAssertTrue(accepted)
+        XCTAssertEqual(accepted, .delivered)
         XCTAssertTrue(sink.records.filter { $0.message.contains("telemetry_batch_refused") }.isEmpty)
     }
 
-    func testARefusedBatchAnswersThatItWasRefused() async {
+    func testARefusedBatchAnswersThatItIsKept() async {
         let stub = RecordingStub(status: 401)
         stub.install()
         defer { stub.uninstall() }
 
         let accepted = await makeTransport(facts: facts).send([event()], droppedSinceLastSend: 0)
 
-        XCTAssertFalse(accepted)
+        XCTAssertEqual(accepted, .kept)
     }
 
     func testTheEvictionCountRidesTheBatch() async throws {

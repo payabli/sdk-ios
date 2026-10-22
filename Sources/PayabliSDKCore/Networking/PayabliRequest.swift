@@ -44,6 +44,10 @@ package struct PayabliRequest: Sendable {
     /// - Parameter query: the query items appended to the path.
     /// - Parameter headers: the request's own headers, where a `Content-Type` spelled exactly is replaced by the JSON one.
     /// - Parameter jsonBody: the body value, encoded as JSON with ISO-8601 dates.
+    /// - Parameter isCallerRefusal: whether a refused answer refuses this caller rather than its
+    ///   credential, so it is returned as it arrived with no refresh and no replay.
+    /// - Parameter pinsCredential: whether a refused answer records the token it carried for the device
+    ///   setup to renew, with no refresh and no replay.
     /// - Returns: the assembled request, ready for the decoration chain.
     package static func json(
         method: HTTPMethod,
@@ -51,6 +55,7 @@ package struct PayabliRequest: Sendable {
         query: [URLQueryItem] = [],
         headers: [String: String] = [:],
         jsonBody: some Encodable,
+        isCallerRefusal: @escaping @Sendable (PayabliResponse) -> Bool = { _ in false },
         pinsCredential: Bool = false
     ) throws -> PayabliRequest {
         let encoder = JSONEncoder()
@@ -64,6 +69,7 @@ package struct PayabliRequest: Sendable {
             query: query,
             headers: mergedHeaders,
             body: body,
+            isCallerRefusal: isCallerRefusal,
             pinsCredential: pinsCredential
         )
     }

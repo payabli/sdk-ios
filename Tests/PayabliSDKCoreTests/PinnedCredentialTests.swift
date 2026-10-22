@@ -58,10 +58,19 @@ final class PinnedCredentialTests: XCTestCase {
         XCTAssertEqual(stub.sentTokens, [testToken, testToken, "refreshed-token"])
     }
 
-    func testThePinSurvivesTheDecorationCopy() async throws {
-        let decorated = try await BearerDecoration(readToken: { "chain" }).decorate(pinned(.get))
+    func testThePinAndTheCallerRefusalSurviveTheDecorationCopy() async throws {
+        let decorated = try await BearerDecoration(readToken: { "chain" }).decorate(
+            PayabliRequest(
+                method: .get,
+                path: "/api/v2/device/taptopay/config/entry",
+                isCallerRefusal: { $0.statusCode == 401 },
+                pinsCredential: true
+            )
+        )
 
         XCTAssertTrue(decorated.pinsCredential)
+        XCTAssertTrue(decorated.isCallerRefusal(answered(401)), "the caller refusal survived the copy")
+        XCTAssertFalse(decorated.isCallerRefusal(answered(200)), "and still answers only a 401")
     }
 
     // MARK: - Renewing what a pinned route refused

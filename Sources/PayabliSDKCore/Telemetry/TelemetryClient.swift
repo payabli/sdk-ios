@@ -1,20 +1,32 @@
 import Foundation
 
+/// What a send did with its batch: the route accepted it, kept it for a later flush, or discarded it.
+package enum TelemetrySendOutcome: Sendable {
+    /// The route accepted the batch.
+    case delivered
+    /// The batch was not accepted and is kept, so a later flush sends it again.
+    case kept
+    /// The batch was not accepted and is dropped, because the same body would be refused the same way again.
+    case discarded
+}
+
 /// Transport abstraction — production uses `URLSession` to POST to the Payabli
 /// telemetry endpoint; tests inject an in-memory sink.
 package protocol TelemetryTransport: Sendable {
-    /// Sends one batch, once. A batch that does not arrive is dropped, never retried.
+    /// Sends one batch, once. A batch this transport does not accept is kept for a later flush, or
+    /// discarded when the same body would be refused the same way again.
     ///
     /// - Parameter batch: the events, oldest first.
     /// - Parameter droppedSinceLastSend: how many events the queue evicted since the last batch arrived.
-    /// - Returns: whether the route accepted the batch.
+    /// - Returns: whether the route accepted the batch, kept it for a later flush, or discarded it.
     @discardableResult
-    func send(_ batch: [TelemetryEvent], droppedSinceLastSend: Int) async -> Bool
+    func send(_ batch: [TelemetryEvent], droppedSinceLastSend: Int) async -> TelemetrySendOutcome
 }
 
 /// Batched, best-effort telemetry client. The caller never passes a PAN, CVV or token.
 ///
-/// Sends on a full batch, a timer, backgrounding, and at once for a failure; never retries a send.
+/// Sends on a full batch, a timer, backgrounding, and at once for a failure. A batch that is not
+/// accepted goes back to the front of the queue and is sent on a later flush.
 package actor TelemetryClient {
     package struct Configuration: Sendable {
         package let flushInterval: TimeInterval
@@ -174,7 +186,8 @@ package actor TelemetryClient {
         }
     }
 
-    /// Sends everything queued, and returns once it has been sent or dropped.
+    /// Sends everything queued, and returns once the flush has finished; a batch that is kept stays
+    /// queued for a later flush.
     package func flush() async {
         await requestFlush().value
     }
@@ -272,8 +285,9 @@ package actor TelemetryClient {
         return drain
     }
 
-    /// Sends as many requests as what was queued when the drain started needs, up to a bound.
-    /// Each request takes what is queued when it leaves.
+    /// Sends as many requests as what was queued when the drain started needs, up to a bound. Each
+    /// request takes what is queued when it leaves, and a kept batch stops the drain, so a failure
+    /// sends no second request.
     private func drainWhatWasWaiting() async {
         let perRequest = configuration.maxEventsPerRequest
         let needed = (queue.count + perRequest - 1) / perRequest
@@ -285,7 +299,7 @@ package actor TelemetryClient {
 
     /// Sends one request's worth.
     ///
-    /// - Returns: whether anything was sent, accepted or not.
+    /// - Returns: whether the drain may send another request.
     private func sendOneRequest() async -> Bool {
         let batch = queue.drain(configuration.maxEventsPerRequest)
         guard !batch.isEmpty else { return false }
@@ -297,9 +311,15 @@ package actor TelemetryClient {
         // The session's identifier as it is, already a digest; the route compares it with the one registration sent.
         let device = deviceId().flatMap { $0.isEmpty ? nil : $0 }
         let stamped = batch.map { $0.carrying(deviceIdHash: device) }
-        if await !transport.send(stamped, droppedSinceLastSend: dropped) {
+        switch await transport.send(stamped, droppedSinceLastSend: dropped) {
+        case .delivered:
+            return true
+        case .kept:
+            queue.restoreFront(batch, droppedSinceLastSend: dropped)
+            return false
+        case .discarded:
             queue.restoreDropCount(dropped)
+            return true
         }
-        return true
     }
 }
