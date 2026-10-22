@@ -151,6 +151,9 @@ final class PayabliSessionTelemetryTests: XCTestCase {
 
         _ = try await session.transport.perform(PayabliRequest(method: .get, path: "/api/v2/before"))
         await session.telemetry.emit(TelemetryEventName.ttpInitializeFailed)
+        // Settled first, so the explicit flush below is its own drain rather than joining the one the
+        // failure event already scheduled: the two sends this test asserts are then deterministic.
+        await session.telemetry.settled()
         await session.telemetry.flush()
         _ = try await session.transport.perform(PayabliRequest(method: .get, path: "/api/v2/after"))
 
