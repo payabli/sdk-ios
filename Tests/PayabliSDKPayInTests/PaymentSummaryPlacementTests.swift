@@ -127,11 +127,12 @@ final class PaymentSummaryPlacementTests: XCTestCase {
         XCTAssertEqual(drawn?.total, amount("12.34"))
     }
 
-    func testOnASurchargedChargeTheTotalAddsTheSurcharge() {
-        let drawn = place([card], details(12.34, surcharge: 0.31)).last
+    func testOnASurchargedChargeTheAmountTakesOutTheSurchargeAndTheTotalIsTheCharge() {
+        let drawn = place([card], details(10.30, surcharge: 0.30)).last
 
         XCTAssertEqual(drawn?.rows.map(\.field), [.amount, .surchargeFee])
-        XCTAssertEqual(drawn?.total, amount("12.65"))
+        XCTAssertEqual(drawn?.rows.map(\.amount), [amount("10"), amount("0.3")])
+        XCTAssertEqual(drawn?.total, amount("10.3"))
     }
 
     func testWithNothingTakenOutOfTheChargeOnlyTheTotalIsDrawn() {
@@ -148,11 +149,11 @@ final class PaymentSummaryPlacementTests: XCTestCase {
         XCTAssertEqual(drawn?.total, amount("12.34"))
     }
 
-    func testANegativeSurchargeThatCancelsTheChargeDrawsTheRowsAndNoTotal() {
-        let drawn = place([card], details(12.34, surcharge: -12.34)).last
+    func testAChargeThatIsAllSurchargeDrawsTheSurchargeAndTheTotal() {
+        let drawn = place([card], details(0.30, surcharge: 0.30)).last
 
-        XCTAssertEqual(drawn?.rows.map(\.field), [.amount, .surchargeFee])
-        XCTAssertNil(drawn?.total)
+        XCTAssertEqual(drawn?.rows.map(\.field), [.surchargeFee])
+        XCTAssertEqual(drawn?.total, amount("0.3"))
     }
 
     func testAPaymentSubmitRefusesDrawsNoSummary() {

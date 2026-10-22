@@ -223,7 +223,7 @@ code is `Billing postal code`.
 Capture and authorize forms include a non-editable payment summary section,
 drawn from `PayabliPayInPaymentDetails`. A fee or surcharge sent as something
 other than zero gets its own row, an Amount row shows the total less the fee
-beside either one, and Total, what the payment charges, ends the summary
+and the surcharge beside either one, and Total, what the payment charges, ends the summary
 whenever it is not zero. With a $1.00 total and a $0.10 fee it reads:
 
 | Label | Figure |

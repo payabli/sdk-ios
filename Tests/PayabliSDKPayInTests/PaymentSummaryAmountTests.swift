@@ -112,18 +112,26 @@ final class PaymentSummaryAmountTests: XCTestCase {
 
     // MARK: - The base and the total
 
-    func testTheAmountIsTheChargeLessTheFeeAndTheTotalAddsTheSurcharge() {
+    func testTheAmountIsTheChargeLessTheFeeAndTheTotalIsTheCharge() {
         let fee = details(12.34, fee: 0.5)
 
         XCTAssertEqual(PayabliPayInSummaryRows.rowAmount(for: .amount, paymentDetails: fee), amount("11.84"))
         XCTAssertEqual(PayabliPayInSummaryRows.totalRowAmount(paymentDetails: fee), amount("12.34"))
     }
 
-    func testOnASurchargedChargeTheAmountIsWhatWasSentAndTheTotalAddsTheSurcharge() {
-        let surcharged = details(12.34, surcharge: 0.31)
+    func testOnASurchargedChargeTheAmountTakesOutTheSurchargeAndTheTotalIsTheCharge() {
+        let surcharged = details(10.30, surcharge: 0.30)
 
-        XCTAssertEqual(PayabliPayInSummaryRows.rowAmount(for: .amount, paymentDetails: surcharged), amount("12.34"))
-        XCTAssertEqual(PayabliPayInSummaryRows.totalRowAmount(paymentDetails: surcharged), amount("12.65"))
+        XCTAssertEqual(PayabliPayInSummaryRows.rowAmount(for: .amount, paymentDetails: surcharged), amount("10"))
+        XCTAssertEqual(PayabliPayInSummaryRows.rowAmount(for: .surchargeFee, paymentDetails: surcharged), amount("0.3"))
+        XCTAssertEqual(PayabliPayInSummaryRows.totalRowAmount(paymentDetails: surcharged), amount("10.3"))
+    }
+
+    func testTheAmountTakesOutBothTheFeeAndTheSurcharge() {
+        let both = details(10.80, fee: 0.5, surcharge: 0.30)
+
+        XCTAssertEqual(PayabliPayInSummaryRows.rowAmount(for: .amount, paymentDetails: both), amount("10"))
+        XCTAssertEqual(PayabliPayInSummaryRows.totalRowAmount(paymentDetails: both), amount("10.8"))
     }
 
     func testWithNothingTakenOutOfTheChargeOnlyTheTotalHasAFigure() {
@@ -133,11 +141,12 @@ final class PaymentSummaryAmountTests: XCTestCase {
         XCTAssertEqual(PayabliPayInSummaryRows.totalRowAmount(paymentDetails: plain), amount("12.34"))
     }
 
-    func testASurchargeThatCancelsTheChargeLeavesTheAmountAndNoTotal() {
-        let cancelled = details(12.34, surcharge: -12.34)
+    func testAChargeThatIsAllSurchargeHasTheSurchargeAndTheTotalAndNoAmount() {
+        let allSurcharge = details(0.30, surcharge: 0.30)
 
-        XCTAssertEqual(PayabliPayInSummaryRows.rowAmount(for: .amount, paymentDetails: cancelled), amount("12.34"))
-        XCTAssertNil(PayabliPayInSummaryRows.totalRowAmount(paymentDetails: cancelled))
+        XCTAssertNil(PayabliPayInSummaryRows.rowAmount(for: .amount, paymentDetails: allSurcharge))
+        XCTAssertEqual(PayabliPayInSummaryRows.rowAmount(for: .surchargeFee, paymentDetails: allSurcharge), amount("0.3"))
+        XCTAssertEqual(PayabliPayInSummaryRows.totalRowAmount(paymentDetails: allSurcharge), amount("0.3"))
     }
 
     func testAChargeSentAsZeroHasNoTotalEvenBesideASurcharge() {

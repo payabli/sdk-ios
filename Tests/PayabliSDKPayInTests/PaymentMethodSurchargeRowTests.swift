@@ -17,6 +17,22 @@ final class PaymentMethodSurchargeRowTests: XCTestCase {
     }
 
     @MainActor
+    func testTheFormDrawsTheFiguresTheReadersReturn() throws {
+        let paymentDetails = PayabliPayInPaymentDetails(totalAmount: 10.30, surchargeFee: 0.30)
+        let view = captureForm(paymentDetails: paymentDetails)
+        let summary = try XCTUnwrap(view.drawnSections.last { $0.isSummary })
+        let read = summary.rows.map { row in
+            PayabliPayInSummaryRows.rowAmount(for: row.field, paymentDetails: paymentDetails)
+        }
+
+        XCTAssertEqual(summary.rows.map(\.field), [.amount, .surchargeFee])
+        XCTAssertEqual(summary.rows.map(\.amount), [Decimal(string: "10"), Decimal(string: "0.3")])
+        XCTAssertEqual(read, summary.rows.map(\.amount))
+        XCTAssertEqual(summary.total, Decimal(string: "10.3"))
+        XCTAssertEqual(PayabliPayInSummaryRows.totalRowAmount(paymentDetails: paymentDetails), summary.total)
+    }
+
+    @MainActor
     func testADefaultFormWithoutASurchargeDrawsNoSurchargeRow() {
         let view = captureForm(paymentDetails: PayabliPayInPaymentDetails(totalAmount: 12.34))
 
