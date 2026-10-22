@@ -170,6 +170,18 @@ final class TTPChargeKeyTests: XCTestCase {
         XCTAssertNotEqual(Self.wire.keys[1], Self.wire.keys[0])
     }
 
+    func testAnApprovalWhoseCloseFailsKeepsTheKey() async throws {
+        let (ttp, _) = try await makeReadyTTP()
+        Self.wire.updateFails = true
+        let unclosed = await failure { try await ttp.charge(paymentDetails: Self.details) }
+        Self.wire.updateFails = false
+
+        _ = try await ttp.charge(paymentDetails: Self.details, attempt: .retry)
+
+        XCTAssertEqual(unclosed?.capture, .charged)
+        XCTAssertEqual(Self.wire.keys[1], Self.wire.keys[0], "a retry after a charged card went out under a new key")
+    }
+
     func testAnUnknownOutcomeKeepsTheKey() async throws {
         let (ttp, _) = try await makeReadyTTP(outcome: .indeterminate)
 
@@ -343,6 +355,7 @@ final class TTPChargeKeyTests: XCTestCase {
         private var initiate = 200
         private var refusal: String?
         private var duplicateSale = false
+        private var closeFails = false
 
         var keys: [String] {
             lock.withLock { sentKeys }
@@ -363,6 +376,11 @@ final class TTPChargeKeyTests: XCTestCase {
             set { lock.withLock { duplicateSale = newValue } }
         }
 
+        var updateFails: Bool {
+            get { lock.withLock { closeFails } }
+            set { lock.withLock { closeFails = newValue } }
+        }
+
         func record(_ key: String?) {
             lock.withLock { sentKeys.append(key ?? "<none>") }
         }
@@ -373,6 +391,7 @@ final class TTPChargeKeyTests: XCTestCase {
                 initiate = 200
                 refusal = nil
                 duplicateSale = false
+                closeFails = false
             }
         }
     }
@@ -394,7 +413,10 @@ final class TTPChargeKeyTests: XCTestCase {
                 data = try JSONSerialization.data(withJSONObject: ["code": "A01", "data": ["paymentTransId": "TXN-KEY"]])
             }
         } else if path.contains("/MoneyIn/update/") {
-            if let refusal = wire.updateRefusal {
+            if wire.updateFails {
+                status = 500
+                data = try JSONSerialization.data(withJSONObject: ["title": "Server Error", "status": 500])
+            } else if let refusal = wire.updateRefusal {
                 status = 400
                 data = try JSONSerialization.data(withJSONObject: ["title": "Bad Request", "status": 400, "detail": refusal])
             } else {
