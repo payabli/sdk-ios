@@ -660,6 +660,9 @@ extension PayabliPayInPaymentMethod {
 
 extension PayabliPayInPaymentDetails {
     /// Each amount is checked as it is sent, at two places, so a total of `0.001`, sent as `0.00`, is refused.
+    ///
+    /// A negative surcharge, or a service fee and surcharge that together reach the total, describe a payment that
+    /// cannot be charged, so it is refused here for the form and a direct call alike instead of being sent.
     func validate() throws {
         guard let total = PayInAmount.sendable(totalAmount) else {
             throw PayabliPayInError.invalidInput("Total amount is out of range.")
@@ -675,8 +678,17 @@ extension PayabliPayInPaymentDetails {
                 throw PayabliPayInError.invalidInput("Service fee cannot be negative.")
             }
         }
-        if let surchargeFee, PayInAmount.sendable(surchargeFee) == nil {
-            throw PayabliPayInError.invalidInput("Surcharge is out of range.")
+        if let surchargeFee {
+            guard let surcharge = PayInAmount.sendable(surchargeFee) else {
+                throw PayabliPayInError.invalidInput("Surcharge is out of range.")
+            }
+            guard surcharge >= 0 else {
+                throw PayabliPayInError.invalidInput("Surcharge cannot be negative.")
+            }
+        }
+        let fees = (serviceFee.flatMap(PayInAmount.sendable) ?? 0) + (surchargeFee.flatMap(PayInAmount.sendable) ?? 0)
+        guard fees < total else {
+            throw PayabliPayInError.invalidInput("Service fee and surcharge must be less than the total amount.")
         }
     }
 }

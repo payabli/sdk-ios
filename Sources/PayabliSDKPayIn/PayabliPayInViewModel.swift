@@ -293,23 +293,26 @@ final class PayabliPayInViewModel: ObservableObject {
         }
         let submittedFlow = component
 
-        // Refused before anything else, and without clearing what the payer typed: only the host can change it.
-        if component.operation != .storePaymentMethod, let details = component.requestConfiguration?.paymentDetails {
-            do {
-                try details.validate()
-            } catch {
-                component.reportFormRefusal(error, method: effectiveSelectedMethod)
-                errorMessage = PayabliPayInFailureMessage.text(for: error, operation: operation)
-                throw error
-            }
+        // A missing field never becomes a submission, so nothing the payer typed is cleared.
+        do {
+            try validateRequiredFields()
+        } catch {
+            component.reportFormRefusal(error, method: effectiveSelectedMethod)
+            errorMessage = PayabliPayInFailureMessage.text(for: error, operation: operation)
+            throw error
         }
 
+        let sendMark = PayabliSendMark()
         do {
-            let result = try await submitToFlow()
+            let result = try await PayabliSendMark.$current.withValue(sendMark) { try await submitToFlow() }
             clearSensitiveFields()
             return result
         } catch {
-            clearSensitiveFieldsAfterFailure()
+            // The card and bank fields go only once the service may have acted on them, whatever the error. A 401
+            // that is not resent left nothing the service acted on, so the payer's entry stays.
+            if sendMark.mayHaveLeft {
+                clearSensitiveFieldsAfterFailure()
+            }
             // After the clear, because its edits take a mark off. A refusal of a flow replaced while
             // it was in flight marks nothing.
             if component === submittedFlow {
@@ -327,7 +330,6 @@ final class PayabliPayInViewModel: ObservableObject {
     private func submitToFlow() async throws -> PayabliPayInResult {
         let request: PayabliPayInRequest?
         do {
-            try validateRequiredFields()
             request = try configuredRequest()
         } catch {
             component.reportFormRefusal(error, method: effectiveSelectedMethod)

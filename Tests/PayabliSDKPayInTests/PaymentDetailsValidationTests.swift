@@ -43,12 +43,44 @@ final class PaymentDetailsValidationTests: XCTestCase {
         }
     }
 
-    func testANegativeFeeIsRefusedAndANegativeSurchargeIsSent() {
+    func testANegativeFeeOrSurchargeIsRefused() {
         XCTAssertEqual(
             refusal(PayabliPayInPaymentDetails(totalAmount: 12.34, serviceFee: -0.01)),
             "Service fee cannot be negative."
         )
-        XCTAssertNil(refusal(PayabliPayInPaymentDetails(totalAmount: 12.34, surchargeFee: -0.31)))
+        XCTAssertEqual(
+            refusal(PayabliPayInPaymentDetails(totalAmount: 12.34, surchargeFee: -0.31)),
+            "Surcharge cannot be negative."
+        )
+    }
+
+    func testAZeroSurchargeIsAccepted() {
+        XCTAssertNil(refusal(PayabliPayInPaymentDetails(totalAmount: 12.34, surchargeFee: 0)))
+    }
+
+    func testASurchargeAboveTheTotalIsRefused() {
+        XCTAssertEqual(
+            refusal(PayabliPayInPaymentDetails(totalAmount: 0.30, surchargeFee: 0.50)),
+            "Service fee and surcharge must be less than the total amount."
+        )
+    }
+
+    func testAServiceFeeEqualToTheTotalIsRefused() {
+        XCTAssertEqual(
+            refusal(PayabliPayInPaymentDetails(totalAmount: 1.00, serviceFee: 1.00)),
+            "Service fee and surcharge must be less than the total amount."
+        )
+    }
+
+    func testAFeeAndSurchargeACentBelowTheTotalAreAccepted() {
+        XCTAssertNil(refusal(PayabliPayInPaymentDetails(totalAmount: 1.00, serviceFee: 0.50, surchargeFee: 0.49)))
+    }
+
+    func testFeesAreComparedWithTheTotalAtTheTwoPlacesSent() {
+        XCTAssertEqual(
+            refusal(PayabliPayInPaymentDetails(totalAmount: 1.004, serviceFee: 0.5, surchargeFee: 0.5)),
+            "Service fee and surcharge must be less than the total amount."
+        )
     }
 
     func testAdditionalDataIsSentAsTheHostGaveItWhateverItsKeysAreCalled() throws {

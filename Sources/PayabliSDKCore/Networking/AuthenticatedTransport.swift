@@ -49,6 +49,9 @@ struct AuthenticatedTransport: PayabliTransport {
         let firstAttempt = try await SentToken.$current.withValue(stamped) {
             try await base.perform(request)
         }
+        // A 401 is refused before the service acts on a request, whatever follows it, so that send ran nothing; a
+        // replay marks again at its own hand-off.
+        lowerTheMarkOnA401(firstAttempt)
 
         guard recovery.isCredentialRejection(firstAttempt) else {
             return firstAttempt
@@ -56,11 +59,6 @@ struct AuthenticatedTransport: PayabliTransport {
 
         if await declinesRecovery(of: request, rejectedBy: firstAttempt, carrying: stamped) {
             return firstAttempt
-        }
-
-        // A 401 is refused before the service acts on a request, so that send ran nothing; the replay marks again.
-        if firstAttempt.statusCode == 401 {
-            PayabliSendMark.current?.lower()
         }
 
         logger.info(
@@ -101,6 +99,7 @@ struct AuthenticatedTransport: PayabliTransport {
         let secondAttempt = try await SentToken.$current.withValue(replayed) {
             try await base.perform(request)
         }
+        lowerTheMarkOnA401(secondAttempt)
         if recovery.isCredentialRejection(secondAttempt), !request.isCallerRefusal(secondAttempt) {
             logger.warning(
                 "recovery exhausted: the replay was refused too"
@@ -109,6 +108,15 @@ struct AuthenticatedTransport: PayabliTransport {
             throw await finishingTheSession(refusedOn: replayed)
         }
         return secondAttempt
+    }
+
+    /// Lowers the payment's send mark when `attempt` was answered 401, since the service ran nothing for it.
+    ///
+    /// - Parameter attempt: one send's answer.
+    private func lowerTheMarkOnA401(_ attempt: PayabliResponse) {
+        if attempt.statusCode == 401 {
+            PayabliSendMark.current?.lower()
+        }
     }
 
     /// Whether `rejection` goes back to the caller unrecovered: the route pins its credential, or refused the caller

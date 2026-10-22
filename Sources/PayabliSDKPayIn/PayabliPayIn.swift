@@ -474,6 +474,13 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
             mint: newIdempotencyKey
         )
         let mark = PayabliSendMark()
+        // The submission around this one, such as the form's, learns whether the payment left.
+        let submission = PayabliSendMark.current
+        defer {
+            if mark.mayHaveLeft {
+                submission?.set()
+            }
+        }
         do {
             let result = try await PayabliSendMark.$current.withValue(mark) { try await send(reservation.key) }
             heldKeys.settle(reservation, outcome: .answered, now: now())

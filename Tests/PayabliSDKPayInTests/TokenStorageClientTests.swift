@@ -836,11 +836,11 @@ private actor MockTransport: PayabliTransport {
     }
 
     func perform(_ request: PayabliRequest) async throws -> PayabliResponse {
+        // It stands for the service, so every call has reached the HTTP layer.
+        PayabliSendMark.current?.set()
         requests.append(request)
         return PayabliResponse(
-            statusCode: statusCode,
-            headers: [:],
-            body: Data(responseBody.utf8)
+            statusCode: statusCode, headers: [:], body: Data(responseBody.utf8)
         )
     }
 

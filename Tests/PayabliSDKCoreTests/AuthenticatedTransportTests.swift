@@ -113,7 +113,7 @@ final class AuthenticatedTransportTests: XCTestCase {
         XCTAssertTrue(mark.mayHaveLeft)
     }
 
-    func testAPinned401LeavesTheMarkItsSendRaised() async throws {
+    func testAPinned401LowersTheMarkItsSendRaised() async throws {
         let stub = RecordingStub(status: Self.unauthorized)
         stub.install()
         defer { stub.uninstall() }
@@ -126,7 +126,7 @@ final class AuthenticatedTransportTests: XCTestCase {
         _ = try await PayabliSendMark.$current.withValue(mark) { try await transport.perform(pinned) }
 
         XCTAssertEqual(stub.count, 1)
-        XCTAssertTrue(mark.mayHaveLeft, "recovery declined, so nothing past the pinned branch touches the mark")
+        XCTAssertFalse(mark.mayHaveLeft, "a send refused with 401 ran nothing, pinned route or not")
     }
 
     func testASecond401IsTerminalAndThereIsNoThirdAttempt() async throws {

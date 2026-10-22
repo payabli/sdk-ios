@@ -295,9 +295,9 @@ recognizable on the store route, so a key sent there is read by nothing.
 
 | Field | Notes |
 | --- | --- |
-| `totalAmount` | Required. Must be greater than 0. |
+| `totalAmount` | Required. The amount charged, including any surcharge sent. Must be greater than 0, and greater than `serviceFee` plus `surchargeFee`. |
 | `serviceFee` | Optional. Must not be negative. Currency JSON is normalized to two decimals such as `0.10`. |
-| `surchargeFee` | Optional. Currency JSON is normalized to two decimals such as `0.30`. |
+| `surchargeFee` | Optional. Already included in `totalAmount`. Must not be negative. Currency JSON is normalized to two decimals such as `0.30`. |
 | `currency` | Optional processor currency, for example `USD`. |
 | `checkNumber` | Optional for check flows. |
 | `checkUniqueId` | Optional for check flows. |
@@ -551,7 +551,7 @@ but must still send a value.
 
 Capture and authorize hosted forms display read-only payment summary rows before
 submit: Fee and Surcharge when sent as something other than zero, Amount (the total
-less the fee) beside either one unless `showsBaseAmount` is false, and Total
+less the fee and the surcharge) beside either one unless `showsBaseAmount` is false, and Total
 whenever it is not zero. The last `.summary` section listed places and titles them;
 without one, a summary is added after the inputs. Rows are vertical. Labels are left aligned; values are right aligned.
 Relabel a money row through `PayabliPayInLabels.fieldLabels`, and the Total label
@@ -561,7 +561,8 @@ A host that draws its own summary reads each row from `PayabliPayInSummaryRows`.
 `Decimal?`, where nil means the form draws no row. When submit would refuse the payment details,
 every figure is nil and the form draws no summary. A card or bank account submit refuses does not
 empty the summary. Amount is the total amount less the service
-fee, and Total is the total amount plus any surcharge. `formattedAmount(_:currency:)` writes a
+fee and any surcharge, and Total is the total amount, which includes any surcharge sent.
+`formattedAmount(_:currency:)` writes a
 figure the way the form does.
 
 `PayabliPayInPaymentSummaryConfiguration`:

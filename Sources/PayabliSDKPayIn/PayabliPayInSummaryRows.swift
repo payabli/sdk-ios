@@ -15,8 +15,8 @@ public enum PayabliPayInSummaryRows {
 
     /// The figure a money row shows, at the two places it is sent, or nil when the form draws no row for it.
     ///
-    /// Amount is the total amount less the service fee, and has a figure only while a fee or a surcharge sits
-    /// beside it. Every row is nil while submit would refuse the payment details.
+    /// Amount is the total amount less the service fee and any surcharge sent, and has a figure only while a fee or
+    /// a surcharge sits beside it. Every row is nil while submit would refuse the payment details.
     ///
     /// - Parameter field: the money field whose figure the row shows; any other field draws no row.
     /// - Parameter paymentDetails: the payment's amounts, at the precision the request carries them.
@@ -30,7 +30,7 @@ public enum PayabliPayInSummaryRows {
             guard fee != nil || surcharge != nil,
                   let charge = PayInAmount.shown(paymentDetails.totalAmount)
             else { return nil }
-            let base = charge - (fee ?? 0)
+            let base = charge - (fee ?? 0) - (surcharge ?? 0)
             return base.isZero ? nil : base
         case .serviceFee:
             return fee
@@ -41,17 +41,14 @@ public enum PayabliPayInSummaryRows {
         }
     }
 
-    /// What the service charges, the total amount plus any surcharge, or nil when that is nothing or when submit
-    /// would refuse the payment details.
+    /// What the service charges, the total amount, which already holds any surcharge sent, or nil when submit would
+    /// refuse the payment details.
     ///
-    /// - Parameter paymentDetails: the payment's amounts, from which the charge is computed.
+    /// - Parameter paymentDetails: the payment's amounts, from which the charge is read.
     /// - Returns: the charge the Total row shows, or nil when there is none.
     public static func totalRowAmount(paymentDetails: PayabliPayInPaymentDetails?) -> Decimal? {
-        guard let paymentDetails, areValid(paymentDetails),
-              let charge = PayInAmount.shown(paymentDetails.totalAmount)
-        else { return nil }
-        let total = charge + (PayInAmount.shown(paymentDetails.surchargeFee) ?? 0)
-        return total.isZero ? nil : total
+        guard let paymentDetails, areValid(paymentDetails) else { return nil }
+        return PayInAmount.shown(paymentDetails.totalAmount)
     }
 
     /// A figure as the form writes it: the device locale's separators, the currency's symbol, two places.

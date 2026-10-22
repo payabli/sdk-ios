@@ -753,9 +753,9 @@ let sheetConfiguration = PayabliPayInSheetConfiguration(
 
 | Field | Description |
 | --- | --- |
-| `totalAmount` | Required amount. Must be greater than 0. |
+| `totalAmount` | Required amount charged, including any surcharge sent. Must be greater than 0, and greater than `serviceFee` plus `surchargeFee`. |
 | `serviceFee` | Optional service fee. Must not be negative. Serialized as currency, for example `0.10`. |
-| `surchargeFee` | Optional surcharge. Serialized as currency, for example `0.30`. |
+| `surchargeFee` | Optional surcharge, already included in `totalAmount`. Must not be negative. Serialized as currency, for example `0.30`. |
 | `currency` | Optional currency, for example `USD`. |
 | `checkNumber` | Optional check number for check workflows. |
 | `checkUniqueId` | Optional check unique ID for check workflows. |
