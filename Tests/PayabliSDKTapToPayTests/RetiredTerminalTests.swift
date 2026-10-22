@@ -80,6 +80,30 @@ final class RetiredTerminalTests: XCTestCase {
         XCTAssertEqual(requests.updates, 1, "the opened payment's close was attempted")
     }
 
+    func testARetiredTerminalChargingWhileAnotherTerminalReadsIsRefusedAsRetired() async throws {
+        let (other, otherProvider, _, _) = try makeTTP(live: true)
+        try await other.initialize()
+        let live = LiveFlag()
+        let (retired, retiredProvider, _, _) = try makeTTP(live: live)
+        try await retired.initialize()
+        live.value = false
+        let reading = expectation(description: "the other terminal is reading")
+        let release = ReadRelease()
+        otherProvider.whileReading = {
+            reading.fulfill()
+            await release.wait()
+        }
+        let otherCharge = Task { try? await self.charge(other) }
+        await fulfillment(of: [reading], timeout: 5)
+
+        let refusal = await failure { _ = try await self.charge(retired) }
+        release.open()
+        _ = await otherCharge.value
+
+        assertRetired(refusal, on: retired)
+        XCTAssertEqual(retiredProvider.startReadingCalls, 0)
+    }
+
     func testARetiredTerminalRefusesActivation() async throws {
         let live = LiveFlag()
         let (ttp, _, attestation, _) = try makeTTP(live: live)
@@ -254,5 +278,36 @@ private final class Requests: @unchecked Sendable {
                 data
             )
         }
+    }
+}
+
+/// Holds a read open until a test lets it finish.
+private final class ReadRelease: @unchecked Sendable {
+    private let lock = NSLock()
+    private var opened = false
+    private var waiting: CheckedContinuation<Void, Never>?
+
+    func wait() async {
+        await withCheckedContinuation { continuation in
+            let resumeNow = lock.withLock { () -> Bool in
+                if opened {
+                    return true
+                }
+                waiting = continuation
+                return false
+            }
+            if resumeNow {
+                continuation.resume()
+            }
+        }
+    }
+
+    func open() {
+        let continuation = lock.withLock { () -> CheckedContinuation<Void, Never>? in
+            opened = true
+            defer { waiting = nil }
+            return waiting
+        }
+        continuation?.resume()
     }
 }

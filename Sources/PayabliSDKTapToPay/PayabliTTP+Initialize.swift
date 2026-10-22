@@ -44,6 +44,9 @@ extension PayabliTTP {
     /// - Throws: `notReady` when a charge already holds the gate, whether it is running or still waiting
     ///   for a setup to finish.
     func holdingSessionSetup<T>(_ body: @MainActor () async throws -> T) async throws -> T {
+        // Before the busy refusal: a retired terminal stays retired, so being told the reader is busy would send it
+        // back here for good.
+        try requireLiveSession()
         let gate = SessionSetupGate.shared
         if gate.isHeldByCharge {
             throw PayabliTTPError.notReady(current: sessionState)
