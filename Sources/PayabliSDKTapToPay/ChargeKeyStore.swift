@@ -27,9 +27,8 @@ package final class ChargeKeyStore: @unchecked Sendable {
         self.now = now
     }
 
-    /// The key a charge's opening sends, and whether it is one already held. A `.retry` is handed the newest key held
-    /// for `entry` under `environment`, and mints only when none is held; a `.newPayment` always mints and leaves every
-    /// held key where it is.
+    /// The key a charge's opening sends. A `.retry` is handed the newest key held for `entry` under `environment` and
+    /// mints only when none is held; a `.newPayment` always mints and leaves every held key where it is.
     ///
     /// - Parameter entry: the entry point the charge is for.
     /// - Parameter environment: the environment the charge is sent to.
