@@ -33,7 +33,9 @@ final class TapToPayOnDeviceTests: XCTestCase {
                 attestor: RealAppAttestor(),
                 storage: KeychainStorage(migrating: PayabliKeychainKey.all),
                 deviceIdentity: session.deviceIdentity
-            )
+            ),
+            // The session was never installed, so it reads as live only because the test says so.
+            isLive: { true }
         )
     }
 

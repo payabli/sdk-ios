@@ -191,26 +191,32 @@ final class TapToPayReportsTests: XCTestCase {
             urlSession: StubURLProtocol.makeSession(),
             telemetryTransport: firstTransport
         )
-        let provider = MockTapToPayProvider()
-        provider.prepareReaderResult = .failure(PayabliTTPError.readerCredentialsUnusable)
         let ttp = PayabliTTP(
             session: first,
-            provider: provider,
+            provider: MockTapToPayProvider(),
             attestation: MockDeviceAttestationService(),
             retryPolicy: RetryPolicy(maxAttempts: 1, baseDelay: 0, maxDelay: 0, multiplier: 1, maxJitter: 0)
         )
-        PayabliSession.resetForTesting()
+        // Another session is installed while the run fetches its configuration, so the work has already started.
         let secondTransport = InMemoryTelemetryTransport()
-        let second = try PayabliSession.install(
-            config: PayabliConfig(entryPoint: "second", environment: .sandbox, tokenProvider: { "seed_token" }),
-            urlSession: StubURLProtocol.makeSession(),
-            telemetryTransport: secondTransport
-        )
+        let second = InstalledLater()
+        let answerConfig = Self.configHandler(status: 200)
+        StubURLProtocol.handler = { request in
+            guard second.value == nil else { return try answerConfig(request) }
+            PayabliSession.resetForTesting()
+            second.value = try PayabliSession.install(
+                config: PayabliConfig(entryPoint: "second", environment: .sandbox, tokenProvider: { "seed_token" }),
+                urlSession: StubURLProtocol.makeSession(),
+                telemetryTransport: secondTransport
+            )
+            return try answerConfig(request)
+        }
 
         _ = try? await ttp.initialize()
+        let installed = try XCTUnwrap(second.value)
         await ttp.reports.sent()
         await first.telemetry.flush()
-        await second.telemetry.flush()
+        await installed.telemetry.flush()
 
         let reported = await sent(firstTransport).filter { $0.event.hasPrefix("ttp.") }
         XCTAssertEqual(
@@ -372,5 +378,16 @@ private actor HeldTelemetryTransport: TelemetryTransport {
         released = true
         held?.resume()
         held = nil
+    }
+}
+
+/// The session a test installs from inside a running request.
+private final class InstalledLater: @unchecked Sendable {
+    private let lock = NSLock()
+    private var stored: PayabliSession?
+
+    var value: PayabliSession? {
+        get { lock.withLock { stored } }
+        set { lock.withLock { stored = newValue } }
     }
 }
