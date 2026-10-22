@@ -289,7 +289,6 @@ import PayabliSDKTapToPay
 let ttp = try await PayabliTTP.create()
 try await ttp.initialize()
 let result = try await ttp.charge(
-    type: .sale,
     paymentDetails: PayabliTTPPaymentDetails(amount: 9.99),
     customer: PayabliTTPCustomerData(firstName: "Jane", lastName: "Doe")
 )
@@ -350,7 +349,9 @@ The SDK is written in Swift, and the card-not-present form is a SwiftUI view.
 - **Objective-C.** Start the session with `PayabliSessionObjC`'s
   `initializeWithTokenHandler:entryPoint:environment:completionHandler:`. `PayabliTTP` has an `@objc`
   companion, taking a completion handler, for every `async` method, and is built with
-  `createWithCompletionHandler:`. For card-not-present, Objective-C uses `PayabliPayInObjC`, built with
+  `createWithCompletionHandler:`. Its `charge:completion:` takes a `PayabliTTPChargeRequestObjC`, built with
+  `initWithPaymentDetails:`, whose `customer`, `invoice`, `orderDescription` and `attempt` are optional and take the
+  Swift defaults when unset. For card-not-present, Objective-C uses `PayabliPayInObjC`, built with
   `createAndReturnError:` on the same session. It offers `addCard` and `addBankAccount`, and `capture`,
   `authorize`, `captureAuthorizedTransaction` and `voidTransaction`, which take a `PayabliPayInRequestObjC` or
   `PayabliPayInAuthorizedRequestObjC` and complete with a `PayabliPayInResultObjC`.

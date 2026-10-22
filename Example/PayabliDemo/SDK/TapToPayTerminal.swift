@@ -54,7 +54,6 @@ final class TapToPayTerminal: ObservableObject {
     func charge(amount: Decimal, suppliesCustomer: Bool) async throws -> String {
         try await run {
             let result = try await terminal.charge(
-                type: .sale,
                 paymentDetails: PayabliTTPPaymentDetails(amount: amount),
                 customer: suppliesCustomer
                     ? TapToPayDemoCustomer.customerData

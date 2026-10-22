@@ -75,7 +75,6 @@ class PayabliTTP {
   /// backend `/update`. Returns the [paymentTransId] on success.
   static Future<String> charge({
     required PayabliTTPPaymentDetails paymentDetails,
-    PayabliTTPPaymentType type = PayabliTTPPaymentType.sale,
     PayabliTTPCustomerData? customer,
     PayabliTTPInvoiceData? invoice,
     String? orderDescription,
@@ -83,7 +82,6 @@ class PayabliTTP {
     try {
       final result = await _payabliMethodChannel
           .invokeMapMethod<String, dynamic>('charge', {
-            'type': type.index,
             'paymentDetails': paymentDetails._toMap(),
             if (customer != null) 'customer': customer._toMap(),
             if (invoice != null) 'invoice': invoice._toMap(),
@@ -384,9 +382,6 @@ class PayabliPayInStoredPaymentMethod {
     );
   }
 }
-
-/// Mirrors `PayabliTTPPaymentType`. v1.0 supports only [sale].
-enum PayabliTTPPaymentType { sale }
 
 /// Mirrors `PayabliTTPSessionState` (raw indices match the @objc Int enum).
 /// The session state and what its case carries. The native enum carries

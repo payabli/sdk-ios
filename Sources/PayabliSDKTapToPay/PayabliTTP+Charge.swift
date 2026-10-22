@@ -16,7 +16,7 @@ private enum TTPUpdateOutcome {
 @available(iOS 16.7, *)
 @MainActor
 extension PayabliTTP {
-    /// Charge a transaction. `.sale` is the only type.
+    /// Charges a sale.
     ///
     /// Threads the `paymentDetails` / `customer` / `invoice` / `orderDescription`
     /// snapshot through the 3-step flow:
@@ -27,24 +27,23 @@ extension PayabliTTP {
     ///      response travels; everything else was persisted at step 1.
     ///
     /// - Parameters:
-    ///   - type: the transaction's kind; `.sale` is the only one this surface takes.
     ///   - paymentDetails: the amount, service fee and currency to charge.
     ///   - customer: the customer to attach, empty when the caller passes none.
     ///   - invoice: the invoice to attach, whose `invoiceNumber` reaches the read.
     ///   - orderDescription: an order description, trimmed, with a blank one dropped.
+    ///   - attempt: `.retry` to repeat the most recent charge whose outcome is unknown; `.newPayment` otherwise.
     /// - Returns: the transaction result, carrying the `paymentTransId` minted at initiate.
     public func charge(
-        type: PayabliTTPPaymentType,
         paymentDetails: PayabliTTPPaymentDetails,
         customer: PayabliTTPCustomerData = PayabliTTPCustomerData(),
         invoice: PayabliTTPInvoiceData = PayabliTTPInvoiceData(),
-        orderDescription: String? = nil
+        orderDescription: String? = nil,
+        attempt: PayabliAttempt = .newPayment
     ) async throws -> TransactionResult {
         let progress = ChargeProgress()
         do {
             return try await holdingSessionSetup {
                 try await runCharge(
-                    type: type,
                     paymentDetails: paymentDetails,
                     customer: customer,
                     invoice: invoice,
@@ -62,17 +61,12 @@ extension PayabliTTP {
     }
 
     private func runCharge(
-        type: PayabliTTPPaymentType,
         paymentDetails: PayabliTTPPaymentDetails,
         customer: PayabliTTPCustomerData,
         invoice: PayabliTTPInvoiceData,
         orderDescription: String?,
         progress: ChargeProgress
     ) async throws -> TransactionResult {
-        guard type == .sale else {
-            throw PayabliTTPError.invalidState(current: sessionState, attempted: "charge(non-sale)")
-        }
-
         // Called directly: `reinitialize()` would wait on the gate this charge holds. Its own task keeps a
         // cancelled charge from stopping the repair.
         try await Task { @MainActor in try await self.runReinitializeIfNeeded() }.value
@@ -197,17 +191,7 @@ extension PayabliTTP {
         }
     }
 
-    /// `@objc` companion to `charge(type:paymentDetails:customer:invoice:orderDescription:)`.
-    ///
-    /// ObjC / MAUI / Flutter / RN consumers express:
-    ///   - `type` as the raw value of `PayabliTTPPaymentType` (`Int`); falls
-    ///     back to `.sale` if the value is unknown — v1.0 only supports
-    ///     `.sale = 0` so this is the practical identity.
-    ///   - `paymentDetails` as the `*ObjC` companion class (non-null).
-    ///   - `customer` and `invoice` as their `*ObjC` companion classes; pass
-    ///     `nil` for "no customer / no invoice provided" (equivalent to
-    ///     passing the default-initialized Swift struct).
-    ///   - `orderDescription` as an optional `String`.
+    /// `@objc` companion to `charge(paymentDetails:customer:invoice:orderDescription:attempt:)`.
     ///
     /// On success the completion is invoked with a non-nil
     /// `PayabliTTPTransactionResultObjC` and `nil` error. On failure the
@@ -216,33 +200,26 @@ extension PayabliTTP {
     /// on the main thread.
     ///
     /// - Parameters:
-    ///   - type: the raw value of `PayabliTTPPaymentType`, `.sale` where the value is unknown.
-    ///   - paymentDetails: the payment's amounts and currency, converted from the companion class.
-    ///   - customer: the customer as the companion class carries it, or `nil` for none.
-    ///   - invoice: the invoice as the companion class carries it, or `nil` for none.
-    ///   - orderDescription: an order description, or `nil` for none.
+    ///   - request: the payment details, and the customer, invoice, description and attempt where they are set.
     ///   - completion: the result, or the error the charge failed with.
     @objc public func charge(
-        type: Int,
-        paymentDetails: PayabliTTPPaymentDetailsObjC,
-        customer: PayabliTTPCustomerDataObjC?,
-        invoice: PayabliTTPInvoiceDataObjC?,
-        orderDescription: String?,
+        _ request: PayabliTTPChargeRequestObjC,
         completion: @escaping (PayabliTTPTransactionResultObjC?, NSError?) -> Void
     ) {
-        let paymentType = PayabliTTPPaymentType(rawValue: type) ?? .sale
-        let swiftDetails = paymentDetails.toSwift()
-        let swiftCustomer = customer?.toSwift() ?? PayabliTTPCustomerData()
-        let swiftInvoice = invoice?.toSwift() ?? PayabliTTPInvoiceData()
+        let swiftDetails = request.paymentDetails.toSwift()
+        let swiftCustomer = request.customer?.toSwift() ?? PayabliTTPCustomerData()
+        let swiftInvoice = request.invoice?.toSwift() ?? PayabliTTPInvoiceData()
+        let orderDescription = request.orderDescription
+        let attempt = request.attempt
 
         Task { @MainActor in
             do {
                 let result = try await self.charge(
-                    type: paymentType,
                     paymentDetails: swiftDetails,
                     customer: swiftCustomer,
                     invoice: swiftInvoice,
-                    orderDescription: orderDescription
+                    orderDescription: orderDescription,
+                    attempt: attempt
                 )
                 completion(PayabliTTPTransactionResultObjC(result), nil)
             } catch {

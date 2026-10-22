@@ -313,7 +313,6 @@ final class TapToPayOnDeviceTests: XCTestCase {
         var outcome = "approved"
         do {
             _ = try await ttp.charge(
-                type: .sale,
                 paymentDetails: PayabliTTPPaymentDetails(amount: 1.00),
                 customer: TapToPayDemoCustomer.customerData,
                 orderDescription: "device tests"
@@ -389,7 +388,6 @@ final class TapToPayOnDeviceTests: XCTestCase {
         let charging = Task { @MainActor in
             do {
                 _ = try await ttp.charge(
-                    type: .sale,
                     paymentDetails: PayabliTTPPaymentDetails(amount: 1.00),
                     customer: customer,
                     orderDescription: "device tests"

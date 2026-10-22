@@ -1,3 +1,4 @@
+import PayabliSDKCore
 @testable import PayabliSDKTapToPay
 import XCTest
 
@@ -10,6 +11,21 @@ import XCTest
 /// hold the same fields with the same labels as the Swift structs and that
 /// `toSwift()` produces an equivalent value.
 final class PayabliTTPObjCInteropTests: XCTestCase {
+    // MARK: - PayabliTTPChargeRequestObjC
+
+    func testAChargeRequestLeftUnsetTakesTheSwiftDefaults() {
+        let request = PayabliTTPChargeRequestObjC(
+            paymentDetails: PayabliTTPPaymentDetailsObjC(
+                amount: 1, serviceFee: 0, currency: "USD", paymentDescription: nil
+            )
+        )
+
+        XCTAssertNil(request.customer)
+        XCTAssertNil(request.invoice)
+        XCTAssertNil(request.orderDescription)
+        XCTAssertEqual(request.attempt, .newPayment)
+    }
+
     // MARK: - PayabliTTPCustomerDataObjC
 
     func testCustomerDataObjCRoundTripPreservesAllFields() {

@@ -216,7 +216,6 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
                 return
             }
 
-            let typeRaw = (args["type"] as? Int) ?? 0
             let serviceFee = (pdDict["serviceFee"] as? Double) ?? 0
             // Pass through nil so the SDK omits `currency` from `/initiate` and the
             // backend authorizes in the merchant's configured processor currency.
@@ -230,17 +229,12 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
                 paymentDescription: paymentDescription
             )
 
-            let customer = (args["customer"] as? [String: Any]).map(Self.customerObjC(from:))
-            let invoice = (args["invoice"] as? [String: Any]).map(Self.invoiceObjC(from:))
-            let orderDescription = args["orderDescription"] as? String
+            let request = PayabliTTPChargeRequestObjC(paymentDetails: paymentDetails)
+            request.customer = (args["customer"] as? [String: Any]).map(Self.customerObjC(from:))
+            request.invoice = (args["invoice"] as? [String: Any]).map(Self.invoiceObjC(from:))
+            request.orderDescription = args["orderDescription"] as? String
 
-            ttp.charge(
-                type: typeRaw,
-                paymentDetails: paymentDetails,
-                customer: customer,
-                invoice: invoice,
-                orderDescription: orderDescription
-            ) { txnResult, error in
+            ttp.charge(request) { txnResult, error in
                 if let txnResult {
                     result(["paymentTransId": txnResult.paymentTransId])
                 } else if let error {

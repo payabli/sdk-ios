@@ -1,4 +1,5 @@
 import Foundation
+import PayabliSDKCore
 
 // MARK: - ObjC companions for transaction-data structs
 
@@ -149,11 +150,28 @@ public final class PayabliTTPCustomerDataObjC: NSObject {
     }
 }
 
+/// A card-present charge, for an Objective-C caller. Each property is a parameter of the Swift
+/// `charge(paymentDetails:customer:invoice:orderDescription:attempt:)`, and one left unset takes that
+/// parameter's default.
+@objc(PayabliTTPChargeRequestObjC)
+public final class PayabliTTPChargeRequestObjC: NSObject {
+    @objc public let paymentDetails: PayabliTTPPaymentDetailsObjC
+    @objc public var customer: PayabliTTPCustomerDataObjC?
+    @objc public var invoice: PayabliTTPInvoiceDataObjC?
+    @objc public var orderDescription: String?
+    @objc public var attempt: PayabliAttempt = .newPayment
+
+    /// - Parameter paymentDetails: the amount, service fee and currency to charge.
+    @objc public init(paymentDetails: PayabliTTPPaymentDetailsObjC) {
+        self.paymentDetails = paymentDetails
+        super.init()
+    }
+}
+
 /// ObjC companion for `TransactionResult`.
 ///
-/// Returned to ObjC callers via the `charge(type:paymentDetails:customer:invoice:orderDescription:completion:)`
-/// completion block when the underlying Swift `charge(...)` returns
-/// successfully.
+/// Returned to ObjC callers via the `charge(_:completion:)` completion block when the underlying Swift
+/// `charge(...)` returns successfully.
 @objc(PayabliTTPTransactionResultObjC)
 public final class PayabliTTPTransactionResultObjC: NSObject {
     @objc public let paymentTransId: String

@@ -141,7 +141,7 @@ final class PayabliTTPChargingTests: XCTestCase {
             guard let ttp else { return }
             during.second = Task { @MainActor in
                 do {
-                    _ = try await ttp.charge(type: .sale, paymentDetails: PayabliTTPPaymentDetails(amount: 1))
+                    _ = try await ttp.charge(paymentDetails: PayabliTTPPaymentDetails(amount: 1))
                 } catch {
                     during.refusal = (error as? TapToPayError)?.type
                 }
@@ -256,7 +256,7 @@ final class PayabliTTPChargingTests: XCTestCase {
             guard let other else { return }
             during.second = Task { @MainActor in
                 do {
-                    _ = try await other.charge(type: .sale, paymentDetails: PayabliTTPPaymentDetails(amount: 1))
+                    _ = try await other.charge(paymentDetails: PayabliTTPPaymentDetails(amount: 1))
                 } catch {
                     during.refusal = (error as? TapToPayError)?.type
                 }
@@ -287,7 +287,7 @@ final class PayabliTTPChargingTests: XCTestCase {
             await Self.letOtherWorkRun()
             let second = Task { @MainActor in
                 do {
-                    _ = try await ttp.charge(type: .sale, paymentDetails: PayabliTTPPaymentDetails(amount: 1))
+                    _ = try await ttp.charge(paymentDetails: PayabliTTPPaymentDetails(amount: 1))
                 } catch {
                     during.refusal = (error as? TapToPayError)?.type
                 }
@@ -373,6 +373,30 @@ final class PayabliTTPChargingTests: XCTestCase {
         XCTAssertEqual(during.callReturnedInRead, false, "the reinitialize returned while the reader waited for a card")
         XCTAssertEqual(provider.prepareReaderCalls, 1)
         XCTAssertEqual(ttp.sessionState, .ready)
+    }
+
+    func testAnObjectiveCChargeWithOnlyPaymentDetailsIsSentWithTheDefaultCustomer() async throws {
+        let (ttp, _) = try await makeReadyTTP()
+        let request = PayabliTTPChargeRequestObjC(
+            paymentDetails: PayabliTTPPaymentDetailsObjC(
+                amount: 1, serviceFee: 0, currency: "USD", paymentDescription: nil
+            )
+        )
+
+        let done = expectation(description: "charge")
+        ttp.charge(request) { result, _ in
+            XCTAssertEqual(result?.paymentTransId, Self.paymentTransId)
+            done.fulfill()
+        }
+        await fulfillment(of: [done], timeout: 5)
+
+        let body = try XCTUnwrap(Self.responses.initiateBody)
+        let sent = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
+        XCTAssertEqual(
+            sent["customerData"] as? [String: String],
+            ["firstName": "", "lastName": "", "customerNumber": ""]
+        )
+        XCTAssertNil(sent["invoiceData"])
     }
 
     func testTheReadersPromptsReportOnTheState() async throws {
@@ -462,6 +486,12 @@ final class PayabliTTPChargingTests: XCTestCase {
         private var initiate = 200
         private var update = 200
         private var initiates = 0
+        private var lastInitiateBody: Data?
+
+        var initiateBody: Data? {
+            get { lock.withLock { lastInitiateBody } }
+            set { lock.withLock { lastInitiateBody = newValue } }
+        }
 
         var initiateCalls: Int {
             lock.withLock { initiates }
@@ -486,6 +516,7 @@ final class PayabliTTPChargingTests: XCTestCase {
                 initiate = 200
                 update = 200
                 initiates = 0
+                lastInitiateBody = nil
             }
         }
     }
@@ -520,7 +551,7 @@ final class PayabliTTPChargingTests: XCTestCase {
     }
 
     private func charge(_ ttp: PayabliTTP) async throws -> TransactionResult {
-        try await ttp.charge(type: .sale, paymentDetails: PayabliTTPPaymentDetails(amount: 1, currency: "USD"))
+        try await ttp.charge(paymentDetails: PayabliTTPPaymentDetails(amount: 1, currency: "USD"))
     }
 
     private func chargeFailure(_ ttp: PayabliTTP) async -> TapToPayError? {
@@ -541,6 +572,7 @@ final class PayabliTTPChargingTests: XCTestCase {
         let body: [String: Any]
         if path.contains("/MoneyIn/initiate") {
             PayabliTTPChargingTests.responses.countInitiate()
+            PayabliTTPChargingTests.responses.initiateBody = request.httpBody
             status = PayabliTTPChargingTests.responses.initiateStatus
             body = ["code": "A01", "data": ["paymentTransId": PayabliTTPChargingTests.paymentTransId]]
         } else if path.contains("/MoneyIn/update/") {

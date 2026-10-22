@@ -197,7 +197,7 @@ final class RetiredTerminalTests: XCTestCase {
     }
 
     private func charge(_ ttp: PayabliTTP) async throws -> TransactionResult {
-        try await ttp.charge(type: .sale, paymentDetails: PayabliTTPPaymentDetails(amount: 1, currency: "USD"))
+        try await ttp.charge(paymentDetails: PayabliTTPPaymentDetails(amount: 1, currency: "USD"))
     }
 
     private func failure(_ block: () async throws -> Void) async -> any Error {
