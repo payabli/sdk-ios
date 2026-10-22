@@ -406,9 +406,9 @@ final class PayInTelemetryTests: XCTestCase {
 private actor RecordingTelemetryTransport: TelemetryTransport {
     private(set) var events: [TelemetryEvent] = []
 
-    func send(_ batch: [TelemetryEvent], droppedSinceLastSend: Int) async -> Bool {
+    func send(_ batch: [TelemetryEvent], droppedSinceLastSend: Int) async -> TelemetrySendOutcome {
         events += batch
-        return true
+        return .delivered
     }
 }
 

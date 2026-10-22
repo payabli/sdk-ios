@@ -384,6 +384,9 @@ Fill in `Secrets.swift`, then start the token server as its
 
 ## Privacy and data collection
 
+The SDK sends error and usage events to Payabli, with no card, payer or account data. The events are
+not listed.
+
 Every request the SDK sends to Payabli carries an `X-Pyb-Client` header with the SDK version, the platform, the OS
 version, the device model, the locale and the device ID described under [Device identity](#device-identity).
 A value that's missing, blank or isn't printable ASCII is left out. The header can't be turned off.

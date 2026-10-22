@@ -7,6 +7,7 @@ package actor InMemoryTelemetryTransport: TelemetryTransport {
     /// The eviction count each batch carried, in the order the batches arrived.
     package private(set) var droppedCounts: [Int] = []
     private var refusing = false
+    private var discarding = false
 
     package init() {}
 
@@ -17,11 +18,21 @@ package actor InMemoryTelemetryTransport: TelemetryTransport {
         self.refusing = refusing
     }
 
+    /// Makes every later batch count as discarded, or as accepted again. Discarded batches are still recorded.
+    ///
+    /// - Parameter discarding: whether to discard.
+    package func discard(_ discarding: Bool) {
+        self.discarding = discarding
+    }
+
     @discardableResult
-    package func send(_ batch: [TelemetryEvent], droppedSinceLastSend: Int) async -> Bool {
+    package func send(_ batch: [TelemetryEvent], droppedSinceLastSend: Int) async -> TelemetrySendOutcome {
         batches.append(batch)
         droppedCounts.append(droppedSinceLastSend)
-        return !refusing
+        if discarding {
+            return .discarded
+        }
+        return refusing ? .kept : .delivered
     }
 
     /// Returns all recorded batches and clears the internal buffer.

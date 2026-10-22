@@ -77,7 +77,7 @@ final class TelemetryClientTests: XCTestCase {
         await client.settled()
 
         let batches = await transport.batches
-        XCTAssertEqual(batches.map { $0.map(\.event) }, [["first"], ["second"]])
+        XCTAssertEqual(batches.map { $0.map(\.event) }, [["first"], ["first", "second"]])
     }
 
     func testDeliveryListensForBackgroundingOnceTheFirstEventIsRecorded() async {
@@ -233,22 +233,22 @@ final class TelemetryClientTests: XCTestCase {
         await client.flush()
 
         let counts = await transport.droppedCounts
-        XCTAssertEqual(counts, [1, 1])
+        XCTAssertEqual(counts, [1, 2])
     }
 
     func testAFlushWithNothingToSendDoesNotConsumeTheCount() async {
         let client = makeClient(queueCapacity: 1)
         await client.emit("a")
         await client.emit("b")
-        await transport.refuse(true)
+        await transport.discard(true)
         await client.flush()
-        await transport.refuse(false)
+        await transport.discard(false)
         await client.flush()
         await client.emit("c")
         await client.flush()
 
         let counts = await transport.droppedCounts
-        XCTAssertEqual(counts, [1, 1], "the refused batch's count survives the empty flush after it")
+        XCTAssertEqual(counts, [1, 1], "the discarded batch's count survives the empty flush after it")
     }
 
     func testOneRequestCarriesNoMoreThanOneRequestMay() async {
@@ -262,6 +262,100 @@ final class TelemetryClientTests: XCTestCase {
         XCTAssertEqual(batches.map(\.count), [2, 2, 1])
     }
 
+    // MARK: - A batch that could not be sent
+
+    func testARefusedBatchIsQueuedAgainInOrderAndTheNextFlushSendsIt() async {
+        let client = makeClient()
+        await transport.refuse(true)
+        await client.emit("first")
+        await client.emit("second")
+        await client.flush()
+        await transport.refuse(false)
+
+        await tick()
+        await client.settled()
+
+        let batches = await transport.batches
+        XCTAssertEqual(
+            batches.map { $0.map(\.event) },
+            [["first", "second"], ["first", "second"]],
+            "the refused batch goes back to the front and the next flush sends it"
+        )
+        let buffered = await client.bufferedCount
+        XCTAssertEqual(buffered, 0)
+    }
+
+    func testAFailedSendMakesNoRequestUntilTheNextFlush() async {
+        let client = makeClient(batchSize: 600)
+        for index in 0 ..< 250 {
+            await client.emit("e\(index)")
+        }
+        await transport.refuse(true)
+        await client.flush()
+
+        let afterFailure = await transport.batches
+        XCTAssertEqual(afterFailure.count, 1, "a failed send starts no loop")
+
+        await transport.refuse(false)
+        await tick()
+        await client.settled()
+
+        let batches = await transport.batches
+        XCTAssertEqual(batches.map(\.count), [100, 100, 100, 50], "the next flush drains what waited")
+    }
+
+    func testADiscardedBatchIsNotQueuedAgain() async {
+        let client = makeClient()
+        await transport.discard(true)
+        await client.emit("only")
+        await client.flush()
+
+        let buffered = await client.bufferedCount
+        XCTAssertEqual(buffered, 0, "a discarded batch is dropped, not kept for a retry")
+
+        await transport.discard(false)
+        await tick()
+        await client.settled()
+
+        let batches = await transport.batches
+        XCTAssertEqual(batches.count, 1, "nothing was left for the next flush")
+    }
+
+    func testAFullQueueEvictsTheOldestPutBackEventsAndCountsThem() async {
+        let gated = GatedTelemetryTransport()
+        let client = TelemetryClient(
+            configuration: .init(
+                batchSize: 5,
+                queueCapacity: 3,
+                entry: "test_entry",
+                environment: "sandbox"
+            ),
+            transport: gated,
+            sleep: clock.sleep,
+            lifecycle: lifecycle,
+            deviceId: { nil },
+            queued: []
+        )
+        await gated.reply(with: .kept)
+        await client.emit("first")
+        await client.emit("second", properties: ["outcome": "failed"])
+        await gated.untilHeld()
+        await client.emit("third")
+        await client.emit("fourth")
+        await client.emit("fifth")
+        await gated.open()
+        await client.settled()
+        await gated.reply(with: .delivered)
+
+        await tick()
+        await client.settled()
+
+        let sent = await gated.sent
+        XCTAssertEqual(sent.map { $0.map(\.event) }, [["first", "second"], ["third", "fourth", "fifth"]])
+        let counts = await gated.droppedCounts
+        XCTAssertEqual(counts, [0, 2], "the two oldest put-back events were evicted and counted")
+    }
+
     // MARK: - Best effort
 
     func testAFailedSendNeverReachesTheCaller() async {
@@ -271,7 +365,7 @@ final class TelemetryClientTests: XCTestCase {
         await client.flush()
 
         let buffered = await client.bufferedCount
-        XCTAssertEqual(buffered, 0, "a refused batch is dropped, not kept for a retry")
+        XCTAssertEqual(buffered, 1, "a refused batch is kept for a later flush, never raised to the caller")
     }
 
     // MARK: - The event
@@ -330,13 +424,20 @@ final class TelemetryClientTests: XCTestCase {
 /// Holds every send until opened, and records how many were in flight at once.
 private actor GatedTelemetryTransport: TelemetryTransport {
     private(set) var sent: [[TelemetryEvent]] = []
+    private(set) var droppedCounts: [Int] = []
     private(set) var mostAtOnce = 0
     private var active = 0
     private var isOpen = false
+    private var outcome: TelemetrySendOutcome = .delivered
     private var gates: [CheckedContinuation<Void, Never>] = []
     private var heldWaiters: [CheckedContinuation<Void, Never>] = []
 
-    func send(_ batch: [TelemetryEvent], droppedSinceLastSend: Int) async -> Bool {
+    /// Makes every released send answer with this outcome.
+    func reply(with outcome: TelemetrySendOutcome) {
+        self.outcome = outcome
+    }
+
+    func send(_ batch: [TelemetryEvent], droppedSinceLastSend: Int) async -> TelemetrySendOutcome {
         active += 1
         mostAtOnce = max(mostAtOnce, active)
         if !isOpen {
@@ -347,8 +448,9 @@ private actor GatedTelemetryTransport: TelemetryTransport {
             }
         }
         sent.append(batch)
+        droppedCounts.append(droppedSinceLastSend)
         active -= 1
-        return true
+        return outcome
     }
 
     /// Returns once a send is held.

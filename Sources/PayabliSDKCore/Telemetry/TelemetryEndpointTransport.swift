@@ -11,8 +11,9 @@ package actor TelemetryEndpointTransport: TelemetryTransport {
     private let deviceFacts: TelemetryDeviceFacts
     private let logger: PayabliLogger
 
-    /// Every batch pins its credential, so a telemetry 401 neither spends the session's refresh nor replays
-    /// the batch, and a finished session refuses it before it is sent.
+    /// Every batch declares a 401 a refusal of its caller, so the answer returns as it arrived, with no
+    /// refresh, no replay and nothing for the device setup to renew. A finished session refuses the
+    /// batch before it is sent.
     ///
     /// - Parameter transport: the session's transport, so a batch takes the same path as every other route.
     /// - Parameter path: the route the batch is posted to.
@@ -43,8 +44,8 @@ package actor TelemetryEndpointTransport: TelemetryTransport {
     }
 
     @discardableResult
-    package func send(_ batch: [TelemetryEvent], droppedSinceLastSend: Int) async -> Bool {
-        guard let entry = batch.first?.entry else { return true }
+    package func send(_ batch: [TelemetryEvent], droppedSinceLastSend: Int) async -> TelemetrySendOutcome {
+        guard let entry = batch.first?.entry else { return .delivered }
         let body = TelemetryBatchBody(
             entry: entry,
             events: batch.map { TelemetryEventBody($0, facts: deviceFacts) },
@@ -52,16 +53,23 @@ package actor TelemetryEndpointTransport: TelemetryTransport {
         )
         do {
             let response = try await transport.perform(
-                PayabliRequest.json(method: .post, path: path, jsonBody: body, pinsCredential: true)
+                PayabliRequest.json(
+                    method: .post,
+                    path: path,
+                    jsonBody: body,
+                    isCallerRefusal: { $0.statusCode == 401 }
+                )
             )
             guard (200 ..< 300).contains(response.statusCode) else {
                 logger.warning("telemetry_batch_refused status=\(response.statusCode)")
-                return false
+                // A 413 alone discards: the same body is refused the same way every time. Every other
+                // refusal is about the caller or the transport, so the batch is kept for the next flush.
+                return response.statusCode == 413 ? .discarded : .kept
             }
-            return true
+            return .delivered
         } catch {
             logger.warning("Telemetry batch send failed (best-effort)")
-            return false
+            return .kept
         }
     }
 }
