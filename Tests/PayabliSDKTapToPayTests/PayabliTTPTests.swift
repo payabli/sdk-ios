@@ -149,19 +149,6 @@ final class PayabliTTPTests: XCTestCase {
         }
     }
 
-    func testChargeRejectsNonSale() async throws {
-        let (ttp, _, _) = try makeTTP()
-        do {
-            _ = try await ttp.charge(
-                type: PayabliTTPPaymentType(rawValue: 99) ?? .sale,
-                paymentDetails: PayabliTTPPaymentDetails(amount: 9.99)
-            )
-            // .sale is the only case in v1.0, so this test is defensive. Pass either way.
-        } catch {
-            // ok
-        }
-    }
-
     /// The service says pending and nothing is stored: what is thrown and where the session lands
     /// both name the paypoint's configuration.
     func testPendingWithNothingStoredThrowsWhatTheSessionLandsOn() async throws {
@@ -314,7 +301,6 @@ final class PayabliTTPTests: XCTestCase {
         attestation.bindings = [MockDeviceAttestationService.anyEntry: "dev_new"]
 
         _ = try? await ttp.charge(
-            type: .sale,
             paymentDetails: PayabliTTPPaymentDetails(amount: 1.00)
         )
 

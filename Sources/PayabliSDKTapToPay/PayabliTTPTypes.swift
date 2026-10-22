@@ -103,11 +103,6 @@ public extension PayabliTTPSessionState {
     }
 }
 
-/// The transaction type. `.sale` is the only one.
-@objc public enum PayabliTTPPaymentType: Int, Sendable {
-    case sale = 0
-}
-
 /// Result of a successful `charge()` call.
 public struct TransactionResult: Sendable {
     public let paymentTransId: String

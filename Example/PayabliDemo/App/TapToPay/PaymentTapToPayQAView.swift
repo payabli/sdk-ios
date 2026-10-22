@@ -6,7 +6,7 @@ import SwiftUI
 /// ones that are still placeholders, and drives the lifecycle:
 ///   - **Enable Terminal** — `initialize()`: eligibility → App Attest → `GET /config` →
 ///     hand credentials to the reader → prepare reader → `.ready`.
-///   - **Charge** — `charge(type:paymentDetails:)`, which presents Apple's NFC sheet.
+///   - **Charge** — `charge(paymentDetails:customer:)`, which presents Apple's NFC sheet.
 ///   - **Activate device** — `activateDevice(activationCode:)` for `.pendingActivation`.
 ///
 /// The values themselves come from `Secrets.swift`; they are read-only here because

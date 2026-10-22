@@ -142,7 +142,11 @@ final class PayabliErrorCatalogTests: XCTestCase {
         (.terminalNotReady, "TERMINAL_NOT_READY", 3029, .invalidRequest, "The terminal is not ready for this call."),
         (.tooManyOpenCharges, "TOO_MANY_OPEN_CHARGES", 3030, .invalidRequest, "Too many charges are waiting to be resolved."),
         (.paymentNotHeld, "PAYMENT_NOT_HELD", 3031, .invalidRequest, "No captured payment is held under that identifier."),
-        (.deviceIdentityUnavailable, "DEVICE_IDENTITY_UNAVAILABLE", 3033, .device, "This device cannot be identified.")
+        (.deviceIdentityUnavailable, "DEVICE_IDENTITY_UNAVAILABLE", 3033, .device, "This device cannot be identified."),
+        (
+            .chargeNotFinished, "CHARGE_NOT_FINISHED", 3034, .outcomeUnknown,
+            "An earlier charge on this device hasn't finished. Check that payment before charging again, or wait four minutes."
+        )
     ]
 
     func testEveryTypeCarriesItsPublishedNameNumberCategoryAndMessage() {

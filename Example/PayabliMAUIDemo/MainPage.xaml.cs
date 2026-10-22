@@ -154,14 +154,7 @@ public partial class MainPage : ContentPage
             "MAUI demo sale"
         );
         _ttp.Charge(
-            // PayabliTTPPaymentType is `enum : long`, and the binding signature
-            // expects `nint`. C# disallows enum -> nint without going through
-            // the underlying integral type first, so cast through `long`.
-            type: (nint)(long)PayabliTTPPaymentType.Sale,
-            paymentDetails: paymentDetails,
-            customer: null,
-            invoice: null,
-            orderDescription: null,
+            request: new PayabliTTPChargeRequestObjC(paymentDetails),
             completion: (result, error) =>
             {
                 SetWorking(false);

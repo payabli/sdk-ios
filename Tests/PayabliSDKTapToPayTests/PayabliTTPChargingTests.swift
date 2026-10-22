@@ -141,7 +141,7 @@ final class PayabliTTPChargingTests: XCTestCase {
             guard let ttp else { return }
             during.second = Task { @MainActor in
                 do {
-                    _ = try await ttp.charge(type: .sale, paymentDetails: PayabliTTPPaymentDetails(amount: 1))
+                    _ = try await ttp.charge(paymentDetails: PayabliTTPPaymentDetails(amount: 1))
                 } catch {
                     during.refusal = (error as? TapToPayError)?.type
                 }
@@ -256,7 +256,7 @@ final class PayabliTTPChargingTests: XCTestCase {
             guard let other else { return }
             during.second = Task { @MainActor in
                 do {
-                    _ = try await other.charge(type: .sale, paymentDetails: PayabliTTPPaymentDetails(amount: 1))
+                    _ = try await other.charge(paymentDetails: PayabliTTPPaymentDetails(amount: 1))
                 } catch {
                     during.refusal = (error as? TapToPayError)?.type
                 }
@@ -287,7 +287,7 @@ final class PayabliTTPChargingTests: XCTestCase {
             await Self.letOtherWorkRun()
             let second = Task { @MainActor in
                 do {
-                    _ = try await ttp.charge(type: .sale, paymentDetails: PayabliTTPPaymentDetails(amount: 1))
+                    _ = try await ttp.charge(paymentDetails: PayabliTTPPaymentDetails(amount: 1))
                 } catch {
                     during.refusal = (error as? TapToPayError)?.type
                 }
@@ -520,7 +520,7 @@ final class PayabliTTPChargingTests: XCTestCase {
     }
 
     private func charge(_ ttp: PayabliTTP) async throws -> TransactionResult {
-        try await ttp.charge(type: .sale, paymentDetails: PayabliTTPPaymentDetails(amount: 1, currency: "USD"))
+        try await ttp.charge(paymentDetails: PayabliTTPPaymentDetails(amount: 1, currency: "USD"))
     }
 
     private func chargeFailure(_ ttp: PayabliTTP) async -> TapToPayError? {

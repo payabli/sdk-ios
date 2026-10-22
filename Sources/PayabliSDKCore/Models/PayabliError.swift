@@ -96,6 +96,7 @@ public enum PayabliErrorType: String, Sendable, CaseIterable {
     case tooManyOpenCharges = "TOO_MANY_OPEN_CHARGES"
     case paymentNotHeld = "PAYMENT_NOT_HELD"
     case deviceIdentityUnavailable = "DEVICE_IDENTITY_UNAVAILABLE"
+    case chargeNotFinished = "CHARGE_NOT_FINISHED"
 }
 
 /// What a host does about a failure. Each ``PayabliErrorType`` belongs to one.
@@ -190,6 +191,7 @@ public extension PayabliErrorType {
         case .tooManyOpenCharges: 3030
         case .paymentNotHeld: 3031
         case .deviceIdentityUnavailable: 3033
+        case .chargeNotFinished: 3034
         }
     }
 
@@ -259,6 +261,8 @@ public extension PayabliErrorType {
         case .tooManyOpenCharges: "Too many charges are waiting to be resolved."
         case .paymentNotHeld: "No captured payment is held under that identifier."
         case .deviceIdentityUnavailable: "This device cannot be identified."
+        case .chargeNotFinished:
+            "An earlier charge on this device hasn't finished. Check that payment before charging again, or wait four minutes."
         }
     }
 
@@ -274,7 +278,7 @@ public extension PayabliErrorType {
         case .paymentDeclined, .paymentNotOpened, .cardDeclined:
             .declined
         case .serverError, .networkError, .decodingError, .userCancelled, .unknown, .conflict, .retryRefused,
-             .tapNotCompleted, .paymentOutcomeUnknown, .paymentNotClosed:
+             .tapNotCompleted, .paymentOutcomeUnknown, .paymentNotClosed, .chargeNotFinished:
             .outcomeUnknown
         case .rateLimited, .deviceKeyUnavailable, .deviceSetupUnavailable, .readerUnavailable, .readerSessionExpired,
              .transactionNotFound:

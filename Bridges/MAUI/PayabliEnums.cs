@@ -30,12 +30,6 @@ namespace Payabli.TapToPay
     }
 
     [Native]
-    public enum PayabliTTPPaymentType : long
-    {
-        Sale = 0,
-    }
-
-    [Native]
     public enum PayabliTTPSessionState : long
     {
         Idle = 0,

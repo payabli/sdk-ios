@@ -289,7 +289,6 @@ import PayabliSDKTapToPay
 let ttp = try await PayabliTTP.create()
 try await ttp.initialize()
 let result = try await ttp.charge(
-    type: .sale,
     paymentDetails: PayabliTTPPaymentDetails(amount: 9.99),
     customer: PayabliTTPCustomerData(firstName: "Jane", lastName: "Doe")
 )

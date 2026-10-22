@@ -23,8 +23,8 @@ public enum PayabliTapToPayModule {
 }
 @available(iOS 16.7, *)
 @_Concurrency::MainActor extension PayabliSDKTapToPay::PayabliTTP {
-  @_Concurrency::MainActor final public func charge(type: PayabliSDKTapToPay::PayabliTTPPaymentType, paymentDetails: PayabliSDKTapToPay::PayabliTTPPaymentDetails, customer: PayabliSDKTapToPay::PayabliTTPCustomerData = PayabliTTPCustomerData(), invoice: PayabliSDKTapToPay::PayabliTTPInvoiceData = PayabliTTPInvoiceData(), orderDescription: Swift::String? = nil) async throws -> PayabliSDKTapToPay::TransactionResult
-  @objc @_Concurrency::MainActor final public func charge(type: Swift::Int, paymentDetails: PayabliSDKTapToPay::PayabliTTPPaymentDetailsObjC, customer: PayabliSDKTapToPay::PayabliTTPCustomerDataObjC?, invoice: PayabliSDKTapToPay::PayabliTTPInvoiceDataObjC?, orderDescription: Swift::String?, completion: @escaping (PayabliSDKTapToPay::PayabliTTPTransactionResultObjC?, Foundation::NSError?) -> Swift::Void)
+  @_Concurrency::MainActor final public func charge(paymentDetails: PayabliSDKTapToPay::PayabliTTPPaymentDetails, customer: PayabliSDKTapToPay::PayabliTTPCustomerData = PayabliTTPCustomerData(), invoice: PayabliSDKTapToPay::PayabliTTPInvoiceData = PayabliTTPInvoiceData(), orderDescription: Swift::String? = nil, attempt: PayabliSDKCore::PayabliAttempt = .newPayment) async throws -> PayabliSDKTapToPay::TransactionResult
+  @objc @_Concurrency::MainActor final public func charge(_ request: PayabliSDKTapToPay::PayabliTTPChargeRequestObjC, completion: @escaping (PayabliSDKTapToPay::PayabliTTPTransactionResultObjC?, Foundation::NSError?) -> Swift::Void)
 }
 @available(iOS 16.7, *)
 @_Concurrency::MainActor extension PayabliSDKTapToPay::PayabliTTP {
@@ -132,6 +132,15 @@ public enum PayabliTTPFailureReason : Swift::Int, Swift::Sendable, Swift::CaseIt
   @objc final public let shippingZip: Swift::String?
   @objc final public let shippingCountry: Swift::String?
   @objc public init(firstName: Swift::String?, lastName: Swift::String?, customerNumber: Swift::String?, email: Swift::String?, phone: Swift::String?, customerId: Foundation::NSNumber?, company: Swift::String?, billingAddress1: Swift::String?, billingAddress2: Swift::String?, billingCity: Swift::String?, billingState: Swift::String?, billingZip: Swift::String?, billingCountry: Swift::String?, billingPhone: Swift::String?, billingEmail: Swift::String?, shippingAddress1: Swift::String?, shippingAddress2: Swift::String?, shippingCity: Swift::String?, shippingState: Swift::String?, shippingZip: Swift::String?, shippingCountry: Swift::String?)
+  @objc deinit
+}
+@objc(PayabliTTPChargeRequestObjC) final public class PayabliTTPChargeRequestObjC : ObjectiveC::NSObject {
+  @objc final public let paymentDetails: PayabliSDKTapToPay::PayabliTTPPaymentDetailsObjC
+  @objc final public var customer: PayabliSDKTapToPay::PayabliTTPCustomerDataObjC?
+  @objc final public var invoice: PayabliSDKTapToPay::PayabliTTPInvoiceDataObjC?
+  @objc final public var orderDescription: Swift::String?
+  @objc final public var attempt: PayabliSDKCore::PayabliAttempt
+  @objc public init(paymentDetails: PayabliSDKTapToPay::PayabliTTPPaymentDetailsObjC)
   @objc deinit
 }
 @_hasMissingDesignatedInitializers @objc(PayabliTTPTransactionResultObjC) final public class PayabliTTPTransactionResultObjC : ObjectiveC::NSObject {
@@ -247,14 +256,6 @@ extension PayabliSDKTapToPay::PayabliTTPSessionState {
     get
   }
 }
-@objc public enum PayabliTTPPaymentType : Swift::Int, Swift::Sendable {
-  case sale = 0
-  public init?(rawValue: Swift::Int)
-  public typealias RawValue = Swift::Int
-  public var rawValue: Swift::Int {
-    get
-  }
-}
 public struct TransactionResult : Swift::Sendable {
   public let paymentTransId: Swift::String
   public init(paymentTransId: Swift::String)
@@ -309,9 +310,6 @@ extension PayabliSDKTapToPay::PayabliTTPFailureReason : Swift::RawRepresentable 
 extension PayabliSDKTapToPay::PayabliTTPSessionStateCode : Swift::Equatable {}
 extension PayabliSDKTapToPay::PayabliTTPSessionStateCode : Swift::Hashable {}
 extension PayabliSDKTapToPay::PayabliTTPSessionStateCode : Swift::RawRepresentable {}
-extension PayabliSDKTapToPay::PayabliTTPPaymentType : Swift::Equatable {}
-extension PayabliSDKTapToPay::PayabliTTPPaymentType : Swift::Hashable {}
-extension PayabliSDKTapToPay::PayabliTTPPaymentType : Swift::RawRepresentable {}
 extension PayabliSDKTapToPay::TapToPayChargeActivity : Swift::Equatable {}
 extension PayabliSDKTapToPay::TapToPayChargeActivity : Swift::Hashable {}
 extension PayabliSDKTapToPay::TapToPayChargeActivity : Swift::RawRepresentable {}

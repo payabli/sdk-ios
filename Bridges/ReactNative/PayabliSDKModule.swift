@@ -206,7 +206,6 @@ public final class PayabliSDKModule: RCTEventEmitter {
                 reject("INVALID_ARGS", "Missing paymentDetails.amount", nil)
                 return
             }
-            let typeRaw = (params["type"] as? Int) ?? 0
             let serviceFeeValue = (pdDict["serviceFee"] as? NSNumber) ?? 0
             // Pass through nil so the SDK omits `currency` from `/initiate` and the
             // backend authorizes in the merchant's configured processor currency.
@@ -220,17 +219,12 @@ public final class PayabliSDKModule: RCTEventEmitter {
                 paymentDescription: paymentDescription
             )
 
-            let customer = (params["customer"] as? [String: Any]).map(Self.customerObjC(from:))
-            let invoice = (params["invoice"] as? [String: Any]).map(Self.invoiceObjC(from:))
-            let orderDescription = params["orderDescription"] as? String
+            let request = PayabliTTPChargeRequestObjC(paymentDetails: paymentDetails)
+            request.customer = (params["customer"] as? [String: Any]).map(Self.customerObjC(from:))
+            request.invoice = (params["invoice"] as? [String: Any]).map(Self.invoiceObjC(from:))
+            request.orderDescription = params["orderDescription"] as? String
 
-            ttp.charge(
-                type: typeRaw,
-                paymentDetails: paymentDetails,
-                customer: customer,
-                invoice: invoice,
-                orderDescription: orderDescription
-            ) { result, error in
+            ttp.charge(request) { result, error in
                 if let result {
                     resolve(["paymentTransId": result.paymentTransId])
                 } else if let error {

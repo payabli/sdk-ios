@@ -200,7 +200,6 @@ When `sessionState` is `.ready`, or `.sessionExpired`, which `charge` refreshes 
 
 ```swift
 let result = try await ttp.charge(
-    type: .sale,
     paymentDetails: PayabliTTPPaymentDetails(amount: 9.99),
     customer: PayabliTTPCustomerData(firstName: "Jane", lastName: "Doe"),
     invoice: PayabliTTPInvoiceData(invoiceNumber: "INV-9001")
@@ -210,11 +209,11 @@ order.paymentTransId = result.paymentTransId // store it; don't log it
 
 | Parameter | Type | Notes |
 |---|---|---|
-| `type` | `PayabliTTPPaymentType` | `.sale` is the only type accepted. |
 | `paymentDetails` | `PayabliTTPPaymentDetails` | `amount`, the total charged, is required. `serviceFee` defaults to `0`. `serviceFee` is part of `amount`, not added to it: the card is charged `amount`. Leave `currency` out to charge in the paypoint's currency. `paymentDescription` is optional. |
 | `customer` | `PayabliTTPCustomerData` | Name the payer with at least one of `firstName`, `lastName`, `customerNumber` or `customerId`. A charge that names nobody can be refused. The other fields (email, phone, billing and shipping address) are optional, and blank values are ignored. |
 | `invoice` | `PayabliTTPInvoiceData` | Optional. `invoiceNumber`. |
 | `orderDescription` | `String?` | Optional. |
+| `attempt` | `PayabliAttempt` | `.newPayment` by default. Pass `.retry` only to repeat a charge whose outcome is unknown. |
 
 `charge` returns only when the payment is approved. Store `result.paymentTransId` with your order.
 

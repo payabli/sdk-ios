@@ -9,7 +9,7 @@ end to end against sandbox.
 - **Initialize** — cold/warm App Attest attestation, `/config` fetch, and
   reader prepare via `try await ttp.initialize()`.
 - **Charge** — full sale pipeline (`/initiate` → NFC tap → `/update`)
-  via `try await ttp.charge(type:paymentDetails:)`.
+  via `try await ttp.charge(paymentDetails:customer:)`.
 - **Activate device** — pending-device activation with an out-of-band
   code via `ttp.activateDevice(activationCode:)`.
 - **State log** — every session state the terminal moves through,

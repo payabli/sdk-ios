@@ -35,14 +35,6 @@ namespace Payabli.TapToPay
         PayabliEnvironment Production { get; }
     }
 
-    // MARK: - PayabliTTPPaymentType
-
-    [Native]
-    public enum PayabliTTPPaymentType : long
-    {
-        Sale = 0,
-    }
-
     // MARK: - PayabliTTPSessionState
 
     [Native]
@@ -183,6 +175,21 @@ namespace Payabli.TapToPay
         [NullAllowed, Export("invoiceNumber")] string InvoiceNumber { get; }
     }
 
+    // MARK: - PayabliTTPChargeRequestObjC
+
+    [BaseType(typeof(NSObject))]
+    [DisableDefaultCtor]
+    public interface PayabliTTPChargeRequestObjC
+    {
+        [Export("initWithPaymentDetails:")]
+        IntPtr Constructor(PayabliTTPPaymentDetailsObjC paymentDetails);
+
+        [Export("paymentDetails")] PayabliTTPPaymentDetailsObjC PaymentDetails { get; }
+        [NullAllowed, Export("customer", ArgumentSemantic.Strong)] PayabliTTPCustomerDataObjC Customer { get; set; }
+        [NullAllowed, Export("invoice", ArgumentSemantic.Strong)] PayabliTTPInvoiceDataObjC Invoice { get; set; }
+        [NullAllowed, Export("orderDescription")] string OrderDescription { get; set; }
+    }
+
     // MARK: - PayabliTTPTransactionResultObjC (returned by charge completion)
 
     [BaseType(typeof(NSObject))]
@@ -244,15 +251,8 @@ namespace Payabli.TapToPay
         [Export("initializeWithCompletion:")]
         void Initialize(PayabliTTPCompletion completion);
 
-        [Export("chargeWithType:paymentDetails:customer:invoice:orderDescription:completion:")]
-        void Charge(
-            nint type,
-            PayabliTTPPaymentDetailsObjC paymentDetails,
-            [NullAllowed] PayabliTTPCustomerDataObjC customer,
-            [NullAllowed] PayabliTTPInvoiceDataObjC invoice,
-            [NullAllowed] string orderDescription,
-            PayabliTTPChargeCompletion completion
-        );
+        [Export("charge:completion:")]
+        void Charge(PayabliTTPChargeRequestObjC request, PayabliTTPChargeCompletion completion);
 
         [Export("activateDeviceWithActivationCode:completion:")]
         void ActivateDevice(string activationCode, PayabliTTPCompletion completion);

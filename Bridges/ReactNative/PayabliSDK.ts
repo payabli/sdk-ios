@@ -40,10 +40,6 @@ export enum PayabliEnvironment {
     Production = "production",
 }
 
-export enum PayabliTTPPaymentType {
-    Sale = 0,
-}
-
 export enum PayabliTTPSessionState {
     Idle = 0,
     AttestingDevice = 1,
@@ -153,7 +149,6 @@ export interface PayabliTTPConfig {
 
 export interface PayabliTTPChargeRequest {
     paymentDetails: PayabliTTPPaymentDetails;
-    type?: PayabliTTPPaymentType;
     customer?: PayabliTTPCustomerData;
     invoice?: PayabliTTPInvoiceData;
     orderDescription?: string;
@@ -296,7 +291,6 @@ export function initialize(): Promise<void> {
 
 export function charge(req: PayabliTTPChargeRequest): Promise<PayabliTTPTransactionResult> {
     return requireNativeModule().charge({
-        type: req.type ?? PayabliTTPPaymentType.Sale,
         paymentDetails: {
             amount: req.paymentDetails.amount,
             serviceFee: req.paymentDetails.serviceFee ?? 0,
