@@ -134,6 +134,20 @@ final class TTPChargeKeyTests: XCTestCase {
         XCTAssertNotEqual(Self.wire.keys[2], Self.wire.keys[0], "a key past the bound was resent")
     }
 
+    func testAResendTheServiceAnsweredRestartsItsKeysClock() async throws {
+        let (ttp, _) = try await makeReadyTTP(outcome: .indeterminate)
+        _ = await failure { try await ttp.charge(paymentDetails: Self.details) }
+        clock.advance(by: .seconds(180))
+        Self.wire.initiateNotApproved = true
+        _ = await failure { try await ttp.charge(paymentDetails: Self.details, attempt: .retry) }
+        Self.wire.initiateNotApproved = false
+        clock.advance(by: .seconds(120))
+
+        _ = await failure { try await ttp.charge(paymentDetails: Self.details, attempt: .retry) }
+
+        XCTAssertEqual(Self.wire.keys[2], Self.wire.keys[0], "a resend the service answered did not restart the clock")
+    }
+
     func testAResendWithdrawnBeforeItLeftDoesNotRestartItsKeysClock() async throws {
         let (ttp, _) = try await makeReadyTTP(outcome: .indeterminate)
         _ = await failure { try await ttp.charge(paymentDetails: Self.details) }
@@ -356,6 +370,7 @@ final class TTPChargeKeyTests: XCTestCase {
         private var refusal: String?
         private var duplicateSale = false
         private var closeFails = false
+        private var notApproved = false
 
         var keys: [String] {
             lock.withLock { sentKeys }
@@ -376,6 +391,11 @@ final class TTPChargeKeyTests: XCTestCase {
             set { lock.withLock { duplicateSale = newValue } }
         }
 
+        var initiateNotApproved: Bool {
+            get { lock.withLock { notApproved } }
+            set { lock.withLock { notApproved = newValue } }
+        }
+
         var updateFails: Bool {
             get { lock.withLock { closeFails } }
             set { lock.withLock { closeFails = newValue } }
@@ -392,6 +412,7 @@ final class TTPChargeKeyTests: XCTestCase {
                 refusal = nil
                 duplicateSale = false
                 closeFails = false
+                notApproved = false
             }
         }
     }
@@ -406,6 +427,8 @@ final class TTPChargeKeyTests: XCTestCase {
             status = wire.initiateStatus
             if status == 409, wire.conflictIsDuplicateSale {
                 data = try JSONSerialization.data(withJSONObject: ["isSuccess": false, "responseText": "Duplicated transaction"])
+            } else if wire.initiateNotApproved {
+                data = try JSONSerialization.data(withJSONObject: ["code": "D01", "reason": "Refused"])
             } else if status == 409 {
                 contentType = "text/plain"
                 data = Data("Duplicated idempotencyKey".utf8)
