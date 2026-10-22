@@ -69,8 +69,8 @@ final class TapToPayOnDeviceTests: XCTestCase {
             let code = ProcessInfo.processInfo.environment["PAYABLI_ACTIVATION_CODE"] ?? ""
             guard !code.isEmpty else {
                 throw XCTSkip(
-                    "this device is pending activation on \(named.entry); "
-                        + "set PAYABLI_ACTIVATION_CODE to a code minted for its handle"
+                    "this device is pending activation on \(named.entry); set PAYABLI_ACTIVATION_CODE to a code "
+                        + "minted for activation id \(ttp.activationId ?? "<none>")"
                 )
             }
             do {
@@ -329,6 +329,58 @@ final class TapToPayOnDeviceTests: XCTestCase {
         XCTAssertTrue(ttp.isReady)
     }
 
+    /// A charge ended at the tap keeps its key: the service refuses a declared retry of it as a repeat before the reader
+    /// opens, and a retry describing another payment is refused on the device.
+    func testARetryOfAChargeEndedAtTheTapIsRefusedAsNotFinished() async throws {
+        let (ttp, _) = try await enrolledDevice()
+        let first = try await runChargeToTheTap(customer: TapToPayDemoCustomer.customerData, label: "keyHeld", on: ttp)
+        XCTAssertEqual(first.result, .completed, "the first charge never reached the tap: \(first.reported)")
+
+        let repeated = await retryRefusedBeforeTheTap(on: ttp, amount: 1.00)
+        let other = await retryRefusedBeforeTheTap(on: ttp, amount: 2.00)
+
+        LiveEnvironment.report(
+            "PAYABLI_RETRY env=\(named.name) repeated=\(repeated?.type.rawValue ?? "none") "
+                + "other=\(other?.type.rawValue ?? "none")"
+        )
+        XCTAssertEqual(repeated?.type, .chargeNotFinished)
+        XCTAssertEqual(repeated?.capture, .unknown)
+        XCTAssertEqual(other?.type, .retryNotSamePayment)
+        XCTAssertEqual(ttp.sessionState, .ready)
+    }
+
+    /// Runs a declared retry and answers what it was refused with, ending the read and answering `nil` if it reached
+    /// the tap, which means the service did not recognise the key.
+    private func retryRefusedBeforeTheTap(on ttp: PayabliTTP, amount: Decimal) async -> TapToPayError? {
+        let reachedTheTap = expectation(description: "the retry reached the tap")
+        reachedTheTap.isInverted = true
+        let watcher = ttp.$sessionState.sink { state in
+            if state == .charging(activity: .waitingForCard) {
+                reachedTheTap.fulfill()
+            }
+        }
+        defer { watcher.cancel() }
+        let retry = Task { @MainActor () -> TapToPayError? in
+            do {
+                _ = try await ttp.charge(
+                    paymentDetails: PayabliTTPPaymentDetails(amount: amount),
+                    customer: TapToPayDemoCustomer.customerData,
+                    orderDescription: "device tests",
+                    attempt: .retry
+                )
+                return nil
+            } catch {
+                return error as? TapToPayError
+            }
+        }
+        let tapped = await XCTWaiter().fulfillment(of: [reachedTheTap], timeout: 15)
+        if tapped != .completed {
+            await ttp.provider.cancelReading()
+            XCTFail("the retry for \(amount) reached the tap")
+        }
+        return await retry.value
+    }
+
     /// The same, with no customer. A paypoint that matches on an identifier refuses
     /// this at the initiate, before any card is presented.
     func testAChargeWithNoCustomerIsRefusedBeforeTheTap() async throws {
@@ -370,9 +422,14 @@ final class TapToPayOnDeviceTests: XCTestCase {
 
     private func runChargeToTheTap(
         customer: PayabliTTPCustomerData,
-        label: String
+        label: String,
+        on terminal: PayabliTTP? = nil
     ) async throws -> (result: XCTWaiter.Result, reported: String) {
-        let (ttp, _) = try await enrolledDevice()
+        let ttp = if let terminal {
+            terminal
+        } else {
+            try await enrolledDevice().session
+        }
 
         let reachedTheTap = expectation(description: "the charge reached the tap")
         reachedTheTap.assertForOverFulfill = false
