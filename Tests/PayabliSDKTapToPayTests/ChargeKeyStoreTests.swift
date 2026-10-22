@@ -111,11 +111,22 @@ final class ChargeKeyStoreTests: XCTestCase {
         XCTAssertEqual(retry.key, held.key)
     }
 
-    func testAmountsAreComparedAtTheTwoPlacesTheServiceCharges() throws {
-        let held = try endUnknown(reserve(.newPayment, amount: 10, serviceFee: 0.5))
+    func testAmountsAreComparedAtTheTwoPlacesTheReaderCharges() throws {
+        let held = try endUnknown(reserve(.newPayment, amount: Self.decimal("10.005"), serviceFee: 0.5))
 
-        XCTAssertEqual(try reserve(.retry, amount: Decimal(string: "10.001")!, serviceFee: Decimal(string: "0.499")!).key, held.key)
-        XCTAssertThrowsError(try reserve(.retry, amount: Decimal(string: "10.005")!, serviceFee: 0.5))
+        XCTAssertEqual(
+            try reserve(.retry, amount: 10, serviceFee: Self.decimal("0.499")).key,
+            held.key,
+            "10.005 is charged as 10.00"
+        )
+        XCTAssertThrowsError(try reserve(.retry, amount: Self.decimal("10.01"), serviceFee: 0.5), "10.01 is another payment")
+        XCTAssertThrowsError(try reserve(.retry, amount: Self.decimal("10.006"), serviceFee: 0.5), "10.006 is charged as 10.01")
+    }
+
+    func testTheReaderAndTheRetryCheckRoundAlike() {
+        XCTAssertEqual(Self.decimal("10.005").roundedAsCharged, Self.decimal("10.00"))
+        XCTAssertEqual(Self.decimal("10.015").roundedAsCharged, Self.decimal("10.02"))
+        XCTAssertEqual(Self.decimal("10.006").roundedAsCharged, Self.decimal("10.01"))
     }
 
     func testAKeyHeldAgainKeepsThePaymentItWasFirstSentFor() throws {
@@ -285,6 +296,10 @@ final class ChargeKeyStoreTests: XCTestCase {
             paymentDetails: PayabliTTPPaymentDetails(amount: amount, serviceFee: serviceFee, currency: currency),
             invoice: PayabliTTPInvoiceData(invoiceNumber: invoice)
         )
+    }
+
+    private static func decimal(_ text: String) -> Decimal {
+        Decimal(string: text)!
     }
 
     private static func counter() -> @Sendable () -> String {

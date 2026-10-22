@@ -11,8 +11,8 @@ struct ChargeDescription: CustomStringConvertible {
     /// - Parameter paymentDetails: the amounts and currency the charge sends, already normalised.
     /// - Parameter invoice: the invoice the charge names, its number already trimmed.
     init(paymentDetails: PayabliTTPPaymentDetails, invoice: PayabliTTPInvoiceData) {
-        amount = Self.asCharged(paymentDetails.amount)
-        serviceFee = Self.asCharged(paymentDetails.serviceFee)
+        amount = paymentDetails.amount.roundedAsCharged
+        serviceFee = paymentDetails.serviceFee.roundedAsCharged
         currency = paymentDetails.currency
         invoiceNumber = invoice.invoiceNumber
     }
@@ -30,16 +30,5 @@ struct ChargeDescription: CustomStringConvertible {
             && serviceFee == retry.serviceFee
             && currency == retry.currency
             && (invoiceNumber == nil || invoiceNumber == retry.invoiceNumber)
-    }
-
-    /// The amount at the two places the service charges it to, rounding half up.
-    ///
-    /// - Parameter amount: the amount as the caller gave it.
-    /// - Returns: the amount the service charges.
-    private static func asCharged(_ amount: Decimal) -> Decimal {
-        var given = amount
-        var charged = Decimal()
-        NSDecimalRound(&charged, &given, 2, .plain)
-        return charged
     }
 }

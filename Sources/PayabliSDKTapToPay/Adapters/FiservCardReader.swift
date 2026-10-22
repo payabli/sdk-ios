@@ -305,7 +305,7 @@ package final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
                 throw PayabliTTPError.readerSetupFailed(reason: "Reader not prepared")
             }
 
-            let amount = request.amount.rounded(2, .bankers)
+            let amount = request.amount.roundedAsCharged
             let details = Models.TransactionDetailsRequest(
                 merchantTransactionId: request.merchantTransactionId,
                 merchantOrderId: request.merchantOrderId ?? request.merchantTransactionId,
@@ -489,15 +489,4 @@ package final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
             return nil
         }
     #endif
-}
-
-// MARK: - Decimal rounding
-
-private extension Decimal {
-    func rounded(_ scale: Int, _ roundingMode: NSDecimalNumber.RoundingMode) -> Decimal {
-        var result = Decimal()
-        var localCopy = self
-        NSDecimalRound(&result, &localCopy, scale, roundingMode)
-        return result
-    }
 }
