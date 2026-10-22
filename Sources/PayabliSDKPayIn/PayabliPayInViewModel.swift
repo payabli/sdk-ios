@@ -279,6 +279,7 @@ final class PayabliPayInViewModel: ObservableObject {
         clearMarks()
         guard !isSubmitting else {
             let error = PayabliPayInError.submissionInProgress
+            component.reportFormRefusal(error, method: effectiveSelectedMethod)
             errorMessage = PayabliPayInFailureMessage.text(for: error, operation: component.operation)
             throw error
         }
@@ -297,31 +298,14 @@ final class PayabliPayInViewModel: ObservableObject {
             do {
                 try details.validate()
             } catch {
+                component.reportFormRefusal(error, method: effectiveSelectedMethod)
                 errorMessage = PayabliPayInFailureMessage.text(for: error, operation: operation)
                 throw error
             }
         }
 
         do {
-            try validateRequiredFields()
-            let result: PayabliPayInResult
-            switch component.operation {
-            case .storePaymentMethod:
-                result = try await component.submitConfigured(
-                    methodInput(),
-                    options: mergedTokenStorageOptions()
-                )
-            case .capture, .authorize:
-                guard let requestConfiguration = component.requestConfiguration else {
-                    throw PayabliPayInError.invalidInput("Payment request configuration is required.")
-                }
-                let request = requestConfiguration.request(
-                    paymentMethod: paymentMethod(),
-                    customerData: mergedCustomerData(),
-                    orderDescription: mergedOrderDescription()
-                )
-                result = try await component.submitConfigured(request)
-            }
+            let result = try await submitToFlow()
             clearSensitiveFields()
             return result
         } catch {
@@ -335,6 +319,39 @@ final class PayabliPayInViewModel: ObservableObject {
             errorMessage = rejectedFields.isEmpty ? PayabliPayInFailureMessage.text(for: error, operation: operation) : nil
             throw error
         }
+    }
+
+    /// Hands the form's submission to the flow, which reports it. A refusal before the flow has it is reported here.
+    ///
+    /// - Returns: what the flow returned.
+    private func submitToFlow() async throws -> PayabliPayInResult {
+        let request: PayabliPayInRequest?
+        do {
+            try validateRequiredFields()
+            request = try configuredRequest()
+        } catch {
+            component.reportFormRefusal(error, method: effectiveSelectedMethod)
+            throw error
+        }
+        if let request {
+            return try await component.submitConfigured(request, origin: .form)
+        }
+        return try await component.submitConfigured(methodInput(), options: mergedTokenStorageOptions(), origin: .form)
+    }
+
+    /// The payment the form submits, or nil when the operation stores a method instead.
+    ///
+    /// - Returns: the request built from the configuration and the fields.
+    private func configuredRequest() throws -> PayabliPayInRequest? {
+        guard component.operation != .storePaymentMethod else { return nil }
+        guard let requestConfiguration = component.requestConfiguration else {
+            throw PayabliPayInError.invalidInput("Payment request configuration is required.")
+        }
+        return requestConfiguration.request(
+            paymentMethod: paymentMethod(),
+            customerData: mergedCustomerData(),
+            orderDescription: mergedOrderDescription()
+        )
     }
 
     func formatCardNumber(_ value: String) -> String {

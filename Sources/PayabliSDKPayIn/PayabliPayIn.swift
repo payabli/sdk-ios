@@ -55,6 +55,8 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
     private var activeSubmissionCount = 0
     private var heldKeys = HeldIdempotencyKeys()
     private let logger = PayabliLogger(category: .tokenization)
+    /// Nil on a flow built on a bare transport without a telemetry client.
+    private(set) var reports: PayInReports?
 
     /// Builds the flow on a session, which carries the credential and the transport that sends it.
     ///
@@ -78,6 +80,7 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
         injectedTransport = nil
         client = PayInPaymentFlowClient(transport: session.transport)
         tokenStorageClient = PayInPaymentFlowTokenStorageClient(transport: session.transport)
+        reports = PayInReports(telemetry: session.telemetry)
         super.init()
     }
 
@@ -91,12 +94,14 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
     /// - Parameter transport: the transport that sends every request, used whole.
     /// - Parameter operation: what a rendered form submits, `.storePaymentMethod` when nothing is given.
     /// - Parameter requestConfiguration: the transaction configuration a rendered form's request is built from.
+    /// - Parameter telemetry: where the flow reports its operations, nil to report nothing.
     init(
         entryPoint: String,
         environment: PayabliEnvironment,
         transport: any PayabliTransport,
         operation: PayabliPayInOperation = .storePaymentMethod,
-        requestConfiguration: PayabliPayInRequestConfiguration? = nil
+        requestConfiguration: PayabliPayInRequestConfiguration? = nil,
+        telemetry: TelemetryClient? = nil
     ) {
         self.entryPoint = entryPoint
         self.environment = environment
@@ -106,6 +111,7 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
         injectedTransport = transport
         client = PayInPaymentFlowClient(transport: transport)
         tokenStorageClient = PayInPaymentFlowTokenStorageClient(transport: transport)
+        reports = telemetry.map(PayInReports.init(telemetry:))
         super.init()
     }
 
@@ -127,6 +133,7 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
             entryPoint = config.entryPoint
             environment = config.environment
             session = installed
+            reports = PayInReports(telemetry: installed.telemetry)
             transport = installed.transport
         } else {
             transport = RefusedTransport(refusal: PayabliGenericError(
@@ -159,26 +166,73 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
     public func submitConfigured(
         _ request: PayabliPayInRequest
     ) async throws -> PayabliPayInResult {
-        switch operation {
-        case .storePaymentMethod:
-            throw PayabliPayInError.invalidInput("A payment method input is required for storePaymentMethod.")
-        case .capture:
-            return try await capture(request)
-        case .authorize:
-            return try await authorize(request)
-        }
+        try await submitConfigured(request, origin: .direct)
     }
 
     public func submitConfigured(
         _ paymentMethod: PayabliPayInMethodInput,
         options: PayabliPayInTokenStorageOptions = PayabliPayInTokenStorageOptions()
     ) async throws -> PayabliPayInResult {
+        try await submitConfigured(paymentMethod, options: options, origin: .direct)
+    }
+
+    /// Runs the configured operation on a payment, reported as started by `origin`.
+    ///
+    /// - Parameter request: the payment and its settings.
+    /// - Parameter origin: whether the form or the host started it.
+    /// - Returns: the result the service sent.
+    func submitConfigured(
+        _ request: PayabliPayInRequest,
+        origin: PayInReports.Origin
+    ) async throws -> PayabliPayInResult {
+        switch operation {
+        case .storePaymentMethod:
+            try await reported(.storeMethod, origin: origin, method: PayInReports.method(of: request.paymentMethod)) {
+                throw PayabliPayInError.invalidInput("A payment method input is required for storePaymentMethod.")
+            }
+        case .capture:
+            try await capture(request, origin: origin)
+        case .authorize:
+            try await authorize(request, origin: origin)
+        }
+    }
+
+    /// Stores a method when that is the configured operation, reported as started by `origin`.
+    ///
+    /// - Parameter paymentMethod: the card or bank account data to store.
+    /// - Parameter options: what the request carries besides the method.
+    /// - Parameter origin: whether the form or the host started it.
+    /// - Returns: the stored method, as a result.
+    func submitConfigured(
+        _ paymentMethod: PayabliPayInMethodInput,
+        options: PayabliPayInTokenStorageOptions,
+        origin: PayInReports.Origin
+    ) async throws -> PayabliPayInResult {
         guard operation == .storePaymentMethod else {
-            throw PayabliPayInError.invalidInput("storePaymentMethod operation is required to store a payment method.")
+            return try await reported(
+                operation == .capture ? .capture : .authorize,
+                origin: origin,
+                method: PayInReports.method(of: paymentMethod.method)
+            ) {
+                throw PayabliPayInError.invalidInput("storePaymentMethod operation is required to store a payment method.")
+            }
         }
 
-        let storedPaymentMethod = try await addPaymentMethod(paymentMethod, options: options)
+        let storedPaymentMethod = try await addPaymentMethod(paymentMethod, options: options, origin: origin)
         return PayabliPayInResult(storedPaymentMethod: storedPaymentMethod)
+    }
+
+    /// Reports a submission the form refused before handing it to the flow.
+    ///
+    /// - Parameter error: the refusal.
+    /// - Parameter method: the kind of method the form was submitting.
+    func reportFormRefusal(_ error: any Error, method: PayabliPayInMethodType) {
+        let reported: PayInReports.Operation = switch operation {
+        case .storePaymentMethod: .storeMethod
+        case .capture: .capture
+        case .authorize: .authorize
+        }
+        reports?.completed(reported, origin: .form, method: PayInReports.method(of: method), after: nil, error: error)
     }
 
     /// Stores card or bank account payment data using `POST /api/TokenStorage/add`.
@@ -190,16 +244,26 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
         _ paymentMethod: PayabliPayInMethodInput,
         options: PayabliPayInTokenStorageOptions = PayabliPayInTokenStorageOptions()
     ) async throws -> PayabliPayInStoredPaymentMethod {
-        try beginSubmission()
-        defer { endSubmission() }
+        try await addPaymentMethod(paymentMethod, options: options, origin: .direct)
+    }
 
-        let storedPaymentMethod = try await tokenStorageClient.addMethod(
-            entryPoint: entryPoint,
-            paymentMethod: paymentMethod,
-            options: options
-        )
-        lastResult = PayabliPayInResult(storedPaymentMethod: storedPaymentMethod)
-        return storedPaymentMethod
+    private func addPaymentMethod(
+        _ paymentMethod: PayabliPayInMethodInput,
+        options: PayabliPayInTokenStorageOptions,
+        origin: PayInReports.Origin
+    ) async throws -> PayabliPayInStoredPaymentMethod {
+        try await reported(.storeMethod, origin: origin, method: PayInReports.method(of: paymentMethod.method)) {
+            try beginSubmission()
+            defer { endSubmission() }
+
+            let storedPaymentMethod = try await tokenStorageClient.addMethod(
+                entryPoint: entryPoint,
+                paymentMethod: paymentMethod,
+                options: options
+            )
+            lastResult = PayabliPayInResult(storedPaymentMethod: storedPaymentMethod)
+            return storedPaymentMethod
+        }
     }
 
     public func addCard(
@@ -226,15 +290,24 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
     public func capture(
         _ request: PayabliPayInRequest
     ) async throws -> PayabliPayInResult {
-        try await submit {
-            let reference = try paymentReference(of: request)
-            return try await sending(
-                .capture(reference: reference),
-                claimsHeld: request.options.attempt == .retry,
-                payment: HeldPaymentDescription(request),
-                reference: reference
-            ) { key in
-                try await client.capture(entryPoint: entryPoint, request: request, idempotencyKey: key)
+        try await capture(request, origin: .direct)
+    }
+
+    private func capture(
+        _ request: PayabliPayInRequest,
+        origin: PayInReports.Origin
+    ) async throws -> PayabliPayInResult {
+        try await reported(.capture, origin: origin, method: PayInReports.method(of: request.paymentMethod)) {
+            try await submit {
+                let reference = try paymentReference(of: request)
+                return try await sending(
+                    .capture(reference: reference),
+                    claimsHeld: request.options.attempt == .retry,
+                    payment: HeldPaymentDescription(request),
+                    reference: reference
+                ) { key in
+                    try await client.capture(entryPoint: entryPoint, request: request, idempotencyKey: key)
+                }
             }
         }
     }
@@ -251,15 +324,24 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
     public func authorize(
         _ request: PayabliPayInRequest
     ) async throws -> PayabliPayInResult {
-        try await submit {
-            let reference = try paymentReference(of: request)
-            return try await sending(
-                .authorize(reference: reference),
-                claimsHeld: request.options.attempt == .retry,
-                payment: HeldPaymentDescription(request),
-                reference: reference
-            ) { key in
-                try await client.authorize(entryPoint: entryPoint, request: request, idempotencyKey: key)
+        try await authorize(request, origin: .direct)
+    }
+
+    private func authorize(
+        _ request: PayabliPayInRequest,
+        origin: PayInReports.Origin
+    ) async throws -> PayabliPayInResult {
+        try await reported(.authorize, origin: origin, method: PayInReports.method(of: request.paymentMethod)) {
+            try await submit {
+                let reference = try paymentReference(of: request)
+                return try await sending(
+                    .authorize(reference: reference),
+                    claimsHeld: request.options.attempt == .retry,
+                    payment: HeldPaymentDescription(request),
+                    reference: reference
+                ) { key in
+                    try await client.authorize(entryPoint: entryPoint, request: request, idempotencyKey: key)
+                }
             }
         }
     }
@@ -274,12 +356,15 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
     public func captureAuthorizedTransaction(
         _ request: PayabliPayInAuthorizedRequest
     ) async throws -> PayabliPayInResult {
-        try await submit {
-            try await sending(
-                .captureAuthorized(transId: request.transId.payabliCaptureTrimmed),
-                claimsHeld: true
-            ) { key in
-                try await client.captureAuthorized(request, idempotencyKey: key)
+        // The capture of an authorization is a capture; the authorization's method is not known here.
+        try await reported(.capture, origin: .direct, method: nil) {
+            try await submit {
+                try await sending(
+                    .captureAuthorized(transId: request.transId.payabliCaptureTrimmed),
+                    claimsHeld: true
+                ) { key in
+                    try await client.captureAuthorized(request, idempotencyKey: key)
+                }
             }
         }
     }
@@ -301,12 +386,14 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
     public func voidTransaction(
         _ transId: String
     ) async throws -> PayabliPayInResult {
-        try await exclusively {
-            try await sending(
-                .void(transId: transId.payabliCaptureTrimmed),
-                claimsHeld: true
-            ) { key in
-                try await client.void(transId: transId, idempotencyKey: key)
+        try await reported(.void, origin: .direct, method: nil) {
+            try await exclusively {
+                try await sending(
+                    .void(transId: transId.payabliCaptureTrimmed),
+                    claimsHeld: true
+                ) { key in
+                    try await client.void(transId: transId, idempotencyKey: key)
+                }
             }
         }
     }
@@ -324,7 +411,41 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
     public func readTransaction(
         _ transId: String
     ) async throws -> PayabliPayInTransaction {
-        try await client.details(transId: transId)
+        try await reported(.read, origin: .direct, method: nil) {
+            try await client.details(transId: transId)
+        }
+    }
+
+    /// Runs an operation and reports how it ended, timed on the flow's clock.
+    ///
+    /// - Parameter operation: what runs.
+    /// - Parameter origin: whether the form or the host started it.
+    /// - Parameter method: the kind of payment method, or nil when the operation names none.
+    /// - Parameter body: the operation.
+    /// - Returns: what the operation returned.
+    private func reported<Value>(
+        _ operation: PayInReports.Operation,
+        origin: PayInReports.Origin,
+        method: String?,
+        _ body: () async throws -> Value
+    ) async throws -> Value {
+        let startedAt = now()
+        let refusal = PayInLocalRefusal()
+        do {
+            let value = try await PayInLocalRefusal.$current.withValue(refusal) { try await body() }
+            reports?.completed(operation, origin: origin, method: method, after: now() - startedAt, error: nil)
+            return value
+        } catch {
+            reports?.completed(
+                operation,
+                origin: origin,
+                method: method,
+                after: now() - startedAt,
+                error: error,
+                refusedLocally: refusal.wasRefused
+            )
+            throw error
+        }
     }
 
     /// Sends one attempt under the key it takes, and records what became of it.
@@ -361,6 +482,9 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
             var outcome = Self.outcome(of: error, reused: reservation.reused)
             if !mark.mayHaveLeft {
                 outcome = .notAnswered
+                if PayInReports.isRefusedBeforeSending(error) {
+                    PayInLocalRefusal.current?.set()
+                }
             }
             if heldKeys.settle(reservation, outcome: outcome, now: now()) {
                 logger.warning("payin_retry_keys_full")

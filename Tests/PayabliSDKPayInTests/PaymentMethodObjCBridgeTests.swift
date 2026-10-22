@@ -8,6 +8,12 @@ private let mainActorCompletionTimeout: TimeInterval = 10
 
 @MainActor
 final class PaymentMethodObjCBridgeTests: XCTestCase {
+    override func setUp() {
+        super.setUp()
+        // A refusal reports at once, and a report would otherwise ask the host's token handler and reach the network.
+        PayabliSession.resetForTesting(telemetryTransport: DiscardingTelemetryTransport())
+    }
+
     override func tearDown() {
         PayabliSession.resetForTesting()
         super.tearDown()
