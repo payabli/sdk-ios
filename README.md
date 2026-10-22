@@ -62,7 +62,7 @@ Or declare it in `Package.swift`, with the latest version from the
 [Releases](https://github.com/payabli/sdk-ios/releases) page:
 
 ```swift
-.package(url: "https://github.com/payabli/sdk-ios.git", .upToNextMinor(from: "<latest version>"))
+.package(url: "https://github.com/payabli/sdk-ios.git", .upToNextMinor(from: "0.1.1"))
 ```
 
 To build changes that aren't released yet, track the `main` branch instead, with Xcode's **Branch** rule
