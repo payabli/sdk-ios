@@ -308,7 +308,8 @@ final class PayabliPayInViewModel: ObservableObject {
             clearSensitiveFields()
             return result
         } catch {
-            // The card and bank fields go only once they were handed to the network, whatever the error.
+            // The card and bank fields go only once the service may have acted on them, whatever the error. A 401
+            // that is not resent left nothing the service acted on, so the payer's entry stays.
             if sendMark.mayHaveLeft {
                 clearSensitiveFieldsAfterFailure()
             }
