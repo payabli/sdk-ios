@@ -94,7 +94,9 @@ final class SessionTokenRenewalWireTests: XCTestCase {
             session: session,
             provider: MockTapToPayProvider(),
             attestation: attestation,
-            retryPolicy: RetryPolicy(maxAttempts: 1, baseDelay: 0, maxDelay: 0, multiplier: 1, maxJitter: 0)
+            retryPolicy: RetryPolicy(maxAttempts: 1, baseDelay: 0, maxDelay: 0, multiplier: 1, maxJitter: 0),
+            // The session was never installed, so it reads as live only because the test says so.
+            isLive: { true }
         )
         return (ttp, tokens)
     }

@@ -104,6 +104,10 @@ extension PayabliTTPSessionState {
         case .sdkInternalError:
             return .failed(reason: .sdkInternalError)
 
+        case .sessionNotInitialized:
+            // A terminal raises it only when its session is no longer the installed one.
+            return .failed(reason: .sessionEnded)
+
         case .decodingError, .validation:
             // Both are the two sides disagreeing about the contract. A 400 is
             // the service reading the request and refusing the body, so the

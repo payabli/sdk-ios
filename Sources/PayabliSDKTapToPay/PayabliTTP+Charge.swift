@@ -108,6 +108,12 @@ extension PayabliTTP {
         let paymentTransId = try await runInitiate(context: context, charge: charge)
         progress.paymentTransId = paymentTransId
 
+        // Again here, because a replacement can land while the payment opens, and by then the reader may be armed
+        // for another merchant.
+        if !isLive() {
+            try await refuseRetiredCharge(paymentTransId: paymentTransId, charge: charge)
+        }
+
         // Step 2 — NFC tap.
         let readRequest = CardReadRequest(
             amount: context.paymentDetails.amount,
@@ -250,6 +256,26 @@ extension PayabliTTP {
     /// Holds the reader for a new charge and names it, or throws when the session is not ready.
     ///
     /// - Returns: the charge's name, held until `leaveCharge` releases it.
+    /// Ends a charge whose session was replaced while its payment opened: the card is not read, the opened payment's
+    /// close is attempted, and the terminal lands `.failed(reason: .sessionEnded)`.
+    ///
+    /// - Parameter paymentTransId: the payment the charge opened.
+    /// - Parameter charge: the charge holding the session.
+    /// - Throws: `sessionNotInitialized`, carrying the opened payment and `capture: .notCharged`.
+    private func refuseRetiredCharge(paymentTransId: String, charge: Int) async throws -> Never {
+        recordChargeActivity(.closing, for: charge)
+        _ = await tryUpdate(paymentTransId: paymentTransId, payload: .nfcFailure(description: Self.retiredReason))
+        sessionManager.failCharge(.sessionEnded, for: charge)
+        syncPublished()
+        throw TapToPayError(
+            type: .sessionNotInitialized,
+            reason: Self.retiredReason,
+            detail: nil,
+            paymentTransId: paymentTransId,
+            capture: .notCharged
+        )
+    }
+
     private func enterCharge() throws -> Int {
         guard let charge = sessionManager.beginCharge() else {
             throw PayabliTTPError.notReady(current: sessionState)

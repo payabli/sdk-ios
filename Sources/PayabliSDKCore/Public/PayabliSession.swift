@@ -34,6 +34,8 @@ public final class PayabliSession: @unchecked Sendable {
 
     package let telemetry: TelemetryClient
 
+    let machine: SessionStateMachine
+
     private let identity: ConfigIdentity
 
     /// A process-wide lock, because the installed session is process-wide.
@@ -41,17 +43,35 @@ public final class PayabliSession: @unchecked Sendable {
     private static var installed: PayabliSession?
     private static var testTelemetryTransport: (any TelemetryTransport)?
 
+    /// Written only by the machine of whichever session `install` installed, so it reads `uninitialized` before any.
+    static let sink = SdkStateSink()
+
+    static var state: SdkState {
+        sink.value
+    }
+
+    private static let logger = PayabliLogger(category: .core)
+
+    /// Whether this is still the installed session, a finished one included. A capability built on a session that
+    /// was replaced reads false and stops acting for it.
+    package var isLive: Bool {
+        Self.lock.withLock { Self.installed === self }
+    }
+
     init(
         config: PayabliConfig,
         urlSession: URLSession? = nil,
         deviceIdentity: DeviceIdentity = DeviceIdentity {
             try InstallIdentifier.hardwareId(storage: KeychainStorage(migrating: [InstallIdentifier.storageKey]))
         },
-        telemetryTransport: (any TelemetryTransport)? = nil
+        telemetryTransport: (any TelemetryTransport)? = nil,
+        sink: SdkStateSink = SdkStateSink()
     ) {
         self.config = config
         self.deviceIdentity = deviceIdentity
         identity = ConfigIdentity(config)
+        let machine = SessionStateMachine(sink: sink)
+        self.machine = machine
         let auth = PayabliAuth(config: config)
         self.auth = auth
         let service = PayabliService(
@@ -65,10 +85,12 @@ public final class PayabliSession: @unchecked Sendable {
             ),
             session: urlSession
         )
+        // Handed in at construction, so no request can finish the credential with nothing listening.
         let transport = AuthenticatedTransport(
             base: service,
             auth: auth,
-            logger: PayabliLogger(category: .network)
+            logger: PayabliLogger(category: .network),
+            onUnrecoverable: { _ in machine.markReinitializeRequired() }
         )
         self.transport = transport
         telemetry = TelemetryClient(
@@ -84,7 +106,7 @@ public final class PayabliSession: @unchecked Sendable {
         )
     }
 
-    /// The state a report gives for this session. An installed session is usable, and iOS has no other.
+    /// The state a report gives for a session that is live and usable, the only one a report is made on.
     private static let reportedState = "ready"
 
     /// Installs the process's session, or returns it if one is already installed for an equal
@@ -95,8 +117,13 @@ public final class PayabliSession: @unchecked Sendable {
     /// A different configuration throws `invalidConfiguration` and leaves the installed session in
     /// place, because every facade already built is running on it.
     ///
+    /// Once the session's credential is finished, after a fresh token was refused too, any configuration
+    /// builds a fresh session and installs it in place of the finished one, and its provider is called again.
+    /// A `PayabliTTP` built on the finished session refuses from then on; build a new one.
+    ///
     /// - Parameter config: the configuration to install; equal by entry point and environment.
-    /// - Returns: the process's installed session, the one already installed when the configuration is equal.
+    /// - Returns: the process's installed session: the one already installed when it is usable and the configuration
+    ///   is equal, or a new one.
     @discardableResult
     public static func initialize(config: PayabliConfig) async throws -> PayabliSession {
         let startedAt = ContinuousClock.now
@@ -134,7 +161,12 @@ public final class PayabliSession: @unchecked Sendable {
     ) throws -> PayabliSession {
         try lock.withLock {
             let identity = ConfigIdentity(config)
-            if let current = installed {
+            let current = installed
+            // The installed session's own machine: the process-wide state is one value, and a stray write to it must
+            // not replace a usable session.
+            let live = current.map { !$0.machine.isFinished } ?? false
+
+            if live, let current {
                 guard current.identity == identity else {
                     throw PayabliGenericError(
                         type: .invalidConfiguration,
@@ -143,12 +175,22 @@ public final class PayabliSession: @unchecked Sendable {
                 }
                 return current
             }
+
             let session = PayabliSession(
                 config: config,
                 urlSession: urlSession,
-                telemetryTransport: telemetryTransport ?? testTelemetryTransport
+                telemetryTransport: telemetryTransport ?? testTelemetryTransport,
+                sink: sink
             )
+            session.machine.markReady()
             installed = session
+
+            if let current {
+                Task { [telemetry = current.telemetry] in await telemetry.stop() }
+                logger.warning("session_replaced: replaced a session that required re-initialization")
+            } else {
+                logger.info("session_initialized")
+            }
             return session
         }
     }
@@ -174,12 +216,14 @@ public final class PayabliSession: @unchecked Sendable {
         lock.withLock { installed }
     }
 
-    /// Removes the installed session.
+    /// Drops the installed session and puts the state back, so one test cannot decide the outcome of the next.
     ///
     /// - Parameter telemetryTransport: what later installs report through, so a test reaches no network; nil restores the default.
     static func resetForTesting(telemetryTransport: (any TelemetryTransport)? = nil) {
         lock.withLock {
+            installed?.machine.finish()
             installed = nil
+            sink.value = .uninitialized
             testTelemetryTransport = telemetryTransport
         }
     }
