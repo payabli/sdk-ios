@@ -22,6 +22,7 @@ package final class TTPTransactionClient: Sendable {
     ///
     /// - Parameter entryPoint: the entry point the transaction is initiated for.
     /// - Parameter deviceId: the device handle the payment method carries.
+    /// - Parameter idempotencyKey: the key the service recognises a repeat of this opening by.
     /// - Parameter paymentDetails: the amounts and currency to charge.
     /// - Parameter customer: the customer attached to the transaction, empty for an anonymous payor.
     /// - Parameter invoice: the invoice attached, its number when one is given.
@@ -30,6 +31,7 @@ package final class TTPTransactionClient: Sendable {
     package func initiate(
         entryPoint: String,
         deviceId: String,
+        idempotencyKey: String,
         paymentDetails: PayabliTTPPaymentDetails,
         customer: PayabliTTPCustomerData = PayabliTTPCustomerData(),
         invoice: PayabliTTPInvoiceData = PayabliTTPInvoiceData(),
@@ -48,7 +50,7 @@ package final class TTPTransactionClient: Sendable {
         let request = try PayabliRequest.json(
             method: .post,
             path: "/api/v2/MoneyIn/initiate",
-            headers: [:],
+            headers: [payabliIdempotencyKeyHeader: idempotencyKey],
             jsonBody: body
         )
 

@@ -15,14 +15,16 @@ extension PayabliTTP {
         retryPolicy: RetryPolicy = .default,
         session: URLSession? = nil,
         telemetry: any TelemetryTransport = InMemoryTelemetryTransport(),
-        isLive: @escaping @Sendable () -> Bool = { true }
+        isLive: @escaping @Sendable () -> Bool = { true },
+        chargeKeys: ChargeKeyStore = ChargeKeyStore()
     ) {
         self.init(
             session: PayabliSession(config: config, urlSession: session, telemetryTransport: telemetry),
             provider: provider,
             attestation: attestation,
             retryPolicy: retryPolicy,
-            isLive: isLive
+            isLive: isLive,
+            chargeKeys: chargeKeys
         )
     }
 }

@@ -213,9 +213,30 @@ order.paymentTransId = result.paymentTransId // store it; don't log it
 | `customer` | `PayabliTTPCustomerData` | Name the payer with at least one of `firstName`, `lastName`, `customerNumber` or `customerId`. A charge that names nobody can be refused. The other fields (email, phone, billing and shipping address) are optional, and blank values are ignored. |
 | `invoice` | `PayabliTTPInvoiceData` | Optional. `invoiceNumber`. |
 | `orderDescription` | `String?` | Optional. |
-| `attempt` | `PayabliAttempt` | `.newPayment` by default. Pass `.retry` only to repeat a charge whose outcome is unknown. |
+| `attempt` | `PayabliAttempt` | `.newPayment` by default. Pass `.retry` only to repeat a charge whose outcome is unknown; see [Retry safely](#retry-safely). |
 
 `charge` returns only when the payment is approved. Store `result.paymentTransId` with your order.
+
+### Retry safely
+
+A charge always sends an idempotency key, which the SDK makes and keeps; your app never handles one. Calling `charge`
+again is a new payment unless you say otherwise.
+
+When a charge fails with `capture` `.unknown`, find the transaction first. If you charge again, pass
+`attempt: .retry`: the SDK sends the key of the most recent charge whose outcome is unknown, for the same entry point
+and environment, so the service refuses a repeat while it still recognises the key. When it refuses one before the
+card is read, the charge fails with `.chargeNotFinished` (3034): the earlier charge reached the service and hasn't
+finished. Check that payment before charging again, or wait four minutes.
+
+A retry describes the same payment as the charge it repeats: the same amount, service fee, currency and, if that charge
+set one, invoice number. A retry that describes another payment is refused before anything is sent, with
+`.retryNotSamePayment` (1022), and the earlier charge's key stays for the right retry. Only the most recent charge
+whose outcome is unknown can be retried: a later one with an unknown outcome replaces it.
+
+The SDK holds a charge's key in memory for four minutes after its latest send, across every `PayabliTTP` in the
+process, for up to four entry points at once. A charge for a fifth entry point while four hold an unresolved charge
+is refused before anything is sent, with `.tooManyOpenCharges` (3030). A retry after the four minutes, or after your
+app restarts, sends a new key, so past that point read the transaction back instead.
 
 ## Outcomes and errors
 
@@ -248,6 +269,8 @@ These Tap to Pay causes are ones your app handles, with their codes:
 | `.activationCodeNotIssued` | 3027 | `.configuration` | No activation code has been issued for this device. |
 | `.deviceNotPending` | 3028 | `.invalidRequest` | This device is not waiting for activation. |
 | `.terminalNotReady` | 3029 | `.invalidRequest` | The terminal is not ready for this call. |
+| `.tooManyOpenCharges` | 3030 | `.invalidRequest` | Too many charges are waiting to be resolved. |
+| `.chargeNotFinished` | 3034 | `.outcomeUnknown` | An earlier charge on this device hasn't finished. Check that payment before charging again, or wait four minutes. |
 
 It also carries `capture` and `paymentTransId`:
 

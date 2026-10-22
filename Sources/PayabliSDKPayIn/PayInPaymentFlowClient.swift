@@ -62,7 +62,7 @@ final class PayInPaymentFlowClient: Sendable {
         )
         // Whether a key went out, not which one: nothing reports a key, and `perform` needs only to
         // know that this route carries one so a failure that leaves the outcome open says so.
-        return try await perform(payabliRequest, carriesKey: payabliRequest.headers["idempotencyKey"] != nil)
+        return try await perform(payabliRequest, carriesKey: payabliRequest.headers[payabliIdempotencyKeyHeader] != nil)
     }
 
     /// Reverses a transaction, releasing an authorization's hold or undoing a capture that has not
@@ -95,7 +95,7 @@ final class PayInPaymentFlowClient: Sendable {
         )
         // Whether a key went out, not which one: nothing reports a key, and `perform` needs only to
         // know that this route carries one so a failure that leaves the outcome open says so.
-        return try await perform(payabliRequest, carriesKey: payabliRequest.headers["idempotencyKey"] != nil)
+        return try await perform(payabliRequest, carriesKey: payabliRequest.headers[payabliIdempotencyKeyHeader] != nil)
     }
 
     /// Reads a transaction back by its identifier.
@@ -196,7 +196,7 @@ final class PayInPaymentFlowClient: Sendable {
         )
         // Whether a key went out, not which one: nothing reports a key, and `perform` needs only to
         // know that this route carries one so a failure that leaves the outcome open says so.
-        return try await perform(payabliRequest, carriesKey: payabliRequest.headers["idempotencyKey"] != nil)
+        return try await perform(payabliRequest, carriesKey: payabliRequest.headers[payabliIdempotencyKeyHeader] != nil)
     }
 
     /// Builds the request. The transport's chain attaches the credential and the content type.
@@ -248,7 +248,7 @@ final class PayInPaymentFlowClient: Sendable {
 
     private static func headers(idempotencyKey: String?) throws -> [String: String] {
         guard let idempotencyKey else { return [:] }
-        return ["idempotencyKey": try sendableKey(idempotencyKey)]
+        return [payabliIdempotencyKeyHeader: try sendableKey(idempotencyKey)]
     }
 
     /// The key as it will be sent, or a refusal.

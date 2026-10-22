@@ -7,7 +7,7 @@ import PayabliSDKCore
 /// sees the failure reason without re-reading logs.
 private enum TTPUpdateOutcome {
     case succeeded
-    case failed(reason: String, retryAfter: TimeInterval?)
+    case failed(reason: String, retryAfter: TimeInterval?, processorHasNoRecord: Bool)
 
     /// The caller cancelled. The best-effort notify after a reader failure ignores it.
     case cancelled
@@ -25,6 +25,10 @@ extension PayabliTTP {
     ///      both `merchantTransactionId` and `merchantOrderId`.
     ///   3. `PATCH /MoneyIn/update/{paymentTransId}` — only the provider
     ///      response travels; everything else was persisted at step 1.
+    ///
+    /// Every charge opens under a key of its own. One whose outcome is unknown keeps it for four minutes, and only
+    /// `attempt: .retry` resends it, describing the same amount, service fee, currency and, when the held charge set
+    /// one, invoice number; any other retry is refused with `RETRY_NOT_SAME_PAYMENT` before anything is sent.
     ///
     /// - Parameters:
     ///   - paymentDetails: the amount, service fee and currency to charge.
@@ -48,6 +52,7 @@ extension PayabliTTP {
                     customer: customer,
                     invoice: invoice,
                     orderDescription: orderDescription,
+                    attempt: attempt,
                     progress: progress
                 )
             }
@@ -55,7 +60,8 @@ extension PayabliTTP {
             throw TapToPayErrorTranslation.hostError(
                 for: error,
                 chargeOf: progress.paymentTransId,
-                askedForCard: progress.askedForCard
+                askedForCard: progress.askedForCard,
+                resentKey: progress.resentKey
             )
         }
     }
@@ -65,6 +71,7 @@ extension PayabliTTP {
         customer: PayabliTTPCustomerData,
         invoice: PayabliTTPInvoiceData,
         orderDescription: String?,
+        attempt: PayabliAttempt,
         progress: ChargeProgress
     ) async throws -> TransactionResult {
         // Called directly: `reinitialize()` would wait on the gate this charge holds. Its own task keeps a
@@ -98,8 +105,72 @@ extension PayabliTTP {
             orderDescription: cleanedOrderDescription
         )
 
+        let deviceId = try chargingDeviceId(for: charge)
+        // After the checks, so a charge that never reaches the wire holds no key.
+        let reservation = try chargeKeys.reserve(
+            entry: entryPoint,
+            environment: environment,
+            attempt: attempt,
+            description: ChargeDescription(paymentDetails: paymentDetails, invoice: invoice)
+        )
+        progress.resentKey = reservation.reused
+        var arrivedAt: ContinuousClock.Instant? = reservation.reservedAt
+        defer {
+            chargeKeys.supersede(entry: entryPoint, environment: environment, key: reservation.key, arrivedAt: arrivedAt)
+        }
+        let mark = PayabliSendMark()
+        do {
+            return try await runOpening(
+                context: context,
+                deviceId: deviceId,
+                reservation: reservation,
+                mark: mark,
+                charge: charge,
+                progress: progress
+            )
+        } catch {
+            if !progress.askedForCard {
+                // A 409 extends no marker an earlier send wrote, and a send that never left writes none.
+                let unsent = !mark.mayHaveLeft || !(error is CancellationError || Self.leavesOutcomeUnknown(error))
+                if progress.paymentTransId == nil, unsent || Self.isConflict(error) {
+                    arrivedAt = nil
+                }
+                // No card was asked for, so no money moved and a fresh key protects no sale.
+                settleFresh(reservation)
+            }
+            throw error
+        }
+    }
+
+    /// Opens the payment under `reservation`'s key, reads the card and closes the payment.
+    ///
+    /// - Parameter context: the payment's details, customer, invoice and description, as the caller gave them.
+    /// - Parameter deviceId: the device handle the opening's payment method carries.
+    /// - Parameter reservation: the key the opening sends, and whether it was already held.
+    /// - Parameter mark: set when the opening reaches the HTTP layer.
+    /// - Parameter charge: the charge holding the session.
+    /// - Parameter progress: how far the charge got, which decides what its failure tells a host.
+    /// - Returns: the transaction result, on an approval the close confirmed.
+    private func runOpening(
+        context: TTPTransactionContext,
+        deviceId: String,
+        reservation: ChargeKeyStore.Reservation,
+        mark: PayabliSendMark,
+        charge: Int,
+        progress: ChargeProgress
+    ) async throws -> TransactionResult {
         // Step 1 — backend mints the paymentTransId.
-        let paymentTransId = try await runInitiate(context: context, charge: charge)
+        let paymentTransId = try await PayabliSendMark.$current.withValue(mark) {
+            try await transactionClient.initiate(
+                entryPoint: entryPoint,
+                deviceId: deviceId,
+                idempotencyKey: reservation.key,
+                paymentDetails: context.paymentDetails,
+                customer: context.customer,
+                invoice: context.invoice,
+                orderDescription: context.orderDescription
+            )
+        }
         progress.paymentTransId = paymentTransId
 
         // Again here, because a replacement can land while the payment opens, and by then the reader may be armed
@@ -131,10 +202,15 @@ extension PayabliTTP {
             // Best-effort backend notify so the transaction isn't left dangling.
             // Its outcome does not change what the caller is told.
             recordChargeActivity(.closing, for: charge)
-            _ = await tryUpdate(
+            let close = await tryUpdate(
                 paymentTransId: paymentTransId,
                 payload: .nfcFailure(description: String(describing: error))
             )
+            // A close that lands keeps the key: the tap's answer is unknown. The processor holding no record of the
+            // payment is the one answer that says nothing was captured.
+            if case .failed(_, _, processorHasNoRecord: true) = close {
+                settleFresh(reservation)
+            }
 
             // Expired after the close, so `closing` is published first. Only while the reader that failed is
             // still the current one. The gate keeps every other setup out until the charge returns, so this
@@ -149,7 +225,32 @@ extension PayabliTTP {
         }
 
         recordChargeActivity(.closing, for: charge)
-        return try await runSuccessUpdate(paymentTransId: paymentTransId, readResult: readResult)
+        return try await runSuccessUpdate(paymentTransId: paymentTransId, readResult: readResult, reservation: reservation)
+    }
+
+    /// Releases a key this charge minted, because its charge reached an outcome not in doubt. A resent key names an
+    /// earlier charge, so nothing this one learns settles it.
+    ///
+    /// - Parameter reservation: the key the charge sent, and whether it was already held.
+    private func settleFresh(_ reservation: ChargeKeyStore.Reservation) {
+        guard !reservation.reused else { return }
+        chargeKeys.settle(entry: entryPoint, environment: environment, key: reservation.key)
+    }
+
+    /// The text the service refuses a close with when the processor has no record of the payment.
+    private static let processorHasNoRecord = "Unable to locate the transaction with the payment processor"
+
+    private static func saysTheProcessorHasNoRecord(_ error: Error) -> Bool {
+        guard let refusal = error as? any PayabliError, refusal.type == .validation else { return false }
+        return refusal.detail == processorHasNoRecord
+    }
+
+    private static func isConflict(_ error: Error) -> Bool {
+        (error as? any PayabliError)?.type == .conflict
+    }
+
+    private static func leavesOutcomeUnknown(_ error: Error) -> Bool {
+        (error as? any PayabliError)?.type.category == .outcomeUnknown
     }
 
     /// Step 3 — the update, sent whatever the processor answered. Only an approval is a payment, and a
@@ -157,16 +258,19 @@ extension PayabliTTP {
     ///
     /// - Parameter paymentTransId: the transaction the update closes, minted at initiate.
     /// - Parameter readResult: what the reader read, whose outcome decides the capture.
+    /// - Parameter reservation: the key the charge sent, settled once the outcome is definite.
     /// - Returns: the transaction's result, on an approval the update confirmed.
     private func runSuccessUpdate(
         paymentTransId: String,
-        readResult: CardReadResult
+        readResult: CardReadResult,
+        reservation: ChargeKeyStore.Reservation
     ) async throws -> TransactionResult {
         let update = await tryUpdate(paymentTransId: paymentTransId, payload: .success(readResult))
 
         let capture: PayabliTTPCapture
         switch readResult.outcome {
         case .declined:
+            settleFresh(reservation)
             throw PayabliTTPError.cardDeclined(paymentTransId: paymentTransId)
         case .approved:
             capture = .charged
@@ -176,10 +280,11 @@ extension PayabliTTP {
 
         switch update {
         case .succeeded where capture == .charged:
+            settleFresh(reservation)
             return TransactionResult(paymentTransId: paymentTransId)
         case .succeeded:
             throw PayabliTTPError.outcomeUnknown(paymentTransId: paymentTransId)
-        case let .failed(reason, retryAfter):
+        case let .failed(reason, retryAfter, _):
             throw PayabliTTPError.updateFailed(
                 reason: reason, paymentTransId: paymentTransId, capture: capture, retryAfter: retryAfter
             )
@@ -296,14 +401,12 @@ extension PayabliTTP {
         }
     }
 
-    /// `POST /MoneyIn/initiate`. Fails loudly if `deviceId` is missing —
-    /// otherwise any later `PATCH /update/{id}` would 400 on a non-existent
-    /// transaction.
+    /// The device the opening charges as. Fails loudly if `deviceId` is missing — otherwise any later
+    /// `PATCH /update/{id}` would 400 on a non-existent transaction.
     ///
-    /// - Parameter context: the payment's details, customer, invoice and description, as the caller gave them.
     /// - Parameter charge: the charge's name, marked failed where `deviceId` is missing.
-    /// - Returns: the `paymentTransId` the backend minted.
-    private func runInitiate(context: TTPTransactionContext, charge: Int) async throws -> String {
+    /// - Returns: the device handle the opening's payment method carries.
+    private func chargingDeviceId(for charge: Int) throws -> String {
         // Read at the point of use: the binding can be replaced between calls, and
         // a copy taken earlier names a device this request cannot sign for.
         guard let deviceId = try attestation.cachedDeviceId(for: entryPoint) else {
@@ -316,14 +419,7 @@ extension PayabliTTP {
                 detail: nil
             )
         }
-        return try await transactionClient.initiate(
-            entryPoint: entryPoint,
-            deviceId: deviceId,
-            paymentDetails: context.paymentDetails,
-            customer: context.customer,
-            invoice: context.invoice,
-            orderDescription: context.orderDescription
-        )
+        return deviceId
     }
 
     /// Runs `PATCH /update/{paymentTransId}` with retry; bearer auth and 401 refresh-and-retry are
@@ -371,7 +467,11 @@ extension PayabliTTP {
         } catch {
             // The caller still gets this surface's vocabulary, so the outcome reads the same whatever
             // layer underneath produced the failure.
-            return .failed(reason: error.localizedDescription, retryAfter: (error as? PayabliRetryAfter)?.retryAfter)
+            return .failed(
+                reason: error.localizedDescription,
+                retryAfter: (error as? PayabliRetryAfter)?.retryAfter,
+                processorHasNoRecord: Self.saysTheProcessorHasNoRecord(error)
+            )
         }
     }
 
