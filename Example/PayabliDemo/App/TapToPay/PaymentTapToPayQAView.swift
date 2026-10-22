@@ -1,16 +1,8 @@
 import SwiftUI
 
-/// Tap to Pay QA screen.
-///
-/// Shows every input the reader needs before it can become ready, flags the
-/// ones that are still placeholders, and drives the lifecycle:
-///   - **Enable Terminal** — `initialize()`: eligibility → App Attest → `GET /config` →
-///     hand credentials to the reader → prepare reader → `.ready`.
-///   - **Charge** — `charge(paymentDetails:customer:)`, which presents Apple's NFC sheet.
-///   - **Activate device** — `activateDevice(activationCode:)` for `.pendingActivation`.
-///
-/// The values themselves come from `Secrets.swift`; they are read-only here because
-/// the terminal is constructed once at launch, in the app's entry point.
+/// Tap to Pay QA screen: shows the inputs the reader needs, flags placeholders, and drives `initialize()`,
+/// `charge(paymentDetails:customer:)` and `activateDevice(activationCode:)`. The values come from `Secrets.swift`,
+/// read-only because the terminal is built once at launch.
 struct PaymentTapToPayQAView: View {
     @ObservedObject var terminal: TapToPayTerminal
 
