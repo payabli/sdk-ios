@@ -660,6 +660,9 @@ extension PayabliPayInPaymentMethod {
 
 extension PayabliPayInPaymentDetails {
     /// Each amount is checked as it is sent, at two places, so a total of `0.001`, sent as `0.00`, is refused.
+    ///
+    /// A negative surcharge, or a service fee and surcharge that together reach the total, describe a payment that
+    /// cannot be charged, so it is refused here for the form and a direct call alike instead of being sent.
     func validate() throws {
         guard let total = PayInAmount.sendable(totalAmount) else {
             throw PayabliPayInError.invalidInput("Total amount is out of range.")
