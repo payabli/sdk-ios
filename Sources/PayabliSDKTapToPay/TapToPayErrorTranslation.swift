@@ -53,7 +53,7 @@ enum TapToPayErrorTranslation {
     ) -> Error {
         guard let failure = hostError(for: error) as? TapToPayError else { return error }
         let claimsNothingWasSent = failure.type == .validation || failure.type == .sdkInternalError
-        let type: PayabliErrorType = if !askedForCard, resentKey, failure.type == .conflict {
+        let type: PayabliErrorType = if !askedForCard, resentKey, error is ChargeKeyRefusal {
             // The opening was refused as a repeat of an earlier charge that has not finished.
             .chargeNotFinished
         } else if askedForCard, claimsNothingWasSent {

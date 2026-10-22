@@ -130,9 +130,9 @@ extension PayabliTTP {
             )
         } catch {
             if !progress.askedForCard {
-                // A 409 extends no marker an earlier send wrote, and a send that never left writes none.
+                // A refused key extends no marker an earlier send wrote, and a send that never left writes none.
                 let unsent = !mark.mayHaveLeft || !(error is CancellationError || Self.leavesOutcomeUnknown(error))
-                if progress.paymentTransId == nil, unsent || Self.isConflict(error) {
+                if progress.paymentTransId == nil, unsent || error is ChargeKeyRefusal {
                     arrivedAt = nil
                 }
                 // No card was asked for, so no money moved and a fresh key protects no sale.
@@ -243,10 +243,6 @@ extension PayabliTTP {
     private static func saysTheProcessorHasNoRecord(_ error: Error) -> Bool {
         guard let refusal = error as? any PayabliError, refusal.type == .validation else { return false }
         return refusal.detail == processorHasNoRecord
-    }
-
-    private static func isConflict(_ error: Error) -> Bool {
-        (error as? any PayabliError)?.type == .conflict
     }
 
     private static func leavesOutcomeUnknown(_ error: Error) -> Bool {

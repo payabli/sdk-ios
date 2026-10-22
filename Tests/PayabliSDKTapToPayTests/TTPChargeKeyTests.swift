@@ -94,6 +94,19 @@ final class TTPChargeKeyTests: XCTestCase {
         XCTAssertEqual(ttp.sessionState, .ready)
     }
 
+    func testAResendRefusedAsADuplicateSaleStaysAConflict() async throws {
+        let (ttp, _) = try await makeReadyTTP(outcome: .indeterminate)
+        _ = await failure { try await ttp.charge(paymentDetails: Self.details) }
+        Self.wire.initiateStatus = 409
+        Self.wire.conflictIsDuplicateSale = true
+
+        let refused = await failure { try await ttp.charge(paymentDetails: Self.details, attempt: .retry) }
+
+        XCTAssertEqual(refused?.type, .conflict)
+        XCTAssertEqual(refused?.code, 1011)
+        XCTAssertEqual(refused?.capture, .unknown, "a resent key never reports not charged")
+    }
+
     func testAFreshKeyRefusedAsARepeatStaysAConflictAndIsReleased() async throws {
         let (ttp, _) = try await makeReadyTTP()
         Self.wire.initiateStatus = 409
@@ -329,6 +342,7 @@ final class TTPChargeKeyTests: XCTestCase {
         private var sentKeys: [String] = []
         private var initiate = 200
         private var refusal: String?
+        private var duplicateSale = false
 
         var keys: [String] {
             lock.withLock { sentKeys }
@@ -344,6 +358,11 @@ final class TTPChargeKeyTests: XCTestCase {
             set { lock.withLock { refusal = newValue } }
         }
 
+        var conflictIsDuplicateSale: Bool {
+            get { lock.withLock { duplicateSale } }
+            set { lock.withLock { duplicateSale = newValue } }
+        }
+
         func record(_ key: String?) {
             lock.withLock { sentKeys.append(key ?? "<none>") }
         }
@@ -353,6 +372,7 @@ final class TTPChargeKeyTests: XCTestCase {
                 sentKeys = []
                 initiate = 200
                 refusal = nil
+                duplicateSale = false
             }
         }
     }
@@ -365,7 +385,9 @@ final class TTPChargeKeyTests: XCTestCase {
         if path.contains("/MoneyIn/initiate") {
             wire.record(request.value(forHTTPHeaderField: "idempotencyKey"))
             status = wire.initiateStatus
-            if status == 409 {
+            if status == 409, wire.conflictIsDuplicateSale {
+                data = try JSONSerialization.data(withJSONObject: ["isSuccess": false, "responseText": "Duplicated transaction"])
+            } else if status == 409 {
                 contentType = "text/plain"
                 data = Data("Duplicated idempotencyKey".utf8)
             } else {
