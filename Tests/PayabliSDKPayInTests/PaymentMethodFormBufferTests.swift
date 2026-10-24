@@ -38,8 +38,16 @@ final class PaymentMethodFormBufferTests: XCTestCase {
         XCTAssertEqual([false, false], wipedWhileInside, "The buffers live while the submission runs")
         XCTAssertTrue(data.cardNumber.isWiped)
         XCTAssertTrue(data.securityCode.isWiped)
-        XCTAssertTrue(data.cardNumber.rawCopy().allSatisfy { $0 == SensitiveDigits.wipedByte })
-        XCTAssertTrue(data.securityCode.rawCopy().allSatisfy { $0 == SensitiveDigits.wipedByte })
+        // The counts come from the fields the buffers were built from — the card number as the form
+        // holds it, separators included — so discarded storage cannot pass as an overwrite.
+        XCTAssertEqual(
+            Array(repeating: SensitiveDigits.wipedByte, count: viewModel.cardNumber.utf8.count),
+            data.cardNumber.rawCopy()
+        )
+        XCTAssertEqual(
+            Array(repeating: SensitiveDigits.wipedByte, count: viewModel.cardCvv.utf8.count),
+            data.securityCode.rawCopy()
+        )
     }
 
     /// A submission that ends in a refusal closes them too: a retry builds its own buffers, and this
@@ -73,7 +81,16 @@ final class PaymentMethodFormBufferTests: XCTestCase {
 
         XCTAssertEqual(2, held.count)
         XCTAssertTrue(held.allSatisfy(\.isWiped))
-        XCTAssertTrue(held.allSatisfy { $0.rawCopy().allSatisfy { $0 == SensitiveDigits.wipedByte } })
+        // The counts come from the fields the buffers were built from — the card number as the form
+        // holds it, separators included — so discarded storage cannot pass as an overwrite.
+        XCTAssertEqual(
+            Array(repeating: SensitiveDigits.wipedByte, count: viewModel.cardNumber.utf8.count),
+            held[0].rawCopy()
+        )
+        XCTAssertEqual(
+            Array(repeating: SensitiveDigits.wipedByte, count: viewModel.cardCvv.utf8.count),
+            held[1].rawCopy()
+        )
     }
 
     /// The bank tab's account number is one of those buffers, closed by the same registry.
@@ -99,7 +116,12 @@ final class PaymentMethodFormBufferTests: XCTestCase {
 
         let account = try XCTUnwrap(held)
         XCTAssertTrue(account.isWiped)
-        XCTAssertTrue(account.rawCopy().allSatisfy { $0 == SensitiveDigits.wipedByte })
+        // The count comes from the field the buffer was built from, so discarded storage cannot
+        // pass as an overwrite.
+        XCTAssertEqual(
+            Array(repeating: SensitiveDigits.wipedByte, count: viewModel.accountNumber.utf8.count),
+            account.rawCopy()
+        )
     }
 
     @MainActor
