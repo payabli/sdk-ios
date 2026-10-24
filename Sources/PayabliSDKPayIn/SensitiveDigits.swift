@@ -72,20 +72,13 @@ public final class SensitiveDigits: @unchecked Sendable, CustomStringConvertible
         wiped ? [] : digits
     }
 
-    /// Runs `body` over a copy of the digits and overwrites that copy before returning, including when
-    /// `body` throws — the reading path that leaves nothing behind. The value itself is untouched:
-    /// lending a copy is not closing the original.
+    /// Runs `body` over the digits, rethrowing whatever `body` throws. The value itself is untouched:
+    /// lending the digits is not closing them, so the same value can be lent again afterwards.
     ///
     /// - Parameter body: the rule to run over the digits.
     /// - Returns: what `body` returned.
     func useDigits<T>(_ body: ([UInt8]) throws -> T) rethrows -> T {
-        var copy = read()
-        defer {
-            for index in copy.indices {
-                copy[index] = Self.wipedByte
-            }
-        }
-        return try body(copy)
+        return try body(read())
     }
 
     /// True once `close()` has run.

@@ -80,9 +80,9 @@ final class SensitiveDigitsTests: XCTestCase {
     }
 
     func testUseDigitsRethrowsAndLeavesTheValueUntouched() {
-        // Swift arrays are copy-on-write, so a body that retains the digits it was lent keeps its own
-        // copy and the wipe of the lent copy cannot reach it. What every production reader relies on,
-        // and what is asserted, is that the error is rethrown and the value itself is untouched.
+        // A reader that keeps the digits it was lent keeps them alive; wiping what a reader kept is
+        // the reader's work. What is asserted is the contract every reader relies on: the error is
+        // rethrown and the value itself is untouched.
         let value = SensitiveDigits.ofString(pan)
         var lent: [UInt8]?
 
@@ -108,7 +108,7 @@ final class SensitiveDigitsTests: XCTestCase {
 
         XCTAssertEqual(16, length)
         XCTAssertEqual(Array(pan.utf8), lent)
-        // The value itself is untouched: lending a copy is not closing the original.
+        // The value itself is untouched: lending the digits is not closing them.
         XCTAssertEqual(Array(pan.utf8), value.read())
         XCTAssertFalse(value.isWiped)
     }
