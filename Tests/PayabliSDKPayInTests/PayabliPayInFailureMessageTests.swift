@@ -65,6 +65,38 @@ final class PayabliPayInFailureMessageTests: XCTestCase {
         )
     }
 
+    func testAConvertedFailureDrawsTheDefaultWhateverTheOperation() {
+        let converted = PayabliGenericError(
+            type: .unknown,
+            reason: PayabliErrorType.unknown.message,
+            underlying: RedactedCause(URLError(.notConnectedToInternet))
+        )
+        for operation in [PayabliPayInOperation.capture, .authorize, .storePaymentMethod] {
+            let expected = switch operation {
+            case .storePaymentMethod: "The payment method couldn't be saved."
+            default: "The payment couldn't be completed."
+            }
+            XCTAssertEqual(
+                PayabliPayInFailureMessage.text(for: converted, operation: operation),
+                expected,
+                "\(operation)"
+            )
+        }
+    }
+
+    func testAnUnrecognizedStatusStillWarnsItsOutcomeIsUnknown() {
+        for operation in [PayabliPayInOperation.capture, .authorize] {
+            XCTAssertEqual(
+                PayabliPayInFailureMessage.text(
+                    for: PayabliGenericError(type: .unknown, reason: "HTTP 580"),
+                    operation: operation
+                ),
+                "This payment may have gone through. Check before paying again.",
+                "\(operation)"
+            )
+        }
+    }
+
     func testACatalogErrorDrawsItsCategorysMessage() {
         XCTAssertEqual(
             PayabliPayInFailureMessage.text(
