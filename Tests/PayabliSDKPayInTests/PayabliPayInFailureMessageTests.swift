@@ -54,15 +54,42 @@ final class PayabliPayInFailureMessageTests: XCTestCase {
         }
     }
 
-    func testAnErrorOutsideTheCatalogDrawsTheDefaultMessage() {
+    func testAnErrorOutsideTheCatalogDrawsTheOutcomeUnknownMessage() {
         XCTAssertEqual(
             PayabliPayInFailureMessage.text(for: URLError(.notConnectedToInternet), operation: .capture),
-            "The payment couldn't be completed."
+            "This payment may have gone through. Check before paying again."
         )
         XCTAssertEqual(
             PayabliPayInFailureMessage.text(for: URLError(.notConnectedToInternet), operation: .storePaymentMethod),
             "The payment method couldn't be saved."
         )
+    }
+
+    func testAnErrorOutsideTheCatalogDrawsTheHostsOutcomeUnknownWording() {
+        XCTAssertEqual(
+            PayabliPayInFailureMessage.text(
+                for: URLError(.notConnectedToInternet),
+                operation: .capture,
+                labels: PayabliPayInFormLabels(outcomeUnknownMessage: "We can't tell whether that went through.")
+            ),
+            "We can't tell whether that went through."
+        )
+    }
+
+    func testAnErrorOutsideTheCatalogDrawsTheOutcomeItIsReportedAs() {
+        let failure = URLError(.notConnectedToInternet)
+        let reported = PayabliGenericError(
+            type: .unknown,
+            reason: PayabliErrorType.unknown.message,
+            underlying: RedactedCause(failure)
+        )
+        for operation in PayabliPayInOperation.allCases {
+            XCTAssertEqual(
+                PayabliPayInFailureMessage.text(for: failure, operation: operation),
+                PayabliPayInFailureMessage.text(for: reported, operation: operation),
+                "\(operation)"
+            )
+        }
     }
 
     func testACatalogErrorDrawsItsCategorysMessage() {
