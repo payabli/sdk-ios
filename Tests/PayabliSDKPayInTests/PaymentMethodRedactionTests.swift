@@ -1,10 +1,9 @@
 @testable import PayabliSDKPayIn
 import XCTest
 
-/// What a crash report or a debugger can render about the instrument: the two data types carry the
-/// card's and the bank account's digits, so the rendering routes that go through `description` have to
-/// refuse to name them. `dump()` and `Mirror` render the stored fields instead, which no protocol
-/// redacts; those routes are not these types' to control.
+/// What a crash report or a debugger can render about the instrument: the rendering routes that go
+/// through `description` refuse to name the card's and the bank account's digits. `dump()` and
+/// `Mirror` render the stored fields, which no protocol redacts.
 final class PaymentMethodRedactionTests: XCTestCase {
     private let pan = "4111111111111111"
     private let securityCode = "999"
