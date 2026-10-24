@@ -70,6 +70,43 @@ final class PayabliSessionTelemetryTests: XCTestCase {
         XCTAssertNotNil(Int(failed["duration_ms"] ?? ""))
     }
 
+    func testAFailureOutsideTheRefusalsIsConvertedAndReportedOnTheLiveSession() async throws {
+        let transport = InMemoryTelemetryTransport()
+        let live = try PayabliSession.install(config: makeConfig(), telemetryTransport: transport)
+        struct Foreign: Error {}
+        PayabliSession.failNextInstallForTesting(Foreign())
+
+        do {
+            try await PayabliSession.initialize(config: makeConfig())
+            XCTFail("the error install threw reached the caller unconverted")
+        } catch let failure as PayabliGenericError {
+            XCTAssertEqual(failure.type, .unknown)
+            XCTAssertEqual(failure.reason, PayabliErrorType.unknown.message)
+            XCTAssertNil(failure.detail)
+            let redacted = try XCTUnwrap(failure.underlying as? RedactedCause)
+            XCTAssertEqual(redacted.originalType, String(reflecting: Foreign.self))
+        } catch {
+            XCTFail("not the SDK's unknown failure: \(error)")
+        }
+        XCTAssertTrue(PayabliSession.current === live, "a failed initialize leaves the installed session in place")
+        await live.telemetry.settled()
+
+        let events = await transport.batches.flatMap { $0 }
+        guard events.map(\.event) == ["sdk.initialized", "sdk.initialize.started", "sdk.initialize.failed"] else {
+            return XCTFail("sent without a flush, because a failure leaves at once: \(events.map(\.event))")
+        }
+        XCTAssertTrue(events.allSatisfy { $0.sessionId == live.telemetry.sessionId && $0.entry == "demo" })
+        XCTAssertEqual(events[1].properties, ["state": "ready"])
+        let failed = events[2].properties
+        XCTAssertEqual(Set(failed.keys), ["outcome", "code", "error_number", "reason", "duration_ms", "failure_type"])
+        XCTAssertEqual(failed["outcome"], "failed")
+        XCTAssertEqual(failed["code"], "UNKNOWN")
+        XCTAssertEqual(failed["error_number"], String(PayabliErrorType.unknown.number))
+        XCTAssertEqual(failed["reason"], PayabliErrorType.unknown.message)
+        XCTAssertEqual(failed["failure_type"], String(describing: Foreign.self))
+        XCTAssertNotNil(Int(failed["duration_ms"] ?? ""))
+    }
+
     func testARepeatCallThatChangesNothingReportsNothing() async throws {
         let transport = InMemoryTelemetryTransport()
         let live = try PayabliSession.install(config: makeConfig(), telemetryTransport: transport)

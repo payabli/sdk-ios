@@ -42,6 +42,7 @@ public final class PayabliSession: @unchecked Sendable {
     private static let lock = NSLock()
     private static var installed: PayabliSession?
     private static var testTelemetryTransport: (any TelemetryTransport)?
+    private static var testInstallFailure: (any Error)?
 
     /// Written only by the machine of whichever session `install` installed, so it reads `uninitialized` before any.
     static let sink = SdkStateSink()
@@ -187,6 +188,10 @@ public final class PayabliSession: @unchecked Sendable {
         telemetryTransport: (any TelemetryTransport)? = nil
     ) throws -> PayabliSession {
         try lock.withLock {
+            if let failure = testInstallFailure {
+                testInstallFailure = nil
+                throw failure
+            }
             let identity = ConfigIdentity(config)
             let current = installed
             // The installed session's own machine: the process-wide state is one value, and a stray write to it must
@@ -243,6 +248,14 @@ public final class PayabliSession: @unchecked Sendable {
         lock.withLock { installed }
     }
 
+    /// Makes the next install throw an error the test chose, leaving the installed session in place
+    /// so a failure lands on a live one. The next install alone takes it.
+    ///
+    /// - Parameter failure: what the next install throws.
+    static func failNextInstallForTesting(_ failure: any Error) {
+        lock.withLock { testInstallFailure = failure }
+    }
+
     /// Drops the installed session and puts the state back, so one test cannot decide the outcome of the next.
     ///
     /// - Parameter telemetryTransport: what later installs report through, so a test reaches no network; nil restores the default.
@@ -252,6 +265,7 @@ public final class PayabliSession: @unchecked Sendable {
             installed = nil
             sink.value = .uninitialized
             testTelemetryTransport = telemetryTransport
+            testInstallFailure = nil
         }
     }
 }
