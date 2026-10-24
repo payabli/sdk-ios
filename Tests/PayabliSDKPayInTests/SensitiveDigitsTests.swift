@@ -12,7 +12,9 @@ final class SensitiveDigitsTests: XCTestCase {
         value.close()
 
         // read() answers empty once wiped, so it cannot show whether the overwrite happened.
-        XCTAssertTrue(value.rawCopy().allSatisfy { $0 == SensitiveDigits.wipedByte })
+        // The expected count comes from the source string, so a close() that discarded the
+        // storage instead of overwriting it cannot pass as an overwrite.
+        XCTAssertEqual(Array(repeating: SensitiveDigits.wipedByte, count: pan.utf8.count), value.rawCopy())
         XCTAssertTrue(value.isWiped)
     }
 
