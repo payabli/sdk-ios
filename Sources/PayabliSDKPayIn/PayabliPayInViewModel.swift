@@ -326,31 +326,39 @@ final class PayabliPayInViewModel: ObservableObject {
 
     /// Hands the form's submission to the flow, which reports it. A refusal before the flow has it is reported here.
     ///
+    /// The submission runs inside `withFormBuffers`, so the buffers it built are closed once it ends,
+    /// whatever it ends in.
+    ///
     /// - Returns: what the flow returned.
     private func submitToFlow() async throws -> PayabliPayInResult {
-        let request: PayabliPayInRequest?
-        do {
-            request = try configuredRequest()
-        } catch {
-            component.reportFormRefusal(error, method: effectiveSelectedMethod)
-            throw error
+        try await withFormBuffers { buffers in
+            let request: PayabliPayInRequest?
+            do {
+                request = try configuredRequest(with: buffers)
+            } catch {
+                component.reportFormRefusal(error, method: effectiveSelectedMethod)
+                throw error
+            }
+            if let request {
+                return try await component.submitConfigured(request, origin: .form)
+            }
+            return try await component.submitConfigured(
+                methodInput(with: buffers), options: mergedTokenStorageOptions(), origin: .form
+            )
         }
-        if let request {
-            return try await component.submitConfigured(request, origin: .form)
-        }
-        return try await component.submitConfigured(methodInput(), options: mergedTokenStorageOptions(), origin: .form)
     }
 
     /// The payment the form submits, or nil when the operation stores a method instead.
     ///
+    /// - Parameter buffers: the registry the submission's sensitive buffers are built through.
     /// - Returns: the request built from the configuration and the fields.
-    private func configuredRequest() throws -> PayabliPayInRequest? {
+    private func configuredRequest(with buffers: FormBufferRegistry) throws -> PayabliPayInRequest? {
         guard component.operation != .storePaymentMethod else { return nil }
         guard let requestConfiguration = component.requestConfiguration else {
             throw PayabliPayInError.invalidInput("Payment request configuration is required.")
         }
         return requestConfiguration.request(
-            paymentMethod: paymentMethod(),
+            paymentMethod: paymentMethod(with: buffers),
             customerData: mergedCustomerData(),
             orderDescription: mergedOrderDescription()
         )
