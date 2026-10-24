@@ -19,14 +19,13 @@ public struct PayabliPayInCardData: CustomStringConvertible, CustomDebugStringCo
         self.postalCode = postalCode
     }
 
-    /// Nothing about the card: an interpolated value reaches a crash report and a debugger, neither of
-    /// which redacts.
+    /// Nothing about the card: an interpolated value reaches a crash report, which does not redact.
     public var description: String {
         "PayabliPayInCardData"
     }
 
-    /// The same redacted text on the debug route, which is what a debugger and `String(reflecting:)`
-    /// render.
+    /// The same redacted text on the debug route, which `String(reflecting:)` and a debugger's `po`
+    /// render. `dump()` and the variables view render the stored fields, which no protocol redacts.
     public var debugDescription: String {
         description
     }
@@ -59,15 +58,14 @@ public struct PayabliPayInBankAccountData: CustomStringConvertible, CustomDebugS
         self.device = device
     }
 
-    /// The account's kind alone: an interpolated value reaches a crash report and a debugger, neither
-    /// of which redacts, and the number and the holder are what this type exists to keep out of a
-    /// message.
+    /// The account's kind alone: an interpolated value reaches a crash report, which does not redact,
+    /// and the number and the holder are what this type exists to keep out of a message.
     public var description: String {
         "PayabliPayInBankAccountData(accountType=\(accountType.rawValue))"
     }
 
-    /// The same redacted text on the debug route, which is what a debugger and `String(reflecting:)`
-    /// render.
+    /// The same redacted text on the debug route, which `String(reflecting:)` and a debugger's `po`
+    /// render. `dump()` and the variables view render the stored fields, which no protocol redacts.
     public var debugDescription: String {
         description
     }

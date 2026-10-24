@@ -62,8 +62,8 @@ public final class SensitiveDigits: @unchecked Sendable, CustomStringConvertible
         "SensitiveDigits(length=\(length))"
     }
 
-    /// The same redacted text on the debug route, which is what a debugger and `String(reflecting:)`
-    /// render.
+    /// The same redacted text on the debug route, which `String(reflecting:)` and a debugger's `po`
+    /// render. `dump()` and the variables view render the stored bytes, which no protocol redacts.
     public var debugDescription: String {
         description
     }

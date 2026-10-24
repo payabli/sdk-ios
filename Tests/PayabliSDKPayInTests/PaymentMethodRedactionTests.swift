@@ -2,7 +2,9 @@
 import XCTest
 
 /// What a crash report or a debugger can render about the instrument: the two data types carry the
-/// card's and the bank account's digits, so every rendering route has to refuse to name them.
+/// card's and the bank account's digits, so the rendering routes that go through `description` have to
+/// refuse to name them. `dump()` and `Mirror` render the stored fields instead, which no protocol
+/// redacts; those routes are not these types' to control.
 final class PaymentMethodRedactionTests: XCTestCase {
     private let pan = "4111111111111111"
     private let securityCode = "999"
@@ -38,9 +40,10 @@ final class PaymentMethodRedactionTests: XCTestCase {
         XCTAssertEqual("PayabliPayInCardData", rendered)
     }
 
-    func testCardDataRendersTheSameRedactedTextOnEveryRoute() {
-        // description is what an interpolated value renders, debugDescription what a debugger renders,
-        // and String(reflecting:) what a formatter renders: all three carry the same absence.
+    func testCardDataRendersTheSameRedactedTextOnEveryDescriptionRoute() {
+        // description is what an interpolated value renders, debugDescription what String(reflecting:)
+        // and a debugger's po render: all of them carry the same absence. dump() and the variables view
+        // render the stored fields, which no protocol redacts.
         XCTAssertEqual(card().description, card().debugDescription)
         XCTAssertEqual("PayabliPayInCardData", String(reflecting: card()))
     }

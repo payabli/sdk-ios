@@ -73,8 +73,8 @@ final class SensitiveDigitsTests: XCTestCase {
 
         XCTAssertEqual("SensitiveDigits(length=16)", value.description)
         XCTAssertFalse(value.description.contains("4111"))
-        // The debug route renders the same redacted text, which is what a debugger and
-        // String(reflecting:) reach.
+        // The debug route renders the same redacted text, which is what String(reflecting:) and a
+        // debugger's po reach.
         XCTAssertEqual(value.description, value.debugDescription)
         XCTAssertEqual(value.description, String(reflecting: value))
     }
