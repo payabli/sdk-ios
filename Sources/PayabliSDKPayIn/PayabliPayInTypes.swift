@@ -595,16 +595,16 @@ extension PayabliPayInPaymentMethod: Encodable {
         case let .card(method):
             try c.encode("card", forKey: .method)
             try c.encode(method.data.normalizedCaptureExpiration(), forKey: .cardexp)
-            try c.encode(method.data.cardholderName.payabliCaptureTrimmed, forKey: .cardHolder)
-            try c.encode(method.data.cardNumber.payabliCaptureDigitsOnly, forKey: .cardnumber)
-            try c.encode(method.data.cvv.payabliCaptureDigitsOnly, forKey: .cardcvv)
-            try c.encode(method.data.billingZip.payabliCaptureTrimmed, forKey: .cardzip)
+            try c.encode(method.data.holderName.payabliCaptureTrimmed, forKey: .cardHolder)
+            try c.encode(method.data.cardNumber.digitsOnly, forKey: .cardnumber)
+            try c.encode(method.data.securityCode.digitsOnly, forKey: .cardcvv)
+            try c.encode(method.data.postalCode.payabliCaptureTrimmed, forKey: .cardzip)
             try c.encodeIfPresent(method.initiator?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty, forKey: .initiator)
             try c.encodeIfPresent(method.saveIfSuccess, forKey: .saveIfSuccess)
 
         case let .bankAccount(method):
             try c.encode("ach", forKey: .method)
-            try c.encode(method.data.accountNumber.payabliCaptureDigitsOnly, forKey: .achAccount)
+            try c.encode(method.data.accountNumber.digitsOnly, forKey: .achAccount)
             try c.encode(method.data.accountType.rawValue, forKey: .achAccountType)
             try c.encode(method.data.holderName.payabliCaptureTrimmed, forKey: .achHolder)
             try c.encode(method.data.routingNumber.payabliCaptureDigitsOnly, forKey: .achRouting)
@@ -695,7 +695,7 @@ extension PayabliPayInPaymentDetails {
 
 private extension PayabliPayInCardData {
     func normalizedCaptureExpiration() throws -> String {
-        let digits = expiration.payabliCaptureDigitsOnly
+        let digits = expiry.payabliCaptureDigitsOnly
         guard digits.count == 4 else {
             throw PayabliPayInError.invalidInput("Expiration must be in MMYY or MM/YY format.")
         }

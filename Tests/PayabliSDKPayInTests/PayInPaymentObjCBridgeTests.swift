@@ -23,10 +23,10 @@ final class PayInPaymentObjCBridgeTests: XCTestCase {
         let bridge = PayabliPayInObjC(component: PayInFixture.makeFlow(transport: transport, key: "reserved-1"))
         let card = PayabliPayInRequestObjC.card(
             cardNumber: "4111111111111111",
-            expiration: "02/30",
-            cardholderName: "Jane Doe",
-            cvv: "999",
-            billingZip: "12345",
+            expiry: "02/30",
+            holderName: "Jane Doe",
+            securityCode: "999",
+            postalCode: "12345",
             saveIfSuccess: false,
             totalAmount: 10
         )

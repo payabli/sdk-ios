@@ -14,11 +14,11 @@ final class PayInPaymentFlowTests: XCTestCase {
         )
 
         let result = try await component.addCard(PayabliPayInCardData(
-            cardNumber: "4111 1111 1111 1111",
-            expiration: "02/25",
-            cardholderName: "John Doe",
-            cvv: "123",
-            billingZip: "12345"
+            cardNumber: SensitiveDigits.ofString("4111 1111 1111 1111"),
+            expiry: "02/25",
+            holderName: "John Doe",
+            securityCode: SensitiveDigits.ofString("123"),
+            postalCode: "12345"
         ))
 
         XCTAssertEqual(result.storedMethodId, "stored-123")
@@ -42,11 +42,11 @@ final class PayInPaymentFlowTests: XCTestCase {
         let result = try await component.capture(PayabliPayInRequest(
             paymentMethod: .card(PayabliPayInPaymentMethod.Card(
                 data: PayabliPayInCardData(
-                    cardNumber: "4111 1111 1111 1111",
-                    expiration: "02/25",
-                    cardholderName: "John Doe",
-                    cvv: "123",
-                    billingZip: "12345"
+                    cardNumber: SensitiveDigits.ofString("4111 1111 1111 1111"),
+                    expiry: "02/25",
+                    holderName: "John Doe",
+                    securityCode: SensitiveDigits.ofString("123"),
+                    postalCode: "12345"
                 )
             )),
             options: PayabliPayInRequestConfiguration(

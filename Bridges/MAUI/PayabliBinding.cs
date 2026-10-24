@@ -311,7 +311,7 @@ namespace Payabli.TapToPay
         [return: NullAllowed]
         PayabliPayInObjC Create(out NSError error);
 
-        [Export("addCardWithCardNumber:expiration:cardholderName:cvv:billingZip:createAnonymous:forceCustomerCreation:temporary:source:completion:")]
+        [Export("addCardWithCardNumber:expiry:holderName:securityCode:postalCode:createAnonymous:forceCustomerCreation:temporary:source:completion:")]
         void AddCard(
             string cardNumber,
             string expiration,

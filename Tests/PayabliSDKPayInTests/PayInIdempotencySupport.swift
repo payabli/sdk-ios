@@ -47,11 +47,11 @@ enum PayInFixture {
             paymentMethod: cardOnly
                 ? .card(PayabliPayInPaymentMethod.Card(
                     data: PayabliPayInCardData(
-                        cardNumber: "4111 1111 1111 1111",
-                        expiration: "02/27",
-                        cardholderName: "John Cassian",
-                        cvv: "999",
-                        billingZip: "12345"
+                        cardNumber: SensitiveDigits.ofString("4111 1111 1111 1111"),
+                        expiry: "02/27",
+                        holderName: "John Cassian",
+                        securityCode: SensitiveDigits.ofString("999"),
+                        postalCode: "12345"
                     ),
                     saveIfSuccess: false
                 ))

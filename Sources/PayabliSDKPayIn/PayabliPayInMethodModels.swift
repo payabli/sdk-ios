@@ -225,56 +225,6 @@ public struct PayabliPayInSaveFailure: Codable, Sendable, Equatable {
     }
 }
 
-public struct PayabliPayInCardData: Sendable {
-    public var cardNumber: String
-    public var expiration: String
-    public var cardholderName: String
-    public var cvv: String
-    public var billingZip: String
-
-    public init(
-        cardNumber: String,
-        expiration: String,
-        cardholderName: String,
-        cvv: String,
-        billingZip: String
-    ) {
-        self.cardNumber = cardNumber
-        self.expiration = expiration
-        self.cardholderName = cardholderName
-        self.cvv = cvv
-        self.billingZip = billingZip
-    }
-}
-
-public struct PayabliPayInBankAccountData: Sendable {
-    public var accountNumber: String
-    public var accountType: PayabliPayInAccountType
-    public var holderName: String
-    public var routingNumber: String
-    public var secCode: PayabliPayInSecCode?
-    public var holderType: PayabliPayInAccountHolderType?
-    public var device: String?
-
-    public init(
-        accountNumber: String,
-        accountType: PayabliPayInAccountType,
-        holderName: String,
-        routingNumber: String,
-        secCode: PayabliPayInSecCode? = .web,
-        holderType: PayabliPayInAccountHolderType? = nil,
-        device: String? = nil
-    ) {
-        self.accountNumber = accountNumber
-        self.accountType = accountType
-        self.holderName = holderName
-        self.routingNumber = routingNumber
-        self.secCode = secCode
-        self.holderType = holderType
-        self.device = device
-    }
-}
-
 public enum PayabliPayInMethodInput: Sendable {
     case card(PayabliPayInCardData)
     case bankAccount(PayabliPayInBankAccountData)
@@ -612,10 +562,10 @@ extension PayabliPayInMethodInput: Encodable {
         case let .card(data):
             try c.encode(PayabliPayInMethodType.card.rawValue, forKey: .method)
             try c.encode(data.normalizedExpiration(), forKey: .cardexp)
-            try c.encode(data.cardholderName.trimmed, forKey: .cardHolder)
+            try c.encode(data.holderName.trimmed, forKey: .cardHolder)
             try c.encode(data.cardNumber.digitsOnly, forKey: .cardnumber)
-            try c.encode(data.cvv.digitsOnly, forKey: .cardcvv)
-            try c.encode(data.billingZip.trimmed, forKey: .cardzip)
+            try c.encode(data.securityCode.digitsOnly, forKey: .cardcvv)
+            try c.encode(data.postalCode.trimmed, forKey: .cardzip)
 
         case let .bankAccount(data):
             try c.encode(PayabliPayInMethodType.bankAccount.rawValue, forKey: .method)
@@ -653,21 +603,21 @@ extension PayabliPayInCardData {
             throw PayabliPayInTokenStorageError.invalidInput("Card number failed validation.")
         }
         _ = try normalizedExpiration()
-        let trimmedCardholderName = cardholderName.trimmed
+        let trimmedCardholderName = holderName.trimmed
         guard !trimmedCardholderName.isEmpty else {
             throw PayabliPayInTokenStorageError.invalidInput("Cardholder name is required.")
         }
         guard trimmedCardholderName.count <= PayabliPayInInputLimits.maximumCardholderNameCharacters else {
             throw PayabliPayInTokenStorageError.invalidInput("Cardholder name must be 60 characters or fewer.")
         }
-        let trimmedBillingZip = billingZip.trimmed
+        let trimmedBillingZip = postalCode.trimmed
         guard !trimmedBillingZip.isEmpty else {
             throw PayabliPayInTokenStorageError.invalidInput("Card Postal Code is required.")
         }
         guard trimmedBillingZip.count <= PayabliPayInInputLimits.maximumPostalCodeCharacters else {
             throw PayabliPayInTokenStorageError.invalidInput("Card Postal Code must be 12 characters or fewer.")
         }
-        let cvvDigits = cvv.digitsOnly
+        let cvvDigits = securityCode.digitsOnly
         guard !cvvDigits.isEmpty else {
             throw PayabliPayInTokenStorageError.invalidInput("CVV is required.")
         }
@@ -679,7 +629,7 @@ extension PayabliPayInCardData {
     }
 
     func normalizedExpiration() throws -> String {
-        let digits = expiration.digitsOnly
+        let digits = expiry.digitsOnly
         guard digits.count == 4 else {
             throw PayabliPayInTokenStorageError.invalidInput("Expiration must be in MMYY or MM/YY format.")
         }
