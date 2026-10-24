@@ -40,6 +40,14 @@ final class PayInBodyWriterTests: XCTestCase {
         )
     }
 
+    private func text(_ bytes: [UInt8]) throws -> String {
+        try XCTUnwrap(String(bytes: bytes, encoding: .utf8))
+    }
+
+    private func text(_ body: Data) throws -> String {
+        try XCTUnwrap(String(bytes: body, encoding: .utf8))
+    }
+
     // MARK: - The transaction routes' fragment
 
     /// Sorted, the order the transaction body's writer writes every other object: an encoder's order
@@ -52,8 +60,9 @@ final class PayInBodyWriterTests: XCTestCase {
             saveIfSuccess: true
         )))
         XCTAssertEqual(
-            String(decoding: full.rawCopy(), as: UTF8.self),
-            #"{"cardHolder":"John Doe","cardcvv":"123","cardexp":"02\/25","cardnumber":"4111111111111111","cardzip":"12345","initiator":"Jane","method":"card","saveIfSuccess":true}"#
+            try text(full.rawCopy()),
+            #"{"cardHolder":"John Doe","cardcvv":"123","cardexp":"02\/25","cardnumber":"4111111111111111","#
+                + #""cardzip":"12345","initiator":"Jane","method":"card","saveIfSuccess":true}"#
         )
 
         let bare = try PayInBodyWriter.captureFragment(.card(PayabliPayInPaymentMethod.Card(
@@ -62,7 +71,7 @@ final class PayInBodyWriterTests: XCTestCase {
             saveIfSuccess: nil
         )))
         XCTAssertEqual(
-            String(decoding: bare.rawCopy(), as: UTF8.self),
+            try text(bare.rawCopy()),
             #"{"cardHolder":"John Doe","cardcvv":"123","cardexp":"02\/25","cardnumber":"4111111111111111","cardzip":"12345","method":"card"}"#
         )
     }
@@ -72,15 +81,16 @@ final class PayInBodyWriterTests: XCTestCase {
             data: bankData()
         )))
         XCTAssertEqual(
-            String(decoding: full.rawCopy(), as: UTF8.self),
-            #"{"achAccount":"123456789","achAccountType":"Checking","achCode":"WEB","achHolder":"John Doe","achHolderType":"personal","achRouting":"123456780","device":"dev-1","method":"ach"}"#
+            try text(full.rawCopy()),
+            #"{"achAccount":"123456789","achAccountType":"Checking","achCode":"WEB","achHolder":"John Doe","achHolderType":"personal","#
+                + #""achRouting":"123456780","device":"dev-1","method":"ach"}"#
         )
 
         let bare = try PayInBodyWriter.captureFragment(.bankAccount(PayabliPayInPaymentMethod.BankAccount(
             data: bankData(accountType: .savings, holderType: nil, device: nil)
         )))
         XCTAssertEqual(
-            String(decoding: bare.rawCopy(), as: UTF8.self),
+            try text(bare.rawCopy()),
             #"{"achAccount":"123456789","achAccountType":"Savings","achCode":"WEB","achHolder":"John Doe","achRouting":"123456780","method":"ach"}"#
         )
     }
@@ -91,7 +101,7 @@ final class PayInBodyWriterTests: XCTestCase {
             storedMethodId: " stored-1 "
         )))
         XCTAssertEqual(
-            String(decoding: fragment.rawCopy(), as: UTF8.self),
+            try text(fragment.rawCopy()),
             #"{"initiator":"payor","method":"card","storedMethodId":"stored-1"}"#
         )
     }
@@ -102,7 +112,7 @@ final class PayInBodyWriterTests: XCTestCase {
             saveIfSuccess: true
         )))
         XCTAssertEqual(
-            String(decoding: saving.rawCopy(), as: UTF8.self),
+            try text(saving.rawCopy()),
             #"{"device":"dev-1","method":"cloud","saveIfSuccess":true}"#
         )
 
@@ -110,7 +120,7 @@ final class PayInBodyWriterTests: XCTestCase {
             device: "dev-1"
         )))
         XCTAssertEqual(
-            String(decoding: bare.rawCopy(), as: UTF8.self),
+            try text(bare.rawCopy()),
             #"{"device":"dev-1","method":"cloud"}"#
         )
     }
@@ -123,7 +133,7 @@ final class PayInBodyWriterTests: XCTestCase {
             holderName: " John Doe "
         )))
         XCTAssertEqual(
-            String(decoding: fragment.rawCopy(), as: UTF8.self),
+            try text(fragment.rawCopy()),
             #"{"achHolder":"John Doe","method":"check"}"#
         )
     }
@@ -131,7 +141,7 @@ final class PayInBodyWriterTests: XCTestCase {
     func testTheCaptureCashFragmentCarriesOnlyTheMethod() throws {
         let fragment = try PayInBodyWriter.captureFragment(.cash)
         XCTAssertEqual(
-            String(decoding: fragment.rawCopy(), as: UTF8.self),
+            try text(fragment.rawCopy()),
             #"{"method":"cash"}"#
         )
     }
@@ -142,7 +152,7 @@ final class PayInBodyWriterTests: XCTestCase {
     func testTheStoreCardFragmentKeepsTheRoutesCallOrder() throws {
         let fragment = try PayInBodyWriter.storeFragment(.card(cardData()))
         XCTAssertEqual(
-            String(decoding: fragment.rawCopy(), as: UTF8.self),
+            try text(fragment.rawCopy()),
             #"{"method":"card","cardexp":"02\/25","cardHolder":"John Doe","cardnumber":"4111111111111111","cardcvv":"123","cardzip":"12345"}"#
         )
     }
@@ -150,13 +160,14 @@ final class PayInBodyWriterTests: XCTestCase {
     func testTheStoreBankFragmentKeepsTheRoutesCallOrder() throws {
         let full = try PayInBodyWriter.storeFragment(.bankAccount(bankData(holderType: .business)))
         XCTAssertEqual(
-            String(decoding: full.rawCopy(), as: UTF8.self),
-            #"{"method":"ach","achAccount":"123456789","achAccountType":"Checking","achHolder":"John Doe","achRouting":"123456780","achCode":"WEB","achHolderType":"business","device":"dev-1"}"#
+            try text(full.rawCopy()),
+            #"{"method":"ach","achAccount":"123456789","achAccountType":"Checking","achHolder":"John Doe","#
+                + #""achRouting":"123456780","achCode":"WEB","achHolderType":"business","device":"dev-1"}"#
         )
 
         let bare = try PayInBodyWriter.storeFragment(.bankAccount(bankData(holderType: nil, device: nil)))
         XCTAssertEqual(
-            String(decoding: bare.rawCopy(), as: UTF8.self),
+            try text(bare.rawCopy()),
             #"{"method":"ach","achAccount":"123456789","achAccountType":"Checking","achHolder":"John Doe","achRouting":"123456780","achCode":"WEB"}"#
         )
     }
@@ -222,8 +233,9 @@ final class PayInBodyWriterTests: XCTestCase {
         let body = try PayInBodyWriter.splice(outer: Data(#"{"entryPoint":"entry"}"#.utf8), fragment: fragment)
 
         XCTAssertEqual(
-            String(decoding: body, as: UTF8.self),
-            #"{"entryPoint":"entry","paymentMethod":{"cardHolder":"John Doe","cardcvv":"123","cardexp":"02\/25","cardnumber":"4111111111111111","cardzip":"12345","initiator":"payor","method":"card"}}"#
+            try text(body),
+            #"{"entryPoint":"entry","paymentMethod":{"cardHolder":"John Doe","cardcvv":"123","cardexp":"02\/25","#
+                + #""cardnumber":"4111111111111111","cardzip":"12345","initiator":"payor","method":"card"}}"#
         )
         XCTAssertTrue(fragment.rawCopy().isEmpty, "the splice overwrites the fragment once copied")
     }
@@ -234,7 +246,7 @@ final class PayInBodyWriterTests: XCTestCase {
             fragment: try PayInBodyWriter.captureFragment(.cash)
         )
         XCTAssertEqual(
-            String(decoding: body, as: UTF8.self),
+            try text(body),
             #"{"paymentMethod":{"method":"cash"}}"#
         )
     }
