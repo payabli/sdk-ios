@@ -159,6 +159,30 @@ final class PaymentMethodPayerFacingFailureTests: XCTestCase {
         XCTAssertNil(viewModel.failureMessage)
     }
 
+    /// The opt-out is a property of the configuration the form holds now, so a change that withdraws
+    /// it withdraws the message a failure already drew; the marks stay, because a marked field is the
+    /// whole answer.
+    func testAnUpdateThatWithdrawsTheOptOutTakesTheDrawnMessageWithIt() async {
+        let flow = flowOnTransport(MockPaymentCaptureTransport(statusCode: 402, responseBody: Self.declineBody))
+        let viewModel = filledForm(on: flow)
+
+        _ = try? await viewModel.submit()
+        XCTAssertEqual(viewModel.failureMessage, "The payment was declined. Try another payment method.")
+
+        viewModel.update(
+            component: flow,
+            operation: .capture,
+            configuration: PayabliPayInFormConfiguration(
+                allowedMethods: [.card],
+                defaultMethod: .card,
+                showsFailureMessage: false
+            ),
+            labels: PayabliPayInFormLabels()
+        )
+
+        XCTAssertNil(viewModel.failureMessage)
+    }
+
     // MARK: - The failure the host receives
 
     /// What the view model's `submit()` throws is what the form's `onFailed` hands the host: the

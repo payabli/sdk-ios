@@ -150,6 +150,11 @@ final class PayabliPayInViewModel: ObservableObject {
         if replacesFlow {
             clearMarks()
         }
+        // The opt-out applies to a message already drawn, so an update that withdraws it takes the
+        // message with it; the marks stay, because a marked field is the whole answer.
+        if !configuration.showsFailureMessage {
+            failureMessage = nil
+        }
 
         let methods = availableMethods
         if !methods.contains(selectedMethod) {
