@@ -1,12 +1,13 @@
 @testable import PayabliSDKCore
 @testable import PayabliSDKPayIn
+import PayabliSDKTestUtils
 import XCTest
 
 /// Every public entry point hands the integrator the SDK's unknown failure for an error it does not
 /// know, keeping cancellations and the SDK's own errors as they are.
 @MainActor
 final class PayInUnexpectedFailureTests: XCTestCase {
-    private let recorder = EventsTransport()
+    private let recorder = InMemoryTelemetryTransport()
     private var telemetry: TelemetryClient?
 
     // MARK: - Every entry point
@@ -199,7 +200,7 @@ final class PayInUnexpectedFailureTests: XCTestCase {
         let reports = try XCTUnwrap(flow.reports, file: file, line: line)
         await reports.sent()
         await telemetry?.flush()
-        let events = await recorder.events
+        let events = await recorder.batches.flatMap { $0 }
         XCTAssertEqual(events.count, 1, "\(events.map(\.event))", file: file, line: line)
         return try XCTUnwrap(events.first, file: file, line: line)
     }
@@ -224,15 +225,5 @@ final class PayInUnexpectedFailureTests: XCTestCase {
 private struct NoBackgrounding: AppLifecycle {
     func backgroundings() -> AsyncStream<BackgroundWindow> {
         AsyncStream { _ in }
-    }
-}
-
-/// Records every event the client sends.
-private actor EventsTransport: TelemetryTransport {
-    private(set) var events: [TelemetryEvent] = []
-
-    func send(_ batch: [TelemetryEvent], droppedSinceLastSend: Int) async -> TelemetrySendOutcome {
-        events += batch
-        return .delivered
     }
 }
