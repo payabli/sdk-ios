@@ -199,6 +199,77 @@ final class PaymentMethodConfigurationChangeTests: XCTestCase {
         }
     }
 
+    func testFailureWordingThatForgesAnotherComponentIsStillAConfigurationChange() {
+        let first = PayInPaymentFlowConfigurationChange(
+            PayabliPayInFormConfiguration(allowedMethods: [.card]),
+            labels: PayabliPayInFormLabels(declinedMessage: "No|retryLater:Wait", retryLaterMessage: "Soon")
+        )
+        let second = PayInPaymentFlowConfigurationChange(
+            PayabliPayInFormConfiguration(allowedMethods: [.card]),
+            labels: PayabliPayInFormLabels(declinedMessage: "No", retryLaterMessage: "Wait|retryLater:Soon")
+        )
+
+        XCTAssertNotEqual(first, second)
+    }
+
+    func testFieldWordingThatForgesAnotherFieldIsStillAConfigurationChange() {
+        let first = PayInPaymentFlowConfigurationChange(
+            PayabliPayInFormConfiguration(allowedMethods: [.card]),
+            labels: PayabliPayInFormLabels(fieldLabels: [.amount: "Total,cardNumber=Due"])
+        )
+        let second = PayInPaymentFlowConfigurationChange(
+            PayabliPayInFormConfiguration(allowedMethods: [.card]),
+            labels: PayabliPayInFormLabels(fieldLabels: [.amount: "Total", .cardNumber: "Due"])
+        )
+
+        XCTAssertNotEqual(first, second)
+    }
+
+    func testHiddenWordingThatForgesAnotherComponentIsStillAConfigurationChange() {
+        let first = PayInPaymentFlowConfigurationChange(
+            PayabliPayInFormConfiguration(
+                allowedMethods: [.card],
+                hiddenValues: PayabliPayInHiddenValues(
+                    deviceId: "d1",
+                    methodDescription: "Terminal 2,methodDescription:Terminal 3"
+                )
+            ),
+            labels: PayabliPayInFormLabels()
+        )
+        let second = PayInPaymentFlowConfigurationChange(
+            PayabliPayInFormConfiguration(
+                allowedMethods: [.card],
+                hiddenValues: PayabliPayInHiddenValues(
+                    deviceId: "d1,methodDescription:Terminal 2",
+                    methodDescription: "Terminal 3"
+                )
+            ),
+            labels: PayabliPayInFormLabels()
+        )
+
+        XCTAssertNotEqual(first, second)
+    }
+
+    func testAnUpdateToWordingThatCollidesWithTheWordingOnScreenStillApplies() {
+        let component = captureComponent()
+        let viewModel = PayabliPayInViewModel(
+            component: component,
+            operation: .capture,
+            configuration: configuration(),
+            labels: PayabliPayInFormLabels(declinedMessage: "No|retryLater:Wait", retryLaterMessage: "Soon")
+        )
+
+        viewModel.update(
+            component: component,
+            operation: .capture,
+            configuration: configuration(),
+            labels: PayabliPayInFormLabels(declinedMessage: "No", retryLaterMessage: "Wait|retryLater:Soon")
+        )
+
+        XCTAssertEqual(viewModel.labels.declinedMessage, "No")
+        XCTAssertEqual(viewModel.labels.retryLaterMessage, "Wait|retryLater:Soon")
+    }
+
     // MARK: - Fixtures
 
     private func configuration(

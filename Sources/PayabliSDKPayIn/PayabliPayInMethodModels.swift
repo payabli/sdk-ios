@@ -425,7 +425,7 @@ public struct PayabliPayInTokenStorageOptions: Sendable {
 
 extension PayabliPayInTokenStorageOptions {
     var payabliViewModelSignature: String {
-        [
+        payabliFramedSignature([
             "achValidation:\(achValidation.map { "\($0)" } ?? "")",
             "createAnonymous:\(createAnonymous.map { "\($0)" } ?? "")",
             "forceCustomerCreation:\(forceCustomerCreation.map { "\($0)" } ?? "")",
@@ -438,8 +438,7 @@ extension PayabliPayInTokenStorageOptions {
             "source:\(source ?? "")",
             "subdomain:\(subdomain ?? "")",
             "validation:\(validation.payabliViewModelSignature)"
-        ]
-        .joined(separator: "|")
+        ])
     }
 }
 

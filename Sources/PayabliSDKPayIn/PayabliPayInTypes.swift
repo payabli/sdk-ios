@@ -297,7 +297,7 @@ public struct PayabliPayInRequestConfiguration: Sendable {
 
 extension PayabliPayInRequestConfiguration {
     var payabliViewModelSignature: String {
-        [
+        payabliFramedSignature([
             "paymentDetails:\(paymentDetails.payabliViewModelSignature)",
             "accountId:\(accountId ?? "")",
             "customerData:\(customerData.payabliJSONSignature)",
@@ -312,8 +312,7 @@ extension PayabliPayInRequestConfiguration {
             "achValidation:\(achValidation.map { "\($0)" } ?? "")",
             "forceCustomerCreation:\(forceCustomerCreation.map { "\($0)" } ?? "")",
             "validation:\(validation.payabliViewModelSignature)"
-        ]
-        .joined(separator: "|")
+        ])
     }
 }
 

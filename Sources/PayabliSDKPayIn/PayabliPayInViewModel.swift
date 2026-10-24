@@ -490,14 +490,13 @@ final class PayabliPayInViewModel: ObservableObject {
         configuration: PayabliPayInFormConfiguration,
         labels: PayabliPayInFormLabels
     ) -> String {
-        [
+        payabliFramedSignature([
             "component:\(ObjectIdentifier(component))",
             "operation:\(operation.rawValue)",
             "request:\(component.requestConfiguration?.payabliViewModelSignature ?? "")",
             "configuration:\(configuration.payabliViewModelSignature)",
             "labels:\(labels.payabliViewModelSignature)"
-        ]
-        .joined(separator: "|")
+        ])
     }
 
     private var selectedExpirationMonth: Int? {
