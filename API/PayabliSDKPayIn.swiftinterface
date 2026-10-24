@@ -657,6 +657,86 @@ extension PayabliSDKPayIn::PayabliPayInMethodInput : Swift::Encodable {
 extension PayabliSDKPayIn::PayabliPayInMethodInput {
   public func validate(_ validation: PayabliSDKPayIn::PayabliPayInValidation = .default) throws
 }
+extension PayabliSDKPayIn::PayabliPayInCardData : Swift::CustomStringConvertible {
+  public var description: Swift::String {
+    get
+  }
+}
+extension PayabliSDKPayIn::PayabliPayInBankAccountData : Swift::CustomStringConvertible {
+  public var description: Swift::String {
+    get
+  }
+}
+extension PayabliSDKPayIn::PayabliPayInMethodInput : Swift::CustomStringConvertible {
+  public var description: Swift::String {
+    get
+  }
+}
+extension PayabliSDKPayIn::PayabliPayInPaymentDetails : Swift::CustomStringConvertible {
+  public var description: Swift::String {
+    get
+  }
+}
+extension PayabliSDKPayIn::PayabliPayInCustomerData : Swift::CustomStringConvertible {
+  public var description: Swift::String {
+    get
+  }
+}
+extension PayabliSDKPayIn::PayabliPayInVendorData : Swift::CustomStringConvertible {
+  public var description: Swift::String {
+    get
+  }
+}
+extension PayabliSDKPayIn::PayabliPayInTokenStorageOptions : Swift::CustomStringConvertible {
+  public var description: Swift::String {
+    get
+  }
+}
+extension PayabliSDKPayIn::PayabliPayInRequestConfiguration : Swift::CustomStringConvertible {
+  public var description: Swift::String {
+    get
+  }
+}
+extension PayabliSDKPayIn::PayabliPayInPaymentMethod : Swift::CustomStringConvertible {
+  public var description: Swift::String {
+    get
+  }
+}
+extension PayabliSDKPayIn::PayabliPayInPaymentMethod.PayabliSDKPayIn::Card : Swift::CustomStringConvertible {
+  public var description: Swift::String {
+    get
+  }
+}
+extension PayabliSDKPayIn::PayabliPayInPaymentMethod.PayabliSDKPayIn::BankAccount : Swift::CustomStringConvertible {
+  public var description: Swift::String {
+    get
+  }
+}
+extension PayabliSDKPayIn::PayabliPayInPaymentMethod.PayabliSDKPayIn::Stored : Swift::CustomStringConvertible {
+  public var description: Swift::String {
+    get
+  }
+}
+extension PayabliSDKPayIn::PayabliPayInPaymentMethod.PayabliSDKPayIn::CloudDevice : Swift::CustomStringConvertible {
+  public var description: Swift::String {
+    get
+  }
+}
+extension PayabliSDKPayIn::PayabliPayInPaymentMethod.PayabliSDKPayIn::Check : Swift::CustomStringConvertible {
+  public var description: Swift::String {
+    get
+  }
+}
+extension PayabliSDKPayIn::PayabliPayInStoreRequest : Swift::CustomStringConvertible {
+  public var description: Swift::String {
+    get
+  }
+}
+extension PayabliSDKPayIn::PayabliPayInRequest : Swift::CustomStringConvertible {
+  public var description: Swift::String {
+    get
+  }
+}
 @_hasMissingDesignatedInitializers @objc(PayabliPayInRequestObjC) final public class PayabliPayInRequestObjC : ObjectiveC::NSObject {
   @objc final public var totalAmount: Swift::Double
   @objc final public var serviceFee: Foundation::NSNumber?
