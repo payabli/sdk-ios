@@ -72,7 +72,12 @@ enum PayInPaymentFlowJSONBody {
         }
     }
 
-    private static func quoted(_ value: String) throws -> String {
+    /// The string as the sorted writer writes it: escaped by the JSON codec, carrying its own
+    /// surrounding quotes, so a forward slash arrives as `\/` as this body has always sent it.
+    ///
+    /// - Parameter value: the string to quote.
+    /// - Returns: the quoted, escaped string.
+    static func quoted(_ value: String) throws -> String {
         let data = try JSONSerialization.data(withJSONObject: [value])
         guard let text = String(data: data, encoding: .utf8) else {
             throw PayabliGenericError(

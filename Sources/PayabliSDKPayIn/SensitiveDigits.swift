@@ -5,8 +5,11 @@ import Foundation
 /// A `String` cannot be erased: it is immutable, the runtime may move it, and nothing can say when the
 /// last copy is gone. This holds the digits as bytes instead, and `close()` overwrites them.
 ///
-/// Whoever supplies the digits decides what they were held in before this, and a text field holds its
-/// value as a `String`: this cannot unmake that, and only takes over from here.
+/// **The guarantee starts here and runs to the socket, not from the keystroke.** Whoever supplies the
+/// digits decides what they were held in before this, and a text field holds its value as a `String`,
+/// which this cannot unmake: it only takes over from here. What this type adds is that the SDK keeps
+/// no `String` of its own on the request path, and that the buffers it owns are overwritten once the
+/// request has been written.
 ///
 /// Not thread-safe. One value belongs to one call.
 public final class SensitiveDigits: @unchecked Sendable, CustomStringConvertible, CustomDebugStringConvertible {
@@ -68,19 +71,44 @@ public final class SensitiveDigits: @unchecked Sendable, CustomStringConvertible
         description
     }
 
-    /// The digits, for a rule that reads them. Returns a copy, which the reader is responsible for
-    /// overwriting in turn; empty once the value is closed.
+    /// The digits, for a rule that reads them. The handed-out array shares this value's storage rather
+    /// than copying it up front: writing into it forks the storage, which leaves the value's own
+    /// untouched. Empty once the value is closed.
     func read() -> [UInt8] {
         wiped ? [] : digits
     }
 
-    /// Runs `body` over the digits, rethrowing whatever `body` throws. The value itself is untouched:
-    /// lending the digits is not closing them, so the same value can be lent again afterwards.
+    /// Runs `body` over the digits this holds, filtered to the ASCII digits a request can write, and
+    /// wipes the filtered copy before returning: the one way to read these that leaves nothing behind.
     ///
-    /// - Parameter body: the rule to run over the digits.
+    /// An ASCII byte that is not a digit — a space a payer typed — is dropped, so a spaced card number
+    /// is read as its digits. A byte that is not ASCII is refused, because a digit-shaped character
+    /// from another script is not the digit it resembles; `field` names the member in that refusal.
+    ///
+    /// - Parameter field: the field's name, carried by the refusal when the bytes are not ASCII.
+    /// - Parameter body: the rule to run over the filtered digits.
     /// - Returns: what `body` returned.
-    func useDigits<T>(_ body: ([UInt8]) throws -> T) rethrows -> T {
-        return try body(read())
+    /// - Throws: ``PayabliPayInTokenStorageError/invalidInput(_:)`` when the digits hold a byte that
+    ///   is not ASCII.
+    func useDigitBytes<T>(field: String, _ body: ([UInt8]) throws -> T) throws -> T {
+        var filtered: [UInt8] = []
+        filtered.reserveCapacity(digits.count)
+        // Before the filter, so a refusal part-way through has wiped what it collected so far, and
+        // after `body`, so a reader that kept the digits keeps its own copy, not this one.
+        defer {
+            for index in filtered.indices {
+                filtered[index] = Self.wipedByte
+            }
+        }
+        for byte in read() {
+            guard byte < 0x80 else {
+                throw PayabliPayInTokenStorageError.invalidInput("\(field) contains unsupported characters.")
+            }
+            if (0x30 ... 0x39).contains(byte) {
+                filtered.append(byte)
+            }
+        }
+        return try body(filtered)
     }
 
     /// True once `close()` has run.
@@ -97,8 +125,9 @@ public final class SensitiveDigits: @unchecked Sendable, CustomStringConvertible
 }
 
 extension SensitiveDigits {
-    /// The digits with everything that is not a digit dropped, for the validators and encoders that
-    /// read them as text.
+    /// The digits as text, for the host-driven path where a host encodes the method itself. The SDK's
+    /// own request routes never read this: they write the digits as bytes instead, because this makes
+    /// a `String`, which nothing can overwrite.
     var digitsOnly: String {
         (String(bytes: read(), encoding: .utf8) ?? "").digitsOnly
     }
