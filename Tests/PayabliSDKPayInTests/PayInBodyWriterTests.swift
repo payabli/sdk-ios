@@ -286,4 +286,15 @@ final class PayInBodyWriterTests: XCTestCase {
         XCTAssertEqual(original, body.count)
         XCTAssertEqual(Array(repeating: 0, count: original), Array(body))
     }
+
+    func testFormattingTheWorkingBufferPrintsNoDigits() {
+        // A struct's default description prints its stored fields, digits included, and the working
+        // buffer holds the card number while a request is written, so its description states the
+        // written count only.
+        var buffer = ByteBuffer()
+        buffer.write(Array("4111111111111111".utf8))
+
+        XCTAssertEqual("ByteBuffer(size=16)", String(describing: buffer))
+        XCTAssertEqual(String(describing: buffer), String(reflecting: buffer))
+    }
 }

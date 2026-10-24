@@ -283,7 +283,7 @@ private final class FragmentWriter {
 ///
 /// `Data` cannot be, reliably: copy-on-write makes an in-place overwrite fork the storage, so a
 /// body assembled through one could leave a card number in a buffer nothing can reach.
-private struct ByteBuffer {
+struct ByteBuffer: CustomStringConvertible, CustomDebugStringConvertible {
     private static let initialCapacity = 256
 
     private var bytes: [UInt8]
@@ -325,6 +325,19 @@ private struct ByteBuffer {
             bytes[index] = 0
         }
         size = 0
+    }
+
+    /// The written count only: a struct's default description would print the stored bytes,
+    /// digits included.
+    var description: String {
+        "ByteBuffer(size=\(size))"
+    }
+
+    /// The same redacted text on the debug route, which `String(reflecting:)` and a debugger's
+    /// `po` render. `dump()` and the variables view render the stored bytes, which no protocol
+    /// redacts.
+    var debugDescription: String {
+        description
     }
 
     /// The storage being replaced is what would otherwise keep a copy of everything written so far.
