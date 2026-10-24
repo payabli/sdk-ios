@@ -125,9 +125,7 @@ final class PayInBodyWriterTests: XCTestCase {
         )
     }
 
-    /// The holder's wire spelling predates this writer and is kept: `achHolder`, not a check-specific
-    /// key. This platform and its sibling already disagree there, and this change is not the one to
-    /// resolve it.
+    /// A check names its holder under `achHolder`, the key the account methods use, not a check-specific one.
     func testTheCaptureCheckFragmentNamesItsHolderUnderAchHolder() throws {
         let fragment = try PayInBodyWriter.captureFragment(.check(PayabliPayInPaymentMethod.Check(
             holderName: " John Doe "
@@ -174,8 +172,8 @@ final class PayInBodyWriterTests: XCTestCase {
 
     // MARK: - Escaping and refusal
 
-    /// Both quoting styles delegate escaping to a JSON codec rather than hand-rolling it, so a value
-    /// carrying a quote, a backslash or a control character arrives decoded exactly as it was given.
+    /// Both quoting styles reach the codec's escaping, so a value carrying a quote, a backslash or a
+    /// control character arrives decoded exactly as it was given.
     func testBothQuotingStylesEscapeSpecialCharactersAndRoundTrip() throws {
         let holder = #"She said "ok"\ and left"#
         let zip = "12\n34"

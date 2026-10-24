@@ -100,7 +100,7 @@ final class SensitiveDigitsTests: XCTestCase {
 
     func testUseDigitBytesRefusesAByteThatIsNotAscii() {
         // A digit-shaped character from another script is not the digit it resembles, so it is refused
-        // rather than read as the value it resembles.
+        // rather than read as one.
         let value = SensitiveDigits.ofString("٤" + String(repeating: "١", count: 15))
 
         do {

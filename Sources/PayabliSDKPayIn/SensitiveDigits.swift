@@ -78,18 +78,14 @@ public final class SensitiveDigits: @unchecked Sendable, CustomStringConvertible
         wiped ? [] : digits
     }
 
-    /// Runs `body` over the digits this holds, filtered to the ASCII digits a request can write, and
-    /// wipes the filtered copy before returning: the one way to read these that leaves nothing behind.
-    ///
-    /// An ASCII byte that is not a digit — a space a payer typed — is dropped, so a spaced card number
-    /// is read as its digits. A byte that is not ASCII is refused, because a digit-shaped character
-    /// from another script is not the digit it resembles; `field` names the member in that refusal.
+    /// Runs `body` over the digits this holds, filtered to the ASCII digits a request can write, with
+    /// the filtered copy wiped before returning. A non-digit ASCII byte is dropped; a non-ASCII byte
+    /// is refused, because a digit-shaped character from another script is not the digit it resembles.
     ///
     /// - Parameter field: the field's name, carried by the refusal when the bytes are not ASCII.
     /// - Parameter body: the rule to run over the filtered digits.
     /// - Returns: what `body` returned.
-    /// - Throws: ``PayabliPayInTokenStorageError/invalidInput(_:)`` when the digits hold a byte that
-    ///   is not ASCII.
+    /// - Throws: ``PayabliPayInTokenStorageError/invalidInput(_:)`` when the digits hold a non-ASCII byte.
     func useDigitBytes<T>(field: String, _ body: ([UInt8]) throws -> T) throws -> T {
         var filtered: [UInt8] = []
         filtered.reserveCapacity(digits.count)
