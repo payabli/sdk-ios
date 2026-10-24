@@ -5,6 +5,37 @@ import PayabliSDKCore
 /// form's operation and the failure's category, and never carries the failure's own text, which
 /// reaches the host only.
 enum PayabliPayInFailureMessage {
+    /// The message for a failed submission, in the wording the host supplied where it supplied any.
+    ///
+    /// - Parameters:
+    ///   - error: The failure the submission threw.
+    ///   - operation: What the form submitted.
+    ///   - labels: The wording the form was given, whose message for the failure's category
+    ///     replaces the SDK's own.
+    /// - Returns: The host's message for the failure's category when it carries one, otherwise
+    ///   the SDK's own message for the category ``messageCategory(for:)`` names.
+    static func text(
+        for error: any Error,
+        operation: PayabliPayInOperation,
+        labels: PayabliPayInFormLabels
+    ) -> String {
+        let category = messageCategory(for: error)
+        return labels.failureMessage(for: category) ?? text(for: category, operation: operation)
+    }
+
+    /// The category whose message the form draws for a failure: an interrupted submission may have
+    /// gone through, so it reads as outcome-unknown whatever its own category is, and a failure
+    /// outside the catalog reads as internal.
+    ///
+    /// - Parameter error: The failure the submission threw.
+    /// - Returns: The category that picks the message.
+    static func messageCategory(for error: any Error) -> PayabliErrorCategory {
+        if case .submissionInterrupted = error as? PayabliPayInError {
+            return .outcomeUnknown
+        }
+        return (error as? any PayabliError)?.category ?? .internal
+    }
+
     /// The message for a failed submission.
     ///
     /// - Parameters:
@@ -13,10 +44,7 @@ enum PayabliPayInFailureMessage {
     /// - Returns: The unknown-outcome message for an interrupted submission, whatever its category; otherwise the
     ///   message for the error's category, or the default message for an error outside the catalog.
     static func text(for error: any Error, operation: PayabliPayInOperation) -> String {
-        if case .submissionInterrupted = error as? PayabliPayInError {
-            return text(for: .outcomeUnknown, operation: operation)
-        }
-        return text(for: (error as? any PayabliError)?.category ?? .internal, operation: operation)
+        text(for: messageCategory(for: error), operation: operation)
     }
 
     /// The message for one category of failure.

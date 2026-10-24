@@ -190,6 +190,24 @@ public struct PayabliPayInRequest: Sendable {
     }
 }
 
+/// A payment method to store: the instrument, and the options for everything else.
+public struct PayabliPayInStoreRequest: Sendable {
+    public let instrument: PayabliPayInMethodInput
+    public let options: PayabliPayInTokenStorageOptions
+
+    /// Creates a store request.
+    ///
+    /// - Parameter instrument: the card or bank account data to store.
+    /// - Parameter options: what the request carries besides the method, from the customer to the flags.
+    public init(
+        instrument: PayabliPayInMethodInput,
+        options: PayabliPayInTokenStorageOptions
+    ) {
+        self.instrument = instrument
+        self.options = options
+    }
+}
+
 public struct PayabliPayInRequestConfiguration: Sendable {
     public let paymentDetails: PayabliPayInPaymentDetails
     public let accountId: String?
@@ -358,7 +376,7 @@ public struct PayabliPayInResult: Sendable, Equatable {
     public let explanation: String?
     public let action: String?
     public let transaction: PayabliPayInTransaction?
-    public let storedPaymentMethod: PayabliPayInStoredPaymentMethod?
+    public let storedPaymentMethod: PayabliPayInStoredMethod?
     public let apiResponse: PayabliPayInAPIResponse?
 
     public init(apiResponse: PayabliPayInAPIResponse) {
@@ -372,7 +390,7 @@ public struct PayabliPayInResult: Sendable, Equatable {
         self.apiResponse = apiResponse
     }
 
-    public init(storedPaymentMethod: PayabliPayInStoredPaymentMethod) {
+    public init(storedPaymentMethod: PayabliPayInStoredMethod) {
         kind = .storedPaymentMethod
         code = storedPaymentMethod.resultCode.map(String.init) ?? "1"
         reason = storedPaymentMethod.resultText ?? storedPaymentMethod.responseText

@@ -549,7 +549,7 @@ public struct PayabliPayInTokenStorageAPIResponse: Codable, Sendable, Equatable 
     }
 }
 
-public struct PayabliPayInStoredPaymentMethod: Sendable, Equatable {
+public struct PayabliPayInStoredMethod: Sendable, Equatable {
     public let storedMethodId: String?
     public let method: PayabliPayInStoredMethodType
     public let methodReferenceId: String?
