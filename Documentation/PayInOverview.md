@@ -103,8 +103,8 @@ are PCI-sensitive because the host app constructs and passes card or bank accoun
 
 ## Hosted UI Capabilities
 
-`PayabliPayInView` can be embedded inline. The sheet modifier
-`.payabliPayInSheet(...)` presents the same component in SwiftUI
+`PayabliPayInForm` can be embedded inline. The sheet modifier
+`.payabliPayInSheet(...)` presents the same form in SwiftUI
 sheet form.
 
 The hosted form supports:
@@ -182,7 +182,7 @@ Each section can also configure:
 
 ## Labels And Placeholders
 
-`PayabliPayInLabels` controls:
+`PayabliPayInFormLabels` controls:
 
 - `title`
 - `subtitle`
@@ -195,7 +195,7 @@ and use placeholder text while the component continues to use the label strings
 for accessibility.
 
 ```swift
-let labels = PayabliPayInLabels(
+let labels = PayabliPayInFormLabels(
     title: "Payment",
     submitButton: "Submit Payment",
     fieldPlaceholders: [
@@ -208,7 +208,6 @@ let labels = PayabliPayInLabels(
 )
 
 let configuration = PayabliPayInFormConfiguration(
-    labels: labels,
     labelLayout: .placeholder,
     showsFieldLabels: false,
     hiddenFieldLabels: [.cardholderName, .cardNumber, .cardExpiration, .cardCvv, .cardZip]
@@ -243,14 +242,14 @@ The styling is configurable through `PayabliPayInPaymentSummaryConfiguration`:
 - `valueStyle`
 - `rowSpacing`
 
-Relabel a money row through `PayabliPayInLabels.fieldLabels`, and the Total label
-through `PayabliPayInLabels.total`.
+Relabel a money row through `PayabliPayInFormLabels.fieldLabels`, and the Total label
+through `PayabliPayInFormLabels.total`.
 
 Rows are vertical. Labels are left aligned and values are right aligned.
 
 ## Styling Capabilities
 
-Use `PayabliPayInStyle` to style the hosted form.
+Use `PayabliPayInFormStyle` to style the hosted form.
 
 Configurable style areas:
 
