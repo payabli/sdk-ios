@@ -410,11 +410,11 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
         }
 
         let card = PayabliPayInCardData(
-            cardNumber: cardNumber,
-            expiration: expiration,
-            cardholderName: cardholderName,
-            cvv: cvv,
-            billingZip: billingZip
+            cardNumber: SensitiveDigits.ofString(cardNumber),
+            expiry: expiration,
+            holderName: cardholderName,
+            securityCode: SensitiveDigits.ofString(cvv),
+            postalCode: billingZip
         )
         handleAddPaymentMethod(
             .card(card),
@@ -441,7 +441,7 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
         }
 
         let ach = PayabliPayInBankAccountData(
-            accountNumber: accountNumber,
+            accountNumber: SensitiveDigits.ofString(accountNumber),
             accountType: resolvedAccountType,
             holderName: holderName,
             routingNumber: routingNumber,

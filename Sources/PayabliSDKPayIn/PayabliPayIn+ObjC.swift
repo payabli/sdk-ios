@@ -120,10 +120,10 @@ public final class PayabliPayInObjC: NSObject {
     // swiftlint:disable:next function_parameter_count
     @objc public func addCard(
         cardNumber: String,
-        expiration: String,
-        cardholderName: String,
-        cvv: String,
-        billingZip: String,
+        expiry: String,
+        holderName: String,
+        securityCode: String,
+        postalCode: String,
         createAnonymous: Bool,
         forceCustomerCreation: Bool,
         temporary: Bool,
@@ -131,11 +131,11 @@ public final class PayabliPayInObjC: NSObject {
         completion: @escaping (PayabliPayInStoredPaymentMethodObjC?, NSError?) -> Void
     ) {
         let card = PayabliPayInCardData(
-            cardNumber: cardNumber,
-            expiration: expiration,
-            cardholderName: cardholderName,
-            cvv: cvv,
-            billingZip: billingZip
+            cardNumber: SensitiveDigits.ofString(cardNumber),
+            expiry: expiry,
+            holderName: holderName,
+            securityCode: SensitiveDigits.ofString(securityCode),
+            postalCode: postalCode
         )
         let options = PayabliPayInOptions(
             createAnonymous: createAnonymous,
@@ -187,7 +187,7 @@ public final class PayabliPayInObjC: NSObject {
         }
 
         let ach = PayabliPayInBankAccountData(
-            accountNumber: accountNumber,
+            accountNumber: SensitiveDigits.ofString(accountNumber),
             accountType: resolvedAccountType,
             holderName: holderName,
             routingNumber: routingNumber,

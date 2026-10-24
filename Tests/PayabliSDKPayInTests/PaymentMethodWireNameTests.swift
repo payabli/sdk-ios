@@ -30,15 +30,15 @@ final class PaymentMethodWireNameTests: XCTestCase {
     }
 
     private static let card = PayabliPayInCardData(
-        cardNumber: "4111111111111111",
-        expiration: "02/28",
-        cardholderName: "Jane Doe",
-        cvv: "123",
-        billingZip: "33139"
+        cardNumber: SensitiveDigits.ofString("4111111111111111"),
+        expiry: "02/28",
+        holderName: "Jane Doe",
+        securityCode: SensitiveDigits.ofString("123"),
+        postalCode: "33139"
     )
 
     private static let bankAccount = PayabliPayInBankAccountData(
-        accountNumber: "1111111111",
+        accountNumber: SensitiveDigits.ofString("1111111111"),
         accountType: .checking,
         holderName: "Jane Doe",
         routingNumber: "123456780"

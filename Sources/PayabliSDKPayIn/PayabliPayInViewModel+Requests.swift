@@ -6,15 +6,15 @@ extension PayabliPayInViewModel {
         switch effectiveSelectedMethod {
         case .card:
             return .card(PayabliPayInCardData(
-                cardNumber: cardNumber,
-                expiration: cardExpiration,
-                cardholderName: cardholderName,
-                cvv: cardCvv,
-                billingZip: cardZip
+                cardNumber: SensitiveDigits.ofString(cardNumber),
+                expiry: cardExpiration,
+                holderName: cardholderName,
+                securityCode: SensitiveDigits.ofString(cardCvv),
+                postalCode: cardZip
             ))
         case .bankAccount:
             return .bankAccount(PayabliPayInBankAccountData(
-                accountNumber: accountNumber,
+                accountNumber: SensitiveDigits.ofString(accountNumber),
                 accountType: accountType,
                 holderName: accountHolder,
                 routingNumber: routingNumber,
@@ -30,17 +30,17 @@ extension PayabliPayInViewModel {
         case .card:
             return .card(PayabliPayInPaymentMethod.Card(
                 data: PayabliPayInCardData(
-                    cardNumber: cardNumber,
-                    expiration: cardExpiration,
-                    cardholderName: cardholderName,
-                    cvv: cardCvv,
-                    billingZip: cardZip
+                    cardNumber: SensitiveDigits.ofString(cardNumber),
+                    expiry: cardExpiration,
+                    holderName: cardholderName,
+                    securityCode: SensitiveDigits.ofString(cardCvv),
+                    postalCode: cardZip
                 )
             ))
         case .bankAccount:
             return .bankAccount(PayabliPayInPaymentMethod.BankAccount(
                 data: PayabliPayInBankAccountData(
-                    accountNumber: accountNumber,
+                    accountNumber: SensitiveDigits.ofString(accountNumber),
                     accountType: accountType,
                     holderName: accountHolder,
                     routingNumber: routingNumber,

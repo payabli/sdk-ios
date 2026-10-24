@@ -14,11 +14,11 @@ final class TokenStorageClientCoverageTests: XCTestCase {
             _ = try await client.addMethod(
                 entryPoint: "entry",
                 paymentMethod: .card(PayabliPayInCardData(
-                    cardNumber: "4111111111111111",
-                    expiration: "02/28",
-                    cardholderName: "Jane Doe",
-                    cvv: "123",
-                    billingZip: "33139"
+                    cardNumber: SensitiveDigits.ofString("4111111111111111"),
+                    expiry: "02/28",
+                    holderName: "Jane Doe",
+                    securityCode: SensitiveDigits.ofString("123"),
+                    postalCode: "33139"
                 ))
             )
             XCTFail("Expected a validation error")
@@ -41,11 +41,11 @@ final class TokenStorageClientCoverageTests: XCTestCase {
             _ = try await client.addMethod(
                 entryPoint: "entry",
                 paymentMethod: .card(PayabliPayInCardData(
-                    cardNumber: "4111111111111111",
-                    expiration: "02/28",
-                    cardholderName: "Jane Doe",
-                    cvv: "123",
-                    billingZip: "33139"
+                    cardNumber: SensitiveDigits.ofString("4111111111111111"),
+                    expiry: "02/28",
+                    holderName: "Jane Doe",
+                    securityCode: SensitiveDigits.ofString("123"),
+                    postalCode: "33139"
                 )),
                 options: PayabliPayInOptions(
                     createAnonymous: false,
@@ -84,11 +84,11 @@ final class TokenStorageClientCoverageTests: XCTestCase {
             _ = try await arrayClient.addMethod(
                 entryPoint: "entry",
                 paymentMethod: .card(PayabliPayInCardData(
-                    cardNumber: "4111111111111111",
-                    expiration: "02/28",
-                    cardholderName: "Jane Doe",
-                    cvv: "123",
-                    billingZip: "33139"
+                    cardNumber: SensitiveDigits.ofString("4111111111111111"),
+                    expiry: "02/28",
+                    holderName: "Jane Doe",
+                    securityCode: SensitiveDigits.ofString("123"),
+                    postalCode: "33139"
                 ))
             )
             XCTFail("Expected decoding error")
@@ -105,11 +105,11 @@ final class TokenStorageClientCoverageTests: XCTestCase {
             _ = try await nonJSONClient.addMethod(
                 entryPoint: "entry",
                 paymentMethod: .card(PayabliPayInCardData(
-                    cardNumber: "4111111111111111",
-                    expiration: "02/28",
-                    cardholderName: "Jane Doe",
-                    cvv: "123",
-                    billingZip: "33139"
+                    cardNumber: SensitiveDigits.ofString("4111111111111111"),
+                    expiry: "02/28",
+                    holderName: "Jane Doe",
+                    securityCode: SensitiveDigits.ofString("123"),
+                    postalCode: "33139"
                 ))
             )
             XCTFail("Expected decoding error")
@@ -138,11 +138,11 @@ final class TokenStorageClientCoverageTests: XCTestCase {
         let result = try await client.addMethod(
             entryPoint: "entry",
             paymentMethod: .card(PayabliPayInCardData(
-                cardNumber: "4111111111111111",
-                expiration: "02/28",
-                cardholderName: "Jane Doe",
-                cvv: "123",
-                billingZip: "33139"
+                cardNumber: SensitiveDigits.ofString("4111111111111111"),
+                expiry: "02/28",
+                holderName: "Jane Doe",
+                securityCode: SensitiveDigits.ofString("123"),
+                postalCode: "33139"
             ))
         )
 
@@ -160,11 +160,11 @@ final class TokenStorageClientCoverageTests: XCTestCase {
             _ = try await client.addMethod(
                 entryPoint: "entry",
                 paymentMethod: .card(PayabliPayInCardData(
-                    cardNumber: "4111111111111111",
-                    expiration: "02/28",
-                    cardholderName: "Jane Doe",
-                    cvv: "123",
-                    billingZip: "33139"
+                    cardNumber: SensitiveDigits.ofString("4111111111111111"),
+                    expiry: "02/28",
+                    holderName: "Jane Doe",
+                    securityCode: SensitiveDigits.ofString("123"),
+                    postalCode: "33139"
                 ))
             )
             XCTFail("Expected a refusal")
@@ -194,11 +194,11 @@ final class TokenStorageClientCoverageTests: XCTestCase {
             _ = try await client.addMethod(
                 entryPoint: "entry",
                 paymentMethod: .card(PayabliPayInCardData(
-                    cardNumber: "4111111111111111",
-                    expiration: "02/28",
-                    cardholderName: "Jane Doe",
-                    cvv: "123",
-                    billingZip: "33139"
+                    cardNumber: SensitiveDigits.ofString("4111111111111111"),
+                    expiry: "02/28",
+                    holderName: "Jane Doe",
+                    securityCode: SensitiveDigits.ofString("123"),
+                    postalCode: "33139"
                 ))
             )
             XCTFail("Expected save failure")
@@ -221,11 +221,11 @@ final class TokenStorageClientCoverageTests: XCTestCase {
             _ = try await invalidEntryClient.addMethod(
                 entryPoint: "   ",
                 paymentMethod: .card(PayabliPayInCardData(
-                    cardNumber: "4111111111111111",
-                    expiration: "02/28",
-                    cardholderName: "Jane Doe",
-                    cvv: "123",
-                    billingZip: "33139"
+                    cardNumber: SensitiveDigits.ofString("4111111111111111"),
+                    expiry: "02/28",
+                    holderName: "Jane Doe",
+                    securityCode: SensitiveDigits.ofString("123"),
+                    postalCode: "33139"
                 ))
             )
             XCTFail("Expected invalid entrypoint error")
@@ -249,11 +249,11 @@ final class TokenStorageClientCoverageTests: XCTestCase {
 
         do {
             _ = try await component.addCard(PayabliPayInCardData(
-                cardNumber: "4111111111111111",
-                expiration: "02/28",
-                cardholderName: "Jane Doe",
-                cvv: "123",
-                billingZip: "33139"
+                cardNumber: SensitiveDigits.ofString("4111111111111111"),
+                expiry: "02/28",
+                holderName: "Jane Doe",
+                securityCode: SensitiveDigits.ofString("123"),
+                postalCode: "33139"
             ))
             XCTFail("Expected missing token error")
         } catch let error as PayabliGenericError {
