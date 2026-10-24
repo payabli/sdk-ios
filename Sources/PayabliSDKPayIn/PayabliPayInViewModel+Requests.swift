@@ -2,19 +2,66 @@ import Foundation
 import PayabliSDKCore
 
 extension PayabliPayInViewModel {
-    func methodInput() -> PayabliPayInMethodInput {
+    /// The form's sensitive buffers for one submission, built once and closed together once the
+    /// submission ends, whatever it ends in. A buffer built outside a registry is a build path nothing
+    /// can close, so every buffer the form builds goes through `of`.
+    final class FormBufferRegistry {
+        private var buffers: [SensitiveDigits] = []
+
+        /// Holds a copy of the supplied digits, registered so `close()` overwrites them too.
+        ///
+        /// - Parameter digits: the digits to hold a copy of.
+        /// - Returns: the value holding a copy of `digits`, registered here.
+        func of(_ digits: [UInt8]) -> SensitiveDigits {
+            let value = SensitiveDigits.of(digits)
+            buffers.append(value)
+            return value
+        }
+
+        /// For digits that are already a `String`, typically from a text field, registered so
+        /// `close()` overwrites them too.
+        ///
+        /// - Parameter source: the digits as a `String`, which this cannot unmake.
+        /// - Returns: the value holding the digits, registered here.
+        func ofString(_ source: String) -> SensitiveDigits {
+            let value = SensitiveDigits.ofString(source)
+            buffers.append(value)
+            return value
+        }
+
+        /// Closes every registered buffer. Idempotent, so a submission that already closed them is
+        /// not an error.
+        func close() {
+            for buffer in buffers {
+                buffer.close()
+            }
+            buffers = []
+        }
+    }
+
+    /// Runs `body` with a registry of the form's sensitive buffers, closing them all once it ends.
+    ///
+    /// - Parameter body: the submission, which takes its buffers from the registry.
+    /// - Returns: what `body` returned.
+    func withFormBuffers<T>(_ body: (FormBufferRegistry) async throws -> T) async rethrows -> T {
+        let registry = FormBufferRegistry()
+        defer { registry.close() }
+        return try await body(registry)
+    }
+
+    func methodInput(with buffers: FormBufferRegistry) -> PayabliPayInMethodInput {
         switch effectiveSelectedMethod {
         case .card:
             return .card(PayabliPayInCardData(
-                cardNumber: SensitiveDigits.ofString(cardNumber),
+                cardNumber: buffers.ofString(cardNumber),
                 expiry: cardExpiration,
                 holderName: cardholderName,
-                securityCode: SensitiveDigits.ofString(cardCvv),
+                securityCode: buffers.ofString(cardCvv),
                 postalCode: cardZip
             ))
         case .bankAccount:
             return .bankAccount(PayabliPayInBankAccountData(
-                accountNumber: SensitiveDigits.ofString(accountNumber),
+                accountNumber: buffers.ofString(accountNumber),
                 accountType: accountType,
                 holderName: accountHolder,
                 routingNumber: routingNumber,
@@ -25,22 +72,22 @@ extension PayabliPayInViewModel {
         }
     }
 
-    func paymentMethod() -> PayabliPayInPaymentMethod {
+    func paymentMethod(with buffers: FormBufferRegistry) -> PayabliPayInPaymentMethod {
         switch effectiveSelectedMethod {
         case .card:
             return .card(PayabliPayInPaymentMethod.Card(
                 data: PayabliPayInCardData(
-                    cardNumber: SensitiveDigits.ofString(cardNumber),
+                    cardNumber: buffers.ofString(cardNumber),
                     expiry: cardExpiration,
                     holderName: cardholderName,
-                    securityCode: SensitiveDigits.ofString(cardCvv),
+                    securityCode: buffers.ofString(cardCvv),
                     postalCode: cardZip
                 )
             ))
         case .bankAccount:
             return .bankAccount(PayabliPayInPaymentMethod.BankAccount(
                 data: PayabliPayInBankAccountData(
-                    accountNumber: SensitiveDigits.ofString(accountNumber),
+                    accountNumber: buffers.ofString(accountNumber),
                     accountType: accountType,
                     holderName: accountHolder,
                     routingNumber: routingNumber,
