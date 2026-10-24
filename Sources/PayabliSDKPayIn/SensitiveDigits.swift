@@ -42,7 +42,9 @@ public final class SensitiveDigits: @unchecked Sendable, CustomStringConvertible
         wiped ? 0 : digits.count
     }
 
-    /// Overwrites the digits. Idempotent, so closing a value a caller already closed is not an error.
+    /// Overwrites the digits for every holder of this value. One object backs the value however many
+    /// copies of it are carrying it, so closing any copy closes them all. Idempotent, so closing a
+    /// value a caller already closed is not an error.
     ///
     /// After this the value behaves as empty rather than throwing: a request built from a closed value
     /// fails validation as a missing field, which is a better failure than an exception from inside a
