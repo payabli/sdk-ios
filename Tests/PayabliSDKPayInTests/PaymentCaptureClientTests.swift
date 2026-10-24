@@ -311,7 +311,10 @@ final class PayInPaymentFlowClientTests: XCTestCase {
         let bodyText = try XCTUnwrap(String(data: XCTUnwrap(request.body), encoding: .utf8))
         XCTAssertEqual(
             bodyText,
-            #"{"customerData":{"customerId":4440},"entryPoint":"entry","ipaddress":"255.255.255.255","orderDescription":"SDK test transaction","orderId":"order-123","paymentDetails":{"currency":"USD","serviceFee":5.00,"totalAmount":100.00},"source":"ios-sdk","paymentMethod":{"cardHolder":"John Cassian","cardcvv":"999","cardexp":"02\/27","cardnumber":"4111111111111111","cardzip":"12345","initiator":"payor","method":"card","saveIfSuccess":true}}"#
+            #"{"customerData":{"customerId":4440},"entryPoint":"entry","ipaddress":"255.255.255.255","orderDescription":"SDK test transaction","orderId":"order-123","#
+                + #""paymentDetails":{"currency":"USD","serviceFee":5.00,"totalAmount":100.00},"#
+                + #""source":"ios-sdk","paymentMethod":{"cardHolder":"John Cassian","cardcvv":"999","cardexp":"02\/27","#
+                + #""cardnumber":"4111111111111111","cardzip":"12345","initiator":"payor","method":"card","saveIfSuccess":true}}"#
         )
     }
 
