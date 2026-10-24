@@ -141,7 +141,13 @@ enum PayInBodyWriter {
         buffer.write(colon)
         buffer.write(fragment.bytes)
         buffer.write(closeBrace)
-        return Data(buffer.finishAndWipe())
+        var finished = buffer.finishAndWipe()
+        let spliced = Data(finished)
+        // The finished array still holds the body, so it is overwritten before it is dropped.
+        for index in finished.indices {
+            finished[index] = 0
+        }
+        return spliced
     }
 
     /// Overwrites a body the routes built, once the transport has returned: a refusal's credential
@@ -294,10 +300,14 @@ private struct ByteBuffer {
     }
 
     mutating func write(_ source: some Sequence<UInt8>) {
-        let incoming = Array(source)
+        var incoming = Array(source)
         ensure(extra: incoming.count)
         bytes.replaceSubrange(size ..< size + incoming.count, with: incoming)
         size += incoming.count
+        // The copy can hold a card number, so it is overwritten before it is dropped.
+        for index in incoming.indices {
+            incoming[index] = 0
+        }
     }
 
     /// The exact-size result, after which the working storage holds zeros.
