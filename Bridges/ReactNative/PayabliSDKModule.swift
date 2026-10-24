@@ -416,7 +416,7 @@ public final class PayabliSDKModule: RCTEventEmitter {
             cvv: cvv,
             billingZip: billingZip
         )
-        addPaymentMethod(
+        storeMethod(
             .card(card),
             options: Self.payInOptions(from: params),
             component: payIn,
@@ -452,7 +452,7 @@ public final class PayabliSDKModule: RCTEventEmitter {
             secCode: (params["secCode"] as? String).flatMap(PayabliPayInSecCode.init(rawValue:)),
             holderType: (params["holderType"] as? String).flatMap(PayabliPayInAccountHolderType.init(rawValue:))
         )
-        addPaymentMethod(
+        storeMethod(
             .bankAccount(ach),
             options: Self.payInOptions(from: params),
             component: payIn,
@@ -461,7 +461,7 @@ public final class PayabliSDKModule: RCTEventEmitter {
         )
     }
 
-    private func addPaymentMethod(
+    private func storeMethod(
         _ input: PayabliPayInMethodInput,
         options: PayabliPayInOptions,
         component: PayabliPayIn,
@@ -470,7 +470,10 @@ public final class PayabliSDKModule: RCTEventEmitter {
     ) {
         Task { @MainActor in
             do {
-                let result = try await component.addPaymentMethod(input, options: options)
+                let result = try await component.storeMethod(PayabliPayInStoreRequest(
+                    instrument: input,
+                    options: options
+                ))
                 resolve(Self.storedPaymentMethodMap(result))
             } catch {
                 let nsError = error as NSError
@@ -545,7 +548,7 @@ public final class PayabliSDKModule: RCTEventEmitter {
     }
 
     private static func storedPaymentMethodMap(
-        _ method: PayabliPayInStoredPaymentMethod
+        _ method: PayabliPayInStoredMethod
     ) -> [String: Any] {
         var map: [String: Any] = [
             "method": methodName(method.method),

@@ -22,47 +22,59 @@ final class PayInFormCustomizationTests: XCTestCase {
         XCTAssertFalse(preset.requiresCustomerNumber)
         XCTAssertFalse(preset.dashesExpiry)
         XCTAssertEqual(preset.cardBrandIconPlacement, sdkDefault.cardBrandIconPlacement)
-        XCTAssertEqual(preset.errorMessagePlacement, sdkDefault.errorMessagePlacement)
+        XCTAssertEqual(preset.failureMessagePlacement, sdkDefault.failureMessagePlacement)
         XCTAssertEqual(preset.inputSizing, .standard)
     }
 
     func testTheDefaultPresetHandsTheFormItsOwnWording() {
-        let configuration = PayInFormCustomization(preset: .sdkDefault).configuration(for: .capture)
-        let sdkDefault = PayabliPayInFormConfiguration()
+        let customization = PayInFormCustomization(preset: .sdkDefault)
+        let configuration = customization.configuration(for: .capture)
+        let labels = customization.labels(for: .capture)
+        let sdkDefaultLabels = PayabliPayInFormLabels()
 
         XCTAssertEqual(configuration.allowedMethods, [.card, .bankAccount])
         XCTAssertEqual(configuration.labelLayout, .external)
         XCTAssertTrue(configuration.showsFieldLabels)
-        XCTAssertEqual(configuration.labels.title, sdkDefault.labels.title)
-        XCTAssertEqual(configuration.labels.submitButton, sdkDefault.labels.submitButton)
-        XCTAssertEqual(configuration.inputSizing, sdkDefault.inputSizing)
-        XCTAssertEqual(configuration.cardSections.map(\.title), sdkDefault.cardSections.map(\.title))
-        XCTAssertEqual(configuration.cardSections.map(\.fields), sdkDefault.cardSections.map(\.fields))
-        XCTAssertEqual(configuration.bankSections.map(\.fields), sdkDefault.bankSections.map(\.fields))
+        XCTAssertEqual(labels.title, sdkDefaultLabels.title)
+        XCTAssertEqual(labels.submitButton, sdkDefaultLabels.submitButton)
+        XCTAssertEqual(configuration.inputSizing, PayabliPayInFormConfiguration().inputSizing)
+        XCTAssertEqual(
+            configuration.cardSections.map(\.title),
+            PayabliPayInFormConfiguration().cardSections.map(\.title)
+        )
+        XCTAssertEqual(
+            configuration.cardSections.map(\.fields),
+            PayabliPayInFormConfiguration().cardSections.map(\.fields)
+        )
+        XCTAssertEqual(
+            configuration.bankSections.map(\.fields),
+            PayabliPayInFormConfiguration().bankSections.map(\.fields)
+        )
         XCTAssertNil(configuration.hiddenValues.accountHolderType)
-        let style = PayInFormCustomization(preset: .sdkDefault).style
-        XCTAssertEqual(style.accentColor, PayabliPayInStyle.default.accentColor)
-        XCTAssertEqual(style.input.backgroundColor, PayabliPayInStyle.default.input.backgroundColor)
+        let style = customization.style
+        XCTAssertEqual(style.accentColor, PayabliPayInFormStyle.default.accentColor)
+        XCTAssertEqual(style.input.backgroundColor, PayabliPayInFormStyle.default.input.backgroundColor)
     }
 
     func testTheBrandPreset() {
         let customization = PayInFormCustomization(preset: .brand)
         let configuration = customization.configuration(for: .capture)
+        let labels = customization.labels(for: .capture)
 
         XCTAssertEqual(customization.activePreset, .brand)
         XCTAssertEqual(customization.look, .brand)
-        XCTAssertEqual(customization.configuration(for: .storedMethod).labels.submitButton, "Save for later")
+        XCTAssertEqual(customization.labels(for: .storedMethod).submitButton, "Save for later")
         XCTAssertEqual(configuration.labelLayout, .placeholder)
-        XCTAssertEqual(configuration.labels.title, "Acme Checkout")
-        XCTAssertEqual(configuration.labels.subtitle, "Secure payment, powered by Payabli")
-        XCTAssertEqual(configuration.labels.label(for: .customerNumber), "Member ID")
+        XCTAssertEqual(labels.title, "Acme Checkout")
+        XCTAssertEqual(labels.subtitle, "Secure payment, powered by Payabli")
+        XCTAssertEqual(labels.label(for: .customerNumber), "Member ID")
         XCTAssertEqual(configuration.cardSections.map(\.title), ["About you", "Your card", "Order total"])
-        XCTAssertEqual(configuration.labels.submitButton, "Pay now")
+        XCTAssertEqual(labels.submitButton, "Pay now")
         XCTAssertEqual(configuration.cardSections.first?.fields, [.firstName, .lastName, .customerNumber, .billingEmail])
         XCTAssertTrue(configuration.requiredFields.contains(.customerNumber))
         XCTAssertEqual(configuration.formatting.expirationSeparator, "-")
         XCTAssertEqual(configuration.cardBrandIconPlacement, .trailing)
-        XCTAssertEqual(configuration.errorMessagePlacement, .top)
+        XCTAssertEqual(configuration.failureMessagePlacement, .top)
         XCTAssertEqual(configuration.inputSizing.size(for: .cardNumber).height, 60)
     }
 
@@ -74,12 +86,12 @@ final class PayInFormCustomizationTests: XCTestCase {
         XCTAssertEqual(customization.look, .compact)
         XCTAssertEqual(configuration.allowedMethods, [.card])
         XCTAssertFalse(configuration.showsFieldLabels)
-        XCTAssertEqual(configuration.labels.placeholder(for: .cardNumber), "Card number")
+        XCTAssertEqual(customization.labels(for: .capture).placeholder(for: .cardNumber), "Card number")
         XCTAssertFalse(configuration.cardSections.flatMap(\.fields).contains(.firstName))
         XCTAssertNil(configuration.cardSections.last?.title)
         XCTAssertFalse(configuration.formatting.insertsCardNumberSpaces)
         XCTAssertEqual(configuration.cardBrandIconPlacement, .hidden)
-        XCTAssertEqual(configuration.errorMessagePlacement, .aboveSubmitButton)
+        XCTAssertEqual(configuration.failureMessagePlacement, .aboveSubmitButton)
         XCTAssertEqual(configuration.inputSizing.size(for: .cardNumber).height, 44)
     }
 
@@ -109,7 +121,7 @@ final class PayInFormCustomizationTests: XCTestCase {
         customization.groupsCardNumber = false
         customization.masksAccountNumber = false
         customization.cardBrandIconPlacement = .hidden
-        customization.errorMessagePlacement = .aboveSubmitButton
+        customization.failureMessagePlacement = .aboveSubmitButton
         customization.inputSizing = .large
 
         let configuration = customization.configuration(for: .storedMethod)
@@ -120,7 +132,7 @@ final class PayInFormCustomizationTests: XCTestCase {
         XCTAssertFalse(configuration.formatting.insertsCardNumberSpaces)
         XCTAssertFalse(configuration.formatting.masksAccountNumber)
         XCTAssertEqual(configuration.cardBrandIconPlacement, .hidden)
-        XCTAssertEqual(configuration.errorMessagePlacement, .aboveSubmitButton)
+        XCTAssertEqual(configuration.failureMessagePlacement, .aboveSubmitButton)
         XCTAssertEqual(configuration.inputSizing.size(for: .routingNumber).height, 60)
     }
 
@@ -164,7 +176,7 @@ final class PayInFormCustomizationTests: XCTestCase {
     func testAnAuthorizationsCustomWordingPlacesAHold() {
         let customization = PayInFormCustomization(preset: .brand)
 
-        XCTAssertEqual(customization.configuration(for: .authorize).labels.submitButton, "Place hold")
-        XCTAssertNil(PayInFormCustomization().configuration(for: .authorize).labels.submitButton)
+        XCTAssertEqual(customization.labels(for: .authorize).submitButton, "Place hold")
+        XCTAssertNil(PayInFormCustomization().labels(for: .authorize).submitButton)
     }
 }

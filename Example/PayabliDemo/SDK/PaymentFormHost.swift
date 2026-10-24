@@ -17,11 +17,14 @@ struct PaymentFormHost: View {
     let onFailed: (PayInFailure) -> Void
 
     var body: some View {
-        PayabliPayInView(
-            component: flow.flow,
+        PayabliPayInForm(
+            payIn: flow.flow,
+            operation: form.operation.formOperation,
             configuration: form.configuration,
+            labels: form.labels,
             onCompleted: { onCompleted(PayInOutcome($0)) },
-            onError: { onFailed(PayInFailure($0, operation: form.operation)) }
+            onFailed: { onFailed(PayInFailure($0, operation: form.operation)) },
+            onMethodChanged: { _ in }
         )
         .payabliPayInStyle(form.style)
     }
@@ -39,15 +42,18 @@ extension View {
     ) -> some View {
         payabliPayInSheet(
             isPresented: isPresented,
-            component: flow.flow,
+            payIn: flow.flow,
+            operation: form.operation.formOperation,
             configuration: form.configuration,
+            labels: form.labels,
             sheetConfiguration: PayabliPayInSheetConfiguration(
                 title: title,
                 dismissButton: .back
             ),
             style: form.style,
             onCompleted: { onCompleted(PayInOutcome($0)) },
-            onError: { onFailed(PayInFailure($0, operation: form.operation)) }
+            onFailed: { onFailed(PayInFailure($0, operation: form.operation)) },
+            onMethodChanged: { _ in }
         )
     }
 }

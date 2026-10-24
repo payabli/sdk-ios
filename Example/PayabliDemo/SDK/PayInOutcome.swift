@@ -103,6 +103,17 @@ struct PayInFailure {
 }
 
 extension PayInOutcome {
+    /// The form reports a payment or a stored method as one success shape, which this app
+    /// reads back as the two outcomes its screens already know.
+    init(_ success: PayabliPayInFormSuccess) {
+        switch success {
+        case let .payment(result):
+            self.init(result)
+        case let .method(storedMethod):
+            self.init(PayabliPayInResult(storedPaymentMethod: storedMethod))
+        }
+    }
+
     init(_ result: PayabliPayInResult) {
         code = result.code
         reason = result.reason

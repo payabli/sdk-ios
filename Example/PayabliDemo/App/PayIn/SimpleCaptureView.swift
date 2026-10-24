@@ -140,6 +140,7 @@ struct SimpleCaptureView: View {
         PayInFormSetup(
             operation: operation,
             configuration: customization.configuration(for: operation),
+            labels: customization.labels(for: operation),
             style: customization.style
         )
     }
@@ -216,9 +217,9 @@ struct SimpleCaptureView: View {
                     Text("Hidden").tag(PayabliPayInCardBrandIconPlacement.hidden)
                 }
                 .pickerStyle(.menu)
-                Picker("Error message", selection: $customization.errorMessagePlacement) {
-                    Text("Top").tag(PayabliPayInErrorMessagePlacement.top)
-                    Text("Above button").tag(PayabliPayInErrorMessagePlacement.aboveSubmitButton)
+                Picker("Failure message", selection: $customization.failureMessagePlacement) {
+                    Text("Top").tag(PayabliPayInFailureMessagePlacement.top)
+                    Text("Above button").tag(PayabliPayInFailureMessagePlacement.aboveSubmitButton)
                 }
                 .pickerStyle(.menu)
                 Picker("Input size", selection: $customization.inputSizing) {

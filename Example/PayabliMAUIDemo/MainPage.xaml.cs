@@ -187,16 +187,19 @@ public partial class MainPage : ContentPage
     {
         if (_payIn is null || _isSubmittingPayIn) return;
         SetSubmittingPayIn(true);
-        _payIn.AddCard(
+        var request = PayabliPayInStoreRequestObjC.Card(
             cardNumber: CardNumberEntry.Text ?? "",
             expiration: CardExpirationEntry.Text ?? "",
             cardholderName: CardHolderEntry.Text ?? "",
             cvv: CardCvvEntry.Text ?? "",
-            billingZip: CardZipEntry.Text ?? "",
-            createAnonymous: false,
-            forceCustomerCreation: true,
-            temporary: false,
-            source: "maui-demo",
+            billingZip: CardZipEntry.Text ?? ""
+        );
+        request.CreateAnonymous = NSNumber.FromBoolean(false);
+        request.ForceCustomerCreation = NSNumber.FromBoolean(true);
+        request.Temporary = NSNumber.FromBoolean(false);
+        request.Source = "maui-demo";
+        _payIn.StoreMethod(
+            request,
             completion: (method, error) =>
             {
                 SetSubmittingPayIn(false);
@@ -211,18 +214,27 @@ public partial class MainPage : ContentPage
     {
         if (_payIn is null || _isSubmittingPayIn) return;
         SetSubmittingPayIn(true);
-        _payIn.AddBankAccount(
+        var request = PayabliPayInStoreRequestObjC.BankAccount(
             accountNumber: AchAccountEntry.Text ?? "",
             accountType: "Checking",
             holderName: AchHolderEntry.Text ?? "",
             routingNumber: AchRoutingEntry.Text ?? "",
             secCode: "WEB",
-            holderType: "personal",
-            achValidation: true,
-            createAnonymous: false,
-            forceCustomerCreation: true,
-            temporary: false,
-            source: "maui-demo",
+            holderType: "personal"
+        );
+        if (request is null)
+        {
+            SetSubmittingPayIn(false);
+            ResultLabel.Text = "✗ The bank account request names a value the SDK does not take";
+            return;
+        }
+        request.AchValidation = NSNumber.FromBoolean(true);
+        request.CreateAnonymous = NSNumber.FromBoolean(false);
+        request.ForceCustomerCreation = NSNumber.FromBoolean(true);
+        request.Temporary = NSNumber.FromBoolean(false);
+        request.Source = "maui-demo";
+        _payIn.StoreMethod(
+            request,
             completion: (method, error) =>
             {
                 SetSubmittingPayIn(false);
