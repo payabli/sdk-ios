@@ -898,29 +898,45 @@ extension PayabliPayInForm {
             : UIColor(resolvedStyle.error.color)
     }
 
-    func fieldBackground(_ field: PayabliPayInField?) -> some ShapeStyle {
-        let isFocused = field.map { focusedField == $0 } ?? false
-        return fieldHasError(field)
-            ? invalidCardNumberBackgroundColor
-            : isFocused
-            ? focusedInputBackgroundColor
-            : resolvedStyle.input.backgroundColor
+    func fieldBackground(_ field: PayabliPayInField?) -> Color {
+        if fieldHasError(field) {
+            return invalidCardNumberBackgroundColor
+        }
+        if isFocused(field) {
+            return focusedInputBackgroundColor
+        }
+        return resolvedStyle.input.backgroundColor
     }
 
     func fieldBorder(_ field: PayabliPayInField?) -> some View {
-        let isFocused = field.map { focusedField == $0 } ?? false
-        return inputShape.stroke(
-            fieldHasError(field)
-                ? resolvedStyle.error.color
-                : isFocused
-                ? focusedInputBorderColor
-                : resolvedStyle.input.borderColor,
-            lineWidth: fieldHasError(field)
-                ? max(resolvedStyle.input.focusedBorderWidth, resolvedStyle.input.borderWidth)
-                : isFocused
-                ? resolvedStyle.input.focusedBorderWidth
-                : resolvedStyle.input.borderWidth
+        inputShape.stroke(
+            fieldBorderColor(field),
+            lineWidth: fieldBorderWidth(field)
         )
+    }
+
+    func fieldBorderColor(_ field: PayabliPayInField?) -> Color {
+        if fieldHasError(field) {
+            return resolvedStyle.error.color
+        }
+        if isFocused(field) {
+            return focusedInputBorderColor
+        }
+        return resolvedStyle.input.borderColor
+    }
+
+    func fieldBorderWidth(_ field: PayabliPayInField?) -> CGFloat {
+        if fieldHasError(field) {
+            return max(resolvedStyle.input.focusedBorderWidth, resolvedStyle.input.borderWidth)
+        }
+        if isFocused(field) {
+            return resolvedStyle.input.focusedBorderWidth
+        }
+        return resolvedStyle.input.borderWidth
+    }
+
+    func isFocused(_ field: PayabliPayInField?) -> Bool {
+        field.map { focusedField == $0 } ?? false
     }
 
     func fieldHasError(_ field: PayabliPayInField?) -> Bool {
