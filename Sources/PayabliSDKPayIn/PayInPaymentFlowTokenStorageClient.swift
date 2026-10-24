@@ -25,15 +25,24 @@ final class PayInPaymentFlowTokenStorageClient: Sendable {
         try paymentMethod.validate(options.validation)
         let storedMethod = paymentMethod.storedMethodType
 
-        let request = try addMethodRequest(
-            entryPoint: entry,
-            paymentMethod: paymentMethod,
-            options: options
-        )
+        // The method's own bytes are written from the buffers, spliced in as the body's last member,
+        // and overwritten once the transport returns, whatever it returns.
+        var body = Data()
         let response: PayabliResponse
         do {
+            body = try addMethodBody(entryPoint: entry, paymentMethod: paymentMethod, options: options)
+            // No idempotency key: a repeat is not recognisable on this route, so a key sent here is
+            // read by nothing. The transport's chain attaches the credential.
+            let request = PayabliRequest(
+                method: .post,
+                path: "/api/TokenStorage/add",
+                query: options.queryItems,
+                headers: [PayabliRequest.contentTypeHeader: PayabliRequest.applicationJSON],
+                body: body
+            )
             response = try await transport.perform(request)
         } catch {
+            PayInBodyWriter.wipe(&body)
             // The chain refuses an empty credential in the capture surface's error type. Translated,
             // so this surface answers in its own.
             if case PayabliPayInError.missingAccessToken = error {
@@ -41,6 +50,7 @@ final class PayInPaymentFlowTokenStorageClient: Sendable {
             }
             throw error
         }
+        PayInBodyWriter.wipe(&body)
         // The status first: a failed status is the core error for that status, so only a refusal
         // answered on a success status is this surface's own. This route refuses a 400 with prose
         // alone, which is kept as the validation error's detail.
@@ -53,36 +63,31 @@ final class PayInPaymentFlowTokenStorageClient: Sendable {
         return try decodeStoredPaymentMethod(from: response, method: storedMethod)
     }
 
-    /// Builds the request. The transport's chain attaches the credential.
-    ///
-    /// No idempotency key: a repeat is not recognisable on this route, so a key sent here is read by
-    /// nothing.
+    /// The body: everything the options carry, encoded deterministically, with the method's own bytes
+    /// spliced in as the last member. The method is written straight out of its buffers, so its digits
+    /// never become a `String`.
     ///
     /// - Parameter entryPoint: the paypoint's entry point, already trimmed by the caller.
     /// - Parameter paymentMethod: the card or bank account data the body carries to store.
     /// - Parameter options: what the request carries besides the method, from the customer to the flags.
-    /// - Returns: the request the transport sends.
-    private func addMethodRequest(
+    /// - Returns: the request body, for the caller to overwrite once the request has been written.
+    private func addMethodBody(
         entryPoint: String,
         paymentMethod: PayabliPayInMethodInput,
         options: PayabliPayInTokenStorageOptions
-    ) throws -> PayabliRequest {
-        return try PayabliRequest.json(
-            method: .post,
-            path: "/api/TokenStorage/add",
-            query: options.queryItems,
-            headers: [:],
-            jsonBody: TokenStorageAddMethodBody(
+    ) throws -> Data {
+        try PayInBodyWriter.splice(
+            outer: PayInPaymentFlowJSONBody.encode(TokenStorageAddMethodBody(
                 customerData: options.customerData,
                 entryPoint: entryPoint,
                 fallbackAuth: options.fallbackAuth,
                 fallbackAuthAmount: options.fallbackAuthAmount,
                 methodDescription: options.methodDescription?.trimmed.nilIfEmpty,
-                paymentMethod: paymentMethod,
                 vendorData: options.vendorData,
                 source: options.source?.trimmed.nilIfEmpty,
                 subdomain: options.subdomain?.trimmed.nilIfEmpty
-            )
+            )),
+            fragment: try PayInBodyWriter.storeFragment(paymentMethod)
         )
     }
 
@@ -150,7 +155,6 @@ private struct TokenStorageAddMethodBody: Encodable {
     let fallbackAuth: Bool?
     let fallbackAuthAmount: Int?
     let methodDescription: String?
-    let paymentMethod: PayabliPayInMethodInput
     let vendorData: PayabliPayInVendorData?
     let source: String?
     let subdomain: String?
