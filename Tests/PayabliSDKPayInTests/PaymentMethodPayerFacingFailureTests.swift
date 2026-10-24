@@ -3,8 +3,9 @@ import Foundation
 @testable import PayabliSDKPayIn
 import XCTest
 
-/// A failed submission shows the payer its category's message and never the error's own text, while the
-/// thrown error carries the real failure to the host.
+/// A failed submission shows the payer its category's message — the host's wording where it supplied
+/// any — and never the error's own text, while the failure the host receives is the one the flow
+/// threw: the payment's own error, the store's, or a core failure, each keeping its category.
 @MainActor
 final class PaymentMethodPayerFacingFailureTests: XCTestCase {
     func testADeclineDrawsTheDeclinedMessage() async {
@@ -50,7 +51,7 @@ final class PaymentMethodPayerFacingFailureTests: XCTestCase {
         _ = try? await viewModel.submit()
 
         XCTAssertEqual(viewModel.rejectedFields, [.cardNumber])
-        XCTAssertNil(viewModel.errorMessage)
+        XCTAssertNil(viewModel.failureMessage)
     }
 
     func testARefusalNamingOnlyFieldsOffScreenDrawsItsCategoryMessage() async {
@@ -64,7 +65,183 @@ final class PaymentMethodPayerFacingFailureTests: XCTestCase {
         _ = try? await viewModel.submit()
 
         XCTAssertEqual(viewModel.rejectedFields, [])
-        XCTAssertEqual(viewModel.errorMessage, "The payment couldn't be completed.")
+        XCTAssertEqual(viewModel.failureMessage, "The payment couldn't be completed.")
+    }
+
+    // MARK: - The host's own wording
+
+    func testAHostsDeclinedMessageReplacesTheDefaultForItsCategory() async {
+        await assertDraws(
+            "That card didn't work.",
+            on: flowOnTransport(MockPaymentCaptureTransport(statusCode: 402, responseBody: Self.declineBody)),
+            category: .declined,
+            labels: PayabliPayInFormLabels(declinedMessage: "That card didn't work.")
+        )
+    }
+
+    func testAHostsRetryMessageReplacesTheDefaultForItsCategory() async {
+        await assertDraws(
+            "It's busy right now. Try once more.",
+            on: flowOnTransport(RecordingIdempotencyTransport(body: Data(), status: 429)),
+            category: .retryLater,
+            labels: PayabliPayInFormLabels(retryLaterMessage: "It's busy right now. Try once more.")
+        )
+    }
+
+    func testAHostsUnknownOutcomeMessageReplacesTheDefaultForItsCategory() async {
+        await assertDraws(
+            "We can't tell whether that went through. Check before paying again.",
+            on: flowOnTransport(RecordingIdempotencyTransport(failure: URLError(.notConnectedToInternet))),
+            category: .outcomeUnknown,
+            labels: PayabliPayInFormLabels(
+                outcomeUnknownMessage: "We can't tell whether that went through. Check before paying again."
+            )
+        )
+    }
+
+    func testAHostsOtherMessageReplacesTheDefaultForEveryOtherCategory() async {
+        await assertDraws(
+            "Something went wrong on our side.",
+            on: flowWhoseTokenProviderThrows(),
+            category: .credential,
+            labels: PayabliPayInFormLabels(otherMessage: "Something went wrong on our side.")
+        )
+    }
+
+    func testABlankFailureLabelFallsBackToTheDefault() async {
+        await assertDraws(
+            "The payment was declined. Try another payment method.",
+            on: flowOnTransport(MockPaymentCaptureTransport(statusCode: 402, responseBody: Self.declineBody)),
+            category: .declined,
+            labels: PayabliPayInFormLabels(declinedMessage: "   ")
+        )
+    }
+
+    // MARK: - The opt-out
+
+    func testTheOptOutHidesTheFormLevelMessageAndTheFailureStillReachesTheHost() async {
+        let viewModel = filledForm(
+            on: flowOnTransport(MockPaymentCaptureTransport(statusCode: 402, responseBody: Self.declineBody)),
+            configuration: PayabliPayInFormConfiguration(
+                allowedMethods: [.card],
+                defaultMethod: .card,
+                showsFailureMessage: false
+            )
+        )
+
+        do {
+            _ = try await viewModel.submit()
+            XCTFail("the submission fails")
+        } catch let error as any PayabliError {
+            XCTAssertEqual(error.category, .declined)
+            XCTAssertNil(viewModel.failureMessage)
+        } catch {
+            XCTFail("Wrong error: \(error)")
+        }
+    }
+
+    func testTheOptOutLeavesAFieldAMarkedFailureStillMarks() async {
+        let viewModel = filledForm(
+            on: flowOnTransport(MockPaymentCaptureTransport(
+                statusCode: 400,
+                responseBody: Self.refusal(naming: ["paymentMethod.cardnumber", "entryPoint"])
+            )),
+            configuration: PayabliPayInFormConfiguration(
+                allowedMethods: [.card],
+                defaultMethod: .card,
+                showsFailureMessage: false
+            )
+        )
+
+        _ = try? await viewModel.submit()
+
+        XCTAssertEqual(viewModel.rejectedFields, [.cardNumber])
+        XCTAssertNil(viewModel.failureMessage)
+    }
+
+    // MARK: - The failure the host receives
+
+    /// What the view model's `submit()` throws is what the form's `onFailed` hands the host: the
+    /// button's task forwards the failure unchanged, so each pin mounts the real flow and asserts on
+    /// the error it throws.
+    func testAPaymentsFailureReachesTheHostAsThePayInErrorTheFlowThrew() async {
+        let viewModel = filledForm(
+            on: flowOnTransport(MockPaymentCaptureTransport(statusCode: 402, responseBody: Self.declineBody))
+        )
+
+        do {
+            _ = try await viewModel.submit()
+            XCTFail("the submission fails")
+        } catch let error as PayabliPayInError {
+            guard case .transactionFailed = error else { return XCTFail("Wrong case: \(error)") }
+            XCTAssertEqual(error.type, .paymentDeclined)
+            XCTAssertEqual(error.category, .declined)
+        } catch {
+            XCTFail("Wrong error: \(error)")
+        }
+    }
+
+    func testAStoresRefusalReachesTheHostAsTheStoresOwnError() async {
+        let viewModel = filledStoreForm(
+            on: flowStoring(MockPaymentCaptureTransport(statusCode: 200, responseBody: Self.storeRefusalBody))
+        )
+
+        do {
+            _ = try await viewModel.submit()
+            XCTFail("the store fails")
+        } catch let error as PayabliPayInTokenStorageError {
+            guard case .saveFailed = error else { return XCTFail("Wrong case: \(error)") }
+            XCTAssertEqual(error.category, .declined)
+            XCTAssertEqual(
+                viewModel.failureMessage,
+                "This payment method couldn't be saved. Try another one.",
+                "the message and the error carry one category"
+            )
+        } catch {
+            XCTFail("Wrong error: \(error)")
+        }
+    }
+
+    func testAStoresRefusedRequestReachesTheHostAsTheCoreValidationErrorTheFlowThrew() async {
+        let viewModel = filledStoreForm(
+            on: flowStoring(MockPaymentCaptureTransport(statusCode: 400, responseBody: Self.storeBadRequestBody))
+        )
+
+        do {
+            _ = try await viewModel.submit()
+            XCTFail("the store fails")
+        } catch let error as PayabliPaymentError {
+            guard case .validation = error else { return XCTFail("Wrong case: \(error)") }
+            XCTAssertEqual(error.category, .invalidRequest)
+            XCTAssertEqual(
+                viewModel.failureMessage,
+                "The payment method couldn't be saved.",
+                "a refused store reads as refused, never as open"
+            )
+        } catch {
+            XCTFail("Wrong error: \(error)")
+        }
+    }
+
+    func testAStoresServerFailureReachesTheHostAsTheCoreServerErrorTheFlowThrew() async {
+        let viewModel = filledStoreForm(
+            on: flowStoring(MockPaymentCaptureTransport(statusCode: 500, responseBody: Self.storeServerErrorBody))
+        )
+
+        do {
+            _ = try await viewModel.submit()
+            XCTFail("the store fails")
+        } catch let error as PayabliPaymentError {
+            guard case .server = error else { return XCTFail("Wrong case: \(error)") }
+            XCTAssertEqual(error.category, .outcomeUnknown)
+            XCTAssertEqual(
+                viewModel.failureMessage,
+                "The payment method couldn't be saved.",
+                "a save moves no money, so its failure never says a payment may have gone through"
+            )
+        } catch {
+            XCTFail("Wrong error: \(error)")
+        }
     }
 
     // MARK: - Fixtures
@@ -75,17 +252,18 @@ final class PaymentMethodPayerFacingFailureTests: XCTestCase {
         _ message: String,
         on flow: PayabliPayIn,
         category: PayabliErrorCategory,
+        labels: PayabliPayInFormLabels = PayabliPayInFormLabels(),
         file: StaticString = #filePath,
         line: UInt = #line
     ) async {
-        let viewModel = filledForm(on: flow)
+        let viewModel = filledForm(on: flow, labels: labels)
 
         do {
             _ = try await viewModel.submit()
             XCTFail("the submission fails", file: file, line: line)
         } catch let error as any PayabliError {
             XCTAssertEqual(error.category, category, file: file, line: line)
-            XCTAssertEqual(viewModel.errorMessage, message, file: file, line: line)
+            XCTAssertEqual(viewModel.failureMessage, message, file: file, line: line)
             XCTAssertEqual(viewModel.rejectedFields, [], file: file, line: line)
             let held = Self.storedValues(of: viewModel)
             for text in [error.reason, error.detail].compactMap({ $0 }) where text != message {
@@ -102,9 +280,33 @@ final class PaymentMethodPayerFacingFailureTests: XCTestCase {
         Mirror(reflecting: viewModel).children.map { String(describing: $0.value) }.joined(separator: "\n")
     }
 
-    private func filledForm(on component: PayabliPayIn) -> PayabliPayInViewModel {
+    private func filledForm(
+        on component: PayabliPayIn,
+        labels: PayabliPayInFormLabels = PayabliPayInFormLabels(),
+        configuration: PayabliPayInFormConfiguration = PayabliPayInFormConfiguration(
+            allowedMethods: [.card],
+            defaultMethod: .card
+        )
+    ) -> PayabliPayInViewModel {
         let viewModel = PayabliPayInViewModel(
             component: component,
+            operation: .capture,
+            configuration: configuration,
+            labels: labels
+        )
+        viewModel.cardholderName = "Jane Doe"
+        viewModel.cardNumber = "4111111111111111"
+        viewModel.cardExpiration = "02/30"
+        viewModel.cardCvv = "123"
+        viewModel.cardZip = "33139"
+        XCTAssertTrue(viewModel.canSubmit)
+        return viewModel
+    }
+
+    private func filledStoreForm(on component: PayabliPayIn) -> PayabliPayInViewModel {
+        let viewModel = PayabliPayInViewModel(
+            component: component,
+            operation: .storePaymentMethod,
             configuration: PayabliPayInFormConfiguration(allowedMethods: [.card], defaultMethod: .card)
         )
         viewModel.cardholderName = "Jane Doe"
@@ -114,6 +316,15 @@ final class PaymentMethodPayerFacingFailureTests: XCTestCase {
         viewModel.cardZip = "33139"
         XCTAssertTrue(viewModel.canSubmit)
         return viewModel
+    }
+
+    private func flowStoring(_ transport: any PayabliTransport) -> PayabliPayIn {
+        PayabliPayIn(
+            entryPoint: "entry",
+            environment: .sandbox,
+            transport: transport,
+            operation: .storePaymentMethod
+        )
     }
 
     private static let requestConfiguration = PayabliPayInRequestConfiguration(
@@ -151,6 +362,36 @@ final class PaymentMethodPayerFacingFailureTests: XCTestCase {
       "action": "Ask for a different payment method.",
       "data": null,
       "token": null
+    }
+    """
+
+    private static let storeRefusalBody = """
+    {
+      "responseText": "Declined",
+      "isSuccess": false,
+      "responseData": {
+        "resultCode": 2,
+        "resultText": "Account validation failed"
+      }
+    }
+    """
+
+    private static let storeBadRequestBody = """
+    {
+      "isSuccess": false,
+      "responseText": "Error",
+      "responseCode": 6000,
+      "responseData": {
+        "explanation": "Invalid Card",
+        "todoAction": "Please check your card details and try again."
+      }
+    }
+    """
+
+    private static let storeServerErrorBody = """
+    {
+      "isSuccess": false,
+      "responseText": "Error"
     }
     """
 

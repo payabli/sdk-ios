@@ -21,7 +21,7 @@ final class PaymentFormRefusalTests: XCTestCase {
         }
         let requests = await transport.requests
         XCTAssertTrue(requests.isEmpty)
-        XCTAssertNotNil(viewModel.errorMessage)
+        XCTAssertNotNil(viewModel.failureMessage)
         XCTAssertEqual(viewModel.cardNumber.filter(\.isNumber), "4111111111111111")
         XCTAssertEqual(viewModel.cardExpiration, "02/27")
         XCTAssertEqual(viewModel.cardCvv, "999")
@@ -103,6 +103,7 @@ final class PaymentFormRefusalTests: XCTestCase {
                     paymentDetails: PayabliPayInPaymentDetails(totalAmount: 12.34, currency: "USD")
                 )
             ),
+            operation: .capture,
             configuration: PayabliPayInFormConfiguration(allowedMethods: [.card], defaultMethod: .card)
         )
         fillCard(viewModel)
@@ -156,6 +157,7 @@ final class PaymentFormRefusalTests: XCTestCase {
                 operation: .capture,
                 requestConfiguration: PayabliPayInRequestConfiguration(paymentDetails: paymentDetails)
             ),
+            operation: .capture,
             configuration: configuration
         )
     }

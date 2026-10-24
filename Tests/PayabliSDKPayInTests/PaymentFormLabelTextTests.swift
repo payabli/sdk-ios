@@ -28,7 +28,7 @@ final class PaymentFormLabelTextTests: XCTestCase {
     ]
 
     func testTheDefaultLabelsAreTheSharedText() {
-        let labels = PayabliPayInLabels()
+        let labels = PayabliPayInFormLabels()
 
         for field in PayabliPayInField.allCases {
             XCTAssertEqual(labels.label(for: field), Self.defaultLabelText[field], field.rawValue)
@@ -36,7 +36,7 @@ final class PaymentFormLabelTextTests: XCTestCase {
     }
 
     func testEverySummaryRowIsLabelledWithTheBareLabel() {
-        let labels = PayabliPayInLabels()
+        let labels = PayabliPayInFormLabels()
 
         XCTAssertEqual(PayabliPayInSummaryRows.labelText(for: .amount, labels: labels), "Amount")
         XCTAssertEqual(PayabliPayInSummaryRows.labelText(for: .serviceFee, labels: labels), "Fee")
@@ -45,7 +45,7 @@ final class PaymentFormLabelTextTests: XCTestCase {
     }
 
     func testABlankHostLabelFallsBackToTheDefault() {
-        let labels = PayabliPayInLabels(fieldLabels: [.amount: "", .serviceFee: "   ", .surchargeFee: "Extra"])
+        let labels = PayabliPayInFormLabels(fieldLabels: [.amount: "", .serviceFee: "   ", .surchargeFee: "Extra"])
 
         XCTAssertEqual(labels.label(for: .amount), "Amount")
         XCTAssertEqual(labels.label(for: .serviceFee), "Fee")
@@ -54,30 +54,30 @@ final class PaymentFormLabelTextTests: XCTestCase {
 
     func testBlankIsSeparatorsAndWhitespaceControlsOnly() {
         for blank in ["", " ", "\t\n", "\u{1C}", "\u{1F}", "\u{00A0}", "\u{2028}", "\u{3000}"] {
-            XCTAssertTrue(PayabliPayInLabels.isBlank(blank), blank.unicodeScalars.map { String($0.value, radix: 16) }.joined())
+            XCTAssertTrue(PayabliPayInFormLabels.isBlank(blank), blank.unicodeScalars.map { String($0.value, radix: 16) }.joined())
         }
         for notBlank in ["\u{85}", "\u{200B}", " a "] {
-            XCTAssertFalse(PayabliPayInLabels.isBlank(notBlank), notBlank.unicodeScalars.map { String($0.value, radix: 16) }.joined())
+            XCTAssertFalse(PayabliPayInFormLabels.isBlank(notBlank), notBlank.unicodeScalars.map { String($0.value, radix: 16) }.joined())
         }
     }
 
     func testAHostLabelIsUsedAsGiven() {
-        let labels = PayabliPayInLabels(fieldLabels: [.cardNumber: " Card # "])
+        let labels = PayabliPayInFormLabels(fieldLabels: [.cardNumber: " Card # "])
 
         XCTAssertEqual(labels.label(for: .cardNumber), " Card # ")
     }
 
     func testAnAbsentOrBlankTitleDrawsNoHeading() {
         for title in [nil, "", "   ", "\u{3000}"] {
-            XCTAssertNil(PayabliPayInLabels(title: title).drawnTitle, String(describing: title))
+            XCTAssertNil(PayabliPayInFormLabels(title: title).drawnTitle, String(describing: title))
         }
-        XCTAssertEqual(PayabliPayInLabels(title: " Checkout ").drawnTitle, "Checkout")
+        XCTAssertEqual(PayabliPayInFormLabels(title: " Checkout ").drawnTitle, "Checkout")
     }
 
     func testAnAbsentOrBlankButtonWordingIsNotTheHosts() {
         for wording in [nil, "", "\t\n"] {
-            XCTAssertNil(PayabliPayInLabels(submitButton: wording).hostSubmitButton, String(describing: wording))
+            XCTAssertNil(PayabliPayInFormLabels(submitButton: wording).hostSubmitButton, String(describing: wording))
         }
-        XCTAssertEqual(PayabliPayInLabels(submitButton: " Pay now ").hostSubmitButton, "Pay now")
+        XCTAssertEqual(PayabliPayInFormLabels(submitButton: " Pay now ").hostSubmitButton, "Pay now")
     }
 }

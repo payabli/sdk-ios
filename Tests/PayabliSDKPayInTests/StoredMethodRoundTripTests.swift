@@ -10,6 +10,7 @@ final class StoredMethodRoundTripTests: XCTestCase {
         let component = PayabliPayIn(entryPoint: "entry", environment: .sandbox, transport: transport)
         let viewModel = PayabliPayInViewModel(
             component: component,
+            operation: .storePaymentMethod,
             configuration: PayabliPayInFormConfiguration(allowedMethods: [.card])
         )
         viewModel.cardNumber = "4111 1111 1111 1111"
@@ -31,6 +32,7 @@ final class StoredMethodRoundTripTests: XCTestCase {
         let component = PayabliPayIn(entryPoint: "entry", environment: .sandbox, transport: transport)
         let viewModel = PayabliPayInViewModel(
             component: component,
+            operation: .storePaymentMethod,
             configuration: PayabliPayInFormConfiguration(allowedMethods: [.bankAccount], defaultMethod: .bankAccount)
         )
         viewModel.accountHolder = "Jane Doe"
@@ -46,7 +48,7 @@ final class StoredMethodRoundTripTests: XCTestCase {
     }
 
     private func chargedPaymentMethod(
-        _ stored: PayabliPayInStoredPaymentMethod,
+        _ stored: PayabliPayInStoredMethod,
         on component: PayabliPayIn,
         transport: RoutedTransport
     ) async throws -> [String: Any] {

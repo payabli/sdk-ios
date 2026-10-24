@@ -13,12 +13,15 @@ final class PayInPaymentFlowTests: XCTestCase {
             operation: .storePaymentMethod
         )
 
-        let result = try await component.addCard(PayabliPayInCardData(
-            cardNumber: "4111 1111 1111 1111",
-            expiration: "02/25",
-            cardholderName: "John Doe",
-            cvv: "123",
-            billingZip: "12345"
+        let result = try await component.storeMethod(PayabliPayInStoreRequest(
+            instrument: .card(PayabliPayInCardData(
+                cardNumber: "4111 1111 1111 1111",
+                expiration: "02/25",
+                cardholderName: "John Doe",
+                cvv: "123",
+                billingZip: "12345"
+            )),
+            options: PayabliPayInTokenStorageOptions()
         ))
 
         XCTAssertEqual(result.storedMethodId, "stored-123")
