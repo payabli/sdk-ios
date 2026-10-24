@@ -1,5 +1,5 @@
-@testable import PayabliSDKCore
 import Foundation
+@testable import PayabliSDKCore
 import XCTest
 
 /// The conversion every public entry point applies to an error it does not know.

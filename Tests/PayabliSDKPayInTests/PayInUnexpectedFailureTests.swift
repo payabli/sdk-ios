@@ -59,7 +59,7 @@ final class PayInUnexpectedFailureTests: XCTestCase {
 
     // MARK: - What passes through
 
-    func testACancellationPassesThroughTheEntryPointUnconverted() async throws {
+    func testACancellationPassesThroughTheEntryPointUnconverted() async {
         let flow = makeFlow(RecordingIdempotencyTransport(failure: CancellationError()))
 
         let told = await PayInFixture.failure { _ = try await flow.readTransaction("trans-1") }
@@ -82,7 +82,7 @@ final class PayInUnexpectedFailureTests: XCTestCase {
 
     // MARK: - The money-open wrap is untouched
 
-    func testAnErrorAfterTheSendMarkKeepsTheMoneyOpenWrap() async throws {
+    func testAnErrorAfterTheSendMarkKeepsTheMoneyOpenWrap() async {
         let flow = makeFlow(RecordingIdempotencyTransport(failure: HostThrew()))
 
         let told = await PayInFixture.failure { _ = try await flow.capture(PayInFixture.request(cardOnly: true)) }
