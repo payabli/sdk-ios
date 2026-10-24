@@ -3,20 +3,8 @@ import PayabliSDKCore
 
 /// Builds a request body as bytes, so a card number never becomes a `String`.
 ///
-/// An encoder would: it produces one immutable value holding the whole body, and nothing can overwrite
-/// it afterwards. So everything except `paymentMethod` is encoded normally, that object is written here
-/// straight out of its buffers, and the two are joined as bytes.
-///
-/// **Escaping is delegated, not hand-rolled.** Every ordinary string value is written through a JSON
-/// codec's own string escaping, so quotes, backslashes and control characters are its problem. The
-/// buffered values need no escaping at all: they are filtered to ASCII digits by the one rule the
-/// validators and this writer share, and a digit is never escaped. The routes validate the same buffers
-/// before they build a body, so a byte that filter refuses here means the two disagree, and the
-/// refusal says so in the same error the validators use.
-///
-/// Every buffer here that can hold a card number is overwritten before it is dropped: the fragment,
-/// the working buffers behind it, and the copy each read takes. The encoded outer body and the quoted
-/// field names are dropped without wiping, and hold none of those values.
+/// Everything except `paymentMethod` is encoded normally, that object is written here straight out
+/// of its buffers, and every buffer that can hold a card number is overwritten before it is dropped.
 enum PayInBodyWriter {
     /// The wire spellings of the members the transaction routes write, taken from the coding keys the
     /// capture method already defines, so a member's name is written once.
@@ -156,12 +144,9 @@ enum PayInBodyWriter {
         return Data(buffer.finishAndWipe())
     }
 
-    /// Overwrites a body the routes built, once the transport has returned.
-    ///
-    /// After `perform` returns, on both exits: the transport's credential recovery may replay the
-    /// request inside the call, and needs the bytes intact to do it. A `Data` copy a caller kept forks
-    /// its own storage on this overwrite rather than holding the wiped one, so a reader that retains
-    /// the request keeps what it read — the transports are not that, and the tests' recording mock is.
+    /// Overwrites a body the routes built, once the transport has returned: a refusal's credential
+    /// recovery may replay the request inside the call and needs the bytes intact until then. A
+    /// `Data` copy a caller kept forks its own storage here, so a retained request keeps its bytes.
     ///
     /// - Parameter body: the body to overwrite.
     static func wipe(_ body: inout Data) {
@@ -290,9 +275,8 @@ private final class FragmentWriter {
 
 /// A growable byte buffer whose working storage can be overwritten.
 ///
-/// `Data` cannot be, reliably: copy-on-write makes an in-place overwrite fork the storage instead of
-/// reaching every copy, so a body assembled through one could leave a card number in a buffer nothing
-/// can reach. This owns one array it zeroes on demand.
+/// `Data` cannot be, reliably: copy-on-write makes an in-place overwrite fork the storage, so a
+/// body assembled through one could leave a card number in a buffer nothing can reach.
 private struct ByteBuffer {
     private static let initialCapacity = 256
 

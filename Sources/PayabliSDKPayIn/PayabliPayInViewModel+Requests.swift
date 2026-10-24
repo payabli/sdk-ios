@@ -2,11 +2,9 @@ import Foundation
 import PayabliSDKCore
 
 extension PayabliPayInViewModel {
-    /// The form's sensitive buffers for one submission.
-    ///
-    /// Built once, registered here, and closed together once the submission ends, whatever it ends in.
-    /// A builder that makes its own `SensitiveDigits` outside a registry is a build path nothing can
-    /// close, so every buffer the form builds goes through `of`.
+    /// The form's sensitive buffers for one submission, built once and closed together once the
+    /// submission ends, whatever it ends in. A buffer built outside a registry is a build path nothing
+    /// can close, so every buffer the form builds goes through `of`.
     final class FormBufferRegistry {
         private var buffers: [SensitiveDigits] = []
 
