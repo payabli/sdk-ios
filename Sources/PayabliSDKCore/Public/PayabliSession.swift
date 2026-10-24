@@ -132,6 +132,11 @@ public final class PayabliSession: @unchecked Sendable {
         } catch let refusal as PayabliGenericError {
             await current?.reportRefusedInitialize(refusal, after: ContinuousClock.now - startedAt)
             throw refusal
+        } catch {
+            // The refusal above takes the errors the SDK classified; this converts what it did not.
+            guard let failure = error.payabliUnexpectedFailure else { throw error }
+            await current?.reportFailedInitialize(failure, original: error, after: ContinuousClock.now - startedAt)
+            throw failure
         }
     }
 
@@ -150,6 +155,28 @@ public final class PayabliSession: @unchecked Sendable {
                 "error_number": String(refusal.code),
                 "reason": refusal.reason,
                 "duration_ms": String(milliseconds)
+            ])
+        ])
+    }
+
+    /// Reports an initialize that failed outside the refusals the SDK names, as a start and its
+    /// failure on this session's channel, so the start is answered.
+    ///
+    /// - Parameter failure: what the call is about to throw, converted.
+    /// - Parameter original: the error as it was thrown, before conversion, whose type the report names.
+    /// - Parameter duration: how long the call took.
+    private func reportFailedInitialize(_ failure: PayabliGenericError, original: any Error, after duration: Duration) async {
+        let (seconds, attoseconds) = duration.components
+        let milliseconds = seconds * 1000 + attoseconds / 1_000_000_000_000_000
+        await telemetry.emit([
+            (TelemetryEventName.sdkInitializeStarted, ["state": Self.reportedState]),
+            (TelemetryEventName.sdkInitializeFailed, [
+                "outcome": "failed",
+                "code": failure.type.rawValue,
+                "error_number": String(failure.code),
+                "reason": failure.reason,
+                "duration_ms": String(milliseconds),
+                "failure_type": String(describing: type(of: original))
             ])
         ])
     }
