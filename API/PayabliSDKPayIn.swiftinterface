@@ -14,7 +14,7 @@ import UIKit
 import _Concurrency
 import _StringProcessing
 import _SwiftConcurrencyShims
-@_hasMissingDesignatedInitializers @objc(PayabliPayInStoredPaymentMethodObjC) final public class PayabliPayInStoredPaymentMethodObjC : ObjectiveC::NSObject {
+@_hasMissingDesignatedInitializers @objc(PayabliPayInStoredMethodObjC) final public class PayabliPayInStoredMethodObjC : ObjectiveC::NSObject {
   @objc final public let storedMethodId: Swift::String?
   @objc final public let method: Swift::String
   @objc final public let methodReferenceId: Swift::String?
@@ -41,8 +41,7 @@ import _SwiftConcurrencyShims
 }
 @_inheritsConvenienceInitializers @_hasMissingDesignatedInitializers @_Concurrency::MainActor @objc(PayabliPayInObjC) final public class PayabliPayInObjC : ObjectiveC::NSObject {
   @objc @_Concurrency::MainActor public static func create() throws -> PayabliSDKPayIn::PayabliPayInObjC
-  @objc @_Concurrency::MainActor final public func addCard(cardNumber: Swift::String, expiration: Swift::String, cardholderName: Swift::String, cvv: Swift::String, billingZip: Swift::String, createAnonymous: Swift::Bool, forceCustomerCreation: Swift::Bool, temporary: Swift::Bool, source: Swift::String?, completion: @escaping (PayabliSDKPayIn::PayabliPayInStoredPaymentMethodObjC?, Foundation::NSError?) -> Swift::Void)
-  @objc @_Concurrency::MainActor final public func addBankAccount(accountNumber: Swift::String, accountType: Swift::String, holderName: Swift::String, routingNumber: Swift::String, secCode: Swift::String?, holderType: Swift::String?, achValidation: Swift::Bool, createAnonymous: Swift::Bool, forceCustomerCreation: Swift::Bool, temporary: Swift::Bool, source: Swift::String?, completion: @escaping (PayabliSDKPayIn::PayabliPayInStoredPaymentMethodObjC?, Foundation::NSError?) -> Swift::Void)
+  @objc(storeMethodWithRequest:completion:) @_Concurrency::MainActor final public func storeMethod(_ request: PayabliSDKPayIn::PayabliPayInStoreRequestObjC, completion: @escaping (PayabliSDKPayIn::PayabliPayInStoredMethodObjC?, Foundation::NSError?) -> Swift::Void)
   @objc @_Concurrency::MainActor final public func readTransaction(transId: Swift::String, completion: @escaping (PayabliSDKPayIn::PayabliPayInTransactionObjC?, Foundation::NSError?) -> Swift::Void)
   @objc @_Concurrency::MainActor final public func capture(_ request: PayabliSDKPayIn::PayabliPayInRequestObjC, completion: @escaping (PayabliSDKPayIn::PayabliPayInResultObjC?, Foundation::NSError?) -> Swift::Void)
   @objc @_Concurrency::MainActor final public func authorize(_ request: PayabliSDKPayIn::PayabliPayInRequestObjC, completion: @escaping (PayabliSDKPayIn::PayabliPayInResultObjC?, Foundation::NSError?) -> Swift::Void)
@@ -63,7 +62,7 @@ import _SwiftConcurrencyShims
   @_Concurrency::MainActor final public var $lastResult: Combine::Published<PayabliSDKPayIn::PayabliPayInResult?>.Combine::Publisher {
     get
   }
-  @_Concurrency::MainActor final public var lastStoredPaymentMethod: PayabliSDKPayIn::PayabliPayInStoredPaymentMethod? {
+  @_Concurrency::MainActor final public var lastStoredPaymentMethod: PayabliSDKPayIn::PayabliPayInStoredMethod? {
     get
   }
   @_Concurrency::MainActor final public var entryPoint: Swift::String {
@@ -91,9 +90,7 @@ import _SwiftConcurrencyShims
   @_Concurrency::MainActor final public func configure(requestConfiguration: PayabliSDKPayIn::PayabliPayInRequestConfiguration)
   @_Concurrency::MainActor final public func submitConfigured(_ request: PayabliSDKPayIn::PayabliPayInRequest) async throws -> PayabliSDKPayIn::PayabliPayInResult
   @_Concurrency::MainActor final public func submitConfigured(_ paymentMethod: PayabliSDKPayIn::PayabliPayInMethodInput, options: PayabliSDKPayIn::PayabliPayInTokenStorageOptions = PayabliPayInTokenStorageOptions()) async throws -> PayabliSDKPayIn::PayabliPayInResult
-  @_Concurrency::MainActor final public func addPaymentMethod(_ paymentMethod: PayabliSDKPayIn::PayabliPayInMethodInput, options: PayabliSDKPayIn::PayabliPayInTokenStorageOptions = PayabliPayInTokenStorageOptions()) async throws -> PayabliSDKPayIn::PayabliPayInStoredPaymentMethod
-  @_Concurrency::MainActor final public func addCard(_ card: PayabliSDKPayIn::PayabliPayInCardData, options: PayabliSDKPayIn::PayabliPayInTokenStorageOptions = PayabliPayInTokenStorageOptions()) async throws -> PayabliSDKPayIn::PayabliPayInStoredPaymentMethod
-  @_Concurrency::MainActor final public func addBankAccount(_ ach: PayabliSDKPayIn::PayabliPayInBankAccountData, options: PayabliSDKPayIn::PayabliPayInTokenStorageOptions = PayabliPayInTokenStorageOptions()) async throws -> PayabliSDKPayIn::PayabliPayInStoredPaymentMethod
+  @_Concurrency::MainActor final public func storeMethod(_ request: PayabliSDKPayIn::PayabliPayInStoreRequest) async throws -> PayabliSDKPayIn::PayabliPayInStoredMethod
   @_Concurrency::MainActor final public func capture(_ request: PayabliSDKPayIn::PayabliPayInRequest) async throws -> PayabliSDKPayIn::PayabliPayInResult
   @_Concurrency::MainActor final public func authorize(_ request: PayabliSDKPayIn::PayabliPayInRequest) async throws -> PayabliSDKPayIn::PayabliPayInResult
   @_Concurrency::MainActor final public func captureAuthorizedTransaction(_ request: PayabliSDKPayIn::PayabliPayInAuthorizedRequest) async throws -> PayabliSDKPayIn::PayabliPayInResult
@@ -125,6 +122,17 @@ public enum PayabliPayInError : PayabliSDKCore::PayabliError, Swift::Equatable {
     get
   }
   public static func == (a: PayabliSDKPayIn::PayabliPayInError, b: PayabliSDKPayIn::PayabliPayInError) -> Swift::Bool
+}
+public enum PayabliPayInFormSuccess {
+  case payment(PayabliSDKPayIn::PayabliPayInResult)
+  case method(PayabliSDKPayIn::PayabliPayInStoredMethod)
+}
+@_Concurrency::MainActor @preconcurrency public struct PayabliPayInForm : SwiftUICore::View {
+  @_Concurrency::MainActor public init(payIn: PayabliSDKPayIn::PayabliPayIn, operation: PayabliSDKPayIn::PayabliPayInOperation, configuration: PayabliSDKPayIn::PayabliPayInFormConfiguration = PayabliPayInFormConfiguration(), labels: PayabliSDKPayIn::PayabliPayInFormLabels = PayabliPayInFormLabels(), style: PayabliSDKPayIn::PayabliPayInFormStyle? = nil, onCompleted: @escaping (PayabliSDKPayIn::PayabliPayInFormSuccess) -> Swift::Void, onFailed: @escaping (any PayabliSDKCore::PayabliError) -> Swift::Void, onMethodChanged: @escaping (PayabliSDKPayIn::PayabliPayInMethodType) -> Swift::Void)
+  @_Concurrency::MainActor @preconcurrency public var body: some SwiftUICore::View {
+    get
+  }
+  public typealias Body = @_opaqueReturnTypeOf("$s15PayabliSDKPayIn0a3PayC4FormV4bodyQrvp", 0) __
 }
 public enum PayabliPayInField : Swift::String, Swift::CaseIterable, Swift::Identifiable, Swift::Sendable {
   case cardholderName
@@ -190,10 +198,10 @@ public enum PayabliPayInCardBrandIconPlacement : Swift::Sendable, Swift::Equatab
     get
   }
 }
-public enum PayabliPayInErrorMessagePlacement : Swift::Sendable, Swift::Equatable {
+public enum PayabliPayInFailureMessagePlacement : Swift::Sendable, Swift::Equatable {
   case top
   case aboveSubmitButton
-  public static func == (a: PayabliSDKPayIn::PayabliPayInErrorMessagePlacement, b: PayabliSDKPayIn::PayabliPayInErrorMessagePlacement) -> Swift::Bool
+  public static func == (a: PayabliSDKPayIn::PayabliPayInFailureMessagePlacement, b: PayabliSDKPayIn::PayabliPayInFailureMessagePlacement) -> Swift::Bool
   public func hash(into hasher: inout Swift::Hasher)
   public var hashValue: Swift::Int {
     get
@@ -220,18 +228,6 @@ public struct PayabliPayInInputSize : Swift::Sendable, Swift::Equatable {
   public let horizontalPadding: CoreFoundation::CGFloat
   public init(width: CoreFoundation::CGFloat? = nil, height: CoreFoundation::CGFloat = 52, horizontalPadding: CoreFoundation::CGFloat = 14)
   public static func == (a: PayabliSDKPayIn::PayabliPayInInputSize, b: PayabliSDKPayIn::PayabliPayInInputSize) -> Swift::Bool
-}
-public struct PayabliPayInLabels : Swift::Sendable {
-  public let title: Swift::String?
-  public let subtitle: Swift::String?
-  public let submitButton: Swift::String?
-  public let fieldLabels: [PayabliSDKPayIn::PayabliPayInField : Swift::String]
-  public let fieldPlaceholders: [PayabliSDKPayIn::PayabliPayInField : Swift::String]
-  public let total: Swift::String?
-  public init(title: Swift::String? = nil, subtitle: Swift::String? = nil, submitButton: Swift::String? = nil, fieldLabels: [PayabliSDKPayIn::PayabliPayInField : Swift::String] = Self.defaultFieldLabels, fieldPlaceholders: [PayabliSDKPayIn::PayabliPayInField : Swift::String] = [:], total: Swift::String? = nil)
-  public func label(for field: PayabliSDKPayIn::PayabliPayInField) -> Swift::String
-  public func placeholder(for field: PayabliSDKPayIn::PayabliPayInField) -> Swift::String?
-  public static let defaultFieldLabels: [PayabliSDKPayIn::PayabliPayInField : Swift::String]
 }
 public struct PayabliPayInFieldSection : Swift::Identifiable, Swift::Sendable {
   public let id: Swift::String
@@ -276,22 +272,140 @@ public struct PayabliPayInFormConfiguration : Swift::Sendable {
   public let bankFieldOrder: [PayabliSDKPayIn::PayabliPayInField]
   public let hiddenValues: PayabliSDKPayIn::PayabliPayInHiddenValues
   public let options: PayabliSDKPayIn::PayabliPayInOptions
-  public let labels: PayabliSDKPayIn::PayabliPayInLabels
   public let labelLayout: PayabliSDKPayIn::PayabliPayInLabelLayout
   public let showsFieldLabels: Swift::Bool
   public let hiddenFieldLabels: Swift::Set<PayabliSDKPayIn::PayabliPayInField>
   public let formatting: PayabliSDKPayIn::PayabliPayInFormatting
   public let inputSizing: PayabliSDKPayIn::PayabliPayInInputSizing
   public let cardBrandIconPlacement: PayabliSDKPayIn::PayabliPayInCardBrandIconPlacement
-  public let errorMessagePlacement: PayabliSDKPayIn::PayabliPayInErrorMessagePlacement
+  public let failureMessagePlacement: PayabliSDKPayIn::PayabliPayInFailureMessagePlacement
   public let requiredFields: Swift::Set<PayabliSDKPayIn::PayabliPayInField>
   public let cardSections: [PayabliSDKPayIn::PayabliPayInFieldSection]
   public let bankSections: [PayabliSDKPayIn::PayabliPayInFieldSection]
   public let paymentSummary: PayabliSDKPayIn::PayabliPayInPaymentSummaryConfiguration
   public let showsBaseAmount: Swift::Bool
-  public init(allowedMethods: [PayabliSDKPayIn::PayabliPayInMethodType] = [.card, .bankAccount], defaultMethod: PayabliSDKPayIn::PayabliPayInMethodType = .card, cardFieldOrder: [PayabliSDKPayIn::PayabliPayInField] = Self.defaultCardFieldOrder, bankFieldOrder: [PayabliSDKPayIn::PayabliPayInField] = Self.defaultBankFieldOrder, cardSections: [PayabliSDKPayIn::PayabliPayInFieldSection]? = nil, bankSections: [PayabliSDKPayIn::PayabliPayInFieldSection]? = nil, hiddenValues: PayabliSDKPayIn::PayabliPayInHiddenValues = PayabliPayInHiddenValues(), options: PayabliSDKPayIn::PayabliPayInOptions = PayabliPayInOptions(), labels: PayabliSDKPayIn::PayabliPayInLabels = PayabliPayInLabels(), labelLayout: PayabliSDKPayIn::PayabliPayInLabelLayout = .external, showsFieldLabels: Swift::Bool? = nil, hiddenFieldLabels: Swift::Set<PayabliSDKPayIn::PayabliPayInField> = [], formatting: PayabliSDKPayIn::PayabliPayInFormatting = PayabliPayInFormatting(), inputSizing: PayabliSDKPayIn::PayabliPayInInputSizing = PayabliPayInInputSizing(), cardBrandIconPlacement: PayabliSDKPayIn::PayabliPayInCardBrandIconPlacement = .trailing, errorMessagePlacement: PayabliSDKPayIn::PayabliPayInErrorMessagePlacement = .aboveSubmitButton, requiredFields: Swift::Set<PayabliSDKPayIn::PayabliPayInField> = [], paymentSummary: PayabliSDKPayIn::PayabliPayInPaymentSummaryConfiguration = PayabliPayInPaymentSummaryConfiguration(), showsBaseAmount: Swift::Bool = true)
+  public let showsFailureMessage: Swift::Bool
+  public init(allowedMethods: [PayabliSDKPayIn::PayabliPayInMethodType] = [.card, .bankAccount], defaultMethod: PayabliSDKPayIn::PayabliPayInMethodType = .card, cardFieldOrder: [PayabliSDKPayIn::PayabliPayInField] = Self.defaultCardFieldOrder, bankFieldOrder: [PayabliSDKPayIn::PayabliPayInField] = Self.defaultBankFieldOrder, cardSections: [PayabliSDKPayIn::PayabliPayInFieldSection]? = nil, bankSections: [PayabliSDKPayIn::PayabliPayInFieldSection]? = nil, hiddenValues: PayabliSDKPayIn::PayabliPayInHiddenValues = PayabliPayInHiddenValues(), options: PayabliSDKPayIn::PayabliPayInOptions = PayabliPayInOptions(), labelLayout: PayabliSDKPayIn::PayabliPayInLabelLayout = .external, showsFieldLabels: Swift::Bool? = nil, hiddenFieldLabels: Swift::Set<PayabliSDKPayIn::PayabliPayInField> = [], formatting: PayabliSDKPayIn::PayabliPayInFormatting = PayabliPayInFormatting(), inputSizing: PayabliSDKPayIn::PayabliPayInInputSizing = PayabliPayInInputSizing(), cardBrandIconPlacement: PayabliSDKPayIn::PayabliPayInCardBrandIconPlacement = .trailing, failureMessagePlacement: PayabliSDKPayIn::PayabliPayInFailureMessagePlacement = .aboveSubmitButton, requiredFields: Swift::Set<PayabliSDKPayIn::PayabliPayInField> = [], paymentSummary: PayabliSDKPayIn::PayabliPayInPaymentSummaryConfiguration = PayabliPayInPaymentSummaryConfiguration(), showsBaseAmount: Swift::Bool = true, showsFailureMessage: Swift::Bool = true)
   public static let defaultCardFieldOrder: [PayabliSDKPayIn::PayabliPayInField]
   public static let defaultBankFieldOrder: [PayabliSDKPayIn::PayabliPayInField]
+}
+public struct PayabliPayInFormLabels : Swift::Sendable {
+  public let title: Swift::String?
+  public let subtitle: Swift::String?
+  public let submitButton: Swift::String?
+  public let fieldLabels: [PayabliSDKPayIn::PayabliPayInField : Swift::String]
+  public let fieldPlaceholders: [PayabliSDKPayIn::PayabliPayInField : Swift::String]
+  public let total: Swift::String?
+  public let declinedMessage: Swift::String?
+  public let retryLaterMessage: Swift::String?
+  public let outcomeUnknownMessage: Swift::String?
+  public let otherMessage: Swift::String?
+  public init(title: Swift::String? = nil, subtitle: Swift::String? = nil, submitButton: Swift::String? = nil, fieldLabels: [PayabliSDKPayIn::PayabliPayInField : Swift::String] = Self.defaultFieldLabels, fieldPlaceholders: [PayabliSDKPayIn::PayabliPayInField : Swift::String] = [:], total: Swift::String? = nil, declinedMessage: Swift::String? = nil, retryLaterMessage: Swift::String? = nil, outcomeUnknownMessage: Swift::String? = nil, otherMessage: Swift::String? = nil)
+  public func failureMessage(for category: PayabliSDKCore::PayabliErrorCategory) -> Swift::String?
+  public func label(for field: PayabliSDKPayIn::PayabliPayInField) -> Swift::String
+  public func placeholder(for field: PayabliSDKPayIn::PayabliPayInField) -> Swift::String?
+  public static let defaultFieldLabels: [PayabliSDKPayIn::PayabliPayInField : Swift::String]
+}
+public struct PayabliPayInTextStyle : Swift::Sendable {
+  public let font: SwiftUICore::Font
+  public let color: SwiftUICore::Color
+  public init(font: SwiftUICore::Font, color: SwiftUICore::Color)
+}
+public struct PayabliPayInInputStyle {
+  public let font: SwiftUICore::Font
+  public let uiFont: UIKit::UIFont?
+  public let textColor: SwiftUICore::Color
+  public let placeholderColor: SwiftUICore::Color
+  public let backgroundColor: SwiftUICore::Color
+  public let focusedBackgroundColor: SwiftUICore::Color?
+  public let borderColor: SwiftUICore::Color
+  public let focusedBorderColor: SwiftUICore::Color?
+  public let borderWidth: CoreFoundation::CGFloat
+  public let focusedBorderWidth: CoreFoundation::CGFloat
+  public let cornerRadius: CoreFoundation::CGFloat
+  public let pickerIconColor: SwiftUICore::Color
+  public init(font: SwiftUICore::Font = .body, uiFont: UIKit::UIFont? = nil, textColor: SwiftUICore::Color = .primary, placeholderColor: SwiftUICore::Color = Color(uiColor: .placeholderText), backgroundColor: SwiftUICore::Color = Color(uiColor: .secondarySystemBackground), focusedBackgroundColor: SwiftUICore::Color? = nil, borderColor: SwiftUICore::Color = Color(uiColor: .separator).opacity(0.45), focusedBorderColor: SwiftUICore::Color? = nil, borderWidth: CoreFoundation::CGFloat = 1, focusedBorderWidth: CoreFoundation::CGFloat = 1.5, cornerRadius: CoreFoundation::CGFloat = 8, pickerIconColor: SwiftUICore::Color = .secondary)
+}
+public struct PayabliPayInSubmitButtonStyle {
+  public let font: SwiftUICore::Font
+  public let backgroundColor: SwiftUICore::Color?
+  public let foregroundColor: SwiftUICore::Color
+  public let disabledBackgroundColor: SwiftUICore::Color
+  public let disabledForegroundColor: SwiftUICore::Color
+  public let cornerRadius: CoreFoundation::CGFloat
+  public let height: CoreFoundation::CGFloat
+  public let horizontalPadding: CoreFoundation::CGFloat
+  public init(font: SwiftUICore::Font = .body.weight(.semibold), backgroundColor: SwiftUICore::Color? = nil, foregroundColor: SwiftUICore::Color = .white, disabledBackgroundColor: SwiftUICore::Color = Color(uiColor: .systemGray5), disabledForegroundColor: SwiftUICore::Color = Color(uiColor: .secondaryLabel), cornerRadius: CoreFoundation::CGFloat = 8, height: CoreFoundation::CGFloat = 52, horizontalPadding: CoreFoundation::CGFloat = 16)
+}
+public struct PayabliPayInLayoutStyle {
+  public var contentSpacing: CoreFoundation::CGFloat {
+    get
+  }
+  public var headerSpacing: CoreFoundation::CGFloat {
+    get
+  }
+  public var fieldGroupSpacing: CoreFoundation::CGFloat {
+    get
+  }
+  public var pairedFieldSpacing: CoreFoundation::CGFloat {
+    get
+  }
+  public var labelSpacing: CoreFoundation::CGFloat {
+    get
+  }
+  public var sectionSpacing: CoreFoundation::CGFloat {
+    get
+  }
+  public var sectionTitleSpacing: CoreFoundation::CGFloat {
+    get
+  }
+  public var inputVerticalSpacing: CoreFoundation::CGFloat {
+    get
+    set
+  }
+  public var inputHorizontalSpacing: CoreFoundation::CGFloat {
+    get
+    set
+  }
+  public init(contentSpacing: CoreFoundation::CGFloat = 20, headerSpacing: CoreFoundation::CGFloat = 4, fieldGroupSpacing: CoreFoundation::CGFloat = 12, pairedFieldSpacing: CoreFoundation::CGFloat = 12, labelSpacing: CoreFoundation::CGFloat = 7, sectionSpacing: CoreFoundation::CGFloat = 18, sectionTitleSpacing: CoreFoundation::CGFloat = 10)
+}
+public struct PayabliPayInFormStyle {
+  public let accentColor: SwiftUICore::Color
+  public let title: PayabliSDKPayIn::PayabliPayInTextStyle
+  public let subtitle: PayabliSDKPayIn::PayabliPayInTextStyle
+  public let sectionTitle: PayabliSDKPayIn::PayabliPayInTextStyle
+  public let label: PayabliSDKPayIn::PayabliPayInTextStyle
+  public let input: PayabliSDKPayIn::PayabliPayInInputStyle
+  public let submitButton: PayabliSDKPayIn::PayabliPayInSubmitButtonStyle
+  public let error: PayabliSDKPayIn::PayabliPayInTextStyle
+  public let layout: PayabliSDKPayIn::PayabliPayInLayoutStyle
+  public init(accentColor: SwiftUICore::Color = .accentColor, title: PayabliSDKPayIn::PayabliPayInTextStyle = PayabliPayInTextStyle(
+            font: .title3.weight(.semibold),
+            color: .primary
+        ), subtitle: PayabliSDKPayIn::PayabliPayInTextStyle = PayabliPayInTextStyle(
+            font: .subheadline,
+            color: .secondary
+        ), sectionTitle: PayabliSDKPayIn::PayabliPayInTextStyle = PayabliPayInTextStyle(
+            font: .subheadline.weight(.semibold),
+            color: .primary
+        ), label: PayabliSDKPayIn::PayabliPayInTextStyle = PayabliPayInTextStyle(
+            font: .footnote.weight(.medium),
+            color: Color(uiColor: .secondaryLabel)
+        ), input: PayabliSDKPayIn::PayabliPayInInputStyle = PayabliPayInInputStyle(), submitButton: PayabliSDKPayIn::PayabliPayInSubmitButtonStyle = PayabliPayInSubmitButtonStyle(), error: PayabliSDKPayIn::PayabliPayInTextStyle = PayabliPayInTextStyle(
+            font: .footnote,
+            color: .red
+        ), layout: PayabliSDKPayIn::PayabliPayInLayoutStyle = PayabliPayInLayoutStyle())
+  public static let `default`: PayabliSDKPayIn::PayabliPayInFormStyle
+}
+extension SwiftUICore::EnvironmentValues {
+  public var payabliPayInStyle: PayabliSDKPayIn::PayabliPayInFormStyle {
+    get
+    set
+  }
+}
+extension SwiftUICore::View {
+  @_Concurrency::MainActor @preconcurrency public func payabliPayInStyle(_ style: PayabliSDKPayIn::PayabliPayInFormStyle) -> some SwiftUICore::View
+  
 }
 public enum PayabliPayInMethodType : Swift::String, Swift::CaseIterable, Swift::Identifiable, Swift::Sendable {
   case card
@@ -525,7 +639,7 @@ public struct PayabliPayInTokenStorageAPIResponse : Swift::Codable, Swift::Senda
   public static func == (a: PayabliSDKPayIn::PayabliPayInTokenStorageAPIResponse, b: PayabliSDKPayIn::PayabliPayInTokenStorageAPIResponse) -> Swift::Bool
   public func encode(to encoder: any Swift::Encoder) throws
 }
-public struct PayabliPayInStoredPaymentMethod : Swift::Sendable, Swift::Equatable {
+public struct PayabliPayInStoredMethod : Swift::Sendable, Swift::Equatable {
   public let storedMethodId: Swift::String?
   public let method: PayabliSDKPayIn::PayabliPayInStoredMethodType
   public let methodReferenceId: Swift::String?
@@ -535,7 +649,7 @@ public struct PayabliPayInStoredPaymentMethod : Swift::Sendable, Swift::Equatabl
   public let responseText: Swift::String
   public let apiResponse: PayabliSDKPayIn::PayabliPayInTokenStorageAPIResponse
   public init(storedMethodId: Swift::String?, method: PayabliSDKPayIn::PayabliPayInStoredMethodType, methodReferenceId: Swift::String?, resultCode: Swift::Int?, resultText: Swift::String?, customerId: Swift::Int64?, responseText: Swift::String, apiResponse: PayabliSDKPayIn::PayabliPayInTokenStorageAPIResponse? = nil)
-  public static func == (a: PayabliSDKPayIn::PayabliPayInStoredPaymentMethod, b: PayabliSDKPayIn::PayabliPayInStoredPaymentMethod) -> Swift::Bool
+  public static func == (a: PayabliSDKPayIn::PayabliPayInStoredMethod, b: PayabliSDKPayIn::PayabliPayInStoredMethod) -> Swift::Bool
 }
 extension PayabliSDKPayIn::PayabliPayInMethodInput : Swift::Encodable {
   public func encode(to encoder: any Swift::Encoder) throws
@@ -570,6 +684,16 @@ extension PayabliSDKPayIn::PayabliPayInMethodInput {
   @objc public static func cloudDevice(device: Swift::String, saveIfSuccess: Swift::Bool, totalAmount: Swift::Double) -> PayabliSDKPayIn::PayabliPayInRequestObjC
   @objc public static func check(holderName: Swift::String, totalAmount: Swift::Double) -> PayabliSDKPayIn::PayabliPayInRequestObjC
   @objc public static func cash(totalAmount: Swift::Double) -> PayabliSDKPayIn::PayabliPayInRequestObjC
+  @objc deinit
+}
+@_hasMissingDesignatedInitializers @objc(PayabliPayInStoreRequestObjC) final public class PayabliPayInStoreRequestObjC : ObjectiveC::NSObject {
+  @objc final public var achValidation: Foundation::NSNumber?
+  @objc final public var createAnonymous: Foundation::NSNumber?
+  @objc final public var forceCustomerCreation: Foundation::NSNumber?
+  @objc final public var temporary: Foundation::NSNumber?
+  @objc final public var source: Swift::String?
+  @objc public static func card(cardNumber: Swift::String, expiration: Swift::String, cardholderName: Swift::String, cvv: Swift::String, billingZip: Swift::String) -> PayabliSDKPayIn::PayabliPayInStoreRequestObjC
+  @objc public static func bankAccount(accountNumber: Swift::String, accountType: Swift::String, holderName: Swift::String, routingNumber: Swift::String, secCode: Swift::String?, holderType: Swift::String?) -> PayabliSDKPayIn::PayabliPayInStoreRequestObjC?
   @objc deinit
 }
 @objc(PayabliPayInAuthorizedRequestObjC) final public class PayabliPayInAuthorizedRequestObjC : ObjectiveC::NSObject {
@@ -638,113 +762,12 @@ public struct PayabliPayInSheetConfiguration {
   public init(title: Swift::String? = nil, subtitle: Swift::String? = nil, dismissButton: PayabliSDKPayIn::PayabliPayInSheetDismissButton = .close, dismissesOnSuccess: Swift::Bool = true, detents: Swift::Set<SwiftUI::PresentationDetent> = [.medium, .large], dragIndicatorVisibility: SwiftUICore::Visibility = .visible, contentInsets: SwiftUICore::EdgeInsets = EdgeInsets(top: 20, leading: 20, bottom: 24, trailing: 20), movesFormHeaderToSheetHeader: Swift::Bool = true, sizesToContentWhenPossible: Swift::Bool = true, expandsToLargeWhenContentDoesNotFit: Swift::Bool = true)
 }
 extension SwiftUICore::View {
-  @_Concurrency::MainActor @preconcurrency public func payabliPayInSheet(isPresented: SwiftUICore::Binding<Swift::Bool>, component: PayabliSDKPayIn::PayabliPayIn, configuration: PayabliSDKPayIn::PayabliPayInFormConfiguration = PayabliPayInFormConfiguration(), sheetConfiguration: PayabliSDKPayIn::PayabliPayInSheetConfiguration = PayabliPayInSheetConfiguration(), style: PayabliSDKPayIn::PayabliPayInStyle? = nil, onCompleted: @escaping (PayabliSDKPayIn::PayabliPayInResult) -> Swift::Void, onError: @escaping (any Swift::Error) -> Swift::Void = { _ in }) -> some SwiftUICore::View
-  
-}
-public struct PayabliPayInTextStyle : Swift::Sendable {
-  public let font: SwiftUICore::Font
-  public let color: SwiftUICore::Color
-  public init(font: SwiftUICore::Font, color: SwiftUICore::Color)
-}
-public struct PayabliPayInInputStyle {
-  public let font: SwiftUICore::Font
-  public let uiFont: UIKit::UIFont?
-  public let textColor: SwiftUICore::Color
-  public let placeholderColor: SwiftUICore::Color
-  public let backgroundColor: SwiftUICore::Color
-  public let focusedBackgroundColor: SwiftUICore::Color?
-  public let borderColor: SwiftUICore::Color
-  public let focusedBorderColor: SwiftUICore::Color?
-  public let borderWidth: CoreFoundation::CGFloat
-  public let focusedBorderWidth: CoreFoundation::CGFloat
-  public let cornerRadius: CoreFoundation::CGFloat
-  public let pickerIconColor: SwiftUICore::Color
-  public init(font: SwiftUICore::Font = .body, uiFont: UIKit::UIFont? = nil, textColor: SwiftUICore::Color = .primary, placeholderColor: SwiftUICore::Color = Color(uiColor: .placeholderText), backgroundColor: SwiftUICore::Color = Color(uiColor: .secondarySystemBackground), focusedBackgroundColor: SwiftUICore::Color? = nil, borderColor: SwiftUICore::Color = Color(uiColor: .separator).opacity(0.45), focusedBorderColor: SwiftUICore::Color? = nil, borderWidth: CoreFoundation::CGFloat = 1, focusedBorderWidth: CoreFoundation::CGFloat = 1.5, cornerRadius: CoreFoundation::CGFloat = 8, pickerIconColor: SwiftUICore::Color = .secondary)
-}
-public struct PayabliPayInSubmitButtonStyle {
-  public let font: SwiftUICore::Font
-  public let backgroundColor: SwiftUICore::Color?
-  public let foregroundColor: SwiftUICore::Color
-  public let disabledBackgroundColor: SwiftUICore::Color
-  public let disabledForegroundColor: SwiftUICore::Color
-  public let cornerRadius: CoreFoundation::CGFloat
-  public let height: CoreFoundation::CGFloat
-  public let horizontalPadding: CoreFoundation::CGFloat
-  public init(font: SwiftUICore::Font = .body.weight(.semibold), backgroundColor: SwiftUICore::Color? = nil, foregroundColor: SwiftUICore::Color = .white, disabledBackgroundColor: SwiftUICore::Color = Color(uiColor: .systemGray5), disabledForegroundColor: SwiftUICore::Color = Color(uiColor: .secondaryLabel), cornerRadius: CoreFoundation::CGFloat = 8, height: CoreFoundation::CGFloat = 52, horizontalPadding: CoreFoundation::CGFloat = 16)
-}
-public struct PayabliPayInLayoutStyle {
-  public var contentSpacing: CoreFoundation::CGFloat {
-    get
-  }
-  public var headerSpacing: CoreFoundation::CGFloat {
-    get
-  }
-  public var fieldGroupSpacing: CoreFoundation::CGFloat {
-    get
-  }
-  public var pairedFieldSpacing: CoreFoundation::CGFloat {
-    get
-  }
-  public var labelSpacing: CoreFoundation::CGFloat {
-    get
-  }
-  public var sectionSpacing: CoreFoundation::CGFloat {
-    get
-  }
-  public var sectionTitleSpacing: CoreFoundation::CGFloat {
-    get
-  }
-  public var inputVerticalSpacing: CoreFoundation::CGFloat {
-    get
-    set
-  }
-  public var inputHorizontalSpacing: CoreFoundation::CGFloat {
-    get
-    set
-  }
-  public init(contentSpacing: CoreFoundation::CGFloat = 20, headerSpacing: CoreFoundation::CGFloat = 4, fieldGroupSpacing: CoreFoundation::CGFloat = 12, pairedFieldSpacing: CoreFoundation::CGFloat = 12, labelSpacing: CoreFoundation::CGFloat = 7, sectionSpacing: CoreFoundation::CGFloat = 18, sectionTitleSpacing: CoreFoundation::CGFloat = 10)
-}
-public struct PayabliPayInStyle {
-  public let accentColor: SwiftUICore::Color
-  public let title: PayabliSDKPayIn::PayabliPayInTextStyle
-  public let subtitle: PayabliSDKPayIn::PayabliPayInTextStyle
-  public let sectionTitle: PayabliSDKPayIn::PayabliPayInTextStyle
-  public let label: PayabliSDKPayIn::PayabliPayInTextStyle
-  public let input: PayabliSDKPayIn::PayabliPayInInputStyle
-  public let submitButton: PayabliSDKPayIn::PayabliPayInSubmitButtonStyle
-  public let error: PayabliSDKPayIn::PayabliPayInTextStyle
-  public let layout: PayabliSDKPayIn::PayabliPayInLayoutStyle
-  public init(accentColor: SwiftUICore::Color = .accentColor, title: PayabliSDKPayIn::PayabliPayInTextStyle = PayabliPayInTextStyle(
-            font: .title3.weight(.semibold),
-            color: .primary
-        ), subtitle: PayabliSDKPayIn::PayabliPayInTextStyle = PayabliPayInTextStyle(
-            font: .subheadline,
-            color: .secondary
-        ), sectionTitle: PayabliSDKPayIn::PayabliPayInTextStyle = PayabliPayInTextStyle(
-            font: .subheadline.weight(.semibold),
-            color: .primary
-        ), label: PayabliSDKPayIn::PayabliPayInTextStyle = PayabliPayInTextStyle(
-            font: .footnote.weight(.medium),
-            color: Color(uiColor: .secondaryLabel)
-        ), input: PayabliSDKPayIn::PayabliPayInInputStyle = PayabliPayInInputStyle(), submitButton: PayabliSDKPayIn::PayabliPayInSubmitButtonStyle = PayabliPayInSubmitButtonStyle(), error: PayabliSDKPayIn::PayabliPayInTextStyle = PayabliPayInTextStyle(
-            font: .footnote,
-            color: .red
-        ), layout: PayabliSDKPayIn::PayabliPayInLayoutStyle = PayabliPayInLayoutStyle())
-  public static let `default`: PayabliSDKPayIn::PayabliPayInStyle
-}
-extension SwiftUICore::EnvironmentValues {
-  public var payabliPayInStyle: PayabliSDKPayIn::PayabliPayInStyle {
-    get
-    set
-  }
-}
-extension SwiftUICore::View {
-  @_Concurrency::MainActor @preconcurrency public func payabliPayInStyle(_ style: PayabliSDKPayIn::PayabliPayInStyle) -> some SwiftUICore::View
+  @_Concurrency::MainActor @preconcurrency public func payabliPayInSheet(isPresented: SwiftUICore::Binding<Swift::Bool>, payIn: PayabliSDKPayIn::PayabliPayIn, operation: PayabliSDKPayIn::PayabliPayInOperation, configuration: PayabliSDKPayIn::PayabliPayInFormConfiguration = PayabliPayInFormConfiguration(), labels: PayabliSDKPayIn::PayabliPayInFormLabels = PayabliPayInFormLabels(), sheetConfiguration: PayabliSDKPayIn::PayabliPayInSheetConfiguration = PayabliPayInSheetConfiguration(), style: PayabliSDKPayIn::PayabliPayInFormStyle? = nil, onCompleted: @escaping (PayabliSDKPayIn::PayabliPayInFormSuccess) -> Swift::Void, onFailed: @escaping (any PayabliSDKCore::PayabliError) -> Swift::Void, onMethodChanged: @escaping (PayabliSDKPayIn::PayabliPayInMethodType) -> Swift::Void) -> some SwiftUICore::View
   
 }
 public enum PayabliPayInSummaryRows {
-  public static func labelText(for field: PayabliSDKPayIn::PayabliPayInField, labels: PayabliSDKPayIn::PayabliPayInLabels) -> Swift::String
-  public static func totalLabelText(labels: PayabliSDKPayIn::PayabliPayInLabels) -> Swift::String
+  public static func labelText(for field: PayabliSDKPayIn::PayabliPayInField, labels: PayabliSDKPayIn::PayabliPayInFormLabels) -> Swift::String
+  public static func totalLabelText(labels: PayabliSDKPayIn::PayabliPayInFormLabels) -> Swift::String
   public static func rowAmount(for field: PayabliSDKPayIn::PayabliPayInField, paymentDetails: PayabliSDKPayIn::PayabliPayInPaymentDetails?) -> Foundation::Decimal?
   public static func totalRowAmount(paymentDetails: PayabliSDKPayIn::PayabliPayInPaymentDetails?) -> Foundation::Decimal?
   public static func formattedAmount(_ amount: Foundation::Decimal, currency: Swift::String?) -> Swift::String
@@ -879,6 +902,11 @@ public struct PayabliPayInRequest : Swift::Sendable {
   }
   public init(paymentMethod: PayabliSDKPayIn::PayabliPayInPaymentMethod, options: PayabliSDKPayIn::PayabliPayInRequestConfiguration)
 }
+public struct PayabliPayInStoreRequest : Swift::Sendable {
+  public let instrument: PayabliSDKPayIn::PayabliPayInMethodInput
+  public let options: PayabliSDKPayIn::PayabliPayInTokenStorageOptions
+  public init(instrument: PayabliSDKPayIn::PayabliPayInMethodInput, options: PayabliSDKPayIn::PayabliPayInTokenStorageOptions)
+}
 public struct PayabliPayInRequestConfiguration : Swift::Sendable {
   public let paymentDetails: PayabliSDKPayIn::PayabliPayInPaymentDetails
   public let accountId: Swift::String?
@@ -932,10 +960,10 @@ public struct PayabliPayInResult : Swift::Sendable, Swift::Equatable {
   public let explanation: Swift::String?
   public let action: Swift::String?
   public let transaction: PayabliSDKPayIn::PayabliPayInTransaction?
-  public let storedPaymentMethod: PayabliSDKPayIn::PayabliPayInStoredPaymentMethod?
+  public let storedPaymentMethod: PayabliSDKPayIn::PayabliPayInStoredMethod?
   public let apiResponse: PayabliSDKPayIn::PayabliPayInAPIResponse?
   public init(apiResponse: PayabliSDKPayIn::PayabliPayInAPIResponse)
-  public init(storedPaymentMethod: PayabliSDKPayIn::PayabliPayInStoredPaymentMethod)
+  public init(storedPaymentMethod: PayabliSDKPayIn::PayabliPayInStoredMethod)
   public static func == (a: PayabliSDKPayIn::PayabliPayInResult, b: PayabliSDKPayIn::PayabliPayInResult) -> Swift::Bool
 }
 public struct PayabliPayInAPIResponse : Swift::Codable, Swift::Sendable, Swift::Equatable {
@@ -1014,13 +1042,6 @@ public struct PayabliPayInValidation : Swift::Sendable {
   public init(requiresLuhnCheck: Swift::Bool = true, validatesRoutingNumberChecksum: Swift::Bool = true)
   public static let `default`: PayabliSDKPayIn::PayabliPayInValidation
 }
-@_Concurrency::MainActor @preconcurrency public struct PayabliPayInView : SwiftUICore::View {
-  @_Concurrency::MainActor public init(component: PayabliSDKPayIn::PayabliPayIn, configuration: PayabliSDKPayIn::PayabliPayInFormConfiguration = PayabliPayInFormConfiguration(), style: PayabliSDKPayIn::PayabliPayInStyle? = nil, onCompleted: @escaping (PayabliSDKPayIn::PayabliPayInResult) -> Swift::Void, onError: @escaping (any Swift::Error) -> Swift::Void = { _ in })
-  @_Concurrency::MainActor @preconcurrency public var body: some SwiftUICore::View {
-    get
-  }
-  public typealias Body = @_opaqueReturnTypeOf("$s15PayabliSDKPayIn0a3PayC4ViewV4bodyQrvp", 0) __
-}
 public enum PayabliPayInModule {
   public static var version: Swift::String {
     get
@@ -1029,6 +1050,7 @@ public enum PayabliPayInModule {
 extension PayabliSDKPayIn::PayabliPayInObjC : Swift::Sendable {}
 extension PayabliSDKPayIn::PayabliPayIn : Swift::Sendable {}
 extension PayabliSDKPayIn::PayabliPayInCardBrandIcon : Swift::Sendable {}
+extension PayabliSDKPayIn::PayabliPayInForm : Swift::Sendable {}
 extension PayabliSDKPayIn::PayabliPayInField : Swift::Equatable {}
 extension PayabliSDKPayIn::PayabliPayInField : Swift::Hashable {}
 extension PayabliSDKPayIn::PayabliPayInField : Swift::RawRepresentable {}
@@ -1036,7 +1058,7 @@ extension PayabliSDKPayIn::PayabliPayInSectionStyle : Swift::Hashable {}
 extension PayabliSDKPayIn::PayabliPayInLabelLayout : Swift::Equatable {}
 extension PayabliSDKPayIn::PayabliPayInLabelLayout : Swift::Hashable {}
 extension PayabliSDKPayIn::PayabliPayInCardBrandIconPlacement : Swift::Hashable {}
-extension PayabliSDKPayIn::PayabliPayInErrorMessagePlacement : Swift::Hashable {}
+extension PayabliSDKPayIn::PayabliPayInFailureMessagePlacement : Swift::Hashable {}
 extension PayabliSDKPayIn::PayabliPayInMethodType : Swift::Equatable {}
 extension PayabliSDKPayIn::PayabliPayInMethodType : Swift::Hashable {}
 extension PayabliSDKPayIn::PayabliPayInMethodType : Swift::RawRepresentable {}
@@ -1061,4 +1083,3 @@ extension PayabliSDKPayIn::PayabliPayInResultKind : Swift::RawRepresentable {}
 extension PayabliSDKPayIn::PayabliPayInStoredMethodType : Swift::Equatable {}
 extension PayabliSDKPayIn::PayabliPayInStoredMethodType : Swift::Hashable {}
 extension PayabliSDKPayIn::PayabliPayInStoredMethodType : Swift::RawRepresentable {}
-extension PayabliSDKPayIn::PayabliPayInView : Swift::Sendable {}

@@ -4,12 +4,12 @@ import Foundation
 public enum PayabliPayInSummaryRows {
     public static func labelText(
         for field: PayabliPayInField,
-        labels: PayabliPayInLabels
+        labels: PayabliPayInFormLabels
     ) -> String {
         labels.label(for: field)
     }
 
-    public static func totalLabelText(labels: PayabliPayInLabels) -> String {
+    public static func totalLabelText(labels: PayabliPayInFormLabels) -> String {
         labels.total?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty ?? "Total"
     }
 

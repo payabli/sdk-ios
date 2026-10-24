@@ -181,6 +181,96 @@ public final class PayabliPayInRequestObjC: NSObject {
     }
 }
 
+/// A payment method to store, for an Objective-C caller. Each property is
+/// ``PayabliPayInStoreRequest``'s, and a factory method per kind sets the method.
+@objc(PayabliPayInStoreRequestObjC)
+public final class PayabliPayInStoreRequestObjC: NSObject {
+    let instrument: PayabliPayInMethodInput
+
+    @objc public var achValidation: NSNumber?
+    @objc public var createAnonymous: NSNumber?
+    @objc public var forceCustomerCreation: NSNumber?
+    @objc public var temporary: NSNumber?
+    @objc public var source: String?
+
+    private init(instrument: PayabliPayInMethodInput) {
+        self.instrument = instrument
+        super.init()
+    }
+
+    /// - Parameter cardNumber: the card number the payer entered.
+    /// - Parameter expiration: the expiry, as `MM/YY`.
+    /// - Parameter cardholderName: the name on the card.
+    /// - Parameter cvv: the card's security code.
+    /// - Parameter billingZip: the billing postal code.
+    /// - Returns: the request.
+    @objc public static func card(
+        cardNumber: String,
+        expiration: String,
+        cardholderName: String,
+        cvv: String,
+        billingZip: String
+    ) -> PayabliPayInStoreRequestObjC {
+        let data = PayabliPayInCardData(
+            cardNumber: cardNumber,
+            expiration: expiration,
+            cardholderName: cardholderName,
+            cvv: cvv,
+            billingZip: billingZip
+        )
+        return PayabliPayInStoreRequestObjC(instrument: .card(data))
+    }
+
+    /// - Parameter accountNumber: the number of the bank account to store.
+    /// - Parameter accountType: `Checking` or `Savings`.
+    /// - Parameter holderName: the account holder's name.
+    /// - Parameter routingNumber: the routing number of the bank holding the account.
+    /// - Parameter secCode: `PPD`, `WEB`, `TEL`, `CCD` or `BOC`; nil for `WEB`.
+    /// - Parameter holderType: `personal` or `business`, or nil.
+    /// - Returns: the request, or nil when a named value is none of those listed.
+    @objc public static func bankAccount(
+        accountNumber: String,
+        accountType: String,
+        holderName: String,
+        routingNumber: String,
+        secCode: String?,
+        holderType: String?
+    ) -> PayabliPayInStoreRequestObjC? {
+        guard let type = PayabliPayInAccountType(rawValue: accountType) else { return nil }
+        let code: PayabliPayInSecCode
+        if let secCode {
+            guard let named = PayabliPayInSecCode(rawValue: secCode) else { return nil }
+            code = named
+        } else {
+            code = .web
+        }
+        var holder: PayabliPayInAccountHolderType?
+        if let holderType {
+            guard let named = PayabliPayInAccountHolderType(rawValue: holderType) else { return nil }
+            holder = named
+        }
+        let data = PayabliPayInBankAccountData(
+            accountNumber: accountNumber,
+            accountType: type,
+            holderName: holderName,
+            routingNumber: routingNumber,
+            secCode: code,
+            holderType: holder
+        )
+        return PayabliPayInStoreRequestObjC(instrument: .bankAccount(data))
+    }
+
+    func toSwift() -> PayabliPayInStoreRequest {
+        var options = PayabliPayInTokenStorageOptions()
+        options.achValidation = achValidation?.boolValue
+        options.createAnonymous = createAnonymous?.boolValue
+        options.forceCustomerCreation = forceCustomerCreation?.boolValue
+        options.temporary = temporary?.boolValue
+        options.source = source
+        return PayabliPayInStoreRequest(instrument: instrument, options: options)
+    }
+}
+
 /// A capture of an authorization, for an Objective-C caller. Each property is ``PayabliPayInAuthorizedRequest``'s.
 @objc(PayabliPayInAuthorizedRequestObjC)
 public final class PayabliPayInAuthorizedRequestObjC: NSObject {

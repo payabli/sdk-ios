@@ -200,7 +200,7 @@ extension PayabliPayInViewModel {
     }
 
     var operationConfigurationIsValid: Bool {
-        if component.operation == .storePaymentMethod {
+        if operation == .storePaymentMethod {
             return true
         }
         return paymentDetailsArePresent
@@ -214,7 +214,7 @@ extension PayabliPayInViewModel {
     func validateRequiredFields() throws {
         for field in activeRequiredFields {
             guard fieldHasRequiredValue(field) else {
-                throw PayabliPayInError.invalidInput("\(configuration.labels.label(for: field)) is required.")
+                throw PayabliPayInError.invalidInput("\(labels.label(for: field)) is required.")
             }
         }
     }

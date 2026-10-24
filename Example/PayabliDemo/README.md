@@ -1,7 +1,7 @@
 # PayabliDemo
 
 SwiftUI demo app exercising the public `PayabliTTP` and
-`PayabliPayInView` APIs, covering card-present and card-not-present
+`PayabliPayInForm` APIs, covering card-present and card-not-present
 end to end against sandbox.
 
 ## What it covers
@@ -17,7 +17,7 @@ end to end against sandbox.
 - **Session badge** — the navigation bar shows where the reader has got to,
   color-coded, as `TapToPaySessionStatus`: the SDK's states in this app's
   own words.
-- **PayIn payment flow** — SwiftUI `PayabliPayInView` tabs that can
+- **PayIn payment flow** — SwiftUI `PayabliPayInForm` tabs that can
   render stored-method and capture forms, hide optional values, apply a custom
   style, and return token-storage or MoneyIn API responses.
 

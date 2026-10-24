@@ -8,23 +8,23 @@ import XCTest
 @MainActor
 final class PaymentMethodConfigurationChangeTests: XCTestCase {
     func testWithdrawnMethodLeavesTheFormOnTheFirstRenderAfterTheChange() {
-        let component = flowOnSession()
-        let host = hostedForm(component: component, configuration: configuration(allowedMethods: [.card, .bankAccount]))
+        let payIn = flowOnSession()
+        let host = hostedForm(payIn: payIn, configuration: configuration(allowedMethods: [.card, .bankAccount]))
         XCTAssertEqual(host.view.payabliSubviews(of: UISegmentedControl.self).count, 1)
 
-        host.rootView = form(component: component, configuration: configuration(allowedMethods: [.card]))
+        host.rootView = form(payIn: payIn, configuration: configuration(allowedMethods: [.card]))
         render(host)
 
         XCTAssertEqual(host.view.payabliSubviews(of: UISegmentedControl.self).count, 0)
     }
 
     func testEachChangeAppliesItsOwnConfigurationRatherThanThePreviousOne() {
-        let component = flowOnSession()
-        let host = hostedForm(component: component, configuration: configuration(allowedMethods: [.card, .bankAccount]))
+        let payIn = flowOnSession()
+        let host = hostedForm(payIn: payIn, configuration: configuration(allowedMethods: [.card, .bankAccount]))
 
-        host.rootView = form(component: component, configuration: configuration(allowedMethods: [.card]))
+        host.rootView = form(payIn: payIn, configuration: configuration(allowedMethods: [.card]))
         render(host)
-        host.rootView = form(component: component, configuration: configuration(allowedMethods: [.card, .bankAccount]))
+        host.rootView = form(payIn: payIn, configuration: configuration(allowedMethods: [.card, .bankAccount]))
         render(host)
 
         XCTAssertEqual(host.view.payabliSubviews(of: UISegmentedControl.self).count, 1)
@@ -36,64 +36,82 @@ final class PaymentMethodConfigurationChangeTests: XCTestCase {
         let component = captureComponent()
         let viewModel = PayabliPayInViewModel(
             component: component,
-            configuration: configuration(amountLabel: "Order total")
+            operation: .capture,
+            configuration: configuration(),
+            labels: labels(amountLabel: "Order total")
         )
         viewModel.cardholderName = "Ada Lovelace"
 
-        viewModel.update(component: component, configuration: configuration(amountLabel: "Due today"))
+        viewModel.update(
+            component: component,
+            operation: .capture,
+            configuration: configuration(),
+            labels: labels(amountLabel: "Due today")
+        )
 
         XCTAssertEqual(viewModel.paymentSummaryLabelText(for: .amount), "Due today")
         XCTAssertEqual(viewModel.cardholderName, "Ada Lovelace")
     }
 
     func testTypedEntrySurvivesAChangeThatKeepsItsField() throws {
-        let component = flowOnSession()
-        let host = hostedForm(component: component, configuration: configuration(allowedMethods: [.card, .bankAccount]))
+        let payIn = flowOnSession()
+        let host = hostedForm(payIn: payIn, configuration: configuration(allowedMethods: [.card, .bankAccount]))
         let nameField = try XCTUnwrap(textField(labelled: "Name on card", in: host))
         type("Ada Lovelace", into: nameField)
         render(host)
 
-        host.rootView = form(component: component, configuration: configuration(allowedMethods: [.card]))
+        host.rootView = form(payIn: payIn, configuration: configuration(allowedMethods: [.card]))
         render(host)
 
         XCTAssertEqual(textField(labelled: "Name on card", in: host)?.text, "Ada Lovelace")
     }
 
     func testChangingTheBaseAmountSwitchAloneIsAConfigurationChange() {
-        let withBaseAmount = PayInPaymentFlowConfigurationChange(configuration(showsBaseAmount: true))
-        let withoutBaseAmount = PayInPaymentFlowConfigurationChange(configuration(showsBaseAmount: false))
+        let withBaseAmount = PayInPaymentFlowConfigurationChange(
+            configuration(showsBaseAmount: true),
+            labels: PayabliPayInFormLabels()
+        )
+        let withoutBaseAmount = PayInPaymentFlowConfigurationChange(
+            configuration(showsBaseAmount: false),
+            labels: PayabliPayInFormLabels()
+        )
 
         XCTAssertNotEqual(withBaseAmount, withoutBaseAmount)
     }
 
     @MainActor
     func testTheSheetHeaderMoveKeepsTheBaseAmountSwitch() {
-        let component = flowOnSession()
+        let payIn = flowOnSession()
         let content = PayabliPayInSheetContent(
             isPresented: .constant(true),
-            component: component,
+            payIn: payIn,
+            operation: .storePaymentMethod,
             configuration: PayabliPayInFormConfiguration(
                 allowedMethods: [.card],
                 showsBaseAmount: false
             ),
+            labels: PayabliPayInFormLabels(),
             sheetConfiguration: PayabliPayInSheetConfiguration(movesFormHeaderToSheetHeader: true),
             style: nil,
             onCompleted: { _ in },
-            onError: { _ in }
+            onFailed: { _ in },
+            onMethodChanged: { _ in }
         )
 
         XCTAssertFalse(
-            content.formConfiguration.showsBaseAmount,
-            "the sheet path rebuilds the form configuration, so the switch a host set must survive the rebuild"
+            content.configuration.showsBaseAmount,
+            "the sheet hands the form the configuration it was given, so the switch a host set must survive the move"
         )
     }
 
     func testChangingTheTotalLabelAloneIsAConfigurationChange() {
         let before = PayInPaymentFlowConfigurationChange(
-            PayabliPayInFormConfiguration(allowedMethods: [.card], labels: PayabliPayInLabels())
+            PayabliPayInFormConfiguration(allowedMethods: [.card]),
+            labels: PayabliPayInFormLabels()
         )
         let after = PayInPaymentFlowConfigurationChange(
-            PayabliPayInFormConfiguration(allowedMethods: [.card], labels: PayabliPayInLabels(total: "Amount due"))
+            PayabliPayInFormConfiguration(allowedMethods: [.card]),
+            labels: PayabliPayInFormLabels(total: "Amount due")
         )
 
         XCTAssertNotEqual(before, after)
@@ -101,38 +119,103 @@ final class PaymentMethodConfigurationChangeTests: XCTestCase {
 
     @MainActor
     func testTheSheetHeaderMoveKeepsTheTotalLabel() {
-        let component = flowOnSession()
+        let payIn = flowOnSession()
         let content = PayabliPayInSheetContent(
             isPresented: .constant(true),
-            component: component,
-            configuration: PayabliPayInFormConfiguration(
-                allowedMethods: [.card],
-                labels: PayabliPayInLabels(total: "Amount due")
+            payIn: payIn,
+            operation: .storePaymentMethod,
+            configuration: PayabliPayInFormConfiguration(allowedMethods: [.card]),
+            labels: PayabliPayInFormLabels(total: "Amount due"),
+            sheetConfiguration: PayabliPayInSheetConfiguration(movesFormHeaderToSheetHeader: true),
+            style: nil,
+            onCompleted: { _ in },
+            onFailed: { _ in },
+            onMethodChanged: { _ in }
+        )
+
+        XCTAssertEqual(content.formLabels.total, "Amount due")
+    }
+
+    @MainActor
+    func testTheSheetHeaderMoveKeepsTheFailureMessages() {
+        let payIn = flowOnSession()
+        let content = PayabliPayInSheetContent(
+            isPresented: .constant(true),
+            payIn: payIn,
+            operation: .storePaymentMethod,
+            configuration: PayabliPayInFormConfiguration(allowedMethods: [.card]),
+            labels: PayabliPayInFormLabels(
+                declinedMessage: "That card didn't work.",
+                retryLaterMessage: "It's busy right now. Try once more.",
+                outcomeUnknownMessage: "We can't tell whether that went through.",
+                otherMessage: "Something went wrong on our side."
             ),
             sheetConfiguration: PayabliPayInSheetConfiguration(movesFormHeaderToSheetHeader: true),
             style: nil,
             onCompleted: { _ in },
-            onError: { _ in }
+            onFailed: { _ in },
+            onMethodChanged: { _ in }
         )
 
-        XCTAssertEqual(content.formConfiguration.labels.total, "Amount due")
+        XCTAssertEqual(content.formLabels.declinedMessage, "That card didn't work.")
+        XCTAssertEqual(content.formLabels.retryLaterMessage, "It's busy right now. Try once more.")
+        XCTAssertEqual(content.formLabels.outcomeUnknownMessage, "We can't tell whether that went through.")
+        XCTAssertEqual(content.formLabels.otherMessage, "Something went wrong on our side.")
+    }
+
+    func testChangingTheShowsFailureMessageSwitchAloneIsAConfigurationChange() {
+        let drawingIt = PayInPaymentFlowConfigurationChange(
+            PayabliPayInFormConfiguration(allowedMethods: [.card], showsFailureMessage: true),
+            labels: PayabliPayInFormLabels()
+        )
+        let hidingIt = PayInPaymentFlowConfigurationChange(
+            PayabliPayInFormConfiguration(allowedMethods: [.card], showsFailureMessage: false),
+            labels: PayabliPayInFormLabels()
+        )
+
+        XCTAssertNotEqual(drawingIt, hidingIt)
+    }
+
+    func testChangingAFailureMessageLabelAloneIsAConfigurationChange() {
+        let plain = PayabliPayInFormLabels()
+        let withEachFailureMessage = [
+            PayabliPayInFormLabels(declinedMessage: "That card didn't work."),
+            PayabliPayInFormLabels(retryLaterMessage: "It's busy right now. Try once more."),
+            PayabliPayInFormLabels(outcomeUnknownMessage: "We can't tell whether that went through."),
+            PayabliPayInFormLabels(otherMessage: "Something went wrong on our side.")
+        ]
+
+        for labels in withEachFailureMessage {
+            XCTAssertNotEqual(
+                PayInPaymentFlowConfigurationChange(
+                    PayabliPayInFormConfiguration(allowedMethods: [.card]),
+                    labels: plain
+                ),
+                PayInPaymentFlowConfigurationChange(
+                    PayabliPayInFormConfiguration(allowedMethods: [.card]),
+                    labels: labels
+                )
+            )
+        }
     }
 
     // MARK: - Fixtures
 
     private func configuration(
         allowedMethods: [PayabliPayInMethodType] = [.card],
-        amountLabel: String? = nil,
         showsBaseAmount: Bool = true
     ) -> PayabliPayInFormConfiguration {
         PayabliPayInFormConfiguration(
             allowedMethods: allowedMethods,
             defaultMethod: .card,
             cardFieldOrder: [.amount] + PayabliPayInFormConfiguration.defaultCardFieldOrder,
-            labels: PayabliPayInLabels(
-                fieldLabels: amountLabel.map { [.amount: $0] } ?? PayabliPayInLabels.defaultFieldLabels
-            ),
             showsBaseAmount: showsBaseAmount
+        )
+    }
+
+    private func labels(amountLabel: String? = nil) -> PayabliPayInFormLabels {
+        PayabliPayInFormLabels(
+            fieldLabels: amountLabel.map { [.amount: $0] } ?? PayabliPayInFormLabels.defaultFieldLabels
         )
     }
 
@@ -146,21 +229,25 @@ final class PaymentMethodConfigurationChangeTests: XCTestCase {
     }
 
     private func form(
-        component: PayabliPayIn,
+        payIn: PayabliPayIn,
         configuration: PayabliPayInFormConfiguration
-    ) -> PayabliPayInView {
-        PayabliPayInView(
-            component: component,
+    ) -> PayabliPayInForm {
+        PayabliPayInForm(
+            payIn: payIn,
+            operation: .storePaymentMethod,
             configuration: configuration,
-            onCompleted: { _ in }
+            labels: PayabliPayInFormLabels(),
+            onCompleted: { _ in },
+            onFailed: { _ in },
+            onMethodChanged: { _ in }
         )
     }
 
     private func hostedForm(
-        component: PayabliPayIn,
+        payIn: PayabliPayIn,
         configuration: PayabliPayInFormConfiguration
-    ) -> UIHostingController<PayabliPayInView> {
-        let host = UIHostingController(rootView: form(component: component, configuration: configuration))
+    ) -> UIHostingController<PayabliPayInForm> {
+        let host = UIHostingController(rootView: form(payIn: payIn, configuration: configuration))
         let window = UIWindow(frame: UIScreen.main.bounds)
         window.rootViewController = host
         window.makeKeyAndVisible()
@@ -169,14 +256,14 @@ final class PaymentMethodConfigurationChangeTests: XCTestCase {
     }
 
     /// One layout pass, with no run-loop turn after it: what the payer sees first after the change.
-    private func render(_ host: UIHostingController<PayabliPayInView>) {
+    private func render(_ host: UIHostingController<PayabliPayInForm>) {
         host.view.setNeedsLayout()
         host.view.layoutIfNeeded()
     }
 
     private func textField(
         labelled label: String,
-        in host: UIHostingController<PayabliPayInView>
+        in host: UIHostingController<PayabliPayInForm>
     ) -> UITextField? {
         host.view.payabliSubviews(of: UITextField.self).first { $0.accessibilityLabel == label }
     }

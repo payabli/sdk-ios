@@ -3,14 +3,14 @@ import XCTest
 
 final class PaymentSummarySectionTests: XCTestCase {
     func testPaymentMethodLabelsLeaveTheTotalLabelUnsetByDefault() {
-        XCTAssertNil(PayabliPayInLabels().total)
-        XCTAssertEqual(PayabliPayInLabels(total: "Amount due").total, "Amount due")
+        XCTAssertNil(PayabliPayInFormLabels().total)
+        XCTAssertEqual(PayabliPayInFormLabels(total: "Amount due").total, "Amount due")
     }
 
     func testTheTotalRowTakesTheHostLabelOrTotal() {
-        XCTAssertEqual(PayabliPayInSummaryRows.totalLabelText(labels: PayabliPayInLabels()), "Total")
-        XCTAssertEqual(PayabliPayInSummaryRows.totalLabelText(labels: PayabliPayInLabels(total: "  ")), "Total")
-        XCTAssertEqual(PayabliPayInSummaryRows.totalLabelText(labels: PayabliPayInLabels(total: "Amount due")), "Amount due")
+        XCTAssertEqual(PayabliPayInSummaryRows.totalLabelText(labels: PayabliPayInFormLabels()), "Total")
+        XCTAssertEqual(PayabliPayInSummaryRows.totalLabelText(labels: PayabliPayInFormLabels(total: "  ")), "Total")
+        XCTAssertEqual(PayabliPayInSummaryRows.totalLabelText(labels: PayabliPayInFormLabels(total: "Amount due")), "Amount due")
     }
 
     func testASectionTakesInputUnlessMarkedAsTheSummary() {

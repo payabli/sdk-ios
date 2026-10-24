@@ -38,7 +38,7 @@ final class PaymentSubmitWordingTests: XCTestCase {
     }
 
     func testBlankHostWordingReadsTheOperation() {
-        let labels = PayabliPayInLabels(submitButton: "  ")
+        let labels = PayabliPayInFormLabels(submitButton: "  ")
 
         XCTAssertEqual(
             PayInSubmitWording.text(showing: .storePaymentMethod, submitting: nil, hostWording: labels.hostSubmitButton),

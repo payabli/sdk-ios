@@ -30,7 +30,7 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
     /// not wait on this for it.
     @Published public private(set) var lastResult: PayabliPayInResult?
 
-    public var lastStoredPaymentMethod: PayabliPayInStoredPaymentMethod? {
+    public var lastStoredPaymentMethod: PayabliPayInStoredMethod? {
         lastResult?.storedPaymentMethod
     }
 
@@ -92,8 +92,8 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
     /// - Parameter entryPoint: the paypoint's entry point, as the requests carry it.
     /// - Parameter environment: the environment the requests go to, whose base URL builds the routes.
     /// - Parameter transport: the transport that sends every request, used whole.
-    /// - Parameter operation: what a rendered form submits, `.storePaymentMethod` when nothing is given.
-    /// - Parameter requestConfiguration: the transaction configuration a rendered form's request is built from.
+    /// - Parameter operation: what a submission without an operation of its own does, `.storePaymentMethod` when nothing is given.
+    /// - Parameter requestConfiguration: the transaction configuration a request is built from.
     /// - Parameter telemetry: where the flow reports its operations, nil to report nothing.
     init(
         entryPoint: String,
@@ -166,23 +166,29 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
     public func submitConfigured(
         _ request: PayabliPayInRequest
     ) async throws -> PayabliPayInResult {
-        try await submitConfigured(request, origin: .direct)
+        try await submitConfigured(request, for: operation, origin: .direct)
     }
 
     public func submitConfigured(
         _ paymentMethod: PayabliPayInMethodInput,
         options: PayabliPayInTokenStorageOptions = PayabliPayInTokenStorageOptions()
     ) async throws -> PayabliPayInResult {
-        try await submitConfigured(paymentMethod, options: options, origin: .direct)
+        try await submitConfigured(
+            PayabliPayInStoreRequest(instrument: paymentMethod, options: options),
+            for: operation,
+            origin: .direct
+        )
     }
 
-    /// Runs the configured operation on a payment, reported as started by `origin`.
+    /// Runs an operation on a payment, reported as started by `origin`.
     ///
     /// - Parameter request: the payment and its settings.
+    /// - Parameter operation: the operation to run on it.
     /// - Parameter origin: whether the form or the host started it.
     /// - Returns: the result the service sent.
     func submitConfigured(
         _ request: PayabliPayInRequest,
+        for operation: PayabliPayInOperation,
         origin: PayInReports.Origin
     ) async throws -> PayabliPayInResult {
         switch operation {
@@ -197,36 +203,41 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
         }
     }
 
-    /// Stores a method when that is the configured operation, reported as started by `origin`.
+    /// Stores a method when that is the operation, reported as started by `origin`.
     ///
-    /// - Parameter paymentMethod: the card or bank account data to store.
-    /// - Parameter options: what the request carries besides the method.
+    /// - Parameter request: the payment method to store and what the request carries besides it.
+    /// - Parameter operation: the operation the method is stored for.
     /// - Parameter origin: whether the form or the host started it.
     /// - Returns: the stored method, as a result.
     func submitConfigured(
-        _ paymentMethod: PayabliPayInMethodInput,
-        options: PayabliPayInTokenStorageOptions,
+        _ request: PayabliPayInStoreRequest,
+        for operation: PayabliPayInOperation,
         origin: PayInReports.Origin
     ) async throws -> PayabliPayInResult {
         guard operation == .storePaymentMethod else {
             return try await reported(
                 operation == .capture ? .capture : .authorize,
                 origin: origin,
-                method: PayInReports.method(of: paymentMethod.method)
+                method: PayInReports.method(of: request.instrument.method)
             ) {
                 throw PayabliPayInError.invalidInput("storePaymentMethod operation is required to store a payment method.")
             }
         }
 
-        let storedPaymentMethod = try await addPaymentMethod(paymentMethod, options: options, origin: origin)
-        return PayabliPayInResult(storedPaymentMethod: storedPaymentMethod)
+        let storedMethod = try await storeMethod(request, origin: origin)
+        return PayabliPayInResult(storedPaymentMethod: storedMethod)
     }
 
     /// Reports a submission the form refused before handing it to the flow.
     ///
     /// - Parameter error: the refusal.
     /// - Parameter method: the kind of method the form was submitting.
-    func reportFormRefusal(_ error: any Error, method: PayabliPayInMethodType) {
+    /// - Parameter operation: the operation the form was submitting for.
+    func reportFormRefusal(
+        _ error: any Error,
+        method: PayabliPayInMethodType,
+        operation: PayabliPayInOperation
+    ) {
         let reported: PayInReports.Operation = switch operation {
         case .storePaymentMethod: .storeMethod
         case .capture: .capture
@@ -237,47 +248,30 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
 
     /// Stores card or bank account payment data using `POST /api/TokenStorage/add`.
     ///
-    /// - Parameter paymentMethod: the card or bank account data to store.
-    /// - Parameter options: what the request carries besides the method, from the customer to the flags.
+    /// - Parameter request: the payment method to store, and what the request carries besides it.
     /// - Returns: the method the service stored, with its identifiers.
-    public func addPaymentMethod(
-        _ paymentMethod: PayabliPayInMethodInput,
-        options: PayabliPayInTokenStorageOptions = PayabliPayInTokenStorageOptions()
-    ) async throws -> PayabliPayInStoredPaymentMethod {
-        try await addPaymentMethod(paymentMethod, options: options, origin: .direct)
+    public func storeMethod(
+        _ request: PayabliPayInStoreRequest
+    ) async throws -> PayabliPayInStoredMethod {
+        try await storeMethod(request, origin: .direct)
     }
 
-    private func addPaymentMethod(
-        _ paymentMethod: PayabliPayInMethodInput,
-        options: PayabliPayInTokenStorageOptions,
+    private func storeMethod(
+        _ request: PayabliPayInStoreRequest,
         origin: PayInReports.Origin
-    ) async throws -> PayabliPayInStoredPaymentMethod {
-        try await reported(.storeMethod, origin: origin, method: PayInReports.method(of: paymentMethod.method)) {
+    ) async throws -> PayabliPayInStoredMethod {
+        try await reported(.storeMethod, origin: origin, method: PayInReports.method(of: request.instrument.method)) {
             try beginSubmission()
             defer { endSubmission() }
 
-            let storedPaymentMethod = try await tokenStorageClient.addMethod(
+            let storedMethod = try await tokenStorageClient.addMethod(
                 entryPoint: entryPoint,
-                paymentMethod: paymentMethod,
-                options: options
+                paymentMethod: request.instrument,
+                options: request.options
             )
-            lastResult = PayabliPayInResult(storedPaymentMethod: storedPaymentMethod)
-            return storedPaymentMethod
+            lastResult = PayabliPayInResult(storedPaymentMethod: storedMethod)
+            return storedMethod
         }
-    }
-
-    public func addCard(
-        _ card: PayabliPayInCardData,
-        options: PayabliPayInTokenStorageOptions = PayabliPayInTokenStorageOptions()
-    ) async throws -> PayabliPayInStoredPaymentMethod {
-        try await addPaymentMethod(.card(card), options: options)
-    }
-
-    public func addBankAccount(
-        _ ach: PayabliPayInBankAccountData,
-        options: PayabliPayInTokenStorageOptions = PayabliPayInTokenStorageOptions()
-    ) async throws -> PayabliPayInStoredPaymentMethod {
-        try await addPaymentMethod(.bankAccount(ach), options: options)
     }
 
     /// Authorizes and captures a transaction in one step using

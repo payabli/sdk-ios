@@ -33,10 +33,13 @@ final class PaymentSummaryRenderTests: XCTestCase {
             operation: operation,
             requestConfiguration: paymentDetails.map { PayabliPayInRequestConfiguration(paymentDetails: $0) }
         )
-        let host = PayInUIKitHostingSupport.host(PayabliPayInView(
-            component: component,
+        let host = PayInUIKitHostingSupport.host(PayabliPayInForm(
+            payIn: component,
+            operation: operation,
             configuration: PayabliPayInFormConfiguration(allowedMethods: [.card]),
-            onCompleted: { _ in }
+            onCompleted: { _ in },
+            onFailed: { _ in },
+            onMethodChanged: { _ in }
         ))
         PayInUIKitHostingSupport.waitForRenderedSubviews(in: host.view)
         return host.sizeThatFits(in: CGSize(width: 390, height: CGFloat.greatestFiniteMagnitude)).height

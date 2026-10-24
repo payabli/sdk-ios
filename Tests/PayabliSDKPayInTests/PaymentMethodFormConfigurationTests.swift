@@ -32,27 +32,27 @@ final class PaymentMethodFormConfigurationTests: XCTestCase {
     }
 
     func testErrorMessagePlacementIsConfigurable() {
-        XCTAssertEqual(PayabliPayInFormConfiguration().errorMessagePlacement, .aboveSubmitButton)
+        XCTAssertEqual(PayabliPayInFormConfiguration().failureMessagePlacement, .aboveSubmitButton)
 
-        let configuration = PayabliPayInFormConfiguration(errorMessagePlacement: .top)
+        let configuration = PayabliPayInFormConfiguration(failureMessagePlacement: .top)
 
-        XCTAssertEqual(configuration.errorMessagePlacement, .top)
+        XCTAssertEqual(configuration.failureMessagePlacement, .top)
     }
 
     func testTheFormTitleAndButtonWordingAreUnsetByDefault() {
-        XCTAssertNil(PayabliPayInLabels().title)
-        XCTAssertNil(PayabliPayInLabels().submitButton)
+        XCTAssertNil(PayabliPayInFormLabels().title)
+        XCTAssertNil(PayabliPayInFormLabels().submitButton)
     }
 
     func testPaymentMethodLabelsUsePostalCodeCopy() {
-        let labels = PayabliPayInLabels()
+        let labels = PayabliPayInFormLabels()
 
         XCTAssertEqual(labels.label(for: .cardZip), "Postal code")
         XCTAssertEqual(labels.label(for: .billingZip), "Billing postal code")
     }
 
     func testPaymentMethodLabelsCanConfigureFieldPlaceholders() {
-        let labels = PayabliPayInLabels(
+        let labels = PayabliPayInFormLabels(
             fieldLabels: [.cardNumber: "Card #"],
             fieldPlaceholders: [
                 .cardNumber: "1234 1234 1234 1234",
@@ -75,17 +75,17 @@ final class PaymentMethodFormConfigurationTests: XCTestCase {
         XCTAssertFalse(placeholderLayoutConfiguration.showsFieldLabels)
 
         let configuration = PayabliPayInFormConfiguration(
-            labels: PayabliPayInLabels(
-                fieldPlaceholders: [.cardNumber: "Enter card number"]
-            ),
             labelLayout: .external,
             showsFieldLabels: false,
             hiddenFieldLabels: [.cardCvv]
         )
+        let labels = PayabliPayInFormLabels(
+            fieldPlaceholders: [.cardNumber: "Enter card number"]
+        )
 
         XCTAssertFalse(configuration.showsFieldLabels)
-        XCTAssertEqual(configuration.labels.placeholder(for: .cardNumber), "Enter card number")
         XCTAssertTrue(configuration.hiddenFieldLabels.contains(.cardCvv))
+        XCTAssertEqual(labels.placeholder(for: .cardNumber), "Enter card number")
     }
 
     func testFormConfigurationCanGroupFieldsIntoSections() {
@@ -275,7 +275,7 @@ final class PaymentMethodFormConfigurationTests: XCTestCase {
     @MainActor
     func testStyleModifierWritesEnvironmentStyle() async {
         let expectation = expectation(description: "Style probe appeared")
-        let style = PayabliPayInStyle(
+        let style = PayabliPayInFormStyle(
             accentColor: .purple,
             layout: PayabliPayInLayoutStyle(contentSpacing: 33)
         )
@@ -335,7 +335,7 @@ final class PaymentMethodFormConfigurationTests: XCTestCase {
 
     @MainActor
     func testViewModelInputLimitHelpers() {
-        let viewModel = PayabliPayInViewModel(component: component())
+        let viewModel = PayabliPayInViewModel(component: component(), operation: .storePaymentMethod)
 
         XCTAssertEqual(viewModel.limitCardholderName(String(repeating: "A", count: 61)).count, 60)
         XCTAssertEqual(viewModel.formatCardNumber(String(repeating: "4", count: 25)).digitsOnly.count, 19)
@@ -374,6 +374,7 @@ final class PaymentMethodFormConfigurationTests: XCTestCase {
     func testViewModelFormatsTypedExpirationAndDefaultsPickerSelection() throws {
         let viewModel = PayabliPayInViewModel(
             component: component(),
+            operation: .storePaymentMethod,
             configuration: PayabliPayInFormConfiguration(
                 allowedMethods: [.card],
                 formatting: PayabliPayInFormatting(expirationSeparator: "-")
@@ -419,6 +420,7 @@ final class PaymentMethodFormConfigurationTests: XCTestCase {
     func testViewModelReportsInvalidCardNumberAsUserTypes() {
         let viewModel = PayabliPayInViewModel(
             component: component(),
+            operation: .storePaymentMethod,
             configuration: PayabliPayInFormConfiguration(allowedMethods: [.card])
         )
 
@@ -447,6 +449,7 @@ final class PaymentMethodFormConfigurationTests: XCTestCase {
                 environment: .sandbox,
                 transport: ThrowingPaymentMethodTransport(error: PaymentMethodTestError.transportBoom)
             ),
+            operation: .storePaymentMethod,
             configuration: PayabliPayInFormConfiguration(allowedMethods: [.card])
         )
         viewModel.cardholderName = "Jane Doe"
@@ -459,7 +462,7 @@ final class PaymentMethodFormConfigurationTests: XCTestCase {
             _ = try await viewModel.submit()
             XCTFail("Expected transport error")
         } catch PaymentMethodTestError.transportBoom {
-            XCTAssertEqual(viewModel.errorMessage, "The payment method couldn't be saved.")
+            XCTAssertEqual(viewModel.failureMessage, "The payment method couldn't be saved.")
         } catch {
             XCTFail("Wrong error: \(error)")
         }
@@ -469,6 +472,7 @@ final class PaymentMethodFormConfigurationTests: XCTestCase {
     func testViewModelRequiresACHCustomerFieldsBeforeSubmit() async {
         let viewModel = PayabliPayInViewModel(
             component: component(),
+            operation: .storePaymentMethod,
             configuration: PayabliPayInFormConfiguration(
                 allowedMethods: [.bankAccount],
                 defaultMethod: .bankAccount,
@@ -516,6 +520,7 @@ final class PaymentMethodFormConfigurationTests: XCTestCase {
     func testViewModelEvaluatesRequiredPickerAndExpirationFields() {
         let cardViewModel = PayabliPayInViewModel(
             component: component(),
+            operation: .storePaymentMethod,
             configuration: PayabliPayInFormConfiguration(
                 allowedMethods: [.card],
                 requiredFields: [.cardExpiration]
@@ -534,6 +539,7 @@ final class PaymentMethodFormConfigurationTests: XCTestCase {
 
         let achViewModel = PayabliPayInViewModel(
             component: component(),
+            operation: .storePaymentMethod,
             configuration: PayabliPayInFormConfiguration(
                 allowedMethods: [.bankAccount],
                 defaultMethod: .bankAccount,
@@ -551,6 +557,7 @@ final class PaymentMethodFormConfigurationTests: XCTestCase {
     func testViewModelBuildsExpirationFromMonthYearSelection() {
         let viewModel = PayabliPayInViewModel(
             component: component(),
+            operation: .storePaymentMethod,
             configuration: PayabliPayInFormConfiguration(allowedMethods: [.card])
         )
 
@@ -578,7 +585,7 @@ final class PaymentMethodFormConfigurationTests: XCTestCase {
 private struct PaymentMethodStyleProbe: View {
     @Environment(\.payabliPayInStyle) private var style
 
-    let onAppear: (PayabliPayInStyle) -> Void
+    let onAppear: (PayabliPayInFormStyle) -> Void
 
     var body: some View {
         Text("Style probe")

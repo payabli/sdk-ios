@@ -266,10 +266,16 @@ struct CheckoutView: View {
     let payIn: PayabliPayIn
 
     var body: some View {
-        PayabliPayInView(
-            component: payIn,
-            onCompleted: { result in order.paymentTransId = result.transaction?.paymentTransId },
-            onError: { error in /* see Handle the outcome */ }
+        PayabliPayInForm(
+            payIn: payIn,
+            operation: .capture,
+            onCompleted: { success in
+                if case let .payment(result) = success {
+                    order.paymentTransId = result.transaction?.paymentTransId
+                }
+            },
+            onFailed: { error in /* see Handle the outcome */ },
+            onMethodChanged: { _ in }
         )
     }
 }
@@ -352,8 +358,10 @@ The SDK is written in Swift, and the card-not-present form is a SwiftUI view.
   `createWithCompletionHandler:`. Its `charge:completion:` takes a `PayabliTTPChargeRequestObjC`, built with
   `initWithPaymentDetails:`, whose `customer`, `invoice`, `orderDescription` and `attempt` are optional and take the
   Swift defaults when unset. For card-not-present, Objective-C uses `PayabliPayInObjC`, built with
-  `createAndReturnError:` on the same session. It offers `addCard` and `addBankAccount`, and `capture`,
-  `authorize`, `captureAuthorizedTransaction` and `voidTransaction`, which take a `PayabliPayInRequestObjC` or
+  `createAndReturnError:` on the same session. It offers `storeMethod`, which takes a
+  `PayabliPayInStoreRequestObjC` built with its `card` or `bankAccount` factory — `bankAccount` returns nil when
+  a named value is none of those listed — and completes with a `PayabliPayInStoredMethodObjC`. It also offers
+  `capture`, `authorize`, `captureAuthorizedTransaction` and `voidTransaction`, which take a `PayabliPayInRequestObjC` or
   `PayabliPayInAuthorizedRequestObjC` and complete with a `PayabliPayInResultObjC`.
 - **Objective-C errors.** An SDK error reaches Objective-C as an `NSError` whose `code` is its catalog
   number, with the type's name in `userInfo["PayabliErrorType"]`. Tap to Pay errors are in the

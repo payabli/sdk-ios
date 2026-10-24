@@ -85,7 +85,7 @@ namespace Payabli.TapToPay
     public delegate void TapToPaySessionStateHandler();
 
     public delegate void PayabliPayInCompletion(
-        [NullAllowed] PayabliPayInStoredPaymentMethodObjC result,
+        [NullAllowed] PayabliPayInStoredMethodObjC result,
         [NullAllowed] NSError error
     );
 
@@ -289,7 +289,7 @@ namespace Payabli.TapToPay
 
     [BaseType(typeof(NSObject))]
     [DisableDefaultCtor]
-    public interface PayabliPayInStoredPaymentMethodObjC
+    public interface PayabliPayInStoredMethodObjC
     {
         [NullAllowed, Export("storedMethodId")] string StoredMethodId { get; }
         [Export("method")] string Method { get; }
@@ -299,6 +299,43 @@ namespace Payabli.TapToPay
         [NullAllowed, Export("customerId")] NSNumber CustomerId { get; }
         [Export("responseText")] string ResponseText { get; }
         [Export("apiResponse")] NSDictionary ApiResponse { get; }
+    }
+
+    // A store request comes from a factory naming its kind, and the option
+    // properties are set on it afterwards; what is left null the paypoint's own
+    // settings decide.
+    [BaseType(typeof(NSObject))]
+    [DisableDefaultCtor]
+    public interface PayabliPayInStoreRequestObjC
+    {
+        [Static]
+        [Export("cardWithCardNumber:expiration:cardholderName:cvv:billingZip:")]
+        PayabliPayInStoreRequestObjC Card(
+            string cardNumber,
+            string expiration,
+            string cardholderName,
+            string cvv,
+            string billingZip
+        );
+
+        // Null when a named value names none of the kinds the request takes.
+        [Static]
+        [return: NullAllowed]
+        [Export("bankAccountWithAccountNumber:accountType:holderName:routingNumber:secCode:holderType:")]
+        PayabliPayInStoreRequestObjC BankAccount(
+            string accountNumber,
+            string accountType,
+            string holderName,
+            string routingNumber,
+            [NullAllowed] string secCode,
+            [NullAllowed] string holderType
+        );
+
+        [NullAllowed, Export("achValidation")] NSNumber AchValidation { get; set; }
+        [NullAllowed, Export("createAnonymous")] NSNumber CreateAnonymous { get; set; }
+        [NullAllowed, Export("forceCustomerCreation")] NSNumber ForceCustomerCreation { get; set; }
+        [NullAllowed, Export("temporary")] NSNumber Temporary { get; set; }
+        [NullAllowed, Export("source")] string Source { get; set; }
     }
 
     [BaseType(typeof(NSObject))]
@@ -311,33 +348,10 @@ namespace Payabli.TapToPay
         [return: NullAllowed]
         PayabliPayInObjC Create(out NSError error);
 
-        [Export("addCardWithCardNumber:expiration:cardholderName:cvv:billingZip:createAnonymous:forceCustomerCreation:temporary:source:completion:")]
-        void AddCard(
-            string cardNumber,
-            string expiration,
-            string cardholderName,
-            string cvv,
-            string billingZip,
-            bool createAnonymous,
-            bool forceCustomerCreation,
-            bool temporary,
-            [NullAllowed] string source,
-            PayabliPayInCompletion completion
-        );
-
-        [Export("addBankAccountWithAccountNumber:accountType:holderName:routingNumber:secCode:holderType:achValidation:createAnonymous:forceCustomerCreation:temporary:source:completion:")]
-        void AddBankAccount(
-            string accountNumber,
-            string accountType,
-            string holderName,
-            string routingNumber,
-            [NullAllowed] string secCode,
-            [NullAllowed] string holderType,
-            bool achValidation,
-            bool createAnonymous,
-            bool forceCustomerCreation,
-            bool temporary,
-            [NullAllowed] string source,
+        // Stores the payment method the request names, with the options set on it.
+        [Export("storeMethodWithRequest:completion:")]
+        void StoreMethod(
+            PayabliPayInStoreRequestObjC request,
             PayabliPayInCompletion completion
         );
     }

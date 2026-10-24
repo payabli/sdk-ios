@@ -80,7 +80,7 @@ final class PaymentMethodAccessibilityTests: XCTestCase {
 
     func testARefusalAnnouncesTheFieldsItNewlyMarkedInTheOrderTheFormDrawsThem() {
         let drawn: [PayabliPayInField] = [.cardholderName, .cardNumber, .cardExpiration, .cardCvv, .cardZip]
-        let label: (PayabliPayInField) -> String = { PayabliPayInLabels.defaultFieldLabels[$0] ?? $0.rawValue }
+        let label: (PayabliPayInField) -> String = { PayabliPayInFormLabels.defaultFieldLabels[$0] ?? $0.rawValue }
         let message = PayabliPayInAccessibility.rejectedFieldMessage
 
         XCTAssertEqual(
@@ -147,20 +147,24 @@ final class PaymentMethodAccessibilityTests: XCTestCase {
         ]
         let configuration = PayabliPayInFormConfiguration(
             allowedMethods: [.card],
-            labels: PayabliPayInLabels(
-                fieldPlaceholders: Dictionary(uniqueKeysWithValues: hiddenLabelFields.map { field in
-                    (
-                        field,
-                        PayabliPayInLabels.defaultFieldLabels[field] ?? field.rawValue
-                    )
-                })
-            ),
             showsFieldLabels: false
         )
-        let view = PayabliPayInView(
-            component: component,
+        let labels = PayabliPayInFormLabels(
+            fieldPlaceholders: Dictionary(uniqueKeysWithValues: hiddenLabelFields.map { field in
+                (
+                    field,
+                    PayabliPayInFormLabels.defaultFieldLabels[field] ?? field.rawValue
+                )
+            })
+        )
+        let view = PayabliPayInForm(
+            payIn: component,
+            operation: .storePaymentMethod,
             configuration: configuration,
-            onCompleted: { _ in }
+            labels: labels,
+            onCompleted: { _ in },
+            onFailed: { _ in },
+            onMethodChanged: { _ in }
         )
         let host = UIHostingController(rootView: view)
         let window = UIWindow(frame: UIScreen.main.bounds)

@@ -1,16 +1,19 @@
 import Foundation
 
-/// Carries the configuration itself into a change handler, which may otherwise read the view's
-/// previous value.
+/// Carries the configuration and the labels into a change handler, which may otherwise read the
+/// view's previous values.
 struct PayInPaymentFlowConfigurationChange: Equatable {
     let configuration: PayabliPayInFormConfiguration
+    let labels: PayabliPayInFormLabels
 
-    init(_ configuration: PayabliPayInFormConfiguration) {
+    init(_ configuration: PayabliPayInFormConfiguration, labels: PayabliPayInFormLabels) {
         self.configuration = configuration
+        self.labels = labels
     }
 
     static func == (lhs: Self, rhs: Self) -> Bool {
         lhs.configuration.payabliViewModelSignature == rhs.configuration.payabliViewModelSignature
+            && lhs.labels.payabliViewModelSignature == rhs.labels.payabliViewModelSignature
     }
 }
 
@@ -23,11 +26,11 @@ extension PayabliPayInFormConfiguration {
             "achFields:\(bankFieldOrder.map(\.rawValue).joined(separator: ","))",
             "hidden:\(hiddenValues.payabliViewModelSignature)",
             "options:\(options.payabliViewModelSignature)",
-            "labels:\(labels.payabliViewModelSignature)",
             "formatting:\(formatting.payabliViewModelSignature)",
             "required:\(requiredFields.map(\.rawValue).sorted().joined(separator: ","))",
             "paymentSummary:\(paymentSummary.payabliViewModelSignature)",
-            "showsBaseAmount:\(showsBaseAmount)"
+            "showsBaseAmount:\(showsBaseAmount)",
+            "showsFailureMessage:\(showsFailureMessage)"
         ]
         .joined(separator: "|")
     }
@@ -46,7 +49,7 @@ private extension PayabliPayInHiddenValues {
     }
 }
 
-private extension PayabliPayInLabels {
+extension PayabliPayInFormLabels {
     var payabliViewModelSignature: String {
         [
             "title:\(title ?? "")",
@@ -54,7 +57,11 @@ private extension PayabliPayInLabels {
             "submit:\(submitButton ?? "")",
             "labels:\(fieldLabels.payabliViewModelSignature)",
             "placeholders:\(fieldPlaceholders.payabliViewModelSignature)",
-            "total:\(total ?? "")"
+            "total:\(total ?? "")",
+            "declined:\(declinedMessage ?? "")",
+            "retryLater:\(retryLaterMessage ?? "")",
+            "outcomeUnknown:\(outcomeUnknownMessage ?? "")",
+            "other:\(otherMessage ?? "")"
         ]
         .joined(separator: "|")
     }

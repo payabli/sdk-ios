@@ -546,6 +546,7 @@ final class TokenStorageClientTests: XCTestCase {
         )
         let viewModel = PayabliPayInViewModel(
             component: component,
+            operation: .storePaymentMethod,
             configuration: PayabliPayInFormConfiguration(
                 allowedMethods: [.card],
                 cardFieldOrder: [.cardNumber, .cardExpiration, .cardholderName],
@@ -608,6 +609,7 @@ final class TokenStorageClientTests: XCTestCase {
         )
         let viewModel = PayabliPayInViewModel(
             component: component,
+            operation: .storePaymentMethod,
             configuration: PayabliPayInFormConfiguration(
                 allowedMethods: [.card],
                 cardFieldOrder: [.cardholderName, .cardNumber, .cardExpiration, .cardCvv, .cardZip],
@@ -661,6 +663,7 @@ final class TokenStorageClientTests: XCTestCase {
         )
         let viewModel = PayabliPayInViewModel(
             component: component,
+            operation: .storePaymentMethod,
             configuration: PayabliPayInFormConfiguration(
                 allowedMethods: [.bankAccount],
                 defaultMethod: .bankAccount,
@@ -708,6 +711,7 @@ final class TokenStorageClientTests: XCTestCase {
                 environment: .sandbox,
                 transport: transport
             ),
+            operation: .storePaymentMethod,
             configuration: PayabliPayInFormConfiguration(allowedMethods: [.card])
         )
         viewModel.cardNumber = "4111111111111111"
@@ -722,7 +726,7 @@ final class TokenStorageClientTests: XCTestCase {
         } catch let PayabliPayInTokenStorageError.saveFailed(failure) {
             XCTAssertEqual(failure.responseCode, 6000)
             XCTAssertEqual(PayabliPayInTokenStorageError.saveFailed(failure).type, .paymentDeclined)
-            XCTAssertEqual(viewModel.errorMessage, "This payment method couldn't be saved. Try another one.")
+            XCTAssertEqual(viewModel.failureMessage, "This payment method couldn't be saved. Try another one.")
             XCTAssertEqual(viewModel.cardNumber, "")
             XCTAssertEqual(viewModel.cardExpiration, "")
             XCTAssertEqual(viewModel.cardholderName, "Jane Doe")
@@ -747,6 +751,7 @@ final class TokenStorageClientTests: XCTestCase {
                 environment: .sandbox,
                 transport: transport
             ),
+            operation: .storePaymentMethod,
             configuration: PayabliPayInFormConfiguration(
                 allowedMethods: [.bankAccount],
                 defaultMethod: .bankAccount
@@ -762,7 +767,7 @@ final class TokenStorageClientTests: XCTestCase {
             XCTFail("Expected payment method failure")
         } catch let error as PayabliPaymentError {
             guard case .server = error else { return XCTFail("Wrong error: \(error)") }
-            XCTAssertEqual(viewModel.errorMessage, "The payment method couldn't be saved.")
+            XCTAssertEqual(viewModel.failureMessage, "The payment method couldn't be saved.")
             XCTAssertEqual(viewModel.accountHolder, "Jane Business")
             XCTAssertEqual(viewModel.routingNumber, "")
             XCTAssertEqual(viewModel.accountNumber, "")
@@ -783,7 +788,7 @@ private func firstRequest(from transport: MockTransport) async throws -> Payabli
     return try XCTUnwrap(requests.first)
 }
 
-private func assertCardPaymentMethodResult(_ result: PayabliPayInStoredPaymentMethod) {
+private func assertCardPaymentMethodResult(_ result: PayabliPayInStoredMethod) {
     XCTAssertEqual(result.storedMethodId, "stored-123")
     XCTAssertEqual(result.apiResponse.isSuccess, true)
     XCTAssertEqual(result.apiResponse.responseText, "Success")

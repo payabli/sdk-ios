@@ -416,7 +416,7 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
             cvv: cvv,
             billingZip: billingZip
         )
-        handleAddPaymentMethod(
+        handleStoreMethod(
             .card(card),
             options: payInOptions(from: args),
             component: payIn,
@@ -448,7 +448,7 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
             secCode: (args["secCode"] as? String).flatMap(PayabliPayInSecCode.init(rawValue:)),
             holderType: (args["holderType"] as? String).flatMap(PayabliPayInAccountHolderType.init(rawValue:))
         )
-        handleAddPaymentMethod(
+        handleStoreMethod(
             .bankAccount(ach),
             options: payInOptions(from: args),
             component: payIn,
@@ -456,7 +456,7 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
         )
     }
 
-    private func handleAddPaymentMethod(
+    private func handleStoreMethod(
         _ payInInput: PayabliPayInMethodInput,
         options: PayabliPayInOptions,
         component: PayabliPayIn,
@@ -464,7 +464,10 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
     ) {
         Task { @MainActor in
             do {
-                let method = try await component.addPaymentMethod(payInInput, options: options)
+                let method = try await component.storeMethod(PayabliPayInStoreRequest(
+                    instrument: payInInput,
+                    options: options
+                ))
                 result(Self.storedPaymentMethodMap(method))
             } catch {
                 result(error.toFlutterError(defaultCode: "PAYIN_FAILED"))
@@ -538,7 +541,7 @@ public final class PayabliSDKPlugin: NSObject, FlutterPlugin {
         }
     }
 
-    private static func storedPaymentMethodMap(_ method: PayabliPayInStoredPaymentMethod) -> [String: Any] {
+    private static func storedPaymentMethodMap(_ method: PayabliPayInStoredMethod) -> [String: Any] {
         var map: [String: Any] = [
             "method": methodName(method.method),
             "responseText": method.responseText,
