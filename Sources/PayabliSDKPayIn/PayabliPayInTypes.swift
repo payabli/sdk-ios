@@ -693,7 +693,7 @@ extension PayabliPayInPaymentDetails {
     }
 }
 
-private extension PayabliPayInCardData {
+extension PayabliPayInCardData {
     func normalizedCaptureExpiration() throws -> String {
         let digits = expiry.payabliCaptureDigitsOnly
         guard digits.count == 4 else {
