@@ -1,3 +1,4 @@
+import PayabliSDKCore
 import SwiftUI
 import UIKit
 
@@ -45,24 +46,47 @@ public struct PayabliPayInSheetConfiguration {
 }
 
 public extension View {
+    /// Presents the form in a sheet, bound to one operation of a component.
+    ///
+    /// - Parameters:
+    ///   - isPresented: whether the sheet is shown.
+    ///   - payIn: the component the form submits through.
+    ///   - operation: the one operation the form submits.
+    ///   - configuration: the fields the form draws and how they behave.
+    ///   - labels: the wording the form draws; what is absent or blank falls back to the SDK's own.
+    ///   - sheetConfiguration: how the sheet itself is presented.
+    ///   - style: the colors, fonts and spacing the form draws with, nil to read the environment's.
+    ///   - onCompleted: called once with the outcome of the submission: `.method` for a stored payment
+    ///     method, `.payment` for a transaction.
+    ///   - onFailed: called with the failure the flow threw, unchanged, when a submission the form
+    ///     sent did not complete.
+    ///   - onMethodChanged: called when the drawn method changes: the payer's choice, or the
+    ///     configuration withdrawing the method the payer had chosen. Not called for the method the
+    ///     form opens with.
     func payabliPayInSheet(
         isPresented: Binding<Bool>,
-        component: PayabliPayIn,
+        payIn: PayabliPayIn,
+        operation: PayabliPayInOperation,
         configuration: PayabliPayInFormConfiguration = PayabliPayInFormConfiguration(),
+        labels: PayabliPayInFormLabels = PayabliPayInFormLabels(),
         sheetConfiguration: PayabliPayInSheetConfiguration = PayabliPayInSheetConfiguration(),
-        style: PayabliPayInStyle? = nil,
-        onCompleted: @escaping (PayabliPayInResult) -> Void,
-        onError: @escaping (Error) -> Void = { _ in }
+        style: PayabliPayInFormStyle? = nil,
+        onCompleted: @escaping (PayabliPayInFormSuccess) -> Void,
+        onFailed: @escaping (any PayabliError) -> Void,
+        onMethodChanged: @escaping (PayabliPayInMethodType) -> Void
     ) -> some View {
         sheet(isPresented: isPresented) {
             PayabliPayInSheetContent(
                 isPresented: isPresented,
-                component: component,
+                payIn: payIn,
+                operation: operation,
                 configuration: configuration,
+                labels: labels,
                 sheetConfiguration: sheetConfiguration,
                 style: style,
                 onCompleted: onCompleted,
-                onError: onError
+                onFailed: onFailed,
+                onMethodChanged: onMethodChanged
             )
         }
     }
@@ -74,30 +98,39 @@ struct PayabliPayInSheetContent: View {
     @State private var measuredContentHeight: CGFloat = 0
     @State private var largestAvailableSheetHeight: CGFloat = 0
 
-    let component: PayabliPayIn
+    let payIn: PayabliPayIn
+    let operation: PayabliPayInOperation
     let configuration: PayabliPayInFormConfiguration
+    let labels: PayabliPayInFormLabels
     let sheetConfiguration: PayabliPayInSheetConfiguration
-    let style: PayabliPayInStyle?
-    let onCompleted: (PayabliPayInResult) -> Void
-    let onError: (Error) -> Void
+    let style: PayabliPayInFormStyle?
+    let onCompleted: (PayabliPayInFormSuccess) -> Void
+    let onFailed: (any PayabliError) -> Void
+    let onMethodChanged: (PayabliPayInMethodType) -> Void
 
     init(
         isPresented: Binding<Bool>,
-        component: PayabliPayIn,
+        payIn: PayabliPayIn,
+        operation: PayabliPayInOperation,
         configuration: PayabliPayInFormConfiguration,
+        labels: PayabliPayInFormLabels,
         sheetConfiguration: PayabliPayInSheetConfiguration,
-        style: PayabliPayInStyle?,
-        onCompleted: @escaping (PayabliPayInResult) -> Void,
-        onError: @escaping (Error) -> Void
+        style: PayabliPayInFormStyle?,
+        onCompleted: @escaping (PayabliPayInFormSuccess) -> Void,
+        onFailed: @escaping (any PayabliError) -> Void,
+        onMethodChanged: @escaping (PayabliPayInMethodType) -> Void
     ) {
         _isPresented = isPresented
         _selectedDetent = State(initialValue: Self.initialDetent(for: sheetConfiguration))
-        self.component = component
+        self.payIn = payIn
+        self.operation = operation
         self.configuration = configuration
+        self.labels = labels
         self.sheetConfiguration = sheetConfiguration
         self.style = style
         self.onCompleted = onCompleted
-        self.onError = onError
+        self.onFailed = onFailed
+        self.onMethodChanged = onMethodChanged
     }
 
     var body: some View {
@@ -106,17 +139,20 @@ struct PayabliPayInSheetContent: View {
                 VStack(alignment: .leading, spacing: 20) {
                     sheetHeader
 
-                    PayabliPayInView(
-                        component: component,
-                        configuration: formConfiguration,
+                    PayabliPayInForm(
+                        payIn: payIn,
+                        operation: operation,
+                        configuration: configuration,
+                        labels: formLabels,
                         style: style,
-                        onCompleted: { result in
-                            onCompleted(result)
+                        onCompleted: { success in
+                            onCompleted(success)
                             if sheetConfiguration.dismissesOnSuccess {
                                 isPresented = false
                             }
                         },
-                        onError: onError
+                        onFailed: onFailed,
+                        onMethodChanged: onMethodChanged
                     )
                     .transaction { transaction in
                         transaction.animation = nil
@@ -203,53 +239,38 @@ struct PayabliPayInSheetContent: View {
         sheetConfiguration.dismissButton != .hidden || sheetTitle != nil || sheetSubtitle != nil
     }
 
-    private var sheetTitle: String? {
+    var sheetTitle: String? {
         if let configuredTitle = sheetConfiguration.title?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty {
             return configuredTitle
         }
         guard sheetConfiguration.movesFormHeaderToSheetHeader else { return nil }
-        return configuration.labels.drawnTitle
+        return labels.drawnTitle
     }
 
-    private var sheetSubtitle: String? {
+    var sheetSubtitle: String? {
         if let configuredSubtitle = sheetConfiguration.subtitle?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty {
             return configuredSubtitle
         }
         guard sheetConfiguration.movesFormHeaderToSheetHeader else { return nil }
-        return configuration.labels.subtitle?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty
+        return labels.subtitle?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty
     }
 
-    var formConfiguration: PayabliPayInFormConfiguration {
-        guard sheetConfiguration.movesFormHeaderToSheetHeader else { return configuration }
+    /// The labels the form inside the sheet draws: the sheet's header owns the form's heading when
+    /// the configuration moves it there, so the form draws no heading of its own.
+    var formLabels: PayabliPayInFormLabels {
+        guard sheetConfiguration.movesFormHeaderToSheetHeader else { return labels }
 
-        let labels = PayabliPayInLabels(
+        return PayabliPayInFormLabels(
             title: nil,
             subtitle: nil,
-            submitButton: configuration.labels.submitButton,
-            fieldLabels: configuration.labels.fieldLabels,
-            fieldPlaceholders: configuration.labels.fieldPlaceholders,
-            total: configuration.labels.total
-        )
-        return PayabliPayInFormConfiguration(
-            allowedMethods: configuration.allowedMethods,
-            defaultMethod: configuration.defaultMethod,
-            cardFieldOrder: configuration.cardFieldOrder,
-            bankFieldOrder: configuration.bankFieldOrder,
-            cardSections: configuration.cardSections,
-            bankSections: configuration.bankSections,
-            hiddenValues: configuration.hiddenValues,
-            options: configuration.options,
-            labels: labels,
-            labelLayout: configuration.labelLayout,
-            showsFieldLabels: configuration.showsFieldLabels,
-            hiddenFieldLabels: configuration.hiddenFieldLabels,
-            formatting: configuration.formatting,
-            inputSizing: configuration.inputSizing,
-            cardBrandIconPlacement: configuration.cardBrandIconPlacement,
-            errorMessagePlacement: configuration.errorMessagePlacement,
-            requiredFields: configuration.requiredFields,
-            paymentSummary: configuration.paymentSummary,
-            showsBaseAmount: configuration.showsBaseAmount
+            submitButton: labels.submitButton,
+            fieldLabels: labels.fieldLabels,
+            fieldPlaceholders: labels.fieldPlaceholders,
+            total: labels.total,
+            declinedMessage: labels.declinedMessage,
+            retryLaterMessage: labels.retryLaterMessage,
+            outcomeUnknownMessage: labels.outcomeUnknownMessage,
+            otherMessage: labels.otherMessage
         )
     }
 

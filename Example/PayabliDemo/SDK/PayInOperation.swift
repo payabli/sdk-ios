@@ -1,3 +1,5 @@
+import PayabliSDKPayIn
+
 /// What a form is for.
 ///
 /// Its own file because two things read it: the form setup that carries it, and the
@@ -14,6 +16,18 @@ enum PayInOperation {
 
     /// Reverse a payment already taken. The SDK mints the key and never shows it.
     case void
+
+    /// The SDK's operation the form submits for this purpose.
+    ///
+    /// A reversal runs as a direct call on a flow the app already holds, so it is never drawn
+    /// as a form; its entry here only keeps the switch total.
+    var formOperation: PayabliPayInOperation {
+        switch self {
+        case .storedMethod: .storePaymentMethod
+        case .capture, .void: .capture
+        case .authorize: .authorize
+        }
+    }
 
     /// Whether the same key can reach the service twice, which is what makes a conflict a repeat.
     ///

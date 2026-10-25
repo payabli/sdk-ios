@@ -248,12 +248,15 @@ final class TokenStorageClientCoverageTests: XCTestCase {
         let component = flowOnSession(token: "")
 
         do {
-            _ = try await component.addCard(PayabliPayInCardData(
-                cardNumber: "4111111111111111",
-                expiration: "02/28",
-                cardholderName: "Jane Doe",
-                cvv: "123",
-                billingZip: "33139"
+            _ = try await component.storeMethod(PayabliPayInStoreRequest(
+                instrument: .card(PayabliPayInCardData(
+                    cardNumber: "4111111111111111",
+                    expiration: "02/28",
+                    cardholderName: "Jane Doe",
+                    cvv: "123",
+                    billingZip: "33139"
+                )),
+                options: PayabliPayInTokenStorageOptions()
             ))
             XCTFail("Expected missing token error")
         } catch let error as PayabliGenericError {
@@ -283,6 +286,7 @@ final class TokenStorageClientCoverageTests: XCTestCase {
                 environment: .sandbox,
                 transport: transport
             ),
+            operation: .storePaymentMethod,
             configuration: PayabliPayInFormConfiguration(
                 allowedMethods: [.bankAccount],
                 defaultMethod: .bankAccount,

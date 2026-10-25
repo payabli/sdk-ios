@@ -17,7 +17,7 @@ final class PayInPaymentFlowTokenStorageClient: Sendable {
         entryPoint: String,
         paymentMethod: PayabliPayInMethodInput,
         options: PayabliPayInTokenStorageOptions = PayabliPayInTokenStorageOptions()
-    ) async throws -> PayabliPayInStoredPaymentMethod {
+    ) async throws -> PayabliPayInStoredMethod {
         let entry = entryPoint.trimmed
         guard !entry.isEmpty else {
             throw PayabliPayInTokenStorageError.invalidInput("Entrypoint is required.")
@@ -89,7 +89,7 @@ final class PayInPaymentFlowTokenStorageClient: Sendable {
     private func decodeStoredPaymentMethod(
         from response: PayabliResponse,
         method: PayabliPayInStoredMethodType
-    ) throws -> PayabliPayInStoredPaymentMethod {
+    ) throws -> PayabliPayInStoredMethod {
         let decoder = JSONDecoder()
         do {
             let decoded = try decoder.decode(PayabliPayInTokenStorageAPIResponse.self, from: response.body)
@@ -97,7 +97,7 @@ final class PayInPaymentFlowTokenStorageClient: Sendable {
             guard approved else {
                 throw PayabliPayInTokenStorageError.saveFailed(decoded.failure(httpStatusCode: response.statusCode))
             }
-            return PayabliPayInStoredPaymentMethod(
+            return PayabliPayInStoredMethod(
                 storedMethodId: decoded.responseData?.referenceId,
                 method: method,
                 methodReferenceId: decoded.responseData?.methodReferenceId,

@@ -185,6 +185,7 @@ final class PayabliPayInTests: XCTestCase {
 
         let viewModel = PayabliPayInViewModel(
             component: component,
+            operation: .authorize,
             configuration: configuration
         )
 
@@ -194,7 +195,7 @@ final class PayabliPayInTests: XCTestCase {
         XCTAssertFalse(viewModel.activeFields.contains(.accountNumber))
     }
 
-    func testViewModelUpdateReconcilesChangedComponentOperationAndConfiguration() {
+    func testViewModelUpdateReconcilesChangedOperationAndConfiguration() {
         let component = flowOnSession(
             token: "access-token",
             entryPoint: "entry",
@@ -207,18 +208,13 @@ final class PayabliPayInTests: XCTestCase {
         )
         let viewModel = PayabliPayInViewModel(
             component: component,
+            operation: .storePaymentMethod,
             configuration: storeConfiguration
         )
 
         XCTAssertEqual(viewModel.effectiveSelectedMethod, .bankAccount)
         XCTAssertFalse(viewModel.activeFields.contains(.amount))
 
-        component.configure(
-            operation: .capture,
-            requestConfiguration: PayabliPayInRequestConfiguration(
-                paymentDetails: PayabliPayInPaymentDetails(totalAmount: 15, serviceFee: 0.75)
-            )
-        )
         let captureConfiguration = PayabliPayInFormConfiguration(
             allowedMethods: [.card],
             defaultMethod: .card,
@@ -227,7 +223,9 @@ final class PayabliPayInTests: XCTestCase {
 
         viewModel.update(
             component: component,
-            configuration: captureConfiguration
+            operation: .capture,
+            configuration: captureConfiguration,
+            labels: PayabliPayInFormLabels()
         )
 
         XCTAssertEqual(viewModel.availableMethods, [.card])
@@ -284,6 +282,7 @@ final class PayabliPayInTests: XCTestCase {
         )
         let viewModel = PayabliPayInViewModel(
             component: component,
+            operation: .capture,
             configuration: PayabliPayInFormConfiguration(allowedMethods: [.card], defaultMethod: .card)
         )
         viewModel.cardholderName = "Jane Doe"
@@ -298,12 +297,17 @@ final class PayabliPayInTests: XCTestCase {
 
         let submission = Task { try await viewModel.submit() }
         await transport.waitForFirstRequest()
-        component.configure(operation: .storePaymentMethod)
+        viewModel.update(
+            component: component,
+            operation: .storePaymentMethod,
+            configuration: PayabliPayInFormConfiguration(allowedMethods: [.card], defaultMethod: .card),
+            labels: PayabliPayInFormLabels()
+        )
 
         XCTAssertEqual(viewModel.submittingOperation, .capture)
         XCTAssertEqual(
             PayInSubmitWording.text(
-                showing: component.operation,
+                showing: viewModel.operation,
                 submitting: viewModel.submittingOperation,
                 hostWording: nil
             ),
@@ -330,6 +334,7 @@ final class PayabliPayInTests: XCTestCase {
         )
         let viewModel = PayabliPayInViewModel(
             component: component,
+            operation: .capture,
             configuration: PayabliPayInFormConfiguration(allowedMethods: [.card], defaultMethod: .card)
         )
         viewModel.cardholderName = "Jane Doe"
@@ -342,14 +347,19 @@ final class PayabliPayInTests: XCTestCase {
 
         let submission = Task { try await viewModel.submit() }
         await transport.waitForFirstRequest()
-        component.configure(operation: .storePaymentMethod)
+        viewModel.update(
+            component: component,
+            operation: .storePaymentMethod,
+            configuration: PayabliPayInFormConfiguration(allowedMethods: [.card], defaultMethod: .card),
+            labels: PayabliPayInFormLabels()
+        )
         await transport.resume()
 
         do {
             _ = try await submission.value
             XCTFail("Expected the capture to be declined")
         } catch {
-            XCTAssertEqual(viewModel.errorMessage, "The payment was declined. Try another payment method.")
+            XCTAssertEqual(viewModel.failureMessage, "The payment was declined. Try another payment method.")
         }
     }
 
@@ -375,6 +385,7 @@ final class PayabliPayInTests: XCTestCase {
         )
         let viewModel = PayabliPayInViewModel(
             component: component,
+            operation: .capture,
             configuration: configuration
         )
         viewModel.cardholderName = "Jane Doe"
@@ -427,6 +438,7 @@ final class PayabliPayInTests: XCTestCase {
         )
         let viewModel = PayabliPayInViewModel(
             component: component,
+            operation: .capture,
             configuration: PayabliPayInFormConfiguration(allowedMethods: [.card], defaultMethod: .card)
         )
         viewModel.cardholderName = "Jane Doe"
@@ -441,7 +453,7 @@ final class PayabliPayInTests: XCTestCase {
             XCTFail("a total sent as 0.00 is refused")
         } catch let PayabliPayInError.invalidInput(reason) {
             XCTAssertEqual(reason, "Total amount must be greater than 0.")
-            XCTAssertEqual(viewModel.errorMessage, "The payment couldn't be completed.")
+            XCTAssertEqual(viewModel.failureMessage, "The payment couldn't be completed.")
         }
         XCTAssertEqual(viewModel.cardNumber.filter(\.isNumber), "4111111111111111", "only the host can fix the amount")
         XCTAssertEqual(viewModel.cardCvv, "999")
@@ -450,9 +462,9 @@ final class PayabliPayInTests: XCTestCase {
     }
 
     func testPaymentSummaryLabelsDefaultsAndOverrides() {
-        let labels = PayabliPayInLabels()
+        let labels = PayabliPayInFormLabels()
         let summary = PayabliPayInPaymentSummaryConfiguration(rowSpacing: 4)
-        let relabelled = PayabliPayInLabels(fieldLabels: [.amount: "Today", .serviceFee: "Processing"])
+        let relabelled = PayabliPayInFormLabels(fieldLabels: [.amount: "Today", .serviceFee: "Processing"])
 
         XCTAssertEqual(PayabliPayInSummaryRows.labelText(for: .amount, labels: labels), "Amount")
         XCTAssertEqual(PayabliPayInSummaryRows.labelText(for: .serviceFee, labels: labels), "Fee")
@@ -544,6 +556,7 @@ extension PayabliPayInTests {
         formComponent.newIdempotencyKey = { "idem-options" }
         let viewModel = PayabliPayInViewModel(
             component: formComponent,
+            operation: .capture,
             configuration: PayabliPayInFormConfiguration(allowedMethods: [.card], defaultMethod: .card)
         )
         viewModel.cardholderName = "Jane Doe"

@@ -74,14 +74,14 @@ enum PayInSharedConfiguration {
         Dictionary(uniqueKeysWithValues: fields.map { field in
             (
                 field,
-                PayabliPayInLabels.defaultFieldLabels[field] ?? field.rawValue
+                PayabliPayInFormLabels.defaultFieldLabels[field] ?? field.rawValue
             )
         })
     }
 
     // MARK: - Style
 
-    static let style = PayabliPayInStyle(
+    static let style = PayabliPayInFormStyle(
         accentColor: .payabliPrimary,
         input: PayabliPayInInputStyle(
             backgroundColor: Color.payabliBackground,

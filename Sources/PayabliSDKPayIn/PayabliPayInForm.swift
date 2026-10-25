@@ -1,43 +1,114 @@
 import Foundation
+import PayabliSDKCore
 import SwiftUI
 import UIKit
 
+/// The outcome of one submission the form sent.
+public enum PayabliPayInFormSuccess {
+    /// The transaction the operation completed.
+    case payment(PayabliPayInResult)
+    /// The payment method the operation stored.
+    case method(PayabliPayInStoredMethod)
+
+    init(_ result: PayabliPayInResult) {
+        if let storedMethod = result.storedPaymentMethod, result.kind == .storedPaymentMethod {
+            self = .method(storedMethod)
+        } else {
+            self = .payment(result)
+        }
+    }
+}
+
 // swiftlint:disable file_length
 // swiftlint:disable:next type_body_length
-public struct PayabliPayInView: View {
+public struct PayabliPayInForm: View {
     @StateObject var viewModel: PayabliPayInViewModel
     @State var isExpirationPickerPresented = false
     @FocusState var focusedField: PayabliPayInField?
-    @AccessibilityFocusState var isErrorAccessibilityFocused: Bool
+    @AccessibilityFocusState var isFailureMessageAccessibilityFocused: Bool
     @Environment(\.payabliPayInStyle) var environmentStyle
     @Environment(\.dynamicTypeSize) var dynamicTypeSize
 
-    let component: PayabliPayIn
+    let payIn: PayabliPayIn
+    let operation: PayabliPayInOperation
     let configuration: PayabliPayInFormConfiguration
-    let explicitStyle: PayabliPayInStyle?
-    let onCompleted: (PayabliPayInResult) -> Void
-    let onError: (Error) -> Void
+    let labels: PayabliPayInFormLabels
+    let explicitStyle: PayabliPayInFormStyle?
+    let onCompleted: (PayabliPayInFormSuccess) -> Void
+    let onFailed: (any PayabliError) -> Void
+    let onMethodChanged: (PayabliPayInMethodType) -> Void
 
+    /// Creates the form, bound to one operation of a component.
+    ///
+    /// - Parameters:
+    ///   - payIn: the component the form submits through.
+    ///   - operation: the one operation the form submits.
+    ///   - configuration: the fields the form draws and how they behave.
+    ///   - labels: the wording the form draws; what is absent or blank falls back to the SDK's own.
+    ///   - style: the colors, fonts and spacing the form draws with, nil to read the environment's.
+    ///   - onCompleted: called once with the outcome of the submission: `.method` for a stored payment
+    ///     method, `.payment` for a transaction.
+    ///   - onFailed: called with the failure the flow threw, unchanged, when a submission the form
+    ///     sent did not complete.
+    ///   - onMethodChanged: called when the drawn method changes: the payer's choice, or the
+    ///     configuration withdrawing the method the payer had chosen. Not called for the method the
+    ///     form opens with.
     @MainActor
     public init(
-        component: PayabliPayIn,
+        payIn: PayabliPayIn,
+        operation: PayabliPayInOperation,
         configuration: PayabliPayInFormConfiguration = PayabliPayInFormConfiguration(),
-        style: PayabliPayInStyle? = nil,
-        onCompleted: @escaping (PayabliPayInResult) -> Void,
-        onError: @escaping (Error) -> Void = { _ in }
+        labels: PayabliPayInFormLabels = PayabliPayInFormLabels(),
+        style: PayabliPayInFormStyle? = nil,
+        onCompleted: @escaping (PayabliPayInFormSuccess) -> Void,
+        onFailed: @escaping (any PayabliError) -> Void,
+        onMethodChanged: @escaping (PayabliPayInMethodType) -> Void
     ) {
-        self.component = component
+        self.payIn = payIn
+        self.operation = operation
         self.configuration = configuration
+        self.labels = labels
         self.explicitStyle = style
         self.onCompleted = onCompleted
-        self.onError = onError
+        self.onFailed = onFailed
+        self.onMethodChanged = onMethodChanged
         _viewModel = StateObject(wrappedValue: PayabliPayInViewModel(
-            component: component,
-            configuration: configuration
+            component: payIn,
+            operation: operation,
+            configuration: configuration,
+            labels: labels
         ))
     }
 
-    var resolvedStyle: PayabliPayInStyle {
+    /// Creates the form, bound to state already built, taking the component, operation,
+    /// configuration and wording that state holds.
+    ///
+    /// - Parameters:
+    ///   - viewModel: the form's state: the values it draws and submits.
+    ///   - style: the colors, fonts and spacing the form draws with, nil to read the environment's.
+    ///   - onCompleted: called once with the outcome of the submission: `.method` or `.payment`.
+    ///   - onFailed: called with the failure the flow threw, unchanged, when a submission did not complete.
+    ///   - onMethodChanged: called when the drawn method changes, not for the one the form opens with.
+    @MainActor
+    init(
+        viewModel: PayabliPayInViewModel,
+        style: PayabliPayInFormStyle? = nil,
+        onCompleted: @escaping (PayabliPayInFormSuccess) -> Void,
+        onFailed: @escaping (any PayabliError) -> Void,
+        onMethodChanged: @escaping (PayabliPayInMethodType) -> Void
+    ) {
+        self.payIn = viewModel.component
+        self.operation = viewModel.operation
+        self.configuration = viewModel.configuration
+        self.labels = viewModel.labels
+        self.explicitStyle = style
+        self.onCompleted = onCompleted
+        self.onFailed = onFailed
+        self.onMethodChanged = onMethodChanged
+        _viewModel = StateObject(wrappedValue: viewModel)
+    }
+
+    var resolvedStyle: PayabliPayInFormStyle {
         explicitStyle ?? environmentStyle
     }
 
@@ -45,8 +116,8 @@ public struct PayabliPayInView: View {
         VStack(alignment: .leading, spacing: resolvedStyle.layout.contentSpacing) {
             header
 
-            if configuration.errorMessagePlacement == .top {
-                errorMessageView
+            if configuration.failureMessagePlacement == .top {
+                failureMessageView
             }
 
             if viewModel.availableMethods.count > 1 {
@@ -63,8 +134,8 @@ public struct PayabliPayInView: View {
                 }
             }
 
-            if configuration.errorMessagePlacement == .aboveSubmitButton {
-                errorMessageView
+            if configuration.failureMessagePlacement == .aboveSubmitButton {
+                failureMessageView
             }
 
             submitButton
@@ -81,23 +152,31 @@ public struct PayabliPayInView: View {
             expirationWheelSheet
         }
         .onAppear {
-            syncViewModelConfiguration()
+            syncViewModel()
             viewModel.normalizeSelectedMethodForAvailableMethods()
         }
-        .onChange(of: PayInPaymentFlowConfigurationChange(configuration)) { change in
-            viewModel.update(component: component, configuration: change.configuration)
+        .onChange(of: PayInPaymentFlowConfigurationChange(configuration, labels: labels)) { change in
+            viewModel.update(
+                component: payIn,
+                operation: operation,
+                configuration: change.configuration,
+                labels: change.labels
+            )
+        }
+        .onChange(of: operation) { _ in
+            syncViewModel()
         }
         .onChange(of: viewModel.availableMethods) { _ in
             viewModel.normalizeSelectedMethodForAvailableMethods()
         }
-        .onReceive(component.$operation) { _ in
-            syncViewModelConfiguration()
+        .onChange(of: viewModel.selectedMethod) { method in
+            onMethodChanged(method)
         }
-        .onReceive(component.$requestConfiguration) { _ in
-            syncViewModelConfiguration()
+        .onReceive(payIn.$requestConfiguration) { _ in
+            syncViewModel()
         }
-        .onChange(of: viewModel.errorMessage) { message in
-            announceErrorMessage(message)
+        .onChange(of: viewModel.failureMessage) { message in
+            announceFailureMessage(message)
         }
         .onChange(of: viewModel.rejectedFields) { [marked = viewModel.rejectedFields] rejected in
             announceRejectedFields(rejected.subtracting(marked))
@@ -111,17 +190,17 @@ public struct PayabliPayInView: View {
     }
 
     @ViewBuilder
-    var errorMessageView: some View {
-        if let errorMessage = viewModel.errorMessage {
-            errorText(errorMessage)
-                .accessibilityFocused($isErrorAccessibilityFocused)
+    var failureMessageView: some View {
+        if let failureMessage = viewModel.failureMessage {
+            errorText(failureMessage)
+                .accessibilityFocused($isFailureMessageAccessibilityFocused)
         }
     }
 
     @ViewBuilder
     var header: some View {
-        let title = configuration.labels.drawnTitle
-        let subtitle = configuration.labels.subtitle?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty
+        let title = labels.drawnTitle
+        let subtitle = labels.subtitle?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty
 
         if title != nil || subtitle != nil {
             VStack(alignment: .leading, spacing: resolvedStyle.layout.headerSpacing) {
@@ -163,24 +242,17 @@ public struct PayabliPayInView: View {
         case .bankAccount:
             configuration.bankSections
         }
-        let charges = viewModel.component.operation != .storePaymentMethod
+        let charges = viewModel.operation != .storePaymentMethod
         return PayInSummaryPlacement.place(
             sections,
-            paymentDetails: charges ? component.requestConfiguration?.paymentDetails : nil,
+            paymentDetails: charges ? payIn.requestConfiguration?.paymentDetails : nil,
             showsBaseAmount: configuration.showsBaseAmount
         )
     }
 
     var submitButton: some View {
         Button {
-            Task {
-                do {
-                    let result = try await viewModel.submit()
-                    onCompleted(result)
-                } catch {
-                    onError(error)
-                }
-            }
+            submitForOutcome()
         } label: {
             HStack(spacing: 8) {
                 if viewModel.isSubmitting {
@@ -212,6 +284,32 @@ public struct PayabliPayInView: View {
         .disabled(!viewModel.canSubmit || viewModel.isSubmitting)
         .accessibilityLabel(submitButtonText)
         .accessibilityHint(submitAccessibilityHint)
+    }
+
+    /// Sends the filled form through its operation and reports the outcome to the host.
+    @MainActor
+    func submitForOutcome() {
+        Task {
+            do {
+                let result = try await viewModel.submit()
+                onCompleted(PayabliPayInFormSuccess(result))
+            } catch let error as any PayabliError {
+                onFailed(error)
+            } catch {
+                onFailed(Self.reportedUnexpectedFailure(error))
+            }
+        }
+    }
+
+    /// The failure reported for an error the SDK does not name: the catalog's reason, the failing
+    /// type's name, its message never.
+    static func reportedUnexpectedFailure(_ error: any Error) -> PayabliGenericError {
+        PayabliGenericError(
+            type: .unknown,
+            reason: PayabliErrorType.unknown.message,
+            detail: nil,
+            underlying: RedactedCause(error)
+        )
     }
 
     func fieldSection(_ section: PayabliPayInFieldSection) -> some View {
@@ -375,7 +473,7 @@ public struct PayabliPayInView: View {
 
     func summarySection(_ drawn: PayInDrawnSection) -> some View {
         let summary = configuration.paymentSummary
-        let currency = component.requestConfiguration?.paymentDetails.currency
+        let currency = payIn.requestConfiguration?.paymentDetails.currency
 
         return VStack(alignment: .leading, spacing: drawn.title == nil ? 0 : resolvedStyle.layout.sectionTitleSpacing) {
             if let title = drawn.title {
@@ -391,7 +489,7 @@ public struct PayabliPayInView: View {
             VStack(alignment: .leading, spacing: summary.rowSpacing) {
                 ForEach(drawn.rows, id: \.field) { row in
                     summaryRow(
-                        label: PayabliPayInSummaryRows.labelText(for: row.field, labels: configuration.labels),
+                        label: PayabliPayInSummaryRows.labelText(for: row.field, labels: labels),
                         value: PayabliPayInSummaryRows.formattedAmount(row.amount, currency: currency),
                         identifier: fieldIdentifier(row.field)
                     )
@@ -399,7 +497,7 @@ public struct PayabliPayInView: View {
 
                 if let total = drawn.total {
                     summaryRow(
-                        label: PayabliPayInSummaryRows.totalLabelText(labels: configuration.labels),
+                        label: PayabliPayInSummaryRows.totalLabelText(labels: labels),
                         value: PayabliPayInSummaryRows.formattedAmount(total, currency: currency),
                         identifier: PayabliPayInAccessibility.totalIdentifier
                     )
@@ -437,7 +535,7 @@ public struct PayabliPayInView: View {
         autocapitalization: UITextAutocapitalizationType = .none,
         sanitize: @escaping (String) -> String = { $0 }
     ) -> some View {
-        let label = configuration.labels.label(for: field)
+        let label = labels.label(for: field)
         let inputSize = configuration.inputSizing.size(for: field)
 
         return fieldRow(field) {
@@ -473,7 +571,7 @@ public struct PayabliPayInView: View {
         text: Binding<String>,
         sanitize: @escaping (String) -> String = { $0 }
     ) -> some View {
-        let label = configuration.labels.label(for: field)
+        let label = labels.label(for: field)
         let inputSize = configuration.inputSizing.size(for: field)
 
         return fieldRow(field) {
@@ -505,7 +603,7 @@ public struct PayabliPayInView: View {
 
     func cardNumberField() -> some View {
         let field = PayabliPayInField.cardNumber
-        let label = configuration.labels.label(for: field)
+        let label = labels.label(for: field)
         let inputSize = configuration.inputSizing.size(for: field)
         let text = Binding(
             get: { viewModel.cardNumber },
@@ -561,7 +659,7 @@ public struct PayabliPayInView: View {
 
     func expirationPickerField() -> some View {
         let field = PayabliPayInField.cardExpiration
-        let label = configuration.labels.label(for: field)
+        let label = labels.label(for: field)
         let placeholder = placeholder(for: field, defaultText: "MM/YY")
         let inputSize = configuration.inputSizing.size(for: field)
 
@@ -603,7 +701,7 @@ public struct PayabliPayInView: View {
     var expirationWheelSheet: some View {
         VStack(spacing: 0) {
             HStack {
-                Text(configuration.labels.label(for: .cardExpiration))
+                Text(labels.label(for: .cardExpiration))
                     .font(.headline)
                     .foregroundStyle(.primary)
                 Spacer()
@@ -659,7 +757,7 @@ public struct PayabliPayInView: View {
         selection: Binding<Value>,
         values: [Value]
     ) -> some View where Value: RawRepresentable & Identifiable & Hashable, Value.RawValue == String {
-        let label = configuration.labels.label(for: field)
+        let label = labels.label(for: field)
         let inputSize = configuration.inputSizing.size(for: field)
 
         return fieldRow(field) {
@@ -711,7 +809,7 @@ public struct PayabliPayInView: View {
 
         return VStack(alignment: .leading, spacing: resolvedStyle.layout.labelSpacing) {
             if showsExternalLabel(for: field) {
-                Text(configuration.labels.label(for: field))
+                Text(labels.label(for: field))
                     .font(resolvedStyle.label.font)
                     .foregroundStyle(resolvedStyle.label.color)
                     .fixedSize(horizontal: false, vertical: true)
@@ -732,7 +830,7 @@ public struct PayabliPayInView: View {
     }
 }
 
-extension PayabliPayInView {
+extension PayabliPayInForm {
     func fieldGroups(for fields: [PayabliPayInField]) -> [[PayabliPayInField]] {
         var groups: [[PayabliPayInField]] = []
         var index = fields.startIndex
@@ -798,8 +896,8 @@ extension PayabliPayInView {
         for field: PayabliPayInField,
         defaultText: String? = nil
     ) -> String {
-        configuration.labels.placeholder(for: field)
-            ?? (configuration.labelLayout == .placeholder ? configuration.labels.label(for: field) : nil)
+        labels.placeholder(for: field)
+            ?? (configuration.labelLayout == .placeholder ? labels.label(for: field) : nil)
             ?? defaultText
             ?? ""
     }
@@ -838,29 +936,45 @@ extension PayabliPayInView {
             : UIColor(resolvedStyle.error.color)
     }
 
-    func fieldBackground(_ field: PayabliPayInField?) -> some ShapeStyle {
-        let isFocused = field.map { focusedField == $0 } ?? false
-        return fieldHasError(field)
-            ? invalidCardNumberBackgroundColor
-            : isFocused
-            ? focusedInputBackgroundColor
-            : resolvedStyle.input.backgroundColor
+    func fieldBackground(_ field: PayabliPayInField?) -> Color {
+        if fieldHasError(field) {
+            return invalidCardNumberBackgroundColor
+        }
+        if isFocused(field) {
+            return focusedInputBackgroundColor
+        }
+        return resolvedStyle.input.backgroundColor
     }
 
     func fieldBorder(_ field: PayabliPayInField?) -> some View {
-        let isFocused = field.map { focusedField == $0 } ?? false
-        return inputShape.stroke(
-            fieldHasError(field)
-                ? resolvedStyle.error.color
-                : isFocused
-                ? focusedInputBorderColor
-                : resolvedStyle.input.borderColor,
-            lineWidth: fieldHasError(field)
-                ? max(resolvedStyle.input.focusedBorderWidth, resolvedStyle.input.borderWidth)
-                : isFocused
-                ? resolvedStyle.input.focusedBorderWidth
-                : resolvedStyle.input.borderWidth
+        inputShape.stroke(
+            fieldBorderColor(field),
+            lineWidth: fieldBorderWidth(field)
         )
+    }
+
+    func fieldBorderColor(_ field: PayabliPayInField?) -> Color {
+        if fieldHasError(field) {
+            return resolvedStyle.error.color
+        }
+        if isFocused(field) {
+            return focusedInputBorderColor
+        }
+        return resolvedStyle.input.borderColor
+    }
+
+    func fieldBorderWidth(_ field: PayabliPayInField?) -> CGFloat {
+        if fieldHasError(field) {
+            return max(resolvedStyle.input.focusedBorderWidth, resolvedStyle.input.borderWidth)
+        }
+        if isFocused(field) {
+            return resolvedStyle.input.focusedBorderWidth
+        }
+        return resolvedStyle.input.borderWidth
+    }
+
+    func isFocused(_ field: PayabliPayInField?) -> Bool {
+        field.map { focusedField == $0 } ?? false
     }
 
     func fieldHasError(_ field: PayabliPayInField?) -> Bool {
@@ -890,9 +1004,9 @@ extension PayabliPayInView {
 
     var submitButtonText: String {
         PayInSubmitWording.text(
-            showing: viewModel.component.operation,
+            showing: viewModel.operation,
             submitting: viewModel.submittingOperation,
-            hostWording: configuration.labels.hostSubmitButton
+            hostWording: labels.hostSubmitButton
         )
     }
 
@@ -917,7 +1031,7 @@ extension PayabliPayInView {
             .font(resolvedStyle.error.font)
             .foregroundStyle(resolvedStyle.error.color)
             .fixedSize(horizontal: false, vertical: true)
-            .accessibilityLabel("\(configuration.labels.label(for: field)) error")
+            .accessibilityLabel("\(labels.label(for: field)) error")
             .accessibilityValue(message)
     }
 
@@ -1028,10 +1142,10 @@ extension PayabliPayInView {
         String(format: "%02d", month)
     }
 
-    func announceErrorMessage(_ message: String?) {
+    func announceFailureMessage(_ message: String?) {
         guard let message else { return }
         UIAccessibility.post(notification: .announcement, argument: message)
-        isErrorAccessibilityFocused = true
+        isFailureMessageAccessibilityFocused = true
     }
 
     /// Announces the fields a refusal has just marked, in the order the form draws them.
@@ -1041,7 +1155,7 @@ extension PayabliPayInView {
         guard let announcement = PayabliPayInAccessibility.rejectedFieldsAnnouncement(
             newlyMarked: newlyMarked,
             drawnFields: viewModel.activeFields,
-            label: configuration.labels.label(for:),
+            label: labels.label(for:),
             message: PayabliPayInAccessibility.rejectedFieldMessage
         ) else { return }
         UIAccessibility.post(notification: .announcement, argument: announcement)
@@ -1054,14 +1168,16 @@ extension PayabliPayInView {
         guard let message else { return }
         UIAccessibility.post(
             notification: .announcement,
-            argument: "\(configuration.labels.label(for: field)): \(message)"
+            argument: "\(labels.label(for: field)): \(message)"
         )
     }
 
-    func syncViewModelConfiguration() {
+    func syncViewModel() {
         viewModel.update(
-            component: component,
-            configuration: configuration
+            component: payIn,
+            operation: operation,
+            configuration: configuration,
+            labels: labels
         )
     }
 }

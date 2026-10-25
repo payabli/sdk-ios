@@ -125,7 +125,10 @@ final class PayInTelemetryTests: XCTestCase {
     func testStoringACardReportsTheStoreEvent() async throws {
         let flow = makeFlow(RecordingIdempotencyTransport(body: Self.stored))
 
-        _ = try await flow.addCard(Self.card)
+        _ = try await flow.storeMethod(PayabliPayInStoreRequest(
+            instrument: .card(Self.card),
+            options: PayabliPayInTokenStorageOptions()
+        ))
 
         let event = try await onlyEvent(of: flow)
         XCTAssertEqual(event.event, "payin.storeMethod.completed")
@@ -213,6 +216,7 @@ final class PayInTelemetryTests: XCTestCase {
         let flow = makeFlow(RecordingIdempotencyTransport(body: Self.stored))
         let viewModel = PayabliPayInViewModel(
             component: flow,
+            operation: .storePaymentMethod,
             configuration: PayabliPayInFormConfiguration(allowedMethods: [.card], defaultMethod: .card)
         )
         viewModel.cardNumber = "4111111111111111"
@@ -234,6 +238,7 @@ final class PayInTelemetryTests: XCTestCase {
         let flow = makeFlow(transport)
         let viewModel = PayabliPayInViewModel(
             component: flow,
+            operation: .storePaymentMethod,
             configuration: PayabliPayInFormConfiguration(allowedMethods: [.card], defaultMethod: .card)
         )
 
@@ -253,6 +258,7 @@ final class PayInTelemetryTests: XCTestCase {
         let flow = makeFlow(transport, operation: .capture)
         let viewModel = PayabliPayInViewModel(
             component: flow,
+            operation: .capture,
             configuration: PayabliPayInFormConfiguration(allowedMethods: [.card], defaultMethod: .card)
         )
         viewModel.cardNumber = "4111111111111111"
@@ -278,6 +284,7 @@ final class PayInTelemetryTests: XCTestCase {
         ))
         let viewModel = PayabliPayInViewModel(
             component: flow,
+            operation: .capture,
             configuration: PayabliPayInFormConfiguration(allowedMethods: [.card], defaultMethod: .card)
         )
         viewModel.cardNumber = "4111111111111111"
@@ -299,6 +306,7 @@ final class PayInTelemetryTests: XCTestCase {
         let flow = makeFlow(RecordingIdempotencyTransport(body: Data(#"{"responseText":"Bad"}"#.utf8), status: 400))
         let viewModel = PayabliPayInViewModel(
             component: flow,
+            operation: .storePaymentMethod,
             configuration: PayabliPayInFormConfiguration(allowedMethods: [.card], defaultMethod: .card)
         )
         viewModel.cardNumber = "4111111111111111"
@@ -319,6 +327,7 @@ final class PayInTelemetryTests: XCTestCase {
         let flow = makeFlow(transport)
         let viewModel = PayabliPayInViewModel(
             component: flow,
+            operation: .storePaymentMethod,
             configuration: PayabliPayInFormConfiguration(allowedMethods: [.card], defaultMethod: .card)
         )
         viewModel.cardNumber = "4111111111111111"

@@ -63,7 +63,7 @@ struct PayInFormCustomization: Hashable {
     var masksAccountNumber = true
     var fixesHolderType = false
     var cardBrandIconPlacement: PayabliPayInCardBrandIconPlacement = .trailing
-    var errorMessagePlacement: PayabliPayInErrorMessagePlacement = .aboveSubmitButton
+    var failureMessagePlacement: PayabliPayInFailureMessagePlacement = .aboveSubmitButton
     var inputSizing: InputSizing = .standard
 
     init() {}
@@ -82,7 +82,7 @@ struct PayInFormCustomization: Hashable {
             requiresCustomerNumber = true
             dashesExpiry = true
             cardBrandIconPlacement = .trailing
-            errorMessagePlacement = .top
+            failureMessagePlacement = .top
             inputSizing = .large
         case .minimal:
             look = .compact
@@ -91,7 +91,7 @@ struct PayInFormCustomization: Hashable {
             fixesHolderType = true
             groupsCardNumber = false
             cardBrandIconPlacement = .hidden
-            errorMessagePlacement = .aboveSubmitButton
+            failureMessagePlacement = .aboveSubmitButton
             inputSizing = .compact
         }
     }
@@ -119,7 +119,6 @@ struct PayInFormCustomization: Hashable {
                 customerData: charges ? nil : PayInDemoCustomer.customerData
             ),
             options: PayabliPayInOptions(forceCustomerCreation: true, source: Self.source),
-            labels: labels(for: operation),
             labelLayout: labelsInsideFields ? .placeholder : .external,
             showsFieldLabels: !hidesLabels,
             formatting: PayabliPayInFormatting(
@@ -129,18 +128,18 @@ struct PayInFormCustomization: Hashable {
             ),
             inputSizing: sdkInputSizing,
             cardBrandIconPlacement: cardBrandIconPlacement,
-            errorMessagePlacement: errorMessagePlacement,
+            failureMessagePlacement: failureMessagePlacement,
             requiredFields: requiresCustomerNumber ? [.customerNumber] : [],
             paymentSummary: paymentSummary
         )
     }
 
-    var style: PayabliPayInStyle {
+    var style: PayabliPayInFormStyle {
         switch look {
         case .sdkDefault:
             .default
         case .brand:
-            PayabliPayInStyle(
+            PayabliPayInFormStyle(
                 accentColor: Self.brandColor,
                 title: PayabliPayInTextStyle(
                     font: .system(.title2, design: .rounded).weight(.bold),
@@ -179,7 +178,7 @@ struct PayInFormCustomization: Hashable {
                 )
             )
         case .compact:
-            PayabliPayInStyle(
+            PayabliPayInFormStyle(
                 accentColor: .primary,
                 title: PayabliPayInTextStyle(font: .headline, color: .primary),
                 input: PayabliPayInInputStyle(
@@ -258,17 +257,19 @@ struct PayInFormCustomization: Hashable {
         return entry + [summary]
     }
 
-    private func labels(for operation: PayInOperation) -> PayabliPayInLabels {
+    /// The wording the form draws for one operation: the wording the preset chose, or the
+    /// SDK's own where a preset leaves it alone.
+    func labels(for operation: PayInOperation) -> PayabliPayInFormLabels {
         let fieldLabels = usesCustomWording
-            ? PayabliPayInLabels.defaultFieldLabels.merging(Self.brandFieldLabels) { _, brand in brand }
-            : PayabliPayInLabels.defaultFieldLabels
+            ? PayabliPayInFormLabels.defaultFieldLabels.merging(Self.brandFieldLabels) { _, brand in brand }
+            : PayabliPayInFormLabels.defaultFieldLabels
         // With labels hidden, the placeholder is the only text a field has.
         let placeholders = hidesLabels ? Self.hiddenLabelPlaceholders : [:]
 
         guard usesCustomWording else {
-            return PayabliPayInLabels(fieldLabels: fieldLabels, fieldPlaceholders: placeholders)
+            return PayabliPayInFormLabels(fieldLabels: fieldLabels, fieldPlaceholders: placeholders)
         }
-        return PayabliPayInLabels(
+        return PayabliPayInFormLabels(
             title: "Acme Checkout",
             subtitle: "Secure payment, powered by Payabli",
             submitButton: Self.customSubmitWording(for: operation),
