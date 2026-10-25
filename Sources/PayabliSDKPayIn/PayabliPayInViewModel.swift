@@ -90,6 +90,9 @@ final class PayabliPayInViewModel: ObservableObject {
     /// The operation the submission in flight is sending, or nil when none is.
     @Published private(set) var submittingOperation: PayabliPayInOperation?
     @Published private(set) var failureMessage: String?
+    /// The failure whose message is drawn, by the category and operation that picked its wording, so
+    /// a change to the wording redraws the message already drawn. Cleared with the message.
+    private var drawnFailure: (category: PayabliErrorCategory, operation: PayabliPayInOperation)?
     /// The fields the last refusal named, until the payer edits one or its box leaves the screen.
     @Published var rejectedFields: Set<PayabliPayInField> = []
 
@@ -151,9 +154,17 @@ final class PayabliPayInViewModel: ObservableObject {
             clearMarks()
         }
         // The opt-out applies to a message already drawn, so an update that withdraws it takes the
-        // message with it; the marks stay, because a marked field is the whole answer.
+        // message with it; the marks stay, because a marked field is the whole answer. A message
+        // still drawn follows the wording the form holds now, so a change to its label redraws it.
         if !configuration.showsFailureMessage {
             failureMessage = nil
+            drawnFailure = nil
+        } else if let failure = drawnFailure {
+            failureMessage = PayabliPayInFailureMessage.text(
+                for: failure.category,
+                operation: failure.operation,
+                labels: labels
+            )
         }
 
         let methods = availableMethods
@@ -296,13 +307,12 @@ final class PayabliPayInViewModel: ObservableObject {
 
     func submit() async throws -> PayabliPayInResult {
         failureMessage = nil
+        drawnFailure = nil
         clearMarks()
         guard !isSubmitting else {
             let error = PayabliPayInError.submissionInProgress
             component.reportFormRefusal(error, method: effectiveSelectedMethod, operation: operation)
-            if configuration.showsFailureMessage {
-                failureMessage = PayabliPayInFailureMessage.text(for: error, operation: operation, labels: labels)
-            }
+            drawFailureMessage(for: error, operation: operation)
             throw error
         }
         isSubmitting = true
@@ -320,9 +330,7 @@ final class PayabliPayInViewModel: ObservableObject {
             try validateRequiredFields()
         } catch {
             component.reportFormRefusal(error, method: effectiveSelectedMethod, operation: operation)
-            if configuration.showsFailureMessage {
-                failureMessage = PayabliPayInFailureMessage.text(for: error, operation: operation, labels: labels)
-            }
+            drawFailureMessage(for: error, operation: operation)
             throw error
         }
 
@@ -344,11 +352,23 @@ final class PayabliPayInViewModel: ObservableObject {
             }
             // A marked field is the whole answer; a failure that marks none on screen shows its
             // message, which the opt-out hides while the marks stay.
-            failureMessage = rejectedFields.isEmpty && configuration.showsFailureMessage
-                ? PayabliPayInFailureMessage.text(for: error, operation: operation, labels: labels)
-                : nil
+            drawFailureMessage(for: error, operation: operation)
             throw error
         }
+    }
+
+    /// Draws the failure's message where the form shows one, or takes it away, remembering the
+    /// category and operation that picked the wording so a change to the wording redraws the
+    /// message already drawn.
+    private func drawFailureMessage(for error: any Error, operation: PayabliPayInOperation) {
+        guard rejectedFields.isEmpty, configuration.showsFailureMessage else {
+            failureMessage = nil
+            drawnFailure = nil
+            return
+        }
+        let category = PayabliPayInFailureMessage.messageCategory(for: error)
+        drawnFailure = (category, operation)
+        failureMessage = PayabliPayInFailureMessage.text(for: category, operation: operation, labels: labels)
     }
 
     /// Hands the form's submission to the flow, which reports it. A refusal before the flow has it is reported here.

@@ -19,8 +19,24 @@ enum PayabliPayInFailureMessage {
         operation: PayabliPayInOperation,
         labels: PayabliPayInFormLabels
     ) -> String {
-        let category = messageCategory(for: error)
-        return labels.failureMessage(for: category) ?? text(for: category, operation: operation)
+        text(for: messageCategory(for: error), operation: operation, labels: labels)
+    }
+
+    /// The message for a failed submission, in the wording the host supplied where it supplied any.
+    ///
+    /// - Parameters:
+    ///   - category: The category whose message the failure draws.
+    ///   - operation: What the form submitted.
+    ///   - labels: The wording the form was given, whose message for the failure's category
+    ///     replaces the SDK's own.
+    /// - Returns: The host's message for the failure's category when it carries one, otherwise
+    ///     the SDK's own message for the category.
+    static func text(
+        for category: PayabliErrorCategory,
+        operation: PayabliPayInOperation,
+        labels: PayabliPayInFormLabels
+    ) -> String {
+        labels.failureMessage(for: category) ?? text(for: category, operation: operation)
     }
 
     /// The category whose message the form draws for a failure: an interrupted submission may have

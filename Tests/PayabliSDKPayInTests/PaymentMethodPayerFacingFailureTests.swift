@@ -183,6 +183,66 @@ final class PaymentMethodPayerFacingFailureTests: XCTestCase {
         XCTAssertNil(viewModel.failureMessage)
     }
 
+    /// The wording a drawn message follows is the wording the form holds now, so a changed failure
+    /// label redraws the message the failure already drew.
+    func testAChangedFailureLabelRedrawsTheDrawnMessage() async {
+        let flow = flowOnTransport(MockPaymentCaptureTransport(statusCode: 402, responseBody: Self.declineBody))
+        let viewModel = filledForm(on: flow)
+
+        _ = try? await viewModel.submit()
+        XCTAssertEqual(viewModel.failureMessage, "The payment was declined. Try another payment method.")
+
+        viewModel.update(
+            component: flow,
+            operation: .capture,
+            configuration: PayabliPayInFormConfiguration(allowedMethods: [.card], defaultMethod: .card),
+            labels: PayabliPayInFormLabels(declinedMessage: "That card didn't work.")
+        )
+
+        XCTAssertEqual(viewModel.failureMessage, "That card didn't work.")
+    }
+
+    func testABlankFailureLabelFallsBackToTheSDKsOwnText() async {
+        let flow = flowOnTransport(MockPaymentCaptureTransport(statusCode: 402, responseBody: Self.declineBody))
+        let viewModel = filledForm(on: flow)
+
+        _ = try? await viewModel.submit()
+        viewModel.update(
+            component: flow,
+            operation: .capture,
+            configuration: PayabliPayInFormConfiguration(allowedMethods: [.card], defaultMethod: .card),
+            labels: PayabliPayInFormLabels(declinedMessage: "That card didn't work.")
+        )
+        XCTAssertEqual(viewModel.failureMessage, "That card didn't work.")
+
+        viewModel.update(
+            component: flow,
+            operation: .capture,
+            configuration: PayabliPayInFormConfiguration(allowedMethods: [.card], defaultMethod: .card),
+            labels: PayabliPayInFormLabels(declinedMessage: "   ")
+        )
+
+        XCTAssertEqual(viewModel.failureMessage, "The payment was declined. Try another payment method.")
+    }
+
+    /// A redraw keeps the failure's own category, so a changed label for another category leaves
+    /// the drawn message alone.
+    func testAChangedLabelForAnotherCategoryLeavesTheDrawnMessage() async {
+        let flow = flowOnTransport(MockPaymentCaptureTransport(statusCode: 402, responseBody: Self.declineBody))
+        let viewModel = filledForm(on: flow)
+
+        _ = try? await viewModel.submit()
+
+        viewModel.update(
+            component: flow,
+            operation: .capture,
+            configuration: PayabliPayInFormConfiguration(allowedMethods: [.card], defaultMethod: .card),
+            labels: PayabliPayInFormLabels(retryLaterMessage: "It's busy right now. Try once more.")
+        )
+
+        XCTAssertEqual(viewModel.failureMessage, "The payment was declined. Try another payment method.")
+    }
+
     // MARK: - The failure the host receives
 
     /// What the view model's `submit()` throws is what the form's `onFailed` hands the host: the
