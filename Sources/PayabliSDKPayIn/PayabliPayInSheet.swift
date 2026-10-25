@@ -239,7 +239,7 @@ struct PayabliPayInSheetContent: View {
         sheetConfiguration.dismissButton != .hidden || sheetTitle != nil || sheetSubtitle != nil
     }
 
-    private var sheetTitle: String? {
+    var sheetTitle: String? {
         if let configuredTitle = sheetConfiguration.title?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty {
             return configuredTitle
         }
@@ -247,7 +247,7 @@ struct PayabliPayInSheetContent: View {
         return labels.drawnTitle
     }
 
-    private var sheetSubtitle: String? {
+    var sheetSubtitle: String? {
         if let configuredSubtitle = sheetConfiguration.subtitle?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty {
             return configuredSubtitle
         }

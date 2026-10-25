@@ -287,6 +287,67 @@ final class PaymentMethodCoverageExpansionTests: XCTestCase {
     }
 
     @MainActor
+    func testTheSheetsOwnWordingWinsWhenBothSupplyIt() {
+        let content = sheetContent(movingHeader: true, sheetTitle: "Sheet title", sheetSubtitle: "Sheet subtitle")
+
+        XCTAssertEqual(content.sheetTitle, "Sheet title")
+        XCTAssertEqual(content.sheetSubtitle, "Sheet subtitle")
+        XCTAssertNil(content.formLabels.title, "the form draws no heading of its own")
+        XCTAssertNil(content.formLabels.subtitle, "the form draws no subtitle of its own")
+    }
+
+    @MainActor
+    func testTheFormsWordingMovesUpWhenTheSheetSuppliesNoneOfItsOwn() {
+        let content = sheetContent(movingHeader: true, sheetTitle: nil, sheetSubtitle: nil)
+
+        XCTAssertEqual(content.sheetTitle, "Inline title")
+        XCTAssertEqual(content.sheetSubtitle, "Inline subtitle")
+        XCTAssertNil(content.formLabels.title, "the heading was moved, not copied")
+    }
+
+    @MainActor
+    func testTheFormKeepsItsWordingWhenTheHeaderMoveIsOff() {
+        let content = sheetContent(movingHeader: false, sheetTitle: "Sheet title", sheetSubtitle: "Sheet subtitle")
+
+        XCTAssertEqual(content.sheetTitle, "Sheet title")
+        XCTAssertEqual(content.sheetSubtitle, "Sheet subtitle")
+        XCTAssertEqual(content.formLabels.title, "Inline title", "the form keeps its own heading")
+        XCTAssertEqual(content.formLabels.subtitle, "Inline subtitle")
+    }
+
+    @MainActor
+    func testABlankSheetTitleCountsAsUnsupplied() {
+        let content = sheetContent(movingHeader: true, sheetTitle: "   ", sheetSubtitle: nil)
+
+        XCTAssertEqual(content.sheetTitle, "Inline title")
+    }
+
+    /// A sheet content whose form supplies its own wording, with the header move as given.
+    @MainActor
+    private func sheetContent(
+        movingHeader: Bool,
+        sheetTitle: String?,
+        sheetSubtitle: String?
+    ) -> PayabliPayInSheetContent {
+        PayabliPayInSheetContent(
+            isPresented: .constant(true),
+            payIn: flowOnSession(),
+            operation: .storePaymentMethod,
+            configuration: PayabliPayInFormConfiguration(allowedMethods: [.card]),
+            labels: PayabliPayInFormLabels(title: "Inline title", subtitle: "Inline subtitle"),
+            sheetConfiguration: PayabliPayInSheetConfiguration(
+                title: sheetTitle,
+                subtitle: sheetSubtitle,
+                movesFormHeaderToSheetHeader: movingHeader
+            ),
+            style: nil,
+            onCompleted: { _ in },
+            onFailed: { _ in },
+            onMethodChanged: { _ in }
+        )
+    }
+
+    @MainActor
     func testHostedACHFormRendersAccountPickerAndCustomerFields() {
         let component = flowOnSession(
             token: "access-token",
