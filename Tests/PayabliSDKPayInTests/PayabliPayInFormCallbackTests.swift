@@ -5,8 +5,8 @@ import UIKit
 import XCTest
 
 /// The form's callbacks: the method events a change to the drawn method reports and the ones it
-/// must not, the sheet's forwarding of them, and the outcome a submission hands its host. A
-/// submission is driven through the view model: the form's submit button hosts no UIKit button.
+/// must not, the sheet's forwarding of them, and the outcome a submission hands its host, driven
+/// through submitForOutcome() — the form's button hosts no UIKit button a test could press.
 @MainActor
 final class PayabliPayInFormCallbackTests: XCTestCase {
     func testTheFormOpensWithoutReportingAMethodChange() throws {
@@ -173,45 +173,154 @@ final class PayabliPayInFormCallbackTests: XCTestCase {
         XCTAssertEqual(reported, stored)
     }
 
-    func testAnApprovedCaptureRoutesAsAPayment() async throws {
-        let viewModel = filledBankAccountForm(
-            on: PayabliPayIn(
-                entryPoint: "entry",
-                environment: .sandbox,
-                transport: MockPaymentCaptureTransport(responseBody: Self.approvedCaptureBody),
-                operation: .capture,
-                requestConfiguration: PayabliPayInRequestConfiguration(
-                    paymentDetails: PayabliPayInPaymentDetails(totalAmount: 10, currency: "USD")
-                )
-            ),
-            operation: .capture
+    func testAnApprovedCaptureReportsOnePaymentAndNothingElse() async {
+        let recorder = CallbackRecorder()
+        let form = filledBankForm(
+            on: captureFlow(on: MockPaymentCaptureTransport(responseBody: Self.approvedCaptureBody)),
+            operation: .capture,
+            recorder: recorder
         )
 
-        let outcome = PayabliPayInFormSuccess(try await viewModel.submit())
+        form.submitForOutcome()
+        await waitUntil { !recorder.successes.isEmpty || !recorder.failures.isEmpty }
 
-        guard case let .payment(result) = outcome else { return XCTFail("Wrong case: \(outcome)") }
+        XCTAssertEqual(recorder.failures.count, 0, "an approved capture reports no failure")
+        guard recorder.successes.count == 1 else {
+            return XCTFail("one completion, not \(recorder.successes.count)")
+        }
+        guard case let .payment(result) = recorder.successes[0] else {
+            return XCTFail("Wrong case: \(recorder.successes[0])")
+        }
         XCTAssertEqual(result.kind, .transaction)
         XCTAssertEqual(result.code, "A0000")
     }
 
-    func testAStoredSubmissionRoutesAsTheStoredMethod() async throws {
-        let viewModel = filledBankAccountForm(
-            on: PayabliPayIn(
-                entryPoint: "entry",
-                environment: .sandbox,
-                transport: MockPaymentCaptureTransport(
-                    statusCode: 200,
-                    responseBody: Self.storedMethodBody
-                ),
-                operation: .storePaymentMethod
+    /// A failure the SDK names reaches the host as the failure the flow threw, never as the
+    /// unknown-error wrapper, and nothing else reaches it.
+    func testADeclinedCaptureReportsTheTypedFailureTheFlowThrew() async {
+        let recorder = CallbackRecorder()
+        let form = filledBankForm(
+            on: captureFlow(
+                on: MockPaymentCaptureTransport(statusCode: 402, responseBody: Self.declineBody)
             ),
-            operation: .storePaymentMethod
+            operation: .capture,
+            recorder: recorder
         )
 
-        let outcome = PayabliPayInFormSuccess(try await viewModel.submit())
+        form.submitForOutcome()
+        await waitUntil { !recorder.successes.isEmpty || !recorder.failures.isEmpty }
 
-        guard case let .method(stored) = outcome else { return XCTFail("Wrong case: \(outcome)") }
+        XCTAssertEqual(recorder.successes.count, 0, "a declined capture reports no completion")
+        guard recorder.failures.count == 1 else {
+            return XCTFail("one failure, not \(recorder.failures.count)")
+        }
+        let failure = recorder.failures[0]
+        guard case PayabliPayInError.transactionFailed = failure else {
+            return XCTFail("Wrong error: \(failure)")
+        }
+        XCTAssertEqual(failure.type, .paymentDeclined)
+        XCTAssertEqual(failure.category, .declined)
+    }
+
+    func testAStoredSubmissionReportsOneStoredMethodAndNothingElse() async {
+        let recorder = CallbackRecorder()
+        let form = filledBankForm(
+            on: storeFlow(
+                on: MockPaymentCaptureTransport(statusCode: 200, responseBody: Self.storedMethodBody)
+            ),
+            operation: .storePaymentMethod,
+            recorder: recorder
+        )
+
+        form.submitForOutcome()
+        await waitUntil { !recorder.successes.isEmpty || !recorder.failures.isEmpty }
+
+        XCTAssertEqual(recorder.failures.count, 0, "a stored submission reports no failure")
+        guard recorder.successes.count == 1 else {
+            return XCTFail("one completion, not \(recorder.successes.count)")
+        }
+        guard case let .method(stored) = recorder.successes[0] else {
+            return XCTFail("Wrong case: \(recorder.successes[0])")
+        }
         XCTAssertEqual(stored.storedMethodId, "stored-123")
+    }
+
+    func testAStoresRefusalReportsTheStoresOwnFailureItThrew() async {
+        let recorder = CallbackRecorder()
+        let form = filledBankForm(
+            on: storeFlow(
+                on: MockPaymentCaptureTransport(statusCode: 200, responseBody: Self.storeRefusalBody)
+            ),
+            operation: .storePaymentMethod,
+            recorder: recorder
+        )
+
+        form.submitForOutcome()
+        await waitUntil { !recorder.successes.isEmpty || !recorder.failures.isEmpty }
+
+        XCTAssertEqual(recorder.successes.count, 0, "a refused store reports no completion")
+        guard recorder.failures.count == 1 else {
+            return XCTFail("one failure, not \(recorder.failures.count)")
+        }
+        let failure = recorder.failures[0]
+        guard case PayabliPayInTokenStorageError.saveFailed = failure else {
+            return XCTFail("Wrong error: \(failure)")
+        }
+        XCTAssertEqual(failure.category, .declined)
+    }
+
+    func testAStoresRefusedRequestReportsTheCoreValidationFailureItThrew() async {
+        let recorder = CallbackRecorder()
+        let form = filledBankForm(
+            on: storeFlow(
+                on: MockPaymentCaptureTransport(statusCode: 400, responseBody: Self.storeBadRequestBody)
+            ),
+            operation: .storePaymentMethod,
+            recorder: recorder
+        )
+
+        form.submitForOutcome()
+        await waitUntil { !recorder.successes.isEmpty || !recorder.failures.isEmpty }
+
+        XCTAssertEqual(recorder.successes.count, 0, "a refused store reports no completion")
+        guard recorder.failures.count == 1 else {
+            return XCTFail("one failure, not \(recorder.failures.count)")
+        }
+        let failure = recorder.failures[0]
+        guard case PayabliPaymentError.validation = failure else {
+            return XCTFail("Wrong error: \(failure)")
+        }
+        XCTAssertEqual(failure.category, .invalidRequest)
+    }
+
+    /// A failure outside the catalog, arriving raw from the store route, is answered as the
+    /// unknown-error shape: the catalog's reason, the failing type's name, its message never.
+    func testAnUnexpectedFailureIsReportedAsTheUnknownShapeAlone() async {
+        let cause = URLError(.userAuthenticationRequired)
+        let recorder = CallbackRecorder()
+        let form = filledBankForm(
+            on: storeFlow(on: RecordingIdempotencyTransport(failure: cause)),
+            operation: .storePaymentMethod,
+            recorder: recorder
+        )
+
+        form.submitForOutcome()
+        await waitUntil { !recorder.successes.isEmpty || !recorder.failures.isEmpty }
+
+        XCTAssertEqual(recorder.successes.count, 0, "a failed store reports no completion")
+        guard recorder.failures.count == 1 else {
+            return XCTFail("one failure, not \(recorder.failures.count)")
+        }
+        guard let reported = recorder.failures[0] as? PayabliGenericError else {
+            return XCTFail("Wrong error: \(recorder.failures[0])")
+        }
+        XCTAssertEqual(reported.type, .unknown)
+        XCTAssertEqual(reported.reason, PayabliErrorType.unknown.message)
+        XCTAssertEqual(reported.underlying as? RedactedCause, RedactedCause(cause))
+        XCTAssertFalse(
+            String(describing: reported).contains(cause.localizedDescription),
+            "the failing error's message never reaches the host"
+        )
     }
 
     func testAnErrorTheSDKDoesNotNameIsReportedAsTheUnknownShape() {
@@ -274,21 +383,68 @@ final class PayabliPayInFormCallbackTests: XCTestCase {
         )
     }
 
-    /// A bank form filled the way the payer's typing leaves it, ready to submit.
-    private func filledBankAccountForm(
-        on component: PayabliPayIn,
-        operation: PayabliPayInOperation
-    ) -> PayabliPayInViewModel {
+    /// A bank form the payer filled, bound to the state the payer's typing left, so a case drives
+    /// the form's own submission path with the values a submission needs.
+    private func filledBankForm(
+        on payIn: PayabliPayIn,
+        operation: PayabliPayInOperation,
+        recorder: CallbackRecorder
+    ) -> PayabliPayInForm {
         let viewModel = PayabliPayInViewModel(
-            component: component,
+            component: payIn,
             operation: operation,
-            configuration: PayabliPayInFormConfiguration(allowedMethods: [.bankAccount], defaultMethod: .bankAccount)
+            configuration: PayabliPayInFormConfiguration(
+                allowedMethods: [.bankAccount],
+                defaultMethod: .bankAccount
+            )
         )
         viewModel.accountHolder = "Jane Doe"
         viewModel.routingNumber = "123456780"
         viewModel.accountNumber = "1111111111111"
-        XCTAssertTrue(viewModel.canSubmit, "the filled bank form can submit")
-        return viewModel
+
+        let form = PayabliPayInForm(
+            viewModel: viewModel,
+            onCompleted: { recorder.successes.append($0) },
+            onFailed: { recorder.failures.append($0) },
+            onMethodChanged: { recorder.methods.append($0) }
+        )
+        XCTAssertTrue(form.viewModel.canSubmit, "the filled bank form can submit")
+        return form
+    }
+
+    /// A capture flow on a transport the cases answer from, carrying the request the form submits.
+    private func captureFlow(on transport: any PayabliTransport) -> PayabliPayIn {
+        PayabliPayIn(
+            entryPoint: "entry",
+            environment: .sandbox,
+            transport: transport,
+            operation: .capture,
+            requestConfiguration: PayabliPayInRequestConfiguration(
+                paymentDetails: PayabliPayInPaymentDetails(totalAmount: 10, currency: "USD")
+            )
+        )
+    }
+
+    /// A store flow on a transport the cases answer from.
+    private func storeFlow(on transport: any PayabliTransport) -> PayabliPayIn {
+        PayabliPayIn(
+            entryPoint: "entry",
+            environment: .sandbox,
+            transport: transport,
+            operation: .storePaymentMethod
+        )
+    }
+
+    /// Runs the main actor, bounded, until the condition holds or the timeout does, so a case can
+    /// await the task a submission runs.
+    private func waitUntil(
+        timeout: TimeInterval = 2,
+        _ condition: @MainActor () -> Bool
+    ) async {
+        let deadline = Date().addingTimeInterval(timeout)
+        while !condition(), Date() < deadline {
+            try? await Task.sleep(nanoseconds: 10_000_000)
+        }
     }
 
     private func textField(
@@ -359,6 +515,40 @@ final class PayabliPayInFormCallbackTests: XCTestCase {
         "resultCode": 1,
         "resultText": "Approved",
         "methodReferenceId": "stored-123"
+      }
+    }
+    """
+
+    private static let declineBody = """
+    {
+      "code": "D0200",
+      "reason": "Insufficient Funds",
+      "explanation": "The card issuer declined the transaction.",
+      "action": "Ask for a different payment method.",
+      "data": null,
+      "token": null
+    }
+    """
+
+    private static let storeRefusalBody = """
+    {
+      "responseText": "Declined",
+      "isSuccess": false,
+      "responseData": {
+        "resultCode": 2,
+        "resultText": "Account validation failed"
+      }
+    }
+    """
+
+    private static let storeBadRequestBody = """
+    {
+      "isSuccess": false,
+      "responseText": "Error",
+      "responseCode": 6000,
+      "responseData": {
+        "explanation": "Invalid Card",
+        "todoAction": "Please check your card details and try again."
       }
     }
     """

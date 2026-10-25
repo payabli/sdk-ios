@@ -80,6 +80,34 @@ public struct PayabliPayInForm: View {
         ))
     }
 
+    /// Creates the form, bound to state already built, taking the component, operation,
+    /// configuration and wording that state holds.
+    ///
+    /// - Parameters:
+    ///   - viewModel: the form's state: the values it draws and submits.
+    ///   - style: the colors, fonts and spacing the form draws with, nil to read the environment's.
+    ///   - onCompleted: called once with the outcome of the submission: `.method` or `.payment`.
+    ///   - onFailed: called with the failure the flow threw, unchanged, when a submission did not complete.
+    ///   - onMethodChanged: called when the drawn method changes, not for the one the form opens with.
+    @MainActor
+    init(
+        viewModel: PayabliPayInViewModel,
+        style: PayabliPayInFormStyle? = nil,
+        onCompleted: @escaping (PayabliPayInFormSuccess) -> Void,
+        onFailed: @escaping (any PayabliError) -> Void,
+        onMethodChanged: @escaping (PayabliPayInMethodType) -> Void
+    ) {
+        self.payIn = viewModel.component
+        self.operation = viewModel.operation
+        self.configuration = viewModel.configuration
+        self.labels = viewModel.labels
+        self.explicitStyle = style
+        self.onCompleted = onCompleted
+        self.onFailed = onFailed
+        self.onMethodChanged = onMethodChanged
+        _viewModel = StateObject(wrappedValue: viewModel)
+    }
+
     var resolvedStyle: PayabliPayInFormStyle {
         explicitStyle ?? environmentStyle
     }
