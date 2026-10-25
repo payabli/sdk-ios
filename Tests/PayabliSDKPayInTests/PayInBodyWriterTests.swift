@@ -287,6 +287,51 @@ final class PayInBodyWriterTests: XCTestCase {
         XCTAssertEqual(Array(repeating: 0, count: original), Array(body))
     }
 
+    func testTheBodyOverwritesItsBytesWhenThePlatformReleasesThem() throws {
+        let note = ReleaseNote()
+
+        let sent = try sendTheBodyThePlatformHolds(note)
+
+        XCTAssertEqual(
+            sent.routeWiped, Array(repeating: 0, count: sent.count),
+            "the route's copy is overwritten at its exit"
+        )
+        XCTAssertTrue(
+            sent.platformWindow.contains("4111111111111111"),
+            "the platform-held allocation still carries the body until its release"
+        )
+        XCTAssertEqual(
+            note.count, sent.count,
+            "the release ran once the last holder was dropped"
+        )
+        XCTAssertEqual(
+            note.bytes, Array(repeating: 0, count: sent.count),
+            "the release overwrites the bytes before the free"
+        )
+    }
+
+    /// The send's own shape: the platform keeps the body it was given, the route overwrites its
+    /// copy once the transport returns, and every holder is then dropped — which is when the
+    /// allocation's own overwrite runs.
+    private func sendTheBodyThePlatformHolds(_ note: ReleaseNote) throws
+        -> (routeWiped: [UInt8], platformWindow: String, count: Int)
+    {
+        let fragment = try PayInBodyWriter.captureFragment(.card(PayabliPayInPaymentMethod.Card(
+            data: cardData()
+        )))
+        let body = try PayInBodyWriter.splice(
+            outer: Data(#"{"entryPoint":"entry"}"#.utf8),
+            fragment: fragment,
+            releaseNoted: note.record
+        )
+        // The platform holds the value it was given: `URLRequest.httpBody` keeps this `Data`.
+        let platformHeld = body
+        var routeCopy = body
+        PayInBodyWriter.wipe(&routeCopy)
+        return (Array(routeCopy), try text(platformHeld), body.count)
+        // The holders die here: the last release runs the deallocator, which overwrites before freeing.
+    }
+
     func testFormattingTheWorkingBufferPrintsNoDigits() {
         // A struct's default description prints its stored fields, digits included, and the working
         // buffer holds the card number while a request is written, so its description states the
@@ -296,5 +341,28 @@ final class PayInBodyWriterTests: XCTestCase {
 
         XCTAssertEqual("ByteBuffer(size=16)", String(describing: buffer))
         XCTAssertEqual(String(describing: buffer), String(reflecting: buffer))
+    }
+}
+
+/// Reads a body at its release, after the overwrite and before the free: the last holder is gone
+/// by then, so the bytes this hands back are the only view of the allocation left.
+private final class ReleaseNote: @unchecked Sendable {
+    private let lock = NSLock()
+    private var bytesAtRelease: [UInt8] = []
+    private var releaseCount = -1
+
+    var bytes: [UInt8] {
+        lock.withLock { bytesAtRelease }
+    }
+
+    var count: Int {
+        lock.withLock { releaseCount }
+    }
+
+    func record(_ pointer: UnsafeRawPointer, _ count: Int) {
+        lock.withLock {
+            bytesAtRelease = Array(UnsafeRawBufferPointer(start: pointer, count: count))
+            releaseCount = count
+        }
     }
 }

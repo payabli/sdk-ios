@@ -116,9 +116,14 @@ enum PayInBodyWriter {
     ///
     /// - Parameter outer: the encoded outer body, holding no sensitive value.
     /// - Parameter fragment: the `paymentMethod` member, overwritten here once copied.
-    /// - Returns: the body with `paymentMethod` spliced in.
+    /// - Parameter releaseNoted: reads the released bytes, proving the overwrite; routes pass nothing.
+    /// - Returns: the body with `paymentMethod` spliced in, owning its allocation.
     /// - Throws: ``PayabliGenericError`` when the encoded outer body is not a JSON object.
-    static func splice(outer: Data, fragment: PayInMethodFragment) throws -> Data {
+    static func splice(
+        outer: Data,
+        fragment: PayInMethodFragment,
+        releaseNoted: (@Sendable (UnsafeRawPointer, Int) -> Void)? = nil
+    ) throws -> Data {
         var buffer = ByteBuffer()
         defer {
             // Every exit, not just the one that returns: the refusal below runs while the fragment
@@ -142,7 +147,7 @@ enum PayInBodyWriter {
         buffer.write(fragment.bytes)
         buffer.write(closeBrace)
         var finished = buffer.finishAndWipe()
-        let spliced = Data(finished)
+        let spliced = ownedBody(finished, releaseNoted: releaseNoted)
         // The finished array still holds the body, so it is overwritten before it is dropped.
         for index in finished.indices {
             finished[index] = 0
@@ -150,9 +155,37 @@ enum PayInBodyWriter {
         return spliced
     }
 
-    /// Overwrites a body the routes built, once the transport has returned: a refusal's credential
-    /// recovery may replay the request inside the call and needs the bytes intact until then. A
-    /// `Data` copy a caller kept forks its own storage here, so a retained request keeps its bytes.
+    /// A finished body as a `Data` owning its bytes, overwritten by whichever holder frees them.
+    ///
+    /// `URLRequest.httpBody` keeps the `Data` it is given, so the platform holds this allocation
+    /// past the routes' wipe until it drops the request; the release zeroes it, whichever frees it.
+    ///
+    /// - Parameter finished: the finished body bytes, copied into the allocation this returns.
+    /// - Parameter releaseNoted: reads the released bytes, proving the overwrite; routes pass nothing.
+    /// - Returns: the body, owning its allocation.
+    private static func ownedBody(
+        _ finished: [UInt8],
+        releaseNoted: (@Sendable (UnsafeRawPointer, Int) -> Void)? = nil
+    ) -> Data {
+        guard !finished.isEmpty else { return Data() }
+        let count = finished.count
+        let allocation = UnsafeMutableRawPointer.allocate(byteCount: count, alignment: 16)
+        finished.withUnsafeBytes { source in
+            guard let base = source.baseAddress else { return }
+            memcpy(allocation, base, count)
+        }
+        return Data(bytesNoCopy: allocation, count: count, deallocator: .custom { pointer, count in
+            memset(pointer, 0, count)
+            if let releaseNoted {
+                releaseNoted(UnsafeRawPointer(pointer), count)
+            }
+            pointer.deallocate()
+        })
+    }
+
+    /// Overwrites a body the routes built, once the transport has returned: a replay inside the
+    /// call needs the bytes intact until then. A `Data` copy a caller kept forks its own storage,
+    /// so this reaches the routes' copy; a request's kept allocation is overwritten at its release.
     ///
     /// - Parameter body: the body to overwrite.
     static func wipe(_ body: inout Data) {
