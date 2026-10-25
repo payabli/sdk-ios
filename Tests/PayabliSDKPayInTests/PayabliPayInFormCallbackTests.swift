@@ -436,9 +436,10 @@ final class PayabliPayInFormCallbackTests: XCTestCase {
     }
 
     /// Runs the main actor, bounded, until the condition holds or the timeout does, so a case can
-    /// await the task a submission runs.
+    /// await the task a submission runs. The bound is generous, because a cold simulator's first
+    /// hosted renders can hold the main actor for seconds on a shared runner.
     private func waitUntil(
-        timeout: TimeInterval = 2,
+        timeout: TimeInterval = 10,
         _ condition: @MainActor () -> Bool
     ) async {
         let deadline = Date().addingTimeInterval(timeout)
