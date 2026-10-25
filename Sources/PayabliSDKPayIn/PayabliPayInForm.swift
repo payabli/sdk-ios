@@ -224,23 +224,7 @@ public struct PayabliPayInForm: View {
 
     var submitButton: some View {
         Button {
-            Task {
-                do {
-                    let result = try await viewModel.submit()
-                    onCompleted(PayabliPayInFormSuccess(result))
-                } catch let error as any PayabliError {
-                    onFailed(error)
-                } catch {
-                    // Not a failure the SDK names, so it is answered as the SDK's unexpected-error
-                    // shape: the catalog's reason, the failing type's name, its message never.
-                    onFailed(PayabliGenericError(
-                        type: .unknown,
-                        reason: PayabliErrorType.unknown.message,
-                        detail: nil,
-                        underlying: RedactedCause(error)
-                    ))
-                }
-            }
+            submitForOutcome()
         } label: {
             HStack(spacing: 8) {
                 if viewModel.isSubmitting {
@@ -272,6 +256,32 @@ public struct PayabliPayInForm: View {
         .disabled(!viewModel.canSubmit || viewModel.isSubmitting)
         .accessibilityLabel(submitButtonText)
         .accessibilityHint(submitAccessibilityHint)
+    }
+
+    /// Sends the filled form through its operation and reports the outcome to the host.
+    @MainActor
+    func submitForOutcome() {
+        Task {
+            do {
+                let result = try await viewModel.submit()
+                onCompleted(PayabliPayInFormSuccess(result))
+            } catch let error as any PayabliError {
+                onFailed(error)
+            } catch {
+                onFailed(Self.reportedUnexpectedFailure(error))
+            }
+        }
+    }
+
+    /// The failure reported for an error the SDK does not name: the catalog's reason, the failing
+    /// type's name, its message never.
+    static func reportedUnexpectedFailure(_ error: any Error) -> PayabliGenericError {
+        PayabliGenericError(
+            type: .unknown,
+            reason: PayabliErrorType.unknown.message,
+            detail: nil,
+            underlying: RedactedCause(error)
+        )
     }
 
     func fieldSection(_ section: PayabliPayInFieldSection) -> some View {
