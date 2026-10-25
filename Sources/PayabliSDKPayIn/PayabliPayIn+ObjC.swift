@@ -284,12 +284,24 @@ public final class PayabliPayInObjC: NSObject {
         }
     }
 
-    private func addPaymentMethod(
+    /// Stores a payment method the adapter built from strings, closing the buffers it built for
+    /// them at the task's end: a host cannot reach those buffers to close them itself.
+    ///
+    /// - Parameter paymentMethod: the method to store.
+    /// - Parameter options: what the request carries besides the method.
+    /// - Parameter completion: the stored method, or the error the store failed with.
+    func addPaymentMethod(
         _ paymentMethod: PayabliPayInMethodInput,
         options: PayabliPayInOptions,
         completion: @escaping (PayabliPayInStoredPaymentMethodObjC?, NSError?) -> Void
     ) {
         Task { @MainActor in
+            // Both exits: a stored method and a refusal have both finished with the digits.
+            defer {
+                for digits in paymentMethod.sensitiveDigits {
+                    digits.close()
+                }
+            }
             do {
                 let result = try await component.addPaymentMethod(
                     paymentMethod,
@@ -329,5 +341,16 @@ extension Error {
             userInfo["capture"] = 0
         }
         return NSError(domain: error.domain, code: error.code, userInfo: userInfo)
+    }
+}
+
+private extension PayabliPayInMethodInput {
+    /// The buffers this facade's input holds, listed where the task that spends them closes them:
+    /// the adapter builds them from strings, so no host can reach them to close them itself.
+    var sensitiveDigits: [SensitiveDigits] {
+        switch self {
+        case let .card(data): [data.cardNumber, data.securityCode]
+        case let .bankAccount(data): [data.accountNumber]
+        }
     }
 }
