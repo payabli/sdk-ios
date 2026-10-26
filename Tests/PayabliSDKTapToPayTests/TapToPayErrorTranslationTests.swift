@@ -184,8 +184,7 @@ final class TapToPayErrorTranslationTests: XCTestCase {
             .deviceHardwareUnsupported, .cardPresentNotEnabled, .readerDeviceRefused, .readerSessionExpired,
             .activationCodeMalformed, .readerUnavailable, .paymentNotOpened,
             // carried by coarse cases until they are classified
-            .paymentNotHeld, // no close call on this platform yet
-            .paymentNotTaken // no failed read is told from the no-record close yet
+            .paymentNotHeld // no close call on this platform yet
         ]
         let produced = fromTheTable.union(fromActivation).union(raisedDirectly)
         for type in PayabliErrorType.allCases where (3001 ... 3999).contains(type.number) {
@@ -239,7 +238,7 @@ final class TapToPayErrorTranslationTests: XCTestCase {
             case .notInitialized, .invalidState, .notReady, .devicePendingActivation, .attestationRevoked,
                  .attestationFailed, .configFailed, .readerSetupFailed, .readerCredentialsUnusable, .initiateFailed,
                  .tokenExpired, .activationFailed, .networkError, .termsNotAccepted, .readerOSVersionNotSupported,
-                 .cardDeclined:
+                 .cardDeclined, .paymentNotTaken:
                 XCTAssertEqual(error.capture, .notCharged, "\(error) took no money")
             }
         }
@@ -276,6 +275,16 @@ final class TapToPayErrorTranslationTests: XCTestCase {
         XCTAssertEqual(nsError.domain, "com.payabli.ttp")
         XCTAssertEqual(nsError.code, PayabliErrorType.cardDeclined.number)
         XCTAssertEqual(nsError.userInfo["PayabliErrorType"] as? String, PayabliErrorType.cardDeclined.rawValue)
+        XCTAssertEqual(nsError.userInfo["capture"] as? Int, PayabliTTPCapture.notCharged.rawValue)
+        XCTAssertEqual(nsError.userInfo["paymentTransId"] as? String, "TXN-9")
+    }
+
+    func testAnObjectiveCCallerReceivesThePaymentNotTakenCodeCaptureAndPayment() throws {
+        let host = try translated(PayabliTTPError.paymentNotTaken(paymentTransId: "TXN-9"))
+        let nsError = host.toPayabliNSError()
+        XCTAssertEqual(nsError.domain, "com.payabli.ttp")
+        XCTAssertEqual(nsError.code, PayabliErrorType.paymentNotTaken.number)
+        XCTAssertEqual(nsError.userInfo["PayabliErrorType"] as? String, PayabliErrorType.paymentNotTaken.rawValue)
         XCTAssertEqual(nsError.userInfo["capture"] as? Int, PayabliTTPCapture.notCharged.rawValue)
         XCTAssertEqual(nsError.userInfo["paymentTransId"] as? String, "TXN-9")
     }
@@ -317,6 +326,7 @@ final class TapToPayErrorTranslationTests: XCTestCase {
         case .readerOSVersionNotSupported: return .deviceOSUnsupported
         case .cardDeclined: return .cardDeclined
         case .outcomeUnknown: return .paymentOutcomeUnknown
+        case .paymentNotTaken: return .paymentNotTaken
         }
     }
 
@@ -341,6 +351,7 @@ final class TapToPayErrorTranslationTests: XCTestCase {
         .termsNotAccepted,
         .readerOSVersionNotSupported(),
         .cardDeclined(paymentTransId: "TXN"),
-        .outcomeUnknown(paymentTransId: "TXN")
+        .outcomeUnknown(paymentTransId: "TXN"),
+        .paymentNotTaken(paymentTransId: "TXN")
     ]
 }

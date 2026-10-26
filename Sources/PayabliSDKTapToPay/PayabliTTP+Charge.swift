@@ -221,6 +221,11 @@ extension PayabliTTP {
             {
                 syncPublished()
             }
+            // The no-record close says this charge took nothing, so it replaces the read's failure — but only
+            // where this run minted the key: a resent key names an earlier charge, which it cannot settle.
+            if case .failed(_, _, processorHasNoRecord: true) = close, !reservation.reused {
+                throw PayabliTTPError.paymentNotTaken(paymentTransId: paymentTransId)
+            }
             throw failure
         }
 

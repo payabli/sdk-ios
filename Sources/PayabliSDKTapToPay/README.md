@@ -271,6 +271,7 @@ These Tap to Pay causes are ones your app handles, with their codes:
 | `.terminalNotReady` | 3029 | `.invalidRequest` | The terminal is not ready for this call. |
 | `.tooManyOpenCharges` | 3030 | `.invalidRequest` | Too many charges are waiting to be resolved. |
 | `.chargeNotFinished` | 3034 | `.outcomeUnknown` | An earlier charge on this device hasn't finished. Check that payment before charging again, or wait four minutes. |
+| `.paymentNotTaken` | 3035 | `.retryLater` | The payment was not taken, and the card was not charged. Try again. |
 
 It also carries `capture` and `paymentTransId`:
 

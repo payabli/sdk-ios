@@ -263,6 +263,69 @@ final class TTPChargeKeyTests: XCTestCase {
         XCTAssertEqual(Set(Self.wire.keys).count, 1)
     }
 
+    func testAFailedTapTheProcessorNeverSawReportsThePaymentNotTakenOnAFreshKey() async throws {
+        let (ttp, _) = try await makeReadyTTP(readFailure: PayabliTTPError.nfcFailed(reason: "tap failed"))
+        Self.wire.updateRefusal = Self.processorHasNoRecord
+
+        let notTaken = await failure { try await ttp.charge(paymentDetails: Self.details) }
+
+        XCTAssertEqual(notTaken?.type, .paymentNotTaken)
+        XCTAssertEqual(notTaken?.code, 3035)
+        XCTAssertEqual(notTaken?.category, .retryLater)
+        XCTAssertEqual(notTaken?.capture, .notCharged)
+        XCTAssertEqual(notTaken?.paymentTransId, "TXN-KEY")
+    }
+
+    func testAFailedTapWhoseCloseAnswersAnythingElseStaysTheTapNotCompleted() async throws {
+        let (ttp, _) = try await makeReadyTTP(readFailure: PayabliTTPError.nfcFailed(reason: "tap failed"))
+
+        Self.wire.updateFails = true
+        let serverFailure = await failure { try await ttp.charge(paymentDetails: Self.details) }
+        Self.wire.updateFails = false
+        Self.wire.updateRefusal = "The transaction was refused for another reason"
+        let otherRefusal = await failure { try await ttp.charge(paymentDetails: Self.details) }
+        Self.wire.updateRefusal = nil
+        let landed = await failure { try await ttp.charge(paymentDetails: Self.details) }
+
+        for reported in [serverFailure, otherRefusal, landed] {
+            XCTAssertEqual(reported?.type, .tapNotCompleted)
+            XCTAssertEqual(reported?.code, 3018)
+            XCTAssertEqual(reported?.capture, .unknown)
+        }
+    }
+
+    func testAFailedTapTheProcessorNeverSawStaysUnknownOnAResentKey() async throws {
+        let (ttp, provider) = try await makeReadyTTP(outcome: .indeterminate)
+        _ = await failure { try await ttp.charge(paymentDetails: Self.details) }
+        provider.readingResult = .failure(PayabliTTPError.nfcFailed(reason: "tap failed"))
+        Self.wire.updateRefusal = Self.processorHasNoRecord
+
+        let resent = await failure { try await ttp.charge(paymentDetails: Self.details, attempt: .retry) }
+        Self.wire.updateRefusal = nil
+
+        XCTAssertEqual(resent?.type, .tapNotCompleted)
+        XCTAssertEqual(resent?.code, 3018)
+        XCTAssertEqual(resent?.capture, .unknown)
+        XCTAssertEqual(resent?.paymentTransId, "TXN-KEY")
+    }
+
+    func testAnIndeterminateReadsNoRecordCloseReportsThePaymentNotClosedAndKeepsTheKey() async throws {
+        let (ttp, _) = try await makeReadyTTP(outcome: .indeterminate)
+        Self.wire.updateRefusal = Self.processorHasNoRecord
+
+        let unclosed = await failure { try await ttp.charge(paymentDetails: Self.details) }
+        Self.wire.updateRefusal = nil
+
+        XCTAssertEqual(unclosed?.type, .paymentNotClosed)
+        XCTAssertEqual(unclosed?.code, 3022)
+        XCTAssertEqual(unclosed?.capture, .unknown)
+        XCTAssertEqual(unclosed?.paymentTransId, "TXN-KEY")
+
+        _ = await failure { try await ttp.charge(paymentDetails: Self.details, attempt: .retry) }
+
+        XCTAssertEqual(Self.wire.keys[1], Self.wire.keys[0], "the indeterminate read's close settled the key")
+    }
+
     func testAnOpeningThatFailsHoldsNoKeyAndLeavesTheEarlierOneClaimable() async throws {
         let (ttp, _) = try await makeReadyTTP(outcome: .indeterminate)
         _ = await failure { try await ttp.charge(paymentDetails: Self.details) }
