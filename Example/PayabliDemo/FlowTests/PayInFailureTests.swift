@@ -53,7 +53,7 @@ final class PayInFailureTests: XCTestCase {
         XCTAssertEqual(failure.message, "Conflict (409)")
     }
 
-    /// The SDK words an open outcome as the payment's, which is what every other call here is.
+    /// A reversal's open outcome reads as the reversal's, in the demo's own copy.
     func testAnInterruptedReversalNamesTheReversalRatherThanThePayment() {
         let failure = PayInFailure(Self.interruptedReversal, operation: .void)
 

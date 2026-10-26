@@ -19,9 +19,10 @@ public enum PayabliPayInError: PayabliError, Equatable {
     /// **What settles the outcome is reading the transaction back**, not repeating the submission. A refused retry
     /// reports ``PayabliErrorType/retryRefused``: the earlier attempt reached the service and is still unresolved.
     ///
-    /// Raised when a send of this payment may have run and nothing says how it ended: a new payment's request reached
-    /// the network and got no answer, or a retry of a payment came back unanswered. A definite outcome, and a new
-    /// payment that never left the device, arrive as themselves.
+    /// Raised when a send that may have moved money came back with nothing that says how it ended: a new
+    /// payment's request reached the network and got no answer, a retry of a payment came back unanswered,
+    /// or a send naming a transaction — the capture of an authorization, or a void — came back unanswered.
+    /// A definite outcome, and a new payment that never left the device, arrive as themselves.
     ///
     /// `type` is the classification to branch on. `causeType` names the failing type and carries none
     /// of its message, because that message can quote a response body or name a host's own endpoint,
@@ -66,7 +67,7 @@ public enum PayabliPayInError: PayabliError, Equatable {
         case let .transactionFailed(failure):
             return failure.reasonText
         case .submissionInterrupted:
-            return "The payment may have been taken and the outcome is unknown."
+            return "The transaction's status is unknown. Read the transaction back to see its status."
         }
     }
 
