@@ -84,6 +84,7 @@ public enum PayabliErrorType : Swift::String, Swift::Sendable, Swift::CaseIterab
   case paymentNotHeld
   case deviceIdentityUnavailable
   case chargeNotFinished
+  case paymentNotTaken
   public init?(rawValue: Swift::String)
   public typealias AllCases = [PayabliSDKCore::PayabliErrorType]
   public typealias RawValue = Swift::String

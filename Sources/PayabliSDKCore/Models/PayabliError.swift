@@ -97,6 +97,7 @@ public enum PayabliErrorType: String, Sendable, CaseIterable {
     case paymentNotHeld = "PAYMENT_NOT_HELD"
     case deviceIdentityUnavailable = "DEVICE_IDENTITY_UNAVAILABLE"
     case chargeNotFinished = "CHARGE_NOT_FINISHED"
+    case paymentNotTaken = "PAYMENT_NOT_TAKEN"
 }
 
 /// What a host does about a failure. Each ``PayabliErrorType`` belongs to one.
@@ -192,6 +193,7 @@ public extension PayabliErrorType {
         case .paymentNotHeld: 3031
         case .deviceIdentityUnavailable: 3033
         case .chargeNotFinished: 3034
+        case .paymentNotTaken: 3035
         }
     }
 
@@ -263,6 +265,7 @@ public extension PayabliErrorType {
         case .deviceIdentityUnavailable: "This device cannot be identified."
         case .chargeNotFinished:
             "An earlier charge on this device hasn't finished. Check that payment before charging again, or wait four minutes."
+        case .paymentNotTaken: "The payment was not taken, and the card was not charged. Try again."
         }
     }
 
@@ -281,7 +284,7 @@ public extension PayabliErrorType {
              .tapNotCompleted, .paymentOutcomeUnknown, .paymentNotClosed, .chargeNotFinished:
             .outcomeUnknown
         case .rateLimited, .deviceKeyUnavailable, .deviceSetupUnavailable, .readerUnavailable, .readerSessionExpired,
-             .transactionNotFound:
+             .transactionNotFound, .paymentNotTaken:
             .retryLater
         case .validation, .sessionNotInitialized, .activationCodeMalformed, .activationCodeIncorrect, .deviceNotPending, .terminalNotReady,
              .tooManyOpenCharges, .paymentNotHeld, .retryNotSamePayment, .paymentReferenceOpen:

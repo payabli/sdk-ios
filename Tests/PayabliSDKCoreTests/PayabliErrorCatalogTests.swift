@@ -146,6 +146,10 @@ final class PayabliErrorCatalogTests: XCTestCase {
         (
             .chargeNotFinished, "CHARGE_NOT_FINISHED", 3034, .outcomeUnknown,
             "An earlier charge on this device hasn't finished. Check that payment before charging again, or wait four minutes."
+        ),
+        (
+            .paymentNotTaken, "PAYMENT_NOT_TAKEN", 3035, .retryLater,
+            "The payment was not taken, and the card was not charged. Try again."
         )
     ]
 

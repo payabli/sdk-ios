@@ -184,7 +184,8 @@ final class TapToPayErrorTranslationTests: XCTestCase {
             .deviceHardwareUnsupported, .cardPresentNotEnabled, .readerDeviceRefused, .readerSessionExpired,
             .activationCodeMalformed, .readerUnavailable, .paymentNotOpened,
             // carried by coarse cases until they are classified
-            .paymentNotHeld // no close call on this platform yet
+            .paymentNotHeld, // no close call on this platform yet
+            .paymentNotTaken // no failed read is told from the no-record close yet
         ]
         let produced = fromTheTable.union(fromActivation).union(raisedDirectly)
         for type in PayabliErrorType.allCases where (3001 ... 3999).contains(type.number) {
