@@ -59,8 +59,8 @@ final class PayInFailureTests: XCTestCase {
 
         XCTAssertTrue(failure.message.contains("reversal may have been applied"), failure.message)
         XCTAssertFalse(
-            failure.message.contains("payment may have been taken"),
-            "an open reversal must not read as an open payment: \(failure.message)"
+            failure.message.contains("The transaction's status is unknown"),
+            "an open reversal reads in the demo's own copy, not the SDK's reason: \(failure.message)"
         )
     }
 
