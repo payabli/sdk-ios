@@ -276,6 +276,22 @@ final class TTPChargeKeyTests: XCTestCase {
         XCTAssertEqual(notTaken?.paymentTransId, "TXN-KEY")
     }
 
+    func testAUserDismissalTheProcessorNeverSawReportsThePaymentNotTaken() async throws {
+        let dismissal = "\(PayabliTTPError.cancellationReasonPrefix) user dismissed Tap to Pay sheet"
+        let (ttp, _) = try await makeReadyTTP(readFailure: PayabliTTPError.nfcFailed(reason: dismissal))
+
+        let cancelled = await failure { try await ttp.charge(paymentDetails: Self.details) }
+        Self.wire.updateRefusal = Self.processorHasNoRecord
+        let notTaken = await failure { try await ttp.charge(paymentDetails: Self.details) }
+
+        XCTAssertEqual(cancelled?.type, .userCancelled)
+        XCTAssertEqual(cancelled?.code, 1015)
+        XCTAssertEqual(notTaken?.type, .paymentNotTaken)
+        XCTAssertEqual(notTaken?.code, 3035)
+        XCTAssertEqual(notTaken?.capture, .notCharged)
+        XCTAssertEqual(notTaken?.paymentTransId, "TXN-KEY")
+    }
+
     func testAFailedTapWhoseCloseAnswersAnythingElseStaysTheTapNotCompleted() async throws {
         let (ttp, _) = try await makeReadyTTP(readFailure: PayabliTTPError.nfcFailed(reason: "tap failed"))
 
