@@ -1920,6 +1920,8 @@ def test_release_branches() -> None:
              None),
             ("R11g a later release is the newest-release check's, not this one's", {"0.3.0": "next"}, "0.2.0",
              None),
+            ("R11h a tag named like main's remote ref does not stand in for main",
+             {"0.1.0": "on-hotfix", "origin/main": "on-hotfix"}, "0.2.0", "0.1.0"),
         ):
             release_repo(repo, {"main": "base"}, tags)
             code, _, err = run_step(merged, repo, {"VERSION": version})
@@ -1939,9 +1941,12 @@ def test_branch_triggers() -> None:
     check("W18 CI runs on push and pull request to main, release and hotfix branches",
           all(set((ci_on.get(event) or {}).get("branches") or []) == branch_set for event in ("push", "pull_request")),
           ci_on)
-    # The release reads a push run, so only a pull request's run may be cancelled by the next one.
-    check("W18b only a pull request's CI run is cancelled by a newer one",
-          (ci.get("concurrency") or {}).get("cancel-in-progress") == "${{ github.event_name == 'pull_request' }}",
+    # The release reads a push run, so a newer run may replace a pull request's run and never a push run.
+    # A group keeps one pending run and cancels it for the next, so the group is what protects a push run.
+    check("W18b only a pull request's CI run is cancelled or replaced by a newer one",
+          ci.get("concurrency") == {
+              "group": "ci-${{ github.event_name == 'pull_request' && github.ref || github.sha }}",
+              "cancel-in-progress": "${{ github.event_name == 'pull_request' }}"},
           ci.get("concurrency"))
     interface = yaml.safe_load(INTERFACE_WORKFLOW.read_text())
     interface_on = interface.get("on", interface.get(True)) or {}

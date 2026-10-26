@@ -135,7 +135,7 @@ jobs:
           tags="$(git for-each-ref --format='%(refname:strip=2)' refs/tags)"
           for tag in $(printf '%s\n' "$tags" | { grep -E "$release" || true; }); do
             if [ "$tag" != "$VERSION" ] && [ "$(printf '%s\n%s\n' "$tag" "$VERSION" | sort -V | head -n 1)" = "$tag" ] \
-                && ! git merge-base --is-ancestor "refs/tags/$tag^{commit}" origin/main; then
+                && ! git merge-base --is-ancestor "refs/tags/$tag^{commit}" refs/remotes/origin/main; then
               echo "::error::release $tag is not in main: its release or hotfix branch has not merged back"
               exit 1
             fi

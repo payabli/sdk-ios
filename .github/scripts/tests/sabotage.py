@@ -998,8 +998,13 @@ MUTATIONS = [
     ),
     Mutation(
         "an earlier release is looked for in its own tag rather than in main",
-        RELEASE_YML, '&& ! git merge-base --is-ancestor "refs/tags/$tag^{commit}" origin/main; then',
+        RELEASE_YML, '&& ! git merge-base --is-ancestor "refs/tags/$tag^{commit}" refs/remotes/origin/main; then',
         '&& ! git merge-base --is-ancestor "refs/tags/$tag^{commit}" "refs/tags/$tag"; then', "R11c", "release",
+    ),
+    Mutation(
+        "main is named short in the merge-back check, so a tag of that name stands in for it",
+        RELEASE_YML, '"refs/tags/$tag^{commit}" refs/remotes/origin/main; then', '"refs/tags/$tag^{commit}" origin/main; then',
+        "R11h", "release",
     ),
     Mutation(
         "every tag counts as a release in the merge-back check",
@@ -1024,6 +1029,11 @@ MUTATIONS = [
         "a push run the release reads can be cancelled by the next merge",
         CI_YML, "cancel-in-progress: ${{ github.event_name == 'pull_request' }}", "cancel-in-progress: true",
         "W18b", "workflows",
+    ),
+    Mutation(
+        "push runs share a group, so a newer push cancels one still waiting",
+        CI_YML, "group: ci-${{ github.event_name == 'pull_request' && github.ref || github.sha }}",
+        "group: ci-${{ github.ref }}", "W18b", "workflows",
     ),
     Mutation(
         "a push to a hotfix branch runs no CI",
