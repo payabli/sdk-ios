@@ -1830,9 +1830,8 @@ def test_release() -> None:
 # Release and hotfix branches.
 #
 # A release is cut from a commit on the branch of the version it declares, after CI passed there, and not
-# while an earlier release is missing from main. Those checks are steps of `release.yml`, so each one's own
-# text is taken from the workflow and run in a synthetic repository: a second copy in a script would be a
-# copy the workflow could drift from while its tests stayed green.
+# while an earlier release is missing from main. Those checks are steps of `release.yml`, and each one's own
+# text is taken from the workflow and run in a synthetic repository.
 # --------------------------------------------------------------------------------------------------
 
 def workflow_step(path: Path, job: str, name: str) -> str | None:

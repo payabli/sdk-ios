@@ -2,8 +2,8 @@ name: Source branch
 
 # main holds only what has been released, so it takes pull requests from release and hotfix branches, and
 # from Dependabot, whose bumps are proved on main where they land. A ruleset can require a check but cannot
-# name a pull request's source branch, so this job is the mechanism, made a required check on main. It reads
-# the event and nothing in the repository, so it checks nothing out and holds no token.
+# name a pull request's source branch, so this job is the mechanism. It reads the event and nothing in the
+# repository, so it checks nothing out and holds no token.
 
 on:
   pull_request:
