@@ -1481,6 +1481,15 @@ def test_workflows() -> None:
     publish_tag_at = next((index for index, run in enumerate(publish_runs) if "gh release create" in run), -1)
     check("W15v the job that tags checks the version against the newest release again, with the script's lines",
           len(ordering) == 4 and recheck_at != -1 and recheck_at < publish_tag_at, (ordering, recheck_at, publish_tag_at))
+    # An earlier release cut while this one waited for approval is looked for again where the tag is created,
+    # with the check job's own lines, so the two copies cannot come to decide differently.
+    merged_check = workflow_step(RELEASE_WORKFLOW, "check", "Check every earlier release is in main and in the commit")
+    merged_again = workflow_step(RELEASE_WORKFLOW, "publish",
+                                 "Check again that every earlier release is in main and in the commit")
+    again_at = next((index for index, run in enumerate(publish_runs) if run == merged_again), -1)
+    check("W15x the job that tags checks every earlier release again, with the check job's lines, before tagging",
+          merged_check is not None and merged_again == merged_check and -1 < again_at < publish_tag_at,
+          (again_at, publish_tag_at))
     # The publish job checks the reported version as data with the gate's own pattern, so the two cannot
     # accept different versions without this failing.
     gate_pattern = re.search(r'\[\[ "\$declared" =~ (\S+) \]\]', GATE_SCRIPT.read_text())
@@ -1885,7 +1894,7 @@ def release_repo(root: Path, branches: dict[str, str], tags: dict[str, str]) -> 
 
 def test_release_branches() -> None:
     on_branch = workflow_step(RELEASE_WORKFLOW, "check", "Check the commit is on its release or hotfix branch")
-    merged = workflow_step(RELEASE_WORKFLOW, "check", "Check every earlier release is in main")
+    merged = workflow_step(RELEASE_WORKFLOW, "check", "Check every earlier release is in main and in the commit")
     with tempfile.TemporaryDirectory() as tmp:
         repo = Path(tmp) / "branches"
         shas = release_repo(repo, {"main": "on-main", "release/0.2.0": "on-release", "release/0.3.0": "next",
@@ -1906,27 +1915,32 @@ def test_release_branches() -> None:
                 check(label, code != 0 and "branch=" not in out and f"release/{version}" in err,
                       (code, out, err[-200:]))
 
-        # An earlier release is merged back before the next is cut. Only release tags count, only those
-        # below the version being cut, and the version's own tag is a release being resumed.
-        for label, tags, version, missing in (
-            ("R11 every earlier release in main is accepted", {"0.1.0": "base"}, "0.2.0", None),
-            ("R11b a first release is accepted", {}, "0.1.0", None),
+        # An earlier release is merged back into main, and main into the branch, before the next is cut. Only
+        # release tags count, only those below the version being cut, and the version's own tag is a release
+        # being resumed. The commit cut is on release/0.2.0 and main is `base` unless a case says otherwise.
+        for label, tags, version, missing, main in (
+            ("R11 every earlier release in main and in the commit is accepted", {"0.1.0": "base"}, "0.2.0", None,
+             "base"),
+            ("R11b a first release is accepted", {}, "0.1.0", None, "base"),
             ("R11c an earlier release missing from main is refused, by name",
-             {"0.1.0": "base", "0.1.1": "on-hotfix"}, "0.2.0", "0.1.1"),
-            ("R11d components compare as numbers, not text", {"0.9.0": "on-hotfix"}, "0.10.0", "0.9.0"),
+             {"0.1.0": "base", "0.1.1": "on-hotfix"}, "0.2.0", "0.1.1 is not in main", "base"),
+            ("R11d components compare as numbers, not text", {"0.9.0": "on-hotfix"}, "0.10.0",
+             "0.9.0 is not in main", "base"),
             ("R11e a tag that is not a release is not counted",
-             {"qa-probe-1": "on-hotfix", "v0.1.0": "on-hotfix", "0.1.0-rc1": "on-hotfix"}, "0.2.0", None),
+             {"qa-probe-1": "on-hotfix", "v0.1.0": "on-hotfix", "0.1.0-rc1": "on-hotfix"}, "0.2.0", None, "base"),
             ("R11f the version's own tag is a resume, not an earlier release", {"0.2.0": "on-release"}, "0.2.0",
-             None),
+             None, "base"),
             ("R11g a later release is the newest-release check's, not this one's", {"0.3.0": "next"}, "0.2.0",
-             None),
+             None, "base"),
             ("R11h a tag named like main's remote ref does not stand in for main",
-             {"0.1.0": "on-hotfix", "origin/main": "on-hotfix"}, "0.2.0", "0.1.0"),
+             {"0.1.0": "on-hotfix", "origin/main": "on-hotfix"}, "0.2.0", "0.1.0 is not in main", "base"),
+            ("R11i an earlier release in main but not merged into the commit is refused, by name",
+             {"0.1.0": "on-hotfix"}, "0.2.0", "0.1.0 is not in {commit}", "on-hotfix"),
         ):
-            release_repo(repo, {"main": "base"}, tags)
-            code, _, err = run_step(merged, repo, {"VERSION": version})
+            shas = release_repo(repo, {"main": main, "release/0.2.0": "on-release"}, tags)
+            code, _, err = run_step(merged, repo, {"VERSION": version, "COMMIT": shas["on-release"]})
             if missing:
-                check(label, code != 0 and missing in err, (code, err[-200:]))
+                check(label, code != 0 and missing.format(commit=shas["on-release"]) in err, (code, err[-200:]))
             else:
                 check(label, code == 0, (code, err[-200:]))
 
@@ -1945,7 +1959,7 @@ def test_branch_triggers() -> None:
     # A group keeps one pending run and cancels it for the next, so the group is what protects a push run.
     check("W18b only a pull request's CI run is cancelled or replaced by a newer one",
           ci.get("concurrency") == {
-              "group": "ci-${{ github.event_name == 'pull_request' && github.ref || github.sha }}",
+              "group": "ci-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}",
               "cancel-in-progress": "${{ github.event_name == 'pull_request' }}"},
           ci.get("concurrency"))
     interface = yaml.safe_load(INTERFACE_WORKFLOW.read_text())
@@ -1955,17 +1969,25 @@ def test_branch_triggers() -> None:
 
     source = yaml.safe_load(SOURCE_WORKFLOW.read_text()) if SOURCE_WORKFLOW.exists() else {}
     source_on = source.get("on", source.get(True)) or {}
-    pull = source_on.get("pull_request") or {}
-    check("W19 the source-branch check runs on every pull request into main, retargets included, with no token",
-          set(source_on) == {"pull_request"} and pull.get("branches") == ["main"]
+    pull = source_on.get("pull_request_target") or {}
+    # main's copy of the check, so a pull request cannot edit the rule it is judged by. Safe only while the job
+    # checks out nothing and holds no token, which the same check asserts.
+    check("W19 the source-branch check runs main's copy on every pull request into main, retargets included, "
+          "checking out nothing and holding no token",
+          set(source_on) == {"pull_request_target"} and pull.get("branches") == ["main"]
           and {"opened", "synchronize", "reopened", "edited"} <= set(pull.get("types") or [])
-          and source.get("permissions") == {}, (source_on, source.get("permissions")))
-    step = workflow_step(SOURCE_WORKFLOW, "source", "Check the pull request comes from a release or hotfix branch") \
+          and source.get("permissions") == {}
+          and not any("uses" in s for job in (source.get("jobs") or {}).values() for s in job.get("steps") or []),
+          (source_on, source.get("permissions")))
+    step = workflow_step(SOURCE_WORKFLOW, "source",
+                         "Check the pull request comes from a release, hotfix or Dependabot branch") \
         if SOURCE_WORKFLOW.exists() else None
     steps = [s for job in (source.get("jobs") or {}).values() for s in job.get("steps") or []]
-    check("W19b the head branch reaches the step through the environment, never the script",
+    check("W19b the head branch and its repository reach the step through the environment, never the script",
           step is not None and "${{" not in step
-          and any((s.get("env") or {}).get("HEAD_REF") == "${{ github.head_ref }}" for s in steps), step)
+          and any((s.get("env") or {}).get("HEAD_REF") == "${{ github.head_ref }}"
+                  and (s.get("env") or {}).get("HEAD_REPO") == "${{ github.event.pull_request.head.repo.full_name }}"
+                  for s in steps), step)
     with tempfile.TemporaryDirectory() as tmp:
         marker, work = Path(tmp) / "ran", Path(tmp) / "work"
         work.mkdir()
@@ -1979,11 +2001,16 @@ def test_branch_triggers() -> None:
             ("W19i a prefix is matched at the start only", "feat/release/0.2.0", False),
             ("W19j a branch name is never run as shell", f"release/$(touch {marker})", True),
         ):
-            code, _, err = run_step(step, work, {"HEAD_REF": head})
+            code, _, err = run_step(step, work, {"HEAD_REF": head, "HEAD_REPO": "payabli/sdk-ios",
+                                                 "GITHUB_REPOSITORY": "payabli/sdk-ios"})
             if accepted:
                 check(label, code == 0 and not marker.exists(), (code, err[-200:]))
             else:
                 check(label, code != 0 and "release/" in err and head in err, (code, err[-200:]))
+        code, _, err = run_step(step, work, {"HEAD_REF": "release/0.2.0", "HEAD_REPO": "someone/sdk-ios",
+                                             "GITHUB_REPOSITORY": "payabli/sdk-ios"})
+        check("W19k a fork's release branch is refused, naming the fork",
+              code != 0 and "someone/sdk-ios" in err, (code, err[-200:]))
 
 def main() -> int:
     if ONLY not in HALVES:

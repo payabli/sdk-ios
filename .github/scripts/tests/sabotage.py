@@ -68,11 +68,14 @@ VERSION_SOURCE = "Sources/PayabliSDKCore/PayabliSDKCore.swift"
 
 class Mutation:
     def __init__(self, name: str, path: str, anchor: str, replacement: str, expect: str,
-                 half: str) -> None:
+                 half: str, occurrences: int = 1) -> None:
         self.name = name
         self.path = path
         self.anchor = anchor
         self.replacement = replacement
+        # How many times the anchor appears. More than one only where the file carries the same lines twice
+        # on purpose and a check holds the copies equal, so breaking one copy alone tests that check instead.
+        self.occurrences = occurrences
         # The check label prefix that must appear among verify.py's failures.
         self.expect = expect
         # Which half of verify.py can see it, so a mutation does not pay for the other two.
@@ -998,32 +1001,60 @@ MUTATIONS = [
     ),
     Mutation(
         "an earlier release is looked for in its own tag rather than in main",
-        RELEASE_YML, '&& ! git merge-base --is-ancestor "refs/tags/$tag^{commit}" refs/remotes/origin/main; then',
-        '&& ! git merge-base --is-ancestor "refs/tags/$tag^{commit}" "refs/tags/$tag"; then', "R11c", "release",
+        RELEASE_YML, 'if ! git merge-base --is-ancestor "refs/tags/$tag^{commit}" refs/remotes/origin/main; then',
+        'if ! git merge-base --is-ancestor "refs/tags/$tag^{commit}" "refs/tags/$tag"; then', "R11c", "release", occurrences=2,
     ),
     Mutation(
         "main is named short in the merge-back check, so a tag of that name stands in for it",
         RELEASE_YML, '"refs/tags/$tag^{commit}" refs/remotes/origin/main; then', '"refs/tags/$tag^{commit}" origin/main; then',
-        "R11h", "release",
+        "R11h", "release", occurrences=2,
     ),
     Mutation(
         "every tag counts as a release in the merge-back check",
         RELEASE_YML, 'for tag in $(printf \'%s\\n\' "$tags" | { grep -E "$release" || true; }); do',
-        'for tag in $(printf \'%s\\n\' "$tags"); do', "R11e", "release",
+        'for tag in $(printf \'%s\\n\' "$tags"); do', "R11e", "release", occurrences=2,
     ),
     Mutation(
         "the merge-back check looks at later releases instead of earlier ones",
-        RELEASE_YML, '| sort -V | head -n 1)" = "$tag" ]', '| sort -V | tail -n 1)" = "$tag" ]', "R11c", "release",
+        RELEASE_YML, '| sort -V | head -n 1)" = "$tag" ]', '| sort -V | tail -n 1)" = "$tag" ]', "R11c", "release", occurrences=2,
     ),
     Mutation(
         "a resumed release is refused for its own tag",
-        RELEASE_YML, 'if [ "$tag" != "$VERSION" ] && [', "if [", "R11f", "release",
+        RELEASE_YML, 'if [ "$tag" != "$VERSION" ] && [', "if [", "R11f", "release", occurrences=2,
     ),
     Mutation(
         "a release missing from main only warns",
-        RELEASE_YML, "      - name: Check every earlier release is in main\n",
-        "      - name: Check every earlier release is in main\n        continue-on-error: true\n",
+        RELEASE_YML, "      - name: Check every earlier release is in main and in the commit\n",
+        "      - name: Check every earlier release is in main and in the commit\n        continue-on-error: true\n",
         "W15p", "workflows",
+    ),
+    Mutation(
+        "a commit that lacks an earlier release is cut",
+        RELEASE_YML, 'if ! git merge-base --is-ancestor "refs/tags/$tag^{commit}" "$COMMIT"; then', "if false; then",
+        "R11i", "release", occurrences=2,
+    ),
+    Mutation(
+        "the earlier release is looked for in main's head rather than in the commit cut",
+        RELEASE_YML, 'if ! git merge-base --is-ancestor "refs/tags/$tag^{commit}" "$COMMIT"; then',
+        'if ! git merge-base --is-ancestor "refs/tags/$tag^{commit}" refs/remotes/origin/main; then', "R11i", "release", occurrences=2,
+    ),
+    Mutation(
+        "the job that tags stops checking every earlier release",
+        RELEASE_YML, "      - name: Check again that every earlier release is in main and in the commit\n        run: |\n",
+        "      - name: Check again that every earlier release is in main and in the commit\n        run: |\n          exit 0\n",
+        "W15x", "workflows",
+    ),
+    Mutation(
+        "a fork's pull request into main passes on its branch name",
+        SOURCE_YML, 'if [ "$HEAD_REPO" != "$GITHUB_REPOSITORY" ]; then', "if false; then", "W19k", "workflows",
+    ),
+    Mutation(
+        "the source-branch check runs the pull request's own copy of itself",
+        SOURCE_YML, "on:\n  pull_request_target:\n", "on:\n  pull_request:\n", "W19", "workflows",
+    ),
+    Mutation(
+        "the source-branch check checks out the pull request it runs main's copy for",
+        SOURCE_YML, "    steps:\n", "    steps:\n      - uses: actions/checkout@v4\n", "W19", "workflows",
     ),
     Mutation(
         "a push run the release reads can be cancelled by the next merge",
@@ -1032,8 +1063,13 @@ MUTATIONS = [
     ),
     Mutation(
         "push runs share a group, so a newer push cancels one still waiting",
-        CI_YML, "group: ci-${{ github.event_name == 'pull_request' && github.ref || github.sha }}",
+        CI_YML, "group: ci-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}",
         "group: ci-${{ github.ref }}", "W18b", "workflows",
+    ),
+    Mutation(
+        "push runs are grouped by commit, so a push of the same commit to a new branch replaces one waiting",
+        CI_YML, "group: ci-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}",
+        "group: ci-${{ github.event_name == 'pull_request' && github.ref || github.sha }}", "W18b", "workflows",
     ),
     Mutation(
         "a push to a hotfix branch runs no CI",
@@ -1167,7 +1203,7 @@ def main() -> int:
 
             text = target.read_text(encoding="utf-8")
             occurrences = text.count(mutation.anchor)
-            if occurrences != 1:
+            if occurrences != mutation.occurrences:
                 bad.append((mutation.name, f"anchor matched {occurrences} times in {mutation.path}"))
                 print(f"  INVALID {mutation.name}")
                 continue

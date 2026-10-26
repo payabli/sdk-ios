@@ -7,10 +7,11 @@ on:
     branches: [main, 'release/**', 'hotfix/**']
 
 # A release names a commit that passed this workflow on a push to its release or hotfix branch, and a push
-# run cancelled by the next merge is one that never passed. So a push run is grouped by its commit, where no
-# newer push replaces it while it runs or waits, and only a pull request's run is cancelled by a newer one.
+# run cancelled by the next merge is one that never passed. So a push run is a group of its own, where no newer
+# run replaces it while it runs or waits, and only a pull request's run is cancelled by a newer one. Not the
+# commit: a release branch created from main pushes main's commit again.
 concurrency:
-  group: ci-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
+  group: ci-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 # Every job here runs the pull request's own code, so the token it inherits is

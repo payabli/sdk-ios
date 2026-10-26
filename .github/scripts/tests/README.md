@@ -55,7 +55,8 @@ gate reads the declaration as it is written without moving when the version is b
 `release-newer.sh` in synthetic repositories holding release tags, because a version below the newest
 release would be published after it. And they run two of `release.yml`'s own steps, taken from the workflow
 rather than copied, in synthetic repositories holding release and hotfix branches and tags: the commit must
-be on the branch of the version it declares, and every earlier release must already be in main.
+be on the branch of the version it declares, and every earlier release must already be in main and in the
+commit.
 
 **Workflow checks (`W*`)** parse the workflows and assert what the files have to be:
 which triggers the nightly may carry, that exactly one job names the Slack token, how the liveness owner is

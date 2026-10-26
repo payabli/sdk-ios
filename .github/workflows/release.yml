@@ -127,17 +127,23 @@ jobs:
             exit 1
           fi
 
-      # Every earlier release is merged back before the next is cut, so main holds each tagged commit and a
-      # release is never cut without an earlier one's fixes. The version's own tag is this release resumed.
-      - name: Check every earlier release is in main
+      # Every earlier release is merged back into main, and main into this release's branch, before the next
+      # is cut: main then holds each tagged commit, and the commit released carries every earlier fix. The
+      # version's own tag is this release resumed.
+      - name: Check every earlier release is in main and in the commit
         run: |
           release='^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'
           tags="$(git for-each-ref --format='%(refname:strip=2)' refs/tags)"
           for tag in $(printf '%s\n' "$tags" | { grep -E "$release" || true; }); do
-            if [ "$tag" != "$VERSION" ] && [ "$(printf '%s\n%s\n' "$tag" "$VERSION" | sort -V | head -n 1)" = "$tag" ] \
-                && ! git merge-base --is-ancestor "refs/tags/$tag^{commit}" refs/remotes/origin/main; then
-              echo "::error::release $tag is not in main: its release or hotfix branch has not merged back"
-              exit 1
+            if [ "$tag" != "$VERSION" ] && [ "$(printf '%s\n%s\n' "$tag" "$VERSION" | sort -V | head -n 1)" = "$tag" ]; then
+              if ! git merge-base --is-ancestor "refs/tags/$tag^{commit}" refs/remotes/origin/main; then
+                echo "::error::release $tag is not in main: its release or hotfix branch has not merged back with a merge commit"
+                exit 1
+              fi
+              if ! git merge-base --is-ancestor "refs/tags/$tag^{commit}" "$COMMIT"; then
+                echo "::error::release $tag is not in $COMMIT: merge main into the branch and pass CI there before cutting $VERSION"
+                exit 1
+              fi
             fi
           done
 
@@ -345,6 +351,25 @@ jobs:
           fi
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
           echo "TAGGED=$tagged" >> "$GITHUB_ENV"
+
+      # Again here, with refs fetched after the approval: an earlier release cut while this one waited is not
+      # in main yet, and this commit does not hold it. The same lines as the check job's step.
+      - name: Check again that every earlier release is in main and in the commit
+        run: |
+          release='^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'
+          tags="$(git for-each-ref --format='%(refname:strip=2)' refs/tags)"
+          for tag in $(printf '%s\n' "$tags" | { grep -E "$release" || true; }); do
+            if [ "$tag" != "$VERSION" ] && [ "$(printf '%s\n%s\n' "$tag" "$VERSION" | sort -V | head -n 1)" = "$tag" ]; then
+              if ! git merge-base --is-ancestor "refs/tags/$tag^{commit}" refs/remotes/origin/main; then
+                echo "::error::release $tag is not in main: its release or hotfix branch has not merged back with a merge commit"
+                exit 1
+              fi
+              if ! git merge-base --is-ancestor "refs/tags/$tag^{commit}" "$COMMIT"; then
+                echo "::error::release $tag is not in $COMMIT: merge main into the branch and pass CI there before cutting $VERSION"
+                exit 1
+              fi
+            fi
+          done
 
       - name: Download the release files
         uses: actions/download-artifact@v4
