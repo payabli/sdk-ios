@@ -323,9 +323,13 @@ successful run of an opted-out tier looks like, so read the skip count rather th
 
 ### CI
 
-- **`ci.yml`** gates every pull request: lint, the SDK suite, `PayabliDemoFlowTests`, and a change report.
-  `pr-reports.yml` holds anything needing a token and is read from the default branch, so a pull request
-  cannot edit the jobs that hold one.
+- **`ci.yml`** gates every pull request into `main`, `release/**` and `hotfix/**`, and every push to them:
+  lint, the SDK suite, `PayabliDemoFlowTests`, and a change report. `pr-reports.yml` holds anything needing
+  a token and is read from the default branch, so a pull request cannot edit the jobs that hold one.
+- **`source-branch.yml`** fails a pull request into `main` from any branch but `release/`, `hotfix/` or
+  `dependabot/`.
+- **`release.yml`** is dispatched from `main` and names a commit on `release/<version>` or
+  `hotfix/<version>` that passed CI there. It refuses while an earlier release's tag is not in `main`.
 - **`public-interface.yml`** compares each module's interface with `API/` on every pull request, and is
   not in `ci.yml`. The release runs the same comparison against the build it is
   about to publish, and refuses to publish on a mismatch; that is repaired by regenerating `API/` in a

@@ -53,14 +53,17 @@ resolves the package by, so a wrong answer publishes a version that cannot be wi
 already resolved it. The run against this tree asserts only the shape of what it prints, so it proves the
 gate reads the declaration as it is written without moving when the version is bumped. They also run
 `release-newer.sh` in synthetic repositories holding release tags, because a version below the newest
-release would be published after it.
+release would be published after it. And they run two of `release.yml`'s own steps, taken from the workflow
+rather than copied, in synthetic repositories holding release and hotfix branches and tags: the commit must
+be on the branch of the version it declares, and every earlier release must already be in main.
 
 **Workflow checks (`W*`)** parse the workflows and assert what the files have to be:
 which triggers the nightly may carry, that exactly one job names the Slack token, how the liveness owner is
 decided, that every suite continues on error and is bounded, that the gate reads every outcome, that a
-release builds, tags and publishes only the commit on main its dispatch names, that a failed release suite
-is re-run without rebuilding the XCFrameworks, and that this harness runs on every file it makes claims
-about. Each of those was true of how the files were written, which is not the same as being enforced.
+release builds, tags and publishes only the commit its dispatch names, on its version's release or hotfix
+branch, that a failed release suite is re-run without rebuilding the XCFrameworks, which branches CI and
+the interface check run on, what the source-branch check lets into main, and that this harness runs on
+every file it makes claims about. Each of those was true of how the files were written, which is not the same as being enforced.
 
 Set `NIGHTLY_ONLY` to `collector`, `poster`, `workflows`, `helper` or `release` to run one family. The default,
 `both`, runs all of them.

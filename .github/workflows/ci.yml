@@ -2,13 +2,15 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, 'release/**', 'hotfix/**']
   pull_request:
-    branches: [main]
+    branches: [main, 'release/**', 'hotfix/**']
 
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  # A pull request's run only. A release names a commit that passed this workflow on a push to its release
+  # or hotfix branch, and a push run cancelled by the next merge is one that never passed.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 # Every job here runs the pull request's own code, so the token it inherits is
 # pinned rather than left to the repository's default. That default is read-only

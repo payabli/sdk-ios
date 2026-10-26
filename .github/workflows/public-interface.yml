@@ -12,7 +12,7 @@ name: Public interface
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, 'release/**', 'hotfix/**']
 
 concurrency:
   group: public-interface-${{ github.ref }}
