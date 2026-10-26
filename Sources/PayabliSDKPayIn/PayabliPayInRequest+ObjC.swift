@@ -34,6 +34,14 @@ public final class PayabliPayInRequestObjC: NSObject {
         super.init()
     }
 
+    /// The buffers the factories built from strings: no host can reach them, so the wrapper
+    /// overwrites them when it is released.
+    deinit {
+        for digits in paymentMethod.sensitiveDigits {
+            digits.close()
+        }
+    }
+
     /// - Parameter storedMethodId: the stored method to charge.
     /// - Parameter method: `card` or `bankAccount`.
     /// - Parameter totalAmount: the amount to charge.
@@ -150,6 +158,8 @@ public final class PayabliPayInRequestObjC: NSObject {
         PayabliPayInRequestObjC(paymentMethod: .cash, totalAmount: totalAmount)
     }
 
+    /// The Swift request this wrapper carries, holding copies of the wrapper's digit buffers: a
+    /// payment spends its own copies and leaves the wrapper's digits for its next use.
     func toSwift() -> PayabliPayInRequest {
         let options = PayabliPayInRequestConfiguration(
             paymentDetails: PayabliPayInPaymentDetails(
@@ -177,7 +187,7 @@ public final class PayabliPayInRequestObjC: NSObject {
                 validatesRoutingNumberChecksum: validatesRoutingNumberChecksum
             )
         )
-        return PayabliPayInRequest(paymentMethod: paymentMethod, options: options)
+        return PayabliPayInRequest(paymentMethod: paymentMethod.withCopiedDigitBuffers(), options: options)
     }
 }
 
@@ -283,5 +293,52 @@ public final class PayabliPayInResultObjC: NSObject {
         action = result.action
         transaction = result.transaction.map(PayabliPayInTransactionObjC.init)
         super.init()
+    }
+}
+
+extension PayabliPayInPaymentMethod {
+    /// The digit buffers this method's payloads hold: a payment task closes the copies it was
+    /// handed, and the wrapper closes these originals when it is released.
+    var sensitiveDigits: [SensitiveDigits] {
+        switch self {
+        case let .card(card): [card.data.cardNumber, card.data.securityCode]
+        case let .bankAccount(account): [account.data.accountNumber]
+        case .stored, .cloudDevice, .check, .cash: []
+        }
+    }
+
+    /// A copy of this method whose digit buffers it holds alone: closing the copy or this method
+    /// leaves the other's digits readable, because a close forks the storage they shared.
+    ///
+    /// - Returns: the copy, with payloads that hold no digits passed through unchanged.
+    func withCopiedDigitBuffers() -> PayabliPayInPaymentMethod {
+        switch self {
+        case let .card(card):
+            .card(PayabliPayInPaymentMethod.Card(
+                data: PayabliPayInCardData(
+                    cardNumber: SensitiveDigits.of(card.data.cardNumber.read()),
+                    expiry: card.data.expiry,
+                    holderName: card.data.holderName,
+                    securityCode: SensitiveDigits.of(card.data.securityCode.read()),
+                    postalCode: card.data.postalCode
+                ),
+                initiator: card.initiator,
+                saveIfSuccess: card.saveIfSuccess
+            ))
+        case let .bankAccount(account):
+            .bankAccount(PayabliPayInPaymentMethod.BankAccount(
+                data: PayabliPayInBankAccountData(
+                    accountNumber: SensitiveDigits.of(account.data.accountNumber.read()),
+                    accountType: account.data.accountType,
+                    holderName: account.data.holderName,
+                    routingNumber: account.data.routingNumber,
+                    secCode: account.data.secCode,
+                    holderType: account.data.holderType,
+                    device: account.data.device
+                )
+            ))
+        case .stored, .cloudDevice, .check, .cash:
+            self
+        }
     }
 }

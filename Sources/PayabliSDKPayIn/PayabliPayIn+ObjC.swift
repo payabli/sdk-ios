@@ -231,8 +231,27 @@ public final class PayabliPayInObjC: NSObject {
         _ request: PayabliPayInRequestObjC,
         completion: @escaping (PayabliPayInResultObjC?, NSError?) -> Void
     ) {
-        let swiftRequest = request.toSwift()
-        complete(completion) { try await $0.capture(swiftRequest) }
+        capture(request.toSwift(), completion: completion)
+    }
+
+    /// Charges a payment the request carries, closing the request's digit buffers at the task's
+    /// end, on a result and a refusal alike: no host can reach them to close them itself.
+    ///
+    /// - Parameter request: the payment and its settings.
+    /// - Parameter completion: the result, or the error the charge failed with.
+    func capture(
+        _ request: PayabliPayInRequest,
+        completion: @escaping (PayabliPayInResultObjC?, NSError?) -> Void
+    ) {
+        complete(completion) {
+            // Both exits: a result and a refusal have both finished with the digits.
+            defer {
+                for digits in request.paymentMethod.sensitiveDigits {
+                    digits.close()
+                }
+            }
+            return try await $0.capture(request)
+        }
     }
 
     /// Holds an amount, as ``PayabliPayIn/authorize(_:)`` does.
@@ -243,8 +262,27 @@ public final class PayabliPayInObjC: NSObject {
         _ request: PayabliPayInRequestObjC,
         completion: @escaping (PayabliPayInResultObjC?, NSError?) -> Void
     ) {
-        let swiftRequest = request.toSwift()
-        complete(completion) { try await $0.authorize(swiftRequest) }
+        authorize(request.toSwift(), completion: completion)
+    }
+
+    /// Holds an amount the request carries, closing the request's digit buffers at the task's end,
+    /// on a result and a refusal alike: no host can reach them to close them itself.
+    ///
+    /// - Parameter request: the payment and its settings.
+    /// - Parameter completion: the result, or the error the authorization failed with.
+    func authorize(
+        _ request: PayabliPayInRequest,
+        completion: @escaping (PayabliPayInResultObjC?, NSError?) -> Void
+    ) {
+        complete(completion) {
+            // Both exits: a result and a refusal have both finished with the digits.
+            defer {
+                for digits in request.paymentMethod.sensitiveDigits {
+                    digits.close()
+                }
+            }
+            return try await $0.authorize(request)
+        }
     }
 
     /// Captures an authorization, as ``PayabliPayIn/captureAuthorizedTransaction(_:)`` does.
