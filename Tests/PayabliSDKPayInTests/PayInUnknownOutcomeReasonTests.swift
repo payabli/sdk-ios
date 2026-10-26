@@ -1,5 +1,5 @@
 import PayabliSDKCore
-@testable import PayabliSDKPayIn
+import PayabliSDKPayIn
 import XCTest
 
 /// The reason each money route reports when the outcome is unknown.
