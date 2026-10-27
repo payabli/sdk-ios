@@ -86,14 +86,14 @@ final class PayabliTTPTermsTests: XCTestCase {
     func testAReaderThatCannotAnswerThrowsRatherThanReportingNotAccepted() async throws {
         let (ttp, provider) = try makeTTP()
         provider.areTermsAcceptedResult = .failure(
-            PayabliTTPError.readerSetupFailed(reason: "Reader not prepared")
+            PayabliTTPError.guardFailed(reason: "Reader not prepared")
         )
 
         do {
             _ = try await ttp.areTermsAccepted()
             XCTFail("expected the provider's failure to surface")
         } catch let error as TapToPayError {
-            XCTAssertEqual(error.type, .unknown)
+            XCTAssertEqual(error.type, .sdkInternalError)
             XCTAssertEqual(error.detail, "Reader not prepared")
         }
     }
@@ -213,14 +213,14 @@ final class PayabliTTPTermsTests: XCTestCase {
     func testAFailureToPresentIsRaised() async throws {
         let (ttp, provider) = try makeTTP()
         provider.presentTermsResult = .failure(
-            PayabliTTPError.readerSetupFailed(reason: "Reader not prepared")
+            PayabliTTPError.guardFailed(reason: "Reader not prepared")
         )
 
         do {
             try await ttp.presentTerms()
             XCTFail("expected the failure to reach the caller")
         } catch let error as TapToPayError {
-            XCTAssertEqual(error.type, .unknown)
+            XCTAssertEqual(error.type, .sdkInternalError)
             XCTAssertEqual(error.detail, "Reader not prepared")
         }
     }
@@ -277,7 +277,7 @@ final class PayabliTTPTermsTests: XCTestCase {
     func testObjCCompanionReportsAFailureAsAnNSError() async throws {
         let (ttp, provider) = try makeTTP()
         provider.presentTermsResult = .failure(
-            PayabliTTPError.readerSetupFailed(reason: "Reader not prepared")
+            PayabliTTPError.guardFailed(reason: "Reader not prepared")
         )
 
         let done = expectation(description: "completion")

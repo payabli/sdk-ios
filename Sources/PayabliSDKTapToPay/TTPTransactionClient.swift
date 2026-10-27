@@ -65,6 +65,9 @@ package final class TTPTransactionClient: Sendable {
             if response.statusCode == 409, !Self.isJSONObject(response.body) {
                 throw ChargeKeyRefusal()
             }
+            if response.statusCode == 404 {
+                throw PayabliTTPError.cardPresentNotEnabled
+            }
             try mapPayabliHTTPError(response: response)
             envelope = try decodePayabliV2Envelope(InitiateData.self, from: response)
         } catch {
@@ -78,7 +81,7 @@ package final class TTPTransactionClient: Sendable {
             )
 
         guard envelope.isApproved, let data = envelope.data else {
-            throw PayabliTTPError.initiateFailed(reason: envelope.reason ?? envelope.code)
+            throw PayabliTTPError.paymentNotOpened(reason: envelope.reason ?? envelope.code)
         }
         return data.paymentTransId
     }

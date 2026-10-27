@@ -10,15 +10,26 @@ package enum PayabliTTPError: Error, Sendable {
     case devicePendingActivation
     case attestationRevoked(reason: String)
     case attestationFailed(reason: String)
+    /// The service holds no attestation for this device, so it has to be set up again before it answers.
+    case deviceSetupRequired(reason: String)
+    /// The service refused the attestation this device presented, in its own words.
+    case deviceSetupRefused(reason: String)
+    /// The entry point refuses this request at the door, before anything about the device is weighed.
+    case entryPointRefused(reason: String)
     case configFailed(reason: String)
+    /// Card-present payments are not enabled for this paypoint. Carries no reason: the status alone says it.
+    case cardPresentNotEnabled
     case readerSetupFailed(reason: String, paymentTransId: String? = nil)
     /// A gateway credential the reader needs is blank. Carries no field name.
     case readerCredentialsUnusable
     case nfcFailed(reason: String, paymentTransId: String? = nil)
-    case initiateFailed(reason: String)
+    /// The service refused to open the payment, in its own words, before any card was asked for.
+    case paymentNotOpened(reason: String)
     case updateFailed(reason: String, paymentTransId: String, capture: PayabliTTPCapture, retryAfter: TimeInterval? = nil)
     case tokenExpired
     case activationFailed(reason: String)
+    /// The activation code is not the six digits the service reads. Carries no reason.
+    case activationCodeMalformed
     case networkError(reason: String)
     /// The merchant has not accepted the terms their platform requires before it
     /// will take a contactless payment. The SDK does not accept on their behalf.
@@ -26,9 +37,24 @@ package enum PayabliTTPError: Error, Sendable {
 
     /// This OS build cannot take contactless payments, and nothing the app or
     /// the merchant does reaches that. The remedy is a different device or an
-    /// OS upgrade, where every other reader failure is transient or
-    /// environmental.
+    /// OS upgrade, where every other reader failure is transient or environmental.
     case readerOSVersionNotSupported(paymentTransId: String? = nil, capture: PayabliTTPCapture = .notCharged)
+
+    /// This device's hardware cannot take contactless payments, and nothing the app or the merchant does
+    /// reaches that. Carries no reason.
+    case readerHardwareUnsupported
+
+    /// The card reader could not be started or kept, in its own words, for a cause that ends only this
+    /// attempt or this read.
+    case readerUnavailable(reason: String, paymentTransId: String? = nil, capture: PayabliTTPCapture = .notCharged)
+
+    /// A precondition the SDK itself checks before it touches the service or the reader failed, in its
+    /// own words.
+    case guardFailed(reason: String, paymentTransId: String? = nil)
+
+    /// The processor refused the device during a read, so the reader session dies with it and the device
+    /// has to be armed again before it reads another card.
+    case readerDeviceRefused(reason: String, paymentTransId: String? = nil, capture: PayabliTTPCapture = .notCharged)
 
     /// The processor refused the card. No money moved.
     case cardDeclined(paymentTransId: String)
@@ -49,11 +75,15 @@ package extension PayabliTTPError {
             // Raised once the reader was asked for a card, and the processor may take the sale before it answers.
             return .unknown
         case let .updateFailed(_, _, capture, _),
-             let .readerOSVersionNotSupported(_, capture):
+             let .readerOSVersionNotSupported(_, capture),
+             let .readerUnavailable(_, _, capture),
+             let .readerDeviceRefused(_, _, capture):
             return capture
         case .notInitialized, .invalidState, .notReady, .devicePendingActivation, .attestationRevoked,
-             .attestationFailed, .configFailed, .readerSetupFailed, .readerCredentialsUnusable, .initiateFailed,
-             .tokenExpired, .activationFailed, .networkError, .termsNotAccepted, .cardDeclined, .paymentNotTaken:
+             .attestationFailed, .deviceSetupRequired, .deviceSetupRefused, .entryPointRefused, .configFailed,
+             .cardPresentNotEnabled, .readerSetupFailed, .readerCredentialsUnusable, .readerHardwareUnsupported,
+             .guardFailed, .paymentNotOpened, .tokenExpired, .activationFailed, .activationCodeMalformed,
+             .networkError, .termsNotAccepted, .cardDeclined, .paymentNotTaken:
             return .notCharged
         }
     }
@@ -63,7 +93,10 @@ package extension PayabliTTPError {
         switch self {
         case let .nfcFailed(_, paymentTransId),
              let .readerSetupFailed(_, paymentTransId),
-             let .readerOSVersionNotSupported(paymentTransId, _):
+             let .readerOSVersionNotSupported(paymentTransId, _),
+             let .readerUnavailable(_, paymentTransId, _),
+             let .readerDeviceRefused(_, paymentTransId, _),
+             let .guardFailed(_, paymentTransId):
             return paymentTransId
         case let .updateFailed(_, paymentTransId, _, _),
              let .cardDeclined(paymentTransId),
@@ -71,8 +104,9 @@ package extension PayabliTTPError {
              let .paymentNotTaken(paymentTransId):
             return paymentTransId
         case .notInitialized, .invalidState, .notReady, .devicePendingActivation, .attestationRevoked,
-             .attestationFailed, .configFailed, .readerCredentialsUnusable, .initiateFailed, .tokenExpired,
-             .activationFailed, .networkError, .termsNotAccepted:
+             .attestationFailed, .deviceSetupRequired, .deviceSetupRefused, .entryPointRefused, .configFailed,
+             .cardPresentNotEnabled, .readerCredentialsUnusable, .readerHardwareUnsupported, .paymentNotOpened,
+             .tokenExpired, .activationFailed, .activationCodeMalformed, .networkError, .termsNotAccepted:
             return nil
         }
     }
@@ -105,14 +139,26 @@ extension PayabliTTPError: LocalizedError {
             return "The payment outcome is not known"
         case .paymentNotTaken:
             return "The processor has no record of the payment, so the card was not charged"
+        case .readerHardwareUnsupported:
+            return "This device cannot take contactless payments"
+        case .cardPresentNotEnabled:
+            return "Card-present payments are not enabled for this paypoint"
+        case .activationCodeMalformed:
+            return "The activation code must be six digits"
         case let .nfcFailed(reason, _),
              let .readerSetupFailed(reason, _),
+             let .readerUnavailable(reason, _, _),
+             let .readerDeviceRefused(reason, _, _),
+             let .guardFailed(reason, _),
              let .updateFailed(reason, _, _, _):
             return reason
         case let .attestationRevoked(reason),
              let .attestationFailed(reason),
+             let .deviceSetupRequired(reason),
+             let .deviceSetupRefused(reason),
+             let .entryPointRefused(reason),
              let .configFailed(reason),
-             let .initiateFailed(reason),
+             let .paymentNotOpened(reason),
              let .activationFailed(reason),
              let .networkError(reason):
             return reason

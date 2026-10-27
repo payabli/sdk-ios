@@ -214,12 +214,10 @@ package final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
     package func checkEligibility() async -> Result<Void, PayabliTTPError> {
         #if canImport(PayabliCardReaderCore)
             guard Self.supportsTapToPay(ProcessInfo.processInfo.operatingSystemVersion) else {
-                return .failure(.readerSetupFailed(reason: "Tap to Pay requires iOS 16.7+"))
+                return .failure(.readerOSVersionNotSupported())
             }
             guard lock.withLock({ injectedPlatformSupport }) ?? PaymentCardReader.isSupported else {
-                return .failure(.readerSetupFailed(
-                    reason: "Tap to Pay hardware not supported on this device"
-                ))
+                return .failure(.readerHardwareUnsupported)
             }
             return .success(())
         #else
@@ -265,7 +263,7 @@ package final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
                 throw PayabliTTPError.termsNotAccepted
             } catch {
                 clearAllState()
-                throw Self.mapError(error) { .readerSetupFailed(reason: $0) }
+                throw Self.mapError(error) { .readerUnavailable(reason: $0) }
             }
         #else
             throw PayabliTTPError.readerSetupFailed(reason: "Tap to Pay is iOS-only")
@@ -278,13 +276,13 @@ package final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
             // which is an error under the Swift 6 language mode from an async context.
             let source = lock.withLock { linkStateSource }
             guard let source else {
-                throw PayabliTTPError.readerSetupFailed(reason: "Reader not prepared")
+                throw PayabliTTPError.guardFailed(reason: "Reader not prepared")
             }
 
             do {
                 return try await source.isAccountLinked()
             } catch {
-                throw Self.mapError(error) { .readerSetupFailed(reason: $0) }
+                throw Self.mapError(error) { .readerUnavailable(reason: $0) }
             }
         #else
             throw PayabliTTPError.readerSetupFailed(reason: "Tap to Pay is iOS-only")
@@ -296,13 +294,13 @@ package final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
             // Same reader the answer comes from, and the same reason for the scoped read as above.
             let source = lock.withLock { linkStateSource }
             guard let source else {
-                throw PayabliTTPError.readerSetupFailed(reason: "Reader not prepared")
+                throw PayabliTTPError.guardFailed(reason: "Reader not prepared")
             }
 
             do {
                 try await source.linkAccount()
             } catch {
-                throw Self.mapError(error) { .readerSetupFailed(reason: $0) }
+                throw Self.mapError(error) { .readerUnavailable(reason: $0) }
             }
         #else
             throw PayabliTTPError.readerSetupFailed(reason: "Tap to Pay is iOS-only")
@@ -315,7 +313,7 @@ package final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
             let activeReader = reader
             lock.unlock()
             guard let reader = activeReader else {
-                throw PayabliTTPError.readerSetupFailed(reason: "Reader not prepared")
+                throw PayabliTTPError.guardFailed(reason: "Reader not prepared")
             }
 
             let amount = request.amount.roundedAsCharged
@@ -412,7 +410,7 @@ package final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
             lock.lock()
             defer { lock.unlock() }
             guard let creds = credentials else {
-                throw PayabliTTPError.readerSetupFailed(reason: "Missing provider credentials")
+                throw PayabliTTPError.guardFailed(reason: "Missing provider credentials")
             }
             return creds
         }

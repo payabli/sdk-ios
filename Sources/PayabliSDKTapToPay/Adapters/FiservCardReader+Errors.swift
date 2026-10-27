@@ -41,7 +41,37 @@ extension FiservCardReader {
             }
 
             let detail = readerDetail(error)
+            if let refusal = vendorRefusal(error, shown: detail) {
+                return refusal
+            }
             return fallback(detail.isEmpty ? error.localizedDescription : detail)
+        }
+
+        /// The refusal the vendor named, where the failure reason it kept carries the processor's own code.
+        ///
+        /// Only a code that decodes out names a refusal; an error whose reason is not the vendor's JSON keeps the
+        /// caller's own classification.
+        ///
+        /// - Parameter error: what the reader stack threw, before it was translated for the host.
+        /// - Parameter shown: the detail a host is shown, which the refusal carries as its reason.
+        /// - Returns: the vendor's refusal, or `nil` where it named none.
+        static func vendorRefusal(_ error: Error, shown: String) -> PayabliTTPError? {
+            guard let readerError = error as? FiservTTPCardReaderError,
+                  let body = readerError.failureReason?.data(using: .utf8),
+                  let responseCode = try? JSONDecoder().decode(VendorFailure.self, from: body).responseCode
+            else { return nil }
+            if deviceDeniedCodes.contains(responseCode) {
+                return .readerDeviceRefused(reason: shown)
+            }
+            return .readerUnavailable(reason: shown)
+        }
+
+        /// The vendor's codes that say it refused the handset, the refusal confirmed or not.
+        private static let deviceDeniedCodes: Set<String> = ["677", "018", "670", "202", "745", "705"]
+
+        /// The vendor's failure reason, decoded: its own `responseCode` where it sent one.
+        private struct VendorFailure: Decodable {
+            let responseCode: String?
         }
 
         /// The platform error behind a card-reader component error, where it kept one.

@@ -132,6 +132,14 @@ final class PayabliTTPReaderSessionRecoveryTests: XCTestCase {
         ))
     }
 
+    /// A refusal of the device by the vendor ends the reader session; a reader that could not be
+    /// started or a guard that failed ends only the read.
+    func testTheSDKsOwnRefusalsAreClassified() {
+        XCTAssertTrue(readerFailureInvalidatesSession(PayabliTTPError.readerDeviceRefused(reason: "x")))
+        XCTAssertFalse(readerFailureInvalidatesSession(PayabliTTPError.readerUnavailable(reason: "x")))
+        XCTAssertFalse(readerFailureInvalidatesSession(PayabliTTPError.guardFailed(reason: "x")))
+    }
+
     // MARK: - initialize() from a state it did not start in
 
     /// `initialize()` has to work from wherever the session happens to be.
@@ -442,16 +450,30 @@ final class PayabliTTPReaderSessionRecoveryTests: XCTestCase {
         XCTAssertEqual(failure.capture, .unknown, "the reader had been asked for a card")
     }
 
-    func testAReaderThatWasNotPreparedKeepsItsCaseAndChargedNothing() async throws {
+    /// A vendor refusal of the device ends the reader session, so the next charge re-arms a reader
+    /// rather than reading against a dead one.
+    func testAVendorRefusalOfTheDeviceDuringTheReadExpiresTheSession() async throws {
         let (ttp, provider, _) = try await makeReadyTTP()
-        provider.readingResult = .failure(PayabliTTPError.readerSetupFailed(reason: "Reader not prepared"))
+        provider.readingResult = .failure(PayabliTTPError.readerDeviceRefused(reason: "677: device refused"))
 
         let failure = try await chargeFailure(ttp)
 
-        XCTAssertEqual(failure.type, .unknown)
+        XCTAssertEqual(failure.type, .readerDeviceRefused)
+        XCTAssertEqual(failure.paymentTransId, Self.paymentTransId)
+        XCTAssertEqual(failure.capture, .unknown, "the processor may have taken the sale")
+        XCTAssertEqual(ttp.sessionState, .sessionExpired)
+    }
+
+    func testAReaderThatWasNotPreparedKeepsItsCaseAndChargedNothing() async throws {
+        let (ttp, provider, _) = try await makeReadyTTP()
+        provider.readingResult = .failure(PayabliTTPError.guardFailed(reason: "Reader not prepared"))
+
+        let failure = try await chargeFailure(ttp)
+
+        XCTAssertEqual(failure.type, .paymentOutcomeUnknown)
         XCTAssertEqual(failure.detail, "Reader not prepared")
         XCTAssertEqual(failure.paymentTransId, Self.paymentTransId)
-        XCTAssertEqual(failure.capture, .notCharged, "the reader was never asked for a card")
+        XCTAssertEqual(failure.capture, .notCharged, "the guard failed before a card was read")
     }
 
     // MARK: - A payment that cannot be opened

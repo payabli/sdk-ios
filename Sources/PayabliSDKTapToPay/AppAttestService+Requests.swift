@@ -13,7 +13,9 @@ extension AppAttestService {
         try await postAttestationRequest(
             path: "/api/v2/device/taptopay/challenge",
             body: ChallengeRequest(entry: entry),
-            label: "challenge"
+            label: "challenge",
+            readsRefusalBeforeStatus: true,
+            makeDeclineError: ColdRouteRefusals.decline
         )
     }
 
@@ -21,7 +23,9 @@ extension AppAttestService {
         try await postAttestationRequest(
             path: "/api/v2/device/taptopay/register",
             body: body,
-            label: "register"
+            label: "register",
+            readsRefusalBeforeStatus: true,
+            makeDeclineError: ColdRouteRefusals.decline
         )
     }
 
@@ -30,25 +34,30 @@ extension AppAttestService {
             path: "/api/v2/device/taptopay/attest",
             body: body,
             label: "attest",
-            pinsCredential: true
+            readsRefusalBeforeStatus: true,
+            pinsCredential: true,
+            makeDeclineError: ColdRouteRefusals.attestDecline
         )
     }
 
-    /// Authenticated POST that expects a non-empty `responseData` of type
-    /// `Payload`. Throws if the envelope is missing it.
+    /// Authenticated POST that expects a non-empty `responseData` of type `Payload`, and throws where the envelope holds none.
     ///
     /// - Parameter path: the route the request is sent to.
     /// - Parameter body: the request's body, encoded as JSON.
     /// - Parameter label: the request's name, carried by its logs and decode errors.
     /// - Parameter assertion: the assertion headers to append, or `nil` where the route needs none.
-    /// - Parameter makeDeclineError: builds the error a refusal or decline throws, from the code and reason the service sent.
+    /// - Parameter readsRefusalBeforeStatus: reads a 400, 403 or 404's refusal envelope, or a 401 saying the binding
+    ///   is gone, before the status mapping.
+    /// - Parameter makeDeclineError: builds the error a refusal or decline throws, from the code and reason the
+    ///   service sent, or `nil` where the words name nothing the route classifies.
     /// - Returns: the envelope's `responseData`, decoded as `Payload`.
     func postAttestationRequest<Payload: Decodable>(
         path: String,
         body: some Encodable,
         label: String,
         assertion: AssertionHeaders? = nil,
-        makeDeclineError: @escaping (_ code: Int?, _ reason: String) -> any Error = { _, reason in
+        readsRefusalBeforeStatus: Bool = false,
+        makeDeclineError: @escaping (_ code: Int?, _ reason: String) -> (any Error)? = { _, reason in
             PayabliTTPError.attestationFailed(reason: reason)
         }
     ) async throws -> Payload {
@@ -57,6 +66,7 @@ extension AppAttestService {
             body: body,
             label: label,
             assertion: assertion,
+            readsRefusalBeforeStatus: readsRefusalBeforeStatus,
             makeDeclineError: makeDeclineError
         )
 
@@ -86,7 +96,8 @@ extension AppAttestService {
     /// - Parameter readsRefusalBeforeStatus: hands a refusal envelope on a 400, 403 or 404, or a 401 saying the binding is
     ///   gone, to `makeDeclineError`, for a route whose refusals are told apart by their text rather than by their status.
     /// - Parameter pinsCredential: sends a refused token once and throws ``PinnedTokenRefusal``.
-    /// - Parameter makeDeclineError: builds the error a refusal or decline throws, from the code and reason the service sent.
+    /// - Parameter makeDeclineError: builds the error a refusal or decline throws, from the code and reason the
+    ///   service sent, or `nil` where the words name nothing the route classifies.
     func postAttestationRequestExpectingNoBody(
         path: String,
         body: some Encodable,
@@ -94,7 +105,7 @@ extension AppAttestService {
         assertion: AssertionHeaders? = nil,
         readsRefusalBeforeStatus: Bool = false,
         pinsCredential: Bool = false,
-        makeDeclineError: @escaping (_ code: Int?, _ reason: String) -> any Error = { _, reason in
+        makeDeclineError: @escaping (_ code: Int?, _ reason: String) -> (any Error)? = { _, reason in
             PayabliTTPError.attestationFailed(reason: reason)
         }
     ) async throws {
@@ -111,8 +122,7 @@ extension AppAttestService {
 
     // MARK: - Private plumbing
 
-    /// Sends an attestation-family POST with its assertion headers and maps the answer: a refusal envelope, a pinned 401,
-    /// an HTTP error, or a 200 carrying `isSuccess: false`. The bearer and any refresh are the transport's.
+    /// Sends an attestation-family POST with its assertion headers and maps the answer; the bearer and refresh are the transport's.
     ///
     /// - Parameter path: the route the request is sent to.
     /// - Parameter body: the request's body, encoded as JSON.
@@ -121,7 +131,8 @@ extension AppAttestService {
     /// - Parameter readsRefusalBeforeStatus: reads a 400, 403 or 404's refusal envelope, or a 401 saying the binding is
     ///   gone, before the status mapping.
     /// - Parameter pinsCredential: sends a refused token once and throws ``PinnedTokenRefusal``.
-    /// - Parameter makeDeclineError: builds the error a refusal or decline throws, from the code and reason the service sent.
+    /// - Parameter makeDeclineError: builds the error a refusal or decline throws, from the code and reason the
+    ///   service sent, or `nil` where the words name nothing the route classifies, so the status mapping answers.
     /// - Returns: the raw response, for the caller to decode.
     private func performAuthenticatedPOST(
         path: String,
@@ -130,7 +141,7 @@ extension AppAttestService {
         assertion: AssertionHeaders?,
         readsRefusalBeforeStatus: Bool = false,
         pinsCredential: Bool = false,
-        makeDeclineError: (_ code: Int?, _ reason: String) -> any Error
+        makeDeclineError: (_ code: Int?, _ reason: String) -> (any Error)?
     ) async throws -> PayabliResponse {
         var headers: [String: String] = [:]
         if let assertion {
@@ -171,14 +182,17 @@ extension AppAttestService {
             throw unregistered
         }
         // Only the statuses a refusal is sent with. Every other status keeps the transport's own
-        // classification, a rate limit's wait among them.
+        // classification, a rate limit's wait among them. A classifier that knows the words throws its own
+        // failure; one that does not leaves the status mapping to answer.
         if readsRefusalBeforeStatus,
            let (code, reason) = PayabliEnvelope.declineOutcome(from: response.body, decoder: decoder),
            [400, 403, 404].contains(response.statusCode)
            || BindingRefusal.isBindingGone(code: response.statusCode, reason: reason)
         {
-            logger.error("[\(label)] refused (code=\(code.map(String.init) ?? "nil"))")
-            throw makeDeclineError(code ?? response.statusCode, reason)
+            if let decline = makeDeclineError(code ?? response.statusCode, reason) {
+                logger.error("[\(label)] refused (code=\(code.map(String.init) ?? "nil"))")
+                throw decline
+            }
         }
         if pinsCredential, response.statusCode == 401 {
             logger.error("[\(label)] the token was refused")
@@ -194,9 +208,10 @@ extension AppAttestService {
 
         if let (code, reason) = PayabliEnvelope.declineOutcome(from: response.body, decoder: decoder) {
             // The reason is the service's `resultText`, which can quote what was
-            // sent. The code says which decline this was.
+            // sent. The code says which decline this was, and a classifier that
+            // knows the words answers with its own failure.
             logger.error("[\(label)] declined (code=\(code.map(String.init) ?? "nil"))")
-            throw makeDeclineError(code, reason)
+            throw makeDeclineError(code, reason) ?? PayabliTTPError.attestationFailed(reason: reason)
         }
 
         return response

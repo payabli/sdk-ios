@@ -41,6 +41,10 @@ final class TapToPayErrorTranslationTests: XCTestCase {
             try translated(PayabliTTPError.readerSetupFailed(reason: "\(prefix) dismissed")).type,
             .userCancelled
         )
+        XCTAssertEqual(
+            try translated(PayabliTTPError.readerUnavailable(reason: "\(prefix) dismissed")).type,
+            .userCancelled
+        )
     }
 
     /// The catalog's sentence and nothing else: no host-facing text names the field that was blank.
@@ -186,10 +190,7 @@ final class TapToPayErrorTranslationTests: XCTestCase {
         ]
         let notProducedYet: Set<PayabliErrorType> = [
             .deviceServicesOutdated, // a Google Play cause, which this platform has no counterpart for
-            .deviceSetupRefused,
-            .deviceHardwareUnsupported, .cardPresentNotEnabled, .readerDeviceRefused, .readerSessionExpired,
-            .activationCodeMalformed, .readerUnavailable, .paymentNotOpened,
-            // carried by coarse cases until they are classified
+            .readerSessionExpired,
             .paymentNotHeld, // no close call on this platform yet
             .paymentNotTaken // no failed read is told from the no-record close yet
         ]
@@ -243,9 +244,11 @@ final class TapToPayErrorTranslationTests: XCTestCase {
             case .nfcFailed, .outcomeUnknown, .updateFailed:
                 XCTAssertEqual(error.capture, .unknown, "\(error) was raised once a card was asked for")
             case .notInitialized, .invalidState, .notReady, .devicePendingActivation, .attestationRevoked,
-                 .attestationFailed, .configFailed, .readerSetupFailed, .readerCredentialsUnusable, .initiateFailed,
-                 .tokenExpired, .activationFailed, .networkError, .termsNotAccepted, .readerOSVersionNotSupported,
-                 .cardDeclined, .paymentNotTaken:
+                 .attestationFailed, .deviceSetupRequired, .deviceSetupRefused, .entryPointRefused, .configFailed,
+                 .cardPresentNotEnabled, .readerSetupFailed, .readerCredentialsUnusable, .readerHardwareUnsupported,
+                 .readerUnavailable, .guardFailed, .readerDeviceRefused, .paymentNotOpened,
+                 .tokenExpired, .activationFailed, .activationCodeMalformed, .networkError, .termsNotAccepted,
+                 .readerOSVersionNotSupported, .cardDeclined, .paymentNotTaken:
                 XCTAssertEqual(error.capture, .notCharged, "\(error) took no money")
             }
         }
@@ -271,7 +274,7 @@ final class TapToPayErrorTranslationTests: XCTestCase {
     }
 
     func testAFailureBeforeAPaymentWasOpenedNamesNone() {
-        XCTAssertNil(PayabliTTPError.initiateFailed(reason: "x").paymentTransId)
+        XCTAssertNil(PayabliTTPError.paymentNotOpened(reason: "x").paymentTransId)
     }
 
     // MARK: - The NSError an Objective-C caller receives
@@ -389,18 +392,27 @@ final class TapToPayErrorTranslationTests: XCTestCase {
         case .notReady: return .terminalNotReady
         case .devicePendingActivation: return .devicePendingActivation
         case .attestationRevoked: return .deviceSetupRequired
+        case .deviceSetupRequired: return .deviceSetupRequired
+        case .deviceSetupRefused: return .deviceSetupRefused
+        case .entryPointRefused: return .entryPointRefused
         case .attestationFailed: return .unknown
         case .configFailed: return .unknown
         case .readerSetupFailed: return .unknown
         case .readerCredentialsUnusable: return .readerCredentialsUnusable
+        case .cardPresentNotEnabled: return .cardPresentNotEnabled
+        case .readerHardwareUnsupported: return .deviceHardwareUnsupported
+        case .guardFailed: return .sdkInternalError
         case .nfcFailed: return .tapNotCompleted
-        case .initiateFailed: return .unknown
+        case .paymentNotOpened: return .paymentNotOpened
         case .updateFailed: return .paymentNotClosed
         case .tokenExpired: return .tokenExpired
         case .activationFailed: return .unknown
+        case .activationCodeMalformed: return .activationCodeMalformed
         case .networkError: return .networkError
         case .termsNotAccepted: return .termsNotAccepted
         case .readerOSVersionNotSupported: return .deviceOSUnsupported
+        case .readerUnavailable: return .readerUnavailable
+        case .readerDeviceRefused: return .readerDeviceRefused
         case .cardDeclined: return .cardDeclined
         case .outcomeUnknown: return .paymentOutcomeUnknown
         case .paymentNotTaken: return .paymentNotTaken
@@ -416,14 +428,23 @@ final class TapToPayErrorTranslationTests: XCTestCase {
         .devicePendingActivation,
         .attestationRevoked(reason: "x"),
         .attestationFailed(reason: "x"),
+        .deviceSetupRequired(reason: "x"),
+        .deviceSetupRefused(reason: "x"),
+        .entryPointRefused(reason: "x"),
         .configFailed(reason: "x"),
+        .cardPresentNotEnabled,
         .readerSetupFailed(reason: "x"),
         .readerCredentialsUnusable,
+        .readerHardwareUnsupported,
+        .readerUnavailable(reason: "x"),
+        .guardFailed(reason: "x"),
+        .readerDeviceRefused(reason: "x"),
         .nfcFailed(reason: "x"),
-        .initiateFailed(reason: "x"),
+        .paymentNotOpened(reason: "x"),
         .updateFailed(reason: "x", paymentTransId: "TXN", capture: .unknown),
         .tokenExpired,
         .activationFailed(reason: "x"),
+        .activationCodeMalformed,
         .networkError(reason: "x"),
         .termsNotAccepted,
         .readerOSVersionNotSupported(),

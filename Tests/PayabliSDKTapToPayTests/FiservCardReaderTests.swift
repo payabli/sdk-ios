@@ -83,14 +83,13 @@ final class FiservCardReaderTests: XCTestCase {
         let reader = FiservCardReader()
         let result = await reader.checkEligibility()
         #if os(iOS)
-            // On a real iPhone `success`; on an incompatible device
-            // `readerSetupFailed`. Both are acceptable, so the assertion is
-            // only that the error, if any, is not about missing credentials.
-            if case let .failure(err) = result, case let .readerSetupFailed(reason, _) = err {
-                XCTAssertFalse(
-                    reason.lowercased().contains("credentials"),
-                    "eligibility should not require credentials"
-                )
+            // On a real iPhone `success`; on a device the platform cannot arm, the
+            // refusal is the hardware's own and never about credentials.
+            if case let .failure(error) = result {
+                guard case .readerHardwareUnsupported = error else {
+                    XCTFail("eligibility refused for another cause: \(error)")
+                    return
+                }
             }
         #else
             if case .success = result {
@@ -120,10 +119,15 @@ final class FiservCardReaderTests: XCTestCase {
         let reader = FiservCardReader()
         do {
             try await reader.prepareReader { _ in }
-            XCTFail("expected readerSetupFailed")
+            XCTFail("expected a refusal before the reader is armed")
+        } catch let PayabliTTPError.guardFailed(reason, _) {
+            XCTAssertTrue(
+                reason.lowercased().contains("credentials"),
+                "unexpected reason: \(reason)"
+            )
         } catch let PayabliTTPError.readerSetupFailed(reason, _) {
             XCTAssertTrue(
-                reason.lowercased().contains("credentials") || reason.lowercased().contains("ios-only"),
+                reason.lowercased().contains("ios-only"),
                 "unexpected reason: \(reason)"
             )
         } catch {
@@ -277,8 +281,10 @@ final class FiservCardReaderTests: XCTestCase {
         do {
             try await reader.prepareReader { _ in }
             XCTFail("expected failure after cleanUp")
-        } catch PayabliTTPError.readerSetupFailed {
+        } catch PayabliTTPError.guardFailed {
             // expected
+        } catch PayabliTTPError.readerSetupFailed {
+            // the build without the reader core, which has no reader to prepare
         } catch {
             XCTFail("wrong error: \(error)")
         }
@@ -298,8 +304,10 @@ final class FiservCardReaderTests: XCTestCase {
         do {
             _ = try await reader.areTermsAccepted()
             XCTFail("expected failure with no prepared reader")
-        } catch PayabliTTPError.readerSetupFailed {
+        } catch PayabliTTPError.guardFailed {
             // expected
+        } catch PayabliTTPError.readerSetupFailed {
+            // the build without the reader core, which has no reader to ask
         } catch {
             XCTFail("wrong error: \(error)")
         }
@@ -342,8 +350,10 @@ final class FiservCardReaderTests: XCTestCase {
         do {
             try await reader.presentTerms()
             XCTFail("expected the missing reader to surface")
-        } catch PayabliTTPError.readerSetupFailed {
+        } catch PayabliTTPError.guardFailed {
             // expected
+        } catch PayabliTTPError.readerSetupFailed {
+            // the build without the reader core, which has no reader to present from
         } catch {
             XCTFail("wrong error: \(error)")
         }
@@ -358,14 +368,14 @@ final class FiservCardReaderTests: XCTestCase {
         do {
             try await reader.presentTerms()
             XCTFail("expected the reader's failure to surface")
-        } catch PayabliTTPError.readerSetupFailed {
+        } catch PayabliTTPError.readerUnavailable {
             // expected
         } catch {
             XCTFail("wrong error: \(error)")
         }
     }
 
-    /// Dismissing the terms sheet fails as `.readerSetupFailed` with the cancel prefix. The same
+    /// Dismissing the terms sheet fails as `.readerUnavailable` with the cancel prefix. The same
     /// `NSUserCancelledError` during a charge maps to `.nfcFailed`; presenting is not a card read.
     func testDismissingTheTermsSheetIsASetupFailureNotAnNfcOne() async {
         let reader = FiservCardReader()
@@ -376,8 +386,8 @@ final class FiservCardReaderTests: XCTestCase {
             try await reader.presentTerms()
             XCTFail("expected dismissal to surface")
         } catch let error as PayabliTTPError {
-            guard case let .readerSetupFailed(reason, _) = error else {
-                return XCTFail("expected readerSetupFailed, got \(error)")
+            guard case let .readerUnavailable(reason, _, _) = error else {
+                return XCTFail("expected readerUnavailable, got \(error)")
             }
             XCTAssertTrue(
                 reason.hasPrefix(PayabliTTPError.cancellationReasonPrefix),
@@ -398,7 +408,7 @@ final class FiservCardReaderTests: XCTestCase {
         do {
             _ = try await reader.areTermsAccepted()
             XCTFail("expected the reader's failure to surface")
-        } catch PayabliTTPError.readerSetupFailed {
+        } catch PayabliTTPError.readerUnavailable {
             // expected
         } catch {
             XCTFail("wrong error: \(error)")
@@ -448,7 +458,7 @@ final class FiservCardReaderTests: XCTestCase {
         }
 
         // Still there to present from and to ask again, which is what "kept" has to mean: a
-        // torn-down reader answers `readerSetupFailed` rather than an acceptance state.
+        // torn-down reader answers `guardFailed` rather than an acceptance state.
         let accepted = try await reader.areTermsAccepted()
         XCTAssertFalse(accepted, "the merchant has not accepted, and the reader must still say so")
     }

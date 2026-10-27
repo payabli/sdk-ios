@@ -137,6 +137,12 @@ extension PayabliTTP {
                 }
                 // No card was asked for, so no money moved and a fresh key protects no sale.
                 settleFresh(reservation)
+                // A paypoint the service refuses card-present for stays refused, so the session says so rather
+                // than arming a reader for every later charge to refuse again.
+                if case PayabliTTPError.cardPresentNotEnabled = error {
+                    markError(error)
+                    syncPublished()
+                }
             }
             throw error
         }
@@ -389,8 +395,14 @@ extension PayabliTTP {
             return PayabliTTPError.nfcFailed(reason: reason, paymentTransId: paymentTransId)
         case let .readerSetupFailed(reason, _):
             return PayabliTTPError.readerSetupFailed(reason: reason, paymentTransId: paymentTransId)
+        case let .guardFailed(reason, _):
+            return PayabliTTPError.guardFailed(reason: reason, paymentTransId: paymentTransId)
         case .readerOSVersionNotSupported:
             return PayabliTTPError.readerOSVersionNotSupported(paymentTransId: paymentTransId, capture: .unknown)
+        case let .readerDeviceRefused(reason, _, _):
+            return PayabliTTPError.readerDeviceRefused(reason: reason, paymentTransId: paymentTransId, capture: .unknown)
+        case let .readerUnavailable(reason, _, _):
+            return PayabliTTPError.readerUnavailable(reason: reason, paymentTransId: paymentTransId, capture: .unknown)
         case let .some(ttpError):
             return PayabliTTPError.nfcFailed(reason: ttpError.localizedDescription, paymentTransId: paymentTransId)
         case .none:

@@ -90,19 +90,34 @@ enum TapToPayErrorTranslation {
             return .terminalNotReady
         case .devicePendingActivation:
             return .devicePendingActivation
-        case .attestationRevoked:
+        case .attestationRevoked, .deviceSetupRequired:
             return .deviceSetupRequired
+        case .deviceSetupRefused:
+            return .deviceSetupRefused
+        case .entryPointRefused:
+            return .entryPointRefused
         case let .readerSetupFailed(reason, _) where isCancellation(reason),
-             let .nfcFailed(reason, _) where isCancellation(reason):
+             let .nfcFailed(reason, _) where isCancellation(reason),
+             let .readerUnavailable(reason, _, _) where isCancellation(reason):
             return .userCancelled
-        case .attestationFailed, .configFailed, .activationFailed, .readerSetupFailed, .initiateFailed:
+        case .attestationFailed, .configFailed, .activationFailed, .readerSetupFailed:
             return .unknown
+        case .activationCodeMalformed:
+            return .activationCodeMalformed
         case .readerCredentialsUnusable:
             return .readerCredentialsUnusable
+        case .cardPresentNotEnabled:
+            return .cardPresentNotEnabled
+        case .readerHardwareUnsupported:
+            return .deviceHardwareUnsupported
+        case .guardFailed:
+            return .sdkInternalError
         case .nfcFailed:
             return .tapNotCompleted
         case .updateFailed:
             return .paymentNotClosed
+        case .paymentNotOpened:
+            return .paymentNotOpened
         case .tokenExpired:
             return .tokenExpired
         case .networkError:
@@ -111,6 +126,10 @@ enum TapToPayErrorTranslation {
             return .termsNotAccepted
         case .readerOSVersionNotSupported:
             return .deviceOSUnsupported
+        case .readerUnavailable:
+            return .readerUnavailable
+        case .readerDeviceRefused:
+            return .readerDeviceRefused
         case .cardDeclined:
             return .cardDeclined
         case .outcomeUnknown:
@@ -160,16 +179,23 @@ enum TapToPayErrorTranslation {
         let text: String? = switch error {
         case let .attestationRevoked(reason),
              let .attestationFailed(reason),
+             let .deviceSetupRequired(reason),
+             let .deviceSetupRefused(reason),
+             let .entryPointRefused(reason),
              let .configFailed(reason),
-             let .initiateFailed(reason),
+             let .paymentNotOpened(reason),
              let .activationFailed(reason),
              let .networkError(reason),
              let .readerSetupFailed(reason, _),
+             let .readerUnavailable(reason, _, _),
+             let .readerDeviceRefused(reason, _, _),
+             let .guardFailed(reason, _),
              let .nfcFailed(reason, _),
              let .updateFailed(reason, _, _, _):
             reason
         case .notInitialized, .invalidState, .notReady, .devicePendingActivation, .tokenExpired,
-             .termsNotAccepted, .readerOSVersionNotSupported, .cardDeclined, .outcomeUnknown, .paymentNotTaken,
+             .termsNotAccepted, .readerOSVersionNotSupported, .readerHardwareUnsupported,
+             .cardPresentNotEnabled, .activationCodeMalformed, .cardDeclined, .outcomeUnknown, .paymentNotTaken,
              .readerCredentialsUnusable:
             nil
         }
