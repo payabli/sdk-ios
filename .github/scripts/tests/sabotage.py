@@ -26,6 +26,7 @@ change that moved the code; deleting the row is how coverage disappears quietly.
 from __future__ import annotations
 
 import ast
+import re
 import shutil
 import subprocess
 import sys
@@ -67,6 +68,23 @@ SCRIPTS_YML = ".github/workflows/scripts.yml"
 GATE = ".github/scripts/release-version.sh"
 NEWER = ".github/scripts/release-newer.sh"
 VERSION_SOURCE = "Sources/PayabliSDKCore/PayabliSDKCore.swift"
+
+
+def pinned(path: str, action: str) -> str:
+    """Return `action@<sha> # <version>` as `path` names it today, so a row survives Dependabot moving the pin.
+
+    - Parameter path: the workflow, relative to the repository root.
+    - Parameter action: the action's `owner/name`.
+    - Returns: the pinned reference, or one that matches nothing, which the run reports as an invalid anchor.
+    """
+    found = re.search(rf"{re.escape(action)}@[0-9a-f]{{40}} # v\S+", (REPO_ROOT / path).read_text(encoding="utf-8"))
+    return found.group(0) if found else f"{action}@<not pinned in {path}>"
+
+
+NIGHTLY_CHECKOUT = pinned(NIGHTLY, "actions/checkout")
+RELEASE_CHECKOUT = pinned(RELEASE_YML, "actions/checkout")
+RELEASE_DOWNLOAD = pinned(RELEASE_YML, "actions/download-artifact")
+CI_UPLOAD = pinned(CI_YML, "actions/upload-artifact")
 
 
 class Mutation:
@@ -491,10 +509,10 @@ MUTATIONS = [
     Mutation(
         "the Slack token moves back into the branch-dispatchable workflow",
         NIGHTLY,
-        "      - name: Checkout\n        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0\n",
+        "      - name: Checkout\n        uses: " + NIGHTLY_CHECKOUT + "\n",
         "      - name: Checkout\n        env:\n"
         "          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}\n"
-        "        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0\n",
+        "        uses: " + NIGHTLY_CHECKOUT + "\n",
         "W3", "workflows",
     ),
     Mutation(
@@ -616,9 +634,9 @@ MUTATIONS = [
     ),
     Mutation(
         "the nightly starts tagging",
-        NIGHTLY, "      - name: Checkout\n        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0\n",
+        NIGHTLY, "      - name: Checkout\n        uses: " + NIGHTLY_CHECKOUT + "\n",
         "      - name: Checkout\n        run: git tag nightly && git push origin nightly\n"
-        "      - name: Checkout again\n        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0\n",
+        "      - name: Checkout again\n        uses: " + NIGHTLY_CHECKOUT + "\n",
         "W15d", "workflows",
     ),
     Mutation(
@@ -756,13 +774,11 @@ MUTATIONS = [
     ),
     Mutation(
         "the job holding the deploy key runs an action by tag",
-        RELEASE_YML, "actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0",
-        "actions/download-artifact@v4", "W25", "workflows",
+        RELEASE_YML, RELEASE_DOWNLOAD, "actions/download-artifact@v4", "W25", "workflows",
     ),
     Mutation(
         "a pinned action loses the version it stands for",
-        CI_YML, "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2",
-        "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02", "W25", "workflows", occurrences=2,
+        CI_YML, CI_UPLOAD, CI_UPLOAD.split(" # ")[0], "W25", "workflows", occurrences=2,
     ),
     Mutation(
         "the tag no longer names the run that made it",
@@ -1081,11 +1097,11 @@ MUTATIONS = [
         "the suite job checks out main's head",
         RELEASE_YML, "    name: Test the release\n    needs: check\n    # The same image as the build job, so the release is tested on the Xcode it\n"
         "    # builds its XCFrameworks with.\n    runs-on: xcode-27\n    permissions:\n"
-        "      contents: read\n\n    steps:\n      - name: Checkout\n        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0\n"
+        "      contents: read\n\n    steps:\n      - name: Checkout\n        uses: " + RELEASE_CHECKOUT + "\n"
         "        with:\n          ref: ${{ needs.check.outputs.commit }}\n",
         "    name: Test the release\n    needs: check\n    # The same image as the build job, so the release is tested on the Xcode it\n"
         "    # builds its XCFrameworks with.\n    runs-on: xcode-27\n    permissions:\n"
-        "      contents: read\n\n    steps:\n      - name: Checkout\n        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0\n"
+        "      contents: read\n\n    steps:\n      - name: Checkout\n        uses: " + RELEASE_CHECKOUT + "\n"
         "        with:\n", "W15q", "workflows",
     ),
     Mutation(
@@ -1206,7 +1222,7 @@ MUTATIONS = [
     ),
     Mutation(
         "the source-branch check checks out the pull request it runs main's copy for",
-        SOURCE_YML, "    steps:\n", "    steps:\n      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0\n", "W19", "workflows",
+        SOURCE_YML, "    steps:\n", "    steps:\n      - uses: actions/checkout@v4\n", "W19", "workflows",
     ),
     Mutation(
         "a push run the release reads can be cancelled by the next merge",
