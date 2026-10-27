@@ -80,8 +80,11 @@ package final class TTPTransactionClient: Sendable {
                 "[initiate] ← isApproved=\(envelope.isApproved) code=\(envelope.code) paymentTransId=\(envelope.data?.paymentTransId ?? "<nil>")"
             )
 
-        guard envelope.isApproved, let data = envelope.data else {
+        guard envelope.isApproved else {
             throw PayabliTTPError.paymentNotOpened(reason: envelope.reason ?? envelope.code)
+        }
+        guard let data = envelope.data else {
+            throw TapToPayError(type: .decodingError, reason: "The opening was approved with no payment", detail: nil)
         }
         return data.paymentTransId
     }

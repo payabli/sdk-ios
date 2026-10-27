@@ -166,6 +166,31 @@ final class PayabliTTPChargeFailureTests: XCTestCase {
         XCTAssertEqual(ttp.sessionState, .ready)
     }
 
+    /// An approval carrying no payment is a response the SDK could not read, not the service refusing the opening.
+    func testAnApprovedOpeningWithNoPaymentIsADecodingError() async throws {
+        let (ttp, _, _) = try await makeReadyTTP()
+        StubURLProtocol.handler = { request in
+            if request.url?.path.contains("/MoneyIn/initiate") == true {
+                return (
+                    HTTPURLResponse(
+                        url: request.url!,
+                        statusCode: 200,
+                        httpVersion: "HTTP/1.1",
+                        headerFields: ["Content-Type": "application/json"]
+                    )!,
+                    Data(#"{"code":"A01","data":null}"#.utf8)
+                )
+            }
+            return try Self.chargeStubHandler(request)
+        }
+
+        let failure = try await chargeFailure(ttp)
+
+        XCTAssertEqual(failure.type, .decodingError, "\(failure)")
+        XCTAssertNil(failure.paymentTransId)
+        XCTAssertEqual(failure.capture, .notCharged)
+    }
+
     // MARK: - Fixtures
 
     private func chargeFailure(_ ttp: PayabliTTP) async throws -> TapToPayError {
