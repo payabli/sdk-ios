@@ -57,10 +57,13 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
+      # Main's copy of the script, reading the commit's tree as data. Nothing from the commit runs before the
+      # checks below have found it on its branch with CI passed there.
       - name: Check the version
         id: version
         run: |
-          VERSION="$(.github/scripts/release-version.sh "$GITHUB_REF")"
+          git show "$GITHUB_SHA:.github/scripts/release-version.sh" > .github/scripts/release-version.sh
+          VERSION="$(bash .github/scripts/release-version.sh "$GITHUB_REF")"
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "tagging $VERSION"

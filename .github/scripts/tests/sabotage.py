@@ -658,6 +658,17 @@ MUTATIONS = [
         '          VERSION="$(.github/scripts/release-version.sh "$GITHUB_REF")"\n', "W15l", "workflows",
     ),
     Mutation(
+        "the check job reads the version with the commit's own script",
+        RELEASE_YML,
+        '          git show "$GITHUB_SHA:.github/scripts/release-version.sh" > .github/scripts/release-version.sh\n',
+        "", "R12", "release",
+    ),
+    Mutation(
+        "the check job fetches the version's script from the commit, not from main",
+        RELEASE_YML, 'git show "$GITHUB_SHA:.github/scripts/release-version.sh"',
+        'git show "$COMMIT:.github/scripts/release-version.sh"', "R12", "release",
+    ),
+    Mutation(
         "the tag is pushed to whatever host answers first",
         RELEASE_YML, "-o StrictHostKeyChecking=yes", "-o StrictHostKeyChecking=accept-new", "W15j", "workflows",
     ),

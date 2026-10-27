@@ -1408,11 +1408,13 @@ def test_workflows() -> None:
     check("W15r the run summary names the commit and its subject line for the approver",
           'echo "Releasing \\`$VERSION\\` from \\`$COMMIT\\`:"' in summary_run
           and 'git log -1 --format=%s "$COMMIT"' in summary_run, summary_run[:160])
-    # The run's own commit is main's head at the click. The summary shows it, and nothing else names it.
+    # The run's own commit is main's head at the click. The summary shows it and the version is read by its
+    # script, and nothing else names it.
     own = [line.strip() for line in RELEASE_WORKFLOW.read_text().splitlines()
            if re.search(r"GITHUB_SHA|github\.sha", line)]
-    check("W15s only the run summary names the run's own commit",
-          own == ['echo "The workflow runs from \\`$GITHUB_SHA\\` on main."'], own)
+    check("W15s only the run summary and the version's script name the run's own commit",
+          own == ['git show "$GITHUB_SHA:.github/scripts/release-version.sh" > .github/scripts/release-version.sh',
+                  'echo "The workflow runs from \\`$GITHUB_SHA\\` on main."'], own)
     check("W15b no input is interpolated into a script body",
           not any("inputs." in run for run in runs), [run[:80] for run in runs if "inputs." in run])
     tag_run = runs[tag_at] if tag_at != -1 else ""
@@ -1944,6 +1946,36 @@ def test_release_branches() -> None:
             else:
                 check(label, code == 0, (code, err[-200:]))
 
+        # The version is read before the commit is found on its branch, so nothing from the commit may run
+        # there. Its own copy of the script here forges the commit the later steps check and the version.
+        version_step = workflow_step(RELEASE_WORKFLOW, "check", "Check the version")
+        candidate = Path(tmp) / "candidate"
+        candidate.mkdir()
+
+        def git(*args: str) -> str:
+            return subprocess.run(["git", *args], cwd=candidate, check=True, capture_output=True, text=True,
+                                  timeout=60, env=GIT_ISOLATED).stdout.strip()
+
+        git("init", "-q", "-b", "main")
+        (candidate / ".github" / "scripts").mkdir(parents=True)
+        (candidate / "Sources" / "PayabliSDKCore").mkdir(parents=True)
+        shutil.copy(GATE_SCRIPT, candidate / ".github" / "scripts")
+        (candidate / VERSION_SOURCE).write_text('public static var version: String {\n    "0.2.0"\n}\n')
+        git("add", "-A")
+        git("commit", "-q", "-m", "main")
+        on_main = git("rev-parse", "HEAD")
+        (candidate / ".github" / "scripts" / "release-version.sh").write_text(
+            '#!/usr/bin/env bash\necho "COMMIT=forged" >> "$GITHUB_ENV"\necho 9.9.9\n')
+        git("commit", "-q", "-am", "candidate")
+        env_file, summary = Path(tmp) / "env", Path(tmp) / "summary"
+        env_file.write_text("")
+        code, out, err = run_step(version_step, candidate, {
+            "GITHUB_SHA": on_main, "GITHUB_REF": "refs/heads/main", "COMMIT": git("rev-parse", "HEAD"),
+            "GITHUB_ENV": str(env_file), "GITHUB_STEP_SUMMARY": str(summary)})
+        check("R12 the version is read by main's copy of the script, and the commit's own copy never runs",
+              code == 0 and out == "version=0.2.0\n" and "forged" not in env_file.read_text(),
+              (code, out, env_file.read_text(), err[-200:]))
+
 
 def test_branch_triggers() -> None:
     """The workflows a release branch's pull requests and pushes depend on, and the check on main's sources."""
@@ -2011,6 +2043,7 @@ def test_branch_triggers() -> None:
                                              "GITHUB_REPOSITORY": "payabli/sdk-ios"})
         check("W19k a fork's release branch is refused, naming the fork",
               code != 0 and "someone/sdk-ios" in err, (code, err[-200:]))
+
 
 def main() -> int:
     if ONLY not in HALVES:
