@@ -134,6 +134,31 @@ import XCTest
             XCTAssertEqual((host as? TapToPayError)?.type, .readerUnavailable, "\(mapped)")
         }
 
+        /// A denial carried in the server error envelope's `error` list reports the refusal's own case.
+        func testAVendorDenialInTheErrorListReportsTheDevicesRefusal() {
+            let mapped = FiservCardReader.mapError(Self.vendorDeniedInErrorList) { .readerSetupFailed(reason: $0) }
+
+            let host = TapToPayErrorTranslation.hostError(for: mapped)
+            XCTAssertEqual((host as? TapToPayError)?.type, .readerDeviceRefused, "\(mapped)")
+        }
+
+        /// The same denial during a read reports the refusal, not the read's failure, and ends the reader session.
+        func testAVendorDenialInTheErrorListDuringAReadEndsTheReaderSession() {
+            let mapped = FiservCardReader.mapError(Self.vendorDeniedInErrorList) { .nfcFailed(reason: $0) }
+
+            let host = TapToPayErrorTranslation.hostError(for: mapped)
+            XCTAssertEqual((host as? TapToPayError)?.type, .readerDeviceRefused, "\(mapped)")
+            XCTAssertTrue(readerFailureInvalidatesSession(mapped))
+        }
+
+        /// A code in the `error` list that is not a denial reports the reader's own case.
+        func testAVendorFailureInTheErrorListReportsTheReadersOwnCase() {
+            let mapped = FiservCardReader.mapError(Self.vendorFailedInErrorList) { .readerSetupFailed(reason: $0) }
+
+            let host = TapToPayErrorTranslation.hostError(for: mapped)
+            XCTAssertEqual((host as? TapToPayError)?.type, .readerUnavailable, "\(mapped)")
+        }
+
         // MARK: - Fixtures
 
         /// Built the way `FiservTTPReader` builds it: the platform's own
@@ -166,6 +191,20 @@ import XCTest
             title: "Setup failed",
             localizedDescription: "the reader could not be started",
             failureReason: #"{"responseCode":"999","responseText":"Unreachable"}"#
+        )
+
+        /// The vendor's server error envelope refusing the handset.
+        private static let vendorDeniedInErrorList = FiservTTPCardReaderError(
+            title: "Setup failed",
+            localizedDescription: "the vendor refused the device",
+            failureReason: #"{"gatewayResponse":{"transactionState":"DECLINED"},"error":[{"type":"GATEWAY","code":"677","message":"Device denied"}]}"#
+        )
+
+        /// The vendor's server error envelope with a code that is not a denial of the handset.
+        private static let vendorFailedInErrorList = FiservTTPCardReaderError(
+            title: "Setup failed",
+            localizedDescription: "the reader could not be started",
+            failureReason: #"{"gatewayResponse":{"transactionState":"FAILED"},"error":[{"type":"GATEWAY","code":"999","message":"Unreachable"}]}"#
         )
     }
 

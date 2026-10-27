@@ -58,9 +58,10 @@ extension FiservCardReader {
         static func vendorRefusal(_ error: Error, shown: String) -> PayabliTTPError? {
             guard let readerError = error as? FiservTTPCardReaderError,
                   let body = readerError.failureReason?.data(using: .utf8),
-                  let responseCode = try? JSONDecoder().decode(VendorFailure.self, from: body).responseCode
+                  let codes = try? JSONDecoder().decode(VendorFailure.self, from: body).codes,
+                  !codes.isEmpty
             else { return nil }
-            if deviceDeniedCodes.contains(responseCode) {
+            if codes.contains(where: deviceDeniedCodes.contains) {
                 return .readerDeviceRefused(reason: shown)
             }
             return .readerUnavailable(reason: shown)
@@ -69,9 +70,20 @@ extension FiservCardReader {
         /// The vendor's codes that say it refused the handset, the refusal confirmed or not.
         private static let deviceDeniedCodes: Set<String> = ["677", "018", "670", "202", "745", "705"]
 
-        /// The vendor's failure reason, decoded: its own `responseCode` where it sent one.
+        /// The vendor's failure reason, decoded: a top-level `responseCode`, and the `code` of each entry in the
+        /// `error` list its server error envelope carries.
         private struct VendorFailure: Decodable {
             let responseCode: String?
+            let error: [VendorFailureEntry]?
+
+            var codes: [String] {
+                [responseCode].compactMap(\.self) + (error ?? []).compactMap(\.code)
+            }
+        }
+
+        /// One entry in the `error` list of the vendor's server error envelope.
+        private struct VendorFailureEntry: Decodable {
+            let code: String?
         }
 
         /// The platform error behind a card-reader component error, where it kept one.
