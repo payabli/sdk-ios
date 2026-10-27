@@ -152,8 +152,8 @@ jobs:
     name: SonarCloud
     needs: newest
     # The analysis token lives in this environment, never at the repository, where a job in a pull
-    # request's own copy of a workflow could name it. The environment deploys from main and release
-    # branches only.
+    # request's own copy of a workflow could name it. The environment deploys from main, release and
+    # hotfix branches only.
     environment: ci-protected
     runs-on: macos-15
     # No coverage is produced by a run whose suite failed. Same-repository only:
@@ -194,6 +194,12 @@ jobs:
           ref: ${{ github.event.workflow_run.head_sha }}
           fetch-depth: 0
 
+      # Main's settings, read from the commit this workflow runs from and written outside the workspace, so the
+      # revision being analysed configures nothing the scanner does. A change to what is measured takes effect
+      # when it merges.
+      - name: Take the analysis settings from main
+        run: git show "$GITHUB_SHA:sonar-project.properties" > "$RUNNER_TEMP/sonar-project.properties"
+
       - name: Download coverage
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
@@ -218,20 +224,19 @@ jobs:
           PR_BRANCH: ${{ github.event.workflow_run.pull_requests[0].head.ref }}
           PR_BASE: ${{ github.event.workflow_run.pull_requests[0].base.ref }}
           HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          SETTINGS: ${{ runner.temp }}/sonar-project.properties
         run: |
           set -euo pipefail
           # Where the analysis goes is decided here, not by the branch. The
-          # scanner reads `sonar-project.properties` out of the revision it is
-          # analysing, and that file names the server and the project: a branch
-          # could point `sonar.host.url` at one of its own and be handed
-          # SONAR_TOKEN, or change the identity and publish into another project.
-          # A property given on the command line wins over the file, and this file
-          # is the one a pull request cannot edit.
+          # scanner reads main's settings, not the analysed revision's: a branch's
+          # copy could point `sonar.host.url` at a server of its own and be handed
+          # SONAR_TOKEN, publish into another project, or set
+          # `sonar.nodejs.executable` and run a binary of its own beside the token.
           #
-          # These three duplicate `sonar-project.properties` on purpose. What the
-          # branch may still choose is what gets measured, which is the rest of
-          # that file.
-          trusted="-Dsonar.host.url=https://sonarcloud.io"
+          # The three that say where the analysis goes are also given here, since
+          # a property on the command line wins over any file.
+          trusted="-Dproject.settings=$SETTINGS"
+          trusted="$trusted -Dsonar.host.url=https://sonarcloud.io"
           trusted="$trusted -Dsonar.organization=payabli"
           trusted="$trusted -Dsonar.projectKey=payabli_sdk-ios"
 

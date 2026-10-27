@@ -796,6 +796,20 @@ MUTATIONS = [
         "W15y", "workflows",
     ),
     Mutation(
+        "the scanner reads the analysed revision's settings",
+        REPORTS_YML, 'git show "$GITHUB_SHA:sonar-project.properties"', 'git show "HEAD:sonar-project.properties"',
+        "W26b", "workflows",
+    ),
+    Mutation(
+        "the scanner is not pointed at main's settings",
+        REPORTS_YML, 'trusted="-Dproject.settings=$SETTINGS"\n          trusted="$trusted -Dsonar.host.url',
+        'trusted="-Dsonar.host.url', "W26", "workflows",
+    ),
+    Mutation(
+        "main's settings are written inside the analysed tree",
+        REPORTS_YML, '> "$RUNNER_TEMP/sonar-project.properties"', '> "sonar-project.properties"', "W26c", "workflows",
+    ),
+    Mutation(
         "a push run's branch reaches the API unchecked",
         REPORTS_YML, "            head=$(printf '%s' \"$HEAD_BRANCH\" | grep -E '^[A-Za-z0-9._/-]+$')\n",
         '            head="$HEAD_BRANCH"\n', "W21e", "workflows", occurrences=2,

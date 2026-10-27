@@ -2114,7 +2114,8 @@ def test_branch_triggers() -> None:
             ("W20b a push run's branch that is not a plain ref is refused", f"release/$(touch {marker}) x", None),
         ):
             code, out, err = run_step(sonar, work, {"PR": "", "PR_BRANCH": "", "PR_BASE": "",
-                                                    "HEAD_BRANCH": head})
+                                                    "HEAD_BRANCH": head,
+                                                    "SETTINGS": "/tmp/runner/sonar-project.properties"})
             if expected:
                 check(label, code == 0 and out.strip().endswith(expected)
                       and "-Dsonar.projectKey=payabli_sdk-ios" in out, (code, out, err[-200:]))
@@ -2122,10 +2123,50 @@ def test_branch_triggers() -> None:
                 check(label, code != 0 and "sonar.branch.name" not in out and not marker.exists(),
                       (code, out, err[-200:]))
         code, out, err = run_step(sonar, work, {"PR": "179", "PR_BRANCH": "ci/x", "PR_BASE": "release/0.2.0",
-                                                "HEAD_BRANCH": "ci/x"})
+                                                "HEAD_BRANCH": "ci/x", "SETTINGS": "/tmp/runner/sonar-project.properties"})
         check("W20c a pull request's run is analysed as the pull request, not as a branch",
               code == 0 and "-Dsonar.pullrequest.key=179" in out and "sonar.branch.name" not in out,
               (code, out, err[-200:]))
+        check("W26 the scanner is pointed at the settings file outside the workspace, and the three that say where "
+              "the analysis goes are still forced",
+              "-Dproject.settings=/tmp/runner/sonar-project.properties" in out
+              and all(f in out for f in ("-Dsonar.host.url=https://sonarcloud.io", "-Dsonar.organization=payabli",
+                                         "-Dsonar.projectKey=payabli_sdk-ios")), out)
+
+        # The settings are main's: the step reads them from the commit this workflow runs from, never from the
+        # revision checked out, and writes them where the analysed tree cannot reach.
+        settings = workflow_step(REPORTS_WORKFLOW, "sonar", "Take the analysis settings from main")
+        analysed = work.parent / "analysed"
+        analysed.mkdir(exist_ok=True)
+
+        def tree_git(*args: str) -> str:
+            return subprocess.run(["git", *args], cwd=analysed, check=True, capture_output=True, text=True,
+                                  timeout=60, env=GIT_ISOLATED).stdout.strip()
+
+        tree_git("init", "-q", "-b", "main")
+        (analysed / "sonar-project.properties").write_text("sonar.sources=Sources\n")
+        tree_git("add", "-A")
+        tree_git("commit", "-q", "-m", "main")
+        main_sha = tree_git("rev-parse", "HEAD")
+        tree_git("checkout", "-q", "-b", "ci/x")
+        (analysed / "sonar-project.properties").write_text("sonar.nodejs.executable=./own-binary\n")
+        tree_git("commit", "-q", "-am", "branch")
+        temp = work.parent / "runner-temp"
+        temp.mkdir(exist_ok=True)
+        code, _, err = run_step(settings, analysed, {"GITHUB_SHA": main_sha, "RUNNER_TEMP": str(temp)})
+        written = temp / "sonar-project.properties"
+        check("W26b the settings written for the scanner are main's, not the analysed revision's",
+              code == 0 and written.exists() and written.read_text() == "sonar.sources=Sources\n",
+              (code, written.exists() and written.read_text(), err[-200:]))
+        sonar_steps = [step.get("name") for step in yaml.safe_load(REPORTS_WORKFLOW.read_text())["jobs"]["sonar"]["steps"]]
+        identify_env = next((step.get("env") or {} for step in yaml.safe_load(REPORTS_WORKFLOW.read_text())["jobs"]
+                             ["sonar"]["steps"] if step.get("name") == "Identify the pull request"), {})
+        check("W26c the settings are taken before the scan and named by the runner's temporary directory",
+              "Take the analysis settings from main" in sonar_steps and "Analyze" in sonar_steps
+              and sonar_steps.index("Take the analysis settings from main") < sonar_steps.index("Analyze")
+              and identify_env.get("SETTINGS") == "${{ runner.temp }}/sonar-project.properties"
+              and settings is not None and '> "$RUNNER_TEMP/sonar-project.properties"' in settings,
+              (sonar_steps, identify_env.get("SETTINGS")))
 
         # Only the newest revision is analysed, so a run that completes after a newer one's cannot replace it.
         # Nothing is cancelled, since a stale run would cancel the newer analysis before reaching this check.
