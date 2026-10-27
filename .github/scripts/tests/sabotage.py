@@ -708,8 +708,8 @@ MUTATIONS = [
     ),
     Mutation(
         "the release leaves the push credential where the tested code can read it",
-        RELEASE_YML, "          persist-credentials: false\n\n      - name: Check the version\n",
-        "          persist-credentials: true\n\n      - name: Check the version\n",
+        RELEASE_YML, "          persist-credentials: false\n\n      # Main's copy of the script",
+        "          persist-credentials: true\n\n      # Main's copy of the script",
         "W15f", "workflows",
     ),
     Mutation(
@@ -1132,7 +1132,16 @@ MUTATIONS = [
     ),
     Mutation(
         "the harness does not run on a pull request changing the source-branch check",
-        SCRIPTS_YML, "      - '.github/workflows/source-branch.yml'\n      - '.github/hardware-only-tests.txt'\n      # The",
+        SCRIPTS_YML,
+        "      - '.github/workflows/source-branch.yml'\n      - '.github/workflows/pr-reports.yml'\n"
+        "      - '.github/hardware-only-tests.txt'\n      # The",
+        "      - '.github/workflows/pr-reports.yml'\n      - '.github/hardware-only-tests.txt'\n      # The",
+        "W11", "workflows",
+    ),
+    Mutation(
+        "the harness does not run on a pull request changing the reporting workflow",
+        SCRIPTS_YML,
+        "      - '.github/workflows/pr-reports.yml'\n      - '.github/hardware-only-tests.txt'\n      # The",
         "      - '.github/hardware-only-tests.txt'\n      # The", "W11", "workflows",
     ),
 ]
