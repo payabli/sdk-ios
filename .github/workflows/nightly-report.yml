@@ -49,7 +49,7 @@ jobs:
     # test result. It cannot change the nightly's own conclusion either way, since that run has finished.
     continue-on-error: true
     # The Slack token lives in this environment, never at the repository, where a job in a pull request's
-    # own copy of a workflow could name it. The environment deploys from main and release branches only.
+    # own copy of a workflow could name it. The environment deploys from main, release and hotfix branches only.
     environment: ci-protected
     runs-on: ubuntu-latest
     timeout-minutes: 10

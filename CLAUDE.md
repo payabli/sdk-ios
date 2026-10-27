@@ -326,7 +326,7 @@ successful run of an opted-out tier looks like, so read the skip count rather th
 - **`ci.yml`** gates every pull request into `main`, `release/**` and `hotfix/**`, and every push to them:
   lint, the SDK suite, `PayabliDemoFlowTests`, and a change report. `pr-reports.yml` holds anything needing
   a token and is read from the default branch, so a pull request cannot edit the jobs that hold one. Every
-  secret but the run's own token lives in an environment that deploys from `main` and `release/*` only, never
+  secret but the run's own token lives in an environment that deploys from `main`, `release/*` and `hotfix/*` only, never
   at the repository, where any job a pull request writes could read it.
 - **Every workflow** sets its own `permissions:` and `defaults: run: shell: bash`, so no token rests on the
   repository default and a failing command piped into another fails its step. Another repository's action is
