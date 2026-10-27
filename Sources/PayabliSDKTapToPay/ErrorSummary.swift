@@ -93,6 +93,8 @@ enum ErrorSummary {
             return "cardDeclined"
         case .outcomeUnknown:
             return "outcomeUnknown"
+        case .paymentNotTaken:
+            return "paymentNotTaken"
         }
     }
 

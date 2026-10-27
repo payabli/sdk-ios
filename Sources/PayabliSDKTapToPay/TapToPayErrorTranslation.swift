@@ -115,6 +115,8 @@ enum TapToPayErrorTranslation {
             return .cardDeclined
         case .outcomeUnknown:
             return .paymentOutcomeUnknown
+        case .paymentNotTaken:
+            return .paymentNotTaken
         }
     }
 
@@ -167,7 +169,7 @@ enum TapToPayErrorTranslation {
              let .updateFailed(reason, _, _, _):
             reason
         case .notInitialized, .invalidState, .notReady, .devicePendingActivation, .tokenExpired,
-             .termsNotAccepted, .readerOSVersionNotSupported, .cardDeclined, .outcomeUnknown,
+             .termsNotAccepted, .readerOSVersionNotSupported, .cardDeclined, .outcomeUnknown, .paymentNotTaken,
              .readerCredentialsUnusable:
             nil
         }

@@ -35,6 +35,10 @@ package enum PayabliTTPError: Error, Sendable {
 
     /// The processor answered neither an approval nor a refusal, so the SDK cannot say whether money moved.
     case outcomeUnknown(paymentTransId: String)
+
+    /// The processor has no record of the payment, so the card was not charged. Only the close of
+    /// a failed read raises it, and only for a key this run minted.
+    case paymentNotTaken(paymentTransId: String)
 }
 
 package extension PayabliTTPError {
@@ -49,7 +53,7 @@ package extension PayabliTTPError {
             return capture
         case .notInitialized, .invalidState, .notReady, .devicePendingActivation, .attestationRevoked,
              .attestationFailed, .configFailed, .readerSetupFailed, .readerCredentialsUnusable, .initiateFailed,
-             .tokenExpired, .activationFailed, .networkError, .termsNotAccepted, .cardDeclined:
+             .tokenExpired, .activationFailed, .networkError, .termsNotAccepted, .cardDeclined, .paymentNotTaken:
             return .notCharged
         }
     }
@@ -63,7 +67,8 @@ package extension PayabliTTPError {
             return paymentTransId
         case let .updateFailed(_, paymentTransId, _, _),
              let .cardDeclined(paymentTransId),
-             let .outcomeUnknown(paymentTransId):
+             let .outcomeUnknown(paymentTransId),
+             let .paymentNotTaken(paymentTransId):
             return paymentTransId
         case .notInitialized, .invalidState, .notReady, .devicePendingActivation, .attestationRevoked,
              .attestationFailed, .configFailed, .readerCredentialsUnusable, .initiateFailed, .tokenExpired,
@@ -98,6 +103,8 @@ extension PayabliTTPError: LocalizedError {
             return "The card was refused"
         case .outcomeUnknown:
             return "The payment outcome is not known"
+        case .paymentNotTaken:
+            return "The processor has no record of the payment, so the card was not charged"
         case let .nfcFailed(reason, _),
              let .readerSetupFailed(reason, _),
              let .updateFailed(reason, _, _, _):
