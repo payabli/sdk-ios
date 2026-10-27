@@ -45,6 +45,7 @@ COPIED = (
     ".github/workflows/public-interface.yml",
     ".github/workflows/source-branch.yml",
     ".github/workflows/pr-reports.yml",
+    ".github/dependabot.yml",
     ".github/hardware-only-tests.txt",
     ".github/scripts/release-version.sh",
     ".github/scripts/release-newer.sh",
@@ -670,6 +671,10 @@ MUTATIONS = [
         'head="$HEAD_BRANCH"', "W20b", "workflows",
     ),
     Mutation(
+        "Dependabot raises one pull request per action",
+        ".github/dependabot.yml", '    groups:\n', '    ungrouped:\n', "W23", "workflows",
+    ),
+    Mutation(
         "a dispatch off main runs the check job",
         RELEASE_YML, '            echo "::error::a release is dispatched from refs/heads/main, not $GITHUB_REF"\n            exit 1\n',
         '            echo "::error::a release is dispatched from refs/heads/main, not $GITHUB_REF"\n', "R14c", "workflows",
@@ -1197,6 +1202,12 @@ MUTATIONS = [
         SCRIPTS_YML,
         "      - '.github/workflows/pr-reports.yml'\n      - '.github/hardware-only-tests.txt'\n      # The",
         "      - '.github/hardware-only-tests.txt'\n      # The", "W11", "workflows",
+    ),
+    Mutation(
+        "the harness does not run on a pull request changing the Dependabot config",
+        SCRIPTS_YML,
+        "      - '.github/workflows/**'\n      - '.github/dependabot.yml'\n",
+        "      - '.github/workflows/**'\n", "W11", "workflows",
     ),
 ]
 

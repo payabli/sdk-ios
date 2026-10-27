@@ -38,6 +38,7 @@ on:
       # The named entries stay because the harness asserts on them literally, so the two would otherwise
       # disagree about what is guarded.
       - '.github/workflows/**'
+      - '.github/dependabot.yml'
       - '.github/workflows/nightly.yml'
       - '.github/workflows/nightly-report.yml'
       - '.github/workflows/ci.yml'
@@ -54,6 +55,7 @@ on:
       - '.github/scripts/**'
       - '.github/workflows/**'
       - '.github/workflows/scripts.yml'
+      - '.github/dependabot.yml'
       - '.github/workflows/nightly.yml'
       - '.github/workflows/nightly-report.yml'
       - '.github/workflows/ci.yml'

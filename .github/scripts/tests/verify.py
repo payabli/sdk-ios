@@ -1241,6 +1241,7 @@ def test_workflows() -> None:
         ".github/workflows/source-branch.yml",
         ".github/workflows/public-interface.yml",
         ".github/workflows/pr-reports.yml",
+        ".github/dependabot.yml",
         VERSION_SOURCE,
         *(f".github/workflows/{name}" for name, _ in tiers),
         *(f".github/workflows/{name}" for name in token_holders),
@@ -2142,6 +2143,17 @@ def test_branch_triggers() -> None:
               "concurrency" not in release
               and locks == {"publish": {"group": "release", "cancel-in-progress": False}},
               (release.get("concurrency"), locks))
+
+        # The pinned action is kept current by a weekly, grouped Dependabot pull request into main, the one source
+        # into main besides release and hotfix branches.
+        dependabot = yaml.safe_load((REPO_ROOT / ".github" / "dependabot.yml").read_text()) \
+            if (REPO_ROOT / ".github" / "dependabot.yml").exists() else {}
+        updates = dependabot.get("updates") or []
+        check("W23 Dependabot raises one weekly pull request into main for every action that moved",
+              len(updates) == 1 and updates[0].get("package-ecosystem") == "github-actions"
+              and updates[0].get("directory") == "/" and "target-branch" not in updates[0]
+              and (updates[0].get("schedule") or {}).get("interval") == "weekly"
+              and (updates[0].get("groups") or {}).get("actions", {}).get("patterns") == ["*"], updates)
 
         # The notes step's own text, run: what it refuses is what the publish job would have nothing to publish.
         notes = workflow_step(RELEASE_WORKFLOW, "check", "Check the release notes are written")

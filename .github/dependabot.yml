@@ -1,0 +1,19 @@
+# Keeps the action references current.
+#
+# `pr-reports.yml` pins the SonarCloud scan action to a commit because it hands that action SONAR_TOKEN, and a
+# pinned SHA ages silently: GitHub does not announce a new release to a workflow that names a commit. This is
+# what turns a release into a pull request, and it maintains the trailing version comment beside the SHA. The
+# other actions are named by tag and move with it.
+#
+# Scoped to actions alone. The package declares no dependencies.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    # One pull request for every action that moved, rather than one each.
+    groups:
+      actions:
+        patterns:
+          - "*"
