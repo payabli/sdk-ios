@@ -1374,7 +1374,8 @@ def test_workflows() -> None:
     triggers = release.get("on", release.get(True)) or {}
     commit_input = ((triggers.get("workflow_dispatch") or {}).get("inputs") or {}).get("commit") or {}
     sha_check = r'\[\[ ! "\$COMMIT" =~ (\S+) \]\]'
-    build_sha = re.search(sha_check, check_runs[0]) if check_runs else None
+    # Second, after the main-dispatch refusal, and before anything is read.
+    build_sha = re.search(sha_check, check_runs[1]) if len(check_runs) > 1 else None
     publish_sha = next((m for run in publish_runs for m in [re.search(sha_check, run)] if m), None)
     check("W15o the dispatch names the commit in full, checked first and checked again where the key is",
           commit_input.get("required") is True
@@ -2122,6 +2123,25 @@ def test_branch_triggers() -> None:
               analyze.get("if") == "steps.newest.outputs.newest == 'true'"
               and sonar_job.get("concurrency", {}).get("cancel-in-progress") is False,
               (analyze.get("if"), sonar_job.get("concurrency")))
+
+        # A dispatch off main is refused as the check job's first step, naming the ref, and only publishing is
+        # serialized: a release waiting for approval holds no other release's checks, tests or build.
+        release = yaml.safe_load(RELEASE_WORKFLOW.read_text())
+        first = ((release["jobs"]["check"].get("steps") or [{}])[0]).get("name")
+        check("R14 the check job's first step is the main-dispatch refusal",
+              first == "Check the release is dispatched from main", first)
+        from_main = workflow_step(RELEASE_WORKFLOW, "check", "Check the release is dispatched from main")
+        for label, ref, accepted in (
+            ("R14b a dispatch from main is accepted", "refs/heads/main", True),
+            ("R14c a dispatch from a release branch is refused, naming it", "refs/heads/release/0.2.0", False),
+        ):
+            code, _, err = run_step(from_main, work, {"GITHUB_REF": ref})
+            check(label, code == 0 if accepted else (code != 0 and ref in err), (code, err[-200:]))
+        locks = {name: job.get("concurrency") for name, job in release["jobs"].items() if job.get("concurrency")}
+        check("R14d only the publish job is serialized, and no release is cancelled",
+              "concurrency" not in release
+              and locks == {"publish": {"group": "release", "cancel-in-progress": False}},
+              (release.get("concurrency"), locks))
 
         # The notes step's own text, run: what it refuses is what the publish job would have nothing to publish.
         notes = workflow_step(RELEASE_WORKFLOW, "check", "Check the release notes are written")

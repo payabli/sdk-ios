@@ -670,6 +670,21 @@ MUTATIONS = [
         'head="$HEAD_BRANCH"', "W20b", "workflows",
     ),
     Mutation(
+        "a dispatch off main runs the check job",
+        RELEASE_YML, '            echo "::error::a release is dispatched from refs/heads/main, not $GITHUB_REF"\n            exit 1\n',
+        '            echo "::error::a release is dispatched from refs/heads/main, not $GITHUB_REF"\n', "R14c", "workflows",
+    ),
+    Mutation(
+        "a later release cancels the one waiting to publish",
+        RELEASE_YML, "      group: release\n      cancel-in-progress: false\n",
+        "      group: release\n      cancel-in-progress: true\n", "R14d", "workflows",
+    ),
+    Mutation(
+        "the whole release workflow is locked again",
+        RELEASE_YML, "\njobs:\n", "\nconcurrency:\n  group: release\n  cancel-in-progress: false\n\njobs:\n",
+        "R14d", "workflows",
+    ),
+    Mutation(
         "the Slack token is read from the repository",
         REPORT_YML, "    environment: ci-protected\n", "", "W22", "workflows",
     ),

@@ -22,10 +22,6 @@ on:
         description: "Release notes (markdown), published as the release body"
         required: true
 
-concurrency:
-  group: release
-  cancel-in-progress: false
-
 jobs:
   # Reads the commit and the version, and holds nothing that can tag or publish.
   check:
@@ -41,6 +37,15 @@ jobs:
       COMMIT: ${{ inputs.commit }}
 
     steps:
+      # The workflow's own definition is main's, so a dispatch from any other ref is refused before anything
+      # else runs. The publish job refuses it again, and the release environment deploys from main only.
+      - name: Check the release is dispatched from main
+        run: |
+          if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+            echo "::error::a release is dispatched from refs/heads/main, not $GITHUB_REF"
+            exit 1
+          fi
+
       # A full SHA and nothing shorter, so the commit approved is not a prefix that resolves to another.
       - name: Check the commit is named in full
         run: |
@@ -306,6 +311,11 @@ jobs:
     # Its required reviewers are who may release, it deploys from main only, and it holds the one key the
     # tag ruleset lets create a tag.
     environment: release
+    # One publish at a time, and none cancelled. Two releases check, test and build side by side, and each
+    # checks the newest release and the tag again just before tagging.
+    concurrency:
+      group: release
+      cancel-in-progress: false
     permissions:
       contents: write
 
