@@ -1485,7 +1485,24 @@ def test_workflows() -> None:
     # the suite tested.
     check("W15c the release tags the commit that was tested",
           re.search(r'gh release create "\$VERSION" --draft --target "\$COMMIT"', tag_run) is not None
-          and re.search(r'git tag -a "\$VERSION" -m "[^"]*" "\$COMMIT"', tag_run) is not None, tag_run[:200])
+          and re.search(r'git tag -a "\$VERSION" -m "[^"]*" -m "[^"]*" "\$COMMIT"', tag_run) is not None, tag_run[:200])
+    # The tag is permanent and public, so it names the run, which carries who dispatched and who approved.
+    check("W15x the tag names the SDK, the version and the run that made it, and no person",
+          'git tag -a "$VERSION" -m "Payabli iOS SDK $VERSION" '
+          '-m "Released by $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" "$COMMIT"' in tag_run
+          and "GITHUB_ACTOR" not in tag_run and "github.actor" not in tag_run, tag_run[:200])
+    # The release re-runs what CI runs without a device: the package suite and the sample app's step sequences,
+    # on the image it builds with.
+    ci_demo = next((step.get("run", "") for step in (yaml.safe_load(CI_WORKFLOW.read_text())["jobs"]
+                                                      .get("test-demo") or {}).get("steps") or []
+                    if "-scheme PayabliDemoFlowTests" in step.get("run", "")), "")
+    release_demo = next((run for run in (step.get("run", "") for step in test_job.get("steps") or [])
+                         if "-scheme PayabliDemoFlowTests" in run), "")
+    demo_flags = ("xcodebuild test", "-project Example/PayabliDemo/PayabliDemo.xcodeproj",
+                  '-destination "platform=iOS Simulator,id=$SIMULATOR_ID"', "-clonedSourcePackagesDirPath .build/checkouts")
+    check("W15y the release tests the sample app's step sequences as CI does",
+          bool(ci_demo) and all(flag in ci_demo and flag in release_demo for flag in demo_flags),
+          release_demo[:300])
     before_publish = {"check": check_job, "test": test_job, "build": build_job}
     check("W15i only the publish job runs in the release environment, and no job before it can write",
           publish_job.get("environment") == "release"

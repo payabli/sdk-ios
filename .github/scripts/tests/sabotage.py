@@ -765,6 +765,21 @@ MUTATIONS = [
         "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02", "W25", "workflows", occurrences=2,
     ),
     Mutation(
+        "the tag no longer names the run that made it",
+        RELEASE_YML, ' -m "Released by $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" "$COMMIT"',
+        ' "$COMMIT"', "W15x", "workflows",
+    ),
+    Mutation(
+        "the tag names whoever dispatched the release",
+        RELEASE_YML, '/actions/runs/$GITHUB_RUN_ID" "$COMMIT"', '/actions/runs/$GITHUB_RUN_ID by $GITHUB_ACTOR" "$COMMIT"',
+        "W15x", "workflows",
+    ),
+    Mutation(
+        "the release skips the sample app's step sequences",
+        RELEASE_YML, "            -scheme PayabliDemoFlowTests \\\n", "            -scheme PayabliDemo \\\n",
+        "W15y", "workflows",
+    ),
+    Mutation(
         "a push run's branch reaches the API unchecked",
         REPORTS_YML, "            head=$(printf '%s' \"$HEAD_BRANCH\" | grep -E '^[A-Za-z0-9._/-]+$')\n",
         '            head="$HEAD_BRANCH"\n', "W21e", "workflows", occurrences=2,
