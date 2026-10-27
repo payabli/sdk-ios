@@ -70,7 +70,8 @@ final class PayabliTTPFailureReasonTests: XCTestCase {
     func testAFailureThatIsNotTheSessionsMovesNothing() {
         for error in [
             PayabliTTPError.nfcFailed(reason: "x"),
-            .initiateFailed(reason: "x"),
+            .paymentNotOpened(reason: "x"),
+            .activationCodeMalformed,
             .updateFailed(reason: "x", paymentTransId: "TXN", capture: .unknown),
             .activationFailed(reason: "x")
         ] {
@@ -192,17 +193,26 @@ final class PayabliTTPFailureReasonTests: XCTestCase {
             (.devicePendingActivation, .pendingActivation(activationId: "dev")),
             (.attestationRevoked(reason: "x"), .failed(reason: .deviceSetupRequired)),
             (.attestationFailed(reason: "x"), .failed(reason: .deviceSetupRequired)),
+            (.deviceSetupRequired(reason: "x"), .failed(reason: .deviceSetupRequired)),
+            (.deviceSetupRefused(reason: "x"), .failed(reason: .deviceSetupRequired)),
             (.configFailed(reason: "x"), .failed(reason: .configurationRejected)),
+            (.entryPointRefused(reason: "x"), .failed(reason: .configurationRejected)),
+            (.cardPresentNotEnabled, .failed(reason: .configurationRejected)),
             (.readerSetupFailed(reason: "x"), .failed(reason: .serviceUnavailable)),
+            (.readerUnavailable(reason: "x"), .failed(reason: .serviceUnavailable)),
             (.readerCredentialsUnusable, .failed(reason: .configurationRejected)),
             (.nfcFailed(reason: "x"), nil),
-            (.initiateFailed(reason: "x"), nil),
+            (.paymentNotOpened(reason: "x"), nil),
             (.updateFailed(reason: "x", paymentTransId: "TXN", capture: .unknown), nil),
             (.tokenExpired, .failed(reason: .serviceUnavailable)),
             (.activationFailed(reason: "x"), nil),
+            (.activationCodeMalformed, nil),
             (.networkError(reason: "x"), .failed(reason: .serviceUnavailable)),
             (.termsNotAccepted, .pendingTerms),
             (.readerOSVersionNotSupported(), .failed(reason: .deviceIneligible)),
+            (.readerHardwareUnsupported, .failed(reason: .deviceIneligible)),
+            (.readerDeviceRefused(reason: "x"), .failed(reason: .deviceIneligible)),
+            (.guardFailed(reason: "x"), .failed(reason: .sdkInternalError)),
             (.cardDeclined(paymentTransId: "TXN"), nil),
             (.outcomeUnknown(paymentTransId: "TXN"), nil)
         ]

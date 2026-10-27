@@ -9,10 +9,16 @@ final class PayabliTTPErrorDescriptionTests: XCTestCase {
         let carryingAReason: [PayabliTTPError] = [
             .attestationRevoked(reason: reason),
             .attestationFailed(reason: reason),
+            .deviceSetupRequired(reason: reason),
+            .deviceSetupRefused(reason: reason),
+            .entryPointRefused(reason: reason),
             .configFailed(reason: reason),
             .readerSetupFailed(reason: reason),
+            .readerUnavailable(reason: reason),
+            .guardFailed(reason: reason),
+            .readerDeviceRefused(reason: reason),
             .nfcFailed(reason: reason),
-            .initiateFailed(reason: reason),
+            .paymentNotOpened(reason: reason),
             .updateFailed(reason: reason, paymentTransId: "TXN", capture: .unknown),
             .activationFailed(reason: reason),
             .networkError(reason: reason)
@@ -31,6 +37,9 @@ final class PayabliTTPErrorDescriptionTests: XCTestCase {
             (.tokenExpired, "Access token expired"),
             (.termsNotAccepted, "Contactless payment terms have not been accepted"),
             (.readerOSVersionNotSupported(), "This OS version does not support contactless payments"),
+            (.readerHardwareUnsupported, "This device cannot take contactless payments"),
+            (.cardPresentNotEnabled, "Card-present payments are not enabled for this paypoint"),
+            (.activationCodeMalformed, "The activation code must be six digits"),
             (.cardDeclined(paymentTransId: "TXN"), "The card was refused"),
             (.outcomeUnknown(paymentTransId: "TXN"), "The payment outcome is not known")
         ]

@@ -1,11 +1,17 @@
-import PayabliSDKCore
+@testable import PayabliSDKCore
 @testable import PayabliSDKTapToPay
+import PayabliSDKTestUtils
 import XCTest
 
 /// What a host is handed for each failure the SDK raises: always a `TapToPayError`, under the catalog entry
 /// for its cause, still naming the payment it belongs to.
 @available(iOS 16.7, *)
 final class TapToPayErrorTranslationTests: XCTestCase {
+    override func tearDown() {
+        StubURLProtocol.handler = nil
+        super.tearDown()
+    }
+
     // MARK: - Every case reaches its catalog code
 
     func testEveryCaseReachesAHostUnderItsCatalogCode() {
@@ -33,6 +39,10 @@ final class TapToPayErrorTranslationTests: XCTestCase {
         XCTAssertEqual(try translated(PayabliTTPError.nfcFailed(reason: "\(prefix) dismissed")).type, .userCancelled)
         XCTAssertEqual(
             try translated(PayabliTTPError.readerSetupFailed(reason: "\(prefix) dismissed")).type,
+            .userCancelled
+        )
+        XCTAssertEqual(
+            try translated(PayabliTTPError.readerUnavailable(reason: "\(prefix) dismissed")).type,
             .userCancelled
         )
     }
@@ -180,12 +190,8 @@ final class TapToPayErrorTranslationTests: XCTestCase {
         ]
         let notProducedYet: Set<PayabliErrorType> = [
             .deviceServicesOutdated, // a Google Play cause, which this platform has no counterpart for
-            .deviceSetupRefused,
-            .deviceHardwareUnsupported, .cardPresentNotEnabled, .readerDeviceRefused, .readerSessionExpired,
-            .activationCodeMalformed, .readerUnavailable, .paymentNotOpened,
-            // carried by coarse cases until they are classified
-            .paymentNotHeld, // no close call on this platform yet
-            .paymentNotTaken // no failed read is told from the no-record close yet
+            .readerSessionExpired,
+            .paymentNotHeld // no close call on this platform yet
         ]
         let produced = fromTheTable.union(fromActivation).union(raisedDirectly)
         for type in PayabliErrorType.allCases where (3001 ... 3999).contains(type.number) {
@@ -237,9 +243,11 @@ final class TapToPayErrorTranslationTests: XCTestCase {
             case .nfcFailed, .outcomeUnknown, .updateFailed:
                 XCTAssertEqual(error.capture, .unknown, "\(error) was raised once a card was asked for")
             case .notInitialized, .invalidState, .notReady, .devicePendingActivation, .attestationRevoked,
-                 .attestationFailed, .configFailed, .readerSetupFailed, .readerCredentialsUnusable, .initiateFailed,
-                 .tokenExpired, .activationFailed, .networkError, .termsNotAccepted, .readerOSVersionNotSupported,
-                 .cardDeclined, .paymentNotTaken:
+                 .attestationFailed, .deviceSetupRequired, .deviceSetupRefused, .entryPointRefused, .configFailed,
+                 .cardPresentNotEnabled, .readerSetupFailed, .readerCredentialsUnusable, .readerHardwareUnsupported,
+                 .readerUnavailable, .guardFailed, .readerDeviceRefused, .paymentNotOpened,
+                 .tokenExpired, .activationFailed, .activationCodeMalformed, .networkError, .termsNotAccepted,
+                 .readerOSVersionNotSupported, .cardDeclined, .paymentNotTaken:
                 XCTAssertEqual(error.capture, .notCharged, "\(error) took no money")
             }
         }
@@ -265,7 +273,7 @@ final class TapToPayErrorTranslationTests: XCTestCase {
     }
 
     func testAFailureBeforeAPaymentWasOpenedNamesNone() {
-        XCTAssertNil(PayabliTTPError.initiateFailed(reason: "x").paymentTransId)
+        XCTAssertNil(PayabliTTPError.paymentNotOpened(reason: "x").paymentTransId)
     }
 
     // MARK: - The NSError an Objective-C caller receives
@@ -295,11 +303,81 @@ final class TapToPayErrorTranslationTests: XCTestCase {
         XCTAssertNotEqual(nsError.domain, "com.payabli.ttp")
     }
 
+    // MARK: - What the transaction client's own failures reach a host as
+
+    /// A bare 404 from the opening is the paypoint's configuration, so it answers
+    /// under the code that says so rather than an unknown one.
+    func testABare404FromInitiateNamesThePaypointsConfiguration() async throws {
+        try await assertInitiateAnswers(as: .cardPresentNotEnabled) { request in
+            (
+                HTTPURLResponse(url: request.url!, statusCode: 404, httpVersion: "HTTP/1.1", headerFields: nil)!,
+                Data()
+            )
+        }
+    }
+
+    /// A declined opening is the payment's own answer: the paypoint took no
+    /// payment, and it says so under the code that names that.
+    func testADeclinedInitiateNamesThePaymentsOwnCode() async throws {
+        try await assertInitiateAnswers(as: .paymentNotOpened) { request in
+            (
+                HTTPURLResponse(
+                    url: request.url!,
+                    statusCode: 200,
+                    httpVersion: "HTTP/1.1",
+                    headerFields: ["Content-Type": "application/json"]
+                )!,
+                Data(#"{"code":"D0001","reason":"not opened"}"#.utf8)
+            )
+        }
+    }
+
     // MARK: - Fixtures
 
     private func translated(_ error: Error, file: StaticString = #filePath, line: UInt = #line) throws -> TapToPayError {
         let host = TapToPayErrorTranslation.hostError(for: error)
         return try XCTUnwrap(host as? TapToPayError, "got \(type(of: host))", file: file, line: line)
+    }
+
+    /// A transaction client on a stubbed network, the way the facade holds one.
+    private func makeClient() throws -> TTPTransactionClient {
+        let config = try PayabliConfig(entryPoint: "myEntry", environment: .sandbox, tokenProvider: { "seed" })
+        let auth = PayabliAuth(config: config)
+        let service = PayabliService(
+            environment: .sandbox,
+            readToken: { try await auth.currentAccessToken() },
+            client: .none,
+            session: StubURLProtocol.makeSession()
+        )
+        let transport = AuthenticatedTransport(
+            base: service,
+            auth: auth,
+            logger: PayabliLogger(category: .network)
+        )
+        return TTPTransactionClient(transport: transport)
+    }
+
+    /// Drives one initiate against `handler` and reads the answer a host gets.
+    private func assertInitiateAnswers(
+        as type: PayabliErrorType,
+        handler: @escaping StubURLProtocol.Handler,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) async throws {
+        StubURLProtocol.handler = handler
+        let client = try makeClient()
+        do {
+            _ = try await client.initiate(
+                entryPoint: "myEntry",
+                deviceId: "dev_1",
+                idempotencyKey: "key-1",
+                paymentDetails: PayabliTTPPaymentDetails(amount: 1, currency: "USD")
+            )
+            XCTFail("initiate succeeded", file: file, line: line)
+        } catch {
+            let host = TapToPayErrorTranslation.hostError(for: error)
+            XCTAssertEqual((host as? TapToPayError)?.type, type, "\(error)", file: file, line: line)
+        }
     }
 
     // swiftlint:disable cyclomatic_complexity
@@ -313,18 +391,27 @@ final class TapToPayErrorTranslationTests: XCTestCase {
         case .notReady: return .terminalNotReady
         case .devicePendingActivation: return .devicePendingActivation
         case .attestationRevoked: return .deviceSetupRequired
+        case .deviceSetupRequired: return .deviceSetupRequired
+        case .deviceSetupRefused: return .deviceSetupRefused
+        case .entryPointRefused: return .entryPointRefused
         case .attestationFailed: return .unknown
         case .configFailed: return .unknown
         case .readerSetupFailed: return .unknown
         case .readerCredentialsUnusable: return .readerCredentialsUnusable
+        case .cardPresentNotEnabled: return .cardPresentNotEnabled
+        case .readerHardwareUnsupported: return .deviceHardwareUnsupported
+        case .guardFailed: return .sdkInternalError
         case .nfcFailed: return .tapNotCompleted
-        case .initiateFailed: return .unknown
+        case .paymentNotOpened: return .paymentNotOpened
         case .updateFailed: return .paymentNotClosed
         case .tokenExpired: return .tokenExpired
         case .activationFailed: return .unknown
+        case .activationCodeMalformed: return .activationCodeMalformed
         case .networkError: return .networkError
         case .termsNotAccepted: return .termsNotAccepted
         case .readerOSVersionNotSupported: return .deviceOSUnsupported
+        case .readerUnavailable: return .readerUnavailable
+        case .readerDeviceRefused: return .readerDeviceRefused
         case .cardDeclined: return .cardDeclined
         case .outcomeUnknown: return .paymentOutcomeUnknown
         case .paymentNotTaken: return .paymentNotTaken
@@ -340,14 +427,23 @@ final class TapToPayErrorTranslationTests: XCTestCase {
         .devicePendingActivation,
         .attestationRevoked(reason: "x"),
         .attestationFailed(reason: "x"),
+        .deviceSetupRequired(reason: "x"),
+        .deviceSetupRefused(reason: "x"),
+        .entryPointRefused(reason: "x"),
         .configFailed(reason: "x"),
+        .cardPresentNotEnabled,
         .readerSetupFailed(reason: "x"),
         .readerCredentialsUnusable,
+        .readerHardwareUnsupported,
+        .readerUnavailable(reason: "x"),
+        .guardFailed(reason: "x"),
+        .readerDeviceRefused(reason: "x"),
         .nfcFailed(reason: "x"),
-        .initiateFailed(reason: "x"),
+        .paymentNotOpened(reason: "x"),
         .updateFailed(reason: "x", paymentTransId: "TXN", capture: .unknown),
         .tokenExpired,
         .activationFailed(reason: "x"),
+        .activationCodeMalformed,
         .networkError(reason: "x"),
         .termsNotAccepted,
         .readerOSVersionNotSupported(),

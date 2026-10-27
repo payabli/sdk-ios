@@ -38,30 +38,31 @@ extension PayabliTTPSessionState {
             // Not a failure either, and it has a state of its own.
             return .pendingTerms
 
-        case .attestationRevoked, .attestationFailed:
-            // Discarding the device's identity needs a positive match, and both
-            // of these name the attestation.
+        case .attestationRevoked, .attestationFailed, .deviceSetupRequired, .deviceSetupRefused:
+            // Discarding the device's identity needs a positive match, and each
+            // of these names the attestation.
             return .failed(reason: .deviceSetupRequired)
 
-        case .configFailed, .readerCredentialsUnusable:
+        case .configFailed, .readerCredentialsUnusable, .entryPointRefused, .cardPresentNotEnabled:
             // Terminal: every retry gets the same answer until the paypoint's configuration is fixed.
             return .failed(reason: .configurationRejected)
 
-        case .readerOSVersionNotSupported:
+        case .readerOSVersionNotSupported, .readerHardwareUnsupported, .readerDeviceRefused:
             return .failed(reason: .deviceIneligible)
 
-        case .readerSetupFailed, .networkError, .tokenExpired:
+        case .readerSetupFailed, .readerUnavailable, .networkError, .tokenExpired:
             // A reader that would not arm, a service that could not be reached
             // and a token that expired all leave the device as it was, so a host
             // is told the same call may work later.
             return .failed(reason: .serviceUnavailable)
 
-        case .notInitialized, .invalidState, .notReady:
+        case .notInitialized, .invalidState, .notReady, .guardFailed:
             // The SDK asked for something out of order, which is this side of
             // the wire.
             return .failed(reason: .sdkInternalError)
 
-        case .nfcFailed, .initiateFailed, .updateFailed, .activationFailed, .cardDeclined, .outcomeUnknown,
+        case .nfcFailed, .paymentNotOpened, .updateFailed, .activationFailed, .activationCodeMalformed,
+             .cardDeclined, .outcomeUnknown,
              .paymentNotTaken:
             // A tap or an activation failed and the session did not. Nothing
             // about the session changed.

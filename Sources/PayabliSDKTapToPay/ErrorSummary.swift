@@ -69,20 +69,38 @@ enum ErrorSummary {
             return "attestationRevoked"
         case .attestationFailed:
             return "attestationFailed"
+        case .deviceSetupRequired:
+            return "deviceSetupRequired"
+        case .deviceSetupRefused:
+            return "deviceSetupRefused"
+        case .entryPointRefused:
+            return "entryPointRefused"
         case .configFailed:
             return "configFailed"
+        case .cardPresentNotEnabled:
+            return "cardPresentNotEnabled"
         case .readerSetupFailed:
             return "readerSetupFailed"
         case .readerCredentialsUnusable:
             return "readerCredentialsUnusable"
+        case .readerHardwareUnsupported:
+            return "readerHardwareUnsupported"
+        case .readerUnavailable:
+            return "readerUnavailable"
+        case .guardFailed:
+            return "guardFailed"
+        case .readerDeviceRefused:
+            return "readerDeviceRefused"
         case .nfcFailed:
             return "nfcFailed"
         case .activationFailed:
             return "activationFailed"
+        case .activationCodeMalformed:
+            return "activationCodeMalformed"
         case .networkError:
             return "networkError"
-        case .initiateFailed:
-            return "initiateFailed"
+        case .paymentNotOpened:
+            return "paymentNotOpened"
         case .updateFailed:
             return "updateFailed"
         case .termsNotAccepted:
