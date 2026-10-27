@@ -53,7 +53,7 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
     private var client: PayInPaymentFlowClient
     private var tokenStorageClient: PayInPaymentFlowTokenStorageClient
     private var activeSubmissionCount = 0
-    private var heldKeys = HeldIdempotencyKeys()
+    private let heldKeys = PayInKeyStore.process
     private let logger = PayabliLogger(category: .tokenization)
     /// Nil on a flow built on a bare transport without a telemetry client.
     private(set) var reports: PayInReports?
@@ -466,7 +466,11 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
         reference: String? = nil,
         _ send: (String) async throws -> PayabliPayInResult
     ) async throws -> PayabliPayInResult {
+        // Settled where it was reserved, though `configure(config:)` may move the flow while it sends.
+        let (reservedEntry, reservedEnvironment) = (entryPoint, environment)
         let reservation = try heldKeys.reserve(
+            entry: reservedEntry,
+            environment: reservedEnvironment,
             scope: scope,
             claimsHeld: claimsHeld,
             payment: payment,
@@ -483,7 +487,9 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
         }
         do {
             let result = try await PayabliSendMark.$current.withValue(mark) { try await send(reservation.key) }
-            heldKeys.settle(reservation, outcome: .answered, now: now())
+            heldKeys.settle(
+                entry: reservedEntry, environment: reservedEnvironment, reservation, outcome: .answered, now: now()
+            )
             return result
         } catch {
             var outcome = Self.outcome(of: error, reused: reservation.reused)
@@ -493,7 +499,9 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
                     PayInLocalRefusal.current?.set()
                 }
             }
-            if heldKeys.settle(reservation, outcome: outcome, now: now()) {
+            if heldKeys.settle(
+                entry: reservedEntry, environment: reservedEnvironment, reservation, outcome: outcome, now: now()
+            ) {
                 logger.warning("payin_retry_keys_full")
             }
             try Self.rethrow(

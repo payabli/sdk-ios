@@ -8,6 +8,11 @@ import XCTest
 /// These cases drive the facade, because reserving the key is the facade's job.
 @MainActor
 final class PayInIdempotencyTests: XCTestCase {
+    override func setUp() {
+        super.setUp()
+        PayInKeyStore.process.forgetHeld()
+    }
+
     // MARK: - The key reaches the wire
 
     func testACaptureWithNoKeySuppliedStillSendsOne() async throws {

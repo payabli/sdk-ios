@@ -6,6 +6,11 @@ import XCTest
 /// instrument or the payer.
 @MainActor
 final class PayInTelemetryTests: XCTestCase {
+    override func setUp() {
+        super.setUp()
+        PayInKeyStore.process.forgetHeld()
+    }
+
     private let recorder = RecordingTelemetryTransport()
     private var telemetry: TelemetryClient?
 

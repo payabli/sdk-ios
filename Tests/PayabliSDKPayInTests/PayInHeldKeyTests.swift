@@ -8,6 +8,11 @@ import XCTest
 /// authorization and a reversal resend their transaction's held key on their own.
 @MainActor
 final class PayInHeldKeyTests: XCTestCase {
+    override func setUp() {
+        super.setUp()
+        PayInKeyStore.process.forgetHeld()
+    }
+
     private let transport = ScriptedTransport()
     private let clock = TestClock()
     private lazy var flow = makeFlow(prefix: "k")
@@ -416,6 +421,7 @@ final class PayInHeldKeyTests: XCTestCase {
             ("", .retryRefused)
         ]
         for (body, expected) in bodies {
+            PayInKeyStore.process.forgetHeld()
             let flow = makeFlow(prefix: "k")
             transport.script = [.lost, .conflict(body)]
             _ = await failure { try await flow.capture(self.request(.newPayment)) }
@@ -468,7 +474,7 @@ final class PayInHeldKeyTests: XCTestCase {
         XCTAssertEqual(transport.sentKeys, ["k1", "k1", "k2"])
     }
 
-    func testANewFlowHoldsNoKey() async throws {
+    func testARebuiltFlowResendsTheKeyItsPredecessorHeld() async throws {
         transport.script = [.lost, .approved, .approved]
         let restarted = makeFlow(prefix: "n")
 
@@ -476,7 +482,7 @@ final class PayInHeldKeyTests: XCTestCase {
         _ = try await restarted.captureAuthorizedTransaction(authorized("t-1"))
         _ = try await restarted.voidTransaction("t-1")
 
-        XCTAssertEqual(transport.sentKeys, ["k1", "n1", "n2"])
+        XCTAssertEqual(transport.sentKeys, ["k1", "k1", "n1"])
     }
 
     func testPastItsCapacityAnAttemptIsSentButNotHeld() async throws {

@@ -14,8 +14,8 @@ enum HeldKeyScope: Hashable {
 
 /// The keys of attempts whose outcome nobody knows, kept so a repeat can be refused rather than taken again.
 ///
-/// In memory, for one flow. A key ages out once the service would no longer recognise it, counted from the latest
-/// send that may have reached it.
+/// In memory, for one entry point and environment, kept in ``PayInKeyStore``. A key ages out once the service would no
+/// longer recognise it, counted from the latest send that may have reached it.
 struct HeldIdempotencyKeys {
     /// How many attempts may be held at once. Past it a new attempt still sends a key and is not held.
     static let capacity = 16
@@ -54,6 +54,11 @@ struct HeldIdempotencyKeys {
 
     /// Whether the last attempt that should have been held found no room. Reported once until a key is held again.
     private(set) var isSaturated = false
+
+    /// Whether nothing is held and no report of being full is pending, so the table can be dropped.
+    var isIdle: Bool {
+        records.isEmpty && !isSaturated
+    }
 
     init(maxAge: Duration = payabliIdempotencyKeyMaxAge) {
         self.maxAge = maxAge
@@ -145,7 +150,7 @@ struct HeldIdempotencyKeys {
     /// Drops every key the service would no longer recognise.
     ///
     /// - Parameter now: the moment a key's age is read against.
-    private mutating func sweep(now: ContinuousClock.Instant) {
+    mutating func sweep(now: ContinuousClock.Instant) {
         records = records.filter { _, record in
             record.reservedAt.duration(to: now) < maxAge
         }
