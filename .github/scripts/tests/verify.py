@@ -48,6 +48,8 @@ CI_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "ci.yml"
 RELEASE_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "release.yml"
 REPORT_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "nightly-report.yml"
 INTERFACE_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "public-interface.yml"
+SOURCE_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "source-branch.yml"
+REPORTS_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "pr-reports.yml"
 HARDWARE_LIST = REPO_ROOT / ".github" / "hardware-only-tests.txt"
 VERSION_SOURCE = "Sources/PayabliSDKCore/PayabliSDKCore.swift"
 GATE_SCRIPT = REPO_ROOT / ".github" / "scripts" / "release-version.sh"
@@ -59,6 +61,10 @@ HALVES = ("collector", "poster", "workflows", "helper", "release", "both")
 # because a second one is how a scan comes to see a different set of files from its neighbour.
 WORKFLOW_SUFFIXES = (".yml", ".yaml")
 ONLY = os.environ.get("NIGHTLY_ONLY", "both")
+# No global or system configuration, so a developer's signing or tagging settings cannot change a fixture.
+GIT_ISOLATED = {**os.environ, "GIT_CONFIG_GLOBAL": os.devnull, "GIT_CONFIG_NOSYSTEM": "1",
+                "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t", "GIT_COMMITTER_NAME": "t",
+                "GIT_COMMITTER_EMAIL": "t@t"}
 
 PASS: list[str] = []
 FAIL: list[tuple[str, str]] = []
@@ -1142,6 +1148,42 @@ def test_workflows() -> None:
               and "Nightly" in ((holder_on.get("workflow_run") or {}).get("workflows") or []),
               holder_on.get("workflow_run"))
 
+    # A repository secret is readable by any job a same-repository pull request writes, whatever the default
+    # branch's workflows do with it. So every secret beyond the run's own token is read inside an environment
+    # whose deployment branches are protected ones, and a job naming one outside an environment is refused.
+    for path in sorted(workflow_dir.iterdir()):
+        if not path.is_file() or path.suffix not in WORKFLOW_SUFFIXES:
+            continue
+        for job_name, job in (yaml.safe_load(path.read_text()).get("jobs") or {}).items():
+            secrets = sorted(set(re.findall(r"secrets\.([A-Za-z0-9_]+)", yaml.safe_dump(job))) - {"GITHUB_TOKEN"})
+            if secrets:
+                check(f"W22 {path.name} {job_name} reads {', '.join(secrets)} from an environment, not the repository",
+                      job.get("environment") in ("ci-protected", "release"), job.get("environment"))
+
+    # Each workflow's token is its own, so none rests on the repository's default or hands a later job a wider
+    # one, and each step runs under pipefail, so a failing command piped into another does not pass.
+    for path in sorted(workflow_dir.iterdir()):
+        if not path.is_file() or path.suffix not in WORKFLOW_SUFFIXES:
+            continue
+        workflow = yaml.safe_load(path.read_text())
+        check(f"W24 {path.name} sets its own token, reading at most the contents",
+              workflow.get("permissions") in ({}, {"contents": "read"}), workflow.get("permissions"))
+        check(f"W24b {path.name} runs every step in bash with pipefail",
+              ((workflow.get("defaults") or {}).get("run") or {}).get("shell") == "bash", workflow.get("defaults"))
+
+    # A tag is moved by whoever owns the action, so another repository's action is named by a full commit,
+    # with the version it stands for beside it for Dependabot and the reader.
+    action_files = [path for path in sorted(workflow_dir.iterdir()) if path.suffix in WORKFLOW_SUFFIXES]
+    action_files += sorted((REPO_ROOT / ".github" / "actions").glob("*/action.yml"))
+    for path in action_files:
+        for number, line in enumerate(path.read_text().splitlines(), 1):
+            found = re.match(r"\s*(?:-\s+)?uses:\s*(\S+)\s*(.*)$", line)
+            if not found or found.group(1).startswith(("./", "$")):
+                continue
+            check(f"W25 {path.name}:{number} names {found.group(1).split('@')[0]} by a full commit and its version",
+                  re.fullmatch(r"[\w.-]+/[\w./-]+@[0-9a-f]{40}", found.group(1)) is not None
+                  and re.fullmatch(r"# v\d+(\.\d+){0,2}", found.group(2)) is not None, line.strip())
+
     report_workflow = token_holders.get("nightly-report.yml") or {}
     report = (report_workflow.get("jobs") or {}).get("report") or {}
     check("W4 the report job cannot redden a green run",
@@ -1220,6 +1262,10 @@ def test_workflows() -> None:
         ".github/scripts/**",
         ".github/workflows/scripts.yml",
         ".github/hardware-only-tests.txt",
+        ".github/workflows/source-branch.yml",
+        ".github/workflows/public-interface.yml",
+        ".github/workflows/pr-reports.yml",
+        ".github/dependabot.yml",
         VERSION_SOURCE,
         *(f".github/workflows/{name}" for name, _ in tiers),
         *(f".github/workflows/{name}" for name in token_holders),
@@ -1322,8 +1368,11 @@ def test_workflows() -> None:
     build_runs = [str(step.get("run", "")) for step in build_job.get("steps") or []]
     publish_runs = [str(step.get("run", "")) for step in publish_job.get("steps") or []]
     ci_run = next((run for run in check_runs if "actions/workflows/ci.yml/runs" in run), "")
-    check("W15h the release starts only once CI on main for the named commit has completed with success",
-          "actions/workflows/ci.yml/runs?head_sha=$COMMIT&branch=main&event=push" in ci_run
+    check("W15h the release starts only once CI on the commit's branch has completed with success",
+          "actions/workflows/ci.yml/runs?head_sha=$COMMIT&branch=$BRANCH&event=push" in ci_run
+          and (next((step.get("env") or {} for step in check_job.get("steps") or []
+                     if "actions/workflows/ci.yml/runs" in str(step.get("run", ""))), {})
+               .get("BRANCH") == "${{ steps.branch.outputs.branch }}")
           and '!= "completed success"' in ci_run
           and re.search(r"\bexit [1-9]", ci_run) is not None
           and (check_job.get("permissions") or {}).get("actions") == "read", ci_run[:160])
@@ -1350,23 +1399,28 @@ def test_workflows() -> None:
     triggers = release.get("on", release.get(True)) or {}
     commit_input = ((triggers.get("workflow_dispatch") or {}).get("inputs") or {}).get("commit") or {}
     sha_check = r'\[\[ ! "\$COMMIT" =~ (\S+) \]\]'
-    build_sha = re.search(sha_check, check_runs[0]) if check_runs else None
+    # Second, after the main-dispatch refusal, and before anything is read.
+    build_sha = re.search(sha_check, check_runs[1]) if len(check_runs) > 1 else None
     publish_sha = next((m for run in publish_runs for m in [re.search(sha_check, run)] if m), None)
     check("W15o the dispatch names the commit in full, checked first and checked again where the key is",
           commit_input.get("required") is True
           and build_sha is not None and build_sha.group(1) == "^[0-9a-f]{40}$"
-          and re.search(r"\bexit [1-9]", check_runs[0]) is not None
+          and re.search(r"\bexit [1-9]", check_runs[1]) is not None
           and publish_sha is not None and publish_sha.group(1) == build_sha.group(1),
           (commit_input, build_sha and build_sha.group(1), publish_sha and publish_sha.group(1)))
-    on_main_at = next((index for index, run in enumerate(runs)
-                       if 'git merge-base "$COMMIT" origin/main' in run and '!= "$COMMIT"' in run
-                       and re.search(r"\bexit [1-9]", run)), -1)
+    on_branch_at = next((index for index, run in enumerate(runs)
+                         if 'git merge-base --is-ancestor "$COMMIT" "refs/remotes/origin/$candidate"' in run
+                         and re.search(r"\bexit [1-9]", run)), -1)
+    ci_at, merged_at = first("actions/workflows/ci.yml/runs"), first("git merge-base --is-ancestor \"refs/tags/")
     # A job or step that continues past a failure, or runs on a condition, can carry a release past a refusal.
     continuing = [str(item.get("name")) for item in [*release_steps, *(release.get("jobs") or {}).values()]
                   if "continue-on-error" in item or "if" in item]
-    check("W15p a commit that is not on main is refused before its version is read, and nothing runs past a "
+    check("W15p a commit not on its version's branch, or not passed by CI there, or cut before an earlier release "
+          "is in main, is refused after the version is read and before the suite, and nothing runs past a "
           "failure or on a condition",
-          on_main_at != -1 and on_main_at < gate_at and not continuing, (on_main_at, gate_at, continuing))
+          -1 not in (on_branch_at, ci_at, merged_at) and gate_at < on_branch_at < ci_at < test_at
+          and merged_at < test_at and all(runs[i] in check_runs for i in (on_branch_at, ci_at, merged_at))
+          and not continuing, (gate_at, on_branch_at, ci_at, merged_at, test_at, continuing))
     # Each job checks out once: the check job the input, every later job the commit the check job passed on.
     checkouts_by_job = {name: [step for step in (job.get("steps") or [])
                                if str(step.get("uses", "")).startswith("actions/checkout")]
@@ -1379,7 +1433,7 @@ def test_workflows() -> None:
     step_commits = [step.get("name") for step in release_steps if "COMMIT" in (step.get("env") or {})]
     moves = [line.strip() for run in runs for line in run.splitlines()
              if re.search(r"\bgit (checkout|switch|reset)\b", line)]
-    # All of history: the on-main check reads origin/main, and the resume checks read the tags.
+    # All of history: the branch check reads the remote branches, and the tag checks read the tags.
     depths = [((checkouts_by_job.get(name) or [{}])[0].get("with") or {}).get("fetch-depth")
               for name in ("check", "publish")]
     check("W15q every job checks out and acts on the named commit",
@@ -1394,27 +1448,33 @@ def test_workflows() -> None:
     check("W15r the run summary names the commit and its subject line for the approver",
           'echo "Releasing \\`$VERSION\\` from \\`$COMMIT\\`:"' in summary_run
           and 'git log -1 --format=%s "$COMMIT"' in summary_run, summary_run[:160])
-    # The run's own commit is main's head at the click. The summary shows it, and nothing else names it.
+    # The run's own commit is main's head at the click. The summary shows it and the version is read by its
+    # script, and nothing else names it.
     own = [line.strip() for line in RELEASE_WORKFLOW.read_text().splitlines()
            if re.search(r"GITHUB_SHA|github\.sha", line)]
-    check("W15s only the run summary names the run's own commit",
-          own == ['echo "The workflow runs from \\`$GITHUB_SHA\\` on main."'], own)
+    check("W15s only the run summary and the version's script name the run's own commit",
+          own == ['git show "$GITHUB_SHA:.github/scripts/release-version.sh" > .github/scripts/release-version.sh',
+                  'echo "The workflow runs from \\`$GITHUB_SHA\\` on main."'], own)
     check("W15b no input is interpolated into a script body",
           not any("inputs." in run for run in runs), [run[:80] for run in runs if "inputs." in run])
     tag_run = runs[tag_at] if tag_at != -1 else ""
     # The release page is public, so its body is the dispatch input and nothing else: no commit
-    # subject reaches it, and an input that is empty or only whitespace refuses the run.
+    # subject reaches it, and an input that is empty or only whitespace refuses the run in the check job,
+    # before the approval is asked for.
     notes_refusal = [
         'if [ -z "${RELEASE_NOTES//[[:space:]]/}" ]; then',
         'echo "::error::release_notes is blank, and a release is published with notes written for it"',
         'exit 1',
         'fi',
-        "printf '%s\\n' \"$RELEASE_NOTES\" > release-notes.md",
     ]
-    notes_lines = [line.strip() for line in tag_run.splitlines() if line.strip()]
+    notes_step = next((step for step in check_job.get("steps") or []
+                       if step.get("name") == "Check the release notes are written"), {})
+    notes_lines = [line.strip() for line in str(notes_step.get("run", "")).splitlines() if line.strip()]
     notes_input = ((triggers.get("workflow_dispatch") or {}).get("inputs") or {}).get("release_notes") or {}
-    check("W15w the release notes are the dispatch input, and a blank one is refused",
-          any(notes_lines[at:at + len(notes_refusal)] == notes_refusal for at in range(len(notes_lines)))
+    check("W15w the release notes are the dispatch input, and a blank one is refused before the approval",
+          notes_lines == notes_refusal
+          and (notes_step.get("env") or {}).get("RELEASE_NOTES") == "${{ inputs.release_notes }}"
+          and "printf '%s\\n' \"$RELEASE_NOTES\" > release-notes.md" in tag_run
           and '--notes-file release-notes.md' in tag_run
           and 'gh release edit "$VERSION" --notes-file release-notes.md' in tag_run
           and (publish_job.get("env") or {}).get("RELEASE_NOTES") == "${{ inputs.release_notes }}"
@@ -1425,7 +1485,24 @@ def test_workflows() -> None:
     # the suite tested.
     check("W15c the release tags the commit that was tested",
           re.search(r'gh release create "\$VERSION" --draft --target "\$COMMIT"', tag_run) is not None
-          and re.search(r'git tag -a "\$VERSION" -m "[^"]*" "\$COMMIT"', tag_run) is not None, tag_run[:200])
+          and re.search(r'git tag -a "\$VERSION" -m "[^"]*" -m "[^"]*" "\$COMMIT"', tag_run) is not None, tag_run[:200])
+    # The tag is permanent and public, so it names the run, which carries who dispatched and who approved.
+    check("W15x the tag names the SDK, the version and the run that made it, and no person",
+          'git tag -a "$VERSION" -m "Payabli iOS SDK $VERSION" '
+          '-m "Released by $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" "$COMMIT"' in tag_run
+          and "GITHUB_ACTOR" not in tag_run and "github.actor" not in tag_run, tag_run[:200])
+    # The release re-runs what CI runs without a device: the package suite and the sample app's step sequences,
+    # on the image it builds with.
+    ci_demo = next((step.get("run", "") for step in (yaml.safe_load(CI_WORKFLOW.read_text())["jobs"]
+                                                      .get("test-demo") or {}).get("steps") or []
+                    if "-scheme PayabliDemoFlowTests" in step.get("run", "")), "")
+    release_demo = next((run for run in (step.get("run", "") for step in test_job.get("steps") or [])
+                         if "-scheme PayabliDemoFlowTests" in run), "")
+    demo_flags = ("xcodebuild test", "-project Example/PayabliDemo/PayabliDemo.xcodeproj",
+                  '-destination "platform=iOS Simulator,id=$SIMULATOR_ID"', "-clonedSourcePackagesDirPath .build/checkouts")
+    check("W15y the release tests the sample app's step sequences as CI does",
+          bool(ci_demo) and all(flag in ci_demo and flag in release_demo for flag in demo_flags),
+          release_demo[:300])
     before_publish = {"check": check_job, "test": test_job, "build": build_job}
     check("W15i only the publish job runs in the release environment, and no job before it can write",
           publish_job.get("environment") == "release"
@@ -1467,6 +1544,15 @@ def test_workflows() -> None:
     publish_tag_at = next((index for index, run in enumerate(publish_runs) if "gh release create" in run), -1)
     check("W15v the job that tags checks the version against the newest release again, with the script's lines",
           len(ordering) == 4 and recheck_at != -1 and recheck_at < publish_tag_at, (ordering, recheck_at, publish_tag_at))
+    # An earlier release cut while this one waited for approval is looked for again where the tag is created,
+    # with the check job's own lines, so the two copies cannot come to decide differently.
+    merged_check = workflow_step(RELEASE_WORKFLOW, "check", "Check every earlier release is in main and in the commit")
+    merged_again = workflow_step(RELEASE_WORKFLOW, "publish",
+                                 "Check again that every earlier release is in main and in the commit")
+    again_at = next((index for index, run in enumerate(publish_runs) if run == merged_again), -1)
+    check("W15x the job that tags checks every earlier release again, with the check job's lines, before tagging",
+          merged_check is not None and merged_again == merged_check and -1 < again_at < publish_tag_at,
+          (again_at, publish_tag_at))
     # The publish job checks the reported version as data with the gate's own pattern, so the two cannot
     # accept different versions without this failing.
     gate_pattern = re.search(r'\[\[ "\$declared" =~ (\S+) \]\]', GATE_SCRIPT.read_text())
@@ -1684,20 +1770,16 @@ def run_newer(args: list[str], tmp: Path, tags: list[str] | None,
     if root.exists():
         shutil.rmtree(root)
     root.mkdir()
-    # No global or system configuration, so a developer's signing or tagging settings cannot change the fixture.
-    isolated = {**os.environ, "GIT_CONFIG_GLOBAL": os.devnull, "GIT_CONFIG_NOSYSTEM": "1",
-                "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t", "GIT_COMMITTER_NAME": "t",
-                "GIT_COMMITTER_EMAIL": "t@t"}
     if tags is not None:
         commands = [["init", "-q"], ["commit", "-q", "--allow-empty", "-m", "one"]]
         commands += [["tag", "-a", tag, "-m", tag] for tag in tags]
         for command in commands:
-            subprocess.run(["git", *command], cwd=root, check=True, capture_output=True, timeout=60, env=isolated)
+            subprocess.run(["git", *command], cwd=root, check=True, capture_output=True, timeout=60, env=GIT_ISOLATED)
     try:
         result = subprocess.run(
             [str(REPO_ROOT / ".github" / "scripts" / "release-newer.sh"), *args],
             cwd=root, capture_output=True, text=True, timeout=60, check=False,
-            env={**isolated, "GIT_CEILING_DIRECTORIES": str(tmp), "GIT_CONFIG_COUNT": str(len(config or {})),
+            env={**GIT_ISOLATED, "GIT_CEILING_DIRECTORIES": str(tmp), "GIT_CONFIG_COUNT": str(len(config or {})),
                  **{f"GIT_CONFIG_{kind}_{index}": value
                     for index, (key, val) in enumerate((config or {}).items())
                     for kind, value in (("KEY", key), ("VALUE", val))}},
@@ -1813,6 +1895,437 @@ def test_release() -> None:
         code, out, _ = run_newer([], root, [])
         check("R9l no argument exits 2", code == 2, (code, out))
 
+    test_release_branches()
+
+
+# --------------------------------------------------------------------------------------------------
+# Release and hotfix branches.
+#
+# A release is cut from a commit on the branch of the version it declares, after CI passed there, and not
+# while an earlier release is missing from main. Those checks are steps of `release.yml`, and each one's own
+# text is taken from the workflow and run in a synthetic repository.
+# --------------------------------------------------------------------------------------------------
+
+def workflow_step(path: Path, job: str, name: str) -> str | None:
+    """The `run` text of the named step in the named job, or None when there is no such step."""
+    import yaml  # noqa: PLC0415 - as in test_workflows
+
+    workflow = yaml.safe_load(path.read_text())
+    steps = (((workflow.get("jobs") or {}).get(job) or {}).get("steps")) or []
+    return next((str(step.get("run")) for step in steps if step.get("name") == name and "run" in step), None)
+
+
+def run_step(script: str | None, cwd: Path, env: dict[str, str]) -> tuple[int, str, str]:
+    """Run a step's text the way a runner runs `shell: bash`, with `env` and a `GITHUB_OUTPUT` to write to."""
+    if script is None:
+        # Reported as a result, so a missing step fails each check rather than passing the accepted cases.
+        return 127, "", "no such step"
+    output = cwd.parent / f"{cwd.name}.output"
+    output.write_text("")
+    result = subprocess.run(
+        ["bash", "--noprofile", "--norc", "-eo", "pipefail", "-c", script], cwd=cwd, capture_output=True, text=True, timeout=60, check=False,
+        env={**GIT_ISOLATED, "GIT_CEILING_DIRECTORIES": str(cwd.parent), "GITHUB_OUTPUT": str(output), **env},
+    )
+    return result.returncode, output.read_text(), result.stdout + result.stderr
+
+
+def release_repo(root: Path, branches: dict[str, str], tags: dict[str, str]) -> dict[str, str]:
+    """A repository whose `origin/<branch>` refs and tags sit on named commits, as a release checkout sees it.
+
+    Every commit is a child of `base`, the commit main and every branch start from. `branches` maps a branch
+    to the commit its remote ref names, and `tags` maps a tag to its commit. Returns each commit's SHA.
+    """
+    if root.exists():
+        shutil.rmtree(root)
+    root.mkdir(parents=True)
+
+    def run(*args: str) -> str:
+        return subprocess.run(["git", *args], cwd=root, check=True, capture_output=True, text=True,
+                              timeout=60, env=GIT_ISOLATED).stdout.strip()
+
+    run("init", "-q", "-b", "main")
+    run("commit", "-q", "--allow-empty", "-m", "base")
+    shas = {"base": run("rev-parse", "HEAD")}
+    for name in sorted({*branches.values(), *tags.values()} - {"base"}):
+        shas[name] = run("commit-tree", "HEAD^{tree}", "-p", shas["base"], "-m", name)
+    for branch, commit in branches.items():
+        run("update-ref", f"refs/remotes/origin/{branch}", shas[commit])
+    for tag, commit in tags.items():
+        run("tag", "-a", tag, "-m", tag, shas[commit])
+    return shas
+
+
+def test_release_branches() -> None:
+    on_branch = workflow_step(RELEASE_WORKFLOW, "check", "Check the commit is on its release or hotfix branch")
+    merged = workflow_step(RELEASE_WORKFLOW, "check", "Check every earlier release is in main and in the commit")
+    with tempfile.TemporaryDirectory() as tmp:
+        repo = Path(tmp) / "branches"
+        shas = release_repo(repo, {"main": "on-main", "release/0.2.0": "on-release", "release/0.3.0": "next",
+                                   "hotfix/0.1.1": "on-hotfix"}, {})
+        for label, commit, version, branch in (
+            ("R10 a commit on release/<version> is accepted", "on-release", "0.2.0", "release/0.2.0"),
+            ("R10b a commit on hotfix/<version> is accepted", "on-hotfix", "0.1.1", "hotfix/0.1.1"),
+            ("R10c a commit on main and its branch is accepted", "base", "0.2.0", "release/0.2.0"),
+            ("R10d a commit on another version's branch is refused", "next", "0.2.0", None),
+            ("R10e a commit only on main is refused", "on-main", "0.2.0", None),
+            ("R10f a version with no branch is refused", "on-release", "0.4.0", None),
+            ("R10g a version is matched whole, not as a prefix of a branch", "on-release", "0.2", None),
+        ):
+            code, out, err = run_step(on_branch, repo, {"COMMIT": shas[commit], "VERSION": version})
+            if branch:
+                check(label, code == 0 and out == f"branch={branch}\n", (code, out, err[-200:]))
+            else:
+                check(label, code != 0 and "branch=" not in out and f"release/{version}" in err,
+                      (code, out, err[-200:]))
+
+        # An earlier release is merged back into main, and main into the branch, before the next is cut. Only
+        # release tags count, only those below the version being cut, and the version's own tag is a release
+        # being resumed. The commit cut is on release/0.2.0 and main is `base` unless a case says otherwise.
+        for label, tags, version, missing, main in (
+            ("R11 every earlier release in main and in the commit is accepted", {"0.1.0": "base"}, "0.2.0", None,
+             "base"),
+            ("R11b a first release is accepted", {}, "0.1.0", None, "base"),
+            ("R11c an earlier release missing from main is refused, by name",
+             {"0.1.0": "base", "0.1.1": "on-hotfix"}, "0.2.0", "0.1.1 is not in main", "base"),
+            ("R11d components compare as numbers, not text", {"0.9.0": "on-hotfix"}, "0.10.0",
+             "0.9.0 is not in main", "base"),
+            ("R11e a tag that is not a release is not counted",
+             {"qa-probe-1": "on-hotfix", "v0.1.0": "on-hotfix", "0.1.0-rc1": "on-hotfix"}, "0.2.0", None, "base"),
+            ("R11f the version's own tag is a resume, not an earlier release", {"0.2.0": "on-release"}, "0.2.0",
+             None, "base"),
+            ("R11g a later release is the newest-release check's, not this one's", {"0.3.0": "next"}, "0.2.0",
+             None, "base"),
+            ("R11h a tag named like main's remote ref does not stand in for main",
+             {"0.1.0": "on-hotfix", "origin/main": "on-hotfix"}, "0.2.0", "0.1.0 is not in main", "base"),
+            ("R11i an earlier release in main but not merged into the commit is refused, by name",
+             {"0.1.0": "on-hotfix"}, "0.2.0", "0.1.0 is not in {commit}", "on-hotfix"),
+        ):
+            shas = release_repo(repo, {"main": main, "release/0.2.0": "on-release"}, tags)
+            code, _, err = run_step(merged, repo, {"VERSION": version, "COMMIT": shas["on-release"]})
+            if missing:
+                check(label, code != 0 and missing.format(commit=shas["on-release"]) in err, (code, err[-200:]))
+            else:
+                check(label, code == 0, (code, err[-200:]))
+
+        # The version is read before the commit is found on its branch, so nothing from the commit may run
+        # there. Its own copy of the script here forges the commit the later steps check and the version.
+        version_step = workflow_step(RELEASE_WORKFLOW, "check", "Check the version")
+        candidate = Path(tmp) / "candidate"
+        candidate.mkdir()
+
+        def git(*args: str) -> str:
+            return subprocess.run(["git", *args], cwd=candidate, check=True, capture_output=True, text=True,
+                                  timeout=60, env=GIT_ISOLATED).stdout.strip()
+
+        git("init", "-q", "-b", "main")
+        (candidate / ".github" / "scripts").mkdir(parents=True)
+        (candidate / "Sources" / "PayabliSDKCore").mkdir(parents=True)
+        shutil.copy(GATE_SCRIPT, candidate / ".github" / "scripts")
+        (candidate / VERSION_SOURCE).write_text('public static var version: String {\n    "0.2.0"\n}\n')
+        git("add", "-A")
+        git("commit", "-q", "-m", "main")
+        on_main = git("rev-parse", "HEAD")
+        (candidate / ".github" / "scripts" / "release-version.sh").write_text(
+            '#!/usr/bin/env bash\necho "COMMIT=forged" >> "$GITHUB_ENV"\necho 9.9.9\n')
+        git("commit", "-q", "-am", "candidate")
+        env_file, summary = Path(tmp) / "env", Path(tmp) / "summary"
+        env_file.write_text("")
+        code, out, err = run_step(version_step, candidate, {
+            "GITHUB_SHA": on_main, "GITHUB_REF": "refs/heads/main", "COMMIT": git("rev-parse", "HEAD"),
+            "GITHUB_ENV": str(env_file), "GITHUB_STEP_SUMMARY": str(summary)})
+        check("R12 the version is read by main's copy of the script, and the commit's own copy never runs",
+              code == 0 and out == "version=0.2.0\n" and "forged" not in env_file.read_text(),
+              (code, out, env_file.read_text(), err[-200:]))
+
+
+def test_branch_triggers() -> None:
+    """The workflows a release branch's pull requests and pushes depend on, and the check on main's sources."""
+    import yaml  # noqa: PLC0415 - as in test_workflows
+
+    branch_set = {"main", "release/**", "hotfix/**"}
+    ci = yaml.safe_load(CI_WORKFLOW.read_text())
+    ci_on = ci.get("on", ci.get(True)) or {}
+    check("W18 CI runs on push and pull request to main, release and hotfix branches",
+          all(set((ci_on.get(event) or {}).get("branches") or []) == branch_set for event in ("push", "pull_request")),
+          ci_on)
+    # The release reads a push run, so a newer run may replace a pull request's run and never a push run.
+    # A group keeps one pending run and cancels it for the next, so the group is what protects a push run.
+    check("W18b only a pull request's CI run is cancelled or replaced by a newer one",
+          ci.get("concurrency") == {
+              "group": "ci-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}",
+              "cancel-in-progress": "${{ github.event_name == 'pull_request' }}"},
+          ci.get("concurrency"))
+    # The analysis is handed only the head, so a pull request's run builds the head, not the merge into the base.
+    ci_checkouts = [step for job in (ci.get("jobs") or {}).values() for step in job.get("steps") or []
+                    if str(step.get("uses", "")).startswith("actions/checkout")]
+    check("W18d every CI checkout builds the pull request's head, which the analysis reads",
+          bool(ci_checkouts) and all((step.get("with") or {}).get("ref") == "${{ github.event.pull_request.head.sha }}"
+                                     for step in ci_checkouts),
+          [(step.get("with") or {}).get("ref") for step in ci_checkouts])
+    interface = yaml.safe_load(INTERFACE_WORKFLOW.read_text())
+    interface_on = interface.get("on", interface.get(True)) or {}
+    check("W18c the interface check runs on pull requests to main, release and hotfix branches",
+          set((interface_on.get("pull_request") or {}).get("branches") or []) == branch_set, interface_on)
+
+    source = yaml.safe_load(SOURCE_WORKFLOW.read_text()) if SOURCE_WORKFLOW.exists() else {}
+    source_on = source.get("on", source.get(True)) or {}
+    pull = source_on.get("pull_request_target") or {}
+    # main's copy of the check, so a pull request cannot edit the rule it is judged by. Safe only while the job
+    # checks out nothing and holds no token, which the same check asserts.
+    check("W19 the source-branch check runs main's copy on every pull request into main, retargets included, "
+          "checking out nothing and holding no token",
+          set(source_on) == {"pull_request_target"} and pull.get("branches") == ["main"]
+          and {"opened", "synchronize", "reopened", "edited"} <= set(pull.get("types") or [])
+          and source.get("permissions") == {}
+          and not any("uses" in s for job in (source.get("jobs") or {}).values() for s in job.get("steps") or []),
+          (source_on, source.get("permissions")))
+    step = workflow_step(SOURCE_WORKFLOW, "source",
+                         "Check the pull request comes from a release, hotfix or Dependabot branch") \
+        if SOURCE_WORKFLOW.exists() else None
+    steps = [s for job in (source.get("jobs") or {}).values() for s in job.get("steps") or []]
+    check("W19b the head branch and its repository reach the step through the environment, never the script",
+          step is not None and "${{" not in step
+          and any((s.get("env") or {}).get("HEAD_REF") == "${{ github.head_ref }}"
+                  and (s.get("env") or {}).get("HEAD_REPO") == "${{ github.event.pull_request.head.repo.full_name }}"
+                  for s in steps), step)
+    with tempfile.TemporaryDirectory() as tmp:
+        marker, work = Path(tmp) / "ran", Path(tmp) / "work"
+        work.mkdir()
+        for label, head, accepted in (
+            ("W19c a release branch is accepted", "release/0.2.0", True),
+            ("W19d a hotfix branch is accepted", "hotfix/0.2.1", True),
+            ("W19e a Dependabot branch is accepted", "dependabot/github_actions/actions/checkout-5", True),
+            ("W19f a feature branch is refused", "feat/some-change", False),
+            ("W19g a branch named release with no version is refused", "release", False),
+            ("W19h an empty release prefix is refused", "release/", False),
+            ("W19i a prefix is matched at the start only", "feat/release/0.2.0", False),
+            ("W19j a branch name is never run as shell", f"release/$(touch {marker})", True),
+        ):
+            code, _, err = run_step(step, work, {"HEAD_REF": head, "HEAD_REPO": "payabli/sdk-ios",
+                                                 "GITHUB_REPOSITORY": "payabli/sdk-ios"})
+            if accepted:
+                check(label, code == 0 and not marker.exists(), (code, err[-200:]))
+            else:
+                check(label, code != 0 and "release/" in err and head in err, (code, err[-200:]))
+        code, _, err = run_step(step, work, {"HEAD_REF": "release/0.2.0", "HEAD_REPO": "someone/sdk-ios",
+                                             "GITHUB_REPOSITORY": "payabli/sdk-ios"})
+        check("W19k a fork's release branch is refused, naming the fork",
+              code != 0 and "someone/sdk-ios" in err, (code, err[-200:]))
+
+        # A push run on a release branch is analysed as that branch, never as the default branch the reporting
+        # workflow runs on, and the name reaches the scanner's arguments only once checked.
+        sonar = workflow_step(REPORTS_WORKFLOW, "sonar", "Identify the pull request")
+        for label, head, expected in (
+            ("W20 a push run is analysed as the branch it pushed to", "release/0.2.0",
+             "-Dsonar.branch.name=release/0.2.0"),
+            ("W20b a push run's branch that is not a plain ref is refused", f"release/$(touch {marker}) x", None),
+        ):
+            code, out, err = run_step(sonar, work, {"PR": "", "PR_BRANCH": "", "PR_BASE": "",
+                                                    "HEAD_BRANCH": head,
+                                                    "SETTINGS": "/tmp/runner/sonar-project.properties"})
+            if expected:
+                check(label, code == 0 and out.strip().endswith(expected)
+                      and "-Dsonar.projectKey=payabli_sdk-ios" in out, (code, out, err[-200:]))
+            else:
+                check(label, code != 0 and "sonar.branch.name" not in out and not marker.exists(),
+                      (code, out, err[-200:]))
+        code, out, err = run_step(sonar, work, {"PR": "179", "PR_BRANCH": "ci/x", "PR_BASE": "release/0.2.0",
+                                                "HEAD_BRANCH": "ci/x", "SETTINGS": "/tmp/runner/sonar-project.properties"})
+        check("W20c a pull request's run is analysed as the pull request, not as a branch",
+              code == 0 and "-Dsonar.pullrequest.key=179" in out and "sonar.branch.name" not in out,
+              (code, out, err[-200:]))
+        check("W26 the scanner is pointed at the settings file outside the workspace, and the three that say where "
+              "the analysis goes are still forced",
+              "-Dproject.settings=/tmp/runner/sonar-project.properties" in out
+              and all(f in out for f in ("-Dsonar.host.url=https://sonarcloud.io", "-Dsonar.organization=payabli",
+                                         "-Dsonar.projectKey=payabli_sdk-ios")), out)
+
+        # The settings are main's: the step reads them from the commit this workflow runs from, never from the
+        # revision checked out, and writes them where the analysed tree cannot reach.
+        settings = workflow_step(REPORTS_WORKFLOW, "sonar", "Take the analysis settings from main")
+        analysed = work.parent / "analysed"
+        analysed.mkdir(exist_ok=True)
+
+        def tree_git(*args: str) -> str:
+            return subprocess.run(["git", *args], cwd=analysed, check=True, capture_output=True, text=True,
+                                  timeout=60, env=GIT_ISOLATED).stdout.strip()
+
+        tree_git("init", "-q", "-b", "main")
+        (analysed / "sonar-project.properties").write_text("sonar.sources=Sources\n")
+        tree_git("add", "-A")
+        tree_git("commit", "-q", "-m", "main")
+        main_sha = tree_git("rev-parse", "HEAD")
+        tree_git("checkout", "-q", "-b", "ci/x")
+        (analysed / "sonar-project.properties").write_text("sonar.nodejs.executable=./own-binary\n")
+        tree_git("commit", "-q", "-am", "branch")
+        temp = work.parent / "runner-temp"
+        temp.mkdir(exist_ok=True)
+        code, _, err = run_step(settings, analysed, {"GITHUB_SHA": main_sha, "RUNNER_TEMP": str(temp)})
+        written = temp / "sonar-project.properties"
+        check("W26b the settings written for the scanner are main's, not the analysed revision's",
+              code == 0 and written.exists() and written.read_text() == "sonar.sources=Sources\n",
+              (code, written.exists() and written.read_text(), err[-200:]))
+        sonar_steps = [step.get("name") for step in yaml.safe_load(REPORTS_WORKFLOW.read_text())["jobs"]["sonar"]["steps"]]
+        identify_env = next((step.get("env") or {} for step in yaml.safe_load(REPORTS_WORKFLOW.read_text())["jobs"]
+                             ["sonar"]["steps"] if step.get("name") == "Identify the pull request"), {})
+        check("W26c the settings are taken before the scan and named by the runner's temporary directory",
+              "Take the analysis settings from main" in sonar_steps and "Analyze" in sonar_steps
+              and sonar_steps.index("Take the analysis settings from main") < sonar_steps.index("Analyze")
+              and identify_env.get("SETTINGS") == "${{ runner.temp }}/sonar-project.properties"
+              and settings is not None and '> "$RUNNER_TEMP/sonar-project.properties"' in settings,
+              (sonar_steps, identify_env.get("SETTINGS")))
+        check("W26d the settings are read with replace refs off, so a ref the checkout carries cannot swap them",
+              settings is not None and 'git --no-replace-objects show "$GITHUB_SHA:' in settings, settings)
+
+        # The coverage was built by the pull request's own CI. It unpacks outside the workspace, after the settings
+        # are read, and only the one file the settings name is copied in, so nothing in it reaches `.git`.
+        raw_sonar = yaml.safe_load(REPORTS_WORKFLOW.read_text())["jobs"]["sonar"]["steps"]
+        downloads = [i for i, step in enumerate(raw_sonar) if "download-artifact" in str(step.get("uses", ""))]
+        check("W26e the coverage unpacks outside the workspace, after the settings are read",
+              bool(downloads) and all(
+                  " ".join(str((raw_sonar[i].get("with") or {}).get("path", "")).split())
+                  == "${{ runner.temp }}/artifacts"
+                  and sonar_steps.index("Take the analysis settings from main") < i for i in downloads),
+              [(raw_sonar[i].get("with") or {}).get("path") for i in downloads])
+        intake_env = next((step.get("env") or {} for step in raw_sonar
+                           if step.get("name") == "Take the coverage report in"), {})
+        check("W26f the coverage is taken in after every download and before the scan",
+              "Take the coverage report in" in sonar_steps and bool(downloads)
+              and intake_env.get("STAGED") == "${{ runner.temp }}/artifacts"
+              and all(i < sonar_steps.index("Take the coverage report in") for i in downloads)
+              and sonar_steps.index("Take the coverage report in") < sonar_steps.index("Analyze"),
+              (sonar_steps, intake_env))
+
+        intake = workflow_step(REPORTS_WORKFLOW, "sonar", "Take the coverage report in")
+
+        def intake_case(name: str) -> tuple[Path, Path]:
+            root = work.parent / f"intake-{name}"
+            staged, workspace = root / "artifacts", root / "workspace"
+            (workspace / ".git").mkdir(parents=True)
+            staged.mkdir(parents=True)
+            (staged / "coverage.xml").write_text("<coverage/>\n")
+            return staged, workspace
+
+        staged, workspace = intake_case("clean")
+        (staged / ".git").mkdir()
+        (staged / ".git" / "config").write_text("[core]\n\tfsmonitor = ./own-binary\n")
+        (staged / "sonar-project.properties").write_text("sonar.nodejs.executable=./own-binary\n")
+        code, _, err = run_step(intake, workspace, {"STAGED": str(staged), "GITHUB_WORKSPACE": str(workspace)})
+        check("W26g only the coverage report is copied in, and nothing else the artifact carries",
+              code == 0 and (workspace / "coverage.xml").read_text() == "<coverage/>\n"
+              and not (workspace / ".git" / "config").exists()
+              and not (workspace / "sonar-project.properties").exists(), (code, err[-200:]))
+
+        staged, workspace = intake_case("artifact-link")
+        (staged / "coverage.xml").unlink()
+        (staged / "coverage.xml").symlink_to(workspace / ".git" / "config")
+        code, _, err = run_step(intake, workspace, {"STAGED": str(staged), "GITHUB_WORKSPACE": str(workspace)})
+        check("W26h a symbolic link in the artifact is refused",
+              code != 0 and "the artifact carries a symbolic link" in err
+              and not (workspace / "coverage.xml").exists(), (code, err[-200:]))
+
+        staged, workspace = intake_case("checkout-link")
+        (workspace / "coverage.xml").symlink_to(workspace / ".git" / "config")
+        code, _, err = run_step(intake, workspace, {"STAGED": str(staged), "GITHUB_WORKSPACE": str(workspace)})
+        check("W26i a symbolic link in the checkout is refused before anything is copied",
+              code != 0 and "the checkout carries a symbolic link" in err
+              and not (workspace / ".git" / "config").exists(), (code, err[-200:]))
+
+        # Only the newest revision is analysed, so a run that completes after a newer one's cannot replace it.
+        # Nothing is cancelled, since a stale run would cancel the newer analysis before reaching this check.
+        newest = workflow_step(REPORTS_WORKFLOW, "sonar", "Check the revision is the newest")
+        bin_dir = work.parent / "fake-gh"
+        bin_dir.mkdir(exist_ok=True)
+        calls = work.parent / "fake-gh.log"
+        (bin_dir / "gh").write_text('#!/usr/bin/env bash\necho "$*" >> "$FAKE_GH_LOG"\necho "$FAKE_TIP"\n')
+        (bin_dir / "gh").chmod(0o755)
+        for label, pr, branch, tip, expected, path in (
+            ("W21 a push run of the branch's tip is analysed", "", "release/0.2.0", "aaa", "newest=true",
+             "repos/payabli/sdk-ios/branches/release/0.2.0"),
+            ("W21b a push run older than the branch's tip is not analysed", "", "release/0.2.0", "bbb",
+             "newest=false", "repos/payabli/sdk-ios/branches/release/0.2.0"),
+            ("W21c a pull request's run older than its head is not analysed", "179", "ci/x", "bbb",
+             "newest=false", "repos/payabli/sdk-ios/pulls/179"),
+            ("W21d a pull request's run of its head is analysed", "179", "ci/x", "aaa", "newest=true",
+             "repos/payabli/sdk-ios/pulls/179"),
+        ):
+            calls.write_text("")
+            code, out, err = run_step(newest, work, {
+                "PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}", "FAKE_GH_LOG": str(calls),
+                "FAKE_TIP": tip, "GH_TOKEN": "x", "REPO": "payabli/sdk-ios", "SHA": "aaa", "PR": pr,
+                "HEAD_BRANCH": branch})
+            check(label, code == 0 and out.strip() == expected and path in calls.read_text(),
+                  (code, out, calls.read_text(), err[-200:]))
+        code, out, err = run_step(newest, work, {
+            "PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}", "FAKE_GH_LOG": str(calls),
+            "FAKE_TIP": "aaa", "GH_TOKEN": "x", "REPO": "payabli/sdk-ios", "SHA": "aaa", "PR": "",
+            "HEAD_BRANCH": f"release/$(touch {marker}) x"})
+        check("W21e a branch that is not a plain ref is refused before it reaches the API",
+              code != 0 and "newest=" not in out and not marker.exists(), (code, out, err[-200:]))
+        import yaml  # noqa: PLC0415 - as in test_workflows
+        sonar_job = yaml.safe_load(REPORTS_WORKFLOW.read_text())["jobs"]["sonar"]
+        analyze = next((s for s in sonar_job["steps"] if s.get("name") == "Analyze"), {})
+        check("W21f the scan runs only on the newest revision, and no analysis is cancelled by a later one",
+              analyze.get("if") == "steps.newest.outputs.newest == 'true'"
+              and sonar_job.get("concurrency", {}).get("cancel-in-progress") is False,
+              (analyze.get("if"), sonar_job.get("concurrency")))
+        # A stale run is turned away before it joins the analysis's group, where it would replace the newest
+        # revision's pending analysis, and the same check runs again before the scan.
+        reports_jobs = yaml.safe_load(REPORTS_WORKFLOW.read_text())["jobs"]
+        gate_job = reports_jobs.get("newest") or {}
+        gate_step = next((s for s in gate_job.get("steps") or [] if s.get("name") == "Check the revision is the newest"),
+                         None)
+        scan_step = next((s for s in sonar_job["steps"] if s.get("name") == "Check the revision is the newest"), None)
+        check("W21g the freshness check runs before the analysis's group and again before the scan, as one step",
+              gate_step is not None and gate_step == scan_step, (gate_step, scan_step))
+        check("W21h the analysis waits on the freshness job and runs only on its newest, which takes no lock",
+              sonar_job.get("needs") == "newest"
+              and "needs.newest.outputs.newest == 'true'" in str(sonar_job.get("if"))
+              and (gate_job.get("outputs") or {}).get("newest") == "${{ steps.newest.outputs.newest }}"
+              and "concurrency" not in gate_job and "environment" not in gate_job,
+              (sonar_job.get("needs"), sonar_job.get("if"), gate_job.get("outputs"), gate_job.get("concurrency")))
+
+        # A dispatch off main is refused as the check job's first step, naming the ref, and only publishing is
+        # serialized: a release waiting for approval holds no other release's checks, tests or build.
+        release = yaml.safe_load(RELEASE_WORKFLOW.read_text())
+        first = ((release["jobs"]["check"].get("steps") or [{}])[0]).get("name")
+        check("R14 the check job's first step is the main-dispatch refusal",
+              first == "Check the release is dispatched from main", first)
+        from_main = workflow_step(RELEASE_WORKFLOW, "check", "Check the release is dispatched from main")
+        for label, ref, accepted in (
+            ("R14b a dispatch from main is accepted", "refs/heads/main", True),
+            ("R14c a dispatch from a release branch is refused, naming it", "refs/heads/release/0.2.0", False),
+        ):
+            code, _, err = run_step(from_main, work, {"GITHUB_REF": ref})
+            check(label, code == 0 if accepted else (code != 0 and ref in err), (code, err[-200:]))
+        locks = {name: job.get("concurrency") for name, job in release["jobs"].items() if job.get("concurrency")}
+        check("R14d only the publish job is serialized, and no release is cancelled",
+              "concurrency" not in release
+              and locks == {"publish": {"group": "release", "cancel-in-progress": False}},
+              (release.get("concurrency"), locks))
+
+        # The pinned actions are kept current by a weekly, grouped Dependabot pull request into main, the one source
+        # into main besides release and hotfix branches.
+        dependabot = yaml.safe_load((REPO_ROOT / ".github" / "dependabot.yml").read_text()) \
+            if (REPO_ROOT / ".github" / "dependabot.yml").exists() else {}
+        updates = dependabot.get("updates") or []
+        check("W23 Dependabot raises one weekly pull request into main for every action that moved",
+              len(updates) == 1 and updates[0].get("package-ecosystem") == "github-actions"
+              and updates[0].get("directory") == "/" and "target-branch" not in updates[0]
+              and (updates[0].get("schedule") or {}).get("interval") == "weekly"
+              and (updates[0].get("groups") or {}).get("actions", {}).get("patterns") == ["*"], updates)
+
+        # The notes step's own text, run: what it refuses is what the publish job would have nothing to publish.
+        notes = workflow_step(RELEASE_WORKFLOW, "check", "Check the release notes are written")
+        for label, value, accepted in (
+            ("R13 release notes that say something are accepted", "Adds the bank account form.", True),
+            ("R13b empty release notes are refused", "", False),
+            ("R13c release notes of only spaces and newlines are refused", "  \n\t \n", False),
+        ):
+            code, _, err = run_step(notes, work, {"RELEASE_NOTES": value})
+            check(label, code == 0 if accepted else (code != 0 and "release_notes is blank" in err),
+                  (code, err[-200:]))
+
 def main() -> int:
     if ONLY not in HALVES:
         print(f"NIGHTLY_ONLY={ONLY!r} is not one of {', '.join(HALVES)}")
@@ -1825,6 +2338,7 @@ def main() -> int:
         test_poster()
     if ONLY in ("workflows", "both"):
         test_workflows()
+        test_branch_triggers()
     if ONLY in ("helper", "both"):
         test_helper()
     if ONLY in ("release", "both"):
