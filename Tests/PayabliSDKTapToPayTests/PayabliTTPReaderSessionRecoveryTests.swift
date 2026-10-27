@@ -454,6 +454,53 @@ final class PayabliTTPReaderSessionRecoveryTests: XCTestCase {
         XCTAssertEqual(failure.capture, .notCharged, "the reader was never asked for a card")
     }
 
+    // MARK: - A payment that cannot be opened
+
+    /// A bare 404 from the opening names the paypoint's configuration, and the
+    /// session lands where the merchant repairs it.
+    func testABare404FromTheOpeningNamesThePaypointsConfigurationAndLandsRejected() async throws {
+        let (ttp, _, _) = try await makeReadyTTP()
+        StubURLProtocol.handler = { request in
+            if request.url?.path.contains("/MoneyIn/initiate") == true {
+                return (
+                    HTTPURLResponse(url: request.url!, statusCode: 404, httpVersion: "HTTP/1.1", headerFields: nil)!,
+                    Data()
+                )
+            }
+            return try Self.chargeStubHandler(request)
+        }
+
+        let failure = try await chargeFailure(ttp)
+
+        XCTAssertEqual(failure.type, .cardPresentNotEnabled, "\(failure)")
+        XCTAssertEqual(ttp.sessionState, .failed(reason: .configurationRejected))
+    }
+
+    /// A declined opening is the payment's own answer, and nothing about the setup
+    /// changed, so the session stays ready.
+    func testADeclinedOpeningNamesThePaymentAndKeepsTheSessionReady() async throws {
+        let (ttp, _, _) = try await makeReadyTTP()
+        StubURLProtocol.handler = { request in
+            if request.url?.path.contains("/MoneyIn/initiate") == true {
+                return (
+                    HTTPURLResponse(
+                        url: request.url!,
+                        statusCode: 200,
+                        httpVersion: "HTTP/1.1",
+                        headerFields: ["Content-Type": "application/json"]
+                    )!,
+                    Data(#"{"code":"D0001","reason":"not opened"}"#.utf8)
+                )
+            }
+            return try Self.chargeStubHandler(request)
+        }
+
+        let failure = try await chargeFailure(ttp)
+
+        XCTAssertEqual(failure.type, .paymentNotOpened, "\(failure)")
+        XCTAssertEqual(ttp.sessionState, .ready)
+    }
+
     // MARK: - Fixtures
 
     private func chargeFailure(_ ttp: PayabliTTP) async throws -> TapToPayError {

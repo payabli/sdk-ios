@@ -99,6 +99,23 @@ final class FiservCardReaderTests: XCTestCase {
         #endif
     }
 
+    #if canImport(PayabliCardReaderCore)
+        /// A device the platform does not support says so under the hardware
+        /// refusal's own code, without a wire.
+        func testAnUnsupportedPlatformReportsTheHardwaresOwnCode() async {
+            let reader = FiservCardReader()
+            reader.setPlatformSupportSource(false)
+
+            let result = await reader.checkEligibility()
+
+            guard case let .failure(error) = result else {
+                return XCTFail("eligibility succeeded on a device the platform refuses")
+            }
+            let host = TapToPayErrorTranslation.hostError(for: error)
+            XCTAssertEqual((host as? TapToPayError)?.type, .deviceHardwareUnsupported, "\(error)")
+        }
+    #endif
+
     func testPrepareReaderRequiresCredentials() async {
         let reader = FiservCardReader()
         do {
@@ -113,6 +130,20 @@ final class FiservCardReaderTests: XCTestCase {
             XCTFail("wrong error: \(error)")
         }
     }
+
+    #if canImport(PayabliCardReaderCore)
+        /// A reader asked to prepare with no credentials held is this SDK's own
+        /// defect, and reports it under that code.
+        func testPreparingAReaderWithNoCredentialsIsTheSDKsOwnDefect() async {
+            do {
+                try await FiservCardReader().prepareReader { _ in }
+                XCTFail("prepare proceeded with no credentials held")
+            } catch {
+                let host = TapToPayErrorTranslation.hostError(for: error)
+                XCTAssertEqual((host as? TapToPayError)?.type, .sdkInternalError, "\(error)")
+            }
+        }
+    #endif
 
     func testConfigureWithFullCredentialsSucceeds() throws {
         let reader = FiservCardReader()

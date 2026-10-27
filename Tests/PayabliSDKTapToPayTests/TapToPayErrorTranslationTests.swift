@@ -1,11 +1,17 @@
-import PayabliSDKCore
+@testable import PayabliSDKCore
 @testable import PayabliSDKTapToPay
+import PayabliSDKTestUtils
 import XCTest
 
 /// What a host is handed for each failure the SDK raises: always a `TapToPayError`, under the catalog entry
 /// for its cause, still naming the payment it belongs to.
 @available(iOS 16.7, *)
 final class TapToPayErrorTranslationTests: XCTestCase {
+    override func tearDown() {
+        StubURLProtocol.handler = nil
+        super.tearDown()
+    }
+
     // MARK: - Every case reaches its catalog code
 
     func testEveryCaseReachesAHostUnderItsCatalogCode() {
@@ -295,11 +301,81 @@ final class TapToPayErrorTranslationTests: XCTestCase {
         XCTAssertNotEqual(nsError.domain, "com.payabli.ttp")
     }
 
+    // MARK: - What the transaction client's own failures reach a host as
+
+    /// A bare 404 from the opening is the paypoint's configuration, so it answers
+    /// under the code that says so rather than an unknown one.
+    func testABare404FromInitiateNamesThePaypointsConfiguration() async throws {
+        try await assertInitiateAnswers(as: .cardPresentNotEnabled) { request in
+            (
+                HTTPURLResponse(url: request.url!, statusCode: 404, httpVersion: "HTTP/1.1", headerFields: nil)!,
+                Data()
+            )
+        }
+    }
+
+    /// A declined opening is the payment's own answer: the paypoint took no
+    /// payment, and it says so under the code that names that.
+    func testADeclinedInitiateNamesThePaymentsOwnCode() async throws {
+        try await assertInitiateAnswers(as: .paymentNotOpened) { request in
+            (
+                HTTPURLResponse(
+                    url: request.url!,
+                    statusCode: 200,
+                    httpVersion: "HTTP/1.1",
+                    headerFields: ["Content-Type": "application/json"]
+                )!,
+                Data(#"{"code":"D0001","reason":"not opened"}"#.utf8)
+            )
+        }
+    }
+
     // MARK: - Fixtures
 
     private func translated(_ error: Error, file: StaticString = #filePath, line: UInt = #line) throws -> TapToPayError {
         let host = TapToPayErrorTranslation.hostError(for: error)
         return try XCTUnwrap(host as? TapToPayError, "got \(type(of: host))", file: file, line: line)
+    }
+
+    /// A transaction client on a stubbed network, the way the facade holds one.
+    private func makeClient() throws -> TTPTransactionClient {
+        let config = try PayabliConfig(entryPoint: "myEntry", environment: .sandbox, tokenProvider: { "seed" })
+        let auth = PayabliAuth(config: config)
+        let service = PayabliService(
+            environment: .sandbox,
+            readToken: { try await auth.currentAccessToken() },
+            client: .none,
+            session: StubURLProtocol.makeSession()
+        )
+        let transport = AuthenticatedTransport(
+            base: service,
+            auth: auth,
+            logger: PayabliLogger(category: .network)
+        )
+        return TTPTransactionClient(transport: transport)
+    }
+
+    /// Drives one initiate against `handler` and reads the answer a host gets.
+    private func assertInitiateAnswers(
+        as type: PayabliErrorType,
+        handler: @escaping StubURLProtocol.Handler,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) async throws {
+        StubURLProtocol.handler = handler
+        let client = try makeClient()
+        do {
+            _ = try await client.initiate(
+                entryPoint: "myEntry",
+                deviceId: "dev_1",
+                idempotencyKey: "key-1",
+                paymentDetails: PayabliTTPPaymentDetails(amount: 1, currency: "USD")
+            )
+            XCTFail("initiate succeeded", file: file, line: line)
+        } catch {
+            let host = TapToPayErrorTranslation.hostError(for: error)
+            XCTAssertEqual((host as? TapToPayError)?.type, type, "\(error)", file: file, line: line)
+        }
     }
 
     // swiftlint:disable cyclomatic_complexity

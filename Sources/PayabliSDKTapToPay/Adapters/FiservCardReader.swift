@@ -82,6 +82,10 @@ package final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
     /// build, where the vendored reader is constructed instead.
     private var injectedReaderFactory: ((Credentials) throws -> ReaderSetup)?
 
+    /// Set only by a test, so the platform's own support answer is reachable without reader
+    /// hardware. `checkEligibility()` never assigns it, so the shipped path always asks the platform.
+    private var injectedPlatformSupport: Bool?
+
     /// Whatever the terms surface asks. Read under the lock by its caller.
     private var linkStateSource: AccountLinking? {
         if let injectedLinkStateSource {
@@ -105,6 +109,15 @@ package final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
     func setReaderFactory(_ make: ((Credentials) throws -> ReaderSetup)?) {
         lock.lock()
         injectedReaderFactory = make
+        lock.unlock()
+    }
+
+    /// Injects the platform support answer `checkEligibility()` reads. Tests only.
+    ///
+    /// - Parameter supported: the answer to give instead of asking the platform, or `nil` to ask it.
+    func setPlatformSupportSource(_ supported: Bool?) {
+        lock.lock()
+        injectedPlatformSupport = supported
         lock.unlock()
     }
 
@@ -203,7 +216,7 @@ package final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
             guard Self.supportsTapToPay(ProcessInfo.processInfo.operatingSystemVersion) else {
                 return .failure(.readerSetupFailed(reason: "Tap to Pay requires iOS 16.7+"))
             }
-            guard PaymentCardReader.isSupported else {
+            guard lock.withLock({ injectedPlatformSupport }) ?? PaymentCardReader.isSupported else {
                 return .failure(.readerSetupFailed(
                     reason: "Tap to Pay hardware not supported on this device"
                 ))

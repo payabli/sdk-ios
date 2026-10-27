@@ -114,6 +114,26 @@ import XCTest
             XCTAssertFalse(reason.isEmpty)
         }
 
+        // MARK: - The vendor's own answer
+
+        /// The vendor's record of refusing the handset, carried in its failure
+        /// reason, reports the refusal's own case rather than the setup failure's.
+        func testAVendorDenialOfTheDeviceReportsTheDevicesRefusal() {
+            let mapped = FiservCardReader.mapError(Self.vendorDenied) { .readerSetupFailed(reason: $0) }
+
+            let host = TapToPayErrorTranslation.hostError(for: mapped)
+            XCTAssertEqual((host as? TapToPayError)?.type, .readerDeviceRefused, "\(mapped)")
+        }
+
+        /// A vendor failure that is not a denial of the handset reports the
+        /// reader's own case.
+        func testAVendorFailureOfTheReaderReportsTheReadersOwnCase() {
+            let mapped = FiservCardReader.mapError(Self.vendorFailed) { .readerSetupFailed(reason: $0) }
+
+            let host = TapToPayErrorTranslation.hostError(for: mapped)
+            XCTAssertEqual((host as? TapToPayError)?.type, .readerUnavailable, "\(mapped)")
+        }
+
         // MARK: - Fixtures
 
         /// Built the way `FiservTTPReader` builds it: the platform's own
@@ -133,6 +153,20 @@ import XCTest
                 underlying: error
             )
         }
+
+        /// The vendor's record of refusing the handset, the shape its failure reason carries.
+        private static let vendorDenied = FiservTTPCardReaderError(
+            title: "Setup failed",
+            localizedDescription: "the vendor refused the device",
+            failureReason: #"{"responseCode":"677","responseText":"Declined"}"#
+        )
+
+        /// A vendor failure that is not a denial of the handset.
+        private static let vendorFailed = FiservTTPCardReaderError(
+            title: "Setup failed",
+            localizedDescription: "the reader could not be started",
+            failureReason: #"{"responseCode":"999","responseText":"Unreachable"}"#
+        )
     }
 
 #endif

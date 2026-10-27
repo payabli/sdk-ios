@@ -192,4 +192,18 @@ final class PayabliErrorCatalogTests: XCTestCase {
             XCTAssertEqual(category.rawValue, name, "\(category)")
         }
     }
+
+    /// Numbers within an area are contiguous except the holes a retirement named:
+    /// a number that was allocated and then retired leaves a hole this test
+    /// knows, and any other gap is an allocation nobody recorded.
+    func testNumbersAreContiguousWithinEachAreaExceptRetiredHoles() {
+        let retired: Set<Int> = [3032]
+        let byArea = Dictionary(grouping: PayabliErrorType.allCases, by: { $0.number / 1000 })
+        for (area, cases) in byArea {
+            let numbers = cases.map(\.number).sorted()
+            let expected = Array((area * 1000 + 1)...numbers.last!)
+                .filter { !retired.contains($0) }
+            XCTAssertEqual(numbers, expected, "area \(area)")
+        }
+    }
 }
