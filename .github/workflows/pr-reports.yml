@@ -147,7 +147,9 @@ jobs:
       # From the event, never from the artifact. `ci.yml` runs from the branch, so
       # a number it uploaded would be one the branch chose, and the scanner would
       # decorate whichever pull request that named while analysing this revision.
-      # A `push` run names none, and that is what selects a branch analysis.
+      # A `push` run names none, and that is what selects a branch analysis. The branch is named, since
+      # without it the scanner takes this run's ref, which is the default branch, and a push to a
+      # release branch would be analysed as main.
       #
       # Refs are checked rather than trusted: they reach the scanner as command
       # arguments, and a ref carrying anything but the characters git needs is
@@ -158,6 +160,7 @@ jobs:
           PR: ${{ github.event.workflow_run.pull_requests[0].number }}
           PR_BRANCH: ${{ github.event.workflow_run.pull_requests[0].head.ref }}
           PR_BASE: ${{ github.event.workflow_run.pull_requests[0].base.ref }}
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
         run: |
           set -euo pipefail
           # Where the analysis goes is decided here, not by the branch. The
@@ -176,8 +179,13 @@ jobs:
           trusted="$trusted -Dsonar.projectKey=payabli_sdk-ios"
 
           if [ -z "$PR" ]; then
-            echo "args=$trusted" >> "$GITHUB_OUTPUT"
-            echo "analysing a branch, not a pull request"
+            head=$(printf '%s' "$HEAD_BRANCH" | grep -E '^[A-Za-z0-9._/-]+$') || head=""
+            if [ -z "$head" ]; then
+              echo "the triggering run named a branch this cannot use" >&2
+              exit 1
+            fi
+            echo "args=$trusted -Dsonar.branch.name=$head" >> "$GITHUB_OUTPUT"
+            echo "analysing $head, not a pull request"
             exit 0
           fi
           number=$(printf '%s' "$PR" | grep -E '^[0-9]+$') || number=""

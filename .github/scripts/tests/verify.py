@@ -49,6 +49,7 @@ RELEASE_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "release.yml"
 REPORT_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "nightly-report.yml"
 INTERFACE_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "public-interface.yml"
 SOURCE_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "source-branch.yml"
+REPORTS_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "pr-reports.yml"
 HARDWARE_LIST = REPO_ROOT / ".github" / "hardware-only-tests.txt"
 VERSION_SOURCE = "Sources/PayabliSDKCore/PayabliSDKCore.swift"
 GATE_SCRIPT = REPO_ROOT / ".github" / "scripts" / "release-version.sh"
@@ -1227,6 +1228,7 @@ def test_workflows() -> None:
         ".github/hardware-only-tests.txt",
         ".github/workflows/source-branch.yml",
         ".github/workflows/public-interface.yml",
+        ".github/workflows/pr-reports.yml",
         VERSION_SOURCE,
         *(f".github/workflows/{name}" for name, _ in tiers),
         *(f".github/workflows/{name}" for name in token_holders),
@@ -2044,6 +2046,27 @@ def test_branch_triggers() -> None:
         check("W19k a fork's release branch is refused, naming the fork",
               code != 0 and "someone/sdk-ios" in err, (code, err[-200:]))
 
+        # A push run on a release branch is analysed as that branch, never as the default branch the reporting
+        # workflow runs on, and the name reaches the scanner's arguments only once checked.
+        sonar = workflow_step(REPORTS_WORKFLOW, "sonar", "Identify the pull request")
+        for label, head, expected in (
+            ("W20 a push run is analysed as the branch it pushed to", "release/0.2.0",
+             "-Dsonar.branch.name=release/0.2.0"),
+            ("W20b a push run's branch that is not a plain ref is refused", f"release/$(touch {marker}) x", None),
+        ):
+            code, out, err = run_step(sonar, work, {"PR": "", "PR_BRANCH": "", "PR_BASE": "",
+                                                    "HEAD_BRANCH": head})
+            if expected:
+                check(label, code == 0 and out.strip().endswith(expected)
+                      and "-Dsonar.projectKey=payabli_sdk-ios" in out, (code, out, err[-200:]))
+            else:
+                check(label, code != 0 and "sonar.branch.name" not in out and not marker.exists(),
+                      (code, out, err[-200:]))
+        code, out, err = run_step(sonar, work, {"PR": "179", "PR_BRANCH": "ci/x", "PR_BASE": "release/0.2.0",
+                                                "HEAD_BRANCH": "ci/x"})
+        check("W20c a pull request's run is analysed as the pull request, not as a branch",
+              code == 0 and "-Dsonar.pullrequest.key=179" in out and "sonar.branch.name" not in out,
+              (code, out, err[-200:]))
 
 def main() -> int:
     if ONLY not in HALVES:

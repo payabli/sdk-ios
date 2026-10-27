@@ -44,6 +44,7 @@ on:
       - '.github/workflows/release.yml'
       - '.github/workflows/public-interface.yml'
       - '.github/workflows/source-branch.yml'
+      - '.github/workflows/pr-reports.yml'
       - '.github/hardware-only-tests.txt'
       # The release gate reads the version this file declares.
       - 'Sources/PayabliSDKCore/PayabliSDKCore.swift'
@@ -59,6 +60,7 @@ on:
       - '.github/workflows/release.yml'
       - '.github/workflows/public-interface.yml'
       - '.github/workflows/source-branch.yml'
+      - '.github/workflows/pr-reports.yml'
       - '.github/hardware-only-tests.txt'
       - 'Sources/PayabliSDKCore/PayabliSDKCore.swift'
 

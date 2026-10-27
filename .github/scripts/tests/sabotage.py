@@ -44,6 +44,7 @@ COPIED = (
     ".github/workflows/nightly-report.yml",
     ".github/workflows/public-interface.yml",
     ".github/workflows/source-branch.yml",
+    ".github/workflows/pr-reports.yml",
     ".github/hardware-only-tests.txt",
     ".github/scripts/release-version.sh",
     ".github/scripts/release-newer.sh",
@@ -55,6 +56,7 @@ RELEASE_YML = ".github/workflows/release.yml"
 REPORT_YML = ".github/workflows/nightly-report.yml"
 INTERFACE_YML = ".github/workflows/public-interface.yml"
 SOURCE_YML = ".github/workflows/source-branch.yml"
+REPORTS_YML = ".github/workflows/pr-reports.yml"
 HARDWARE_LIST = ".github/hardware-only-tests.txt"
 HELPER = ".github/scripts/hardware-only-skips.sh"
 REPORT = ".github/scripts/nightly_report.py"
@@ -656,6 +658,16 @@ MUTATIONS = [
         "the publish job runs a script from the checkout again",
         RELEASE_YML, '          VERSION="$BUILT_VERSION"\n',
         '          VERSION="$(.github/scripts/release-version.sh "$GITHUB_REF")"\n', "W15l", "workflows",
+    ),
+    Mutation(
+        "a push run's analysis names no branch",
+        REPORTS_YML, 'echo "args=$trusted -Dsonar.branch.name=$head" >> "$GITHUB_OUTPUT"',
+        'echo "args=$trusted" >> "$GITHUB_OUTPUT"', "W20", "workflows",
+    ),
+    Mutation(
+        "a push run's branch reaches the scanner unchecked",
+        REPORTS_YML, "head=$(printf '%s' \"$HEAD_BRANCH\" | grep -E '^[A-Za-z0-9._/-]+$') || head=\"\"",
+        'head="$HEAD_BRANCH"', "W20b", "workflows",
     ),
     Mutation(
         "the check job reads the version with the commit's own script",
