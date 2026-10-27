@@ -298,7 +298,7 @@ final class PayInPaymentFlowClient: Sendable {
              .readerUnavailable, .readerSessionExpired, .paymentNotOpened, .cardDeclined, .activationCodeMalformed,
              .activationCodeIncorrect, .activationCodeExpired, .activationAttemptsExhausted, .activationCodeNotIssued,
              .deviceNotPending, .terminalNotReady, .tooManyOpenCharges, .paymentNotHeld, .deviceIdentityUnavailable,
-             .transactionNotFound, .retryNotSamePayment, .paymentReferenceOpen:
+             .paymentNotTaken, .transactionNotFound, .retryNotSamePayment, .paymentReferenceOpen:
             return false
         }
     }
