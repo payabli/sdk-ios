@@ -347,7 +347,9 @@ final class PayabliTTPSetupLandingTests: XCTestCase {
 /// without a sheet. A throwing setup never gets that far, but the facade is
 /// given a reader whose every answer is stable.
 private final class LinkedStub: AccountLinking {
-    func isAccountLinked() async throws -> Bool { true }
+    func isAccountLinked() async throws -> Bool {
+        true
+    }
 
     func linkAccount() async throws {}
 }
@@ -365,7 +367,9 @@ private final class ThrowingReaderSetup: ReaderSetup {
         throw failure
     }
 
-    func isAccountLinked() async throws -> Bool { true }
+    func isAccountLinked() async throws -> Bool {
+        true
+    }
 
     func linkAccount() async throws {}
 
