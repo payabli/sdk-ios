@@ -103,6 +103,10 @@ jobs:
 
   sonar:
     name: SonarCloud
+    # The analysis token lives in this environment, never at the repository, where a job in a pull
+    # request's own copy of a workflow could name it. The environment deploys from main and release
+    # branches only.
+    environment: ci-protected
     runs-on: macos-15
     # No coverage is produced by a run whose suite failed. Same-repository only:
     # a fork's pull request has no entry in `pull_requests`, so there would be

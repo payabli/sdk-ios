@@ -670,6 +670,14 @@ MUTATIONS = [
         'head="$HEAD_BRANCH"', "W20b", "workflows",
     ),
     Mutation(
+        "the Slack token is read from the repository",
+        REPORT_YML, "    environment: ci-protected\n", "", "W22", "workflows",
+    ),
+    Mutation(
+        "the analysis token is read from the repository",
+        REPORTS_YML, "    environment: ci-protected\n", "", "W22", "workflows",
+    ),
+    Mutation(
         "a revision older than the tip is analysed",
         REPORTS_YML, 'if [ "$tip" = "$SHA" ]; then', "if true; then", "W21b", "workflows",
     ),

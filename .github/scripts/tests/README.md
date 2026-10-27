@@ -63,7 +63,7 @@ which triggers the nightly may carry, that exactly one job names the Slack token
 decided, that every suite continues on error and is bounded, that the gate reads every outcome, that a
 release builds, tags and publishes only the commit its dispatch names, on its version's release or hotfix
 branch, that a failed release suite is re-run without rebuilding the XCFrameworks, which branches CI and
-the interface check run on, what the source-branch check lets into main, which branch a push run's analysis is filed under, that only the newest revision is analysed, and that this harness runs on
+the interface check run on, what the source-branch check lets into main, which branch a push run's analysis is filed under, that only the newest revision is analysed, that every secret is read from an environment, and that this harness runs on
 every file it makes claims about. Each of those was true of how the files were written, which is not the same as being enforced.
 
 Set `NIGHTLY_ONLY` to `collector`, `poster`, `workflows`, `helper` or `release` to run one family. The default,

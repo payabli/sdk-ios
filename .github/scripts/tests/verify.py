@@ -1148,6 +1148,18 @@ def test_workflows() -> None:
               and "Nightly" in ((holder_on.get("workflow_run") or {}).get("workflows") or []),
               holder_on.get("workflow_run"))
 
+    # A repository secret is readable by any job a same-repository pull request writes, whatever the default
+    # branch's workflows do with it. So every secret beyond the run's own token is read inside an environment
+    # whose deployment branches are protected ones, and a job naming one outside an environment is refused.
+    for path in sorted(workflow_dir.iterdir()):
+        if not path.is_file() or path.suffix not in WORKFLOW_SUFFIXES:
+            continue
+        for job_name, job in (yaml.safe_load(path.read_text()).get("jobs") or {}).items():
+            secrets = sorted(set(re.findall(r"secrets\.([A-Za-z0-9_]+)", yaml.safe_dump(job))) - {"GITHUB_TOKEN"})
+            if secrets:
+                check(f"W22 {path.name} {job_name} reads {', '.join(secrets)} from an environment, not the repository",
+                      job.get("environment") in ("ci-protected", "release"), job.get("environment"))
+
     report_workflow = token_holders.get("nightly-report.yml") or {}
     report = (report_workflow.get("jobs") or {}).get("report") or {}
     check("W4 the report job cannot redden a green run",
