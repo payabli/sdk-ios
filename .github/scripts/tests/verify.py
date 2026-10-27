@@ -2167,6 +2167,62 @@ def test_branch_triggers() -> None:
               and identify_env.get("SETTINGS") == "${{ runner.temp }}/sonar-project.properties"
               and settings is not None and '> "$RUNNER_TEMP/sonar-project.properties"' in settings,
               (sonar_steps, identify_env.get("SETTINGS")))
+        check("W26d the settings are read with replace refs off, so a ref the checkout carries cannot swap them",
+              settings is not None and 'git --no-replace-objects show "$GITHUB_SHA:' in settings, settings)
+
+        # The coverage was built by the pull request's own CI. It unpacks outside the workspace, after the settings
+        # are read, and only the one file the settings name is copied in, so nothing in it reaches `.git`.
+        raw_sonar = yaml.safe_load(REPORTS_WORKFLOW.read_text())["jobs"]["sonar"]["steps"]
+        downloads = [i for i, step in enumerate(raw_sonar) if "download-artifact" in str(step.get("uses", ""))]
+        check("W26e the coverage unpacks outside the workspace, after the settings are read",
+              bool(downloads) and all(
+                  " ".join(str((raw_sonar[i].get("with") or {}).get("path", "")).split())
+                  == "${{ runner.temp }}/artifacts"
+                  and sonar_steps.index("Take the analysis settings from main") < i for i in downloads),
+              [(raw_sonar[i].get("with") or {}).get("path") for i in downloads])
+        intake_env = next((step.get("env") or {} for step in raw_sonar
+                           if step.get("name") == "Take the coverage report in"), {})
+        check("W26f the coverage is taken in after every download and before the scan",
+              "Take the coverage report in" in sonar_steps and bool(downloads)
+              and intake_env.get("STAGED") == "${{ runner.temp }}/artifacts"
+              and all(i < sonar_steps.index("Take the coverage report in") for i in downloads)
+              and sonar_steps.index("Take the coverage report in") < sonar_steps.index("Analyze"),
+              (sonar_steps, intake_env))
+
+        intake = workflow_step(REPORTS_WORKFLOW, "sonar", "Take the coverage report in")
+
+        def intake_case(name: str) -> tuple[Path, Path]:
+            root = work.parent / f"intake-{name}"
+            staged, workspace = root / "artifacts", root / "workspace"
+            (workspace / ".git").mkdir(parents=True)
+            staged.mkdir(parents=True)
+            (staged / "coverage.xml").write_text("<coverage/>\n")
+            return staged, workspace
+
+        staged, workspace = intake_case("clean")
+        (staged / ".git").mkdir()
+        (staged / ".git" / "config").write_text("[core]\n\tfsmonitor = ./own-binary\n")
+        (staged / "sonar-project.properties").write_text("sonar.nodejs.executable=./own-binary\n")
+        code, _, err = run_step(intake, workspace, {"STAGED": str(staged), "GITHUB_WORKSPACE": str(workspace)})
+        check("W26g only the coverage report is copied in, and nothing else the artifact carries",
+              code == 0 and (workspace / "coverage.xml").read_text() == "<coverage/>\n"
+              and not (workspace / ".git" / "config").exists()
+              and not (workspace / "sonar-project.properties").exists(), (code, err[-200:]))
+
+        staged, workspace = intake_case("artifact-link")
+        (staged / "coverage.xml").unlink()
+        (staged / "coverage.xml").symlink_to(workspace / ".git" / "config")
+        code, _, err = run_step(intake, workspace, {"STAGED": str(staged), "GITHUB_WORKSPACE": str(workspace)})
+        check("W26h a symbolic link in the artifact is refused",
+              code != 0 and "the artifact carries a symbolic link" in err
+              and not (workspace / "coverage.xml").exists(), (code, err[-200:]))
+
+        staged, workspace = intake_case("checkout-link")
+        (workspace / "coverage.xml").symlink_to(workspace / ".git" / "config")
+        code, _, err = run_step(intake, workspace, {"STAGED": str(staged), "GITHUB_WORKSPACE": str(workspace)})
+        check("W26i a symbolic link in the checkout is refused before anything is copied",
+              code != 0 and "the checkout carries a symbolic link" in err
+              and not (workspace / ".git" / "config").exists(), (code, err[-200:]))
 
         # Only the newest revision is analysed, so a run that completes after a newer one's cannot replace it.
         # Nothing is cancelled, since a stale run would cancel the newer analysis before reaching this check.

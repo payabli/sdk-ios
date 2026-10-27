@@ -84,6 +84,7 @@ def pinned(path: str, action: str) -> str:
 NIGHTLY_CHECKOUT = pinned(NIGHTLY, "actions/checkout")
 RELEASE_CHECKOUT = pinned(RELEASE_YML, "actions/checkout")
 RELEASE_DOWNLOAD = pinned(RELEASE_YML, "actions/download-artifact")
+REPORTS_DOWNLOAD = pinned(REPORTS_YML, "actions/download-artifact")
 CI_UPLOAD = pinned(CI_YML, "actions/upload-artifact")
 
 
@@ -797,8 +798,51 @@ MUTATIONS = [
     ),
     Mutation(
         "the scanner reads the analysed revision's settings",
-        REPORTS_YML, 'git show "$GITHUB_SHA:sonar-project.properties"', 'git show "HEAD:sonar-project.properties"',
+        REPORTS_YML, 'show "$GITHUB_SHA:sonar-project.properties"', 'show "HEAD:sonar-project.properties"',
         "W26b", "workflows",
+    ),
+    Mutation(
+        "the settings are read honouring replace refs",
+        REPORTS_YML, "git --no-replace-objects show", "git show", "W26d", "workflows",
+    ),
+    Mutation(
+        "the coverage unpacks into the workspace again",
+        REPORTS_YML, "          name: coverage\n          path: ${{ runner.temp }}/artifacts\n",
+        "          name: coverage\n", "W26e", "workflows",
+    ),
+    Mutation(
+        "the coverage arrives before the settings are read",
+        REPORTS_YML, "      - name: Take the analysis settings from main\n",
+        "      - name: Download early\n        uses: " + REPORTS_DOWNLOAD
+        + "\n        with:\n          name: coverage\n          path: ${{ runner.temp }}/artifacts\n\n"
+        "      - name: Take the analysis settings from main\n",
+        "W26e", "workflows",
+    ),
+    Mutation(
+        "the coverage is never taken in",
+        REPORTS_YML, "      - name: Take the coverage report in\n", "      - name: Stage the coverage\n",
+        "W26f", "workflows",
+    ),
+    Mutation(
+        "the whole artifact is copied into the workspace",
+        REPORTS_YML, 'cp "$STAGED/coverage.xml" "$GITHUB_WORKSPACE/coverage.xml"',
+        'cp -R "$STAGED/." "$GITHUB_WORKSPACE/"', "W26g", "workflows",
+    ),
+    Mutation(
+        "a symbolic link in the artifact is taken in",
+        REPORTS_YML,
+        '          if [ -n "$(find "$STAGED" -type l -print -quit)" ]; then\n'
+        '            echo "::error::the artifact carries a symbolic link"\n'
+        '            exit 1\n'
+        '          fi\n', "", "W26h", "workflows",
+    ),
+    Mutation(
+        "a symbolic link in the checkout is copied through",
+        REPORTS_YML,
+        '          if [ -n "$(find "$GITHUB_WORKSPACE" -path "$GITHUB_WORKSPACE/.git" -prune -o -type l -print -quit)" ]; then\n'
+        '            echo "::error::the checkout carries a symbolic link"\n'
+        '            exit 1\n'
+        '          fi\n', "", "W26i", "workflows",
     ),
     Mutation(
         "the scanner is not pointed at main's settings",

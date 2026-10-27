@@ -195,17 +195,36 @@ jobs:
           fetch-depth: 0
 
       # Main's settings, read from the commit this workflow runs from and written outside the workspace, so the
-      # revision being analysed configures nothing the scanner does. A change to what is measured takes effect
-      # when it merges.
+      # revision being analysed configures nothing the scanner does. Read before the artifact arrives and with
+      # replace refs off. A change to what is measured takes effect when it merges.
       - name: Take the analysis settings from main
-        run: git show "$GITHUB_SHA:sonar-project.properties" > "$RUNNER_TEMP/sonar-project.properties"
+        run: git --no-replace-objects show "$GITHUB_SHA:sonar-project.properties" > "$RUNNER_TEMP/sonar-project.properties"
 
+      # The pull request's own CI built this, so it unpacks outside the workspace, where nothing in it can reach
+      # `.git` or the settings.
       - name: Download coverage
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: coverage
+          path: ${{ runner.temp }}/artifacts
           run-id: ${{ github.event.workflow_run.id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      # The one file the settings name, by its exact path. `cp` follows a link on the destination path, so the
+      # checkout may carry none either.
+      - name: Take the coverage report in
+        env:
+          STAGED: ${{ runner.temp }}/artifacts
+        run: |
+          if [ -n "$(find "$STAGED" -type l -print -quit)" ]; then
+            echo "::error::the artifact carries a symbolic link"
+            exit 1
+          fi
+          if [ -n "$(find "$GITHUB_WORKSPACE" -path "$GITHUB_WORKSPACE/.git" -prune -o -type l -print -quit)" ]; then
+            echo "::error::the checkout carries a symbolic link"
+            exit 1
+          fi
+          cp "$STAGED/coverage.xml" "$GITHUB_WORKSPACE/coverage.xml"
 
       # From the event, never from the artifact. `ci.yml` runs from the branch, so
       # a number it uploaded would be one the branch chose, and the scanner would
