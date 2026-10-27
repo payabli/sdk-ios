@@ -31,6 +31,11 @@ env:
   # facts file that never arrived.
   PLATFORM: iOS
 
+# Every step under pipefail, so a failing command piped into another fails its step.
+defaults:
+  run:
+    shell: bash
+
 jobs:
   report:
     name: Report to Slack
@@ -54,7 +59,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           # The default branch, which is what `workflow_run` checks out and the whole point of this file.
           # Nothing here pushes, so the token is not left in `.git/config`.
@@ -64,7 +69,7 @@ jobs:
       # token are both required.
       - name: Download the report facts
         continue-on-error: true
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: nightly-facts
           run-id: ${{ github.event.workflow_run.id }}

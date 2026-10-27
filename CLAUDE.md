@@ -328,6 +328,9 @@ successful run of an opted-out tier looks like, so read the skip count rather th
   a token and is read from the default branch, so a pull request cannot edit the jobs that hold one. Every
   secret but the run's own token lives in an environment that deploys from `main` and `release/*` only, never
   at the repository, where any job a pull request writes could read it.
+- **Every workflow** sets its own `permissions:` and `defaults: run: shell: bash`, so no token rests on the
+  repository default and a failing command piped into another fails its step. Another repository's action is
+  named by its full commit SHA with the version in a trailing comment (`# v4.4.0`); Dependabot keeps both current.
 - **`source-branch.yml`** fails a pull request into `main` from a fork, or from any branch but `release/`,
   `hotfix/` or `dependabot/`. It runs `main`'s copy of itself and checks nothing out.
 - **`release.yml`** is dispatched from `main` and names a commit on `release/<version>` or

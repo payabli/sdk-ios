@@ -22,6 +22,14 @@ on:
         description: "Release notes (markdown), published as the release body"
         required: true
 
+# Granted per job, never here.
+permissions: {}
+
+# Every step under pipefail, so a failing command piped into another fails its step.
+defaults:
+  run:
+    shell: bash
+
 jobs:
   # Reads the commit and the version, and holds nothing that can tag or publish.
   check:
@@ -67,7 +75,7 @@ jobs:
 
       # All of history, so the checks below can see every branch and every tag.
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           ref: ${{ inputs.commit }}
           fetch-depth: 0
@@ -178,7 +186,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           ref: ${{ needs.check.outputs.commit }}
           persist-credentials: false
@@ -231,7 +239,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           ref: ${{ needs.check.outputs.commit }}
           persist-credentials: false
@@ -293,7 +301,7 @@ jobs:
       # Kept past the 30 days in which GitHub allows a run to be re-run, so a re-run of the suite still finds
       # these files to publish. Replaced when this job itself is re-run, since an artifact name is written once.
       - name: Hand the release files to the publish job
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: release-files
           path: |
@@ -336,7 +344,7 @@ jobs:
           fi
 
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           ref: ${{ needs.check.outputs.commit }}
           fetch-depth: 0
@@ -396,7 +404,7 @@ jobs:
           done
 
       - name: Download the release files
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: release-files
           path: build/release

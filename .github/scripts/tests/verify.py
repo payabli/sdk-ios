@@ -1160,6 +1160,30 @@ def test_workflows() -> None:
                 check(f"W22 {path.name} {job_name} reads {', '.join(secrets)} from an environment, not the repository",
                       job.get("environment") in ("ci-protected", "release"), job.get("environment"))
 
+    # Each workflow's token is its own, so none rests on the repository's default or hands a later job a wider
+    # one, and each step runs under pipefail, so a failing command piped into another does not pass.
+    for path in sorted(workflow_dir.iterdir()):
+        if not path.is_file() or path.suffix not in WORKFLOW_SUFFIXES:
+            continue
+        workflow = yaml.safe_load(path.read_text())
+        check(f"W24 {path.name} sets its own token, reading at most the contents",
+              workflow.get("permissions") in ({}, {"contents": "read"}), workflow.get("permissions"))
+        check(f"W24b {path.name} runs every step in bash with pipefail",
+              ((workflow.get("defaults") or {}).get("run") or {}).get("shell") == "bash", workflow.get("defaults"))
+
+    # A tag is moved by whoever owns the action, so another repository's action is named by a full commit,
+    # with the version it stands for beside it for Dependabot and the reader.
+    action_files = [path for path in sorted(workflow_dir.iterdir()) if path.suffix in WORKFLOW_SUFFIXES]
+    action_files += sorted((REPO_ROOT / ".github" / "actions").glob("*/action.yml"))
+    for path in action_files:
+        for number, line in enumerate(path.read_text().splitlines(), 1):
+            found = re.match(r"\s*(?:-\s+)?uses:\s*(\S+)\s*(.*)$", line)
+            if not found or found.group(1).startswith(("./", "$")):
+                continue
+            check(f"W25 {path.name}:{number} names {found.group(1).split('@')[0]} by a full commit and its version",
+                  re.fullmatch(r"[\w.-]+/[\w./-]+@[0-9a-f]{40}", found.group(1)) is not None
+                  and re.fullmatch(r"# v\d+(\.\d+){0,2}", found.group(2)) is not None, line.strip())
+
     report_workflow = token_holders.get("nightly-report.yml") or {}
     report = (report_workflow.get("jobs") or {}).get("report") or {}
     check("W4 the report job cannot redden a green run",
@@ -1875,14 +1899,14 @@ def workflow_step(path: Path, job: str, name: str) -> str | None:
 
 
 def run_step(script: str | None, cwd: Path, env: dict[str, str]) -> tuple[int, str, str]:
-    """Run a step's text the way a runner does, `bash -e`, with `env` and a `GITHUB_OUTPUT` to write to."""
+    """Run a step's text the way a runner runs `shell: bash`, with `env` and a `GITHUB_OUTPUT` to write to."""
     if script is None:
         # Reported as a result, so a missing step fails each check rather than passing the accepted cases.
         return 127, "", "no such step"
     output = cwd.parent / f"{cwd.name}.output"
     output.write_text("")
     result = subprocess.run(
-        ["bash", "-e", "-c", script], cwd=cwd, capture_output=True, text=True, timeout=60, check=False,
+        ["bash", "--noprofile", "--norc", "-eo", "pipefail", "-c", script], cwd=cwd, capture_output=True, text=True, timeout=60, check=False,
         env={**GIT_ISOLATED, "GIT_CEILING_DIRECTORIES": str(cwd.parent), "GITHUB_OUTPUT": str(output), **env},
     )
     return result.returncode, output.read_text(), result.stdout + result.stderr
@@ -2159,7 +2183,7 @@ def test_branch_triggers() -> None:
               and locks == {"publish": {"group": "release", "cancel-in-progress": False}},
               (release.get("concurrency"), locks))
 
-        # The pinned action is kept current by a weekly, grouped Dependabot pull request into main, the one source
+        # The pinned actions are kept current by a weekly, grouped Dependabot pull request into main, the one source
         # into main besides release and hotfix branches.
         dependabot = yaml.safe_load((REPO_ROOT / ".github" / "dependabot.yml").read_text()) \
             if (REPO_ROOT / ".github" / "dependabot.yml").exists() else {}

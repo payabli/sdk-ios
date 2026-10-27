@@ -23,6 +23,11 @@ on:
 # Granted per job, never here.
 permissions: {}
 
+# Every step under pipefail, so a failing command piped into another fails its step.
+defaults:
+  run:
+    shell: bash
+
 jobs:
   comment:
     name: Change report comment
@@ -55,7 +60,7 @@ jobs:
       # From the run that triggered this one, which is not the run this job is
       # part of, so the id and a token are both required.
       - name: Download the report
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: change-report
           run-id: ${{ github.event.workflow_run.id }}
@@ -184,13 +189,13 @@ jobs:
       # executes anything from the tree, and the coverage the scanner reads was
       # produced by the run that triggered this one.
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
           fetch-depth: 0
 
       - name: Download coverage
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: coverage
           run-id: ${{ github.event.workflow_run.id }}
@@ -275,8 +280,6 @@ jobs:
             echo "not analysing $SHA: $tip is newer"
           fi
 
-      # Pinned to a commit, not a tag. `v5` is mutable, and this step is handed
-      # SONAR_TOKEN, so a replaced action would hold a repository secret.
       - name: Analyze
         if: steps.newest.outputs.newest == 'true'
         uses: SonarSource/sonarqube-scan-action@2f77a1ec69fb1d595b06f35ab27e97605bdef703 # v5.3.2

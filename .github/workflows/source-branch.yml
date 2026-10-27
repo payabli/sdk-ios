@@ -17,6 +17,11 @@ on:
 
 permissions: {}
 
+# Every step under pipefail, so a failing command piped into another fails its step.
+defaults:
+  run:
+    shell: bash
+
 jobs:
   source:
     name: Source branch

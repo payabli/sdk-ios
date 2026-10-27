@@ -491,10 +491,10 @@ MUTATIONS = [
     Mutation(
         "the Slack token moves back into the branch-dispatchable workflow",
         NIGHTLY,
-        "      - name: Checkout\n        uses: actions/checkout@v4\n",
+        "      - name: Checkout\n        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0\n",
         "      - name: Checkout\n        env:\n"
         "          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}\n"
-        "        uses: actions/checkout@v4\n",
+        "        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0\n",
         "W3", "workflows",
     ),
     Mutation(
@@ -616,9 +616,9 @@ MUTATIONS = [
     ),
     Mutation(
         "the nightly starts tagging",
-        NIGHTLY, "      - name: Checkout\n        uses: actions/checkout@v4\n",
+        NIGHTLY, "      - name: Checkout\n        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0\n",
         "      - name: Checkout\n        run: git tag nightly && git push origin nightly\n"
-        "      - name: Checkout again\n        uses: actions/checkout@v4\n",
+        "      - name: Checkout again\n        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0\n",
         "W15d", "workflows",
     ),
     Mutation(
@@ -737,6 +737,32 @@ MUTATIONS = [
         "the commit's SHA check reports and carries on",
         RELEASE_YML, "40-character commit SHA, not '$COMMIT'\"\n            exit 1\n",
         "40-character commit SHA, not '$COMMIT'\"\n", "W15o", "workflows",
+    ),
+    Mutation(
+        "the release's token rests on the repository default",
+        RELEASE_YML, "# Granted per job, never here.\npermissions: {}\n", "", "W24", "workflows",
+    ),
+    Mutation(
+        "CI's token can write the repository",
+        CI_YML, "\npermissions:\n  contents: read\n", "\npermissions:\n  contents: write\n", "W24", "workflows",
+    ),
+    Mutation(
+        "the release's steps run without pipefail",
+        RELEASE_YML, "defaults:\n  run:\n    shell: bash\n", "", "W24b", "workflows",
+    ),
+    Mutation(
+        "CI's steps run in sh",
+        CI_YML, "defaults:\n  run:\n    shell: bash\n", "defaults:\n  run:\n    shell: sh\n", "W24b", "workflows",
+    ),
+    Mutation(
+        "the job holding the deploy key runs an action by tag",
+        RELEASE_YML, "actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0",
+        "actions/download-artifact@v4", "W25", "workflows",
+    ),
+    Mutation(
+        "a pinned action loses the version it stands for",
+        CI_YML, "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2",
+        "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02", "W25", "workflows", occurrences=2,
     ),
     Mutation(
         "a push run's branch reaches the API unchecked",
@@ -1040,11 +1066,11 @@ MUTATIONS = [
         "the suite job checks out main's head",
         RELEASE_YML, "    name: Test the release\n    needs: check\n    # The same image as the build job, so the release is tested on the Xcode it\n"
         "    # builds its XCFrameworks with.\n    runs-on: xcode-27\n    permissions:\n"
-        "      contents: read\n\n    steps:\n      - name: Checkout\n        uses: actions/checkout@v4\n"
+        "      contents: read\n\n    steps:\n      - name: Checkout\n        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0\n"
         "        with:\n          ref: ${{ needs.check.outputs.commit }}\n",
         "    name: Test the release\n    needs: check\n    # The same image as the build job, so the release is tested on the Xcode it\n"
         "    # builds its XCFrameworks with.\n    runs-on: xcode-27\n    permissions:\n"
-        "      contents: read\n\n    steps:\n      - name: Checkout\n        uses: actions/checkout@v4\n"
+        "      contents: read\n\n    steps:\n      - name: Checkout\n        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0\n"
         "        with:\n", "W15q", "workflows",
     ),
     Mutation(
@@ -1165,7 +1191,7 @@ MUTATIONS = [
     ),
     Mutation(
         "the source-branch check checks out the pull request it runs main's copy for",
-        SOURCE_YML, "    steps:\n", "    steps:\n      - uses: actions/checkout@v4\n", "W19", "workflows",
+        SOURCE_YML, "    steps:\n", "    steps:\n      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0\n", "W19", "workflows",
     ),
     Mutation(
         "a push run the release reads can be cancelled by the next merge",
