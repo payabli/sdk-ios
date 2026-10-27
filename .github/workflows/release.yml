@@ -49,6 +49,17 @@ jobs:
             exit 1
           fi
 
+      # Notes are written for the release, because commit subjects carry tracker references no release page
+      # should name. A run that cannot publish is refused here, before anyone is asked to approve it.
+      - name: Check the release notes are written
+        env:
+          RELEASE_NOTES: ${{ inputs.release_notes }}
+        run: |
+          if [ -z "${RELEASE_NOTES//[[:space:]]/}" ]; then
+            echo "::error::release_notes is blank, and a release is published with notes written for it"
+            exit 1
+          fi
+
       # All of history, so the checks below can see every branch and every tag.
       - name: Checkout
         uses: actions/checkout@v4
@@ -389,12 +400,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           RELEASE_DEPLOY_KEY: ${{ secrets.RELEASE_DEPLOY_KEY }}
         run: |
-          # Notes are written for the release, because commit subjects carry
-          # tracker references no release page should name.
-          if [ -z "${RELEASE_NOTES//[[:space:]]/}" ]; then
-            echo "::error::release_notes is blank, and a release is published with notes written for it"
-            exit 1
-          fi
           printf '%s\n' "$RELEASE_NOTES" > release-notes.md
           bundle="build/release/payabli-ios-sdk-$VERSION.zip"
           if [ ! -f "$bundle" ]; then

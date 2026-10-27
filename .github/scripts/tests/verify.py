@@ -1433,18 +1433,22 @@ def test_workflows() -> None:
           not any("inputs." in run for run in runs), [run[:80] for run in runs if "inputs." in run])
     tag_run = runs[tag_at] if tag_at != -1 else ""
     # The release page is public, so its body is the dispatch input and nothing else: no commit
-    # subject reaches it, and an input that is empty or only whitespace refuses the run.
+    # subject reaches it, and an input that is empty or only whitespace refuses the run in the check job,
+    # before the approval is asked for.
     notes_refusal = [
         'if [ -z "${RELEASE_NOTES//[[:space:]]/}" ]; then',
         'echo "::error::release_notes is blank, and a release is published with notes written for it"',
         'exit 1',
         'fi',
-        "printf '%s\\n' \"$RELEASE_NOTES\" > release-notes.md",
     ]
-    notes_lines = [line.strip() for line in tag_run.splitlines() if line.strip()]
+    notes_step = next((step for step in check_job.get("steps") or []
+                       if step.get("name") == "Check the release notes are written"), {})
+    notes_lines = [line.strip() for line in str(notes_step.get("run", "")).splitlines() if line.strip()]
     notes_input = ((triggers.get("workflow_dispatch") or {}).get("inputs") or {}).get("release_notes") or {}
-    check("W15w the release notes are the dispatch input, and a blank one is refused",
-          any(notes_lines[at:at + len(notes_refusal)] == notes_refusal for at in range(len(notes_lines)))
+    check("W15w the release notes are the dispatch input, and a blank one is refused before the approval",
+          notes_lines == notes_refusal
+          and (notes_step.get("env") or {}).get("RELEASE_NOTES") == "${{ inputs.release_notes }}"
+          and "printf '%s\\n' \"$RELEASE_NOTES\" > release-notes.md" in tag_run
           and '--notes-file release-notes.md' in tag_run
           and 'gh release edit "$VERSION" --notes-file release-notes.md' in tag_run
           and (publish_job.get("env") or {}).get("RELEASE_NOTES") == "${{ inputs.release_notes }}"
@@ -2118,6 +2122,17 @@ def test_branch_triggers() -> None:
               analyze.get("if") == "steps.newest.outputs.newest == 'true'"
               and sonar_job.get("concurrency", {}).get("cancel-in-progress") is False,
               (analyze.get("if"), sonar_job.get("concurrency")))
+
+        # The notes step's own text, run: what it refuses is what the publish job would have nothing to publish.
+        notes = workflow_step(RELEASE_WORKFLOW, "check", "Check the release notes are written")
+        for label, value, accepted in (
+            ("R13 release notes that say something are accepted", "Adds the bank account form.", True),
+            ("R13b empty release notes are refused", "", False),
+            ("R13c release notes of only spaces and newlines are refused", "  \n\t \n", False),
+        ):
+            code, _, err = run_step(notes, work, {"RELEASE_NOTES": value})
+            check(label, code == 0 if accepted else (code != 0 and "release_notes is blank" in err),
+                  (code, err[-200:]))
 
 def main() -> int:
     if ONLY not in HALVES:

@@ -919,9 +919,23 @@ MUTATIONS = [
     Mutation(
         "the release notes are bound to a literal the workflow writes",
         RELEASE_YML,
-        "      RELEASE_NOTES: ${{ inputs.release_notes }}\n",
-        "      RELEASE_NOTES: placeholder notes\n",
+        "\n      RELEASE_NOTES: ${{ inputs.release_notes }}\n",
+        "\n      RELEASE_NOTES: placeholder notes\n",
         "W15w", "workflows",
+    ),
+    Mutation(
+        "the check job judges a literal rather than the notes the release publishes",
+        RELEASE_YML,
+        "\n          RELEASE_NOTES: ${{ inputs.release_notes }}\n",
+        "\n          RELEASE_NOTES: placeholder notes\n",
+        "W15w", "workflows",
+    ),
+    Mutation(
+        "blank release notes are refused only after the approval",
+        RELEASE_YML,
+        "      - name: Check the release notes are written\n",
+        "      - name: Check the notes\n",
+        "R13b", "workflows",
     ),
     Mutation(
         "one step queries CI for main's head through its own environment",
