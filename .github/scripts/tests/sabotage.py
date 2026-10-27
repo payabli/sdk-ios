@@ -406,8 +406,8 @@ MUTATIONS = [
     Mutation(
         "the harness stops running on the workflow it makes claims about",
         SCRIPTS_YML,
-        "      - '.github/workflows/**'\n      - '.github/workflows/nightly.yml'\n",
-        "      - '.github/workflows/**'\n",
+        "      - '.github/workflows/**'\n      - '.github/dependabot.yml'\n      - '.github/workflows/nightly.yml'\n",
+        "      - '.github/workflows/**'\n      - '.github/dependabot.yml'\n",
         "W11", "workflows",
     ),
     Mutation(
