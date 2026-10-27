@@ -26,6 +26,8 @@ final class TTPConfigClient: Sendable {
     /// Fetches the TTP config for `entry` on a pinned credential. A 401 saying the binding is gone, in the status or the
     /// envelope, drops the binding and throws `attestationRevoked`. Any other HTTP 401 throws ``PinnedTokenRefusal`` for the
     /// session to renew, and any other envelope 401 throws `.tokenExpired`; neither drops the binding.
+    /// A 403 naming the entry point throws `entryPointRefused`, and any other 403 is the device still owing its
+    /// activation code; neither drops the binding.
     ///
     /// - Parameter entry: the entry point whose configuration is fetched.
     /// - Returns: the route's configuration, carrying the reader credentials.
@@ -77,6 +79,9 @@ final class TTPConfigClient: Sendable {
             if code == 401 {
                 throw PayabliGenericError(type: .tokenExpired, reason: reason)
             }
+            if let refused = ColdRouteRefusals.decline(code: code, reason: reason) {
+                throw refused
+            }
             if code == 403 {
                 throw ConfigPendingActivation(presentedDeviceId: headers.deviceId)
             }
@@ -98,7 +103,8 @@ final class TTPConfigClient: Sendable {
     }
 
     /// Throws the refusals told apart by their text before the status is mapped: an app the paypoint has not registered,
-    /// and a binding the service no longer holds, which is dropped here while the handle the request presented is known.
+    /// an entry point the request may not use, and a binding the service no longer holds, which is dropped here while
+    /// the handle the request presented is known.
     ///
     /// - Parameter response: the answer to the config request.
     /// - Parameter entry: the entry point the request was made for.
@@ -112,6 +118,10 @@ final class TTPConfigClient: Sendable {
         if let unregistered = AppRegistrationRefusals.hostError(status: response.statusCode, reason: reason) {
             logger.error("[config] refused: the app is not registered on the paypoint")
             throw unregistered
+        }
+        if let refused = ColdRouteRefusals.decline(code: response.statusCode, reason: reason) {
+            logger.error("[config] refused: the entry point is not available")
+            throw refused
         }
         guard BindingRefusal.isBindingGone(code: response.statusCode, reason: reason) else { return }
         logger.error("[config] the service holds no live attestation for this binding")

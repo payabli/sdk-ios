@@ -5,7 +5,7 @@ import PayabliSDKCore
 /// exact, or a prefix where the service appends detail, and one matching nothing returns `nil`, so the status keeps
 /// its own answer. `/activate` is classified by `ActivationRefusals`, and a binding that is gone is read before either.
 enum ColdRouteRefusals {
-    /// The refusals `/challenge` and `/register` send, which no device state decides.
+    /// The refusals `/challenge`, `/register` and `/config` send, which no device state decides.
     ///
     /// - Parameter code: the HTTP status, or the envelope's `resultCode`.
     /// - Parameter reason: the envelope's `resultText`, matched exactly against the service's fixed words.
@@ -36,7 +36,8 @@ enum ColdRouteRefusals {
         }
     }
 
-    private static let entryPointUnusable = "Entry point is not available for this request."
+    /// The service's refusal of an entry point the request may not use, the same words on every device route.
+    static let entryPointUnusable = "Entry point is not available for this request."
     private static let deviceNotFound = "Device not found."
     private static let notPending = "Device is not in a state that allows this operation."
     private static let verificationFailedPrefix = "Attestation verification failed: "
