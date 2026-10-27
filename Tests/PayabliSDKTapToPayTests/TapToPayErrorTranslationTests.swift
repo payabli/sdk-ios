@@ -191,8 +191,7 @@ final class TapToPayErrorTranslationTests: XCTestCase {
         let notProducedYet: Set<PayabliErrorType> = [
             .deviceServicesOutdated, // a Google Play cause, which this platform has no counterpart for
             .readerSessionExpired,
-            .paymentNotHeld, // no close call on this platform yet
-            .paymentNotTaken // no failed read is told from the no-record close yet
+            .paymentNotHeld // no close call on this platform yet
         ]
         let produced = fromTheTable.union(fromActivation).union(raisedDirectly)
         for type in PayabliErrorType.allCases where (3001 ... 3999).contains(type.number) {
