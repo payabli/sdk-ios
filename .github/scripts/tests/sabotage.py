@@ -734,6 +734,11 @@ MUTATIONS = [
         REPORTS_YML, "    needs: newest\n", "", "W21h", "workflows",
     ),
     Mutation(
+        "the commit's SHA check reports and carries on",
+        RELEASE_YML, "40-character commit SHA, not '$COMMIT'\"\n            exit 1\n",
+        "40-character commit SHA, not '$COMMIT'\"\n", "W15o", "workflows",
+    ),
+    Mutation(
         "a push run's branch reaches the API unchecked",
         REPORTS_YML, "            head=$(printf '%s' \"$HEAD_BRANCH\" | grep -E '^[A-Za-z0-9._/-]+$')\n",
         '            head="$HEAD_BRANCH"\n', "W21e", "workflows", occurrences=2,

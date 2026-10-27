@@ -1381,7 +1381,7 @@ def test_workflows() -> None:
     check("W15o the dispatch names the commit in full, checked first and checked again where the key is",
           commit_input.get("required") is True
           and build_sha is not None and build_sha.group(1) == "^[0-9a-f]{40}$"
-          and re.search(r"\bexit [1-9]", check_runs[0]) is not None
+          and re.search(r"\bexit [1-9]", check_runs[1]) is not None
           and publish_sha is not None and publish_sha.group(1) == build_sha.group(1),
           (commit_input, build_sha and build_sha.group(1), publish_sha and publish_sha.group(1)))
     on_branch_at = next((index for index, run in enumerate(runs)
