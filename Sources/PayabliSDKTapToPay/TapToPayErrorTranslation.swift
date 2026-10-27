@@ -36,9 +36,9 @@ enum TapToPayErrorTranslation {
         }
     }
 
-    /// What a charge's failure reaches a host as. Once the reader has been asked for a card, a code saying
-    /// nothing was sent becomes `paymentOutcomeUnknown`, because the sale may already be taken, and a failure
-    /// that names no payment takes the charge's. A resent key names an earlier charge, so it never reports not charged.
+    /// What a charge's failure reaches a host as. Once the reader is asked for a card, a code saying nothing was sent
+    /// becomes `paymentOutcomeUnknown`, except the reader's own guard, which throws before it touches a card. A failure
+    /// naming no payment takes the charge's, and a resent key names an earlier charge, so it never reports not charged.
     ///
     /// - Parameter error: what the charge threw, before it was translated for the host.
     /// - Parameter paymentTransId: the charge's payment, which a failure naming none takes.
@@ -53,10 +53,15 @@ enum TapToPayErrorTranslation {
     ) -> Error {
         guard let failure = hostError(for: error) as? TapToPayError else { return error }
         let claimsNothingWasSent = failure.type == .validation || failure.type == .sdkInternalError
+        let readerTouchedNoCard = if case .guardFailed = error as? PayabliTTPError {
+            true
+        } else {
+            false
+        }
         let type: PayabliErrorType = if !askedForCard, resentKey, error is ChargeKeyRefusal {
             // The opening was refused as a repeat of an earlier charge that has not finished.
             .chargeNotFinished
-        } else if askedForCard, claimsNothingWasSent {
+        } else if askedForCard, claimsNothingWasSent, !readerTouchedNoCard {
             .paymentOutcomeUnknown
         } else {
             failure.type

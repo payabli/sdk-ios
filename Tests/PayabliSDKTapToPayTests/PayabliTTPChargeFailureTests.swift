@@ -106,13 +106,14 @@ final class PayabliTTPChargeFailureTests: XCTestCase {
         XCTAssertEqual(ttp.sessionState, .sessionExpired)
     }
 
+    /// The guard throws before the reader touches a card, so its code is not turned into an unconfirmed outcome.
     func testAReaderThatWasNotPreparedKeepsItsCaseAndChargedNothing() async throws {
         let (ttp, provider, _) = try await makeReadyTTP()
         provider.readingResult = .failure(PayabliTTPError.guardFailed(reason: "Reader not prepared"))
 
         let failure = try await chargeFailure(ttp)
 
-        XCTAssertEqual(failure.type, .paymentOutcomeUnknown)
+        XCTAssertEqual(failure.type, .sdkInternalError)
         XCTAssertEqual(failure.detail, "Reader not prepared")
         XCTAssertEqual(failure.paymentTransId, Self.paymentTransId)
         XCTAssertEqual(failure.capture, .notCharged, "the guard failed before a card was read")
