@@ -1298,6 +1298,16 @@ MUTATIONS = [
         "group: ci-${{ github.event_name == 'pull_request' && github.ref || github.sha }}", "W18b", "workflows",
     ),
     Mutation(
+        "the change report checks out the merge into the base again",
+        CI_YML, "          ref: ${{ github.event.pull_request.head.sha }}\n          fetch-depth: 0\n",
+        "          fetch-depth: 0\n", "W18d", "workflows",
+    ),
+    Mutation(
+        "every CI job builds the merge, while the analysis reads the head",
+        CI_YML, "          ref: ${{ github.event.pull_request.head.sha }}\n",
+        "          ref: ${{ github.ref }}\n", "W18d", "workflows", occurrences=4,
+    ),
+    Mutation(
         "a push to a hotfix branch runs no CI",
         CI_YML, "  push:\n    branches: [main, 'release/**', 'hotfix/**']\n", "  push:\n    branches: [main, 'release/**']\n",
         "W18", "workflows",

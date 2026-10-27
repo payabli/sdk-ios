@@ -2055,6 +2055,13 @@ def test_branch_triggers() -> None:
               "group": "ci-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}",
               "cancel-in-progress": "${{ github.event_name == 'pull_request' }}"},
           ci.get("concurrency"))
+    # The analysis is handed only the head, so a pull request's run builds the head, not the merge into the base.
+    ci_checkouts = [step for job in (ci.get("jobs") or {}).values() for step in job.get("steps") or []
+                    if str(step.get("uses", "")).startswith("actions/checkout")]
+    check("W18d every CI checkout builds the pull request's head, which the analysis reads",
+          bool(ci_checkouts) and all((step.get("with") or {}).get("ref") == "${{ github.event.pull_request.head.sha }}"
+                                     for step in ci_checkouts),
+          [(step.get("with") or {}).get("ref") for step in ci_checkouts])
     interface = yaml.safe_load(INTERFACE_WORKFLOW.read_text())
     interface_on = interface.get("on", interface.get(True)) or {}
     check("W18c the interface check runs on pull requests to main, release and hotfix branches",
