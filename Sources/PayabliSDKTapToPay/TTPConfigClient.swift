@@ -23,11 +23,9 @@ final class TTPConfigClient: Sendable {
         self.attestation = attestation
     }
 
-    /// Fetches the TTP config for `entry` on a pinned credential. A 401 saying the binding is gone, in the status or the
-    /// envelope, drops the binding and throws `attestationRevoked`. Any other HTTP 401 throws ``PinnedTokenRefusal`` for the
-    /// session to renew, and any other envelope 401 throws `.tokenExpired`; neither drops the binding.
-    /// A 403 naming the entry point throws `entryPointRefused`, and any other 403 is the device still owing its
-    /// activation code; neither drops the binding.
+    /// Fetches the TTP config for `entry` on a pinned credential. Only a 401 saying the binding is gone drops it, throwing
+    /// `attestationRevoked`; another HTTP 401 throws ``PinnedTokenRefusal``, and an envelope 401 `.tokenExpired`. A 403
+    /// naming the entry point throws `entryPointRefused`; one naming nothing classified is the device owing its code.
     ///
     /// - Parameter entry: the entry point whose configuration is fetched.
     /// - Returns: the route's configuration, carrying the reader credentials.

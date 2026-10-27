@@ -4,7 +4,8 @@ import PayabliSDKTestUtils
 import XCTest
 
 /// A refusal naming the entry point reports `ENTRY_POINT_REFUSED` and lands on a rejected configuration, from the
-/// configuration route and from setting the device up alike. Every other 403 there still asks for an activation code.
+/// configuration route and from setting the device up alike. A configuration 403 whose words name nothing classified
+/// still asks for an activation code.
 @available(iOS 16.7, *)
 @MainActor
 final class EntryPointRefusalTests: XCTestCase {

@@ -3,7 +3,7 @@ import PayabliSDKCore
 
 /// Turns a cold route's refusal into the failure a host receives, by the service's own words: each comparison is
 /// exact, or a prefix where the service appends detail, and one matching nothing returns `nil`, so the status keeps
-/// its own answer. `/activate` is classified by `ActivationRefusals`, and a binding that is gone is read before either.
+/// its own answer. `/activate` is classified by `ActivationRefusals`.
 enum ColdRouteRefusals {
     /// The refusals `/challenge`, `/register` and `/config` send, which no device state decides.
     ///
