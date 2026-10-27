@@ -2068,6 +2068,45 @@ def test_branch_triggers() -> None:
               code == 0 and "-Dsonar.pullrequest.key=179" in out and "sonar.branch.name" not in out,
               (code, out, err[-200:]))
 
+        # Only the newest revision is analysed, so a run that completes after a newer one's cannot replace it.
+        # Nothing is cancelled, since a stale run would cancel the newer analysis before reaching this check.
+        newest = workflow_step(REPORTS_WORKFLOW, "sonar", "Check the revision is the newest")
+        bin_dir = work.parent / "fake-gh"
+        bin_dir.mkdir(exist_ok=True)
+        calls = work.parent / "fake-gh.log"
+        (bin_dir / "gh").write_text('#!/usr/bin/env bash\necho "$*" >> "$FAKE_GH_LOG"\necho "$FAKE_TIP"\n')
+        (bin_dir / "gh").chmod(0o755)
+        for label, pr, branch, tip, expected, path in (
+            ("W21 a push run of the branch's tip is analysed", "", "release/0.2.0", "aaa", "newest=true",
+             "repos/payabli/sdk-ios/branches/release/0.2.0"),
+            ("W21b a push run older than the branch's tip is not analysed", "", "release/0.2.0", "bbb",
+             "newest=false", "repos/payabli/sdk-ios/branches/release/0.2.0"),
+            ("W21c a pull request's run older than its head is not analysed", "179", "ci/x", "bbb",
+             "newest=false", "repos/payabli/sdk-ios/pulls/179"),
+            ("W21d a pull request's run of its head is analysed", "179", "ci/x", "aaa", "newest=true",
+             "repos/payabli/sdk-ios/pulls/179"),
+        ):
+            calls.write_text("")
+            code, out, err = run_step(newest, work, {
+                "PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}", "FAKE_GH_LOG": str(calls),
+                "FAKE_TIP": tip, "GH_TOKEN": "x", "REPO": "payabli/sdk-ios", "SHA": "aaa", "PR": pr,
+                "HEAD_BRANCH": branch})
+            check(label, code == 0 and out.strip() == expected and path in calls.read_text(),
+                  (code, out, calls.read_text(), err[-200:]))
+        code, out, err = run_step(newest, work, {
+            "PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}", "FAKE_GH_LOG": str(calls),
+            "FAKE_TIP": "aaa", "GH_TOKEN": "x", "REPO": "payabli/sdk-ios", "SHA": "aaa", "PR": "",
+            "HEAD_BRANCH": f"release/$(touch {marker}) x"})
+        check("W21e a branch that is not a plain ref is refused before it reaches the API",
+              code != 0 and "newest=" not in out and not marker.exists(), (code, out, err[-200:]))
+        import yaml  # noqa: PLC0415 - as in test_workflows
+        sonar_job = yaml.safe_load(REPORTS_WORKFLOW.read_text())["jobs"]["sonar"]
+        analyze = next((s for s in sonar_job["steps"] if s.get("name") == "Analyze"), {})
+        check("W21f the scan runs only on the newest revision, and no analysis is cancelled by a later one",
+              analyze.get("if") == "steps.newest.outputs.newest == 'true'"
+              and sonar_job.get("concurrency", {}).get("cancel-in-progress") is False,
+              (analyze.get("if"), sonar_job.get("concurrency")))
+
 def main() -> int:
     if ONLY not in HALVES:
         print(f"NIGHTLY_ONLY={ONLY!r} is not one of {', '.join(HALVES)}")

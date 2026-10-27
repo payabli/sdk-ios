@@ -670,6 +670,23 @@ MUTATIONS = [
         'head="$HEAD_BRANCH"', "W20b", "workflows",
     ),
     Mutation(
+        "a revision older than the tip is analysed",
+        REPORTS_YML, 'if [ "$tip" = "$SHA" ]; then', "if true; then", "W21b", "workflows",
+    ),
+    Mutation(
+        "the scan runs whatever the freshness check found",
+        REPORTS_YML, "        if: steps.newest.outputs.newest == 'true'\n", "", "W21f", "workflows",
+    ),
+    Mutation(
+        "a later analysis cancels the one running",
+        REPORTS_YML, "      cancel-in-progress: false\n", "      cancel-in-progress: true\n", "W21f", "workflows",
+    ),
+    Mutation(
+        "a push run's branch reaches the API unchecked",
+        REPORTS_YML, "            head=$(printf '%s' \"$HEAD_BRANCH\" | grep -E '^[A-Za-z0-9._/-]+$')\n",
+        '            head="$HEAD_BRANCH"\n', "W21e", "workflows",
+    ),
+    Mutation(
         "the check job reads the version with the commit's own script",
         RELEASE_YML,
         '          git show "$GITHUB_SHA:.github/scripts/release-version.sh" > .github/scripts/release-version.sh\n',
