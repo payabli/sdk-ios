@@ -2124,6 +2124,21 @@ def test_branch_triggers() -> None:
               analyze.get("if") == "steps.newest.outputs.newest == 'true'"
               and sonar_job.get("concurrency", {}).get("cancel-in-progress") is False,
               (analyze.get("if"), sonar_job.get("concurrency")))
+        # A stale run is turned away before it joins the analysis's group, where it would replace the newest
+        # revision's pending analysis, and the same check runs again before the scan.
+        reports_jobs = yaml.safe_load(REPORTS_WORKFLOW.read_text())["jobs"]
+        gate_job = reports_jobs.get("newest") or {}
+        gate_step = next((s for s in gate_job.get("steps") or [] if s.get("name") == "Check the revision is the newest"),
+                         None)
+        scan_step = next((s for s in sonar_job["steps"] if s.get("name") == "Check the revision is the newest"), None)
+        check("W21g the freshness check runs before the analysis's group and again before the scan, as one step",
+              gate_step is not None and gate_step == scan_step, (gate_step, scan_step))
+        check("W21h the analysis waits on the freshness job and runs only on its newest, which takes no lock",
+              sonar_job.get("needs") == "newest"
+              and "needs.newest.outputs.newest == 'true'" in str(sonar_job.get("if"))
+              and (gate_job.get("outputs") or {}).get("newest") == "${{ steps.newest.outputs.newest }}"
+              and "concurrency" not in gate_job and "environment" not in gate_job,
+              (sonar_job.get("needs"), sonar_job.get("if"), gate_job.get("outputs"), gate_job.get("concurrency")))
 
         # A dispatch off main is refused as the check job's first step, naming the ref, and only publishing is
         # serialized: a release waiting for approval holds no other release's checks, tests or build.

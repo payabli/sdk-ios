@@ -699,7 +699,7 @@ MUTATIONS = [
     ),
     Mutation(
         "a revision older than the tip is analysed",
-        REPORTS_YML, 'if [ "$tip" = "$SHA" ]; then', "if true; then", "W21b", "workflows",
+        REPORTS_YML, 'if [ "$tip" = "$SHA" ]; then', "if true; then", "W21b", "workflows", occurrences=2,
     ),
     Mutation(
         "the scan runs whatever the freshness check found",
@@ -710,9 +710,33 @@ MUTATIONS = [
         REPORTS_YML, "      cancel-in-progress: false\n", "      cancel-in-progress: true\n", "W21f", "workflows",
     ),
     Mutation(
+        "the freshness job and the scan's check drift apart",
+        REPORTS_YML, "server.\n      - name: Check the revision is the newest\n        id: newest\n        env:\n"
+        "          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}\n          REPO: ${{ github.repository }}\n"
+        "          SHA: ${{ github.event.workflow_run.head_sha }}\n          PR: ${{ github.event.workflow_run.pull_requests[0].number }}\n"
+        "          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}\n        run: |\n          set -euo pipefail\n"
+        "          if [ -n \"$PR\" ]; then\n            number=$(printf '%s' \"$PR\" | grep -E '^[0-9]+$')\n"
+        "            tip=$(gh api \"repos/$REPO/pulls/$number\" --jq .head.sha)\n          else\n"
+        "            head=$(printf '%s' \"$HEAD_BRANCH\" | grep -E '^[A-Za-z0-9._/-]+$')\n"
+        "            tip=$(gh api \"repos/$REPO/branches/$head\" --jq .commit.sha)\n          fi\n"
+        "          if [ \"$tip\" = \"$SHA\" ]; then\n            echo \"newest=true\" >> \"$GITHUB_OUTPUT\"\n"
+        "          else\n            echo \"newest=false\" >> \"$GITHUB_OUTPUT\"\n"
+        "            echo \"not analysing $SHA: $tip is newer\"\n          fi\n\n  sonar:",
+        "server.\n      - name: Check the revision is the newest\n        id: newest\n        run: echo newest=true >> \"$GITHUB_OUTPUT\"\n\n  sonar:",
+        "W21g", "workflows",
+    ),
+    Mutation(
+        "a stale run joins the analysis's group",
+        REPORTS_YML, "      && needs.newest.outputs.newest == 'true'\n", "", "W21h", "workflows",
+    ),
+    Mutation(
+        "the analysis does not wait on the freshness job",
+        REPORTS_YML, "    needs: newest\n", "", "W21h", "workflows",
+    ),
+    Mutation(
         "a push run's branch reaches the API unchecked",
         REPORTS_YML, "            head=$(printf '%s' \"$HEAD_BRANCH\" | grep -E '^[A-Za-z0-9._/-]+$')\n",
-        '            head="$HEAD_BRANCH"\n', "W21e", "workflows",
+        '            head="$HEAD_BRANCH"\n', "W21e", "workflows", occurrences=2,
     ),
     Mutation(
         "the check job reads the version with the commit's own script",

@@ -101,8 +101,51 @@ jobs:
           gh api -X POST "repos/$REPO/issues/$pr/comments" -F body=@report.md >/dev/null
           echo "posted the report"
 
+  newest:
+    name: Newest revision
+    runs-on: ubuntu-latest
+    if: >-
+      github.event.workflow_run.conclusion == 'success'
+      && github.event.workflow_run.head_repository.full_name == github.repository
+    # Outside the analysis's concurrency group, so a stale run is turned away before it can take the pending
+    # place in it: GitHub keeps one pending job per group, and a later arrival replaces it, so a stale run
+    # admitted there would cancel the newest revision's waiting analysis and then skip its own.
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      newest: ${{ steps.newest.outputs.newest }}
+
+    steps:
+      # Only the newest revision of the pull request or branch is analysed. An
+      # older one's numbers would replace the newer analysis on the server.
+      - name: Check the revision is the newest
+        id: newest
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.event.workflow_run.head_sha }}
+          PR: ${{ github.event.workflow_run.pull_requests[0].number }}
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+        run: |
+          set -euo pipefail
+          if [ -n "$PR" ]; then
+            number=$(printf '%s' "$PR" | grep -E '^[0-9]+$')
+            tip=$(gh api "repos/$REPO/pulls/$number" --jq .head.sha)
+          else
+            head=$(printf '%s' "$HEAD_BRANCH" | grep -E '^[A-Za-z0-9._/-]+$')
+            tip=$(gh api "repos/$REPO/branches/$head" --jq .commit.sha)
+          fi
+          if [ "$tip" = "$SHA" ]; then
+            echo "newest=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "newest=false" >> "$GITHUB_OUTPUT"
+            echo "not analysing $SHA: $tip is newer"
+          fi
+
   sonar:
     name: SonarCloud
+    needs: newest
     # The analysis token lives in this environment, never at the repository, where a job in a pull
     # request's own copy of a workflow could name it. The environment deploys from main and release
     # branches only.
@@ -115,12 +158,14 @@ jobs:
     if: >-
       github.event.workflow_run.conclusion == 'success'
       && github.event.workflow_run.head_repository.full_name == github.repository
+      && needs.newest.outputs.newest == 'true'
     # One analysis at a time per pull request, or per branch for a push run, which
     # names no pull request. Two analyses reach the server in whichever order they
     # finish, and a push run is never cancelled by a newer one, so an older
     # revision's run can complete after a newer one's. Nothing here is cancelled:
-    # a stale run would cancel the newer analysis. It waits its turn and is then
-    # skipped by the check before the scan.
+    # a stale run would cancel the newer analysis. The job above keeps a stale run
+    # out of the group, and the same check runs again before the scan, for a run
+    # overtaken while it waited.
     concurrency:
       group: >-
         sonar-${{ github.event.workflow_run.pull_requests[0].number
