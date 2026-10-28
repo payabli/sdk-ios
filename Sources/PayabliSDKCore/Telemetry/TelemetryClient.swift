@@ -17,10 +17,9 @@ package protocol TelemetryTransport: Sendable {
     /// discarded when the same body would be refused the same way again.
     ///
     /// - Parameter batch: the events, oldest first.
-    /// - Parameter droppedSinceLastSend: how many events the queue evicted since the last batch arrived.
     /// - Returns: whether the route accepted the batch, kept it for a later flush, or discarded it.
     @discardableResult
-    func send(_ batch: [TelemetryEvent], droppedSinceLastSend: Int) async -> TelemetrySendOutcome
+    func send(_ batch: [TelemetryEvent]) async -> TelemetrySendOutcome
 }
 
 /// Batched, best-effort telemetry client. The caller never passes a PAN, CVV or token.
@@ -48,6 +47,8 @@ package actor TelemetryClient {
             entry: String,
             environment: String
         ) {
+            // The overflow event takes one of a request's places, so a request needs one left for anything else.
+            precondition(maxEventsPerRequest >= 2, "maxEventsPerRequest must be at least 2")
             self.flushInterval = flushInterval
             self.batchSize = batchSize
             self.queueCapacity = queueCapacity
@@ -180,8 +181,10 @@ package actor TelemetryClient {
             properties: properties,
             timestamp: occurredAt
         )
-        let queued = queue.offer(event)
-        if queued >= configuration.batchSize || (!waitsForBatch && Self.sendsAtOnce(name, properties)) {
+        // Counts what was offered since the last send attempt, so a refused batch back on the queue does not
+        // make every later event a full batch.
+        let offered = queue.offer(event)
+        if offered >= configuration.batchSize || (!waitsForBatch && Self.sendsAtOnce(name, properties)) {
             requestFlush()
         }
     }
@@ -289,7 +292,9 @@ package actor TelemetryClient {
     /// request takes what is queued when it leaves, and a kept batch stops the drain, so a failure
     /// sends no second request.
     private func drainWhatWasWaiting() async {
-        let perRequest = configuration.maxEventsPerRequest
+        // Every request may carry an overflow event, since a discarded batch gives its count back. A request
+        // left with nothing to send is not made and ends the drain, so the spare places cost nothing.
+        let perRequest = configuration.maxEventsPerRequest - 1
         let needed = (queue.count + perRequest - 1) / perRequest
         var requests = min(max(needed, 1), configuration.maxRequestsPerDrain)
         while requests > 0, await sendOneRequest() {
@@ -301,25 +306,52 @@ package actor TelemetryClient {
     ///
     /// - Returns: whether the drain may send another request.
     private func sendOneRequest() async -> Bool {
-        let batch = queue.drain(configuration.maxEventsPerRequest)
-        guard !batch.isEmpty else { return false }
-        // Taken only when a batch leaves: the count resets as it is read.
         let dropped = queue.takeDropCount()
+        // The overflow event takes one of the request's places, so a request never carries more than
+        // `maxEventsPerRequest` events.
+        let perRequest = configuration.maxEventsPerRequest
+        let batch = queue.drain(dropped > 0 ? perRequest - 1 : perRequest)
+        // The count resets as it is read, so a count taken with nothing to send goes back for the batch that has something.
+        guard !batch.isEmpty else {
+            queue.restoreDropCount(dropped)
+            return false
+        }
+        var events = batch
         if dropped > 0 {
             logger.warning("telemetry_queue_overflow dropped=\(dropped)")
+            events.append(overflowEvent(dropped))
         }
         // The session's identifier as it is, already a digest; the route compares it with the one registration sent.
         let device = deviceId().flatMap { $0.isEmpty ? nil : $0 }
-        let stamped = batch.map { $0.carrying(deviceIdHash: device) }
-        switch await transport.send(stamped, droppedSinceLastSend: dropped) {
+        let stamped = events.map { $0.carrying(deviceIdHash: device) }
+        switch await transport.send(stamped) {
         case .delivered:
             return true
         case .kept:
+            // The count goes back beside the events rather than as an event among them, so the events offered
+            // during the send can evict the batch but never the count.
             queue.restoreFront(batch, droppedSinceLastSend: dropped)
             return false
         case .discarded:
             queue.restoreDropCount(dropped)
             return true
         }
+    }
+
+    /// The event that reports evictions, last in its batch and timed when the send noticed them.
+    ///
+    /// - Parameter dropped: how many events the queue evicted, more than zero.
+    /// - Returns: the event to append to the batch.
+    private func overflowEvent(_ dropped: Int) -> TelemetryEvent {
+        TelemetryEvent(
+            sdkVersion: configuration.sdkVersion,
+            sessionId: sessionId,
+            deviceIdHash: nil,
+            entry: configuration.entry,
+            environment: configuration.environment,
+            event: TelemetryEventName.sdkTelemetryOverflow,
+            properties: ["dropped": String(dropped)],
+            timestamp: Date()
+        )
     }
 }

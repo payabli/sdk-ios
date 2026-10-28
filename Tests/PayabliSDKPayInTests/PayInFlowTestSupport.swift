@@ -28,7 +28,7 @@ func flowOnSession(
 
 /// Accepts every telemetry batch and sends nothing, so a session built in a test never reaches the network.
 struct DiscardingTelemetryTransport: TelemetryTransport {
-    func send(_ batch: [TelemetryEvent], droppedSinceLastSend: Int) async -> TelemetrySendOutcome {
+    func send(_ batch: [TelemetryEvent]) async -> TelemetrySendOutcome {
         .delivered
     }
 }

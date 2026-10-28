@@ -18,7 +18,7 @@ final class TelemetryEndpointTransportTests: XCTestCase {
         )
         let subject = TelemetryEndpointTransport(transport: service)
 
-        await subject.send([event()], droppedSinceLastSend: 0)
+        await subject.send([event()])
 
         XCTAssertEqual(stub.count, 1)
         XCTAssertEqual(stub.sentTokens, ["telemetry-token"])
@@ -42,7 +42,7 @@ final class TelemetryEndpointTransportTests: XCTestCase {
         let recording = RecordingDecoration()
         let transport = makeStackWithChain([recording], auth: try makeTestAuth())
 
-        await TelemetryEndpointTransport(transport: transport).send([event()], droppedSinceLastSend: 0)
+        await TelemetryEndpointTransport(transport: transport).send([event()])
 
         let request = try XCTUnwrap(recording.observed.first)
         XCTAssertFalse(request.pinsCredential, "a refusal is not recorded for the device setup to renew")
@@ -62,7 +62,7 @@ final class TelemetryEndpointTransportTests: XCTestCase {
             session: StubURLProtocol.makeSession()
         )
 
-        await TelemetryEndpointTransport(transport: service).send([], droppedSinceLastSend: 0)
+        await TelemetryEndpointTransport(transport: service).send([])
 
         XCTAssertEqual(stub.count, 0)
     }
@@ -80,7 +80,7 @@ final class TelemetryEndpointTransportTests: XCTestCase {
             session: StubURLProtocol.makeSession()
         )
 
-        await TelemetryEndpointTransport(transport: service).send([event()], droppedSinceLastSend: 0)
+        await TelemetryEndpointTransport(transport: service).send([event()])
 
         XCTAssertEqual(stub.count, 1, "it was attempted and not retried")
     }
@@ -100,7 +100,7 @@ final class TelemetryEndpointTransportTests: XCTestCase {
             session: StubURLProtocol.makeSession()
         )
 
-        await TelemetryEndpointTransport(transport: service).send([event()], droppedSinceLastSend: 0)
+        await TelemetryEndpointTransport(transport: service).send([event()])
 
         XCTAssertEqual(stub.count, 0)
     }
@@ -201,7 +201,7 @@ final class TelemetryEndpointTransportTests: XCTestCase {
             session: StubURLProtocol.makeSession()
         )
 
-        let outcome = await TelemetryEndpointTransport(transport: service).send([event()], droppedSinceLastSend: 0)
+        let outcome = await TelemetryEndpointTransport(transport: service).send([event()])
 
         XCTAssertEqual(outcome, .kept)
     }
@@ -223,7 +223,7 @@ final class TelemetryEndpointTransportTests: XCTestCase {
             client: .none,
             session: StubURLProtocol.makeSession()
         )
-        return await TelemetryEndpointTransport(transport: service).send([event()], droppedSinceLastSend: 0)
+        return await TelemetryEndpointTransport(transport: service).send([event()])
     }
 
     private func event() -> TelemetryEvent {
