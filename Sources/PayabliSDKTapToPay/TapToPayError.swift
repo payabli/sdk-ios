@@ -60,9 +60,12 @@ extension TapToPayError: CustomNSError {
         if let retryAfter {
             info["retryAfter"] = retryAfter
         }
-        if case let .customerDataRefused(requiredFields) = refusal {
+        switch refusal {
+        case let .customerDataRefused(requiredFields):
             info["refusal"] = "customerDataRefused"
             info["requiredFields"] = requiredFields
+        case nil:
+            break
         }
         return info
     }
