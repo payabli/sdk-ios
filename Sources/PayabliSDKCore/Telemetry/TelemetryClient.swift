@@ -142,8 +142,8 @@ package actor TelemetryClient {
         watcher?.cancel()
         let previous = tail
         let bound = configuration.maxRequestsPerDrain
-        // Bounded by requests rather than by what is queued: nothing is queued after this, so a request left with
-        // nothing to send or a batch kept for later ends it.
+        // Nothing is queued after this, so the drain ends when the queue is empty, a batch is kept, or the
+        // bound is reached.
         tail = Task {
             await previous?.value
             var requests = 0
