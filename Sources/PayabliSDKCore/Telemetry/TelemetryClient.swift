@@ -311,7 +311,7 @@ package actor TelemetryClient {
         // `maxEventsPerRequest` events.
         let perRequest = configuration.maxEventsPerRequest
         let batch = queue.drain(dropped > 0 ? perRequest - 1 : perRequest)
-        // The count resets as it is read, so a count taken with nothing to send goes back for the batch that has something.
+        // The count resets as it is read, so a count taken with nothing to send goes back for a later batch.
         guard !batch.isEmpty else {
             queue.restoreDropCount(dropped)
             return false
