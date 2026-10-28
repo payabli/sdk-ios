@@ -326,7 +326,7 @@ extension Error {
                 userInfo["capture"] = 1
             }
         } else if movesMoney {
-            userInfo["capture"] = 0
+            userInfo["capture"] = PayInInterruption.isCancellation(self) ? 1 : 0
         }
         return NSError(domain: error.domain, code: error.code, userInfo: userInfo)
     }

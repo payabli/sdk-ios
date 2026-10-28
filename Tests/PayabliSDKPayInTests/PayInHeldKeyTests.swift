@@ -286,7 +286,7 @@ final class PayInHeldKeyTests: XCTestCase {
     }
 
     func testASystemCancellationOfTheTaskReadsAsTheCallersCancellation() async throws {
-        transport.script = [.systemCancelled, .approved]
+        transport.script = [.urlErrorCancelled, .approved]
 
         let cancelled = await failure { try await self.flow.capture(self.request(.newPayment)) }
         _ = try await flow.capture(request(.retry))
@@ -683,8 +683,7 @@ final class ScriptedTransport: PayabliTransport, @unchecked Sendable {
         case lostBeforeHandOff
         case tokenFetchFailed
         case cancelled(afterHandOff: Bool)
-        /// A cancelled task raised as `URLError.cancelled` after the hand-off, by a transport that does not convert it.
-        case systemCancelled
+        case urlErrorCancelled
     }
 
     private static let approved = Data("""
@@ -749,7 +748,7 @@ final class ScriptedTransport: PayabliTransport, @unchecked Sendable {
             throw PayabliGenericError(type: .networkError, reason: "The response was lost.")
         case .cancelled:
             throw CancellationError()
-        case .systemCancelled:
+        case .urlErrorCancelled:
             throw URLError(.cancelled)
         case .unauthorized:
             throw PayabliGenericError(type: .tokenExpired, reason: "Token expired")

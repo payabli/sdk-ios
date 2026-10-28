@@ -80,6 +80,12 @@ final class PayInPaymentObjCBridgeTests: XCTestCase {
         XCTAssertNil(error.userInfo["capture"])
     }
 
+    func testACancelledPaymentSaysThePaymentMayHaveBeenTaken() {
+        let error = CancellationError().toPayabliPayInNSError(movesMoney: true)
+
+        XCTAssertEqual(error.userInfo["capture"] as? Int, 1)
+    }
+
     func testAnUnknownOutcomeThroughObjectiveCCarriesTheTransactionAndThePaymentsReference() async throws {
         let transport = RecordingIdempotencyTransport(body: Self.interrupted, status: 500)
         let bridge = PayabliPayInObjC(component: PayInFixture.makeFlow(transport: transport, key: "reserved-1"))
