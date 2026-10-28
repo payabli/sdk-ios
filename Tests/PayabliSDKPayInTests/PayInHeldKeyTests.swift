@@ -257,16 +257,47 @@ final class PayInHeldKeyTests: XCTestCase {
     }
 
     func testAResentKeyThatNeverLeftStillReportsAnOpenOutcome() async {
-        transport.script = [.lost, .tokenFetchFailed, .cancelled(afterHandOff: false)]
+        transport.script = [.lost, .tokenFetchFailed]
 
         _ = await failure { try await self.flow.capture(self.request(.newPayment)) }
         let noToken = await failure { try await self.flow.capture(self.request(.retry)) }
-        let cancelled = await failure { try await self.flow.capture(self.request(.retry)) }
 
         XCTAssertEqual(PayInFixture.interruption(noToken)?.type, .tokenProviderFailed)
         XCTAssertEqual(Self.reference(in: noToken), "p1")
-        XCTAssertNotNil(PayInFixture.interruption(cancelled), "\(cancelled)")
+        XCTAssertEqual(transport.sentKeys, ["k1", "k1"])
+    }
+
+    // MARK: - A cancelled call
+
+    func testACaptureCancelledAfterTheHandOffEndsAsItsCancellationAndKeepsTheKey() async throws {
+        transport.script = [.cancelled(afterHandOff: true), .approved]
+
+        let cancelled = await failure { try await self.flow.capture(self.request(.newPayment)) }
+        _ = try await flow.capture(request(.retry))
+
+        XCTAssertTrue(cancelled is CancellationError, "\(cancelled)")
+        XCTAssertEqual(transport.sentKeys, ["k1", "k1"])
+    }
+
+    func testARetryCancelledBeforeTheHandOffEndsAsItsCancellationAndKeepsTheKey() async throws {
+        transport.script = [.lost, .cancelled(afterHandOff: false), .approved]
+
+        _ = await failure { try await self.flow.capture(self.request(.newPayment)) }
+        let cancelled = await failure { try await self.flow.capture(self.request(.retry)) }
+        _ = try await flow.capture(request(.retry))
+
+        XCTAssertTrue(cancelled is CancellationError, "\(cancelled)")
         XCTAssertEqual(transport.sentKeys, ["k1", "k1", "k1"])
+    }
+
+    func testASystemCancellationOfTheTaskReadsAsTheCallersCancellation() async throws {
+        transport.script = [.urlErrorCancelled, .approved]
+
+        let cancelled = await failure { try await self.flow.capture(self.request(.newPayment)) }
+        _ = try await flow.capture(request(.retry))
+
+        XCTAssertTrue(cancelled is CancellationError, "\(cancelled)")
+        XCTAssertEqual(transport.sentKeys, ["k1", "k1"])
     }
 
     func testAKeyThatAgesOutDuringAnUnknownSendIsHeldOnTheRestartedClock() async throws {
@@ -654,6 +685,7 @@ final class ScriptedTransport: PayabliTransport, @unchecked Sendable {
         case lostBeforeHandOff
         case tokenFetchFailed
         case cancelled(afterHandOff: Bool)
+        case urlErrorCancelled
     }
 
     private static let approved = Data("""
@@ -718,6 +750,8 @@ final class ScriptedTransport: PayabliTransport, @unchecked Sendable {
             throw PayabliGenericError(type: .networkError, reason: "The response was lost.")
         case .cancelled:
             throw CancellationError()
+        case .urlErrorCancelled:
+            throw URLError(.cancelled)
         case .unauthorized:
             throw PayabliGenericError(type: .tokenExpired, reason: "Token expired")
         }

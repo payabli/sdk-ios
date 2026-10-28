@@ -159,7 +159,7 @@ final class PayInReports {
     }
 
     private static func isCancellation(_ error: any Error) -> Bool {
-        if error is CancellationError {
+        if PayInInterruption.isCancellation(error) {
             return true
         }
         guard case let PayabliPayInError.submissionInterrupted(_, causeType, _, _) = error else { return false }
