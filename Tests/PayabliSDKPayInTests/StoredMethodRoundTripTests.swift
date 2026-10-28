@@ -5,6 +5,11 @@ import XCTest
 /// A method stored through the form is charged from the result alone.
 @MainActor
 final class StoredMethodRoundTripTests: XCTestCase {
+    override func setUp() {
+        super.setUp()
+        PayInKeyStore.process.forgetHeld()
+    }
+
     func testACardStoredThroughTheFormIsChargedAsACard() async throws {
         let transport = RoutedTransport()
         let component = PayabliPayIn(entryPoint: "entry", environment: .sandbox, transport: transport)

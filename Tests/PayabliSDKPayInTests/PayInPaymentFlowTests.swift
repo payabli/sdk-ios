@@ -4,6 +4,11 @@ import XCTest
 
 @MainActor
 final class PayInPaymentFlowTests: XCTestCase {
+    override func setUp() {
+        super.setUp()
+        PayInKeyStore.process.forgetHeld()
+    }
+
     func testStoresCardPaymentMethodThroughUnifiedComponent() async throws {
         let transport = MockPayInPaymentFlowTransport(responseBody: Self.storedMethodResponse)
         let component = PayabliPayIn(

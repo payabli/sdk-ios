@@ -53,7 +53,7 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
     private var client: PayInPaymentFlowClient
     private var tokenStorageClient: PayInPaymentFlowTokenStorageClient
     private var activeSubmissionCount = 0
-    private var heldKeys = HeldIdempotencyKeys()
+    private let heldKeys = PayInKeyStore.process
     private let logger = PayabliLogger(category: .tokenization)
     /// Nil on a flow built on a bare transport without a telemetry client.
     private(set) var reports: PayInReports?
@@ -305,8 +305,8 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
                     claimsHeld: request.options.attempt == .retry,
                     payment: HeldPaymentDescription(request),
                     reference: reference
-                ) { key in
-                    try await client.capture(entryPoint: entryPoint, request: request, idempotencyKey: key)
+                ) { client, entry, key in
+                    try await client.capture(entryPoint: entry, request: request, idempotencyKey: key)
                 }
             }
         }
@@ -339,8 +339,8 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
                     claimsHeld: request.options.attempt == .retry,
                     payment: HeldPaymentDescription(request),
                     reference: reference
-                ) { key in
-                    try await client.authorize(entryPoint: entryPoint, request: request, idempotencyKey: key)
+                ) { client, entry, key in
+                    try await client.authorize(entryPoint: entry, request: request, idempotencyKey: key)
                 }
             }
         }
@@ -362,7 +362,7 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
                 try await sending(
                     .captureAuthorized(transId: request.transId.payabliCaptureTrimmed),
                     claimsHeld: true
-                ) { key in
+                ) { client, _, key in
                     try await client.captureAuthorized(request, idempotencyKey: key)
                 }
             }
@@ -391,7 +391,7 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
                 try await sending(
                     .void(transId: transId.payabliCaptureTrimmed),
                     claimsHeld: true
-                ) { key in
+                ) { client, _, key in
                     try await client.void(transId: transId, idempotencyKey: key)
                 }
             }
@@ -457,22 +457,29 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
     /// - Parameter claimsHeld: whether the attempt takes the key held for its scope.
     /// - Parameter payment: the payment the attempt is for, compared with the held key's before taking it.
     /// - Parameter reference: the payment's reference, returned on an unknown outcome.
-    /// - Parameter send: sends the request under the key it is given.
+    /// - Parameter send: sends the request with the client, to the entry point and under the key it is given.
     /// - Returns: the result the service sent.
     private func sending(
         _ scope: HeldKeyScope,
         claimsHeld: Bool,
         payment: HeldPaymentDescription? = nil,
         reference: String? = nil,
-        _ send: (String) async throws -> PayabliPayInResult
+        _ send: (PayInPaymentFlowClient, String, String) async throws -> PayabliPayInResult
     ) async throws -> PayabliPayInResult {
+        // Sent and settled where it was reserved, though `configure(config:)` may move the flow while it sends.
+        let (reservedEntry, reservedEnvironment, reservedClient) = (entryPoint, environment, client)
         let reservation = try heldKeys.reserve(
+            entry: reservedEntry,
+            environment: reservedEnvironment,
             scope: scope,
             claimsHeld: claimsHeld,
             payment: payment,
             now: now(),
             mint: newIdempotencyKey
         )
+        if reservation.foundNoRoom {
+            logger.warning("payin_retry_keys_full")
+        }
         let mark = PayabliSendMark()
         // The submission around this one, such as the form's, learns whether the payment left.
         let submission = PayabliSendMark.current
@@ -482,8 +489,10 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
             }
         }
         do {
-            let result = try await PayabliSendMark.$current.withValue(mark) { try await send(reservation.key) }
-            heldKeys.settle(reservation, outcome: .answered, now: now())
+            let result = try await PayabliSendMark.$current.withValue(mark) {
+                try await send(reservedClient, reservedEntry, reservation.key)
+            }
+            heldKeys.settle(entry: reservedEntry, environment: reservedEnvironment, reservation, outcome: .answered)
             return result
         } catch {
             var outcome = Self.outcome(of: error, reused: reservation.reused)
@@ -493,9 +502,7 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
                     PayInLocalRefusal.current?.set()
                 }
             }
-            if heldKeys.settle(reservation, outcome: outcome, now: now()) {
-                logger.warning("payin_retry_keys_full")
-            }
+            heldKeys.settle(entry: reservedEntry, environment: reservedEnvironment, reservation, outcome: outcome)
             try Self.rethrow(
                 error,
                 as: outcome,

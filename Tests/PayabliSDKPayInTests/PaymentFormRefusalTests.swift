@@ -4,6 +4,11 @@ import XCTest
 
 @MainActor
 final class PaymentFormRefusalTests: XCTestCase {
+    override func setUp() {
+        super.setUp()
+        PayInKeyStore.process.forgetHeld()
+    }
+
     func testAnAmountRefusalSendsNothingAndKeepsTheCardFields() async throws {
         let transport = RecordingTransport()
         let viewModel = form(

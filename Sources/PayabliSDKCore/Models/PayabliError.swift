@@ -60,7 +60,7 @@ public enum PayabliErrorType: String, Sendable, CaseIterable {
     case retryRefused = "RETRY_REFUSED"
     /// A retry described a different payment from the one whose outcome is unknown, so nothing was sent.
     case retryNotSamePayment = "RETRY_NOT_SAME_PAYMENT"
-    /// A new payment named a reference whose earlier payment is still unresolved, so nothing was sent.
+    /// Another call for this payment is still under way or its outcome is unknown, so nothing was sent.
     case paymentReferenceOpen = "PAYMENT_REFERENCE_OPEN"
 
     // Card-present.
@@ -229,8 +229,8 @@ public extension PayabliErrorType {
             "This retry describes a different payment from the one still unresolved, so it was not sent. "
                 + "Check that payment first; to charge a different payment, send it as a new payment."
         case .paymentReferenceOpen:
-            "A payment with this reference is still unresolved, so this one was not sent. "
-                + "Check that payment first, or retry it."
+            "Another call for this payment is still under way or its outcome is unknown, so this one was not sent. "
+                + "Check that payment's outcome first."
         case .deviceKeyUnavailable: "This device's secure storage is unavailable."
         case .deviceSetupUnsupported: "This device cannot be set up for card-present payments."
         case .deviceServicesOutdated: "Google Play on this device must be installed, updated or signed in."
