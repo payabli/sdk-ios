@@ -69,15 +69,15 @@ final class TapToPayErrorTests: XCTestCase {
             type: .validation,
             reason: "r",
             detail: nil,
-            refusal: .customerDataRefused(requiredFields: ["customerNumber", "email"])
+            refusal: .customerDataRefused(requiredFields: ["customerNumber", "billingEmail"])
         )
 
         let bridged = error.toPayabliNSError()
 
-        XCTAssertEqual((error as? TapToPayError)?.refusal, .customerDataRefused(requiredFields: ["customerNumber", "email"]))
+        XCTAssertEqual((error as? TapToPayError)?.refusal, .customerDataRefused(requiredFields: ["customerNumber", "billingEmail"]))
         XCTAssertEqual(bridged.code, 1016)
         XCTAssertEqual(bridged.userInfo["refusal"] as? String, "customerDataRefused")
-        XCTAssertEqual(bridged.userInfo["requiredFields"] as? [String], ["customerNumber", "email"])
+        XCTAssertEqual(bridged.userInfo["requiredFields"] as? [String], ["customerNumber", "billingEmail"])
     }
 
     func testACustomerDataRefusalNamingNoFieldsStillReachesABridgedCaller() {
