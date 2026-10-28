@@ -68,6 +68,9 @@ package final class TTPTransactionClient: Sendable {
             if response.statusCode == 404 {
                 throw PayabliTTPError.cardPresentNotEnabled
             }
+            if let refusal = CustomerDataRefusal(response: response) {
+                throw refusal
+            }
             try mapPayabliHTTPError(response: response)
             envelope = try decodePayabliV2Envelope(InitiateData.self, from: response)
         } catch {
@@ -188,5 +191,56 @@ struct ChargeKeyRefusal: PayabliError {
 
     var detail: String? {
         nil
+    }
+}
+
+/// A 400 with code `E7020` blaming `customerData`: the customer the charge sent was refused before any card was read.
+/// It reads as the validation error it is wherever it is not translated for a host.
+struct CustomerDataRefusal: PayabliError {
+    let validation: PayabliValidationError
+    let requiredFields: [String]
+
+    /// The refusal a response carries, or nil for any other response.
+    ///
+    /// - Parameter response: the opening's response.
+    /// - Returns: the refusal, with the fields its text names, or nil when the response is not this refusal.
+    init?(response: PayabliResponse) {
+        guard response.statusCode == 400,
+              let validation = try? JSONDecoder().decode(PayabliValidationError.self, from: response.body),
+              validation.rawCode == "E7020",
+              let entries = validation.errors?["customerData"]
+        else { return nil }
+        self.validation = validation
+        requiredFields = entries.lazy.compactMap { Self.fieldsNamed(in: $0.message) }.first ?? []
+    }
+
+    var type: PayabliErrorType {
+        validation.type
+    }
+
+    var reason: String {
+        validation.reason
+    }
+
+    var detail: String? {
+        validation.detail
+    }
+
+    var errorDescription: String? {
+        validation.errorDescription
+    }
+
+    private static let identifiersPrefix = "Missing customer identifiers: "
+
+    /// The field names a refusal's text lists after its fixed prefix, or nil for text that lists none.
+    ///
+    /// - Parameter message: the refusal's text for the customer.
+    /// - Returns: the names in the order given, trimmed, with empty ones dropped.
+    private static func fieldsNamed(in message: String) -> [String]? {
+        guard message.hasPrefix(identifiersPrefix) else { return nil }
+        return message.dropFirst(identifiersPrefix.count)
+            .split(separator: ",")
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
     }
 }
