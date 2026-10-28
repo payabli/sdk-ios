@@ -12,11 +12,9 @@ enum HeldKeyScope: Hashable {
     case void(transId: String)
 }
 
-/// The key of every payment sent and not yet answered, kept so a repeat can be refused rather than taken again.
+/// The key of every payment sent and not yet answered, for one entry point and environment, in ``PayInKeyStore``.
 ///
-/// In memory, for one entry point and environment, kept in ``PayInKeyStore``. A key is recorded as it is made, and
-/// ages out once the service would no longer recognise it and no send of it is under way, counted from the latest
-/// send that may have reached it.
+/// A key ages out once the service would no longer recognise it and no send of it is under way.
 struct HeldIdempotencyKeys {
     /// How many payments may hold a key at once. Past it a new attempt still sends a key and it is not recorded.
     static let capacity = 16
