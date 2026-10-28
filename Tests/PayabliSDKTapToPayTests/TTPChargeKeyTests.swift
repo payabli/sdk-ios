@@ -325,6 +325,50 @@ final class TTPChargeKeyTests: XCTestCase {
         XCTAssertEqual(resent?.paymentTransId, "TXN-KEY")
     }
 
+    func testAReaderGoneBeforeTheReadWhoseCloseLandsSettlesAFreshKey() async throws {
+        let (ttp, provider) = try await makeReadyTTP(readFailure: PayabliTTPError.readerSessionExpired())
+
+        let expired = await failure { try await ttp.charge(paymentDetails: Self.details) }
+        provider.readingResult = Self.read(.approved)
+        try await ttp.initialize()
+        _ = try await ttp.charge(paymentDetails: Self.details, attempt: .retry)
+
+        XCTAssertEqual(expired?.type, .readerSessionExpired)
+        XCTAssertEqual(expired?.capture, .notCharged)
+        XCTAssertNotEqual(Self.wire.keys[1], Self.wire.keys[0], "the key outlived a charge that took nothing")
+    }
+
+    func testAReaderGoneBeforeTheReadWhoseCloseFindsNoRecordStaysTheSessionsExpiry() async throws {
+        let (ttp, provider) = try await makeReadyTTP(readFailure: PayabliTTPError.readerSessionExpired())
+        Self.wire.updateRefusal = Self.processorHasNoRecord
+
+        let expired = await failure { try await ttp.charge(paymentDetails: Self.details) }
+        Self.wire.updateRefusal = nil
+        provider.readingResult = Self.read(.approved)
+        try await ttp.initialize()
+        _ = try await ttp.charge(paymentDetails: Self.details, attempt: .retry)
+
+        XCTAssertEqual(expired?.type, .readerSessionExpired)
+        XCTAssertEqual(expired?.code, 3017)
+        XCTAssertEqual(expired?.capture, .notCharged)
+        XCTAssertEqual(expired?.paymentTransId, "TXN-KEY")
+        XCTAssertNotEqual(Self.wire.keys[1], Self.wire.keys[0], "the key outlived a charge that took nothing")
+    }
+
+    func testAReaderGoneBeforeTheReadKeepsAResentKey() async throws {
+        let (ttp, provider) = try await makeReadyTTP(outcome: .indeterminate)
+        _ = await failure { try await ttp.charge(paymentDetails: Self.details) }
+        provider.readingResult = .failure(PayabliTTPError.readerSessionExpired())
+
+        let expired = await failure { try await ttp.charge(paymentDetails: Self.details, attempt: .retry) }
+        try await ttp.initialize()
+        _ = await failure { try await ttp.charge(paymentDetails: Self.details, attempt: .retry) }
+
+        XCTAssertEqual(expired?.type, .readerSessionExpired)
+        XCTAssertEqual(expired?.capture, .unknown, "a resent key names an earlier charge whose outcome is unknown")
+        XCTAssertEqual(Set(Self.wire.keys).count, 1, "the resent key was settled by a charge that read no card")
+    }
+
     func testAnIndeterminateReadsNoRecordCloseReportsThePaymentNotClosedAndKeepsTheKey() async throws {
         let (ttp, _) = try await makeReadyTTP(outcome: .indeterminate)
         Self.wire.updateRefusal = Self.processorHasNoRecord
