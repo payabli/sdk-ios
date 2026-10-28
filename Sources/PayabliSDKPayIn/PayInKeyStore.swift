@@ -21,8 +21,8 @@ final class PayInKeyStore: @unchecked Sendable {
     private let lock = NSLock()
     private var partitions: [Partition: HeldIdempotencyKeys] = [:]
 
-    /// The key an attempt sends. Reading and recording are one operation under one lock, so below the capacity two
-    /// flows sending one payment at once cannot each find nothing and make a key.
+    /// The key an attempt sends. Reading and recording are one operation under one lock, so below the capacity only
+    /// one of two flows sending one payment at once sends it, and the other is refused.
     ///
     /// - Parameter entry: the entry point the attempt is sent to.
     /// - Parameter environment: the environment the attempt is sent to.

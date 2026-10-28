@@ -86,20 +86,36 @@ final class PayInKeyStoreTests: XCTestCase {
 
     // MARK: - Recorded as it is made
 
-    func testANewPaymentFromAnotherFlowWhileTheFirstIsSendingIsRefusedAndARetrySendsTheFirstKey() async throws {
+    func testANewPaymentOrARetryFromAnotherFlowWhileTheFirstIsSendingIsRefused() async throws {
         let held = HeldOpenTransport()
         let first = makeFlow(prefix: "k", transport: held)
         let second = makeFlow(prefix: "n", transport: held)
 
         let sending = Task { try await first.capture(self.request(.newPayment)) }
         await held.firstSendArrived()
-        let refused = await failure { try await second.capture(self.request(.newPayment)) }
-        _ = try await second.capture(request(.retry))
+        let newPayment = await failure { try await second.capture(self.request(.newPayment)) }
+        let retry = await failure { try await second.capture(self.request(.retry)) }
+        held.release()
+        _ = try await sending.value
+
+        XCTAssertEqual((newPayment as? any PayabliError)?.type, .paymentReferenceOpen)
+        XCTAssertEqual((retry as? any PayabliError)?.type, .paymentReferenceOpen)
+        XCTAssertEqual(held.sentKeys, ["k1"])
+    }
+
+    func testAVoidFromAnotherFlowWhileTheFirstVoidsTheSameTransactionIsRefused() async throws {
+        let held = HeldOpenTransport()
+        let first = makeFlow(prefix: "k", transport: held)
+        let second = makeFlow(prefix: "n", transport: held)
+
+        let sending = Task { try await first.voidTransaction("t-1") }
+        await held.firstSendArrived()
+        let refused = await failure { try await second.voidTransaction("t-1") }
         held.release()
         _ = try await sending.value
 
         XCTAssertEqual((refused as? any PayabliError)?.type, .paymentReferenceOpen)
-        XCTAssertEqual(held.sentKeys, ["k1", "k1"])
+        XCTAssertEqual(held.sentKeys, ["k1"])
     }
 
     func testAnUnknownSendSettlesUnderTheEntryPointItWasReservedForThoughTheFlowMovedWhileSending() async throws {
@@ -138,38 +154,49 @@ final class PayInKeyStoreTests: XCTestCase {
         let start = ContinuousClock.now
         _ = try reserve(in: store, claimsHeld: false, at: start, mint: "k1")
 
-        let retried = try reserve(in: store, claimsHeld: true, at: start.advanced(by: payabliIdempotencyKeyMaxAge))
-
-        XCTAssertEqual(retried.key, "k1")
-    }
-
-    func testAKeyNoSendCarriedOutIsDroppedWhenItsLastSendEnds() throws {
-        let store = PayInKeyStore()
-        let start = ContinuousClock.now
-        let first = try reserve(in: store, claimsHeld: false, at: start, mint: "k1")
-        let retry = try reserve(in: store, claimsHeld: true, at: start)
-
-        store.settle(entry: "entry", environment: .sandbox, first, outcome: .notAnswered)
-        XCTAssertThrowsError(try reserve(in: store, claimsHeld: false, at: start), "a send of it is under way") {
+        XCTAssertThrowsError(try reserve(in: store, claimsHeld: false, at: start.advanced(by: payabliIdempotencyKeyMaxAge))) {
             XCTAssertEqual(($0 as? any PayabliError)?.type, .paymentReferenceOpen)
         }
-        store.settle(entry: "entry", environment: .sandbox, retry, outcome: .notAnswered)
+    }
+
+    func testASecondSendOfAKeyUnderWayIsRefusedWhetherOrNotItClaimsTheKey() throws {
+        let store = PayInKeyStore()
+        let start = ContinuousClock.now
+        let first = try reserve(in: store, claimsHeld: false, at: start, mint: "k1")
+
+        for claimsHeld in [true, false] {
+            XCTAssertThrowsError(try reserve(in: store, claimsHeld: claimsHeld, at: start)) {
+                XCTAssertEqual(($0 as? any PayabliError)?.type, .paymentReferenceOpen)
+            }
+        }
+        store.settle(entry: "entry", environment: .sandbox, first, outcome: .unknown)
+        let retry = try reserve(in: store, claimsHeld: true, at: start)
+
+        XCTAssertEqual(retry.key, "k1")
+    }
+
+    func testAKeyNoSendCarriedOutIsDroppedWhenItsSendNeverLeft() throws {
+        let store = PayInKeyStore()
+        let start = ContinuousClock.now
+        let first = try reserve(in: store, claimsHeld: false, at: start, mint: "k1")
+
+        store.settle(entry: "entry", environment: .sandbox, first, outcome: .notAnswered)
         let next = try reserve(in: store, claimsHeld: false, at: start, mint: "k2")
 
         XCTAssertEqual(next.key, "k2")
     }
 
-    func testAnAnswerForgetsTheKeyThoughAnotherSendOfItIsUnderWay() throws {
+    func testAKeyAnEarlierSendCarriedOutIsKeptWhenALaterSendNeverLeaves() throws {
         let store = PayInKeyStore()
         let start = ContinuousClock.now
         let first = try reserve(in: store, claimsHeld: false, at: start, mint: "k1")
+        store.settle(entry: "entry", environment: .sandbox, first, outcome: .unknown)
         let retry = try reserve(in: store, claimsHeld: true, at: start)
 
-        store.settle(entry: "entry", environment: .sandbox, first, outcome: .answered)
-        store.settle(entry: "entry", environment: .sandbox, retry, outcome: .unknown)
-        let next = try reserve(in: store, claimsHeld: false, at: start, mint: "k2")
+        store.settle(entry: "entry", environment: .sandbox, retry, outcome: .notAnswered)
+        let next = try reserve(in: store, claimsHeld: true, at: start)
 
-        XCTAssertEqual(next.key, "k2")
+        XCTAssertEqual(next.key, "k1")
     }
 
     // MARK: - Support

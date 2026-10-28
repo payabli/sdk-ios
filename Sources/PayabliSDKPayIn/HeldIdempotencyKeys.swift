@@ -48,8 +48,8 @@ struct HeldIdempotencyKeys {
         let key: String
         var reservedAt: ContinuousClock.Instant
         let payment: HeldPaymentDescription?
-        /// Sends of this key not yet ended, which may still reach the service, so no sweep drops it meanwhile.
-        var sending: Int
+        /// Whether a send of this key has not yet ended, which refuses any other and keeps the key from the sweep.
+        var sending: Bool
         /// Whether the service may know this key, which keeps it when no send of it is under way.
         var carried: Bool
     }
@@ -77,8 +77,9 @@ struct HeldIdempotencyKeys {
     /// - Parameter now: the moment the key is chosen.
     /// - Parameter mint: makes a new key.
     /// - Returns: the reservation to send under and to settle afterwards.
-    /// - Throws: ``PayabliErrorType/retryNotSamePayment`` when the recorded key was made for another payment, and
-    ///   ``PayabliErrorType/paymentReferenceOpen`` when a new payment names a reference whose key is recorded.
+    /// - Throws: ``PayabliErrorType/paymentReferenceOpen`` when a send of the recorded key is under way, or a new payment
+    ///   names a reference whose key is recorded, and ``PayabliErrorType/retryNotSamePayment`` when the recorded key was
+    ///   made for another payment.
     mutating func reserve(
         scope: HeldKeyScope,
         claimsHeld: Bool,
@@ -88,13 +89,13 @@ struct HeldIdempotencyKeys {
     ) throws -> Reservation {
         sweep(now: now)
         if var held = records[scope] {
-            guard claimsHeld else {
+            guard claimsHeld, !held.sending else {
                 throw PayabliGenericError(type: .paymentReferenceOpen, reason: "Payment reference still unresolved")
             }
             if let heldPayment = held.payment, let payment, !heldPayment.isRepeated(by: payment) {
                 throw PayabliGenericError(type: .retryNotSamePayment, reason: "Retry describes a different payment")
             }
-            held.sending += 1
+            held.sending = true
             records[scope] = held
             return Reservation(
                 scope: scope, key: held.key, reused: true, reservedAt: now, payment: held.payment ?? payment,
@@ -108,20 +109,20 @@ struct HeldIdempotencyKeys {
                 scope: scope, key: key, reused: false, reservedAt: now, payment: payment, foundNoRoom: !isSaturated
             )
         }
-        records[scope] = Record(key: key, reservedAt: now, payment: payment, sending: 1, carried: false)
+        records[scope] = Record(key: key, reservedAt: now, payment: payment, sending: true, carried: false)
         isSaturated = false
         return Reservation(scope: scope, key: key, reused: false, reservedAt: now, payment: payment, foundNoRoom: false)
     }
 
     /// Ends a send: an answer forgets its key, and any other ending keeps it only while a send of it may have reached
-    /// the service or is still under way. A key not recorded, past the capacity or already answered, is left alone.
+    /// the service. A key not recorded, past the capacity or already answered, is left alone.
     ///
     /// - Parameter reservation: the reservation the attempt was sent under.
     /// - Parameter outcome: what became of it.
     mutating func settle(_ reservation: Reservation, outcome: Outcome) {
         let scope = reservation.scope
         guard var held = records[scope], held.key == reservation.key else { return }
-        held.sending = max(0, held.sending - 1)
+        held.sending = false
         switch outcome {
         case .answered:
             records[scope] = nil
@@ -133,7 +134,7 @@ struct HeldIdempotencyKeys {
             // The service has seen the key, so it was carried out; the clock it already had stands.
             held.carried = true
         case .notAnswered:
-            if held.sending == 0, !held.carried {
+            if !held.carried {
                 records[scope] = nil
                 return
             }
@@ -146,7 +147,7 @@ struct HeldIdempotencyKeys {
     /// - Parameter now: the moment a key's age is read against.
     mutating func sweep(now: ContinuousClock.Instant) {
         records = records.filter { _, record in
-            record.sending > 0 || record.reservedAt.duration(to: now) < maxAge
+            record.sending || record.reservedAt.duration(to: now) < maxAge
         }
     }
 }
