@@ -4,11 +4,6 @@ import SwiftUI
 import XCTest
 
 final class TokenStorageClientTests: XCTestCase {
-    override func setUp() {
-        super.setUp()
-        PayInKeyStore.process.forgetHeld()
-    }
-
     func testAddMethodSerializesCardPaymentMethodRequest() async throws {
         let transport = MockTransport(responseBody: """
         {
