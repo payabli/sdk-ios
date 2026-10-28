@@ -133,8 +133,9 @@ package actor TelemetryClient {
         watcher?.cancel()
     }
 
-    /// Stops this client: its timer and its background watcher end, a later record is dropped, and what is queued is
-    /// sent in at most `maxRequestsPerDrain` requests. Called once, when the session it reports for is replaced.
+    /// Stops this client: its timer and its background watcher end, a later record or flush is refused, and one last
+    /// drain of at most `maxRequestsPerDrain` requests runs after any drain already scheduled. A batch that drain
+    /// cannot send is dropped. Called once, when the session it reports for is replaced.
     package func stop() {
         guard !stopped else { return }
         stopped = true
@@ -142,8 +143,7 @@ package actor TelemetryClient {
         watcher?.cancel()
         let previous = tail
         let bound = configuration.maxRequestsPerDrain
-        // Nothing is queued after this, so the drain ends when the queue is empty, a batch is kept, or the
-        // bound is reached.
+        // Nothing is queued after this, so the drain ends when the queue is empty or the bound is reached.
         tail = Task {
             await previous?.value
             var requests = 0
@@ -306,6 +306,10 @@ package actor TelemetryClient {
     /// - Returns: the drain that will send what is queued now.
     @discardableResult
     private func requestFlush() -> Task<Void, Never> {
+        // A stopped client's last drain is already scheduled, so a request waits for it and adds nothing.
+        if stopped, let tail {
+            return tail
+        }
         if let waiting {
             return waiting
         }
@@ -362,6 +366,13 @@ package actor TelemetryClient {
         case .delivered:
             return true
         case .kept:
+            // Nothing reads a stopped client's queue after its last drain, so a batch kept then is dropped and the
+            // drain moves on to the next.
+            guard !stopped else {
+                queue.restoreDropCount(dropped)
+                logger.debug("telemetry_batch_after_stop count=\(batch.count)")
+                return true
+            }
             // The count goes back beside the events rather than as an event among them, so the events offered
             // during the send can evict the batch but never the count.
             queue.restoreFront(batch, droppedSinceLastSend: dropped)

@@ -679,6 +679,46 @@ extension TelemetryClientTests {
         let batches = await transport.batches
         XCTAssertEqual(batches.count, 16)
         XCTAssertEqual(batches.flatMap { $0 }.map(\.label), (0 ..< 32).map { "e\($0)" })
+        let buffered = await client.bufferedCount
+        XCTAssertEqual(buffered, 8, "what the bound leaves is not sent")
+    }
+
+    func testABatchKeptAfterStopIsDroppedAndTheDrainCarriesOn() async {
+        let sink = RecordingLogSink()
+        let client = makeClient(
+            batchSize: 100,
+            maxEventsPerRequest: 2,
+            logger: PayabliLogger(category: .telemetry, sink: sink)
+        )
+        for index in 0 ..< 6 {
+            await record(client, "e\(index)")
+        }
+        await transport.refuse(true)
+
+        await client.stop()
+        await client.settled()
+
+        let batches = await transport.batches
+        XCTAssertEqual(batches.flatMap { $0 }.map(\.label), (0 ..< 6).map { "e\($0)" })
+        let buffered = await client.bufferedCount
+        XCTAssertEqual(buffered, 0)
+        let dropped = sink.records.filter { $0.message.hasPrefix("telemetry_batch_after_stop") }
+        XCTAssertEqual(dropped.map(\.message), Array(repeating: "telemetry_batch_after_stop count=2", count: 3))
+        XCTAssertEqual(dropped.map(\.level), Array(repeating: .debug, count: 3))
+    }
+
+    func testAFlushAfterStopSendsNothingMore() async {
+        let client = makeClient(batchSize: 100, maxEventsPerRequest: 2)
+        for index in 0 ..< 40 {
+            await record(client, "e\(index)")
+        }
+
+        await client.stop()
+        await client.flush()
+        await client.settled()
+
+        let batches = await transport.batches
+        XCTAssertEqual(batches.count, 16)
     }
 
     func testARecordReachingAStoppedClientIsReported() async {
