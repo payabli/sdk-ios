@@ -14,6 +14,13 @@ enum TapToPayErrorTranslation {
             return error
         case let refusal as ActivationRefusal:
             return refusal.hostError
+        case let refusal as CustomerDataRefusal:
+            return TapToPayError(
+                type: refusal.type,
+                reason: refusal.reason,
+                detail: displayedDetail(of: refusal.validation),
+                refusal: .customerDataRefused(requiredFields: refusal.requiredFields)
+            )
         case let error as PayabliTTPError:
             let type = catalogType(of: error)
             return TapToPayError(
@@ -74,7 +81,8 @@ enum TapToPayErrorTranslation {
             detail: failure.detail,
             paymentTransId: failure.paymentTransId ?? paymentTransId,
             capture: resentKey && capture == .notCharged ? .unknown : capture,
-            retryAfter: failure.retryAfter
+            retryAfter: failure.retryAfter,
+            refusal: failure.refusal
         )
     }
 

@@ -8,6 +8,11 @@ import XCTest
 /// authorization and a reversal resend their transaction's held key on their own.
 @MainActor
 final class PayInHeldKeyTests: XCTestCase {
+    override func setUp() {
+        super.setUp()
+        PayInKeyStore.process.forgetHeld()
+    }
+
     private let transport = ScriptedTransport()
     private let clock = TestClock()
     private lazy var flow = makeFlow(prefix: "k")
@@ -447,6 +452,7 @@ final class PayInHeldKeyTests: XCTestCase {
             ("", .retryRefused)
         ]
         for (body, expected) in bodies {
+            PayInKeyStore.process.forgetHeld()
             let flow = makeFlow(prefix: "k")
             transport.script = [.lost, .conflict(body)]
             _ = await failure { try await flow.capture(self.request(.newPayment)) }
@@ -499,7 +505,7 @@ final class PayInHeldKeyTests: XCTestCase {
         XCTAssertEqual(transport.sentKeys, ["k1", "k1", "k2"])
     }
 
-    func testANewFlowHoldsNoKey() async throws {
+    func testARebuiltFlowResendsTheKeyItsPredecessorHeld() async throws {
         transport.script = [.lost, .approved, .approved]
         let restarted = makeFlow(prefix: "n")
 
@@ -507,7 +513,7 @@ final class PayInHeldKeyTests: XCTestCase {
         _ = try await restarted.captureAuthorizedTransaction(authorized("t-1"))
         _ = try await restarted.voidTransaction("t-1")
 
-        XCTAssertEqual(transport.sentKeys, ["k1", "n1", "n2"])
+        XCTAssertEqual(transport.sentKeys, ["k1", "k1", "n1"])
     }
 
     func testPastItsCapacityAnAttemptIsSentButNotHeld() async throws {
@@ -523,30 +529,26 @@ final class PayInHeldKeyTests: XCTestCase {
         XCTAssertEqual(transport.sentKeys.suffix(2), ["k\(capacity + 2)", "k1"])
     }
 
-    func testAKeyThatExpiresDuringASendGivesUpItsPlaceToTheNewOne() throws {
+    func testPastItsCapacityAKeyIsNotRecordedThoughRoomFreesBeforeItsSendEnds() throws {
         var keys = HeldIdempotencyKeys()
         let start = ContinuousClock.now
-        let maxAge = payabliIdempotencyKeyMaxAge
         for index in 0 ..< HeldIdempotencyKeys.capacity {
-            let reservedAt = index == 0 ? start : start.advanced(by: .seconds(10))
             let held = try keys.reserve(
-                scope: .void(transId: "t-\(index)"), claimsHeld: true, now: reservedAt, mint: { "k\(index)" }
+                scope: .void(transId: "t-\(index)"), claimsHeld: true, now: start, mint: { "k\(index)" }
             )
-            keys.settle(held, outcome: .unknown, now: reservedAt)
+            keys.settle(held, outcome: .unknown)
         }
 
-        let sent = try keys.reserve(
-            scope: .void(transId: "t-new"), claimsHeld: true,
-            now: start.advanced(by: maxAge - .seconds(1)), mint: { "k-new" }
-        )
-        let full = keys.settle(sent, outcome: .unknown, now: start.advanced(by: maxAge))
-        let retried = try keys.reserve(
-            scope: .void(transId: "t-new"), claimsHeld: true,
-            now: start.advanced(by: maxAge), mint: { "k-other" }
-        )
+        let sent = try keys.reserve(scope: .void(transId: "t-new"), claimsHeld: true, now: start, mint: { "k-new" })
+        let again = try keys.reserve(scope: .void(transId: "t-next"), claimsHeld: true, now: start, mint: { "k-next" })
+        let answered = try keys.reserve(scope: .void(transId: "t-0"), claimsHeld: true, now: start, mint: { "" })
+        keys.settle(answered, outcome: .answered)
+        keys.settle(sent, outcome: .unknown)
+        let retried = try keys.reserve(scope: .void(transId: "t-new"), claimsHeld: true, now: start, mint: { "k-other" })
 
-        XCTAssertFalse(full, "payin_retry_keys_full is not logged")
-        XCTAssertEqual(retried.key, "k-new")
+        XCTAssertTrue(sent.foundNoRoom, "payin_retry_keys_full is logged")
+        XCTAssertFalse(again.foundNoRoom, "and only once")
+        XCTAssertEqual(retried.key, "k-other")
     }
 
     // MARK: - Support

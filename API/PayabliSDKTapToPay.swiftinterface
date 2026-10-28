@@ -280,6 +280,10 @@ public enum TapToPayChargeActivity : Swift::Int, Swift::Sendable, Swift::CaseIte
     get
   }
 }
+public enum TapToPayChargeRefusal : Swift::Sendable, Swift::Equatable {
+  case customerDataRefused(requiredFields: [Swift::String])
+  public static func == (a: PayabliSDKTapToPay::TapToPayChargeRefusal, b: PayabliSDKTapToPay::TapToPayChargeRefusal) -> Swift::Bool
+}
 public struct TapToPayError : PayabliSDKCore::PayabliError, PayabliSDKCore::PayabliRetryAfter {
   public let type: PayabliSDKCore::PayabliErrorType
   public let reason: Swift::String
@@ -287,6 +291,7 @@ public struct TapToPayError : PayabliSDKCore::PayabliError, PayabliSDKCore::Paya
   public let paymentTransId: Swift::String?
   public let capture: PayabliSDKTapToPay::PayabliTTPCapture
   public let retryAfter: Foundation::TimeInterval?
+  public let refusal: PayabliSDKTapToPay::TapToPayChargeRefusal?
 }
 extension PayabliSDKTapToPay::TapToPayError : Foundation::CustomNSError {
   public static var errorDomain: Swift::String {

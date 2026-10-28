@@ -6,6 +6,11 @@ import XCTest
 /// instrument or the payer.
 @MainActor
 final class PayInTelemetryTests: XCTestCase {
+    override func setUp() {
+        super.setUp()
+        PayInKeyStore.process.forgetHeld()
+    }
+
     private let recorder = RecordingTelemetryTransport()
     private var telemetry: TelemetryClient?
 
@@ -482,7 +487,7 @@ final class PayInTelemetryTests: XCTestCase {
 private actor RecordingTelemetryTransport: TelemetryTransport {
     private(set) var events: [TelemetryEvent] = []
 
-    func send(_ batch: [TelemetryEvent], droppedSinceLastSend: Int) async -> TelemetrySendOutcome {
+    func send(_ batch: [TelemetryEvent]) async -> TelemetrySendOutcome {
         events += batch
         return .delivered
     }

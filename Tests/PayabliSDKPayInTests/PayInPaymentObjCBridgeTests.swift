@@ -5,6 +5,11 @@ import XCTest
 /// The payment members as an Objective-C caller reaches them: a request object in, a result or an `NSError` out.
 @MainActor
 final class PayInPaymentObjCBridgeTests: XCTestCase {
+    override func setUp() {
+        super.setUp()
+        PayInKeyStore.process.forgetHeld()
+    }
+
     private static let interrupted = Data(#"{"code":"E9999","reason":"Error","data":{"paymentTransId":"101-abc"}}"#.utf8)
 
     func testACaptureThroughObjectiveCSendsTheRequestAndReturnsTheResult() async {

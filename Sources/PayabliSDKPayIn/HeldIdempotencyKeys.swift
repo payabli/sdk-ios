@@ -10,25 +10,41 @@ enum HeldKeyScope: Hashable {
     case authorize(reference: String)
     case captureAuthorized(transId: String)
     case void(transId: String)
+
+    /// Whether a send under `other` keeps one under this scope from being sent: the same scope, or the other route
+    /// naming the same transaction.
+    ///
+    /// - Parameter other: the scope of a send under way.
+    /// - Returns: whether the two would overlap.
+    func overlaps(_ other: HeldKeyScope) -> Bool {
+        switch (self, other) {
+        case let (.captureAuthorized(transId), .void(otherTransId)),
+             let (.void(transId), .captureAuthorized(otherTransId)):
+            transId == otherTransId
+        default:
+            self == other
+        }
+    }
 }
 
-/// The keys of attempts whose outcome nobody knows, kept so a repeat can be refused rather than taken again.
+/// The key of every payment sent and not yet answered, for one entry point and environment, in ``PayInKeyStore``.
 ///
-/// In memory, for one flow. A key ages out once the service would no longer recognise it, counted from the latest
-/// send that may have reached it.
+/// A key ages out once the service would no longer recognise it and no send of it is under way.
 struct HeldIdempotencyKeys {
-    /// How many attempts may be held at once. Past it a new attempt still sends a key and is not held.
+    /// How many payments may hold a key at once. Past it a new attempt still sends a key and it is not recorded.
     static let capacity = 16
 
     /// The key one attempt sends, and where it came from.
     struct Reservation: Equatable {
         let scope: HeldKeyScope
         let key: String
-        /// The key was held for an earlier attempt and is being sent again.
+        /// The key was recorded for an earlier attempt and is being sent again.
         let reused: Bool
         let reservedAt: ContinuousClock.Instant
-        /// The payment the key was made for, which stays the same each time a held key is sent.
+        /// The payment the key was made for, which stays the same each time a recorded key is sent.
         let payment: HeldPaymentDescription?
+        /// The key should have been recorded and found no room, for the first time since a key was last recorded.
+        let foundNoRoom: Bool
     }
 
     /// What became of an attempt, as far as its key is concerned.
@@ -37,38 +53,48 @@ struct HeldIdempotencyKeys {
         case answered
         /// The request may have been carried out and nobody knows whether it was.
         case unknown
-        /// The service refused a held key it had already seen, so the earlier attempt reached it.
+        /// The service refused a recorded key it had already seen, so an earlier attempt reached it.
         case repeatRefused
         /// Nothing answered about the payment: the request never left, or was refused before it was read.
         case notAnswered
     }
 
     private struct Record {
-        var key: String
+        let key: String
         var reservedAt: ContinuousClock.Instant
         let payment: HeldPaymentDescription?
+        /// Whether a send of this key has not yet ended, which refuses any other and keeps the key from the sweep.
+        var sending: Bool
+        /// Whether the service may know this key, which keeps it when no send of it is under way.
+        var carried: Bool
     }
 
     private let maxAge: Duration
     private var records: [HeldKeyScope: Record] = [:]
 
-    /// Whether the last attempt that should have been held found no room. Reported once until a key is held again.
-    private(set) var isSaturated = false
+    /// Whether the last attempt that should have been recorded found no room. Reported once until a key is recorded.
+    private var isSaturated = false
+
+    /// Whether nothing is recorded, so the table can be dropped.
+    var isIdle: Bool {
+        records.isEmpty
+    }
 
     init(maxAge: Duration = payabliIdempotencyKeyMaxAge) {
         self.maxAge = maxAge
     }
 
-    /// The key an attempt sends.
+    /// The key an attempt sends: the one recorded for its scope, otherwise a new one, recorded as it is made.
     ///
     /// - Parameter scope: what the attempt belongs to.
-    /// - Parameter claimsHeld: whether the attempt takes the key held for its scope.
-    /// - Parameter payment: the payment the attempt is for, which must match the held key's to take it.
+    /// - Parameter claimsHeld: whether the attempt takes the key recorded for its scope.
+    /// - Parameter payment: the payment the attempt is for, which must match the recorded key's to take it.
     /// - Parameter now: the moment the key is chosen.
     /// - Parameter mint: makes a new key.
     /// - Returns: the reservation to send under and to settle afterwards.
-    /// - Throws: ``PayabliErrorType/retryNotSamePayment`` when the held key was made for another payment, and
-    ///   ``PayabliErrorType/paymentReferenceOpen`` when a new payment names a reference whose key is still held.
+    /// - Throws: ``PayabliErrorType/paymentReferenceOpen`` when a send of the recorded key, or of the other route naming
+    ///   the same transaction, is under way, or a new payment names a reference whose key is recorded, and
+    ///   ``PayabliErrorType/retryNotSamePayment`` when the recorded key was made for another payment.
     mutating func reserve(
         scope: HeldKeyScope,
         claimsHeld: Bool,
@@ -77,77 +103,70 @@ struct HeldIdempotencyKeys {
         mint: () -> String
     ) throws -> Reservation {
         sweep(now: now)
-        if !claimsHeld, records[scope] != nil {
-            throw PayabliGenericError(type: .paymentReferenceOpen, reason: "Payment reference still unresolved")
+        let open = PayabliGenericError(type: .paymentReferenceOpen, reason: "Another call for this payment is open")
+        if records.contains(where: { $0.value.sending && $0.key.overlaps(scope) }) {
+            throw open
         }
-        if claimsHeld, let held = records[scope] {
+        if var held = records[scope] {
+            guard claimsHeld else {
+                throw open
+            }
             if let heldPayment = held.payment, let payment, !heldPayment.isRepeated(by: payment) {
                 throw PayabliGenericError(type: .retryNotSamePayment, reason: "Retry describes a different payment")
             }
+            held.sending = true
+            records[scope] = held
             return Reservation(
-                scope: scope, key: held.key, reused: true, reservedAt: now, payment: held.payment ?? payment
+                scope: scope, key: held.key, reused: true, reservedAt: now, payment: held.payment ?? payment,
+                foundNoRoom: false
             )
         }
-        return Reservation(scope: scope, key: mint(), reused: false, reservedAt: now, payment: payment)
+        let key = mint()
+        guard records.count < Self.capacity else {
+            defer { isSaturated = true }
+            return Reservation(
+                scope: scope, key: key, reused: false, reservedAt: now, payment: payment, foundNoRoom: !isSaturated
+            )
+        }
+        records[scope] = Record(key: key, reservedAt: now, payment: payment, sending: true, carried: false)
+        isSaturated = false
+        return Reservation(scope: scope, key: key, reused: false, reservedAt: now, payment: payment, foundNoRoom: false)
     }
 
-    /// Records what became of an attempt.
+    /// Ends a send: an answer forgets its key, and any other ending keeps it only while a send of it may have reached
+    /// the service. A key not recorded, past the capacity or already answered, is left alone.
     ///
     /// - Parameter reservation: the reservation the attempt was sent under.
     /// - Parameter outcome: what became of it.
-    /// - Parameter now: the moment it ended, against which expired keys are dropped before one is held.
-    /// - Returns: whether the attempt should have been held and found no room, for the first time since a key was
-    ///   last held.
-    @discardableResult
-    mutating func settle(_ reservation: Reservation, outcome: Outcome, now: ContinuousClock.Instant) -> Bool {
+    mutating func settle(_ reservation: Reservation, outcome: Outcome) {
         let scope = reservation.scope
+        guard var held = records[scope], held.key == reservation.key else { return }
+        held.sending = false
         switch outcome {
-        case .notAnswered, .repeatRefused:
-            return false
         case .answered:
-            if records[scope]?.key == reservation.key {
-                records[scope] = nil
-            }
-            return false
+            records[scope] = nil
+            return
         case .unknown:
-            return hold(reservation, now: now)
-        }
-    }
-
-    /// Holds the key of an attempt whose outcome is unknown, from that attempt's reservation.
-    ///
-    /// A scope holds one key, and a different key never displaces it.
-    ///
-    /// - Parameter reservation: the attempt whose key is held, carrying the scope, the key and the moment
-    ///   it was chosen.
-    /// - Parameter now: the moment the attempt ended, against which expired keys are dropped before one is held.
-    /// - Returns: whether the key found no room, reported the first time since a key was last held.
-    private mutating func hold(_ reservation: Reservation, now: ContinuousClock.Instant) -> Bool {
-        sweep(now: now)
-        let scope = reservation.scope
-        if var existing = records[scope] {
-            if existing.key == reservation.key {
-                existing.reservedAt = max(existing.reservedAt, reservation.reservedAt)
-                records[scope] = existing
+            held.carried = true
+            held.reservedAt = max(held.reservedAt, reservation.reservedAt)
+        case .repeatRefused:
+            // The service has seen the key, so it was carried out; the clock it already had stands.
+            held.carried = true
+        case .notAnswered:
+            if !held.carried {
+                records[scope] = nil
+                return
             }
-            isSaturated = false
-            return false
         }
-        guard records.count < Self.capacity else {
-            defer { isSaturated = true }
-            return !isSaturated
-        }
-        records[scope] = Record(key: reservation.key, reservedAt: reservation.reservedAt, payment: reservation.payment)
-        isSaturated = false
-        return false
+        records[scope] = held
     }
 
-    /// Drops every key the service would no longer recognise.
+    /// Drops every key the service would no longer recognise, unless a send of it is under way.
     ///
     /// - Parameter now: the moment a key's age is read against.
-    private mutating func sweep(now: ContinuousClock.Instant) {
+    mutating func sweep(now: ContinuousClock.Instant) {
         records = records.filter { _, record in
-            record.reservedAt.duration(to: now) < maxAge
+            record.sending || record.reservedAt.duration(to: now) < maxAge
         }
     }
 }

@@ -149,7 +149,7 @@ final class SessionReplacementTests: XCTestCase {
         )
 
         await client.stop()
-        await client.emit("sdk_initialized")
+        await client.emit(TelemetryEventName.sdkInitialized)
 
         await fulfillment(of: [timerStarted], timeout: 0.5)
     }

@@ -151,12 +151,15 @@ A retry describes the same payment as the attempt it repeats: the same amount, f
 payment method and, if the first attempt set one, order identifier. A retry that describes another payment is refused
 before anything is sent, with type `.retryNotSamePayment`, and the earlier attempt's key stays for the right
 retry. A new payment that names a reference whose payment is still unresolved is refused before anything is sent,
-with type `.paymentReferenceOpen`. A blank reference is refused as invalid input.
+with type `.paymentReferenceOpen`. So is any call on a payment another `PayabliPayIn` is still sending, a declared
+retry included, and a capture or void of a transaction another one is still capturing or voiding. A blank reference
+is refused as invalid input.
 
-The SDK holds a payment's key in memory, on the `PayabliPayIn` it was sent from, for a few minutes after its latest
-send, and holds at most 16 at a time. A retry after that, from another `PayabliPayIn`, or after your app restarts
-sends a new key, so a reference you keep is a name and not a guard against a second charge. Past that point, read
-the transaction back instead.
+Every `PayabliPayIn` in your app for the same entry point and environment shares the keys the SDK holds, so a retry
+from a `PayabliPayIn` you built again sends the payment's key. The SDK holds a key in memory for a few minutes after
+its latest send, and holds at most 16 for each entry point and environment. A retry after that, or after your app
+restarts, sends a new key, so a reference you keep is a name and not a guard against a second charge. Past that
+point, read the transaction back instead.
 
 ## Outcomes and errors
 

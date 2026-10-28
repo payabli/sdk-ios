@@ -1,5 +1,5 @@
 import PayabliSDKCore
-import PayabliSDKPayIn
+@testable import PayabliSDKPayIn
 import XCTest
 
 /// The reason each money route reports when the outcome is unknown.
@@ -8,6 +8,11 @@ import XCTest
 /// reason that drifts on one route fails that route's test.
 @MainActor
 final class PayInUnknownOutcomeReasonTests: XCTestCase {
+    override func setUp() {
+        super.setUp()
+        PayInKeyStore.process.forgetHeld()
+    }
+
     func testAnInterruptedCaptureNamesTheTransaction() async {
         let transport = RecordingIdempotencyTransport(
             failure: PayabliGenericError(type: .networkError, reason: "offline")
