@@ -102,6 +102,37 @@ final class PayInKeyStoreTests: XCTestCase {
         XCTAssertEqual(held.sentKeys, ["k1", "k1"])
     }
 
+    func testAnUnknownSendSettlesUnderTheEntryPointItWasReservedForThoughTheFlowMovedWhileSending() async throws {
+        let held = HeldOpenTransport(firstSendLost: true)
+        let first = makeFlow(prefix: "k", transport: held)
+        let retrying = makeFlow(prefix: "n", transport: held)
+
+        let sending = Task { try await first.capture(self.request(.newPayment)) }
+        await held.firstSendArrived()
+        first.configure(config: try PayabliConfig(entryPoint: "other", environment: .sandbox, tokenProvider: { "tok" }))
+        held.release()
+        _ = await PayInFixture.failure(from: { _ = try await sending.value })
+        clock.advance(by: payabliIdempotencyKeyMaxAge)
+        _ = try await retrying.capture(request(.retry))
+
+        XCTAssertEqual(held.sentKeys, ["k1", "n1"])
+    }
+
+    func testAnAnsweredSendForgetsItsKeyUnderTheEntryPointItWasReservedForThoughTheFlowMovedWhileSending() async throws {
+        let held = HeldOpenTransport()
+        let first = makeFlow(prefix: "k", transport: held)
+        let second = makeFlow(prefix: "n", transport: held)
+
+        let sending = Task { try await first.capture(self.request(.newPayment)) }
+        await held.firstSendArrived()
+        first.configure(config: try PayabliConfig(entryPoint: "other", environment: .sandbox, tokenProvider: { "tok" }))
+        held.release()
+        _ = try await sending.value
+        _ = try await second.capture(request(.newPayment))
+
+        XCTAssertEqual(held.sentKeys, ["k1", "n1"])
+    }
+
     func testAKeyWhoseSendIsUnderWayOutlivesItsWindow() throws {
         let store = PayInKeyStore()
         let start = ContinuousClock.now
@@ -185,12 +216,13 @@ final class PayInKeyStoreTests: XCTestCase {
     }
 }
 
-/// Answers every send approved, and holds the first open until ``release()``.
+/// Answers every send approved, and holds the first open until ``release()``, then answers it or loses it.
 private final class HeldOpenTransport: PayabliTransport, @unchecked Sendable {
     private static let approved = Data("""
     {"code":"A0000","reason":"Approved","responseData":{"authCode":"1","referenceId":"trans-1"}}
     """.utf8)
 
+    private let firstSendLost: Bool
     private let lock = NSLock()
     private var keys: [String] = []
     private let arrivals = AsyncStream<Void>.makeStream()
@@ -198,6 +230,10 @@ private final class HeldOpenTransport: PayabliTransport, @unchecked Sendable {
 
     var sentKeys: [String] {
         lock.withLock { keys }
+    }
+
+    init(firstSendLost: Bool = false) {
+        self.firstSendLost = firstSendLost
     }
 
     /// Returns once the first send is under way.
@@ -222,6 +258,9 @@ private final class HeldOpenTransport: PayabliTransport, @unchecked Sendable {
             arrivals.continuation.yield()
             for await _ in releases.stream {
                 break
+            }
+            if firstSendLost {
+                throw PayabliGenericError(type: .networkError, reason: "The response was lost.")
             }
         }
         return PayabliResponse(statusCode: 200, headers: [:], body: Self.approved)
