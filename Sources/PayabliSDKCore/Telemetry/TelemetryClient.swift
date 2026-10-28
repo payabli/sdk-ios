@@ -141,8 +141,8 @@ package actor TelemetryClient {
     /// Enqueue an event.
     ///
     /// - Parameter name: the event's catalog name.
-    /// - Parameter properties: the string values the event carries. Only the keys the catalog declares for the event
-    ///   are kept, and an event the catalog does not name is dropped.
+    /// - Parameter properties: the string values the event carries. A pair the catalog does not allow the event is
+    ///   dropped, and an event the catalog does not name is dropped whole.
     package func emit(_ name: String, properties: [String: String] = [:]) async {
         await emit(name, properties: properties, occurredAt: Date())
     }
@@ -150,8 +150,8 @@ package actor TelemetryClient {
     /// Enqueue an event stamped with when it happened.
     ///
     /// - Parameter name: the event's catalog name.
-    /// - Parameter properties: the string values the event carries. Only the keys the catalog declares for the event
-    ///   are kept, and an event the catalog does not name is dropped.
+    /// - Parameter properties: the string values the event carries. A pair the catalog does not allow the event is
+    ///   dropped, and an event the catalog does not name is dropped whole.
     /// - Parameter occurredAt: when the reported thing happened.
     /// - Parameter waitsForBatch: holds even a failure for its batch, for a report the send-at-once rule must not move.
     package func emit(
