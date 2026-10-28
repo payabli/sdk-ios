@@ -60,11 +60,11 @@ struct HeldIdempotencyKeys {
     private var records: [HeldKeyScope: Record] = [:]
 
     /// Whether the last attempt that should have been recorded found no room. Reported once until a key is recorded.
-    private(set) var isSaturated = false
+    private var isSaturated = false
 
-    /// Whether nothing is recorded and no report of being full is pending, so the table can be dropped.
+    /// Whether nothing is recorded, so the table can be dropped.
     var isIdle: Bool {
-        records.isEmpty && !isSaturated
+        records.isEmpty
     }
 
     init(maxAge: Duration = payabliIdempotencyKeyMaxAge) {
