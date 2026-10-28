@@ -49,6 +49,33 @@ import XCTest
             }
         }
 
+        /// A read that finds the reader session spent is the session's expiry, and the processor may have taken
+        /// the sale before the reader answered.
+        func testAReadThatFindsTheSessionSpentIsTheSessionsExpiry() {
+            for error in [Self.rebuiltRead(.readerSessionExpired), Self.rebuiltRead(.noReaderSession)] {
+                guard case let .readerSessionExpired(_, capture) = FiservCardReader.mapReadError(error) else {
+                    return XCTFail("expected .readerSessionExpired for \(error)")
+                }
+                XCTAssertEqual(capture, .unknown)
+            }
+        }
+
+        /// Where the platform's type did not survive, its case name in the reader's words still says so.
+        func testASpentSessionNamedOnlyInTheReadersWordsIsTheSessionsExpiry() {
+            let named = FiservTTPCardReaderError(title: "readerTokenExpired", localizedDescription: "token expired")
+
+            guard case .readerSessionExpired = FiservCardReader.mapReadError(named) else {
+                return XCTFail("expected .readerSessionExpired")
+            }
+        }
+
+        /// A read that failed while the session lives keeps the read's own case.
+        func testAReadFailureTheSessionSurvivesIsNotAnExpiry() {
+            guard case .nfcFailed = FiservCardReader.mapReadError(Self.rebuiltRead(.cardReadFailed)) else {
+                return XCTFail("expected .nfcFailed")
+            }
+        }
+
         func testACancelledReadCarriesTheCancellationPrefix() {
             let mapped = FiservCardReader.mapError(Self.rebuiltRead(.readCancelled)) { .nfcFailed(reason: $0) }
 

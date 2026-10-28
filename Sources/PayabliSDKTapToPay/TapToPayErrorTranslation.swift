@@ -143,6 +143,8 @@ enum TapToPayErrorTranslation {
             return .readerUnavailable
         case .readerDeviceRefused:
             return .readerDeviceRefused
+        case .readerSessionExpired:
+            return .readerSessionExpired
         case .cardDeclined:
             return .cardDeclined
         case .outcomeUnknown:
@@ -209,7 +211,7 @@ enum TapToPayErrorTranslation {
         case .notInitialized, .invalidState, .notReady, .devicePendingActivation, .tokenExpired,
              .termsNotAccepted, .readerOSVersionNotSupported, .readerHardwareUnsupported,
              .cardPresentNotEnabled, .activationCodeMalformed, .cardDeclined, .outcomeUnknown, .paymentNotTaken,
-             .readerCredentialsUnusable:
+             .readerCredentialsUnusable, .readerSessionExpired:
             nil
         }
         guard let text, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }

@@ -403,6 +403,8 @@ extension PayabliTTP {
             return PayabliTTPError.readerDeviceRefused(reason: reason, paymentTransId: paymentTransId, capture: .unknown)
         case let .readerUnavailable(reason, _, _):
             return PayabliTTPError.readerUnavailable(reason: reason, paymentTransId: paymentTransId, capture: .unknown)
+        case let .readerSessionExpired(_, capture):
+            return PayabliTTPError.readerSessionExpired(paymentTransId: paymentTransId, capture: capture)
         case let .some(ttpError):
             return PayabliTTPError.nfcFailed(reason: ttpError.localizedDescription, paymentTransId: paymentTransId)
         case .none:

@@ -56,6 +56,10 @@ package enum PayabliTTPError: Error, Sendable {
     /// has to be armed again before it reads another card.
     case readerDeviceRefused(reason: String, paymentTransId: String? = nil, capture: PayabliTTPCapture = .notCharged)
 
+    /// The reader session is gone, so the session has to be set up again before it reads another card. Not charged
+    /// where the reader was missing before the read began; unknown where the session ended during the read.
+    case readerSessionExpired(paymentTransId: String? = nil, capture: PayabliTTPCapture = .notCharged)
+
     /// The processor refused the card. No money moved.
     case cardDeclined(paymentTransId: String)
 
@@ -77,7 +81,8 @@ package extension PayabliTTPError {
         case let .updateFailed(_, _, capture, _),
              let .readerOSVersionNotSupported(_, capture),
              let .readerUnavailable(_, _, capture),
-             let .readerDeviceRefused(_, _, capture):
+             let .readerDeviceRefused(_, _, capture),
+             let .readerSessionExpired(_, capture):
             return capture
         case .notInitialized, .invalidState, .notReady, .devicePendingActivation, .attestationRevoked,
              .attestationFailed, .deviceSetupRequired, .deviceSetupRefused, .entryPointRefused, .configFailed,
@@ -96,6 +101,7 @@ package extension PayabliTTPError {
              let .readerOSVersionNotSupported(paymentTransId, _),
              let .readerUnavailable(_, paymentTransId, _),
              let .readerDeviceRefused(_, paymentTransId, _),
+             let .readerSessionExpired(paymentTransId, _),
              let .guardFailed(_, paymentTransId):
             return paymentTransId
         case let .updateFailed(_, paymentTransId, _, _),
@@ -141,6 +147,8 @@ extension PayabliTTPError: LocalizedError {
             return "The processor has no record of the payment, so the card was not charged"
         case .readerHardwareUnsupported:
             return "This device cannot take contactless payments"
+        case .readerSessionExpired:
+            return "The card reader session expired"
         case .cardPresentNotEnabled:
             return "Card-present payments are not enabled for this paypoint"
         case .activationCodeMalformed:

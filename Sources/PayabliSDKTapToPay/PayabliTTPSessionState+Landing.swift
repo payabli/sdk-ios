@@ -4,6 +4,8 @@ import PayabliSDKCore
 // MARK: - Where a failure lands
 
 extension PayabliTTPSessionState {
+    // swiftlint:disable cyclomatic_complexity
+
     /// The state a failure leaves the session in, or `nil` when it leaves the session where it was. Failures
     /// a host repairs identically land together; one whose remedy is unknown lands on
     /// ``PayabliTTPFailureReason/serviceUnavailable``, where being wrong costs a retry rather than a bug report.
@@ -50,6 +52,10 @@ extension PayabliTTPSessionState {
         case .readerOSVersionNotSupported, .readerHardwareUnsupported, .readerDeviceRefused:
             return .failed(reason: .deviceIneligible)
 
+        case .readerSessionExpired:
+            // The reader session is gone, and setting the session up again repairs it.
+            return .sessionExpired
+
         case .readerSetupFailed, .readerUnavailable, .networkError, .tokenExpired:
             // A reader that would not arm, a service that could not be reached
             // and a token that expired all leave the device as it was, so a host
@@ -69,6 +75,8 @@ extension PayabliTTPSessionState {
             return nil
         }
     }
+
+    // swiftlint:enable cyclomatic_complexity
 
     /// A failure that carries a catalog type, landed by that type.
     ///

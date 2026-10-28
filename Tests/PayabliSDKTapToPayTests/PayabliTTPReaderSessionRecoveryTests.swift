@@ -132,10 +132,11 @@ final class PayabliTTPReaderSessionRecoveryTests: XCTestCase {
         ))
     }
 
-    /// A refusal of the device by the vendor ends the reader session; a reader that could not be
+    /// A refusal of the device by the vendor and a reader gone end the reader session; a reader that could not be
     /// started or a guard that failed ends only the read.
     func testTheSDKsOwnRefusalsAreClassified() {
         XCTAssertTrue(readerFailureInvalidatesSession(PayabliTTPError.readerDeviceRefused(reason: "x")))
+        XCTAssertTrue(readerFailureInvalidatesSession(PayabliTTPError.readerSessionExpired()))
         XCTAssertFalse(readerFailureInvalidatesSession(PayabliTTPError.readerUnavailable(reason: "x")))
         XCTAssertFalse(readerFailureInvalidatesSession(PayabliTTPError.guardFailed(reason: "x")))
     }

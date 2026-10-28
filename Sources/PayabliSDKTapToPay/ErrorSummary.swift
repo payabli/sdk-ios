@@ -44,7 +44,7 @@ enum ErrorSummary {
         }
     }
 
-    // swiftlint:disable cyclomatic_complexity
+    // swiftlint:disable cyclomatic_complexity function_body_length
 
     /// The case, and details that are not free text. No `reason` reaches this string.
     ///
@@ -91,6 +91,8 @@ enum ErrorSummary {
             return "guardFailed"
         case .readerDeviceRefused:
             return "readerDeviceRefused"
+        case .readerSessionExpired:
+            return "readerSessionExpired"
         case .nfcFailed:
             return "nfcFailed"
         case .activationFailed:
@@ -116,7 +118,7 @@ enum ErrorSummary {
         }
     }
 
-    // swiftlint:enable cyclomatic_complexity
+    // swiftlint:enable cyclomatic_complexity function_body_length
 
     /// A log read at speed wants the name rather than the case's description.
     ///

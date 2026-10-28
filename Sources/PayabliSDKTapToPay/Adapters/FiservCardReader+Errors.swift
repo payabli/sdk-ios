@@ -47,6 +47,19 @@ extension FiservCardReader {
             return fallback(detail.isEmpty ? error.localizedDescription : detail)
         }
 
+        /// Translates a read's failure: a reader session found spent is the session's expiry, with the outcome
+        /// unknown because the processor may take the sale before the reader answers. Any other failure is mapped
+        /// as an NFC one.
+        ///
+        /// - Parameter error: what the read threw, before it was translated for the host.
+        /// - Returns: the typed error a host receives.
+        static func mapReadError(_ error: Error) -> PayabliTTPError {
+            if let platform = platformError(behind: error), readerFailureInvalidatesSession(platform) {
+                return .readerSessionExpired(capture: .unknown)
+            }
+            return mapError(error) { .nfcFailed(reason: $0) }
+        }
+
         /// The refusal the vendor named, where the failure reason it kept carries the processor's own code.
         ///
         /// Only a code that decodes out names a refusal; an error whose reason is not the vendor's JSON keeps the
