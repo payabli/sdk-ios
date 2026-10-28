@@ -200,14 +200,14 @@ final class PayabliTTPChargeFailureTests: XCTestCase {
         StubURLProtocol.handler = Self.refusingOpening(
             code: "E7020",
             field: "customerData",
-            message: "Missing customer identifiers: customerNumber, email"
+            message: "Missing customer identifiers: customerNumber,email"
         )
 
         let failure = try await chargeFailure(ttp)
 
         XCTAssertEqual(failure.type, .validation, "\(failure)")
         XCTAssertEqual(failure.code, 1016)
-        XCTAssertEqual(failure.refusal, .customerDataRefused(requiredFields: ["customerNumber", "email"]))
+        XCTAssertEqual(failure.refusal, .customerDataRefused(requiredFields: ["customerNumber", "billingEmail"]))
         XCTAssertEqual(failure.capture, .notCharged)
         XCTAssertNil(failure.paymentTransId)
         XCTAssertEqual(provider.startReadingCalls, 0)

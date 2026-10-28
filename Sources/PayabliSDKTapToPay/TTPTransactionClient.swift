@@ -232,15 +232,35 @@ struct CustomerDataRefusal: PayabliError {
 
     private static let identifiersPrefix = "Missing customer identifiers: "
 
+    /// The ``PayabliTTPCustomerData`` property that sets each identifier key, by the key lowercased.
+    private static let propertyForKey: [String: String] = [
+        "customernumber": "customerNumber",
+        "firstname": "firstName",
+        "lastname": "lastName",
+        "company": "company",
+        "phone": "billingPhone",
+        "email": "billingEmail",
+        "city": "billingCity",
+        "state": "billingState",
+        "zip": "billingZip",
+        "country": "billingCountry",
+        "shippingcity": "shippingCity",
+        "shippingstate": "shippingState",
+        "shippingzip": "shippingZip",
+        "shippingcountry": "shippingCountry"
+    ]
+
     /// The field names a refusal's text lists after its fixed prefix, or nil for text that lists none.
     ///
     /// - Parameter message: the refusal's text for the customer.
-    /// - Returns: the names in the order given, trimmed, with empty ones dropped.
+    /// - Returns: the names in the order given, each as the customer property that sets it, or as given when no
+    ///   property does.
     private static func fieldsNamed(in message: String) -> [String]? {
         guard message.hasPrefix(identifiersPrefix) else { return nil }
         return message.dropFirst(identifiersPrefix.count)
             .split(separator: ",")
             .map { $0.trimmingCharacters(in: .whitespaces) }
             .filter { !$0.isEmpty }
+            .map { propertyForKey[$0.lowercased()] ?? $0 }
     }
 }
