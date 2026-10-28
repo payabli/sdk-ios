@@ -332,7 +332,9 @@ package actor TelemetryClient {
         var events = batch
         if dropped > 0 {
             logger.warning("telemetry_queue_overflow dropped=\(dropped)")
-            events.append(overflowEvent(dropped))
+            if let overflow = overflowEvent(dropped) {
+                events.append(overflow)
+            }
         }
         // The session's identifier as it is, already a digest; the route compares it with the one registration sent.
         let device = deviceId().flatMap { $0.isEmpty ? nil : $0 }
@@ -354,19 +356,20 @@ package actor TelemetryClient {
     /// The event that reports evictions, last in its batch and timed when the send noticed them.
     ///
     /// - Parameter dropped: how many events the queue evicted, more than zero.
-    /// - Returns: the event to append to the batch.
-    private func overflowEvent(_ dropped: Int) -> TelemetryEvent {
-        TelemetryEvent(
+    /// - Returns: the event to append to the batch, or `nil` when the catalog does not name it.
+    private func overflowEvent(_ dropped: Int) -> TelemetryEvent? {
+        guard let properties = TelemetryCatalog.scrub(
+            TelemetryEventName.sdkTelemetryOverflow,
+            [TelemetryProperty.dropped.rawValue: String(dropped)]
+        ) else { return nil }
+        return TelemetryEvent(
             sdkVersion: configuration.sdkVersion,
             sessionId: sessionId,
             deviceIdHash: nil,
             entry: configuration.entry,
             environment: configuration.environment,
             event: TelemetryEventName.sdkTelemetryOverflow,
-            properties: TelemetryCatalog.scrub(
-                TelemetryEventName.sdkTelemetryOverflow,
-                [TelemetryProperty.dropped.rawValue: String(dropped)]
-            ) ?? [:],
+            properties: properties,
             timestamp: Date()
         )
     }
