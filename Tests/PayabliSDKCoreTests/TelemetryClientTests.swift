@@ -209,6 +209,69 @@ final class TelemetryClientTests: XCTestCase {
         XCTAssertTrue(TelemetryClient.sendsAtOnce(TelemetryEventName.ttpCloseFailed, [:]))
     }
 
+    // MARK: - The catalog gate
+
+    func testAKeyTheEventDoesNotDeclareIsNotQueued() async {
+        let client = makeClient()
+        await client.emit(
+            TelemetryEventName.payinCaptureCompleted,
+            properties: ["outcome": "approved", "holder": "undeclared"]
+        )
+
+        let queued = await client.queuedEvents
+        XCTAssertEqual(queued.map(\.properties), [["outcome": "approved"]])
+    }
+
+    func testAnEventTheCatalogDoesNotNameIsNotQueued() async {
+        let client = makeClient()
+        await client.emit("payin.cardNumber.entered", properties: ["outcome": "failed"])
+        await client.settled()
+
+        let buffered = await client.bufferedCount
+        let batches = await transport.batches
+        XCTAssertEqual(buffered, 0)
+        XCTAssertTrue(batches.isEmpty, "a dropped event asks for no send")
+    }
+
+    func testWhatWasRecordedBeforeTheClientStartedPassesTheSameGate() async {
+        let client = makeClient(queued: [
+            (TelemetryEventName.sdkInitialized, ["state": "ready", "holder": "undeclared"]),
+            ("payin.cardNumber.entered", [:])
+        ])
+
+        let queued = await client.queuedEvents
+        XCTAssertEqual(queued.map(\.event), [TelemetryEventName.sdkInitialized])
+        XCTAssertEqual(queued.map(\.properties), [["state": "ready"]])
+    }
+
+    func testADeclaredValueThatCannotBeReportedDropsItsPairAndKeepsTheRest() async {
+        let client = makeClient()
+        await client.emit(TelemetryEventName.payinCaptureCompleted, properties: [
+            "outcome": "approved",
+            "code": "",
+            "origin": String(repeating: "o", count: 257),
+            "failure_type": "Caf\u{E9}Error",
+            "duration_ms": "12\n",
+            "method": String(repeating: "m", count: 256)
+        ])
+
+        let queued = await client.queuedEvents
+        XCTAssertEqual(
+            queued.map(\.properties),
+            [["outcome": "approved", "method": String(repeating: "m", count: 256)]],
+            "empty, too long and non-printable values go; a value of exactly 256 stays"
+        )
+    }
+
+    func testAnOutcomeTheEventDoesNotDeclareDoesNotSendItAtOnce() async {
+        let client = makeClient()
+        await client.emit(TelemetryEventName.ttpInitializeSucceeded, properties: ["outcome": "failed"])
+        await client.settled()
+
+        let batches = await transport.batches
+        XCTAssertTrue(batches.isEmpty)
+    }
+
     // MARK: - The bounded queue
 
     func testWhatTheQueueEvictedArrivesAsOneOverflowEventLastInTheNextBatch() async {

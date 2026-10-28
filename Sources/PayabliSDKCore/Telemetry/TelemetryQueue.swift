@@ -4,7 +4,8 @@
 /// What is evicted is counted, and the count is reported by the next batch that leaves.
 struct TelemetryQueue {
     private let capacity: Int
-    private var events: [TelemetryEvent] = []
+    /// The events held, oldest first.
+    private(set) var events: [TelemetryEvent] = []
     private var dropped = 0
     private var offeredSinceLastDrain = 0
 
