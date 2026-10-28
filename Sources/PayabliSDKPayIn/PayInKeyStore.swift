@@ -74,7 +74,8 @@ final class PayInKeyStore: @unchecked Sendable {
         lock.withLock { partitions.removeAll() }
     }
 
-    /// Drops every key the service would no longer recognise, in every entry point, and every table left idle.
+    /// Drops every key the service would no longer recognise, for every entry point and environment, and every table
+    /// left idle.
     /// Called with the lock held.
     ///
     /// - Parameter now: the moment a key's age is read against.
