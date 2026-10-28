@@ -10,6 +10,21 @@ enum HeldKeyScope: Hashable {
     case authorize(reference: String)
     case captureAuthorized(transId: String)
     case void(transId: String)
+
+    /// Whether a send under `other` keeps one under this scope from being sent: the same scope, or the other route
+    /// naming the same transaction.
+    ///
+    /// - Parameter other: the scope of a send under way.
+    /// - Returns: whether the two would overlap.
+    func overlaps(_ other: HeldKeyScope) -> Bool {
+        switch (self, other) {
+        case let (.captureAuthorized(transId), .void(otherTransId)),
+             let (.void(transId), .captureAuthorized(otherTransId)):
+            transId == otherTransId
+        default:
+            self == other
+        }
+    }
 }
 
 /// The key of every payment sent and not yet answered, for one entry point and environment, in ``PayInKeyStore``.
@@ -77,9 +92,9 @@ struct HeldIdempotencyKeys {
     /// - Parameter now: the moment the key is chosen.
     /// - Parameter mint: makes a new key.
     /// - Returns: the reservation to send under and to settle afterwards.
-    /// - Throws: ``PayabliErrorType/paymentReferenceOpen`` when a send of the recorded key is under way, or a new payment
-    ///   names a reference whose key is recorded, and ``PayabliErrorType/retryNotSamePayment`` when the recorded key was
-    ///   made for another payment.
+    /// - Throws: ``PayabliErrorType/paymentReferenceOpen`` when a send of the recorded key, or of the other route naming
+    ///   the same transaction, is under way, or a new payment names a reference whose key is recorded, and
+    ///   ``PayabliErrorType/retryNotSamePayment`` when the recorded key was made for another payment.
     mutating func reserve(
         scope: HeldKeyScope,
         claimsHeld: Bool,
@@ -88,9 +103,13 @@ struct HeldIdempotencyKeys {
         mint: () -> String
     ) throws -> Reservation {
         sweep(now: now)
+        let open = PayabliGenericError(type: .paymentReferenceOpen, reason: "Another call for this payment is open")
+        if records.contains(where: { $0.value.sending && $0.key.overlaps(scope) }) {
+            throw open
+        }
         if var held = records[scope] {
-            guard claimsHeld, !held.sending else {
-                throw PayabliGenericError(type: .paymentReferenceOpen, reason: "Payment reference still unresolved")
+            guard claimsHeld else {
+                throw open
             }
             if let heldPayment = held.payment, let payment, !heldPayment.isRepeated(by: payment) {
                 throw PayabliGenericError(type: .retryNotSamePayment, reason: "Retry describes a different payment")

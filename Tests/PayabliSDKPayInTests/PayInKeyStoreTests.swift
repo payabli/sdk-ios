@@ -118,6 +118,47 @@ final class PayInKeyStoreTests: XCTestCase {
         XCTAssertEqual(held.sentKeys, ["k1"])
     }
 
+    func testAVoidFromAnotherFlowWhileTheFirstCapturesTheSameAuthorizationIsRefused() async throws {
+        let held = HeldOpenTransport()
+        let first = makeFlow(prefix: "k", transport: held)
+        let second = makeFlow(prefix: "n", transport: held)
+
+        let sending = Task { try await first.captureAuthorizedTransaction(self.authorized("t-1")) }
+        await held.firstSendArrived()
+        let refused = await failure { try await second.voidTransaction("t-1") }
+        held.release()
+        _ = try await sending.value
+
+        XCTAssertEqual((refused as? any PayabliError)?.type, .paymentReferenceOpen)
+        XCTAssertEqual(held.sentKeys, ["k1"])
+    }
+
+    func testACaptureFromAnotherFlowWhileTheFirstVoidsTheSameTransactionIsRefused() async throws {
+        let held = HeldOpenTransport()
+        let first = makeFlow(prefix: "k", transport: held)
+        let second = makeFlow(prefix: "n", transport: held)
+
+        let sending = Task { try await first.voidTransaction("t-1") }
+        await held.firstSendArrived()
+        let refused = await failure { try await second.captureAuthorizedTransaction(self.authorized("t-1")) }
+        _ = try await second.captureAuthorizedTransaction(self.authorized("t-2"))
+        held.release()
+        _ = try await sending.value
+
+        XCTAssertEqual((refused as? any PayabliError)?.type, .paymentReferenceOpen)
+        XCTAssertEqual(held.sentKeys, ["k1", "n1"])
+    }
+
+    func testAVoidAfterACaptureOfTheSameTransactionEndedUnknownSendsAKeyOfItsOwn() async throws {
+        transport.script = [.lost, .approved]
+        let other = makeFlow(prefix: "n")
+
+        _ = await failure { try await self.flow.captureAuthorizedTransaction(self.authorized("t-1")) }
+        _ = try await other.voidTransaction("t-1")
+
+        XCTAssertEqual(transport.sentKeys, ["k1", "n1"])
+    }
+
     func testAnUnknownSendSettlesUnderTheEntryPointItWasReservedForThoughTheFlowMovedWhileSending() async throws {
         let held = HeldOpenTransport(firstSendLost: true)
         let first = makeFlow(prefix: "k", transport: held)
@@ -224,6 +265,10 @@ final class PayInKeyStoreTests: XCTestCase {
                 attempt: attempt
             )
         )
+    }
+
+    private func authorized(_ transId: String) -> PayabliPayInAuthorizedRequest {
+        PayabliPayInAuthorizedRequest(transId: transId, paymentDetails: PayabliPayInPaymentDetails(totalAmount: 10))
     }
 
     private func failure(_ block: () async throws -> PayabliPayInResult) async -> any Error {
