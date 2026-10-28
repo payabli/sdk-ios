@@ -4,6 +4,11 @@ import Foundation
 import XCTest
 
 final class TokenStorageClientCoverageTests: XCTestCase {
+    override func setUp() {
+        super.setUp()
+        PayInKeyStore.process.forgetHeld()
+    }
+
     func testAStoreBadRequestCarriesTheRoutesResponseTextInItsDetail() async throws {
         let transport = CoverageMockTransport(statusCode: 400, responseBody: """
         { "responseText": "Paypoint not found or inactive" }

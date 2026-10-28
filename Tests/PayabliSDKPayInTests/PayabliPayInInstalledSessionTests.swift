@@ -6,6 +6,7 @@ import XCTest
 final class PayabliPayInInstalledSessionTests: XCTestCase {
     override func setUp() {
         super.setUp()
+        PayInKeyStore.process.forgetHeld()
         // A refusal reports at once, and a report would otherwise ask the host's token handler and reach the network.
         PayabliSession.resetForTesting(telemetryTransport: DiscardingTelemetryTransport())
     }
