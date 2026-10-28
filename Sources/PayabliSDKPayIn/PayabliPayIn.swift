@@ -546,9 +546,9 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
         }
     }
 
-    /// Throws a failure as the caller receives it: a definite outcome or a host's cancellation as itself, and
-    /// ``PayabliPayInError/submissionInterrupted(type:causeType:paymentTransId:paymentReference:)`` whenever a send of
-    /// this payment may have run.
+    /// Throws a failure as the caller receives it: a definite outcome as itself, a direct call's cancellation as
+    /// `CancellationError`, and ``PayabliPayInError/submissionInterrupted(type:causeType:paymentTransId:paymentReference:)``
+    /// for any other failure once a send of this payment may have run.
     ///
     /// - Parameter error: what the attempt threw.
     /// - Parameter outcome: what it meant for the key.
