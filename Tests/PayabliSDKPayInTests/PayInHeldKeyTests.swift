@@ -683,7 +683,7 @@ final class ScriptedTransport: PayabliTransport, @unchecked Sendable {
         case lostBeforeHandOff
         case tokenFetchFailed
         case cancelled(afterHandOff: Bool)
-        /// `URLSession` ending a cancelled task after the hand-off.
+        /// A cancelled task raised as `URLError.cancelled` after the hand-off, by a transport that does not convert it.
         case systemCancelled
     }
 
