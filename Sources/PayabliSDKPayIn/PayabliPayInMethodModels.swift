@@ -5,16 +5,16 @@ public enum PayabliPayInMethodType: RawRepresentable, CaseIterable, Identifiable
     case card
     case bankAccount
 
+    /// Finds the method the service names.
+    ///
     /// - Parameter rawValue: the service's name for the method.
-    /// - Returns: the method, or nil when the service has no such name for one a payer enters.
+    /// - Returns: the method, or nil when no case carries that name.
     public init?(rawValue: String) {
-        switch rawValue {
-        case PayInMethodWireNames.card: self = .card
-        case PayInMethodWireNames.ach: self = .bankAccount
-        default: return nil
-        }
+        guard let method = Self.allCases.first(where: { $0.rawValue == rawValue }) else { return nil }
+        self = method
     }
 
+    /// The service's name for the method.
     public var rawValue: String {
         switch self {
         case .card: PayInMethodWireNames.card
