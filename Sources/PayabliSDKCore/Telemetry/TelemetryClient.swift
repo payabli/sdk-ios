@@ -69,7 +69,7 @@ package actor TelemetryClient {
     private let transport: TelemetryTransport
     private let sleep: Sleep
     private let lifecycle: any AppLifecycle
-    private let logger = PayabliLogger(category: .telemetry)
+    private let logger: PayabliLogger
     private let deviceId: @Sendable () -> String?
     private var queue: TelemetryQueue
 
@@ -89,6 +89,7 @@ package actor TelemetryClient {
     /// - Parameter queued: events queued before anything else can record, oldest first, held to the catalog as
     ///   `emit` holds them.
     /// - Parameter sessionId: the identifier every event from this client carries.
+    /// - Parameter logger: where the client's own log lines go.
     package init(
         configuration: Configuration,
         transport: TelemetryTransport,
@@ -96,9 +97,11 @@ package actor TelemetryClient {
         lifecycle: any AppLifecycle,
         deviceId: @escaping @Sendable () -> String?,
         queued: [(name: String, properties: [String: String])],
-        sessionId: String = UUID().uuidString
+        sessionId: String = UUID().uuidString,
+        logger: PayabliLogger = PayabliLogger(category: .telemetry)
     ) {
         self.configuration = configuration
+        self.logger = logger
         self.transport = transport
         self.sleep = sleep
         self.lifecycle = lifecycle
@@ -130,12 +133,24 @@ package actor TelemetryClient {
         watcher?.cancel()
     }
 
-    /// Stops this client scheduling sends of its own: its timer and its background watcher end, and nothing starts
-    /// them again. Called once, when the session it reports for is replaced.
+    /// Stops this client: its timer and its background watcher end, a later record is dropped, and what is queued is
+    /// sent in at most `maxRequestsPerDrain` requests. Called once, when the session it reports for is replaced.
     package func stop() {
+        guard !stopped else { return }
         stopped = true
         timer?.cancel()
         watcher?.cancel()
+        let previous = tail
+        let bound = configuration.maxRequestsPerDrain
+        // Bounded by requests rather than by what is queued: nothing is queued after this, so a request left with
+        // nothing to send or a batch kept for later ends it.
+        tail = Task {
+            await previous?.value
+            var requests = 0
+            while requests < bound, await self.sendOneRequest() {
+                requests += 1
+            }
+        }
     }
 
     /// Enqueue an event.
@@ -176,6 +191,10 @@ package actor TelemetryClient {
     private func enqueue(_ name: String, properties: [String: String], occurredAt: Date, waitsForBatch: Bool) {
         guard let properties = TelemetryCatalog.scrub(name, properties) else {
             logger.warning("telemetry_event_unknown: event not in the catalog; dropped")
+            return
+        }
+        guard !stopped else {
+            logger.debug("telemetry_event_after_stop: this channel was stopped; dropped")
             return
         }
         startIfNeeded()
