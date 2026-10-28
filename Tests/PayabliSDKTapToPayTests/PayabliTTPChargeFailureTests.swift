@@ -191,7 +191,109 @@ final class PayabliTTPChargeFailureTests: XCTestCase {
         XCTAssertEqual(failure.capture, .notCharged)
     }
 
+    // MARK: - A refused customer
+
+    /// The paypoint names the customer fields it requires, and the host receives them with nothing charged and no
+    /// card asked for.
+    func testARefusedCustomerNamesTheFieldsToCollectAndChargesNothing() async throws {
+        let (ttp, provider, _) = try await makeReadyTTP()
+        StubURLProtocol.handler = Self.refusingOpening(
+            code: "E7020",
+            field: "customerData",
+            message: "Missing customer identifiers: customerNumber, email"
+        )
+
+        let failure = try await chargeFailure(ttp)
+
+        XCTAssertEqual(failure.type, .validation, "\(failure)")
+        XCTAssertEqual(failure.code, 1016)
+        XCTAssertEqual(failure.refusal, .customerDataRefused(requiredFields: ["customerNumber", "email"]))
+        XCTAssertEqual(failure.capture, .notCharged)
+        XCTAssertNil(failure.paymentTransId)
+        XCTAssertEqual(provider.startReadingCalls, 0)
+    }
+
+    /// A refusal of the customer that names no field still reaches the host as a refused customer, with nothing to
+    /// collect listed.
+    func testARefusedCustomerNamingNoFieldsListsNone() async throws {
+        let (ttp, _, _) = try await makeReadyTTP()
+        StubURLProtocol.handler = Self.refusingOpening(
+            code: "E7020",
+            field: "customerData",
+            message: "Customer data is required"
+        )
+
+        let failure = try await chargeFailure(ttp)
+
+        XCTAssertEqual(failure.type, .validation, "\(failure)")
+        XCTAssertEqual(failure.refusal, .customerDataRefused(requiredFields: []))
+        XCTAssertEqual(failure.capture, .notCharged)
+    }
+
+    /// The same code blaming another field is an ordinary invalid request.
+    func testTheSameCodeOnAnotherFieldIsNotARefusedCustomer() async throws {
+        let (ttp, _, _) = try await makeReadyTTP()
+        StubURLProtocol.handler = Self.refusingOpening(
+            code: "E7020",
+            field: "paymentDetails.totalAmount",
+            message: "Missing customer identifiers: customerNumber"
+        )
+
+        let failure = try await chargeFailure(ttp)
+
+        XCTAssertEqual(failure.type, .validation, "\(failure)")
+        XCTAssertNil(failure.refusal)
+    }
+
+    /// Another code blaming the customer is an ordinary invalid request.
+    func testAnotherCodeOnTheCustomerIsNotARefusedCustomer() async throws {
+        let (ttp, _, _) = try await makeReadyTTP()
+        StubURLProtocol.handler = Self.refusingOpening(
+            code: "E5009",
+            field: "customerData",
+            message: "Missing customer identifiers: customerNumber"
+        )
+
+        let failure = try await chargeFailure(ttp)
+
+        XCTAssertEqual(failure.type, .validation, "\(failure)")
+        XCTAssertNil(failure.refusal)
+    }
+
     // MARK: - Fixtures
+
+    /// Answers `/initiate` with a 400 blaming `field`, shaped as the service's refusal body, and every other path as
+    /// ``chargeStubHandler`` does.
+    ///
+    /// - Parameter code: the refusal's code.
+    /// - Parameter field: the field the refusal blames.
+    /// - Parameter message: the refusal's text, sent as its detail and as the field's message.
+    /// - Returns: the handler.
+    private static func refusingOpening(code: String, field: String, message: String) -> StubURLProtocol.Handler {
+        { request in
+            guard request.url?.path.contains("/MoneyIn/initiate") == true else {
+                return try chargeStubHandler(request)
+            }
+            let body: [String: Any] = [
+                "type": "https://docs.payabli.com/developers/references/pay-in-unified-response-codes",
+                "title": "Bad Request",
+                "status": 400,
+                "detail": message,
+                "instance": "/api/v2/MoneyIn/initiate",
+                "code": code,
+                "errors": [field: [["message": message, "suggestion": ""]]]
+            ]
+            return (
+                HTTPURLResponse(
+                    url: request.url!,
+                    statusCode: 400,
+                    httpVersion: "HTTP/1.1",
+                    headerFields: ["Content-Type": "application/json"]
+                )!,
+                try JSONSerialization.data(withJSONObject: body)
+            )
+        }
+    }
 
     private func chargeFailure(_ ttp: PayabliTTP) async throws -> TapToPayError {
         do {
