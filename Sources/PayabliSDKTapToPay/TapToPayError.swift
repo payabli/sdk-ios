@@ -6,6 +6,9 @@ import PayabliSDKCore
 ///
 /// `paymentTransId` and `capture` describe the payment a failure belongs to, and say no money moved
 /// for one that belongs to none. `retryAfter` is the wait the service asked for, when it asked for one.
+///
+/// `refusal` is the charge's own refusal when this failure refused the charge, and nil when it did not.
+/// It does not change ``type``: a host branches on `refusal` for what this failure asks them to do.
 public struct TapToPayError: PayabliError, PayabliRetryAfter {
     public let type: PayabliErrorType
     public let reason: String
@@ -13,6 +16,7 @@ public struct TapToPayError: PayabliError, PayabliRetryAfter {
     public let paymentTransId: String?
     public let capture: PayabliTTPCapture
     public let retryAfter: TimeInterval?
+    public let refusal: TapToPayChargeRefusal?
 
     package init(
         type: PayabliErrorType,
@@ -20,7 +24,8 @@ public struct TapToPayError: PayabliError, PayabliRetryAfter {
         detail: String?,
         paymentTransId: String? = nil,
         capture: PayabliTTPCapture = .notCharged,
-        retryAfter: TimeInterval? = nil
+        retryAfter: TimeInterval? = nil,
+        refusal: TapToPayChargeRefusal? = nil
     ) {
         self.type = type
         self.reason = reason
@@ -28,6 +33,7 @@ public struct TapToPayError: PayabliError, PayabliRetryAfter {
         self.paymentTransId = paymentTransId
         self.capture = capture
         self.retryAfter = retryAfter
+        self.refusal = refusal
     }
 }
 
@@ -53,6 +59,10 @@ extension TapToPayError: CustomNSError {
         }
         if let retryAfter {
             info["retryAfter"] = retryAfter
+        }
+        if case let .customerDataRefused(requiredFields) = refusal {
+            info["refusal"] = "customerDataRefused"
+            info["requiredFields"] = requiredFields
         }
         return info
     }
