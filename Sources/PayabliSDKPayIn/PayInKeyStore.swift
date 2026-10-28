@@ -7,13 +7,13 @@ final class PayInKeyStore: @unchecked Sendable {
     /// The store every flow in this process uses.
     static let process = PayInKeyStore()
 
-    /// An entry point and an environment.
+    /// An entry point, as it is sent, and an environment.
     private struct Partition: Hashable {
         let entry: String
         let environment: String
 
         init(_ entry: String, _ environment: PayabliEnvironment) {
-            self.entry = entry
+            self.entry = entry.payabliCaptureTrimmed
             self.environment = environment.name
         }
     }

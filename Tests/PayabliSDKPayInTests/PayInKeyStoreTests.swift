@@ -74,6 +74,16 @@ final class PayInKeyStoreTests: XCTestCase {
         XCTAssertEqual(transport.sentKeys.suffix(2), ["n1", "n1"])
     }
 
+    func testAnEntryPointIsMatchedAsItIsSent() async throws {
+        transport.script = [.lost, .approved]
+        let padded = makeFlow(prefix: "n", entryPoint: " entry ")
+
+        _ = await failure { try await padded.capture(self.request(.newPayment)) }
+        _ = try await flow.capture(request(.retry))
+
+        XCTAssertEqual(transport.sentKeys, ["n1", "n1"])
+    }
+
     // MARK: - Recorded as it is made
 
     func testANewPaymentFromAnotherFlowWhileTheFirstIsSendingIsRefusedAndARetrySendsTheFirstKey() async throws {
