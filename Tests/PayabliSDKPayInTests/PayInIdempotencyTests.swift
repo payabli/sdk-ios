@@ -199,14 +199,8 @@ final class PayInIdempotencyTests: XCTestCase {
         XCTAssertEqual(interrupted.type, .serverError)
     }
 
-    /// A cancellation is classified as leaving the outcome open, which is what this pins.
-    ///
-    /// It reaches the classification through an injected error rather than through a cancelled task,
-    /// because no production path produces that code: `PayabliService.perform` wraps anything that is
-    /// not already a Payabli error, cancellation included, into `networkError`. So this covers the
-    /// table's handling of the code and not a route a caller can take to it. Whether a cancelled
-    /// request should report cancellation instead is Core's behaviour for every module and is asked
-    /// rather than decided here.
+    /// The `userCancelled` code leaves the outcome open. Injected as an error, because the transport raises a
+    /// cancelled task as `CancellationError`, never as this code.
     func testACancellationReportsTheKey() async {
         let transport = RecordingIdempotencyTransport(
             failure: PayabliGenericError(type: .userCancelled, reason: "Cancelled")

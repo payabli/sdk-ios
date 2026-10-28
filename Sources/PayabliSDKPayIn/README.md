@@ -142,6 +142,11 @@ service refuses a repeat while it still recognises the key. When it refuses one,
 names an earlier payment matching this one ends with type `.conflict`. `captureAuthorizedTransaction(_:)` and
 `voidTransaction(_:)` do this for their transaction without being asked.
 
+Cancelling the task that runs a charge ends the call with a `CancellationError`, whether or not the request was
+sent, so treat its outcome as unknown. If your app cancels charges, name each payment with `paymentReference` and
+retry under it with `attempt: .retry`. The form reports a cancelled charge that may have been sent to its failure
+handler as `submissionInterrupted` with type `.userCancelled`.
+
 A retry describes the same payment as the attempt it repeats: the same amount, fee, surcharge, currency, kind of
 payment method and, if the first attempt set one, order identifier. A retry that describes another payment is refused
 before anything is sent, with type `.retryNotSamePayment`, and the earlier attempt's key stays for the right

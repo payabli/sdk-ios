@@ -303,6 +303,7 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
                 return try await sending(
                     .capture(reference: reference),
                     claimsHeld: request.options.attempt == .retry,
+                    origin: origin,
                     payment: HeldPaymentDescription(request),
                     reference: reference
                 ) { key in
@@ -337,6 +338,7 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
                 return try await sending(
                     .authorize(reference: reference),
                     claimsHeld: request.options.attempt == .retry,
+                    origin: origin,
                     payment: HeldPaymentDescription(request),
                     reference: reference
                 ) { key in
@@ -361,7 +363,8 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
             try await submit {
                 try await sending(
                     .captureAuthorized(transId: request.transId.payabliCaptureTrimmed),
-                    claimsHeld: true
+                    claimsHeld: true,
+                    origin: .direct
                 ) { key in
                     try await client.captureAuthorized(request, idempotencyKey: key)
                 }
@@ -390,7 +393,8 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
             try await exclusively {
                 try await sending(
                     .void(transId: transId.payabliCaptureTrimmed),
-                    claimsHeld: true
+                    claimsHeld: true,
+                    origin: .direct
                 ) { key in
                     try await client.void(transId: transId, idempotencyKey: key)
                 }
@@ -455,6 +459,7 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
     ///
     /// - Parameter scope: what the attempt belongs to.
     /// - Parameter claimsHeld: whether the attempt takes the key held for its scope.
+    /// - Parameter origin: whether the form or the host started it, which decides how a cancellation ends.
     /// - Parameter payment: the payment the attempt is for, compared with the held key's before taking it.
     /// - Parameter reference: the payment's reference, returned on an unknown outcome.
     /// - Parameter send: sends the request under the key it is given.
@@ -462,6 +467,7 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
     private func sending(
         _ scope: HeldKeyScope,
         claimsHeld: Bool,
+        origin: PayInReports.Origin,
         payment: HeldPaymentDescription? = nil,
         reference: String? = nil,
         _ send: (String) async throws -> PayabliPayInResult
@@ -501,7 +507,8 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
                 as: outcome,
                 reused: reservation.reused,
                 mayHaveLeft: mark.mayHaveLeft,
-                reference: reference
+                reference: reference,
+                origin: origin
             )
         }
     }
@@ -532,7 +539,7 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
         }
     }
 
-    /// Throws a failure as the caller receives it: a definite outcome as itself, and
+    /// Throws a failure as the caller receives it: a definite outcome or a host's cancellation as itself, and
     /// ``PayabliPayInError/submissionInterrupted(type:causeType:paymentTransId:paymentReference:)`` whenever a send of
     /// this payment may have run.
     ///
@@ -541,14 +548,19 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
     /// - Parameter reused: whether the attempt resent a held key, so an earlier send of this payment may have run.
     /// - Parameter mayHaveLeft: whether this send reached the HTTP layer.
     /// - Parameter reference: the payment's reference, which an unknown outcome carries.
+    /// - Parameter origin: whether the form or the host started the attempt.
     /// - Throws: the failure, with a refused held key reported as ``PayabliErrorType/retryRefused``.
     private static func rethrow(
         _ error: any Error,
         as outcome: HeldIdempotencyKeys.Outcome,
         reused: Bool,
         mayHaveLeft: Bool,
-        reference: String?
+        reference: String?,
+        origin: PayInReports.Origin
     ) throws -> Never {
+        if origin == .direct, PayInInterruption.isCancellation((error as? PayInOpenOutcome)?.cause ?? error) {
+            throw CancellationError()
+        }
         if let open = error as? PayInOpenOutcome {
             guard reused || mayHaveLeft else { throw open.cause }
             guard case let .submissionInterrupted(type, causeType, paymentTransId, _) = open.interruption
@@ -562,7 +574,7 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
         }
         guard reused, outcome != .answered else { throw error }
         throw PayabliPayInError.submissionInterrupted(
-            type: (error as? any PayabliError)?.type ?? .unknown,
+            type: PayInInterruption.type(of: error),
             causeType: RedactedCause(error).originalType,
             paymentTransId: nil,
             paymentReference: reference

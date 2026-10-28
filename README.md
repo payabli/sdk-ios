@@ -307,7 +307,7 @@ retry.
 |---|---|---|---|
 | **Charged** | The call returns a result | `charge` returns a `TransactionResult` | No |
 | **Not charged** | `PayabliPayInError.transactionFailed`, for example a decline | a `TapToPayError` whose `capture` is `.notCharged`, or a `CancellationError`, which `charge` throws only before the card is read | Yes |
-| **Unknown** | `PayabliPayInError.submissionInterrupted` | an error whose `capture` is `.unknown` | Not until you've checked |
+| **Unknown** | `PayabliPayInError.submissionInterrupted`, or a `CancellationError` when your app cancelled the call | an error whose `capture` is `.unknown` | Not until you've checked |
 | **Charged, not confirmed** | — | an error whose `capture` is `.charged` | No. Reconcile the payment |
 
 When the outcome is unknown, look the transaction up before you charge again. On card-not-present, call
