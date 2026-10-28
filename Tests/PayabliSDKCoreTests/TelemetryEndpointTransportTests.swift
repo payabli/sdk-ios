@@ -115,7 +115,7 @@ final class TelemetryEndpointTransportTests: XCTestCase {
         XCTAssertNotNil(session.auth.terminalFailure, "a refused replay finished the session")
         let sentBefore = stub.count
 
-        await session.telemetry.emit("sdk_initialized")
+        await session.telemetry.emit(TelemetryEventName.sdkInitialized)
         await session.telemetry.flush()
 
         XCTAssertEqual(stub.count, sentBefore, "the batch never left")
@@ -131,7 +131,7 @@ final class TelemetryEndpointTransportTests: XCTestCase {
             return "telemetry-token"
         })
 
-        await session.telemetry.emit("sdk_initialized")
+        await session.telemetry.emit(TelemetryEventName.sdkInitialized)
         await session.telemetry.flush()
 
         XCTAssertEqual(stub.count, 1, "no replay")
@@ -152,7 +152,7 @@ final class TelemetryEndpointTransportTests: XCTestCase {
             return "telemetry-token"
         })
 
-        await session.telemetry.emit("sdk_initialized")
+        await session.telemetry.emit(TelemetryEventName.sdkInitialized)
         await session.telemetry.flush()
 
         XCTAssertEqual(stub.count, 1, "no replay")

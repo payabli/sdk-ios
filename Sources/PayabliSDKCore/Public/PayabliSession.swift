@@ -102,7 +102,7 @@ public final class PayabliSession: @unchecked Sendable {
             sleep: { try await ContinuousClock().sleep(for: .seconds($0)) },
             lifecycle: UIKitAppLifecycle(),
             deviceId: { try? deviceIdentity.value() },
-            queued: [(TelemetryEventName.sdkInitialized, ["state": Self.reportedState])]
+            queued: [(TelemetryEventName.sdkInitialized, [TelemetryProperty.state.rawValue: Self.reportedState])]
         )
     }
 
@@ -143,13 +143,13 @@ public final class PayabliSession: @unchecked Sendable {
         let (seconds, attoseconds) = duration.components
         let milliseconds = seconds * 1000 + attoseconds / 1_000_000_000_000_000
         await telemetry.emit([
-            (TelemetryEventName.sdkInitializeStarted, ["state": Self.reportedState]),
+            (TelemetryEventName.sdkInitializeStarted, [TelemetryProperty.state.rawValue: Self.reportedState]),
             (TelemetryEventName.sdkInitializeFailed, [
-                "outcome": "refused",
-                "code": refusal.type.rawValue,
-                "error_number": String(refusal.code),
-                "reason": refusal.reason,
-                "duration_ms": String(milliseconds)
+                TelemetryProperty.outcome.rawValue: "refused",
+                TelemetryProperty.code.rawValue: refusal.type.rawValue,
+                TelemetryProperty.errorNumber.rawValue: String(refusal.code),
+                TelemetryProperty.reason.rawValue: refusal.reason,
+                TelemetryProperty.durationMs.rawValue: String(milliseconds)
             ])
         ])
     }

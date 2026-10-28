@@ -86,7 +86,8 @@ package actor TelemetryClient {
     /// - Parameter sleep: the timer's wait.
     /// - Parameter lifecycle: the app's movement to the background.
     /// - Parameter deviceId: the device's identity, read as each batch leaves; `nil` while it cannot be read.
-    /// - Parameter queued: events queued before anything else can record, oldest first.
+    /// - Parameter queued: events queued before anything else can record, oldest first, held to the catalog as
+    ///   `emit` holds them.
     /// - Parameter sessionId: the identifier every event from this client carries.
     package init(
         configuration: Configuration,
@@ -106,6 +107,7 @@ package actor TelemetryClient {
         var queue = TelemetryQueue(capacity: configuration.queueCapacity)
         let now = Date()
         for (name, properties) in queued {
+            guard let properties = TelemetryCatalog.scrub(name, properties) else { continue }
             _ = queue.offer(TelemetryEvent(
                 sdkVersion: configuration.sdkVersion,
                 sessionId: sessionId,
@@ -139,7 +141,8 @@ package actor TelemetryClient {
     /// Enqueue an event.
     ///
     /// - Parameter name: the event's catalog name.
-    /// - Parameter properties: the string values the event carries, sent on as given.
+    /// - Parameter properties: the string values the event carries. A pair the catalog does not allow the event is
+    ///   dropped, and an event the catalog does not name is dropped whole.
     package func emit(_ name: String, properties: [String: String] = [:]) async {
         await emit(name, properties: properties, occurredAt: Date())
     }
@@ -147,7 +150,8 @@ package actor TelemetryClient {
     /// Enqueue an event stamped with when it happened.
     ///
     /// - Parameter name: the event's catalog name.
-    /// - Parameter properties: the string values the event carries, sent on as given.
+    /// - Parameter properties: the string values the event carries. A pair the catalog does not allow the event is
+    ///   dropped, and an event the catalog does not name is dropped whole.
     /// - Parameter occurredAt: when the reported thing happened.
     /// - Parameter waitsForBatch: holds even a failure for its batch, for a report the send-at-once rule must not move.
     package func emit(
@@ -170,6 +174,10 @@ package actor TelemetryClient {
     }
 
     private func enqueue(_ name: String, properties: [String: String], occurredAt: Date, waitsForBatch: Bool) {
+        guard let properties = TelemetryCatalog.scrub(name, properties) else {
+            logger.warning("telemetry_event_unknown: event not in the catalog; dropped")
+            return
+        }
         startIfNeeded()
         let event = TelemetryEvent(
             sdkVersion: configuration.sdkVersion,
@@ -209,6 +217,11 @@ package actor TelemetryClient {
         queue.count
     }
 
+    /// The events waiting to be sent, oldest first.
+    var queuedEvents: [TelemetryEvent] {
+        queue.events
+    }
+
     /// The catalog's send-at-once rule: an event whose name means failure, or whose outcome is not a
     /// success, including an outcome nobody classified.
     ///
@@ -219,7 +232,7 @@ package actor TelemetryClient {
         if sentAtOnce.contains(name) {
             return true
         }
-        guard let outcome = properties["outcome"] else { return false }
+        guard let outcome = properties[TelemetryProperty.outcome.rawValue] else { return false }
         return !successfulOutcomes.contains(outcome)
     }
 
@@ -319,7 +332,9 @@ package actor TelemetryClient {
         var events = batch
         if dropped > 0 {
             logger.warning("telemetry_queue_overflow dropped=\(dropped)")
-            events.append(overflowEvent(dropped))
+            if let overflow = overflowEvent(dropped) {
+                events.append(overflow)
+            }
         }
         // The session's identifier as it is, already a digest; the route compares it with the one registration sent.
         let device = deviceId().flatMap { $0.isEmpty ? nil : $0 }
@@ -341,16 +356,20 @@ package actor TelemetryClient {
     /// The event that reports evictions, last in its batch and timed when the send noticed them.
     ///
     /// - Parameter dropped: how many events the queue evicted, more than zero.
-    /// - Returns: the event to append to the batch.
-    private func overflowEvent(_ dropped: Int) -> TelemetryEvent {
-        TelemetryEvent(
+    /// - Returns: the event to append to the batch, or `nil` when the catalog does not name it.
+    private func overflowEvent(_ dropped: Int) -> TelemetryEvent? {
+        guard let properties = TelemetryCatalog.scrub(
+            TelemetryEventName.sdkTelemetryOverflow,
+            [TelemetryProperty.dropped.rawValue: String(dropped)]
+        ) else { return nil }
+        return TelemetryEvent(
             sdkVersion: configuration.sdkVersion,
             sessionId: sessionId,
             deviceIdHash: nil,
             entry: configuration.entry,
             environment: configuration.environment,
             event: TelemetryEventName.sdkTelemetryOverflow,
-            properties: ["dropped": String(dropped)],
+            properties: properties,
             timestamp: Date()
         )
     }
