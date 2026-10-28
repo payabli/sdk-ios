@@ -81,7 +81,7 @@ final class PayInRetrySamePaymentTests: XCTestCase {
         XCTAssertEqual(transport.sentKeys, ["k1", "k1", "k1", "k1"])
     }
 
-    func testAKeyHeldAgainAfterItsRecordExpiredKeepsTheFirstPayment() throws {
+    func testAKeyResentAtTheEndOfItsWindowKeepsTheFirstPayment() throws {
         var keys = HeldIdempotencyKeys()
         let start = ContinuousClock.now
         let maxAge = payabliIdempotencyKeyMaxAge
@@ -89,13 +89,13 @@ final class PayInRetrySamePaymentTests: XCTestCase {
             scope: .capture(reference: "p1"), claimsHeld: false,
             payment: HeldPaymentDescription(payment(.newPayment)), now: start, mint: { "k1" }
         )
-        keys.settle(first, outcome: .unknown, now: start)
+        keys.settle(first, outcome: .unknown)
         let resent = try keys.reserve(
             scope: .capture(reference: "p1"), claimsHeld: true,
             payment: HeldPaymentDescription(payment(.retry, orderId: "order-1")),
             now: start.advanced(by: maxAge - .seconds(1)), mint: { "k-other" }
         )
-        keys.settle(resent, outcome: .unknown, now: start.advanced(by: maxAge))
+        keys.settle(resent, outcome: .unknown)
 
         let retried = try keys.reserve(
             scope: .capture(reference: "p1"), claimsHeld: true,

@@ -1,21 +1,28 @@
 import Foundation
 import PayabliSDKCore
 
-/// The held keys of every flow in this process, one table per entry point and environment, so a rebuilt flow
-/// resends what the last one held. Each key ages out on ``payabliIdempotencyKeyMaxAge``.
+/// The recorded keys of every flow in this process, one table per entry point and environment, so a rebuilt flow
+/// resends what the last one sent. Each key ages out on ``payabliIdempotencyKeyMaxAge`` once no send of it is under way.
 final class PayInKeyStore: @unchecked Sendable {
     /// The store every flow in this process uses.
     static let process = PayInKeyStore()
 
+    /// An entry point and an environment.
     private struct Partition: Hashable {
         let entry: String
         let environment: String
+
+        init(_ entry: String, _ environment: PayabliEnvironment) {
+            self.entry = entry
+            self.environment = environment.name
+        }
     }
 
     private let lock = NSLock()
     private var partitions: [Partition: HeldIdempotencyKeys] = [:]
 
-    /// The key an attempt sends.
+    /// The key an attempt sends. Reading and recording are one operation under one lock, so below the capacity two
+    /// flows sending one payment at once cannot each find nothing and make a key.
     ///
     /// - Parameter entry: the entry point the attempt is sent to.
     /// - Parameter environment: the environment the attempt is sent to.
@@ -37,46 +44,43 @@ final class PayInKeyStore: @unchecked Sendable {
     ) throws -> HeldIdempotencyKeys.Reservation {
         try lock.withLock {
             sweep(now: now)
-            var keys = partitions[Partition(entry: entry, environment: environment.name)] ?? HeldIdempotencyKeys()
-            return try keys.reserve(scope: scope, claimsHeld: claimsHeld, payment: payment, now: now, mint: mint)
+            let partition = Partition(entry, environment)
+            var keys = partitions[partition] ?? HeldIdempotencyKeys()
+            let reservation = try keys.reserve(
+                scope: scope, claimsHeld: claimsHeld, payment: payment, now: now, mint: mint
+            )
+            partitions[partition] = keys.isIdle ? nil : keys
+            return reservation
         }
     }
 
-    /// Records what became of an attempt.
+    /// Ends a send, as ``HeldIdempotencyKeys/settle(_:outcome:)`` does.
     ///
     /// - Parameter entry: the entry point the attempt was sent to.
     /// - Parameter environment: the environment the attempt was sent to.
     /// - Parameter reservation: the reservation the attempt was sent under.
     /// - Parameter outcome: what became of it.
-    /// - Parameter now: the moment it ended.
-    /// - Returns: whether the attempt should have been held and found no room, for the first time since a key was
-    ///   last held for this entry point and environment.
-    @discardableResult
     func settle(
         entry: String,
         environment: PayabliEnvironment,
         _ reservation: HeldIdempotencyKeys.Reservation,
-        outcome: HeldIdempotencyKeys.Outcome,
-        now: ContinuousClock.Instant
-    ) -> Bool {
+        outcome: HeldIdempotencyKeys.Outcome
+    ) {
         lock.withLock {
-            sweep(now: now)
-            let partition = Partition(entry: entry, environment: environment.name)
-            var keys = partitions[partition] ?? HeldIdempotencyKeys()
-            let full = keys.settle(reservation, outcome: outcome, now: now)
+            let partition = Partition(entry, environment)
+            guard var keys = partitions[partition] else { return }
+            keys.settle(reservation, outcome: outcome)
             partitions[partition] = keys.isIdle ? nil : keys
-            return full
         }
     }
 
-    /// Drops every held key. Process state for tests.
+    /// Drops every recorded key. Process state for tests.
     func forgetHeld() {
         lock.withLock { partitions.removeAll() }
     }
 
-    /// Drops every key the service would no longer recognise, for every entry point and environment, and every table
-    /// left idle.
-    /// Called with the lock held.
+    /// Drops every key the service would no longer recognise and no send is using, for every entry point and
+    /// environment, and every table left empty. Called with the lock held.
     ///
     /// - Parameter now: the moment a key's age is read against.
     private func sweep(now: ContinuousClock.Instant) {

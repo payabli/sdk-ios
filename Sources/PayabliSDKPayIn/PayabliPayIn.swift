@@ -477,6 +477,9 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
             now: now(),
             mint: newIdempotencyKey
         )
+        if reservation.foundNoRoom {
+            logger.warning("payin_retry_keys_full")
+        }
         let mark = PayabliSendMark()
         // The submission around this one, such as the form's, learns whether the payment left.
         let submission = PayabliSendMark.current
@@ -487,9 +490,7 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
         }
         do {
             let result = try await PayabliSendMark.$current.withValue(mark) { try await send(reservation.key) }
-            heldKeys.settle(
-                entry: reservedEntry, environment: reservedEnvironment, reservation, outcome: .answered, now: now()
-            )
+            heldKeys.settle(entry: reservedEntry, environment: reservedEnvironment, reservation, outcome: .answered)
             return result
         } catch {
             var outcome = Self.outcome(of: error, reused: reservation.reused)
@@ -499,11 +500,7 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
                     PayInLocalRefusal.current?.set()
                 }
             }
-            if heldKeys.settle(
-                entry: reservedEntry, environment: reservedEnvironment, reservation, outcome: outcome, now: now()
-            ) {
-                logger.warning("payin_retry_keys_full")
-            }
+            heldKeys.settle(entry: reservedEntry, environment: reservedEnvironment, reservation, outcome: outcome)
             try Self.rethrow(
                 error,
                 as: outcome,
