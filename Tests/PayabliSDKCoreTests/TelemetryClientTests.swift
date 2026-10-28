@@ -707,6 +707,44 @@ extension TelemetryClientTests {
         XCTAssertEqual(dropped.map(\.level), Array(repeating: .debug, count: 3))
     }
 
+    func testStoppingDuringASendRunsTheLastDrainAfterItAndDropsWhatIsKept() async {
+        let sink = RecordingLogSink()
+        let gated = GatedTelemetryTransport()
+        let client = TelemetryClient(
+            configuration: .init(batchSize: 100, maxEventsPerRequest: 2, entry: "test_entry", environment: "sandbox"),
+            transport: gated,
+            sleep: clock.sleep,
+            lifecycle: lifecycle,
+            deviceId: { nil },
+            queued: [],
+            logger: PayabliLogger(category: .telemetry, sink: sink)
+        )
+        await gated.reply(with: .kept)
+        await recordFailure(client, "a", outcome: "failed")
+        await gated.untilHeld()
+        await record(client, "b")
+        await record(client, "c")
+        await record(client, "d")
+
+        await client.stop()
+        let flushed = Task { await client.flush() }
+        await gated.open()
+        await flushed.value
+
+        let sent = await gated.sent
+        XCTAssertEqual(sent.map { $0.map(\.label) }, [["a"], ["b", "c"], ["d"]], "the flush waits for the last drain")
+        await client.settled()
+        let mostAtOnce = await gated.mostAtOnce
+        XCTAssertEqual(mostAtOnce, 1)
+        let buffered = await client.bufferedCount
+        XCTAssertEqual(buffered, 0, "the batch whose send spanned the stop is not queued again")
+        let dropped = sink.records.filter { $0.message.hasPrefix("telemetry_batch_after_stop") }
+        XCTAssertEqual(
+            dropped.map(\.message),
+            ["telemetry_batch_after_stop count=1", "telemetry_batch_after_stop count=2", "telemetry_batch_after_stop count=1"]
+        )
+    }
+
     func testAFlushAfterStopSendsNothingMore() async {
         let client = makeClient(batchSize: 100, maxEventsPerRequest: 2)
         for index in 0 ..< 40 {
