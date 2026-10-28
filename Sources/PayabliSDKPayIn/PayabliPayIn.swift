@@ -305,8 +305,8 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
                     claimsHeld: request.options.attempt == .retry,
                     payment: HeldPaymentDescription(request),
                     reference: reference
-                ) { key in
-                    try await client.capture(entryPoint: entryPoint, request: request, idempotencyKey: key)
+                ) { client, entry, key in
+                    try await client.capture(entryPoint: entry, request: request, idempotencyKey: key)
                 }
             }
         }
@@ -339,8 +339,8 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
                     claimsHeld: request.options.attempt == .retry,
                     payment: HeldPaymentDescription(request),
                     reference: reference
-                ) { key in
-                    try await client.authorize(entryPoint: entryPoint, request: request, idempotencyKey: key)
+                ) { client, entry, key in
+                    try await client.authorize(entryPoint: entry, request: request, idempotencyKey: key)
                 }
             }
         }
@@ -362,7 +362,7 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
                 try await sending(
                     .captureAuthorized(transId: request.transId.payabliCaptureTrimmed),
                     claimsHeld: true
-                ) { key in
+                ) { client, _, key in
                     try await client.captureAuthorized(request, idempotencyKey: key)
                 }
             }
@@ -391,7 +391,7 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
                 try await sending(
                     .void(transId: transId.payabliCaptureTrimmed),
                     claimsHeld: true
-                ) { key in
+                ) { client, _, key in
                     try await client.void(transId: transId, idempotencyKey: key)
                 }
             }
@@ -457,17 +457,17 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
     /// - Parameter claimsHeld: whether the attempt takes the key held for its scope.
     /// - Parameter payment: the payment the attempt is for, compared with the held key's before taking it.
     /// - Parameter reference: the payment's reference, returned on an unknown outcome.
-    /// - Parameter send: sends the request under the key it is given.
+    /// - Parameter send: sends the request with the client, to the entry point and under the key it is given.
     /// - Returns: the result the service sent.
     private func sending(
         _ scope: HeldKeyScope,
         claimsHeld: Bool,
         payment: HeldPaymentDescription? = nil,
         reference: String? = nil,
-        _ send: (String) async throws -> PayabliPayInResult
+        _ send: (PayInPaymentFlowClient, String, String) async throws -> PayabliPayInResult
     ) async throws -> PayabliPayInResult {
-        // Settled where it was reserved, though `configure(config:)` may move the flow while it sends.
-        let (reservedEntry, reservedEnvironment) = (entryPoint, environment)
+        // Sent and settled where it was reserved, though `configure(config:)` may move the flow while it sends.
+        let (reservedEntry, reservedEnvironment, reservedClient) = (entryPoint, environment, client)
         let reservation = try heldKeys.reserve(
             entry: reservedEntry,
             environment: reservedEnvironment,
@@ -489,7 +489,9 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
             }
         }
         do {
-            let result = try await PayabliSendMark.$current.withValue(mark) { try await send(reservation.key) }
+            let result = try await PayabliSendMark.$current.withValue(mark) {
+                try await send(reservedClient, reservedEntry, reservation.key)
+            }
             heldKeys.settle(entry: reservedEntry, environment: reservedEnvironment, reservation, outcome: .answered)
             return result
         } catch {
