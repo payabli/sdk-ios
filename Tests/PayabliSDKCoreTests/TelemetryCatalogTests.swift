@@ -26,6 +26,25 @@ final class TelemetryCatalogTests: XCTestCase {
         }
     }
 
+    func testAKeyLongerThan64CharactersIsDroppedWithItsValue() {
+        let long = String(repeating: "k", count: 65)
+        let edge = String(repeating: "e", count: 64)
+
+        let kept = TelemetryCatalog.reduce([long: "1", edge: "2", "outcome": "approved"], to: [long, edge, "outcome"])
+
+        XCTAssertEqual(kept, [edge: "2", "outcome": "approved"])
+    }
+
+    func testPairsPastTheTwentiethAreDroppedAndTheEventKeepsTwenty() {
+        let keys = (1 ... 25).map { "key_\($0)" }
+        let properties = Dictionary(uniqueKeysWithValues: keys.map { ($0, "v") })
+
+        let kept = TelemetryCatalog.reduce(properties, to: Set(keys))
+
+        XCTAssertEqual(kept.count, 20)
+        XCTAssertEqual(kept, TelemetryCatalog.reduce(properties, to: Set(keys)), "the same twenty every time")
+    }
+
     func testTheOverflowEventKeepsItsCount() {
         XCTAssertEqual(
             TelemetryCatalog.scrub(TelemetryEventName.sdkTelemetryOverflow, ["dropped": "37"]),

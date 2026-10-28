@@ -23,10 +23,13 @@ package enum TelemetryProperty: String, CaseIterable, Sendable {
 /// Deny by default, applied before an event is queued: an event this table does not name is dropped whole, and a key
 /// an event does not declare is dropped from it, so nothing unvetted is held in memory waiting for a send.
 package enum TelemetryCatalog {
+    /// Longest property key that may be reported.
+    static let maxKeyLength = 64
+
     /// Longest property value that may be reported.
     static let maxValueLength = 256
 
-    /// Most properties one event may declare.
+    /// Most properties one event may carry.
     static let maxProperties = 20
 
     private static let timed: Set<TelemetryProperty> = [.durationMs]
@@ -86,10 +89,21 @@ package enum TelemetryCatalog {
     /// - Returns: the properties the event may report, or `nil` when the catalog does not name the event.
     package static func scrub(_ name: String, _ properties: [String: String]) -> [String: String]? {
         guard let keys = allowed[name] else { return nil }
-        return properties.filter { key, value in
-            guard let property = TelemetryProperty(rawValue: key) else { return false }
-            return keys.contains(property) && isReportable(value)
-        }
+        return reduce(properties, to: Set(keys.map(\.rawValue)))
+    }
+
+    /// Keeps the pairs whose key is declared and whose key and value may be reported, at most `maxProperties` of
+    /// them, the first by key.
+    ///
+    /// - Parameter properties: the properties as the caller assembled them.
+    /// - Parameter keys: the keys the event declares.
+    /// - Returns: the pairs that may be reported.
+    static func reduce(_ properties: [String: String], to keys: Set<String>) -> [String: String] {
+        let reportable = properties
+            .filter { key, value in keys.contains(key) && key.count <= maxKeyLength && isReportable(value) }
+            .sorted { $0.key < $1.key }
+            .prefix(maxProperties)
+        return Dictionary(uniqueKeysWithValues: reportable.map { ($0.key, $0.value) })
     }
 
     private static func isReportable(_ value: String) -> Bool {
