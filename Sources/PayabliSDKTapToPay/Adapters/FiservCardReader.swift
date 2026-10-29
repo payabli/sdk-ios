@@ -315,7 +315,7 @@ package final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
             guard let reader = activeReader else {
                 // A charge reads only from a ready session, so a missing reader is that session gone since the
                 // opening, before any card was touched.
-                throw PayabliTTPError.readerSessionExpired()
+                throw PayabliTTPError.readerSessionExpired(capture: .notCharged)
             }
 
             let amount = request.amount.roundedAsCharged

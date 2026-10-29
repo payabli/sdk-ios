@@ -112,7 +112,7 @@ final class PayabliTTPChargeFailureTests: XCTestCase {
         let (ttp, provider, _) = try await makeReadyTTP()
         let closes = CloseCount()
         StubURLProtocol.handler = closes.counting(Self.chargeStubHandler)
-        provider.readingResult = .failure(PayabliTTPError.readerSessionExpired())
+        provider.readingResult = .failure(PayabliTTPError.readerSessionExpired(capture: .notCharged))
 
         let failure = try await chargeFailure(ttp)
 

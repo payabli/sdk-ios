@@ -136,7 +136,7 @@ final class PayabliTTPReaderSessionRecoveryTests: XCTestCase {
     /// started or a guard that failed ends only the read.
     func testTheSDKsOwnRefusalsAreClassified() {
         XCTAssertTrue(readerFailureInvalidatesSession(PayabliTTPError.readerDeviceRefused(reason: "x")))
-        XCTAssertTrue(readerFailureInvalidatesSession(PayabliTTPError.readerSessionExpired()))
+        XCTAssertTrue(readerFailureInvalidatesSession(PayabliTTPError.readerSessionExpired(capture: .notCharged)))
         XCTAssertFalse(readerFailureInvalidatesSession(PayabliTTPError.readerUnavailable(reason: "x")))
         XCTAssertFalse(readerFailureInvalidatesSession(PayabliTTPError.guardFailed(reason: "x")))
     }

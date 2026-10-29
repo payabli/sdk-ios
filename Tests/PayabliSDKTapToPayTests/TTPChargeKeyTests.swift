@@ -326,7 +326,7 @@ final class TTPChargeKeyTests: XCTestCase {
     }
 
     func testAReaderGoneBeforeTheReadWhoseCloseLandsSettlesAFreshKey() async throws {
-        let (ttp, provider) = try await makeReadyTTP(readFailure: PayabliTTPError.readerSessionExpired())
+        let (ttp, provider) = try await makeReadyTTP(readFailure: PayabliTTPError.readerSessionExpired(capture: .notCharged))
 
         let expired = await failure { try await ttp.charge(paymentDetails: Self.details) }
         provider.readingResult = Self.read(.approved)
@@ -339,7 +339,7 @@ final class TTPChargeKeyTests: XCTestCase {
     }
 
     func testAReaderGoneBeforeTheReadWhoseCloseFindsNoRecordStaysTheSessionsExpiry() async throws {
-        let (ttp, provider) = try await makeReadyTTP(readFailure: PayabliTTPError.readerSessionExpired())
+        let (ttp, provider) = try await makeReadyTTP(readFailure: PayabliTTPError.readerSessionExpired(capture: .notCharged))
         Self.wire.updateRefusal = Self.processorHasNoRecord
 
         let expired = await failure { try await ttp.charge(paymentDetails: Self.details) }
@@ -358,7 +358,7 @@ final class TTPChargeKeyTests: XCTestCase {
     func testAReaderGoneBeforeTheReadKeepsAResentKey() async throws {
         let (ttp, provider) = try await makeReadyTTP(outcome: .indeterminate)
         _ = await failure { try await ttp.charge(paymentDetails: Self.details) }
-        provider.readingResult = .failure(PayabliTTPError.readerSessionExpired())
+        provider.readingResult = .failure(PayabliTTPError.readerSessionExpired(capture: .notCharged))
 
         let expired = await failure { try await ttp.charge(paymentDetails: Self.details, attempt: .retry) }
         try await ttp.initialize()

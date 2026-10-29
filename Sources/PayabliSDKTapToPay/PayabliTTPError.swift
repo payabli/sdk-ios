@@ -58,7 +58,7 @@ package enum PayabliTTPError: Error, Sendable {
 
     /// The reader session is gone, so the session has to be set up again before it reads another card. Not charged
     /// where the reader was missing before the read began; unknown where the session ended during the read.
-    case readerSessionExpired(paymentTransId: String? = nil, capture: PayabliTTPCapture = .notCharged)
+    case readerSessionExpired(paymentTransId: String? = nil, capture: PayabliTTPCapture)
 
     /// The processor refused the card. No money moved.
     case cardDeclined(paymentTransId: String)

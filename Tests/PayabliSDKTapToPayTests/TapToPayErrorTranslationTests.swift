@@ -438,7 +438,7 @@ final class TapToPayErrorTranslationTests: XCTestCase {
         .readerUnavailable(reason: "x"),
         .guardFailed(reason: "x"),
         .readerDeviceRefused(reason: "x"),
-        .readerSessionExpired(),
+        .readerSessionExpired(capture: .notCharged),
         .nfcFailed(reason: "x"),
         .paymentNotOpened(reason: "x"),
         .updateFailed(reason: "x", paymentTransId: "TXN", capture: .unknown),
