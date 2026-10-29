@@ -217,11 +217,11 @@ public struct PayabliPayInRequestConfiguration: Sendable {
     public let source: String?
     public let subdomain: String?
     public let subscriptionId: Int64?
-    /// Your app's own name for this payment, never sent. Left unset, the SDK makes one and returns it if the outcome
-    /// is unknown, so the payment can be retried by name. A blank one is refused.
+    /// Your app's own name for this payment, never sent. Left unset on a new payment, the SDK makes one and returns
+    /// it if the outcome is unknown, so the payment can be retried by name. A blank one is refused.
     public let paymentReference: String?
-    /// A new payment unless set to `.retry`, which resends the key held for ``paymentReference`` and must describe
-    /// that same payment. A new payment naming a reference whose outcome is still unknown is refused.
+    /// A new payment unless set to `.retry`, which resends the key held for ``paymentReference`` and must name and
+    /// describe that same payment. A new payment naming a reference whose outcome is still unknown is refused.
     public let attempt: PayabliAttempt
     /// Whether to verify a bank account before debiting it. `true` adds the check to any the merchant's account
     /// already applies; it never turns one off. A failed check is a decline.

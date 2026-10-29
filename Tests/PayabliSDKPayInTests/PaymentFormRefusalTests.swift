@@ -32,6 +32,26 @@ final class PaymentFormRefusalTests: XCTestCase {
         XCTAssertEqual(viewModel.cardCvv, "999")
     }
 
+    func testAFormRetryNamingNoReferenceSendsNothing() async throws {
+        let transport = RecordingTransport()
+        let viewModel = form(
+            on: transport,
+            paymentDetails: PayabliPayInPaymentDetails(totalAmount: 12.34, currency: "USD"),
+            attempt: .retry,
+            configuration: PayabliPayInFormConfiguration(allowedMethods: [.card], defaultMethod: .card)
+        )
+        fillCard(viewModel)
+
+        do {
+            _ = try await viewModel.submit()
+            XCTFail("a retry naming no payment is refused")
+        } catch let PayabliPayInError.invalidInput(reason) {
+            XCTAssertEqual(reason, "A retry must name the paymentReference of the payment it repeats.")
+        }
+        let requests = await transport.requests
+        XCTAssertTrue(requests.isEmpty)
+    }
+
     func testAnAmountRefusalKeepsTheBankFields() async throws {
         let viewModel = form(
             on: RecordingTransport(),
@@ -151,6 +171,7 @@ final class PaymentFormRefusalTests: XCTestCase {
         on transport: RecordingTransport,
         entryPoint: String = "entry",
         paymentDetails: PayabliPayInPaymentDetails,
+        attempt: PayabliAttempt = .newPayment,
         configuration: PayabliPayInFormConfiguration
     ) -> PayabliPayInViewModel {
         PayabliPayInViewModel(
@@ -159,7 +180,7 @@ final class PaymentFormRefusalTests: XCTestCase {
                 environment: .sandbox,
                 transport: transport,
                 operation: .capture,
-                requestConfiguration: PayabliPayInRequestConfiguration(paymentDetails: paymentDetails)
+                requestConfiguration: PayabliPayInRequestConfiguration(paymentDetails: paymentDetails, attempt: attempt)
             ),
             configuration: configuration
         )

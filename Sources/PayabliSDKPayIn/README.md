@@ -131,8 +131,8 @@ releases it or voids a transaction that hasn't settled.
 ### Retry safely
 
 A charge always sends an idempotency key, which the SDK makes and keeps; your app never handles one. Name each
-payment with `paymentReference` on the request's options, or leave it unset and the SDK names the payment. The
-reference stays on the device. Calling again is a new payment unless you say otherwise.
+payment with `paymentReference` on the request's options, or leave it unset on a new payment and the SDK names it.
+The reference stays on the device. Calling again is a new payment unless you say otherwise.
 
 When a charge ends in `submissionInterrupted`, its outcome is unknown. The error carries the payment's
 `paymentReference` and, when the service named one, its `paymentTransId`. Find the transaction first. If you charge
@@ -153,7 +153,8 @@ before anything is sent, with type `.retryNotSamePayment`, and the earlier attem
 retry. A new payment that names a reference whose payment is still unresolved is refused before anything is sent,
 with type `.paymentReferenceOpen`. So is any call on a payment another `PayabliPayIn` is still sending, a declared
 retry included, and a capture or void of a transaction another one is still capturing or voiding. A blank reference
-is refused as invalid input.
+is refused as invalid input, and so is a retry that names no reference: the SDK can't tell which payment it
+repeats, so it sends nothing.
 
 Every `PayabliPayIn` in your app for the same entry point and environment shares the keys the SDK holds, so a retry
 from a `PayabliPayIn` you built again sends the payment's key. The SDK holds a key in memory for a few minutes after

@@ -53,7 +53,31 @@ final class PayInHeldKeyTests: XCTestCase {
     func testABlankReferenceIsRefusedUnsent() async {
         let refused = await failure { try await self.flow.capture(self.request(.newPayment, reference: " ")) }
 
-        XCTAssertEqual(refused as? PayabliPayInError, .invalidInput("The payment reference cannot be blank."))
+        XCTAssertEqual(refused as? PayabliPayInError, .invalidInput("The paymentReference cannot be blank."))
+        XCTAssertEqual(transport.sentKeys, [])
+    }
+
+    func testARetryNamingNoReferenceIsRefusedUnsent() async {
+        let minted = Counter()
+        flow.newPaymentReference = { "minted-\(minted.next())" }
+
+        let refused = await failure { try await self.flow.capture(self.request(.retry, reference: nil)) }
+
+        XCTAssertEqual(
+            refused as? PayabliPayInError,
+            .invalidInput("A retry must name the paymentReference of the payment it repeats.")
+        )
+        XCTAssertEqual(transport.sentKeys, [])
+        XCTAssertEqual(minted.next(), 1, "no reference is minted for a retry")
+    }
+
+    func testAnAuthorizationRetryNamingNoReferenceIsRefusedUnsent() async {
+        let refused = await failure { try await self.flow.authorize(self.request(.retry, reference: nil)) }
+
+        XCTAssertEqual(
+            refused as? PayabliPayInError,
+            .invalidInput("A retry must name the paymentReference of the payment it repeats.")
+        )
         XCTAssertEqual(transport.sentKeys, [])
     }
 
