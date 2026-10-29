@@ -2,6 +2,9 @@ import PayabliSDKCore
 @testable import PayabliSDKTapToPay
 import PayabliSDKTestUtils
 import XCTest
+#if canImport(PayabliCardReaderCore)
+    @testable import PayabliCardReaderCore
+#endif
 
 /// Which key a charge's opening sends, when the charge keeps it, and what a refused resend reports.
 @available(iOS 16.7, *)
@@ -354,6 +357,34 @@ final class TTPChargeKeyTests: XCTestCase {
         XCTAssertEqual(expired?.paymentTransId, "TXN-KEY")
         XCTAssertNotEqual(Self.wire.keys[1], Self.wire.keys[0], "the key outlived a charge that took nothing")
     }
+
+    #if canImport(PayabliCardReaderCore)
+        /// The card reader's refusal to read without a session, rebuilt as the charge's own failure.
+        func testTheCardReadersRefusalWithoutASessionExpiresTheSessionAndReleasesAFreshKey() async throws {
+            let reader = FiservTTPReader(config: FiservTTPConfig(
+                secretKey: "s", apiKey: "a", environment: .Sandbox, currencyCode: "USD", merchantId: "m",
+                merchantName: "n", merchantCategoryCode: "5999", terminalId: "t", terminalProfileId: "p"
+            ))
+            guard case let .failure(refusal) = try await reader.readCard(
+                for: 1, currencyCode: "USD", transactionType: .purchase
+            ) else { return XCTFail("expected the read to be refused") }
+            let chargeFailure = FiservTTPCardReaderError(
+                title: "Charges", localizedDescription: refusal.localizedDescription, underlying: refusal
+            )
+            let (ttp, provider) = try await makeReadyTTP(readFailure: FiservCardReader.mapReadError(chargeFailure))
+
+            let expired = await failure { try await ttp.charge(paymentDetails: Self.details) }
+            let landed = ttp.sessionState
+            provider.readingResult = Self.read(.approved)
+            try await ttp.initialize()
+            _ = try await ttp.charge(paymentDetails: Self.details, attempt: .retry)
+
+            XCTAssertEqual(expired?.code, 3017)
+            XCTAssertEqual(expired?.capture, .notCharged)
+            XCTAssertEqual(landed, .sessionExpired)
+            XCTAssertNotEqual(Self.wire.keys[1], Self.wire.keys[0], "the key outlived a charge that took nothing")
+        }
+    #endif
 
     func testAReaderGoneBeforeTheReadKeepsAResentKey() async throws {
         let (ttp, provider) = try await makeReadyTTP(outcome: .indeterminate)
