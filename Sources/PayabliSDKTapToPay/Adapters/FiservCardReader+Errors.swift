@@ -47,17 +47,40 @@ extension FiservCardReader {
             return fallback(detail.isEmpty ? error.localizedDescription : detail)
         }
 
-        /// Translates a read's failure: a reader session found spent is the session's expiry, with the outcome
-        /// unknown because the processor may take the sale before the reader answers. Any other failure is mapped
-        /// as an NFC one.
+        /// Translates a read's failure: a reader session found spent is the session's expiry, not charged where the
+        /// card reader refused to read without one, and unknown where it ended during the read, because the processor
+        /// may take the sale before the reader answers. Any other failure is mapped as an NFC one.
         ///
         /// - Parameter error: what the read threw, before it was translated for the host.
         /// - Returns: the typed error a host receives.
         static func mapReadError(_ error: Error) -> PayabliTTPError {
+            if refusedToReadWithoutASession(error) {
+                return .readerSessionExpired(capture: .notCharged)
+            }
             if let platform = platformError(behind: error), readerFailureInvalidatesSession(platform) {
                 return .readerSessionExpired(capture: .unknown)
             }
             return mapError(error) { .nfcFailed(reason: $0) }
+        }
+
+        /// The card reader's refusal to read without a session, raised before any card is asked for. It names
+        /// itself only in text.
+        static let noSessionRefusal = (
+            title: "Invalid Session",
+            description: "The card reader session has not been initialized."
+        )
+
+        /// Whether the card reader refused the read because it holds no session, either directly or kept behind
+        /// the charge's own failure.
+        ///
+        /// - Parameter error: what the read threw, before it was translated for the host.
+        /// - Returns: `true` where the refusal is the card reader's own missing-session check.
+        static func refusedToReadWithoutASession(_ error: Error) -> Bool {
+            [error, platformError(behind: error)].contains { candidate in
+                guard let refusal = candidate as? FiservTTPCardReaderError else { return false }
+                return refusal.title == noSessionRefusal.title
+                    && refusal.localizedDescription == noSessionRefusal.description
+            }
         }
 
         /// The refusal the vendor named, where the failure reason it kept carries the processor's own code.
