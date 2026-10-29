@@ -3,7 +3,7 @@
 import PayabliSDKTestUtils
 import XCTest
 
-/// The renewal end to end over the wire: the facade's own transport records the token `/attest` or `/activate`
+/// The renewal end to end over the wire: the facade's own transport records the token a device route
 /// refused, the session renews it, and the sequence's second run carries the new token.
 @available(iOS 16.7, *)
 @MainActor
@@ -14,7 +14,7 @@ final class SessionTokenRenewalWireTests: XCTestCase {
     }
 
     func testAColdStartWhoseAttestRefusedItsTokenRenewsItAndAttestsUnderTheNewOne() async throws {
-        let wire = Wire(refusingOnce: "attest")
+        let wire = Wire(refusing: "attest")
         StubURLProtocol.handler = wire.handle
         let (ttp, tokens) = try makeTTP()
 
@@ -26,7 +26,7 @@ final class SessionTokenRenewalWireTests: XCTestCase {
     }
 
     func testAnActivationWhoseTokenWasRefusedRenewsItAndSendsTheCodeUnderTheNewOne() async throws {
-        let wire = Wire(refusingOnce: "activate", registersPending: true)
+        let wire = Wire(refusing: "activate", registersPending: true)
         StubURLProtocol.handler = wire.handle
         let (ttp, tokens) = try makeTTP()
         do {
@@ -44,10 +44,45 @@ final class SessionTokenRenewalWireTests: XCTestCase {
         XCTAssertEqual(tokens.count, 2, "one renewal")
     }
 
+    // MARK: - The routes before a binding exists
+
+    func testAColdStartWhoseChallengeRefusedItsTokenRenewsItAndAttests() async throws {
+        let wire = Wire(refusing: "challenge")
+        StubURLProtocol.handler = wire.handle
+        let (ttp, tokens) = try makeTTP()
+
+        try await ttp.initialize()
+
+        XCTAssertEqual(ttp.sessionState, .ready)
+        XCTAssertEqual(wire.bearers(for: "challenge"), ["seed", "renewed-2"])
+        XCTAssertEqual(tokens.count, 2, "one renewal")
+    }
+
+    func testAColdStartWhoseRegisterRefusedItsTokenRenewsItAndRunsTheSequenceAgain() async throws {
+        let wire = Wire(refusing: "register")
+        StubURLProtocol.handler = wire.handle
+        let (ttp, tokens) = try makeTTP()
+
+        try await ttp.initialize()
+
+        XCTAssertEqual(ttp.sessionState, .ready)
+        XCTAssertEqual(wire.bearers(for: "challenge"), ["seed", "renewed-2"], "the sequence ran again from its first request")
+        XCTAssertEqual(wire.bearers(for: "register"), ["seed", "renewed-2"])
+        XCTAssertEqual(tokens.count, 2, "one renewal")
+    }
+
+    func testAChallengeRefusedAgainAfterTheRenewalThrows1002AndLeavesTheSessionUsable() async throws {
+        try await assertRefusedAgainLeavesTheSessionUsable(at: "challenge")
+    }
+
+    func testARegisterRefusedAgainAfterTheRenewalThrows1002AndLeavesTheSessionUsable() async throws {
+        try await assertRefusedAgainLeavesTheSessionUsable(at: "register")
+    }
+
     /// The held refusal can be the event that fills a batch, which sends it at once. It is held until the renewal has
     /// run, so that send carries the renewed token and not the one being replaced.
     func testARenewableRefusalThatFillsTheBatchLeavesUnderTheRenewedToken() async throws {
-        let wire = Wire(refusingOnce: "attest")
+        let wire = Wire(refusing: "attest")
         StubURLProtocol.handler = wire.handle
         let renewal = RenewalGate()
         let (ttp, _) = try makeTTP(renewal: renewal)
@@ -68,6 +103,33 @@ final class SessionTokenRenewalWireTests: XCTestCase {
     }
 
     // MARK: - Fixtures
+
+    /// A cold `initialize` whose `route` refuses the seed and the renewed token throws 1002, lands `serviceUnavailable`,
+    /// and leaves the session's credential usable: the next request on the session is sent.
+    private func assertRefusedAgainLeavesTheSessionUsable(
+        at route: String,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) async throws {
+        let wire = Wire(refusing: route, times: 2)
+        StubURLProtocol.handler = wire.handle
+        let (ttp, tokens) = try makeTTP()
+
+        do {
+            try await ttp.initialize()
+            XCTFail("a twice-refused \(route) reported ready", file: file, line: line)
+        } catch {
+            XCTAssertEqual((error as? any PayabliError)?.type, .tokenExpired, "got \(error)", file: file, line: line)
+        }
+
+        XCTAssertEqual(ttp.sessionState, .failed(reason: .serviceUnavailable), file: file, line: line)
+        XCTAssertEqual(wire.bearers(for: route), ["seed", "renewed-2"], file: file, line: line)
+        XCTAssertEqual(tokens.count, 2, "one renewal", file: file, line: line)
+        _ = try await ttp.session.transport.perform(PayabliRequest(method: .get, path: "/api/v2/ping"))
+        XCTAssertEqual(wire.bearers(for: "/api/v2/ping"), ["renewed-2"], "the session refused a later call", file: file, line: line)
+        // The failure's report is sent after the throw, and would otherwise reach the next test's stub.
+        await ttp.reports.sent()
+    }
 
     /// A facade whose attestation service runs on the facade's own session, so a refusal is recorded where the
     /// renewal reads it.
@@ -164,16 +226,18 @@ private final class RenewalGate: @unchecked Sendable {
     }
 }
 
-/// Every device route answering as the service does, with one route refusing its first request with a bare 401.
+/// Every device route answering as the service does, with one route refusing its first `times` requests with a bare
+/// 401. A request outside the device routes is recorded under its path and answered with success.
 private final class Wire: @unchecked Sendable {
     private let lock = NSLock()
     private let refused: String
     private let registersPending: Bool
-    private var refusedOnce = false
+    private var refusalsLeft: Int
     private var seen: [String: [String]] = [:]
 
-    init(refusingOnce route: String, registersPending: Bool = false) {
+    init(refusing route: String, times: Int = 1, registersPending: Bool = false) {
         refused = route
+        refusalsLeft = times
         self.registersPending = registersPending
     }
 
@@ -184,13 +248,15 @@ private final class Wire: @unchecked Sendable {
 
     func handle(_ request: URLRequest) throws -> (HTTPURLResponse, Data) {
         let path = request.url?.path ?? ""
+        let devicePrefix = "/api/v2/device/taptopay/"
         let route = path.hasSuffix(TelemetryEndpointTransport.defaultPath) ? "telemetry"
-            : path.replacingOccurrences(of: "/api/v2/device/taptopay/", with: "").components(separatedBy: "/")[0]
+            : !path.hasPrefix(devicePrefix) ? path
+            : path.replacingOccurrences(of: devicePrefix, with: "").components(separatedBy: "/")[0]
         let bearer = request.value(forHTTPHeaderField: "Authorization")?.replacingOccurrences(of: "Bearer ", with: "")
         let refuses: Bool = lock.withLock {
             seen[route, default: []].append(bearer ?? "")
-            guard route == refused, !refusedOnce else { return false }
-            refusedOnce = true
+            guard route == refused, refusalsLeft > 0 else { return false }
+            refusalsLeft -= 1
             return true
         }
         if refuses {

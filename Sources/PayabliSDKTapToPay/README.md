@@ -320,7 +320,7 @@ From Objective-C, these errors arrive as `NSError`. See
 |---|---|
 | `.configurationRejected` | The paypoint, the app, the device or its setup is missing something, such as the app's Keychain entitlement. Retrying won't help; contact Payabli. A token, network or service failure while fetching the configuration lands on `.serviceUnavailable` instead. |
 | `.deviceSetupRequired` | This device must be set up again: its setup was refused or revoked, its registration was replaced, or its key is gone. Check the entitlements, then initialize again. |
-| `.serviceUnavailable` | The service, Apple's attestation service or the reader wasn't available. Try again later. |
+| `.serviceUnavailable` | The service, Apple's attestation service or the reader wasn't available, or the token was refused again after the SDK renewed it. If the error thrown was `.tokenExpired`, waiting won't help: fix the credential, then call `initialize()` again. If that fails at once and your token provider isn't called, the session's credential is finished: call `PayabliSession.initialize`, then create the terminal again with `PayabliTTP.create()`. Otherwise try again when someone asks to, or wait longer before each attempt. |
 | `.deviceIneligible` | This iPhone or iOS version can't take Tap to Pay payments, the card reader refused it, or the app has no bundle identifier. If an iPhone that meets the requirements lands here, contact Payabli before replacing it. |
 | `.sdkInternalError` | Report it to Payabli. |
 | `.deviceKeyUnavailable` | This device's secure storage is unavailable, for example before the first unlock after a restart. Initialize again. If it keeps failing, the phone is the cause. |

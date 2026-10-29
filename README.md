@@ -225,15 +225,19 @@ freshly minted token is being rejected. Don't treat it as a signal to fetch a to
 app has to fix. The usual causes are a token for another environment or entry point, a missing permission, or a
 disabled paypoint. Apart from the two cases below, after a 1002 the session's credential is finished: every later
 call on that session fails at once with 1002, without sending a request or calling your provider. Fix the cause,
-then call `initialize` again; it starts a fresh session and calls your provider.
+then call `PayabliSession.initialize` again; it starts a fresh session, which calls your provider before its first
+request.
 
 Two kinds of 1002 leave the session usable:
 
 - One from Tap to Pay setting up the device (`PayabliTTP.initialize()`, `activateDevice`, or the repair `charge`
-  runs first). Those requests keep the token they were sent, so the session isn't finished. Fix the cause, then
-  call that setup again; it asks your provider for a new token.
-- One whose refused token another call had already replaced. Only that call fails; the next call uses the new
-  token, and `initialize` with the same configuration returns the same session.
+  runs first) when the setup's own request was refused, the SDK renewed the token, and the new one was refused
+  too. Fix the cause, then call that setup again; it asks your provider for a new token.
+- One whose refused token another call had already replaced, or was replacing. Only that call fails; the next
+  call uses the new token, and `initialize` with the same configuration returns the same session.
+
+If a setup called again fails at once with 1002 and your provider isn't called, the session's credential is
+finished: call `PayabliSession.initialize`, then create the terminal again from the new session.
 
 ### Device identity
 
