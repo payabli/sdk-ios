@@ -59,6 +59,7 @@ final class PayInPaymentObjCBridgeTests: XCTestCase {
         let failure = try XCTUnwrap(error)
         XCTAssertEqual(failure.domain, "com.payabli.payIn")
         XCTAssertEqual(failure.code, PayabliErrorType.serverError.number)
+        XCTAssertEqual(PayabliErrorTypeCode(rawValue: failure.code), .serverError)
         XCTAssertEqual(failure.userInfo["paymentTransId"] as? String, "101-abc")
     }
 

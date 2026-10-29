@@ -150,6 +150,10 @@ final class PayabliErrorCatalogTests: XCTestCase {
         (
             .paymentNotTaken, "PAYMENT_NOT_TAKEN", 3035, .retryLater,
             "The payment was not taken, and the card was not charged. Try again."
+        ),
+        (
+            .contactlessDisabled, "CONTACTLESS_DISABLED", 3036, .configuration,
+            "Contactless (NFC) is turned off on this device. Turn it on in Settings."
         )
     ]
 
@@ -164,6 +168,18 @@ final class PayabliErrorCatalogTests: XCTestCase {
 
     func testTheTableCoversEveryType() {
         XCTAssertEqual(Set(table.map(\.0)), Set(PayabliErrorType.allCases))
+    }
+
+    /// The Objective-C name of each code carries the published number.
+    func testEveryTypesObjectiveCCodeCarriesItsPublishedNumber() {
+        for (type, _, number, _, _) in table {
+            XCTAssertEqual(type.code, PayabliErrorTypeCode(rawValue: number), "\(type)")
+        }
+    }
+
+    func testEveryObjectiveCCodeNamesExactlyOneType() {
+        XCTAssertEqual(PayabliErrorTypeCode.allCases.count, PayabliErrorType.allCases.count)
+        XCTAssertEqual(Set(PayabliErrorType.allCases.map(\.code)), Set(PayabliErrorTypeCode.allCases))
     }
 
     /// 3032 was retired before publication, and a retired number is never reused.

@@ -115,6 +115,7 @@ final class PayabliPayInInstalledSessionTests: XCTestCase {
         let nsError = error as NSError
         XCTAssertEqual(nsError.domain, domain, file: file, line: line)
         XCTAssertEqual(nsError.code, type.number, file: file, line: line)
+        XCTAssertEqual(PayabliErrorTypeCode(rawValue: nsError.code), type.code, file: file, line: line)
         XCTAssertEqual(
             nsError.userInfo["PayabliErrorType"] as? String,
             type.rawValue,
