@@ -171,6 +171,23 @@ final class TTPOverlappingChargeTests: XCTestCase {
         XCTAssertEqual(Self.wire.keys[1], Self.wire.keys[0], "the held sale's key was not kept")
     }
 
+    /// The session is replaced after the retry claims the gate, so the refusal comes from inside it.
+    func testARetryRetiredAfterItClaimsTheGateIsUnknownAndItsKeyStays() async throws {
+        let live = LiveFlag()
+        let (retired, _) = try await makeReadyTTP(outcome: .indeterminate, live: live)
+        _ = await Self.failure { try await retired.charge(paymentDetails: Self.sale) }
+        live.retire(after: 1)
+
+        let retry = await Self.failure { try await retired.charge(paymentDetails: Self.sale, attempt: .retry) }
+
+        XCTAssertEqual(retry?.type, .sessionNotInitialized)
+        XCTAssertEqual(retry?.capture, .unknown)
+        XCTAssertEqual(Self.wire.keys.count, 1, "the retired terminal sent an opening")
+        let (other, _) = try await makeReadyTTP()
+        _ = try await other.charge(paymentDetails: Self.sale, attempt: .retry)
+        XCTAssertEqual(Self.wire.keys[1], Self.wire.keys[0], "the held sale's key was not kept")
+    }
+
     func testOnARetiredTerminalARetryIsUnknownOnlyWhenItDescribesTheSaleRunningOnItsEntryPoint() async throws {
         let live = LiveFlag()
         let (retired, _) = try await makeReadyTTP(live: live)
@@ -244,10 +261,26 @@ final class TTPOverlappingChargeTests: XCTestCase {
     private final class LiveFlag: @unchecked Sendable {
         private let lock = NSLock()
         private var stored = true
+        private var readsLeft: Int?
 
         var value: Bool {
-            get { lock.withLock { stored } }
+            get {
+                lock.withLock {
+                    if let left = readsLeft {
+                        stored = left > 0
+                        readsLeft = left - 1
+                    }
+                    return stored
+                }
+            }
             set { lock.withLock { stored = newValue } }
+        }
+
+        /// Answers live for the next `reads` reads, then retired.
+        ///
+        /// - Parameter reads: how many reads still find the session installed.
+        func retire(after reads: Int) {
+            lock.withLock { readsLeft = reads }
         }
     }
 
