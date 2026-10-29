@@ -153,8 +153,7 @@ before anything is sent, with type `.retryNotSamePayment`, and the earlier attem
 retry. A new payment that names a reference whose payment is still unresolved is refused before anything is sent,
 with type `.paymentReferenceOpen`. So is any call on a payment another `PayabliPayIn` is still sending, a declared
 retry included, and a capture or void of a transaction another one is still capturing or voiding. A blank reference
-is refused as invalid input, and so is a retry that names no reference: the SDK can't tell which payment it
-repeats, so it sends nothing.
+is refused as invalid input, and so is a retry that names no reference.
 
 Every `PayabliPayIn` in your app for the same entry point and environment shares the keys the SDK holds, so a retry
 from a `PayabliPayIn` you built again sends the payment's key. The SDK holds a key in memory for a few minutes after

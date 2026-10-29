@@ -240,6 +240,8 @@ public final class PayabliPayInObjC: NSObject {
 
     /// Holds an amount, as ``PayabliPayIn/authorize(_:)`` does.
     ///
+    /// The error's `userInfo["capture"]` reads as it does for ``capture(_:completion:)``.
+    ///
     /// - Parameter request: the payment and its settings.
     /// - Parameter completion: the result, or the error the authorization failed with.
     @objc public func authorize(
@@ -252,6 +254,8 @@ public final class PayabliPayInObjC: NSObject {
 
     /// Captures an authorization, as ``PayabliPayIn/captureAuthorizedTransaction(_:)`` does.
     ///
+    /// The error's `userInfo["capture"]` reads as it does for ``capture(_:completion:)``.
+    ///
     /// - Parameter request: the authorization and the amount to capture.
     /// - Parameter completion: the result, or the error the capture failed with.
     @objc public func captureAuthorizedTransaction(
@@ -263,6 +267,8 @@ public final class PayabliPayInObjC: NSObject {
     }
 
     /// Reverses a transaction, as ``PayabliPayIn/voidTransaction(_:)`` does.
+    ///
+    /// The error's `userInfo["capture"]` reads as it does for ``capture(_:completion:)``.
     ///
     /// - Parameter transId: the transaction to reverse.
     /// - Parameter completion: the result, or the error the reversal failed with.
