@@ -313,7 +313,8 @@ package final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
             let activeReader = reader
             lock.unlock()
             guard let reader = activeReader else {
-                throw PayabliTTPError.guardFailed(reason: "Reader not prepared")
+                // A charge starts only from a ready session, so no reader here means that session ended, not a fault.
+                throw PayabliTTPError.readerSessionExpired(capture: .notCharged)
             }
 
             let amount = request.amount.roundedAsCharged
@@ -346,7 +347,7 @@ package final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
                     transactionDetailsRequest: details
                 )
             } catch {
-                throw Self.mapError(error) { .nfcFailed(reason: $0) }
+                throw Self.mapReadError(error)
             }
 
             let elapsedMs = Int(Date().timeIntervalSince(started) * 1000)

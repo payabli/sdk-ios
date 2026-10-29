@@ -27,7 +27,19 @@ extension PayabliTTPSessionState {
         guard let ttpError = error as? PayabliTTPError else {
             return landingByType(error, registration: registration)
         }
+        return landing(for: ttpError, registration: registration)
+    }
 
+    /// Where a Tap to Pay failure lands, by its case.
+    ///
+    /// - Parameter ttpError: a failure from the SDK's own taxonomy; refusals, cancellation and foreign errors are
+    ///   landed by the caller.
+    /// - Parameter registration: the activation registration the store still holds, for the code remedy.
+    /// - Returns: the state to land on, or `nil` where the session stays.
+    private static func landing(
+        for ttpError: PayabliTTPError,
+        registration: StoredRegistration
+    ) -> PayabliTTPSessionState? {
         switch ttpError {
         case .devicePendingActivation:
             // Not a failure. The device owes an activation code and the host's
@@ -49,6 +61,9 @@ extension PayabliTTPSessionState {
 
         case .readerOSVersionNotSupported, .readerHardwareUnsupported, .readerDeviceRefused:
             return .failed(reason: .deviceIneligible)
+
+        case .readerSessionExpired:
+            return .sessionExpired
 
         case .readerSetupFailed, .readerUnavailable, .networkError, .tokenExpired:
             // A reader that would not arm, a service that could not be reached
