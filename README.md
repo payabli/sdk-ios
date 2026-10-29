@@ -360,7 +360,7 @@ The SDK is written in Swift, and the card-not-present form is a SwiftUI view.
   number, so compare the code of an error carrying `PayabliErrorType` against a case rather than a number:
 
   ```objc
-  if (error.code == PayabliErrorTypeCodeDevicePendingActivation) {
+  if (error.userInfo[@"PayabliErrorType"] != nil && error.code == PayabliErrorTypeCodeDevicePendingActivation) {
       // Ask for the activation code.
   }
   ```
