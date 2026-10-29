@@ -93,7 +93,8 @@ let package = Package(
                 "LLM.md"
             ],
             resources: [
-                .process("Resources/PayabliBrandAssets.xcassets")
+                .process("Resources/PayabliBrandAssets.xcassets"),
+                .copy("Resources/PrivacyInfo.xcprivacy")
             ]
         ),
         .target(

@@ -388,6 +388,18 @@ Fill in `Secrets.swift`, then start the token server as its
 The SDK sends error and usage events to Payabli, with no card, payer or account data. The events are
 not listed.
 
+Core, PayIn and Tap to Pay each ship a privacy manifest declaring what they collect, so Xcode's privacy report
+for your app includes it:
+
+- `PayabliSDKCore`, which every product includes, collects the device ID, performance data, other diagnostic
+  data and product interaction, linked to the user, not used for tracking, for app functionality and analytics.
+- `PayabliSDKPayIn` collects the payment info, name, email address and customer number the payer enters in
+  its form, linked to the user, not used for tracking, for app functionality.
+- `PayabliSDKTapToPay` declares nothing beyond Core, because Apple's reader takes the card.
+
+The manifests don't cover data your app passes to the SDK, such as the customer record, invoice or order
+description on a payment. The SDK sends that data to Payabli with the payment, and your app declares it.
+
 Every request the SDK sends to Payabli carries an `X-Pyb-Client` header with the SDK version, the platform, the OS
 version, the device model, the locale and the device ID described under [Device identity](#device-identity).
 A value that's missing, blank or isn't printable ASCII is left out. The header can't be turned off.

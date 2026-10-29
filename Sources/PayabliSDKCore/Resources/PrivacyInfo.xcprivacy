@@ -12,20 +12,7 @@
             <key>NSPrivacyCollectedDataType</key>
             <string>NSPrivacyCollectedDataTypeDeviceID</string>
             <key>NSPrivacyCollectedDataLinked</key>
-            <false/>
-            <key>NSPrivacyCollectedDataTracking</key>
-            <false/>
-            <key>NSPrivacyCollectedDataPurposes</key>
-            <array>
-                <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
-                <string>NSPrivacyCollectedDataTypePurposeAnalytics</string>
-            </array>
-        </dict>
-        <dict>
-            <key>NSPrivacyCollectedDataType</key>
-            <string>NSPrivacyCollectedDataTypeCrashData</string>
-            <key>NSPrivacyCollectedDataLinked</key>
-            <false/>
+            <true/>
             <key>NSPrivacyCollectedDataTracking</key>
             <false/>
             <key>NSPrivacyCollectedDataPurposes</key>
@@ -38,7 +25,7 @@
             <key>NSPrivacyCollectedDataType</key>
             <string>NSPrivacyCollectedDataTypePerformanceData</string>
             <key>NSPrivacyCollectedDataLinked</key>
-            <false/>
+            <true/>
             <key>NSPrivacyCollectedDataTracking</key>
             <false/>
             <key>NSPrivacyCollectedDataPurposes</key>
@@ -51,7 +38,20 @@
             <key>NSPrivacyCollectedDataType</key>
             <string>NSPrivacyCollectedDataTypeOtherDiagnosticData</string>
             <key>NSPrivacyCollectedDataLinked</key>
+            <true/>
+            <key>NSPrivacyCollectedDataTracking</key>
             <false/>
+            <key>NSPrivacyCollectedDataPurposes</key>
+            <array>
+                <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+                <string>NSPrivacyCollectedDataTypePurposeAnalytics</string>
+            </array>
+        </dict>
+        <dict>
+            <key>NSPrivacyCollectedDataType</key>
+            <string>NSPrivacyCollectedDataTypeProductInteraction</string>
+            <key>NSPrivacyCollectedDataLinked</key>
+            <true/>
             <key>NSPrivacyCollectedDataTracking</key>
             <false/>
             <key>NSPrivacyCollectedDataPurposes</key>
