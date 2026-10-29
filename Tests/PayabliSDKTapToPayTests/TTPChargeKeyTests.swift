@@ -325,6 +325,106 @@ final class TTPChargeKeyTests: XCTestCase {
         XCTAssertEqual(resent?.paymentTransId, "TXN-KEY")
     }
 
+    // MARK: - A retry refused before its key is reserved
+
+    func testARetryRefusedAsNotReadyWhileItsSaleIsHeldStaysUnknownAndKeepsTheKey() async throws {
+        let (ttp, provider) = try await makeReadyTTP(outcome: .indeterminate)
+        _ = await failure { try await ttp.charge(paymentDetails: Self.details) }
+        let ready = waitOnActivation(ttp)
+
+        let refused = await failure { try await ttp.charge(paymentDetails: Self.details, attempt: .retry) }
+
+        XCTAssertEqual(refused?.type, .terminalNotReady)
+        XCTAssertEqual(refused?.capture, .unknown)
+        XCTAssertEqual(Self.wire.keys.count, 1, "the refused retry sent its opening")
+        ready()
+        provider.readingResult = Self.read(.approved)
+        _ = try await ttp.charge(paymentDetails: Self.details, attempt: .retry)
+        XCTAssertEqual(Self.wire.keys[1], Self.wire.keys[0], "the refusal let the held key go")
+    }
+
+    func testARetryRefusedForAMissingDeviceWhileItsSaleIsHeldStaysUnknownAndKeepsTheKey() async throws {
+        let attestation = MockDeviceAttestationService()
+        let (ttp, provider) = try await makeReadyTTP(outcome: .indeterminate, attestation: attestation)
+        _ = await failure { try await ttp.charge(paymentDetails: Self.details) }
+        let deviceId = attestation.cachedDeviceId
+        attestation.cachedDeviceId = nil
+
+        let refused = await failure { try await ttp.charge(paymentDetails: Self.details, attempt: .retry) }
+
+        XCTAssertEqual(refused?.type, .deviceSetupRequired)
+        XCTAssertEqual(refused?.capture, .unknown)
+        XCTAssertEqual(Self.wire.keys.count, 1, "the refused retry sent its opening")
+        attestation.cachedDeviceId = deviceId
+        provider.readingResult = Self.read(.approved)
+        _ = try await ttp.charge(paymentDetails: Self.details, attempt: .retry)
+        XCTAssertEqual(Self.wire.keys[1], Self.wire.keys[0], "the refusal let the held key go")
+    }
+
+    func testARetryRefusedBeforeItsKeyWithNothingHeldIsNotCharged() async throws {
+        let (ttp, _) = try await makeReadyTTP()
+        _ = waitOnActivation(ttp)
+
+        let refused = await failure { try await ttp.charge(paymentDetails: Self.details, attempt: .retry) }
+
+        XCTAssertEqual(refused?.type, .terminalNotReady)
+        XCTAssertEqual(refused?.capture, .notCharged)
+    }
+
+    func testARetryRefusedBeforeItsKeyForAnotherSaleIsNotCharged() async throws {
+        let (ttp, _) = try await makeReadyTTP(outcome: .indeterminate)
+        _ = await failure { try await ttp.charge(paymentDetails: Self.details) }
+        _ = waitOnActivation(ttp)
+
+        let refused = await failure {
+            try await ttp.charge(paymentDetails: PayabliTTPPaymentDetails(amount: 2, currency: "USD"), attempt: .retry)
+        }
+
+        XCTAssertEqual(refused?.type, .terminalNotReady)
+        XCTAssertEqual(refused?.capture, .notCharged)
+    }
+
+    func testANewPaymentRefusedBeforeItsKeyWhileTheSameSaleIsHeldIsNotCharged() async throws {
+        let (ttp, _) = try await makeReadyTTP(outcome: .indeterminate)
+        _ = await failure { try await ttp.charge(paymentDetails: Self.details) }
+        _ = waitOnActivation(ttp)
+
+        let refused = await failure { try await ttp.charge(paymentDetails: Self.details) }
+
+        XCTAssertEqual(refused?.type, .terminalNotReady)
+        XCTAssertEqual(refused?.capture, .notCharged)
+    }
+
+    // MARK: - A refused customer
+
+    func testARefusedCustomerOnAResentKeyStaysUnknownAndKeepsTheKey() async throws {
+        let (ttp, provider) = try await makeReadyTTP(outcome: .indeterminate)
+        _ = await failure { try await ttp.charge(paymentDetails: Self.details) }
+        Self.wire.initiateRefusesCustomer = true
+
+        let refused = await failure { try await ttp.charge(paymentDetails: Self.details, attempt: .retry) }
+        Self.wire.initiateRefusesCustomer = false
+
+        XCTAssertEqual(refused?.refusal, .customerDataRefused(requiredFields: ["customerNumber"]))
+        XCTAssertEqual(refused?.capture, .unknown)
+        XCTAssertEqual(provider.startReadingCalls, 1, "the refused resend asked for a card")
+        _ = await failure { try await ttp.charge(paymentDetails: Self.details, attempt: .retry) }
+        XCTAssertEqual(Self.wire.keys[2], Self.wire.keys[0], "the refusal let the held key go")
+    }
+
+    func testARefusedCustomerOnAFreshKeyIsNotChargedAndSettlesTheKey() async throws {
+        let (ttp, _) = try await makeReadyTTP()
+        Self.wire.initiateRefusesCustomer = true
+
+        let refused = await failure { try await ttp.charge(paymentDetails: Self.details) }
+        Self.wire.initiateRefusesCustomer = false
+
+        XCTAssertEqual(refused?.refusal, .customerDataRefused(requiredFields: ["customerNumber"]))
+        XCTAssertEqual(refused?.capture, .notCharged)
+        _ = try await ttp.charge(paymentDetails: Self.details, attempt: .retry)
+        XCTAssertNotEqual(Self.wire.keys[1], Self.wire.keys[0], "the refused opening's key was kept")
+    }
+
     func testAnIndeterminateReadsNoRecordCloseReportsThePaymentNotClosedAndKeepsTheKey() async throws {
         let (ttp, _) = try await makeReadyTTP(outcome: .indeterminate)
         Self.wire.updateRefusal = Self.processorHasNoRecord
@@ -412,7 +512,8 @@ final class TTPChargeKeyTests: XCTestCase {
     private func makeReadyTTP(
         outcome: CardReadOutcome = .approved,
         readFailure: Error? = nil,
-        store: ChargeKeyStore? = nil
+        store: ChargeKeyStore? = nil,
+        attestation: MockDeviceAttestationService = MockDeviceAttestationService()
     ) async throws -> (PayabliTTP, MockTapToPayProvider) {
         StubURLProtocol.handler = Self.stubHandler
         let provider = MockTapToPayProvider()
@@ -420,7 +521,7 @@ final class TTPChargeKeyTests: XCTestCase {
         let ttp = PayabliTTP(
             config: try PayabliConfig(entryPoint: "e", environment: .sandbox, tokenProvider: { "seed_token" }),
             provider: provider,
-            attestation: MockDeviceAttestationService(),
+            attestation: attestation,
             retryPolicy: RetryPolicy(maxAttempts: 1, baseDelay: 0, maxDelay: 0, multiplier: 1, maxJitter: 0),
             session: StubURLProtocol.makeSession(),
             chargeKeys: store ?? ChargeKeyStore(now: { [clock] in clock.now })
@@ -428,6 +529,24 @@ final class TTPChargeKeyTests: XCTestCase {
         try await ttp.initialize()
         XCTAssertEqual(ttp.sessionState, .ready, "the fixture itself is broken if this fails")
         return (ttp, provider)
+    }
+
+    /// Leaves the session waiting on activation, a state a charge is refused in before it reserves a key.
+    ///
+    /// - Parameter ttp: the terminal, ready.
+    /// - Returns: puts the terminal back to ready.
+    private func waitOnActivation(_ ttp: PayabliTTP) -> () -> Void {
+        for state: PayabliTTPSessionState in [.idle, .attestingDevice, .pendingActivation(activationId: "activation")] {
+            XCTAssertTrue(ttp.sessionManager.transition(to: state), "the fixture itself is broken if this fails")
+        }
+        ttp.syncPublished()
+        return {
+            let setUp: [PayabliTTPSessionState] = [.attestingDevice, .fetchingConfig, .initializingReader(percent: nil), .ready]
+            for state in setUp {
+                XCTAssertTrue(ttp.sessionManager.transition(to: state), "the fixture itself is broken if this fails")
+            }
+            ttp.syncPublished()
+        }
     }
 
     private func failure(_ work: () async throws -> some Any) async -> TapToPayError? {
@@ -450,6 +569,7 @@ final class TTPChargeKeyTests: XCTestCase {
         private var duplicateSale = false
         private var closeFails = false
         private var notApproved = false
+        private var refusesCustomer = false
 
         var keys: [String] {
             lock.withLock { sentKeys }
@@ -480,6 +600,11 @@ final class TTPChargeKeyTests: XCTestCase {
             set { lock.withLock { closeFails = newValue } }
         }
 
+        var initiateRefusesCustomer: Bool {
+            get { lock.withLock { refusesCustomer } }
+            set { lock.withLock { refusesCustomer = newValue } }
+        }
+
         func record(_ key: String?) {
             lock.withLock { sentKeys.append(key ?? "<none>") }
         }
@@ -492,6 +617,7 @@ final class TTPChargeKeyTests: XCTestCase {
                 duplicateSale = false
                 closeFails = false
                 notApproved = false
+                refusesCustomer = false
             }
         }
     }
@@ -504,7 +630,17 @@ final class TTPChargeKeyTests: XCTestCase {
         if path.contains("/MoneyIn/initiate") {
             wire.record(request.value(forHTTPHeaderField: "idempotencyKey"))
             status = wire.initiateStatus
-            if status == 409, wire.conflictIsDuplicateSale {
+            if wire.initiateRefusesCustomer {
+                status = 400
+                let message = "Missing customer identifiers: customerNumber"
+                data = try JSONSerialization.data(withJSONObject: [
+                    "title": "Bad Request",
+                    "status": 400,
+                    "detail": message,
+                    "code": "E7020",
+                    "errors": ["customerData": [["message": message, "suggestion": ""]]]
+                ])
+            } else if status == 409, wire.conflictIsDuplicateSale {
                 data = try JSONSerialization.data(withJSONObject: ["isSuccess": false, "responseText": "Duplicated transaction"])
             } else if wire.initiateNotApproved {
                 data = try JSONSerialization.data(withJSONObject: ["code": "D01", "reason": "Refused"])

@@ -86,10 +86,22 @@ package final class TTPTransactionClient: Sendable {
         guard envelope.isApproved else {
             throw PayabliTTPError.paymentNotOpened(reason: envelope.reason ?? envelope.code)
         }
-        guard let data = envelope.data else {
+        // A blank or dot-segment identifier counts as none: the close could not address it, and the card would
+        // already be taken.
+        guard let data = envelope.data, Self.isAddressable(data.paymentTransId) else {
             throw TapToPayError(type: .decodingError, reason: "The opening was approved with no payment", detail: nil)
         }
         return data.paymentTransId
+    }
+
+    /// Whether `paymentTransId` names a payment the close can address. `.` and `..` pass percent-encoding unchanged
+    /// and would name a route instead.
+    ///
+    /// - Parameter paymentTransId: the payment an approved opening named.
+    /// - Returns: `false` when it is blank, `.` or `..` once trimmed.
+    private static func isAddressable(_ paymentTransId: String) -> Bool {
+        let trimmed = paymentTransId.trimmingCharacters(in: .whitespacesAndNewlines)
+        return !trimmed.isEmpty && trimmed != "." && trimmed != ".."
     }
 
     private static func isJSONObject(_ body: Data) -> Bool {

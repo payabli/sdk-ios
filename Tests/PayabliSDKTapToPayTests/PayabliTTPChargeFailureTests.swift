@@ -191,6 +191,26 @@ final class PayabliTTPChargeFailureTests: XCTestCase {
         XCTAssertEqual(failure.capture, .notCharged)
     }
 
+    /// An approval whose payment is empty names nothing the close could address, so no card is asked for.
+    func testAnApprovedOpeningWithAnEmptyPaymentIsADecodingError() async throws {
+        try await assertUnaddressable("")
+    }
+
+    /// An approval whose payment is only whitespace names nothing either.
+    func testAnApprovedOpeningWithABlankPaymentIsADecodingError() async throws {
+        try await assertUnaddressable("  ")
+    }
+
+    /// `.` survives percent-encoding, so the close would name a route rather than the payment.
+    func testAnApprovedOpeningWhosePaymentIsADotIsADecodingError() async throws {
+        try await assertUnaddressable(".")
+    }
+
+    /// `..` survives percent-encoding too, and the close would climb out of its route.
+    func testAnApprovedOpeningWhosePaymentIsTwoDotsIsADecodingError() async throws {
+        try await assertUnaddressable("..")
+    }
+
     // MARK: - A refused customer
 
     /// The paypoint names the customer fields it requires, and the host receives them with nothing charged and no
@@ -245,6 +265,23 @@ final class PayabliTTPChargeFailureTests: XCTestCase {
         XCTAssertNil(failure.refusal)
     }
 
+    /// The code blaming one of the customer's own fields is an invalid field, not a refused customer.
+    func testTheSameCodeOnTheCustomersFirstNameIsNotARefusedCustomer() async throws {
+        let (ttp, _, _) = try await makeReadyTTP()
+        StubURLProtocol.handler = Self.refusingOpening(
+            code: "E7020",
+            field: "customerData.firstName",
+            message: "First name is too long"
+        )
+
+        let failure = try await chargeFailure(ttp)
+
+        XCTAssertEqual(failure.type, .validation, "\(failure)")
+        XCTAssertEqual(failure.code, 1016)
+        XCTAssertNil(failure.refusal)
+        XCTAssertEqual(failure.capture, .notCharged)
+    }
+
     /// Another code blaming the customer is an ordinary invalid request.
     func testAnotherCodeOnTheCustomerIsNotARefusedCustomer() async throws {
         let (ttp, _, _) = try await makeReadyTTP()
@@ -261,6 +298,46 @@ final class PayabliTTPChargeFailureTests: XCTestCase {
     }
 
     // MARK: - Fixtures
+
+    /// Charges against an opening approved with `paymentTransId`, and asserts the charge is refused as unreadable
+    /// before the reader is asked and before any close is sent.
+    ///
+    /// - Parameter paymentTransId: the payment the approval names.
+    private func assertUnaddressable(
+        _ paymentTransId: String,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) async throws {
+        let (ttp, provider, _) = try await makeReadyTTP()
+        let closes = CloseCount()
+        StubURLProtocol.handler = { request in
+            let path = request.url?.path ?? ""
+            if path.contains("/MoneyIn/update/") {
+                closes.add()
+            }
+            guard path.contains("/MoneyIn/initiate") else {
+                return try Self.chargeStubHandler(request)
+            }
+            return (
+                HTTPURLResponse(
+                    url: request.url!,
+                    statusCode: 200,
+                    httpVersion: "HTTP/1.1",
+                    headerFields: ["Content-Type": "application/json"]
+                )!,
+                try JSONSerialization.data(withJSONObject: ["code": "A01", "data": ["paymentTransId": paymentTransId]])
+            )
+        }
+
+        let failure = try await chargeFailure(ttp)
+
+        XCTAssertEqual(failure.type, .decodingError, "\(failure)", file: file, line: line)
+        XCTAssertEqual(failure.code, 1014, file: file, line: line)
+        XCTAssertNil(failure.paymentTransId, file: file, line: line)
+        XCTAssertEqual(failure.capture, .notCharged, file: file, line: line)
+        XCTAssertEqual(provider.startReadingCalls, 0, "a card was asked for", file: file, line: line)
+        XCTAssertEqual(closes.count, 0, "a close was sent", file: file, line: line)
+    }
 
     /// Answers `/initiate` with a 400 blaming `field`, shaped as the service's refusal body, and every other path as
     /// ``chargeStubHandler`` does.
@@ -438,6 +515,20 @@ final class PayabliTTPChargeFailureTests: XCTestCase {
 /// Distinguishes "the charge never returned" from "the charge threw", so a
 /// wedge cannot be mistaken for the failure these tests expect.
 private struct ChargeTimedOut: Error {}
+
+/// How many closes the stub was sent, counted from the URL loading thread.
+private final class CloseCount: @unchecked Sendable {
+    private let lock = NSLock()
+    private var sent = 0
+
+    var count: Int {
+        lock.withLock { sent }
+    }
+
+    func add() {
+        lock.withLock { sent += 1 }
+    }
+}
 
 /// Guards a continuation so the deadline and the work cannot both resume it.
 /// Only touched from the main actor, which is where both racers run.

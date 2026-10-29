@@ -43,20 +43,22 @@ enum TapToPayErrorTranslation {
         }
     }
 
-    /// What a charge's failure reaches a host as. Once the reader is asked for a card, a code saying nothing was sent
-    /// becomes `paymentOutcomeUnknown`, except the reader's own guard, which throws before it touches a card. A failure
-    /// naming no payment takes the charge's, and a resent key names an earlier charge, so it never reports not charged.
+    /// What a charge's failure reaches a host as. Once a card is asked for, a code saying nothing was sent becomes
+    /// `paymentOutcomeUnknown`, except the reader's own guard. A failure naming no payment takes the charge's, and a
+    /// resent key or a refused retry of a held sale names an earlier charge, so neither reports not charged.
     ///
     /// - Parameter error: what the charge threw, before it was translated for the host.
     /// - Parameter paymentTransId: the charge's payment, which a failure naming none takes.
     /// - Parameter askedForCard: whether the reader was already asked for a card.
     /// - Parameter resentKey: whether the charge resent a key held for an earlier one.
+    /// - Parameter retriesHeldSale: whether a retry refused before reserving its key describes a held sale.
     /// - Returns: the failure a host receives, with its catalog entry.
     static func hostError(
         for error: Error,
         chargeOf paymentTransId: String?,
         askedForCard: Bool,
-        resentKey: Bool = false
+        resentKey: Bool = false,
+        retriesHeldSale: Bool = false
     ) -> Error {
         guard let failure = hostError(for: error) as? TapToPayError else { return error }
         let claimsNothingWasSent = failure.type == .validation || failure.type == .sdkInternalError
@@ -80,7 +82,7 @@ enum TapToPayErrorTranslation {
             reason: type == failure.type ? failure.reason : type.message,
             detail: failure.detail,
             paymentTransId: failure.paymentTransId ?? paymentTransId,
-            capture: resentKey && capture == .notCharged ? .unknown : capture,
+            capture: (resentKey || retriesHeldSale) && capture == .notCharged ? .unknown : capture,
             retryAfter: failure.retryAfter,
             refusal: failure.refusal
         )
@@ -222,7 +224,9 @@ enum TapToPayErrorTranslation {
 final class ChargeProgress {
     var paymentTransId: String?
     var askedForCard = false
+    var reserved = false
     var resentKey = false
+    var retriesHeldSale = false
 }
 
 @available(iOS 16.7, *)
