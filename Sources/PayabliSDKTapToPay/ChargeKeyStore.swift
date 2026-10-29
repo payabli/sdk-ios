@@ -2,8 +2,8 @@ import Foundation
 import PayabliSDKCore
 
 /// The idempotency keys of unsettled charges, in memory only, newest first per entry point and environment. A declared
-/// retry is handed the newest, and every key ages out on ``payabliIdempotencyKeyMaxAge``, as the service forgets it.
-/// Every terminal shares ``process``, so a second terminal's retry repeats the first one's charge.
+/// retry is handed the newest, never while it is being sent, and a key not being sent ages out on
+/// ``payabliIdempotencyKeyMaxAge``. Every terminal shares ``process``, so a second terminal's retry repeats the first.
 package final class ChargeKeyStore: @unchecked Sendable {
     /// The store every terminal in this process uses.
     package static let process = ChargeKeyStore()
@@ -35,8 +35,8 @@ package final class ChargeKeyStore: @unchecked Sendable {
     /// - Parameter attempt: whether the host declared the charge a retry.
     /// - Parameter description: the payment the charge describes.
     /// - Returns: the key to send, whether it was already held, and when this send reserved it.
-    /// - Throws: ``TapToPayError`` of type `retryNotSamePayment` when a retry describes another payment than the held
-    ///   key's, which stays held; of type `tooManyOpenCharges` when every slot holds another entry point's charge.
+    /// - Throws: ``TapToPayError``: `paymentReferenceOpen` when a retry's held key is being sent, `retryNotSamePayment`
+    ///   for another payment, the key held either way; `tooManyOpenCharges` when other entry points fill every slot.
     func reserve(
         entry: String,
         environment: PayabliEnvironment,
@@ -47,10 +47,13 @@ package final class ChargeKeyStore: @unchecked Sendable {
             let now = now()
             sweep(now)
             if attempt == .retry, let existing = held.first(where: { $0.matches(entry, environment) }) {
+                guard !existing.underWay else {
+                    throw Self.refusal(.paymentReferenceOpen)
+                }
                 guard existing.payment.isRepeated(by: description) else {
                     throw Self.refusal(.retryNotSamePayment)
                 }
-                existing.sending += 1
+                existing.underWay = true
                 return Reservation(key: existing.key, reused: true, reservedAt: now)
             }
             var slots: [String] = []
@@ -68,7 +71,7 @@ package final class ChargeKeyStore: @unchecked Sendable {
                 reservedAt: now,
                 payment: description
             )
-            minted.sending = 1
+            minted.underWay = true
             held.insert(minted, at: 0)
             return Reservation(key: minted.key, reused: false, reservedAt: now)
         }
@@ -111,7 +114,7 @@ package final class ChargeKeyStore: @unchecked Sendable {
     func supersede(entry: String, environment: PayabliEnvironment, key: String, arrivedAt: ContinuousClock.Instant?) {
         lock.withLock {
             guard let kept = held.first(where: { $0.matches(entry, environment) && $0.key == key }) else { return }
-            kept.sending = max(0, kept.sending - 1)
+            kept.underWay = false
             held.removeAll { $0.matches(entry, environment) && $0.key != key }
             if let arrivedAt {
                 kept.reservedAt = max(kept.reservedAt, arrivedAt)
@@ -119,11 +122,30 @@ package final class ChargeKeyStore: @unchecked Sendable {
         }
     }
 
+    /// The held keys as a retry describing `description` would find them, read without reserving anything.
+    ///
+    /// - Parameter entry: the entry point the retry is for.
+    /// - Parameter environment: the environment the retry is sent to.
+    /// - Parameter description: the payment the retry describes.
+    /// - Returns: whether the key a retry is handed has a send under way, and whether the retry describes the payment
+    ///   of any held key, not only the newest; `nil` when nothing is held.
+    func heldRetry(entry: String, environment: PayabliEnvironment, description: ChargeDescription) -> HeldRetry? {
+        lock.withLock {
+            sweep(now())
+            let keys = held.filter { $0.matches(entry, environment) }
+            guard let newest = keys.first else { return nil }
+            return HeldRetry(
+                underWay: newest.underWay,
+                describesHeld: keys.contains { $0.payment.isRepeated(by: description) }
+            )
+        }
+    }
+
     /// Drops every key past the bound that no send is using. Called with the lock held.
     ///
     /// - Parameter now: the instant the bound is measured to.
     private func sweep(_ now: ContinuousClock.Instant) {
-        held.removeAll { $0.sending == 0 && now - $0.reservedAt >= payabliIdempotencyKeyMaxAge }
+        held.removeAll { !$0.underWay && now - $0.reservedAt >= payabliIdempotencyKeyMaxAge }
     }
 
     private static func refusal(_ type: PayabliErrorType) -> TapToPayError {
@@ -142,6 +164,15 @@ extension ChargeKeyStore {
             "Reservation(reused: \(reused))"
         }
     }
+
+    /// The held keys as a retry finds them, read in one pass under the lock.
+    struct HeldRetry {
+        /// Whether the newest key, the one ``ChargeKeyStore/reserve(entry:environment:attempt:description:)`` would
+        /// hand a retry, has a send under way.
+        let underWay: Bool
+        /// Whether the retry describes the payment of any held key.
+        let describesHeld: Bool
+    }
 }
 
 /// One entry point's charge under one environment, and the key its repeat carries. Its description names neither the
@@ -152,7 +183,7 @@ private final class ChargeAttempt: CustomStringConvertible {
     let key: String
     let payment: ChargeDescription
     var reservedAt: ContinuousClock.Instant
-    var sending = 0
+    var underWay = false
 
     init(entry: String, environment: String, key: String, reservedAt: ContinuousClock.Instant, payment: ChargeDescription) {
         self.entry = entry
@@ -163,7 +194,7 @@ private final class ChargeAttempt: CustomStringConvertible {
     }
 
     var description: String {
-        "ChargeAttempt(sending: \(sending))"
+        "ChargeAttempt(underWay: \(underWay))"
     }
 
     var slot: String {
