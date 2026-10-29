@@ -65,7 +65,8 @@ public final class PayabliSession: @unchecked Sendable {
             try InstallIdentifier.hardwareId(storage: KeychainStorage(migrating: [InstallIdentifier.storageKey]))
         },
         telemetryTransport: (any TelemetryTransport)? = nil,
-        sink: SdkStateSink = SdkStateSink()
+        sink: SdkStateSink = SdkStateSink(),
+        predecessor: TelemetryClient? = nil
     ) {
         self.config = config
         self.deviceIdentity = deviceIdentity
@@ -102,7 +103,8 @@ public final class PayabliSession: @unchecked Sendable {
             sleep: { try await ContinuousClock().sleep(for: .seconds($0)) },
             lifecycle: UIKitAppLifecycle(),
             deviceId: { try? deviceIdentity.value() },
-            queued: [(TelemetryEventName.sdkInitialized, [TelemetryProperty.state.rawValue: Self.reportedState])]
+            queued: [(TelemetryEventName.sdkInitialized, [TelemetryProperty.state.rawValue: Self.reportedState])],
+            predecessor: predecessor
         )
     }
 
@@ -176,17 +178,23 @@ public final class PayabliSession: @unchecked Sendable {
                 return current
             }
 
+            // A finished credential refuses every send, so the old queue can only leave under the new session's token,
+            // and only a session reporting for the same entry point and environment takes it.
+            let inherits = current?.identity == identity
             let session = PayabliSession(
                 config: config,
                 urlSession: urlSession,
                 telemetryTransport: telemetryTransport ?? testTelemetryTransport,
-                sink: sink
+                sink: sink,
+                predecessor: inherits ? current?.telemetry : nil
             )
             session.machine.markReady()
             installed = session
 
             if let current {
-                Task { [telemetry = current.telemetry] in await telemetry.stop() }
+                if !inherits {
+                    Task { [telemetry = current.telemetry] in await telemetry.discard() }
+                }
                 logger.warning("session_replaced: replaced a session that required re-initialization")
             } else {
                 logger.info("session_initialized")

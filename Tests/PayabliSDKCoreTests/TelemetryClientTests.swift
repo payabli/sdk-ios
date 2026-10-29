@@ -3,17 +3,19 @@ import PayabliSDKTestUtils
 import XCTest
 
 final class TelemetryClientTests: XCTestCase {
-    private let clock = ManualTelemetryClock()
-    private let lifecycle = ManualAppLifecycle()
-    private let transport = InMemoryTelemetryTransport()
-    private let overflow = "sdk.telemetryOverflow"
+    let clock = ManualTelemetryClock()
+    let lifecycle = ManualAppLifecycle()
+    let transport = InMemoryTelemetryTransport()
+    let overflow = "sdk.telemetryOverflow"
 
-    private func makeClient(
+    func makeClient(
         batchSize: Int = 20,
         queueCapacity: Int = 500,
         maxEventsPerRequest: Int = 100,
         deviceId: String? = nil,
-        queued: [(name: String, properties: [String: String])] = []
+        queued: [(name: String, properties: [String: String])] = [],
+        logger: PayabliLogger = PayabliLogger(category: .telemetry, sink: RecordingLogSink()),
+        predecessor: TelemetryClient? = nil
     ) -> TelemetryClient {
         TelemetryClient(
             configuration: .init(
@@ -28,17 +30,19 @@ final class TelemetryClientTests: XCTestCase {
             sleep: clock.sleep,
             lifecycle: lifecycle,
             deviceId: { deviceId },
-            queued: queued
+            queued: queued,
+            logger: logger,
+            predecessor: predecessor
         )
     }
 
     /// Records an event that waits for its batch, told apart from the others by `label`.
-    private func record(_ client: TelemetryClient, _ label: String) async {
+    func record(_ client: TelemetryClient, _ label: String) async {
         await client.emit(TelemetryEventName.formPresented, properties: ["step": label])
     }
 
     /// Records an event whose outcome sends it at once, told apart from the others by `label`.
-    private func recordFailure(_ client: TelemetryClient, _ label: String, outcome: String) async {
+    func recordFailure(_ client: TelemetryClient, _ label: String, outcome: String) async {
         await client.emit(TelemetryEventName.payinCaptureCompleted, properties: ["outcome": outcome, "origin": label])
     }
 
@@ -596,7 +600,7 @@ final class TelemetryClientTests: XCTestCase {
 }
 
 /// Holds every send until opened, and records how many were in flight at once.
-private actor GatedTelemetryTransport: TelemetryTransport {
+actor GatedTelemetryTransport: TelemetryTransport {
     private(set) var sent: [[TelemetryEvent]] = []
     private(set) var mostAtOnce = 0
     private var active = 0
@@ -639,7 +643,7 @@ private actor GatedTelemetryTransport: TelemetryTransport {
     }
 }
 
-private extension TelemetryEvent {
+extension TelemetryEvent {
     /// The label a test recorded the event under, or its name for an event recorded by name.
     var label: String {
         properties["step"] ?? properties["origin"] ?? event
