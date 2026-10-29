@@ -36,8 +36,7 @@ extension PayabliTTP {
         try await SessionSetupGate.shared.run(kind, for: ObjectIdentifier(self), work)
     }
 
-    /// Holds the process's gate for a charge. A setup call made meanwhile, on any `PayabliTTP`, waits until `body`
-    /// returns.
+    /// Holds the process's gate for a charge, so a setup on any `PayabliTTP` waits until `body` returns.
     ///
     /// - Parameters:
     ///   - attempt: Whether the host declared the charge a retry.
@@ -45,8 +44,8 @@ extension PayabliTTP {
     ///   - body: The charge, run in the caller's task while the gate is held.
     /// - Returns: The charge's result.
     /// - Throws: `sessionNotInitialized` when this terminal's session was replaced or ended; `notReady` when a charge
-    ///   already holds the gate, on any entry point, whether it is running or still waiting for a setup to finish. A
-    ///   declared retry refused either way carries the capture ``refusedRetry(of:)`` reads.
+    ///   on any entry point holds the gate, or for a declared retry `paymentReferenceOpen` when its key is being sent,
+    ///   else `terminalNotReady`. A refused retry carries the capture ``refusedRetry(of:)`` reads.
     func holdingSessionSetup<T>(
         attempt: PayabliAttempt,
         sale: ChargeDescription,
