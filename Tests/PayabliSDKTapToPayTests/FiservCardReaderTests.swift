@@ -359,6 +359,23 @@ final class FiservCardReaderTests: XCTestCase {
         }
     }
 
+    /// A charge reaches the read only from a ready session, so a reader missing there is the session gone
+    /// between the opening and the read, and no card was touched.
+    func testReadingWithoutAReaderIsTheSessionsExpiryAndChargesNothing() async {
+        let reader = FiservCardReader()
+
+        do {
+            _ = try await reader.startReading(CardReadRequest(amount: 1, merchantTransactionId: "TXN"))
+            XCTFail("expected the missing reader to surface")
+        } catch let PayabliTTPError.readerSessionExpired(_, capture) {
+            XCTAssertEqual(capture, .notCharged)
+        } catch PayabliTTPError.readerSetupFailed {
+            // the build without the reader core, which has no reader to read with
+        } catch {
+            XCTFail("wrong error: \(error)")
+        }
+    }
+
     /// A platform failure while presenting keeps its shape rather than reading as a dismissal.
     func testAReaderThatRaisesWhilePresentingIsMapped() async {
         let reader = FiservCardReader()

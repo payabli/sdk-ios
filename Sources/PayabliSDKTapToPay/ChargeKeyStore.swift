@@ -77,6 +77,20 @@ package final class ChargeKeyStore: @unchecked Sendable {
         }
     }
 
+    /// Whether a `.retry` describing `description` would be handed a held key, without reserving one.
+    ///
+    /// - Parameter entry: the entry point the charge is for.
+    /// - Parameter environment: the environment the charge is sent to.
+    /// - Parameter description: the payment the retry describes.
+    /// - Returns: `true` when ``reserve(entry:environment:attempt:description:)`` would resend a held key for it.
+    func holdsRetryOf(entry: String, environment: PayabliEnvironment, description: ChargeDescription) -> Bool {
+        lock.withLock {
+            sweep(now())
+            guard let existing = held.first(where: { $0.matches(entry, environment) }) else { return false }
+            return existing.payment.isRepeated(by: description)
+        }
+    }
+
     /// Forgets `key` for `entry` under `environment`, because its charge reached an outcome not in doubt. A key no
     /// longer held is left alone.
     ///

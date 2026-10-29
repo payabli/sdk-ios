@@ -95,6 +95,7 @@ function_parameter_count:
 cyclomatic_complexity:
   warning: 12
   error: 20
+  ignores_case_statements: true
 
 # Keep the excluded list in sync with the single-letter names that show up in
 # Codable `encode(to:)` / `init(from:)` bodies and SwiftUI state closures —

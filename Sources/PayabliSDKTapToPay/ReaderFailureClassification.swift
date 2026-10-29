@@ -16,6 +16,9 @@ func readerFailureInvalidatesSession(_ error: Error) -> Bool {
         // config arms a new reader session.
         return true
     }
+    if case PayabliTTPError.readerSessionExpired = error {
+        return true
+    }
     #if canImport(ProximityReader)
         if let readError = error as? PaymentCardReaderSession.ReadError {
             return sessionLevelReadErrorNames.contains(String(describing: readError))
