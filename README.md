@@ -357,7 +357,7 @@ The SDK is written in Swift, and the card-not-present form is a SwiftUI view.
   `PayabliPayInAuthorizedRequestObjC` and complete with a `PayabliPayInResultObjC`.
 - **Objective-C errors.** An SDK error reaches Objective-C as an `NSError` whose `code` is its catalog
   number, with the type's name in `userInfo["PayabliErrorType"]`. `PayabliErrorTypeCode` names every catalog
-  number, so compare the code against a case rather than a number:
+  number, so compare the code of an error carrying `PayabliErrorType` against a case rather than a number:
 
   ```objc
   if (error.code == PayabliErrorTypeCodeDevicePendingActivation) {

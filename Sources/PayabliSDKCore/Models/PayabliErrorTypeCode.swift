@@ -1,8 +1,9 @@
 import Foundation
 
 /// ``PayabliErrorType`` for Objective-C, which cannot see a `String`-backed Swift enum. Each raw value is the
-/// catalog number, the `NSError` code of every SDK error in the `com.payabli.ttp`, `com.payabli.payIn` and
-/// `com.payabli.session` domains, so a host compares that code against a named case.
+/// catalog number, which is the `NSError` code of an error carrying `userInfo["PayabliErrorType"]` in the
+/// `com.payabli.ttp`, `com.payabli.payIn` and `com.payabli.session` domains, so a host compares that code
+/// against a named case.
 ///
 /// Raw values are public API: do not reorder or renumber.
 @objc public enum PayabliErrorTypeCode: Int, Sendable, CaseIterable {
