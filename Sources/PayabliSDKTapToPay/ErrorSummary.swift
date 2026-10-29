@@ -44,8 +44,6 @@ enum ErrorSummary {
         }
     }
 
-    // swiftlint:disable cyclomatic_complexity
-
     /// The case, and details that are not free text. No `reason` reaches this string.
     ///
     /// A reason cannot be classified by the case that holds it — the same `attestationFailed` carries this
@@ -115,8 +113,6 @@ enum ErrorSummary {
             return "paymentNotTaken"
         }
     }
-
-    // swiftlint:enable cyclomatic_complexity
 
     /// A log read at speed wants the name rather than the case's description.
     ///

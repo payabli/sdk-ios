@@ -86,8 +86,6 @@ enum TapToPayErrorTranslation {
         )
     }
 
-    // swiftlint:disable cyclomatic_complexity
-
     /// One branch per case, with no `default`, so a case added without an entry stops this compiling. A
     /// case collecting causes that do not share a code reports `unknown`.
     ///
@@ -151,8 +149,6 @@ enum TapToPayErrorTranslation {
             return .paymentNotTaken
         }
     }
-
-    // swiftlint:enable cyclomatic_complexity
 
     /// Everything a core error shows after its reason: its detail, and the field errors or the payer's next
     /// step some of them add.
