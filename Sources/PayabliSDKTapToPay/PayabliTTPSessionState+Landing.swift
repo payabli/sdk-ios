@@ -53,7 +53,6 @@ extension PayabliTTPSessionState {
             return .failed(reason: .deviceIneligible)
 
         case .readerSessionExpired:
-            // The reader session is gone, and setting the session up again repairs it.
             return .sessionExpired
 
         case .readerSetupFailed, .readerUnavailable, .networkError, .tokenExpired:
