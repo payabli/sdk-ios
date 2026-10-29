@@ -47,21 +47,35 @@ extension PayabliTTP {
         let progress = ChargeProgress()
         do {
             return try await holdingSessionSetup {
-                try await runCharge(
-                    paymentDetails: paymentDetails,
-                    customer: customer,
-                    invoice: invoice,
-                    orderDescription: orderDescription,
-                    attempt: attempt,
-                    progress: progress
-                )
+                do {
+                    return try await runCharge(
+                        paymentDetails: paymentDetails,
+                        customer: customer,
+                        invoice: invoice,
+                        orderDescription: orderDescription,
+                        attempt: attempt,
+                        progress: progress
+                    )
+                } catch {
+                    // A retry refused before its key was reserved still describes the held sale, whose outcome is
+                    // unknown. Asked while the gate is held, so no other charge can settle that key under the read.
+                    if attempt == .retry, !progress.reserved {
+                        progress.retriesHeldSale = chargeKeys.holdsRetryOf(
+                            entry: entryPoint,
+                            environment: environment,
+                            description: ChargeDescription(paymentDetails: paymentDetails, invoice: invoice)
+                        )
+                    }
+                    throw error
+                }
             }
         } catch {
             throw TapToPayErrorTranslation.hostError(
                 for: error,
                 chargeOf: progress.paymentTransId,
                 askedForCard: progress.askedForCard,
-                resentKey: progress.resentKey
+                resentKey: progress.resentKey,
+                retriesHeldSale: progress.retriesHeldSale
             )
         }
     }
@@ -113,6 +127,7 @@ extension PayabliTTP {
             attempt: attempt,
             description: ChargeDescription(paymentDetails: paymentDetails, invoice: invoice)
         )
+        progress.reserved = true
         progress.resentKey = reservation.reused
         var arrivedAt: ContinuousClock.Instant? = reservation.reservedAt
         defer {

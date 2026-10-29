@@ -174,6 +174,52 @@ final class ChargeKeyStoreTests: XCTestCase {
         XCTAssertEqual(Set(keys).count, 1)
     }
 
+    // MARK: - Whether a retry would be handed a held key
+
+    func testARetryOfTheHeldSaleIsReportedHeldAndNothingIsReserved() throws {
+        let held = try endUnknown(reserve(.newPayment))
+
+        XCTAssertTrue(holdsRetry())
+        XCTAssertTrue(holdsRetry(), "asking consumed the key")
+        let retry = try reserve(.retry)
+        XCTAssertEqual(retry.key, held.key)
+        XCTAssertTrue(retry.reused)
+    }
+
+    func testAskingWhileTheKeyIsBeingSentLeavesItsSendCountAlone() throws {
+        let sending = try reserve(.newPayment)
+        clock.advance(by: payabliIdempotencyKeyMaxAge)
+
+        XCTAssertTrue(holdsRetry(), "a key still being sent was aged out")
+        store.supersede(entry: "e", environment: .sandbox, key: sending.key, arrivedAt: nil)
+
+        XCTAssertFalse(holdsRetry(), "asking counted a send the key is still waiting on")
+    }
+
+    func testARetryOfAnotherSaleIsNotReportedHeld() throws {
+        _ = try endUnknown(reserve(.newPayment))
+
+        XCTAssertFalse(holdsRetry(amount: 2))
+    }
+
+    func testNothingHeldIsNotReportedHeld() {
+        XCTAssertFalse(holdsRetry())
+    }
+
+    func testAKeyHeldForAnotherEntryPointOrEnvironmentIsNotReportedHeld() throws {
+        _ = try endUnknown(reserve(.newPayment, entry: "a"), entry: "a")
+
+        XCTAssertFalse(holdsRetry())
+        XCTAssertFalse(store.holdsRetryOf(entry: "a", environment: .production, description: Self.payment()))
+    }
+
+    func testAnExpiredKeyIsNotReportedHeld() throws {
+        _ = try endUnknown(reserve(.newPayment))
+        clock.advance(by: payabliIdempotencyKeyMaxAge)
+
+        XCTAssertFalse(holdsRetry())
+    }
+
     // MARK: - How long a key is held
 
     func testAnExpiredKeyIsNotResent() throws {
@@ -278,6 +324,10 @@ final class ChargeKeyStoreTests: XCTestCase {
             attempt: attempt,
             description: Self.payment(amount: amount, serviceFee: serviceFee, currency: currency, invoice: invoice)
         )
+    }
+
+    private func holdsRetry(amount: Decimal = 1) -> Bool {
+        store.holdsRetryOf(entry: "e", environment: .sandbox, description: Self.payment(amount: amount))
     }
 
     /// Ends the send unknown, as a charge does once the card was asked for and no answer came.
