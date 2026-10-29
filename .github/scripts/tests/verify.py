@@ -207,6 +207,8 @@ def build_repo(root: Path) -> Path:
     # The same type name in two places, so the lookup has to refuse rather than pick one.
     (repo / "Tests" / "PayabliSDKCoreTests" / "AmbiguousTests.swift").write_text("// a\n")
     (repo / "Example" / "PayabliDemo" / "FlowTests" / "AmbiguousTests.swift").write_text("// b\n")
+    (repo / "Tests" / "PayabliSDKObjCTests").mkdir(parents=True)
+    (repo / "Tests" / "PayabliSDKObjCTests" / "GadgetTests.m").write_text("// gadget tests\n")
 
     git(repo, "init", "-q", "-b", "main")
     git(repo, "config", "user.email", "harness@example.invalid")
@@ -437,6 +439,21 @@ def test_collector() -> None:
         check("C13 a type name that resolves to two files is attributed to neither",
               at((facts or {}).get("failures") or [], 0).get("culprits") == [],
               at((facts or {}).get("failures") or [], 0))
+
+        objc = write_bundle(
+            repo, "ObjC.xcresult",
+            summary=summary_json(1, 0, 1, 0),
+            tests=tests_tree("PayabliSDKObjCTests", {
+                "GadgetTests": [case("testTwo", "Failed", ["boom"])],
+            }),
+            xccov=healthy_cov,
+        )
+        _, _, facts, _, _ = run_collector(
+            repo, bin_dir, {**ALL_GREEN_STEPS, **base, "SDK_RESULTS": str(objc)}
+        )
+        culprits = at((facts or {}).get("failures") or [], 0).get("culprits") or []
+        check("C13b an Objective-C suite's failure is attributed to its .m file",
+              [c["what"] for c in culprits] == ["test"], culprits)
 
         # C14 -------------------------------------------------------------------------------------
         _, _, facts, _, _ = run_collector(repo, bin_dir, {**ALL_GREEN_STEPS, **base})
