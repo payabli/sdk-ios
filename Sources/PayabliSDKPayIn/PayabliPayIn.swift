@@ -588,15 +588,22 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
         )
     }
 
-    /// The reference a capture or an authorization is held under: the host's, trimmed, or one made here.
+    /// The reference a capture or an authorization is held under: the host's, trimmed, or for a new payment one
+    /// made here.
     ///
     /// - Parameter request: the request whose options carry the host's payment reference.
     /// - Returns: the reference to hold the payment's key under.
-    /// - Throws: ``PayabliPayInError/invalidInput(_:)`` when the host's reference is blank.
+    /// - Throws: ``PayabliPayInError/invalidInput(_:)`` when the host's reference is blank, or when a retry names
+    ///   none.
     private func paymentReference(of request: PayabliPayInRequest) throws -> String {
-        guard let named = request.options.paymentReference else { return newPaymentReference() }
+        guard let named = request.options.paymentReference else {
+            guard request.options.attempt == .newPayment else {
+                throw PayabliPayInError.invalidInput("A retry must name the paymentReference of the payment it repeats.")
+            }
+            return newPaymentReference()
+        }
         guard let trimmed = named.payabliCaptureTrimmed.payabliCaptureNilIfEmpty else {
-            throw PayabliPayInError.invalidInput("The payment reference cannot be blank.")
+            throw PayabliPayInError.invalidInput("The paymentReference cannot be blank.")
         }
         return trimmed
     }

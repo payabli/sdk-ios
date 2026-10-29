@@ -289,7 +289,7 @@ final class PayInKeyStoreTests: XCTestCase {
 }
 
 /// Answers every send approved, and holds the first open until ``release()``, then answers it or loses it.
-private final class HeldOpenTransport: PayabliTransport, @unchecked Sendable {
+final class HeldOpenTransport: PayabliTransport, @unchecked Sendable {
     private static let approved = Data("""
     {"code":"A0000","reason":"Approved","responseData":{"authCode":"1","referenceId":"trans-1"}}
     """.utf8)

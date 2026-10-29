@@ -225,6 +225,9 @@ public final class PayabliPayInObjC: NSObject {
 
     /// Charges a payment, as ``PayabliPayIn/capture(_:)`` does.
     ///
+    /// The error's `userInfo["capture"]` is `1` when the payment may have been taken, including a refusal with code
+    /// 1023 because another call for the payment is open, and `0` when it wasn't.
+    ///
     /// - Parameter request: the payment and its settings.
     /// - Parameter completion: the result, or the error the charge failed with.
     @objc public func capture(
@@ -236,6 +239,8 @@ public final class PayabliPayInObjC: NSObject {
     }
 
     /// Holds an amount, as ``PayabliPayIn/authorize(_:)`` does.
+    ///
+    /// The error's `userInfo["capture"]` reads as it does for ``capture(_:completion:)``.
     ///
     /// - Parameter request: the payment and its settings.
     /// - Parameter completion: the result, or the error the authorization failed with.
@@ -249,6 +254,8 @@ public final class PayabliPayInObjC: NSObject {
 
     /// Captures an authorization, as ``PayabliPayIn/captureAuthorizedTransaction(_:)`` does.
     ///
+    /// The error's `userInfo["capture"]` reads as it does for ``capture(_:completion:)``.
+    ///
     /// - Parameter request: the authorization and the amount to capture.
     /// - Parameter completion: the result, or the error the capture failed with.
     @objc public func captureAuthorizedTransaction(
@@ -260,6 +267,8 @@ public final class PayabliPayInObjC: NSObject {
     }
 
     /// Reverses a transaction, as ``PayabliPayIn/voidTransaction(_:)`` does.
+    ///
+    /// The error's `userInfo["capture"]` reads as it does for ``capture(_:completion:)``.
     ///
     /// - Parameter transId: the transaction to reverse.
     /// - Parameter completion: the result, or the error the reversal failed with.
@@ -315,7 +324,8 @@ extension Error {
     /// The `NSError` an Objective-C caller receives; an unknown outcome adds `paymentTransId` and `paymentReference`.
     ///
     /// - Parameter movesMoney: whether the call could take a payment, so the error says whether it may have.
-    /// - Returns: the error, with `capture` set to 1 when the payment may have been taken and 0 when it wasn't.
+    /// - Returns: the error, with `capture` set to 1 when the payment may have been taken, a refusal because another
+    ///   call for the payment is open included, and 0 when it wasn't.
     func toPayabliPayInNSError(movesMoney: Bool = false) -> NSError {
         let error = payabliNSError(domain: payInObjCErrorDomain)
         var userInfo = error.userInfo
@@ -326,7 +336,8 @@ extension Error {
                 userInfo["capture"] = 1
             }
         } else if movesMoney {
-            userInfo["capture"] = PayInInterruption.isCancellation(self) ? 1 : 0
+            let paymentIsOpen = (self as? any PayabliError)?.type == .paymentReferenceOpen
+            userInfo["capture"] = PayInInterruption.isCancellation(self) || paymentIsOpen ? 1 : 0
         }
         return NSError(domain: error.domain, code: error.code, userInfo: userInfo)
     }
