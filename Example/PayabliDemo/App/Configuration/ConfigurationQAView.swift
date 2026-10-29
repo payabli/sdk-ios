@@ -1,4 +1,3 @@
-import PayabliSDKCore
 import SwiftUI
 
 /// Every knob the demo runs on, in one place.
@@ -11,14 +10,15 @@ import SwiftUI
 /// The card-not-present rows read from `PayInSharedConfiguration`, the same
 /// source the forms use, so this screen cannot drift from the real behaviour.
 struct ConfigurationQAView: View {
-    let session: PayabliSession
+    /// Answers the session's device ID.
+    let readDeviceId: () async -> String?
 
     @EnvironmentObject private var tokenProbes: TokenProbeResults
     @EnvironmentObject private var demoCustomer: DemoCustomerSetting
     @AppStorage(Self.showsSimpleCaptureKey) private var showsSimpleCapture = false
     @State private var healthCheckText = ""
     @State private var isWorking = false
-    @State private var deviceId = SupportDeviceId(nil)
+    @State private var deviceId = SupportDeviceId.reading
 
     static let showsSimpleCaptureKey = "showsSimpleCapture"
 
@@ -37,7 +37,7 @@ struct ConfigurationQAView: View {
             }
             .navigationTitle("Configuration")
             // Read on each appearance: the keychain does not answer before the first unlock after a restart.
-            .onAppear { deviceId = SupportDeviceId(session.deviceId) }
+            .task { deviceId = await SupportDeviceId(readDeviceId()) }
         }
     }
 
@@ -319,7 +319,7 @@ struct ConfigurationQAView: View {
 
 #Preview {
     WithDemoSession { session, _ in
-        ConfigurationQAView(session: session)
+        ConfigurationQAView(readDeviceId: { await SessionDeviceId.read(session) })
             .environmentObject(TokenProbeResults.inert())
             .environmentObject(DemoCustomerSetting())
     }

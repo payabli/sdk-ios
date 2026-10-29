@@ -457,20 +457,18 @@ struct PaymentTapToPayQAView: View {
             do {
                 try await terminal.presentTerms()
             } catch {
-                termsMessage = ActionLine.failed(error)
+                termsMessage = TermsPresentation.failed(error).line
                 return
             }
             // Asked in its own scope: presenting has already returned by here, so a failure to
             // ask afterwards must not be reported as the presentation having failed.
+            let accepted: Result<Bool, Error>
             do {
-                let accepted = try await terminal.termsAccepted()
-                termsMessage = accepted
-                    ? "returned; now ✓ Accepted"
-                    : "returned; still ✗ Not accepted"
+                accepted = try await .success(terminal.termsAccepted())
             } catch {
-                termsMessage = "returned; could not ask whether accepted: "
-                    + error.localizedDescription
+                accepted = .failure(error)
             }
+            termsMessage = TermsPresentation.returned(accepted: accepted).line
         }
     }
 

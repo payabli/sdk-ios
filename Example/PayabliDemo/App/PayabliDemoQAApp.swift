@@ -79,7 +79,7 @@ struct DemoTabs: View {
                     Label("TapToPay", systemImage: "wave.3.right")
                 }
 
-            ConfigurationQAView(session: session)
+            ConfigurationQAView(readDeviceId: { await SessionDeviceId.read(session) })
                 .tabItem {
                     Label("Config", systemImage: "gearshape")
                 }
@@ -122,7 +122,7 @@ struct DemoTabs: View {
                     Label("TapToPay", systemImage: "wave.3.right")
                 }
 
-            ConfigurationQAView(session: session)
+            ConfigurationQAView(readDeviceId: { await SessionDeviceId.read(session) })
                 .tabItem {
                     Label("Config", systemImage: "gearshape")
                 }

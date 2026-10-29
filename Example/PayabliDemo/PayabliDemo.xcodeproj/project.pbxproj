@@ -7,6 +7,11 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		C38240000000000000000072 /* TermsPresentationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C38240000000000000000071 /* TermsPresentationTests.swift */; };
+		C38240000000000000000063 /* TermsPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = C38240000000000000000061 /* TermsPresentation.swift */; };
+		C38240000000000000000062 /* TermsPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = C38240000000000000000061 /* TermsPresentation.swift */; };
+		C38240000000000000000052 /* SessionDeviceId.swift in Sources */ = {isa = PBXBuildFile; fileRef = C38240000000000000000051 /* SessionDeviceId.swift */; };
+		C38240000000000000000042 /* SupportDeviceIdUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C38240000000000000000041 /* SupportDeviceIdUITests.swift */; };
 		C38240000000000000000032 /* ActionLineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C38240000000000000000031 /* ActionLineTests.swift */; };
 		C38240000000000000000022 /* SupportDeviceIdTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C38240000000000000000021 /* SupportDeviceIdTests.swift */; };
 		C38240000000000000000013 /* ActionLine.swift in Sources */ = {isa = PBXBuildFile; fileRef = C38240000000000000000011 /* ActionLine.swift */; };
@@ -153,6 +158,10 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		C38240000000000000000071 /* TermsPresentationTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TermsPresentationTests.swift; sourceTree = "<group>"; };
+		C38240000000000000000061 /* TermsPresentation.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TermsPresentation.swift; sourceTree = "<group>"; };
+		C38240000000000000000051 /* SessionDeviceId.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SessionDeviceId.swift; sourceTree = "<group>"; };
+		C38240000000000000000041 /* SupportDeviceIdUITests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SupportDeviceIdUITests.swift; sourceTree = "<group>"; };
 		C38240000000000000000031 /* ActionLineTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ActionLineTests.swift; sourceTree = "<group>"; };
 		C38240000000000000000021 /* SupportDeviceIdTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SupportDeviceIdTests.swift; sourceTree = "<group>"; };
 		C38240000000000000000011 /* ActionLine.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ActionLine.swift; sourceTree = "<group>"; };
@@ -350,6 +359,7 @@
 		5DC0000000000000000000A0 /* SDK */ = {
 			isa = PBXGroup;
 			children = (
+				C38240000000000000000051 /* SessionDeviceId.swift */,
 				5DC00000000000000000C501 /* PayInOperation.swift */,
 				5DC00000000000000000BF01 /* PayabliEnvironmentMapping.swift */,
 				5DC00000000000000000E001 /* OfferedEnvironments.swift */,
@@ -468,6 +478,7 @@
 		F20000000000000000000010 /* Flow */ = {
 			isa = PBXGroup;
 			children = (
+				C38240000000000000000061 /* TermsPresentation.swift */,
 				C38240000000000000000011 /* ActionLine.swift */,
 				F20000000000000000000001 /* StepStatus.swift */,
 				F20000000000000000000003 /* TapToPaySteps.swift */,
@@ -491,6 +502,7 @@
 		F30000000000000000000020 /* UITests */ = {
 			isa = PBXGroup;
 			children = (
+				C38240000000000000000041 /* SupportDeviceIdUITests.swift */,
 				F30000000000000000000021 /* QAWalkthroughUITests.swift */,
 				A1B2C3D4E5F600000000BB61 /* KeyboardDismissalUITests.swift */,
 				5DC00000000000000000D031 /* FormCustomizationUITests.swift */,
@@ -502,6 +514,7 @@
 		F20000000000000000000020 /* FlowTests */ = {
 			isa = PBXGroup;
 			children = (
+				C38240000000000000000071 /* TermsPresentationTests.swift */,
 				C38240000000000000000031 /* ActionLineTests.swift */,
 				C38240000000000000000021 /* SupportDeviceIdTests.swift */,
 				5DC00000000000000000C301 /* PayInFailureTests.swift */,
@@ -729,6 +742,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C38240000000000000000042 /* SupportDeviceIdUITests.swift in Sources */,
 				F30000000000000000000022 /* QAWalkthroughUITests.swift in Sources */,
 				A1B2C3D4E5F600000000BB62 /* KeyboardDismissalUITests.swift in Sources */,
 				5DC00000000000000000D032 /* FormCustomizationUITests.swift in Sources */,
@@ -747,6 +761,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C38240000000000000000072 /* TermsPresentationTests.swift in Sources */,
+				C38240000000000000000063 /* TermsPresentation.swift in Sources */,
 				C38240000000000000000032 /* ActionLineTests.swift in Sources */,
 				C38240000000000000000022 /* SupportDeviceIdTests.swift in Sources */,
 				C38240000000000000000013 /* ActionLine.swift in Sources */,
@@ -799,6 +815,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C38240000000000000000062 /* TermsPresentation.swift in Sources */,
+				C38240000000000000000052 /* SessionDeviceId.swift in Sources */,
 				C38240000000000000000012 /* ActionLine.swift in Sources */,
 				C38240000000000000000002 /* SupportDeviceId.swift in Sources */,
 				5DC00000000000000000C502 /* PayInOperation.swift in Sources */,
