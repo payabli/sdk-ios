@@ -203,20 +203,20 @@ struct PayabliPayInSheetContent: View {
         sheetConfiguration.dismissButton != .hidden || sheetTitle != nil || sheetSubtitle != nil
     }
 
-    private var sheetTitle: String? {
-        if let configuredTitle = sheetConfiguration.title?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty {
+    var sheetTitle: String? {
+        if let configuredTitle = PayabliPayInLabels.nonBlank(sheetConfiguration.title) {
             return configuredTitle
         }
         guard sheetConfiguration.movesFormHeaderToSheetHeader else { return nil }
         return configuration.labels.drawnTitle
     }
 
-    private var sheetSubtitle: String? {
-        if let configuredSubtitle = sheetConfiguration.subtitle?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty {
+    var sheetSubtitle: String? {
+        if let configuredSubtitle = PayabliPayInLabels.nonBlank(sheetConfiguration.subtitle) {
             return configuredSubtitle
         }
         guard sheetConfiguration.movesFormHeaderToSheetHeader else { return nil }
-        return configuration.labels.subtitle?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty
+        return configuration.labels.drawnSubtitle
     }
 
     var formConfiguration: PayabliPayInFormConfiguration {
