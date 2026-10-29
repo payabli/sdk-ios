@@ -190,7 +190,8 @@ final class TapToPayErrorTranslationTests: XCTestCase {
         ]
         let notProducedYet: Set<PayabliErrorType> = [
             .deviceServicesOutdated, // a Google Play cause, which this platform has no counterpart for
-            .paymentNotHeld // no close call on this platform yet
+            .paymentNotHeld, // no close call on this platform yet
+            .contactlessDisabled // an iPhone has no switch for its contactless radio
         ]
         let produced = fromTheTable.union(fromActivation).union(raisedDirectly)
         for type in PayabliErrorType.allCases where (3001 ... 3999).contains(type.number) {
@@ -295,6 +296,13 @@ final class TapToPayErrorTranslationTests: XCTestCase {
         XCTAssertEqual(nsError.userInfo["PayabliErrorType"] as? String, PayabliErrorType.paymentNotTaken.rawValue)
         XCTAssertEqual(nsError.userInfo["capture"] as? Int, PayabliTTPCapture.notCharged.rawValue)
         XCTAssertEqual(nsError.userInfo["paymentTransId"] as? String, "TXN-9")
+    }
+
+    func testAnObjectiveCCallerReadsTheCodeAsItsNamedCase() {
+        let nsError = TapToPayError(type: .contactlessDisabled, reason: "r", detail: nil).toPayabliNSError()
+        XCTAssertEqual(nsError.domain, "com.payabli.ttp")
+        XCTAssertEqual(PayabliErrorTypeCode(rawValue: nsError.code), .contactlessDisabled)
+        XCTAssertEqual(nsError.userInfo["PayabliErrorType"] as? String, "CONTACTLESS_DISABLED")
     }
 
     func testACancellationBridgesAsSwiftDoes() {

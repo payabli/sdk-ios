@@ -303,7 +303,7 @@ final class PayabliTTPFailureReasonTests: XCTestCase {
 
     /// The published vocabulary, each member at a fixed integer.
     func testThePublishedVocabularyKeepsItsIntegers() {
-        XCTAssertEqual(PayabliTTPFailureReason.allCases.count, 7)
+        XCTAssertEqual(PayabliTTPFailureReason.allCases.count, 8)
         XCTAssertEqual(PayabliTTPFailureReason.deviceSetupRequired.rawValue, 0)
         XCTAssertEqual(PayabliTTPFailureReason.configurationRejected.rawValue, 1)
         XCTAssertEqual(PayabliTTPFailureReason.serviceUnavailable.rawValue, 2)
@@ -311,9 +311,10 @@ final class PayabliTTPFailureReasonTests: XCTestCase {
         XCTAssertEqual(PayabliTTPFailureReason.sdkInternalError.rawValue, 4)
         XCTAssertEqual(PayabliTTPFailureReason.deviceKeyUnavailable.rawValue, 5)
         XCTAssertEqual(PayabliTTPFailureReason.sessionEnded.rawValue, 6)
+        XCTAssertEqual(PayabliTTPFailureReason.contactlessDisabled.rawValue, 7)
         // The bridges read these integers, so a member is appended and never
         // renumbered. This is what makes an append visible here first.
-        XCTAssertNil(PayabliTTPFailureReason(rawValue: 7))
+        XCTAssertNil(PayabliTTPFailureReason(rawValue: 8))
     }
 
     /// A transport refusal lands by its code.

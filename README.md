@@ -356,7 +356,16 @@ The SDK is written in Swift, and the card-not-present form is a SwiftUI view.
   `authorize`, `captureAuthorizedTransaction` and `voidTransaction`, which take a `PayabliPayInRequestObjC` or
   `PayabliPayInAuthorizedRequestObjC` and complete with a `PayabliPayInResultObjC`.
 - **Objective-C errors.** An SDK error reaches Objective-C as an `NSError` whose `code` is its catalog
-  number, with the type's name in `userInfo["PayabliErrorType"]`. Tap to Pay errors are in the
+  number, with the type's name in `userInfo["PayabliErrorType"]`. `PayabliErrorTypeCode` names every catalog
+  number, so compare the code of an error carrying `PayabliErrorType` against a case rather than a number:
+
+  ```objc
+  if (error.userInfo[@"PayabliErrorType"] != nil && error.code == PayabliErrorTypeCodeDevicePendingActivation) {
+      // Ask for the activation code.
+  }
+  ```
+
+  Tap to Pay errors are in the
   `com.payabli.ttp` domain, where `userInfo["capture"]` holds the `PayabliTTPCapture` raw value (`0` not
   charged, `1` unknown, `2` charged), `userInfo["paymentTransId"]` is absent when there is no
   transaction ID, and `userInfo["retryAfter"]` holds the wait in seconds when the service asked for one.

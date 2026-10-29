@@ -41,4 +41,8 @@ public enum PayabliTTPFailureReason: Int, Sendable, CaseIterable {
 
     /// This `PayabliTTP`'s `PayabliSession` was replaced or ended; create a new one with `PayabliTTP.create()`.
     case sessionEnded = 6
+
+    /// The device's contactless radio is switched off. Part of the published vocabulary, and never reached on
+    /// iOS: an iPhone has no switch for its contactless radio.
+    case contactlessDisabled = 7
 }

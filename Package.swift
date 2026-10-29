@@ -131,6 +131,11 @@ let package = Package(
             path: "Tests/PayabliSDKCrossCapabilityTests"
         ),
         .testTarget(
+            name: "PayabliSDKObjCTests",
+            dependencies: ["PayabliSDKCore"],
+            path: "Tests/PayabliSDKObjCTests"
+        ),
+        .testTarget(
             name: "PayabliSDKTestUtilsTests",
             dependencies: ["PayabliSDKTestUtils"],
             path: "Tests/PayabliSDKTestUtilsTests"
