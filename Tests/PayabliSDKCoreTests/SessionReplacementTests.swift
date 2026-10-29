@@ -154,16 +154,63 @@ final class SessionReplacementTests: XCTestCase {
         await fulfillment(of: [timerStarted], timeout: 0.5)
     }
 
+    // MARK: - The replaced session's telemetry
+
+    func testAReplacementOnTheSameEntryPointDeliversTheOldQueueThroughTheNewChannel() async throws {
+        let stub = RecordingStub(status: 401)
+        stub.install()
+        defer { stub.uninstall() }
+        let delivered = InMemoryTelemetryTransport()
+        let first = try install(entryPoint: "first")
+        await first.telemetry.emit(TelemetryEventName.formPresented, properties: ["step": "before"])
+        await finishTheCredential(of: first)
+        await first.telemetry.settled()
+        let left = await first.telemetry.queuedEvents
+
+        let second = try install(entryPoint: "first", telemetryTransport: delivered)
+        await second.telemetry.settled()
+
+        let sent = await delivered.batches.flatMap { $0 }
+        XCTAssertTrue(left.contains { $0.properties["step"] == "before" })
+        XCTAssertEqual(
+            sent.prefix(left.count).map { [$0.event, $0.sessionId] },
+            left.map { [$0.event, first.telemetry.sessionId] },
+            "the old queue leaves first, each event under the session it was recorded in"
+        )
+        XCTAssertEqual(
+            sent.dropFirst(left.count).map { [$0.event, $0.sessionId] },
+            [[TelemetryEventName.sdkInitialized, second.telemetry.sessionId]]
+        )
+    }
+
+    func testAReplacementOnADifferentEntryPointSendsNothingOldUnderTheNewToken() async throws {
+        let stub = RecordingStub(status: 401)
+        stub.install()
+        defer { stub.uninstall() }
+        let delivered = InMemoryTelemetryTransport()
+        let first = try install(entryPoint: "first")
+        await first.telemetry.emit(TelemetryEventName.formPresented, properties: ["step": "before"])
+        await finishTheCredential(of: first)
+
+        let second = try install(entryPoint: "second", telemetryTransport: delivered)
+        await second.telemetry.flush()
+        await second.telemetry.settled()
+
+        let sent = await delivered.batches.flatMap { $0 }
+        XCTAssertEqual(sent.map { [$0.event, $0.sessionId] }, [[TelemetryEventName.sdkInitialized, second.telemetry.sessionId]])
+    }
+
     // MARK: - Helpers
 
     private func install(
         entryPoint: String,
+        telemetryTransport: InMemoryTelemetryTransport = InMemoryTelemetryTransport(),
         tokenProvider: @escaping PayabliTokenRefresh = { UUID().uuidString }
     ) throws -> PayabliSession {
         try PayabliSession.install(
             config: PayabliConfig(entryPoint: entryPoint, environment: .sandbox, tokenProvider: tokenProvider),
             urlSession: StubURLProtocol.makeSession(),
-            telemetryTransport: InMemoryTelemetryTransport()
+            telemetryTransport: telemetryTransport
         )
     }
 

@@ -80,6 +80,8 @@ package actor TelemetryClient {
     private var timer: Task<Void, Never>?
     private var watcher: Task<Void, Never>?
     private var stopped = false
+    /// Set while `handOff` waits for the drains already scheduled, so a batch kept then stays queued for the successor.
+    private var handingOff = false
 
     /// - Parameter configuration: the batch and queue sizes and the identifiers every event carries.
     /// - Parameter transport: where batches are sent.
@@ -90,6 +92,8 @@ package actor TelemetryClient {
     ///   `emit` holds them.
     /// - Parameter sessionId: the identifier every event from this client carries.
     /// - Parameter logger: where the client's own log lines go.
+    /// - Parameter predecessor: the replaced session's client, whose queue this one takes before its first send, ahead
+    ///   of what this one queues; `nil` when nothing is taken over.
     package init(
         configuration: Configuration,
         transport: TelemetryTransport,
@@ -98,7 +102,8 @@ package actor TelemetryClient {
         deviceId: @escaping @Sendable () -> String?,
         queued: [(name: String, properties: [String: String])],
         sessionId: String = UUID().uuidString,
-        logger: PayabliLogger = PayabliLogger(category: .telemetry)
+        logger: PayabliLogger = PayabliLogger(category: .telemetry),
+        predecessor: TelemetryClient? = nil
     ) {
         self.configuration = configuration
         self.logger = logger
@@ -123,6 +128,13 @@ package actor TelemetryClient {
             ))
         }
         self.queue = queue
+        // The first drain, so every later one and `settled()` wait for what the predecessor hands over.
+        if let predecessor {
+            tail = Task { [weak self] in
+                let handed = await predecessor.handOff()
+                await self?.adopt(handed.events, dropped: handed.dropped)
+            }
+        }
         if !queued.isEmpty {
             Task { [weak self] in await self?.startIfNeeded() }
         }
@@ -151,6 +163,39 @@ package actor TelemetryClient {
                 requests += 1
             }
         }
+    }
+
+    /// Stops this client and gives up what it has queued: its timer and its background watcher end, a later record or
+    /// flush is refused, and the drains already scheduled finish first. A batch one of them cannot send stays queued.
+    ///
+    /// - Returns: the events left, oldest first, and how many the queue evicted that no batch has reported.
+    package func handOff() async -> (events: [TelemetryEvent], dropped: Int) {
+        stopped = true
+        handingOff = true
+        timer?.cancel()
+        watcher?.cancel()
+        await settled()
+        handingOff = false
+        let events = queue.drain(queue.count)
+        return (events, queue.takeDropCount())
+    }
+
+    /// Stops this client and drops what it has queued, logging how many events were dropped. Called when the session it
+    /// reports for is replaced by one with a different entry point or environment.
+    package func discard() async {
+        let (events, _) = await handOff()
+        logger.debug("telemetry_queue_dropped_on_replacement count=\(events.count)")
+    }
+
+    /// Puts a predecessor's events ahead of what this client has queued and sends them, each keeping the session it was
+    /// recorded under.
+    ///
+    /// - Parameter events: the predecessor's events, oldest first.
+    /// - Parameter dropped: how many events the predecessor's queue evicted that no batch has reported.
+    private func adopt(_ events: [TelemetryEvent], dropped: Int) async {
+        queue.restoreFront(events, droppedSinceLastSend: dropped)
+        guard !events.isEmpty || dropped > 0 else { return }
+        await drainWhatWasWaiting()
     }
 
     /// Enqueue an event.
@@ -367,8 +412,8 @@ package actor TelemetryClient {
             return true
         case .kept:
             // Nothing reads a stopped client's queue after its last drain, so a batch kept then is dropped and the
-            // drain moves on to the next.
-            guard !stopped else {
+            // drain moves on to the next. A client handing its queue over keeps the batch for its successor.
+            guard !stopped || handingOff else {
                 queue.restoreDropCount(dropped)
                 logger.debug("telemetry_batch_after_stop count=\(batch.count)")
                 return true
