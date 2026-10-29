@@ -45,14 +45,16 @@ extension PayabliTTP {
         attempt: PayabliAttempt = .newPayment
     ) async throws -> TransactionResult {
         let progress = ChargeProgress()
+        let sale = ChargeDescription(paymentDetails: paymentDetails, invoice: invoice)
         do {
-            return try await holdingSessionSetup {
+            return try await holdingSessionSetup(attempt: attempt, sale: sale) {
                 try await runCharge(
                     paymentDetails: paymentDetails,
                     customer: customer,
                     invoice: invoice,
                     orderDescription: orderDescription,
                     attempt: attempt,
+                    sale: sale,
                     progress: progress
                 )
             }
@@ -72,6 +74,7 @@ extension PayabliTTP {
         invoice: PayabliTTPInvoiceData,
         orderDescription: String?,
         attempt: PayabliAttempt,
+        sale: ChargeDescription,
         progress: ChargeProgress
     ) async throws -> TransactionResult {
         // Called directly: `reinitialize()` would wait on the gate this charge holds. Its own task keeps a
@@ -111,7 +114,7 @@ extension PayabliTTP {
             entry: entryPoint,
             environment: environment,
             attempt: attempt,
-            description: ChargeDescription(paymentDetails: paymentDetails, invoice: invoice)
+            description: sale
         )
         progress.resentKey = reservation.reused
         var arrivedAt: ContinuousClock.Instant? = reservation.reservedAt

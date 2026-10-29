@@ -30,9 +30,9 @@ final class SessionSetupGate {
     /// that arrives after the reader was prepared again is not attributed to the new one.
     var readerGeneration = 0
 
-    /// True from the moment a charge claims the gate until it returns, whether it is running, waiting for
-    /// the operation before it, or has setups queued behind it.
-    private(set) var isHeldByCharge = false
+    /// The charge holding the gate, from the moment it claims the gate until it returns, whether it is running,
+    /// waiting for the operation before it, or has setups queued behind it.
+    private(set) var runningCharge: RunningCharge?
 
     /// Runs `work` after every operation already in the gate, or joins `owner`'s pending setup of an equal `kind`.
     ///
@@ -78,10 +78,11 @@ final class SessionSetupGate {
     /// Holds the gate for a charge until `body` returns. `body` runs in the caller's task, so cancelling the
     /// charge reaches it.
     ///
-    /// - Parameter body: The charge, run in the caller's task once every operation already in the gate has
-    ///   finished.
+    /// - Parameters:
+    ///   - charge: The entry point and sale the charge is for, recorded until `body` returns.
+    ///   - body: The charge, run in the caller's task once every operation already in the gate has finished.
     /// - Returns: The charge's result.
-    func holdForCharge<T>(_ body: @MainActor () async throws -> T) async throws -> T {
+    func holdForCharge<T>(_ charge: RunningCharge, _ body: @MainActor () async throws -> T) async throws -> T {
         // Claimed before the first suspension, so a setup call made while the
         // charge waits for the previous one chains behind the charge.
         let previous = last?.task
@@ -97,9 +98,9 @@ final class SessionSetupGate {
         last = claim
         // A setup call made from here on waits for this charge, so no earlier setup can be joined.
         setups.removeAll()
-        isHeldByCharge = true
+        runningCharge = charge
         defer {
-            isHeldByCharge = false
+            runningCharge = nil
             release.finish()
             self.release(claim.id)
         }
@@ -108,6 +109,12 @@ final class SessionSetupGate {
             _ = try? await previous.value
         }
         return try await body()
+    }
+
+    /// The charge holding the gate: the entry point it is for and the sale it describes.
+    struct RunningCharge {
+        let entryPoint: String
+        let sale: ChargeDescription
     }
 
     private func claimID() -> Int {

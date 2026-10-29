@@ -39,19 +39,49 @@ extension PayabliTTP {
     /// Holds the process's gate for a charge. A setup call made meanwhile, on any `PayabliTTP`, waits until `body`
     /// returns.
     ///
-    /// - Parameter body: The charge, run in the caller's task while the gate is held.
+    /// - Parameters:
+    ///   - attempt: Whether the host declared the charge a retry.
+    ///   - sale: The sale the charge describes.
+    ///   - body: The charge, run in the caller's task while the gate is held.
     /// - Returns: The charge's result.
-    /// - Throws: `notReady` when a charge already holds the gate, whether it is running or still waiting
-    ///   for a setup to finish.
-    func holdingSessionSetup<T>(_ body: @MainActor () async throws -> T) async throws -> T {
+    /// - Throws: `notReady` when a charge already holds the gate, on any entry point, whether it is running or still
+    ///   waiting for a setup to finish; for a declared retry, the refusal ``overlapRefusal(of:running:)`` builds.
+    func holdingSessionSetup<T>(
+        attempt: PayabliAttempt,
+        sale: ChargeDescription,
+        _ body: @MainActor () async throws -> T
+    ) async throws -> T {
         // Before the busy refusal: a retired terminal stays retired, so being told the reader is busy would send it
         // back here for good.
         try requireLiveSession()
         let gate = SessionSetupGate.shared
-        if gate.isHeldByCharge {
-            throw PayabliTTPError.notReady(current: sessionState)
+        if let running = gate.runningCharge {
+            guard attempt == .retry else {
+                throw PayabliTTPError.notReady(current: sessionState)
+            }
+            throw overlapRefusal(of: sale, running: running)
         }
-        return try await gate.holdForCharge(body)
+        return try await gate.holdForCharge(SessionSetupGate.RunningCharge(entryPoint: entryPoint, sale: sale), body)
+    }
+
+    /// The refusal of a declared retry made while another charge holds the gate, read from this entry point's held keys.
+    ///
+    /// - Parameters:
+    ///   - sale: The sale the retry describes.
+    ///   - running: The charge holding the gate.
+    /// - Returns: `paymentReferenceOpen` when the key the retry would be handed is being sent, `terminalNotReady`
+    ///   otherwise; capture `unknown` when the retry describes the running sale on this entry point or any held key's
+    ///   sale, `notCharged` when it describes neither.
+    private func overlapRefusal(of sale: ChargeDescription, running: SessionSetupGate.RunningCharge) -> TapToPayError {
+        let held = chargeKeys.heldRetry(entry: entryPoint, environment: environment, description: sale)
+        let describesRunning = running.entryPoint == entryPoint && running.sale.isRepeated(by: sale)
+        let type: PayabliErrorType = held?.underWay == true ? .paymentReferenceOpen : .terminalNotReady
+        return TapToPayError(
+            type: type,
+            reason: type.message,
+            detail: nil,
+            capture: describesRunning || held?.describesHeld == true ? .unknown : .notCharged
+        )
     }
 
     /// Runs once per setup, by its owner: a caller that joins it adds no report.
