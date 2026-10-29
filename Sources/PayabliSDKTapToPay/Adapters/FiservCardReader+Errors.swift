@@ -64,11 +64,14 @@ extension FiservCardReader {
         }
 
         /// The card reader's refusal to read without a session, raised before any card is asked for. It names
-        /// itself only in text.
-        static let noSessionRefusal = (
-            title: "Invalid Session",
-            description: "The card reader session has not been initialized."
-        )
+        /// itself only in text, and its description is looked up in the app's strings as the reader looks it up,
+        /// so an app that translates it changes both sides alike.
+        static var noSessionRefusal: (title: String, description: String) {
+            (
+                title: "Invalid Session",
+                description: NSLocalizedString("The card reader session has not been initialized.", comment: "")
+            )
+        }
 
         /// Whether the card reader refused the read because it holds no session, either directly or kept behind
         /// the charge's own failure.
