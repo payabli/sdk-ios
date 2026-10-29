@@ -32,7 +32,8 @@ extension PayabliTTPSessionState {
 
     /// Where a Tap to Pay failure lands, by its case.
     ///
-    /// - Parameter ttpError: the failure to land.
+    /// - Parameter ttpError: a failure from the SDK's own taxonomy; refusals, cancellation and foreign errors are
+    ///   landed by the caller.
     /// - Parameter registration: the activation registration the store still holds, for the code remedy.
     /// - Returns: the state to land on, or `nil` where the session stays.
     private static func landing(
