@@ -67,8 +67,8 @@ extension PayabliTTPSessionState {
 
         case .readerSetupFailed, .readerUnavailable, .networkError, .tokenExpired:
             // A reader that would not arm, a service that could not be reached
-            // and a token refused after the renewal all leave the device as it
-            // was. The thrown error tells the host whether waiting helps.
+            // and a refused token all leave the device as it was. The thrown
+            // error tells the host whether waiting helps.
             return .failed(reason: .serviceUnavailable)
 
         case .notInitialized, .invalidState, .notReady, .guardFailed:
