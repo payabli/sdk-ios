@@ -232,11 +232,12 @@ Two kinds of 1002 leave the session usable:
 
 - One from Tap to Pay setting up the device (`PayabliTTP.initialize()`, `activateDevice`, or the repair `charge`
   runs first) when the setup's own request was refused, the SDK renewed the token, and the new one was refused
-  too. Fix the cause, then call that setup again; it asks your provider for a new token. If it fails again at
-  once with 1002 and your provider isn't called, the session's credential is finished: call
-  `PayabliSession.initialize`, then create the terminal again from the new session.
+  too. Fix the cause, then call that setup again; it asks your provider for a new token.
 - One whose refused token another call had already replaced, or was replacing. Only that call fails; the next
   call uses the new token, and `initialize` with the same configuration returns the same session.
+
+If a setup called again fails at once with 1002 and your provider isn't called, the session's credential is
+finished: call `PayabliSession.initialize`, then create the terminal again from the new session.
 
 ### Device identity
 

@@ -3,9 +3,9 @@
 import PayabliSDKTestUtils
 import XCTest
 
-/// Every device route pins its credential, over the wire: `/challenge`, `/register`, `/attest` and `/activate` each send
-/// a refused token once and keep it for the session to renew. A binding the service no longer holds is told apart from
-/// a refused token by its text.
+/// Device routes that pin their credential, over the wire: `/challenge`, `/register`, `/attest` and `/activate` each send
+/// a refused token once and keep it for the session to renew. On `/activate`, a 401 saying the binding is gone is told
+/// apart from a refused token by its text.
 final class DeviceRoutePinTests: XCTestCase {
     private static let challenge = "/api/v2/device/taptopay/challenge"
     private static let register = "/api/v2/device/taptopay/register"
