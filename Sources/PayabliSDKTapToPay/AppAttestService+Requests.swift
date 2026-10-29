@@ -15,6 +15,7 @@ extension AppAttestService {
             body: ChallengeRequest(entry: entry),
             label: "challenge",
             readsRefusalBeforeStatus: true,
+            pinsCredential: true,
             makeDeclineError: ColdRouteRefusals.decline
         )
     }
@@ -25,6 +26,7 @@ extension AppAttestService {
             body: body,
             label: "register",
             readsRefusalBeforeStatus: true,
+            pinsCredential: true,
             makeDeclineError: ColdRouteRefusals.decline
         )
     }
@@ -48,6 +50,7 @@ extension AppAttestService {
     /// - Parameter assertion: the assertion headers to append, or `nil` where the route needs none.
     /// - Parameter readsRefusalBeforeStatus: reads a 400, 403 or 404's refusal envelope, or a 401 saying the binding
     ///   is gone, before the status mapping.
+    /// - Parameter pinsCredential: sends a refused token once and throws ``PinnedTokenRefusal``.
     /// - Parameter makeDeclineError: builds the error a refusal or decline throws, from the code and reason the
     ///   service sent, or `nil` where the words name nothing the route classifies.
     /// - Returns: the envelope's `responseData`, decoded as `Payload`.
@@ -57,6 +60,7 @@ extension AppAttestService {
         label: String,
         assertion: AssertionHeaders? = nil,
         readsRefusalBeforeStatus: Bool = false,
+        pinsCredential: Bool = false,
         makeDeclineError: @escaping (_ code: Int?, _ reason: String) -> (any Error)? = { _, reason in
             PayabliTTPError.attestationFailed(reason: reason)
         }
@@ -67,6 +71,7 @@ extension AppAttestService {
             label: label,
             assertion: assertion,
             readsRefusalBeforeStatus: readsRefusalBeforeStatus,
+            pinsCredential: pinsCredential,
             makeDeclineError: makeDeclineError
         )
 
