@@ -265,7 +265,6 @@ extension PayabliTTP {
         return true
     }
 
-    /// The text the service refuses a close with when the processor has no record of the payment.
     private static let processorHasNoRecord = "Unable to locate the transaction with the payment processor"
 
     private static func saysTheProcessorHasNoRecord(_ error: Error) -> Bool {
