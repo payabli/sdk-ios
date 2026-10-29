@@ -233,6 +233,11 @@ set one, invoice number. A retry that describes another payment is refused befor
 `.retryNotSamePayment` (1022), and the earlier charge's key stays for the right retry. Only the most recent charge
 whose outcome is unknown can be retried: a later one with an unknown outcome replaces it.
 
+One charge runs at a time across every `PayabliTTP` in the process. A charge made while another runs is refused
+before anything is sent: a retry whose earlier charge's key is still being sent fails with `.paymentReferenceOpen`
+(1023), and any other charge with `.terminalNotReady` (3029). Follow `capture`: `.unknown` means the retry describes a
+payment that may have been charged, so find it before charging again.
+
 The SDK holds a charge's key in memory for four minutes after its latest send, across every `PayabliTTP` in the
 process, for up to four entry points at once, counting an entry point once per environment. A charge for a fifth
 while four hold an unresolved charge is refused before anything is sent, with `.tooManyOpenCharges` (3030). A retry after the four minutes, or after your
@@ -268,6 +273,7 @@ These Tap to Pay causes are ones your app handles, with their codes:
 | `.activationAttemptsExhausted` | 3026 | `.configuration` | Too many incorrect activation codes were entered. |
 | `.activationCodeNotIssued` | 3027 | `.configuration` | No activation code has been issued for this device. |
 | `.deviceNotPending` | 3028 | `.invalidRequest` | This device is not waiting for activation. |
+| `.paymentReferenceOpen` | 1023 | `.invalidRequest` | Another call for this payment is still under way or its outcome is unknown, so this one was not sent. Check that payment's outcome first. |
 | `.terminalNotReady` | 3029 | `.invalidRequest` | The terminal is not ready for this call. |
 | `.tooManyOpenCharges` | 3030 | `.invalidRequest` | Too many charges are waiting to be resolved. |
 | `.chargeNotFinished` | 3034 | `.outcomeUnknown` | An earlier charge on this device hasn't finished. Check that payment before charging again, or wait four minutes. |

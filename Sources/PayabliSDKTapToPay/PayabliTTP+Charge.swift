@@ -27,8 +27,9 @@ extension PayabliTTP {
     ///      response travels; everything else was persisted at step 1.
     ///
     /// Every charge opens under a key of its own. One whose outcome is unknown keeps it for four minutes, and only
-    /// `attempt: .retry` resends it, describing the same amount, service fee, currency and, when the held charge set
-    /// one, invoice number; any other retry is refused with `RETRY_NOT_SAME_PAYMENT` before anything is sent.
+    /// `attempt: .retry` resends it, describing the same amount, service fee, currency and any invoice number it set.
+    /// A retry refused before anything is sent says why: `RETRY_NOT_SAME_PAYMENT`, `PAYMENT_REFERENCE_OPEN` or
+    /// `TERMINAL_NOT_READY`.
     ///
     /// - Parameters:
     ///   - paymentDetails: the amount, service fee and currency to charge.

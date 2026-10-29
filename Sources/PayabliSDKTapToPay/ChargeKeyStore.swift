@@ -2,8 +2,8 @@ import Foundation
 import PayabliSDKCore
 
 /// The idempotency keys of unsettled charges, in memory only, newest first per entry point and environment. A declared
-/// retry is handed the newest, never while it is being sent, and every key ages out on ``payabliIdempotencyKeyMaxAge``.
-/// Every terminal shares ``process``, so a second terminal's retry repeats the first one's charge.
+/// retry is handed the newest, never while it is being sent, and a key not being sent ages out on
+/// ``payabliIdempotencyKeyMaxAge``. Every terminal shares ``process``, so a second terminal's retry repeats the first.
 package final class ChargeKeyStore: @unchecked Sendable {
     /// The store every terminal in this process uses.
     package static let process = ChargeKeyStore()
