@@ -457,7 +457,7 @@ struct PaymentTapToPayQAView: View {
             do {
                 try await terminal.presentTerms()
             } catch {
-                termsMessage = "✗ Presenting failed: \(error.localizedDescription)"
+                termsMessage = ActionLine.failed(error)
                 return
             }
             // Asked in its own scope: presenting has already returned by here, so a failure to
@@ -483,7 +483,7 @@ struct PaymentTapToPayQAView: View {
                 try await terminal.initialize()
                 enableMessage = "✓ Reader ready"
             } catch {
-                enableMessage = "✗ \(error.localizedDescription)"
+                enableMessage = ActionLine.failed(error)
             }
         }
     }
@@ -504,7 +504,7 @@ struct PaymentTapToPayQAView: View {
                 )
                 chargeMessage = "✓ Charged · txn \(paymentTransId)"
             } catch {
-                chargeMessage = "✗ \(error.localizedDescription)"
+                chargeMessage = ActionLine.failed(error)
             }
         }
     }
@@ -553,7 +553,7 @@ struct PaymentTapToPayQAView: View {
                 // `enableMessage`, and the activation row is not `.failed` here,
                 // so writing only to `activationMessage` would discard the error.
                 activationOutcome = .enableFailed
-                enableMessage = "✗ \(error.localizedDescription)"
+                enableMessage = ActionLine.failed(error)
                 activationMessage = "✓ Activated. Enabling the terminal failed — see step 2."
             }
         }

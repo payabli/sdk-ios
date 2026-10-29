@@ -7,6 +7,12 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		C38240000000000000000032 /* ActionLineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C38240000000000000000031 /* ActionLineTests.swift */; };
+		C38240000000000000000022 /* SupportDeviceIdTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C38240000000000000000021 /* SupportDeviceIdTests.swift */; };
+		C38240000000000000000013 /* ActionLine.swift in Sources */ = {isa = PBXBuildFile; fileRef = C38240000000000000000011 /* ActionLine.swift */; };
+		C38240000000000000000012 /* ActionLine.swift in Sources */ = {isa = PBXBuildFile; fileRef = C38240000000000000000011 /* ActionLine.swift */; };
+		C38240000000000000000003 /* SupportDeviceId.swift in Sources */ = {isa = PBXBuildFile; fileRef = C38240000000000000000001 /* SupportDeviceId.swift */; };
+		C38240000000000000000002 /* SupportDeviceId.swift in Sources */ = {isa = PBXBuildFile; fileRef = C38240000000000000000001 /* SupportDeviceId.swift */; };
 		5DC00000000000000000D042 /* PayInSharedConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000000000000000000004 /* PayInSharedConfiguration.swift */; };
 		5DC00000000000000000D043 /* PayabliDemoColors.swift in Sources */ = {isa = PBXBuildFile; fileRef = D20000000000000000000021 /* PayabliDemoColors.swift */; };
 		5DC00000000000000000D032 /* FormCustomizationUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DC00000000000000000D031 /* FormCustomizationUITests.swift */; };
@@ -147,6 +153,10 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		C38240000000000000000031 /* ActionLineTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ActionLineTests.swift; sourceTree = "<group>"; };
+		C38240000000000000000021 /* SupportDeviceIdTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SupportDeviceIdTests.swift; sourceTree = "<group>"; };
+		C38240000000000000000011 /* ActionLine.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ActionLine.swift; sourceTree = "<group>"; };
+		C38240000000000000000001 /* SupportDeviceId.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SupportDeviceId.swift; sourceTree = "<group>"; };
 		5DC00000000000000000D031 /* FormCustomizationUITests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FormCustomizationUITests.swift; sourceTree = "<group>"; };
 		5DC00000000000000000D0F1 /* PayerFacingFailureUITests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PayerFacingFailureUITests.swift; sourceTree = "<group>"; };
 		5DC00000000000000000D001 /* PayInFormCustomization.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PayInFormCustomization.swift; sourceTree = "<group>"; };
@@ -442,6 +452,7 @@
 		E10000000000000000000020 /* Shared */ = {
 			isa = PBXGroup;
 			children = (
+				C38240000000000000000001 /* SupportDeviceId.swift */,
 				D10000000000000000000005 /* QADetailRow.swift */,
 				A1B2C3D4E5F60000000000D1 /* StepRow.swift */,
 				A1B2C3D4E5F60000000000E1 /* QAContextLine.swift */,
@@ -457,6 +468,7 @@
 		F20000000000000000000010 /* Flow */ = {
 			isa = PBXGroup;
 			children = (
+				C38240000000000000000011 /* ActionLine.swift */,
 				F20000000000000000000001 /* StepStatus.swift */,
 				F20000000000000000000003 /* TapToPaySteps.swift */,
 				F20000000000000000000005 /* PayInSteps.swift */,
@@ -490,6 +502,8 @@
 		F20000000000000000000020 /* FlowTests */ = {
 			isa = PBXGroup;
 			children = (
+				C38240000000000000000031 /* ActionLineTests.swift */,
+				C38240000000000000000021 /* SupportDeviceIdTests.swift */,
 				5DC00000000000000000C301 /* PayInFailureTests.swift */,
 				5DC00000000000000000C3B3 /* PayInReversalStateTests.swift */,
 				5DC00000000000000000C3A1 /* PayInReversibleTransIdTests.swift */,
@@ -733,6 +747,10 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C38240000000000000000032 /* ActionLineTests.swift in Sources */,
+				C38240000000000000000022 /* SupportDeviceIdTests.swift in Sources */,
+				C38240000000000000000013 /* ActionLine.swift in Sources */,
+				C38240000000000000000003 /* SupportDeviceId.swift in Sources */,
 				5DC00000000000000000C503 /* PayInOperation.swift in Sources */,
 				5DC00000000000000000C402 /* LoggableError.swift in Sources */,
 				5DC00000000000000000C401 /* PayInOutcome.swift in Sources */,
@@ -781,6 +799,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C38240000000000000000012 /* ActionLine.swift in Sources */,
+				C38240000000000000000002 /* SupportDeviceId.swift in Sources */,
 				5DC00000000000000000C502 /* PayInOperation.swift in Sources */,
 				5DC00000000000000000BF02 /* PayabliEnvironmentMapping.swift in Sources */,
 				5DC00000000000000000E002 /* OfferedEnvironments.swift in Sources */,
