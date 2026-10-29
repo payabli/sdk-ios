@@ -44,8 +44,9 @@ extension PayabliTTP {
     ///   - sale: The sale the charge describes.
     ///   - body: The charge, run in the caller's task while the gate is held.
     /// - Returns: The charge's result.
-    /// - Throws: `notReady` when a charge already holds the gate, on any entry point, whether it is running or still
-    ///   waiting for a setup to finish; for a declared retry, the refusal ``overlapRefusal(of:running:)`` builds.
+    /// - Throws: `sessionNotInitialized` when this terminal's session was replaced or ended; `notReady` when a charge
+    ///   already holds the gate, on any entry point, whether it is running or still waiting for a setup to finish. A
+    ///   declared retry refused either way carries the capture ``refusedRetry(of:)`` reads.
     func holdingSessionSetup<T>(
         attempt: PayabliAttempt,
         sale: ChargeDescription,
@@ -53,33 +54,40 @@ extension PayabliTTP {
     ) async throws -> T {
         // Before the busy refusal: a retired terminal stays retired, so being told the reader is busy would send it
         // back here for good.
-        try requireLiveSession()
+        do {
+            try requireLiveSession()
+        } catch let refusal as TapToPayError where attempt == .retry {
+            throw TapToPayError(
+                type: refusal.type,
+                reason: refusal.reason,
+                detail: refusal.detail,
+                capture: refusedRetry(of: sale).capture
+            )
+        }
         let gate = SessionSetupGate.shared
-        if let running = gate.runningCharge {
+        if gate.runningCharge != nil {
             guard attempt == .retry else {
                 throw PayabliTTPError.notReady(current: sessionState)
             }
-            throw overlapRefusal(of: sale, running: running)
+            let refused = refusedRetry(of: sale)
+            let type: PayabliErrorType = refused.keyUnderWay ? .paymentReferenceOpen : .terminalNotReady
+            throw TapToPayError(type: type, reason: type.message, detail: nil, capture: refused.capture)
         }
         return try await gate.holdForCharge(SessionSetupGate.RunningCharge(entryPoint: entryPoint, sale: sale), body)
     }
 
-    /// The refusal of a declared retry made while another charge holds the gate, read from this entry point's held keys.
+    /// What a declared retry refused before its key is reserved finds, read from the running charge and this entry
+    /// point's held keys.
     ///
-    /// - Parameters:
-    ///   - sale: The sale the retry describes.
-    ///   - running: The charge holding the gate.
-    /// - Returns: `paymentReferenceOpen` when the key the retry would be handed is being sent, `terminalNotReady`
-    ///   otherwise; capture `unknown` when the retry describes the running sale on this entry point or any held key's
-    ///   sale, `notCharged` when it describes neither.
-    private func overlapRefusal(of sale: ChargeDescription, running: SessionSetupGate.RunningCharge) -> TapToPayError {
+    /// - Parameter sale: The sale the retry describes.
+    /// - Returns: Whether the key the retry would be handed is being sent, and the capture: `unknown` when the retry
+    ///   describes the sale running on this entry point or any held key's sale, `notCharged` when it describes neither.
+    private func refusedRetry(of sale: ChargeDescription) -> (keyUnderWay: Bool, capture: PayabliTTPCapture) {
         let held = chargeKeys.heldRetry(entry: entryPoint, environment: environment, description: sale)
-        let describesRunning = running.entryPoint == entryPoint && running.sale.isRepeated(by: sale)
-        let type: PayabliErrorType = held?.underWay == true ? .paymentReferenceOpen : .terminalNotReady
-        return TapToPayError(
-            type: type,
-            reason: type.message,
-            detail: nil,
+        let running = SessionSetupGate.shared.runningCharge
+        let describesRunning = running?.entryPoint == entryPoint && running?.sale.isRepeated(by: sale) == true
+        return (
+            keyUnderWay: held?.underWay == true,
             capture: describesRunning || held?.describesHeld == true ? .unknown : .notCharged
         )
     }

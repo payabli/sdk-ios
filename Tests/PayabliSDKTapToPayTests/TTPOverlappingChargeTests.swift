@@ -150,6 +150,52 @@ final class TTPOverlappingChargeTests: XCTestCase {
         XCTAssertEqual(during.retryRefusal?.capture, .notCharged)
     }
 
+    // MARK: - A retry refused on a retired terminal
+
+    func testARetryOfAHeldSaleOnARetiredTerminalIsUnknownAndItsKeyStays() async throws {
+        let live = LiveFlag()
+        let (retired, _) = try await makeReadyTTP(outcome: .indeterminate, live: live)
+        _ = await Self.failure { try await retired.charge(paymentDetails: Self.sale) }
+        live.value = false
+
+        let retry = await Self.failure { try await retired.charge(paymentDetails: Self.sale, attempt: .retry) }
+        let newPayment = await Self.failure { try await retired.charge(paymentDetails: Self.sale) }
+
+        XCTAssertEqual(retry?.type, .sessionNotInitialized)
+        XCTAssertEqual(retry?.capture, .unknown)
+        XCTAssertEqual(newPayment?.type, .sessionNotInitialized)
+        XCTAssertEqual(newPayment?.capture, .notCharged, "a new payment describes no held sale")
+        XCTAssertEqual(Self.wire.keys.count, 1, "the retired terminal sent an opening")
+        let (other, _) = try await makeReadyTTP()
+        _ = try await other.charge(paymentDetails: Self.sale, attempt: .retry)
+        XCTAssertEqual(Self.wire.keys[1], Self.wire.keys[0], "the held sale's key was not kept")
+    }
+
+    func testOnARetiredTerminalARetryIsUnknownOnlyWhenItDescribesTheSaleRunningOnItsEntryPoint() async throws {
+        let live = LiveFlag()
+        let (retired, _) = try await makeReadyTTP(live: live)
+        let (running, provider) = try await makeReadyTTP()
+        live.value = false
+        let during = Overlap()
+        provider.whileReading = { [weak retired] in
+            guard let retired else { return }
+            during.refusal = await Self.failure {
+                try await retired.charge(paymentDetails: Self.sale, attempt: .retry)
+            }
+            during.retryRefusal = await Self.failure {
+                try await retired.charge(paymentDetails: Self.otherSale, attempt: .retry)
+            }
+        }
+
+        _ = try await running.charge(paymentDetails: Self.sale)
+
+        XCTAssertEqual(during.refusal?.type, .sessionNotInitialized)
+        XCTAssertEqual(during.refusal?.capture, .unknown)
+        XCTAssertEqual(during.retryRefusal?.type, .sessionNotInitialized)
+        XCTAssertEqual(during.retryRefusal?.capture, .notCharged)
+        XCTAssertEqual(Self.wire.keys.count, 1, "the retired terminal sent an opening")
+    }
+
     // MARK: - The gate is released however a charge ends
 
     func testAnAnsweredChargeReleasesTheGate() async throws {
@@ -194,6 +240,17 @@ final class TTPOverlappingChargeTests: XCTestCase {
     private static let sale = PayabliTTPPaymentDetails(amount: 1, currency: "USD")
     private static let otherSale = PayabliTTPPaymentDetails(amount: 2, currency: "USD")
 
+    /// Whether a terminal's session is still the installed one, as a test sets it.
+    private final class LiveFlag: @unchecked Sendable {
+        private let lock = NSLock()
+        private var stored = true
+
+        var value: Bool {
+            get { lock.withLock { stored } }
+            set { lock.withLock { stored = newValue } }
+        }
+    }
+
     private final class Overlap {
         var refusal: TapToPayError?
         var retryRefusal: TapToPayError?
@@ -217,7 +274,8 @@ final class TTPOverlappingChargeTests: XCTestCase {
     /// A ready terminal sharing this test's key store, so two of them see each other's keys.
     private func makeReadyTTP(
         entryPoint: String = "e",
-        outcome: CardReadOutcome = .approved
+        outcome: CardReadOutcome = .approved,
+        live: LiveFlag = LiveFlag()
     ) async throws -> (PayabliTTP, MockTapToPayProvider) {
         StubURLProtocol.handler = Self.stubHandler
         let provider = MockTapToPayProvider()
@@ -228,6 +286,7 @@ final class TTPOverlappingChargeTests: XCTestCase {
             attestation: MockDeviceAttestationService(),
             retryPolicy: RetryPolicy(maxAttempts: 1, baseDelay: 0, maxDelay: 0, multiplier: 1, maxJitter: 0),
             session: StubURLProtocol.makeSession(),
+            isLive: { live.value },
             chargeKeys: store
         )
         try await ttp.initialize()
