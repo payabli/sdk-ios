@@ -2,9 +2,8 @@ import Foundation
 import PayabliSDKCore
 
 /// The idempotency keys of unsettled charges, in memory only, newest first per entry point and environment. A declared
-/// retry is handed the newest, never while a send of it is under way, and every key ages out on
-/// ``payabliIdempotencyKeyMaxAge``, as the service forgets it. Every terminal shares ``process``, so a second terminal's
-/// retry repeats the first one's charge.
+/// retry is handed the newest, never while it is being sent, and every key ages out on ``payabliIdempotencyKeyMaxAge``.
+/// Every terminal shares ``process``, so a second terminal's retry repeats the first one's charge.
 package final class ChargeKeyStore: @unchecked Sendable {
     /// The store every terminal in this process uses.
     package static let process = ChargeKeyStore()
@@ -36,9 +35,8 @@ package final class ChargeKeyStore: @unchecked Sendable {
     /// - Parameter attempt: whether the host declared the charge a retry.
     /// - Parameter description: the payment the charge describes.
     /// - Returns: the key to send, whether it was already held, and when this send reserved it.
-    /// - Throws: ``TapToPayError`` of type `paymentReferenceOpen` when a retry finds the held key's send under way, and
-    ///   of type `retryNotSamePayment` when it describes another payment than the held key's; either way the key stays
-    ///   held. Of type `tooManyOpenCharges` when every slot holds another entry point's charge.
+    /// - Throws: ``TapToPayError``: `paymentReferenceOpen` when a retry's held key is being sent, `retryNotSamePayment`
+    ///   for another payment, the key held either way; `tooManyOpenCharges` when other entry points fill every slot.
     func reserve(
         entry: String,
         environment: PayabliEnvironment,
