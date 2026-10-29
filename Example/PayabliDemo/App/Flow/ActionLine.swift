@@ -1,6 +1,6 @@
 import Foundation
 
-/// The line an action leaves beside its step.
+/// The line a failed action leaves on the Tap to Pay tab.
 enum ActionLine {
     /// - Parameter error: what the action threw.
     /// - Returns: "✗ " and the error's message, with no step name.

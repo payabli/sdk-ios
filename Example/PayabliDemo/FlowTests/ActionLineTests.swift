@@ -1,6 +1,6 @@
 import XCTest
 
-/// The line a failed action leaves on the Tap to Pay screen.
+/// The line a failed action leaves on the Tap to Pay tab.
 final class ActionLineTests: XCTestCase {
     private struct Refusal: LocalizedError {
         var errorDescription: String? {
@@ -10,12 +10,5 @@ final class ActionLineTests: XCTestCase {
 
     func testAFailureIsTheMarkPlusTheErrorsMessage() {
         XCTAssertEqual(ActionLine.failed(Refusal()), "✗ The merchant declined the terms.")
-    }
-
-    func testAFailedTermsPresentationNamesNoStep() {
-        let line = ActionLine.failed(Refusal())
-
-        XCTAssertFalse(line.contains("Presenting"), line)
-        XCTAssertFalse(line.contains("failed:"), line)
     }
 }

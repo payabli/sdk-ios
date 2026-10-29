@@ -132,6 +132,7 @@ PayabliDemo/
                   DemoCustomerData.swift        the stand-in customer each surface sends
                   PayInSharedConfiguration.swift  what both forms share
                   LoggableError.swift           what a log line may say about a failure
+                  SessionDeviceId.swift         the device ID support asks for
   App/            PayabliDemoQAApp.swift        @main + the tab shell
     Configuration/  ConfigurationQAView.swift   the Config tab
                     DemoEnvironment.swift       an environment, in this app's terms
@@ -177,7 +178,9 @@ Read-only. The SDK captures `entryPoint` and `environment` at launch,
 so an editable field would show a value it never received. Edit `Secrets.swift`
 and relaunch.
 
-It shows Integration, Token endpoint (with **Check token** and **Health**
+It opens with Support: the device ID Payabli support asks for, with a copy
+button, read off the session each time the tab appears and shown as
+**Unavailable** while the device cannot read it. Then Integration, Token endpoint (with **Check token** and **Health**
 probes), card-present readiness, the shared card-not-present settings, and a
 Build section carrying the bundle ID, signing team,
 device, host kind, SDK linkage and SDK version. The card-not-present rows read

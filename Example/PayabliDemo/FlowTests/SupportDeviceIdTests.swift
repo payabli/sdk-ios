@@ -2,7 +2,7 @@ import XCTest
 
 /// What the Config tab's support row shows for the session's device ID.
 final class SupportDeviceIdTests: XCTestCase {
-    private let deviceId = "4da924ef-1c2b-4e5f-8a9b-0c1d2e3f4a5b"
+    private let deviceId = "a1b2c3d4e5f60718293a4b5c6d7e8f90"
 
     func testTheSessionsDeviceIdIsShownAndCopyable() {
         let row = SupportDeviceId(deviceId)
@@ -18,10 +18,10 @@ final class SupportDeviceIdTests: XCTestCase {
         XCTAssertNil(row.copyable)
     }
 
-    func testAnEmptyDeviceIdReadsUnavailable() {
-        let row = SupportDeviceId("")
+    func testBeforeTheSessionAnswersTheRowSaysItIsReading() {
+        let row = SupportDeviceId.reading
 
-        XCTAssertEqual(row.shown, "Unavailable")
+        XCTAssertEqual(row.shown, "Reading…")
         XCTAssertNil(row.copyable)
     }
 
