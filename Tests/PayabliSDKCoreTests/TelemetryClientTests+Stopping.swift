@@ -101,10 +101,19 @@ extension TelemetryClientTests {
 
     func testAHandOverWaitsForASendInFlightAndKeepsTheBatchItCouldNotSend() async {
         let gated = GatedTelemetryTransport()
+        // The hand-over cancels the old client's timer before it waits for the send, so the gate opens only after.
+        let handingOver = expectation(description: "the hand-over began")
         let old = TelemetryClient(
             configuration: .init(batchSize: 100, entry: "test_entry", environment: "sandbox"),
             transport: gated,
-            sleep: clock.sleep,
+            sleep: { _ in
+                do {
+                    try await Task.sleep(nanoseconds: .max)
+                } catch {
+                    handingOver.fulfill()
+                    throw error
+                }
+            },
             lifecycle: lifecycle,
             deviceId: { nil },
             queued: []
@@ -115,6 +124,7 @@ extension TelemetryClientTests {
         await record(old, "b")
 
         let successor = makeClient(predecessor: old)
+        await fulfillment(of: [handingOver], timeout: 5)
         await gated.open()
         await successor.settled()
 
