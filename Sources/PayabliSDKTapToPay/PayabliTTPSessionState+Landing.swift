@@ -4,8 +4,6 @@ import PayabliSDKCore
 // MARK: - Where a failure lands
 
 extension PayabliTTPSessionState {
-    // swiftlint:disable cyclomatic_complexity
-
     /// The state a failure leaves the session in, or `nil` when it leaves the session where it was. Failures
     /// a host repairs identically land together; one whose remedy is unknown lands on
     /// ``PayabliTTPFailureReason/serviceUnavailable``, where being wrong costs a retry rather than a bug report.
@@ -29,7 +27,18 @@ extension PayabliTTPSessionState {
         guard let ttpError = error as? PayabliTTPError else {
             return landingByType(error, registration: registration)
         }
+        return landing(for: ttpError, registration: registration)
+    }
 
+    /// Where a Tap to Pay failure lands, by its case.
+    ///
+    /// - Parameter ttpError: the failure to land.
+    /// - Parameter registration: the activation registration the store still holds, for the code remedy.
+    /// - Returns: the state to land on, or `nil` where the session stays.
+    private static func landing(
+        for ttpError: PayabliTTPError,
+        registration: StoredRegistration
+    ) -> PayabliTTPSessionState? {
         switch ttpError {
         case .devicePendingActivation:
             // Not a failure. The device owes an activation code and the host's
@@ -74,8 +83,6 @@ extension PayabliTTPSessionState {
             return nil
         }
     }
-
-    // swiftlint:enable cyclomatic_complexity
 
     /// A failure that carries a catalog type, landed by that type.
     ///
