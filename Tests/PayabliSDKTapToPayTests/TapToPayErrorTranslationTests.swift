@@ -380,8 +380,6 @@ final class TapToPayErrorTranslationTests: XCTestCase {
         }
     }
 
-    // swiftlint:disable cyclomatic_complexity
-
     /// The published entry for each case, written out independently of the table under test. A new case
     /// stops this compiling until it is given one.
     private static func expectedType(of error: PayabliTTPError) -> PayabliErrorType {
@@ -417,8 +415,6 @@ final class TapToPayErrorTranslationTests: XCTestCase {
         case .paymentNotTaken: return .paymentNotTaken
         }
     }
-
-    // swiftlint:enable cyclomatic_complexity
 
     private static let allSamples: [PayabliTTPError] = [
         .notInitialized,
