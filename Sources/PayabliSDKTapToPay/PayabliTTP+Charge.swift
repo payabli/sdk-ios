@@ -219,6 +219,7 @@ extension PayabliTTP {
             readResult = try await provider.startReading(readRequest)
         } catch {
             let failure = readFailure(error, paymentTransId: paymentTransId)
+            let touchedNoCard = Self.touchedNoCard(failure)
 
             // Best-effort backend notify so the transaction isn't left dangling.
             // Its outcome does not change what the caller is told.
@@ -228,8 +229,14 @@ extension PayabliTTP {
                 payload: .nfcFailure(description: String(describing: error))
             )
             // A close that lands keeps the key: the tap's answer is unknown. The processor holding no record of the
-            // payment is the one answer that says nothing was captured.
+            // payment says nothing was captured, and so does a read that never reached a card, whatever the close
+            // answers.
             if case .failed(_, _, processorHasNoRecord: true) = close {
+                settleFresh(reservation)
+                if touchedNoCard {
+                    logger.info("[charge] the close found no record of a payment whose read never reached a card")
+                }
+            } else if touchedNoCard {
                 settleFresh(reservation)
             }
 
@@ -243,8 +250,9 @@ extension PayabliTTP {
                 syncPublished()
             }
             // The no-record close says this charge took nothing, so it replaces the read's failure — but only
-            // where this run minted the key: a resent key names an earlier charge, which it cannot settle.
-            if case .failed(_, _, processorHasNoRecord: true) = close, !reservation.reused {
+            // where this run minted the key: a resent key names an earlier charge, which it cannot settle. A read
+            // that never reached a card keeps its 3017, which already says nothing was taken.
+            if case .failed(_, _, processorHasNoRecord: true) = close, !reservation.reused, !touchedNoCard {
                 throw PayabliTTPError.paymentNotTaken(paymentTransId: paymentTransId)
             }
             throw failure
@@ -263,7 +271,15 @@ extension PayabliTTP {
         chargeKeys.settle(entry: entryPoint, environment: environment, key: reservation.key)
     }
 
-    /// The text the service refuses a close with when the processor has no record of the payment.
+    /// Whether a read failed before the reader reached a card, so the charge took nothing.
+    ///
+    /// - Parameter failure: the read's failure, as the caller is told it.
+    /// - Returns: `true` where the reader session was gone before the read began.
+    private static func touchedNoCard(_ failure: Error) -> Bool {
+        guard case PayabliTTPError.readerSessionExpired(_, .notCharged) = failure else { return false }
+        return true
+    }
+
     private static let processorHasNoRecord = "Unable to locate the transaction with the payment processor"
 
     private static func saysTheProcessorHasNoRecord(_ error: Error) -> Bool {
@@ -418,6 +434,8 @@ extension PayabliTTP {
             return PayabliTTPError.readerDeviceRefused(reason: reason, paymentTransId: paymentTransId, capture: .unknown)
         case let .readerUnavailable(reason, _, _):
             return PayabliTTPError.readerUnavailable(reason: reason, paymentTransId: paymentTransId, capture: .unknown)
+        case let .readerSessionExpired(_, capture):
+            return PayabliTTPError.readerSessionExpired(paymentTransId: paymentTransId, capture: capture)
         case let .some(ttpError):
             return PayabliTTPError.nfcFailed(reason: ttpError.localizedDescription, paymentTransId: paymentTransId)
         case .none:

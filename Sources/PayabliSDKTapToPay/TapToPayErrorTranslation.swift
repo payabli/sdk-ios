@@ -88,8 +88,6 @@ enum TapToPayErrorTranslation {
         )
     }
 
-    // swiftlint:disable cyclomatic_complexity
-
     /// One branch per case, with no `default`, so a case added without an entry stops this compiling. A
     /// case collecting causes that do not share a code reports `unknown`.
     ///
@@ -145,6 +143,8 @@ enum TapToPayErrorTranslation {
             return .readerUnavailable
         case .readerDeviceRefused:
             return .readerDeviceRefused
+        case .readerSessionExpired:
+            return .readerSessionExpired
         case .cardDeclined:
             return .cardDeclined
         case .outcomeUnknown:
@@ -153,8 +153,6 @@ enum TapToPayErrorTranslation {
             return .paymentNotTaken
         }
     }
-
-    // swiftlint:enable cyclomatic_complexity
 
     /// Everything a core error shows after its reason: its detail, and the field errors or the payer's next
     /// step some of them add.
@@ -211,7 +209,7 @@ enum TapToPayErrorTranslation {
         case .notInitialized, .invalidState, .notReady, .devicePendingActivation, .tokenExpired,
              .termsNotAccepted, .readerOSVersionNotSupported, .readerHardwareUnsupported,
              .cardPresentNotEnabled, .activationCodeMalformed, .cardDeclined, .outcomeUnknown, .paymentNotTaken,
-             .readerCredentialsUnusable:
+             .readerCredentialsUnusable, .readerSessionExpired:
             nil
         }
         guard let text, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }

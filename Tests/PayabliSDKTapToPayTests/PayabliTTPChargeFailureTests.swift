@@ -106,17 +106,35 @@ final class PayabliTTPChargeFailureTests: XCTestCase {
         XCTAssertEqual(ttp.sessionState, .sessionExpired)
     }
 
-    /// The guard throws before the reader touches a card, so its code is not turned into an unconfirmed outcome.
-    func testAReaderThatWasNotPreparedKeepsItsCaseAndChargedNothing() async throws {
+    /// A reader gone between the opening and the read touched no card. The session is what ended, so it expires and
+    /// the opened payment is closed as any failed read's is.
+    func testAReaderGoneAfterThePaymentOpenedExpiresTheSessionAndChargedNothing() async throws {
         let (ttp, provider, _) = try await makeReadyTTP()
-        provider.readingResult = .failure(PayabliTTPError.guardFailed(reason: "Reader not prepared"))
+        let closes = CloseCount()
+        StubURLProtocol.handler = closes.counting(Self.chargeStubHandler)
+        provider.readingResult = .failure(PayabliTTPError.readerSessionExpired(capture: .notCharged))
 
         let failure = try await chargeFailure(ttp)
 
-        XCTAssertEqual(failure.type, .sdkInternalError)
-        XCTAssertEqual(failure.detail, "Reader not prepared")
+        XCTAssertEqual(failure.type, .readerSessionExpired)
+        XCTAssertEqual(failure.code, 3017)
         XCTAssertEqual(failure.paymentTransId, Self.paymentTransId)
-        XCTAssertEqual(failure.capture, .notCharged, "the guard failed before a card was read")
+        XCTAssertEqual(failure.capture, .notCharged, "no card was read")
+        XCTAssertEqual(ttp.sessionState, .sessionExpired)
+        XCTAssertEqual(closes.value, 1, "the opened payment's close was sent")
+    }
+
+    /// A reader session spent during the read ends the session, and the processor may have taken the sale first.
+    func testAReaderSessionSpentDuringTheReadExpiresTheSessionWithTheOutcomeUnknown() async throws {
+        let (ttp, provider, _) = try await makeReadyTTP()
+        provider.readingResult = .failure(PayabliTTPError.readerSessionExpired(capture: .unknown))
+
+        let failure = try await chargeFailure(ttp)
+
+        XCTAssertEqual(failure.type, .readerSessionExpired)
+        XCTAssertEqual(failure.paymentTransId, Self.paymentTransId)
+        XCTAssertEqual(failure.capture, .unknown)
+        XCTAssertEqual(ttp.sessionState, .sessionExpired)
     }
 
     // MARK: - A payment that cannot be opened
@@ -310,11 +328,8 @@ final class PayabliTTPChargeFailureTests: XCTestCase {
     ) async throws {
         let (ttp, provider, _) = try await makeReadyTTP()
         let closes = CloseCount()
-        StubURLProtocol.handler = { request in
+        StubURLProtocol.handler = closes.counting { request in
             let path = request.url?.path ?? ""
-            if path.contains("/MoneyIn/update/") {
-                closes.add()
-            }
             guard path.contains("/MoneyIn/initiate") else {
                 return try Self.chargeStubHandler(request)
             }
@@ -336,7 +351,7 @@ final class PayabliTTPChargeFailureTests: XCTestCase {
         XCTAssertNil(failure.paymentTransId, file: file, line: line)
         XCTAssertEqual(failure.capture, .notCharged, file: file, line: line)
         XCTAssertEqual(provider.startReadingCalls, 0, "a card was asked for", file: file, line: line)
-        XCTAssertEqual(closes.count, 0, "a close was sent", file: file, line: line)
+        XCTAssertEqual(closes.value, 0, "a close was sent", file: file, line: line)
     }
 
     /// Answers `/initiate` with a 400 blaming `field`, shaped as the service's refusal body, and every other path as
@@ -517,22 +532,28 @@ final class PayabliTTPChargeFailureTests: XCTestCase {
 private struct ChargeTimedOut: Error {}
 
 /// How many closes the stub was sent, counted from the URL loading thread.
-private final class CloseCount: @unchecked Sendable {
-    private let lock = NSLock()
-    private var sent = 0
-
-    var count: Int {
-        lock.withLock { sent }
-    }
-
-    func add() {
-        lock.withLock { sent += 1 }
-    }
-}
-
 /// Guards a continuation so the deadline and the work cannot both resume it.
 /// Only touched from the main actor, which is where both racers run.
 @MainActor
 private final class ResumeOnce {
     var done = false
+}
+
+/// Counts the closes a charge sends, answering each request as the wrapped handler does.
+private final class CloseCount: @unchecked Sendable {
+    private let lock = NSLock()
+    private var closes = 0
+
+    var value: Int {
+        lock.withLock { closes }
+    }
+
+    func counting(_ handler: @escaping StubURLProtocol.Handler) -> StubURLProtocol.Handler {
+        { [self] request in
+            if request.url?.path.contains("/MoneyIn/update/") == true {
+                lock.withLock { closes += 1 }
+            }
+            return try handler(request)
+        }
+    }
 }

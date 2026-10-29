@@ -190,7 +190,6 @@ final class TapToPayErrorTranslationTests: XCTestCase {
         ]
         let notProducedYet: Set<PayabliErrorType> = [
             .deviceServicesOutdated, // a Google Play cause, which this platform has no counterpart for
-            .readerSessionExpired,
             .paymentNotHeld // no close call on this platform yet
         ]
         let produced = fromTheTable.union(fromActivation).union(raisedDirectly)
@@ -245,7 +244,7 @@ final class TapToPayErrorTranslationTests: XCTestCase {
             case .notInitialized, .invalidState, .notReady, .devicePendingActivation, .attestationRevoked,
                  .attestationFailed, .deviceSetupRequired, .deviceSetupRefused, .entryPointRefused, .configFailed,
                  .cardPresentNotEnabled, .readerSetupFailed, .readerCredentialsUnusable, .readerHardwareUnsupported,
-                 .readerUnavailable, .guardFailed, .readerDeviceRefused, .paymentNotOpened,
+                 .readerUnavailable, .guardFailed, .readerDeviceRefused, .readerSessionExpired, .paymentNotOpened,
                  .tokenExpired, .activationFailed, .activationCodeMalformed, .networkError, .termsNotAccepted,
                  .readerOSVersionNotSupported, .cardDeclined, .paymentNotTaken:
                 XCTAssertEqual(error.capture, .notCharged, "\(error) took no money")
@@ -380,8 +379,6 @@ final class TapToPayErrorTranslationTests: XCTestCase {
         }
     }
 
-    // swiftlint:disable cyclomatic_complexity
-
     /// The published entry for each case, written out independently of the table under test. A new case
     /// stops this compiling until it is given one.
     private static func expectedType(of error: PayabliTTPError) -> PayabliErrorType {
@@ -412,13 +409,12 @@ final class TapToPayErrorTranslationTests: XCTestCase {
         case .readerOSVersionNotSupported: return .deviceOSUnsupported
         case .readerUnavailable: return .readerUnavailable
         case .readerDeviceRefused: return .readerDeviceRefused
+        case .readerSessionExpired: return .readerSessionExpired
         case .cardDeclined: return .cardDeclined
         case .outcomeUnknown: return .paymentOutcomeUnknown
         case .paymentNotTaken: return .paymentNotTaken
         }
     }
-
-    // swiftlint:enable cyclomatic_complexity
 
     private static let allSamples: [PayabliTTPError] = [
         .notInitialized,
@@ -438,6 +434,7 @@ final class TapToPayErrorTranslationTests: XCTestCase {
         .readerUnavailable(reason: "x"),
         .guardFailed(reason: "x"),
         .readerDeviceRefused(reason: "x"),
+        .readerSessionExpired(capture: .notCharged),
         .nfcFailed(reason: "x"),
         .paymentNotOpened(reason: "x"),
         .updateFailed(reason: "x", paymentTransId: "TXN", capture: .unknown),

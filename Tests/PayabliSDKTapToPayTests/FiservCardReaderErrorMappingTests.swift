@@ -2,7 +2,7 @@
 import XCTest
 
 #if canImport(PayabliCardReaderCore) && canImport(ProximityReader)
-    import PayabliCardReaderCore
+    @testable import PayabliCardReaderCore
     import ProximityReader
 
     /// What `mapError` does with the errors it actually receives.
@@ -46,6 +46,73 @@ import XCTest
 
             guard case .readerSetupFailed = mapped else {
                 return XCTFail("expected .readerSetupFailed, got \(mapped)")
+            }
+        }
+
+        /// A read that finds the reader session spent is the session's expiry, and the processor may have taken
+        /// the sale before the reader answered.
+        func testAReadThatFindsTheSessionSpentIsTheSessionsExpiry() {
+            for error in [Self.rebuiltRead(.readerSessionExpired), Self.rebuiltRead(.noReaderSession)] {
+                guard case let .readerSessionExpired(_, capture) = FiservCardReader.mapReadError(error) else {
+                    return XCTFail("expected .readerSessionExpired for \(error)")
+                }
+                XCTAssertEqual(capture, .unknown)
+            }
+        }
+
+        /// The card reader refuses to read without a session before any card is asked for, so nothing was charged.
+        func testAReadRefusedForWantOfASessionIsTheSessionsExpiryAndChargesNothing() {
+            let refusal = FiservTTPCardReaderError(
+                title: FiservCardReader.noSessionRefusal.title,
+                localizedDescription: FiservCardReader.noSessionRefusal.description
+            )
+
+            for error in [refusal, Self.chargeFailure(behind: refusal)] {
+                guard case let .readerSessionExpired(_, capture) = FiservCardReader.mapReadError(error) else {
+                    return XCTFail("expected .readerSessionExpired for \(error)")
+                }
+                XCTAssertEqual(capture, .notCharged)
+            }
+        }
+
+        /// The charge's own failure reads the same for every refusal behind it, so only the one it keeps decides.
+        func testAnUnreadableCardBehindTheChargesFailureStaysAnNFCFailure() {
+            let unreadable = FiservTTPCardReaderError(
+                title: "Read Payment Card",
+                localizedDescription: "The card was unable to be successfully read."
+            )
+
+            guard case .nfcFailed = FiservCardReader.mapReadError(Self.chargeFailure(behind: unreadable)) else {
+                return XCTFail("expected .nfcFailed")
+            }
+        }
+
+        /// The card reader's own refusal is the text the mapping matches, so a reworded refusal fails here.
+        func testTheCardReadersRefusalWithoutASessionIsTheOneMatched() async throws {
+            let reader = FiservTTPReader(config: FiservTTPConfig(
+                secretKey: "s", apiKey: "a", environment: .Sandbox, currencyCode: "USD", merchantId: "m",
+                merchantName: "n", merchantCategoryCode: "5999", terminalId: "t", terminalProfileId: "p"
+            ))
+
+            let result = try await reader.readCard(for: 1, currencyCode: "USD", transactionType: .purchase)
+
+            guard case let .failure(refusal) = result else { return XCTFail("expected the read to be refused") }
+            XCTAssertTrue(FiservCardReader.refusedToReadWithoutASession(Self.chargeFailure(behind: refusal)))
+        }
+
+        /// Where the platform's type did not survive, its case name in the reader's words still says so.
+        func testASpentSessionNamedOnlyInTheReadersWordsIsTheSessionsExpiry() {
+            let named = FiservTTPCardReaderError(title: "readerTokenExpired", localizedDescription: "token expired")
+
+            guard case .readerSessionExpired = FiservCardReader.mapReadError(named) else {
+                return XCTFail("expected .readerSessionExpired")
+            }
+        }
+
+        /// A read that failed while the session lives keeps the read's own case.
+        func testAReadFailureTheSessionSurvivesIsNotAnExpiry() {
+            guard case .nfcFailed = FiservCardReader.mapReadError(Self.rebuiltRead(.cardReadFailed)) else {
+                return XCTFail("expected .nfcFailed")
             }
         }
 
@@ -169,6 +236,12 @@ import XCTest
                 localizedDescription: error.errorDescription,
                 underlying: error
             )
+        }
+
+        /// Built the way `FiservTTPCardReader.charges` rebuilds a refused read: its own title, the refusal's
+        /// bridged description, and the refusal itself.
+        private static func chargeFailure(behind refusal: Error) -> FiservTTPCardReaderError {
+            FiservTTPCardReaderError(title: "Charges", localizedDescription: refusal.localizedDescription, underlying: refusal)
         }
 
         private static func rebuiltRead(_ error: PaymentCardReaderSession.ReadError) -> FiservTTPCardReaderError {
