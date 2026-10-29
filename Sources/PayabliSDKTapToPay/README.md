@@ -234,9 +234,10 @@ set one, invoice number. A retry that describes another payment is refused befor
 whose outcome is unknown can be retried: a later one with an unknown outcome replaces it.
 
 One charge runs at a time across every `PayabliTTP` in the process. A charge made while another runs is refused
-before anything is sent: a retry whose earlier charge's key is still being sent fails with `.paymentReferenceOpen`
-(1023), and any other charge with `.terminalNotReady` (3029). Follow `capture`: `.unknown` means the retry describes a
-payment that may have been charged, so find it before charging again.
+before anything is sent. A retry fails with `.paymentReferenceOpen` (1023) while the key it would be handed, the newest
+held for its entry point, is being sent, whichever payment it describes; any other charge fails with
+`.terminalNotReady` (3029). Follow `capture`: `.unknown` means the retry describes a payment that may have been
+charged, so find it before charging again.
 
 The SDK holds a charge's key in memory for four minutes after its latest send, across every `PayabliTTP` in the
 process, for up to four entry points at once, counting an entry point once per environment. A charge for a fifth

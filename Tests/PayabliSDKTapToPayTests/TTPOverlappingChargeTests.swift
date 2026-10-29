@@ -62,6 +62,25 @@ final class TTPOverlappingChargeTests: XCTestCase {
         XCTAssertEqual(Self.wire.keys[1], Self.wire.keys[0], "the retry did not resend the unknown charge's key")
     }
 
+    /// The type follows the key a retry would be handed, whichever sale it describes.
+    func testARetryOfAnotherSaleWhileTheRunningKeyIsBeingSentIsOpenAndNotCharged() async throws {
+        let (running, provider) = try await makeReadyTTP()
+        let (other, _) = try await makeReadyTTP()
+        let during = Overlap()
+        provider.whileReading = { [weak other] in
+            guard let other else { return }
+            during.refusal = await Self.failure {
+                try await other.charge(paymentDetails: Self.otherSale, attempt: .retry)
+            }
+        }
+
+        _ = try await running.charge(paymentDetails: Self.sale)
+
+        XCTAssertEqual(during.refusal?.type, .paymentReferenceOpen)
+        XCTAssertEqual(during.refusal?.capture, .notCharged)
+        XCTAssertEqual(Self.wire.keys.count, 1, "the refused retry sent an opening")
+    }
+
     func testAChargeOnAnotherEntryPointIsRefusedAndReadsOnlyItsOwnEntryPoint() async throws {
         let (running, provider) = try await makeReadyTTP()
         let (other, otherProvider) = try await makeReadyTTP(entryPoint: "other")
