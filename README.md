@@ -395,7 +395,10 @@ for your app includes it:
   data and product interaction, linked to the user, not used for tracking, for app functionality and analytics.
 - `PayabliSDKPayIn` collects the payment info, name, email address and customer number the payer enters in
   its form, linked to the user, not used for tracking, for app functionality.
-- `PayabliSDKTapToPay` collects nothing beyond Core, because Apple's reader takes the card.
+- `PayabliSDKTapToPay` declares nothing beyond Core, because Apple's reader takes the card.
+
+The manifests don't cover data your app passes to the SDK, such as the customer record, invoice or order
+description on a payment. The SDK sends that data to Payabli with the payment, and your app declares it.
 
 Every request the SDK sends to Payabli carries an `X-Pyb-Client` header with the SDK version, the platform, the OS
 version, the device model, the locale and the device ID described under [Device identity](#device-identity).
