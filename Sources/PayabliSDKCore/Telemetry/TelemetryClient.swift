@@ -147,7 +147,7 @@ package actor TelemetryClient {
 
     /// Stops this client: its timer and its background watcher end, a later record or flush is refused, and one last
     /// drain of at most `maxRequestsPerDrain` requests runs after any drain already scheduled. A batch that drain
-    /// cannot send is dropped. Called once, when the session it reports for is replaced.
+    /// cannot send is dropped. A second call does nothing.
     package func stop() {
         guard !stopped else { return }
         stopped = true
