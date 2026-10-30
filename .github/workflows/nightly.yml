@@ -60,7 +60,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           # Load-bearing rather than cautious. The failure attribution runs `git log -1 -- <file>`, and on a
           # shallow clone git attributes the single grafted commit to every path, so every failure would name
@@ -231,7 +231,7 @@ jobs:
       - name: Upload the report facts
         if: ${{ !cancelled() }}
         continue-on-error: true
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: nightly-facts
           path: ${{ runner.temp }}/nightly-facts
@@ -240,7 +240,7 @@ jobs:
       - name: Upload the result bundles
         if: always()
         continue-on-error: true
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: nightly-results
           path: |
