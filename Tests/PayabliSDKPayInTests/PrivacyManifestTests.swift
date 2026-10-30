@@ -32,16 +32,26 @@ final class PrivacyManifestTests: XCTestCase {
         for entry in declared {
             let type = try XCTUnwrap(entry["NSPrivacyCollectedDataType"] as? String)
             XCTAssertEqual(
-                entry["NSPrivacyCollectedDataLinked"] as? Bool,
+                Set(entry.keys),
+                [
+                    "NSPrivacyCollectedDataType",
+                    "NSPrivacyCollectedDataTypeLinked",
+                    "NSPrivacyCollectedDataTypeTracking",
+                    "NSPrivacyCollectedDataTypePurposes"
+                ],
+                "\(type) is declared under Apple's keys, which Xcode's privacy report reads"
+            )
+            XCTAssertEqual(
+                entry["NSPrivacyCollectedDataTypeLinked"] as? Bool,
                 true,
                 "\(type) is linked to the user"
             )
             XCTAssertEqual(
-                entry["NSPrivacyCollectedDataTracking"] as? Bool,
+                entry["NSPrivacyCollectedDataTypeTracking"] as? Bool,
                 false,
                 "\(type) is not used for tracking"
             )
-            let purposes = Set((entry["NSPrivacyCollectedDataPurposes"] as? [String]) ?? [])
+            let purposes = Set((entry["NSPrivacyCollectedDataTypePurposes"] as? [String]) ?? [])
             XCTAssertEqual(
                 purposes,
                 ["NSPrivacyCollectedDataTypePurposeAppFunctionality"],

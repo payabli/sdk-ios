@@ -11,11 +11,11 @@
         <dict>
             <key>NSPrivacyCollectedDataType</key>
             <string>NSPrivacyCollectedDataTypeDeviceID</string>
-            <key>NSPrivacyCollectedDataLinked</key>
+            <key>NSPrivacyCollectedDataTypeLinked</key>
             <true/>
-            <key>NSPrivacyCollectedDataTracking</key>
+            <key>NSPrivacyCollectedDataTypeTracking</key>
             <false/>
-            <key>NSPrivacyCollectedDataPurposes</key>
+            <key>NSPrivacyCollectedDataTypePurposes</key>
             <array>
                 <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
                 <string>NSPrivacyCollectedDataTypePurposeAnalytics</string>
@@ -24,11 +24,11 @@
         <dict>
             <key>NSPrivacyCollectedDataType</key>
             <string>NSPrivacyCollectedDataTypePerformanceData</string>
-            <key>NSPrivacyCollectedDataLinked</key>
+            <key>NSPrivacyCollectedDataTypeLinked</key>
             <true/>
-            <key>NSPrivacyCollectedDataTracking</key>
+            <key>NSPrivacyCollectedDataTypeTracking</key>
             <false/>
-            <key>NSPrivacyCollectedDataPurposes</key>
+            <key>NSPrivacyCollectedDataTypePurposes</key>
             <array>
                 <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
                 <string>NSPrivacyCollectedDataTypePurposeAnalytics</string>
@@ -37,11 +37,11 @@
         <dict>
             <key>NSPrivacyCollectedDataType</key>
             <string>NSPrivacyCollectedDataTypeOtherDiagnosticData</string>
-            <key>NSPrivacyCollectedDataLinked</key>
+            <key>NSPrivacyCollectedDataTypeLinked</key>
             <true/>
-            <key>NSPrivacyCollectedDataTracking</key>
+            <key>NSPrivacyCollectedDataTypeTracking</key>
             <false/>
-            <key>NSPrivacyCollectedDataPurposes</key>
+            <key>NSPrivacyCollectedDataTypePurposes</key>
             <array>
                 <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
                 <string>NSPrivacyCollectedDataTypePurposeAnalytics</string>
@@ -50,11 +50,11 @@
         <dict>
             <key>NSPrivacyCollectedDataType</key>
             <string>NSPrivacyCollectedDataTypeProductInteraction</string>
-            <key>NSPrivacyCollectedDataLinked</key>
+            <key>NSPrivacyCollectedDataTypeLinked</key>
             <true/>
-            <key>NSPrivacyCollectedDataTracking</key>
+            <key>NSPrivacyCollectedDataTypeTracking</key>
             <false/>
-            <key>NSPrivacyCollectedDataPurposes</key>
+            <key>NSPrivacyCollectedDataTypePurposes</key>
             <array>
                 <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
                 <string>NSPrivacyCollectedDataTypePurposeAnalytics</string>
