@@ -5,8 +5,8 @@ import PayabliSDKCore
 
 //
 // These `*ObjC` classes are thin wrappers around the Swift value types in
-// `PayabliTTPTransactionData.swift` / `PayabliTTPTypes.swift` so ObjC, MAUI
-// (sharpie), Flutter, and React Native consumers can build the same payloads
+// `PayabliTTPTransactionData.swift` / `PayabliTTPTypes.swift` so Objective-C
+// hosts can build the same payloads
 // that Swift callers express as `struct`s. Each class exposes immutable
 // `@objc` properties and an `init(...)` mirroring the Swift parameter labels;
 // the internal `toSwift()` / `init(_:)` helpers bridge to and from the

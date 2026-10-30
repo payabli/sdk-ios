@@ -46,10 +46,6 @@ included:
   # The sample app too. The sensitive-field rule below names it as a place a leak
   # was found, and a rule that does not read the file it cites guarantees nothing.
   - Example/PayabliDemo
-  # The two bridge wrappers are Swift and take a card number, a CVV, an expiry and
-  # an account, so they are exactly where the rule below has to look. SPM does not
-  # build them, which is why they were outside every scope until now.
-  - Bridges
 
 excluded:
   - .build
@@ -154,7 +150,7 @@ custom_rules:
   # is not a credential but contains the name of one, and naming a closure in a log
   # line is legitimate, so the lookahead lets that one through.
   #
-  # A bare `token` holds the bearer in the transport and in both bridges, and it is
+  # A bare `token` holds the bearer in the transport, and it is
   # matched where it terminates an interpolation. The word itself is ordinary in a
   # log message — this SDK already writes "Access token refreshed" — so matching the
   # name would report three of its own lines. Terminating rather than exact text,

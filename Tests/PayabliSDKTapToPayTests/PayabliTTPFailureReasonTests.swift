@@ -265,7 +265,7 @@ final class PayabliTTPFailureReasonTests: XCTestCase {
         XCTAssertNil(PayabliTTPSessionState.initializingReader(percent: 50).failureReason)
     }
 
-    /// The codes are what every bridge reads, so they are pinned here.
+    /// The codes are what an Objective-C host reads, so they are pinned here.
     func testTheProjectionIsStable() {
         XCTAssertEqual(PayabliTTPSessionStateCode.idle.rawValue, 0)
         XCTAssertEqual(PayabliTTPSessionStateCode.attestingDevice.rawValue, 1)
@@ -281,7 +281,7 @@ final class PayabliTTPFailureReasonTests: XCTestCase {
         XCTAssertNil(PayabliTTPSessionStateCode(rawValue: 11))
     }
 
-    /// The activities a bridge reads by integer, each at a fixed value.
+    /// The activities an Objective-C host reads by integer, each at a fixed value.
     func testTheChargeActivitiesKeepTheirIntegers() {
         let expected: [TapToPayChargeActivity] = [
             .opening, .waitingForCard, .closing, .cardDetected, .cardRemovalRequested,
@@ -312,7 +312,7 @@ final class PayabliTTPFailureReasonTests: XCTestCase {
         XCTAssertEqual(PayabliTTPFailureReason.deviceKeyUnavailable.rawValue, 5)
         XCTAssertEqual(PayabliTTPFailureReason.sessionEnded.rawValue, 6)
         XCTAssertEqual(PayabliTTPFailureReason.contactlessDisabled.rawValue, 7)
-        // The bridges read these integers, so a member is appended and never
+        // An Objective-C host reads these integers, so a member is appended and never
         // renumbered. This is what makes an append visible here first.
         XCTAssertNil(PayabliTTPFailureReason(rawValue: 8))
     }

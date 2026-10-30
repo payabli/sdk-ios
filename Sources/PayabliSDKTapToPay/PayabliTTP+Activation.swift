@@ -105,8 +105,8 @@ public extension PayabliTTP {
         )
     }
 
-    /// `@objc` companion to `activateDevice(activationCode:)` for ObjC /
-    /// MAUI / Flutter / RN consumers. `completion(nil)` on success,
+    /// `@objc` companion to `activateDevice(activationCode:)` for
+    /// Objective-C hosts. `completion(nil)` on success,
     /// `completion(NSError)` on failure, a ``TapToPayError`` with its catalog
     /// number as the code.
     ///

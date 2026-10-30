@@ -378,8 +378,6 @@ The SDK is written in Swift, and the card-not-present form is a SwiftUI view.
   taken, including a refusal with code 1023 because another call for the payment is open, and `0` when it wasn't.
   When it's `1`, `userInfo["paymentTransId"]` holds the transaction ID and
   `userInfo["paymentReference"]` the payment's reference; each is absent when there is none. Errors from `PayabliSessionObjC`'s initializer are in `com.payabli.session`.
-- **Flutter, .NET MAUI and React Native.** [`Bridges/`](Bridges/README.md) has an example integration for each.
-  Use them as a starting point for your own integration.
 
 ## Sample app and testing
 
