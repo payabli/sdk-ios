@@ -23,6 +23,11 @@ on:
 # Granted per job, never here.
 permissions: {}
 
+# Every step under pipefail, so a failing command piped into another fails its step.
+defaults:
+  run:
+    shell: bash
+
 jobs:
   comment:
     name: Change report comment
@@ -55,7 +60,7 @@ jobs:
       # From the run that triggered this one, which is not the run this job is
       # part of, so the id and a token are both required.
       - name: Download the report
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: change-report
           run-id: ${{ github.event.workflow_run.id }}
@@ -101,8 +106,55 @@ jobs:
           gh api -X POST "repos/$REPO/issues/$pr/comments" -F body=@report.md >/dev/null
           echo "posted the report"
 
+  newest:
+    name: Newest revision
+    runs-on: ubuntu-latest
+    if: >-
+      github.event.workflow_run.conclusion == 'success'
+      && github.event.workflow_run.head_repository.full_name == github.repository
+    # Outside the analysis's concurrency group, so a stale run is turned away before it can take the pending
+    # place in it: GitHub keeps one pending job per group, and a later arrival replaces it, so a stale run
+    # admitted there would cancel the newest revision's waiting analysis and then skip its own.
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      newest: ${{ steps.newest.outputs.newest }}
+
+    steps:
+      # Only the newest revision of the pull request or branch is analysed. An
+      # older one's numbers would replace the newer analysis on the server.
+      - name: Check the revision is the newest
+        id: newest
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.event.workflow_run.head_sha }}
+          PR: ${{ github.event.workflow_run.pull_requests[0].number }}
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+        run: |
+          set -euo pipefail
+          if [ -n "$PR" ]; then
+            number=$(printf '%s' "$PR" | grep -E '^[0-9]+$')
+            tip=$(gh api "repos/$REPO/pulls/$number" --jq .head.sha)
+          else
+            head=$(printf '%s' "$HEAD_BRANCH" | grep -E '^[A-Za-z0-9._/-]+$')
+            tip=$(gh api "repos/$REPO/branches/$head" --jq .commit.sha)
+          fi
+          if [ "$tip" = "$SHA" ]; then
+            echo "newest=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "newest=false" >> "$GITHUB_OUTPUT"
+            echo "not analysing $SHA: $tip is newer"
+          fi
+
   sonar:
     name: SonarCloud
+    needs: newest
+    # The analysis token lives in this environment, never at the repository, where a job in a pull
+    # request's own copy of a workflow could name it. The environment deploys from main, release and
+    # hotfix branches only.
+    environment: ci-protected
     runs-on: macos-15
     # No coverage is produced by a run whose suite failed. Same-repository only:
     # a fork's pull request has no entry in `pull_requests`, so there would be
@@ -111,18 +163,23 @@ jobs:
     if: >-
       github.event.workflow_run.conclusion == 'success'
       && github.event.workflow_run.head_repository.full_name == github.repository
-    # The same race, for the same reason. Two analyses of one pull request reach
-    # the server in whichever order they finish, so the later revision's numbers
-    # can be overwritten by the earlier one's. A push run names no pull request
-    # and is keyed by its branch instead.
+      && needs.newest.outputs.newest == 'true'
+    # One analysis at a time per pull request, or per branch for a push run, which
+    # names no pull request. Two analyses reach the server in whichever order they
+    # finish, and a push run is never cancelled by a newer one, so an older
+    # revision's run can complete after a newer one's. Nothing here is cancelled:
+    # a stale run would cancel the newer analysis. The job above keeps a stale run
+    # out of the group, and the same check runs again before the scan, for a run
+    # overtaken while it waited.
     concurrency:
       group: >-
         sonar-${{ github.event.workflow_run.pull_requests[0].number
           || github.event.workflow_run.head_branch }}
-      cancel-in-progress: true
+      cancel-in-progress: false
     permissions:
       contents: read
       actions: read
+      pull-requests: read
 
     steps:
       # The revision the triggering run tested, not the default branch this
@@ -132,22 +189,49 @@ jobs:
       # executes anything from the tree, and the coverage the scanner reads was
       # produced by the run that triggered this one.
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
           fetch-depth: 0
 
+      # Main's settings, read from the commit this workflow runs from and written outside the workspace, so the
+      # revision being analysed configures nothing the scanner does. Read before the artifact arrives and with
+      # replace refs off. A change to what is measured takes effect when it merges.
+      - name: Take the analysis settings from main
+        run: git --no-replace-objects show "$GITHUB_SHA:sonar-project.properties" > "$RUNNER_TEMP/sonar-project.properties"
+
+      # The pull request's own CI built this, so it unpacks outside the workspace, where nothing in it can reach
+      # `.git` or the settings.
       - name: Download coverage
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: coverage
+          path: ${{ runner.temp }}/artifacts
           run-id: ${{ github.event.workflow_run.id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      # The one file the settings name, by its exact path. `cp` follows a link on the destination path, so the
+      # checkout may carry none either.
+      - name: Take the coverage report in
+        env:
+          STAGED: ${{ runner.temp }}/artifacts
+        run: |
+          if [ -n "$(find "$STAGED" -type l -print -quit)" ]; then
+            echo "::error::the artifact carries a symbolic link"
+            exit 1
+          fi
+          if [ -n "$(find "$GITHUB_WORKSPACE" -path "$GITHUB_WORKSPACE/.git" -prune -o -type l -print -quit)" ]; then
+            echo "::error::the checkout carries a symbolic link"
+            exit 1
+          fi
+          cp "$STAGED/coverage.xml" "$GITHUB_WORKSPACE/coverage.xml"
 
       # From the event, never from the artifact. `ci.yml` runs from the branch, so
       # a number it uploaded would be one the branch chose, and the scanner would
       # decorate whichever pull request that named while analysing this revision.
-      # A `push` run names none, and that is what selects a branch analysis.
+      # A `push` run names none, and that is what selects a branch analysis. The branch is named, since
+      # without it the scanner takes this run's ref, which is the default branch, and a push to a
+      # release branch would be analysed as main.
       #
       # Refs are checked rather than trusted: they reach the scanner as command
       # arguments, and a ref carrying anything but the characters git needs is
@@ -158,26 +242,31 @@ jobs:
           PR: ${{ github.event.workflow_run.pull_requests[0].number }}
           PR_BRANCH: ${{ github.event.workflow_run.pull_requests[0].head.ref }}
           PR_BASE: ${{ github.event.workflow_run.pull_requests[0].base.ref }}
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          SETTINGS: ${{ runner.temp }}/sonar-project.properties
         run: |
           set -euo pipefail
           # Where the analysis goes is decided here, not by the branch. The
-          # scanner reads `sonar-project.properties` out of the revision it is
-          # analysing, and that file names the server and the project: a branch
-          # could point `sonar.host.url` at one of its own and be handed
-          # SONAR_TOKEN, or change the identity and publish into another project.
-          # A property given on the command line wins over the file, and this file
-          # is the one a pull request cannot edit.
+          # scanner reads main's settings, not the analysed revision's: a branch's
+          # copy could point `sonar.host.url` at a server of its own and be handed
+          # SONAR_TOKEN, publish into another project, or set
+          # `sonar.nodejs.executable` and run a binary of its own beside the token.
           #
-          # These three duplicate `sonar-project.properties` on purpose. What the
-          # branch may still choose is what gets measured, which is the rest of
-          # that file.
-          trusted="-Dsonar.host.url=https://sonarcloud.io"
+          # The three that say where the analysis goes are also given here, since
+          # a property on the command line wins over any file.
+          trusted="-Dproject.settings=$SETTINGS"
+          trusted="$trusted -Dsonar.host.url=https://sonarcloud.io"
           trusted="$trusted -Dsonar.organization=payabli"
           trusted="$trusted -Dsonar.projectKey=payabli_sdk-ios"
 
           if [ -z "$PR" ]; then
-            echo "args=$trusted" >> "$GITHUB_OUTPUT"
-            echo "analysing a branch, not a pull request"
+            head=$(printf '%s' "$HEAD_BRANCH" | grep -E '^[A-Za-z0-9._/-]+$') || head=""
+            if [ -z "$head" ]; then
+              echo "the triggering run named a branch this cannot use" >&2
+              exit 1
+            fi
+            echo "args=$trusted -Dsonar.branch.name=$head" >> "$GITHUB_OUTPUT"
+            echo "analysing $head, not a pull request"
             exit 0
           fi
           number=$(printf '%s' "$PR" | grep -E '^[0-9]+$') || number=""
@@ -189,9 +278,34 @@ jobs:
           fi
           echo "args=$trusted -Dsonar.pullrequest.key=$number -Dsonar.pullrequest.branch=$branch -Dsonar.pullrequest.base=$base" >> "$GITHUB_OUTPUT"
 
-      # Pinned to a commit, not a tag. `v5` is mutable, and this step is handed
-      # SONAR_TOKEN, so a replaced action would hold a repository secret.
+      # Only the newest revision of the pull request or branch is analysed. An
+      # older one's numbers would replace the newer analysis on the server.
+      - name: Check the revision is the newest
+        id: newest
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.event.workflow_run.head_sha }}
+          PR: ${{ github.event.workflow_run.pull_requests[0].number }}
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+        run: |
+          set -euo pipefail
+          if [ -n "$PR" ]; then
+            number=$(printf '%s' "$PR" | grep -E '^[0-9]+$')
+            tip=$(gh api "repos/$REPO/pulls/$number" --jq .head.sha)
+          else
+            head=$(printf '%s' "$HEAD_BRANCH" | grep -E '^[A-Za-z0-9._/-]+$')
+            tip=$(gh api "repos/$REPO/branches/$head" --jq .commit.sha)
+          fi
+          if [ "$tip" = "$SHA" ]; then
+            echo "newest=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "newest=false" >> "$GITHUB_OUTPUT"
+            echo "not analysing $SHA: $tip is newer"
+          fi
+
       - name: Analyze
+        if: steps.newest.outputs.newest == 'true'
         uses: SonarSource/sonarqube-scan-action@2f77a1ec69fb1d595b06f35ab27e97605bdef703 # v5.3.2
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}

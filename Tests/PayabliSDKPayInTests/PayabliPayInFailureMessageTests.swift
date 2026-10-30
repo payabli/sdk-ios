@@ -4,6 +4,11 @@ import PayabliSDKCore
 import XCTest
 
 final class PayabliPayInFailureMessageTests: XCTestCase {
+    override func setUp() {
+        super.setUp()
+        PayInKeyStore.process.forgetHeld()
+    }
+
     func testEachCategoryDrawsItsMessageForAPaymentOrAnAuthorization() {
         for operation in [PayabliPayInOperation.capture, .authorize] {
             for category in PayabliErrorCategory.allCases {

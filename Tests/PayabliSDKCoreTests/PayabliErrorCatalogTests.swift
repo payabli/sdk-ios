@@ -3,28 +3,50 @@ import XCTest
 
 /// The published catalog: every type's wire name, number, category and message, exactly as both SDKs declare them.
 final class PayabliErrorCatalogTests: XCTestCase {
-    private typealias Row = (PayabliErrorType, String, Int, PayabliErrorCategory, String)
+    private typealias Row = (PayabliErrorType, PayabliErrorTypeCode, String, Int, PayabliErrorCategory, String)
 
     private let table: [Row] = [
-        (.missingToken, "MISSING_TOKEN", 1001, .credential, "No access token is available."),
-        (.tokenExpired, "TOKEN_EXPIRED", 1002, .credential, "The access token expired or was rejected."),
-        (.tokenMalformed, "TOKEN_MALFORMED", 1003, .credential, "The access token could not be read."),
-        (.tokenProviderFailed, "TOKEN_PROVIDER_FAILED", 1004, .credential, "The token provider did not return a usable token."),
-        (.invalidSignature, "INVALID_SIGNATURE", 1005, .credential, "The request signature was rejected."),
-        (.permissionDenied, "PERMISSION_DENIED", 1006, .configuration, "The credentials are not permitted to make this request."),
-        (.sessionBurned, "SESSION_BURNED", 1007, .credential, "The session can no longer be used."),
-        (.paymentDeclined, "PAYMENT_DECLINED", 1008, .declined, "The payment was declined."),
-        (.serverError, "SERVER_ERROR", 1009, .outcomeUnknown, "The service could not process the request."),
-        (.rateLimited, "RATE_LIMITED", 1010, .retryLater, "Too many requests. Try again later."),
-        (.conflict, "CONFLICT", 1011, .outcomeUnknown, "The request conflicts with the state the service holds."),
-        (.invalidConfiguration, "INVALID_CONFIGURATION", 1012, .configuration, "The SDK is not configured correctly."),
-        (.networkError, "NETWORK_ERROR", 1013, .outcomeUnknown, "The service could not be reached."),
-        (.decodingError, "DECODING_ERROR", 1014, .outcomeUnknown, "The response could not be read."),
-        (.userCancelled, "USER_CANCELLED", 1015, .outcomeUnknown, "The person cancelled."),
-        (.validation, "VALIDATION_ERROR", 1016, .invalidRequest, "The request was refused as invalid."),
-        (.unknown, "UNKNOWN", 1017, .outcomeUnknown, "An unexpected error occurred."),
-        (.sdkInternalError, "SDK_INTERNAL_ERROR", 1018, .internal, "The SDK failed before the request was sent."),
+        (.missingToken, .missingToken, "MISSING_TOKEN", 1001, .credential, "No access token is available."),
+        (.tokenExpired, .tokenExpired, "TOKEN_EXPIRED", 1002, .credential, "The access token expired or was rejected."),
+        (.tokenMalformed, .tokenMalformed, "TOKEN_MALFORMED", 1003, .credential, "The access token could not be read."),
         (
+            .tokenProviderFailed,
+            .tokenProviderFailed,
+            "TOKEN_PROVIDER_FAILED",
+            1004,
+            .credential,
+            "The token provider did not return a usable token."
+        ),
+        (.invalidSignature, .invalidSignature, "INVALID_SIGNATURE", 1005, .credential, "The request signature was rejected."),
+        (
+            .permissionDenied,
+            .permissionDenied,
+            "PERMISSION_DENIED",
+            1006,
+            .configuration,
+            "The credentials are not permitted to make this request."
+        ),
+        (.sessionBurned, .sessionBurned, "SESSION_BURNED", 1007, .credential, "The session can no longer be used."),
+        (.paymentDeclined, .paymentDeclined, "PAYMENT_DECLINED", 1008, .declined, "The payment was declined."),
+        (.serverError, .serverError, "SERVER_ERROR", 1009, .outcomeUnknown, "The service could not process the request."),
+        (.rateLimited, .rateLimited, "RATE_LIMITED", 1010, .retryLater, "Too many requests. Try again later."),
+        (.conflict, .conflict, "CONFLICT", 1011, .outcomeUnknown, "The request conflicts with the state the service holds."),
+        (
+            .invalidConfiguration,
+            .invalidConfiguration,
+            "INVALID_CONFIGURATION",
+            1012,
+            .configuration,
+            "The SDK is not configured correctly."
+        ),
+        (.networkError, .networkError, "NETWORK_ERROR", 1013, .outcomeUnknown, "The service could not be reached."),
+        (.decodingError, .decodingError, "DECODING_ERROR", 1014, .outcomeUnknown, "The response could not be read."),
+        (.userCancelled, .userCancelled, "USER_CANCELLED", 1015, .outcomeUnknown, "The person cancelled."),
+        (.validation, .validation, "VALIDATION_ERROR", 1016, .invalidRequest, "The request was refused as invalid."),
+        (.unknown, .unknown, "UNKNOWN", 1017, .outcomeUnknown, "An unexpected error occurred."),
+        (.sdkInternalError, .sdkInternalError, "SDK_INTERNAL_ERROR", 1018, .internal, "The SDK failed before the request was sent."),
+        (
+            .sessionNotInitialized,
             .sessionNotInitialized,
             "SESSION_NOT_INITIALIZED",
             1019,
@@ -32,6 +54,7 @@ final class PayabliErrorCatalogTests: XCTestCase {
             "The session has not been initialized."
         ),
         (
+            .transactionNotFound,
             .transactionNotFound,
             "TRANSACTION_NOT_FOUND",
             1020,
@@ -41,6 +64,7 @@ final class PayabliErrorCatalogTests: XCTestCase {
         ),
         (
             .retryRefused,
+            .retryRefused,
             "RETRY_REFUSED",
             1021,
             .outcomeUnknown,
@@ -48,6 +72,7 @@ final class PayabliErrorCatalogTests: XCTestCase {
                 + "Check that payment before trying again."
         ),
         (
+            .retryNotSamePayment,
             .retryNotSamePayment,
             "RETRY_NOT_SAME_PAYMENT",
             1022,
@@ -57,50 +82,105 @@ final class PayabliErrorCatalogTests: XCTestCase {
         ),
         (
             .paymentReferenceOpen,
+            .paymentReferenceOpen,
             "PAYMENT_REFERENCE_OPEN",
             1023,
             .invalidRequest,
-            "A payment with this reference is still unresolved, so this one was not sent. "
-                + "Check that payment first, or retry it."
+            "Another call for this payment is still under way or its outcome is unknown, so this one was not sent. "
+                + "Check that payment's outcome first."
         ),
         (
+            .deviceKeyUnavailable,
             .deviceKeyUnavailable,
             "DEVICE_KEY_UNAVAILABLE",
             3001,
             .retryLater,
             "This device's secure storage is unavailable."
         ),
-        (.deviceSetupUnsupported, "DEVICE_SETUP_UNSUPPORTED", 3002, .device, "This device cannot be set up for card-present payments."),
         (
+            .deviceSetupUnsupported,
+            .deviceSetupUnsupported,
+            "DEVICE_SETUP_UNSUPPORTED",
+            3002,
+            .device,
+            "This device cannot be set up for card-present payments."
+        ),
+        (
+            .deviceServicesOutdated,
             .deviceServicesOutdated,
             "DEVICE_SERVICES_OUTDATED",
             3003,
             .configuration,
             "Google Play on this device must be installed, updated or signed in."
         ),
-        (.devicePendingActivation, "DEVICE_PENDING_ACTIVATION", 3004, .configuration, "This device is waiting for its activation code."),
-        (.deviceSetupRequired, "DEVICE_SETUP_REQUIRED", 3005, .credential, "This device must be set up again."),
-        (.deviceSetupRefused, "DEVICE_SETUP_REFUSED", 3006, .device, "This device was refused during setup."),
-        (.deviceSetupUnavailable, "DEVICE_SETUP_UNAVAILABLE", 3007, .retryLater, "Device setup is temporarily unavailable."),
         (
+            .devicePendingActivation,
+            .devicePendingActivation,
+            "DEVICE_PENDING_ACTIVATION",
+            3004,
+            .configuration,
+            "This device is waiting for its activation code."
+        ),
+        (.deviceSetupRequired, .deviceSetupRequired, "DEVICE_SETUP_REQUIRED", 3005, .credential, "This device must be set up again."),
+        (.deviceSetupRefused, .deviceSetupRefused, "DEVICE_SETUP_REFUSED", 3006, .device, "This device was refused during setup."),
+        (
+            .deviceSetupUnavailable,
+            .deviceSetupUnavailable,
+            "DEVICE_SETUP_UNAVAILABLE",
+            3007,
+            .retryLater,
+            "Device setup is temporarily unavailable."
+        ),
+        (
+            .deviceSetupNotConfigured,
             .deviceSetupNotConfigured,
             "DEVICE_SETUP_NOT_CONFIGURED",
             3008,
             .configuration,
             "Device setup is not configured for this app or environment."
         ),
-        (.entryPointRefused, "ENTRY_POINT_REFUSED", 3009, .configuration, "The entry point is not available for this request."),
-        (.readerCredentialsUnusable, "READER_CREDENTIALS_UNUSABLE", 3010, .configuration, "The card reader's configuration is incomplete."),
         (
+            .entryPointRefused,
+            .entryPointRefused,
+            "ENTRY_POINT_REFUSED",
+            3009,
+            .configuration,
+            "The entry point is not available for this request."
+        ),
+        (
+            .readerCredentialsUnusable,
+            .readerCredentialsUnusable,
+            "READER_CREDENTIALS_UNUSABLE",
+            3010,
+            .configuration,
+            "The card reader's configuration is incomplete."
+        ),
+        (
+            .deviceOSUnsupported,
             .deviceOSUnsupported,
             "DEVICE_OS_UNSUPPORTED",
             3011,
             .device,
             "This device's operating system version cannot take contactless payments."
         ),
-        (.deviceHardwareUnsupported, "DEVICE_HARDWARE_UNSUPPORTED", 3012, .device, "This device cannot take contactless payments."),
-        (.termsNotAccepted, "TERMS_NOT_ACCEPTED", 3013, .configuration, "The merchant has not accepted the Tap to Pay terms."),
         (
+            .deviceHardwareUnsupported,
+            .deviceHardwareUnsupported,
+            "DEVICE_HARDWARE_UNSUPPORTED",
+            3012,
+            .device,
+            "This device cannot take contactless payments."
+        ),
+        (
+            .termsNotAccepted,
+            .termsNotAccepted,
+            "TERMS_NOT_ACCEPTED",
+            3013,
+            .configuration,
+            "The merchant has not accepted the Tap to Pay terms."
+        ),
+        (
+            .cardPresentNotEnabled,
             .cardPresentNotEnabled,
             "CARD_PRESENT_NOT_ENABLED",
             3014,
@@ -109,22 +189,52 @@ final class PayabliErrorCatalogTests: XCTestCase {
         ),
         (
             .readerDeviceRefused,
+            .readerDeviceRefused,
             "READER_DEVICE_REFUSED",
             3015,
             .device,
             "This device is not set up for Tap to Pay with this app. Contact Payabli support with the device ID."
         ),
-        (.readerUnavailable, "READER_UNAVAILABLE", 3016, .retryLater, "The card reader could not be started."),
-        (.readerSessionExpired, "READER_SESSION_EXPIRED", 3017, .retryLater, "The card reader session expired."),
-        (.tapNotCompleted, "TAP_NOT_COMPLETED", 3018, .outcomeUnknown, "The card read did not complete."),
-        (.paymentNotOpened, "PAYMENT_NOT_OPENED", 3019, .declined, "The service did not open the payment."),
-        (.cardDeclined, "CARD_DECLINED", 3020, .declined, "The card was declined."),
-        (.paymentOutcomeUnknown, "PAYMENT_OUTCOME_UNKNOWN", 3021, .outcomeUnknown, "The payment's outcome could not be confirmed."),
-        (.paymentNotClosed, "PAYMENT_NOT_CLOSED", 3022, .outcomeUnknown, "The payment could not be closed."),
-        (.activationCodeMalformed, "ACTIVATION_CODE_MALFORMED", 3023, .invalidRequest, "The activation code must be six digits."),
-        (.activationCodeIncorrect, "ACTIVATION_CODE_INCORRECT", 3024, .invalidRequest, "The activation code is incorrect."),
-        (.activationCodeExpired, "ACTIVATION_CODE_EXPIRED", 3025, .configuration, "The activation code has expired."),
+        (.readerUnavailable, .readerUnavailable, "READER_UNAVAILABLE", 3016, .retryLater, "The card reader could not be started."),
+        (.readerSessionExpired, .readerSessionExpired, "READER_SESSION_EXPIRED", 3017, .retryLater, "The card reader session expired."),
+        (.tapNotCompleted, .tapNotCompleted, "TAP_NOT_COMPLETED", 3018, .outcomeUnknown, "The card read did not complete."),
+        (.paymentNotOpened, .paymentNotOpened, "PAYMENT_NOT_OPENED", 3019, .declined, "The service did not open the payment."),
+        (.cardDeclined, .cardDeclined, "CARD_DECLINED", 3020, .declined, "The card was declined."),
         (
+            .paymentOutcomeUnknown,
+            .paymentOutcomeUnknown,
+            "PAYMENT_OUTCOME_UNKNOWN",
+            3021,
+            .outcomeUnknown,
+            "The payment's outcome could not be confirmed."
+        ),
+        (.paymentNotClosed, .paymentNotClosed, "PAYMENT_NOT_CLOSED", 3022, .outcomeUnknown, "The payment could not be closed."),
+        (
+            .activationCodeMalformed,
+            .activationCodeMalformed,
+            "ACTIVATION_CODE_MALFORMED",
+            3023,
+            .invalidRequest,
+            "The activation code must be six digits."
+        ),
+        (
+            .activationCodeIncorrect,
+            .activationCodeIncorrect,
+            "ACTIVATION_CODE_INCORRECT",
+            3024,
+            .invalidRequest,
+            "The activation code is incorrect."
+        ),
+        (
+            .activationCodeExpired,
+            .activationCodeExpired,
+            "ACTIVATION_CODE_EXPIRED",
+            3025,
+            .configuration,
+            "The activation code has expired."
+        ),
+        (
+            .activationAttemptsExhausted,
             .activationAttemptsExhausted,
             "ACTIVATION_ATTEMPTS_EXHAUSTED",
             3026,
@@ -133,24 +243,47 @@ final class PayabliErrorCatalogTests: XCTestCase {
         ),
         (
             .activationCodeNotIssued,
+            .activationCodeNotIssued,
             "ACTIVATION_CODE_NOT_ISSUED",
             3027,
             .configuration,
             "No activation code has been issued for this device."
         ),
-        (.deviceNotPending, "DEVICE_NOT_PENDING", 3028, .invalidRequest, "This device is not waiting for activation."),
-        (.terminalNotReady, "TERMINAL_NOT_READY", 3029, .invalidRequest, "The terminal is not ready for this call."),
-        (.tooManyOpenCharges, "TOO_MANY_OPEN_CHARGES", 3030, .invalidRequest, "Too many charges are waiting to be resolved."),
-        (.paymentNotHeld, "PAYMENT_NOT_HELD", 3031, .invalidRequest, "No captured payment is held under that identifier."),
-        (.deviceIdentityUnavailable, "DEVICE_IDENTITY_UNAVAILABLE", 3033, .device, "This device cannot be identified."),
+        (.deviceNotPending, .deviceNotPending, "DEVICE_NOT_PENDING", 3028, .invalidRequest, "This device is not waiting for activation."),
+        (.terminalNotReady, .terminalNotReady, "TERMINAL_NOT_READY", 3029, .invalidRequest, "The terminal is not ready for this call."),
         (
-            .chargeNotFinished, "CHARGE_NOT_FINISHED", 3034, .outcomeUnknown,
+            .tooManyOpenCharges,
+            .tooManyOpenCharges,
+            "TOO_MANY_OPEN_CHARGES",
+            3030,
+            .invalidRequest,
+            "Too many charges are waiting to be resolved."
+        ),
+        (.paymentNotHeld, .paymentNotHeld, "PAYMENT_NOT_HELD", 3031, .invalidRequest, "No captured payment is held under that identifier."),
+        (
+            .deviceIdentityUnavailable,
+            .deviceIdentityUnavailable,
+            "DEVICE_IDENTITY_UNAVAILABLE",
+            3033,
+            .device,
+            "This device cannot be identified."
+        ),
+        (
+            .chargeNotFinished, .chargeNotFinished, "CHARGE_NOT_FINISHED", 3034, .outcomeUnknown,
             "An earlier charge on this device hasn't finished. Check that payment before charging again, or wait four minutes."
+        ),
+        (
+            .paymentNotTaken, .paymentNotTaken, "PAYMENT_NOT_TAKEN", 3035, .retryLater,
+            "The payment was not taken, and the card was not charged. Try again."
+        ),
+        (
+            .contactlessDisabled, .contactlessDisabled, "CONTACTLESS_DISABLED", 3036, .configuration,
+            "Contactless (NFC) is turned off on this device. Turn it on in Settings."
         )
     ]
 
     func testEveryTypeCarriesItsPublishedNameNumberCategoryAndMessage() {
-        for (type, name, number, category, message) in table {
+        for (type, _, name, number, category, message) in table {
             XCTAssertEqual(type.rawValue, name, "\(type)")
             XCTAssertEqual(type.number, number, "\(type)")
             XCTAssertEqual(type.category, category, "\(type)")
@@ -160,6 +293,19 @@ final class PayabliErrorCatalogTests: XCTestCase {
 
     func testTheTableCoversEveryType() {
         XCTAssertEqual(Set(table.map(\.0)), Set(PayabliErrorType.allCases))
+    }
+
+    /// Each type's Objective-C code is the one of the same name, and carries the published number.
+    func testEveryTypesObjectiveCCodeIsItsNamedCodeCarryingItsPublishedNumber() {
+        for (type, code, _, number, _, _) in table {
+            XCTAssertEqual(type.code, code, "\(type)")
+            XCTAssertEqual(code.rawValue, number, "\(type)")
+        }
+    }
+
+    func testEveryObjectiveCCodeNamesExactlyOneType() {
+        XCTAssertEqual(PayabliErrorTypeCode.allCases.count, PayabliErrorType.allCases.count)
+        XCTAssertEqual(Set(PayabliErrorType.allCases.map(\.code)), Set(PayabliErrorTypeCode.allCases))
     }
 
     /// 3032 was retired before publication, and a retired number is never reused.
@@ -186,6 +332,20 @@ final class PayabliErrorCatalogTests: XCTestCase {
         XCTAssertEqual(Set(PayabliErrorCategory.allCases), Set(names.keys))
         for (category, name) in names {
             XCTAssertEqual(category.rawValue, name, "\(category)")
+        }
+    }
+
+    /// Numbers within an area are contiguous except the holes a retirement named:
+    /// a number that was allocated and then retired leaves a hole this test
+    /// knows, and any other gap is an allocation nobody recorded.
+    func testNumbersAreContiguousWithinEachAreaExceptRetiredHoles() {
+        let retired: Set = [3032]
+        let byArea = Dictionary(grouping: PayabliErrorType.allCases, by: { $0.number / 1000 })
+        for (area, cases) in byArea {
+            let numbers = cases.map(\.number).sorted()
+            let expected = Array((area * 1000 + 1) ... numbers.last!)
+                .filter { !retired.contains($0) }
+            XCTAssertEqual(numbers, expected, "area \(area)")
         }
     }
 }

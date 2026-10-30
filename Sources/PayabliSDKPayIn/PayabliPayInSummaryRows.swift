@@ -10,7 +10,7 @@ public enum PayabliPayInSummaryRows {
     }
 
     public static func totalLabelText(labels: PayabliPayInLabels) -> String {
-        labels.total?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty ?? "Total"
+        PayabliPayInLabels.nonBlank(labels.total) ?? "Total"
     }
 
     /// The figure a money row shows, at the two places it is sent, or nil when the form draws no row for it.

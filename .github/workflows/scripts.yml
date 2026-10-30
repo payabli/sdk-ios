@@ -38,23 +38,31 @@ on:
       # The named entries stay because the harness asserts on them literally, so the two would otherwise
       # disagree about what is guarded.
       - '.github/workflows/**'
+      - '.github/dependabot.yml'
       - '.github/workflows/nightly.yml'
       - '.github/workflows/nightly-report.yml'
       - '.github/workflows/ci.yml'
       - '.github/workflows/release.yml'
+      - '.github/workflows/public-interface.yml'
+      - '.github/workflows/source-branch.yml'
+      - '.github/workflows/pr-reports.yml'
       - '.github/hardware-only-tests.txt'
       # The release gate reads the version this file declares.
       - 'Sources/PayabliSDKCore/PayabliSDKCore.swift'
   push:
-    branches: [main]
+    branches: [main, 'release/**', 'hotfix/**']
     paths:
       - '.github/scripts/**'
       - '.github/workflows/**'
       - '.github/workflows/scripts.yml'
+      - '.github/dependabot.yml'
       - '.github/workflows/nightly.yml'
       - '.github/workflows/nightly-report.yml'
       - '.github/workflows/ci.yml'
       - '.github/workflows/release.yml'
+      - '.github/workflows/public-interface.yml'
+      - '.github/workflows/source-branch.yml'
+      - '.github/workflows/pr-reports.yml'
       - '.github/hardware-only-tests.txt'
       - 'Sources/PayabliSDKCore/PayabliSDKCore.swift'
 
@@ -64,6 +72,11 @@ concurrency:
 
 permissions:
   contents: read
+
+# Every step under pipefail, so a failing command piped into another fails its step.
+defaults:
+  run:
+    shell: bash
 
 jobs:
   harness:
@@ -75,7 +88,7 @@ jobs:
     timeout-minutes: 10
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           persist-credentials: false
 

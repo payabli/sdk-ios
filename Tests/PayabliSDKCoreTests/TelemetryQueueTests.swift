@@ -6,10 +6,32 @@ final class TelemetryQueueTests: XCTestCase {
         var queue = TelemetryQueue(capacity: 2)
         _ = queue.offer(event("a"))
         _ = queue.offer(event("b"))
-        let held = queue.offer(event("c"))
+        _ = queue.offer(event("c"))
 
-        XCTAssertEqual(held, 2)
         XCTAssertEqual(queue.drain(10).map(\.event), ["b", "c"])
+    }
+
+    func testOffersAreCountedSinceTheLastDrainThatTookAnything() {
+        var queue = TelemetryQueue(capacity: 10)
+        XCTAssertEqual(queue.offer(event("a")), 1)
+        XCTAssertEqual(queue.offer(event("b")), 2)
+        _ = queue.drain(1)
+        XCTAssertEqual(queue.offer(event("c")), 1)
+        _ = queue.drain(10)
+        XCTAssertEqual(queue.offer(event("d")), 1)
+        _ = queue.drain(0)
+        XCTAssertEqual(queue.offer(event("e")), 2, "a drain that took nothing is not a send attempt")
+    }
+
+    func testABatchPutBackIsNotCountedAsOffered() {
+        var queue = TelemetryQueue(capacity: 10)
+        _ = queue.offer(event("a"))
+        _ = queue.offer(event("b"))
+        let batch = queue.drain(10)
+        queue.restoreFront(batch, droppedSinceLastSend: 0)
+
+        XCTAssertEqual(queue.offer(event("c")), 1)
+        XCTAssertEqual(queue.drain(10).map(\.event), ["a", "b", "c"])
     }
 
     func testEvictionsAreCountedOnceAndThenReset() {
