@@ -330,7 +330,7 @@ successful run of an opted-out tier looks like, so read the skip count rather th
   repository default and a failing command piped into another fails its step. Another repository's action is
   named by its full commit SHA with the version in a trailing comment (`# v4.4.0`); Dependabot keeps both current.
 - **`source-branch.yml`** fails a pull request into `main` from a fork, or from any branch but `release/`,
-  `hotfix/` or `dependabot/`. It runs `main`'s copy of itself and checks nothing out.
+  `hotfix/`, `dependabot/` or `ci/`. It runs `main`'s copy of itself and checks nothing out.
 - **`release.yml`** is dispatched from `main` and names a commit on `release/<version>` or
   `hotfix/<version>` that passed CI there. It refuses while an earlier release's tag is not in `main` or not
   in that commit.

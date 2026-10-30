@@ -1323,12 +1323,22 @@ MUTATIONS = [
     ),
     Mutation(
         "a Dependabot pull request into main is refused",
-        SOURCE_YML, "release/?*|hotfix/?*|dependabot/?*) ;;", "release/?*|hotfix/?*) ;;", "W19e", "workflows",
+        SOURCE_YML, "release/?*|hotfix/?*|dependabot/?*|ci/?*) ;;", "release/?*|hotfix/?*|ci/?*) ;;", "W19e", "workflows",
     ),
     Mutation(
         "a bare release/ prefix passes the source-branch check",
-        SOURCE_YML, "release/?*|hotfix/?*|dependabot/?*) ;;", "release/*|hotfix/?*|dependabot/?*) ;;",
+        SOURCE_YML, "release/?*|hotfix/?*|dependabot/?*|ci/?*) ;;", "release/*|hotfix/?*|dependabot/?*|ci/?*) ;;",
         "W19h", "workflows",
+    ),
+    Mutation(
+        "a ci pull request into main is refused",
+        SOURCE_YML, "release/?*|hotfix/?*|dependabot/?*|ci/?*) ;;", "release/?*|hotfix/?*|dependabot/?*) ;;",
+        "W19l", "workflows",
+    ),
+    Mutation(
+        "a bare ci/ prefix passes the source-branch check",
+        SOURCE_YML, "release/?*|hotfix/?*|dependabot/?*|ci/?*) ;;", "release/?*|hotfix/?*|dependabot/?*|ci/*) ;;",
+        "W19m", "workflows",
     ),
     Mutation(
         "the head branch is interpolated into the script",

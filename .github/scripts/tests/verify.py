@@ -2097,7 +2097,7 @@ def test_branch_triggers() -> None:
           and not any("uses" in s for job in (source.get("jobs") or {}).values() for s in job.get("steps") or []),
           (source_on, source.get("permissions")))
     step = workflow_step(SOURCE_WORKFLOW, "source",
-                         "Check the pull request comes from a release, hotfix or Dependabot branch") \
+                         "Check the pull request comes from a release, hotfix, Dependabot or ci branch") \
         if SOURCE_WORKFLOW.exists() else None
     steps = [s for job in (source.get("jobs") or {}).values() for s in job.get("steps") or []]
     check("W19b the head branch and its repository reach the step through the environment, never the script",
@@ -2112,6 +2112,8 @@ def test_branch_triggers() -> None:
             ("W19c a release branch is accepted", "release/0.2.0", True),
             ("W19d a hotfix branch is accepted", "hotfix/0.2.1", True),
             ("W19e a Dependabot branch is accepted", "dependabot/github_actions/actions/checkout-5", True),
+            ("W19l a ci branch is accepted", "ci/release-workflow", True),
+            ("W19m an empty ci prefix is refused", "ci/", False),
             ("W19f a feature branch is refused", "feat/some-change", False),
             ("W19g a branch named release with no version is refused", "release", False),
             ("W19h an empty release prefix is refused", "release/", False),
