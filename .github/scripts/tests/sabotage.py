@@ -1341,6 +1341,11 @@ MUTATIONS = [
         "W19m", "workflows",
     ),
     Mutation(
+        "a ci/ prefix is matched anywhere in the branch name",
+        SOURCE_YML, "release/?*|hotfix/?*|dependabot/?*|ci/?*) ;;", "release/?*|hotfix/?*|dependabot/?*|*ci/?*) ;;",
+        "W19n", "workflows",
+    ),
+    Mutation(
         "the head branch is interpolated into the script",
         SOURCE_YML, 'case "$HEAD_REF" in', 'case "${{ github.head_ref }}" in', "W19b", "workflows",
     ),

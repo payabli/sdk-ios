@@ -2114,6 +2114,7 @@ def test_branch_triggers() -> None:
             ("W19e a Dependabot branch is accepted", "dependabot/github_actions/actions/checkout-5", True),
             ("W19l a ci branch is accepted", "ci/release-workflow", True),
             ("W19m an empty ci prefix is refused", "ci/", False),
+            ("W19n a ci prefix is matched at the start only", "feat/ci/some-change", False),
             ("W19f a feature branch is refused", "feat/some-change", False),
             ("W19g a branch named release with no version is refused", "release", False),
             ("W19h an empty release prefix is refused", "release/", False),
@@ -2323,8 +2324,7 @@ def test_branch_triggers() -> None:
               and locks == {"publish": {"group": "release", "cancel-in-progress": False}},
               (release.get("concurrency"), locks))
 
-        # The pinned actions are kept current by a weekly, grouped Dependabot pull request into main, the one source
-        # into main besides release and hotfix branches.
+        # The pinned actions are kept current by a weekly, grouped Dependabot pull request into main.
         dependabot = yaml.safe_load((REPO_ROOT / ".github" / "dependabot.yml").read_text()) \
             if (REPO_ROOT / ".github" / "dependabot.yml").exists() else {}
         updates = dependabot.get("updates") or []
