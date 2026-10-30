@@ -414,7 +414,8 @@ Give the module the same calls on both platforms, so your JavaScript or Dart has
 
 A `PaymentOutcome` maps [Handle the outcome](#handle-the-outcome) to three answers: `charged` (store
 `paymentTransId`, don't charge again), `notCharged` (the customer can try again) and `unknown` (look the payment
-up by `paymentTransId`, or by your `orderId`, before charging again). `tapToPay` answers a fourth, `unsupported`,
+up by `paymentTransId` before charging again; without one, find it by your `orderId` on card-not-present, or in
+the Payabli portal for Tap to Pay). `tapToPay` answers a fourth, `unsupported`,
 where Tap to Pay isn't available. A failure that isn't a payment outcome, such as a session that didn't start,
 rejects the call in React Native and throws a `PlatformException` in Flutter, with a `code`.
 
