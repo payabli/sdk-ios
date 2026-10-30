@@ -62,11 +62,8 @@ Or declare it in `Package.swift`, with the latest version from the
 [Releases](https://github.com/payabli/sdk-ios/releases) page:
 
 ```swift
-.package(url: "https://github.com/payabli/sdk-ios.git", .upToNextMinor(from: "0.1.1"))
+.package(url: "https://github.com/payabli/sdk-ios.git", .upToNextMinor(from: "<latest version>"))
 ```
-
-To build changes that aren't released yet, track the `main` branch instead, with Xcode's **Branch** rule
-or `branch: "main"`.
 
 Then link what you use:
 
@@ -557,8 +554,8 @@ A value that's missing, blank or isn't printable ASCII is left out. The header c
 
 - **Depend on the latest version** as [Installation](#installation) describes. Each version and its
   notes are on the [Releases](https://github.com/payabli/sdk-ios/releases) page.
-- **`main` holds changes that aren't released yet, and changes without notice.** A build that tracks
-  `main` takes whatever is there when the package resolves.
+- **`main` holds the latest release.** Work toward the next release isn't published for integration; depend on a
+  released version.
 - **When a stable version is released,** this section says so.
 
 ## Support
