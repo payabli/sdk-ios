@@ -486,8 +486,17 @@ abstract class PayabliHostApi {
 }
 ```
 
-Run `dart run pigeon --input pigeons/payabli_api.dart`, then implement `PayabliHostApi` in Swift and set it up on
-the engine's binary messenger at startup. Without Pigeon, a `MethodChannel` and an `EventChannel`
+Generate the code, naming where each file goes in your app:
+
+```sh
+dart run pigeon --input pigeons/payabli_api.dart \
+  --dart_out lib/payabli_api.g.dart \
+  --swift_out ios/Runner/PayabliApi.g.swift \
+  --kotlin_out android/app/src/main/kotlin/com/example/app/PayabliApi.g.kt \
+  --kotlin_package com.example.app
+```
+
+Then implement `PayabliHostApi` in Swift and set it up on the engine's binary messenger at startup. Without Pigeon, a `MethodChannel` and an `EventChannel`
 ([platform channels](https://docs.flutter.dev/platform-integration/platform-channels)) carry the same calls.
 
 Each call is one SDK call underneath:
