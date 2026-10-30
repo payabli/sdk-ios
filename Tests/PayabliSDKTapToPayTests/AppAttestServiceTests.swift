@@ -589,11 +589,8 @@ final class AppAttestServiceTests: XCTestCase {
 
     // MARK: - What a storage failure looks like to a caller
 
-    /// A store that could not be read reports this SDK's own error, not the
-    /// Keychain's. The domain and the code are what an Objective-C host reads,
-    /// so an error thrown as it arrived reaches that host as a bare failure
-    /// with nothing naming the cause. A Keychain that
-    /// does not answer is storage a retry can reach.
+    /// A store that could not be read reports this SDK's own error, whose domain and code an Objective-C
+    /// host reads. A Keychain that does not answer is storage a retry can reach.
     func testAStorageFailureIsReportedAsThisSDKsOwnError() async throws {
         let storage = InMemorySecureStorage()
         try AttestFixture.seedBinding(entry: "myEntry", deviceId: "dev", keyId: "key", in: storage)
