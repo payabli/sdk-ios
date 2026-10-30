@@ -385,8 +385,8 @@ The SDK is written in Swift, and the card-not-present form is a SwiftUI view.
 > **Guidance only:** This section suggests one way to take Payabli payments from a React Native or Flutter app.
 > It's guidance, not a supported implementation. Payabli doesn't state that any example here is a complete or
 > direct implementation, or that it fits your app as written. The examples are subject to limitations, including
-> the frameworks' own versions and requirements, and only the Dart is checked with `flutter analyze`. Your team
-> designs, builds, tests and maintains its integration, and is responsible for it.
+> the frameworks' own versions and requirements, and Payabli doesn't build or test them. Your team designs,
+> builds, tests and maintains its integration, and is responsible for it.
 
 There is no React Native or Flutter package. Your app adds a small native module that exposes a few calls to
 JavaScript or Dart, and runs this SDK underneath on iOS and the Payabli Android SDK on Android. The same applies to any
@@ -410,7 +410,7 @@ Give the module the same calls on both platforms, so your JavaScript or Dart has
 | `tapToPay({ amount, orderId })` | Takes a Tap to Pay payment | a `PaymentOutcome` |
 | `presentTerms()` | Shows Apple's Tap to Pay terms to the merchant | whether they accepted |
 | `activateDevice(code)` | Activates this phone with its 6-digit code | nothing, or an error with a `code` |
-| `sessionState` (a stream) | Tap to Pay readiness, one value per change | `idle`, `preparing`, `ready`, `charging`, `pendingActivation`, `pendingTerms` or `failed` |
+| `sessionState` (a stream) | Tap to Pay readiness, one value per change | `idle`, `attestingDevice`, `fetchingConfig`, `initializingReader`, `ready`, `sessionExpired`, `reinitializing`, `pendingActivation`, `pendingTerms`, `charging` or `failed` |
 
 A `PaymentOutcome` maps [Handle the outcome](#handle-the-outcome) to three answers: `charged` (store
 `paymentTransId`, don't charge again), `notCharged` (the customer can try again) and `unknown` (look the payment
@@ -447,8 +447,8 @@ export const Payabli = requireNativeModule<PayabliModule>('Payabli');
 The Swift half is an `AsyncFunction` per call, run on the main queue so the SDK's screens can be presented.
 Expo Go can't load your own native code, so run a development build (`npx expo run:ios`). React Native's
 [Turbo Native Modules](https://reactnative.dev/docs/turbo-native-modules-introduction) work too: declare the same
-calls as a spec, and call `PayabliSessionObjC`, `PayabliTTP` and `PayabliPayInObjC` from the module's
-Objective-C++ class.
+calls as a spec, and have the module's Objective-C++ class call a Swift file that makes the SDK calls. The
+card-not-present form is a SwiftUI view, which Objective-C can't present.
 
 **Flutter.** Describe the calls once with [Pigeon](https://pub.dev/packages/pigeon), which generates the Dart API
 and the Swift and Kotlin interfaces your native code implements:
